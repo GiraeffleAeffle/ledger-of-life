@@ -85,7 +85,7 @@ export function AccountSetup({ role, authorized, onChangeRole, onReady }: {
   }, []);
   const hasWallets = wallet.wallets.some((w) => w.chainType === 'solana') && wallet.wallets.some((w) => w.chainType === 'ethereum');
   const accountDone = wallet.authenticated && wallet.passkeyCount > 0;
-  const backupDone = accountDone && wallet.backupLoginLinked;
+  const backupDone = accountDone && (wallet.backupLoginLinked || !recoveryCheck);
   const status = recovery.identity?.recovery.status;
   const recoveryDone = recoveryCheck ? status === 'verified' : hasWallets;
 
@@ -113,7 +113,7 @@ export function AccountSetup({ role, authorized, onChangeRole, onReady }: {
   return (
     <section className="onboarding">
       <span className="eyebrow">SET UP YOUR ACCOUNT · {roleName.toUpperCase()}</span>
-      <h1>{recoveryCheck ? 'Four quick steps, once.' : 'Three quick steps, once.'}</h1>
+      <h1>{recoveryCheck ? 'Four quick steps, once.' : 'Two quick steps, once.'}</h1>
       <p className="lede">Your passkey signs you in. Your own wallet holds your money; nobody else can move it.</p>
       <ol className="setup-steps">
         <Step n={1} state={state(accountDone, true)} title="Create your account with a passkey">
@@ -131,11 +131,13 @@ export function AccountSetup({ role, authorized, onChangeRole, onReady }: {
             <button className="button primary" onClick={() => void wallet.addPasskey().catch(() => {})}>Add a passkey to this account</button>
           )}
         </Step>
-        <Step n={2} state={state(backupDone, accountDone)} title="Add a backup email">
-          <p>So you never lose access if this device is gone. You’ll get a one-time code.</p>
-          <button className="button primary large" disabled={wallet.busy} onClick={wallet.addBackupEmail}><Mail size={18} /> Add email</button>
-        </Step>
-        <Step n={3} state={state(hasWallets, backupDone)} title="Create your wallet">
+        {recoveryCheck && (
+          <Step n={2} state={state(backupDone, accountDone)} title="Add a backup email">
+            <p>So you never lose access if this device is gone. You’ll get a one-time code.</p>
+            <button className="button primary large" disabled={wallet.busy} onClick={wallet.addBackupEmail}><Mail size={18} /> Add email</button>
+          </Step>
+        )}
+        <Step n={recoveryCheck ? 3 : 2} state={state(hasWallets, backupDone)} title="Create your wallet">
           <p><Loader2 className="spin" size={14} /> Creating your personal wallet…</p>
         </Step>
         {recoveryCheck && <Step n={4} state={state(recoveryDone, backupDone && hasWallets)} title="Prove you can recover it">
@@ -181,6 +183,12 @@ export function AccountSetup({ role, authorized, onChangeRole, onReady }: {
           {recovery.error && <p className="note" role="alert">{recovery.error}</p>}
         </Step>}
       </ol>
+      {!recoveryCheck && (
+        <p className="small-copy">
+          <Mail size={13} /> In a real launch you’d also add a backup email and prove recovery from a second device, so
+          losing this phone never means losing your deposit. Skipped in this demo.
+        </p>
+      )}
       {wallet.error && <p className="note" role="alert">{wallet.error}</p>}
       <button className="text-button" onClick={onChangeRole}>Not a {role}? Choose another role</button>
     </section>

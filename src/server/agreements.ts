@@ -5,6 +5,7 @@ import { atomic } from '../domain/assets.ts';
 import { WorkflowError } from '../domain/workflow.ts';
 import { AccessError, ConflictError } from './workspaces.ts';
 import type { Store } from './store.ts';
+import { recoveryCheckRequired } from './recovery.ts';
 
 export interface Agreement {
   id: string;
@@ -31,7 +32,7 @@ export function walletFor(identity: VerifiedIdentity, network: Network) {
   return candidates[0];
 }
 export function requireReady(identity: VerifiedIdentity) {
-  if (identity.passkeyCount < 1 || !identity.backupLoginLinked)
+  if (identity.passkeyCount < 1 || (!identity.backupLoginLinked && recoveryCheckRequired()))
     throw new AccessError('Add a passkey and backup access before recording a tenancy.');
 }
 export function agreementRole(value: Agreement, identity: VerifiedIdentity): Role {

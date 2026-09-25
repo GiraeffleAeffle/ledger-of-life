@@ -261,7 +261,8 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
     createMissingWallets: () =>
       runAction(async () => {
         requireSession();
-        if (passkeyCount === 0 || !backupLoginLinked) {
+        // Local demo builds may skip the backup email (NEXT_PUBLIC_DEMO_SKIP_RECOVERY=1).
+        if (passkeyCount === 0 || (!backupLoginLinked && process.env.NEXT_PUBLIC_DEMO_SKIP_RECOVERY !== '1')) {
           throw new Error('Add a passkey and a backup email before creating wallets.');
         }
         // Direct passkey hooks do not run Privy's automatic wallet creation.
