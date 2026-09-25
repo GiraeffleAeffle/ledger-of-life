@@ -26,7 +26,7 @@ import {
   type ExpectedTokenDelta,
 } from '../finance/solana/index.ts';
 import { agreementDigest, agreementRole, type Agreement } from './agreements.ts';
-import { requireWalletRecovery } from './recovery.ts';
+import { requireWalletRecovery, type RecoveryGate } from './recovery.ts';
 import type { Store } from './store.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import {
@@ -112,7 +112,7 @@ type Dependencies = {
   gateway: SolanaGateway;
   sponsor: FeeSponsor;
   now?: () => number;
-  recoveryGate?: typeof requireWalletRecovery;
+  recoveryGate?: RecoveryGate;
 };
 function publicOperation(op: SolanaOperation) {
   const { signedTxBase64: _, subject: __, fingerprint: ___, ...visible } = op;

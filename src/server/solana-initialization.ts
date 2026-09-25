@@ -27,7 +27,7 @@ import {
   type AccountObservation,
 } from '../finance/solana/index.ts';
 import { agreementDigest, agreementRole, type Agreement } from './agreements.ts';
-import { requireWalletRecovery } from './recovery.ts';
+import { requireWalletRecovery, type RecoveryGate } from './recovery.ts';
 import {
   RpcSolanaGateway,
   solanaConfiguration,
@@ -212,7 +212,7 @@ export function createSolanaInitializationService(input: {
   gateway: InitializationGateway;
   sponsor: FeeSponsor;
   now?: () => number;
-  recoveryGate?: typeof requireWalletRecovery;
+  recoveryGate?: RecoveryGate;
 }) {
   const { store, config, gateway, sponsor } = input;
   const now = input.now ?? Date.now;

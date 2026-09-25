@@ -1,6 +1,6 @@
 import { authenticated } from '@/server/authenticated';
 import { myTenancies, tenancyJourney } from '@/server/journey';
-import { solanaServicesFor } from '@/server/solana-tenancies';
+import { ensurePayoutAccounts, solanaServicesFor } from '@/server/solana-tenancies';
 import { SolanaServiceError } from '@/server/solana-service';
 import { getStore } from '@/server/store';
 import { errorResponse, readBody, sameOrigin } from '@/server/http';
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     return errorResponse(error);
   }
 }
-/** `advance` performs sponsor-side work that needs no wallet: payouts after settlement. */
+/** `advance` performs sponsor-side work that needs no wallet: payout accounts before setup, payouts after settlement. */
 export async function POST(request: Request) {
   try {
     sameOrigin(request);
@@ -47,10 +47,16 @@ export async function POST(request: Request) {
     if (body.action !== 'advance' || typeof body.agreementId !== 'string')
       throw new SolanaServiceError(400, 'invalid_action', 'Choose a tenancy to advance.');
     const store = await getStore();
-    const services = await solanaServicesFor(store, body.agreementId);
-    if (!services) throw new SolanaServiceError(503, 'solana_unavailable', 'The deposit service is not configured.');
-    const payout = await services.service.payout(identity);
-    const agreement = (await store.get<Agreement>(`agreement:${body.agreementId}`))!;
+    const agreement = await store.get<Agreement>(`agreement:${body.agreementId}`);
+    if (!agreement) throw new SolanaServiceError(404, 'agreement_unavailable', 'This tenancy is unavailable.');
+    const before = await tenancyJourney(store, identity, agreement);
+    let payout = null;
+    if (before.next.kind === 'create_space') await ensurePayoutAccounts(store, agreement.id);
+    if (before.next.kind === 'paying_out') {
+      const services = await solanaServicesFor(store, agreement.id);
+      if (!services) throw new SolanaServiceError(503, 'solana_unavailable', 'The deposit service is not configured.');
+      payout = await services.service.payout(identity);
+    }
     return Response.json({ payout, journey: await tenancyJourney(store, identity, agreement) }, noStore);
   } catch (error) {
     return failure(error);

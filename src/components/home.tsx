@@ -18,6 +18,7 @@ const STAGES: { id: JourneyStage; label: string }[] = [
 const AUTO: Record<string, true> = { confirming: true, paying_out: true, wait: true };
 type Unavailable = { agreementId: string; property: string; unavailable: string };
 /** Typed view of our own same-origin API responses. */
+type Helper = (body: Record<string, unknown>) => Promise<void>;
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 const b64 = (value: string) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
 const toB64 = (bytes: Uint8Array) => btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''));
@@ -44,6 +45,12 @@ function SignedInHome({ openConnections }: { openConnections: () => void }) {
   const [tenancies, setTenancies] = useState<(TenancyJourney | Unavailable)[] | null>(null);
   const [listings, setListings] = useState<PublicListing[]>([]);
   const [error, setError] = useState('');
+  const [helpers, setHelpers] = useState(false);
+  const [helperBusy, setHelperBusy] = useState(false);
+  const [helperLog, setHelperLog] = useState('');
+  useEffect(() => {
+    fetch('/api/test-helpers').then((r) => r.json()).then((d) => setHelpers(Boolean(d.enabled))).catch(() => {});
+  }, []);
   const request = useCallback(async <T,>(path: string, body?: unknown): Promise<T> => {
     const token = await wallet.getAccessToken();
     if (!token) throw new Error('Sign in again to continue.');
@@ -92,6 +99,21 @@ function SignedInHome({ openConnections }: { openConnections: () => void }) {
     return () => clearInterval(timer);
   }, [waiting, load]);
 
+  const helper: Helper | null = helpers
+    ? async (body) => {
+        setHelperBusy(true);
+        setHelperLog('Test party is acting… (this can take up to a minute on devnet)');
+        try {
+          const result = await request<{ done?: string[] }>('/api/test-helpers', body);
+          setHelperLog(result.done?.length ? result.done.join(' · ') : 'Done.');
+          await load();
+        } catch (e) {
+          setHelperLog(e instanceof Error ? e.message : 'The helper failed.');
+        } finally {
+          setHelperBusy(false);
+        }
+      }
+    : null;
   const invitation = typeof window !== 'undefined' ? new URLSearchParams(window.location.hash.slice(1)).get('invitation') : null;
   return (
     <div className="home">
@@ -103,6 +125,12 @@ function SignedInHome({ openConnections }: { openConnections: () => void }) {
         </div>
       </div>
       {error && <p className="note" role="alert">{error}</p>}
+      {helpers && (
+        <p className="test-helper-note">
+          <strong>Test helpers on.</strong> Local test signers can play the other people so one account can walk the whole journey. Their steps are fixtures, not wallet proof.
+          {helperLog && <span> {helperBusy && <Loader2 className="spin" size={14} />} {helperLog}</span>}
+        </p>
+      )}
       {invitation && <JoinInvitation request={request} encoded={invitation} onDone={load} />}
       {tenancies === null ? (
         <section className="card"><Loader2 className="spin" size={18} /> Loading…</section>
@@ -111,11 +139,11 @@ function SignedInHome({ openConnections }: { openConnections: () => void }) {
           'unavailable' in t ? (
             <section className="card" key={t.agreementId}><h2>{t.property}</h2><p className="note">{t.unavailable}</p></section>
           ) : (
-            <TenancyCard key={t.agreementId} journey={t} request={request} reload={load} openConnections={openConnections} />
+            <TenancyCard key={t.agreementId} journey={t} request={request} reload={load} openConnections={openConnections} helper={helper} helperBusy={helperBusy} />
           ),
         )
       )}
-      <Homes listings={listings} request={request} reload={load} />
+      <Homes listings={listings} request={request} reload={load} helper={helper} helperBusy={helperBusy} />
     </div>
   );
 }
@@ -134,8 +162,9 @@ function Progress({ stage }: { stage: JourneyStage }) {
   );
 }
 
-function TenancyCard({ journey, request, reload, openConnections }: {
+function TenancyCard({ journey, request, reload, openConnections, helper, helperBusy }: {
   journey: TenancyJourney; request: Request; reload: () => Promise<void>; openConnections: () => void;
+  helper: Helper | null; helperBusy: boolean;
 }) {
   const wallet = useRentalWallet();
   const [busy, setBusy] = useState(false);
@@ -202,6 +231,8 @@ function TenancyCard({ journey, request, reload, openConnections }: {
         await request(`/api/agreements/${agreementId}`, { action: 'accept', digest: next.digest });
         return;
       case 'create_space': {
+        // The sponsor first creates both parties' own payout accounts (no approval needed).
+        await request('/api/journey', { action: 'advance', agreementId });
         const { initialization: init } = await request<{
           initialization: { state: string; walletId: string; expiresAt: string; transactionBase64: string; feePayer: string; walletChain: string | null };
         }>(`/api/finance/solana/initialize${q}`, { action: 'prepare' });
@@ -278,6 +309,16 @@ function TenancyCard({ journey, request, reload, openConnections }: {
           </div>
         )}
         {message && <p className="note" role="status">{message}</p>}
+        {helper && next.kind === 'invite_arbitrator' && (
+          <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'act', agreementId })}>
+            Use the test arbitrator instead
+          </button>
+        )}
+        {helper && next.kind === 'wait' && (
+          <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'act', agreementId })}>
+            Let the test party do their step
+          </button>
+        )}
       </div>
       {chain && (
         <dl className="journey-facts">
@@ -322,7 +363,9 @@ function JoinInvitation({ request, encoded, onDone }: { request: Request; encode
   );
 }
 
-function Homes({ listings, request, reload }: { listings: PublicListing[]; request: Request; reload: () => Promise<void> }) {
+function Homes({ listings, request, reload, helper, helperBusy }: {
+  listings: PublicListing[]; request: Request; reload: () => Promise<void>; helper: Helper | null; helperBusy: boolean;
+}) {
   const [posting, setPosting] = useState(false);
   const [form, setForm] = useState({ title: '', description: '', rent: '900', deposit: '10', releaseAllowed: true });
   const [applyTo, setApplyTo] = useState<string | null>(null);
@@ -343,7 +386,10 @@ function Homes({ listings, request, reload }: { listings: PublicListing[]; reque
     <section className="card homes">
       <div className="section-heading">
         <h2>Homes</h2>
-        <button className="button secondary" onClick={() => setPosting(!posting)}><Plus size={15} /> Post a home</button>
+        <div className="button-row">
+          {helper && <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'post_home' })}>Test landlord posts a home</button>}
+          <button className="button secondary" onClick={() => setPosting(!posting)}><Plus size={15} /> Post a home</button>
+        </div>
       </div>
       {message && <p className="note" role="alert">{message}</p>}
       {posting && (
@@ -362,6 +408,9 @@ function Homes({ listings, request, reload }: { listings: PublicListing[]; reque
         <article className="listing" key={l.id}>
           <header><strong>{l.title}</strong><Badge tone={l.status === 'open' ? 'green' : 'neutral'}>{l.status === 'open' ? `${l.applicants} applicant(s)` : 'Tenant chosen'}</Badge></header>
           <p className="small-copy">{money(l.rentMonthly)} / month · {money(l.requiredSecurity)} deposit</p>
+          {helper && l.status === 'open' && (
+            <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'apply', listingId: l.id })}>Add a test applicant</button>
+          )}
           {l.status === 'open' && l.applications?.map((a) => (
             <div className="applicant" key={a.id}>
               <div><strong>{a.name}</strong><p>{a.message}</p></div>
@@ -380,6 +429,9 @@ function Homes({ listings, request, reload }: { listings: PublicListing[]; reque
           </header>
           <p className="small-copy">{money(l.rentMonthly)} / month · {money(l.requiredSecurity)} deposit{l.releaseAllowed ? ' · deposit earnings are yours' : ''}</p>
           {l.description && <p>{l.description}</p>}
+          {helper && l.relation === 'applicant' && l.status === 'open' && (
+            <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'act', listingId: l.id })}>Let the test landlord choose</button>
+          )}
           {l.relation === null && (applyTo === l.id ? (
             <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void act(async () => {
               await request(`/api/listings/${l.id}`, { action: 'apply', ...application });

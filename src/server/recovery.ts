@@ -172,6 +172,8 @@ function assertRecoveryBrowser(
 }
 
 /** Read-only gate for connected finance; no caller-provided recovery flag is accepted. */
+/** Custody services only need the gate to throw when recovery is missing; the result is unused. */
+export type RecoveryGate = (store: Store, identity: VerifiedIdentity, walletId: string) => Promise<unknown>;
 export async function requireWalletRecovery(
   store: Store,
   identity: VerifiedIdentity,

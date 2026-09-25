@@ -24,8 +24,19 @@ Each person sees a six-step progress line and exactly **one** next step. Waiting
 
 - `SOLANA_DEPLOYMENT_MANIFEST` must point at the pull-v2 deployment ([evidence](evidence/SOLANA_PULL_DEVNET_DEPLOYMENT_2026-09-25.json)); settlement bundles require it.
 - Each person needs a passkey, backup email and a Solana wallet, plus the one-time recovery check under **Connections**. The home screen links there when it is missing.
-- The tenant needs test USDC in their wallet (Circle faucet) and payout token accounts must exist (`scripts/prepare-solana-app-payouts.mjs <agreementId> --send`).
+- The tenant needs test USDC in their wallet (Circle faucet). Payout token accounts are created automatically by the sponsor right before the landlord creates the deposit space.
 - The public devnet RPC rate-limits. The gateway backs off on HTTP 429, but a keyed devnet RPC is recommended for a smooth demo.
+
+## Test helpers: one real account is enough
+
+With `SOLANA_TEST_SIGNER_MODE=1` (local store, devnet and loopback requests only), My home shows dashed **test helper** buttons:
+
+- **Test landlord posts a home**, then **Let the test landlord choose** after you apply.
+- **Add a test applicant** to your own listing.
+- **Use the test arbitrator instead** of sending an invite link.
+- **Let the test party do their step** whenever you are waiting on a test person.
+
+Test people sign with operator-held test keys through the same services. So you need **one** real account (passkey, backup email, one-time recovery check), ideally as the tenant, whose signatures are the ones that matter. Helper steps are fixtures, not wallet proof.
 
 ## Verified
 

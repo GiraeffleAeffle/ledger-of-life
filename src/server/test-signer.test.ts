@@ -64,3 +64,21 @@ test('disputes route to the arbitrator and pull payouts are paid before completi
   const owed = nextTestStep({ ...base, tenancy: tenancy('closed', { landlordOwedAtomic: '50' }) });
   assert.deepEqual(owed.kind === 'action' && owed.action, { kind: 'payout', landlord: true });
 });
+
+test('in-app test helpers need the flag, a devnet deployment and a loopback request', async () => {
+  const { testHelpersEnabled } = await import('./test-helpers.ts');
+  const manifest = JSON.parse(await (await import('node:fs/promises')).readFile(
+    new URL('../../docs/evidence/SOLANA_PULL_DEVNET_DEPLOYMENT_2026-09-25.json', import.meta.url), 'utf8'));
+  const env = {
+    SOLANA_RPC_URL: 'https://api.devnet.solana.com',
+    SOLANA_DEPLOYMENT_MANIFEST: JSON.stringify({
+      ...manifest, maxObservationAgeMs: 15000, maximumSponsorLamports: '10000000',
+      agreementId: 'a', tenancyAddress: manifest.escrowProgram,
+    }),
+  };
+  const local = new Request('http://localhost:4175/api/test-helpers');
+  assert.equal(testHelpersEnabled(local, env), false);
+  assert.equal(testHelpersEnabled(local, { ...env, SOLANA_TEST_SIGNER_MODE: '1' }), true);
+  assert.equal(testHelpersEnabled(new Request('https://deposit.example/api/test-helpers'), { ...env, SOLANA_TEST_SIGNER_MODE: '1' }), false);
+  assert.equal(testHelpersEnabled(local, { ...env, SOLANA_TEST_SIGNER_MODE: '1', DATABASE_URL: 'postgres://x' }), false);
+});

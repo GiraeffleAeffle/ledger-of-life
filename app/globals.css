@@ -2924,3 +2924,5 @@ dd {
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 700px) { .journey-progress { grid-template-columns: repeat(3, 1fr); row-gap: 14px; } .journey-progress li::before { display: none; } }
+.test-helper-note { margin: 0; padding: 10px 14px; border: 1px dashed #b98a1a; border-radius: 12px; background: #fff8e6; font-size: 0.88rem; }
+.button.test-helper { justify-self: start; border: 1px dashed #b98a1a; background: #fff8e6; color: #6b4e00; }
