@@ -38,9 +38,35 @@ const unavailable = async (): Promise<never> => {
   throw new Error('Account access is not configured yet.');
 };
 
-function passkeyNameForInvitation() {
-  const role = pendingInvitationRole();
-  return role ? `Rental workspace · ${role}` : 'Rental workspace';
+/** A distinct label per account so several demo roles are distinguishable in the device's passkey chooser. */
+function passkeyLabel() {
+  const chosen = typeof window === 'undefined' ? null : window.localStorage.getItem('deposit-workspace.role');
+  const role = pendingInvitationRole() ?? chosen ?? 'account';
+  const stamp = new Date().toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return `Deposit · ${role} · ${stamp}`;
+}
+
+/**
+ * Privy's sign-up sets the WebAuthn user name/displayName server-side (the app name). Those fields are
+ * display labels only (not part of the signed attestation), so relabel them for this one creation.
+ */
+async function withPasskeyLabel<T>(label: string, work: () => Promise<T>): Promise<T> {
+  const credentials = typeof navigator === 'undefined' ? undefined : navigator.credentials;
+  if (!credentials?.create) return work();
+  const original = credentials.create.bind(credentials);
+  credentials.create = (options?: CredentialCreationOptions) => {
+    const user = options?.publicKey?.user;
+    if (user) {
+      user.name = label;
+      user.displayName = label;
+    }
+    return original(options);
+  };
+  try {
+    return await work();
+  } finally {
+    credentials.create = original;
+  }
 }
 
 function walletActionError(cause: unknown, action: 'passkey' | 'wallet') {
@@ -243,7 +269,7 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
     busy,
     error,
     loginWithPasskey: () => runAction(() => loginWithPasskey(), 'passkey'),
-    signupWithPasskey: () => runAction(() => signupWithPasskey(), 'passkey'),
+    signupWithPasskey: () => runAction(() => withPasskeyLabel(passkeyLabel(), () => signupWithPasskey()), 'passkey'),
     loginWithBackup: () => {
       setError(null);
       login({ loginMethods: ['email'] });
@@ -251,7 +277,8 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
     addPasskey: () =>
       runAction(async () => {
         requireSession();
-        await linkWithPasskey({ name: passkeyNameForInvitation() });
+        const label = passkeyLabel();
+        await withPasskeyLabel(label, () => linkWithPasskey({ name: label }));
       }, 'passkey'),
     addBackupEmail: () => {
       requireSession();
