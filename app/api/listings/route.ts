@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   try {
     sameOrigin(request);
     const identity = await authenticated(request);
-    return Response.json({ listing: await createListing(await getStore(), identity, await readBody(request)) }, noStore);
+    return Response.json({ listing: await createListing(await getStore(), identity, await readBody(request, 3_000_000)) }, noStore);
   } catch (error) {
     return errorResponse(error);
   }

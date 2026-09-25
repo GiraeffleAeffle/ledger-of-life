@@ -225,7 +225,17 @@ function TenancyCard({ journey, request, reload, openConnections, helper, helper
       expiresAt: input.expiresAt, transaction: b64(input.transactionBase64), description,
     }));
   }
+  /** A signed step is valid for about a minute on Solana; if it lapses, prepare a fresh one once. */
   async function operation(action: Record<string, unknown>, description: string, evidence?: string) {
+    try {
+      await attempt(action, description, evidence);
+    } catch (e) {
+      if (!(e && typeof e === 'object' && 'code' in e && e.code === 'operation_expired')) throw e;
+      setMessage('That approval expired on the network. Please approve once more.');
+      await attempt(action, description);
+    }
+  }
+  async function attempt(action: Record<string, unknown>, description: string, evidence?: string) {
     if (!chain) throw new Error('The tenancy is not readable yet.');
     const { operation: op } = await request<{ operation: { id: string; walletId: string; expiresAt: string; transactionBase64: string } }>(
       `/api/finance/solana/operations${q}`, { requestId: crypto.randomUUID(), action });
@@ -377,12 +387,59 @@ function JoinInvitation({ request, encoded, onDone }: { request: Request; encode
   );
 }
 
+const PRESETS = [
+  'photo-1502672260266-1c1ef2d93688',
+  'photo-1522708323590-d24dbb6b0267',
+  'photo-1560448204-e02f11c3d0e2',
+  'photo-1493809842364-78817add7ffb',
+  'photo-1484154218962-a197022b5858',
+  'photo-1505691938895-1758d7feb511',
+].map((id) => `https://images.unsplash.com/${id}?w=1200&q=70&auto=format&fit=crop`);
+const thumb = (url: string) => (url.startsWith('https://') ? url.replace('w=1200', 'w=360') : url);
+
+/** Downscale an uploaded photo in the browser so it stays small enough to store with the listing. */
+async function compressPhoto(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1280 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  for (const quality of [0.8, 0.65, 0.5]) {
+    const url = canvas.toDataURL('image/jpeg', quality);
+    if (url.length <= 700_000) return url;
+  }
+  throw new Error('This photo is too large even after compression.');
+}
+
+function ListingCard({ listing, children }: { listing: PublicListing; children?: React.ReactNode }) {
+  const d = listing.details;
+  const facts = [d.city, d.rooms ? `${d.rooms} room${d.rooms > 1 ? 's' : ''}` : '', d.sizeSqm ? `${d.sizeSqm} m²` : '',
+    d.availableFrom ? `from ${new Date(d.availableFrom).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''].filter(Boolean);
+  return (
+    <article className="listing-card">
+      <div className="listing-photo">
+        {/* eslint-disable-next-line @next/next/no-img-element -- uploaded photos are data URLs */}
+        {d.photos[0] ? <img src={d.photos[0]} alt={listing.title} loading="lazy" /> : <HomeIcon size={42} />}
+        {d.photos.length > 1 && <span className="photo-count">+{d.photos.length - 1}</span>}
+      </div>
+      <div className="listing-body">
+        <header><strong>{listing.title}</strong><span className="listing-rent">{money(listing.rentMonthly)}<small>/month</small></span></header>
+        {facts.length > 0 && <p className="listing-facts">{facts.join(' · ')}</p>}
+        {listing.description && <p className="listing-description">{listing.description}</p>}
+        <p className="small-copy">Deposit {money(listing.requiredSecurity)}{listing.releaseAllowed ? ' · deposit earnings go to the tenant' : ''}</p>
+        {children}
+      </div>
+    </article>
+  );
+}
+
 function Homes({ role, listings, request, reload, helper, helperBusy }: {
-  role: ChosenRole;
-  listings: PublicListing[]; request: Request; reload: () => Promise<void>; helper: Helper | null; helperBusy: boolean;
+  role: ChosenRole; listings: PublicListing[]; request: Request; reload: () => Promise<void>; helper: Helper | null; helperBusy: boolean;
 }) {
   const [posting, setPosting] = useState(role === 'landlord' && !listings.some((l) => l.relation === 'landlord'));
-  const [form, setForm] = useState({ title: '', description: '', rent: '900', deposit: '10', releaseAllowed: true });
+  const [form, setForm] = useState({ title: '', city: '', rooms: '2', sizeSqm: '55', availableFrom: '', description: '', rent: '900', deposit: '1', releaseAllowed: true });
+  const [photos, setPhotos] = useState<string[]>([PRESETS[0]]);
   const [applyTo, setApplyTo] = useState<string | null>(null);
   const [application, setApplication] = useState({ name: '', message: '' });
   const [message, setMessage] = useState('');
@@ -395,6 +452,9 @@ function Homes({ role, listings, request, reload, helper, helperBusy }: {
       setMessage(e instanceof Error ? e.message : 'Please try again.');
     }
   }
+  const togglePhoto = (url: string) =>
+    setPhotos((current) => (current.includes(url) ? current.filter((p) => p !== url) : current.length >= 4 ? current : [...current, url]));
+  const field = (key: keyof typeof form) => ({ value: String(form[key]), onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }) });
   const mine = listings.filter((l) => l.relation === 'landlord');
   const others = listings.filter((l) => l.relation !== 'landlord');
   return (
@@ -402,67 +462,93 @@ function Homes({ role, listings, request, reload, helper, helperBusy }: {
       <div className="section-heading">
         <h2>{role === 'landlord' ? 'Your listings' : 'Homes you can apply for'}</h2>
         <div className="button-row">
-          {helper && role === 'tenant' && <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'post_home' })}>Add a test landlord’s home</button>}
+          {helper && role === 'tenant' && <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'post_home' })}>Add sample homes</button>}
           {role === 'landlord' && <button className="button secondary" onClick={() => setPosting(!posting)}><Plus size={15} /> Post a home</button>}
         </div>
       </div>
       {message && <p className="note" role="alert">{message}</p>}
       {posting && (
-        <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void act(async () => {
-          await request('/api/listings', { title: form.title, description: form.description, rentMonthly: parseAmount(form.rent), requiredSecurity: parseAmount(form.deposit), releaseAllowed: form.releaseAllowed });
+        <form className="listing-form" onSubmit={(e) => { e.preventDefault(); void act(async () => {
+          await request('/api/listings', {
+            title: form.title, city: form.city, rooms: Number(form.rooms), sizeSqm: Number(form.sizeSqm), availableFrom: form.availableFrom,
+            description: form.description, photos, rentMonthly: parseAmount(form.rent), requiredSecurity: parseAmount(form.deposit), releaseAllowed: form.releaseAllowed,
+          });
           setPosting(false);
         }); }}>
-          <label>Address or title<input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-          <label>Monthly rent (USDC)<input inputMode="decimal" value={form.rent} onChange={(e) => setForm({ ...form, rent: e.target.value })} /></label>
-          <label>Deposit (test USDC)<input inputMode="decimal" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} /></label>
-          <label className="policy-check"><input type="checkbox" checked={form.releaseAllowed} onChange={(e) => setForm({ ...form, releaseAllowed: e.target.checked })} /> Earnings above the deposit belong to the tenant</label>
-          <button className="button primary">Publish</button>
+          <label className="wide">Title<input required placeholder="Bright 2-room flat near the park" {...field('title')} /></label>
+          <label>City / district<input placeholder="Berlin-Friedrichshain" {...field('city')} /></label>
+          <label>Rooms<input type="number" min={1} max={20} {...field('rooms')} /></label>
+          <label>Size (m²)<input type="number" min={10} max={1000} {...field('sizeSqm')} /></label>
+          <label>Available from<input type="date" {...field('availableFrom')} /></label>
+          <label>Monthly rent (USDC)<input inputMode="decimal" {...field('rent')} /></label>
+          <label>Deposit (test USDC)<input inputMode="decimal" {...field('deposit')} /></label>
+          <label className="wide">Description<textarea rows={3} placeholder="Balcony, fitted kitchen, 5 minutes to the U-Bahn…" {...field('description')} /></label>
+          <div className="wide">
+            <span className="field-label">Photos (up to 4): pick samples or upload your own</span>
+            <div className="photo-picker">
+              {[...PRESETS, ...photos.filter((p) => !PRESETS.includes(p))].map((url) => (
+                <button type="button" key={url.slice(-40)} className={photos.includes(url) ? 'selected' : ''} onClick={() => togglePhoto(url)}>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- uploaded photos are data URLs */}
+                  <img src={thumb(url)} alt="" />
+                  {photos.includes(url) && <span><Check size={14} /></span>}
+                </button>
+              ))}
+              <label className="photo-upload">
+                <Plus size={18} /> Upload
+                <input type="file" accept="image/*" hidden onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void compressPhoto(file).then((url) => setPhotos((c) => (c.length >= 4 ? c : [...c, url]))).catch((err) => setMessage(err.message));
+                }} />
+              </label>
+            </div>
+          </div>
+          <label className="policy-check wide"><input type="checkbox" checked={form.releaseAllowed} onChange={(e) => setForm({ ...form, releaseAllowed: e.target.checked })} /> Earnings on the deposit belong to the tenant</label>
+          <button className="button primary large">Publish home</button>
         </form>
       )}
-      {mine.map((l) => (
-        <article className="listing" key={l.id}>
-          <header><strong>{l.title}</strong><Badge tone={l.status === 'open' ? 'green' : 'neutral'}>{l.status === 'open' ? `${l.applicants} applicant(s)` : 'Tenant chosen'}</Badge></header>
-          <p className="small-copy">{money(l.rentMonthly)} / month · {money(l.requiredSecurity)} deposit</p>
-          {helper && l.status === 'open' && (
-            <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'apply', listingId: l.id })}>Add a test applicant</button>
-          )}
-          {l.status === 'open' && l.applications?.map((a) => (
-            <div className="applicant" key={a.id}>
-              <div><strong>{a.name}</strong><p>{a.message}</p></div>
-              <button className="button primary" onClick={() => act(() => request(`/api/listings/${l.id}`, { action: 'choose', applicationId: a.id }))}>Choose</button>
-            </div>
-          ))}
-        </article>
-      ))}
-      {others.length === 0 && mine.length === 0 && (
-        <p className="small-copy">{role === 'landlord' ? 'Post your first home above.' : 'No homes are listed yet.'}{helper && role === 'tenant' ? ' For a test run, add a test landlord’s home.' : ''}</p>
+      <div className="listing-grid">
+        {mine.map((l) => (
+          <ListingCard listing={l} key={l.id}>
+            <Badge tone={l.status === 'open' ? 'green' : 'neutral'}>{l.status === 'open' ? `${l.applicants} applicant(s)` : 'Tenant chosen'}</Badge>
+            {helper && l.status === 'open' && (
+              <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'apply', listingId: l.id })}>Add a test applicant</button>
+            )}
+            {l.status === 'open' && l.applications?.map((a) => (
+              <div className="applicant" key={a.id}>
+                <div><strong>{a.name}</strong><p>{a.message}</p></div>
+                <button className="button primary" onClick={() => act(() => request(`/api/listings/${l.id}`, { action: 'choose', applicationId: a.id }))}>Choose</button>
+              </div>
+            ))}
+          </ListingCard>
+        ))}
+        {role === 'tenant' && others.map((l) => (
+          <ListingCard listing={l} key={l.id}>
+            {l.relation !== null && (
+              <Badge tone={l.relation === 'chosen' ? 'green' : 'neutral'}>
+                {l.relation === 'chosen' ? 'You got it, see above' : l.status === 'let' ? 'Not chosen' : 'Applied'}
+              </Badge>
+            )}
+            {helper && l.relation === 'applicant' && l.status === 'open' && (
+              <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'act', listingId: l.id })}>Let the test landlord choose</button>
+            )}
+            {l.relation === null && (applyTo === l.id ? (
+              <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void act(async () => {
+                await request(`/api/listings/${l.id}`, { action: 'apply', ...application });
+                setApplyTo(null);
+              }); }}>
+                <label>Your name<input required value={application.name} onChange={(e) => setApplication({ ...application, name: e.target.value })} /></label>
+                <label>A few words about you<input required value={application.message} onChange={(e) => setApplication({ ...application, message: e.target.value })} /></label>
+                <button className="button primary">Send application</button>
+              </form>
+            ) : (
+              <button className="button primary" onClick={() => setApplyTo(l.id)}>Apply</button>
+            ))}
+          </ListingCard>
+        ))}
+      </div>
+      {others.length === 0 && mine.length === 0 && !posting && (
+        <p className="small-copy">{role === 'landlord' ? 'Post your first home.' : 'No homes are listed yet.'}{helper && role === 'tenant' ? ' For a test run, add sample homes.' : ''}</p>
       )}
-      {role === 'tenant' && others.map((l) => (
-        <article className="listing" key={l.id}>
-          <header><strong>{l.title}</strong>
-            <Badge tone={l.relation === 'chosen' ? 'green' : 'neutral'}>
-              {l.relation === 'chosen' ? 'You got it' : l.relation === 'applicant' ? (l.status === 'let' ? 'Not chosen' : 'Applied') : 'Available'}
-            </Badge>
-          </header>
-          <p className="small-copy">{money(l.rentMonthly)} / month · {money(l.requiredSecurity)} deposit{l.releaseAllowed ? ' · deposit earnings are yours' : ''}</p>
-          {l.description && <p>{l.description}</p>}
-          {helper && l.relation === 'applicant' && l.status === 'open' && (
-            <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'act', listingId: l.id })}>Let the test landlord choose</button>
-          )}
-          {l.relation === null && (applyTo === l.id ? (
-            <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void act(async () => {
-              await request(`/api/listings/${l.id}`, { action: 'apply', ...application });
-              setApplyTo(null);
-            }); }}>
-              <label>Your name<input required value={application.name} onChange={(e) => setApplication({ ...application, name: e.target.value })} /></label>
-              <label>About you<input required value={application.message} onChange={(e) => setApplication({ ...application, message: e.target.value })} /></label>
-              <button className="button primary">Send application</button>
-            </form>
-          ) : (
-            <button className="button primary" onClick={() => setApplyTo(l.id)}>Apply</button>
-          ))}
-        </article>
-      ))}
     </section>
   );
 }
@@ -492,7 +578,7 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
   async function invest() {
     setBusy(true);
     setMessage('');
-    try {
+    const buyOnce = async () => {
       const { buy } = await request<{ buy: { id: string; walletId: string; feePayer: string; expiresAt: string; transactionBase64: string } }>(
         '/api/portfolio', { action: 'prepare_buy', usdcInAtomic: '5000000' });
       const signed = await wallet.signSolanaTransaction({
@@ -500,6 +586,15 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
         expiresAt: buy.expiresAt, transaction: b64(buy.transactionBase64), description: 'Invest 5 test USDC in tSPYx',
       });
       await request('/api/portfolio', { action: 'submit_buy', id: buy.id, signedTxBase64: toB64(signed) });
+    };
+    try {
+      try {
+        await buyOnce();
+      } catch (e) {
+        if (!(e && typeof e === 'object' && 'code' in e && e.code === 'operation_expired')) throw e;
+        setMessage('The price quote expired. Please approve once more.');
+        await buyOnce();
+      }
       setMessage('Bought. Your holding is updated.');
       await refresh();
     } catch (e) {

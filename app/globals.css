@@ -2955,3 +2955,34 @@ dd {
 .helper-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; font-size: 0.82rem; color: #6b4e00; }
 .helper-strip .helper-log { flex-basis: 100%; opacity: 0.85; }
 .listing > .button, .inline-form > .button, .applicant .button { justify-self: start; width: auto; }
+
+/* Listings */
+.listing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.listing-card { display: grid; grid-template-rows: auto 1fr; border-radius: 18px; overflow: hidden; border: 1px solid rgba(0, 0, 0, 0.08); background: white; }
+.listing-photo { position: relative; aspect-ratio: 16 / 10; background: #eef2ea; display: grid; place-items: center; color: #9aa892; }
+.listing-photo img { width: 100%; height: 100%; object-fit: cover; }
+.photo-count { position: absolute; right: 10px; bottom: 10px; padding: 3px 8px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: white; font-size: 0.75rem; }
+.listing-body { display: grid; align-content: start; gap: 8px; padding: 16px; }
+.listing-body header { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.listing-rent { font-weight: 700; white-space: nowrap; }
+.listing-rent small { font-weight: 400; opacity: 0.6; }
+.listing-facts { margin: 0; font-size: 0.85rem; color: #4d5a45; }
+.listing-description { margin: 0; font-size: 0.9rem; opacity: 0.85; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.listing-body > .button, .listing-body > .badge { justify-self: start; }
+.listing-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; padding: 18px; border-radius: 16px; background: #f7f9f5; }
+.listing-form .wide { grid-column: 1 / -1; }
+.listing-form label { display: grid; gap: 4px; font-size: 0.85rem; }
+.listing-form textarea { font: inherit; padding: 10px; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.15); }
+.listing-form > .button { justify-self: start; }
+.field-label { font-size: 0.85rem; }
+.photo-picker { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.photo-picker button, .photo-upload { position: relative; width: 104px; height: 72px; border-radius: 10px; overflow: hidden; border: 2px solid transparent; padding: 0; cursor: pointer; background: white; }
+.photo-picker button img { width: 100%; height: 100%; object-fit: cover; }
+.photo-picker button.selected { border-color: #1f7a4d; }
+.photo-picker button span { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #1f7a4d; color: white; }
+.photo-upload { display: flex; align-items: center; justify-content: center; gap: 4px; border: 2px dashed rgba(0, 0, 0, 0.2); font-size: 0.85rem; }
+.listing-card { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.listing-photo { overflow: hidden; }
+.listing-photo img { position: absolute; inset: 0; }
+.listing-body header strong { min-width: 0; }
+.listing-form label.policy-check { display: flex; align-items: center; gap: 8px; }

@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const user = await authenticated(request);
     const body = await readBody(request);
     const store = await getStore();
-    if (body.action === 'post_home') return Response.json({ listing: await postTestHome(store) }, noStore);
+    if (body.action === 'post_home') return Response.json({ listings: await postTestHome(store) }, noStore);
     if (body.action === 'apply' && typeof body.listingId === 'string')
       return Response.json({ listing: await addTestApplicant(store, user, body.listingId) }, noStore);
     if (body.action === 'act')

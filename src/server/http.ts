@@ -22,7 +22,7 @@ export function sameOrigin(request: Request) {
     throw new AccessError('This action must originate from the application.');
 }
 
-export async function readBody(request: Request): Promise<Record<string, unknown>> {
+export async function readBody(request: Request, maxBytes = 24000): Promise<Record<string, unknown>> {
   if (!request.headers.get('content-type')?.includes('application/json'))
     throw new WorkflowError('Send JSON.');
   const reader = request.body?.getReader();
@@ -33,7 +33,7 @@ export async function readBody(request: Request): Promise<Record<string, unknown
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > 24000) {
+    if (size > maxBytes) {
       await reader.cancel();
       throw new WorkflowError('Request too large.');
     }

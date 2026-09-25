@@ -25,6 +25,7 @@ export interface Listing {
   landlord: { subject: string; wallet: VerifiedWallet };
   title: string;
   description: string;
+  details: HomeDetails;
   rentMonthly: string;
   requiredSecurity: string;
   releaseAllowed: boolean;
@@ -34,10 +35,29 @@ export interface Listing {
   agreementId: string | null;
   chosenApplicationId: string | null;
 }
+export interface HomeDetails {
+  city: string;
+  rooms: number;
+  sizeSqm: number;
+  availableFrom: string;
+  /** Preset stock photos or small uploaded JPEG/PNG/WebP data URLs. */
+  photos: string[];
+}
+/** Curated stock photos landlords can pick instead of uploading. */
+export const PRESET_PHOTOS = [
+  'photo-1502672260266-1c1ef2d93688',
+  'photo-1522708323590-d24dbb6b0267',
+  'photo-1560448204-e02f11c3d0e2',
+  'photo-1493809842364-78817add7ffb',
+  'photo-1484154218962-a197022b5858',
+  'photo-1505691938895-1758d7feb511',
+].map((id) => `https://images.unsplash.com/${id}?w=1200&q=70&auto=format&fit=crop`);
+
 export interface PublicListing {
   id: string;
   title: string;
   description: string;
+  details: HomeDetails;
   rentMonthly: string;
   requiredSecurity: string;
   releaseAllowed: boolean;
@@ -72,6 +92,7 @@ export function publicListing(value: Listing, identity: VerifiedIdentity | null)
     id: value.id,
     title: value.title,
     description: value.description,
+    details: value.details ?? { city: '', rooms: 0, sizeSqm: 0, availableFrom: '', photos: [] },
     rentMonthly: value.rentMonthly,
     requiredSecurity: value.requiredSecurity,
     releaseAllowed: value.releaseAllowed,
@@ -85,6 +106,27 @@ export function publicListing(value: Listing, identity: VerifiedIdentity | null)
   };
 }
 
+function details(input: Record<string, unknown>): HomeDetails {
+  const whole = (value: unknown, min: number, max: number, field: string) => {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < min || parsed > max) throw new WorkflowError(`${field} must be between ${min} and ${max}.`);
+    return parsed;
+  };
+  const photos = Array.isArray(input.photos) ? input.photos : [];
+  if (photos.length > 4) throw new WorkflowError('Add up to four photos.');
+  for (const photo of photos)
+    if (typeof photo !== 'string' || !(PRESET_PHOTOS.includes(photo) || (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(photo) && photo.length <= 700_000)))
+      throw new WorkflowError('Use one of the sample photos or a JPEG, PNG or WebP under 500 KB.');
+  const availableFrom = typeof input.availableFrom === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.availableFrom) ? input.availableFrom : '';
+  return {
+    city: text(input.city ?? '', 0, 80, 'The city'),
+    rooms: whole(input.rooms ?? 1, 1, 20, 'Rooms'),
+    sizeSqm: whole(input.sizeSqm ?? 40, 10, 1000, 'The size'),
+    availableFrom,
+    photos: photos as string[],
+  };
+}
+
 export async function createListing(store: Store, identity: VerifiedIdentity, input: Record<string, unknown>) {
   requireReady(identity);
   if (typeof input.releaseAllowed !== 'boolean') throw new WorkflowError('Choose the earnings policy.');
@@ -94,6 +136,7 @@ export async function createListing(store: Store, identity: VerifiedIdentity, in
     landlord: { subject: identity.subject, wallet: walletFor(identity, 'solana') },
     title: text(input.title, 3, 120, 'The title'),
     description: text(input.description ?? '', 0, 2000, 'The description'),
+    details: details(input),
     rentMonthly: amount(input.rentMonthly, 'The monthly rent'),
     requiredSecurity: amount(input.requiredSecurity, 'The deposit'),
     releaseAllowed: input.releaseAllowed,

@@ -5,7 +5,7 @@ import { createKeyPairSignerFromBytes, type KeyPairSigner } from '@solana/kit';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { acceptAgreement, addAgreementRecord, inviteToAgreement, joinAgreement, type Agreement } from './agreements.ts';
 import { tenancyJourney, type JourneyRole } from './journey.ts';
-import { applyToListing, chooseApplicant, createListing, type Listing } from './listings.ts';
+import { applyToListing, chooseApplicant, createListing, PRESET_PHOTOS, type Listing } from './listings.ts';
 import { ensurePayoutAccounts, solanaServicesFor } from './solana-tenancies.ts';
 import { assertTestSignerAllowed, signPrepared, testIdentity, TEST_SUBJECT_PREFIX, type TestRole } from './test-signer.ts';
 import { solanaConfiguration } from './solana-rpc.ts';
@@ -52,15 +52,40 @@ async function finalize<T extends { state: string }>(check: () => Promise<T>) {
   throw new Error('Still confirming. Press the helper again in a moment.');
 }
 
+const SAMPLE_HOMES = [
+  {
+    title: 'Bright 2-room flat near the park', city: 'Berlin-Friedrichshain', rooms: 2, sizeSqm: 58, availableFrom: '2026-11-01',
+    description: 'Sunny corner flat on the 3rd floor with balcony, wooden floors and a fitted kitchen. Five minutes to the park and the U-Bahn.',
+    rentMonthly: '1150000000', requiredSecurity: '1000000', photo: 0,
+  },
+  {
+    title: 'Quiet studio with garden view', city: 'Hamburg-Eimsbüttel', rooms: 1, sizeSqm: 34, availableFrom: '2026-10-15',
+    description: 'Compact studio facing the courtyard garden. New bathroom, washing machine connection, bike cellar.',
+    rentMonthly: '780000000', requiredSecurity: '1000000', photo: 3,
+  },
+  {
+    title: 'Family home with 4 rooms', city: 'Munich-Sendling', rooms: 4, sizeSqm: 96, availableFrom: '2026-12-01',
+    description: 'Spacious flat for a family: two bedrooms, a study, open kitchen, loggia and a parking space in the courtyard.',
+    rentMonthly: '2100000000', requiredSecurity: '2000000', photo: 1,
+  },
+];
+
+/** The test landlord publishes a few realistic sample homes (skips ones already listed). */
 export async function postTestHome(store: Store, environment = process.env) {
   const { landlord } = await signers(environment);
-  return createListing(store, landlord.identity, {
-    title: 'Test landlord’s flat (fixture)',
-    description: 'Posted by a local test landlord so one real account can walk the whole journey.',
-    rentMonthly: '900000000',
-    requiredSecurity: '1000000',
-    releaseAllowed: true,
-  });
+  const existing = (await store.scan<Listing>('listing:', '', 200))
+    .filter((row) => row.value.landlord.subject === landlord.identity.subject && row.value.status === 'open')
+    .map((row) => row.value.title);
+  const posted = [];
+  for (const home of SAMPLE_HOMES) {
+    if (existing.includes(home.title)) continue;
+    posted.push(await createListing(store, landlord.identity, {
+      ...home,
+      photos: [PRESET_PHOTOS[home.photo], PRESET_PHOTOS[(home.photo + 2) % PRESET_PHOTOS.length]],
+      releaseAllowed: true,
+    }));
+  }
+  return posted;
 }
 
 export async function addTestApplicant(store: Store, user: VerifiedIdentity, listingId: string, environment = process.env) {
