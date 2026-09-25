@@ -2946,3 +2946,12 @@ dd {
 .setup-step.done .journey-dot { background: #1f7a4d; color: white; }
 .setup-step.current { border-color: #e0a526; box-shadow: 0 0 0 3px rgba(224, 165, 38, 0.15); }
 .setup-step.current .journey-dot { background: #e0a526; }
+
+/* Home facts: labelled tiles, overriding the global key/value dl layout */
+.journey-facts > div { display: grid; gap: 4px; justify-content: stretch; border: 0; padding: 14px 16px; border-radius: 14px; background: rgba(0, 0, 0, 0.03); font-size: 0.8rem; }
+.journey-facts dt { color: #6f7a66; font-size: 0.78rem; }
+.journey-facts dd { text-align: left; font-size: 1.15rem; font-weight: 700; color: #1b2a1f; }
+.home > .card, .home > section { margin: 0; }
+.helper-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; font-size: 0.82rem; color: #6b4e00; }
+.helper-strip .helper-log { flex-basis: 100%; opacity: 0.85; }
+.listing > .button, .inline-form > .button, .applicant .button { justify-self: start; width: auto; }

@@ -79,12 +79,6 @@ export function Workspace() {
   const totals = state ? summary(state) : null;
 
   useEffect(() => {
-    const agreementId = new URLSearchParams(window.location.search).get('agreement');
-    if (!agreementId || !/^[a-zA-Z0-9_-]{1,160}$/.test(agreementId)) return;
-    const frame = window.requestAnimationFrame(() => setView('connections'));
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
-  useEffect(() => {
     const controller = new AbortController();
     api('/api/demo', { network }, controller.signal)
       .then((result) => {
@@ -227,7 +221,7 @@ export function Workspace() {
             My home
           </button>
         </nav>
-        <span className="nav-caption">DEMO · MADE-UP PEOPLE</span>
+        <span className="nav-caption">{demoView ? 'DEMO · MADE-UP PEOPLE' : 'EXPLORE'}</span>
         {demoView && (
           <div className="workspace-picker">
             <span className="avatar small">{people[role][0]}</span>
@@ -239,7 +233,13 @@ export function Workspace() {
           </div>
         )}
         <nav aria-label="Main navigation">
-          {nav.map((item) => (
+          {!demoView && (
+            <button className="nav-item" onClick={() => setView('overview')}>
+              <Sprout size={18} />
+              Demo with made-up people
+            </button>
+          )}
+          {(demoView ? nav : []).map((item) => (
             <button
               className={`nav-item ${view === item.id ? 'selected' : ''}`}
               key={item.id}
@@ -252,6 +252,7 @@ export function Workspace() {
           ))}
         </nav>
         <div className="sidebar-bottom">
+          {demoView && (
           <div className="sidebar-note">
             <Sprout size={23} />
             <strong>
@@ -261,6 +262,7 @@ export function Workspace() {
             </strong>
             <p>A personal portfolio that stays with you, wherever you live next.</p>
           </div>
+          )}
           <button
             className={`nav-item ${view === 'connections' ? 'selected' : ''}`}
             aria-current={view === 'connections' ? 'page' : undefined}

@@ -15,6 +15,13 @@ function failure(error: unknown) {
       { error: error.message, code: error.code },
       { status: error.status, headers: { 'Cache-Control': 'no-store' } },
     );
+  if (error instanceof Error && /simulation failed|Simulation bank changed/i.test(error.message))
+    return Response.json(
+      { error: 'The network rejected this step in a dry run. Refresh and try again; if it persists, check your test USDC balance.', code: 'simulation_failed' },
+      { status: 409, headers: { 'Cache-Control': 'no-store' } },
+    );
+  if (error instanceof Error && error.message === 'RPC unavailable')
+    return Response.json({ error: 'The test network is busy. Try again in a moment.', code: 'rpc_busy' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   return errorResponse(error);
 }
 export async function solanaGet(request: Request, id?: string) {

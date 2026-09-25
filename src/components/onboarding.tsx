@@ -197,7 +197,7 @@ export function AccountSetup({ role, authorized, onChangeRole, onReady }: {
 
 export function RoleIntro({ role, solanaAddress, testUsdcAtomic }: { role: ChosenRole; solanaAddress: string | null; testUsdcAtomic: string | null }) {
   const [copied, setCopied] = useState(false);
-  if (role === 'tenant' && solanaAddress && (testUsdcAtomic === null || BigInt(testUsdcAtomic) < 5_000_000n))
+  if (role === 'tenant' && solanaAddress && testUsdcAtomic !== null && BigInt(testUsdcAtomic) < 1_000_000n)
     return (
       <section className="card next-step-card">
         <span className="eyebrow">BEFORE YOU APPLY</span>

@@ -17,6 +17,14 @@ const STAGES: { id: JourneyStage; label: string }[] = [
   { id: 'move-out', label: 'Move-out' },
   { id: 'paid', label: 'Paid out' },
 ];
+const BUTTON_LABEL: Record<string, string> = {
+  invite_arbitrator: 'Invite arbitrator',
+  accept_agreement: 'Accept',
+  create_space: 'Create deposit space',
+  secure_deposit: 'Approve deposit',
+  settle: 'Settle',
+  finish_setup: 'Open account check',
+};
 const ROLE_LABEL: Record<ChosenRole, string> = { tenant: 'TENANT', landlord: 'LANDLORD', arbitrator: 'ARBITRATOR' };
 const AUTO: Record<string, true> = { confirming: true, paying_out: true, wait: true };
 type Unavailable = { agreementId: string; property: string; unavailable: string };
@@ -107,7 +115,7 @@ function SignedInHome({ role, onChangeRole, openConnections }: { role: ChosenRol
   const helper: Helper | null = helpers
     ? async (body) => {
         setHelperBusy(true);
-        setHelperLog('Test party is acting… (this can take up to a minute on devnet)');
+        setHelperLog('The test person is doing their step… (up to a minute on devnet)');
         try {
           const result = await request<{ done?: string[] }>('/api/test-helpers', body);
           setHelperLog(result.done?.length ? result.done.join(' · ') : 'Done.');
@@ -131,10 +139,9 @@ function SignedInHome({ role, onChangeRole, openConnections }: { role: ChosenRol
       </div>
       <RoleIntro role={role} solanaAddress={wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? null} testUsdcAtomic={usdc} />
       {error && <p className="note" role="alert">{error}</p>}
-      {helpers && (
+      {helpers && helperLog && (
         <p className="test-helper-note">
-          <strong>Test helpers on.</strong> Local test signers can play the other people so one account can walk the whole journey. Their steps are fixtures, not wallet proof.
-          {helperLog && <span> {helperBusy && <Loader2 className="spin" size={14} />} {helperLog}</span>}
+          {helperBusy && <Loader2 className="spin" size={14} />} {helperLog}
         </p>
       )}
       {invitation && <JoinInvitation request={request} encoded={invitation} onDone={load} />}
@@ -149,14 +156,14 @@ function SignedInHome({ role, onChangeRole, openConnections }: { role: ChosenRol
           ),
         )
       )}
-      {role !== 'arbitrator' && <Portfolio request={request} onBalance={setUsdc} />}
       {role !== 'arbitrator' && <Homes role={role} listings={listings} request={request} reload={load} helper={helper} helperBusy={helperBusy} />}
+      {role !== 'arbitrator' && <Portfolio request={request} onBalance={setUsdc} />}
     </div>
   );
 }
 
-function Progress({ stage }: { stage: JourneyStage }) {
-  const current = STAGES.findIndex((s) => s.id === stage);
+function Progress({ stage, finished }: { stage: JourneyStage; finished: boolean }) {
+  const current = STAGES.findIndex((s) => s.id === stage) + (finished ? 1 : 0);
   return (
     <ol className="journey-progress" aria-label="Tenancy progress">
       {STAGES.map((s, index) => (
@@ -268,7 +275,7 @@ function TenancyCard({ journey, request, reload, openConnections, helper, helper
         <h2><HomeIcon size={18} /> {journey.property}</h2>
         <Badge tone="neutral">You are the {journey.role}</Badge>
       </div>
-      <Progress stage={journey.stage} />
+      <Progress stage={journey.stage} finished={next.kind === 'done'} />
       <div className={`next-step-card ${AUTO[next.kind] || next.kind === 'done' ? 'passive' : ''}`}>
         <span className="eyebrow">{next.kind === 'wait' ? 'NOTHING TO DO RIGHT NOW' : next.kind === 'done' ? 'FINISHED' : 'YOUR NEXT STEP'}</span>
         <h3>{AUTO[next.kind] && next.kind !== 'wait' && <Loader2 className="spin" size={18} />} {next.label}</h3>
@@ -276,7 +283,7 @@ function TenancyCard({ journey, request, reload, openConnections, helper, helper
         {oneButton && (
           <button className="button primary large" disabled={busy} onClick={() => run(primary)}>
             {busy ? <Loader2 className="spin" size={18} /> : null}
-            {next.kind === 'accept_agreement' ? 'Accept' : next.kind === 'finish_setup' ? 'Open account check' : next.label}
+            {BUTTON_LABEL[next.kind] ?? next.label}
             <ArrowRight size={17} />
           </button>
         )}
@@ -395,8 +402,8 @@ function Homes({ role, listings, request, reload, helper, helperBusy }: {
       <div className="section-heading">
         <h2>{role === 'landlord' ? 'Your listings' : 'Homes you can apply for'}</h2>
         <div className="button-row">
-          {helper && <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'post_home' })}>Test landlord posts a home</button>}
-          <button className="button secondary" onClick={() => setPosting(!posting)}><Plus size={15} /> Post a home</button>
+          {helper && role === 'tenant' && <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'post_home' })}>Add a test landlord’s home</button>}
+          {role === 'landlord' && <button className="button secondary" onClick={() => setPosting(!posting)}><Plus size={15} /> Post a home</button>}
         </div>
       </div>
       {message && <p className="note" role="alert">{message}</p>}
@@ -427,8 +434,10 @@ function Homes({ role, listings, request, reload, helper, helperBusy }: {
           ))}
         </article>
       ))}
-      {others.length === 0 && mine.length === 0 && <p className="small-copy">No homes are listed yet.</p>}
-      {others.map((l) => (
+      {others.length === 0 && mine.length === 0 && (
+        <p className="small-copy">{role === 'landlord' ? 'Post your first home above.' : 'No homes are listed yet.'}{helper && role === 'tenant' ? ' For a test run, add a test landlord’s home.' : ''}</p>
+      )}
+      {role === 'tenant' && others.map((l) => (
         <article className="listing" key={l.id}>
           <header><strong>{l.title}</strong>
             <Badge tone={l.relation === 'chosen' ? 'green' : 'neutral'}>
@@ -505,12 +514,12 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
         <h2>Your portfolio</h2>
         <Badge tone="neutral">Devnet test market · no value</Badge>
       </div>
-      <div className="journey-facts">
+      <dl className="journey-facts">
         <div><dt>tSPYx (S&amp;P 500 copy)</dt><dd>{view.shares.toFixed(6)} shares</dd></div>
         <div><dt>Value at live SPYx price</dt><dd>${view.valueUsd.toFixed(2)}</dd></div>
         <div><dt>Distributions so far</dt><dd>{((view.multiplier - 1) * 100).toFixed(2)} %</dd></div>
         <div><dt>Test USDC available</dt><dd>{money(view.testUsdcAtomic)}</dd></div>
-      </div>
+      </dl>
       <p className="small-copy">
         Deposit earnings above the required deposit are yours to invest. Devnet lending pays no interest, so you can
         invest your own test USDC here. Distributions raise your displayed shares, as they do for xStocks.

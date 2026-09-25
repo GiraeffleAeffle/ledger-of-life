@@ -319,7 +319,9 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
           {
             address: wallet.address,
             uiOptions: {
-              showWalletUIs: true,
+              // Local demo: the app's own step card is the approval; Privy's preview cannot
+              // simulate sponsor-paid transactions and would block the button.
+              showWalletUIs: process.env.NEXT_PUBLIC_DEMO_SKIP_RECOVERY !== '1',
               isCancellable: true,
               description: request.description,
               buttonText: 'Authorize signature',

@@ -618,6 +618,9 @@ export function createSolanaService(dependencies: Dependencies) {
         t = verified.snapshot.tenancy;
       const action = decodeSolanaAction(input, t.tenantDestination);
       allowed(action, verified.role, verified.snapshot, config);
+      if ((action.kind === 'fund' || action.kind === 'fund_and_supply') &&
+        atomic(verified.snapshot.tenantCashAtomic) < atomic(t.requiredSecurityAtomic))
+        fail('insufficient_funds', `Your wallet needs ${(Number(t.requiredSecurityAtomic) / 1e6).toFixed(2)} test USDC for this deposit. Get it from the faucet, then try again.`);
       const id = hash(
           identity.subject +
             ':' +
