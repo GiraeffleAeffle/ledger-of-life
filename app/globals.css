@@ -2887,3 +2887,40 @@ dd {
 .distribution-timeline li span:not(.timeline-dot) { font-size: 0.8rem; opacity: 0.6; }
 .distribution-timeline li p { margin: 0; font-size: 0.85rem; opacity: 0.8; }
 .timeline-dot { flex: none; width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: #1f7a4d; }
+
+/* Signed-in home: one progress line and one next step per tenancy */
+.home { display: grid; gap: 20px; }
+.home-intro { display: grid; gap: 12px; }
+.tenancy-card { display: grid; gap: 18px; }
+.tenancy-card h2 { display: flex; gap: 8px; align-items: center; }
+.journey-progress { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; list-style: none; margin: 0; padding: 0; counter-reset: none; }
+.journey-progress li { display: grid; justify-items: center; gap: 6px; font-size: 0.78rem; text-align: center; opacity: 0.55; position: relative; }
+.journey-progress li::before { content: ''; position: absolute; top: 13px; left: -50%; width: 100%; height: 2px; background: rgba(0, 0, 0, 0.1); z-index: 0; }
+.journey-progress li:first-child::before { display: none; }
+.journey-progress li.done, .journey-progress li.current { opacity: 1; }
+.journey-progress li.done::before, .journey-progress li.current::before { background: #1f7a4d; }
+.journey-dot { position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #eee; font-weight: 700; font-size: 0.8rem; }
+.journey-progress li.done .journey-dot { background: #1f7a4d; color: white; }
+.journey-progress li.current .journey-dot { background: #e0a526; color: #1b1b1b; box-shadow: 0 0 0 4px rgba(224, 165, 38, 0.25); }
+.next-step-card { display: grid; gap: 10px; padding: 22px; border-radius: 18px; background: #f4f8f3; border: 1px solid rgba(31, 122, 77, 0.2); }
+.next-step-card.passive { background: rgba(0, 0, 0, 0.03); border-color: rgba(0, 0, 0, 0.06); }
+.next-step-card h3 { display: flex; gap: 8px; align-items: center; margin: 0; font-size: 1.35rem; }
+.next-step-card p { margin: 0; }
+.button.large { justify-self: start; padding: 14px 22px; font-size: 1.02rem; }
+.inline-form { display: grid; gap: 10px; max-width: 520px; }
+.inline-form label { display: grid; gap: 4px; font-size: 0.88rem; }
+.inline-form details { display: grid; gap: 8px; }
+.invite-link { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.invite-link p { grid-column: 1 / -1; }
+.journey-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 0; }
+.journey-facts div { display: grid; gap: 2px; }
+.journey-facts dt { font-size: 0.8rem; opacity: 0.65; }
+.journey-facts dd { margin: 0; font-weight: 700; }
+.homes { display: grid; gap: 14px; }
+.listing { display: grid; gap: 8px; padding: 14px; border-radius: 14px; border: 1px solid rgba(0, 0, 0, 0.08); }
+.listing header { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.applicant { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid rgba(0, 0, 0, 0.06); }
+.applicant p { margin: 2px 0 0; font-size: 0.88rem; opacity: 0.8; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 700px) { .journey-progress { grid-template-columns: repeat(3, 1fr); row-gap: 14px; } .journey-progress li::before { display: none; } }

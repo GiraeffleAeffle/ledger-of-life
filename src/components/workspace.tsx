@@ -48,7 +48,7 @@ import {
   money,
 } from './workspace-panels';
 
-export type View = 'overview' | 'deposit' | 'settlement' | 'records' | 'activity' | 'connections';
+export type View = 'home' | 'overview' | 'deposit' | 'settlement' | 'records' | 'activity' | 'connections';
 const people = { tenant: 'Maya', landlord: 'Alex', arbitrator: 'Jordan' };
 const roles: Role[] = ['tenant', 'landlord', 'arbitrator'];
 async function api(path: string, body?: unknown, signal?: AbortSignal) {
@@ -74,6 +74,7 @@ export function Workspace() {
   const [confirmation, setConfirmation] = useState<FinancialOperation | null>(null);
   const [showProjection, setShowProjection] = useState(false);
   const [connections, setConnections] = useState<ReactNode>(null);
+  const [home, setHome] = useState<ReactNode>(null);
   const main = useRef<HTMLElement>(null);
   const totals = state ? summary(state) : null;
 
@@ -102,6 +103,10 @@ export function Workspace() {
     if (view === 'connections' && !connections)
       import('./connections').then((module) => setConnections(<module.Connections />));
   }, [view, connections]);
+  useEffect(() => {
+    if (view === 'home' && !home)
+      import('./home').then((module) => setHome(<module.MyHome openConnections={() => setView('connections')} />));
+  }, [view, home]);
 
   async function refresh() {
     if (state) {
@@ -219,7 +224,18 @@ export function Workspace() {
           </div>
           <span className="tiny-dot" />
         </div>
-        <span className="nav-caption">YOUR WORKSPACE</span>
+        <span className="nav-caption">YOUR REAL TENANCY</span>
+        <nav aria-label="Real tenancy">
+          <button
+            className={`nav-item ${view === 'home' ? 'selected' : ''}`}
+            aria-current={view === 'home' ? 'page' : undefined}
+            onClick={() => navigate('home')}
+          >
+            <House size={18} />
+            My home
+          </button>
+        </nav>
+        <span className="nav-caption">DEMO WALKTHROUGH</span>
         <nav aria-label="Main navigation">
           {nav.map((item) => (
             <button
@@ -259,12 +275,12 @@ export function Workspace() {
       <div className="main-shell">
         <header className="topbar">
           <div className="breadcrumb">
-            {view === 'connections' ? (
+            {view === 'connections' || view === 'home' ? (
               <>
                 <ShieldCheck size={16} />
                 <span>Account</span>
                 <ChevronRight size={14} />
-                <strong>Connected proof</strong>
+                <strong>{view === 'home' ? 'My home' : 'Connected proof'}</strong>
               </>
             ) : (
               <>
@@ -275,7 +291,7 @@ export function Workspace() {
               </>
             )}
           </div>
-          {view !== 'connections' && (
+          {view !== 'connections' && view !== 'home' && (
             <div className="topbar-right">
               <span className="demo-label">
                 <span />
@@ -289,7 +305,7 @@ export function Workspace() {
           )}
         </header>
         <main id="main" ref={main} className="main-content">
-          {view !== 'connections' && (
+          {view !== 'connections' && view !== 'home' && (
             <div className="demo-toolbar">
               <span>
                 <Sparkles size={15} />
@@ -346,7 +362,7 @@ export function Workspace() {
               </button>
             </div>
           )}
-          {!state && view !== 'connections' && (
+          {!state && view !== 'connections' && view !== 'home' && (
             <section className="card loading-card">
               <Sprout size={28} />
               <h1>
@@ -364,7 +380,7 @@ export function Workspace() {
               )}
             </section>
           )}
-          {state && totals && (
+          {state && totals && view !== 'home' && (
             <>
               {totals.pending && (
                 <div className="pending-banner">
@@ -742,6 +758,7 @@ export function Workspace() {
               )}
             </>
           )}
+          {view === 'home' && (home || <section className="card"><h1>Loading your home…</h1></section>)}
           {view === 'connections' &&
             (connections || (
               <section className="card">

@@ -22,7 +22,7 @@ export interface Agreement {
 function digest(value: string) {
   return createHash('sha256').update(value).digest('hex');
 }
-function walletFor(identity: VerifiedIdentity, network: Network) {
+export function walletFor(identity: VerifiedIdentity, network: Network) {
   const candidates = identity.wallets.filter(
     (wallet) => wallet.chainType === (network === 'solana' ? 'solana' : 'ethereum'),
   );
@@ -30,7 +30,7 @@ function walletFor(identity: VerifiedIdentity, network: Network) {
     throw new AccessError('One verified personal wallet is required for this network.');
   return candidates[0];
 }
-function requireReady(identity: VerifiedIdentity) {
+export function requireReady(identity: VerifiedIdentity) {
   if (identity.passkeyCount < 1 || !identity.backupLoginLinked)
     throw new AccessError('Add a passkey and backup access before recording a tenancy.');
 }

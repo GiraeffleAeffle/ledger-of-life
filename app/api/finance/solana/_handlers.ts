@@ -1,6 +1,7 @@
 import { authenticated } from '@/server/authenticated';
 import { getStore } from '@/server/store';
-import { configuredSolanaService, SolanaServiceError } from '@/server/solana-service';
+import { SolanaServiceError } from '@/server/solana-service';
+import { solanaServicesFor } from '@/server/solana-tenancies';
 import { RecoveryError } from '@/server/recovery';
 import { errorResponse, readBody, sameOrigin } from '@/server/http';
 
@@ -19,7 +20,9 @@ function failure(error: unknown) {
 export async function solanaGet(request: Request, id?: string) {
   try {
     const identity = await authenticated(request);
-    const service = await configuredSolanaService(await getStore());
+    const service = (
+      await solanaServicesFor(await getStore(), new URL(request.url).searchParams.get('agreement'))
+    )?.service;
     if (!service)
       return response({
         available: false,
@@ -41,7 +44,9 @@ export async function solanaPost(
   try {
     sameOrigin(request);
     const identity = await authenticated(request);
-    const service = await configuredSolanaService(await getStore());
+    const service = (
+      await solanaServicesFor(await getStore(), new URL(request.url).searchParams.get('agreement'))
+    )?.service;
     if (!service)
       throw new SolanaServiceError(
         503,

@@ -24,6 +24,8 @@ Open [the workspace](http://localhost:4175). Use this hostname for passkeys; Web
 6. Authorize and reconcile settlement. A 120-unit allocation returns 2,880 of the original security to the tenant. Personal holdings remain theirs and can subsequently be sold and withdrawn in the walkthrough.
 7. Open **Connections** for native proof details, real read-only Jupiter prices and provider setup status.
 
+For the real, passkey-signed flow on the Solana test network (post a home → apply → choose → deposit → move-out → payout, one next step at a time), open **My home**. See [the home journey](docs/HOME_JOURNEY.md).
+
 Every financial action has a review, an explicit authorization and a separate result check. A failed purchase leaves personal cash intact. A claim decision alone does not pay anyone.
 
 ## Architecture

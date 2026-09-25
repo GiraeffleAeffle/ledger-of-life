@@ -208,12 +208,22 @@ export class RpcSolanaGateway implements SolanaGateway {
     this.fetcher = fetcher;
   }
   async rpc(method: string, params: unknown[]) {
-    const response = await this.fetcher(this.config.rpcUrl, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-      signal: AbortSignal.timeout(10_000),
-    });
+    let response: Response;
+    // Rate-limited requests were not processed; resending identical bytes (even a signed
+    // transaction) is idempotent, so a short bounded backoff is safe for every method here.
+    for (let attempt = 0; ; attempt++) {
+      response = await this.fetcher(this.config.rpcUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (response.status !== 429 || attempt >= 4) break;
+      const hinted = Number(response.headers.get('retry-after'));
+      const pause = Promise.withResolvers<void>();
+      setTimeout(pause.resolve, Number.isFinite(hinted) && hinted > 0 ? Math.min(hinted, 5) * 1000 : 500 * 2 ** attempt);
+      await pause.promise;
+    }
     if (!response.ok) throw new Error('RPC unavailable');
     const body = object(await response.json());
     if (body.error || !('result' in body)) throw new Error('RPC request failed');

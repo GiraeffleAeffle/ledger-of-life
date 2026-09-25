@@ -1,6 +1,6 @@
 import { authenticated } from '@/server/authenticated';
 import { getStore } from '@/server/store';
-import { configuredSolanaInitializationService } from '@/server/solana-initialization';
+import { solanaServicesFor } from '@/server/solana-tenancies';
 import { SolanaServiceError } from '@/server/solana-service';
 import { RecoveryError } from '@/server/recovery';
 import { errorResponse, readBody, sameOrigin } from '@/server/http';
@@ -16,8 +16,10 @@ function failure(error: unknown) {
     );
   return errorResponse(error);
 }
-async function service() {
-  const configured = await configuredSolanaInitializationService(await getStore());
+async function service(request: Request) {
+  const configured = (
+    await solanaServicesFor(await getStore(), new URL(request.url).searchParams.get('agreement'))
+  )?.initialization;
   if (!configured)
     throw new SolanaServiceError(
       503,
@@ -29,7 +31,7 @@ async function service() {
 export async function GET(request: Request) {
   try {
     const identity = await authenticated(request);
-    return response(await (await service()).status(identity));
+    return response(await (await service(request)).status(identity));
   } catch (error) {
     return failure(error);
   }
@@ -39,7 +41,7 @@ export async function POST(request: Request) {
     sameOrigin(request);
     const identity = await authenticated(request);
     const body = await readBody(request);
-    const configured = await service();
+    const configured = await service(request);
     if (body.action === 'prepare' && Object.keys(body).length === 1)
       return response({ initialization: await configured.prepare(identity) });
     if (
