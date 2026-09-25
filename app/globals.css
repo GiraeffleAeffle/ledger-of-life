@@ -525,6 +525,31 @@
 .operation-section {
   margin-top: 22px;
 }
+.solana-pending,
+.solana-completion {
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid #d4ddce;
+  border-radius: 10px;
+  background: #f2f5ed;
+}
+.solana-pending {
+  border-color: #dccfa9;
+  background: #faf6e9;
+}
+.solana-pending strong {
+  display: block;
+  font-size: 15px;
+}
+.solana-pending p,
+.solana-completion p {
+  margin: 8px 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.solana-pending .button-row {
+  flex-wrap: wrap;
+}
 .operation-detail {
   padding: 18px 0;
   border-bottom: 1px solid var(--line);
@@ -2838,3 +2863,27 @@ dd {
     font-size: 24px;
   }
 }
+
+/* Holdings showcase: fictional walkthrough ownership visuals */
+.holdings-showcase { display: grid; gap: 20px; }
+.holdings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.holding-tile { border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 16px; padding: 18px; display: grid; gap: 10px; background: rgba(255, 255, 255, 0.6); }
+.holding-tile header { display: flex; gap: 12px; align-items: center; }
+.holding-tile header div { display: grid; }
+.holding-tile header span { font-size: 0.85rem; opacity: 0.7; }
+.holding-value { font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em; }
+.holding-change { font-size: 0.9rem; font-weight: 600; }
+.holding-change.up { color: #1f7a4d; }
+.holding-change.down { color: #b3412e; }
+.holding-bar { height: 8px; border-radius: 999px; background: #bfe3cf; overflow: hidden; }
+.holding-bar span { display: block; height: 100%; background: #1f5e45; border-radius: inherit; }
+.home-tiles { display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px; }
+.home-tiles span { aspect-ratio: 1; border-radius: 3px; background: rgba(0, 0, 0, 0.08); }
+.home-tiles span.owned { background: #e0a526; }
+.distribution-timeline h3 { margin: 0 0 10px; font-size: 1rem; }
+.distribution-timeline ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.distribution-timeline li { display: flex; gap: 12px; }
+.distribution-timeline li div { display: grid; gap: 2px; }
+.distribution-timeline li span:not(.timeline-dot) { font-size: 0.8rem; opacity: 0.6; }
+.distribution-timeline li p { margin: 0; font-size: 0.85rem; opacity: 0.8; }
+.timeline-dot { flex: none; width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: #1f7a4d; }

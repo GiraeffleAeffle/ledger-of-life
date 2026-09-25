@@ -31,6 +31,7 @@ import {
   type WorkspaceState,
 } from '@/domain/workflow';
 import { Neighborhood } from './neighborhood';
+import { HoldingsShowcase } from './holdings-showcase';
 import {
   Badge,
   ConfirmOperation,
@@ -468,6 +469,7 @@ export function Workspace() {
                         plan={plan}
                         navigate={navigate}
                       />
+                      <HoldingsShowcase state={state} />
                       <div className="two-panels">
                         <DepositSnapshot state={state} open={() => navigate('deposit')} />
                         <PortfolioActions

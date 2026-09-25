@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, ShieldCheck } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
 import type { SolanaInitialization } from '@/server/solana-initialization';
+import type { SolanaSnapshot } from '@/server/solana-rpc';
 import { Badge, money } from './workspace-panels';
 
 type Role = 'tenant' | 'landlord' | 'arbitrator';
@@ -33,6 +34,7 @@ export function SolanaInitializationPanel({
 }) {
   const wallet = useRentalWallet();
   const [setup, setSetup] = useState<Setup | null>(null);
+  const [tenancyPhase, setTenancyPhase] = useState<SolanaSnapshot['tenancy']['phase'] | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const initialRequest = useRef(request);
@@ -55,6 +57,27 @@ export function SolanaInitializationPanel({
       });
     return () => { active = false; };
   }, [wallet.ready]);
+  useEffect(() => {
+    if (setup?.setupMode !== 'staged' || setup.initialization?.state !== 'finalized') return;
+    let active = true;
+    const readPhase = () => {
+      void initialRequest.current('/api/finance/solana')
+        .then((result) => {
+          if (active) setTenancyPhase((result as SolanaSnapshot).tenancy.phase);
+        })
+        .catch(() => {
+          if (active) setTenancyPhase(null);
+        });
+    };
+    readPhase();
+    window.addEventListener('solana-tenancy-updated', readPhase);
+    window.addEventListener('focus', readPhase);
+    return () => {
+      active = false;
+      window.removeEventListener('solana-tenancy-updated', readPhase);
+      window.removeEventListener('focus', readPhase);
+    };
+  }, [setup?.setupMode, setup?.initialization?.state]);
   useEffect(() => {
     if (setup?.setupMode !== 'staged' ||
         !setup.initialization?.signature ||
@@ -84,6 +107,10 @@ export function SolanaInitializationPanel({
   async function refresh() {
     const result = (await request('/api/finance/solana/initialize')) as Setup;
     setSetup(result);
+    if (result.setupMode === 'staged' && result.initialization?.state === 'finalized') {
+      const snapshot = (await request('/api/finance/solana')) as SolanaSnapshot;
+      setTenancyPhase(snapshot.tenancy.phase);
+    } else setTenancyPhase(null);
   }
   async function change(action: 'prepare' | 'reconcile' | 'retry', notice: string) {
     const result = (await request('/api/finance/solana/initialize', { action })) as {
@@ -160,7 +187,13 @@ export function SolanaInitializationPanel({
         </div>
         <p className="section-copy">
           {ready
-            ? 'The agreed terms are fixed on devnet. The deposit space holds no security until the tenant funds it.'
+            ? tenancyPhase === 'awaiting-funding'
+              ? 'The agreed terms are fixed on devnet. The deposit space holds no security until the tenant funds it.'
+              : tenancyPhase === 'closed'
+                ? 'Setup was completed, and the on-chain tenancy is now closed. See the connected escrow for its final result.'
+                : tenancyPhase
+                  ? `Setup was completed. The on-chain tenancy is now ${tenancyPhase.replaceAll('-', ' ')}; funding is no longer the next step.`
+                  : 'Setup was completed. Checking the current on-chain tenancy phase before showing a next action.'
             : role === 'landlord'
               ? 'Create the empty deposit space for the agreed terms. The tenant can add the security later, on their own time.'
               : role === 'tenant'
@@ -170,7 +203,7 @@ export function SolanaInitializationPanel({
         {initialization && (
           <p className="note">
             Required security: <strong>{money(initialization.requiredSecurityAtomic)} test USDC</strong>.
-            {ready ? ' Current setup is confirmed.' : ' No security has been deposited by this setup.'}
+            {ready ? ' Setup is confirmed; see the connected escrow for current security.' : ' No security has been deposited by this setup.'}
           </p>
         )}
         <div className="button-row">
@@ -187,7 +220,7 @@ export function SolanaInitializationPanel({
           <button className="button secondary" disabled={busy} onClick={() => run(refresh)}>
             <RefreshCw size={16} /> Refresh
           </button>
-          {ready && role === 'tenant' && (
+          {ready && tenancyPhase === 'awaiting-funding' && role === 'tenant' && (
             <a className="button primary" href="#connected-solana-escrow">Review and fund deposit</a>
           )}
         </div>
@@ -226,12 +259,9 @@ export function SolanaInitializationPanel({
       {!setup && message && <p className="note" role="status">{message}</p>}
       {setup && (
         <>
-          <dl className="detail-list">
-            <div><dt>Agreement</dt><dd className="mono">{setup.agreementId}</dd></div>
-            <div><dt>Your role</dt><dd>{setup.role}</dd></div>
-            <div><dt>Network</dt><dd>{setup.cluster}</dd></div>
-            <div><dt>Tenancy address</dt><dd className="mono">{setup.tenancyAddress}</dd></div>
-          </dl>
+          <p className="section-copy">Your role: {setup.role}. {initialization
+            ? `Setup ${initialization.state}; required security ${money(initialization.requiredSecurityAtomic)} test USDC.`
+            : 'Waiting for the parties to prepare the agreement.'}</p>
           {!initialization ? (
             <p className="note">
               No initialization is prepared. Both parties must accept the agreement, and the operator
@@ -243,18 +273,9 @@ export function SolanaInitializationPanel({
                 <div><dt>State</dt><dd>{initialization.state}</dd></div>
                 <div><dt>Required security</dt><dd>{money(initialization.requiredSecurityAtomic)} test USDC</dd></div>
                 <div><dt>Earnings release</dt><dd>{initialization.releasePermitted ? 'Permitted above security' : 'Retained until settlement'}</dd></div>
-                <div><dt>Tenant</dt><dd className="mono">{initialization.tenant}</dd></div>
-                <div><dt>Landlord</dt><dd className="mono">{initialization.landlord}</dd></div>
-                <div><dt>Arbitrator</dt><dd className="mono">{initialization.arbitrator}</dd></div>
-                <div><dt>Policy hash</dt><dd className="mono">{initialization.policyHash}</dd></div>
-                <div><dt>Tenant payout</dt><dd className="mono">{initialization.tenantDestination}</dd></div>
-                <div><dt>Landlord payout</dt><dd className="mono">{initialization.landlordDestination}</dd></div>
                 <div><dt>Signed by</dt><dd>{initialization.signedRoles.join(' and ') || 'Neither party yet'}</dd></div>
                 {initialization.state === 'prepared' && (
                   <div><dt>Sign before</dt><dd>{new Date(initialization.expiresAt).toLocaleTimeString()}</dd></div>
-                )}
-                {initialization.signature && (
-                  <div><dt>Transaction</dt><dd className="mono">{initialization.signature}</dd></div>
                 )}
               </dl>
               {initialization.lastError && <p className="note">{initialization.lastError}</p>}
@@ -266,6 +287,25 @@ export function SolanaInitializationPanel({
               )}
             </>
           )}
+          <details className="operation-section">
+            <summary>Technical setup proof</summary>
+            <dl className="detail-list">
+              <div><dt>Agreement</dt><dd className="mono">{setup.agreementId}</dd></div>
+              <div><dt>Network</dt><dd>{setup.cluster}</dd></div>
+              <div><dt>Tenancy address</dt><dd className="mono">{setup.tenancyAddress}</dd></div>
+              {initialization && (
+                <>
+                  <div><dt>Tenant</dt><dd className="mono">{initialization.tenant}</dd></div>
+                  <div><dt>Landlord</dt><dd className="mono">{initialization.landlord}</dd></div>
+                  <div><dt>Arbitrator</dt><dd className="mono">{initialization.arbitrator}</dd></div>
+                  <div><dt>Policy hash</dt><dd className="mono">{initialization.policyHash}</dd></div>
+                  <div><dt>Tenant payout</dt><dd className="mono">{initialization.tenantDestination}</dd></div>
+                  <div><dt>Landlord payout</dt><dd className="mono">{initialization.landlordDestination}</dd></div>
+                  {initialization.signature && <div><dt>Transaction</dt><dd className="mono">{initialization.signature}</dd></div>}
+                </>
+              )}
+            </dl>
+          </details>
           <div className="button-row">
             {role !== 'arbitrator' &&
               (!initialization || initialization.state === 'failed' || initialization.state === 'prepared' || initialization.state === 'unknown') && (

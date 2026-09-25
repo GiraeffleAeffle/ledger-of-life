@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, ShieldCheck } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
 import type { SolanaOperation } from '@/server/solana-service';
@@ -16,6 +16,7 @@ type Observation = SolanaSnapshot & {
   agreementId: string;
   role: 'tenant' | 'landlord' | 'arbitrator';
   walletId: string;
+  escrowVersion?: 'direct-v1' | 'pull-v2';
   feePayer: string;
   operations: Operation[];
 };
@@ -26,6 +27,7 @@ type Action =
       amountAtomic: string;
     }
   | { kind: 'respond_to_claim'; accept: boolean }
+  | { kind: 'payout'; landlord: boolean }
   | { kind: 'redeem'; receiptAtomic: string; minimumReceivedAtomic: string };
 const titles: Record<Action['kind'], string> = {
   fund: 'Fund the fixed rental security',
@@ -36,6 +38,7 @@ const titles: Record<Action['kind'], string> = {
   respond_to_claim: 'Record the tenant’s claim response',
   resolve_claim: 'Record the assigned arbitration decision',
   settle: 'Pay the recorded security allocation',
+  payout: 'Pay an owed deposit allocation',
 };
 function actionForReview(action: Operation['action']): Action {
   switch (action.kind) {
@@ -56,7 +59,73 @@ function actionForReview(action: Operation['action']): Action {
       };
     case 'respond_to_claim':
       return { kind: 'respond_to_claim', accept: action.accept };
+    case 'payout':
+      return { kind: 'payout', landlord: action.landlord };
   }
+}
+
+type NextStep = { label: string; action?: Action; form?: 'claim' | 'decision'; waiting?: string };
+function nextStep(snapshot: Observation): NextStep {
+  const { tenancy, role } = snapshot;
+  switch (tenancy.phase) {
+    case 'awaiting-funding':
+      return role === 'tenant'
+        ? { label: `Deposit ${money(tenancy.requiredSecurityAtomic)} test USDC`, action: { kind: 'fund' } }
+        : { label: 'Deposit not yet funded', waiting: 'Waiting for the tenant to fund the deposit.' };
+    case 'active':
+      if (role === 'landlord')
+        return { label: 'Propose a claim or confirm no claim', form: 'claim' };
+      if (role === 'tenant' && BigInt(tenancy.accountedIdleAtomic) > 0n)
+        return { label: 'Put the deposit to work', action: { kind: 'supply', amountAtomic: tenancy.accountedIdleAtomic } };
+      return {
+        label: role === 'tenant' ? 'Deposit is active' : 'No dispute to decide',
+        waiting: role === 'tenant'
+          ? 'Waiting for the landlord to propose a claim or confirm no claim.'
+          : 'Waiting for a claim to be disputed before the arbitrator can decide.',
+      };
+    case 'claim-proposed':
+      return role === 'tenant'
+        ? { label: tenancy.claimAtomic === '0' ? 'Accept no deduction' : 'Accept the claim', action: { kind: 'respond_to_claim', accept: true } }
+        : { label: 'Claim awaiting response', waiting: 'Waiting for the tenant to accept or dispute the claim.' };
+    case 'disputed':
+      return role === 'arbitrator'
+        ? { label: 'Decide the disputed claim', form: 'decision' }
+        : { label: 'Claim under review', waiting: 'Waiting for the assigned arbitrator to decide the claim.' };
+    case 'settling':
+      return BigInt(tenancy.accountedReceiptsAtomic) > 0n
+        ? {
+            label: 'Return lending assets to the deposit',
+            action: {
+              kind: 'redeem',
+              receiptAtomic: tenancy.accountedReceiptsAtomic,
+              minimumReceivedAtomic: snapshot.receiptValueAtomic,
+            },
+          }
+        : { label: 'Complete the deposit settlement', action: { kind: 'settle' } };
+    case 'closed':
+      if (snapshot.escrowVersion === 'pull-v2') {
+        const tenantOwed = BigInt(tenancy.tenantOwedAtomic);
+        const landlordOwed = BigInt(tenancy.landlordOwedAtomic);
+        if (role === 'tenant' && tenantOwed > 0n)
+          return { label: `Collect your ${money(tenancy.tenantOwedAtomic)} test USDC payout`, action: { kind: 'payout', landlord: false } };
+        if (role === 'landlord' && landlordOwed > 0n)
+          return { label: `Collect your ${money(tenancy.landlordOwedAtomic)} test USDC payout`, action: { kind: 'payout', landlord: true } };
+        if (tenantOwed > 0n || landlordOwed > 0n)
+          return {
+            label: 'Settlement recorded; payouts outstanding',
+            waiting: tenantOwed > 0n
+              ? 'Waiting for the tenant to collect the owed allocation.'
+              : 'Waiting for the landlord to collect the owed allocation.',
+          };
+      }
+      return { label: 'Deposit settlement completed' };
+  }
+}
+const pendingStates = ['prepared', 'signed', 'broadcast', 'unknown'] as const;
+function latestPending(snapshot: Observation): Operation | undefined {
+  return snapshot.operations.findLast(
+    (item) => item.walletId === snapshot.walletId && pendingStates.some((state) => item.state === state),
+  );
 }
 
 export function NativeSolana({
@@ -65,6 +134,7 @@ export function NativeSolana({
   request: (path: string, body?: unknown) => Promise<unknown>;
 }) {
   const wallet = useRentalWallet();
+  const initialRequest = useRef(request);
   const [observation, setObservation] = useState<Observation | null>(null);
   const [operation, setOperation] = useState<Operation | null>(null);
   const [amount, setAmount] = useState('10');
@@ -76,6 +146,37 @@ export function NativeSolana({
   const phase = tenancy?.phase;
   const role = observation?.role;
   const settlement = operation && tenancy ? settlementPayouts(operation, tenancy) : null;
+  const step = observation ? nextStep(observation) : null;
+  const pending = observation ? latestPending(observation) : null;
+  const settledOperation = observation?.operations.findLast(
+    (item) => item.state === 'finalized' && item.action.kind === 'settle',
+  );
+  const settledPayouts = settledOperation && tenancy ? settlementPayouts(settledOperation, tenancy) : null;
+  const paidFromPayouts = observation && tenancy && observation.escrowVersion === 'pull-v2'
+    ? (['tenant', 'landlord'] as const).map((side) => observation.operations
+        .filter((item) => item.state === 'finalized' && item.action.kind === 'payout')
+        .flatMap((item) => item.expectedDeltas)
+        .filter((delta) => delta.account === tenancy[`${side}Destination`] &&
+          delta.owner === tenancy[side] && delta.mint === tenancy.depositMint &&
+          delta.direction === 'credit' && delta.minimumAtomic === delta.maximumAtomic)
+        .reduce((sum, delta) => sum + BigInt(delta.minimumAtomic), 0n).toString())
+    : null;
+  useEffect(() => {
+    if (!wallet.ready) return;
+    let active = true;
+    void initialRequest.current('/api/finance/solana')
+      .then((result) => {
+        if (!active) return;
+        const next = result as Observation;
+        if (!next.available) return;
+        setObservation(next);
+        setOperation(latestPending(next) ?? null);
+      })
+      .catch((error) => {
+        if (active) setMessage(error instanceof Error ? error.message : 'Solana escrow is unavailable.');
+      });
+    return () => { active = false; };
+  }, [wallet.ready]);
   useEffect(() => {
     if (operation?.state !== 'prepared') return;
     const delay = Math.max(0, Date.parse(operation.expiresAt) - Date.now());
@@ -85,14 +186,24 @@ export function NativeSolana({
   const reviewExpired = operation?.state === 'prepared' &&
     (expiredReviewId === operation.id ||
       /(?:blockhash|operation) expired/i.test(message));
-  async function run(action: () => Promise<void>) {
+  async function run(action: () => Promise<unknown>) {
     if (busy) return;
     setBusy(true);
     setMessage('');
     try {
       await action();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Solana escrow is unavailable.');
+      const detail = error instanceof Error ? error.message : 'Solana escrow is unavailable.';
+      if (/nonce_reserved|already reserves this tenancy nonce/i.test(detail)) {
+        try {
+          const current = await refresh();
+          setMessage(latestPending(current)
+            ? 'Another action is already pending. Resume it in the banner below before preparing a new one.'
+            : 'A pending action reserves this tenancy. Wait for its signer to check the result before preparing another.');
+        } catch {
+          setMessage(detail);
+        }
+      } else setMessage(detail);
     } finally {
       setBusy(false);
     }
@@ -106,40 +217,48 @@ export function NativeSolana({
       throw new Error(next.reason);
     }
     setObservation(next);
+    const latest = latestPending(next);
+    setOperation((selected) =>
+      latest ?? next.operations.find((item) => item.id === selected?.id) ?? selected,
+    );
+    window.dispatchEvent(new Event('solana-tenancy-updated'));
+    return next;
   }
   async function plan(action: Action) {
     if (!observation) throw new Error('Read the verified test escrow first.');
-    if (
+    const needsEvidence =
       action.kind === 'propose_claim' ||
       action.kind === 'resolve_claim' ||
-      (action.kind === 'respond_to_claim' && !action.accept)
-    ) {
-      if (evidence.trim().length < 12)
-        throw new Error('Provide a reason and supporting evidence before continuing.');
-      await request(`/api/agreements/${observation.agreementId}`, {
-        action: 'record',
-        name: titles[action.kind],
-        body: evidence.trim(),
-      });
-    }
+      (action.kind === 'respond_to_claim' && !action.accept);
+    if (needsEvidence && evidence.trim().length < 12)
+      throw new Error('Provide a reason and supporting evidence before continuing.');
     const result = (await request('/api/finance/solana/operations', {
       requestId: crypto.randomUUID(),
       action,
     })) as { operation: Operation };
     setOperation(result.operation);
+    await refresh();
+    if (needsEvidence) {
+      await request(`/api/agreements/${observation.agreementId}`, {
+        action: 'record',
+        name: `Evidence for prepared ${titles[action.kind]} (not confirmed)`,
+        body: `Prepared Solana operation ${result.operation.id}; this is a review, not an on-chain result.\n\n${evidence.trim()}`,
+      });
+      setEvidence('');
+    }
   }
-  async function authorize() {
+  async function authorize(now: () => number) {
     if (!operation || !observation?.walletChain)
       throw new Error('Browser signing is available only for a configured devnet escrow.');
     let current = operation;
-    if (Date.parse(current.expiresAt) <= Date.now() ||
+    if (Date.parse(current.expiresAt) <= now() ||
         /(?:blockhash|operation) expired/i.test(message)) {
       const result = (await request('/api/finance/solana/operations', {
         requestId: crypto.randomUUID(),
         action: actionForReview(current.action),
       })) as { operation: Operation };
       setOperation(result.operation);
-      if (!sameEconomicReview(current, result.operation, Date.now()))
+      if (!sameEconomicReview(current, result.operation, now()))
         throw new Error('The renewed review changed. Check its details before signing.');
       current = result.operation;
     }
@@ -155,19 +274,78 @@ export function NativeSolana({
       description: titles[current.action.kind],
     });
     const signedTxBase64 = btoa(Array.from(signed, (byte) => String.fromCharCode(byte)).join(''));
-    const result = (await request(`/api/finance/solana/operations/${current.id}/authorize`, {
-      signedTxBase64,
-    })) as { operation: Operation };
-    setOperation(result.operation);
+    try {
+      const result = (await request(`/api/finance/solana/operations/${current.id}/authorize`, {
+        signedTxBase64,
+      })) as { operation: Operation };
+      setOperation(result.operation);
+    } catch (error) {
+      try {
+        await refresh();
+      } catch {
+        // Keep the original authorization error if the snapshot is also unavailable.
+      }
+      throw error;
+    }
+    await refresh();
   }
-  async function reconcile() {
-    if (!operation) return;
+  async function reconcile(target: Operation | null = operation) {
+    if (!target) return;
     const result = (await request(
-      `/api/finance/solana/operations/${operation.id}/reconcile`,
+      `/api/finance/solana/operations/${target.id}/reconcile`,
       {},
     )) as { operation: Operation };
     setOperation(result.operation);
     await refresh();
+  }
+  async function retry(target: Operation) {
+    const result = (await request(
+      `/api/finance/solana/operations/${target.id}/retry`,
+      {},
+    )) as { operation: Operation };
+    setOperation(result.operation);
+    await refresh();
+  }
+  function evidenceForm(
+    kind: 'propose_claim' | 'respond_to_claim' | 'resolve_claim' | 'release_earnings',
+    primary: boolean,
+  ) {
+    const hasAmount = kind !== 'respond_to_claim';
+    const hasEvidence = kind !== 'release_earnings';
+    return (
+      <form
+        className="connection-form operation-section"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void run(() => plan(kind === 'respond_to_claim'
+            ? { kind, accept: false }
+            : { kind, amountAtomic: parseAmount(amount) }));
+        }}
+      >
+        {hasAmount && (
+          <label>
+            {kind === 'release_earnings' ? 'Earnings to release' : 'Landlord allocation'} (test USDC)
+            <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" />
+          </label>
+        )}
+        {hasEvidence && (
+          <label>
+            Reason and supporting evidence
+            <textarea value={evidence} onChange={(event) => setEvidence(event.target.value)} maxLength={3000} />
+          </label>
+        )}
+        <p className="small-copy">
+          {hasEvidence
+            ? 'Evidence is attached to a prepared review, not recorded as a completed on-chain claim or decision. Only a finalized result changes the tenancy.'
+            : 'Only observed, permitted surplus can be released; the security remains in the escrow.'}
+        </p>
+        <button className={primary ? 'button primary' : 'button secondary'} disabled={busy || Boolean(pending)}>
+          Review {kind === 'propose_claim' ? 'claim proposal'
+            : kind === 'respond_to_claim' ? 'dispute'
+              : kind === 'resolve_claim' ? 'arbitration decision' : 'earnings release'}
+        </button>
+      </form>
+    );
   }
   return (
     <section className="card operation-section" id="connected-solana-escrow">
@@ -193,40 +371,69 @@ export function NativeSolana({
       )}
       {observation && tenancy && (
         <>
-          <dl className="detail-list">
-            <div>
-              <dt>Your assigned role</dt>
-              <dd>{role}</dd>
+          <div className="section-heading">
+            <h3>{step?.label}</h3>
+            <Badge tone={phase === 'closed' ? 'green' : 'neutral'}>
+              {phase?.replaceAll('-', ' ')}
+            </Badge>
+          </div>
+          <p className="section-copy">
+            {step?.waiting ?? (
+              phase === 'closed'
+                ? 'The on-chain settlement is closed. Check the payout status below.'
+                : `Your assigned role: ${role}. Security required: ${money(tenancy.requiredSecurityAtomic)} test USDC.`
+            )}
+          </p>
+          {phase === 'closed' && (
+            <div className="solana-completion" role="status">
+              {observation.escrowVersion === 'pull-v2' ? (
+                <>
+                  <p>Settlement fixed the allocations. Each unpaid amount needs a separate payout transaction.</p>
+                  <dl className="detail-list">
+                    <div><dt>Tenant payout still owed</dt><dd>{money(tenancy.tenantOwedAtomic)} test USDC</dd></div>
+                    <div><dt>Landlord payout still owed</dt><dd>{money(tenancy.landlordOwedAtomic)} test USDC</dd></div>
+                    <div><dt>Finalized tenant payouts in this history</dt><dd>{money(paidFromPayouts?.[0] ?? '0')} test USDC</dd></div>
+                    <div><dt>Finalized landlord payouts in this history</dt><dd>{money(paidFromPayouts?.[1] ?? '0')} test USDC</dd></div>
+                  </dl>
+                </>
+              ) : settledPayouts ? (
+                <>
+                  <p>The finalized settlement credited the fixed payout accounts.</p>
+                  <dl className="detail-list">
+                    <div><dt>Returned to tenant</dt><dd>{money(settledPayouts.tenantAtomic)} test USDC</dd></div>
+                    <div><dt>Paid to landlord</dt><dd>{money(settledPayouts.landlordAtomic)} test USDC</dd></div>
+                  </dl>
+                </>
+              ) : (
+                <p>The tenancy is closed. No finalized payout breakdown is available in this operation history; do not infer a payment from the closed phase alone.</p>
+              )}
             </div>
-            <div>
-              <dt>Network / tenancy state</dt>
-              <dd>
-                {observation.cluster} / {phase}
-              </dd>
+          )}
+          {pending && (
+            <div className="solana-pending" role="status">
+              <strong>Pending action: {titles[pending.action.kind]}</strong>
+              <p>
+                {pending.state === 'prepared'
+                  ? 'A review already reserves the next action. Open it rather than preparing another.'
+                  : 'A signed transaction may already be on-chain. Check this exact operation before attempting a new action.'}
+              </p>
+              <div className="button-row">
+                <button className="button secondary" disabled={busy} onClick={() => setOperation(pending)}>
+                  Open pending review
+                </button>
+                {pending.state !== 'prepared' && (
+                  <>
+                    <button className="button primary" disabled={busy} onClick={() => run(() => reconcile(pending))}>
+                      <RefreshCw size={16} /> Check result
+                    </button>
+                    <button className="button secondary" disabled={busy} onClick={() => run(() => retry(pending))}>
+                      Retry same signed transaction
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-            <div>
-              <dt>Required security</dt>
-              <dd>{money(tenancy.requiredSecurityAtomic)} USDC</dd>
-            </div>
-            <div>
-              <dt>Escrow cash</dt>
-              <dd>{money(tenancy.accountedIdleAtomic)} USDC</dd>
-            </div>
-            <div>
-              <dt>Lending receipt value</dt>
-              <dd>{money(observation.receiptValueAtomic)} USDC</dd>
-            </div>
-            <div>
-              <dt>Released earnings</dt>
-              <dd>{money(tenancy.releasedEarningsAtomic)} USDC</dd>
-            </div>
-            <div>
-              <dt>Proposed / approved claim</dt>
-              <dd>
-                {money(tenancy.claimAtomic)} / {money(tenancy.approvedClaimAtomic)} USDC
-              </dd>
-            </div>
-          </dl>
+          )}
           {!observation.walletChain && (
             <p className="note">
               Localnet is available for operator tests. This wallet integration does not support
@@ -239,127 +446,30 @@ export function NativeSolana({
               before authorization.
             </p>
           )}
-          <div className="button-row">
-            {role === 'tenant' && phase === 'awaiting-funding' && (
-              <button
-                className="button primary"
-                disabled={busy}
-                onClick={() => run(() => plan({ kind: 'fund' }))}
-              >
-                Review deposit funding
-              </button>
-            )}
-            {role === 'tenant' &&
-              phase === 'active' &&
-              BigInt(tenancy.accountedIdleAtomic) > 0n && (
-                <button
-                  className="button secondary"
-                  disabled={busy}
-                  onClick={() =>
-                    run(() => plan({ kind: 'supply', amountAtomic: tenancy.accountedIdleAtomic }))
-                  }
-                >
-                  Review lending supply
-                </button>
+          {!pending && step?.action && (
+            <button className="button primary" disabled={busy} onClick={() => run(() => plan(step.action!))}>
+              Review: {step.label}
+            </button>
+          )}
+          {!pending && step?.form === 'claim' && evidenceForm('propose_claim', true)}
+          {!pending && step?.form === 'decision' && evidenceForm('resolve_claim', true)}
+          {(phase === 'active' && role === 'tenant' && tenancy.releasePermitted ||
+            phase === 'claim-proposed' && role === 'tenant' ||
+            phase === 'active' && role === 'tenant' && BigInt(tenancy.accountedReceiptsAtomic) > 0n) && (
+            <details className="operation-section">
+              <summary>Other available actions</summary>
+              {phase === 'active' && role === 'tenant' && tenancy.releasePermitted &&
+                evidenceForm('release_earnings', false)}
+              {phase === 'claim-proposed' && role === 'tenant' &&
+                evidenceForm('respond_to_claim', false)}
+              {phase === 'active' && role === 'tenant' && BigInt(tenancy.accountedReceiptsAtomic) > 0n && (
+                <button className="button secondary" disabled={busy || Boolean(pending)} onClick={() => run(() => plan({
+                  kind: 'redeem',
+                  receiptAtomic: tenancy.accountedReceiptsAtomic,
+                  minimumReceivedAtomic: observation.receiptValueAtomic,
+                }))}>Review full lending redemption</button>
               )}
-            {((role === 'tenant' && phase === 'active') || phase === 'settling') &&
-              BigInt(tenancy.accountedReceiptsAtomic) > 0n && (
-                <button
-                  className="button secondary"
-                  disabled={busy}
-                  onClick={() =>
-                    run(() =>
-                      plan({
-                        kind: 'redeem',
-                        receiptAtomic: tenancy.accountedReceiptsAtomic,
-                        minimumReceivedAtomic: observation.receiptValueAtomic,
-                      }),
-                    )
-                  }
-                >
-                  Review full lending redemption
-                </button>
-              )}
-            {role === 'tenant' && phase === 'claim-proposed' && (
-              <button
-                className="button primary"
-                disabled={busy}
-                onClick={() => run(() => plan({ kind: 'respond_to_claim', accept: true }))}
-              >
-              Review {tenancy.claimAtomic === '0' ? 'no-deduction acceptance' : 'claim acceptance'}
-              </button>
-            )}
-            {phase === 'settling' && tenancy.accountedReceiptsAtomic === '0' && (
-              <button
-                className="button primary"
-                disabled={busy}
-                onClick={() => run(() => plan({ kind: 'settle' }))}
-              >
-                Review recorded settlement
-              </button>
-            )}
-          </div>
-          {((phase === 'active' &&
-            ((role === 'tenant' && tenancy.releasePermitted) || role === 'landlord')) ||
-            (phase === 'disputed' && role === 'arbitrator') ||
-            (phase === 'claim-proposed' && role === 'tenant')) && (
-            <form
-              className="connection-form operation-section"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void run(() =>
-                  plan(
-                    phase === 'claim-proposed'
-                      ? { kind: 'respond_to_claim', accept: false }
-                      : {
-                          kind:
-                            role === 'tenant'
-                              ? 'release_earnings'
-                              : role === 'landlord'
-                                ? 'propose_claim'
-                                : 'resolve_claim',
-                          amountAtomic: parseAmount(amount),
-                        },
-                  ),
-                );
-              }}
-            >
-              {phase !== 'claim-proposed' && (
-                <label>
-                  {role === 'tenant' ? 'Earnings to release' : 'Landlord allocation'} (USDC)
-                  <input
-                    value={amount}
-                    onChange={(event) => setAmount(event.target.value)}
-                    inputMode="decimal"
-                  />
-                </label>
-              )}
-              {(role !== 'tenant' || phase === 'claim-proposed') && (
-                <label>
-                  Reason and supporting evidence
-                  <textarea
-                    value={evidence}
-                    onChange={(event) => setEvidence(event.target.value)}
-                    maxLength={3000}
-                  />
-                </label>
-              )}
-              <p className="small-copy">
-                {role === 'tenant' && phase === 'active'
-                  ? 'Redeem lending receipts first. Release is limited to permitted surplus while the required security remains in escrow.'
-                  : 'The private reason is stored with the agreement. A proposed or approved claim does not pay anyone.'}
-              </p>
-              <button className="button secondary" disabled={busy}>
-                Review{' '}
-                {phase === 'claim-proposed'
-                  ? 'dispute'
-                  : role === 'tenant'
-                    ? 'earnings release'
-                    : role === 'landlord'
-                      ? 'claim proposal'
-                      : 'arbitration decision'}
-              </button>
-            </form>
+            </details>
           )}
           <details className="operation-section">
             <summary>Operation history and deployment</summary>
@@ -389,7 +499,7 @@ export function NativeSolana({
         </>
       )}
       {operation && (
-        <section className="operation-section">
+        <section className="operation-section" id="solana-operation-review">
           <div className="section-heading">
             <h3>{titles[operation.action.kind]}</h3>
             <Badge tone={operation.state === 'finalized' ? 'green' : 'neutral'}>
@@ -410,16 +520,10 @@ export function NativeSolana({
               </div>
             )}
             {operation.action.kind === 'redeem' && (
-              <>
-                <div>
-                  <dt>Receipt units to redeem</dt>
-                  <dd>{operation.action.receiptAtomic} atomic units</dd>
-                </div>
-                <div>
-                  <dt>Minimum returned to escrow</dt>
-                  <dd>{money(operation.action.minimumReceivedAtomic)} USDC</dd>
-                </div>
-              </>
+              <div>
+                <dt>Minimum returned to escrow</dt>
+                <dd>{money(operation.action.minimumReceivedAtomic)} test USDC</dd>
+              </div>
             )}
             {operation.action.kind === 'respond_to_claim' && (
               <div>
@@ -431,6 +535,12 @@ export function NativeSolana({
                       : 'Accept the claim'
                     : 'Request assigned arbitration'}
                 </dd>
+              </div>
+            )}
+            {operation.action.kind === 'payout' && tenancy && (
+              <div>
+                <dt>Fixed recipient</dt>
+                <dd>{operation.action.landlord ? 'Landlord' : 'Tenant'} payout account</dd>
               </div>
             )}
             {operation.action.kind === 'settle' && settlement && (
@@ -445,16 +555,18 @@ export function NativeSolana({
                 </div>
               </>
             )}
+            {operation.action.kind === 'settle' && observation?.escrowVersion === 'pull-v2' && tenancy && (
+              <>
+                <div><dt>Recorded as owed to tenant</dt><dd>{money((BigInt(tenancy.accountedIdleAtomic) - BigInt(tenancy.approvedClaimAtomic)).toString())} test USDC</dd></div>
+                <div><dt>Recorded as owed to landlord</dt><dd>{money(tenancy.approvedClaimAtomic)} test USDC</dd></div>
+              </>
+            )}
             <div>
-              <dt>Sponsor debit ceiling</dt>
-              <dd>{displayAmount(operation.simulation.sponsorDebitCeilingLamports, 9, 9)} SOL</dd>
-            </div>
-            <div>
-              <dt>Authorization expires</dt>
+              <dt>Review expires</dt>
               <dd>{new Date(operation.expiresAt).toLocaleString()}</dd>
             </div>
           </dl>
-          {operation.action.kind === 'settle' && !settlement && (
+          {operation.action.kind === 'settle' && observation?.escrowVersion !== 'pull-v2' && !settlement && (
             <p className="note" role="status">
               The fixed-recipient settlement amounts could not be verified. Do not sign this review.
             </p>
@@ -471,20 +583,8 @@ export function NativeSolana({
           )}
           <div className="button-row">
             {['signed', 'broadcast', 'unknown'].includes(operation.state) &&
-              operation.walletId === observation?.walletId && (
-                <button
-                  className="button secondary"
-                  disabled={busy}
-                  onClick={() =>
-                    run(async () => {
-                      const result = (await request(
-                        `/api/finance/solana/operations/${operation.id}/retry`,
-                        {},
-                      )) as { operation: Operation };
-                      setOperation(result.operation);
-                    })
-                  }
-                >
+              operation.walletId === observation?.walletId && pending?.id !== operation.id && (
+                <button className="button secondary" disabled={busy} onClick={() => run(() => retry(operation))}>
                   Retry the same signed transaction
                 </button>
               )}
@@ -492,18 +592,24 @@ export function NativeSolana({
               <button
                 className="button primary"
                 disabled={busy || wallet.busy || !observation?.walletChain ||
-                  (operation.action.kind === 'settle' && !settlement)}
-                onClick={() => run(authorize)}
+                  (operation.action.kind === 'settle' && observation?.escrowVersion !== 'pull-v2' && !settlement)}
+                onClick={() => run(() => authorize(Date.now))}
               >
                 <ShieldCheck size={16} /> {reviewExpired ? 'Renew and sign reviewed devnet action' : 'Sign reviewed devnet action'}
               </button>
             )}
-            <button className="button secondary" disabled={busy} onClick={() => run(reconcile)}>
-              <RefreshCw size={16} /> Check finalized result
-            </button>
+            {pending?.id !== operation.id && operation.state !== 'prepared' && (
+              <button className="button secondary" disabled={busy} onClick={() => run(() => reconcile())}>
+                <RefreshCw size={16} /> Check finalized result
+              </button>
+            )}
           </div>
           <details className="operation-section">
             <summary>Exact authorization and receipt</summary>
+            <p className="small-copy">
+              Sponsor debit ceiling: {displayAmount(operation.simulation.sponsorDebitCeilingLamports, 9, 9)} test SOL.
+              {operation.action.kind === 'redeem' && ` Lending receipts: ${operation.action.receiptAtomic} atomic units.`}
+            </p>
             <pre className="proof-code">
               {JSON.stringify(
                 {
