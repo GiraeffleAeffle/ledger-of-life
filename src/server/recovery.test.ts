@@ -167,7 +167,7 @@ test('HTTP recovery verifies actual EVM and Ed25519 signatures in another browse
       'wallet-ethereum',
     );
     assert.equal(gate.wallet.address, context.enrollment.wallets[0].address);
-    assert.equal(gate.proof.checkedAt, '2026-09-22T19:00:00.000Z');
+    assert.equal(gate.proof!.checkedAt, '2026-09-22T19:00:00.000Z');
     assert.equal(JSON.stringify(persisted).includes('browserHash'), false);
     assert.equal(JSON.stringify(persisted).includes('nonce'), false);
   } finally {

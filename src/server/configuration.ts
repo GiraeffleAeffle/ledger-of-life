@@ -1,6 +1,7 @@
 export function connectionStatus(environment: Record<string, string | undefined>) {
   return {
     identity: Boolean(environment.NEXT_PUBLIC_PRIVY_APP_ID && environment.PRIVY_APP_SECRET),
+    recoveryCheck: !(environment.DEMO_SKIP_RECOVERY === '1' && environment.NODE_ENV !== 'production'),
     persistence: environment.DATABASE_URL
       ? 'postgres'
       : environment.NODE_ENV !== 'production' || environment.ALLOW_LOCAL_STORE === '1'

@@ -174,11 +174,20 @@ function assertRecoveryBrowser(
 /** Read-only gate for connected finance; no caller-provided recovery flag is accepted. */
 /** Custody services only need the gate to throw when recovery is missing; the result is unused. */
 export type RecoveryGate = (store: Store, identity: VerifiedIdentity, walletId: string) => Promise<unknown>;
+/** Local demo only: skip the second-browser recovery proof (never in a production build). */
+export function recoveryCheckRequired(environment: Record<string, string | undefined> = process.env) {
+  return !(environment.DEMO_SKIP_RECOVERY === '1' && environment.NODE_ENV !== 'production');
+}
 export async function requireWalletRecovery(
   store: Store,
   identity: VerifiedIdentity,
   walletId: string,
 ) {
+  if (!recoveryCheckRequired()) {
+    const wallet = identity.wallets.find((candidate) => candidate.id === walletId);
+    if (!wallet) throw new RecoveryError(409, 'recovery_required', 'This wallet is not linked to your account.');
+    return { wallet, proof: null };
+  }
   const record = await store.get<RecoveryRecord>(accountKey(identity.subject));
   assertCurrentBaseline(record, identity);
   const wallet = record.baseline.wallets.find((candidate) => candidate.id === walletId);

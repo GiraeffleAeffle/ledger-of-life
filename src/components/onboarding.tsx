@@ -79,11 +79,15 @@ export function AccountSetup({ role, authorized, onChangeRole, onReady }: {
   const recovery = useRecovery(authorized);
   const [copied, setCopied] = useState(false);
   const creating = useRef(false);
+  const [recoveryCheck, setRecoveryCheck] = useState(true);
+  useEffect(() => {
+    fetch('/api/status').then((r) => r.json()).then((d) => setRecoveryCheck(d.recoveryCheck !== false)).catch(() => {});
+  }, []);
   const hasWallets = wallet.wallets.some((w) => w.chainType === 'solana') && wallet.wallets.some((w) => w.chainType === 'ethereum');
   const accountDone = wallet.authenticated && wallet.passkeyCount > 0;
   const backupDone = accountDone && wallet.backupLoginLinked;
   const status = recovery.identity?.recovery.status;
-  const recoveryDone = status === 'verified';
+  const recoveryDone = recoveryCheck ? status === 'verified' : hasWallets;
 
   // Wallets are created automatically once passkey and backup exist.
   useEffect(() => {
@@ -94,11 +98,11 @@ export function AccountSetup({ role, authorized, onChangeRole, onReady }: {
   // Keep the recovery status live (it changes when the second browser finishes).
   const { inspect } = recovery;
   useEffect(() => {
-    if (!backupDone || !hasWallets || recoveryDone) return;
+    if (!recoveryCheck || !backupDone || !hasWallets || recoveryDone) return;
     const first = setTimeout(() => void inspect(), 0);
     const timer = setInterval(() => void inspect(), 6000);
     return () => { clearTimeout(first); clearInterval(timer); };
-  }, [backupDone, hasWallets, recoveryDone, inspect]);
+  }, [recoveryCheck, backupDone, hasWallets, recoveryDone, inspect]);
   useEffect(() => {
     if (recoveryDone) onReady();
   }, [recoveryDone, onReady]);
@@ -109,7 +113,7 @@ export function AccountSetup({ role, authorized, onChangeRole, onReady }: {
   return (
     <section className="onboarding">
       <span className="eyebrow">SET UP YOUR ACCOUNT · {roleName.toUpperCase()}</span>
-      <h1>Four quick steps, once.</h1>
+      <h1>{recoveryCheck ? 'Four quick steps, once.' : 'Three quick steps, once.'}</h1>
       <p className="lede">Your passkey signs you in. Your own wallet holds your money; nobody else can move it.</p>
       <ol className="setup-steps">
         <Step n={1} state={state(accountDone, true)} title="Create your account with a passkey">
@@ -134,7 +138,7 @@ export function AccountSetup({ role, authorized, onChangeRole, onReady }: {
         <Step n={3} state={state(hasWallets, backupDone)} title="Create your wallet">
           <p><Loader2 className="spin" size={14} /> Creating your personal wallet…</p>
         </Step>
-        <Step n={4} state={state(recoveryDone, backupDone && hasWallets)} title="Prove you can recover it">
+        {recoveryCheck && <Step n={4} state={state(recoveryDone, backupDone && hasWallets)} title="Prove you can recover it">
           {status === undefined || recovery.busy && !status ? (
             <p><Loader2 className="spin" size={14} /> Checking…</p>
           ) : status === 'needs_baseline' ? (
@@ -175,7 +179,7 @@ export function AccountSetup({ role, authorized, onChangeRole, onReady }: {
             <p>Finish the steps above first.</p>
           )}
           {recovery.error && <p className="note" role="alert">{recovery.error}</p>}
-        </Step>
+        </Step>}
       </ol>
       {wallet.error && <p className="note" role="alert">{wallet.error}</p>}
       <button className="text-button" onClick={onChangeRole}>Not a {role}? Choose another role</button>
