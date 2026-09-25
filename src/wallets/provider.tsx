@@ -34,6 +34,10 @@ import { validateRecoveryRequest } from './recovery.ts';
 import { prepareEscrowTypedData } from './escrow-signing.ts';
 import { pendingInvitationRole } from './pending-invitation.ts';
 
+/** Local demo builds let the app's own step card be the approval instead of Privy's review modals. */
+const DEVNET_RPC = process.env.NEXT_PUBLIC_SOLANA_DEVNET_RPC_URL || 'https://api.devnet.solana.com';
+const SHOW_WALLET_UIS = process.env.NEXT_PUBLIC_DEMO_SKIP_RECOVERY !== '1';
+
 const unavailable = async (): Promise<never> => {
   throw new Error('Account access is not configured yet.');
 };
@@ -158,7 +162,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           embeddedWallets: {
             ethereum: { createOnLogin: 'off' },
             solana: { createOnLogin: 'off' },
-            showWalletUIs: true,
+            showWalletUIs: SHOW_WALLET_UIS,
           },
           solana: {
             rpcs: {
@@ -167,8 +171,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 rpcSubscriptions: createSolanaRpcSubscriptions('wss://api.mainnet-beta.solana.com'),
               },
               'solana:devnet': {
-                rpc: createSolanaRpc('https://api.devnet.solana.com'),
-                rpcSubscriptions: createSolanaRpcSubscriptions('wss://api.devnet.solana.com'),
+                rpc: createSolanaRpc(DEVNET_RPC),
+                rpcSubscriptions: createSolanaRpcSubscriptions(DEVNET_RPC.replace(/^http/, 'ws')),
               },
             },
           },
@@ -321,7 +325,7 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
             uiOptions: {
               // Local demo: the app's own step card is the approval; Privy's preview cannot
               // simulate sponsor-paid transactions and would block the button.
-              showWalletUIs: process.env.NEXT_PUBLIC_DEMO_SKIP_RECOVERY !== '1',
+              showWalletUIs: SHOW_WALLET_UIS,
               isCancellable: true,
               description: request.description,
               buttonText: 'Authorize signature',
@@ -347,7 +351,7 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
           wallet,
           options: {
             uiOptions: {
-              showWalletUIs: true,
+              showWalletUIs: SHOW_WALLET_UIS,
               isCancellable: true,
               description: request.description,
               buttonText: 'Authorize signature',
@@ -362,7 +366,7 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
         requireSession();
         const { wallet } = validateRecoveryRequest(chainType, message, user!.id, wallets);
         const uiOptions = {
-          showWalletUIs: true,
+          showWalletUIs: SHOW_WALLET_UIS,
           title: 'Verify access to your existing wallet',
           description: 'Sign this recovery check. It does not authorize a transfer.',
           buttonText: 'Verify wallet access',
@@ -395,7 +399,7 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
         const { signature } = await signTypedData(typedData, {
           address: wallet!.address,
           uiOptions: {
-            showWalletUIs: true,
+            showWalletUIs: SHOW_WALLET_UIS,
             isCancellable: true,
             title: 'Authorize this rental action',
             description: request.description,

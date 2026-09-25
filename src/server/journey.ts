@@ -133,6 +133,9 @@ function pendingFor(operations: Omit<SolanaOperation, 'signedTxBase64' | 'subjec
   return operations.find((op) => op.walletId === walletId && op.signature && ['signed', 'broadcast', 'unknown'].includes(op.state));
 }
 
+/** Closed and fully paid tenancies never change again; skip chain reads for them. */
+const finished = new Map<string, TenancyJourney>();
+
 export async function tenancyJourney(
   store: Store,
   identity: VerifiedIdentity,
@@ -140,6 +143,8 @@ export async function tenancyJourney(
   resolveServices: typeof solanaServicesFor = solanaServicesFor,
 ): Promise<TenancyJourney> {
   const role = agreementRole(agreement, identity);
+  const cached = finished.get(`${agreement.id}:${role}`);
+  if (cached && resolveServices === solanaServicesFor) return cached;
   const base = { agreementId: agreement.id, property: agreement.property, role, requiredSecurity: agreement.requiredSecurity, chain: null };
   const early = agreementStep(agreement, role);
   if (early) return { ...base, stage: 'agreement', next: early };
@@ -175,7 +180,7 @@ export async function tenancyJourney(
       .filter((op) => op.state === 'finalized' && op.action.kind === 'payout' && op.action.landlord === landlord)
       .reduce((sum, op) => sum + BigInt(op.expectedDeltas.find((delta) => delta.direction === 'credit')?.minimumAtomic ?? '0'), 0n)
       .toString();
-  return {
+  const result: TenancyJourney = {
     ...base,
     stage,
     next: pending ? { kind: 'confirming', label: 'Confirming on the network…', detail: 'Your approval was sent. This usually takes a few seconds.', operationId: pending.id } : next,
@@ -194,6 +199,8 @@ export async function tenancyJourney(
       walletChain: snapshot.walletChain === 'solana:devnet' ? 'solana:devnet' : null,
     },
   };
+  if (result.next.kind === 'done' && resolveServices === solanaServicesFor) finished.set(`${agreement.id}:${role}`, result);
+  return result;
 }
 
 export async function myTenancies(store: Store, identity: VerifiedIdentity) {

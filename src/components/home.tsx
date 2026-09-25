@@ -108,9 +108,11 @@ function SignedInHome({ role, onChangeRole, openConnections }: { role: ChosenRol
   const waiting = tenancies?.some((t) => 'unavailable' in t || AUTO[t.next.kind]);
   useEffect(() => {
     if (!waiting) return;
-    const timer = setInterval(() => load().catch(() => {}), 5000);
+    // Confirmations refresh quickly; plain waiting (the other person's turn) refreshes gently.
+    const fast = tenancies?.some((t) => 'next' in t && (t.next.kind === 'confirming' || t.next.kind === 'paying_out'));
+    const timer = setInterval(() => load().catch(() => {}), fast ? 5000 : 15000);
     return () => clearInterval(timer);
-  }, [waiting, load]);
+  }, [waiting, load, tenancies]);
 
   const helper: Helper | null = helpers
     ? async (body) => {
@@ -565,15 +567,19 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
   }, [request, onBalance]);
   useEffect(() => {
     let active = true;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio')
       .then(({ portfolio }) => {
         if (!active) return;
         setView(portfolio.available ? portfolio : null);
         if (portfolio.available) onBalance(portfolio.testUsdcAtomic);
       })
-      .catch(() => {});
-    return () => { active = false; };
-  }, [request, onBalance]);
+      .catch(() => {
+        // Busy public RPC: try again shortly instead of hiding the portfolio.
+        if (active) retry = setTimeout(() => active && refresh().catch(() => {}), 8000);
+      });
+    return () => { active = false; clearTimeout(retry); };
+  }, [request, onBalance, refresh]);
   if (!view) return null;
   async function invest() {
     setBusy(true);

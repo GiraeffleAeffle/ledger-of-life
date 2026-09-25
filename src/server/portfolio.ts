@@ -7,7 +7,8 @@ import {
   compileTransaction,
   createKeyPairSignerFromBytes,
   createNoopSigner,
-  createSolanaRpc,
+  createDefaultRpcTransport,
+  createSolanaRpcFromTransport,
   createTransactionMessage,
   getBase64EncodedWireTransaction,
   getTransactionDecoder,
@@ -46,6 +47,25 @@ const DECIMALS = 8;
 type PreparedBuy = { id: string; subject: string; wallet: string; messageSha256: string; usdcInAtomic: string; rawOutAtomic: string; expiresAt: number };
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
+/** Public devnet RPC rate-limits bursts; rate-limited calls were not processed, so retry them. */
+function retryingTransport(url: string) {
+  const transport = createDefaultRpcTransport({ url });
+  return (async (config: Parameters<typeof transport>[0]) => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await transport(config);
+      } catch (error) {
+        const context = error && typeof error === 'object' && 'context' in error ? error.context : null;
+        const limited = Boolean(context && typeof context === 'object' && 'statusCode' in context && context.statusCode === 429);
+        if (!limited || attempt >= 5) throw error;
+        const pause = Promise.withResolvers<void>();
+        setTimeout(pause.resolve, 400 * 2 ** attempt);
+        await pause.promise;
+      }
+    }
+  }) as typeof transport;
+}
+
 async function market(environment: Record<string, string | undefined>) {
   const config = solanaConfiguration(environment);
   if (!config || config.cluster !== 'devnet' || environment.SOLANA_TEST_SIGNER_MODE !== '1') return null;
@@ -53,7 +73,7 @@ async function market(environment: Record<string, string | undefined>) {
   try {
     const { mint } = JSON.parse(await readFile(resolve(dir, 'market.json'), 'utf8')) as { mint: string };
     const maker = await createKeyPairSignerFromBytes(new Uint8Array(JSON.parse(await readFile(resolve(dir, 'market-maker.json'), 'utf8'))));
-    return { rpc: createSolanaRpc(config.rpcUrl), mint: address(mint), maker };
+    return { rpc: createSolanaRpcFromTransport(retryingTransport(config.rpcUrl)), mint: address(mint), maker };
   } catch {
     return null;
   }
