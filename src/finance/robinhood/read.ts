@@ -19,7 +19,11 @@ export interface EscrowSnapshot {
   personalWallet: Address;
   agreementHash: string;
   securityRequirement: string;
+  fundingReserve: string;
   earningsReleaseAllowed: boolean;
+  tenantAccepted: boolean;
+  landlordAccepted: boolean;
+  arbitratedDecision: boolean;
   trackedShares: string;
   totalSupplied: string;
   totalRedeemed: string;
@@ -56,7 +60,11 @@ export async function readEscrow(
     'arbitrator',
     'personalWallet',
     'agreementHash',
+    'tenantAccepted',
+    'arbitratedDecision',
+    'landlordAccepted',
     'securityRequirement',
+    'fundingReserve',
     'earningsReleaseAllowed',
     'trackedShares',
     'totalSupplied',
@@ -102,8 +110,12 @@ export async function readEscrow(
     landlord: getAddress(String(record.landlord)),
     arbitrator: getAddress(String(record.arbitrator)),
     personalWallet: getAddress(String(record.personalWallet)),
+    fundingReserve: String(record.fundingReserve),
     agreementHash: String(record.agreementHash),
     securityRequirement: String(record.securityRequirement),
+    tenantAccepted: record.tenantAccepted === true,
+    arbitratedDecision: record.arbitratedDecision === true,
+    landlordAccepted: record.landlordAccepted === true,
     earningsReleaseAllowed: record.earningsReleaseAllowed === true,
     trackedShares: String(record.trackedShares),
     totalSupplied: String(record.totalSupplied),

@@ -39,6 +39,7 @@ contract RentalEscrow {
     address public immutable personalWallet;
     uint256 public immutable fixedChainId;
     uint256 public immutable securityRequirement;
+    uint256 public immutable fundingReserve;
     bool public immutable earningsReleaseAllowed;
     bytes32 public immutable agreementHash;
 
@@ -97,6 +98,7 @@ contract RentalEscrow {
         address arbitrator;
         address personalWallet;
         uint256 securityRequirement;
+        uint256 fundingReserve;
         bool earningsReleaseAllowed;
         bytes32 agreementHash;
     }
@@ -108,12 +110,14 @@ contract RentalEscrow {
                 || config.personalWallet == address(0) || config.tenant == config.landlord
                 || config.tenant == config.arbitrator || config.landlord == config.arbitrator
                 || config.personalWallet == config.landlord || config.personalWallet == config.arbitrator
-                || config.securityRequirement == 0 || config.agreementHash == bytes32(0)
+                || config.securityRequirement == 0 || config.fundingReserve > 1e6
+                || config.fundingReserve > config.securityRequirement / 100 || config.agreementHash == bytes32(0)
         ) revert InvalidConfiguration();
         if (IMorphoVault(config.vault).asset() != config.asset) revert InvalidConfiguration();
         asset = IERC20Asset(config.asset);
         vault = IMorphoVault(config.vault);
         tenant = config.tenant;
+        fundingReserve = config.fundingReserve;
         landlord = config.landlord;
         arbitrator = config.arbitrator;
         personalWallet = config.personalWallet;
@@ -238,9 +242,9 @@ contract RentalEscrow {
     function fund(uint256 expectedNonce, uint256 deadline) external operation(expectedNonce, deadline) {
         _onlyTenant();
         if (state != State.AwaitingFunding) revert InvalidState();
-        asset.safeTransferFrom(tenant, securityRequirement);
+        asset.safeTransferFrom(tenant, securityRequirement + fundingReserve);
         state = State.Active;
-        emit Funded(securityRequirement, expectedNonce);
+        emit Funded(securityRequirement + fundingReserve, expectedNonce);
     }
 
     function supply(uint256 assets, uint256 minShares, uint256 expectedNonce, uint256 deadline)
@@ -267,11 +271,12 @@ contract RentalEscrow {
         if (state != State.Active || !earningsReleaseAllowed) return 0;
         uint256 positionValue = vault.previewRedeem(trackedShares);
         uint256 value = asset.balanceOf(address(this)) + positionValue;
-        if (value <= securityRequirement) return 0;
+        uint256 protectedAmount = securityRequirement + fundingReserve;
+        if (value <= protectedAmount) return 0;
         uint256 recoveredAndHeld = totalRedeemed + positionValue;
         if (recoveredAndHeld <= totalSupplied + releasedEarnings) return 0;
         uint256 earned = recoveredAndHeld - totalSupplied - releasedEarnings;
-        uint256 surplus = value - securityRequirement;
+        uint256 surplus = value - protectedAmount;
         return earned < surplus ? earned : surplus;
     }
 
@@ -293,7 +298,7 @@ contract RentalEscrow {
         }
         releasedEarnings += assets;
         asset.safeTransfer(personalWallet, assets);
-        if (securityValue() < securityRequirement) revert InsufficientSecurity();
+        if (securityValue() < securityRequirement + fundingReserve) revert InsufficientSecurity();
         emit EarningsReleased(personalWallet, assets, expectedNonce);
     }
 

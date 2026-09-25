@@ -91,6 +91,10 @@ function snapshot(): EscrowSnapshot {
     personalWallet: tenant.address,
     agreementHash: blockHash,
     securityRequirement: '3000000000',
+    fundingReserve: '10000',
+    tenantAccepted: false,
+    landlordAccepted: false,
+    arbitratedDecision: false,
     earningsReleaseAllowed: true,
     trackedShares: '0',
     totalSupplied: '0',
@@ -113,12 +117,11 @@ function fixture(store: Store = new LocalStore(':memory:'), config = configurati
     broadcasts: [] as Hex[],
     nonceReads: 0,
     simulations: 0,
-    observations: 0,
     recoveryChecks: 0,
+    observations: 0,
   };
   const controls = {
-    recovery: true,
-    allowance: 3000000000n,
+    allowance: 3000010000n,
     estimate: 100000n,
     fee: 2n,
     failBroadcast: false,
@@ -130,6 +133,11 @@ function fixture(store: Store = new LocalStore(':memory:'), config = configurati
     previewUnavailable: false,
     receiptUnavailable: false,
     time: now,
+    idle: 3000000000n,
+    depositPreview: 3000000000000000000000n,
+    redeemPreview: 3000000000n,
+    redeemLoss: 0n,
+    recovery: true,
   };
   let latestRaw: Hex | undefined;
   const client = {
@@ -139,17 +147,19 @@ function fixture(store: Store = new LocalStore(':memory:'), config = configurati
       if (controls.simulationFailure) throw new Error('Native simulation reverted');
       return { data: '0x' };
     },
-    readContract: async ({ functionName }: { functionName: string }) => {
+    readContract: async ({ functionName, args }: { functionName: string; args?: readonly unknown[] }) => {
       if (functionName === 'allowance') return controls.allowance;
-      if (functionName === 'balanceOf') return 3000000000n;
+      if (functionName === 'balanceOf') return controls.idle;
       if (functionName === 'previewDeposit') {
         if (controls.previewUnavailable) throw new Error('RPC failed');
-        return 3000000000000000000000n;
+        return BigInt(args?.[0] as bigint) * 1000000000000n;
       }
       if (functionName === 'previewWithdraw') return 10000000000000000000n;
       if (functionName === 'previewRedeem') {
         if (controls.previewUnavailable) throw new Error('RPC failed');
-        return 1000000000n;
+        const shares = BigInt(args?.[0] as bigint);
+        return (shares === 1000000000000000000000n ? 1000000000n : shares / 1000000000000n) -
+          controls.redeemLoss;
       }
       if (functionName === 'fixedChainId') return 4663n;
       const value = observed[functionName as keyof EscrowSnapshot];
@@ -377,7 +387,8 @@ test('persisted recovery is required for planning and rechecked immediately befo
 test('funding requires existing exact allowance and never submits an approval on behalf of a user', async () => {
   const f = fixture();
   await f.bindAgreement();
-  f.controls.allowance = 0n;
+  // Security alone is insufficient; the tenant-owned rounding reserve must be approved too.
+  f.controls.allowance = 3000000000n;
   await assert.rejects(
     () =>
       f.service.plan(identity, {
@@ -393,7 +404,7 @@ test('funding requires existing exact allowance and never submits an approval on
         spender: string;
         approval: { to: string; value: string };
       };
-      assert.equal(details.amount, '3000000000');
+      assert.equal(details.amount, '3000010000');
       assert.equal(details.spender, escrow);
       assert.equal(details.approval.to, robinhoodMainnet.asset.address);
       assert.equal(details.approval.value, '0');
@@ -402,7 +413,7 @@ test('funding requires existing exact allowance and never submits an approval on
   );
   assert.equal(f.effects.broadcasts.length, 0);
   assert.equal(f.effects.simulations, 0);
-  f.controls.allowance = 3000000000n;
+  f.controls.allowance = 3000010000n;
   assert.equal(
     (
       await f.service.plan(identity, {
@@ -444,9 +455,21 @@ test('funding binds both accepted agreement digests, current tenant identity, am
   await f.store.close();
 });
 
+test('supply hint preserves exact security at the rounding boundary and fails closed one unit short', async () => {
+  const f = fixture();
+  f.observed.state = 2;
+  f.controls.redeemLoss = 0n;
+  let result = await f.service.observation(identity);
+  assert.equal(result.planningHints.supply?.assets, '3000000000');
+  f.controls.redeemLoss = 1n;
+  result = await f.service.observation(identity);
+  assert.equal(result.planningHints.supply, null);
+  await f.store.close();
+});
 test('read-only planning hints use atomic previews with 2 bps bounds and preserve unavailable evidence', async () => {
   const f = fixture();
   f.observed.state = 2;
+  f.controls.redeemPreview = 3000000000n;
   f.observed.releasableEarnings = '10000000';
   f.observed.trackedShares = '3000000000000000000000';
   const result = await f.service.observation(identity);

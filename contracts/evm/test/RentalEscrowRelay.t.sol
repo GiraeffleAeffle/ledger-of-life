@@ -74,6 +74,7 @@ contract RentalEscrowRelayTest {
                 arbitrator,
                 account,
                 3_000e6,
+                0,
                 true,
                 keccak256("RELAY TEST AGREEMENT")
             )

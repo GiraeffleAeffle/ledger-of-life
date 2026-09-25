@@ -68,15 +68,23 @@ node --experimental-strip-types --test src/finance/robinhood/native.test.ts
 | Fork observation | Result |
 | --- | ---: |
 | Declared local security fixture | 3,000 USDG |
-| Separate local rounding buffer | 1 USDG |
-| Vault shares minted | 2,976.933803835862343805 |
-| Eligible earnings after **90 days of synthetic time progression** | 40.743012 USDG |
-| Earnings released into personal wallet | 10 USDG |
+| Cash retained for preview rounding | Determined from same-block deposit/redeem previews |
+| Vault shares minted | Reported by the fork test |
+| Eligible earnings after **90 days of synthetic time progression** | Reported by the fork test |
+| Earnings released | 10 USDG |
 | Landlord settlement | 120 USDG |
-| Tenant settlement, including residual earnings and buffer | 2,911.743012 USDG |
+| Tenant settlement | Includes residual earnings and any retained cash |
 | Remaining escrow shares | 0 |
 
-These are local fork results, not realized mainnet returns or a forecast. The fixture changes the tenant's local token balance and local time; no transaction is broadcast to Robinhood. Morpho V2's transient per-transaction accrual cache requires deposit setup and later accrual to execute as separate transactions. Advancing time within the same Foundry transaction does not reset that cache. The extra buffer covers share rounding without silently reducing required security; actual costs need an identified payer in the product.
+The fork supplies only the exact funded security requirement. It computes a
+preview-backed amount that leaves enough USDG idle to preserve the contract's
+minimum accounting value; a separate test call confirms that supplying all
+available USDG reverts when preview rounding would make security insufficient.
+These are local fork results, not realized mainnet returns or a forecast. The
+fixture changes the tenant's local token balance and local time; no transaction
+is broadcast to Robinhood. Morpho V2's transient per-transaction accrual cache
+requires deposit setup and later accrual to execute as separate transactions.
+Advancing time within the same Foundry transaction does not reset that cache.
 
 Replay, using an archive-capable RPC if the public endpoint has pruned the block:
 

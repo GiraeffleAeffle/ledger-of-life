@@ -326,23 +326,43 @@ export async function readPlanningHints(
   const blockNumber = atomic(snapshot.blockNumber);
   const [supply, release, settle] = await Promise.allSettled([
     (async () => {
-      const assets = await client.readContract({
+      const idle = await client.readContract({
         address: config.manifest.asset.address,
         abi: erc20Abi,
         functionName: 'balanceOf',
         args: [config.escrow],
         blockNumber,
       });
-      if (assets === 0n || snapshot.state !== 2) return null;
-      const preview = await client.readContract({
-        address: config.manifest.vault,
-        abi: morphoVaultAbi,
-        functionName: 'previewDeposit',
-        args: [assets],
-        blockNumber,
-      });
+      if (idle === 0n || snapshot.state !== 2) return null;
+      const required = atomic(snapshot.securityRequirement);
+      // Preview-rounding can leave the escrow below its security requirement.
+      // Search down from idle in a bounded neighborhood for the largest safe amount.
+      let assets = idle;
+      let preview = 0n;
+      let safe = false;
+      for (let attempts = 0; attempts < 64 && assets > 0n; attempts++, assets--) {
+        const shares = await client.readContract({
+          address: config.manifest.vault,
+          abi: morphoVaultAbi,
+          functionName: 'previewDeposit',
+          args: [assets],
+          blockNumber,
+        });
+        const redeemed = await client.readContract({
+          address: config.manifest.vault,
+          abi: morphoVaultAbi,
+          functionName: 'previewRedeem',
+          args: [shares],
+          blockNumber,
+        });
+        if (idle - assets + redeemed >= required) {
+          preview = shares;
+          safe = true;
+          break;
+        }
+      }
       const minShares = (preview * 9998n) / 10000n;
-      if (minShares === 0n) return null;
+      if (!safe || minShares === 0n) return null;
       return {
         kind: 'supply' as const,
         assets: assets.toString(),
@@ -718,18 +738,17 @@ export function createRobinhoodService(dependencies: Dependencies) {
       args: [getAddress(wallet.address), config.escrow],
       blockNumber: atomic(snapshot.blockNumber),
     });
-    if (allowance < atomic(snapshot.securityRequirement))
+    const fundingAmount = (
+      atomic(snapshot.securityRequirement) + atomic(snapshot.fundingReserve)
+    ).toString();
+    if (allowance < BigInt(fundingAmount))
       throw new RobinhoodServiceError(
         'funding_approval_required',
-        'Funding requires your separate exact USDG allowance approval. Approval sponsorship is not configured.',
+        'Funding requires approval for the security plus its tenant-owned rounding reserve.',
         409,
         {
-          approval: planFundingApproval(
-            config.manifest,
-            config.escrow,
-            snapshot.securityRequirement,
-          ),
-          amount: snapshot.securityRequirement,
+          approval: planFundingApproval(config.manifest, config.escrow, fundingAmount),
+          amount: fundingAmount,
           spender: config.escrow,
           execution: 'unconfigured',
         },

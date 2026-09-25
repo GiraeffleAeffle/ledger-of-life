@@ -107,15 +107,19 @@ Supported intents:
 These amounts are examples, not current executable quotes. A settlement floor
 must reflect the parties' explicit decision if there is a shortfall. The contract
 enforces liquidity, role, state, claims, principal, policy, consent and slippage.
-GET planning hints use current idle USDG and `previewDeposit` for supply, and
-eligible earnings and `previewWithdraw` for release, with 2 basis point integer
-bounds at the same observed block. `planningHints.settle` applies the same haircut
-to `previewRedeem(trackedShares)` for the vault-specific redemption minimum; it
-uses zero when no vault shares remain. The contract independently preserves the
-approved total-assets minimum. For example, 2,000 idle USDG plus a 1,000 USDG vault
-position must not request a 3,000 USDG minimum from the vault alone.
-A failed preview yields an unavailable hint;
-it never yields an invented amount. The UI must review the final exact bounds.
+GET planning hints use same-block previews. Supply checks
+`idle USDG remaining + previewRedeem(previewDeposit(supply amount))` against the
+contract's security requirement and leaves a small cash remainder when vault
+rounding would otherwise make the accounting value fall short. The search is
+bounded and returns no hint if it cannot find a safe amount. The hint retains its
+2 basis point minimum-share bound; simulations remain mandatory and the hint does
+not guarantee execution or liquidity. Release uses eligible earnings and
+`previewWithdraw` with 2 basis point bounds at the same observed block.
+`planningHints.settle` applies the same haircut to `previewRedeem(trackedShares)`
+for the vault-specific redemption minimum; it uses zero when no vault shares
+remain. The contract independently preserves the approved total-assets minimum.
+A failed preview yields an unavailable hint; it never yields an invented amount.
+The UI must review the final exact bounds.
 Simulations remain mandatory because a preview does not prove cash liquidity.
 
 The authenticated GET also includes `agreementId` or `null`, for linking private

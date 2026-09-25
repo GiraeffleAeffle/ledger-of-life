@@ -25,6 +25,7 @@ interface TokenMetadata {
 
 interface VaultPreview {
     function previewDeposit(uint256) external view returns (uint256);
+    function previewRedeem(uint256) external view returns (uint256);
 }
 
 /// @notice Opt-in mainnet FORK tests. Only public reads reach Robinhood; balances/time change locally.
@@ -68,26 +69,40 @@ contract RobinhoodForkTest {
     function _setupPosition() private {
         escrow = new RentalEscrow(
             RentalEscrow.Config(
-                USDG, VAULT, TENANT, LANDLORD, ARBITRATOR, TENANT, 3_000e6, true, keccak256("LOCAL FORK POLICY")
+                USDG, VAULT, TENANT, LANDLORD, ARBITRATOR, TENANT, 3_000e6, 10_000, true, keccak256("LOCAL FORK POLICY")
             )
         );
-        // Test-only token balance injection. One USDG extra is a declared rounding buffer, not deposit yield.
-        _fixtureTokenBalance(USDG, TENANT, 3_001e6);
+        _fixtureTokenBalance(USDG, TENANT, 3_000e6 + 10_000);
         vm.prank(TENANT);
-        IERC20Asset(USDG).approve(address(escrow), 3_000e6);
+        IERC20Asset(USDG).approve(address(escrow), 3_000e6 + 10_000);
         vm.prank(TENANT);
         escrow.acceptAgreement(0, DEADLINE);
         vm.prank(LANDLORD);
         escrow.acceptAgreement(1, DEADLINE);
         vm.prank(TENANT);
         escrow.fund(2, DEADLINE);
+        // Mirror readPlanningHints: largest amount whose same-block round trip keeps the security whole.
+        uint256 idle = 3_000e6 + 10_000;
+        uint256 supplyAmount = idle;
+        uint256 shares;
+        bool safe;
+        for (uint256 i; i < 64 && supplyAmount > 0; ++i) {
+            shares = VaultPreview(VAULT).previewDeposit(supplyAmount);
+            if (idle - supplyAmount + VaultPreview(VAULT).previewRedeem(shares) >= 3_000e6) {
+                safe = true;
+                break;
+            }
+            --supplyAmount;
+        }
+        require(safe, "NO_ROUNDING_SAFE_SUPPLY");
+        uint256 minShares = shares * 999 / 1000;
         vm.prank(TENANT);
-        IERC20Asset(USDG).transfer(address(escrow), 1e6);
-        uint256 minShares = VaultPreview(VAULT).previewDeposit(3_000e6) * 999 / 1000;
-        vm.prank(TENANT);
-        escrow.supply(3_000e6, minShares, 3, DEADLINE);
-        uint256 shares = escrow.trackedShares();
-        require(shares != 0 && IMorphoVault(VAULT).balanceOf(address(escrow)) == shares, "WRONG_SHARE_OWNER");
+        escrow.supply(supplyAmount, minShares, 3, DEADLINE);
+        uint256 actualShares = escrow.trackedShares();
+        require(
+            actualShares != 0 && IMorphoVault(VAULT).balanceOf(address(escrow)) == actualShares,
+            "WRONG_SHARE_OWNER"
+        );
     }
 
     function testPinnedMorphoRoundTripFromRestrictedEscrow() public {

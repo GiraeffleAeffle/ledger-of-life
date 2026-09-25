@@ -45,6 +45,7 @@ contract RentalEscrowTest {
                 ARBITRATOR,
                 PERSONAL,
                 PRINCIPAL,
+                0,
                 allowRelease,
                 keccak256("fictional rental agreement")
             )

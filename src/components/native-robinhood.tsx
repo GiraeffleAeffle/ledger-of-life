@@ -182,22 +182,30 @@ export function NativeRobinhood({
             </div>
           </dl>
           <div className="button-row">
-            {(party?.role === 'tenant' || party?.role === 'landlord') && snapshot.state === 0 && (
-              <button
-                className="button secondary"
-                disabled={busy}
-                onClick={() => run(() => plan({ kind: 'acceptAgreement' }))}
-              >
-                Review agreement acceptance
-              </button>
-            )}
+            {snapshot.state === 0 &&
+              ((party?.role === 'tenant' && !snapshot.tenantAccepted) ||
+                (party?.role === 'landlord' && !snapshot.landlordAccepted)) && (
+                <button
+                  className="button secondary"
+                  disabled={busy}
+                  onClick={() => run(() => plan({ kind: 'acceptAgreement' }))}
+                >
+                  Review agreement acceptance
+                </button>
+              )}
+            {snapshot.state === 0 &&
+              ((party?.role === 'tenant' && snapshot.tenantAccepted) ||
+                (party?.role === 'landlord' && snapshot.landlordAccepted)) && (
+                <p className="small-copy">Waiting for the other party to accept the agreement.</p>
+              )}
             {party?.role === 'tenant' && snapshot.state === 1 && (
               <button
                 className="button primary"
                 disabled={busy}
                 onClick={() => run(() => plan({ kind: 'fund' }))}
               >
-                Review deposit funding
+                Review funding: {money(snapshot.securityRequirement)} USDG security +{' '}
+                {money(snapshot.fundingReserve)} USDG rounding reserve, returned to you at settlement
               </button>
             )}
             {party?.role === 'tenant' && observation?.planningHints.supply && (
@@ -247,9 +255,16 @@ export function NativeRobinhood({
                 Review recorded settlement
               </button>
             )}
+          {party?.role === 'tenant' && observation?.planningHints.supply && (
+            <p className="small-copy">
+              A small amount stays as cash to cover vault share-rounding and preserve the required
+              security.
+            </p>
+          )}
           </div>
           {((party?.role === 'landlord' && snapshot.state === 2) ||
-            (party?.role === 'arbitrator' && snapshot.state === 4)) && (
+            (party?.role === 'arbitrator' &&
+              (snapshot.state === 4 || (snapshot.state === 5 && snapshot.arbitratedDecision)))) && (
             <form
               className="connection-form operation-section"
               onSubmit={(event) => {

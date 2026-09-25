@@ -38,12 +38,13 @@ contract LocalProof {
                 arbitrator,
                 tenant,
                 3_000e6,
+                10_000,
                 true,
-                keccak256("LOCAL FIXTURE: 3000 USDG security")
+                keccak256("LOCAL FIXTURE: 3000 USDG security plus 0.01 USDG rounding reserve")
             )
         );
-        token.mint(tenant, 3_000e6);
-        token.approve(address(escrow), 3_000e6);
+        token.mint(tenant, 3_000e6 + 10_000);
+        token.approve(address(escrow), 3_000e6 + 10_000);
         escrow.acceptAgreement(0, DEADLINE);
         vm.stopBroadcast();
         vm.startBroadcast(LANDLORD_KEY);
