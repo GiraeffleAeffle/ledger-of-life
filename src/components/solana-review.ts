@@ -11,6 +11,7 @@ type Review = Pick<
   | 'role'
   | 'nonce'
   | 'action'
+  | 'deployment'
   | 'expectedDeltas'
   | 'simulation'
   | 'expiresAt'
@@ -28,6 +29,12 @@ export function sameEconomicReview(previous: Review, refreshed: Review, now: num
     refreshed.actor === previous.actor &&
     refreshed.role === previous.role &&
     refreshed.nonce === previous.nonce &&
+    refreshed.deployment?.genesisHash === previous.deployment?.genesisHash &&
+    refreshed.deployment?.escrowProgram === previous.deployment?.escrowProgram &&
+    refreshed.deployment?.programSha256 === previous.deployment?.programSha256 &&
+    typeof previous.deployment?.genesisHash === 'string' &&
+    typeof previous.deployment?.escrowProgram === 'string' &&
+    typeof previous.deployment?.programSha256 === 'string' &&
     JSON.stringify(refreshed.action) === JSON.stringify(previous.action) &&
     JSON.stringify(refreshed.expectedDeltas) === JSON.stringify(previous.expectedDeltas) &&
     BigInt(refreshed.simulation.sponsorDebitCeilingLamports) <=

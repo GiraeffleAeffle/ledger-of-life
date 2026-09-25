@@ -2,6 +2,8 @@
 
 This is the **target customer journey and completed connected custody proof**. The staged program is [deployed separately on devnet](evidence/SOLANA_STAGED_DEVNET_DEPLOYMENT_2026-09-24.json), with its finalized bytes and authority verified. A landlord using the recovered Privy wallet created an empty escrow for the separately accepted Exit proof apartment. The tenant later funded its 10 test USDC, supplied to Kamino and redeemed it. A zero-dollar landlord claim, tenant acceptance and final return all finalized. Independent token-account reads showed zero cash and receipts in escrow, 10 test USDC at the tenant's fixed payout account and zero at the landlord's. The existing funded Privy tenancy remains active on the pinned joint-signature program. [ADR 0009](adr/0009-stage-solana-escrow-setup-and-funding.md) records the custody boundary.
 
+The custody-hardening work after this proof is **local only and not deployed**: new source requires canonical classic-Token ATAs at staged and joint setup, settlement first records independent obligations, and a permissionless payout settles one side at a time. Existing staged/joint devnet tenancies still use their pinned direct-transfer binaries and manifests. Before any future deployment, review a new program key/hash, ABI/account layout and explicit `escrowVersion: "pull-v2"` manifest; historical evidence and the active joint tenancy stay untouched.
+
 ```mermaid
 flowchart LR
     A[Landlord invites tenant and arbitrator] --> B[Both parties accept the same terms]

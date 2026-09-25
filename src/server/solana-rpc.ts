@@ -112,6 +112,8 @@ export function solanaConfiguration(
   )
     throw new Error('Mainnet execution is disabled');
   const deployment = candidate as DeploymentManifest;
+  if (deployment.escrowVersion !== undefined && deployment.escrowVersion !== 'direct-v1' && deployment.escrowVersion !== 'pull-v2')
+    throw new Error('Invalid escrow version');
   if (
     !resolveSolanaManifest({
       cluster: deployment.cluster,
@@ -268,15 +270,16 @@ export class RpcSolanaGateway implements SolanaGateway {
       first.landlordDestination,
     ];
     const observed = await this.multiple(keys);
-    if (observed.accounts.some((value) => value === null))
+    if (observed.accounts.slice(0, 9).some((value) => value === null) ||
+      ((c.escrowVersion ?? 'direct-v1') === 'direct-v1' && observed.accounts.slice(9).some((value) => value === null)))
       throw new Error('Required finance account is missing');
-    const rows = observed.accounts as (AccountObservation & { lamports: string })[];
-    const tenancy = decodeTenancy(rows[0], c);
+    const rows = observed.accounts;
+    const tenancy = decodeTenancy(rows[0]!, c);
     for (const [index, mint] of [
       [5, c.depositMint],
       [6, c.receiptMint],
     ] as const) {
-      const row = rows[index];
+      const row = rows[index]!;
       if (row.data.length !== 82) throw new Error('Unreviewed mint layout');
       validateMintObservation(
         {
@@ -291,46 +294,64 @@ export class RpcSolanaGateway implements SolanaGateway {
         { mint, tokenProgram: SOLANA_IDS.token, decimals: 6 },
       );
     }
-    const receiptMint = rows[6];
+    const receiptMint = rows[6]!;
     if (
       new DataView(receiptMint.data.buffer, receiptMint.data.byteOffset).getUint32(0, true) !== 1 ||
       getAddressDecoder().decode(receiptMint.data.subarray(4, 36)) !== c.marketAuthority
     )
       throw new Error('Wrong receipt mint authority');
-    const tokens = rows.slice(7).map(decodeClassicTokenAccount);
-    for (const [index, owner, mint] of [
-      [0, tenancy.address, c.depositMint],
-      [1, tenancy.address, c.receiptMint],
-      [2, tenancy.tenant, c.depositMint],
-      [3, tenancy.landlord, c.depositMint],
+    const cash = decodeClassicTokenAccount(rows[7]!);
+    const receipts = decodeClassicTokenAccount(rows[8]!);
+    for (const [token, owner, mint] of [
+      [cash, tenancy.address, c.depositMint],
+      [receipts, tenancy.address, c.receiptMint],
     ] as const) {
-      const token = tokens[index];
       if (token.authority !== owner || token.mint !== mint || !token.initialized || token.frozen)
         throw new Error('Wrong finance token account');
     }
+    const payoutBalance = (row: AccountObservation | null, owner: string) => {
+      if (!row) return '0';
+      try {
+        const token = decodeClassicTokenAccount(row);
+        if (token.authority !== owner || token.mint !== c.depositMint || !token.initialized || token.frozen)
+          throw new Error('Unavailable payout');
+        return token.amountAtomic;
+      } catch {
+        if ((c.escrowVersion ?? 'direct-v1') === 'direct-v1')
+          throw new Error('Wrong finance token account');
+        return '0';
+      }
+    };
+    const tenantCashAtomic = payoutBalance(rows[9], tenancy.tenant);
+    const landlordCashAtomic = payoutBalance(rows[10], tenancy.landlord);
     if (
-      atomic(tokens[0].amountAtomic) < atomic(tenancy.accountedIdleAtomic) ||
-      atomic(tokens[1].amountAtomic) < atomic(tenancy.accountedReceiptsAtomic)
+      atomic(cash.amountAtomic) < atomic(tenancy.accountedIdleAtomic) ||
+      atomic(receipts.amountAtomic) < atomic(tenancy.accountedReceiptsAtomic)
     )
       throw new Error('Escrow balances below ledger');
+    if (c.escrowVersion === 'pull-v2' &&
+      (tenancy.phase === 'closed'
+        ? atomic(tenancy.tenantOwedAtomic) + atomic(tenancy.landlordOwedAtomic) !== atomic(tenancy.accountedIdleAtomic)
+        : tenancy.tenantOwedAtomic !== '0' || tenancy.landlordOwedAtomic !== '0'))
+      throw new Error('Escrow payout ledger mismatch');
     const lending = await validateKaminoAccounts({
       manifest: c,
       context: { genesisHash, slot: observed.slot, observedAtMs: Date.now() },
       nowMs: Date.now(),
-      reserve: rows[1],
-      market: rows[2],
-      liquiditySupply: rows[3],
-      program: rows[4],
+      reserve: rows[1]!,
+      market: rows[2]!,
+      liquiditySupply: rows[3]!,
+      program: rows[4]!,
       trackedReceiptAtomic: tenancy.accountedReceiptsAtomic,
     });
     return {
       tenancy,
       slot: observed.slot,
       genesisHash,
-      cashAtomic: tokens[0].amountAtomic,
-      receiptsAtomic: tokens[1].amountAtomic,
-      tenantCashAtomic: tokens[2].amountAtomic,
-      landlordCashAtomic: tokens[3].amountAtomic,
+      cashAtomic: cash.amountAtomic,
+      receiptsAtomic: receipts.amountAtomic,
+      tenantCashAtomic,
+      landlordCashAtomic,
       receiptValueAtomic: lending.receiptValueAtomic,
       availableLiquidityAtomic: lending.availableLiquidityAtomic,
       requiresRefresh: lending.requiresRefresh,

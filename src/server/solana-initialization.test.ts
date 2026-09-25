@@ -126,6 +126,8 @@ async function fixture(setupMode: 'joint' | 'staged' = 'joint') {
       claimAtomic: '0',
       approvedClaimAtomic: '0',
       phase: 'awaiting-funding',
+      tenantOwedAtomic: '0',
+      landlordOwedAtomic: '0',
       bump: derived.bump,
     },
   };
@@ -222,6 +224,31 @@ test('staged setup needs only the landlord; the tenant remains the sole funding 
   await f.store.close();
 });
 
+test('finalized setup remains finalized after funding and claim transitions, but not changed terms', async () => {
+  for (const phase of ['active', 'claim-proposed', 'disputed', 'settling', 'closed'] as const) {
+    const f = await fixture('staged');
+    try {
+      const plan = await f.service.prepare(f.identities.landlord);
+      await f.service.sign(f.identities.landlord, await f.sign(plan.transactionBase64, f.landlord));
+      f.state.final = true;
+      f.snapshot.tenancy.phase = phase;
+      assert.equal((await f.service.reconcile(f.identities.tenant)).state, 'finalized');
+    } finally {
+      await f.store.close();
+    }
+  }
+  const f = await fixture('staged');
+  try {
+    const plan = await f.service.prepare(f.identities.landlord);
+    await f.service.sign(f.identities.landlord, await f.sign(plan.transactionBase64, f.landlord));
+    f.state.final = true;
+    f.snapshot.tenancy.phase = 'active';
+    f.snapshot.tenancy.tenantDestination = addressFor(22);
+    assert.equal((await f.service.reconcile(f.identities.tenant)).state, 'unknown');
+  } finally {
+    await f.store.close();
+  }
+});
 test('changed message, wrong signer and expired blockhash cannot authorize setup', async () => {
   const f = await fixture();
   const plan = await f.service.prepare(f.identities.tenant);

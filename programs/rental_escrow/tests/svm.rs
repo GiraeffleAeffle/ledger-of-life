@@ -27,6 +27,18 @@ use std::{path::PathBuf, str::FromStr};
 
 const PRINCIPAL: u64 = 3_000_000_000;
 const CLAIM: u64 = 120_000_000;
+fn ata(owner: Pubkey) -> Pubkey {
+    let program = Pubkey::from_str("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL").unwrap();
+    Pubkey::find_program_address(
+        &[
+            owner.as_ref(),
+            anchor_spl::token::ID.as_ref(),
+            TEST_USDC.as_ref(),
+        ],
+        &program,
+    )
+    .0
+}
 struct Fixture {
     svm: LiteSVM,
     payer: Keypair,
@@ -174,8 +186,8 @@ impl Fixture {
             Pubkey::find_program_address(&[b"tenancy", tenant.pubkey().as_ref(), &[1; 32]], &ID).0;
         let cash = Pubkey::find_program_address(&[b"cash", tenancy.as_ref()], &ID).0;
         let receipts = Pubkey::find_program_address(&[b"receipts", tenancy.as_ref()], &ID).0;
-        let tenant_token = Pubkey::new_unique();
-        let landlord_token = Pubkey::new_unique();
+        let tenant_token = ata(tenant.pubkey());
+        let landlord_token = ata(landlord.pubkey());
         put(
             &mut svm,
             tenant_token,
@@ -417,7 +429,7 @@ impl Fixture {
             token_data(TEST_USDC, self.market_authority, low),
         );
     }
-    fn settle(&self, tenant_destination: Pubkey, nonce: u64) -> Instruction {
+    fn settle(&self, nonce: u64) -> Instruction {
         Instruction {
             program_id: ID,
             accounts: accounts::Settle {
@@ -425,12 +437,24 @@ impl Fixture {
                 tenancy: self.tenancy,
                 deposit_mint: TEST_USDC,
                 cash: self.cash,
-                tenant_destination,
-                landlord_destination: self.landlord_token,
-                token_program: anchor_spl::token::ID,
             }
             .to_account_metas(None),
             data: instruction::Settle { nonce }.data(),
+        }
+    }
+    fn payout(&self, destination: Pubkey, landlord: bool, nonce: u64) -> Instruction {
+        Instruction {
+            program_id: ID,
+            accounts: accounts::Payout {
+                actor: self.payer.pubkey(),
+                tenancy: self.tenancy,
+                deposit_mint: TEST_USDC,
+                cash: self.cash,
+                destination,
+                token_program: anchor_spl::token::ID,
+            }
+            .to_account_metas(None),
+            data: instruction::Payout { landlord, nonce }.data(),
         }
     }
 }
@@ -440,12 +464,22 @@ impl Fixture {
 fn staged_setup_is_landlord_only_and_does_not_fund_security() {
     let mut f = Fixture::new();
     let metas = accounts::InitializeStaged {
-        payer: f.payer.pubkey(), tenant: f.tenant.pubkey(), landlord: f.landlord.pubkey(),
-        tenancy: f.tenancy, deposit_mint: TEST_USDC, receipt_mint: f.receipt_mint,
-        cash: f.cash, receipts: f.receipts, tenant_destination: f.tenant_token,
-        landlord_destination: f.landlord_token, reserve: f.reserve, market: f.market,
-        token_program: anchor_spl::token::ID, system_program: anchor_lang::system_program::ID,
-    }.to_account_metas(None);
+        payer: f.payer.pubkey(),
+        tenant: f.tenant.pubkey(),
+        landlord: f.landlord.pubkey(),
+        tenancy: f.tenancy,
+        deposit_mint: TEST_USDC,
+        receipt_mint: f.receipt_mint,
+        cash: f.cash,
+        receipts: f.receipts,
+        tenant_destination: f.tenant_token,
+        landlord_destination: f.landlord_token,
+        reserve: f.reserve,
+        market: f.market,
+        token_program: anchor_spl::token::ID,
+        system_program: anchor_lang::system_program::ID,
+    }
+    .to_account_metas(None);
     assert!(!metas[1].is_signer);
     assert!(metas[2].is_signer);
     f.staged_initialize("landlord").unwrap();
@@ -526,16 +560,21 @@ fn executable_escrow_checks_authority_claim_replay_recipient_and_settlement() {
         anchor_spl::token::ID,
         token_data(TEST_USDC, f.tenant.pubkey(), 0),
     );
-    let ix = f.settle(wrong, 4);
-    assert!(f.send(ix, "tenant").is_err());
-    assert_eq!(f.state().next_nonce, 4);
-    let ix = f.settle(f.tenant_token, 4);
-    f.send(ix, "tenant").unwrap();
+    f.send(f.settle(4), "tenant").unwrap();
+    assert_eq!(f.state().tenant_owed, PRINCIPAL - CLAIM);
+    assert_eq!(f.state().landlord_owed, CLAIM);
+    assert_eq!(f.balance(f.cash), PRINCIPAL);
+    assert_eq!(f.state().phase, Phase::Closed);
+    assert!(f.send(f.payout(wrong, false, 5), "payer").is_err());
+    f.send(f.payout(f.landlord_token, true, 5), "payer")
+        .unwrap();
+    f.send(f.payout(f.tenant_token, false, 6), "payer").unwrap();
     assert_eq!(f.balance(f.landlord_token), CLAIM);
     assert_eq!(f.balance(f.tenant_token), PRINCIPAL - CLAIM);
-    assert_eq!(f.state().phase, Phase::Closed);
-    let ix = f.settle(f.tenant_token, 4);
-    assert!(f.send(ix, "tenant").is_err());
+    assert_eq!(f.balance(f.cash), 0);
+    assert_eq!(f.state().tenant_owed, 0);
+    assert_eq!(f.state().landlord_owed, 0);
+    assert!(f.send(f.settle(7), "tenant").is_err());
 }
 
 #[test]
@@ -697,10 +736,237 @@ fn controlled_earnings_release_then_claim_settlement_preserves_personal_cash() {
         .data(),
     );
     f.send(ix, "tenant").unwrap();
-    let ix = f.settle(f.tenant_token, 6);
-    f.send(ix, "tenant").unwrap();
+    f.send(f.settle(6), "tenant").unwrap();
+    f.send(f.payout(f.landlord_token, true, 7), "payer")
+        .unwrap();
+    f.send(f.payout(f.tenant_token, false, 8), "payer").unwrap();
     assert_eq!(f.balance(f.landlord_token), CLAIM);
     assert_eq!(f.balance(f.tenant_token), 10_000_000 + PRINCIPAL - CLAIM);
     assert_eq!(f.state().released_earnings, 10_000_000);
     assert_eq!(f.state().phase, Phase::Closed);
+}
+
+fn settle_claim(f: &mut Fixture, amount: u64) {
+    f.staged_initialize("landlord").unwrap();
+    f.fund();
+    let ix = f.party(
+        f.landlord.pubkey(),
+        instruction::ProposeClaim { amount, nonce: 1 }.data(),
+    );
+    f.send(ix, "landlord").unwrap();
+    let ix = f.party(
+        f.tenant.pubkey(),
+        instruction::RespondToClaim {
+            accept: true,
+            nonce: 2,
+        }
+        .data(),
+    );
+    f.send(ix, "tenant").unwrap();
+    f.send(f.settle(3), "tenant").unwrap();
+    assert_eq!(f.state().phase, Phase::Closed);
+}
+
+#[test]
+#[ignore = "requires new custody SBF and public KLend fixture paths"]
+fn audit_landlord_owner_change_cannot_block_tenant_payout() {
+    let mut f = Fixture::new();
+    settle_claim(&mut f, 0);
+    let change = anchor_spl::token::spl_token::instruction::set_authority(
+        &anchor_spl::token::ID,
+        &f.landlord_token,
+        Some(&Pubkey::new_unique()),
+        anchor_spl::token::spl_token::instruction::AuthorityType::AccountOwner,
+        &f.landlord.pubkey(),
+        &[],
+    )
+    .unwrap();
+    f.send(change, "landlord").unwrap();
+    f.send(f.payout(f.tenant_token, false, 4), "payer").unwrap();
+    assert_eq!(f.balance(f.tenant_token), PRINCIPAL);
+    assert_eq!(f.balance(f.cash), 0);
+}
+
+#[test]
+#[ignore = "requires new custody SBF and public KLend fixture paths"]
+fn audit_tenant_owner_change_cannot_block_landlord_payout() {
+    let mut f = Fixture::new();
+    f.staged_initialize("landlord").unwrap();
+    f.fund();
+    let ix = f.finance(
+        instruction::Supply {
+            amount: PRINCIPAL,
+            nonce: 1,
+        }
+        .data(),
+        f.tenant.pubkey(),
+    );
+    f.send(ix, "tenant").unwrap();
+    let shares = f.state().accounted_receipts;
+    let ix = f.party(
+        f.landlord.pubkey(),
+        instruction::ProposeClaim {
+            amount: CLAIM,
+            nonce: 2,
+        }
+        .data(),
+    );
+    f.send(ix, "landlord").unwrap();
+    let ix = f.party(
+        f.tenant.pubkey(),
+        instruction::RespondToClaim {
+            accept: true,
+            nonce: 3,
+        }
+        .data(),
+    );
+    f.send(ix, "tenant").unwrap();
+    let change = anchor_spl::token::spl_token::instruction::set_authority(
+        &anchor_spl::token::ID,
+        &f.tenant_token,
+        Some(&Pubkey::new_unique()),
+        anchor_spl::token::spl_token::instruction::AuthorityType::AccountOwner,
+        &f.tenant.pubkey(),
+        &[],
+    )
+    .unwrap();
+    f.send(change, "tenant").unwrap();
+    let ix = f.finance(
+        instruction::Redeem {
+            receipt_amount: shares,
+            minimum_received: PRINCIPAL - 2,
+            nonce: 4,
+        }
+        .data(),
+        f.landlord.pubkey(),
+    );
+    f.send(ix, "landlord").unwrap();
+    assert_eq!(f.state().accounted_receipts, 0);
+    f.send(f.settle(5), "tenant").unwrap();
+    let tenant_due = f.state().tenant_owed;
+    assert!(f.send(f.payout(f.tenant_token, false, 6), "payer").is_err());
+    f.send(f.payout(f.landlord_token, true, 6), "payer")
+        .unwrap();
+    assert_eq!(f.balance(f.landlord_token), CLAIM);
+    assert_eq!(f.balance(f.cash), tenant_due);
+    assert_eq!(f.state().tenant_owed, tenant_due);
+}
+
+#[test]
+#[ignore = "requires new custody SBF and public KLend fixture paths"]
+fn audit_staged_and_joint_reject_non_ata_destinations() {
+    let mut f = Fixture::new();
+    let canonical = f.tenant_token;
+    let hostile = Pubkey::new_unique();
+    put(
+        &mut f.svm,
+        hostile,
+        anchor_spl::token::ID,
+        token_data(TEST_USDC, f.landlord.pubkey(), 0),
+    );
+    let set_close = anchor_spl::token::spl_token::instruction::set_authority(
+        &anchor_spl::token::ID,
+        &hostile,
+        Some(&f.landlord.pubkey()),
+        anchor_spl::token::spl_token::instruction::AuthorityType::CloseAccount,
+        &f.landlord.pubkey(),
+        &[],
+    )
+    .unwrap();
+    f.send(set_close, "landlord").unwrap();
+    let set_owner = anchor_spl::token::spl_token::instruction::set_authority(
+        &anchor_spl::token::ID,
+        &hostile,
+        Some(&f.tenant.pubkey()),
+        anchor_spl::token::spl_token::instruction::AuthorityType::AccountOwner,
+        &f.landlord.pubkey(),
+        &[],
+    )
+    .unwrap();
+    f.send(set_owner, "landlord").unwrap();
+    let account = TokenAccount::unpack(&f.svm.get_account(&hostile).unwrap().data).unwrap();
+    assert_eq!(account.close_authority, COption::Some(f.landlord.pubkey()));
+    f.tenant_token = hostile;
+    assert!(f.staged_initialize("landlord").is_err());
+    // Joint initialization rejects the same owner-correct, landlord-closable destination.
+    let joint = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f.initialize()));
+    assert!(joint.is_err());
+    assert!(f.svm.get_account(&f.tenancy).is_none());
+    f.tenant_token = canonical;
+    f.staged_initialize("landlord").unwrap();
+}
+
+#[test]
+#[ignore = "requires new custody SBF and public KLend fixture paths"]
+fn audit_closed_canonical_ata_can_be_recreated_for_payout() {
+    let mut f = Fixture::new();
+    f.staged_initialize("landlord").unwrap();
+    f.fund();
+    let ix = f.finance(
+        instruction::Supply {
+            amount: PRINCIPAL,
+            nonce: 1,
+        }
+        .data(),
+        f.tenant.pubkey(),
+    );
+    f.send(ix, "tenant").unwrap();
+    let shares = f.state().accounted_receipts;
+    let ix = f.party(
+        f.landlord.pubkey(),
+        instruction::ProposeClaim {
+            amount: 0,
+            nonce: 2,
+        }
+        .data(),
+    );
+    f.send(ix, "landlord").unwrap();
+    let ix = f.party(
+        f.tenant.pubkey(),
+        instruction::RespondToClaim {
+            accept: true,
+            nonce: 3,
+        }
+        .data(),
+    );
+    f.send(ix, "tenant").unwrap();
+    let close = anchor_spl::token::spl_token::instruction::close_account(
+        &anchor_spl::token::ID,
+        &f.tenant_token,
+        &f.tenant.pubkey(),
+        &f.tenant.pubkey(),
+        &[],
+    )
+    .unwrap();
+    f.send(close, "tenant").unwrap();
+    let ix = f.finance(
+        instruction::Redeem {
+            receipt_amount: shares,
+            minimum_received: PRINCIPAL - 2,
+            nonce: 4,
+        }
+        .data(),
+        f.landlord.pubkey(),
+    );
+    f.send(ix, "landlord").unwrap();
+    f.send(f.settle(5), "tenant").unwrap();
+    let due = f.state().tenant_owed;
+    assert!(f.send(f.payout(f.tenant_token, false, 6), "payer").is_err());
+    assert!(due >= PRINCIPAL - 2);
+    let create_ata = Instruction {
+        program_id: Pubkey::from_str("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL").unwrap(),
+        accounts: vec![
+            AccountMeta::new(f.payer.pubkey(), true),
+            AccountMeta::new(f.tenant_token, false),
+            AccountMeta::new_readonly(f.tenant.pubkey(), false),
+            AccountMeta::new_readonly(TEST_USDC, false),
+            AccountMeta::new_readonly(anchor_lang::system_program::ID, false),
+            AccountMeta::new_readonly(anchor_spl::token::ID, false),
+        ],
+        data: vec![0],
+    };
+    f.send(create_ata, "payer").unwrap();
+    f.send(f.payout(f.tenant_token, false, 6), "payer").unwrap();
+    assert_eq!(f.balance(f.tenant_token), due);
+    assert_eq!(f.balance(f.cash), 0);
 }

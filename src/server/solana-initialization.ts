@@ -8,7 +8,6 @@ import {
   getAddressDecoder,
   getAddressEncoder,
   getBase58Decoder,
-  getProgramDerivedAddress,
   getTransactionDecoder,
   getTransactionEncoder,
   setTransactionMessageFeePayer,
@@ -19,6 +18,7 @@ import {
   atomic,
   buildInitializeEscrow,
   decodeClassicTokenAccount,
+  derivePayoutAddress,
   deriveEscrowAddresses,
   messageDigest,
   SOLANA_IDS,
@@ -61,17 +61,7 @@ export function leaseIdForAgreement(config: SolanaConfiguration, agreementId: st
   );
 }
 export async function payoutTokenAccount(config: SolanaConfiguration, owner: string) {
-  const encode = getAddressEncoder();
-  return (
-    await getProgramDerivedAddress({
-      programAddress: address(SOLANA_IDS.associatedToken),
-      seeds: [
-        encode.encode(address(owner)),
-        encode.encode(address(SOLANA_IDS.token)),
-        encode.encode(address(config.depositMint)),
-      ],
-    })
-  )[0];
+  return derivePayoutAddress(owner, config.depositMint);
 }
 
 type PartyRole = 'tenant' | 'landlord';
@@ -327,7 +317,7 @@ export function createSolanaInitializationService(input: {
       t.landlordDestination !== verified.landlordDestination ||
       t.requiredSecurityAtomic !== verified.agreement.requiredSecurity ||
       t.releasePermitted !== verified.agreement.releaseAllowed ||
-      t.phase !== 'awaiting-funding'
+      !['awaiting-funding', 'active', 'claim-proposed', 'disputed', 'settling', 'closed'].includes(t.phase)
     )
       fail('tenancy_binding_mismatch', 'The initialized tenancy differs from the accepted agreement.');
   }

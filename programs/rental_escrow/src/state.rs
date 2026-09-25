@@ -37,6 +37,8 @@ pub struct Tenancy {
     pub approved_claim: u64,
     pub phase: Phase,
     pub bump: u8,
+    pub tenant_owed: u64,
+    pub landlord_owed: u64,
 }
 
 impl Tenancy {
@@ -128,6 +130,8 @@ mod tests {
             approved_claim: 0,
             phase: Phase::Active,
             bump: 1,
+            tenant_owed: 0,
+            landlord_owed: 0,
         }
     }
     #[test]

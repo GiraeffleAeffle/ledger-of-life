@@ -1,0 +1,22 @@
+{
+  "cluster": "devnet",
+  "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "setupMode": "staged",
+  "escrowVersion": "pull-v2",
+  "escrowProgram": "DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb",
+  "programData": "GwMaezUTMYBpyvmL53t3rrCfYfjMNVjXrJd67Le2Jg1e",
+  "programCodeLength": 456528,
+  "programSha256": "36ae539877cb9fde7804fed81d76697b7e401e0b282ff8bc0dbdd3547bfa0d98",
+  "upgradeAuthority": "JCgJEV37VwWxzd2JqzFNaC847hrtPjQq9TU6c6HHxQao",
+  "deploymentSlot": 504073661,
+  "deploymentSignature": "3BMHs333dNptaESiocDN4JkALPshZZyb7e5pVbYU3hCxjm6po91qJZmPhWSXDHnG5JuMXbcGz3UfjvrjrwApAGE1",
+  "depositMint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  "reserve": "HRwMj8uuoGVWCanKzKvpTWN5ZvXjtjKGxcFbn2qTPKMW",
+  "market": "6aaNTBEmwdN19AAdTwbNrWyUo6iEyiLguxCTePEzSqoH",
+  "receiptMint": "6FY2rwh5wWrtSveAG9t9ANc2YsrChNasVSEpMQubJcXd",
+  "liquiditySupply": "6icVFmuKEsH5dzDwTSrxzrnJ14N27gDKRc2XAxPtB4ep",
+  "marketAuthority": "7Aoc3MHQkYSB5y3g3ipyFKWF2TBsYdvqNWHbQ2btWXJt",
+  "oracleAccounts": ["Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX"],
+  "operatorOnly": true,
+  "caveat": "Separate devnet test program built from the custody-fix source (pull-based payouts, canonical payout ATAs). Upgrade authority retained. Not independently reviewed; no Privy-backed cycle recorded yet."
+}

@@ -10,10 +10,12 @@ export type TenancyAccount = {
   tenantDestination: string; landlordDestination: string; policyHash: Uint8Array; releasePermitted: boolean;
   requiredSecurityAtomic: string; accountedIdleAtomic: string; accountedReceiptsAtomic: string; releasedEarningsAtomic: string;
   nextNonce: string; claimAtomic: string; approvedClaimAtomic: string; phase: typeof phases[number]; bump: number;
+  tenantOwedAtomic: string; landlordOwedAtomic: string;
 };
 export function decodeTenancy(account: AccountObservation, manifest: DeploymentManifest): TenancyAccount {
   const data = account.data;
-  if (account.owner !== manifest.escrowProgram || account.executable || data.length !== 483 || ![251, 53, 106, 214, 69, 170, 131, 234].every((byte, index) => data[index] === byte)) throw new Error("Invalid tenancy account");
+  const pull = manifest.escrowVersion === "pull-v2";
+  if (account.owner !== manifest.escrowProgram || account.executable || data.length !== (pull ? 499 : 483) || ![251, 53, 106, 214, 69, 170, 131, 234].every((byte, index) => data[index] === byte)) throw new Error("Invalid tenancy account");
   let offset = 8;
   const bytes32 = () => { const bytes = data.slice(offset, offset + 32); offset += 32; return bytes; };
   const key = () => getAddressDecoder().decode(bytes32());
@@ -25,9 +27,10 @@ export function decodeTenancy(account: AccountObservation, manifest: DeploymentM
   if (data[offset] > 1) throw new Error("Invalid policy encoding");
   const releasePermitted = data[offset++] === 1;
   const requiredSecurityAtomic = u64(), accountedIdleAtomic = u64(), accountedReceiptsAtomic = u64(), releasedEarningsAtomic = u64(), nextNonce = u64(), claimAtomic = u64(), approvedClaimAtomic = u64();
-  const phase = phases[data[offset++]]; const bump = data[offset];
+  const phase = phases[data[offset++]]; const bump = data[offset++];
+  const tenantOwedAtomic = pull ? u64() : "0", landlordOwedAtomic = pull ? u64() : "0";
   if (!phase || depositMint !== manifest.depositMint || reserve !== manifest.reserve || market !== manifest.market || receiptMint !== manifest.receiptMint || liquiditySupply !== manifest.liquiditySupply || marketAuthority !== manifest.marketAuthority) throw new Error("Tenancy differs from configured deployment");
-  return { address: account.address, leaseId, tenant, landlord, arbitrator, depositMint, reserve, market, receiptMint, liquiditySupply, marketAuthority, tenantDestination, landlordDestination, policyHash, releasePermitted, requiredSecurityAtomic, accountedIdleAtomic, accountedReceiptsAtomic, releasedEarningsAtomic, nextNonce, claimAtomic, approvedClaimAtomic, phase, bump };
+  return { address: account.address, leaseId, tenant, landlord, arbitrator, depositMint, reserve, market, receiptMint, liquiditySupply, marketAuthority, tenantDestination, landlordDestination, policyHash, releasePermitted, requiredSecurityAtomic, accountedIdleAtomic, accountedReceiptsAtomic, releasedEarningsAtomic, nextNonce, claimAtomic, approvedClaimAtomic, phase, bump, tenantOwedAtomic, landlordOwedAtomic };
 }
 export async function deriveEscrowAddresses(program: string, tenant: string, leaseId: Uint8Array) {
   if (leaseId.length !== 32) throw new Error("Lease identifier must be 32 bytes");
@@ -37,11 +40,23 @@ export async function deriveEscrowAddresses(program: string, tenant: string, lea
   const [cash, receipts] = await Promise.all(["cash", "receipts"].map(async seed => (await derive([new TextEncoder().encode(seed), new Uint8Array(encode.encode(tenancy))]))[0]));
   return { tenancy, bump, cash, receipts };
 }
+export async function derivePayoutAddress(owner: string, mint: string) {
+  const encode = getAddressEncoder();
+  return (await getProgramDerivedAddress({
+    programAddress: address(SOLANA_IDS.associatedToken),
+    seeds: [
+      encode.encode(address(owner)),
+      encode.encode(address(SOLANA_IDS.token)),
+      encode.encode(address(mint)),
+    ],
+  }))[0];
+}
 const discriminators = {
   initialize: [175, 175, 109, 31, 13, 152, 155, 237], initialize_staged: [168, 74, 32, 26, 236, 97, 244, 1], fund: [218, 188, 111, 221, 152, 113, 174, 7],
   supply: [81, 67, 116, 61, 250, 209, 5, 198], redeem: [184, 12, 86, 149, 70, 196, 97, 225],
   release_earnings: [133, 153, 190, 61, 65, 103, 225, 72], propose_claim: [70, 254, 74, 21, 158, 61, 195, 189],
   respond_to_claim: [45, 203, 133, 116, 107, 221, 231, 3], resolve_claim: [63, 99, 216, 44, 183, 52, 190, 140], settle: [175, 42, 185, 87, 144, 131, 102, 212],
+  payout: [149, 140, 194, 236, 174, 189, 6, 239],
 } as const;
 function u64(value: string) { const bytes = new Uint8Array(8); new DataView(bytes.buffer).setBigUint64(0, atomic(value), true); return bytes; }
 function concat(parts: readonly Uint8Array[]) { const bytes = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0)); let offset = 0; for (const part of parts) { bytes.set(part, offset); offset += part.length; } return bytes; }
@@ -51,7 +66,8 @@ export type EscrowAction =
   | { kind: "supply" | "release_earnings" | "propose_claim" | "resolve_claim"; amountAtomic: string }
   | { kind: "redeem"; receiptAtomic: string; minimumReceivedAtomic: string }
   | { kind: "respond_to_claim"; accept: boolean }
-  | { kind: "settle" };
+  | { kind: "settle" }
+  | { kind: "payout"; landlord: boolean };
 
 export async function buildEscrowInstruction(input: {
   manifest: DeploymentManifest; tenancy: TenancyAccount; actor: string; nonce: string; action: EscrowAction;
@@ -67,12 +83,18 @@ export async function buildEscrowInstruction(input: {
   } else if (["supply", "redeem", "release_earnings"].includes(action.kind)) {
     accounts = [actor, tenancy, meta(t.depositMint), meta(t.receiptMint, AccountRole.WRITABLE), meta(derived.cash, AccountRole.WRITABLE), meta(derived.receipts, AccountRole.WRITABLE), meta(t.tenantDestination, AccountRole.WRITABLE), meta(t.reserve, AccountRole.WRITABLE), meta(t.market), meta(t.marketAuthority), meta(t.liquiditySupply, AccountRole.WRITABLE), meta(SOLANA_IDS.klend), meta(SOLANA_IDS.instructions), meta(SOLANA_IDS.token), ...manifest.oracleAccounts.map(key => meta(key))];
   } else if (action.kind === "settle") {
-    accounts = [actor, tenancy, meta(t.depositMint), meta(derived.cash, AccountRole.WRITABLE), meta(t.tenantDestination, AccountRole.WRITABLE), meta(t.landlordDestination, AccountRole.WRITABLE), meta(SOLANA_IDS.token)];
+    accounts = manifest.escrowVersion === "pull-v2"
+      ? [actor, tenancy, meta(t.depositMint), meta(derived.cash)]
+      : [actor, tenancy, meta(t.depositMint), meta(derived.cash, AccountRole.WRITABLE), meta(t.tenantDestination, AccountRole.WRITABLE), meta(t.landlordDestination, AccountRole.WRITABLE), meta(SOLANA_IDS.token)];
+  } else if (action.kind === "payout") {
+    if (manifest.escrowVersion !== "pull-v2") throw new Error("Pull payout requires a new deployment");
+    accounts = [actor, tenancy, meta(t.depositMint), meta(derived.cash, AccountRole.WRITABLE), meta(action.landlord ? t.landlordDestination : t.tenantDestination, AccountRole.WRITABLE), meta(SOLANA_IDS.token)];
   } else accounts = [actor, tenancy];
   const args: Uint8Array[] = [];
   if ("amountAtomic" in action) args.push(u64(action.amountAtomic));
   if (action.kind === "redeem") args.push(u64(action.receiptAtomic), u64(action.minimumReceivedAtomic));
   if (action.kind === "respond_to_claim") args.push(Uint8Array.of(action.accept ? 1 : 0));
+  if (action.kind === "payout") args.push(Uint8Array.of(action.landlord ? 1 : 0));
   args.push(u64(input.nonce));
   return { programAddress: address(manifest.escrowProgram), accounts, data: concat([Uint8Array.from(discriminators[action.kind]), ...args]) };
 }

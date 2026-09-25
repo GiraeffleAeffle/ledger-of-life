@@ -6,9 +6,22 @@ pub mod lending;
 pub mod state;
 use state::{Phase, Tenancy};
 
-declare_id!("B1hjmapwssey8AbpjAtw5qF87DvvtuSisGov4kHec7Yc");
+declare_id!("DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb");
 
 pub const TEST_USDC: Pubkey = pubkey!("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
+const ASSOCIATED_TOKEN_PROGRAM: Pubkey = pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+
+fn payout_address(party: &Pubkey, mint: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[
+            party.as_ref(),
+            anchor_spl::token::ID.as_ref(),
+            mint.as_ref(),
+        ],
+        &ASSOCIATED_TOKEN_PROGRAM,
+    )
+    .0
+}
 
 #[program]
 pub mod rental_escrow {
@@ -198,8 +211,16 @@ pub mod rental_escrow {
             EscrowError::InvalidRecipient
         );
         require_keys_eq!(
-            ctx.accounts.destination.owner,
-            t.tenant,
+            *ctx.accounts.destination.owner,
+            token::ID,
+            EscrowError::InvalidRecipient
+        );
+        let destination =
+            TokenAccount::try_deserialize(&mut ctx.accounts.destination.data.borrow().as_ref())?;
+        require_keys_eq!(destination.owner, t.tenant, EscrowError::InvalidRecipient);
+        require_keys_eq!(
+            destination.mint,
+            t.deposit_mint,
             EscrowError::InvalidRecipient
         );
         require!(
@@ -222,7 +243,7 @@ pub mod rental_escrow {
         transfer_from_escrow(
             &ctx.accounts.tenancy,
             &ctx.accounts.cash,
-            &ctx.accounts.destination,
+            ctx.accounts.destination.to_account_info(),
             &ctx.accounts.deposit_mint,
             &ctx.accounts.token_program,
             amount,
@@ -271,28 +292,9 @@ pub mod rental_escrow {
             t.claim_amount,
             t.required_security,
         )?;
-        if landlord_amount > 0 {
-            transfer_from_escrow(
-                t,
-                &ctx.accounts.cash,
-                &ctx.accounts.landlord_destination,
-                &ctx.accounts.deposit_mint,
-                &ctx.accounts.token_program,
-                landlord_amount,
-            )?;
-        }
-        if tenant_amount > 0 {
-            transfer_from_escrow(
-                t,
-                &ctx.accounts.cash,
-                &ctx.accounts.tenant_destination,
-                &ctx.accounts.deposit_mint,
-                &ctx.accounts.token_program,
-                tenant_amount,
-            )?;
-        }
         let t = &mut ctx.accounts.tenancy;
-        t.accounted_idle = 0;
+        t.tenant_owed = tenant_amount;
+        t.landlord_owed = landlord_amount;
         t.phase = Phase::Closed;
         t.advance()?;
         emit!(FinanceEvent {
@@ -300,6 +302,50 @@ pub mod rental_escrow {
             nonce,
             kind: EventKind::Settled,
             amount: landlord_amount
+        });
+        Ok(())
+    }
+
+    pub fn payout(ctx: Context<Payout>, landlord: bool, nonce: u64) -> Result<()> {
+        let t = &ctx.accounts.tenancy;
+        t.check_nonce(nonce)?;
+        require!(t.phase == Phase::Closed, EscrowError::InvalidPhase);
+        let (amount, recipient) = if landlord {
+            (t.landlord_owed, t.landlord)
+        } else {
+            (t.tenant_owed, t.tenant)
+        };
+        require!(amount > 0, EscrowError::InvalidAmount);
+        require_keys_eq!(
+            ctx.accounts.destination.owner,
+            recipient,
+            EscrowError::InvalidRecipient
+        );
+        require!(
+            ctx.accounts.cash.amount >= t.accounted_idle,
+            EscrowError::UnexpectedTokenDelta
+        );
+        transfer_from_escrow(
+            t,
+            &ctx.accounts.cash,
+            ctx.accounts.destination.to_account_info(),
+            &ctx.accounts.deposit_mint,
+            &ctx.accounts.token_program,
+            amount,
+        )?;
+        let t = &mut ctx.accounts.tenancy;
+        t.accounted_idle = accounting::checked_sub(t.accounted_idle, amount)?;
+        if landlord {
+            t.landlord_owed = 0;
+        } else {
+            t.tenant_owed = 0;
+        }
+        t.advance()?;
+        emit!(FinanceEvent {
+            tenancy: t.key(),
+            nonce,
+            kind: EventKind::PaidOut,
+            amount
         });
         Ok(())
     }
@@ -319,7 +365,10 @@ fn initialize_tenancy(
     bump: u8,
     args: InitializeArgs,
 ) -> Result<()> {
-    require!(cfg!(feature = "test-deployment"), EscrowError::DeploymentDisabled);
+    require!(
+        cfg!(feature = "test-deployment"),
+        EscrowError::DeploymentDisabled
+    );
     require_keys_eq!(deposit_mint, TEST_USDC, EscrowError::InvalidAsset);
     require!(
         args.required_security > 0 && args.required_security <= 10_000_000_000,
@@ -332,6 +381,16 @@ fn initialize_tenancy(
             && args.arbitrator != landlord
             && args.arbitrator != Pubkey::default(),
         EscrowError::InvalidParties
+    );
+    require_keys_eq!(
+        tenant_destination,
+        payout_address(&tenant, &deposit_mint),
+        EscrowError::InvalidRecipient
+    );
+    require_keys_eq!(
+        landlord_destination,
+        payout_address(&landlord, &deposit_mint),
+        EscrowError::InvalidRecipient
     );
     t.lease_id = args.lease_id;
     t.tenant = tenant;
@@ -354,6 +413,8 @@ fn initialize_tenancy(
     t.next_nonce = 0;
     t.claim_amount = 0;
     t.approved_claim = 0;
+    t.tenant_owed = 0;
+    t.landlord_owed = 0;
     t.phase = Phase::AwaitingFunding;
     t.bump = bump;
     let snapshot = lending::inspect(reserve, market, t)?;
@@ -370,7 +431,7 @@ fn initialize_tenancy(
 fn transfer_from_escrow<'info>(
     t: &Account<'info, Tenancy>,
     from: &Account<'info, TokenAccount>,
-    to: &Account<'info, TokenAccount>,
+    to: AccountInfo<'info>,
     mint: &Account<'info, Mint>,
     program: &Program<'info, Token>,
     amount: u64,
@@ -383,7 +444,7 @@ fn transfer_from_escrow<'info>(
             TransferChecked {
                 from: from.to_account_info(),
                 mint: mint.to_account_info(),
-                to: to.to_account_info(),
+                to,
                 authority: t.to_account_info(),
             },
             &[seeds],
@@ -420,9 +481,9 @@ pub struct Initialize<'info> {
     pub cash: Account<'info, TokenAccount>,
     #[account(init,payer=payer,seeds=[b"receipts",tenancy.key().as_ref()],bump,token::mint=receipt_mint,token::authority=tenancy)]
     pub receipts: Account<'info, TokenAccount>,
-    #[account(token::mint=deposit_mint,token::authority=tenant)]
+    #[account(address=payout_address(&tenant.key(), &deposit_mint.key()),token::mint=deposit_mint,token::authority=tenant)]
     pub tenant_destination: Account<'info, TokenAccount>,
-    #[account(token::mint=deposit_mint,token::authority=landlord)]
+    #[account(address=payout_address(&landlord.key(), &deposit_mint.key()),token::mint=deposit_mint,token::authority=landlord)]
     pub landlord_destination: Account<'info, TokenAccount>,
     /// CHECK: KLend owner, discriminator, fields and derived accounts verified by lending::inspect.
     #[account(owner=klend_interface::KLEND_PROGRAM_ID)]
@@ -452,9 +513,9 @@ pub struct InitializeStaged<'info> {
     pub cash: Account<'info, TokenAccount>,
     #[account(init,payer=payer,seeds=[b"receipts",tenancy.key().as_ref()],bump,token::mint=receipt_mint,token::authority=tenancy)]
     pub receipts: Account<'info, TokenAccount>,
-    #[account(token::mint=deposit_mint,token::authority=tenant)]
+    #[account(address=payout_address(&tenant.key(), &deposit_mint.key()),token::mint=deposit_mint,token::authority=tenant)]
     pub tenant_destination: Account<'info, TokenAccount>,
-    #[account(token::mint=deposit_mint,token::authority=landlord)]
+    #[account(address=payout_address(&landlord.key(), &deposit_mint.key()),token::mint=deposit_mint,token::authority=landlord)]
     pub landlord_destination: Account<'info, TokenAccount>,
     /// CHECK: KLend owner, discriminator, fields and derived accounts verified by lending::inspect.
     #[account(owner=klend_interface::KLEND_PROGRAM_ID)]
@@ -493,8 +554,10 @@ pub struct Finance<'info> {
     pub cash: Account<'info, TokenAccount>,
     #[account(mut,seeds=[b"receipts",tenancy.key().as_ref()],bump,token::mint=receipt_mint,token::authority=tenancy)]
     pub receipts: Account<'info, TokenAccount>,
-    #[account(mut,address=tenancy.tenant_destination,token::mint=deposit_mint)]
-    pub destination: Account<'info, TokenAccount>,
+    /// CHECK: Only earnings release needs a live token account; supply/redeem remain
+    /// available if a party closes or changes ownership of their own payout ATA.
+    #[account(mut,address=tenancy.tenant_destination)]
+    pub destination: UncheckedAccount<'info>,
     /// CHECK: pinned KLend account and data verified before every CPI.
     #[account(mut,address=tenancy.reserve,owner=klend_interface::KLEND_PROGRAM_ID)]
     pub reserve: UncheckedAccount<'info>,
@@ -529,12 +592,22 @@ pub struct Settle<'info> {
     pub tenancy: Account<'info, Tenancy>,
     #[account(address=tenancy.deposit_mint)]
     pub deposit_mint: Account<'info, Mint>,
+    #[account(seeds=[b"cash",tenancy.key().as_ref()],bump,token::mint=deposit_mint,token::authority=tenancy)]
+    pub cash: Account<'info, TokenAccount>,
+}
+
+#[derive(Accounts)]
+#[instruction(landlord: bool)]
+pub struct Payout<'info> {
+    pub actor: Signer<'info>,
+    #[account(mut,seeds=[b"tenancy",tenancy.tenant.as_ref(),&tenancy.lease_id],bump=tenancy.bump)]
+    pub tenancy: Account<'info, Tenancy>,
+    #[account(address=tenancy.deposit_mint)]
+    pub deposit_mint: Account<'info, Mint>,
     #[account(mut,seeds=[b"cash",tenancy.key().as_ref()],bump,token::mint=deposit_mint,token::authority=tenancy)]
     pub cash: Account<'info, TokenAccount>,
-    #[account(mut,address=tenancy.tenant_destination,token::mint=deposit_mint,constraint=tenant_destination.owner == tenancy.tenant @ EscrowError::InvalidRecipient)]
-    pub tenant_destination: Account<'info, TokenAccount>,
-    #[account(mut,address=tenancy.landlord_destination,token::mint=deposit_mint,constraint=landlord_destination.owner == tenancy.landlord @ EscrowError::InvalidRecipient)]
-    pub landlord_destination: Account<'info, TokenAccount>,
+    #[account(mut,address=if landlord { tenancy.landlord_destination } else { tenancy.tenant_destination },token::mint=deposit_mint)]
+    pub destination: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
 }
 
@@ -546,6 +619,7 @@ pub enum EventKind {
     Redeemed,
     EarningsReleased,
     Settled,
+    PaidOut,
 }
 #[event]
 pub struct FinanceEvent {

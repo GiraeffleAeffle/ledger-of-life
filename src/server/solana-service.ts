@@ -18,6 +18,7 @@ import {
   atomic,
   buildEscrowInstruction,
   deriveEscrowAddresses,
+  derivePayoutAddress,
   messageDigest,
   SOLANA_MAINNET_MANIFEST,
   type EscrowAction,
@@ -70,6 +71,7 @@ export type SolanaOperation = {
   actor: string;
   role: 'tenant' | 'landlord' | 'arbitrator';
   action: EscrowAction;
+  deployment: { genesisHash: string; escrowProgram: string; programSha256: string };
   nonce: string;
   state: 'prepared' | 'signed' | 'broadcast' | 'unknown' | 'finalized' | 'failed' | 'expired';
   createdAt: string;
@@ -132,6 +134,11 @@ export function decodeSolanaAction(value: unknown, source: string): EscrowAction
     case 'settle':
       strictFields(row, ['kind']);
       return { kind: 'settle' };
+    case 'payout':
+      strictFields(row, ['kind', 'landlord']);
+      if (typeof row.landlord !== 'boolean')
+        fail('invalid_action', 'Choose which fixed payout is due.', 400);
+      return { kind: 'payout', landlord: row.landlord };
     case 'supply':
     case 'release_earnings':
     case 'propose_claim':
@@ -158,7 +165,7 @@ export function decodeSolanaAction(value: unknown, source: string): EscrowAction
       );
   }
 }
-function allowed(action: EscrowAction, role: string, snapshot: SolanaSnapshot) {
+function allowed(action: EscrowAction, role: string, snapshot: SolanaSnapshot, config: SolanaConfiguration) {
   const phase = snapshot.tenancy.phase;
   const valid =
     action.kind === 'fund'
@@ -173,7 +180,10 @@ function allowed(action: EscrowAction, role: string, snapshot: SolanaSnapshot) {
               ? role === 'tenant' && phase === 'claim-proposed'
               : action.kind === 'resolve_claim'
                 ? role === 'arbitrator' && phase === 'disputed'
-                : phase === 'settling';
+                : action.kind === 'payout'
+                  ? config.escrowVersion === 'pull-v2' && phase === 'closed' &&
+                    atomic(action.landlord ? snapshot.tenancy.landlordOwedAtomic : snapshot.tenancy.tenantOwedAtomic) > 0n
+                  : phase === 'settling';
   if (!valid)
     fail(
       'action_not_available',
@@ -232,7 +242,7 @@ async function deltasFor(
         delta(t.tenantDestination, t.depositMint, t.tenant, 'credit', action.amountAtomic),
       ];
     case 'settle':
-      return [
+      return config.escrowVersion === 'pull-v2' ? [] : [
         delta(derived.cash, t.depositMint, t.address, 'debit', t.accountedIdleAtomic),
         delta(t.landlordDestination, t.depositMint, t.landlord, 'credit', t.approvedClaimAtomic),
         delta(
@@ -243,6 +253,14 @@ async function deltasFor(
           (atomic(t.accountedIdleAtomic) - atomic(t.approvedClaimAtomic)).toString(),
         ),
       ];
+    case 'payout': {
+      const amount = action.landlord ? t.landlordOwedAtomic : t.tenantOwedAtomic;
+      return [
+        delta(derived.cash, t.depositMint, t.address, 'debit', amount),
+        delta(action.landlord ? t.landlordDestination : t.tenantDestination, t.depositMint,
+          action.landlord ? t.landlord : t.tenant, 'credit', amount),
+      ];
+    }
     default:
       return [];
   }
@@ -295,6 +313,10 @@ export function createSolanaService(dependencies: Dependencies) {
         'Tenant and landlord must accept the same complete agreement.',
       );
     const snapshot = await gateway.snapshot();
+    const [tenantDestination, landlordDestination] = await Promise.all([
+      derivePayoutAddress(agreement.parties.tenant!.wallet.address, config.depositMint),
+      derivePayoutAddress(agreement.parties.landlord!.wallet.address, config.depositMint),
+    ]);
     const t = snapshot.tenancy;
     if (
       snapshot.genesisHash !== config.genesisHash ||
@@ -304,7 +326,9 @@ export function createSolanaService(dependencies: Dependencies) {
       t.releasePermitted !== agreement.releaseAllowed ||
       (['tenant', 'landlord', 'arbitrator'] as const).some(
         (role) => t[role] !== agreement.parties[role]?.wallet.address,
-      )
+      ) ||
+      t.tenantDestination !== tenantDestination ||
+      t.landlordDestination !== landlordDestination
     )
       fail(
         'tenancy_binding_mismatch',
@@ -362,8 +386,13 @@ export function createSolanaService(dependencies: Dependencies) {
                 ? tenancy.phase === 'settling' &&
                   tenancy.approvedClaimAtomic === action.amountAtomic
                 : action.kind === 'settle'
-                  ? tenancy.phase === 'closed'
-                  : true;
+                  ? tenancy.phase === 'closed' &&
+                    (config.escrowVersion !== 'pull-v2' ||
+                      (atomic(tenancy.tenantOwedAtomic) + atomic(tenancy.landlordOwedAtomic) === atomic(tenancy.accountedIdleAtomic)))
+                  : action.kind === 'payout'
+                    ? tenancy.phase === 'closed' &&
+                      (action.landlord ? tenancy.landlordOwedAtomic : tenancy.tenantOwedAtomic) === '0'
+                    : true;
         if (!matches) receipt = { status: 'unknown', reason: 'tenancy-transition-not-observed' };
       }
     }
@@ -472,6 +501,7 @@ export function createSolanaService(dependencies: Dependencies) {
         cluster: config.cluster,
         walletChain: config.cluster === 'devnet' ? 'solana:devnet' : null,
         agreementId: config.agreementId,
+        escrowVersion: config.escrowVersion ?? 'direct-v1',
         role: verified.role,
         walletId: verified.wallet.id,
         feePayer: sponsor.address,
@@ -490,7 +520,7 @@ export function createSolanaService(dependencies: Dependencies) {
       const verified = await access(identity),
         t = verified.snapshot.tenancy;
       const action = decodeSolanaAction(input, t.tenantDestination);
-      allowed(action, verified.role, verified.snapshot);
+      allowed(action, verified.role, verified.snapshot, config);
       const id = hash(
           identity.subject +
             ':' +
@@ -505,6 +535,11 @@ export function createSolanaService(dependencies: Dependencies) {
       if (prior) {
         if (prior.fingerprint !== fingerprint)
           fail('request_reused', 'This request identifier already represents another action.');
+        if (prior.deployment &&
+          (prior.deployment.genesisHash !== config.genesisHash ||
+            prior.deployment.escrowProgram !== config.escrowProgram ||
+            prior.deployment.programSha256 !== config.programSha256))
+          fail('deployment_changed', 'The recorded review belongs to another deployment.');
         return publicOperation(prior);
       }
       const lifetime = await gateway.lifetime();
@@ -566,6 +601,11 @@ export function createSolanaService(dependencies: Dependencies) {
         actor: verified.wallet.address,
         role: verified.role,
         action,
+        deployment: {
+          genesisHash: config.genesisHash,
+          escrowProgram: config.escrowProgram,
+          programSha256: config.programSha256,
+        },
         nonce: t.nextNonce,
         state: 'prepared',
         createdAt: new Date(createdAt).toISOString(),
@@ -585,6 +625,11 @@ export function createSolanaService(dependencies: Dependencies) {
         if (duplicate) {
           if (duplicate.fingerprint !== fingerprint)
             fail('request_reused', 'This request identifier already represents another action.');
+          if (duplicate.deployment &&
+            (duplicate.deployment.genesisHash !== config.genesisHash ||
+              duplicate.deployment.escrowProgram !== config.escrowProgram ||
+              duplicate.deployment.programSha256 !== config.programSha256))
+            fail('deployment_changed', 'The recorded review belongs to another deployment.');
           return record;
         }
         const operations = record.operations.map((item) =>
@@ -623,6 +668,11 @@ export function createSolanaService(dependencies: Dependencies) {
         op.actor !== verified.wallet.address
       )
         fail('operation_owner', 'Only the recorded actor can authorize this operation.', 403);
+      if (op.deployment &&
+        (op.deployment.genesisHash !== config.genesisHash ||
+          op.deployment.escrowProgram !== config.escrowProgram ||
+          op.deployment.programSha256 !== config.programSha256))
+        fail('deployment_changed', 'This signature belongs to another deployment.');
       if (typeof signedTxBase64 !== 'string' || signedTxBase64.length > 1800)
         fail('invalid_signature', 'Invalid signed transaction.', 400);
       const raw = Buffer.from(signedTxBase64, 'base64');

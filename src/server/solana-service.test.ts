@@ -22,6 +22,7 @@ import {
 } from './solana-rpc.ts';
 import {
   deriveEscrowAddresses,
+  derivePayoutAddress,
   SOLANA_DEVNET_MANIFEST,
   SOLANA_IDS,
   SOLANA_MAINNET_MANIFEST,
@@ -119,8 +120,8 @@ async function fixture() {
       receiptMint: config.receiptMint,
       liquiditySupply: config.liquiditySupply,
       marketAuthority: config.marketAuthority,
-      tenantDestination: key(16),
-      landlordDestination: key(17),
+      tenantDestination: await derivePayoutAddress(tenant.address, config.depositMint),
+      landlordDestination: await derivePayoutAddress(landlord.address, config.depositMint),
       policyHash: new Uint8Array(Buffer.from(digest.slice(2), 'hex')),
       releasePermitted: true,
       requiredSecurityAtomic: '3000000000',
@@ -131,6 +132,8 @@ async function fixture() {
       claimAtomic: '0',
       approvedClaimAtomic: '0',
       phase: 'awaiting-funding',
+      tenantOwedAtomic: '0',
+      landlordOwedAtomic: '0',
       bump: derived.bump,
     },
   };
@@ -233,6 +236,57 @@ async function fixture() {
   };
 }
 
+test('accepted tenancy rejects a substituted non-ATA payout destination', async () => {
+  const f = await fixture();
+  try {
+    f.snapshot.tenancy.tenantDestination = key(16);
+    await assert.rejects(f.service.snapshot(f.identity), (error: unknown) =>
+      (error as { code?: string }).code === 'tenancy_binding_mismatch');
+    f.snapshot.tenancy.tenantDestination = await derivePayoutAddress(f.tenant.address, f.config.depositMint);
+    f.snapshot.tenancy.landlordDestination = key(17);
+    await assert.rejects(f.service.prepare(f.identity, 'request_ata_guard', { kind: 'fund' }),
+      (error: unknown) => (error as { code?: string }).code === 'tenancy_binding_mismatch');
+    assert.equal(f.state.simulations, 0);
+  } finally {
+    await f.store.close();
+  }
+});
+test('pull settlement records obligations without transfer and payout reviews one exact party credit', async () => {
+  const f = await fixture();
+  try {
+    f.config.escrowVersion = 'pull-v2';
+    f.snapshot.tenancy.phase = 'settling';
+    f.snapshot.tenancy.nextNonce = '3';
+    f.snapshot.tenancy.accountedIdleAtomic = '3000000000';
+    f.snapshot.tenancy.approvedClaimAtomic = '120000000';
+    const settlement = await f.service.prepare(f.identity, 'request_settle_pull', { kind: 'settle' });
+    assert.deepEqual(settlement.expectedDeltas, []);
+    assert.equal(settlement.deployment.programSha256, f.config.programSha256);
+  } finally {
+    await f.store.close();
+  }
+  const payoutFixture = await fixture();
+  try {
+    payoutFixture.config.escrowVersion = 'pull-v2';
+    payoutFixture.snapshot.tenancy.phase = 'closed';
+    payoutFixture.snapshot.tenancy.accountedIdleAtomic = '3000000000';
+    payoutFixture.snapshot.tenancy.tenantOwedAtomic = '2880000000';
+    payoutFixture.snapshot.tenancy.landlordOwedAtomic = '120000000';
+    payoutFixture.snapshot.tenancy.nextNonce = '4';
+    const payout = await payoutFixture.service.prepare(payoutFixture.identity, 'request_payout_pull', { kind: 'payout', landlord: true });
+    assert.deepEqual(payout.expectedDeltas.map((delta) => [delta.account, delta.direction, delta.minimumAtomic, delta.maximumAtomic]), [
+      [(await deriveEscrowAddresses(payoutFixture.config.escrowProgram, payoutFixture.tenant.address, payoutFixture.snapshot.tenancy.leaseId)).cash, 'debit', '120000000', '120000000'],
+      [payoutFixture.snapshot.tenancy.landlordDestination, 'credit', '120000000', '120000000'],
+    ]);
+    payoutFixture.snapshot.tenancy.landlordOwedAtomic = '0';
+    await assert.rejects(
+      payoutFixture.service.prepare(payoutFixture.identity, 'request_payout_empty', { kind: 'payout', landlord: true }),
+      /not available/,
+    );
+  } finally {
+    await payoutFixture.store.close();
+  }
+});
 test('prepare is idempotent, reserves one nonce and persists exact bytes before broadcast', async () => {
   const f = await fixture();
   try {

@@ -30,6 +30,8 @@ export type DeploymentManifest = {
   genesisHash: string;
   escrowProgram: string;
   programSha256: string;
+  /** Legacy manifests omit this field; pull payouts require a separately pinned deployment. */
+  escrowVersion?: "direct-v1" | "pull-v2";
   depositMint: string;
   market: string;
   reserve: string;
@@ -53,6 +55,13 @@ export function resolveSolanaManifest(input: {
     return { available: false, reason: "cluster-genesis-mismatch" };
   }
   if (deployment.depositMint !== SOLANA_DEVNET_MANIFEST.deposit.mint) return { available: false, reason: "test-mint-required" };
+  if (deployment.escrowVersion !== undefined && !["direct-v1", "pull-v2"].includes(deployment.escrowVersion)) return { available: false, reason: "invalid-escrow-version" };
+  if (deployment.escrowVersion === "pull-v2" &&
+    (deployment.escrowProgram === "B1hjmapwssey8AbpjAtw5qF87DvvtuSisGov4kHec7Yc" ||
+      deployment.escrowProgram === "BiwaGavQUsSsg48UPpRAGWoXSiUnzgvdDs7rd8WizvPD" ||
+      deployment.programSha256 === "29b7a9877bb8dacfa170ecf13e7c112a88d6dd3355e006b79975a25baefaae41" ||
+      deployment.programSha256 === "03193455b06f9ee8c6f96ff5504f5fb97fb3ed839164676e3e9afcec55ca4377"))
+    return { available: false, reason: "pull-payout-program-not-deployed" };
   try {
     for (const key of [deployment.escrowProgram, deployment.market, deployment.reserve, deployment.receiptMint, deployment.liquiditySupply, deployment.marketAuthority, ...deployment.oracleAccounts]) address(key);
     if (!/^[a-f0-9]{64}$/.test(deployment.programSha256) || !Number.isSafeInteger(deployment.maxObservationAgeMs) || deployment.maxObservationAgeMs <= 0 || deployment.maxObservationAgeMs > 60_000) throw new Error("Invalid deployment bounds");

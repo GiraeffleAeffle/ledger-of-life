@@ -269,7 +269,7 @@ mod tests {
     fn client_binary_layout_is_pinned_to_the_protocol_interface() {
         assert_eq!(std::mem::size_of::<Reserve>() + 8, 8624);
         assert_eq!(std::mem::size_of::<LendingMarket>() + 8, 4664);
-        assert_eq!(crate::state::Tenancy::INIT_SPACE + 8, 483);
+        assert_eq!(crate::state::Tenancy::INIT_SPACE + 8, 499);
         assert_eq!(std::mem::offset_of!(Reserve, liquidity) + 8, 128);
         assert_eq!(
             std::mem::offset_of!(ReserveLiquidity, total_available_amount),

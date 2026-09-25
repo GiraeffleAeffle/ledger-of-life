@@ -75,7 +75,7 @@ test("issuer powers need explicit review and cannot be confused with escrow perm
 });
 async function tenancyFixture(): Promise<TenancyAccount> {
   const leaseId = new Uint8Array(32).fill(1); const derived = await deriveEscrowAddresses(program, tenant, leaseId);
-  return { address: derived.tenancy, leaseId, tenant, landlord, arbitrator, depositMint: manifest.depositMint, reserve, market, receiptMint: manifest.receiptMint, liquiditySupply: manifest.liquiditySupply, marketAuthority: manifest.marketAuthority, tenantDestination: inputAccount, landlordDestination: key(23), policyHash: new Uint8Array(32).fill(2), releasePermitted: true, requiredSecurityAtomic: "3000000000", accountedIdleAtomic: "3010000000", accountedReceiptsAtomic: "0", releasedEarningsAtomic: "0", nextNonce: "4", claimAtomic: "0", approvedClaimAtomic: "0", phase: "active", bump: derived.bump };
+  return { address: derived.tenancy, leaseId, tenant, landlord, arbitrator, depositMint: manifest.depositMint, reserve, market, receiptMint: manifest.receiptMint, liquiditySupply: manifest.liquiditySupply, marketAuthority: manifest.marketAuthority, tenantDestination: inputAccount, landlordDestination: key(23), policyHash: new Uint8Array(32).fill(2), releasePermitted: true, requiredSecurityAtomic: "3000000000", accountedIdleAtomic: "3010000000", accountedReceiptsAtomic: "0", releasedEarningsAtomic: "0", nextNonce: "4", claimAtomic: "0", approvedClaimAtomic: "0", phase: "active", bump: derived.bump, tenantOwedAtomic: "0", landlordOwedAtomic: "0" };
 }
 test("instruction planner pins PDAs, nonce and tenant recipient", async () => {
   const tenancy = await tenancyFixture();
@@ -96,6 +96,33 @@ test("tenancy binary decoder mirrors the 483-byte Anchor account ABI", async () 
   for (const amount of [t.requiredSecurityAtomic,t.accountedIdleAtomic,t.accountedReceiptsAtomic,t.releasedEarningsAtomic,t.nextNonce,t.claimAtomic,t.approvedClaimAtomic]) { view.setBigUint64(offset, BigInt(amount), true);offset += 8; }
   data[offset++] = 1;data[offset] = t.bump;
   assert.deepEqual(decodeTenancy({ address: t.address, owner: program, executable: false, data }, manifest), t);
+});
+test("pull deployment decodes owed balances and builds one exact payout instruction", async () => {
+  const t = await tenancyFixture();
+  const pull = { ...manifest, escrowVersion: "pull-v2" as const };
+  const data = new Uint8Array(499);
+  const view = new DataView(data.buffer);
+  let offset = 8;
+  data.set([251, 53, 106, 214, 69, 170, 131, 234]);
+  data.set(t.leaseId, offset); offset += 32;
+  for (const value of [t.tenant,t.landlord,t.arbitrator,t.depositMint,t.reserve,t.market,t.receiptMint,t.liquiditySupply,t.marketAuthority,t.tenantDestination,t.landlordDestination]) {
+    data.set(getAddressEncoder().encode(address(value)), offset); offset += 32;
+  }
+  data.set(t.policyHash, offset); offset += 32; data[offset++] = 1;
+  for (const amount of [t.requiredSecurityAtomic, t.accountedIdleAtomic, t.accountedReceiptsAtomic, t.releasedEarningsAtomic, t.nextNonce, t.claimAtomic, t.approvedClaimAtomic]) {
+    view.setBigUint64(offset, BigInt(amount), true); offset += 8;
+  }
+  data[offset++] = 5; data[offset++] = t.bump;
+  view.setBigUint64(offset, 2_890_000_000n, true); offset += 8;
+  view.setBigUint64(offset, 120_000_000n, true);
+  const observed = decodeTenancy({ address: t.address, owner: program, executable: false, data }, pull);
+  assert.equal(observed.tenantOwedAtomic, "2890000000");
+  assert.equal(observed.landlordOwedAtomic, "120000000");
+  assert.throws(() => decodeTenancy({ address: t.address, owner: program, executable: false, data }, manifest));
+  const payout = await buildEscrowInstruction({ manifest: pull, tenancy: observed, actor: sponsor, nonce: observed.nextNonce, action: { kind: "payout", landlord: true } });
+  assert.equal(payout.accounts![4].address, t.landlordDestination);
+  assert.deepEqual([...payout.data!.slice(0, 9)], [149, 140, 194, 236, 174, 189, 6, 239, 1]);
+  await assert.rejects(buildEscrowInstruction({ manifest, tenancy: t, actor: sponsor, nonce: t.nextNonce, action: { kind: "payout", landlord: true } }));
 });
 test("Jupiter permits keyless price checks while builds and test issuer routes stay gated", async () => {
   let calls = 0;
