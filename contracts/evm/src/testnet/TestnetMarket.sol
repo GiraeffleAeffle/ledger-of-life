@@ -190,3 +190,31 @@ contract TestStockDesk {
         emit PriceSet(newPrice);
     }
 }
+
+/// @notice TESTNET ONLY. Operator-set price feed (USD, 6 decimals per whole token) mirroring the
+/// desk price. Stands in for a Chainlink feed; it is not a market price source.
+contract TestPriceOracle {
+    address public immutable owner;
+    uint256 public price;
+    uint256 public updatedAt;
+
+    event PriceUpdated(uint256 price);
+
+    constructor(uint256 initialPrice) {
+        if (block.chainid != 46630 && block.chainid != 31337) revert("TESTNET_ONLY");
+        owner = msg.sender;
+        setPrice(initialPrice);
+    }
+
+    function setPrice(uint256 newPrice) public {
+        require(msg.sender == owner, "OWNER");
+        require(newPrice > 0, "PRICE");
+        price = newPrice;
+        updatedAt = block.timestamp;
+        emit PriceUpdated(newPrice);
+    }
+
+    function latestPrice() external view returns (uint256, uint256) {
+        return (price, updatedAt);
+    }
+}

@@ -24,7 +24,15 @@ Status 2026-09-25. These are **product explorations**, not implemented features 
 - **Robinhood Chain testnet:** high. The official testnet TSLA/AMZN tokens exist, and our `TestStockDesk` can act as the sale route. A Chainlink feed would need to be confirmed on testnet, or mocked with a clearly labelled test oracle.
 - **Solana devnet:** medium. `tSPYx` exists, but it needs an oracle integration in the Anchor program.
 
-**Smallest prototype:** a `CollateralEscrow` contract with pledge, top-up, oracle-checked liquidation and in-kind return, plus forge tests, on Robinhood testnet.
+**Prototype (done, unreviewed):** [`CollateralEscrow.sol`](../contracts/evm/src/CollateralEscrow.sol) implements pledge at an initial ratio, excess withdrawal, permissionless shortfall flag, grace period, forced sale of only what is needed with an oracle-bounded slippage limit, the claim/dispute/arbitrator flow, and settlement that pays the landlord in cash and returns the rest in kind. There are 7 forge tests in `test/CollateralEscrow.t.sol`.
+
+It also ran live on Robinhood Chain testnet (`script/CollateralTestnetCycle.s.sol`, 14 transactions, all succeeded, escrow `0xb04bCbA7D89631E5Ca33B8152B8b346Cc8F08229`):
+- A $10 deposit was secured by 0.0403 **official test TSLA** (150%).
+- A test 25% price drop triggered a shortfall, which the tenant cured with 0.0081 TSLA.
+- A $2 claim was paid to the landlord by selling 0.0072 TSLA.
+- 0.0412 TSLA returned to the tenant.
+
+The price oracle and sale desk are our test contracts (`TestPriceOracle`, `TestStockDesk`), not Chainlink or a real venue.
 
 ## 2. Borrowing against stocks to pay the deposit
 
@@ -62,6 +70,6 @@ Status 2026-09-25. These are **product explorations**, not implemented features 
 
 ## Recommendation
 
-1. Build idea 1 as a testnet prototype on Robinhood Chain; it reuses the official test Stock Tokens and our desk.
+1. Idea 1 is prototyped on Robinhood testnet. Next: a real oracle (Chainlink), a Solana port, and a landlord-facing risk explanation.
 2. Pitch ideas 3 and 4 as the roadmap ("every euro that has to wait should work for its owner").
 3. Skip idea 2 as a feature.
