@@ -21,9 +21,9 @@ type Observation = SolanaSnapshot & {
   operations: Operation[];
 };
 type Action =
-  | { kind: 'fund' | 'settle' }
+  | { kind: 'fund' | 'settle' | 'fund_and_supply' | 'accept_and_settle' | 'redeem_and_settle' }
   | {
-      kind: 'supply' | 'release_earnings' | 'propose_claim' | 'resolve_claim';
+      kind: 'supply' | 'release_earnings' | 'propose_claim' | 'resolve_claim' | 'resolve_and_settle';
       amountAtomic: string;
     }
   | { kind: 'respond_to_claim'; accept: boolean }
@@ -39,17 +39,24 @@ const titles: Record<Action['kind'], string> = {
   resolve_claim: 'Record the assigned arbitration decision',
   settle: 'Pay the recorded security allocation',
   payout: 'Pay an owed deposit allocation',
+  fund_and_supply: 'Secure the deposit and start lending',
+  accept_and_settle: 'Accept the claim and settle the deposit',
+  resolve_and_settle: 'Decide the claim and settle the deposit',
+  redeem_and_settle: 'Settle the deposit',
 };
 function actionForReview(action: Operation['action']): Action {
   switch (action.kind) {
     case 'fund':
-      return { kind: 'fund' };
     case 'settle':
-      return { kind: 'settle' };
+    case 'fund_and_supply':
+    case 'accept_and_settle':
+    case 'redeem_and_settle':
+      return { kind: action.kind };
     case 'supply':
     case 'release_earnings':
     case 'propose_claim':
     case 'resolve_claim':
+    case 'resolve_and_settle':
       return { kind: action.kind, amountAtomic: action.amountAtomic };
     case 'redeem':
       return {

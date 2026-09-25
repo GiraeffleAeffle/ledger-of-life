@@ -426,7 +426,8 @@ export class RpcSolanaGateway implements SolanaGateway {
         atomic(pre.lamports) > atomic(post.lamports)
           ? atomic(pre.lamports) - atomic(post.lamports)
           : 0n;
-      const actorIndex = keys.indexOf(address(actor));
+      // Sponsor-run permissionless actions (pull-v2 payouts) have no separate user to protect.
+      const actorIndex = actor === sponsor ? -1 : keys.indexOf(address(actor));
       if (actorIndex >= 0) {
         const original = before.accounts[actorIndex];
         const final =

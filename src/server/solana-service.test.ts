@@ -287,6 +287,34 @@ test('pull settlement records obligations without transfer and payout reviews on
     await payoutFixture.store.close();
   }
 });
+test('bundles sign fixed instruction sequences with net token effects and pull-v2-only settlement', async () => {
+  const f = await fixture();
+  try {
+    const t = f.snapshot.tenancy;
+    const cash = (await deriveEscrowAddresses(f.config.escrowProgram, f.tenant.address, t.leaseId)).cash;
+    const deposit = await f.service.prepare(f.identity, 'request_bundle_fund', { kind: 'fund_and_supply' });
+    assert.equal(deposit.steps, 2);
+    // The escrow cash hop cancels out; only the tenant debit and receipt credit remain.
+    assert.deepEqual(deposit.expectedDeltas.map((delta) => [delta.account, delta.direction]), [
+      [t.tenantDestination, 'debit'],
+      [(await deriveEscrowAddresses(f.config.escrowProgram, f.tenant.address, t.leaseId)).receipts, 'credit'],
+    ]);
+    assert.ok(!deposit.expectedDeltas.some((delta) => delta.account === cash));
+    t.phase = 'claim-proposed';
+    t.nextNonce = '4';
+    await assert.rejects(
+      f.service.prepare(f.identity, 'request_bundle_legacy', { kind: 'accept_and_settle' }),
+      /not available/,
+    );
+    f.config.escrowVersion = 'pull-v2';
+    t.accountedReceiptsAtomic = '2990000000';
+    const settle = await f.service.prepare(f.identity, 'request_bundle_settle', { kind: 'accept_and_settle' });
+    assert.equal(settle.steps, 3);
+    assert.deepEqual(settle.expectedDeltas.map((delta) => delta.direction), ['debit', 'credit']);
+  } finally {
+    await f.store.close();
+  }
+});
 test('prepare is idempotent, reserves one nonce and persists exact bytes before broadcast', async () => {
   const f = await fixture();
   try {

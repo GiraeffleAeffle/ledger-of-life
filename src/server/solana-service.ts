@@ -1,7 +1,7 @@
 import { createHash, createPublicKey, verify as verifyEd25519 } from 'node:crypto';
 import {
   address,
-  appendTransactionMessageInstruction,
+  appendTransactionMessageInstructions,
   blockhash,
   compileTransaction,
   createKeyPairSignerFromBytes,
@@ -13,6 +13,7 @@ import {
   partiallySignTransaction,
   setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash,
+  type Instruction,
 } from '@solana/kit';
 import {
   atomic,
@@ -61,6 +62,13 @@ function signingKey(wallet: string) {
     type: 'spki',
   });
 }
+/** One wallet approval for a short, fixed sequence of escrow instructions (pull-v2 settlement). */
+export type BundleAction =
+  | { kind: 'fund_and_supply' }
+  | { kind: 'accept_and_settle' }
+  | { kind: 'resolve_and_settle'; amountAtomic: string }
+  | { kind: 'redeem_and_settle' };
+export type ServiceAction = EscrowAction | BundleAction;
 export type SolanaOperation = {
   id: string;
   requestId: string;
@@ -70,7 +78,9 @@ export type SolanaOperation = {
   walletId: string;
   actor: string;
   role: 'tenant' | 'landlord' | 'arbitrator';
-  action: EscrowAction;
+  action: ServiceAction;
+  /** Escrow instructions in this transaction; each consumes one tenancy nonce. */
+  steps?: number;
   deployment: { genesisHash: string; escrowProgram: string; programSha256: string };
   nonce: string;
   state: 'prepared' | 'signed' | 'broadcast' | 'unknown' | 'finalized' | 'failed' | 'expired';
@@ -115,7 +125,7 @@ function strictFields(value: Record<string, unknown>, fields: string[]) {
   if (Object.keys(value).some((key) => !fields.includes(key)))
     fail('invalid_action', 'Unexpected action field.', 400);
 }
-export function decodeSolanaAction(value: unknown, source: string): EscrowAction {
+export function decodeSolanaAction(value: unknown, source: string): ServiceAction {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     fail('invalid_action', 'Choose a supported escrow action.', 400);
   const row = value as Record<string, unknown>;
@@ -129,8 +139,11 @@ export function decodeSolanaAction(value: unknown, source: string): EscrowAction
   };
   switch (row.kind) {
     case 'fund':
+    case 'fund_and_supply':
+    case 'accept_and_settle':
+    case 'redeem_and_settle':
       strictFields(row, ['kind']);
-      return { kind: 'fund', source };
+      return row.kind === 'fund' ? { kind: 'fund', source } : { kind: row.kind };
     case 'settle':
       strictFields(row, ['kind']);
       return { kind: 'settle' };
@@ -143,6 +156,7 @@ export function decodeSolanaAction(value: unknown, source: string): EscrowAction
     case 'release_earnings':
     case 'propose_claim':
     case 'resolve_claim':
+    case 'resolve_and_settle':
       strictFields(row, ['kind', 'amountAtomic']);
       return { kind: row.kind, amountAtomic: amount('amountAtomic') };
     case 'redeem':
@@ -165,10 +179,11 @@ export function decodeSolanaAction(value: unknown, source: string): EscrowAction
       );
   }
 }
-function allowed(action: EscrowAction, role: string, snapshot: SolanaSnapshot, config: SolanaConfiguration) {
+function allowed(action: ServiceAction, role: string, snapshot: SolanaSnapshot, config: SolanaConfiguration) {
   const phase = snapshot.tenancy.phase;
+  const pull = config.escrowVersion === 'pull-v2';
   const valid =
-    action.kind === 'fund'
+    action.kind === 'fund' || action.kind === 'fund_and_supply'
       ? role === 'tenant' && phase === 'awaiting-funding'
       : action.kind === 'supply' || action.kind === 'release_earnings'
         ? role === 'tenant' && phase === 'active'
@@ -178,18 +193,43 @@ function allowed(action: EscrowAction, role: string, snapshot: SolanaSnapshot, c
             ? role === 'landlord' && phase === 'active'
             : action.kind === 'respond_to_claim'
               ? role === 'tenant' && phase === 'claim-proposed'
-              : action.kind === 'resolve_claim'
-                ? role === 'arbitrator' && phase === 'disputed'
-                : action.kind === 'payout'
-                  ? config.escrowVersion === 'pull-v2' && phase === 'closed' &&
-                    atomic(action.landlord ? snapshot.tenancy.landlordOwedAtomic : snapshot.tenancy.tenantOwedAtomic) > 0n
-                  : phase === 'settling';
+              : action.kind === 'accept_and_settle'
+                ? pull && role === 'tenant' && phase === 'claim-proposed'
+                : action.kind === 'resolve_claim'
+                  ? role === 'arbitrator' && phase === 'disputed'
+                  : action.kind === 'resolve_and_settle'
+                    ? pull && role === 'arbitrator' && phase === 'disputed'
+                    : action.kind === 'redeem_and_settle'
+                      ? pull && phase === 'settling'
+                      : action.kind === 'payout'
+                        ? pull && phase === 'closed' &&
+                          atomic(action.landlord ? snapshot.tenancy.landlordOwedAtomic : snapshot.tenancy.tenantOwedAtomic) > 0n
+                        : phase === 'settling';
   if (!valid)
     fail(
       'action_not_available',
       'This action is not available to this party in the current tenancy state.',
       403,
     );
+}
+/** Expand a bundle into the exact escrow instructions it signs, in nonce order. */
+function stepsFor(action: ServiceAction, snapshot: SolanaSnapshot): EscrowAction[] {
+  const t = snapshot.tenancy;
+  const redeemAll: EscrowAction[] = atomic(t.accountedReceiptsAtomic) > 0n
+    ? [{ kind: 'redeem', receiptAtomic: t.accountedReceiptsAtomic, minimumReceivedAtomic: snapshot.receiptValueAtomic }]
+    : [];
+  switch (action.kind) {
+    case 'fund_and_supply':
+      return [{ kind: 'fund', source: t.tenantDestination }, { kind: 'supply', amountAtomic: t.requiredSecurityAtomic }];
+    case 'accept_and_settle':
+      return [{ kind: 'respond_to_claim', accept: true }, ...redeemAll, { kind: 'settle' }];
+    case 'resolve_and_settle':
+      return [{ kind: 'resolve_claim', amountAtomic: action.amountAtomic }, ...redeemAll, { kind: 'settle' }];
+    case 'redeem_and_settle':
+      return [...redeemAll, { kind: 'settle' }];
+    default:
+      return [action];
+  }
 }
 async function deltasFor(
   action: EscrowAction,
@@ -264,6 +304,23 @@ async function deltasFor(
     default:
       return [];
   }
+}
+/** Net token effects a finalized bundle must show; intermediate hops inside the escrow cancel out. */
+async function bundleDeltas(
+  action: ServiceAction,
+  steps: EscrowAction[],
+  snapshot: SolanaSnapshot,
+  config: SolanaConfiguration,
+): Promise<ExpectedTokenDelta[]> {
+  if (steps.length === 1) return deltasFor(steps[0], snapshot, config);
+  if (action.kind === 'fund_and_supply') {
+    const [tenantDebit] = await deltasFor(steps[0], snapshot, config);
+    const [, receiptCredit] = await deltasFor(steps[1], snapshot, config);
+    return [tenantDebit, receiptCredit];
+  }
+  // Settlement bundles only exist for pull-v2, whose settle moves no tokens.
+  const redeem = steps.find((step) => step.kind === 'redeem');
+  return redeem ? deltasFor(redeem, snapshot, config) : [];
 }
 
 export function createSolanaService(dependencies: Dependencies) {
@@ -354,6 +411,37 @@ export function createSolanaService(dependencies: Dependencies) {
         operations: record.operations.map((op) => (op.id === id ? change(op) : op)),
       }))
       .then((record) => record.operations.find((op) => op.id === id)!);
+  /** Each instruction consumes the next nonce; later steps see the nonce the earlier ones leave. */
+  async function escrowInstructions(steps: EscrowAction[], t: SolanaSnapshot['tenancy'], actor: string) {
+    const instructions: Instruction[] = [];
+    let nonce = atomic(t.nextNonce);
+    for (const step of steps) {
+      const tenancy = { ...t, nextNonce: nonce.toString() };
+      instructions.push(await buildEscrowInstruction({ manifest: config, tenancy, actor, nonce: tenancy.nextNonce, action: step }));
+      nonce++;
+    }
+    return instructions;
+  }
+  async function compileWithSponsor(
+    instructions: Instruction[],
+    computeUnits: number,
+    lifetime: { blockhash: string; lastValidBlockHeight: string },
+  ) {
+    const computeData = new Uint8Array(5);
+    computeData[0] = 2;
+    new DataView(computeData.buffer).setUint32(1, computeUnits, true);
+    const message = appendTransactionMessageInstructions(
+      [{ programAddress: address('ComputeBudget111111111111111111111111111111'), data: computeData }, ...instructions],
+      setTransactionMessageLifetimeUsingBlockhash(
+        { blockhash: blockhash(lifetime.blockhash), lastValidBlockHeight: BigInt(lifetime.lastValidBlockHeight) },
+        setTransactionMessageFeePayer(address(sponsor.address), createTransactionMessage({ version: 0 })),
+      ),
+    );
+    const bytes = new Uint8Array(getTransactionEncoder().encode(compileTransaction(message)));
+    if (bytes.length > 1232)
+      fail('transaction_too_large', 'This action needs a reviewed account-list reduction.');
+    return bytes;
+  }
   async function reconcileStored(id: string) {
     const op = await operation(id);
     if (
@@ -368,12 +456,17 @@ export function createSolanaService(dependencies: Dependencies) {
     let receipt = await gateway.reconcile(op.signature, op.messageSha256, op.expectedDeltas);
     if (receipt.status === 'finalized') {
       const nextNonce = atomic(snapshot.tenancy.nextNonce);
-      if (atomic(snapshot.slot) < atomic(receipt.slot) || nextNonce <= atomic(op.nonce)) {
+      const finalNonce = atomic(op.nonce) + BigInt(op.steps ?? 1);
+      if (atomic(snapshot.slot) < atomic(receipt.slot) || nextNonce < finalNonce) {
         receipt = { status: 'unknown', reason: 'awaiting-finalized-tenancy-state' };
-      } else if (nextNonce === atomic(op.nonce) + 1n) {
+      } else if (nextNonce === finalNonce) {
         // Claim approval moves no tokens, so also require its recorded state transition.
         const tenancy = snapshot.tenancy;
         const action = op.action;
+        const closedWithObligations =
+          tenancy.phase === 'closed' &&
+          (config.escrowVersion !== 'pull-v2' ||
+            atomic(tenancy.tenantOwedAtomic) + atomic(tenancy.landlordOwedAtomic) === atomic(tenancy.accountedIdleAtomic));
         const matches =
           action.kind === 'propose_claim'
             ? tenancy.phase === 'claim-proposed' && tenancy.claimAtomic === action.amountAtomic
@@ -385,14 +478,18 @@ export function createSolanaService(dependencies: Dependencies) {
               : action.kind === 'resolve_claim'
                 ? tenancy.phase === 'settling' &&
                   tenancy.approvedClaimAtomic === action.amountAtomic
-                : action.kind === 'settle'
-                  ? tenancy.phase === 'closed' &&
-                    (config.escrowVersion !== 'pull-v2' ||
-                      (atomic(tenancy.tenantOwedAtomic) + atomic(tenancy.landlordOwedAtomic) === atomic(tenancy.accountedIdleAtomic)))
-                  : action.kind === 'payout'
-                    ? tenancy.phase === 'closed' &&
-                      (action.landlord ? tenancy.landlordOwedAtomic : tenancy.tenantOwedAtomic) === '0'
-                    : true;
+                : action.kind === 'settle' || action.kind === 'redeem_and_settle'
+                  ? closedWithObligations
+                  : action.kind === 'accept_and_settle'
+                    ? closedWithObligations && tenancy.approvedClaimAtomic === tenancy.claimAtomic
+                    : action.kind === 'resolve_and_settle'
+                      ? closedWithObligations && tenancy.approvedClaimAtomic === action.amountAtomic
+                      : action.kind === 'fund_and_supply'
+                        ? tenancy.phase === 'active' && atomic(tenancy.accountedReceiptsAtomic) > 0n
+                        : action.kind === 'payout'
+                          ? tenancy.phase === 'closed' &&
+                            (action.landlord ? tenancy.landlordOwedAtomic : tenancy.tenantOwedAtomic) === '0'
+                          : true;
         if (!matches) receipt = { status: 'unknown', reason: 'tenancy-transition-not-observed' };
       }
     }
@@ -545,38 +642,12 @@ export function createSolanaService(dependencies: Dependencies) {
       const lifetime = await gateway.lifetime();
       if (atomic(lifetime.blockHeight) >= atomic(lifetime.lastValidBlockHeight))
         throw new Error('Recent blockhash expired');
-      const ix = await buildEscrowInstruction({
-        manifest: config,
-        tenancy: t,
-        actor: verified.wallet.address,
-        nonce: t.nextNonce,
-        action,
-      });
-      const computeData = new Uint8Array(5);
-      computeData[0] = 2;
-      new DataView(computeData.buffer).setUint32(1, 300_000, true);
-      const baseMessage = setTransactionMessageLifetimeUsingBlockhash(
-        {
-          blockhash: blockhash(lifetime.blockhash),
-          lastValidBlockHeight: BigInt(lifetime.lastValidBlockHeight),
-        },
-        setTransactionMessageFeePayer(
-          address(sponsor.address),
-          createTransactionMessage({ version: 0 }),
-        ),
+      const steps = stepsFor(action, verified.snapshot);
+      const transactionBytes = await compileWithSponsor(
+        await escrowInstructions(steps, t, verified.wallet.address),
+        steps.length === 1 ? 300_000 : Math.min(250_000 * steps.length, 1_000_000),
+        lifetime,
       );
-      const computeMessage = appendTransactionMessageInstruction(
-        {
-          programAddress: address('ComputeBudget111111111111111111111111111111'),
-          data: computeData,
-        },
-        baseMessage,
-      );
-      const message = appendTransactionMessageInstruction(ix, computeMessage);
-      const transaction = compileTransaction(message),
-        transactionBytes = new Uint8Array(getTransactionEncoder().encode(transaction));
-      if (transactionBytes.length > 1232)
-        fail('transaction_too_large', 'This action needs a reviewed account-list reduction.');
       const simulation = await gateway.simulate(
         transactionBytes,
         sponsor.address,
@@ -601,6 +672,7 @@ export function createSolanaService(dependencies: Dependencies) {
         actor: verified.wallet.address,
         role: verified.role,
         action,
+        steps: steps.length,
         deployment: {
           genesisHash: config.genesisHash,
           escrowProgram: config.escrowProgram,
@@ -616,7 +688,7 @@ export function createSolanaService(dependencies: Dependencies) {
         signedTxBase64: null,
         signature: null,
         simulation,
-        expectedDeltas: await deltasFor(action, verified.snapshot, config),
+        expectedDeltas: await bundleDeltas(action, steps, verified.snapshot, config),
         receipt: null,
         lastError: null,
       };
@@ -766,6 +838,72 @@ export function createSolanaService(dependencies: Dependencies) {
     async reconcile(identity: VerifiedIdentity, id: string) {
       await access(identity);
       return publicOperation(await reconcileStored(id));
+    },
+    /**
+     * pull-v2 payouts are permissionless on-chain, so the sponsor runs them after settlement:
+     * one side per transaction, so a party that breaks its own payout account only blocks itself.
+     * Returns the payout operation it advanced, or null when nothing is owed.
+     */
+    async payout(identity: VerifiedIdentity) {
+      const verified = await access(identity);
+      const t = verified.snapshot.tenancy;
+      if (config.escrowVersion !== 'pull-v2' || t.phase !== 'closed') return null;
+      const operations = (await lane()).operations;
+      const pending = operations.find((op) =>
+        op.action.kind === 'payout' && op.signature && !['finalized', 'failed', 'expired'].includes(op.state));
+      if (pending) return publicOperation(await reconcileStored(pending.id));
+      const owed = (['tenant', 'landlord'] as const).filter((side) =>
+        atomic(side === 'landlord' ? t.landlordOwedAtomic : t.tenantOwedAtomic) > 0n);
+      if (!owed.length) return null;
+      const failures = (side: 'tenant' | 'landlord') => operations.filter((op) =>
+        op.action.kind === 'payout' && op.action.landlord === (side === 'landlord') && op.state === 'failed').length;
+      const action: EscrowAction = { kind: 'payout', landlord: owed.sort((a, b) => failures(a) - failures(b))[0] === 'landlord' };
+      const id = hash(`payout:${config.genesisHash}:${config.tenancyAddress}:${t.nextNonce}`);
+      const existing = operations.find((op) => op.id === id);
+      if (existing) return publicOperation(existing);
+      const lifetime = await gateway.lifetime();
+      const unsigned = await compileWithSponsor(await escrowInstructions([action], t, sponsor.address), 200_000, lifetime);
+      const simulation = await gateway.simulate(unsigned, sponsor.address, sponsor.address);
+      if (atomic(simulation.sponsorDebitCeilingLamports) > atomic(config.maximumSponsorLamports))
+        fail('sponsor_limit', 'The sponsor fee limit would be exceeded.');
+      const signed = await sponsor.sign(unsigned);
+      const payerSignature = getTransactionDecoder().decode(signed).signatures[address(sponsor.address)];
+      if (!payerSignature) throw new Error('Sponsor did not sign the payout');
+      const createdAt = new Date(now()).toISOString();
+      const op: SolanaOperation = {
+        id,
+        requestId: `payout-${t.nextNonce}`,
+        fingerprint: hash(JSON.stringify(action)),
+        agreementId: config.agreementId,
+        subject: identity.subject,
+        walletId: verified.wallet.id,
+        actor: sponsor.address,
+        role: verified.role,
+        action,
+        steps: 1,
+        deployment: { genesisHash: config.genesisHash, escrowProgram: config.escrowProgram, programSha256: config.programSha256 },
+        nonce: t.nextNonce,
+        state: 'signed',
+        createdAt,
+        expiresAt: new Date(now() + 60_000).toISOString(),
+        lastValidBlockHeight: lifetime.lastValidBlockHeight,
+        messageSha256: await messageDigest(unsigned),
+        transactionBase64: Buffer.from(unsigned).toString('base64'),
+        signedTxBase64: Buffer.from(signed).toString('base64'),
+        signature: getBase58Decoder().decode(payerSignature),
+        simulation,
+        expectedDeltas: await deltasFor(action, verified.snapshot, config),
+        receipt: null,
+        lastError: null,
+      };
+      const stored = await store.update<Lane>(laneKey, (record) => {
+        if (record.operations.some((item) => item.id === id)) return record;
+        if (record.operations.some((item) => item.nonce === op.nonce && !['failed', 'expired', 'finalized'].includes(item.state)))
+          fail('nonce_reserved', 'Another operation already reserves this tenancy nonce. Reconcile it first.');
+        return { ...record, operations: [...record.operations, op] };
+      });
+      const saved = stored.operations.find((item) => item.id === id)!;
+      return publicOperation(saved.signedTxBase64 === op.signedTxBase64 ? await sendStored(saved) : saved);
     },
     reconcileStored,
     laneKey,

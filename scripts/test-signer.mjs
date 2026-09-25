@@ -30,6 +30,7 @@ import { getStore } from '../src/server/store.ts';
 import {
   assertTestAgreement,
   assertTestSignerAllowed,
+  nextBundledStep,
   nextTestStep,
   signPrepared,
   testIdentity,
@@ -38,9 +39,10 @@ import {
 const [command = 'status', ...flags] = process.argv.slice(2);
 const send = flags.includes('--send');
 const dispute = flags.includes('--dispute');
+const bundled = flags.includes('--bundled');
 const claimAtomic = flags.find((flag) => flag.startsWith('--claim='))?.slice(8) ?? '0';
 if (!['new', 'status', 'next', 'run'].includes(command) || !/^(0|[1-9]\d{0,9})$/.test(claimAtomic)) {
-  console.error('Usage: scripts/test-signer.mjs new|status|next|run [--send] [--claim=ATOMIC] [--dispute]');
+  console.error('Usage: scripts/test-signer.mjs new|status|next|run [--send] [--claim=ATOMIC] [--dispute] [--bundled]');
   process.exit(2);
 }
 const dir = resolve(process.env.SOLANA_TEST_SIGNER_DIR || '.testnet-secrets/test-signer');
@@ -154,7 +156,7 @@ async function observe() {
   const initialized = setup?.state === 'finalized';
   const snapshot = initialized ? await service.snapshot(identities.tenant) : null;
   const supplied = Boolean(snapshot?.operations.some((op) => op.action.kind === 'supply' && op.state === 'finalized'));
-  const step = nextTestStep({
+  const step = (bundled ? nextBundledStep : nextTestStep)({
     initialized, tenancy: snapshot?.tenancy, receiptValueAtomic: snapshot?.receiptValueAtomic, supplied, claimAtomic, dispute,
   });
   return { setup, snapshot, step };
@@ -180,6 +182,12 @@ async function next() {
     view = await settle(() => init.reconcile(identity));
     log({ step: step.label, state: view.state, signature: view.signature });
     if (view.state !== 'finalized') throw new Error(view.lastError ?? 'Initialization failed');
+    return step;
+  }
+  if (step.kind === 'payouts') {
+    const op = await settle(async () => (await service.payout(identity)) ?? { state: 'finalized', signature: null });
+    log({ step: step.label, action: op.action?.landlord === undefined ? null : op.action.landlord ? 'landlord' : 'tenant', state: op.state, signature: op.signature });
+    if (op.state !== 'finalized') throw new Error(op.lastError ?? 'Payout failed');
     return step;
   }
   // Resume a signed operation left pending by an interrupted run; never sign a second intent.

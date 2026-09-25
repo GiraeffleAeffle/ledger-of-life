@@ -59,13 +59,7 @@ export async function signPrepared(signer: KeyPairSigner, transactionBase64: str
   return Buffer.from(getTransactionEncoder().encode(signed)).toString('base64');
 }
 
-export type NextStep =
-  | { role: TestRole; kind: 'initialize'; label: string }
-  | { role: TestRole; kind: 'action'; action: Record<string, unknown>; label: string }
-  | { role: null; kind: 'done'; label: string };
-
-/** Next action of a happy-path cycle; `claimAtomic` and `dispute` shape the move-out branch. */
-export function nextTestStep(input: {
+export type TestStepInput = {
   initialized: boolean;
   tenancy?: Pick<
     TenancyAccount,
@@ -80,7 +74,51 @@ export function nextTestStep(input: {
   supplied: boolean;
   claimAtomic: string;
   dispute: boolean;
-}): NextStep {
+};
+
+export type NextStep =
+  | { role: TestRole; kind: 'initialize'; label: string }
+  | { role: TestRole; kind: 'action'; action: Record<string, unknown>; label: string }
+  | { role: TestRole; kind: 'payouts'; label: string }
+  | { role: null; kind: 'done'; label: string };
+
+/**
+ * The same cycle with one wallet approval per person-visible moment, as the app journey uses it:
+ * deposit (fund + lend), claim, accept-and-settle or decide-and-settle, then sponsor-run payouts.
+ */
+export function nextBundledStep(input: TestStepInput): NextStep {
+  const t = input.tenancy;
+  if (!input.initialized || !t) return { role: 'landlord', kind: 'initialize', label: 'Landlord creates the deposit space' };
+  switch (t.phase) {
+    case 'awaiting-funding':
+      return { role: 'tenant', kind: 'action', action: { kind: 'fund_and_supply' }, label: 'Tenant secures the deposit (fund + lend)' };
+    case 'active':
+      return {
+        role: 'landlord', kind: 'action', action: { kind: 'propose_claim', amountAtomic: input.claimAtomic },
+        label: 'Landlord proposes the move-out claim',
+      };
+    case 'claim-proposed':
+      return input.dispute
+        ? { role: 'tenant', kind: 'action', action: { kind: 'respond_to_claim', accept: false }, label: 'Tenant disputes the claim' }
+        : { role: 'tenant', kind: 'action', action: { kind: 'accept_and_settle' }, label: 'Tenant accepts and settles' };
+    case 'disputed':
+      return {
+        role: 'arbitrator', kind: 'action', action: { kind: 'resolve_and_settle', amountAtomic: t.claimAtomic },
+        label: 'Arbitrator decides and settles',
+      };
+    case 'settling':
+      return { role: 'tenant', kind: 'action', action: { kind: 'redeem_and_settle' }, label: 'Tenant settles' };
+    case 'closed':
+      return BigInt(t.tenantOwedAtomic) + BigInt(t.landlordOwedAtomic) > 0n
+        ? { role: 'tenant', kind: 'payouts', label: 'Sponsor pays out both sides' }
+        : { role: null, kind: 'done', label: 'Tenancy closed and paid out' };
+    default:
+      throw new Error(`Unknown tenancy phase ${String(t.phase)}`);
+  }
+}
+
+/** Next action of a happy-path cycle; `claimAtomic` and `dispute` shape the move-out branch. */
+export function nextTestStep(input: TestStepInput): NextStep {
   const t = input.tenancy;
   if (!input.initialized || !t) return { role: 'landlord', kind: 'initialize', label: 'Landlord creates the empty deposit space' };
   const redeem = (role: TestRole): NextStep => ({
