@@ -66,7 +66,7 @@ async function api(path: string, body?: unknown, signal?: AbortSignal) {
 export function Workspace() {
   const [network, setNetwork] = useState<Network>('solana');
   const [role, setRole] = useState<Role>('tenant');
-  const [view, setView] = useState<View>('overview');
+  const [view, setView] = useState<View>('home');
   const [state, setState] = useState<WorkspaceState | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
@@ -105,7 +105,7 @@ export function Workspace() {
   }, [view, connections]);
   useEffect(() => {
     if (view === 'home' && !home)
-      import('./home').then((module) => setHome(<module.MyHome openConnections={() => setView('connections')} />));
+      import('./home').then((module) => setHome(<module.MyHome openConnections={() => setView('connections')} openDemo={() => setView('overview')} />));
   }, [view, home]);
 
   async function refresh() {
@@ -158,6 +158,7 @@ export function Workspace() {
     main.current?.scrollIntoView({ block: 'start' });
   }
   const plan = (kind: OperationKind, amount?: string) => command({ type: 'plan', kind, amount });
+  const demoView = view !== 'home' && view !== 'connections';
   async function restart() {
     if (busy) return;
     setBusy(true);
@@ -216,16 +217,7 @@ export function Workspace() {
             <strong>workspace</strong>
           </span>
         </button>
-        <div className="workspace-picker">
-          <span className="avatar small">{people[role][0]}</span>
-          <div>
-            <strong>{people[role]}’s workspace</strong>
-            <span>{role[0].toUpperCase() + role.slice(1)}</span>
-          </div>
-          <span className="tiny-dot" />
-        </div>
-        <span className="nav-caption">YOUR REAL TENANCY</span>
-        <nav aria-label="Real tenancy">
+        <nav aria-label="Your account">
           <button
             className={`nav-item ${view === 'home' ? 'selected' : ''}`}
             aria-current={view === 'home' ? 'page' : undefined}
@@ -235,7 +227,17 @@ export function Workspace() {
             My home
           </button>
         </nav>
-        <span className="nav-caption">DEMO WALKTHROUGH</span>
+        <span className="nav-caption">DEMO · MADE-UP PEOPLE</span>
+        {demoView && (
+          <div className="workspace-picker">
+            <span className="avatar small">{people[role][0]}</span>
+            <div>
+              <strong>Demo: {people[role]} ({role})</strong>
+              <span>Fictional person, no account</span>
+            </div>
+            <span className="tiny-dot" />
+          </div>
+        )}
         <nav aria-label="Main navigation">
           {nav.map((item) => (
             <button
@@ -765,6 +767,7 @@ export function Workspace() {
                 <h1>Loading connections…</h1>
               </section>
             ))}
+          {demoView && (
           <footer className="content-footer">
             <span>
               <ShieldCheck size={15} />
@@ -774,9 +777,14 @@ export function Workspace() {
               See integration evidence <ArrowUpRight size={15} />
             </button>
           </footer>
+          )}
         </main>
         <nav className="mobile-nav" aria-label="Mobile navigation">
-          {nav.slice(0, 4).map((item) => (
+          <button aria-current={view === 'home' ? 'page' : undefined} onClick={() => navigate('home')}>
+            <House size={19} />
+            <span>My home</span>
+          </button>
+          {nav.slice(0, 3).map((item) => (
             <button
               key={item.id}
               aria-current={view === item.id ? 'page' : undefined}
@@ -790,7 +798,7 @@ export function Workspace() {
                     ? 'Records'
                     : item.id === 'deposit'
                       ? 'Deposit'
-                      : 'Overview'}
+                      : 'Demo'}
               </span>
             </button>
           ))}

@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, Copy, Home as HomeIcon, Loader2, Plus } from 'lucide-react';
-import { WalletAccessPanel, useRentalWallet } from '@/wallets';
+import { useRentalWallet } from '@/wallets';
+import { AccountSetup, RoleIntro, RolePicker, useChosenRole, type ChosenRole } from './onboarding';
 import { parseAmount } from '@/domain/assets';
 import type { JourneyStage, TenancyJourney } from '@/server/journey';
 import type { PublicListing } from '@/server/listings';
@@ -16,6 +17,7 @@ const STAGES: { id: JourneyStage; label: string }[] = [
   { id: 'move-out', label: 'Move-out' },
   { id: 'paid', label: 'Paid out' },
 ];
+const ROLE_LABEL: Record<ChosenRole, string> = { tenant: 'TENANT', landlord: 'LANDLORD', arbitrator: 'ARBITRATOR' };
 const AUTO: Record<string, true> = { confirming: true, paying_out: true, wait: true };
 type Unavailable = { agreementId: string; property: string; unavailable: string };
 /** Typed view of our own same-origin API responses. */
@@ -24,35 +26,10 @@ type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Pr
 const b64 = (value: string) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
 const toB64 = (bytes: Uint8Array) => btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''));
 
-export function MyHome({ openConnections }: { openConnections: () => void }) {
+/** Authenticated same-origin JSON requests with the current Privy token. */
+function useAuthorizedRequest(): Request {
   const wallet = useRentalWallet();
-  if (!wallet.authenticated)
-    return (
-      <section className="card home-intro">
-        <span className="eyebrow">YOUR REAL TENANCY</span>
-        <h1>Sign in with a passkey</h1>
-        <p className="section-copy">
-          Landlords post a home, tenants apply, and the deposit is secured and returned on the Solana test network.
-          Everything uses test USDC; nothing here is real money.
-        </p>
-        <WalletAccessPanel />
-      </section>
-    );
-  return <SignedInHome key={wallet.subject} openConnections={openConnections} />;
-}
-
-function SignedInHome({ openConnections }: { openConnections: () => void }) {
-  const wallet = useRentalWallet();
-  const [tenancies, setTenancies] = useState<(TenancyJourney | Unavailable)[] | null>(null);
-  const [listings, setListings] = useState<PublicListing[]>([]);
-  const [error, setError] = useState('');
-  const [helpers, setHelpers] = useState(false);
-  const [helperBusy, setHelperBusy] = useState(false);
-  const [helperLog, setHelperLog] = useState('');
-  useEffect(() => {
-    fetch('/api/test-helpers').then((r) => r.json()).then((d) => setHelpers(Boolean(d.enabled))).catch(() => {});
-  }, []);
-  const request = useCallback(async <T,>(path: string, body?: unknown): Promise<T> => {
+  return useCallback(async <T,>(path: string, body?: unknown): Promise<T> => {
     const token = await wallet.getAccessToken();
     if (!token) throw new Error('Sign in again to continue.');
     const response = await fetch(path, {
@@ -66,6 +43,33 @@ function SignedInHome({ openConnections }: { openConnections: () => void }) {
     const typed: T = data;
     return typed;
   }, [wallet]) as Request;
+}
+
+export function MyHome({ openConnections, openDemo }: { openConnections: () => void; openDemo: () => void }) {
+  const wallet = useRentalWallet();
+  const [role, choose] = useChosenRole();
+  const [readyFor, setReadyFor] = useState<string | null>(null);
+  const request = useAuthorizedRequest();
+  const markReady = useCallback(() => setReadyFor(wallet.subject), [wallet.subject]);
+  if (!role) return <RolePicker onPick={choose} onDemo={openDemo} />;
+  if (!wallet.authenticated || readyFor !== wallet.subject)
+    return <AccountSetup key={wallet.subject ?? 'signed-out'} role={role} authorized={request} onChangeRole={() => choose(null)} onReady={markReady} />;
+  return <SignedInHome key={wallet.subject} role={role} onChangeRole={() => choose(null)} openConnections={openConnections} />;
+}
+
+function SignedInHome({ role, onChangeRole, openConnections }: { role: ChosenRole; onChangeRole: () => void; openConnections: () => void }) {
+  const wallet = useRentalWallet();
+  const [tenancies, setTenancies] = useState<(TenancyJourney | Unavailable)[] | null>(null);
+  const [listings, setListings] = useState<PublicListing[]>([]);
+  const [error, setError] = useState('');
+  const [helpers, setHelpers] = useState(false);
+  const [helperBusy, setHelperBusy] = useState(false);
+  const [helperLog, setHelperLog] = useState('');
+  const [usdc, setUsdc] = useState<string | null>(null);
+  useEffect(() => {
+    fetch('/api/test-helpers').then((r) => r.json()).then((d) => setHelpers(Boolean(d.enabled))).catch(() => {});
+  }, []);
+  const request = useAuthorizedRequest();
   const fetchAll = useCallback(
     () =>
       Promise.all([
@@ -120,11 +124,12 @@ function SignedInHome({ openConnections }: { openConnections: () => void }) {
     <div className="home">
       <div className="page-heading">
         <div>
-          <span className="eyebrow">YOUR REAL TENANCY · SOLANA TEST NETWORK</span>
-          <h1>Your home</h1>
-          <p>One next step at a time. Test USDC only.</p>
+          <span className="eyebrow">{ROLE_LABEL[role]} · SOLANA TEST NETWORK</span>
+          <h1>{role === 'landlord' ? 'Your homes' : role === 'arbitrator' ? 'Your cases' : 'Your home'}</h1>
+          <p>One next step at a time. Test USDC only. <button className="text-button" onClick={onChangeRole}>Change role</button></p>
         </div>
       </div>
+      <RoleIntro role={role} solanaAddress={wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? null} testUsdcAtomic={usdc} />
       {error && <p className="note" role="alert">{error}</p>}
       {helpers && (
         <p className="test-helper-note">
@@ -144,8 +149,8 @@ function SignedInHome({ openConnections }: { openConnections: () => void }) {
           ),
         )
       )}
-      <Portfolio request={request} />
-      <Homes listings={listings} request={request} reload={load} helper={helper} helperBusy={helperBusy} />
+      {role !== 'arbitrator' && <Portfolio request={request} onBalance={setUsdc} />}
+      {role !== 'arbitrator' && <Homes role={role} listings={listings} request={request} reload={load} helper={helper} helperBusy={helperBusy} />}
     </div>
   );
 }
@@ -365,10 +370,11 @@ function JoinInvitation({ request, encoded, onDone }: { request: Request; encode
   );
 }
 
-function Homes({ listings, request, reload, helper, helperBusy }: {
+function Homes({ role, listings, request, reload, helper, helperBusy }: {
+  role: ChosenRole;
   listings: PublicListing[]; request: Request; reload: () => Promise<void>; helper: Helper | null; helperBusy: boolean;
 }) {
-  const [posting, setPosting] = useState(false);
+  const [posting, setPosting] = useState(role === 'landlord' && !listings.some((l) => l.relation === 'landlord'));
   const [form, setForm] = useState({ title: '', description: '', rent: '900', deposit: '10', releaseAllowed: true });
   const [applyTo, setApplyTo] = useState<string | null>(null);
   const [application, setApplication] = useState({ name: '', message: '' });
@@ -387,7 +393,7 @@ function Homes({ listings, request, reload, helper, helperBusy }: {
   return (
     <section className="card homes">
       <div className="section-heading">
-        <h2>Homes</h2>
+        <h2>{role === 'landlord' ? 'Your listings' : 'Homes you can apply for'}</h2>
         <div className="button-row">
           {helper && <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'post_home' })}>Test landlord posts a home</button>}
           <button className="button secondary" onClick={() => setPosting(!posting)}><Plus size={15} /> Post a home</button>
@@ -452,7 +458,7 @@ function Homes({ listings, request, reload, helper, helperBusy }: {
   );
 }
 
-function Portfolio({ request }: { request: Request }) {
+function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomic: string) => void }) {
   const wallet = useRentalWallet();
   const [view, setView] = useState<PortfolioView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -460,14 +466,19 @@ function Portfolio({ request }: { request: Request }) {
   const refresh = useCallback(async () => {
     const { portfolio } = await request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio');
     setView(portfolio.available ? portfolio : null);
-  }, [request]);
+    if (portfolio.available) onBalance(portfolio.testUsdcAtomic);
+  }, [request, onBalance]);
   useEffect(() => {
     let active = true;
     request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio')
-      .then(({ portfolio }) => active && setView(portfolio.available ? portfolio : null))
+      .then(({ portfolio }) => {
+        if (!active) return;
+        setView(portfolio.available ? portfolio : null);
+        if (portfolio.available) onBalance(portfolio.testUsdcAtomic);
+      })
       .catch(() => {});
     return () => { active = false; };
-  }, [request]);
+  }, [request, onBalance]);
   if (!view) return null;
   async function invest() {
     setBusy(true);

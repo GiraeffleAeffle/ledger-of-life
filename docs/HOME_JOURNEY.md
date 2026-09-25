@@ -2,6 +2,17 @@
 
 **My home** is the real, passkey-signed flow on the Solana test network (test USDC only). The fictional walkthrough stays separate under **Demo walkthrough**.
 
+## Onboarding
+
+The app opens on a welcome screen: **Who are you?**, with three choices (tenant, landlord, arbitrator) or "just look around" (the fictional demo). The role only decides what you see first; permissions always come from each agreement. Account setup then walks through four steps with live status:
+
+1. Create an account with a passkey.
+2. Add a backup email.
+3. Create the wallet (automatic).
+4. Prove recovery: the app remembers your wallet, you open it in a different browser with **Continue with email**, and approve two signatures there. The first browser continues by itself.
+
+After setup, a tenant sees their wallet address with a faucet link until test USDC arrives, a landlord sees the listing form, and an arbitrator sees how invitations work.
+
 ## Flow
 
 1. **Homes.** A landlord posts a home: title, monthly rent, deposit amount and earnings policy. Signed-in people apply with a short note; applicants never see each other. The landlord chooses one applicant, which creates the agreement with landlord and tenant already bound.

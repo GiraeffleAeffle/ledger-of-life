@@ -2926,3 +2926,23 @@ dd {
 @media (max-width: 700px) { .journey-progress { grid-template-columns: repeat(3, 1fr); row-gap: 14px; } .journey-progress li::before { display: none; } }
 .test-helper-note { margin: 0; padding: 10px 14px; border: 1px dashed #b98a1a; border-radius: 12px; background: #fff8e6; font-size: 0.88rem; }
 .button.test-helper { justify-self: start; border: 1px dashed #b98a1a; background: #fff8e6; color: #6b4e00; }
+
+/* Onboarding: role choice and guided account setup */
+.onboarding { display: grid; gap: 18px; max-width: 920px; }
+.onboarding h1 { margin: 0; font-size: clamp(2rem, 4vw, 2.8rem); letter-spacing: -0.03em; }
+.onboarding h2 { margin: 12px 0 0; font-size: 1.15rem; }
+.onboarding .lede { margin: 0; font-size: 1.08rem; opacity: 0.8; max-width: 640px; }
+.role-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.role-card { display: grid; gap: 10px; align-content: start; text-align: left; padding: 22px; border-radius: 20px; border: 1px solid rgba(0, 0, 0, 0.1); background: white; cursor: pointer; font: inherit; color: inherit; transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; }
+.role-card:hover, .role-card:focus-visible { transform: translateY(-2px); border-color: #1f7a4d; box-shadow: 0 10px 30px rgba(31, 94, 69, 0.12); }
+.role-card strong { font-size: 1.15rem; }
+.role-card span { opacity: 0.75; font-size: 0.92rem; line-height: 1.45; }
+.role-card .role-go { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; opacity: 1; font-weight: 700; color: #1f7a4d; }
+.setup-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.setup-step { display: flex; gap: 14px; padding: 16px 18px; border-radius: 16px; border: 1px solid rgba(0, 0, 0, 0.08); background: white; }
+.setup-step > div { display: grid; gap: 10px; flex: 1; }
+.setup-step p { margin: 0; }
+.setup-step.todo { opacity: 0.5; }
+.setup-step.done .journey-dot { background: #1f7a4d; color: white; }
+.setup-step.current { border-color: #e0a526; box-shadow: 0 0 0 3px rgba(224, 165, 38, 0.15); }
+.setup-step.current .journey-dot { background: #e0a526; }
