@@ -5,6 +5,7 @@ import { WalletAccessPanel, useRentalWallet } from '@/wallets';
 import { parseAmount } from '@/domain/assets';
 import type { JourneyStage, TenancyJourney } from '@/server/journey';
 import type { PublicListing } from '@/server/listings';
+import type { PortfolioView } from '@/server/portfolio';
 import { Badge, money } from './workspace-panels';
 
 const STAGES: { id: JourneyStage; label: string }[] = [
@@ -143,6 +144,7 @@ function SignedInHome({ openConnections }: { openConnections: () => void }) {
           ),
         )
       )}
+      <Portfolio request={request} />
       <Homes listings={listings} request={request} reload={load} helper={helper} helperBusy={helperBusy} />
     </div>
   );
@@ -446,6 +448,66 @@ function Homes({ listings, request, reload, helper, helperBusy }: {
           ))}
         </article>
       ))}
+    </section>
+  );
+}
+
+function Portfolio({ request }: { request: Request }) {
+  const wallet = useRentalWallet();
+  const [view, setView] = useState<PortfolioView | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const refresh = useCallback(async () => {
+    const { portfolio } = await request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio');
+    setView(portfolio.available ? portfolio : null);
+  }, [request]);
+  useEffect(() => {
+    let active = true;
+    request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio')
+      .then(({ portfolio }) => active && setView(portfolio.available ? portfolio : null))
+      .catch(() => {});
+    return () => { active = false; };
+  }, [request]);
+  if (!view) return null;
+  async function invest() {
+    setBusy(true);
+    setMessage('');
+    try {
+      const { buy } = await request<{ buy: { id: string; walletId: string; feePayer: string; expiresAt: string; transactionBase64: string } }>(
+        '/api/portfolio', { action: 'prepare_buy', usdcInAtomic: '5000000' });
+      const signed = await wallet.signSolanaTransaction({
+        operationId: buy.id, walletId: buy.walletId, chain: 'solana:devnet', feePayer: buy.feePayer,
+        expiresAt: buy.expiresAt, transaction: b64(buy.transactionBase64), description: 'Invest 5 test USDC in tSPYx',
+      });
+      await request('/api/portfolio', { action: 'submit_buy', id: buy.id, signedTxBase64: toB64(signed) });
+      setMessage('Bought. Your holding is updated.');
+      await refresh();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'The purchase failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="card portfolio-card">
+      <div className="section-heading">
+        <h2>Your portfolio</h2>
+        <Badge tone="neutral">Devnet test market · no value</Badge>
+      </div>
+      <div className="journey-facts">
+        <div><dt>tSPYx (S&amp;P 500 copy)</dt><dd>{view.shares.toFixed(6)} shares</dd></div>
+        <div><dt>Value at live SPYx price</dt><dd>${view.valueUsd.toFixed(2)}</dd></div>
+        <div><dt>Distributions so far</dt><dd>{((view.multiplier - 1) * 100).toFixed(2)} %</dd></div>
+        <div><dt>Test USDC available</dt><dd>{money(view.testUsdcAtomic)}</dd></div>
+      </div>
+      <p className="small-copy">
+        Deposit earnings above the required deposit are yours to invest. Devnet lending pays no interest, so you can
+        invest your own test USDC here. Distributions raise your displayed shares, as they do for xStocks.
+      </p>
+      <button className="button primary" disabled={busy || BigInt(view.testUsdcAtomic) < 5_000_000n} onClick={invest}>
+        {busy ? <Loader2 className="spin" size={16} /> : null} Invest 5 test USDC <ArrowRight size={16} />
+      </button>
+      {message && <p className="note" role="status">{message}</p>}
     </section>
   );
 }

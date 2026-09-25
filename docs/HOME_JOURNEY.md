@@ -27,6 +27,10 @@ Each person sees a six-step progress line and exactly **one** next step. Waiting
 - The tenant needs test USDC in their wallet (Circle faucet). Payout token accounts are created automatically by the sponsor right before the landlord creates the deposit space.
 - The public devnet RPC rate-limits. The gateway backs off on HTTP 429, but a keyed devnet RPC is recommended for a smooth demo.
 
+## Portfolio
+
+My home also shows **Your portfolio**: the person's `tSPYx` holding (the devnet Token-2022 copy of SPYx, no value), its value at the live mainnet SPYx price, distributions so far (the scaled-UI multiplier), and available test USDC. **Invest 5 test USDC** is one approval: an atomic transaction co-signed by the test market maker, which pays the fee. Devnet lending pays no interest, so the purchase uses the person's own test USDC rather than released deposit earnings. It needs `SOLANA_TEST_SIGNER_MODE=1` and the local test market (`scripts/solana-test-market.mjs setup`).
+
 ## Test helpers: one real account is enough
 
 With `SOLANA_TEST_SIGNER_MODE=1` (local store, devnet and loopback requests only), My home shows dashed **test helper** buttons:

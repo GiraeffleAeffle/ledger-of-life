@@ -21,6 +21,7 @@
     "@privy-io/node": "0.35.0",
     "@privy-io/react-auth": "3.45.0",
     "@solana-program/memo": "0.10.0",
+    "@solana-program/token-2022": "0.6.1",
     "@solana/kit": "5.5.1",
     "lucide-react": "1.47.0",
     "next": "16.3.5",
@@ -32,7 +33,6 @@
     "viem": "2.56.0"
   },
   "devDependencies": {
-    "@solana-program/token-2022": "0.6.1",
     "@types/node": "^24.0.0",
     "@types/pg": "8.23.1",
     "@types/react": "^19.0.0",
