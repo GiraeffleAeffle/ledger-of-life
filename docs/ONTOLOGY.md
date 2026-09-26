@@ -6,6 +6,8 @@ The machine-readable source of truth is [`ontology.yaml`](ontology.yaml). This p
 
 **Positioning (decided 2026-09-26).** A household-ownership app. Your verified identity is the root, and everything you own, rent or run attaches to it through adapters. The rental deposit is the first and most complete building block.
 
+**Overview for people.** Start with [`LEDGER_OF_LIFE.md`](LEDGER_OF_LIFE.md): the five areas of one person's overview, the proposed app structure, and the adapter decision.
+
 **Bigger picture.** Part of [Stadtstack](https://stadtstack.giraeffleaeffle.chatgpt.site): one verified identity, many contexts (tenancy, club, house community, city). Each context gives the person roles, a feed of what is decided, and what they own there. The tenancy is the first context that is built.
 
 **The app in one sentence.** A home-centred app that shows everything you own. It secures rental deposits in escrows that earn, lets tenants claim and invest those earnings, and connects the other things a household owns that produce value.

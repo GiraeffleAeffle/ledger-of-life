@@ -46,7 +46,7 @@ layers:  # product architecture, bottom-up
   - id: ownership
     concepts: [Asset, Position, Venue, Distribution, Adapter]
   - id: vision
-    concepts: [ServiceChargeAccount, CollateralDeposit, HomeEquityPath, DeviceTokenization]
+    concepts: [ServiceChargeAccount, CollateralDeposit, HomeEquityPath, DeviceTokenization, LocalInvestment, LifeTimeline]
 
 concepts:
   Person:
@@ -246,6 +246,29 @@ concepts:
       - §556 BGB gives landlords up to 12 months after the period for the annual statement; the app shortens the wait, not the legal right.
       - Many costs (property tax, insurance, cleaning) are invoiced annually; those remain estimates until the invoice arrives.
     relations: {secured_by: Escrow, fed_by: Adapter (meters, Home Assistant), belongs_to: Agreement}
+    reality: roadmap
+
+  LocalInvestment:
+    definition: A holding in a company, cooperative or property in the person's own city, shown next to the city's plans (for example a community solar park and the cooperative behind it).
+    forms:
+      cooperative_share: {reality: roadmap, note: "Genossenschaft (housing, energy); proven, no tokens needed. First step: directory via the Stadtstack atlas."}
+      electronic_security: {reality: roadmap, note: "eWpG; electronic shares since 1 Jan 2024 (ZuFinG), crypto registers need a BaFin-licensed operator. The app shows and holds; issuers do the regulated part."}
+      crowdfunding: {reality: roadmap, note: "ECSPR: up to EUR 5 million per project owner per 12 months via licensed platforms; link out."}
+      tokenized_real_estate: {reality: roadmap, note: "Tokens cannot carry a German land-register title; they represent SPV shares/bonds or profit participation. Test-network illustration only; absorbs HomeEquityPath."}
+    rules:
+      - No real offers without a licensed partner and legal review; until then illustration or test network, labeled.
+    relations: {held_by: Person, located_in: Context (city), shown_in: Portfolio}
+    reality: roadmap
+
+  LifeTimeline:
+    definition: The person's private history of places and events: moves, tenancies, deposits returned, memberships, first local investment.
+    sources:
+      in_app_tenancies: {reality: testnet_real, note: "Derivable from Agreements today; timeline view not built."}
+      self_declared_moves: {reality: roadmap, note: "Labeled self-declared."}
+      residence_attestation: {reality: roadmap, note: "EU wallet attestation where authorities issue one."}
+    rules:
+      - Owned by the person; never shared by default. Contexts see derived facts only (e.g. '3 tenancies, all deposits returned').
+    relations: {belongs_to: Person, spans: Context}
     reality: roadmap
 
   CollateralDeposit:

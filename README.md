@@ -2,6 +2,8 @@
 
 _Formerly "Deposit workspace". Package names, repository name and environment keys are unchanged._
 
+Start with [docs/LEDGER_OF_LIFE.md](docs/LEDGER_OF_LIFE.md) for the idea, structure and adapter overview.
+
 **Build assets while renting.** A tenant's eligible deposit earnings can become contributions to a separate personal portfolio. Landlords retain a bounded rental-security workflow; assigned human arbitrators can resolve disputed claims. The product name is still undecided.
 
 This public hackathon implementation explores **Robinhood Chain and Solana in parallel**. It includes a persistent walkthrough, verified-account and private-agreement services, restricted native escrows, and signing/reconciliation APIs. Local native proofs passed on both stacks. A separate operator-key Solana devnet rehearsal completed test-USDC funding, Kamino supply/redemption and no-claim settlement. One Privy-connected tenancy remains active after funding and supplying 10 test USDC to Kamino. A second Privy-connected tenancy on the staged program completed asynchronous setup, funding, supply, redemption, zero-claim acceptance and a full 10-test-USDC return to the tenant's fixed payout account. **Earned yield, a personal investment order and production deployment are not yet proved.** See [implementation status](docs/IMPLEMENTATION_STATUS.md) for the exact boundaries.
