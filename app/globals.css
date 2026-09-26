@@ -3004,3 +3004,8 @@ dd {
 .roadmap-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
 .roadmap-tiles > div { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; border: 1px dashed rgba(0, 0, 0, 0.15); font-size: 0.82rem; opacity: 0.85; }
 .roadmap-tiles strong { display: block; margin-bottom: 2px; }
+.identity-strip { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-radius: 14px; background: #eef4ff; border: 1px solid rgba(40, 80, 160, 0.15); }
+.identity-strip div { display: grid; gap: 2px; }
+.identity-strip span { font-size: 0.82rem; opacity: 0.75; }
+.asset-tile.clickable { cursor: pointer; }
+.asset-tile.clickable:hover { border-color: #1f7a4d; }

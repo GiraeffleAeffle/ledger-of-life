@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowRight, Car, Cpu, Fingerprint, Home as HomeIcon, KeyRound, LineChart, Loader2, Sun, TrendingUp } from 'lucide-react';
+import { ArrowRight, Car, Cpu, Fingerprint, Receipt, Home as HomeIcon, KeyRound, LineChart, Loader2, Sun, TrendingUp } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
 import type { TenancyJourney } from '@/server/journey';
 import type { PortfolioView } from '@/server/portfolio';
@@ -80,20 +80,28 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
 
   return (
     <section className="card assets">
+      <div className="identity-strip">
+        <Fingerprint size={18} />
+        <div>
+          <strong>Verified with passkey</strong>
+          <span>Own wallets on Solana and Robinhood Chain · EU Digital Identity Wallet: prototype, not connected</span>
+        </div>
+      </div>
       <div className="assets-head">
         <div>
-          <span className="eyebrow">EVERYTHING YOU OWN · TEST NETWORKS</span>
+          <span className="eyebrow">PORTFOLIO · TEST NETWORKS</span>
           <h2>{assets ? usd(total) : <Loader2 className="spin" size={20} />}</h2>
-          <p className="small-copy">Deposits, stocks and what your home and hardware earn, in one place. Test assets have no real value.</p>
+          <p className="small-copy">Your home, deposits, stocks and what your hardware earns, in one place. Test assets have no real value.</p>
         </div>
       </div>
       {message && <p className="note" role="status">{message}</p>}
       <div className="asset-grid">
-        <article className="asset-tile">
-          <header><KeyRound size={18} /> Rental deposit</header>
+        <article className="asset-tile clickable" onClick={() => document.querySelector('.tenancy-card')?.scrollIntoView({ behavior: 'smooth' })}>
+          <header><KeyRound size={18} /> Rental home & deposit</header>
           <strong>{usd(locked)}</strong>
           <span>{deposits.length ? `Locked for ${deposits.length} home${deposits.length > 1 ? 's' : ''}, earning in lending` : 'No active deposit'}</span>
           {claimed > 0 && <span className="asset-gain"><TrendingUp size={13} /> {usd(claimed)} earnings claimed</span>}
+          {deposits.length > 0 && <span className="text-button">Open tenancy →</span>}
         </article>
 
         <article className="asset-tile">
@@ -187,6 +195,7 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
         <div><HomeIcon size={16} /><span><strong>Stocks as your deposit</strong> Secure a flat with 150 % in shares instead of cash. Prototype live on Robinhood testnet.</span></div>
         <div><HomeIcon size={16} /><span><strong>Home tokens → your own home</strong> Collect shares of homes; they count toward buying one.</span></div>
         <div><Car size={16} /><span><strong>Electric car</strong> Charging and vehicle-to-grid income as another adapter.</span></div>
+        <div><Receipt size={16} /><span><strong>Real-time service charges</strong> Prepayments in escrow, live consumption, surplus released monthly instead of yearly.</span></div>
         <div><Fingerprint size={16} /><span><strong>EU Digital Identity Wallet</strong> Verified tenant and owner identity (eIDAS 2.0).</span></div>
       </div>
     </section>

@@ -41,7 +41,7 @@ layers:  # product architecture, bottom-up
   - id: ownership
     concepts: [Asset, Position, Venue, Distribution, Adapter]
   - id: vision
-    concepts: [CollateralDeposit, HomeEquityPath, DeviceTokenization]
+    concepts: [ServiceChargeAccount, CollateralDeposit, HomeEquityPath, DeviceTokenization]
 
 concepts:
   Person:
@@ -72,6 +72,7 @@ concepts:
     formats:
       sd_jwt_vc: {reality: roadmap, note: "Selective disclosure; linkable across presentations unless issued in single-use batches."}
       iso_mdoc: {reality: roadmap, note: "Selective disclosure; same linkability caveat."}
+      integration: {reality: roadmap, note: "App acts as verifier via OpenID4VP; issuance via OpenID4VCI; EU reference wallet, verifier endpoint and Kotlin/Swift libraries at github.com/eu-digital-identity-wallet; commercial SDKs (walt.id, Sphereon, Procivis)."}
       zero_knowledge_predicate: {reality: roadmap, note: "For example 'income >= 3x rent' without revealing income. Not in the EUDI framework yet (an open discussion topic)."}
     relations: {held_by: Person, presented_to: Person (verifier role in an Agreement or Listing)}
 
@@ -215,6 +216,15 @@ concepts:
       validator: {chains: [gnosis, ethereum, solana], reality: read_only_live, code: src/server/adapters.ts#readValidator}
       electric_car: {reality: roadmap}
       bank_account: {reality: roadmap}
+
+  ServiceChargeAccount:
+    definition: Monthly service-charge prepayments (Nebenkosten) held in escrow with a running statement. Consumption shares come live from meters or adapters; landlords add invoices with allocation keys as they arrive; surplus is released or top-ups requested monthly instead of after the annual statement.
+    grounding:
+      - HeizkostenV requires monthly consumption information where meters are remotely readable (since 2022).
+      - §556 BGB gives landlords up to 12 months after the period for the annual statement; the app shortens the wait, not the legal right.
+      - Many costs (property tax, insurance, cleaning) are invoiced annually; those remain estimates until the invoice arrives.
+    relations: {secured_by: Escrow, fed_by: Adapter (meters, Home Assistant), belongs_to: Agreement}
+    reality: roadmap
 
   CollateralDeposit:
     definition: Securing an Agreement with SecurityTokens (for example 150 %) instead of cash; top-up grace period; forced sale only of what's needed; rest returned in kind.

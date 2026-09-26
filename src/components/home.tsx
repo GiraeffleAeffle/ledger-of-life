@@ -636,7 +636,7 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
   return (
     <section className="card portfolio-card">
       <div className="section-heading">
-        <h2>Your portfolio</h2>
+        <h2>Invest · stocks on Solana</h2>
         <Badge tone="neutral">Devnet test market · no value</Badge>
       </div>
       <dl className="journey-facts">
