@@ -2926,6 +2926,16 @@ dd {
 @media (max-width: 700px) { .journey-progress { grid-template-columns: repeat(3, 1fr); row-gap: 14px; } .journey-progress li::before { display: none; } }
 .test-helper-note { margin: 0; padding: 10px 14px; border: 1px dashed #b98a1a; border-radius: 12px; background: #fff8e6; font-size: 0.88rem; }
 .button.test-helper { justify-self: start; border: 1px dashed #b98a1a; background: #fff8e6; color: #6b4e00; }
+.tenancy-details { border-top: 1px solid var(--line); padding-top: 14px; }
+.tenancy-details summary, .test-tools summary { cursor: pointer; font-weight: 700; }
+.tenancy-details[open] summary, .test-tools[open] summary { margin-bottom: 16px; }
+.tenancy-details .mono { overflow-wrap: anywhere; }
+.tenancy-activity { max-height: 420px; overflow-y: auto; }
+.tenancy-activity .record-item { padding: 12px 0; }
+.tenancy-activity .record-body { margin: 0; }
+.test-tools { border: 1px dashed #b98a1a; }
+.test-tool-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.test-tool-row > span { min-width: 160px; flex: 1; font-weight: 600; }
 
 /* Onboarding: role choice and guided account setup */
 .onboarding { display: grid; gap: 18px; max-width: 920px; }

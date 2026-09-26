@@ -34,8 +34,8 @@ function entitlementUsd(role: TenancyJourney['role'], c: Chain): number {
  * Holdings and read-only adapters, rendered per area: Money shows the total and every holding,
  * Home shows home energy, Overview shows a short summary that opens Money.
  */
-export function AssetsOverview({ request, tenancies, testHelpers, show, go }: {
-  request: Request; tenancies: TenancyJourney[]; testHelpers: boolean; show: 'money' | 'home' | 'summary'; go: (area: Area) => void;
+export function AssetsOverview({ request, tenancies, show, go }: {
+  request: Request; tenancies: TenancyJourney[]; show: 'money' | 'home' | 'summary'; go: (area: Area) => void;
 }) {
   const wallet = useRentalWallet();
   const [assets, setAssets] = useState<AssetsResponse | null>(null);
@@ -155,14 +155,6 @@ export function AssetsOverview({ request, tenancies, testHelpers, show, go }: {
           <strong>{rh ? usd(rh.tslaValueUsd) : '—'}</strong>
           <span>{rh ? `${rh.tslaShares.toFixed(5)} TSLA (official test token) · ${usd(atomicUsd(rh.testUsdAtomic))} test USD` : assets?.robinhood && !assets.robinhood.ok ? assets.robinhood.error : 'Loading…'}</span>
           <div className="button-row">
-            {testHelpers && (
-              <button className="button test-helper" disabled={Boolean(busy)} onClick={() => run('earn', async () => {
-                const { result } = await request<{ result: { releasedAtomic: string } }>('/api/assets', { action: 'robinhood_earn' });
-                setMessage(`A Robinhood testnet deposit earned ${usd(atomicUsd(result.releasedAtomic))} of simulated yield (test tokens), released to your wallet.`);
-              })}>
-                {busy === 'earn' ? <Loader2 className="spin" size={14} /> : null} Earn on Robinhood (test)
-              </button>
-            )}
             {rh && BigInt(rh.testUsdAtomic) > 0n && (
               <button className="button primary" disabled={Boolean(busy)} onClick={() => run('buy', buyTsla)}>
                 {busy === 'buy' ? <Loader2 className="spin" size={14} /> : null} Invest in TSLA <ArrowRight size={14} />

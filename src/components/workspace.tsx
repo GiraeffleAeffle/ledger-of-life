@@ -78,8 +78,10 @@ export function Workspace() {
   const [area, setArea] = useState<Area>('overview');
   const [HomeView, setHomeView] = useState<typeof import('./home').MyHome | null>(null);
   const totals = state ? summary(state) : null;
+  const demoView = view !== 'home' && view !== 'connections';
 
   useEffect(() => {
+    if (!demoView) return;
     const controller = new AbortController();
     api('/api/demo', { network }, controller.signal)
       .then((result) => {
@@ -93,7 +95,7 @@ export function Workspace() {
         }
       });
     return () => controller.abort();
-  }, [network]);
+  }, [network, demoView]);
   useEffect(() => {
     if (view === 'connections' && !connections)
       import('./connections').then((module) => setConnections(<module.Connections />));
@@ -148,6 +150,7 @@ export function Workspace() {
   }
   function navigate(next: View) {
     setView(next);
+    if (next === 'home' || next === 'connections') setConfirmation(null);
     setNotice('');
     document.getElementById('main')?.scrollIntoView({ block: 'start' });
   }
@@ -156,7 +159,6 @@ export function Workspace() {
     navigate('home');
   }
   const plan = (kind: OperationKind, amount?: string) => command({ type: 'plan', kind, amount });
-  const demoView = view !== 'home' && view !== 'connections';
   async function restart() {
     if (busy) return;
     setBusy(true);
@@ -228,24 +230,31 @@ export function Workspace() {
             </button>
           ))}
         </nav>
-        <span className="nav-caption">{demoView ? 'DEMO · MADE-UP PEOPLE' : 'EXPLORE'}</span>
+        <span className="nav-caption">EXPLORE · FICTIONAL</span>
+        <nav aria-label="Explore">
+          <button
+            className={`nav-item ${demoView ? 'selected' : ''}`}
+            aria-current={demoView ? 'page' : undefined}
+            onClick={() => navigate('overview')}
+          >
+            <Sprout size={18} />
+            Explore demo · made-up people
+          </button>
+        </nav>
         {demoView && (
-          <div className="workspace-picker">
-            <span className="avatar small">{people[role][0]}</span>
-            <div>
-              <strong>Demo: {people[role]} ({role})</strong>
-              <span>Fictional person, no account</span>
+          <>
+            <div className="workspace-picker">
+              <span className="avatar small">{people[role][0]}</span>
+              <div>
+                <strong>Demo: {people[role]} ({role})</strong>
+                <span>Fictional person, no account</span>
+              </div>
+              <span className="tiny-dot" />
             </div>
-            <span className="tiny-dot" />
-          </div>
+            <span className="nav-caption">WITHIN THE FICTIONAL DEMO</span>
+          </>
         )}
-        <nav aria-label="Main navigation">
-          {!demoView && (
-            <button className="nav-item" onClick={() => setView('overview')}>
-              <Sprout size={18} />
-              Demo with made-up people
-            </button>
-          )}
+        <nav aria-label="Fictional demo sections">
           {(demoView ? nav : []).map((item) => (
             <button
               className={`nav-item ${view === item.id ? 'selected' : ''}`}
@@ -296,17 +305,17 @@ export function Workspace() {
             ) : (
               <>
                 <House size={16} />
-                <span>Cedar Court</span>
+                <span>Fictional demo</span>
                 <ChevronRight size={14} />
-                <strong>Apartment 04</strong>
+                <strong>{nav.find((item) => item.id === view)?.label}</strong>
               </>
             )}
           </div>
-          {view !== 'connections' && view !== 'home' && (
+          {demoView && (
             <div className="topbar-right">
               <span className="demo-label">
                 <span />
-                Persistent demonstration
+                Fictional demonstration
               </span>
               <button className="reset-button" disabled={busy} onClick={restart}>
                 <RotateCcw size={15} />
@@ -316,11 +325,11 @@ export function Workspace() {
           )}
         </header>
         <main id="main" className="main-content">
-          {view !== 'connections' && view !== 'home' && (
+          {demoView && (
             <div className="demo-toolbar">
               <span>
                 <Sparkles size={15} />
-                Try the same journey from every side.
+                Fictional example only · try the journey from every side.
               </span>
               <div className="role-switch" role="group" aria-label="Choose demonstration role">
                 {roles.map((item) => (
@@ -373,7 +382,7 @@ export function Workspace() {
               </button>
             </div>
           )}
-          {!state && view !== 'connections' && view !== 'home' && (
+          {!state && demoView && (
             <section className="card loading-card">
               <Sprout size={28} />
               <h1>
@@ -391,7 +400,7 @@ export function Workspace() {
               )}
             </section>
           )}
-          {state && totals && view !== 'home' && (
+          {state && totals && demoView && (
             <>
               {totals.pending && (
                 <div className="pending-banner">
@@ -797,6 +806,10 @@ export function Workspace() {
               <span>{item.label}</span>
             </button>
           ))}
+          {!demoView && <button onClick={() => navigate('overview')}>
+            <Sprout size={19} />
+            <span>Fictional demo</span>
+          </button>}
           {demoView && <button onClick={() => openArea('overview')}>
             <House size={19} />
             <span>My overview</span>

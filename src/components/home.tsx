@@ -156,17 +156,11 @@ function SignedInHome({ area, go, role, onChangeRole, openConnections }: { area:
         </div>
       </div>
       {error && <p className="note" role="alert">{error}</p>}
-      {helpers && helperLog && (area === 'home' || area === 'overview') && (
-        <p className="test-helper-note">
-          {helperBusy && <Loader2 className="spin" size={14} />} {helperLog}
-        </p>
-      )}
-
       {area === 'overview' && (
         <div className="overview-grid">
           <NextStepSummary tenancies={tenancies} role={role} go={go} />
           <IdentityStrip request={request} compact onOpen={() => go('me')} />
-          {role !== 'arbitrator' && tenancies !== null && <AssetsOverview request={request} tenancies={ready} testHelpers={helpers} show="summary" go={go} />}
+          {role !== 'arbitrator' && tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="summary" go={go} />}
           <CityCard request={request} compact onOpen={() => go('places')} />
         </div>
       )}
@@ -189,19 +183,20 @@ function SignedInHome({ area, go, role, onChangeRole, openConnections }: { area:
               'unavailable' in t ? (
                 <section className="card" key={t.agreementId}><h2>{t.property}</h2><p className="note">{t.unavailable}</p></section>
               ) : (
-                <TenancyCard key={t.agreementId} journey={t} request={request} reload={load} openConnections={openConnections} helper={helper} helperBusy={helperBusy} />
+                <TenancyCard key={t.agreementId} journey={t} request={request} reload={load} openConnections={openConnections} />
               ),
             )
           )}
-          {role !== 'arbitrator' && <Homes role={role} listings={listings} request={request} reload={load} helper={helper} helperBusy={helperBusy} />}
-          {role !== 'arbitrator' && tenancies !== null && <AssetsOverview request={request} tenancies={ready} testHelpers={helpers} show="home" go={go} />}
+          {helpers && helper && <TestTools role={role} tenancies={ready} listings={listings} request={request} helper={helper} busy={helperBusy} log={helperLog} />}
+          {role !== 'arbitrator' && <Homes role={role} listings={listings} request={request} reload={load} />}
+          {role !== 'arbitrator' && tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="home" go={go} />}
           <PlannedHere area="home" go={go} />
         </>
       )}
 
       {area === 'money' && (
         <>
-          {tenancies !== null && <AssetsOverview request={request} tenancies={ready} testHelpers={helpers} show="money" go={go} />}
+          {tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="money" go={go} />}
           <Portfolio request={request} onBalance={setUsdc} />
           <PlannedHere area="money" go={go} />
         </>
@@ -258,9 +253,8 @@ function Progress({ stage, finished }: { stage: JourneyStage; finished: boolean 
   );
 }
 
-function TenancyCard({ journey, request, reload, openConnections, helper, helperBusy }: {
+function TenancyCard({ journey, request, reload, openConnections }: {
   journey: TenancyJourney; request: Request; reload: () => Promise<void>; openConnections: () => void;
-  helper: Helper | null; helperBusy: boolean;
 }) {
   const wallet = useRentalWallet();
   const [busy, setBusy] = useState(false);
@@ -415,16 +409,6 @@ function TenancyCard({ journey, request, reload, openConnections, helper, helper
           </div>
         )}
         {message && <p className="note" role="status">{message}</p>}
-        {helper && next.kind === 'invite_arbitrator' && (
-          <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'act', agreementId })}>
-            Use the test arbitrator instead
-          </button>
-        )}
-        {helper && next.kind === 'wait' && (
-          <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'act', agreementId })}>
-            Let the test party do their step
-          </button>
-        )}
       </div>
       {chain && chain.phase === 'active' && journey.role === 'tenant' && (
         <div className="earnings-panel">
@@ -438,11 +422,6 @@ function TenancyCard({ journey, request, reload, openConnections, helper, helper
               onClick={() => run(() => operation({ kind: 'release_earnings', amountAtomic: chain.claimableAtomic }, 'Claim deposit earnings to your wallet'))}>
               Claim to my wallet <ArrowRight size={16} />
             </button>
-            {helper && (
-              <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'interest', agreementId })}>
-                Simulate a month of interest
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -462,7 +441,108 @@ function TenancyCard({ journey, request, reload, openConnections, helper, helper
           )}
         </dl>
       )}
+      <TenancyDetails journey={journey} request={request} />
     </section>
+  );
+}
+
+type TenancyAgreement = {
+  createdAt: string;
+  requiredSecurity: string;
+  releaseAllowed: boolean;
+  digest: string | null;
+  accepted: Partial<Record<'tenant' | 'landlord', { digest: string; at: string }>>;
+  parties: Partial<Record<'tenant' | 'landlord' | 'arbitrator', { subject: string }>>;
+  records: { id: string; name: string; body: string; by: string; at: string }[];
+};
+type TenancyOperation = {
+  id: string;
+  action: { kind: string };
+  role: string;
+  state: string;
+  createdAt: string;
+  signature: string | null;
+};
+const operationLabels: Record<string, string> = {
+  fund_and_supply: 'Deposit secured and supplied',
+  release_earnings: 'Deposit earnings claimed',
+  propose_claim: 'Move-out deduction proposed',
+  respond_to_claim: 'Deduction disputed',
+  accept_and_settle: 'Deduction agreed and settled',
+  resolve_and_settle: 'Arbitration decision and settlement',
+  redeem_and_settle: 'Settlement completed',
+  payout: 'Payout sent',
+};
+
+function TenancyDetails({ journey, request }: { journey: TenancyJourney; request: Request }) {
+  const [open, setOpen] = useState(false);
+  const [agreement, setAgreement] = useState<TenancyAgreement | null>(null);
+  const [operations, setOperations] = useState<TenancyOperation[]>([]);
+  const [error, setError] = useState('');
+  const [operationsError, setOperationsError] = useState(false);
+  const { agreementId, chain } = journey;
+  const hasChain = chain !== null;
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    Promise.allSettled([
+      request<{ agreement: TenancyAgreement }>(`/api/agreements/${encodeURIComponent(agreementId)}`),
+      hasChain ? request<{ operations: TenancyOperation[] }>(`/api/finance/solana?agreement=${encodeURIComponent(agreementId)}`) : Promise.resolve(null),
+    ]).then(([terms, snapshot]) => {
+      if (!active) return;
+      if (terms.status === 'fulfilled') {
+        setAgreement(terms.value.agreement);
+        setError('');
+      } else setError(terms.reason instanceof Error ? terms.reason.message : 'Agreement records are unavailable.');
+      setOperations(snapshot.status === 'fulfilled' ? snapshot.value?.operations ?? [] : []);
+      setOperationsError(snapshot.status === 'rejected');
+    });
+    return () => { active = false; };
+  }, [open, request, agreementId, hasChain, chain?.phase, journey.stage, journey.next.kind, chain?.releasedAtomic]);
+  const entries = agreement ? [
+    { id: 'created', at: agreement.createdAt, title: 'Agreement created', detail: 'Recorded tenancy terms' },
+    ...(['tenant', 'landlord'] as const).flatMap((role) => agreement.accepted[role]
+      ? [{ id: `accepted-${role}`, at: agreement.accepted[role].at, title: `Agreement accepted by ${role}`, detail: 'Same agreement digest' }]
+      : []),
+    ...agreement.records.map((record) => ({
+      id: record.id, at: record.at, title: `${record.name} · ${Object.entries(agreement.parties).find(([, value]) => value?.subject === record.by)?.[0] ?? 'party'}`, detail: record.body,
+    })),
+    ...operations.map((op) => ({
+      id: op.id, at: op.createdAt, title: operationLabels[op.action.kind] ?? op.action.kind.replaceAll('_', ' '),
+      detail: `${op.role} · ${op.state}${op.signature ? ` · transaction ${op.signature}` : ''}`,
+    })),
+  ].sort((a, b) => b.at.localeCompare(a.at)) : [];
+  return (
+    <details className="tenancy-details" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>Agreement, claim & activity · this tenancy</summary>
+      {error && <p className="note" role="alert">{error}</p>}
+      {!agreement && !error && <p className="small-copy">Loading tenancy records…</p>}
+      {agreement && (
+        <>
+          <dl className="journey-facts">
+            <div><dt>Agreement</dt><dd>{agreement.digest && agreement.accepted.tenant?.digest === agreement.digest && agreement.accepted.landlord?.digest === agreement.digest ? 'Accepted by both parties' : 'Awaiting acceptance'}</dd></div>
+            <div><dt>Required deposit</dt><dd>{money(agreement.requiredSecurity)}</dd></div>
+            <div><dt>Earnings policy</dt><dd>{agreement.releaseAllowed ? 'Tenant may claim surplus' : 'Locked until move-out'}</dd></div>
+            {chain && <div><dt>Claim status</dt><dd>{chain.phase === 'claim-proposed' ? 'Awaiting tenant answer' : chain.phase === 'disputed' ? 'Disputed' : chain.phase === 'settling' ? 'Settling' : chain.phase === 'closed' ? 'Closed' : BigInt(chain.claimAtomic) > 0n ? 'Claim recorded' : 'No deduction proposed'}</dd></div>}
+            {chain && BigInt(chain.claimAtomic) > 0n && <div><dt>Requested deduction</dt><dd>{money(chain.claimAtomic)}</dd></div>}
+            {chain && (chain.phase === 'settling' || chain.phase === 'closed') && <div><dt>Approved deduction</dt><dd>{money(chain.approvedClaimAtomic)}</dd></div>}
+          </dl>
+          {agreement.digest && <p className="small-copy">Agreement digest: <span className="mono">{agreement.digest}</span></p>}
+          <h3>Activity & shared records</h3>
+          <p className="small-copy">Only this tenancy’s recorded agreement, evidence and test-network operations. Prepared operations are not completed payments.</p>
+          {operationsError && <p className="note">Test-network operations are unavailable right now; agreement records are still shown.</p>}
+          <div className="tenancy-activity">
+            {entries.map((entry) => (
+              <article className="record-item" key={entry.id}>
+                <strong>{entry.title}</strong>
+                <span className="small-copy">{new Date(entry.at).toLocaleString('en-GB')}</span>
+                <p className="record-body">{entry.detail}</p>
+              </article>
+            ))}
+          </div>
+        </>
+      )}
+    </details>
   );
 }
 
@@ -536,8 +616,8 @@ function ListingCard({ listing, children }: { listing: PublicListing; children?:
   );
 }
 
-function Homes({ role, listings, request, reload, helper, helperBusy }: {
-  role: ChosenRole; listings: PublicListing[]; request: Request; reload: () => Promise<void>; helper: Helper | null; helperBusy: boolean;
+function Homes({ role, listings, request, reload }: {
+  role: ChosenRole; listings: PublicListing[]; request: Request; reload: () => Promise<void>;
 }) {
   const [posting, setPosting] = useState(role === 'landlord' && !listings.some((l) => l.relation === 'landlord'));
   const [form, setForm] = useState({ title: '', city: '', rooms: '2', sizeSqm: '55', availableFrom: '', description: '', rent: '900', deposit: '1', releaseAllowed: true });
@@ -564,7 +644,6 @@ function Homes({ role, listings, request, reload, helper, helperBusy }: {
       <div className="section-heading">
         <h2>{role === 'landlord' ? 'Your listings' : 'Homes you can apply for'}</h2>
         <div className="button-row">
-          {helper && role === 'tenant' && <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'post_home' })}>Add sample homes</button>}
           {role === 'landlord' && <button className="button secondary" onClick={() => setPosting(!posting)}><Plus size={15} /> Post a home</button>}
         </div>
       </div>
@@ -612,9 +691,6 @@ function Homes({ role, listings, request, reload, helper, helperBusy }: {
         {mine.map((l) => (
           <ListingCard listing={l} key={l.id}>
             <Badge tone={l.status === 'open' ? 'green' : 'neutral'}>{l.status === 'open' ? `${l.applicants} applicant(s)` : 'Tenant chosen'}</Badge>
-            {helper && l.status === 'open' && (
-              <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'apply', listingId: l.id })}>Add a test applicant</button>
-            )}
             {l.status === 'open' && l.applications?.map((a) => (
               <div className="applicant" key={a.id}>
                 <div><strong>{a.name}</strong><p>{a.message}</p></div>
@@ -629,9 +705,6 @@ function Homes({ role, listings, request, reload, helper, helperBusy }: {
               <Badge tone={l.relation === 'chosen' ? 'green' : 'neutral'}>
                 {l.relation === 'chosen' ? 'You got it, see above' : l.status === 'let' ? 'Not chosen' : 'Applied'}
               </Badge>
-            )}
-            {helper && l.relation === 'applicant' && l.status === 'open' && (
-              <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'act', listingId: l.id })}>Let the test landlord choose</button>
             )}
             {l.relation === null && (applyTo === l.id ? (
               <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void act(async () => {
@@ -649,9 +722,69 @@ function Homes({ role, listings, request, reload, helper, helperBusy }: {
         ))}
       </div>
       {others.length === 0 && mine.length === 0 && !posting && (
-        <p className="small-copy">{role === 'landlord' ? 'Post your first home.' : 'No homes are listed yet.'}{helper && role === 'tenant' ? ' For a test run, add sample homes.' : ''}</p>
+        <p className="small-copy">{role === 'landlord' ? 'Post your first home.' : 'No homes are listed yet.'}</p>
       )}
     </section>
+  );
+}
+
+function TestTools({ role, tenancies, listings, request, helper, busy, log }: {
+  role: ChosenRole; tenancies: TenancyJourney[]; listings: PublicListing[];
+  request: Request; helper: Helper; busy: boolean; log: string;
+}) {
+  const [earning, setEarning] = useState(false);
+  const [earnLog, setEarnLog] = useState('');
+  async function robinhoodEarn() {
+    setEarning(true);
+    setEarnLog('');
+    try {
+      const { result } = await request<{ result: { releasedAtomic: string } }>('/api/assets', { action: 'robinhood_earn' });
+      setEarnLog(`A Robinhood testnet deposit earned ${money(result.releasedAtomic)} of simulated yield (test tokens), released to your wallet.`);
+    } catch (cause) {
+      setEarnLog(cause instanceof Error ? cause.message : 'The test earnings could not be released.');
+    } finally {
+      setEarning(false);
+    }
+  }
+  function runHelper(body: Record<string, unknown>) {
+    setEarnLog('');
+    void helper(body);
+  }
+  const disabled = busy || earning;
+  return (
+    <details className="card test-tools">
+      <summary>Test tools · simulated actions only</summary>
+      <p className="small-copy">For test networks only. These shortcuts use test people or simulated earnings; your own tenancy actions remain in its card.</p>
+      {role === 'tenant' && <div className="test-tool-row">
+        <span>Test listings</span>
+        <button className="button test-helper" disabled={disabled} onClick={() => runHelper({ action: 'post_home' })}>Add sample homes</button>
+      </div>}
+      {tenancies.map((tenancy) => {
+        const act = tenancy.next.kind === 'invite_arbitrator' || tenancy.next.kind === 'wait';
+        const interest = tenancy.chain?.phase === 'active' && tenancy.role === 'tenant';
+        if (!act && !interest) return null;
+        return <div className="test-tool-row" key={tenancy.agreementId}>
+          <span>{tenancy.property}</span>
+          {act && <button className="button test-helper" disabled={disabled} onClick={() => runHelper({ action: 'act', agreementId: tenancy.agreementId })}>
+            {tenancy.next.kind === 'invite_arbitrator' ? 'Use the test arbitrator instead' : 'Let the test party do their step'}
+          </button>}
+          {interest && <button className="button test-helper" disabled={disabled} onClick={() => runHelper({ action: 'interest', agreementId: tenancy.agreementId })}>Simulate a month of interest</button>}
+        </div>;
+      })}
+      {listings.filter((listing) => listing.status === 'open' && (listing.relation === 'landlord' || (role === 'tenant' && listing.relation === 'applicant'))).map((listing) => (
+        <div className="test-tool-row" key={listing.id}>
+          <span>{listing.title}</span>
+          {listing.relation === 'landlord'
+            ? <button className="button test-helper" disabled={disabled} onClick={() => runHelper({ action: 'apply', listingId: listing.id })}>Add a test applicant</button>
+            : <button className="button test-helper" disabled={disabled} onClick={() => runHelper({ action: 'act', listingId: listing.id })}>Let the test landlord choose</button>}
+        </div>
+      ))}
+      <div className="test-tool-row">
+        <span>Money · Robinhood testnet</span>
+        <button className="button test-helper" disabled={disabled} onClick={robinhoodEarn}>Earn on Robinhood (test)</button>
+      </div>
+      {(log || earnLog) && <p className="test-helper-note" role="status">{(busy || earning) && <Loader2 className="spin" size={14} />} {earnLog || log}</p>}
+    </details>
   );
 }
 

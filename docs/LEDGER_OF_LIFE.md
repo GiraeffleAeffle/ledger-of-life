@@ -120,9 +120,12 @@ person; matching happens on the device or with explicit consent.
 
 Built: the sidebar and the mobile tab bar show these areas; each renders only its own content, and planned
 items appear in a dashed "Planned in this area · not built yet" box that links to **Ideas** (one list in
-`src/components/ideas.tsx`). The old demo with made-up people sits under "Explore", outside the signed-in
-areas. Still open: folding the legacy demo views (Claims & settlement, Shared records, Activity) into the
-tenancy detail, and one "Test tools" panel instead of test buttons inside the tenancy card.
+`src/components/ideas.tsx`). Each real tenancy in **Home** has a read-only detail for its agreement terms,
+claim/settlement state, shared evidence and test-network operations from that tenancy's authenticated
+records. The fictional workflow stays in a separate **Explore demo · made-up people** entry; its internal
+views do not appear in the signed-in areas. Test-only shortcuts, including simulated interest and sample
+people/listings, sit in one collapsible **Test tools** panel in Home; actions on one's own tenancy remain
+in its card.
 
 ## 4. Adapters: one contract, then a decision
 
