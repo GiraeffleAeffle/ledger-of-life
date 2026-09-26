@@ -47,7 +47,7 @@ function passkeyLabel() {
   const chosen = typeof window === 'undefined' ? null : window.localStorage.getItem('deposit-workspace.role');
   const role = pendingInvitationRole() ?? chosen ?? 'account';
   const stamp = new Date().toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  return `Deposit · ${role} · ${stamp}`;
+  return `Ledger of Life · ${role} · ${stamp}`;
 }
 
 /**

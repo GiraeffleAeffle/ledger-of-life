@@ -206,9 +206,9 @@ export function Workspace() {
             <span />
           </span>
           <span>
-            Deposit
+            Ledger
             <br />
-            <strong>workspace</strong>
+            <strong>of Life</strong>
           </span>
         </button>
         <nav aria-label="Your account">

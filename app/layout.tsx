@@ -5,9 +5,9 @@ import './globals.css';
 import { WalletProvider } from '@/wallets';
 
 export const metadata: Metadata = {
-  title: 'Deposit workspace · Make room for your future',
+  title: 'Ledger of Life · Everything that is yours, in one place',
   description:
-    'A shared rental workspace with a separate personal investing journey. Explore the persistent demonstration and inspect connected integration evidence.',
+    'Your verified identity, your home and deposit, what you own and earn, and what is changing in your city. A test-network prototype.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

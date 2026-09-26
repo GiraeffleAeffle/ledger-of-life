@@ -1,4 +1,6 @@
-# Deposit workspace
+# Ledger of Life
+
+_Formerly "Deposit workspace". Package names, repository name and environment keys are unchanged._
 
 **Build assets while renting.** A tenant's eligible deposit earnings can become contributions to a separate personal portfolio. Landlords retain a bounded rental-security workflow; assigned human arbitrators can resolve disputed claims. The product name is still undecided.
 

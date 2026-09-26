@@ -6,7 +6,7 @@
 version: 1
 updated: 2026-09-26
 product:
-  working_name: Deposit workspace   # final name undecided
+  working_name: Ledger of Life   # chosen 2026-09-26; technical identifiers unchanged
   thesis: >-
     Money and assets that everyday life forces people to lock away (rental deposits first)
     should keep working for their owner, without weakening the protection they exist for.
@@ -281,3 +281,29 @@ test_tooling:   # never presented as wallet or user evidence
   test_signers: {code: [src/server/test-signer.ts, scripts/test-signer.mjs], purpose: "Operator keys play people end to end."}
   test_helpers: {code: src/server/test-helpers.ts, gate: "SOLANA_TEST_SIGNER_MODE=1, local store, loopback", purpose: "One real account walks the whole journey."}
   demo_mode: {env: [DEMO_SKIP_RECOVERY, NEXT_PUBLIC_DEMO_SKIP_RECOVERY], effect: "No recovery proof, optional backup email, no Privy confirmation modals."}
+
+# ---------------------------------------------------------------------------
+# Vision recorded 2026-09-26 (not built unless marked). Grounding for later work.
+# ---------------------------------------------------------------------------
+vision:
+  scales:
+    order: [person, household, neighbourhood, municipality, neighbouring_municipalities, landkreis, land, federation, eu, world]
+    rule: Every Context sits at one scale; the app starts from what affects the person and widens outward.
+  public_money_flow:
+    reality: roadmap
+    idea: Show where a person's taxes go and come back, and what their city can realistically spend.
+    grounding_de:
+      - Income tax is shared; municipalities receive a share (Gemeindeanteil, currently 15 %) allocated by residents' income, so it follows where you live.
+      - Trade tax (Gewerbesteuer) goes to the municipality where the employer operates, so it follows where you work.
+      - The Land redistributes to municipalities through the kommunaler Finanzausgleich (e.g. Brandenburg to Strausberg); Länder balance each other federally.
+      - The municipal budget (Haushalt) and council decisions (RIS/OParl, e.g. via CCF) show what is planned and decided.
+    caution: Figures must come from published budgets and statistics with source and as-of date; per-person attribution is an estimate and must be labeled as one.
+  measurable_city:
+    reality: roadmap
+    idea: Sensors and open data (Stadtstack layers 1-2) make needs and the impact of measures measurable, so participation decisions rest on evidence.
+  newcomer_welcome:
+    reality: roadmap
+    idea: On moving to a city, see what is being built (3D atlas), what is decided, and personalised offers such as sports clubs matching interests, possibly with a welcome voucher; invite people to contribute expertise.
+    privacy: Interests stay with the person; offers are matched on the device or on explicit consent, never sold or shared by default.
+  residence_proof:
+    note: The EU PID may omit the address (test issuer form asks birthplace; address fields optional). Fall back to a chosen city, or a residence attestation where issued.
