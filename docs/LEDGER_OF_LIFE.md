@@ -35,7 +35,7 @@ flowchart TB
 
 | Area | Question it answers | Concepts (status) |
 |---|---|---|
-| **1 · Me** | Who am I here, and what may others learn? | Passkey sign-in and own wallets (built) · EU Digital Identity Wallet check: adult, optional city (built, test environment) · roles per context: tenant, landlord, member, resident (partly built: tenancy roles) · **life timeline**: where I lived, moves, tenancies (new, roadmap) |
+| **1 · Me** | Who am I here, and what may others learn? | Passkey sign-in and own wallets (built) · EU Digital Identity Wallet check: adult, optional city (built, test environment) · roles derived per context (built for tenancies, owned listings and city; general memberships planned) · **life timeline** (partly built: app tenancies and self-declared earlier places) |
 | **2 · Home** | Where do I live, and what is locked or owed there? | Listing → application → agreement (built) · deposit escrow that earns, claimable earnings, move-out payouts (built, Solana devnet, simulated yield) · service-charge account (prototype, example costs and test prepayment, optional live Home Assistant daily consumption) · stocks as the deposit (calculator only; testnet contract prototype) · home solar via Home Assistant (built, read-only) |
 | **3 · Money & ownership** | What do I own and earn? | Portfolio total (built) · tokenized stocks on Solana and Robinhood Chain (built, test tokens) · validator stake (built, read-only) · local investment leads for Strausberg (illustration, not verified offers) · home tokens towards owning a home (roadmap) · EV and device income (roadmap) |
 | **4 · Places** | What is changing where I live, and what can my city afford? | Stadtstack atlas projects and consultations (built, read-only) · current DWD weather and nearby uncalibrated citizen PM readings (read-only live) · named OSM clubs/sports facilities (read-only live, not an official directory) · statutory money-flow explainer and Strausberg budget publication/access links (illustration; budget totals unavailable) · city → Landkreis → Land → Germany → EU links (illustration) · ALLRIS calendar/document links (illustration, no OParl feed) · atlas 3D project map (in Stadtstack) |
@@ -48,18 +48,17 @@ person → household → neighbourhood → city → neighbouring cities → Land
 EU → world. Every context, figure and decision is tagged with its scale, so the person can zoom out without
 losing the thread back to their own life.
 
-### 2.2 Life timeline (new)
+### 2.2 Life timeline (partly built)
 
-A personal, private timeline of where the person lived and what happened there:
+The private timeline currently shows tenancies from this app and earlier places entered by the person,
+clearly marked as self-declared. Future entries could include moves with dates, returned deposits and
+milestones such as joining a club or buying a first home share. A residence attestation from an EU wallet
+could later replace a self-declared address where an authority issues one.
 
-- **Entries:** moves (city, from–to), tenancies (created automatically from agreements in the app),
-  deposits returned, milestones such as "joined a club" or "bought a first share of a house".
-- **Sources:** tenancies from the app itself (reliable); earlier addresses entered by the person
-  (self-declared, labeled as such); later, a residence attestation in the EU wallet where authorities issue one.
 - **Why:** it explains the person's current state (why a deposit is still open elsewhere, which cities they
   know) and makes moving the moment where the app helps most.
-- **Privacy:** the timeline belongs to the person and is never shared by default; each context sees only what
-  it needs (a landlord might see "3 completed tenancies, all deposits returned", not the addresses).
+- **Privacy:** the timeline belongs to the person and is never shared by default; a future disclosure
+  could share a derived predicate (for example "3 completed tenancies, all deposits returned"), not addresses.
 
 ### 2.3 Public money flow (explainer built; budget figures unavailable)
 
@@ -110,14 +109,14 @@ interests would stay with the person and matching would require explicit consent
 
 ## 3. How the app should be organised
 
-### Today (why it feels cobbled together)
+### Before the reorganisation
 
-- Previously the signed-in home mixed a role heading, identity, city, portfolio tiles, roadmap tiles, a
-  role intro, tenancy cards, listings, and a separate "Invest" card with its own portfolio.
-- The sidebar still belongs to the earlier deposit app: Rental deposit, Claims & settlement, Shared records,
-  Activity, and a demo that is not the signed-in journey.
-- Built features and roadmap ideas sit side by side with the same visual weight.
-- Two portfolio views exist (the Portfolio tiles and the "Invest · stocks on Solana" card).
+- The signed-in home mixed a role heading, identity, city, portfolio and roadmap tiles, tenancy cards,
+  listings and a separate Invest card with its own portfolio.
+- The sidebar belonged to the earlier deposit app: Rental deposit, Claims & settlement, Shared records,
+  Activity and a demo separate from the signed-in journey.
+- Built features and roadmap ideas sat side by side with the same visual weight.
+- Two portfolio views existed (Portfolio tiles and the Invest card).
 
 ### Structure (built 2026-09-26)
 
