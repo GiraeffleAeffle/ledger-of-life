@@ -240,16 +240,17 @@ concepts:
       bank_account: {reality: roadmap}
 
   ServiceChargeAccount:
-    definition: Monthly service-charge prepayments (Nebenkosten) held in escrow with a running statement. Consumption shares come live from meters or adapters; landlords add invoices with allocation keys as they arrive; surplus is released or top-ups requested monthly instead of after the annual statement.
+    definition: Future monthly service-charge prepayments (Nebenkosten) secured alongside the deposit, with a running statement. The current app only calculates a prototype from a stored test prepayment, example annual allocations and optional daily Home Assistant consumption; no billing, escrow funding or release is implemented.
     grounding:
       - HeizkostenV requires monthly consumption information where meters are remotely readable (since 2022).
       - §556 BGB gives landlords up to 12 months after the period for the annual statement; the app shortens the wait, not the legal right.
       - Many costs (property tax, insurance, cleaning) are invoiced annually; those remain estimates until the invoice arrives.
-    relations: {secured_by: Escrow, fed_by: Adapter (meters, Home Assistant), belongs_to: Agreement}
-    reality: roadmap
+    relations: {secured_by: Escrow (future), fed_by: Adapter (Home Assistant daily consumption), belongs_to: Agreement}
+    reality: prototype
+    code: [src/server/service-charges.ts, src/components/service-charges.tsx]
 
   LocalInvestment:
-    definition: A holding in a company, cooperative or property in the person's own city, shown next to the city's plans (for example a community solar park and the cooperative behind it).
+    definition: Future holding in a company, cooperative or property in the person's own city; the app currently lists unverified research leads and legal forms only, without an offer or transaction.
     forms:
       cooperative_share: {reality: roadmap, note: "Genossenschaft (housing, energy); proven, no tokens needed. First step: directory via the Stadtstack atlas."}
       electronic_security: {reality: roadmap, note: "eWpG; electronic shares since 1 Jan 2024 (ZuFinG), crypto registers need a BaFin-licensed operator. The app shows and holds; issuers do the regulated part."}
@@ -258,7 +259,7 @@ concepts:
     rules:
       - No real offers without a licensed partner and legal review; until then illustration or test network, labeled.
     relations: {held_by: Person, located_in: Context (city), shown_in: Portfolio}
-    reality: roadmap
+    reality: illustration
 
   LifeTimeline:
     definition: "The person's private history of places and events: moves, tenancies, deposits returned, memberships, first local investment."
@@ -288,9 +289,9 @@ concepts:
     constraint: Securities and consumer-protection regulation; start with observation (Adapters).
 
 journeys:
-  tenant: [choose_role, create_account, fund_wallet, browse_listings, apply, accept_agreement, secure_deposit, claim_earnings_any_time, invest, move_out_respond, receive_payout]
-  landlord: [choose_role, create_account, post_listing, choose_applicant, invite_arbitrator, accept_agreement, create_deposit_space, propose_claim, receive_payout]
-  arbitrator: [choose_role, create_account, join_by_invitation, decide_disputed_claim]
+  tenant: [create_account, browse_listings, apply, accept_agreement, secure_deposit, claim_earnings_any_time, invest, move_out_respond, receive_payout]
+  landlord: [create_account, post_listing, choose_applicant, invite_arbitrator, accept_agreement, create_deposit_space, propose_claim, receive_payout]
+  arbitrator: [create_account, join_by_invitation, decide_disputed_claim]
   owner_of_things: [connect_adapter, see_everything_owned]   # any role
   journey_ui: {stages: [agreement, space, deposit, living, move-out, paid], code: src/server/journey.ts, rule: "Exactly one person has an action per phase; the others see what they wait for."}
 

@@ -87,8 +87,7 @@ async function assertReachableHost(origin: string) {
     if (linkLocal || (privateNet && process.env.VERCEL)) throw new WorkflowError('That Home Assistant address is not allowed from this server.');
   }
 }
-
-export async function readSolar(config: NonNullable<AdapterConfig['homeAssistant']>): Promise<SolarReading> {
+async function homeAssistantStates(config: NonNullable<AdapterConfig['homeAssistant']>): Promise<HaState[]> {
   await assertReachableHost(config.url);
   const response = await fetch(`${config.url}/api/states`, {
     headers: { Authorization: `Bearer ${config.token}` },
@@ -97,7 +96,24 @@ export async function readSolar(config: NonNullable<AdapterConfig['homeAssistant
   });
   if (response.status === 401) throw new Error('Home Assistant rejected the token.');
   if (!response.ok) throw new Error(`Home Assistant answered ${response.status}.`);
-  const states: HaState[] = await response.json();
+  return response.json();
+}
+
+/** Daily readings only: lifetime counters must never be presented as today's consumption. */
+export async function readHomeEnergy(config: NonNullable<AdapterConfig['homeAssistant']>) {
+  const states = await homeAssistantStates(config);
+  const daily = (sensor: HaState) => sensor.attributes.device_class === 'energy'
+    && /today|daily/i.test(`${sensor.entity_id} ${sensor.attributes.friendly_name ?? ''}`)
+    && ['Wh', 'kWh'].includes(sensor.attributes.unit_of_measurement ?? '')
+    && Number.isFinite(Number(sensor.state)) && Number(sensor.state) >= 0;
+  const consumption = states.find((sensor) => daily(sensor) && /consumption|usage|used/i.test(`${sensor.entity_id} ${sensor.attributes.friendly_name ?? ''}`));
+  const solar = states.find((sensor) => daily(sensor) && /solar|pv|photovoltaic/i.test(`${sensor.entity_id} ${sensor.attributes.friendly_name ?? ''}`));
+  const kwh = (sensor: HaState | undefined) => sensor ? Number((Number(sensor.state) * (sensor.attributes.unit_of_measurement === 'Wh' ? 0.001 : 1)).toFixed(2)) : null;
+  return { consumptionTodayKwh: kwh(consumption), consumptionEntity: consumption?.entity_id ?? null, solarTodayKwh: kwh(solar) };
+}
+
+export async function readSolar(config: NonNullable<AdapterConfig['homeAssistant']>): Promise<SolarReading> {
+  const states = await homeAssistantStates(config);
   const solarish = (s: HaState) => /solar|pv|photovolt|inverter|yield|production/i.test(`${s.entity_id} ${s.attributes.friendly_name ?? ''}`);
   const numeric = (s: HaState) => Number.isFinite(Number(s.state));
   const energy = (config.entity ? states.find((s) => s.entity_id === config.entity) : undefined)

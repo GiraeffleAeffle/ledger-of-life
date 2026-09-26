@@ -8,7 +8,11 @@ import { CityCard } from './city';
 import { IdentityStrip } from './identity';
 import { IdeasArea, PlannedHere } from './ideas';
 import { MeArea } from './me';
+import { LocalInvestments } from './local-investments';
 import { AccountSetup } from './onboarding';
+import { PlacesArea } from './places';
+import { ServiceCharges } from './service-charges';
+import { StockCollateral } from './stock-collateral';
 import { parseAmount } from '@/domain/assets';
 import type { JourneyStage, TenancyJourney } from '@/server/journey';
 import type { PublicListing } from '@/server/listings';
@@ -121,7 +125,7 @@ function SignedInHome({ area, go, openConnections }: { area: Area; go: (area: Ar
         setHelperLog('The test person is doing their step… (up to a minute on devnet)');
         try {
           const result = await request<{ done?: string[] }>('/api/test-helpers', body);
-          setHelperLog(result.done?.length ? result.done.join(' · ') : 'Done.');
+          setHelperLog(result.done?.length ? result.done.join(' · ') : 'No test party can act here; your real counterparty may need to do this step.');
           await load();
         } catch (e) {
           setHelperLog(e instanceof Error ? e.message : 'The helper failed.');
@@ -196,13 +200,13 @@ function SignedInHome({ area, go, openConnections }: { area: Area; go: (area: Ar
           {helpers && helper && <TestTools tenancies={ready} listings={listings} request={request} helper={helper} busy={helperBusy} log={helperLog} />}
           <Homes listings={listings} request={request} reload={load} />
           {tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="home" go={go} />}
-          <PlannedHere area="home" go={go} />
         </>
       )}
 
       {area === 'money' && (
         <>
           {tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="money" go={go} />}
+          <LocalInvestments request={request} />
           <Portfolio request={request} />
           <PlannedHere area="money" go={go} />
         </>
@@ -210,7 +214,7 @@ function SignedInHome({ area, go, openConnections }: { area: Area; go: (area: Ar
 
       {area === 'places' && (
         <>
-          <CityCard request={request} />
+          <PlacesArea request={request} go={go} />
           <PlannedHere area="places" go={go} />
         </>
       )}
@@ -395,7 +399,10 @@ function TenancyCard({ journey, request, reload, openConnections }: {
           </button>
         )}
         {next.kind === 'secure_deposit' && (
-          <p className="small-copy faucet-note">Need test USDC? Get it from <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer">Circle’s faucet</a> on Solana Devnet, sent to your wallet {wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? 'address in Me'}.</p>
+          <>
+            <p className="small-copy faucet-note">Need test USDC? Get it from <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer">Circle’s faucet</a> on Solana Devnet, sent to your wallet {wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? 'address in Me'}.</p>
+            <StockCollateral initialDeposit={Number(journey.requiredSecurity) / 1e6} />
+          </>
         )}
         {next.kind === 'propose_claim' && (
           <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void run(() => operation({ kind: 'propose_claim', amountAtomic: parseAmount(amount) }, 'Move-out deduction', needsReason(reason))); }}>
@@ -465,6 +472,7 @@ function TenancyCard({ journey, request, reload, openConnections }: {
           )}
         </dl>
       )}
+      {living && <ServiceCharges agreementId={agreementId} request={request} />}
       <TenancyDetails journey={journey} request={request} />
     </section>
   );
@@ -731,6 +739,7 @@ function Homes({ listings, request, reload }: {
           ))}
         </div>
       )}
+      {finding && <StockCollateral />}
       {finding && <div className="listing-grid">
         {others.map((l) => (
           <ListingCard listing={l} key={l.id}>
@@ -792,13 +801,15 @@ function TestTools({ tenancies, listings, request, helper, busy, log }: {
       </div>
       {tenancies.map((tenancy) => {
         const act = tenancy.next.kind === 'invite_arbitrator' || (tenancy.next.kind === 'wait' && tenancy.chain?.phase !== 'active');
-        const interest = tenancy.chain?.phase === 'active' && tenancy.role === 'tenant';
+        const startMoveOut = tenancy.chain?.phase === 'active' && tenancy.role === 'tenant';
+        const interest = startMoveOut;
         if (!act && !interest) return null;
         return <div className="test-tool-row" key={tenancy.agreementId}>
           <span>{tenancy.property}</span>
           {act && <button className="button test-helper" disabled={disabled} onClick={() => runHelper({ action: 'act', agreementId: tenancy.agreementId })}>
             {tenancy.next.kind === 'invite_arbitrator' ? 'Use the test arbitrator instead' : 'Let the test party do their step'}
           </button>}
+          {startMoveOut && <button className="button test-helper" disabled={disabled} onClick={() => runHelper({ action: 'act', agreementId: tenancy.agreementId })}>Test landlord starts move-out</button>}
           {interest && <button className="button test-helper" disabled={disabled} onClick={() => runHelper({ action: 'interest', agreementId: tenancy.agreementId })}>Simulate a month of interest</button>}
         </div>;
       })}

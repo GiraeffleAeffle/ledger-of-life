@@ -24,6 +24,16 @@ After setup, Home shows the person's own tenancies and compact listings. Browsin
 
 Each person sees the progress through their current phase and exactly **one** next step when action is required. Waiting states, network confirmations and payouts refresh automatically; there are no "check result" buttons. Across the whole tenancy the three people approve 4 transactions without a dispute and 5 with one, instead of the previous 7–8.
 
+While living, each tenancy has a collapsed **Service charges · prototype** statement. Its landlord can edit
+the server-stored monthly test prepayment; example annual building costs use m², units and consumption keys,
+and a daily Home Assistant consumption sensor is read when present. Without a consumption sensor, a labeled
+example week is used. The balance and projected monthly surplus are calculations only: no escrow prepayment
+or release exists. In a future implementation, those prepayments would share the deposit escrow.
+
+**Alternative: secure with stocks** appears only while finding a home or securing a deposit. Its collapsed
+calculator illustrates 150% initial collateral, a 125% example maintenance level and an approved claim
+sale with illustrative slippage. `CollateralEscrow` ran on Robinhood Chain testnet, but it is not an app flow.
+
 ## Architecture
 
 - `src/server/listings.ts`: listings, applications and the choice that creates the agreement.
@@ -49,7 +59,8 @@ With `SOLANA_TEST_SIGNER_MODE=1` (local store, devnet and loopback requests only
 - **Add sample homes**, then **Let the test landlord choose** after you apply.
 - **Add a test applicant** to your own listing.
 - **Use the test arbitrator instead** of sending an invite link.
-- **Let the test party do their step** while waiting, except during normal active living (which must not trigger move-out).
+- **Let the test party do their step** while waiting.
+- **Test landlord starts move-out** explicitly while the tenant is living in an active test tenancy; this is how one-account demos reach move-out. Do not click it until ready to advance the devnet tenancy.
 
 Test people sign with operator-held test keys through the same services. So you need **one** real account (passkey, backup email, one-time recovery check) whose signatures are the ones that matter. Helper steps are fixtures, not wallet proof.
 

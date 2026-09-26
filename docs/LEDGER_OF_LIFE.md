@@ -36,8 +36,8 @@ flowchart TB
 | Area | Question it answers | Concepts (status) |
 |---|---|---|
 | **1 · Me** | Who am I here, and what may others learn? | Passkey sign-in and own wallets (built) · EU Digital Identity Wallet check: adult, optional city (built, test environment) · roles per context: tenant, landlord, member, resident (partly built: tenancy roles) · **life timeline**: where I lived, moves, tenancies (new, roadmap) |
-| **2 · Home** | Where do I live, and what is locked or owed there? | Listing → application → agreement (built) · deposit escrow that earns, claimable earnings, move-out payouts (built, Solana devnet, simulated yield) · real-time service charges (roadmap) · home solar via Home Assistant (built, read-only) |
-| **3 · Money & ownership** | What do I own and earn? | Portfolio total (built) · tokenized stocks on Solana and Robinhood Chain (built, test tokens) · validator stake (built, read-only) · stocks as the deposit (prototype contract) · home tokens towards owning a home (roadmap) · **local investments**: local companies and houses (new, roadmap) · EV and device income (roadmap) |
+| **2 · Home** | Where do I live, and what is locked or owed there? | Listing → application → agreement (built) · deposit escrow that earns, claimable earnings, move-out payouts (built, Solana devnet, simulated yield) · service-charge account (prototype, example costs and test prepayment, optional live Home Assistant daily consumption) · stocks as the deposit (calculator only; testnet contract prototype) · home solar via Home Assistant (built, read-only) |
+| **3 · Money & ownership** | What do I own and earn? | Portfolio total (built) · tokenized stocks on Solana and Robinhood Chain (built, test tokens) · validator stake (built, read-only) · local investment leads for Strausberg (illustration, not verified offers) · home tokens towards owning a home (roadmap) · EV and device income (roadmap) |
 | **4 · Places** | What is changing where I live, and what can my city afford? | "What is changing in <city>" from the Stadtstack atlas (built, read-only) · public money flow: taxes, redistribution, city budget (roadmap) · measurable city: sensors and open data (roadmap, Stadtstack) · 3D map of projects (exists in the Stadtstack atlas) |
 | **5 · Have a say** | Where can I take part, and where am I welcome? | Open consultations with deadlines (built, via atlas) · council decisions (upstream: CCF/OParl) · newcomer welcome: clubs, interests, voucher (roadmap) · offering expertise (roadmap) |
 
@@ -131,6 +131,13 @@ Account setup is role-free. The person sees their agreement roles and owned list
 preference; browsing homes and posting a listing open only on request. While a tenancy is active its move-out
 details stay behind a quiet "Moving out?" action, and finished tenancies move to **Past tenancies**.
 
+The Home service-charge account is a collapsed prototype per active tenancy: the landlord sets only an
+example prepayment; example annual allocations and daily consumption estimates drive a running balance.
+An available Home Assistant daily consumption sensor is identified as live, not as a bill; solar production
+is never called consumption. Nothing moves on-chain. A separate stock-collateral calculator sits only in
+home discovery or the deposit step. Money's collapsed local-investment card names four legal forms and
+unverified Strausberg cooperative leads; it cannot accept investments.
+
 Money's Solana and Robinhood test stocks use read-only Jupiter reference prices. Server reads share one
 in-flight request per mint and cache quotes for 60 seconds; an upstream throttle retains the last good
 price with its original observation time and waits another minute before trying again. Without a prior
@@ -174,11 +181,11 @@ Today each connection is built differently (`adapters.ts`, `eudi.ts`, `city.ts`,
 | Validator (Gnosis/Ethereum/Solana) | Money | Built, read-only | **Keep** |
 | Life timeline | Me | New | **Next**: tenancies automatic, earlier moves self-declared |
 | City budget and money flow | Places | New | **Next**: data through the Stadtstack atlas, not in this app |
-| Real-time service charges | Home | Idea | **Next**: reuses the escrow |
-| Local investments | Money / Places | New | **Later**: start with a cooperative directory and a test-network illustration; real offers only with a licensed partner |
+| Real-time service charges | Home | Prototype statement, simulated costs and stored test prepayment; optional live daily Home Assistant consumption | **Next**: authorized utility meters, invoices and escrow-based settlement |
+| Local investments | Money | Illustration: four legal forms and unverified Strausberg cooperative leads; no offers | **Later**: direct provider verification and licensed partner before any investment |
 | Newcomer welcome, clubs, voucher | Have a say | Idea | **Later**: needs city partners and interest matching |
 | CCF council decisions | Have a say | External, running | **Later**, via the atlas or directly from the CCF store |
-| Stocks as the deposit | Home | Prototype contract | **Park** until the core flow is polished |
+| Stocks as the deposit | Home | CollateralEscrow testnet contract + illustration calculator, not an app flow | **Park** real integration pending review and legal agreement |
 | Home tokens towards owning | Money | Idea | **Park**, becomes part of local investments |
 | EV and device tokenization | Money | Idea | **Park** |
 

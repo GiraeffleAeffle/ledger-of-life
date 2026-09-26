@@ -88,9 +88,9 @@ sequenceDiagram
 | Live mainnet | Real assets | Nothing yet |
 | Testnet, real | Real execution with test tokens | Accounts and wallets; listings and agreements; Solana escrow (setup, deposit, lending, claims, settlement, payouts); Robinhood escrow; tSPYx and test TSLA purchases |
 | Testnet, simulated input | Real execution, one input faked on purpose | Deposit yield (Solana `test_credit_yield`, Robinhood test vault) and therefore earnings claims; tSPYx distributions |
-| Read-only live | Real third-party data | Home Assistant solar and savings; Gnosis, Ethereum and Solana validators; SPYx and TSLA reference prices |
-| Prototype | Ran in tests or scripts, not an app feature | Stocks as deposit (`CollateralEscrow`); Morpho on a mainnet fork |
-| Illustration | Visual only | Home shares and the home-token grid |
+| Read-only live | Real third-party data | Home Assistant solar/savings and optional daily consumption reading (not billing totals); Gnosis, Ethereum and Solana validators; SPYx and TSLA reference prices |
+| Prototype | A working test/counterpart exists but this is not a money-moving app flow | Stocks as deposit (`CollateralEscrow` testnet contract and calculator); service-charge example statement with server-stored test prepayment; Morpho on a mainnet fork |
+| Illustration | Visual or researched lead only | Unverified local cooperative candidates (no offers); home shares and the home-token grid |
 | Roadmap | Idea only | Home tokens toward owning a home; EU Digital Identity Wallet; EV adapter; tokenizing device income |
 
 ## Journeys
