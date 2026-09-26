@@ -7,7 +7,7 @@ type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Pr
 const date = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('de-DE');
 
 /** What is happening in the person's city, read from the Stadtstack project atlas. */
-export function CityCard({ request, compact, onOpen }: { request: Request; compact?: boolean; onOpen?: () => void }) {
+export function CityCard({ request, compact, onOpen, onCityChange }: { request: Request; compact?: boolean; onOpen?: () => void; onCityChange?: () => void }) {
   const [city, setCity] = useState<CityResult | null>(null);
   const [draft, setDraft] = useState('Strausberg');
   const [busy, setBusy] = useState(false);
@@ -25,6 +25,7 @@ export function CityCard({ request, compact, onOpen }: { request: Request; compa
     setError('');
     try {
       setCity((await request<{ city: CityResult }>('/api/city', { city: draft })).city);
+      onCityChange?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Please try again.');
     } finally {

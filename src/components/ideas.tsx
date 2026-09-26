@@ -2,7 +2,7 @@
 import { Lightbulb } from 'lucide-react';
 import { AREAS, type Area } from './areas';
 
-type Status = 'planned' | 'prototype' | 'partly built';
+type Status = 'planned' | 'prototype' | 'partly built' | 'illustration';
 interface Idea {
   id: string;
   area: Exclude<Area, 'overview' | 'ideas'>;
@@ -21,50 +21,53 @@ export const IDEAS: Idea[] = [
   { id: 'roles', area: 'me', status: 'planned', title: 'Roles in every part of your life',
     how: 'Each context (tenancy, club, building, city) grants you a role; the EU wallet proves eligibility such as residence or age.',
     enables: 'One identity for tenant, landlord, club member and resident, and each context learns only what it needs.' },
-  { id: 'service-charges', area: 'home', status: 'planned', title: 'Real-time service charges',
-    how: 'Monthly prepayments go into an escrow like the deposit; consumption comes live from meters or Home Assistant; invoices arrive with their allocation key.',
-    enables: 'A running balance ("you are €12 ahead") and surplus paid back monthly instead of after the yearly statement.' },
+  { id: 'service-charges', area: 'home', status: 'prototype', title: 'Real-time service charges',
+    how: 'Example service-charge statement with a landlord-set test prepayment and optional live daily Home Assistant consumption; no escrow funding or payouts.',
+    enables: 'See an illustrative running balance. It is not a legal annual statement or money movement.',
+    needs: 'Real meter/invoice integration and an authorized payment design before balances or refunds can become real.' },
   { id: 'stock-deposit', area: 'home', status: 'prototype', title: 'Stocks as your deposit',
-    how: 'Secure a flat with 150 % in tokenized shares instead of cash; a claim is paid by selling just enough shares.',
-    enables: 'Keep your savings invested while renting. The contract ran on Robinhood Chain testnet; not an app flow yet.' },
-  { id: 'local-investments', area: 'money', status: 'planned', title: 'Invest in your own city',
-    how: 'Cooperative shares (housing, energy), electronic shares of local companies (eWpG, since 2024), crowdfunding via licensed platforms (up to €5 million per project owner a year), tokenized property shares via a property company.',
-    enables: 'See a planned project in your city, the company or cooperative behind it, and take part financially and in the consultation.',
-    needs: 'A licensed partner and legal review before any real offer; until then illustration or test network.' },
+    how: '150 % collateral calculator and Robinhood Chain testnet contract; no pledge flow in the app.',
+    enables: 'Explore how tokenized shares might secure a deposit without claiming a working collateral tenancy.' },
+  { id: 'local-investments', area: 'money', status: 'illustration', title: 'Invest in your own city',
+    how: 'Four legal forms and unverified Strausberg cooperative leads; no offers or investment in the app.',
+    enables: 'Understand possible forms of participation without implying membership, available shares or real investable projects.',
+    needs: 'Verified provider terms, a licensed partner and legal review before any real offer.' },
   { id: 'home-tokens', area: 'money', status: 'planned', title: 'Home shares towards owning a home',
-    how: 'Collect shares of homes month by month; they count toward buying one.',
-    enables: 'A path from renting to owning. Becomes part of "Invest in your own city".' },
+    how: 'Collect shares of homes month by month; they count toward buying one. No live asset is offered.',
+    enables: 'A potential path from renting to owning; now part of \"Invest in your own city\".' },
   { id: 'devices', area: 'money', status: 'planned', title: 'Electric car and other devices',
     how: 'Charging and vehicle-to-grid income read like the solar and validator adapters.',
     enables: 'Everything your hardware earns in one total.' },
-  { id: 'budget', area: 'places', status: 'planned', title: 'Where the money goes',
-    how: 'Your city receives a share of income tax where you live and trade tax where companies operate; the state redistributes (for example Brandenburg to Strausberg); the budget and council decisions show what is planned.',
-    enables: 'See what your city can realistically spend and on what. Figures only from published budgets, with source and date; anything per person is an estimate.',
-    needs: 'Research which budget data each city and state publishes; delivered through the Stadtstack protocol.' },
-  { id: 'scales', area: 'places', status: 'planned', title: 'From your street to the world',
-    how: 'Every project, decision and figure carries its scale: neighbourhood, city, neighbouring cities, Landkreis, state, country, EU, world.',
-    enables: 'Zoom out without losing the thread back to your own life.' },
-  { id: 'measurable', area: 'places', status: 'planned', title: 'A measurable city',
-    how: 'Sensors and open data (Stadtstack layers 1 and 2) show needs and whether a measure helped.',
-    enables: 'Votes and priorities based on evidence, and results people can check.' },
-  { id: 'decisions', area: 'places', status: 'planned', title: 'Council decisions',
-    how: 'Council agendas and papers from OParl systems, collected by CCF (Council Context Feed), summarised with sources in the atlas.',
-    enables: 'Know what is decided before it happens, not after.' },
-  { id: 'welcome', area: 'places', status: 'planned', title: 'Welcome to your new city',
-    how: 'When you move, see what is being built (3D atlas), what is decided, how to register, and clubs or groups that match your interests, maybe with a welcome voucher.',
-    enables: 'Newcomers connect faster and can offer their expertise. Interests stay with you; matching only with your consent.',
-    needs: 'City partners for vouchers and club listings.' },
+  { id: 'budget', area: 'places', status: 'partly built', title: 'Where the money goes',
+    how: 'The Places explainer links to income-tax and trade-tax laws, Brandenburg equalisation and Strausberg’s gazette and inspection route. No unverified budget totals.',
+    enables: 'Understand the statutory flow and find the actual city plan rather than treating your own taxes as a city receipt.',
+    needs: 'The complete city budget plan, annexes, reusable licence and verified line items before a spending breakdown can be shown.' },
+  { id: 'scales', area: 'places', status: 'illustration', title: 'From your street to the world',
+    how: 'Places now illustrates Strausberg → Märkisch-Oderland → Brandenburg → Germany → EU with official portal links, not a live feed at each level.',
+    enables: 'See which levels can be explored today; neighbourhood and world data are not integrated.' },
+  { id: 'measurable', area: 'places', status: 'partly built', title: 'A measurable city',
+    how: 'Read-only live DWD weather via Bright Sky and nearby uncalibrated citizen PM sensors with observation time and distance.',
+    enables: 'Inspect sourced local measurements; this is not a calibrated city-wide sensor layer.',
+    needs: 'Verified environmental coverage and city-reviewed interpretation before comparing measures over time.' },
+  { id: 'decisions', area: 'places', status: 'partly built', title: 'Council decisions',
+    how: 'Strausberg ALLRIS meeting calendar and document search are linked; no working public OParl endpoint was confirmed and no agendas are imported.',
+    enables: 'Reach the official source yourself, without presenting unverified meeting records as a feed.',
+    needs: 'A permitted structured meeting feed (OParl or reviewed atlas/CCF data) for read-only meetings.' },
+  { id: 'welcome', area: 'places', status: 'partly built', title: 'Welcome to your new city',
+    how: 'Named OSM clubs and sports facilities are now read-only live, grouped by type and linked to OSM; Strausberg city and district directories are linked.',
+    enables: 'Find nearby activities without claiming OSM contributions are an official directory.',
+    needs: 'City partners for vouchers, registration help and any consent-based interest matching.' },
 ];
 
-const STATUS_LABEL: Record<Status, string> = { planned: 'Planned', prototype: 'Prototype', 'partly built': 'Partly built' };
+const STATUS_LABEL: Record<Status, string> = { planned: 'Planned', prototype: 'Prototype', 'partly built': 'Partly built', illustration: 'Illustration' };
 
-/** Compact planned items at the end of an area, visibly separate from what works today. */
+/** Roadmap work left in an area, separate from the built features and illustrations above. */
 export function PlannedHere({ area, go }: { area: Idea['area']; go: (area: Area) => void }) {
-  const ideas = IDEAS.filter((i) => i.area === area);
+  const ideas = IDEAS.filter((i) => i.area === area && i.status !== 'illustration');
   if (!ideas.length) return null;
   return (
     <section className="planned-here">
-      <span className="eyebrow"><Lightbulb size={12} /> PLANNED IN THIS AREA · NOT BUILT YET</span>
+      <span className="eyebrow"><Lightbulb size={12} /> MORE TO BUILD IN THIS AREA</span>
       <div className="planned-grid">
         {ideas.map((idea) => (
           <div key={idea.id} className="planned-item">
