@@ -64,14 +64,35 @@ export interface SolarReading {
   energyTodayKwh: number | null;
   powerW: number | null;
   valueToday: number | null;
+  /** True when valueToday is kWh × the entered tariff rather than the home's own savings sensor. */
+  valueEstimated: boolean;
   /** From the home's own monetary sensors (e.g. inverter savings), when present. */
   savings: { today: number | null; month: number | null; year: number | null } | null;
-  currency: 'EUR';
+  currency: string;
+}
+
+/**
+ * Home Assistant usually lives on the home network, so private addresses are allowed for local
+ * runs. Hosted deployments (Vercel) may only reach public addresses, and link-local/metadata
+ * addresses are never allowed. DNS is checked at fetch time; redirects are refused.
+ */
+async function assertReachableHost(origin: string) {
+  const { lookup } = await import('node:dns/promises');
+  const { hostname } = new URL(origin);
+  const addresses = await lookup(hostname.replace(/^\[|\]$/g, ''), { all: true }).catch(() => []);
+  if (!addresses.length) throw new WorkflowError('That Home Assistant address cannot be resolved from the server.');
+  for (const { address } of addresses) {
+    const linkLocal = /^169\.254\./.test(address) || /^fe80:/i.test(address) || address === '100.100.100.200' || /^fd00:ec2::/i.test(address);
+    const privateNet = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.)/.test(address) || address === '::1' || /^f[cd]/i.test(address);
+    if (linkLocal || (privateNet && process.env.VERCEL)) throw new WorkflowError('That Home Assistant address is not allowed from this server.');
+  }
 }
 
 export async function readSolar(config: NonNullable<AdapterConfig['homeAssistant']>): Promise<SolarReading> {
+  await assertReachableHost(config.url);
   const response = await fetch(`${config.url}/api/states`, {
     headers: { Authorization: `Bearer ${config.token}` },
+    redirect: 'error',
     signal: AbortSignal.timeout(8000),
   });
   if (response.status === 401) throw new Error('Home Assistant rejected the token.');
@@ -80,12 +101,14 @@ export async function readSolar(config: NonNullable<AdapterConfig['homeAssistant
   const solarish = (s: HaState) => /solar|pv|photovolt|inverter|yield|production/i.test(`${s.entity_id} ${s.attributes.friendly_name ?? ''}`);
   const numeric = (s: HaState) => Number.isFinite(Number(s.state));
   const energy = (config.entity ? states.find((s) => s.entity_id === config.entity) : undefined)
-    ?? states.find((s) => s.attributes.device_class === 'energy' && solarish(s) && /today|daily|day/i.test(s.entity_id) && numeric(s))
-    ?? states.find((s) => s.attributes.device_class === 'energy' && solarish(s) && numeric(s));
+    // Only sensors that are clearly per-day; lifetime counters (total_increasing without a period) would read as "today".
+    ?? states.find((s) => s.attributes.device_class === 'energy' && solarish(s) && /today|daily/i.test(s.entity_id) && numeric(s));
   const power = states.find((s) => s.attributes.device_class === 'power' && solarish(s) && numeric(s));
   if (!energy && !power) throw new Error('No solar sensor found. Enter the sensor ID (e.g. sensor.solar_energy_today).');
+  let currency = 'EUR';
   const money = (period: RegExp) => {
     const sensor = states.find((s) => s.attributes.device_class === 'monetary' && solarish(s) && /saving|earning|revenue/i.test(s.entity_id) && period.test(s.entity_id) && numeric(s));
+    if (sensor && /^[A-Z]{3}$/.test(sensor.attributes.unit_of_measurement ?? '')) currency = sensor.attributes.unit_of_measurement!;
     return sensor ? Number(Number(sensor.state).toFixed(2)) : null;
   };
   const savings = { today: money(/daily|today|24h/), month: money(/monthly|month/), year: money(/yearly|year/) };
@@ -97,8 +120,9 @@ export async function readSolar(config: NonNullable<AdapterConfig['homeAssistant
     energyTodayKwh: kwh === null ? null : Number(kwh.toFixed(2)),
     powerW: watts === null ? null : Math.round(watts),
     valueToday: savings.today ?? (kwh === null ? null : Number((kwh * config.pricePerKwh).toFixed(2))),
+    valueEstimated: savings.today === null,
     savings: savings.today === null && savings.month === null && savings.year === null ? null : savings,
-    currency: 'EUR',
+    currency,
   };
 }
 

@@ -15,7 +15,7 @@ export function IdentityStrip({ request }: { request: Request }) {
 
   useEffect(() => {
     let active = true;
-    request<{ identity: IdentityStatus }>('/api/identity').then((r) => active && setStatus(r.identity)).catch(() => {});
+    request<{ identity: IdentityStatus }>('/api/eudi').then((r) => active && setStatus(r.identity)).catch(() => {});
     return () => { active = false; };
   }, [request]);
 
@@ -23,7 +23,7 @@ export function IdentityStrip({ request }: { request: Request }) {
     if (!offer) return;
     const timer = setInterval(async () => {
       try {
-        const r = await request<{ identity: IdentityStatus }>('/api/identity', { action: 'poll' });
+        const r = await request<{ identity: IdentityStatus }>('/api/eudi', { action: 'poll' });
         if (r.identity.state === 'verified') { setStatus(r.identity); setOffer(null); }
         if (r.identity.state === 'none') { setOffer(null); setError('The request expired. Please start again.'); }
       } catch (e) {
@@ -38,7 +38,7 @@ export function IdentityStrip({ request }: { request: Request }) {
     setBusy(true);
     setError('');
     try {
-      setOffer(await request<{ walletLink: string; qr: string }>('/api/identity', { action: 'start', shareCity }));
+      setOffer(await request<{ walletLink: string; qr: string }>('/api/eudi', { action: 'start', shareCity }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Please try again.');
     } finally {
@@ -46,7 +46,7 @@ export function IdentityStrip({ request }: { request: Request }) {
     }
   }
   async function forget() {
-    const r = await request<{ identity: IdentityStatus }>('/api/identity', { action: 'forget' });
+    const r = await request<{ identity: IdentityStatus }>('/api/eudi', { action: 'forget' });
     setStatus(r.identity);
   }
 

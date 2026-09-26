@@ -101,8 +101,15 @@ export async function pollIdentityRequest(store: Store, identity: VerifiedIdenti
   const presentation = Array.isArray(token) ? token[0] : token;
   if (!presentation) throw new WorkflowError('The wallet did not share an identity credential.');
   const statement = statementFromSdJwt(presentation, pending.nonce);
-  await save(store, identity.subject, { statement });
-  return { state: 'verified', statement };
+  // Store only if this exact request is still pending: "Forget" or a newer request wins over a late answer.
+  const stored = await store
+    .update<IdentityRecord>(key(identity.subject), (current) => {
+      if (current.pending?.transactionId !== pending.transactionId || current.pending.nonce !== pending.nonce)
+        throw new WorkflowError('This request was cancelled.');
+      return { statement };
+    })
+    .catch(() => null);
+  return stored ? { state: 'verified', statement } : identityStatus(store, identity);
 }
 
 export async function forgetIdentity(store: Store, identity: VerifiedIdentity) {

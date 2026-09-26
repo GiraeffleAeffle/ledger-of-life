@@ -15,6 +15,20 @@ type BuyStep = { description: string; transaction: { chainId: 46630; to: string;
 
 const usd = (value: number) => value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 const atomicUsd = (atomic: string | undefined) => Number(atomic ?? '0') / 1e6;
+const money = (value: number, currency: string) => value.toLocaleString('en-US', { style: 'currency', currency });
+type Chain = NonNullable<TenancyJourney['chain']>;
+/** What of one tenancy belongs to the viewer, in USD. Before settlement the tenant owns the deposit and
+ * earnings minus approved claims; after settlement each side owns what is owed and not yet paid. */
+function entitlementUsd(role: TenancyJourney['role'], c: Chain): number {
+  const settled = c.phase === 'settling' || c.phase === 'closed';
+  if (role === 'tenant')
+    return settled
+      ? atomicUsd(c.tenantOwedAtomic) - atomicUsd(c.tenantPaidAtomic)
+      : Math.max(0, atomicUsd(c.lendingValueAtomic) + atomicUsd(c.escrowAtomic) - atomicUsd(c.approvedClaimAtomic));
+  if (role === 'landlord')
+    return settled ? atomicUsd(c.landlordOwedAtomic) - atomicUsd(c.landlordPaidAtomic) : atomicUsd(c.approvedClaimAtomic);
+  return 0;
+}
 
 export function AssetsOverview({ request, tenancies, testHelpers }: { request: Request; tenancies: TenancyJourney[]; testHelpers: boolean }) {
   const wallet = useRentalWallet();
@@ -71,9 +85,14 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
     setMessage('Bought test TSLA with your Robinhood earnings.');
   }
 
-  const deposits = tenancies.filter((t) => t.chain && t.chain.phase !== 'closed');
-  const locked = deposits.reduce((sum, t) => sum + atomicUsd(t.chain!.lendingValueAtomic) + atomicUsd(t.chain!.escrowAtomic), 0);
-  const claimed = tenancies.reduce((sum, t) => sum + atomicUsd(t.chain?.releasedAtomic), 0);
+  // Count only what belongs to the viewer: a landlord must not see the tenant's deposit as their own,
+  // and unpaid payouts stay visible after the tenancy closes.
+  const entitled = tenancies
+    .map((t) => ({ t, value: t.chain ? entitlementUsd(t.role, t.chain) : 0 }))
+    .filter(({ value }) => value > 0);
+  const locked = entitled.reduce((sum, { value }) => sum + value, 0);
+  const claimed = tenancies.filter((t) => t.role === 'tenant').reduce((sum, t) => sum + atomicUsd(t.chain?.releasedAtomic), 0);
+  const asTenant = entitled.filter(({ t }) => t.role === 'tenant').length;
   const rh = assets?.robinhood?.ok ? assets.robinhood.value : null;
   const solar = assets?.solar?.ok ? assets.solar.value : null;
   const validator = assets?.validator?.ok ? assets.validator.value : null;
@@ -94,16 +113,18 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
         <article className="asset-tile clickable" onClick={() => document.querySelector('.tenancy-card')?.scrollIntoView({ behavior: 'smooth' })}>
           <header><KeyRound size={18} /> Rental home & deposit</header>
           <strong>{usd(locked)}</strong>
-          <span>{deposits.length ? `Locked for ${deposits.length} home${deposits.length > 1 ? 's' : ''}, earning in lending` : 'No active deposit'}</span>
+          <span>{entitled.length === 0 ? 'No active deposit' : asTenant === entitled.length
+            ? `Your deposit for ${asTenant} home${asTenant > 1 ? 's' : ''}, earning in lending`
+            : 'Your deposits plus approved claims and payouts owed to you'}</span>
           {claimed > 0 && <span className="asset-gain"><TrendingUp size={13} /> {usd(claimed)} earnings claimed</span>}
-          {deposits.length > 0 && <span className="text-button">Open tenancy →</span>}
+          {tenancies.some((t) => t.chain) && <span className="text-button">Open tenancy →</span>}
         </article>
 
         <article className="asset-tile">
           <header><LineChart size={18} /> Stocks · Solana</header>
           <strong>{portfolio ? usd(portfolio.valueUsd) : '—'}</strong>
           <span>{portfolio ? `${portfolio.shares.toFixed(4)} tSPYx (S&P 500 copy)` : 'Loading…'}</span>
-          {portfolio && portfolio.multiplier > 1 && <span className="asset-gain"><TrendingUp size={13} /> +{((portfolio.multiplier - 1) * 100).toFixed(2)} % from distributions</span>}
+          {portfolio && portfolio.multiplier > 1 && <span className="asset-gain"><TrendingUp size={13} /> +{((portfolio.multiplier - 1) * 100).toFixed(2)} % from simulated distributions (test market)</span>}
         </article>
 
         <article className="asset-tile">
@@ -114,7 +135,7 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
             {testHelpers && (
               <button className="button test-helper" disabled={Boolean(busy)} onClick={() => run('earn', async () => {
                 const { result } = await request<{ result: { releasedAtomic: string } }>('/api/assets', { action: 'robinhood_earn' });
-                setMessage(`A Robinhood testnet deposit earned ${usd(atomicUsd(result.releasedAtomic))}, released to your wallet.`);
+                setMessage(`A Robinhood testnet deposit earned ${usd(atomicUsd(result.releasedAtomic))} of simulated yield (test tokens), released to your wallet.`);
               })}>
                 {busy === 'earn' ? <Loader2 className="spin" size={14} /> : null} Earn on Robinhood (test)
               </button>
@@ -131,10 +152,10 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
           <header><Sun size={18} /> Home solar</header>
           {solar ? (
             <>
-              <strong>{solar.valueToday !== null ? `€${solar.valueToday.toFixed(2)} today` : `${solar.powerW} W now`}</strong>
+              <strong>{solar.valueToday !== null ? `${solar.valueEstimated ? '≈ ' : ''}${money(solar.valueToday, solar.currency)} today` : `${solar.powerW} W now`}</strong>
               <span>{solar.energyTodayKwh !== null ? `${solar.energyTodayKwh} kWh today` : ''}{solar.powerW !== null ? ` · ${solar.powerW} W now` : ''}</span>
               {solar.savings && (solar.savings.month !== null || solar.savings.year !== null) && (
-                <span className="asset-gain"><TrendingUp size={13} /> {solar.savings.month !== null ? `€${solar.savings.month.toFixed(2)} this month` : ''}{solar.savings.month !== null && solar.savings.year !== null ? ' · ' : ''}{solar.savings.year !== null ? `€${solar.savings.year.toFixed(2)} this year` : ''}</span>
+                <span className="asset-gain"><TrendingUp size={13} /> {solar.savings.month !== null ? `${money(solar.savings.month, solar.currency)} this month` : ''}{solar.savings.month !== null && solar.savings.year !== null ? ' · ' : ''}{solar.savings.year !== null ? `${money(solar.savings.year, solar.currency)} this year` : ''}</span>
               )}
               <span className="small-copy">via Home Assistant · {solar.entity}</span>
             </>

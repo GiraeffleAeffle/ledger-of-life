@@ -355,7 +355,7 @@ function TenancyCard({ journey, request, reload, openConnections, helper, helper
           <div>
             <span className="eyebrow">YOUR DEPOSIT EARNINGS</span>
             <strong>{money(chain.claimableAtomic)} ready to claim</strong>
-            <span className="small-copy">Already claimed: {money(chain.releasedAtomic)}. The deposit itself stays locked; only what it earns is yours now.</span>
+            <span className="small-copy">Already claimed: {money(chain.releasedAtomic)}. The deposit itself stays locked; only what it earns is yours now. On devnet, earnings are simulated interest in test tokens.</span>
           </div>
           <div className="button-row">
             <button className="button primary" disabled={busy || BigInt(chain.claimableAtomic) === 0n}
@@ -642,7 +642,7 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
       <dl className="journey-facts">
         <div><dt>tSPYx (S&amp;P 500 copy)</dt><dd>{view.shares.toFixed(6)} shares</dd></div>
         <div><dt>Value at live SPYx price</dt><dd>${view.valueUsd.toFixed(2)}</dd></div>
-        <div><dt>Distributions so far</dt><dd>{((view.multiplier - 1) * 100).toFixed(2)} %</dd></div>
+        <div><dt>Simulated distributions so far</dt><dd>{((view.multiplier - 1) * 100).toFixed(2)} %</dd></div>
         <div><dt>Test USDC available</dt><dd>{money(view.testUsdcAtomic)}</dd></div>
       </dl>
       <p className="small-copy">
