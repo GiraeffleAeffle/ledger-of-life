@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -30,6 +30,7 @@ import {
   type OperationKind,
   type WorkspaceState,
 } from '@/domain/workflow';
+import { AREAS, areaLabel, type Area } from './areas';
 import { Neighborhood } from './neighborhood';
 import { HoldingsShowcase } from './holdings-showcase';
 import {
@@ -74,8 +75,8 @@ export function Workspace() {
   const [confirmation, setConfirmation] = useState<FinancialOperation | null>(null);
   const [showProjection, setShowProjection] = useState(false);
   const [connections, setConnections] = useState<ReactNode>(null);
-  const [home, setHome] = useState<ReactNode>(null);
-  const main = useRef<HTMLElement>(null);
+  const [area, setArea] = useState<Area>('overview');
+  const [HomeView, setHomeView] = useState<typeof import('./home').MyHome | null>(null);
   const totals = state ? summary(state) : null;
 
   useEffect(() => {
@@ -98,9 +99,8 @@ export function Workspace() {
       import('./connections').then((module) => setConnections(<module.Connections />));
   }, [view, connections]);
   useEffect(() => {
-    if (view === 'home' && !home)
-      import('./home').then((module) => setHome(<module.MyHome openConnections={() => setView('connections')} openDemo={() => setView('overview')} />));
-  }, [view, home]);
+    if (view === 'home' && !HomeView) import('./home').then((module) => setHomeView(() => module.MyHome));
+  }, [view, HomeView]);
 
   async function refresh() {
     if (state) {
@@ -149,7 +149,11 @@ export function Workspace() {
   function navigate(next: View) {
     setView(next);
     setNotice('');
-    main.current?.scrollIntoView({ block: 'start' });
+    document.getElementById('main')?.scrollIntoView({ block: 'start' });
+  }
+  function openArea(next: Area) {
+    setArea(next);
+    navigate('home');
   }
   const plan = (kind: OperationKind, amount?: string) => command({ type: 'plan', kind, amount });
   const demoView = view !== 'home' && view !== 'connections';
@@ -212,14 +216,17 @@ export function Workspace() {
           </span>
         </button>
         <nav aria-label="Your account">
-          <button
-            className={`nav-item ${view === 'home' ? 'selected' : ''}`}
-            aria-current={view === 'home' ? 'page' : undefined}
-            onClick={() => navigate('home')}
-          >
-            <House size={18} />
-            My home
-          </button>
+          {AREAS.map((item) => (
+            <button
+              key={item.id}
+              className={`nav-item ${view === 'home' && area === item.id ? 'selected' : ''}`}
+              aria-current={view === 'home' && area === item.id ? 'page' : undefined}
+              onClick={() => openArea(item.id)}
+            >
+              <item.icon size={18} />
+              {item.label}
+            </button>
+          ))}
         </nav>
         <span className="nav-caption">{demoView ? 'DEMO · MADE-UP PEOPLE' : 'EXPLORE'}</span>
         {demoView && (
@@ -272,7 +279,7 @@ export function Workspace() {
             Connections & proof
           </button>
           <div className="sidebar-foot">
-            Built around your next chapter.<span>Brand name to come.</span>
+            Everything that is yours,<span>in one place.</span>
           </div>
         </div>
       </aside>
@@ -284,7 +291,7 @@ export function Workspace() {
                 <ShieldCheck size={16} />
                 <span>Account</span>
                 <ChevronRight size={14} />
-                <strong>{view === 'home' ? 'My home' : 'Connected proof'}</strong>
+                <strong>{view === 'home' ? areaLabel(area) : 'Connected proof'}</strong>
               </>
             ) : (
               <>
@@ -308,7 +315,7 @@ export function Workspace() {
             </div>
           )}
         </header>
-        <main id="main" ref={main} className="main-content">
+        <main id="main" className="main-content">
           {view !== 'connections' && view !== 'home' && (
             <div className="demo-toolbar">
               <span>
@@ -762,7 +769,9 @@ export function Workspace() {
               )}
             </>
           )}
-          {view === 'home' && (home || <section className="card"><h1>Loading your home…</h1></section>)}
+          {view === 'home' && (HomeView
+            ? <HomeView area={area} go={openArea} openConnections={() => setView('connections')} openDemo={() => setView('overview')} />
+            : <section className="card"><h1>Loading…</h1></section>)}
           {view === 'connections' &&
             (connections || (
               <section className="card">
@@ -782,11 +791,17 @@ export function Workspace() {
           )}
         </main>
         <nav className="mobile-nav" aria-label="Mobile navigation">
-          <button aria-current={view === 'home' ? 'page' : undefined} onClick={() => navigate('home')}>
+          {!demoView && AREAS.filter((a) => a.id !== 'ideas').map((item) => (
+            <button key={item.id} aria-current={view === 'home' && area === item.id ? 'page' : undefined} onClick={() => openArea(item.id)}>
+              <item.icon size={19} />
+              <span>{item.label}</span>
+            </button>
+          ))}
+          {demoView && <button onClick={() => openArea('overview')}>
             <House size={19} />
-            <span>My home</span>
-          </button>
-          {nav.slice(0, 3).map((item) => (
+            <span>My overview</span>
+          </button>}
+          {demoView && nav.slice(0, 3).map((item) => (
             <button
               key={item.id}
               aria-current={view === item.id ? 'page' : undefined}
@@ -804,14 +819,13 @@ export function Workspace() {
               </span>
             </button>
           ))}
-          <button
-            aria-current={view === 'connections' ? 'page' : undefined}
+          {demoView && <button
             aria-label="Account and connections"
             onClick={() => navigate('connections')}
           >
             <Link2 size={19} />
             <span>Account</span>
-          </button>
+          </button>}
         </nav>
       </div>
       <ConfirmOperation

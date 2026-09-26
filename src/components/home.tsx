@@ -3,6 +3,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, Copy, Home as HomeIcon, Loader2, Plus } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
 import { AssetsOverview } from './assets';
+import { AREAS, type Area } from './areas';
+import { CityCard } from './city';
+import { IdentityStrip } from './identity';
+import { IdeasArea, PlannedHere } from './ideas';
+import { MeArea } from './me';
 import { AccountSetup, RoleIntro, RolePicker, useChosenRole, type ChosenRole } from './onboarding';
 import { parseAmount } from '@/domain/assets';
 import type { JourneyStage, TenancyJourney } from '@/server/journey';
@@ -54,7 +59,7 @@ function useAuthorizedRequest(): Request {
   }, [wallet]) as Request;
 }
 
-export function MyHome({ openConnections, openDemo }: { openConnections: () => void; openDemo: () => void }) {
+export function MyHome({ area, go, openConnections, openDemo }: { area: Area; go: (area: Area) => void; openConnections: () => void; openDemo: () => void }) {
   const wallet = useRentalWallet();
   const [role, choose] = useChosenRole();
   const [readyFor, setReadyFor] = useState<string | null>(null);
@@ -63,10 +68,10 @@ export function MyHome({ openConnections, openDemo }: { openConnections: () => v
   if (!role) return <RolePicker onPick={choose} onDemo={openDemo} />;
   if (!wallet.authenticated || readyFor !== wallet.subject)
     return <AccountSetup key={wallet.subject ?? 'signed-out'} role={role} authorized={request} onChangeRole={() => choose(null)} onReady={markReady} />;
-  return <SignedInHome key={wallet.subject} role={role} onChangeRole={() => choose(null)} openConnections={openConnections} />;
+  return <SignedInHome key={wallet.subject} area={area} go={go} role={role} onChangeRole={() => choose(null)} openConnections={openConnections} />;
 }
 
-function SignedInHome({ role, onChangeRole, openConnections }: { role: ChosenRole; onChangeRole: () => void; openConnections: () => void }) {
+function SignedInHome({ area, go, role, onChangeRole, openConnections }: { area: Area; go: (area: Area) => void; role: ChosenRole; onChangeRole: () => void; openConnections: () => void }) {
   const wallet = useRentalWallet();
   const [tenancies, setTenancies] = useState<(TenancyJourney | Unavailable)[] | null>(null);
   const [listings, setListings] = useState<PublicListing[]>([]);
@@ -131,40 +136,111 @@ function SignedInHome({ role, onChangeRole, openConnections }: { role: ChosenRol
       }
     : null;
   const invitation = typeof window !== 'undefined' ? new URLSearchParams(window.location.hash.slice(1)).get('invitation') : null;
+  const ready = (tenancies ?? []).filter((t): t is TenancyJourney => !('unavailable' in t));
+  const heading: Record<Area, string> = {
+    overview: 'Your overview',
+    me: 'Me',
+    home: role === 'landlord' ? 'Your homes' : role === 'arbitrator' ? 'Your cases' : 'Your home',
+    money: 'Money',
+    places: 'Places',
+    ideas: 'Ideas',
+  };
+  const meta = AREAS.find((a) => a.id === area)!;
   return (
     <div className="home">
       <div className="page-heading">
         <div>
-          <span className="eyebrow">{ROLE_LABEL[role]} · SOLANA TEST NETWORK</span>
-          <h1>{role === 'landlord' ? 'Your homes' : role === 'arbitrator' ? 'Your cases' : 'Your home'}</h1>
-          <p>One next step at a time. Test USDC only. <button className="text-button" onClick={onChangeRole}>Change role</button></p>
+          <span className="eyebrow">{ROLE_LABEL[role]} · TEST NETWORKS</span>
+          <h1>{heading[area]}</h1>
+          <p>{meta.question}</p>
         </div>
       </div>
-      {role !== 'arbitrator' && tenancies !== null && (
-        <AssetsOverview request={request} tenancies={tenancies.filter((t): t is TenancyJourney => !('unavailable' in t))} testHelpers={helpers} />
-      )}
-      <RoleIntro role={role} solanaAddress={wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? null} testUsdcAtomic={usdc} />
       {error && <p className="note" role="alert">{error}</p>}
-      {helpers && helperLog && (
+      {helpers && helperLog && (area === 'home' || area === 'overview') && (
         <p className="test-helper-note">
           {helperBusy && <Loader2 className="spin" size={14} />} {helperLog}
         </p>
       )}
-      {invitation && <JoinInvitation request={request} encoded={invitation} onDone={load} />}
-      {tenancies === null ? (
-        <section className="card"><Loader2 className="spin" size={18} /> Loading…</section>
-      ) : (
-        tenancies.map((t) =>
-          'unavailable' in t ? (
-            <section className="card" key={t.agreementId}><h2>{t.property}</h2><p className="note">{t.unavailable}</p></section>
-          ) : (
-            <TenancyCard key={t.agreementId} journey={t} request={request} reload={load} openConnections={openConnections} helper={helper} helperBusy={helperBusy} />
-          ),
-        )
+
+      {area === 'overview' && (
+        <div className="overview-grid">
+          <NextStepSummary tenancies={tenancies} role={role} go={go} />
+          <IdentityStrip request={request} compact onOpen={() => go('me')} />
+          {role !== 'arbitrator' && tenancies !== null && <AssetsOverview request={request} tenancies={ready} testHelpers={helpers} show="summary" go={go} />}
+          <CityCard request={request} compact onOpen={() => go('places')} />
+        </div>
       )}
-      {role !== 'arbitrator' && <Homes role={role} listings={listings} request={request} reload={load} helper={helper} helperBusy={helperBusy} />}
-      {role !== 'arbitrator' && <Portfolio request={request} onBalance={setUsdc} />}
+
+      {area === 'me' && (
+        <>
+          <MeArea request={request} role={ROLE_LABEL[role].toLowerCase()} tenancies={ready} onChangeRole={onChangeRole} go={go} openConnections={openConnections} />
+          <PlannedHere area="me" go={go} />
+        </>
+      )}
+
+      {area === 'home' && (
+        <>
+          <RoleIntro role={role} solanaAddress={wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? null} testUsdcAtomic={usdc} />
+          {invitation && <JoinInvitation request={request} encoded={invitation} onDone={load} />}
+          {tenancies === null ? (
+            <section className="card"><Loader2 className="spin" size={18} /> Loading…</section>
+          ) : (
+            tenancies.map((t) =>
+              'unavailable' in t ? (
+                <section className="card" key={t.agreementId}><h2>{t.property}</h2><p className="note">{t.unavailable}</p></section>
+              ) : (
+                <TenancyCard key={t.agreementId} journey={t} request={request} reload={load} openConnections={openConnections} helper={helper} helperBusy={helperBusy} />
+              ),
+            )
+          )}
+          {role !== 'arbitrator' && <Homes role={role} listings={listings} request={request} reload={load} helper={helper} helperBusy={helperBusy} />}
+          {role !== 'arbitrator' && tenancies !== null && <AssetsOverview request={request} tenancies={ready} testHelpers={helpers} show="home" go={go} />}
+          <PlannedHere area="home" go={go} />
+        </>
+      )}
+
+      {area === 'money' && (
+        <>
+          {tenancies !== null && <AssetsOverview request={request} tenancies={ready} testHelpers={helpers} show="money" go={go} />}
+          <Portfolio request={request} onBalance={setUsdc} />
+          <PlannedHere area="money" go={go} />
+        </>
+      )}
+
+      {area === 'places' && (
+        <>
+          <CityCard request={request} />
+          <PlannedHere area="places" go={go} />
+        </>
+      )}
+
+      {area === 'ideas' && <IdeasArea />}
     </div>
+  );
+}
+
+/** The single most useful thing to do now, across all tenancies. */
+function NextStepSummary({ tenancies, role, go }: { tenancies: (TenancyJourney | Unavailable)[] | null; role: ChosenRole; go: (area: Area) => void }) {
+  const ready = (tenancies ?? []).filter((t): t is TenancyJourney => !('unavailable' in t));
+  const actionable = ready.find((t) => !AUTO[t.next.kind] && t.next.kind !== 'done');
+  const waiting = ready.find((t) => AUTO[t.next.kind]);
+  const pick = actionable ?? waiting;
+  return (
+    <section className="card overview-tile next clickable" onClick={() => go('home')}>
+      <span className="eyebrow">YOUR NEXT STEP</span>
+      {tenancies === null ? <Loader2 className="spin" size={18} /> : pick ? (
+        <>
+          <strong className="overview-figure small">{pick.next.label}</strong>
+          <span className="small-copy">{pick.property}{actionable ? '' : ' · nothing for you to do right now'}</span>
+        </>
+      ) : (
+        <>
+          <strong className="overview-figure small">{role === 'landlord' ? 'List a home' : role === 'arbitrator' ? 'No open cases' : 'Find a home'}</strong>
+          <span className="small-copy">{role === 'tenant' ? 'Apply for a listed home; the deposit then earns for you.' : ''}</span>
+        </>
+      )}
+      <span className="text-button">Open Home →</span>
+    </section>
   );
 }
 

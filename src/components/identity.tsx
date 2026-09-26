@@ -6,7 +6,7 @@ import type { IdentityStatus } from '@/server/eudi';
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 
 /** Identity header of the portfolio: passkey sign-in plus an optional EU Digital Identity Wallet check. */
-export function IdentityStrip({ request }: { request: Request }) {
+export function IdentityStrip({ request, compact, onOpen }: { request: Request; compact?: boolean; onOpen?: () => void }) {
   const [status, setStatus] = useState<IdentityStatus | null>(null);
   const [offer, setOffer] = useState<{ walletLink: string; qr: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -51,6 +51,17 @@ export function IdentityStrip({ request }: { request: Request }) {
   }
 
   const verified = status?.state === 'verified' ? status.statement : null;
+  if (compact)
+    return (
+      <button className={`identity-strip compact${verified ? ' verified' : ''}`} onClick={onOpen}>
+        {verified ? <BadgeCheck size={18} /> : <Fingerprint size={18} />}
+        <span className="identity-copy">
+          <strong>{verified ? `Verified adult${verified.city ? ` · ${verified.city}` : ''}` : 'Signed in with passkey'}</strong>
+          <span>{verified ? 'EU Digital Identity Wallet (test)' : 'Verify with your EU identity wallet in Me'}</span>
+        </span>
+        <span className="text-button">Open Me →</span>
+      </button>
+    );
   return (
     <div className={`identity-strip${verified ? ' verified' : ''}`}>
       {verified ? <BadgeCheck size={20} /> : <Fingerprint size={18} />}

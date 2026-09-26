@@ -107,7 +107,7 @@ person; matching happens on the device or with explicit consent.
 - Built features and roadmap ideas sit side by side with the same visual weight.
 - Two portfolio views exist (the Portfolio tiles and the "Invest · stocks on Solana" card).
 
-### Proposed structure
+### Structure (built 2026-09-26)
 
 | Navigation item | Contains | Moves from |
 |---|---|---|
@@ -118,9 +118,11 @@ person; matching happens on the device or with explicit consent.
 | **Places** | My city (atlas projects, consultations, later budget), then wider scales | City card |
 | **Ideas** (or "Coming") | Roadmap items, clearly separate and labeled | Dashed roadmap tiles |
 
-The legacy sidebar views (Claims & settlement, Shared records, Activity) become parts of the tenancy
-detail inside **Home**; the old demo moves out of the signed-in navigation. Test helpers stay, grouped in one
-"Test tools" panel shown only in test mode.
+Built: the sidebar and the mobile tab bar show these areas; each renders only its own content, and planned
+items appear in a dashed "Planned in this area · not built yet" box that links to **Ideas** (one list in
+`src/components/ideas.tsx`). The old demo with made-up people sits under "Explore", outside the signed-in
+areas. Still open: folding the legacy demo views (Claims & settlement, Shared records, Activity) into the
+tenancy detail, and one "Test tools" panel instead of test buttons inside the tenancy card.
 
 ## 4. Adapters: one contract, then a decision
 
@@ -173,9 +175,17 @@ Today each connection is built differently (`adapters.ts`, `eudi.ts`, `city.ts`,
 4. City budget via the Stadtstack atlas.
 5. Service charges, then local investments.
 
-## 5. Open decisions
+## 5. Decisions (2026-09-26)
 
-- Does the pitch need both chains, or is one the main path and the other a side note?
-- Is "Places" part of this app, or does the app hand over to the Stadtstack portal for anything beyond the city card?
-- Which city partner (Strausberg?) could provide budget data, a welcome voucher and club listings?
-- Which licensed partner, if any, for local investments after the hackathon?
+- **Networks:** keep both Solana and Robinhood Chain for now; per feature, use whichever is easier to integrate.
+- **Places lives in this app.** Its data comes from open data and the Stadtstack protocol (atlas read model),
+  not from anything this app collects itself.
+- **Approach:** show the whole organisation, how it would work and what it enables, clearly labeled as
+  planned; then build it step by step.
+
+Still to research:
+
+- City budget data: what Strausberg, Brandenburg and other cities publish (Haushalt, Finanzausgleich), in
+  which format, and how it enters the Stadtstack protocol.
+- Newcomer welcome: which cities or clubs would offer listings or a welcome voucher (idea stage).
+- A licensed partner for local investments (cooperatives, eWpG registers, ECSPR platforms).

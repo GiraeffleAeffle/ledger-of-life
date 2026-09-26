@@ -7,7 +7,7 @@ type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Pr
 const date = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('de-DE');
 
 /** What is happening in the person's city, read from the Stadtstack project atlas. */
-export function CityCard({ request }: { request: Request }) {
+export function CityCard({ request, compact, onOpen }: { request: Request; compact?: boolean; onOpen?: () => void }) {
   const [city, setCity] = useState<CityResult | null>(null);
   const [draft, setDraft] = useState('Strausberg');
   const [busy, setBusy] = useState(false);
@@ -33,6 +33,24 @@ export function CityCard({ request }: { request: Request }) {
   }
 
   if (!city) return <section className="city-card"><Loader2 className="spin" size={16} /></section>;
+  if (compact)
+    return (
+      <section className="card overview-tile clickable" onClick={onOpen}>
+        <span className="eyebrow">PLACES</span>
+        {city.available ? (
+          <>
+            <strong className="overview-figure small">{city.name}</strong>
+            <span className="small-copy">
+              {city.projectCount} projects · {city.openConsultations.length ? `${city.openConsultations.length} open for your say` : 'no consultation open right now'}
+              {city.recent[0] ? ` · latest: ${city.recent[0].title}` : ''}
+            </span>
+          </>
+        ) : (
+          <span className="small-copy">{city.reason === 'choose' ? 'Choose your city to see what is changing there.' : city.reason}</span>
+        )}
+        <span className="text-button">Open Places →</span>
+      </section>
+    );
   const picker = (
     <form className="city-picker" onSubmit={choose}>
       <input value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="Your city" />

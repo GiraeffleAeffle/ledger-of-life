@@ -1,13 +1,12 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowRight, Car, Cpu, Receipt, Users, Home as HomeIcon, KeyRound, LineChart, Loader2, Sun, TrendingUp } from 'lucide-react';
+import { ArrowRight, Cpu, KeyRound, LineChart, Loader2, Sun, TrendingUp } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
 import type { TenancyJourney } from '@/server/journey';
 import type { PortfolioView } from '@/server/portfolio';
 import type { PublicAdapterConfig, SolarReading, ValidatorReading } from '@/server/adapters';
 import type { RobinhoodHoldings } from '@/server/robinhood-demo';
-import { IdentityStrip } from './identity';
-import { CityCard } from './city';
+import type { Area } from './areas';
 
 type Settled<T> = { ok: true; value: T } | { ok: false; error: string } | null;
 type AssetsResponse = { robinhood: Settled<RobinhoodHoldings>; solar: Settled<SolarReading>; validator: Settled<ValidatorReading>; adapters: PublicAdapterConfig };
@@ -31,7 +30,13 @@ function entitlementUsd(role: TenancyJourney['role'], c: Chain): number {
   return 0;
 }
 
-export function AssetsOverview({ request, tenancies, testHelpers }: { request: Request; tenancies: TenancyJourney[]; testHelpers: boolean }) {
+/**
+ * Holdings and read-only adapters, rendered per area: Money shows the total and every holding,
+ * Home shows home energy, Overview shows a short summary that opens Money.
+ */
+export function AssetsOverview({ request, tenancies, testHelpers, show, go }: {
+  request: Request; tenancies: TenancyJourney[]; testHelpers: boolean; show: 'money' | 'home' | 'summary'; go: (area: Area) => void;
+}) {
   const wallet = useRentalWallet();
   const [assets, setAssets] = useState<AssetsResponse | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioView | null>(null);
@@ -99,27 +104,43 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
   const validator = assets?.validator?.ok ? assets.validator.value : null;
   const total = locked + (portfolio ? portfolio.valueUsd + atomicUsd(portfolio.testUsdcAtomic) : 0) + (rh ? rh.tslaValueUsd + atomicUsd(rh.testUsdAtomic) : 0);
 
+  if (show === 'summary')
+    return (
+      <section className="card overview-tile clickable" onClick={() => go('money')}>
+        <span className="eyebrow">MONEY · TEST NETWORKS</span>
+        <strong className="overview-figure">{assets ? usd(total) : <Loader2 className="spin" size={20} />}</strong>
+        <span className="small-copy">
+          Deposit {usd(locked)} · stocks {usd((portfolio?.valueUsd ?? 0) + (rh?.tslaValueUsd ?? 0))}
+          {validator ? ` · validator ${validator.stake.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${validator.unit}` : ''}
+        </span>
+        <span className="text-button">Open Money →</span>
+      </section>
+    );
+
   return (
-    <section className="card assets">
-      <IdentityStrip request={request} />
-      <CityCard request={request} />
-      <div className="assets-head">
-        <div>
-          <span className="eyebrow">PORTFOLIO · TEST NETWORKS</span>
-          <h2>{assets ? usd(total) : <Loader2 className="spin" size={20} />}</h2>
-          <p className="small-copy">Your home, deposits, stocks and what your hardware earns, in one place. Test assets have no real value.</p>
+    <section className={`card assets ${show}`}>
+      {show === 'money' ? (
+        <div className="assets-head">
+          <div>
+            <span className="eyebrow">EVERYTHING YOU OWN · TEST NETWORKS</span>
+            <h2>{assets ? usd(total) : <Loader2 className="spin" size={20} />}</h2>
+            <p className="small-copy">Your deposit, stocks and what your hardware earns. Test assets have no real value.</p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="assets-head"><div><span className="eyebrow">HOME ENERGY · READ-ONLY</span></div></div>
+      )}
       {message && <p className="note" role="status">{message}</p>}
       <div className="asset-grid">
-        <article className="asset-tile clickable" onClick={() => document.querySelector('.tenancy-card')?.scrollIntoView({ behavior: 'smooth' })}>
+        {show === 'money' && <>
+        <article className="asset-tile clickable" onClick={() => go('home')}>
           <header><KeyRound size={18} /> Rental home & deposit</header>
           <strong>{usd(locked)}</strong>
           <span>{entitled.length === 0 ? 'No active deposit' : asTenant === entitled.length
             ? `Your deposit for ${asTenant} home${asTenant > 1 ? 's' : ''}, earning in lending`
             : 'Your deposits plus approved claims and payouts owed to you'}</span>
           {claimed > 0 && <span className="asset-gain"><TrendingUp size={13} /> {usd(claimed)} earnings claimed</span>}
-          {tenancies.some((t) => t.chain) && <span className="text-button">Open tenancy →</span>}
+          {tenancies.some((t) => t.chain) && <span className="text-button">Open in Home →</span>}
         </article>
 
         <article className="asset-tile">
@@ -149,7 +170,9 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
             )}
           </div>
         </article>
+        </>}
 
+        {show === 'home' && (
         <article className="asset-tile">
           <header><Sun size={18} /> Home solar</header>
           {solar ? (
@@ -181,7 +204,9 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
             </form>
           )}
         </article>
+        )}
 
+        {show === 'money' && (
         <article className="asset-tile">
           <header><Cpu size={18} /> Validator</header>
           {validator ? (
@@ -208,13 +233,7 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
             </form>
           )}
         </article>
-      </div>
-      <div className="roadmap-tiles">
-        <div><HomeIcon size={16} /><span><strong>Stocks as your deposit</strong> Secure a flat with 150 % in shares instead of cash. Prototype live on Robinhood testnet.</span></div>
-        <div><HomeIcon size={16} /><span><strong>Home tokens → your own home</strong> Collect shares of homes; they count toward buying one.</span></div>
-        <div><Car size={16} /><span><strong>Electric car</strong> Charging and vehicle-to-grid income as another adapter.</span></div>
-        <div><Receipt size={16} /><span><strong>Real-time service charges</strong> Prepayments in escrow, live consumption, surplus released monthly instead of yearly.</span></div>
-        <div><Users size={16} /><span><strong>Every part of your life</strong> Work, health, mobility, family, learning, clubs, your building, your city: each with your role, what is decided and what you own there.</span></div>
+        )}
       </div>
     </section>
   );
