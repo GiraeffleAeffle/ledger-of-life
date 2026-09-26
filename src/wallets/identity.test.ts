@@ -208,3 +208,60 @@ test('a missing wallet observation is unavailable, never an empty success', asyn
     (error) => error instanceof IdentityError && error.code === 'identity_unavailable',
   );
 });
+
+test('simultaneous area requests share verified identity until the short ownership window ends', async () => {
+  let clock = Date.now();
+  let reads = 0;
+  const { dependencies } = fixture();
+  const verify = createIdentityVerifier({
+    ...dependencies,
+    now: () => clock,
+    getUser: async (id) => {
+      reads++;
+      return dependencies.getUser(id);
+    },
+  });
+  const token = accessToken();
+  const identities = await Promise.all(Array.from({ length: 12 }, () => verify(token)));
+  assert.equal(reads, 1);
+  assert.ok(identities.every((identity) => identity === identities[0]));
+  clock += 30_001;
+  await verify(token);
+  assert.equal(reads, 2);
+});
+
+test('provider failure is not cached, and refreshed ownership cannot outlive the cache window', async () => {
+  let clock = Date.now();
+  let unavailable = true;
+  let otherSigner = false;
+  const { dependencies } = fixture();
+  const verify = createIdentityVerifier({
+    ...dependencies,
+    now: () => clock,
+    getUser: async (id) => {
+      if (unavailable) throw new Error('provider offline');
+      return dependencies.getUser(id);
+    },
+    getWallet: async (id) => ({
+      ...(await dependencies.getWallet(id)),
+      additional_signers: otherSigner ? [{ signer_id: 'foreign' }] : [],
+    }),
+  });
+  const token = accessToken();
+  await assert.rejects(verify(token), { code: 'identity_unavailable' });
+  unavailable = false;
+  await verify(token);
+  otherSigner = true;
+  clock += 30_001;
+  await assert.rejects(verify(token), { code: 'wallet_not_user_owned' });
+});
+
+test('a cached identity stops at the access token expiration', async () => {
+  let clock = Date.now();
+  const { dependencies } = fixture();
+  const verify = createIdentityVerifier({ ...dependencies, now: () => clock });
+  const token = accessToken({ exp: Math.floor(clock / 1000) + 30 });
+  await verify(token);
+  clock += 31_000;
+  await assert.rejects(verify(token), { code: 'unauthenticated' });
+});

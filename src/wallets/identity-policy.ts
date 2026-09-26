@@ -72,7 +72,8 @@ const backupAccountTypes = new Set(['email', 'google_oauth', 'apple_oauth']);
 
 /** Only provider-verified identity enters here; application roles stay in our database. */
 export function createIdentityVerifier(dependencies: IdentityVerificationDependencies) {
-  return async (token: string): Promise<VerifiedIdentity> => {
+  const verified = new Map<string, { until: number; result: Promise<VerifiedIdentity> }>();
+  const verify = async (token: string): Promise<VerifiedIdentity> => {
     if (!token || token.length > 16_384 || /\s/.test(token)) {
       throw new IdentityError('unauthenticated', 'Sign in to continue.');
     }
@@ -201,5 +202,25 @@ export function createIdentityVerifier(dependencies: IdentityVerificationDepende
         backupAccountTypes.has(account.type),
       ),
     };
+  };
+  // One provider read for simultaneous area requests. A short, positive-only
+  // window limits stale ownership after a wallet or account is changed.
+  return (token: string): Promise<VerifiedIdentity> => {
+    const now = dependencies.now?.() ?? Date.now();
+    const cached = verified.get(token);
+    if (cached && cached.until > now) return cached.result;
+    if (cached) verified.delete(token);
+    const result = verify(token);
+    const entry = { until: now + 30_000, result };
+    verified.set(token, entry);
+    if (verified.size > 128) verified.delete(verified.keys().next().value!);
+    void result.then(
+      (identity) => {
+        if (verified.get(token) === entry)
+          entry.until = Math.min(identity.expiresAt * 1000, (dependencies.now?.() ?? Date.now()) + 30_000);
+      },
+      () => { if (verified.get(token) === entry) verified.delete(token); },
+    );
+    return result;
   };
 }

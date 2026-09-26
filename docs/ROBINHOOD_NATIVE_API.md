@@ -70,8 +70,10 @@ coordinate external use of the same key. No such key has been configured here.
 
 All routes run in the Node runtime. Requests require
 `Authorization: Bearer <Privy access token>`. The server verifies the token and
-current provider wallet ownership, then matches the EVM wallet to an immutable
-tenant, landlord or arbitrator address. Mutating requests also require the
+provider wallet ownership, then matches the EVM wallet to an immutable tenant,
+landlord or arbitrator address. Concurrent requests with the same verified
+access token share the provider check for at most 30 seconds (and never past
+token expiry); failed checks are not cached. Mutating requests also require the
 application Origin and `Content-Type: application/json`. Responses are `no-store`.
 There is no demonstration-cookie authorization on these routes.
 
