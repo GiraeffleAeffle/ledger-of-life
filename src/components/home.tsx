@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, Copy, Home as HomeIcon, Loader2, Plus } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
+import { AssetsOverview } from './assets';
 import { AccountSetup, RoleIntro, RolePicker, useChosenRole, type ChosenRole } from './onboarding';
 import { parseAmount } from '@/domain/assets';
 import type { JourneyStage, TenancyJourney } from '@/server/journey';
@@ -139,6 +140,9 @@ function SignedInHome({ role, onChangeRole, openConnections }: { role: ChosenRol
           <p>One next step at a time. Test USDC only. <button className="text-button" onClick={onChangeRole}>Change role</button></p>
         </div>
       </div>
+      {role !== 'arbitrator' && tenancies !== null && (
+        <AssetsOverview request={request} tenancies={tenancies.filter((t): t is TenancyJourney => !('unavailable' in t))} testHelpers={helpers} />
+      )}
       <RoleIntro role={role} solanaAddress={wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? null} testUsdcAtomic={usdc} />
       {error && <p className="note" role="alert">{error}</p>}
       {helpers && helperLog && (

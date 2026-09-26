@@ -2989,3 +2989,18 @@ dd {
 .earnings-panel { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 16px; background: linear-gradient(135deg, #f1f8ee, #fdf6e3); border: 1px solid rgba(31, 122, 77, 0.18); }
 .earnings-panel > div:first-child { display: grid; gap: 4px; }
 .earnings-panel strong { font-size: 1.35rem; }
+
+/* Everything you own */
+.assets { display: grid; gap: 16px; background: linear-gradient(160deg, #ffffff, #f4f8f1); }
+.assets-head h2 { margin: 4px 0; font-size: 2.2rem; letter-spacing: -0.02em; }
+.asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.asset-tile { display: grid; align-content: start; gap: 6px; padding: 16px; border-radius: 16px; background: white; border: 1px solid rgba(0, 0, 0, 0.07); min-width: 0; }
+.asset-tile header { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #4d5a45; }
+.asset-tile strong { font-size: 1.35rem; }
+.asset-tile > span { font-size: 0.85rem; opacity: 0.8; overflow-wrap: anywhere; }
+.asset-tile .asset-gain { display: inline-flex; align-items: center; gap: 4px; color: #1f7a4d; font-weight: 600; opacity: 1; }
+.asset-tile .text-button { justify-self: start; }
+.asset-tile .button-row { flex-wrap: wrap; }
+.roadmap-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.roadmap-tiles > div { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; border: 1px dashed rgba(0, 0, 0, 0.15); font-size: 0.82rem; opacity: 0.85; }
+.roadmap-tiles strong { display: block; margin-bottom: 2px; }
