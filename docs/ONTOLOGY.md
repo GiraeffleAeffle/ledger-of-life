@@ -6,13 +6,15 @@ The machine-readable source of truth is [`ontology.yaml`](ontology.yaml). This p
 
 **Positioning (decided 2026-09-26).** A household-ownership app. Your verified identity is the root, and everything you own, rent or run attaches to it through adapters. The rental deposit is the first and most complete building block.
 
+**Bigger picture.** Part of [Stadtstack](https://stadtstack.giraeffleaeffle.chatgpt.site): one verified identity, many contexts (tenancy, club, house community, city). Each context gives the person roles, a feed of what is decided, and what they own there. The tenancy is the first context that is built.
+
 **The app in one sentence.** A home-centred app that shows everything you own. It secures rental deposits in escrows that earn, lets tenants claim and invest those earnings, and connects the other things a household owns that produce value.
 
 ## Six layers
 
 | Layer | Question it answers | Concepts |
 | --- | --- | --- |
-| 1. Identity | Who is acting, with which keys, and what may others learn? | Person, Wallet, IdentityAssurance, Credential, DisclosurePolicy |
+| 1. Identity | Who is acting, with which keys, in which contexts, and what may others learn? | Person, Wallet, IdentityAssurance, Credential, DisclosurePolicy, Context, Membership |
 | 2. Homes | Which home, which terms, who is involved? | Home, Listing, Application, Agreement, Role |
 | 3. Custody | Where is the deposit, and who may move it? | Escrow, Operation, Claim, Settlement, Payout |
 | 4. Earnings | What does the locked deposit earn? | YieldSource, Earnings, Release |
@@ -120,5 +122,5 @@ In each tenancy phase exactly one person has an action; everyone else sees what 
 1. **Name and positioning:** is this a deposit product with a portfolio, or a household-ownership app whose first adapter is the rental deposit?
 2. **Home shares:** which issuer or legal wrapper (a Germany-compatible security), and is "down-payment credit" enough for the vision?
 3. **Device income:** stay read-only, or pilot selling future solar or validator income (regulatory scope)?
-4. **Identity:** EUDI Wallet pilot versus German eID via a provider. The EUDI framework offers selective disclosure (SD-JWT VC, mdoc) but no zero-knowledge proofs yet; income thresholds without revealing income need them.
+4. **Identity:** EUDI Wallet ("age 18 or over" is built against the EU test verifier) versus German eID via a provider. The EUDI framework offers selective disclosure (SD-JWT VC, mdoc) but no zero-knowledge proofs yet; income thresholds without revealing income need them.
 5. **Mainnet path:** which network holds the first real deposit, and which yield source and stock venue are eligible there?

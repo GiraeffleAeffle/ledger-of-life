@@ -3005,7 +3005,16 @@ dd {
 .roadmap-tiles > div { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; border: 1px dashed rgba(0, 0, 0, 0.15); font-size: 0.82rem; opacity: 0.85; }
 .roadmap-tiles strong { display: block; margin-bottom: 2px; }
 .identity-strip { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-radius: 14px; background: #eef4ff; border: 1px solid rgba(40, 80, 160, 0.15); }
-.identity-strip div { display: grid; gap: 2px; }
+.identity-strip .identity-copy { display: grid; gap: 2px; }
 .identity-strip span { font-size: 0.82rem; opacity: 0.75; }
 .asset-tile.clickable { cursor: pointer; }
 .asset-tile.clickable:hover { border-color: #1f7a4d; }
+.identity-strip { flex-wrap: wrap; }
+.identity-strip .identity-copy { flex: 1; min-width: 220px; }
+.identity-strip.verified { background: #eaf7ef; border-color: rgba(31, 122, 77, 0.25); color: #174d33; }
+.identity-offer { position: relative; flex-basis: 100%; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; padding: 14px; margin-top: 6px; border-radius: 12px; background: #fff; border: 1px solid rgba(40, 80, 160, 0.15); }
+.identity-offer img { border-radius: 8px; image-rendering: pixelated; }
+.identity-offer ol { margin: 6px 0 8px 18px; padding: 0; font-size: 0.86rem; display: grid; gap: 3px; }
+.identity-offer > div { display: grid; gap: 4px; flex: 1; min-width: 220px; }
+.identity-offer .icon-button { position: absolute; top: 8px; right: 8px; }
+.identity-error { flex-basis: 100%; color: #a3342b; font-size: 0.85rem; }

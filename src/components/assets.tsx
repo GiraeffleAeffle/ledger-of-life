@@ -1,11 +1,12 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowRight, Car, Cpu, Fingerprint, Receipt, Home as HomeIcon, KeyRound, LineChart, Loader2, Sun, TrendingUp } from 'lucide-react';
+import { ArrowRight, Car, Cpu, Receipt, Users, Home as HomeIcon, KeyRound, LineChart, Loader2, Sun, TrendingUp } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
 import type { TenancyJourney } from '@/server/journey';
 import type { PortfolioView } from '@/server/portfolio';
 import type { PublicAdapterConfig, SolarReading, ValidatorReading } from '@/server/adapters';
 import type { RobinhoodHoldings } from '@/server/robinhood-demo';
+import { IdentityStrip } from './identity';
 
 type Settled<T> = { ok: true; value: T } | { ok: false; error: string } | null;
 type AssetsResponse = { robinhood: Settled<RobinhoodHoldings>; solar: Settled<SolarReading>; validator: Settled<ValidatorReading>; adapters: PublicAdapterConfig };
@@ -80,13 +81,7 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
 
   return (
     <section className="card assets">
-      <div className="identity-strip">
-        <Fingerprint size={18} />
-        <div>
-          <strong>Verified with passkey</strong>
-          <span>Own wallets on Solana and Robinhood Chain · EU Digital Identity Wallet: prototype, not connected</span>
-        </div>
-      </div>
+      <IdentityStrip request={request} />
       <div className="assets-head">
         <div>
           <span className="eyebrow">PORTFOLIO · TEST NETWORKS</span>
@@ -196,7 +191,7 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
         <div><HomeIcon size={16} /><span><strong>Home tokens → your own home</strong> Collect shares of homes; they count toward buying one.</span></div>
         <div><Car size={16} /><span><strong>Electric car</strong> Charging and vehicle-to-grid income as another adapter.</span></div>
         <div><Receipt size={16} /><span><strong>Real-time service charges</strong> Prepayments in escrow, live consumption, surplus released monthly instead of yearly.</span></div>
-        <div><Fingerprint size={16} /><span><strong>EU Digital Identity Wallet</strong> Verified tenant and owner identity (eIDAS 2.0).</span></div>
+        <div><Users size={16} /><span><strong>Clubs, house & city</strong> One identity, many roles: club member, house community, your city&apos;s decisions and feed.</span></div>
       </div>
     </section>
   );
