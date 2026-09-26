@@ -143,7 +143,10 @@
         "end": "2026-09-26T17:32:14.365Z"
       },
       "spatialCoverage": "bbox:13.8131843,52.5142025,14.020926,52.6035192",
-      "licence": "Mixed; see each source"
+      "licence": "Mixed; see each source",
+      "minUrl": "cities/strausberg/signals.min.geojson",
+      "fullBytes": 306554,
+      "minBytes": 150133
     },
     {
       "id": "koeln",
@@ -516,7 +519,10 @@
         "end": "2026-09-26T17:32:40.895Z"
       },
       "spatialCoverage": "bbox:6.7725303,50.8304399,7.162028,51.0849743",
-      "licence": "Mixed; see each source"
+      "licence": "Mixed; see each source",
+      "minUrl": "cities/koeln/signals.min.geojson",
+      "fullBytes": 15616443,
+      "minBytes": 6084649
     },
     {
       "id": "muenster",
@@ -719,7 +725,10 @@
         "end": "2026-09-26T17:32:51.867Z"
       },
       "spatialCoverage": "bbox:7.4737853,51.8401448,7.7743634,52.0600251",
-      "licence": "Mixed; see each source"
+      "licence": "Mixed; see each source",
+      "minUrl": "cities/muenster/signals.min.geojson",
+      "fullBytes": 11226387,
+      "minBytes": 2358367
     },
     {
       "id": "wuppertal",
@@ -872,7 +881,10 @@
         "end": "2026-09-26T17:33:23.372Z"
       },
       "spatialCoverage": "bbox:7.0140725,51.1657181,7.31343,51.3180951",
-      "licence": "Mixed; see each source"
+      "licence": "Mixed; see each source",
+      "minUrl": "cities/wuppertal/signals.min.geojson",
+      "fullBytes": 3144526,
+      "minBytes": 1677262
     },
     {
       "id": "castrop-rauxel",
@@ -1055,7 +1067,10 @@
         "end": "2026-09-26T17:35:02.615Z"
       },
       "spatialCoverage": "bbox:7.2424932,51.5202054,7.3718796,51.6262817",
-      "licence": "Mixed; see each source"
+      "licence": "Mixed; see each source",
+      "minUrl": "cities/castrop-rauxel/signals.min.geojson",
+      "fullBytes": 672225,
+      "minBytes": 356857
     },
     {
       "id": "duesseldorf",
@@ -1308,7 +1323,10 @@
         "end": "2026-09-26T17:35:10.507Z"
       },
       "spatialCoverage": "bbox:6.6888147,51.1243747,6.9399324,51.3524872",
-      "licence": "Mixed; see each source"
+      "licence": "Mixed; see each source",
+      "minUrl": "cities/duesseldorf/signals.min.geojson",
+      "fullBytes": 4297700,
+      "minBytes": 2256975
     },
     {
       "id": "dresden",
@@ -1441,7 +1459,10 @@
         "end": "2026-09-26T17:35:14.890Z"
       },
       "spatialCoverage": "bbox:13.5793237,50.9749317,13.9660626,51.1776864",
-      "licence": "Mixed; see each source"
+      "licence": "Mixed; see each source",
+      "minUrl": "cities/dresden/signals.min.geojson",
+      "fullBytes": 3957150,
+      "minBytes": 2053955
     },
     {
       "id": "freiburg",
@@ -1544,7 +1565,10 @@
         "end": "2026-09-26T17:35:15.105Z"
       },
       "spatialCoverage": "bbox:7.6620055,47.9035777,7.9308444,48.0710579",
-      "licence": "Mixed; see each source"
+      "licence": "Mixed; see each source",
+      "minUrl": "cities/freiburg/signals.min.geojson",
+      "fullBytes": 1941246,
+      "minBytes": 1007096
     }
   ]
 }

@@ -77,6 +77,10 @@ npm run reconcile
 
 [Validation evidence](docs/VALIDATION.md) distinguishes application tests, actual local protocol execution, public price observations and unperformed live acceptance. Native contract/program commands are in [the EVM guide](contracts/evm/README.md) and [the Solana guide](programs/rental_escrow/README.md).
 
+## Whole-city data for the map
+
+[`stadtstack-data/`](stadtstack-data/README.md) publishes the eight-city, source-attributed open-data catalogue at `stadtstack-data/out/catalogue.json`. Each city has a full `signals.geojson` (original geometry and all sources) and a phone-friendly `signals.min.geojson` (five-decimal display coordinates, ~4 m topology-checked simplification, all feature ids retained). Catalogue `minUrl` resolves relative to the catalogue; `fullBytes` and `minBytes` report exact file sizes. Compact records carry the display fields, `sourceCount`, one attributed `primarySource`, and optional faithfulness score/threshold; retrieve the full feature by stable `id` for all source locators and review details. The compact view **does not alter reuse rights**: OSM remains ODbL 1.0 with attribution and share-alike; other source-specific caveats are in [the data README](stadtstack-data/out/README.md). Whole-city files contain no resident home/work coordinates.
+
 ## Project map
 
 - `src/domain/` — exact amounts, demonstration accounting and savings illustrations.

@@ -22,6 +22,10 @@ Freiburg (freiburg): nominatim — OpenStreetMap contributors, ODbL 1.0, open_li
 
 OpenStreetMap place records are an ODbL 1.0 derivative database: © OpenStreetMap contributors, https://www.openstreetmap.org/copyright ; reuse and share-alike obligations apply to that separable subset. Source-specific licence and reuse metadata on each record controls other records; a public PDF is not itself an open-data licence. Ordinance facts are attributed under § 5 UrhG; council papers are short original factual summaries with outbound links, not copied attachments. Autobahn API licence is not verified.
 
+## Compact map display
+
+Each city also publishes `signals.min.geojson` beside the full `signals.geojson`. Catalogue `minUrl` is relative to this catalogue; `fullBytes` and `minBytes` are exact UTF-8 file sizes. The compact map projection retains all features and stable ids/versions, with coordinates snapped to five decimals and line/polygon vertices simplified by Douglas–Peucker at ~4 m, keeping valid polygon topology. Sub-grid multipolygon components and holes can be omitted from the display geometry; the full file is unchanged. Each compact record carries `sourceCount`, one attributed `primarySource` and optional faithfulness score/threshold; exact locators, source hashes, all sources and review reasoning remain in the full feature retrievable by id. ODbL and all other source-specific rights apply equally to both projections.
+
 ## Coverage and privacy
 
 Eight pilot cities. Council archives and live OParl feeds cover recent pages, not all proceedings; highways include a ~25 km margin for commutes, not municipal streetwork; places are unverified OSM listings. Collection failures appear in catalogue sources. Null geometry means citywide or not yet geocoded; an approximate point does not establish impacts at an address. No private location or profile enters these public files.
