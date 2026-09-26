@@ -1,0 +1,20 @@
+import { z } from 'zod';
+const coord = z.tuple([z.number().finite().min(-180).max(180), z.number().finite().min(-90).max(90)]);
+const geometry = z.discriminatedUnion('type', [
+  z.object({type:z.literal('Point'),coordinates:coord}),
+  z.object({type:z.literal('LineString'),coordinates:z.array(coord).min(2)}),
+  z.object({type:z.literal('Polygon'),coordinates:z.array(z.array(coord).min(4)).min(1)}),
+  z.object({type:z.literal('MultiPolygon'),coordinates:z.array(z.array(z.array(coord).min(4)).min(1)).min(1)}),
+]);
+const source = z.object({url:z.url(),snapshotUrl:z.url().optional(),title:z.string().min(1),publisher:z.string().min(1),locator:z.string().min(1),retrievedAt:z.string().min(1),sha256:z.string().regex(/^[a-f0-9]{64}$/).nullable(),snapshot:z.boolean(),licence:z.string().min(1),reuse:z.enum(['open_licence','official_work','facts_with_attribution','unknown'])}).superRefine((value,ctx)=>{if(value.snapshot!==(value.sha256!==null))ctx.addIssue({code:'custom',message:'Snapshot hash required iff source bytes were fetched'});});
+export const signalSchema = z.object({type:z.literal('Feature'),geometry:geometry.nullable(),properties:z.object({
+  id:z.string().regex(/^[^:]+:.+/),version:z.string().regex(/^[a-f0-9]{64}$/),cityId:z.string().min(1),kind:z.enum(['planning','construction','roadworks','council_paper','council_meeting','budget','consultation','place']),category:z.string(),title:z.string().min(1),statement:z.string().min(1),status:z.string(),startDate:z.string().nullable(),endDate:z.string().nullable(),nextStep:z.string(),unknowns:z.array(z.string()),scale:z.enum(['street','neighbourhood','city','district','state','national']),geometryPrecision:z.enum(['exact','approximate','area','none']),sources:z.array(source).min(1),extraction:z.object({method:z.enum(['structured','llm']),model:z.string().optional(),faithfulness:z.object({score:z.number().min(0).max(1),reason:z.string(),evaluator:z.string(),threshold:z.number().min(0).max(1)}).optional()}),reviewState:z.enum(['candidate','auto_checked','reviewed','rejected']),asOf:z.string().min(1)
+})}).superRefine((feature,ctx)=>{if ((feature.geometry===null)!==(feature.properties.geometryPrecision==='none')) ctx.addIssue({code:'custom',message:'Null geometry must have precision none'});if(feature.properties.extraction.method==='llm'&&feature.properties.reviewState==='reviewed')ctx.addIssue({code:'custom',message:'LLM cannot confer human review'});});
+export const collectionSchema = z.object({type:z.literal('FeatureCollection'),features:z.array(signalSchema)});
+export const catalogueSchema = z.object({schemaVersion:z.literal('stadtstack-signals-v1'),generatedAt:z.string(),publisher:z.string(),cities:z.array(z.object({id:z.string(),name:z.string(),state:z.string(),center:coord,bbox:z.tuple([z.number(),z.number(),z.number(),z.number()]),sources:z.array(z.object({id:z.string(),kind:z.string(),publisher:z.string(),url:z.url(),licence:z.string(),reuse:z.enum(['open_licence','official_work','facts_with_attribution','unknown']),retrievedAt:z.string(),status:z.string().optional(),error:z.string().optional()})),temporalCoverage:z.object({start:z.string().nullable(),end:z.string().nullable()}).optional(),spatialCoverage:z.string().optional(),licence:z.string().optional()}))});
+export type Signal = z.infer<typeof signalSchema>;
+export type Catalogue = z.infer<typeof catalogueSchema>;
+export type FeatureCollection = z.infer<typeof collectionSchema>;
+export function validatePublication(catalogue: unknown,collections: Record<string,unknown>): {catalogue:Catalogue;collections:Record<string,FeatureCollection>} {
+ const parsed=catalogueSchema.parse(catalogue);const output:Record<string,FeatureCollection>={};for(const city of parsed.cities){const collection=collectionSchema.parse(collections[city.id]);const ids=new Set<string>();for(const feature of collection.features){if(feature.properties.cityId!==city.id)throw Error(`Wrong city for ${feature.properties.id}`);if(ids.has(feature.properties.id))throw Error(`Duplicate id ${feature.properties.id}`);ids.add(feature.properties.id);}output[city.id]=collection;}return {catalogue:parsed,collections:output};
+}

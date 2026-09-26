@@ -5,5 +5,5 @@ import nextTypescript from 'eslint-config-next/typescript';
 export default defineConfig([
   ...nextVitals,
   ...nextTypescript,
-  globalIgnores(['.next/**', 'next-env.d.ts', 'contracts/out/**', 'contracts/cache/**']),
+  globalIgnores(['.next/**', 'next-env.d.ts', 'contracts/out/**', 'contracts/cache/**', 'stadtstack-data/**']),
 ]);

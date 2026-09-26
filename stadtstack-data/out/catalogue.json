@@ -1,0 +1,1550 @@
+{
+  "schemaVersion": "stadtstack-signals-v1",
+  "generatedAt": "2026-09-26T17:32:14.234Z",
+  "publisher": "Stadtstack (independent derived factual summaries)",
+  "cities": [
+    {
+      "id": "strausberg",
+      "name": "Strausberg",
+      "state": "Brandenburg",
+      "center": [
+        13.9042481,
+        52.5588942
+      ],
+      "bbox": [
+        13.8131843,
+        52.5142025,
+        14.020926,
+        52.6035192
+      ],
+      "sources": [
+        {
+          "id": "nominatim",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=Strausberg%2C+Brandenburg%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:13:32.905Z",
+          "status": "ok"
+        },
+        {
+          "id": "atlas",
+          "kind": "atlas",
+          "publisher": "Stadtstack Atlas",
+          "url": "http://localhost:4317/api/atlas/strausberg",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T17:16:59.816Z",
+          "status": "ok"
+        },
+        {
+          "id": "atlas-map",
+          "kind": "atlas",
+          "publisher": "Stadtstack Atlas",
+          "url": "http://localhost:4317/api/atlas/strausberg/map",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T17:16:59.829Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm",
+          "kind": "places",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://www.openstreetmap.org/copyright",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:13:34.916Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm-boundary",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=Strausberg%2C+Brandenburg%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:13:32.905Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A10-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A10/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:17.185Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A10-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A10/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:17.226Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A11-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A11/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:17.267Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A11-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A11/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:17.300Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A12-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A12/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:17.332Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A12-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A12/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:17.365Z",
+          "status": "ok"
+        },
+        {
+          "id": "budget-ordinance",
+          "kind": "budget",
+          "publisher": "Stadt Strausberg",
+          "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
+          "licence": "§ 5 UrhG – amtliches Werk",
+          "reuse": "official_work",
+          "retrievedAt": "2026-09-26T16:49:24.355Z"
+        }
+      ],
+      "temporalCoverage": {
+        "start": null,
+        "end": "2026-09-26T17:32:14.365Z"
+      },
+      "spatialCoverage": "bbox:13.8131843,52.5142025,14.020926,52.6035192",
+      "licence": "Mixed; see each source"
+    },
+    {
+      "id": "koeln",
+      "name": "Köln",
+      "state": "Nordrhein-Westfalen",
+      "center": [
+        6.959974,
+        50.938361
+      ],
+      "bbox": [
+        6.7725303,
+        50.8304399,
+        7.162028,
+        51.0849743
+      ],
+      "sources": [
+        {
+          "id": "nominatim",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=K%C3%B6ln%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:12:51.126Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm",
+          "kind": "places",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://www.openstreetmap.org/copyright",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:32:31.848Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm-boundary",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=K%C3%B6ln%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:12:51.126Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A1-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A1/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.332Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A1-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A1/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.369Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A3-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A3/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.441Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A3-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A3/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.482Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A4-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A4/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.749Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A4-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A4/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.791Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A57-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A57/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.825Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A57-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A57/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.859Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A59-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A59/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.902Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A59-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A59/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.940Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A555-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A555/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:20.005Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A555-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A555/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:20.044Z",
+          "status": "ok"
+        },
+        {
+          "id": "ccf-meeting",
+          "kind": "council",
+          "publisher": "Köln",
+          "url": "https://github.com/komma-systems/ccf",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T17:32:31.958Z",
+          "status": "ok"
+        },
+        {
+          "id": "ccf-paper",
+          "kind": "council",
+          "publisher": "Köln",
+          "url": "https://github.com/komma-systems/ccf",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T17:32:35.276Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-0",
+          "kind": "council",
+          "publisher": "Köln",
+          "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/meetings",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:50:23.968Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-1",
+          "kind": "council",
+          "publisher": "Köln",
+          "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/meetings?page=2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:50:24.250Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-0",
+          "kind": "council",
+          "publisher": "Köln",
+          "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/papers",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:50:25.556Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-1",
+          "kind": "council",
+          "publisher": "Köln",
+          "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/papers?page=2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:50:31.438Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-baustelleneinrichtung-0",
+          "kind": "roadworks",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/wss/service/baustellen_wfs/guest?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abaustelleneinrichtung&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=0&COUNT=180&MAXFEATURES=180",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:10:12.598Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-baustelleneinrichtung-180",
+          "kind": "roadworks",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/wss/service/baustellen_wfs/guest?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abaustelleneinrichtung&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=180&COUNT=180&MAXFEATURES=180",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:10:12.775Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-baustelleneinrichtung-360",
+          "kind": "roadworks",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/wss/service/baustellen_wfs/guest?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abaustelleneinrichtung&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=360&COUNT=180&MAXFEATURES=180",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:10:13.056Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-baustelleneinrichtung-540",
+          "kind": "roadworks",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/wss/service/baustellen_wfs/guest?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abaustelleneinrichtung&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=540&COUNT=180&MAXFEATURES=180",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:10:13.217Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-strassenbauarbeiten-0",
+          "kind": "roadworks",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/wss/service/baustellen_wfs/guest?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Astrassenbauarbeiten&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=0&COUNT=100&MAXFEATURES=100",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:10:13.370Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-ampelarbeiten-0",
+          "kind": "roadworks",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/wss/service/baustellen_wfs/guest?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Aampelarbeiten&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=0&COUNT=50&MAXFEATURES=50",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:10:13.565Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-bplan-0",
+          "kind": "planning",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=0&resultRecordCount=200&f=geojson",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:07:41.606Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-bplan-200",
+          "kind": "planning",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=200&resultRecordCount=200&f=geojson",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:07:41.807Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-bplan-400",
+          "kind": "planning",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=400&resultRecordCount=200&f=geojson",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:07:42.044Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-bplan-600",
+          "kind": "planning",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=600&resultRecordCount=200&f=geojson",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:07:42.248Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-bplan-800",
+          "kind": "planning",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=800&resultRecordCount=200&f=geojson",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:07:42.421Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-bplan-1000",
+          "kind": "planning",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=1000&resultRecordCount=200&f=geojson",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:07:42.668Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-bplan-1200",
+          "kind": "planning",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=1200&resultRecordCount=200&f=geojson",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:07:42.774Z",
+          "status": "ok"
+        },
+        {
+          "id": "koeln-bplan-1400",
+          "kind": "planning",
+          "publisher": "Stadt Köln",
+          "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=1400&resultRecordCount=200&f=geojson",
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:07:42.930Z",
+          "status": "ok"
+        }
+      ],
+      "temporalCoverage": {
+        "start": null,
+        "end": "2026-09-26T17:32:40.895Z"
+      },
+      "spatialCoverage": "bbox:6.7725303,50.8304399,7.162028,51.0849743",
+      "licence": "Mixed; see each source"
+    },
+    {
+      "id": "muenster",
+      "name": "Münster",
+      "state": "Nordrhein-Westfalen",
+      "center": [
+        7.6251879,
+        51.9625101
+      ],
+      "bbox": [
+        7.4737853,
+        51.8401448,
+        7.7743634,
+        52.0600251
+      ],
+      "sources": [
+        {
+          "id": "nominatim",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=M%C3%BCnster%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:15:43.337Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm",
+          "kind": "places",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://www.openstreetmap.org/copyright",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:15:50.911Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm-boundary",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=M%C3%BCnster%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:15:43.337Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A1-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A1/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.332Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A1-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A1/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.369Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A43-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A43/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:52:53.008Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A43-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A43/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:52:53.039Z",
+          "status": "ok"
+        },
+        {
+          "id": "ccf-meeting",
+          "kind": "council",
+          "publisher": "Münster",
+          "url": "https://github.com/komma-systems/ccf",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T17:32:41.019Z",
+          "status": "ok"
+        },
+        {
+          "id": "ccf-paper",
+          "kind": "council",
+          "publisher": "Münster",
+          "url": "https://github.com/komma-systems/ccf",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T17:32:46.294Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-0",
+          "kind": "council",
+          "publisher": "Münster",
+          "url": "https://oparl.stadt-muenster.de/bodies/0001/meetings",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:52:58.224Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-1",
+          "kind": "council",
+          "publisher": "Münster",
+          "url": "https://oparl.stadt-muenster.de/bodies/0001/meetings?page=2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:52:58.637Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-0",
+          "kind": "council",
+          "publisher": "Münster",
+          "url": "https://oparl.stadt-muenster.de/bodies/0001/papers",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:52:59.812Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-1",
+          "kind": "council",
+          "publisher": "Münster",
+          "url": "https://oparl.stadt-muenster.de/bodies/0001/papers?page=2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:53:03.015Z",
+          "status": "ok"
+        },
+        {
+          "id": "muenster-bplan-0",
+          "kind": "planning",
+          "publisher": "Stadt Münster",
+          "url": "https://geo.stadt-muenster.de/mapserv/bplan_serv?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abplan2&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=0&COUNT=200&MAXFEATURES=200",
+          "licence": "Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:07:47.113Z",
+          "status": "ok"
+        },
+        {
+          "id": "muenster-bplan-200",
+          "kind": "planning",
+          "publisher": "Stadt Münster",
+          "url": "https://geo.stadt-muenster.de/mapserv/bplan_serv?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abplan2&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=200&COUNT=200&MAXFEATURES=200",
+          "licence": "Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:07:47.359Z",
+          "status": "ok"
+        },
+        {
+          "id": "muenster-bplan-400",
+          "kind": "planning",
+          "publisher": "Stadt Münster",
+          "url": "https://geo.stadt-muenster.de/mapserv/bplan_serv?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abplan2&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=400&COUNT=200&MAXFEATURES=200",
+          "licence": "Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:07:47.598Z",
+          "status": "ok"
+        },
+        {
+          "id": "muenster-bplan-600",
+          "kind": "planning",
+          "publisher": "Stadt Münster",
+          "url": "https://geo.stadt-muenster.de/mapserv/bplan_serv?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abplan2&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=600&COUNT=200&MAXFEATURES=200",
+          "licence": "Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:07:47.813Z",
+          "status": "ok"
+        },
+        {
+          "id": "muenster-baustellen-0",
+          "kind": "roadworks",
+          "publisher": "Stadt Münster",
+          "url": "https://geo.stadt-muenster.de/mapserv/odbaustellen_serv?SERVICE=WFS&VERSION=1.1.0&REQUEST=GetFeature&TYPENAME=baustellen&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=0&COUNT=100&MAXFEATURES=100",
+          "licence": "Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:07:47.911Z",
+          "status": "ok"
+        }
+      ],
+      "temporalCoverage": {
+        "start": null,
+        "end": "2026-09-26T17:32:51.867Z"
+      },
+      "spatialCoverage": "bbox:7.4737853,51.8401448,7.7743634,52.0600251",
+      "licence": "Mixed; see each source"
+    },
+    {
+      "id": "wuppertal",
+      "name": "Wuppertal",
+      "state": "Nordrhein-Westfalen",
+      "center": [
+        7.1780374,
+        51.264018
+      ],
+      "bbox": [
+        7.0140725,
+        51.1657181,
+        7.31343,
+        51.3180951
+      ],
+      "sources": [
+        {
+          "id": "nominatim",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=Wuppertal%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:16:01.343Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm",
+          "kind": "places",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://www.openstreetmap.org/copyright",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:33:10.069Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm-boundary",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=Wuppertal%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:16:01.343Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A1-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A1/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.332Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A1-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A1/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.369Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A46-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A46/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:53:06.169Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A46-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A46/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:53:06.204Z",
+          "status": "ok"
+        },
+        {
+          "id": "ccf-meeting",
+          "kind": "council",
+          "publisher": "Wuppertal",
+          "url": "https://github.com/komma-systems/ccf",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T17:33:10.123Z",
+          "status": "ok"
+        },
+        {
+          "id": "ccf-paper",
+          "kind": "council",
+          "publisher": "Wuppertal",
+          "url": "https://github.com/komma-systems/ccf",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T17:33:15.654Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-0",
+          "kind": "council",
+          "publisher": "Wuppertal",
+          "url": "http://oparl.wuppertal.de/oparl/bodies/0001/meetings",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:53:13.435Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-1",
+          "kind": "council",
+          "publisher": "Wuppertal",
+          "url": "http://oparl.wuppertal.de/oparl/bodies/0001/meetings?page=2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:53:14.341Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-0",
+          "kind": "council",
+          "publisher": "Wuppertal",
+          "url": "http://oparl.wuppertal.de/oparl/bodies/0001/papers",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:53:17.573Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-1",
+          "kind": "council",
+          "publisher": "Wuppertal",
+          "url": "http://oparl.wuppertal.de/oparl/bodies/0001/papers?page=2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:53:28.060Z",
+          "status": "ok"
+        }
+      ],
+      "temporalCoverage": {
+        "start": null,
+        "end": "2026-09-26T17:33:23.372Z"
+      },
+      "spatialCoverage": "bbox:7.0140725,51.1657181,7.31343,51.3180951",
+      "licence": "Mixed; see each source"
+    },
+    {
+      "id": "castrop-rauxel",
+      "name": "Castrop-Rauxel",
+      "state": "Nordrhein-Westfalen",
+      "center": [
+        7.3106175,
+        51.5646195
+      ],
+      "bbox": [
+        7.2424932,
+        51.5202054,
+        7.3718796,
+        51.6262817
+      ],
+      "sources": [
+        {
+          "id": "nominatim",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=Castrop-Rauxel%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:18:00.138Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm",
+          "kind": "places",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://www.openstreetmap.org/copyright",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:19:44.197Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm-boundary",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=Castrop-Rauxel%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:18:00.138Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A2-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A2/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:53:34.994Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A2-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A2/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:53:35.030Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A42-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A42/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:53:35.071Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A42-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A42/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:53:35.112Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A45-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A45/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:53:35.186Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A45-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A45/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:53:35.218Z",
+          "status": "ok"
+        },
+        {
+          "id": "ccf-meeting",
+          "kind": "council",
+          "publisher": "Castrop-Rauxel",
+          "url": "https://github.com/komma-systems/ccf",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T17:35:02.530Z",
+          "status": "ok"
+        },
+        {
+          "id": "ccf-paper",
+          "kind": "council",
+          "publisher": "Castrop-Rauxel",
+          "url": "https://github.com/komma-systems/ccf",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T17:35:02.580Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-0",
+          "kind": "council",
+          "publisher": "Castrop-Rauxel",
+          "url": "https://castroprauxel.gremien.info/oparl/body/EUV/meeting",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:53:37.139Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-0",
+          "kind": "council",
+          "publisher": "Castrop-Rauxel",
+          "url": "https://castroprauxel.gremien.info/oparl/body/EUV/paper",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:53:37.477Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-0",
+          "kind": "council",
+          "publisher": "Castrop-Rauxel",
+          "url": "https://castroprauxel.gremien.info/oparl/body/CAS/meeting",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:53:41.401Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-1",
+          "kind": "council",
+          "publisher": "Castrop-Rauxel",
+          "url": "https://castroprauxel.gremien.info/oparl/body/CAS/meeting/page/2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:53:45.471Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-0",
+          "kind": "council",
+          "publisher": "Castrop-Rauxel",
+          "url": "https://castroprauxel.gremien.info/oparl/body/CAS/paper",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:53:45.936Z",
+          "status": "ok"
+        }
+      ],
+      "temporalCoverage": {
+        "start": null,
+        "end": "2026-09-26T17:35:02.615Z"
+      },
+      "spatialCoverage": "bbox:7.2424932,51.5202054,7.3718796,51.6262817",
+      "licence": "Mixed; see each source"
+    },
+    {
+      "id": "duesseldorf",
+      "name": "Düsseldorf",
+      "state": "Nordrhein-Westfalen",
+      "center": [
+        6.7763137,
+        51.2254018
+      ],
+      "bbox": [
+        6.6888147,
+        51.1243747,
+        6.9399324,
+        51.3524872
+      ],
+      "sources": [
+        {
+          "id": "nominatim",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=D%C3%BCsseldorf%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:19:44.722Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm",
+          "kind": "places",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://www.openstreetmap.org/copyright",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:19:52.529Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm-boundary",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=D%C3%BCsseldorf%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:19:44.722Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A3-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A3/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.441Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A3-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A3/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.482Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A44-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A44/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:56:25.507Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A44-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A44/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:56:25.539Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A46-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A46/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:53:06.169Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A46-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A46/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:53:06.204Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A52-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A52/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:56:25.573Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A52-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A52/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:56:25.606Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A57-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A57/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.825Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A57-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A57/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.859Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A59-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A59/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.902Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A59-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A59/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.940Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-0",
+          "kind": "council",
+          "publisher": "Düsseldorf",
+          "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0009/meetings",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:56:33.631Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-1",
+          "kind": "council",
+          "publisher": "Düsseldorf",
+          "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0009/meetings?page=2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:56:43.769Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-0",
+          "kind": "council",
+          "publisher": "Düsseldorf",
+          "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0009/papers",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:56:49.531Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-1",
+          "kind": "council",
+          "publisher": "Düsseldorf",
+          "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0009/papers?page=2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:57:02.473Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-0",
+          "kind": "council",
+          "publisher": "Düsseldorf",
+          "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0011/meetings",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:57:06.419Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-1",
+          "kind": "council",
+          "publisher": "Düsseldorf",
+          "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0011/meetings?page=2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:57:17.929Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-0",
+          "kind": "council",
+          "publisher": "Düsseldorf",
+          "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0011/papers",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:57:24.017Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-1",
+          "kind": "council",
+          "publisher": "Düsseldorf",
+          "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0011/papers?page=2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:57:30.281Z",
+          "status": "ok"
+        }
+      ],
+      "temporalCoverage": {
+        "start": null,
+        "end": "2026-09-26T17:35:10.507Z"
+      },
+      "spatialCoverage": "bbox:6.6888147,51.1243747,6.9399324,51.3524872",
+      "licence": "Mixed; see each source"
+    },
+    {
+      "id": "dresden",
+      "name": "Dresden",
+      "state": "Sachsen",
+      "center": [
+        13.7381437,
+        51.0493286
+      ],
+      "bbox": [
+        13.5793237,
+        50.9749317,
+        13.9660626,
+        51.1776864
+      ],
+      "sources": [
+        {
+          "id": "nominatim",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=Dresden%2C+Sachsen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:20:01.621Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm",
+          "kind": "places",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://www.openstreetmap.org/copyright",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:28:26.278Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm-boundary",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=Dresden%2C+Sachsen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:20:01.621Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A4-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A4/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.749Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A4-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A4/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:50:19.791Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A17-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A17/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:57:32.670Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A17-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A17/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T16:57:32.699Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-0",
+          "kind": "council",
+          "publisher": "Dresden",
+          "url": "http://oparl.dresden.de/bodies/0001/meetings",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:57:33.715Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-1",
+          "kind": "council",
+          "publisher": "Dresden",
+          "url": "http://oparl.dresden.de/bodies/0001/meetings?page=2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:57:33.922Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-0",
+          "kind": "council",
+          "publisher": "Dresden",
+          "url": "http://oparl.dresden.de/bodies/0001/papers",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:57:39.472Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-1",
+          "kind": "council",
+          "publisher": "Dresden",
+          "url": "http://oparl.dresden.de/bodies/0001/papers?page=2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T16:57:46.764Z",
+          "status": "ok"
+        }
+      ],
+      "temporalCoverage": {
+        "start": null,
+        "end": "2026-09-26T17:35:14.890Z"
+      },
+      "spatialCoverage": "bbox:13.5793237,50.9749317,13.9660626,51.1776864",
+      "licence": "Mixed; see each source"
+    },
+    {
+      "id": "freiburg",
+      "name": "Freiburg",
+      "state": "Baden-Württemberg",
+      "center": [
+        7.8494005,
+        47.9960901
+      ],
+      "bbox": [
+        7.6620055,
+        47.9035777,
+        7.9308444,
+        48.0710579
+      ],
+      "sources": [
+        {
+          "id": "nominatim",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=Freiburg%2C+Baden-W%C3%BCrttemberg%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:21:54.859Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm",
+          "kind": "places",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://www.openstreetmap.org/copyright",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:22:08.637Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm-boundary",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=Freiburg%2C+Baden-W%C3%BCrttemberg%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:21:54.859Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A5-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A5/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T17:00:29.177Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A5-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A5/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-26T17:00:29.221Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-0",
+          "kind": "council",
+          "publisher": "Freiburg",
+          "url": "https://ris.freiburg.de/oparl/body/FR/meeting",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T17:00:38.461Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-meeting-1",
+          "kind": "council",
+          "publisher": "Freiburg",
+          "url": "https://ris.freiburg.de/oparl/body/FR/meeting/page/2",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T17:00:47.983Z",
+          "status": "ok"
+        },
+        {
+          "id": "oparl-paper-0",
+          "kind": "council",
+          "publisher": "Freiburg",
+          "url": "https://ris.freiburg.de/oparl/body/FR/paper",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-26T17:00:49.065Z",
+          "status": "ok"
+        }
+      ],
+      "temporalCoverage": {
+        "start": null,
+        "end": "2026-09-26T17:35:15.105Z"
+      },
+      "spatialCoverage": "bbox:7.6620055,47.9035777,7.9308444,48.0710579",
+      "licence": "Mixed; see each source"
+    }
+  ]
+}

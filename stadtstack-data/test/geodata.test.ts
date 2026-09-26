@@ -1,0 +1,4 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {gmlFeatures} from '../src/geodata.ts';
+test('GML fallback retains plan polygon rings and exact feature locator',()=>{const xml=`<wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs/2.0" xmlns:ms="http://mapserver.gis.umn.edu/mapserver" xmlns:gml="http://www.opengis.net/gml/3.2"><wfs:member><ms:bplan2 gml:id="bplan2.17"><ms:msGeometry><gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>51 7 51 8 52 8 51 7</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></ms:msGeometry><ms:name>Testplan</ms:name></ms:bplan2></wfs:member></wfs:FeatureCollection>`;assert.deepEqual(gmlFeatures(xml,'ms:bplan2'),[{id:'bplan2.17',properties:{name:'Testplan'},geometry:{type:'Polygon',coordinates:[[[7,51],[8,51],[8,52],[7,51]]]}}]);});
