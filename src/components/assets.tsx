@@ -191,7 +191,7 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
         <div><HomeIcon size={16} /><span><strong>Home tokens → your own home</strong> Collect shares of homes; they count toward buying one.</span></div>
         <div><Car size={16} /><span><strong>Electric car</strong> Charging and vehicle-to-grid income as another adapter.</span></div>
         <div><Receipt size={16} /><span><strong>Real-time service charges</strong> Prepayments in escrow, live consumption, surplus released monthly instead of yearly.</span></div>
-        <div><Users size={16} /><span><strong>Clubs, house & city</strong> One identity, many roles: club member, house community, your city&apos;s decisions and feed.</span></div>
+        <div><Users size={16} /><span><strong>Every part of your life</strong> Work, health, mobility, family, learning, clubs, your building, your city: each with your role, what is decided and what you own there.</span></div>
       </div>
     </section>
   );

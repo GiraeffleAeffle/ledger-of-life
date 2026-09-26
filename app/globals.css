@@ -3018,3 +3018,4 @@ dd {
 .identity-offer > div { display: grid; gap: 4px; flex: 1; min-width: 220px; }
 .identity-offer .icon-button { position: absolute; top: 8px; right: 8px; }
 .identity-error { flex-basis: 100%; color: #a3342b; font-size: 0.85rem; }
+.identity-option { display: flex; gap: 6px; align-items: center; font-size: 0.82rem; margin-top: 4px; cursor: pointer; }

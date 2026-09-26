@@ -11,6 +11,7 @@ export function IdentityStrip({ request }: { request: Request }) {
   const [offer, setOffer] = useState<{ walletLink: string; qr: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [shareCity, setShareCity] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -37,7 +38,7 @@ export function IdentityStrip({ request }: { request: Request }) {
     setBusy(true);
     setError('');
     try {
-      setOffer(await request<{ walletLink: string; qr: string }>('/api/identity', { action: 'start' }));
+      setOffer(await request<{ walletLink: string; qr: string }>('/api/identity', { action: 'start', shareCity }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Please try again.');
     } finally {
@@ -54,12 +55,18 @@ export function IdentityStrip({ request }: { request: Request }) {
     <div className={`identity-strip${verified ? ' verified' : ''}`}>
       {verified ? <BadgeCheck size={20} /> : <Fingerprint size={18} />}
       <div className="identity-copy">
-        <strong>{verified ? 'Verified adult · EU Digital Identity Wallet' : 'Signed in with passkey'}</strong>
+        <strong>{verified ? `Verified adult${verified.city ? ` · lives in ${verified.city}` : ''} · EU Digital Identity Wallet` : 'Signed in with passkey'}</strong>
         <span>
           {verified
-            ? `Test credential, checked ${new Date(verified.verifiedAt).toLocaleDateString()}. The app learned only "18 or over": no name, no birth date, no address.`
-            : 'Own wallets on Solana and Robinhood Chain. Add your EU identity wallet to prove you are a real adult without sharing personal data.'}
+            ? `Test credential, checked ${new Date(verified.verifiedAt).toLocaleDateString()}. Kept: "18 or over"${verified.city ? ' and your city' : ''}. Not kept: name, birth date, street address.`
+            : 'Own wallets on Solana and Robinhood Chain. Add your EU identity wallet to prove you are a real adult; the app keeps only that fact.'}
         </span>
+        {!verified && !offer && (
+          <label className="identity-option">
+            <input type="checkbox" checked={shareCity} onChange={(e) => setShareCity(e.target.checked)} />
+            Also share my city (not the street) for local news and decisions
+          </label>
+        )}
       </div>
       {verified
         ? <button className="text-button" onClick={forget}>Forget</button>
@@ -75,10 +82,11 @@ export function IdentityStrip({ request }: { request: Request }) {
             <strong>Scan with the EU reference wallet</strong>
             <ol>
               <li>Open the EUDI reference wallet app with a test PID.</li>
-              <li>Scan this code and review the request: only &ldquo;age 18 or over&rdquo;.</li>
+              <li>Scan this code and review the request: your birth date{shareCity ? ' and city' : ''}, nothing else.</li>
               <li>Approve. This page updates by itself.</li>
             </ol>
             <a className="text-button" href={offer.walletLink}>On this phone? Open the wallet</a>
+            <span className="small-copy">The app checks &ldquo;18 or over&rdquo; and discards the birth date. The current EU person ID has no separate age flag.</span>
             <span className="small-copy"><Loader2 className="spin" size={12} /> Waiting for your wallet · EU test environment, not a real identity check</span>
           </div>
         </div>

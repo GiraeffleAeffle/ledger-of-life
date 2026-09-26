@@ -6,8 +6,10 @@ import type { Store } from './store.ts';
 
 /**
  * EU Digital Identity Wallet via OpenID4VP, using the EU's hosted reference verifier
- * (test environment, public "TEST-01" registration). The app asks only for "age 18 or over"
- * from a PID credential and stores the resulting statement, never the credential itself.
+ * (test environment, public "TEST-01" registration). The app asks a PID credential for the birth
+ * date (the current EU PID carries no age-over-18 flag) and, only if the person opts in, the city
+ * of residence. It keeps only the derived statement ("adult", optional city), never the birth
+ * date, the credential or any other attribute.
  *
  * Signature and issuer-chain validation happen in the reference verifier before it accepts the
  * wallet's response; this module additionally checks the nonce binding and the credential type.
@@ -20,6 +22,8 @@ const QUERY_ID = 'pid';
 
 export interface IdentityStatement {
   adult: true;
+  /** City of residence (PID address.locality), only when the person chose to share it. */
+  city?: string;
   issuer: string;
   credentialType: string;
   verifiedAt: string;
@@ -45,7 +49,13 @@ export async function identityStatus(store: Store, identity: VerifiedIdentity): 
   return { state: 'none' };
 }
 
-export async function startIdentityRequest(store: Store, identity: VerifiedIdentity) {
+export async function startIdentityRequest(store: Store, identity: VerifiedIdentity, options: { shareCity: boolean }) {
+  const birth = { id: 'birth', path: ['birthdate'] };
+  const city = { id: 'city', path: ['address', 'locality'] };
+  // With the city requested, claim_sets let the wallet fall back to birth date only when the PID has no address.
+  const pidQuery = options.shareCity
+    ? { claims: [birth, city], claim_sets: [['birth', 'city'], ['birth']] }
+    : { claims: [birth] };
   const nonce = randomBytes(18).toString('base64url');
   const response = await fetch(`${VERIFIER}/ui/presentations`, {
     method: 'POST',
@@ -53,7 +63,7 @@ export async function startIdentityRequest(store: Store, identity: VerifiedIdent
     signal: AbortSignal.timeout(15_000),
     body: JSON.stringify({
       dcql_query: {
-        credentials: [{ id: QUERY_ID, format: 'dc+sd-jwt', meta: { vct_values: [PID_VCT] }, claims: [{ path: ['age_equal_or_over', '18'] }] }],
+        credentials: [{ id: QUERY_ID, format: 'dc+sd-jwt', meta: { vct_values: [PID_VCT] }, ...pidQuery }],
       },
       nonce,
       jar_mode: 'by_reference',
@@ -101,8 +111,20 @@ export async function forgetIdentity(store: Store, identity: VerifiedIdentity) {
 
 const decodeJson = (part: string) => JSON.parse(Buffer.from(part, 'base64url').toString('utf8')) as Record<string, unknown>;
 
-/** Reads an SD-JWT VC presentation (issuer JWT ~ disclosures ~ key-binding JWT) into the minimal statement. */
-export function statementFromSdJwt(presentation: string, nonce: string): IdentityStatement {
+/** Whole years between an ISO birth date (YYYY-MM-DD) and `now`, in UTC. */
+export function ageOn(birthdate: string, now: Date): number {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthdate);
+  if (!match) throw new WorkflowError('The wallet shared an unreadable birth date.');
+  const [year, month, day] = match.slice(1).map(Number);
+  const beforeBirthday = now.getUTCMonth() + 1 < month || (now.getUTCMonth() + 1 === month && now.getUTCDate() < day);
+  return now.getUTCFullYear() - year - (beforeBirthday ? 1 : 0);
+}
+
+/**
+ * Reads an SD-JWT VC presentation (issuer JWT ~ disclosures ~ key-binding JWT) into the minimal
+ * statement. The birth date is used for the age check and then dropped.
+ */
+export function statementFromSdJwt(presentation: string, nonce: string, now = new Date()): IdentityStatement {
   const parts = presentation.split('~');
   const issuerJwt = parts[0];
   const keyBinding = parts[parts.length - 1];
@@ -112,8 +134,19 @@ export function statementFromSdJwt(presentation: string, nonce: string): Identit
   const binding = decodeJson(keyBinding.split('.')[1] ?? '');
   if (binding.nonce !== nonce) throw new WorkflowError('The presentation belongs to a different request.');
   const disclosures = parts.slice(1, -1).filter(Boolean).map((d) => JSON.parse(Buffer.from(d, 'base64url').toString('utf8')) as unknown[]);
-  const adult = disclosures.some((d) => d.length === 3 && d[1] === '18' && d[2] === true)
-    || disclosures.some((d) => d[1] === 'age_equal_or_over' && (d[2] as Record<string, unknown> | undefined)?.['18'] === true);
-  if (!adult) throw new WorkflowError('The wallet did not confirm age 18 or over.');
-  return { adult: true, issuer: String(payload.iss ?? 'unknown issuer'), credentialType: PID_VCT, verifiedAt: new Date().toISOString(), via: 'EU reference verifier (test environment)' };
+  const claim = (name: string) => disclosures.find((d) => d.length === 3 && d[1] === name)?.[2];
+  const birthdate = claim('birthdate');
+  if (typeof birthdate !== 'string') throw new WorkflowError('The wallet did not share a birth date.');
+  if (ageOn(birthdate, now) < 18) throw new WorkflowError('The identity shared is under 18.');
+  // locality is disclosed either on its own (nested disclosure) or inside a disclosed address object.
+  const address = claim('address') as Record<string, unknown> | undefined;
+  const locality = claim('locality') ?? address?.locality;
+  return {
+    adult: true,
+    ...(typeof locality === 'string' && locality.trim() ? { city: locality.trim().slice(0, 80) } : {}),
+    issuer: String(payload.iss ?? 'unknown issuer'),
+    credentialType: PID_VCT,
+    verifiedAt: now.toISOString(),
+    via: 'EU reference verifier (test environment)',
+  };
 }

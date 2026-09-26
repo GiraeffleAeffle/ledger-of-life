@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const identity = await authenticated(request);
     const body = await readBody(request);
     const store = await getStore();
-    if (body.action === 'start') return Response.json(await startIdentityRequest(store, identity), noStore);
+    if (body.action === 'start') return Response.json(await startIdentityRequest(store, identity, { shareCity: body.shareCity === true }), noStore);
     if (body.action === 'poll') return Response.json({ identity: await pollIdentityRequest(store, identity) }, noStore);
     if (body.action === 'forget') {
       await forgetIdentity(store, identity);

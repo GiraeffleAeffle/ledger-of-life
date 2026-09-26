@@ -75,7 +75,7 @@ concepts:
   Credential:
     definition: A signed attestation about a Person (identity, age, income band, rental history) held in the Person's own wallet, for example the EU Digital Identity Wallet.
     formats:
-      sd_jwt_vc: {reality: testnet_real, note: "Built: PID 'age 18 or over' via OpenID4VP and the EU hosted reference verifier (test environment, TEST-01). Only the statement is stored. Linkable across presentations unless issued in single-use batches."}
+      sd_jwt_vc: {reality: testnet_real, note: "Built: OpenID4VP via the EU hosted reference verifier (test environment, TEST-01). Requests the PID birthdate (the current EU PID has no age-over-18 flag) and, opt-in, address.locality; stores only 'adult' and the city. Not tested end-to-end with a phone wallet yet. Linkable across presentations unless issued in single-use batches."}
       iso_mdoc: {reality: roadmap, note: "Selective disclosure; same linkability caveat."}
       integration: {reality: roadmap, note: "App acts as verifier via OpenID4VP; issuance via OpenID4VCI; EU reference wallet, verifier endpoint and Kotlin/Swift libraries at github.com/eu-digital-identity-wallet; commercial SDKs (walt.id, Sphereon, Procivis)."}
       zero_knowledge_predicate: {reality: roadmap, note: "For example 'income >= 3x rent' without revealing income. Not in the EUDI framework yet (an open discussion topic)."}
@@ -83,11 +83,12 @@ concepts:
 
   Context:
     definition: A shared space a Person takes part in, with its own members, rules, decisions and feed. A tenancy is one Context; so are a sports club, a house community, a neighbourhood or a city.
+    open_ended: true   # kinds are examples, not a closed list; a life has many more
     kinds:
       tenancy: {reality: testnet_real, note: "Agreement plus escrow; the only context built today."}
-      club: {reality: roadmap}
+      city: {reality: roadmap, note: "Stadtstack levels: decisions, participation, local feed. Membership can be proven with the PID city of residence (address.locality), shared opt-in; the capture is built, the feed is not."}
       house_community: {reality: roadmap, note: "Shared building costs; ties to ServiceChargeAccount."}
-      city: {reality: roadmap, note: "Stadtstack levels: decisions, participation, local feed."}
+      examples: [work/employer, health/insurer, mobility, family, learning, club, bank, energy supplier]
     rules:
       - A Context grants roles; the app never infers a role from onboarding choices alone.
       - Each Context applies its own DisclosurePolicy; joining one never reveals membership in another.

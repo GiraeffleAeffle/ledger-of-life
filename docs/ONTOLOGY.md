@@ -122,5 +122,5 @@ In each tenancy phase exactly one person has an action; everyone else sees what 
 1. **Name and positioning:** is this a deposit product with a portfolio, or a household-ownership app whose first adapter is the rental deposit?
 2. **Home shares:** which issuer or legal wrapper (a Germany-compatible security), and is "down-payment credit" enough for the vision?
 3. **Device income:** stay read-only, or pilot selling future solar or validator income (regulatory scope)?
-4. **Identity:** EUDI Wallet ("age 18 or over" is built against the EU test verifier) versus German eID via a provider. The EUDI framework offers selective disclosure (SD-JWT VC, mdoc) but no zero-knowledge proofs yet; income thresholds without revealing income need them.
+4. **Identity:** EUDI Wallet (adult check and opt-in city are built against the EU test verifier; the current PID has no age flag, so the birth date is read and discarded) versus German eID via a provider. Banks must accept EUDI wallets for onboarding and strong authentication by December 2027. The EUDI framework offers selective disclosure (SD-JWT VC, mdoc) but no zero-knowledge proofs yet; income thresholds without revealing income need them.
 5. **Mainnet path:** which network holds the first real deposit, and which yield source and stock venue are eligible there?
