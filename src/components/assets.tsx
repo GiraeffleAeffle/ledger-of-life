@@ -23,7 +23,7 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
   const [message, setMessage] = useState('');
   const [open, setOpen] = useState<'solar' | 'validator' | null>(null);
   const [solarForm, setSolarForm] = useState({ url: 'http://homeassistant.local:8123', token: '', entity: '', pricePerKwh: '0.30' });
-  const [validatorForm, setValidatorForm] = useState({ chain: 'ethereum', id: '' });
+  const [validatorForm, setValidatorForm] = useState({ chain: 'gnosis', id: '' });
 
   const refresh = useCallback(async () => {
     const [a, p] = await Promise.all([
@@ -129,7 +129,10 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
           {solar ? (
             <>
               <strong>{solar.valueToday !== null ? `€${solar.valueToday.toFixed(2)} today` : `${solar.powerW} W now`}</strong>
-              <span>{solar.energyTodayKwh !== null ? `${solar.energyTodayKwh} kWh produced today` : ''}{solar.powerW !== null ? ` · ${solar.powerW} W now` : ''}</span>
+              <span>{solar.energyTodayKwh !== null ? `${solar.energyTodayKwh} kWh today` : ''}{solar.powerW !== null ? ` · ${solar.powerW} W now` : ''}</span>
+              {solar.savings && (solar.savings.month !== null || solar.savings.year !== null) && (
+                <span className="asset-gain"><TrendingUp size={13} /> {solar.savings.month !== null ? `€${solar.savings.month.toFixed(2)} this month` : ''}{solar.savings.month !== null && solar.savings.year !== null ? ' · ' : ''}{solar.savings.year !== null ? `€${solar.savings.year.toFixed(2)} this year` : ''}</span>
+              )}
               <span className="small-copy">via Home Assistant · {solar.entity}</span>
             </>
           ) : (
@@ -173,8 +176,8 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
               await request('/api/assets', { action: 'save_adapter', kind: 'validator', ...validatorForm });
               setOpen(null);
             }); }}>
-              <label>Network<select value={validatorForm.chain} onChange={(e) => setValidatorForm({ ...validatorForm, chain: e.target.value })}><option value="ethereum">Ethereum</option><option value="solana">Solana</option></select></label>
-              <label>{validatorForm.chain === 'ethereum' ? 'Validator index or public key' : 'Vote account'}<input value={validatorForm.id} onChange={(e) => setValidatorForm({ ...validatorForm, id: e.target.value })} /></label>
+              <label>Network<select value={validatorForm.chain} onChange={(e) => setValidatorForm({ ...validatorForm, chain: e.target.value })}><option value="gnosis">Gnosis</option><option value="ethereum">Ethereum</option><option value="solana">Solana</option></select></label>
+              <label>{validatorForm.chain === 'solana' ? 'Vote account' : 'Validator index or public key'}<input value={validatorForm.id} onChange={(e) => setValidatorForm({ ...validatorForm, id: e.target.value })} /></label>
               <button className="button primary" disabled={Boolean(busy)}>Save</button>
             </form>
           )}

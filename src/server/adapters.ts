@@ -8,7 +8,7 @@ import type { Store } from './store.ts';
  */
 export interface AdapterConfig {
   homeAssistant?: { url: string; token: string; entity?: string; pricePerKwh: number };
-  validator?: { chain: 'solana' | 'ethereum'; id: string };
+  validator?: { chain: 'solana' | 'ethereum' | 'gnosis'; id: string };
 }
 export interface PublicAdapterConfig {
   homeAssistant?: { url: string; entity?: string; pricePerKwh: number };
@@ -46,7 +46,7 @@ export async function saveAdapterConfig(store: Store, identity: VerifiedIdentity
   } else if (input.kind === 'validator') {
     if (input.remove === true) delete next.validator;
     else {
-      const chain = input.chain === 'ethereum' ? 'ethereum' : 'solana';
+      const chain = input.chain === 'ethereum' || input.chain === 'gnosis' ? input.chain : 'solana';
       const id = String(input.id ?? '').trim();
       if (chain === 'solana' ? !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(id) : !/^(\d{1,8}|0x[0-9a-fA-F]{96})$/.test(id))
         throw new WorkflowError(chain === 'solana' ? 'Enter your vote account address.' : 'Enter your validator index or public key.');
@@ -58,7 +58,16 @@ export async function saveAdapterConfig(store: Store, identity: VerifiedIdentity
 }
 
 type HaState = { entity_id: string; state: string; attributes: { device_class?: string; unit_of_measurement?: string; friendly_name?: string; state_class?: string } };
-export interface SolarReading { entity: string; name: string; energyTodayKwh: number | null; powerW: number | null; valueToday: number | null; currency: 'EUR' }
+export interface SolarReading {
+  entity: string;
+  name: string;
+  energyTodayKwh: number | null;
+  powerW: number | null;
+  valueToday: number | null;
+  /** From the home's own monetary sensors (e.g. inverter savings), when present. */
+  savings: { today: number | null; month: number | null; year: number | null } | null;
+  currency: 'EUR';
+}
 
 export async function readSolar(config: NonNullable<AdapterConfig['homeAssistant']>): Promise<SolarReading> {
   const response = await fetch(`${config.url}/api/states`, {
@@ -75,6 +84,11 @@ export async function readSolar(config: NonNullable<AdapterConfig['homeAssistant
     ?? states.find((s) => s.attributes.device_class === 'energy' && solarish(s) && numeric(s));
   const power = states.find((s) => s.attributes.device_class === 'power' && solarish(s) && numeric(s));
   if (!energy && !power) throw new Error('No solar sensor found. Enter the sensor ID (e.g. sensor.solar_energy_today).');
+  const money = (period: RegExp) => {
+    const sensor = states.find((s) => s.attributes.device_class === 'monetary' && solarish(s) && /saving|earning|revenue/i.test(s.entity_id) && period.test(s.entity_id) && numeric(s));
+    return sensor ? Number(Number(sensor.state).toFixed(2)) : null;
+  };
+  const savings = { today: money(/daily|today|24h/), month: money(/monthly|month/), year: money(/yearly|year/) };
   const kwh = energy ? Number(energy.state) * (energy.attributes.unit_of_measurement === 'Wh' ? 0.001 : 1) : null;
   const watts = power ? Number(power.state) * (power.attributes.unit_of_measurement === 'kW' ? 1000 : 1) : null;
   return {
@@ -82,12 +96,13 @@ export async function readSolar(config: NonNullable<AdapterConfig['homeAssistant
     name: energy?.attributes.friendly_name ?? power?.attributes.friendly_name ?? 'Solar',
     energyTodayKwh: kwh === null ? null : Number(kwh.toFixed(2)),
     powerW: watts === null ? null : Math.round(watts),
-    valueToday: kwh === null ? null : Number((kwh * config.pricePerKwh).toFixed(2)),
+    valueToday: savings.today ?? (kwh === null ? null : Number((kwh * config.pricePerKwh).toFixed(2))),
+    savings: savings.today === null && savings.month === null && savings.year === null ? null : savings,
     currency: 'EUR',
   };
 }
 
-export interface ValidatorReading { chain: 'solana' | 'ethereum'; id: string; status: string; stake: number; unit: 'SOL' | 'ETH'; rewardsRecent: number | null; rewardsLabel: string; commission?: number }
+export interface ValidatorReading { chain: 'solana' | 'ethereum' | 'gnosis'; id: string; status: string; stake: number; unit: 'SOL' | 'ETH' | 'GNO'; rewardsRecent: number | null; rewardsLabel: string; commission?: number }
 
 async function solanaRpc(method: string, params: unknown[]) {
   const response = await fetch('https://api.mainnet-beta.solana.com', {
@@ -111,13 +126,17 @@ export async function readValidator(config: NonNullable<AdapterConfig['validator
       rewardsRecent: reward ? reward.amount / 1e9 : null, rewardsLabel: reward ? `epoch ${reward.epoch} commission` : 'last epoch',
     };
   }
-  const response = await fetch(`https://ethereum-beacon-api.publicnode.com/eth/v1/beacon/states/head/validators/${config.id}`, { signal: AbortSignal.timeout(10_000) });
-  if (!response.ok) throw new Error('Validator not found on the Ethereum beacon chain.');
+  // Gnosis counts stake in mGNO on its beacon chain: 32 mGNO = 1 GNO.
+  const gnosis = config.chain === 'gnosis';
+  const api = gnosis ? 'https://gnosis-beacon-api.publicnode.com' : 'https://ethereum-beacon-api.publicnode.com';
+  const response = await fetch(`${api}/eth/v1/beacon/states/head/validators/${config.id}`, { signal: AbortSignal.timeout(10_000) });
+  if (!response.ok) throw new Error(`Validator not found on the ${gnosis ? 'Gnosis' : 'Ethereum'} beacon chain.`);
   const { data } = await response.json();
-  const balance = Number(data.balance) / 1e9;
-  const effective = Number(data.validator.effective_balance) / 1e9;
+  const scale = gnosis ? 1e9 * 32 : 1e9;
+  const balance = Number(data.balance) / scale;
+  const effective = Number(data.validator.effective_balance) / scale;
   return {
-    chain: 'ethereum', id: String(data.index), status: data.status, stake: balance, unit: 'ETH',
+    chain: gnosis ? 'gnosis' : 'ethereum', id: String(data.index), status: data.status, stake: balance, unit: gnosis ? 'GNO' : 'ETH',
     // Pending rewards above the effective balance (swept to the withdrawal address periodically).
     rewardsRecent: Number(Math.max(0, balance - effective).toFixed(5)), rewardsLabel: 'unswept rewards',
   };
