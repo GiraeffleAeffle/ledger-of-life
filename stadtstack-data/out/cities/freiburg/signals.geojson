@@ -1224,8 +1224,8 @@
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2022-BehB-26",
-        "version": "633c7b32790008c2d9dc89651944db95b257b636d75319faabb55146d3b52f93",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2022-BehB-26",
+        "version": "d5f4dd80ea539e762a930e78195704710bf1094789062bd4b14edebefc44b342",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1259,15 +1259,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-ASW-151",
-        "version": "231805cca77843219a6b4ef1833782521ab3e323050a098f23c564fe496bd4f9",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-ASW-151",
+        "version": "dc7e34ecfda0886f85b0d93522a9145a23aefaaaad35df34eec4c3aafa66e970",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1301,15 +1302,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-AWW-17",
-        "version": "e8502c0cf0962047f9365e369fbf1f8e87e92d1545618e0609c0f7bed9d1919f",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-AWW-17",
+        "version": "e604a68eb81f7bb7273779e1123982b1217bf37dea5416067c8439f6049812b3",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1343,15 +1345,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-AWW-18",
-        "version": "781aa03d8db4a8a5e84be501a4bb2aac2383b91ce35ca26b6459c152553c9df1",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-AWW-18",
+        "version": "8f2bdcec9936b221987957b9600184abd1b1be33ada23065225fdf7a7e995e9b",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1385,15 +1388,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-73",
-        "version": "31cfaa2f8b37b6287e5d1808df44b5d9db4b6fb33ebf2ddcf7732e080812fb21",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-73",
+        "version": "98ba3aea507014336b6603d579811b29a16329362ed825c833603b4248ae8105",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1427,15 +1431,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-74",
-        "version": "02987c4b48eeb4d34e395088164d59ff807182b4cf343f6987970a1d6d66533e",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-74",
+        "version": "49c6af0054e12c4057292904305ab5f274c2223dac0736bfcab37f032c32b023",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1469,15 +1474,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-75",
-        "version": "254606bf147592d021321a46c2214e397a6941af697773815b56667a66cd1fcc",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-75",
+        "version": "e8509fa67656510a6e7383bc82205adcc84850a9fe4ddc63c3588aab9b4a31b2",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1511,15 +1517,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-76",
-        "version": "dc6609e64d10dff178455824feb65105972c1d1feff4e14ebf2b001cc8c0eb2c",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-76",
+        "version": "7f1e795a91b26c7abd4d748ba13fdc89cf113253920d603f2d448a3844dea515",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1553,15 +1560,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BehB-25",
-        "version": "95c673186bdd31d67b8fa00cf402d728feb51b017f445467275a69d631e94f20",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BehB-25",
+        "version": "c543d39d873d1b4510f42a203e77094ea95689ff40ddbd307af4dbe431c032d8",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1595,15 +1603,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-300",
-        "version": "9b38c3532e1e0062cc016fc12ba096fead0a61f0151487e46fcb43f5c21800f8",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-300",
+        "version": "d555df12c7d6204ac549b76e62873df07f61c04668b1f36a5ff0a8957e7e9ace",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1637,15 +1646,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-301",
-        "version": "b5047dd80cb0019b9c781c5695eacb61232ad57e967dd9e5bd813d5843ae26ec",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-301",
+        "version": "3e5b603e54e7dc0f3090ffe4e721a7f28221101fe3cf1f21c8a6ee0536384687",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1679,15 +1689,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-302",
-        "version": "14dfc2203d76c4dfc8b9545d2d3532ce25f939a7bce12fcfcc8e220aabb4c2c7",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-302",
+        "version": "9e895f90abcc7e849d4a978a8bd42fc5b761722e2b33a5266117c604c0056b74",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1721,15 +1732,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-303",
-        "version": "f621947262a205f1dc794fe483ae7879f0706de5f302c2615e80ebc3d5e52160",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-303",
+        "version": "5c960ced58fd0d2bd73bc28dfa820087551e97caea31891a6a3b54df6c7b401d",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1763,15 +1775,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-304",
-        "version": "b337201cd9368b40322df48932d07420b4886cd7eb38de74e069f6044766e2f9",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-304",
+        "version": "0c744878e104d032743f3c20df38e337e5d3b2179b76e8560209ec448cb5302f",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1805,15 +1818,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-305",
-        "version": "adef8ee0987ab7e552581cf69c3abedba740cbbd559b361ee7802c36d5e5dd6e",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-305",
+        "version": "246f429802c68cbe5f9d78e06eba17752cbb5c907525b0cdb175c03647baff79",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1847,15 +1861,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-120",
-        "version": "982ff1e97ad09c4b92190cf46085a26828fc77e10250f0f62943a5aa1456b595",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-120",
+        "version": "67acd93bef6be8135430836dd2cf8d7baa9c4db618f6a94801847f9cef2908af",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1889,15 +1904,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-121",
-        "version": "a9e7e4eef4b9a1b328e618ce1365f551ba3d6f1b461897174463e4049e8ffbff",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-121",
+        "version": "6450c90b9a534ddde38ea96c1884151724ce2a3e60215d54ada13a5d5fa8566e",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1931,15 +1947,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-122",
-        "version": "ad9ad1c9afe5dae0b039d890be1936ded174904067e800dc4af8149a2fef6aa8",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-122",
+        "version": "fc6b7feaaa191090b78c7802f94e3fab3d744eff487fd73cfbe51c057d30e0d2",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1973,15 +1990,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-123",
-        "version": "b5345ce87e42f6884eb9625e603c9ffe8a4cb5f40e302f03283c2c9fcfffbfc2",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-123",
+        "version": "17810b5cf027852dfb95794ecffa24b5b806000c321ebed6ba60bf628f404c37",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2015,15 +2033,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-KA-168",
-        "version": "2887b5c963d933335bfacd1b7ade1ec5aa204513984bd1cd92cef216c63f98e8",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-KA-168",
+        "version": "ae334c6d27713e4909debe33c9a5b816bd0a8e90be727b56047cde2a769107ae",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2057,15 +2076,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-KJHA-155",
-        "version": "26f9884e634c539bb74f5e5210d4599649a735ed3ca0bc39d47accc24d623d05",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-KJHA-155",
+        "version": "0d4784c75d84d7888e49a22b6c6ba4a89e9e692b0332bb8ed14184c2a760bfed",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2099,15 +2119,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-KJHA-156",
-        "version": "003122a02881ccbb81a9d81b4177f5cc41ab2f2736fa42b0cff7f1b2f9f86876",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-KJHA-156",
+        "version": "7b339f1db71ab1b5bcb10fe0ec620aea89207ee30f154ee1f10d9ecc94be2ac8",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2141,15 +2162,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-MIA-26",
-        "version": "72b97d7c42de754fabe15830fa406db1aadcfcc203a58ebbeedccbb4b8f0abd9",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-MIA-26",
+        "version": "f67cd936c9abeb8c72f8b59b6d0125d4d26daa1bbadb0d9b633e3f28071a7403",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2183,15 +2205,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-MIA-27",
-        "version": "05cceedd704508c7f08c4219cefc023ac5e7f6809a94072f2999c296a0184d47",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-MIA-27",
+        "version": "96c23579ee2e214a2b1abf8451a772d59f90f80020c33da829bff5e7a41cdf59",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2225,15 +2248,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Mobi-26",
-        "version": "ea2563d1531467f199a9f994bd753ec44853b07321fc720b188b2ae5726eda43",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Mobi-26",
+        "version": "8f54cfd72760cefacf19fbc38c7dfd373c281ebbb35ffc67d5447d570e194257",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2267,15 +2291,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Mobi-27",
-        "version": "72dca50581033170f6eb1decb56d64fea469eca2db28df7ce6e9c77a688f5263",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Mobi-27",
+        "version": "c360f126b74b44c59e07c4ed8363ce2af3c8b2f9f43618ed7ef1db681d32b92f",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2309,15 +2334,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-116",
-        "version": "c72d12f4a7fcd2362524d5c97db68c654a4b919f13e3554a021bf1c971ec0dbf",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-116",
+        "version": "bc3beaaed524cdeed6264aebb58ed3054823ffa9e82d1ed9665f12554901ca45",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2351,15 +2377,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-117",
-        "version": "d2d6fe3256ef4263bb122f865ddbcf639f20c08da8790849be86eecce27b0136",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-117",
+        "version": "aabab00e8503e62442f9cd120bb545180dd0d0a702790354348edb8dcaceb8cd",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2393,15 +2420,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-118",
-        "version": "6dc0ea53a5918b3edc40a39a9a3a2b23fbeae3fce15c79078a71c5327d31c458",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-118",
+        "version": "1f2a15be71ec27cb3702d3bd305f847ad60fbfea723cb491e34edac62ada345a",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2435,15 +2463,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-119",
-        "version": "55b6f628038b8133d70b1d0e4b63849950464a33ff9667a51efb6a269980c181",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-119",
+        "version": "1215f7dcb45e0518933d7b5bd8ca6bf611f1a7d0120f426cc051a1e5742ec498",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2477,15 +2506,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_HD-251",
-        "version": "88ad56406f8c1a5ee359508b7ae13b51954f691712461426e21ecc90fbadf201",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_HD-251",
+        "version": "15b763fc00c436a53c561c935b7ab20e998a787febbb76152d50cbc54347ac64",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2519,15 +2549,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_HD-252",
-        "version": "0569f9594e5415f21a4e041e7974f2527321f3d37b93546390e0505af104d69e",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_HD-252",
+        "version": "a2809a4ac44cd88be946388d8eda9ffbcc823b9ae467737b63eab66f71bb5b7d",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2561,15 +2592,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_HD-253",
-        "version": "40d473f069d73669693f3c0525c62d976508dd61d46a38767e65a2e0f14687be",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_HD-253",
+        "version": "bc92a181c62f511a653fa1c3344c89bf9ebc4e4de43129c475609174e16a19eb",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2603,15 +2635,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-112",
-        "version": "b75b26ac8d721c5589deb84cae98d043e3b4af7f68808637eac9b0f08853b39d",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-112",
+        "version": "44d04a64eb31ae511b4c1cecb0af59cbae4927242996393ec018c5dcb3a57e2a",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2645,15 +2678,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-113",
-        "version": "ad6c091a4ae9817566f4e2c5ae14f3f0ed636174dc1c9a3bf93d853ee1b42915",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-113",
+        "version": "330d541d119f092fb17135038ac6ce225db52c6159ad87deda3d3eeb0c763728",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2687,15 +2721,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-114",
-        "version": "ebe394706fc236a0146412f1352b58683c34476b132b8cbf5f7a5b1b0a9895f4",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-114",
+        "version": "fe8bca29725da2a75c711b88b873fc58fd47a58e42db7e689a0a9a99925d6cb1",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2729,15 +2764,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-115",
-        "version": "03daa64f5c14a7e23d3f34aa86900ad4f2265c055269443d47c4c837b6e2b528",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-115",
+        "version": "a9c4cb280a48d64bdd64ac9f7731f2590972fac3e6bf7071d6bfdb00330609f7",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2771,15 +2807,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_LE-138",
-        "version": "f77b52a6f5e3ea5c8514a6c99c38ae3bc8af2a67c4f5e1f73bbb156416aa3217",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_LE-138",
+        "version": "fe5e130e08db77156bd93d39fcabfac74a6d3f0644bdb7dbf8509409d60c49da",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2813,15 +2850,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_LE-139",
-        "version": "7fc38dc348710ed672120ed2a2fe6cd45a1b6b9dea86ea88c7041f130b195339",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_LE-139",
+        "version": "1a4a729b2bf015bffa8c4cf830a6bf21131ce6050fb65a1b6c01882be10e964b",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2855,15 +2893,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_LE-140",
-        "version": "146a4eba01c488a5100f1ead72263eab05918391d3b2a15e4eb9ad2bde27425a",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_LE-140",
+        "version": "7507e0a9bc1e8826bca9a1216098f673047ac5e1164b07b47a1e30b5c09d6b57",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2897,15 +2936,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_MU-121",
-        "version": "243b243ce358d8f4f7e03986afdc2de40cafd8e19852ef99c9bef80a865e39c7",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_MU-121",
+        "version": "b76b4adc7e7a2e28b5cee69cfb992fd2033692c3c0bc39a6bfd522c4972d849d",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2939,15 +2979,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_MU-122",
-        "version": "60eec7a9a2e5d7385ba7602a6ba07e1ce51bf97fda3d385c07233db530f2549d",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_MU-122",
+        "version": "cdeb912bc69a687c63c4869eca351e1a92ccc02f8616081afe75eba617462f85",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2981,15 +3022,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_MU-123",
-        "version": "bd2dfca9934f9ec6ecfbcdd9b5c01e2580e02518f880fc74a8ada722930d7beb",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_MU-123",
+        "version": "851018dfd919ebc124dd456c0b4c754b0a6f73b0a40acef8b08345b96536bcc1",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3023,15 +3065,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_OPF-127",
-        "version": "c07ee6d77f724d0bf703bdba8b644119706e3aa4a60397c8157fe10bc66b9f3c",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_OPF-127",
+        "version": "6c8690ad46bb07f01d6bcdc4879e2d89cd86a985212a4434d643078fc6b80d35",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3065,15 +3108,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_OPF-128",
-        "version": "6664a1b9dc3daad53d9e00a47519314edfedcc6d882896a58abfcac9deb92791",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_OPF-128",
+        "version": "5fb03f5d3ed44ecbd182cbc45aab91d0e834879f768af77741e698c070c22737",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3107,15 +3151,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_OPF-129",
-        "version": "089a1eb612bf314f3e4770b8681d14775bbfaf1f1250e5a3f98c6feed1ea20e1",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_OPF-129",
+        "version": "bd99fe32bedda7284dc2be4a30eb574be011db50af9ce392329ee3315ed86dc3",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3149,15 +3194,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-144",
-        "version": "4beaa903039a71e2e40b1c5378c66e67d90f4c6cf12a13d74845307b9b2a6c03",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-144",
+        "version": "3f1908d6e35e5a4d1776974e30c755b21d2a95697a768cabdb5299fa212b84b8",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3191,15 +3237,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-145",
-        "version": "f29486ac520c959970d82aec9f38ce345229f3e05ae38b9766c03b6ef8bd1059",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-145",
+        "version": "deccb54750f2f0a5a5061da4d4eaeefe6f85c756695f8e0b02bf55fcac2ec588",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3233,15 +3280,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-146",
-        "version": "76693a029553baad3b80fb5601a8a516cd32762fba90a38607f71eecc4b4e30c",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-146",
+        "version": "06598d0af7684b21d66a32fb31a48bf306ac057d3efce38f36c7ddc40a544aaf",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3275,15 +3323,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-147",
-        "version": "e12b9c4b7047d7b24a60f22ee29fa34932661c487bb83733789f7dbfaa5df2e4",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-147",
+        "version": "a4f04f87e3e91f354e02b39abfcffb960a99e872fe1f6e035c2fbff755300ea1",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3317,15 +3366,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-123",
-        "version": "232789de36b74c789bdd13cadd88c47b40dd21eb51a2fcc5ea5e7728ace05f9a",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-123",
+        "version": "287e694a0b47d6bb4874a00b341d76f214d283854692f7224a65f66ea6651e98",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3359,15 +3409,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-124",
-        "version": "898d3b80ee054ac36b8ddc11579e20837526060f13e0c8e6b899bb28bb6e47b8",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-124",
+        "version": "ef3e22e7bcfa002733e9e05aaefc296c08ed1ae5b0813a2c4bf38f403102360c",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3401,15 +3452,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-125",
-        "version": "0fcedd965ac060fd17efd9126ee1cb060b568c2b0ae86c7a6fe9a1bd5e6dc520",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-125",
+        "version": "97dbc28467c309525f4aa1c8db5457abe06eee5f06c441bf6606d1c331b6a6bb",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3443,15 +3495,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-126",
-        "version": "b359390dd5a2ff340ef1846b1ea78a6398c803fdb0a05905437e463165e10991",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-126",
+        "version": "5b7c56110971bd809e329689565f056676f313222e8e1ba0ebc94eb475f9d55d",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3485,15 +3538,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-SO-211",
-        "version": "17721f465fcea4655f4c61879e2a4cd6af7e906d66a2ebcf378175bb2b86465b",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-SO-211",
+        "version": "17f645836c16b663ff5c0cdb402b536209f8a82d5379f2e94bb08da809264ef6",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3527,15 +3581,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-SO-212",
-        "version": "e3a5b7196fc1848e84ae6fdfe4ad64c2e6122dfa0c15b10ae58192fbdce6f111",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-SO-212",
+        "version": "e0790ef88dd5253528724835b6083c15d944488b06c64686bd9cb6be4c1231f6",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3569,15 +3624,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-SP-105",
-        "version": "04260d775266804a0c91b106825363c42fcdbcb06abcb3e37099dde02e61dafc",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-SP-105",
+        "version": "4f5088bc08b82979129ff7726ae6c41e362f8ffabf62eb3ea3b90f2b85068951",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3611,15 +3667,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Strat-36",
-        "version": "7f0fdf810e7a81d3e611f73dcdc255db10fbbea9c8ff1e3852d1107f3f6552ff",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Strat-36",
+        "version": "a0495c0f0034466b2d860dc4a1d97e82ff12a9c64503b57a0ba24c3e1dbe7a9d",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3653,15 +3710,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Strat-37",
-        "version": "c735644731100669572fac74941ee992350ae4fa0b8d510f8bbb9eeab90cbcfc",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Strat-37",
+        "version": "a36f8cce03822cee4c4192e9c308d4d2c647dd3a0cbfd83781f8d2457a2d5bde",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3695,15 +3753,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-The-90",
-        "version": "7ccc14a2d0c5250c699d381e7238f0e0486cdd7fae7a7d126a3c1b5f7c1f2efd",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-The-90",
+        "version": "96376ab199fe0d043ab775afca984973cf8f03bd631015f28e11e47bceb6686d",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3737,15 +3796,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-UKA-42",
-        "version": "6592ff0da6031a74b5e887830afed4edf68b06536c1f74ab11ba983a3364fe3d",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-UKA-42",
+        "version": "6f8b52819b274be8e943aed9e52f07ac7894e7b6eb226d751f322e2eacdd1fae",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3779,15 +3839,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-UKA-43",
-        "version": "8ad5ffbc6103e37a6ee8aceac5dff227034d936f3631206f797e578db6e89eb3",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-UKA-43",
+        "version": "2860cf3384bb9b63d696ff3e48667940548dbbfde3b5f1561945aa8335ec70b2",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3821,15 +3882,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-HFA-119",
-        "version": "b894ffd5fd4833c2eb25dfea52e656b7c3108658733c78bfceddf408b5a91f35",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-HFA-119",
+        "version": "b1b2e4ea09a37ca7ff5c72c9daab2b883d8e16f47746c4aa4d1f7303704be9ce",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3863,15 +3925,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_HD-250",
-        "version": "1cf4c8585b6b544d9deb45897495c82b51da329a70413fe11a551f5840ca7f3f",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_HD-250",
+        "version": "3c64309396e0495cf295a4d25df4e5bda5f635fe8993c3fa1b24f44070aefebe",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3905,15 +3968,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_HD-264",
-        "version": "742fce71b25fc8fa8f7c835d900664ac5c196e1524e65a7e34e655caefa53143",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_HD-264",
+        "version": "d5c12871995cab562c1b6a946a39bf202d39c10800f25f379c1436b0a7faec69",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3947,15 +4011,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_HD-265",
-        "version": "b594b8ca70643b7a32b9541fafc75b98faa9840acce58185ad0d465e70979336",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_HD-265",
+        "version": "65aabe9ba2d61d8c16b00ede3809de097434effd1743be77d5b00f88bb5ede34",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -3989,15 +4054,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_LE-137",
-        "version": "527cf612fa0baf5a31dead5b9abf42034c4521129d8ca68a046bc2d598112453",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_LE-137",
+        "version": "3f421962a73d300bb80710b81c1357eca7eae51399f003100f1889e37411557c",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -4031,15 +4097,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_MU-120",
-        "version": "d72aabe98842b891f770af9a5211513d6f2ec4341beb8946a886a230651a43ad",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_MU-120",
+        "version": "1172ce450be3c91f7381cf68b09a4e4c8062f4865db4c06698c9173c99130e8c",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -4073,15 +4140,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_OPF-126",
-        "version": "d40b7fd50aa445d7ed1184c7ff44f4b0efcee803855205cfbb58e706da60b9d2",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_OPF-126",
+        "version": "30e7e34bf8a16b11d84b1661ab73860b8132268f099bcdfcccc1b68203444ea9",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -4115,15 +4183,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_TI-143",
-        "version": "76a8d66ebd7072fb2c3a72b09283f82aa73c00825e27f73e01a35fd85472f46b",
+        "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2Fni_2026-OR_TI-143",
+        "version": "da9e505f0a59c156cb08f971afe516b4446f2d9200adee5d3f5ea31aaf7e6644",
         "cityId": "freiburg",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -4157,7 +4226,8 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T00:00:00+02:00"
+        "asOf": "2026-09-25T00:00:00+02:00",
+        "upstreamModified": "2026-09-25T00:00:00+02:00"
       }
     },
     {
@@ -22595,7 +22665,7 @@
       },
       "properties": {
         "id": "osm:node-4068964423",
-        "version": "5fe4fb43ea34fd234bfa5c68a3c1c1ba1b64f284197fd6bc5f7e4d6456b3c4c6",
+        "version": "2430dc626742c8a324a9ad6219ea39f80333b66550152d585160031f56cfe6bc",
         "cityId": "freiburg",
         "kind": "place",
         "category": "kindergarten",
@@ -22617,6 +22687,18 @@
             "title": "OpenStreetMap contributors",
             "publisher": "OpenStreetMap contributors",
             "locator": "node/4068964423; tags.name, tags.amenity",
+            "retrievedAt": "2026-09-26T17:22:08.637Z",
+            "sha256": "b842451ef883b608ce76fbc65a10092cf0c9f5885ec4ad0451ad6154fe14dd77",
+            "snapshot": true,
+            "licence": "ODbL 1.0",
+            "reuse": "open_licence"
+          },
+          {
+            "url": "https://www.openstreetmap.org/way/286375825",
+            "snapshotUrl": "https://gall.openstreetmap.de/api/interpreter",
+            "title": "OpenStreetMap contributors",
+            "publisher": "OpenStreetMap contributors",
+            "locator": "way/286375825; tags.name, tags.amenity",
             "retrievedAt": "2026-09-26T17:22:08.637Z",
             "sha256": "b842451ef883b608ce76fbc65a10092cf0c9f5885ec4ad0451ad6154fe14dd77",
             "snapshot": true,
@@ -44096,53 +44178,6 @@
             "title": "OpenStreetMap contributors",
             "publisher": "OpenStreetMap contributors",
             "locator": "way/281442965; tags.name, tags.amenity",
-            "retrievedAt": "2026-09-26T17:22:08.637Z",
-            "sha256": "b842451ef883b608ce76fbc65a10092cf0c9f5885ec4ad0451ad6154fe14dd77",
-            "snapshot": true,
-            "licence": "ODbL 1.0",
-            "reuse": "open_licence"
-          }
-        ],
-        "extraction": {
-          "method": "structured"
-        },
-        "reviewState": "candidate",
-        "asOf": "2026-09-26T17:22:08.637Z"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          7.8170975,
-          47.9702794
-        ]
-      },
-      "properties": {
-        "id": "osm:way-286375825",
-        "version": "4b3bb078e0bca28a808a142513e2d579d9d1a372f1a2ad5f481b8eac249047e4",
-        "cityId": "freiburg",
-        "kind": "place",
-        "category": "kindergarten",
-        "title": "Waldkindergarten Schönberg",
-        "statement": "Waldkindergarten Schönberg ist in OpenStreetMap als kindergarten eingetragen. Betrieb und Öffnungszeiten nicht geprüft.",
-        "status": "OSM-Eintrag, nicht offiziell geprüft",
-        "startDate": null,
-        "endDate": null,
-        "nextStep": "Aktuelle Angaben direkt beim Ort prüfen.",
-        "unknowns": [
-          "Aktueller Betrieb und tatsächliche Öffnungszeiten"
-        ],
-        "scale": "street",
-        "geometryPrecision": "approximate",
-        "sources": [
-          {
-            "url": "https://www.openstreetmap.org/way/286375825",
-            "snapshotUrl": "https://gall.openstreetmap.de/api/interpreter",
-            "title": "OpenStreetMap contributors",
-            "publisher": "OpenStreetMap contributors",
-            "locator": "way/286375825; tags.name, tags.amenity",
             "retrievedAt": "2026-09-26T17:22:08.637Z",
             "sha256": "b842451ef883b608ce76fbc65a10092cf0c9f5885ec4ad0451ad6154fe14dd77",
             "snapshot": true,

@@ -6,6 +6,7 @@ import {cacheDir,cachedFetch,hash,jsonFile,save,signal,sourceFrom} from './commo
 import {cities} from './cities.ts';
 import {provider} from './provider.ts';
 import {geocode} from './council.ts';
+import {councilId} from './dedupe.ts';
 import type {Catalogue,FeatureCollection} from './schema.ts';
 const threshold=.8;const model=provider.id;
 async function pdfText(bytes:Uint8Array,identifier:string){const filename=join(cacheDir,'pdf',identifier+'.pdf'),textfile=join(cacheDir,'pdf',identifier+'.txt');await save(filename,bytes);const task=getDocument({data:new Uint8Array(bytes),useSystemFonts:true});try{const pdf=await task.promise,page=await pdf.getPage(1),content=await page.getTextContent(),text=content.items.map(item=>'str' in item?item.str:'').join(' ');await save(textfile,text);return text;}finally{await task.destroy();}}
@@ -54,7 +55,7 @@ for(const city of cities.filter(c=>c.endpoint&&catalogue.cities.some(x=>x.id===c
  let attempted=0,evaluated=0;
  for(const candidate of candidates){
   if(attempted>=10||evaluated>=1)break;
-  const paper=collection.features.find(f=>f.properties.id===`ccf:${encodeURIComponent(candidate.sourceId)}`);
+  const paper=collection.features.find(f=>f.properties.id===councilId(candidate.sourceId));
   if(!paper)continue;
   attempted++;
   try{

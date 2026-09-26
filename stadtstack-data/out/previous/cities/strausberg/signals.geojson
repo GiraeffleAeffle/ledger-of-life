@@ -124,7 +124,7 @@
       },
       "properties": {
         "id": "atlas:altstadt-quartier",
-        "version": "d3473c5cdf0d9fa25e54cb0a49417b8cd535c5eb996e9a628b2f667131e7bee0",
+        "version": "90992497a8cfc101ba705336bc05931ea579c3c31fe3f55335f0f4d74b9a85bb",
         "cityId": "strausberg",
         "kind": "consultation",
         "category": "Wohnen & Stadtentwicklung",
@@ -133,7 +133,7 @@
         "status": "Beteiligungsfrist endete am 2026-09-20; aktueller Verfahrensstand nicht bestätigt",
         "startDate": "2026-08-17",
         "endDate": "2026-09-20",
-        "nextStep": "Nach Fristende: Stellungnahmen bis 20.09.2026; anschließend Abwägung und weitere Entscheidung der Stadtverordnetenversammlung. Ein Termin dafür ist in den ausgewerteten Quellen nicht belegt.",
+        "nextStep": "Nach Fristende: Abwägung und weitere Entscheidung der Stadtverordnetenversammlung. Ein Termin dafür ist in den ausgewerteten Quellen nicht belegt.",
         "unknowns": [
           "Verbindlicher Baubeginn und Fertigstellungstermin",
           "Aktuell terminbestimmende Abhängigkeit",
@@ -8076,6 +8076,104 @@
         },
         "reviewState": "candidate",
         "asOf": "2026-09-26T17:13:34.916Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": null,
+      "properties": {
+        "id": "budget:investment-outlays-2025",
+        "version": "1b6eafbbcc3540570b354a3609295cda432032a85b5460fa0ee87aede9a99eee",
+        "cityId": "strausberg",
+        "kind": "budget",
+        "category": "Geplante Investitionsauszahlungen",
+        "title": "Investitionsplan 2025: 17.941.270 €",
+        "statement": "§ 1 der Haushaltssatzung setzt für 2025 geplante Auszahlungen aus Investitionstätigkeit von 17.941.270 Euro fest; das ist kein Betrag tatsächlicher Ausgaben.",
+        "status": "Haushaltsansatz; keine tatsächliche Ausgabe",
+        "startDate": "2025-01-01",
+        "endDate": "2025-12-31",
+        "nextStep": "Tatsächliche Auszahlungen gesondert prüfen.",
+        "unknowns": [
+          "Tatsächliche Ausgaben nicht durch Haushaltssatzung belegt",
+          "Einzelprojekte und vollständiger Plan online nicht verfügbar"
+        ],
+        "scale": "city",
+        "geometryPrecision": "none",
+        "sources": [
+          {
+            "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
+            "snapshotUrl": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
+            "title": "Haushaltssatzung 2025/2026",
+            "publisher": "Stadt Strausberg",
+            "locator": "PDF Seite 1, § 1, Zeile „Auszahlungen aus Investitionstätigkeit“, Spalte 2025",
+            "retrievedAt": "2026-09-26T16:49:24.355Z",
+            "sha256": "721b47b826a1913cee55054d1251857b2c2a6cf4a7f7319a8124110d16332315",
+            "snapshot": true,
+            "licence": "§ 5 UrhG – amtliches Werk",
+            "reuse": "official_work"
+          }
+        ],
+        "extraction": {
+          "method": "llm",
+          "model": "codex:gpt-6-luna",
+          "faithfulness": {
+            "score": 1,
+            "reason": "The score is 1.00 because no contradictions were identified, indicating the actual output is faithful to the retrieval context.",
+            "evaluator": "DeepEval FaithfulnessMetric / codex:gpt-6-luna",
+            "threshold": 0.8
+          }
+        },
+        "reviewState": "auto_checked",
+        "asOf": "2026-09-26T16:49:24.355Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": null,
+      "properties": {
+        "id": "budget:investment-outlays-2026",
+        "version": "02fe062da7ba03d3295b5de4e7fa449bb2a3dbcca35b8ffdcb90cec3823ed245",
+        "cityId": "strausberg",
+        "kind": "budget",
+        "category": "Geplante Investitionsauszahlungen",
+        "title": "Investitionsplan 2026: 12.609.320 €",
+        "statement": "Die Haushaltssatzung setzt für 2026 geplante Auszahlungen aus Investitionstätigkeit von 12.609.320 Euro fest.",
+        "status": "Haushaltsansatz; keine tatsächliche Ausgabe",
+        "startDate": "2026-01-01",
+        "endDate": "2026-12-31",
+        "nextStep": "Weitere Angaben stehen in § 1 der Haushaltssatzung.",
+        "unknowns": [
+          "Tatsächliche Ausgaben nicht durch Haushaltssatzung belegt",
+          "Einzelprojekte und vollständiger Plan online nicht verfügbar"
+        ],
+        "scale": "city",
+        "geometryPrecision": "none",
+        "sources": [
+          {
+            "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
+            "snapshotUrl": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
+            "title": "Haushaltssatzung 2025/2026",
+            "publisher": "Stadt Strausberg",
+            "locator": "PDF Seite 1, § 1, Zeile „Auszahlungen aus Investitionstätigkeit“, Spalte 2026",
+            "retrievedAt": "2026-09-26T16:49:24.355Z",
+            "sha256": "721b47b826a1913cee55054d1251857b2c2a6cf4a7f7319a8124110d16332315",
+            "snapshot": true,
+            "licence": "§ 5 UrhG – amtliches Werk",
+            "reuse": "official_work"
+          }
+        ],
+        "extraction": {
+          "method": "llm",
+          "model": "codex:gpt-6-luna",
+          "faithfulness": {
+            "score": 1,
+            "reason": "The score is 1.00 because there are no contradictions; the output is fully faithful to the retrieval context.",
+            "evaluator": "DeepEval FaithfulnessMetric / codex:gpt-6-luna",
+            "threshold": 0.8
+          }
+        },
+        "reviewState": "auto_checked",
+        "asOf": "2026-09-26T16:49:24.355Z"
       }
     }
   ]

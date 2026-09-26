@@ -1,6 +1,6 @@
 {
   "schemaVersion": "stadtstack-signals-v1",
-  "generatedAt": "2026-09-26T17:32:14.234Z",
+  "generatedAt": "2026-09-26T18:11:35.149Z",
   "publisher": "Stadtstack (independent derived factual summaries)",
   "cities": [
     {
@@ -35,7 +35,7 @@
           "url": "http://localhost:4317/api/atlas/strausberg",
           "licence": "unknown",
           "reuse": "facts_with_attribution",
-          "retrievedAt": "2026-09-26T17:16:59.816Z",
+          "retrievedAt": "2026-09-26T18:11:35.369Z",
           "status": "ok"
         },
         {
@@ -45,7 +45,7 @@
           "url": "http://localhost:4317/api/atlas/strausberg/map",
           "licence": "unknown",
           "reuse": "facts_with_attribution",
-          "retrievedAt": "2026-09-26T17:16:59.829Z",
+          "retrievedAt": "2026-09-26T18:11:35.404Z",
           "status": "ok"
         },
         {
@@ -140,13 +140,13 @@
       ],
       "temporalCoverage": {
         "start": null,
-        "end": "2026-09-26T17:32:14.365Z"
+        "end": "2026-09-26T18:11:35.632Z"
       },
       "spatialCoverage": "bbox:13.8131843,52.5142025,14.020926,52.6035192",
       "licence": "Mixed; see each source",
       "minUrl": "cities/strausberg/signals.min.geojson",
-      "fullBytes": 306554,
-      "minBytes": 150133
+      "fullBytes": 305389,
+      "minBytes": 149209
     },
     {
       "id": "koeln",
@@ -320,7 +320,7 @@
           "url": "https://github.com/komma-systems/ccf",
           "licence": "unknown",
           "reuse": "facts_with_attribution",
-          "retrievedAt": "2026-09-26T17:32:31.958Z",
+          "retrievedAt": "2026-09-26T18:11:35.776Z",
           "status": "ok"
         },
         {
@@ -330,7 +330,7 @@
           "url": "https://github.com/komma-systems/ccf",
           "licence": "unknown",
           "reuse": "facts_with_attribution",
-          "retrievedAt": "2026-09-26T17:32:35.276Z",
+          "retrievedAt": "2026-09-26T18:11:39.095Z",
           "status": "ok"
         },
         {
@@ -516,13 +516,13 @@
       ],
       "temporalCoverage": {
         "start": null,
-        "end": "2026-09-26T17:32:40.895Z"
+        "end": "2026-09-26T18:11:44.737Z"
       },
       "spatialCoverage": "bbox:6.7725303,50.8304399,7.162028,51.0849743",
       "licence": "Mixed; see each source",
       "minUrl": "cities/koeln/signals.min.geojson",
-      "fullBytes": 15616443,
-      "minBytes": 6084649
+      "fullBytes": 15521627,
+      "minBytes": 5996904
     },
     {
       "id": "muenster",
@@ -616,7 +616,7 @@
           "url": "https://github.com/komma-systems/ccf",
           "licence": "unknown",
           "reuse": "facts_with_attribution",
-          "retrievedAt": "2026-09-26T17:32:41.019Z",
+          "retrievedAt": "2026-09-26T18:11:44.855Z",
           "status": "ok"
         },
         {
@@ -626,7 +626,7 @@
           "url": "https://github.com/komma-systems/ccf",
           "licence": "unknown",
           "reuse": "facts_with_attribution",
-          "retrievedAt": "2026-09-26T17:32:46.294Z",
+          "retrievedAt": "2026-09-26T18:11:50.120Z",
           "status": "ok"
         },
         {
@@ -722,13 +722,13 @@
       ],
       "temporalCoverage": {
         "start": null,
-        "end": "2026-09-26T17:32:51.867Z"
+        "end": "2026-09-26T18:11:55.705Z"
       },
       "spatialCoverage": "bbox:7.4737853,51.8401448,7.7743634,52.0600251",
       "licence": "Mixed; see each source",
       "minUrl": "cities/muenster/signals.min.geojson",
-      "fullBytes": 11226387,
-      "minBytes": 2358367
+      "fullBytes": 11126389,
+      "minBytes": 2270634
     },
     {
       "id": "wuppertal",
@@ -822,7 +822,7 @@
           "url": "https://github.com/komma-systems/ccf",
           "licence": "unknown",
           "reuse": "facts_with_attribution",
-          "retrievedAt": "2026-09-26T17:33:10.123Z",
+          "retrievedAt": "2026-09-26T18:11:55.845Z",
           "status": "ok"
         },
         {
@@ -832,7 +832,7 @@
           "url": "https://github.com/komma-systems/ccf",
           "licence": "unknown",
           "reuse": "facts_with_attribution",
-          "retrievedAt": "2026-09-26T17:33:15.654Z",
+          "retrievedAt": "2026-09-26T18:12:02.219Z",
           "status": "ok"
         },
         {
@@ -878,13 +878,13 @@
       ],
       "temporalCoverage": {
         "start": null,
-        "end": "2026-09-26T17:33:23.372Z"
+        "end": "2026-09-26T18:12:09.948Z"
       },
       "spatialCoverage": "bbox:7.0140725,51.1657181,7.31343,51.3180951",
       "licence": "Mixed; see each source",
       "minUrl": "cities/wuppertal/signals.min.geojson",
-      "fullBytes": 3144526,
-      "minBytes": 1677262
+      "fullBytes": 2954642,
+      "minBytes": 1498856
     },
     {
       "id": "castrop-rauxel",
@@ -998,7 +998,7 @@
           "url": "https://github.com/komma-systems/ccf",
           "licence": "unknown",
           "reuse": "facts_with_attribution",
-          "retrievedAt": "2026-09-26T17:35:02.530Z",
+          "retrievedAt": "2026-09-26T18:13:52.435Z",
           "status": "ok"
         },
         {
@@ -1008,7 +1008,7 @@
           "url": "https://github.com/komma-systems/ccf",
           "licence": "unknown",
           "reuse": "facts_with_attribution",
-          "retrievedAt": "2026-09-26T17:35:02.580Z",
+          "retrievedAt": "2026-09-26T18:13:52.487Z",
           "status": "ok"
         },
         {
@@ -1064,13 +1064,13 @@
       ],
       "temporalCoverage": {
         "start": null,
-        "end": "2026-09-26T17:35:02.615Z"
+        "end": "2026-09-26T18:13:52.524Z"
       },
       "spatialCoverage": "bbox:7.2424932,51.5202054,7.3718796,51.6262817",
       "licence": "Mixed; see each source",
       "minUrl": "cities/castrop-rauxel/signals.min.geojson",
-      "fullBytes": 672225,
-      "minBytes": 356857
+      "fullBytes": 641536,
+      "minBytes": 329735
     },
     {
       "id": "duesseldorf",
@@ -1320,13 +1320,13 @@
       ],
       "temporalCoverage": {
         "start": null,
-        "end": "2026-09-26T17:35:10.507Z"
+        "end": "2026-09-26T18:14:00.429Z"
       },
       "spatialCoverage": "bbox:6.6888147,51.1243747,6.9399324,51.3524872",
       "licence": "Mixed; see each source",
       "minUrl": "cities/duesseldorf/signals.min.geojson",
-      "fullBytes": 4297700,
-      "minBytes": 2256975
+      "fullBytes": 4314001,
+      "minBytes": 2254461
     },
     {
       "id": "dresden",
@@ -1456,13 +1456,13 @@
       ],
       "temporalCoverage": {
         "start": null,
-        "end": "2026-09-26T17:35:14.890Z"
+        "end": "2026-09-26T18:14:04.816Z"
       },
       "spatialCoverage": "bbox:13.5793237,50.9749317,13.9660626,51.1776864",
       "licence": "Mixed; see each source",
       "minUrl": "cities/dresden/signals.min.geojson",
-      "fullBytes": 3957150,
-      "minBytes": 2053955
+      "fullBytes": 3957351,
+      "minBytes": 2052357
     },
     {
       "id": "freiburg",
@@ -1562,13 +1562,13 @@
       ],
       "temporalCoverage": {
         "start": null,
-        "end": "2026-09-26T17:35:15.105Z"
+        "end": "2026-09-26T18:14:05.029Z"
       },
       "spatialCoverage": "bbox:7.6620055,47.9035777,7.9308444,48.0710579",
       "licence": "Mixed; see each source",
       "minUrl": "cities/freiburg/signals.min.geojson",
-      "fullBytes": 1941246,
-      "minBytes": 1007096
+      "fullBytes": 1944247,
+      "minBytes": 1006349
     }
   ]
 }

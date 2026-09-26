@@ -7,6 +7,7 @@ import {collectAutobahn} from './autobahn.ts';
 import {collectCcf,collectOparl} from './council.ts';
 import {collectGeodata} from './geodata.ts';
 import {geoFeeds} from './geodata-registry.ts';
+import {deduplicateCitySignals,duplicateStats} from './dedupe.ts';
 import type {Catalogue,FeatureCollection,Signal} from './schema.ts';
 const target=process.argv.includes('--city')?process.argv[process.argv.indexOf('--city')+1]:'all';const selected=target==='all'?cities:cities.filter(c=>c.id===target);if(!selected.length)throw Error(`Unknown city ${target}`);
 const old=await jsonFile<Catalogue>(join(cacheDir,'staging','catalogue.json'));const catalogue:Catalogue={schemaVersion:'stadtstack-signals-v1',generatedAt:new Date().toISOString(),publisher:'Stadtstack (independent derived factual summaries)',cities:target==='all'?[]:old?.cities.filter(c=>c.id!==target)??[]};
@@ -30,7 +31,7 @@ for(const city of selected){let features:Signal[]=[],sources:Catalogue['cities']
    if(result.sources.some(s=>s.status==='failed')){
     const previous=await jsonFile<FeatureCollection>(join(cacheDir,'staging','cities',city.id,'signals.geojson'));
     const currentIds=new Set(result.features.map(f=>f.properties.id));
-    const prefixes=id==='wfs'||id==='arcgis-rest'?geoFeeds.filter(f=>f.cityId===city.id&&f.sourceType===id).map(f=>`${f.id}:`):[`${id}:`];
+    const prefixes=id==='ccf'||id==='oparl'?['council:',`${id}:`]:id==='wfs'||id==='arcgis-rest'?geoFeeds.filter(f=>f.cityId===city.id&&f.sourceType===id).map(f=>`${f.id}:`):[`${id}:`];
     if(previous)features.push(...previous.features.filter(f=>prefixes.some(prefix=>f.properties.id.startsWith(prefix))&&!currentIds.has(f.properties.id)));
    }
    console.log(`${city.id}/${id}: ${result.features.length}`);
@@ -39,9 +40,15 @@ for(const city of selected){let features:Signal[]=[],sources:Catalogue['cities']
    const url=id==='atlas'?`http://localhost:4317/api/atlas/${city.id}`:id==='osm'?'https://overpass-api.de/api/interpreter':id==='autobahn'?'https://verkehr.autobahn.de/o/autobahn/':id==='ccf'?'https://github.com/komma-systems/ccf':id==='wfs'||id==='arcgis-rest'?geoFeeds.find(f=>f.cityId===city.id&&f.sourceType===id)?.url??'https://oparl.org/':city.endpoint??'https://oparl.org/';
    sources.push(sourceStatus(id,id,id,url,id==='osm'||id==='wfs'||id==='arcgis-rest'?'open_licence':id==='autobahn'?'unknown':'facts_with_attribution',new Date().toISOString(),'failed',String(error)));
    const previous=await jsonFile<FeatureCollection>(join(cacheDir,'staging','cities',city.id,'signals.geojson'));
-   const prefixes=id==='wfs'||id==='arcgis-rest'?geoFeeds.filter(f=>f.cityId===city.id&&f.sourceType===id).map(f=>`${f.id}:`):[`${id}:`];
+   const prefixes=id==='ccf'||id==='oparl'?['council:',`${id}:`]:id==='wfs'||id==='arcgis-rest'?geoFeeds.filter(f=>f.cityId===city.id&&f.sourceType===id).map(f=>`${f.id}:`):[`${id}:`];
    if(previous)features.push(...previous.features.filter(f=>prefixes.some(prefix=>f.properties.id.startsWith(prefix))));
   }
   for(const failure of staleFetches.slice(staleOffset))sources.push(sourceStatus(`stale-${id}`,id,id,failure.url,'unknown',new Date().toISOString(),'stale',failure.error));
  }
- const unique=new Map(features.map(f=>[f.properties.id,f]));const collection:FeatureCollection={type:'FeatureCollection',features:[...unique.values()].sort((a,b)=>a.properties.id.localeCompare(b.properties.id))};await save(join(cacheDir,'staging','cities',city.id,'signals.geojson'),JSON.stringify(collection));catalogue.cities.push({id:city.id,name:city.name,state:city.state,center:city.center,bbox:city.bbox,sources,temporalCoverage:{start:null,end:new Date().toISOString()},spatialCoverage:`bbox:${city.bbox.join(',')}`,licence:'Mixed; see each source'});await save(join(cacheDir,'staging','catalogue.json'),JSON.stringify(catalogue));}
+ const before=duplicateStats(features),deduplicated=deduplicateCitySignals(features),after=duplicateStats(deduplicated);
+ console.log(`${city.id}/duplicates: OParl URL ${before.councilUrl} -> ${after.councilUrl}; title+date+kind ${before.titleDate} -> ${after.titleDate}; OSM node/way ${before.osmNodeWay} -> ${after.osmNodeWay}`);
+ const collection:FeatureCollection={type:'FeatureCollection',features:deduplicated};
+ await save(join(cacheDir,'staging','cities',city.id,'signals.geojson'),JSON.stringify(collection));
+ catalogue.cities.push({id:city.id,name:city.name,state:city.state,center:city.center,bbox:city.bbox,sources,temporalCoverage:{start:null,end:new Date().toISOString()},spatialCoverage:`bbox:${city.bbox.join(',')}`,licence:'Mixed; see each source'});
+ await save(join(cacheDir,'staging','catalogue.json'),JSON.stringify(catalogue));
+}
