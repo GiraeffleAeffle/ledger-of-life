@@ -41,3 +41,7 @@ The faithfulness threshold is `0.8`. On a short ordinance §1 excerpt, a support
 ## Read-only MCP tools
 
 `list_cities`; `search_signals_near(cityId,lon,lat,radius_m,kinds?)`; `search_signals_along(cityId,line:[[lon,lat],...],buffer_m,kinds?)`; `get_signal(id)`; `get_sources(id)`; `get_changes(cityId)`. Spatial searches return full signal Features with exact sources, precision, review status, as-of. Changes return stable ID arrays, not duplicated city-sized Feature payloads; retrieve current records via `get_signal` and removed records from `out/previous/`. Null-geometry citywide records are intentionally not assigned to arbitrary nearby points; retrieve by id or process the citywide collection separately. MCP only reads published files and cannot fetch or mutate source documents.
+
+## Consumers
+
+The owner's Stadtstack Projektatlas reads this `out/` snapshot for its optional city views via `GET /api/signals`, `GET /api/signals/<city>?kind=<kind>` (compact map data), and `GET /api/signals/<city>/<encoded-id>` (full record). Its existing `/api/atlas/<city>` and `/map` remain the pipeline's curated-project input, not pipeline output.
