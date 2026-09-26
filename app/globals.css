@@ -3069,6 +3069,9 @@ a.city-row:hover strong { text-decoration: underline; }
 .life-timeline li.planned { opacity: 0.7; }
 .life-timeline li.planned::before { background: #fff; border: 2px dashed #1f7a4d; width: 6px; height: 6px; }
 .life-timeline span { font-size: 0.85rem; opacity: 0.75; }
+.life-timeline .inline-form { width: min(100%, 520px); max-width: none; margin: 8px 0; padding: 16px; border-radius: 14px; background: #f7f9f5; }
+.life-timeline .inline-form input { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 10px; background: white; }
+.life-timeline li > .text-button { justify-self: start; }
 .connection-list { display: grid; }
 .connection-row { display: grid; grid-template-columns: 20px 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(0, 0, 0, 0.05); font-size: 0.9rem; }
 .connection-level { font-size: 0.75rem; opacity: 0.65; }
