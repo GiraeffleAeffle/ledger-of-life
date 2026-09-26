@@ -1,0 +1,230 @@
+# Domain ontology: machine-readable model of the product.
+# Read this before designing features. Every concept has: definition, relations, lifecycle (if
+# any), invariants, where it lives in code, and `reality` (how real it is today; see levels).
+# Human-readable companion: docs/ONTOLOGY.md. Keep both in sync when concepts change.
+
+version: 1
+updated: 2026-09-26
+product:
+  working_name: Deposit workspace   # final name undecided
+  thesis: >-
+    Money and assets that everyday life forces people to lock away (rental deposits first)
+    should keep working for their owner, without weakening the protection they exist for.
+  one_sentence: >-
+    A home-centred app that shows everything you own, secures rental deposits in escrows that
+    earn, lets tenants claim and invest those earnings, and connects the other things a
+    household owns that produce value (solar, validators, later cars and home shares).
+
+# How real something is. Every number or feature shown to users must map to one level.
+reality_levels:
+  live_mainnet: Real assets on a production network. Nothing is at this level yet.
+  testnet_real: Real program/contract execution on a test network with test tokens.
+  testnet_simulated: Real execution, but an input is simulated on purpose (for example test yield).
+  read_only_live: Real third-party data, read-only (Home Assistant, validators, prices).
+  prototype: Code exists and ran (tests or a script), but it is not an app feature yet.
+  illustration: Visual or copy only; no execution.
+  roadmap: Idea recorded; nothing built.
+
+layers:  # product architecture, bottom-up
+  - id: identity
+    concepts: [Person, Wallet, IdentityAssurance]
+  - id: homes
+    concepts: [Home, Listing, Application, Agreement, Role]
+  - id: custody
+    concepts: [Escrow, Operation, Claim, Settlement, Payout]
+  - id: earnings
+    concepts: [YieldSource, Earnings, Release]
+  - id: ownership
+    concepts: [Asset, Position, Venue, Distribution, Adapter]
+  - id: vision
+    concepts: [CollateralDeposit, HomeEquityPath, DeviceTokenization]
+
+concepts:
+  Person:
+    definition: A verified human using the app. Identity is provider-verified; roles are not stored on the person.
+    has: [Wallet (1 per chain family), IdentityAssurance]
+    relations: {participates_in: Agreement (via Role), owns: Asset, configures: Adapter}
+    code: [src/wallets/identity-policy.ts, src/server/authenticated.ts]
+    reality: testnet_real
+
+  Wallet:
+    definition: A user-owned signing key per chain family (Solana, EVM), embedded via Privy, unlocked by passkey session.
+    invariants:
+      - The server never holds a person's wallet key.
+      - Sponsors pay fees but have no authority over a person's assets.
+    code: [src/wallets/provider.tsx, src/wallets/signing-policy.ts]
+    reality: testnet_real
+
+  IdentityAssurance:
+    definition: How strongly a Person is verified.
+    levels:
+      passkey: testnet_real
+      backup_email_and_recovery_proof: testnet_real   # skipped in local demo mode (DEMO_SKIP_RECOVERY=1)
+      eu_digital_identity_wallet: roadmap              # EUDI Wallet, eIDAS 2.0; German eID as interim
+    code: [src/server/recovery.ts, src/components/onboarding.tsx]
+
+  Role:
+    definition: The relation between a Person and an Agreement. One of tenant, landlord, arbitrator.
+    invariants:
+      - A role is granted by an Agreement, never by a UI selector.
+      - One person and one wallet per role per agreement.
+      - The arbitrator only acts on a disputed claim.
+    note: The onboarding "Who are you?" choice is a display preference, not a Role.
+    code: [src/server/agreements.ts#agreementRole]
+
+  Home:
+    definition: A physical dwelling. Today it appears only as the subject of a Listing and Agreement.
+    future: May be owned (HomeEquityPath) or represented by HomeShare assets.
+    reality: illustration
+
+  Listing:
+    definition: A landlord's offer of a Home, with rent, required deposit, earnings policy and details (city, rooms, size, move-in date, photos).
+    lifecycle: [open, let]
+    relations: {offered_by: Person(landlord), receives: Application, results_in: Agreement}
+    code: [src/server/listings.ts]
+    reality: testnet_real   # off-chain record
+
+  Application:
+    definition: A Person's request to rent a Listing. Applicants never see each other.
+    lifecycle: [submitted, chosen | not_chosen]
+    code: [src/server/listings.ts]
+
+  Agreement:
+    definition: The tenancy terms bound to exact parties; accepted by tenant and landlord over one digest.
+    fields: [property, network, requiredSecurity, releaseAllowed, "parties{tenant,landlord,arbitrator}", "accepted{tenant,landlord}"]
+    lifecycle: [parties_joining, awaiting_acceptance, accepted]
+    invariants:
+      - The on-chain Escrow's policy hash equals the accepted agreement digest.
+      - Changing terms or parties changes the digest and requires new acceptance.
+    code: [src/server/agreements.ts]
+    reality: testnet_real
+
+  Escrow:
+    definition: The custody instance holding one Agreement's deposit. It enforces authority, amounts, recipients and order.
+    implementations:
+      solana_pull_v2: {code: programs/rental_escrow/src, program: DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb, network: solana-devnet, reality: testnet_real}
+      robinhood_rental_escrow: {code: contracts/evm/src/RentalEscrow.sol, network: robinhood-testnet, reality: testnet_real}
+      collateral_escrow: {code: contracts/evm/src/CollateralEscrow.sol, network: robinhood-testnet, reality: prototype}
+    lifecycle: [awaiting_funding, active, claim_proposed, disputed, settling, closed]
+    invariants:
+      - The required security is never released as earnings.
+      - Payouts go only to fixed, canonical recipient accounts.
+      - Pull payouts; a party breaking its own account blocks only itself.
+      - Each action consumes the next nonce; replays are rejected.
+    relations: {secures: Agreement, supplies_to: YieldSource, produces: Earnings, settles_via: Settlement}
+
+  Operation:
+    definition: One signed chain action (possibly a bundle of escrow instructions) persisted before broadcast and reconciled from finalized receipts.
+    lifecycle: [prepared, signed, broadcast, unknown, finalized, failed, expired]
+    invariants:
+      - Signed bytes are immutable; retries resend the same bytes.
+      - An expired unsigned review may be replaced only with the same action, deltas, fee ceiling and deployment.
+      - Finality requires the expected token deltas and state transition.
+    bundles: [fund_and_supply, accept_and_settle, resolve_and_settle, redeem_and_settle]
+    code: [src/server/solana-service.ts, src/server/solana-initialization.ts]
+    reality: testnet_real
+
+  YieldSource:
+    definition: Where an Escrow's idle deposit earns.
+    implementations:
+      kamino_devnet: {reality: testnet_real, note: "No borrowers on devnet, so 0 % yield."}
+      solana_test_credit_yield: {reality: testnet_simulated, note: "Test-only program instruction standing in for interest."}
+      robinhood_test_vault: {reality: testnet_simulated, code: contracts/evm/src/testnet/TestnetMarket.sol}
+      morpho_mainnet_vault: {reality: prototype, note: "Mainnet-fork tests only."}
+
+  Earnings:
+    definition: Value held by an Escrow above the required security (and any funding reserve).
+    invariants:
+      - claimable = min(idle cash, total value - required security), only while active and if permitted.
+    relations: {released_by: Release, to: Asset(CashBalance of tenant)}
+
+  Release:
+    definition: The tenant claims Earnings during the tenancy to their own fixed account.
+    code: [programs/rental_escrow/src/lib.rs#release_earnings, contracts/evm/src/RentalEscrow.sol#releaseEarnings]
+    reality: testnet_simulated   # real execution; yield input simulated
+
+  Claim:
+    definition: The landlord's proposed deduction at move-out (0 allowed), with evidence.
+    lifecycle: [proposed, accepted | disputed, decided]
+    invariants: [claim <= required security, arbitrator decision <= claim]
+
+  Settlement:
+    definition: Fixes each party's owed amount after all lending positions are redeemed. It moves no tokens (pull-v2).
+    relations: {creates: Payout x2}
+
+  Payout:
+    definition: A permissionless transfer of one party's owed amount to its fixed account. The sponsor runs it automatically.
+    reality: testnet_real
+
+  Asset:
+    definition: Anything a Person owns that has value.
+    subclasses:
+      CashBalance: {examples: [test USDC (Solana), tUSDG (Robinhood testnet)], reality: testnet_real}
+      LockedDeposit: {definition: "The tenant's residual claim on an active Escrow.", reality: testnet_real}
+      SecurityToken: {examples: [tSPYx (our Token-2022 copy of SPYx), official Robinhood testnet TSLA], reality: testnet_real, future: [xStocks, Robinhood Stock Tokens on mainnet]}
+      HomeShare: {definition: "Fractional claim on a home's value and rent.", reality: illustration}
+      ProductiveDevice: {examples: [home solar, staking validator, electric car], reality: read_only_live, note: "Observed through Adapters; not tokenized."}
+
+  Position:
+    definition: A quantity of an Asset held in a Person's wallet, valued at a reference price.
+    code: [src/server/portfolio.ts, src/server/robinhood-demo.ts#robinhoodHoldings, src/components/assets.tsx]
+
+  Venue:
+    definition: Where a Person exchanges cash for an Asset.
+    implementations:
+      tspyx_test_market: {reality: testnet_real, note: "Atomic co-signed swap at the live SPYx price."}
+      robinhood_test_desk: {reality: testnet_real, note: "TestStockDesk at the live TSLAx price."}
+      jupiter_xstocks: {reality: read_only_live, note: "Price quotes only."}
+
+  Distribution:
+    definition: Value an Asset pays its holder (dividends, rent, staking rewards, energy savings).
+    implementations:
+      token_multiplier: {reality: testnet_simulated, note: "tSPYx scaled-UI multiplier, as xStocks do."}
+      validator_rewards: {reality: read_only_live}
+      solar_savings: {reality: read_only_live}
+      home_rent_share: {reality: roadmap}
+
+  Adapter:
+    definition: A read-only connector that observes an Asset or ProductiveDevice outside the app and reports its value or income.
+    invariants:
+      - Read-only. Adapters never move money.
+      - Credentials are stored server-side, per Person.
+    implementations:
+      home_assistant_solar: {reality: read_only_live, code: src/server/adapters.ts#readSolar}
+      validator: {chains: [gnosis, ethereum, solana], reality: read_only_live, code: src/server/adapters.ts#readValidator}
+      electric_car: {reality: roadmap}
+      bank_account: {reality: roadmap}
+
+  CollateralDeposit:
+    definition: Securing an Agreement with SecurityTokens (for example 150 %) instead of cash; top-up grace period; forced sale only of what's needed; rest returned in kind.
+    code: [contracts/evm/src/CollateralEscrow.sol]
+    reality: prototype
+    legal_note: German law (§551 BGB) allows other securities only by agreement; the landlord accepts the price risk.
+
+  HomeEquityPath:
+    definition: Accumulating HomeShares that count toward acquiring a whole home.
+    reality: roadmap
+    constraint: A real swap needs a legal wrapper, a notary and the land register; model it as down-payment credit.
+
+  DeviceTokenization:
+    definition: Selling shares of a ProductiveDevice's future income (solar, validator, car).
+    reality: roadmap
+    constraint: Securities and consumer-protection regulation; start with observation (Adapters).
+
+journeys:
+  tenant: [choose_role, create_account, fund_wallet, browse_listings, apply, accept_agreement, secure_deposit, claim_earnings_any_time, invest, move_out_respond, receive_payout]
+  landlord: [choose_role, create_account, post_listing, choose_applicant, invite_arbitrator, accept_agreement, create_deposit_space, propose_claim, receive_payout]
+  arbitrator: [choose_role, create_account, join_by_invitation, decide_disputed_claim]
+  owner_of_things: [connect_adapter, see_everything_owned]   # any role
+  journey_ui: {stages: [agreement, space, deposit, living, move-out, paid], code: src/server/journey.ts, rule: "Exactly one person has an action per phase; the others see what they wait for."}
+
+networks:
+  solana_devnet: {used_for: [Escrow, Operation, tSPYx market], rpc: "Helius (SOLANA_RPC_URL)"}
+  robinhood_testnet: {chain_id: 46630, used_for: [RentalEscrow earnings demo, CollateralEscrow prototype, official test TSLA]}
+  gnosis_beacon: {used_for: [validator adapter]}
+  solana_mainnet_read: {used_for: [validator adapter, SPYx/TSLAx reference prices via Jupiter]}
+
+test_tooling:   # never presented as wallet or user evidence
+  test_signers: {code: [src/server/test-signer.ts, scripts/test-signer.mjs], purpose: "Operator keys play people end to end."}
+  test_helpers: {code: src/server/test-helpers.ts, gate: "SOLANA_TEST_SIGNER_MODE=1, local store, loopback", purpose: "One real account walks the whole journey."}
+  demo_mode: {env: [DEMO_SKIP_RECOVERY, NEXT_PUBLIC_DEMO_SKIP_RECOVERY], effect: "No recovery proof, optional backup email, no Privy confirmation modals."}

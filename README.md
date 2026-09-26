@@ -57,7 +57,7 @@ flowchart LR
 
 Account credentials being present is not a successful onboarding test. Native APIs authenticate actual provider identities and fixed tenancy roles; they never inherit the walkthrough's role selector or balances. The sponsor pays fees and receives no general investment authority.
 
-Read the [build spec](docs/HACKATHON_BUILD_SPEC.md), [ADRs](docs/adr/README.md), [wallet setup](docs/WALLET_SETUP.md), [Robinhood operator guide](docs/ROBINHOOD_NATIVE_API.md), and [Solana operator guide](docs/SOLANA_NATIVE_API.md).
+Start with the [product ontology](docs/ONTOLOGY.md) (machine-readable: [`ontology.yaml`](docs/ontology.yaml)). Read the [build spec](docs/HACKATHON_BUILD_SPEC.md), [ADRs](docs/adr/README.md), [wallet setup](docs/WALLET_SETUP.md), [Robinhood operator guide](docs/ROBINHOOD_NATIVE_API.md), and [Solana operator guide](docs/SOLANA_NATIVE_API.md).
 
 ## Validate
 
