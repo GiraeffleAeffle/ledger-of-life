@@ -2,7 +2,7 @@
 import { Lightbulb } from 'lucide-react';
 import { AREAS, type Area } from './areas';
 
-type Status = 'planned' | 'prototype' | 'partly built' | 'illustration';
+type Status = 'planned' | 'prototype' | 'partly built' | 'illustration' | 'built';
 interface Idea {
   id: string;
   area: Exclude<Area, 'overview' | 'ideas'>;
@@ -38,13 +38,17 @@ export const IDEAS: Idea[] = [
   { id: 'devices', area: 'money', status: 'planned', title: 'Electric car and other devices',
     how: 'Charging and vehicle-to-grid income read like the solar and validator adapters.',
     enables: 'Everything your hardware earns in one total.' },
+  { id: 'personal-map', area: 'places', status: 'built', title: 'Personal map · near home, in my city, on my way to work',
+    how: 'MapLibre overlays published, sourced public city signals. Optional home/work pins are kept only in this browser; distance and straight-line commute matching run entirely on-device. Candidate signals remain visibly not yet reviewed.',
+    enables: 'See what public sources say may matter nearby without giving your home or work coordinates to the app server. Coverage and review vary by city.' },
   { id: 'budget', area: 'places', status: 'partly built', title: 'Where the money goes',
-    how: 'The Places explainer links to income-tax and trade-tax laws, Brandenburg equalisation and Strausberg’s gazette and inspection route. No unverified budget totals.',
-    enables: 'Understand the statutory flow and find the actual city plan rather than treating your own taxes as a city receipt.',
+    how: 'Places explains statutory flows and links Strausberg’s 2025/26 ordinance, with planned investment outlays of €17,941,270 (2025) and €12,609,320 (2026). The full detailed plan is offered for inspection; no actual spending is inferred.',
+    enables: 'Distinguish an adopted headline plan from money spent or an individual tax receipt.',
     needs: 'The complete city budget plan, annexes, reusable licence and verified line items before a spending breakdown can be shown.' },
-  { id: 'scales', area: 'places', status: 'illustration', title: 'From your street to the world',
-    how: 'Places now illustrates Strausberg → Märkisch-Oderland → Brandenburg → Germany → EU with official portal links, not a live feed at each level.',
-    enables: 'See which levels can be explored today; neighbourhood and world data are not integrated.' },
+  { id: 'scales', area: 'places', status: 'partly built', title: 'From your street to the world',
+    how: 'The private personal map now matches city-wide published signals against on-device home/work pins in a neighbourhood ring and approximate straight commute corridor. Places still links district → state → Germany → EU portals; those wider levels are not live feeds.',
+    enables: 'Start with what may affect your neighbourhood and city without disclosing your exact home or work to the server.',
+    needs: 'Reviewed, rights-cleared coverage across more cities and district/state/world levels.' },
   { id: 'measurable', area: 'places', status: 'partly built', title: 'A measurable city',
     how: 'Read-only live DWD weather via Bright Sky and nearby uncalibrated citizen PM sensors with observation time and distance.',
     enables: 'Inspect sourced local measurements; this is not a calibrated city-wide sensor layer.',
@@ -59,11 +63,11 @@ export const IDEAS: Idea[] = [
     needs: 'City partners for vouchers, registration help and any consent-based interest matching.' },
 ];
 
-const STATUS_LABEL: Record<Status, string> = { planned: 'Planned', prototype: 'Prototype', 'partly built': 'Partly built', illustration: 'Illustration' };
+const STATUS_LABEL: Record<Status, string> = { planned: 'Planned', prototype: 'Prototype', 'partly built': 'Partly built', illustration: 'Illustration', built: 'Built' };
 
 /** Roadmap work left in an area, separate from the built features and illustrations above. */
 export function PlannedHere({ area, go }: { area: Idea['area']; go: (area: Area) => void }) {
-  const ideas = IDEAS.filter((i) => i.area === area && i.status !== 'illustration');
+  const ideas = IDEAS.filter((i) => i.area === area && i.status !== 'illustration' && i.status !== 'built');
   if (!ideas.length) return null;
   return (
     <section className="planned-here">

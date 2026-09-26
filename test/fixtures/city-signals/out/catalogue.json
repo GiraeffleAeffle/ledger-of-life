@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "stadtstack-signals-v1",
+  "generatedAt": "2026-09-26T10:00:00Z",
+  "cities": [{
+    "id": "strausberg", "name": "Strausberg (fictional demo records)", "state": "Brandenburg",
+    "center": [13.882, 52.579], "bbox": [13.77, 52.50, 14.00, 52.65],
+    "sources": [{"id":"fictional-demo","kind":"demonstration","publisher":"Fictional test fixture — not the city","url":"https://example.org/fictional-city-signals","licence":"fictional-demo","reuse":"test only","retrievedAt":"2026-09-26"}]
+  }]
+}

@@ -29,3 +29,37 @@
 .places-unavailable { padding: 12px; border: 1px dashed var(--line, #9baaae); border-radius: 9px; }
 .idea-status.illustration { background: #eaf0fb; color: #34558a; }
 @media (max-width: 680px) { .places-measures, .places-groups { grid-template-columns: 1fr; } .places-heading { flex-wrap: wrap; } .places-scales li { grid-template-columns: 1fr; gap: 2px; } }
+.personal-map-section { min-width: 0; padding: 22px; display: grid; gap: 12px; }
+.personal-map-section h2 { margin: 5px 0 0; font-size: 1.3rem; }
+.personal-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.personal-pin-controls { display: flex; flex-wrap: wrap; gap: 10px; }
+.personal-pin-controls > div { display: flex; flex: 1 1 280px; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.personal-pin-controls button { font-size: .8rem; }
+.personal-privacy, .personal-corridor, .personal-tile-note { font-size: .82rem; color: var(--muted); line-height: 1.5; }
+.personal-map-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(230px, 320px); align-items: start; gap: 14px; }
+.personal-map-layout > div:first-child { min-width: 0; }
+.personal-map-layout:not(:has(.personal-feature-panel)) { grid-template-columns: 1fr; }
+.personal-map-canvas { height: min(60vh, 520px); min-height: 330px; width: 100%; border-radius: 12px; overflow: hidden; background: #e8eee6; }
+.personal-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; font-size: .83rem; }
+.personal-legend label { display: inline-flex; align-items: center; gap: 5px; }
+.personal-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; }
+.personal-feature-panel { position: relative; border: 1px solid var(--line); border-radius: 12px; padding: 16px; max-height: 590px; overflow: auto; overflow-wrap: anywhere; }
+.personal-feature-panel h3 { margin: 8px 0; }
+.personal-close { float: right; border: 0; background: transparent; font-size: 1.6rem; cursor: pointer; }
+.personal-meaning { border-left: 3px solid var(--green); padding: 8px 12px; background: var(--soft); }
+.personal-source-meta { font-size: .76rem; color: var(--muted); overflow-wrap: anywhere; }
+.personal-source-meta a { color: var(--green); text-decoration: underline; }
+.personal-rings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.personal-rings.city-only { grid-template-columns: minmax(0, 1fr); }
+.personal-rings.city-only .personal-ring { max-width: 780px; width: 100%; }
+.personal-ring { min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.personal-ring h3 { display: flex; justify-content: space-between; gap: 8px; margin: 0 0 10px; font-size: 1rem; }
+.personal-ring h3 span { font-variant-numeric: tabular-nums; color: var(--green); }
+.personal-ring ul { margin: 0; padding: 0; list-style: none; max-height: 500px; overflow: auto; }
+.personal-ring li { border-top: 1px solid var(--line); padding: 10px 0; }
+.personal-ring li button { display: grid; gap: 5px; width: 100%; padding: 0; text-align: left; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.personal-ring li button span { font-size: .82rem; line-height: 1.4; }
+.personal-overview { display: grid; gap: 8px; }
+.personal-overview button { justify-self: start; border: 0; background: transparent; padding: 0; cursor: pointer; }
+@media (max-width: 900px) { .personal-rings { grid-template-columns: 1fr; } }
+@media (max-width: 680px) { .personal-map-section { padding: 16px; } .personal-map-layout { grid-template-columns: minmax(0, 1fr); } .personal-map-canvas { min-height: 320px; } .personal-feature-panel { max-height: none; } }

@@ -5,6 +5,7 @@ import { CityCard } from './city';
 import type { Area } from './areas';
 import type { PlacesResult, LiveSection, PlaceSource } from '@/server/places-live';
 import { strausbergSources as strausberg } from '@/data/cities/strausberg';
+import { PersonalMap, CITY_CHANGED_EVENT } from './personal-map';
 import './places.css';
 
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
@@ -41,7 +42,8 @@ export function PlacesArea({ request }: { request: Request; go?: (area: Area) =>
   }, [request, version]);
   const strausbergCity = places?.cityId === 'strausberg';
   return <div className="places-area">
-    <CityCard request={request} onCityChange={() => { setLoading(true); setVersion((current) => current + 1); }} />
+    <PersonalMap request={request} />
+    <CityCard request={request} onCityChange={() => { window.dispatchEvent(new Event(CITY_CHANGED_EVENT)); setPlaces(null); setLoading(true); setVersion((current) => current + 1); }} />
     {loading && <p className="places-loading"><Loader2 size={16} className="spin" /> Reading public city sources…</p>}
     {!loading && !places && <p className="places-unavailable">{reason === 'choose' ? 'Choose your city above to discover public sources.' : reason}</p>}
     {places && <>
@@ -88,7 +90,7 @@ export function PlacesArea({ request }: { request: Request; go?: (area: Area) =>
       </section>
       <section className="card places-section">
         <div className="places-heading"><div><span className="eyebrow">03 · EXPLAINER, NOT YOUR TAX RECEIPT</span><h2>Where the money goes</h2></div><Badge level="illustration" /></div>
-        <p>German law describes these flows; 15% is a national allocation, <strong>not</strong> 15% of your own income-tax bill paid directly to your city. No city totals have been verified here.</p>
+        <p>German law describes these flows; 15% is a national allocation, <strong>not</strong> 15% of your own income-tax bill paid directly to your city. The budget figures below, where available, are plans, not actual spending or your tax receipt.</p>
         <ul className="places-flow">
           <li><strong>Residence → municipality</strong> · Municipalities receive 15% of wage and assessed income tax, allocated by statutory keys. <Link url="https://www.gesetze-im-internet.de/gemfinrefg/__1.html">GemFinRefG § 1</Link></li>
           <li><strong>Businesses → operating municipality</strong> · Trade tax belongs to the municipality where business operations take place. <Link url="https://www.gesetze-im-internet.de/gewstg/__4.html">GewStG § 4</Link></li>
@@ -99,18 +101,18 @@ export function PlacesArea({ request }: { request: Request; go?: (area: Area) =>
         <div className="places-publications"><h3>What {places.city} publishes</h3>
           {strausbergCity ? <>
             <ul>
-              <li><Link url={strausberg.gazette}>2025/26 double-budget ordinance</Link> · adopted 7 Nov 2024; gazette published 23 Nov 2024, pp. 24–25. The detailed plan and annexes are offered by appointment for inspection at the Kämmerei; a full online plan was not found in the sources examined. <Link url={strausberg.inspectionLaw}>BbgKVerf § 69</Link></li>
+              <li><Link url="https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf">2025/26 budget ordinance, § 1, PDF page 1</Link> · <strong>planned investment outlays:</strong> €17,941,270 in 2025 and €12,609,320 in 2026. These are adopted plan amounts, <strong>not money spent</strong> and not a project-by-project allocation. Adopted 7 Nov 2024; published in the city gazette 23 Nov 2024. The detailed plan and annexes are offered for inspection at the Kämmerei; a full online plan was not found. <Link url={strausberg.inspectionLaw}>BbgKVerf § 69</Link></li>
               <li><Link url={strausberg.gazette}>2018 annual account</Link> · adopted 26 Sep 2024, gazette p. 2. This is the latest whole-city adopted annual account found in the examined sources, <strong>not</strong> a claim that none was adopted since.</li>
               <li><Link url={strausberg.informationAccessLaw}>Request the complete 2025/26 plan and annexes electronically</Link> from Stadt Strausberg Kämmerei under Brandenburg&apos;s AIG; access may be subject to exclusions, fees and redaction.</li>
-              <li>Comparison: <Link url={strausberg.bernau}>Bernau</Link> and <Link url={strausberg.brandenburg}>Brandenburg an der Havel</Link> publish budget material online; this does not establish Strausberg&apos;s plan totals.</li>
+              <li>Comparison: <Link url={strausberg.bernau}>Bernau</Link> and <Link url={strausberg.brandenburg}>Brandenburg an der Havel</Link> publish detailed budget material online; this does not establish Strausberg&apos;s detailed plan allocations or actual spending.</li>
             </ul>
-            <p className="places-meta">Source: city Amtsblatt / linked legal and municipal sources · ordinance 23 Nov 2024; research checked {checked} · no explicit open-data licence found for city PDFs; links only · illustration.</p>
+            <p className="places-meta">Source: Stadt Strausberg 2025/26 budget ordinance, § 1, PDF page 1; city Amtsblatt pp. 24–25 · publication 23 Nov 2024; research checked {checked} · no explicit open-data licence found for city PDFs; linked source with attributed headline figures only · illustration, not actual spending.</p>
           </> : <p>Not researched yet for {places.city}. No city budget figures or publication claims available.</p>}
         </div>
       </section>
       <section className="card places-section">
         <div className="places-heading"><div><span className="eyebrow">04 · THE WIDER PICTURE</span><h2>From your street to the world</h2></div><Badge level="illustration" /></div>
-        <p className="small-copy">A navigation map, not a live feed of decisions at each level. Street-level data and world coverage are not available here.</p>
+        <p className="small-copy">A navigation map, not a live feed at every level. The personal map above shows published street and neighbourhood signals where covered; district, state and world feeds are not integrated.</p>
         <ol className="places-scales">{(strausbergCity ? strausberg.hierarchy : [
           { level: `City · ${places.city}`, available: 'City atlas (if researched); other levels not researched yet', url: '' },
           { level: 'District · not researched yet', available: 'No verified local link', url: '' },

@@ -38,7 +38,7 @@ flowchart TB
 | **1 · Me** | Who am I here, and what may others learn? | Passkey sign-in and own wallets (built) · EU Digital Identity Wallet check: adult, optional city (built, test environment) · roles derived per context (built for tenancies, owned listings and city; general memberships planned) · **life timeline** (partly built: app tenancies and self-declared earlier places) |
 | **2 · Home** | Where do I live, and what is locked or owed there? | Listing → application → agreement (built) · deposit escrow that earns, claimable earnings, move-out payouts (built, Solana devnet, simulated yield) · service-charge account (prototype, example costs and test prepayment, optional live Home Assistant daily consumption) · stocks as the deposit (calculator only; testnet contract prototype) · home solar via Home Assistant (built, read-only) |
 | **3 · Money & ownership** | What do I own and earn? | Portfolio total (built) · tokenized stocks on Solana and Robinhood Chain (built, test tokens) · validator stake (built, read-only) · local investment leads for Strausberg (illustration, not verified offers) · home tokens towards owning a home (roadmap) · EV and device income (roadmap) |
-| **4 · Places** | What is changing where I live, and what can my city afford? | Stadtstack atlas projects and consultations (built, read-only) · current DWD weather and nearby uncalibrated citizen PM readings (read-only live) · named OSM clubs/sports facilities (read-only live, not an official directory) · statutory money-flow explainer and Strausberg budget publication/access links (illustration; budget totals unavailable) · city → Landkreis → Land → Germany → EU links (illustration) · ALLRIS calendar/document links (illustration, no OParl feed) · atlas 3D project map (in Stadtstack) |
+| **4 · Places** | What is changing where I live, and what can my city afford? | Personal MapLibre map of published city-wide signals, with private home/work pins and on-device neighbourhood / approximate commute matching (built, read-only; coverage and review vary by city) · Stadtstack atlas projects and consultations (built, read-only) · current DWD weather and nearby uncalibrated citizen PM readings (read-only live) · named OSM clubs/sports facilities (read-only live, not an official directory) · statutory money-flow explainer and Strausberg 2025/26 ordinance headline planned investment outlays (built, not actual spending) · city → Landkreis → Land → Germany → EU links (illustration) · ALLRIS calendar/document links (illustration, no Strausberg OParl feed) |
 | **5 · Have a say** | Where can I take part, and where am I welcome? | Open consultations with deadlines (built, via atlas) · Strausberg ALLRIS council calendar/document links (illustration, no imported meetings) · newcomer clubs/sports discovery (read-only live OSM), with interests, registration help and voucher still planned · offering expertise (roadmap) |
 
 ### 2.1 Scales
@@ -60,9 +60,11 @@ could later replace a self-declared address where an authority issues one.
 - **Privacy:** the timeline belongs to the person and is never shared by default; a future disclosure
   could share a derived predicate (for example "3 completed tenancies, all deposits returned"), not addresses.
 
-### 2.3 Public money flow (explainer built; budget figures unavailable)
+### 2.3 Public money flow (explainer built; ordinance headline plan published)
 
-Places now links the primary laws for how money reaches municipalities in Germany:
+Places links the primary laws for how money reaches municipalities in Germany and cites Strausberg's
+published budget ordinance for two headline **planned investment outlay** figures; these are not actual
+spending or allocations to any particular project:
 
 - Municipalities receive a **15 % share** of wage and assessed income tax under GemFinRefG § 1, allocated
   by statutory keys linked to residence. This is **not** 15 % of an individual's tax bill paid to their city.
@@ -71,11 +73,13 @@ Places now links the primary laws for how money reaches municipalities in German
 - Brandenburg redistributes to municipalities through its BbgFAG fiscal equalisation system.
 - The city budget and council records show plans and decisions only if the underlying sources are available.
 
-**Why the budget isn't in the app:** Strausberg's 2025/26 ordinance is published in the Amtsblatt, but
-the detailed plan and annexes were offered for inspection at the Kämmerei. BbgKVerf § 69 provides for
-public notice and inspection, not a duty to publish the complete plan online. An electronic copy may be
-requested from the city under Brandenburg's AIG, subject to its access rules. The full plan, reusable
-licence and verified line items were not obtained, so Places quotes no budget totals. See
+**Published ordinance versus missing detail:** Strausberg's [2025/26 budget ordinance, § 1,
+PDF page 1](https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf)
+states planned investment outlays of **€17,941,270 for 2025** and **€12,609,320 for 2026**.
+The complete detailed plan and annexes were not found online and are offered for inspection at the
+Kämmerei. BbgKVerf § 69 provides notice and inspection, not a duty to publish the whole plan online.
+An electronic copy may be requested under Brandenburg's AIG subject to access rules. No project
+breakdown, actual expenditure or open-data licence is inferred. See
 [Strausberg budget research](research/CITY_BUDGET_DATA_STRAUSBERG_BRANDENBURG.md#legal-obligations-and-where-the-plan-actually-is)
 and [Places source checks](research/ROADMAP_DATA_SOURCES_STRAUSBERG.md).
 
@@ -107,6 +111,30 @@ Strausberg's city and district directories. These OSM contributions are not an o
 Registration help, interest matching, city-partner offers and a welcome voucher are still planned;
 interests would stay with the person and matching would require explicit consent.
 
+### 2.6 Personal city map (built; public signal coverage varies)
+
+The authenticated `GET /api/city-signals?city=<id>` reads the published
+`stadtstack-data/out/catalogue.json`, `cities/<id>/signals.geojson` and `changes.json`
+(or `STADTSTACK_DATA_DIR`), caching file contents by mtime; it accepts **city ID only**, never home,
+work or commute coordinates. City selection comes from the opted-in EU-wallet locality or the
+chosen city; uncovered cities offer the catalogue's covered cities for exploration. The hand-written
+fictional Strausberg fixture is under `test/fixtures/city-signals/out/` for geometric tests only,
+not app data; real published files are the runtime source.
+
+The resident clicks to place home and work pins (or separately requests browser geolocation).
+They are stored only in per-city `localStorage` and can be removed. The map does not recenter on
+private pins, and no geocoding, routing or private-coordinate request is made. MapLibre uses
+OpenFreeMap tiles: **tile requests disclose the viewed map area to the tile provider**, even though
+saved pin coordinates are never transmitted; self-hosted tiles could reduce this later.
+
+The browser matches published public geometries to a 1 km straight-line neighbourhood radius and
+a 400 m approximate corridor around the straight line from home to work—not a walking or
+driving route. Citywide items and a full city list remain available without a pin. Feature cards
+show source locators, as-of date, review state (`candidate` means **not yet reviewed**), geometry
+precision and an LLM faithfulness score when present. Source status is retained for provenance;
+dated consultations whose windows have passed display **closed**, and past roadworks display
+**ended (scheduled end; completion not verified)**. Coverage is not a complete inventory.
+
 ## 3. How the app should be organised
 
 ### Before the reorganisation
@@ -122,11 +150,11 @@ interests would stay with the person and matching would require explicit consent
 
 | Navigation item | Contains | Moves from |
 |---|---|---|
-| **Overview** | Identity line, portfolio total, the one next step across all areas, what changed since last visit | Page heading, identity strip, portfolio total |
+| **Overview** | Identity line, portfolio total, the one next step across all areas, compact \"Near you / in your city\" counts and top sourced signals matched on-device | Page heading, identity strip, portfolio total |
 | **Me** | Identity and credentials, roles derived per context (agreement party, owned listing, chosen or wallet city), life timeline with an on-demand earlier-place form, connected adapters and their permissions | Identity strip details, adapter settings |
 | **Home** | Active tenancies with a journey that stops at "Living here" until move-out starts, compact past tenancies, on-demand find/rent actions, service charges, home energy | Tenancy cards, Homes card, solar tile |
 | **Money** | All holdings in one list (deposit entitlement, stocks per network, validator, later local investments), earnings, invest actions | Portfolio tiles, Invest card, Robinhood tile, validator tile |
-| **Places** | My city (atlas projects and consultations; read-only weather, citizen PM and OSM clubs), sourced money-flow explainer, official directories and wider-scale link illustration | City card |
+| **Places** | Map-first private home/work neighbourhood, straight-line commute and city-wide signals (MapLibre, OpenFreeMap tiles); then existing atlas, weather/air, OSM clubs, money-flow explainer, official directories and wider-scale links | City card |
 | **Ideas** (or "Coming") | Roadmap items, clearly separate and labeled | Dashed roadmap tiles |
 
 Built: the sidebar and the mobile tab bar show these areas; each renders only its own content. Remaining
@@ -191,9 +219,9 @@ Today each connection is built differently (`adapters.ts`, `eudi.ts`, `city.ts`,
 | Stadtstack atlas (city projects) | Places | Built, read-only live | **Keep** atlas provenance and review state |
 | DWD via Bright Sky and sensor.community | Places | Read-only live weather and nearby uncalibrated citizen PM sensors | **Keep** times, distances, licences and stale labels; no city-wide air-quality claim |
 | OSM clubs and sports via Overpass | Places | Read-only live named objects, not an official directory | **Keep** ODbL attribution and official Strausberg directory links; no partner offer implied |
-| Public money flow and Strausberg budget access | Places | Partly built: sourced statutory explainer and publication/inspection links, no budget totals | **Next**: obtain complete plan, reuse terms and verified line items before showing figures |
-| From your street to the world | Places | Illustration: Strausberg → Landkreis → Brandenburg → Germany → EU portals | **Keep** links only; street and world feeds not built |
-| Council decisions | Places | Partly built: Strausberg ALLRIS calendar and document links only; no confirmed OParl endpoint | **Later**: a permitted, reviewed structured feed before showing meetings |
+| Public money flow and Strausberg budget access | Places | Sourced statutory explainer and ordinance headline **planned** investment outlays (2025 €17,941,270; 2026 €12,609,320), no actual spending or detailed project allocations | Obtain complete plan and reuse terms before a spending breakdown |
+| From your street to the world | Places | Personal map's home-neighbourhood, city and approximate straight-line commute matching built; district/state/country/EU links remain illustration | Expand reviewed city coverage, then wider-scale feeds |
+| Council decisions | Places | Strausberg ALLRIS links only; where the public signals feed covers other cities, distinguish sourced papers/meetings from adopted decisions | Reviewed/rights-cleared council data and explicit decisions |
 | Home Assistant solar | Home | Built, read-only | **Keep** |
 | Validator (Gnosis/Ethereum/Solana) | Money | Built, read-only | **Keep** |
 | Life timeline | Me | Partly built: app tenancies and labeled self-declared earlier places | **Next**: residence attestations where issued, private milestones |
@@ -206,10 +234,12 @@ Today each connection is built differently (`adapters.ts`, `eudi.ts`, `city.ts`,
 
 ### 4.4 Suggested order
 
-1. **Done:** reorganise the signed-in overview and build a partial life timeline, a service-charge
-   prototype, local-investment illustrations and sourced read-only Places feeds.
-2. **Next:** obtain Strausberg's full 2025/26 plan and reuse terms through inspection or an AIG request.
-   Only then consider verified budget figures; statutory percentages are not city budget amounts.
+1. **Done:** reorganise the signed-in overview, build a partial life timeline, service-charge
+   prototype, local-investment illustrations, read-only Places feeds and the on-device personal map.
+   Strausberg's ordinance headline *planned* investment outlays are shown with source; no actual
+   spending or detailed allocations are claimed.
+2. **Next:** obtain Strausberg's full 2025/26 detailed plan and reuse terms through inspection or
+   an AIG request before showing a project-level breakdown.
 3. Introduce the common adapter provenance/permission contract while preserving each feed's reality
    level, observation time, licence and stale state.
 4. Pursue authorized meter/invoice inputs before any service-charge settlement, and confirm a permitted

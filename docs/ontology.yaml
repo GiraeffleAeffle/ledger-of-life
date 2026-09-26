@@ -30,13 +30,14 @@ reality_levels:
   testnet_real: Real program/contract execution on a test network with test tokens.
   testnet_simulated: Real execution, but an input is simulated on purpose (for example test yield).
   read_only_live: Real third-party data, read-only (Home Assistant, validators, prices).
+  self_declared_local: A person's unverified pin placed on their own device; never sent to the server.
   prototype: Code exists and ran (tests or a script), but it is not an app feature yet.
   illustration: Visual or copy only; no execution.
   roadmap: Idea recorded; nothing built.
 
 layers:  # product architecture, bottom-up
   - id: identity
-    concepts: [Person, Wallet, IdentityAssurance, Credential, DisclosurePolicy, Context, Membership]
+    concepts: [Person, Wallet, IdentityAssurance, Credential, DisclosurePolicy, Context, Membership, CitySignal, MyPlaces]
   - id: homes
     concepts: [Home, Listing, Application, Agreement, Role]
   - id: custody
@@ -52,7 +53,7 @@ concepts:
   Person:
     definition: A verified human using the app. Identity is provider-verified; roles are not stored on the person.
     has: [Wallet (1 per chain family), IdentityAssurance]
-    relations: {participates_in: Agreement (via Role), owns: Asset, configures: Adapter}
+    relations: {participates_in: Agreement (via Role), owns: Asset, configures: Adapter, sees_relevant: CitySignal (matched on device with MyPlaces)}
     code: [src/wallets/identity-policy.ts, src/server/authenticated.ts]
     reality: testnet_real
 
@@ -86,12 +87,33 @@ concepts:
     open_ended: true   # kinds are examples, not a closed list; a life has many more
     kinds:
       tenancy: {reality: testnet_real, note: "Agreement plus escrow; the only transactional shared context built today. City is read-only."}
-      city: {reality: read_only_live, note: "Built read-only: atlas projects and consultations for the EU-wallet city (opt-in locality) or chosen city, retaining the atlas's source time and review state; Bright Sky/DWD weather, nearby uncalibrated sensor.community PM readings and named OSM clubs/sports facilities have their own time, licence and stale labels. Strausberg official directories and ALLRIS calendar/documents are outbound links only; no OParl meeting feed was confirmed. Budget flows and the city-to-EU hierarchy are illustrations without city budget totals."}
+      city: {reality: read_only_live, note: "Built read-only: atlas projects/consultations and public Stadtstack CitySignals for EU-wallet or chosen city, with as-of, review and geometry precision. Private MyPlaces matching runs on device. Bright Sky/DWD weather, citizen PM and OSM clubs retain their own times/licences. Strausberg ALLRIS links are outbound only; the published 2025/26 ordinance has headline planned investment outlays, not actual spending or a detailed plan."}
       house_community: {reality: roadmap, note: "Shared building costs; ties to ServiceChargeAccount."}
       examples: [work/employer, health/insurer, mobility, family, learning, club, bank, energy supplier]
     rules:
       - A Context grants roles; the app never infers a role from onboarding choices alone.
       - Each Context applies its own DisclosurePolicy; joining one never reveals membership in another.
+
+  CitySignal:
+    definition: A public, versioned city-wide statement or place published by Stadtstack; its source, as-of, review state, geometry precision and (for LLM extraction) faithfulness score qualify every claim.
+    source: stadtstack-data/out/catalogue.json and cities/<cityId>/signals.geojson
+    reality: read_only_live
+    levels:
+      public_snapshot: {reality: read_only_live, note: "Actual sourced city data; candidate means not yet human-reviewed and coverage is not a complete city inventory."}
+      fictional_test_fixture: {reality: illustration, note: "Hand-written fixture under test/fixtures only; never app data."}
+    relations: {located_in: Context (city), relevant_to: Person (matched in the browser with MyPlaces)}
+    code: [src/server/city-signals.ts, app/api/city-signals/route.ts, src/components/personal-map.tsx]
+
+  MyPlaces:
+    definition: Optional home and work pins self-declared by clicking the map or explicitly requesting browser geolocation.
+    reality: self_declared_local
+    invariants:
+      - Home and work coordinates are stored only in this device's localStorage and can be removed.
+      - Neither exact coordinates nor a commute route is sent to our server or a geocoder/router.
+      - The browser matches public CitySignals within 1 km of home and an approximate 400 m straight-line commute corridor.
+      - Map tile requests reveal the viewed map area to OpenFreeMap, not saved pin coordinates.
+    relations: {belongs_to: Person, matches: CitySignal (on device)}
+    code: [src/components/personal-map.tsx, src/components/personal-map-relevance.ts]
 
   Membership:
     definition: Person × Context × Role (tenant, landlord, member, board, resident), optionally backed by a Credential proving eligibility (adult, resident of the city, club member).

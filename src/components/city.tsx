@@ -87,9 +87,9 @@ export function CityCard({ request, compact, onOpen, onCityChange }: { request: 
         </div>
       )}
       <div className="city-recent">
-        <span className="eyebrow">LATEST CHANGES</span>
+        <span className="eyebrow">ATLAS ITEMS · SOURCE AS OF {date(city.asOf)} · CHECK CURRENT DATES ON THE MAP</span>
         {city.recent.map((p) => (
-          <div key={p.id} className="city-row"><span><strong>{p.title}</strong> · {p.status}</span><span>{date(p.latest)}</span></div>
+          <div key={p.id} className="city-row"><span><strong>{p.title}</strong></span><span>{date(p.latest)}</span></div>
         ))}
       </div>
       <p className="small-copy">

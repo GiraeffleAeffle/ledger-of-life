@@ -16,7 +16,7 @@ The machine-readable source of truth is [`ontology.yaml`](ontology.yaml). This p
 
 | Layer | Question it answers | Concepts |
 | --- | --- | --- |
-| 1. Identity | Who is acting, with which keys, in which contexts, and what may others learn? | Person, Wallet, IdentityAssurance, Credential, DisclosurePolicy, Context, Membership |
+| 1. Identity and contexts | Who is acting, with which keys, in which contexts, and what may they see? | Person, Wallet, IdentityAssurance, Credential, DisclosurePolicy, Context, Membership, CitySignal, MyPlaces |
 | 2. Homes | Which home, which terms, who is involved? | Home, Listing, Application, Agreement, Role |
 | 3. Custody | Where is the deposit, and who may move it? | Escrow, Operation, Claim, Settlement, Payout |
 | 4. Earnings | What does the locked deposit earn? | YieldSource, Earnings, Release |
@@ -52,6 +52,15 @@ flowchart LR
   E -. tenant's residual claim .-> LD
 ```
 
+**City signals and private places.** Stadtstack publishes public, versioned **CitySignals** with
+source locators, as-of time, review state, geometry precision and LLM faithfulness if applicable.
+They are read-only public data; `candidate` means **not yet human-reviewed**, not a fact checked
+by the city. A **Person** may mark optional **MyPlaces** home/work pins, self-declared and kept only
+in that device's localStorage. The person sees relevant CitySignals through matching performed
+entirely in the browser (1 km near home; approximate 400 m straight-line home-to-work corridor).
+Neither pin nor route is sent to the app server; map tiles do reveal the viewed area to OpenFreeMap.
+The fictional test fixture is an illustration, never an app data source.
+
 ## Money flow of one tenancy
 
 ```mermaid
@@ -79,6 +88,7 @@ sequenceDiagram
 - **The tenant's portfolio is theirs.** Landlord and arbitrator have no authority beyond the escrow.
 - **Adapters are read-only**, and their credentials stay on the server.
 - **Privacy by predicates.** Others learn facts ("verified adult, income at least 3× rent"), not documents. No personal data goes on-chain, and identity is never linked to a wallet address on-chain.
+- **Private local pins.** MyPlaces never leaves the device. Only public whole-city CitySignals are fetched; matching runs in the browser, not on the server.
 - **Everything shown has a reality level** (below). Never present simulated or illustrative values as real.
 
 ## How real each part is (2026-09-26)
@@ -88,7 +98,8 @@ sequenceDiagram
 | Live mainnet | Real assets | Nothing yet |
 | Testnet, real | Real execution with test tokens | Accounts and wallets; listings and agreements; Solana escrow (setup, deposit, lending, claims, settlement, payouts); Robinhood escrow; tSPYx and test TSLA purchases |
 | Testnet, simulated input | Real execution, one input faked on purpose | Deposit yield (Solana `test_credit_yield`, Robinhood test vault) and therefore earnings claims; tSPYx distributions |
-| Read-only live | Real third-party data | Home Assistant solar/savings and optional daily consumption reading (not billing totals); Gnosis, Ethereum and Solana validators; SPYx and TSLA reference prices |
+| Read-only live | Real third-party data, with source and review caveats | CitySignals from Stadtstack public files (candidate items not yet reviewed); Home Assistant solar/savings and optional daily consumption reading; Gnosis, Ethereum and Solana validators; SPYx and TSLA reference prices |
+| Self-declared local | Unverified information a person places on their device | MyPlaces home/work map pins, removable from localStorage; not a verified address |
 | Prototype | A working test/counterpart exists but this is not a money-moving app flow | Stocks as deposit (`CollateralEscrow` testnet contract and calculator); service-charge example statement with server-stored test prepayment; Morpho on a mainnet fork |
 | Illustration | Visual or researched lead only | Unverified local cooperative candidates (no offers); home shares and the home-token grid |
 | Roadmap | Idea only | Home tokens toward owning a home; EU Digital Identity Wallet; EV adapter; tokenizing device income |
@@ -117,6 +128,8 @@ In each tenancy phase exactly one person has an action; everyone else sees what 
 | Journey (next step per person) | `src/server/journey.ts`, `src/components/home.tsx` |
 | Position, Venue, Distribution | `src/server/portfolio.ts`, `src/server/robinhood-demo.ts` |
 | Adapter | `src/server/adapters.ts`, `src/components/assets.tsx` |
+| CitySignal | `src/server/city-signals.ts`, `app/api/city-signals/route.ts`, `src/components/personal-map.tsx` |
+| MyPlaces and on-device relevance | `src/components/personal-map.tsx`, `src/components/personal-map-relevance.ts` |
 | Test tooling (never evidence) | `src/server/test-signer.ts`, `src/server/test-helpers.ts`, `scripts/` |
 
 ## Open design questions

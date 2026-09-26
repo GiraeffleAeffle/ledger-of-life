@@ -11,6 +11,7 @@ import { MeArea } from './me';
 import { LocalInvestments } from './local-investments';
 import { AccountSetup } from './onboarding';
 import { PlacesArea } from './places';
+import { NearYouCard } from './personal-map';
 import { ServiceCharges } from './service-charges';
 import { StockCollateral } from './stock-collateral';
 import { parseAmount } from '@/domain/assets';
@@ -161,6 +162,7 @@ function SignedInHome({ area, go, openConnections }: { area: Area; go: (area: Ar
           <IdentityStrip request={request} compact onOpen={() => go('me')} />
           {tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="summary" go={go} />}
           <CityCard request={request} compact onOpen={() => go('places')} />
+          <NearYouCard request={request} go={() => go('places')} />
         </div>
       )}
 
