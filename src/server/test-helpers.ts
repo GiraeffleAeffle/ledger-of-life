@@ -24,24 +24,17 @@ import { acceptAgreement, addAgreementRecord, inviteToAgreement, joinAgreement, 
 import { tenancyJourney, type JourneyRole } from './journey.ts';
 import { applyToListing, chooseApplicant, createListing, PRESET_PHOTOS, type Listing } from './listings.ts';
 import { ensurePayoutAccounts, solanaConfigurationFor, solanaServicesFor } from './solana-tenancies.ts';
-import { assertTestSignerAllowed, signPrepared, testIdentity, TEST_SUBJECT_PREFIX, type TestRole } from './test-signer.ts';
-import { solanaConfiguration } from './solana-rpc.ts';
+import { signPrepared, testIdentity, TEST_SUBJECT_PREFIX, type TestRole } from './test-signer.ts';
 import type { Store } from './store.ts';
+import { operatorTestCapability } from './test-capability.ts';
 
 /**
  * Local-only helpers: operator-held test keys play the *other* people in a tenancy so one real
  * passkey account can walk the whole journey. They use the same services as real people; only
  * the signature is produced here. Their actions are fixtures, never wallet evidence.
  */
-export function testHelpersEnabled(request: Request, environment: Record<string, string | undefined> = process.env) {
-  const config = solanaConfiguration(environment);
-  if (!config) return false;
-  try {
-    assertTestSignerAllowed(environment, config);
-  } catch {
-    return false;
-  }
-  return ['localhost', '127.0.0.1', '[::1]'].includes(new URL(request.url).hostname);
+export function testHelpersEnabled(_request: Request, environment: Record<string, string | undefined> = process.env) {
+  return operatorTestCapability(environment);
 }
 
 async function signers(environment: Record<string, string | undefined>) {

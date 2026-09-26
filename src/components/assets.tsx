@@ -7,6 +7,7 @@ import type { PortfolioView } from '@/server/portfolio';
 import type { PublicAdapterConfig, SolarReading, ValidatorReading } from '@/server/adapters';
 import type { RobinhoodHoldings } from '@/server/robinhood-demo';
 import { IdentityStrip } from './identity';
+import { CityCard } from './city';
 
 type Settled<T> = { ok: true; value: T } | { ok: false; error: string } | null;
 type AssetsResponse = { robinhood: Settled<RobinhoodHoldings>; solar: Settled<SolarReading>; validator: Settled<ValidatorReading>; adapters: PublicAdapterConfig };
@@ -101,6 +102,7 @@ export function AssetsOverview({ request, tenancies, testHelpers }: { request: R
   return (
     <section className="card assets">
       <IdentityStrip request={request} />
+      <CityCard request={request} />
       <div className="assets-head">
         <div>
           <span className="eyebrow">PORTFOLIO · TEST NETWORKS</span>

@@ -1,8 +1,9 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, createPublicKey, randomUUID, verify as verifyEd25519 } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
   address,
+  getAddressEncoder,
   appendTransactionMessageInstructions,
   compileTransaction,
   createKeyPairSignerFromBytes,
@@ -32,6 +33,7 @@ import { walletFor } from './agreements.ts';
 import { solanaConfiguration } from './solana-rpc.ts';
 import { SolanaServiceError } from './solana-service.ts';
 import type { Store } from './store.ts';
+import { operatorTestCapability } from './test-capability.ts';
 
 /**
  * Devnet test market for the tenant's personal portfolio: `tSPYx`, a Token-2022 copy of SPYx
@@ -44,8 +46,38 @@ const CLASSIC_TOKEN = address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 const SPYX_MAINNET = 'XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W';
 const DECIMALS = 8;
 
-type PreparedBuy = { id: string; subject: string; wallet: string; messageSha256: string; usdcInAtomic: string; rawOutAtomic: string; expiresAt: number };
+type PreparedBuy = {
+  id: string; subject: string; wallet: string; messageSha256: string;
+  usdcInAtomic: string; rawOutAtomic: string; expiresAt: number; lastValidBlockHeight: string;
+  state: 'prepared' | 'signed' | 'finalized' | 'failed';
+  signedTxBase64?: string; signature?: string;
+};
+type BuyAccount = { activeId: string | null; activeState: 'prepared' | 'signed' | null; lastId: string | null; sponsoredCount: number };
+const SPONSOR_ATTEMPTS = 5;
+const MAX_SPONSOR_DEBIT_LAMPORTS = 10_000_000n;
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+
+function signingKey(wallet: string) {
+  return createPublicKey({
+    key: Buffer.concat([
+      Buffer.from('302a300506032b6570032100', 'hex'),
+      Buffer.from(getAddressEncoder().encode(address(wallet))),
+    ]),
+    format: 'der',
+    type: 'spki',
+  });
+}
+
+async function buyAccount(store: Store, subject: string) {
+  const key = `portfolio-buy-account:${subject}`;
+  if (await store.get<BuyAccount>(key)) return key;
+  try {
+    await store.create<BuyAccount>(key, { activeId: null, activeState: null, lastId: null, sponsoredCount: 0 });
+  } catch (error) {
+    if (!(await store.get<BuyAccount>(key))) throw error;
+  }
+  return key;
+}
 
 /** Public devnet RPC rate-limits bursts; rate-limited calls were not processed, so retry them. */
 function retryingTransport(url: string) {
@@ -68,7 +100,7 @@ function retryingTransport(url: string) {
 
 async function market(environment: Record<string, string | undefined>) {
   const config = solanaConfiguration(environment);
-  if (!config || config.cluster !== 'devnet' || environment.SOLANA_TEST_SIGNER_MODE !== '1') return null;
+  if (!operatorTestCapability(environment) || !config || config.cluster !== 'devnet') return null;
   const dir = resolve(environment.SOLANA_TEST_SIGNER_DIR || '.testnet-secrets/test-signer');
   try {
     const { mint } = JSON.parse(await readFile(resolve(dir, 'market.json'), 'utf8')) as { mint: string };
@@ -124,12 +156,18 @@ export async function readPortfolio(identity: VerifiedIdentity, environment = pr
   return { available: true, symbol: 'tSPYx', testUsdcAtomic, rawAtomic, shares, multiplier, referencePriceUsd, valueUsd: Number((shares * referencePriceUsd).toFixed(2)) };
 }
 
-/** Builds the atomic buy, co-signed by the market maker (fee payer); the tenant signs next. */
+/** Builds an unsigned quote; only the person's wallet signs before server-side simulation. */
 export async function prepareBuy(store: Store, identity: VerifiedIdentity, usdcInAtomic: unknown, environment = process.env) {
   const m = await market(environment);
   if (!m) throw new SolanaServiceError(503, 'market_unavailable', 'The devnet test market is not configured.');
   if (typeof usdcInAtomic !== 'string' || !/^[1-9]\d{0,8}$/.test(usdcInAtomic) || BigInt(usdcInAtomic) > 20_000_000n)
     throw new SolanaServiceError(400, 'invalid_amount', 'Invest between 0 and 20 test USDC.');
+  const accountKey = await buyAccount(store, identity.subject);
+  const account = (await store.get<BuyAccount>(accountKey))!;
+  if (account.sponsoredCount >= SPONSOR_ATTEMPTS)
+    throw new SolanaServiceError(429, 'sponsor_limit', 'This test account has used its sponsored purchase budget.');
+  if (account.activeState === 'signed')
+    throw new SolanaServiceError(409, 'buy_pending', 'Your existing purchase is still being checked.');
   const wallet = walletFor(identity, 'solana');
   const tenant = address(wallet.address);
   const price = await referencePrice();
@@ -155,42 +193,125 @@ export async function prepareBuy(store: Store, identity: VerifiedIdentity, usdcI
     ], msg),
   );
   const compiled = compileTransaction(message);
-  const makerSigned = await partiallySignTransaction([m.maker.keyPair], compiled);
-  const bytes = new Uint8Array(getTransactionEncoder().encode(makerSigned));
+  const bytes = new Uint8Array(getTransactionEncoder().encode(compiled));
   const prepared: PreparedBuy = {
     id: randomUUID(), subject: identity.subject, wallet: wallet.address, messageSha256: sha(new Uint8Array(compiled.messageBytes)),
     usdcInAtomic, rawOutAtomic: rawOut.toString(), expiresAt: Date.now() + 60_000,
+    lastValidBlockHeight: lifetime.lastValidBlockHeight.toString(), state: 'prepared',
   };
   await store.create(`portfolio-buy:${prepared.id}`, prepared);
+  await store.update<BuyAccount>(accountKey, (current) => {
+    if (current.sponsoredCount >= SPONSOR_ATTEMPTS)
+      throw new SolanaServiceError(429, 'sponsor_limit', 'This test account has used its sponsored purchase budget.');
+    // A signed quote cannot be replaced, even if the response or confirmation timed out.
+    if (current.activeState === 'signed' || current.activeId !== account.activeId)
+      throw new SolanaServiceError(409, 'buy_pending', 'A purchase is already in progress.');
+    return { ...current, activeId: prepared.id, activeState: 'prepared' };
+  });
   return {
     id: prepared.id, walletId: wallet.id, feePayer: m.maker.address, expiresAt: new Date(prepared.expiresAt).toISOString(),
     transactionBase64: Buffer.from(bytes).toString('base64'), usdcInAtomic, rawOutAtomic: prepared.rawOutAtomic, referencePriceUsd: price,
   };
 }
 
-/** Accepts only the exact prepared message, signed by the tenant, then broadcasts and confirms. */
+/** The signed bytes are persisted before broadcast and may safely be rebroadcast as the same transaction. */
+export async function purchaseStatus(store: Store, identity: VerifiedIdentity, environment = process.env) {
+  const account = await store.get<BuyAccount>(`portfolio-buy-account:${identity.subject}`);
+  if (!account?.activeId || account.activeState !== 'signed') {
+    const last = account?.lastId ? await store.get<PreparedBuy>(`portfolio-buy:${account.lastId}`) : null;
+    if (last?.subject === identity.subject && (last.state === 'finalized' || last.state === 'failed'))
+      return { state: last.state, id: last.id, signature: last.signature, rawOutAtomic: last.rawOutAtomic };
+    return { state: 'none' as const };
+  }
+  const key = `portfolio-buy:${account.activeId}`;
+  const purchase = await store.get<PreparedBuy>(key);
+  if (!purchase?.signedTxBase64 || !purchase.signature)
+    return { state: 'pending' as const, id: account.activeId };
+  if (purchase.subject !== identity.subject) throw new SolanaServiceError(403, 'buy_owner', 'Purchase owner changed.');
+  const m = await market(environment);
+  if (!m) return { state: 'pending' as const, id: purchase.id, signature: purchase.signature };
+  try {
+    const { value } = await m.rpc.getSignatureStatuses([signature(purchase.signature)], { searchTransactionHistory: true }).send();
+    const status = value[0];
+    if (status?.err || status?.confirmationStatus === 'finalized') {
+      const state = status.err ? 'failed' as const : 'finalized' as const;
+      await store.update<PreparedBuy>(key, (current) => ({ ...current, state }));
+      await store.update<BuyAccount>(`portfolio-buy-account:${identity.subject}`, (current) =>
+        current.activeId === purchase.id ? { ...current, activeId: null, activeState: null, lastId: purchase.id } : current);
+      return { state, id: purchase.id, signature: purchase.signature, rawOutAtomic: purchase.rawOutAtomic };
+    }
+    if (!status && BigInt(await m.rpc.getBlockHeight({ commitment: 'finalized' }).send()) <= BigInt(purchase.lastValidBlockHeight)) {
+      // A send timeout may mean the RPC never received it. Rebroadcast only the same immutable bytes.
+      await m.rpc.sendTransaction(purchase.signedTxBase64 as Parameters<typeof m.rpc.sendTransaction>[0], {
+        encoding: 'base64', preflightCommitment: 'confirmed',
+      }).send();
+    }
+  } catch {
+    // RPC timeouts are ambiguous: never clear the reservation or offer a new buy.
+  }
+  return { state: 'pending' as const, id: purchase.id, signature: purchase.signature };
+}
+
+/** Verify the exact prepared quote and buyer signature, simulate and budget, then sign and persist. */
 export async function submitBuy(store: Store, identity: VerifiedIdentity, id: unknown, signedTxBase64: unknown, environment = process.env) {
   const m = await market(environment);
-  if (!m || typeof id !== 'string' || typeof signedTxBase64 !== 'string')
+  if (!m || typeof id !== 'string' || typeof signedTxBase64 !== 'string' || signedTxBase64.length > 1800)
     throw new SolanaServiceError(400, 'invalid_request', 'Invalid purchase.');
-  const prepared = await store.get<PreparedBuy>(`portfolio-buy:${id}`);
+  const key = `portfolio-buy:${id}`;
+  const prepared = await store.get<PreparedBuy>(key);
   if (!prepared || prepared.subject !== identity.subject) throw new SolanaServiceError(404, 'buy_unavailable', 'Purchase not found.');
+  if (prepared.state !== 'prepared') return purchaseStatus(store, identity, environment);
   if (prepared.expiresAt < Date.now()) throw new SolanaServiceError(409, 'operation_expired', 'The quote expired. Try again.');
-  const tx = getTransactionDecoder().decode(Buffer.from(signedTxBase64, 'base64'));
-  if (sha(new Uint8Array(tx.messageBytes)) !== prepared.messageSha256)
+  const raw = Buffer.from(signedTxBase64, 'base64');
+  if (raw.length > 1232 || raw.toString('base64') !== signedTxBase64)
+    throw new SolanaServiceError(400, 'invalid_signature', 'Invalid transaction encoding.');
+  const tx = getTransactionDecoder().decode(raw);
+  if (sha(new Uint8Array(tx.messageBytes)) !== prepared.messageSha256 || Object.keys(tx.signatures).length !== 2)
     throw new SolanaServiceError(400, 'changed_message', 'The signed purchase differs from the quote.');
-  if (!tx.signatures[address(prepared.wallet)] || !tx.signatures[m.maker.address])
-    throw new SolanaServiceError(400, 'invalid_signature', 'The purchase is not fully signed.');
-  const wire = getBase64EncodedWireTransaction(tx);
-  const txSignature = signature(getBase58Decoder().decode(tx.signatures[m.maker.address]!));
-  await m.rpc.sendTransaction(wire, { encoding: 'base64', preflightCommitment: 'confirmed' }).send();
-  for (let attempt = 0; attempt < 30; attempt++) {
-    const { value } = await m.rpc.getSignatureStatuses([txSignature]).send();
-    if (value[0]?.err) throw new SolanaServiceError(502, 'buy_failed', 'The purchase failed on the network.');
-    if (value[0]?.confirmationStatus === 'confirmed' || value[0]?.confirmationStatus === 'finalized') return { signature: txSignature, rawOutAtomic: prepared.rawOutAtomic };
-    const pause = Promise.withResolvers<void>();
-    setTimeout(pause.resolve, 1500);
-    await pause.promise;
-  }
-  throw new SolanaServiceError(504, 'buy_pending', 'The purchase is still confirming.');
+  const buyerSig = tx.signatures[address(prepared.wallet)];
+  const makerSig = tx.signatures[m.maker.address];
+  if (!buyerSig || !verifyEd25519(null, Buffer.from(tx.messageBytes), signingKey(prepared.wallet), Buffer.from(buyerSig)) ||
+    (makerSig && makerSig.some((byte) => byte !== 0)))
+    throw new SolanaServiceError(400, 'invalid_signature', 'Only your valid wallet signature may be submitted.');
+  if (BigInt((await m.rpc.getBlockHeight({ commitment: 'confirmed' }).send())) >= BigInt(prepared.lastValidBlockHeight))
+    throw new SolanaServiceError(409, 'operation_expired', 'The quote expired on the network. Try again.');
+  const [before, simulation] = await Promise.all([
+    m.rpc.getBalance(m.maker.address, { commitment: 'confirmed' }).send(),
+    m.rpc.simulateTransaction(getBase64EncodedWireTransaction(tx), {
+      encoding: 'base64', sigVerify: false, commitment: 'confirmed',
+      accounts: { addresses: [m.maker.address], encoding: 'base64' },
+    }).send(),
+  ]);
+  const after = simulation.value.accounts[0]?.lamports;
+  if (simulation.value.err || after === undefined)
+    throw new SolanaServiceError(409, 'buy_simulation_failed', 'The test purchase could not be simulated. Check your test USDC balance.');
+  const debit = before.value - after;
+  if (debit < 0n || debit > MAX_SPONSOR_DEBIT_LAMPORTS)
+    throw new SolanaServiceError(429, 'sponsor_limit', 'The purchase exceeds the test fee sponsor budget.');
+  const accountKey = await buyAccount(store, identity.subject);
+  await store.update<BuyAccount>(accountKey, (current) => {
+    if (current.activeId !== id || current.activeState !== 'prepared')
+      throw new SolanaServiceError(409, 'buy_pending', 'Another purchase is already being checked.');
+    if (current.sponsoredCount >= SPONSOR_ATTEMPTS)
+      throw new SolanaServiceError(429, 'sponsor_limit', 'This test account has used its sponsored purchase budget.');
+    return { ...current, activeId: id, activeState: 'signed', sponsoredCount: current.sponsoredCount + 1 };
+  });
+  const fullySigned = await partiallySignTransaction([m.maker.keyPair], tx);
+  if (sha(new Uint8Array(fullySigned.messageBytes)) !== prepared.messageSha256)
+    throw new Error('The fee payer changed the approved purchase.');
+  const signedBuyer = fullySigned.signatures[address(prepared.wallet)];
+  const signedMaker = fullySigned.signatures[m.maker.address];
+  if (!signedBuyer || !Buffer.from(signedBuyer).equals(Buffer.from(buyerSig)) ||
+    !signedMaker || !verifyEd25519(null, Buffer.from(fullySigned.messageBytes), signingKey(m.maker.address), Buffer.from(signedMaker)))
+    throw new Error('Purchase signatures changed during sponsorship.');
+  const txSignature = getBase58Decoder().decode(signedMaker);
+  await store.update<PreparedBuy>(key, (current) => {
+    if (current.state !== 'prepared' || current.messageSha256 !== prepared.messageSha256)
+      throw new SolanaServiceError(409, 'buy_pending', 'The purchase was already signed.');
+    return {
+      ...current, state: 'signed', signedTxBase64: Buffer.from(getTransactionEncoder().encode(fullySigned)).toString('base64'),
+      signature: txSignature,
+    };
+  });
+  return purchaseStatus(store, identity, environment);
 }

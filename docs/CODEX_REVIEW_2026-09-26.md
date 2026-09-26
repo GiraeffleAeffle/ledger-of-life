@@ -7,13 +7,13 @@ Independent read-only review of `06e9f0f..b769078` (23 commits). Report verbatim
 | # | Severity | Finding | Status |
 |---|---|---|---|
 | 1 | High | SSRF via Home Assistant URL | Partly fixed: redirects refused, link-local/metadata addresses blocked, private addresses blocked on Vercel. DNS rebinding between check and fetch remains; hosted use needs a connector or allowlist. |
-| 2 | High | One failing recipient stalls Solana payouts | Open |
-| 3 | High | CollateralEscrow forgives claims on slippage | Open (prototype contract, not used in the app flow) |
+| 2 | High | One failing recipient stalls Solana payouts | Fixed: definitive failures recorded per recipient, other payout proceeds, fresh operation after confirmed failure/expiry |
+| 3 | High | CollateralEscrow forgives claims on slippage | Fixed: sells more at the realized price until the claim is covered or collateral is exhausted ($400/$392/$120 test) |
 | 4 | High | `/api/identity` overwritten, breaking recovery | Fixed: original recovery route restored; EU wallet moved to `/api/eudi` |
-| 5 | Medium | Local-only test actions trust request hostname | Open |
-| 6 | Medium | Clients receive unrestricted fee-payer signatures (portfolio buy) | Open |
-| 7 | Medium | Concurrent applicant selection creates two agreements | Open |
-| 8 | Medium | Purchase timeouts lose transaction state | Open |
+| 5 | Medium | Local-only test actions trust request hostname | Fixed: shared `operatorTestCapability` (no Vercel, no production without `ALLOW_OPERATOR_TEST_ACTIONS=1`, test signer rules); Robinhood earn once per wallet |
+| 6 | Medium | Clients receive unrestricted fee-payer signatures (portfolio buy) | Fixed: maker signs only after exact-quote check, simulation and a per-account budget reservation |
+| 7 | Medium | Concurrent applicant selection creates two agreements | Fixed: listing claim is atomic and the agreement id is derived from it; retries are idempotent |
+| 8 | Medium | Purchase timeouts lose transaction state | Fixed: signed bytes and signature persisted before broadcast; pending purchases reconcile and block a duplicate buy |
 | 9 | Medium | Late EUDI poll reverses "Forget" | Fixed: result stored only if the same request is still pending (atomic update) |
 | 10 | Medium | Portfolio counts tenants' deposits for landlords | Fixed: viewer entitlement per role; unpaid payouts kept after close |
 | 11 | Medium | Lifetime solar counter shown as today | Fixed: only per-day sensors auto-detected; tariff values marked as estimates; currency from sensor |

@@ -65,7 +65,7 @@ test('disputes route to the arbitrator and pull payouts are paid before completi
   assert.deepEqual(owed.kind === 'action' && owed.action, { kind: 'payout', landlord: true });
 });
 
-test('in-app test helpers need the flag, a devnet deployment and a loopback request', async () => {
+test('in-app test helpers require an operator test deployment regardless of request hostname', async () => {
   const { testHelpersEnabled } = await import('./test-helpers.ts');
   const manifest = JSON.parse(await (await import('node:fs/promises')).readFile(
     new URL('../../docs/evidence/SOLANA_PULL_DEVNET_DEPLOYMENT_2026-09-25.json', import.meta.url), 'utf8'));
@@ -76,9 +76,13 @@ test('in-app test helpers need the flag, a devnet deployment and a loopback requ
       agreementId: 'a', tenancyAddress: manifest.escrowProgram,
     }),
   };
-  const local = new Request('http://localhost:4175/api/test-helpers');
-  assert.equal(testHelpersEnabled(local, env), false);
-  assert.equal(testHelpersEnabled(local, { ...env, SOLANA_TEST_SIGNER_MODE: '1' }), true);
-  assert.equal(testHelpersEnabled(new Request('https://deposit.example/api/test-helpers'), { ...env, SOLANA_TEST_SIGNER_MODE: '1' }), false);
-  assert.equal(testHelpersEnabled(local, { ...env, SOLANA_TEST_SIGNER_MODE: '1', DATABASE_URL: 'postgres://x' }), false);
+  const hostile = new Request('https://deposit.example/api/test-helpers', { headers: { host: 'localhost' } });
+  const allowed = { ...env, SOLANA_TEST_SIGNER_MODE: '1' };
+  assert.equal(testHelpersEnabled(hostile, env), false);
+  assert.equal(testHelpersEnabled(hostile, allowed), true);
+  assert.equal(testHelpersEnabled(new Request('http://localhost:4175/api/test-helpers'), allowed), true);
+  assert.equal(testHelpersEnabled(hostile, { ...allowed, DATABASE_URL: 'postgres://x' }), false);
+  assert.equal(testHelpersEnabled(hostile, { ...allowed, VERCEL: '1' }), false);
+  assert.equal(testHelpersEnabled(hostile, { ...allowed, NODE_ENV: 'production' }), false);
+  assert.equal(testHelpersEnabled(hostile, { ...allowed, NODE_ENV: 'production', ALLOW_OPERATOR_TEST_ACTIONS: '1' }), true);
 });

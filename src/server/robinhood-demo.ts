@@ -14,6 +14,8 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { defineChain } from 'viem';
+import type { Store } from './store.ts';
+import { operatorTestCapability } from './test-capability.ts';
 
 /**
  * Robinhood Chain TESTNET demo: a real on-chain rental escrow whose released earnings go to the
@@ -62,7 +64,7 @@ async function tslaPrice() {
 }
 
 export async function robinhoodEnabled(environment = process.env) {
-  if (environment.SOLANA_TEST_SIGNER_MODE !== '1') return false;
+  if (!operatorTestCapability(environment)) return false;
   try {
     await readFile(resolve(environment.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet', 'operator.key'));
     return true;
@@ -109,9 +111,22 @@ export async function robinhoodHoldings(owner: string): Promise<RobinhoodHolding
  * wallet: fund 10 tUSDG → supply to the test vault → test yield → release earnings to that wallet.
  * Also tops up a little test ETH so the wallet can pay gas for its own purchase.
  */
-export async function earnOnRobinhood(personalWallet: string, environment = process.env) {
-  const people = await keys(environment);
+export async function earnOnRobinhood(store: Store, personalWallet: string, environment = process.env) {
+  if (!operatorTestCapability(environment) || !(await robinhoodEnabled(environment)))
+    throw new Error('The Robinhood testnet demo is disabled.');
   const wallet = getAddress(personalWallet);
+  // Reserve before any sends: a timeout or partial deployment must never fund another run.
+  const key = `robinhood-earn:${wallet.toLowerCase()}`;
+  type Job = { state: 'started' | 'done'; result?: { escrow: Address; releasedAtomic: string } };
+  try {
+    await store.create<Job>(key, { state: 'started' });
+  } catch (error) {
+    const existing = await store.get<Job>(key);
+    if (!existing) throw error;
+    if (existing.state === 'done' && existing.result) return existing.result;
+    throw new Error('This testnet demo is already running or needs operator reconciliation.');
+  }
+  const people = await keys(environment);
   const as = (account: typeof people.operator) => createWalletClient({ chain, account, transport: http() });
   const [op, tenant, landlord] = [as(people.operator), as(people.tenant), as(people.landlord)];
   const wait = (hash: Hex) => client.waitForTransactionReceipt({ hash }).then((r) => {
@@ -158,7 +173,9 @@ export async function earnOnRobinhood(personalWallet: string, environment = proc
   await wait(await tenant.writeContract({ address: escrow, abi: escrowAbi, functionName: 'releaseEarnings', args: [releasable, MAX, 4n, deadline] }));
   // Keep the desk priced at the live TSLAx reference.
   await wait(await op.writeContract({ address: ROBINHOOD_TESTNET.desk, abi: deskAbi, functionName: 'setPrice', args: [BigInt(Math.round((await tslaPrice()) * 1e6))] }));
-  return { escrow, releasedAtomic: releasable.toString() };
+  const result = { escrow, releasedAtomic: releasable.toString() };
+  await store.update<Job>(key, () => ({ state: 'done', result }));
+  return result;
 }
 
 /** Unsigned approve (if needed) + buy transactions for the person's own wallet to sign. */

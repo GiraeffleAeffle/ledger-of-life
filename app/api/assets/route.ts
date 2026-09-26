@@ -3,6 +3,7 @@ import { readAdapterConfig, readSolar, readValidator, saveAdapterConfig, type Ad
 import { earnOnRobinhood, prepareRobinhoodBuy, robinhoodEnabled, robinhoodHoldings, submitRobinhoodTransaction } from '@/server/robinhood-demo';
 import { getStore } from '@/server/store';
 import { readBody, sameOrigin } from '@/server/http';
+import { operatorTestCapability } from '@/server/test-capability';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };
 const settle = <T,>(work: Promise<T>) => work.then((value) => ({ ok: true as const, value })).catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : 'Unavailable' }));
@@ -34,10 +35,10 @@ export async function POST(request: Request) {
     const evm = identity.wallets.find((w) => w.chainType === 'ethereum');
     if (body.action === 'save_adapter') return Response.json({ adapters: await saveAdapterConfig(store, identity, body) }, noStore);
     if (!evm) throw new Error('Your account has no Robinhood Chain wallet yet.');
+    if (!operatorTestCapability()) throw new Error('The Robinhood testnet demo is disabled.');
     if (body.action === 'robinhood_earn') {
-      if (!(await robinhoodEnabled()) || !['localhost', '127.0.0.1'].includes(new URL(request.url).hostname))
-        throw new Error('The Robinhood testnet demo runs locally only.');
-      return Response.json({ result: await earnOnRobinhood(evm.address) }, noStore);
+      if (!(await robinhoodEnabled())) throw new Error('The Robinhood testnet demo is disabled.');
+      return Response.json({ result: await earnOnRobinhood(store, evm.address) }, noStore);
     }
     if (body.action === 'robinhood_prepare_buy') return Response.json({ walletId: evm.id, steps: await prepareRobinhoodBuy(evm.address) }, noStore);
     if (body.action === 'robinhood_submit' && typeof body.signed === 'string') return Response.json(await submitRobinhoodTransaction(body.signed), noStore);

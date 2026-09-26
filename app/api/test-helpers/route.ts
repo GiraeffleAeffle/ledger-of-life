@@ -4,7 +4,7 @@ import { getStore } from '@/server/store';
 import { readBody, sameOrigin } from '@/server/http';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store' } };
-/** Local test helpers: off unless SOLANA_TEST_SIGNER_MODE=1, local store, devnet and a loopback request. */
+/** Operator-only fixtures: server configuration controls access, not the request hostname. */
 export async function GET(request: Request) {
   return Response.json({ enabled: testHelpersEnabled(request) }, noStore);
 }

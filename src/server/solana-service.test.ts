@@ -5,6 +5,7 @@ import {
   generateKeyPairSigner,
   getAddressDecoder,
   getAddressEncoder,
+  getCompiledTransactionMessageDecoder,
   getTransactionDecoder,
   getTransactionEncoder,
   partiallySignTransaction,
@@ -285,6 +286,70 @@ test('pull settlement records obligations without transfer and payout reviews on
     );
   } finally {
     await payoutFixture.store.close();
+  }
+});
+test('a failed tenant simulation does not stall the landlord, and confirmed failed or expired payouts get fresh attempts', async () => {
+  const f = await fixture();
+  try {
+    f.config.escrowVersion = 'pull-v2';
+    f.snapshot.tenancy.phase = 'closed';
+    f.snapshot.tenancy.accountedIdleAtomic = '3000000000';
+    f.snapshot.tenancy.tenantOwedAtomic = '2880000000';
+    f.snapshot.tenancy.landlordOwedAtomic = '120000000';
+    f.snapshot.tenancy.nextNonce = '4';
+    const simulated: boolean[] = [];
+    const originalSimulate = f.gateway.simulate;
+    f.gateway.simulate = async (bytes, payer, actor) => {
+      const message = getCompiledTransactionMessageDecoder().decode(getTransactionDecoder().decode(bytes).messageBytes);
+      const landlord = message.staticAccounts.some((account) => account === f.snapshot.tenancy.landlordDestination);
+      simulated.push(landlord);
+      if (!landlord) throw new Error('Exact transaction simulation failed');
+      return originalSimulate(bytes, payer, actor);
+    };
+    f.gateway.broadcast = async (bytes) => {
+      const records = await f.store.scan<{ operations: SolanaOperation[] }>('solana-lane:');
+      const saved = records[0].value.operations.find((op) => op.signedTxBase64 === Buffer.from(bytes).toString('base64'));
+      assert.equal(saved?.state, 'signed');
+      assert.ok(saved.signature);
+      f.state.broadcasts.push(Buffer.from(bytes).toString('base64'));
+      return saved.signature;
+    };
+    const first = await f.service.payout(f.identity);
+    assert.equal(first?.action.kind === 'payout' && first.action.landlord, true);
+    assert.equal(first?.state, 'broadcast');
+    assert.deepEqual(simulated, [false, true]);
+    const firstLane = (await f.store.scan<{ payoutAttempts?: { side: string }[]; operations: SolanaOperation[] }>('solana-lane:'))[0].value;
+    assert.deepEqual(firstLane.payoutAttempts?.map((attempt) => attempt.side), ['tenant']);
+    assert.equal(firstLane.operations.length, 1);
+    f.gateway.lifetime = async () => ({
+      blockhash: key(31), blockHeight: f.state.blockHeight, lastValidBlockHeight: '150',
+    });
+
+    f.gateway.reconcile = async (signature) =>
+      signature === first?.signature
+        ? { status: 'failed', reason: 'confirmed-on-chain-failure' }
+        : { status: 'unknown', reason: 'signature-not-observed-do-not-resubmit-new-intent' };
+    const replacement = await f.service.payout(f.identity);
+    assert.equal(replacement?.state, 'broadcast');
+    assert.equal(replacement?.action.kind === 'payout' && replacement.action.landlord, true);
+    assert.notEqual(replacement?.id, first?.id);
+    assert.equal((await f.service.get(f.identity, first!.id)).state, 'failed');
+    assert.deepEqual(simulated, [false, true, false, true]);
+
+    // Absence alone is ambiguous; an expired finalized block height permits replacement.
+    assert.equal((await f.service.payout(f.identity))?.id, replacement?.id);
+    f.state.blockHeight = '151';
+    f.gateway.lifetime = async () => ({
+      blockhash: key(32), blockHeight: f.state.blockHeight, lastValidBlockHeight: '201',
+    });
+    const afterExpiry = await f.service.payout(f.identity);
+    assert.equal((await f.service.get(f.identity, replacement!.id)).state, 'expired');
+    assert.equal(afterExpiry?.state, 'broadcast');
+    assert.equal(afterExpiry?.action.kind === 'payout' && afterExpiry.action.landlord, true);
+    assert.notEqual(afterExpiry?.id, replacement?.id);
+    assert.equal(f.state.broadcasts.length, 3);
+  } finally {
+    await f.store.close();
   }
 });
 test('bundles sign fixed instruction sequences with net token effects and pull-v2-only settlement', async () => {

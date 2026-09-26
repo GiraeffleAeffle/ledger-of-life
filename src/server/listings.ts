@@ -186,30 +186,57 @@ export async function applyToListing(store: Store, identity: VerifiedIdentity, i
 export async function chooseApplicant(store: Store, identity: VerifiedIdentity, id: string, applicationId: unknown) {
   const listing = await store.get<Listing>(key(id));
   if (!listing) throw new AccessError('This listing is unavailable.');
-  if (listing.landlord.subject !== identity.subject) throw new AccessError('Only the landlord chooses a tenant.');
-  if (listing.status !== 'open') throw new ConflictError('A tenant was already chosen.');
-  const application = listing.applications.find((item) => item.id === applicationId);
-  if (!application) throw new WorkflowError('Choose one of the applications.');
+  const chosen = await store.update<Listing>(key(id), (value) => {
+    if (value.landlord.subject !== identity.subject) throw new AccessError('Only the landlord chooses a tenant.');
+    if (value.status !== 'open') {
+      if (value.chosenApplicationId === applicationId && value.agreementId) return value;
+      throw new ConflictError('A tenant was already chosen.');
+    }
+    if (typeof applicationId !== 'string' || !value.applications.some((item) => item.id === applicationId))
+      throw new WorkflowError('Choose one of the applications.');
+    return { ...value, status: 'let', agreementId: `listing-${value.id}`, chosenApplicationId: applicationId };
+  });
+  const application = chosen.applications.find((item) => item.id === chosen.chosenApplicationId)!;
   const agreement: Agreement = {
-    id: randomUUID(),
+    id: chosen.agreementId!,
     network: 'solana',
-    property: listing.title,
-    requiredSecurity: listing.requiredSecurity,
-    releaseAllowed: listing.releaseAllowed,
+    property: chosen.title,
+    requiredSecurity: chosen.requiredSecurity,
+    releaseAllowed: chosen.releaseAllowed,
     createdAt: new Date().toISOString(),
     revision: 0,
     parties: {
-      landlord: listing.landlord,
+      landlord: chosen.landlord,
       tenant: { subject: application.subject, wallet: application.wallet },
     },
     invitations: {},
     accepted: {},
     records: [],
   };
-  await store.create(`agreement:${agreement.id}`, agreement);
-  const next = await store.update<Listing>(key(id), (value) => {
-    if (value.status !== 'open') throw new ConflictError('A tenant was already chosen.');
-    return { ...value, status: 'let', agreementId: agreement.id, chosenApplicationId: application.id };
-  });
-  return publicListing(next, identity);
+  const agreementKey = `agreement:${agreement.id}`;
+  let existing = await store.get<Agreement>(agreementKey);
+  if (!existing) {
+    try {
+      await store.create(agreementKey, agreement);
+    } catch (error) {
+      existing = await store.get<Agreement>(agreementKey);
+      if (!existing) throw error;
+    }
+  }
+  if (existing && (
+    existing.id !== agreement.id ||
+    existing.network !== agreement.network ||
+    existing.property !== agreement.property ||
+    existing.requiredSecurity !== agreement.requiredSecurity ||
+    existing.releaseAllowed !== agreement.releaseAllowed ||
+    existing.parties.landlord?.subject !== agreement.parties.landlord?.subject ||
+    existing.parties.landlord?.wallet.id !== agreement.parties.landlord?.wallet.id ||
+    existing.parties.landlord?.wallet.address !== agreement.parties.landlord?.wallet.address ||
+    existing.parties.landlord?.wallet.chainType !== agreement.parties.landlord?.wallet.chainType ||
+    existing.parties.tenant?.subject !== agreement.parties.tenant?.subject ||
+    existing.parties.tenant?.wallet.id !== agreement.parties.tenant?.wallet.id ||
+    existing.parties.tenant?.wallet.address !== agreement.parties.tenant?.wallet.address ||
+    existing.parties.tenant?.wallet.chainType !== agreement.parties.tenant?.wallet.chainType
+  )) throw new ConflictError('An agreement is already recorded for this listing.');
+  return publicListing(chosen, identity);
 }

@@ -101,6 +101,7 @@ type Lane = {
   genesisHash: string;
   tenancy: string;
   operations: SolanaOperation[];
+  payoutAttempts?: { side: 'tenant' | 'landlord'; nonce: string; at: string; error: string }[];
 };
 export type FeeSponsor = {
   address: string;
@@ -851,62 +852,109 @@ export function createSolanaService(dependencies: Dependencies) {
       const verified = await access(identity);
       const t = verified.snapshot.tenancy;
       if (config.escrowVersion !== 'pull-v2' || t.phase !== 'closed') return null;
-      const operations = (await lane()).operations;
-      const pending = operations.find((op) =>
+      const initial = await lane();
+      const pending = initial.operations.find((op) =>
         op.action.kind === 'payout' && op.signature && !['finalized', 'failed', 'expired'].includes(op.state));
-      if (pending) return publicOperation(await reconcileStored(pending.id));
+      if (pending) {
+        const settled = await reconcileStored(pending.id);
+        if (settled.state !== 'failed') {
+          // An unobserved signature is not a failed payout until its blockhash
+          // has expired on the finalized chain.
+          const receipt = settled.receipt as { status?: string; reason?: string } | null;
+          if (settled.state !== 'unknown' ||
+            receipt?.reason !== 'signature-not-observed-do-not-resubmit-new-intent' ||
+            atomic((await gateway.lifetime()).blockHeight) < atomic(settled.lastValidBlockHeight))
+            return publicOperation(settled);
+          const expired = await update(settled.id, (current) =>
+            current.state === 'unknown' ? { ...current, state: 'expired' } : current);
+          if (expired.state !== 'expired' && expired.state !== 'failed') return publicOperation(expired);
+        }
+      }
       const owed = (['tenant', 'landlord'] as const).filter((side) =>
         atomic(side === 'landlord' ? t.landlordOwedAtomic : t.tenantOwedAtomic) > 0n);
       if (!owed.length) return null;
-      const failures = (side: 'tenant' | 'landlord') => operations.filter((op) =>
-        op.action.kind === 'payout' && op.action.landlord === (side === 'landlord') && op.state === 'failed').length;
-      const action: EscrowAction = { kind: 'payout', landlord: owed.sort((a, b) => failures(a) - failures(b))[0] === 'landlord' };
-      const id = hash(`payout:${config.genesisHash}:${config.tenancyAddress}:${t.nextNonce}`);
-      const existing = operations.find((op) => op.id === id);
-      if (existing) return publicOperation(existing);
-      const lifetime = await gateway.lifetime();
-      const unsigned = await compileWithSponsor(await escrowInstructions([action], t, sponsor.address), 200_000, lifetime);
-      const simulation = await gateway.simulate(unsigned, sponsor.address, sponsor.address);
-      if (atomic(simulation.sponsorDebitCeilingLamports) > atomic(config.maximumSponsorLamports))
-        fail('sponsor_limit', 'The sponsor fee limit would be exceeded.');
-      const signed = await sponsor.sign(unsigned);
-      const payerSignature = getTransactionDecoder().decode(signed).signatures[address(sponsor.address)];
-      if (!payerSignature) throw new Error('Sponsor did not sign the payout');
-      const createdAt = new Date(now()).toISOString();
-      const op: SolanaOperation = {
-        id,
-        requestId: `payout-${t.nextNonce}`,
-        fingerprint: hash(JSON.stringify(action)),
-        agreementId: config.agreementId,
-        subject: identity.subject,
-        walletId: verified.wallet.id,
-        actor: sponsor.address,
-        role: verified.role,
-        action,
-        steps: 1,
-        deployment: { genesisHash: config.genesisHash, escrowProgram: config.escrowProgram, programSha256: config.programSha256 },
-        nonce: t.nextNonce,
-        state: 'signed',
-        createdAt,
-        expiresAt: new Date(now() + 60_000).toISOString(),
-        lastValidBlockHeight: lifetime.lastValidBlockHeight,
-        messageSha256: await messageDigest(unsigned),
-        transactionBase64: Buffer.from(unsigned).toString('base64'),
-        signedTxBase64: Buffer.from(signed).toString('base64'),
-        signature: getBase58Decoder().decode(payerSignature),
-        simulation,
-        expectedDeltas: await deltasFor(action, verified.snapshot, config),
-        receipt: null,
-        lastError: null,
-      };
-      const stored = await store.update<Lane>(laneKey, (record) => {
-        if (record.operations.some((item) => item.id === id)) return record;
-        if (record.operations.some((item) => item.nonce === op.nonce && !['failed', 'expired', 'finalized'].includes(item.state)))
-          fail('nonce_reserved', 'Another operation already reserves this tenancy nonce. Reconcile it first.');
-        return { ...record, operations: [...record.operations, op] };
-      });
-      const saved = stored.operations.find((item) => item.id === id)!;
-      return publicOperation(saved.signedTxBase64 === op.signedTxBase64 ? await sendStored(saved) : saved);
+      const failures = (side: 'tenant' | 'landlord', record: Lane) =>
+        record.operations.filter((op) =>
+          op.action.kind === 'payout' && op.action.landlord === (side === 'landlord') &&
+          ['failed', 'expired'].includes(op.state)).length +
+        (record.payoutAttempts ?? []).filter((attempt) => attempt.side === side).length;
+      const record = await lane();
+      owed.sort((a, b) => failures(a, record) - failures(b, record));
+      let simulationFailure: unknown;
+      for (const side of owed) {
+        const action: EscrowAction = { kind: 'payout', landlord: side === 'landlord' };
+        const current = await lane();
+        const attempt = current.operations.filter((op) =>
+          op.action.kind === 'payout' && op.nonce === t.nextNonce && op.action.landlord === action.landlord).length +
+          (current.payoutAttempts ?? []).filter((item) => item.nonce === t.nextNonce && item.side === side).length;
+        const id = hash(`payout:${config.genesisHash}:${config.tenancyAddress}:${t.nextNonce}:${side}:${attempt}`);
+        const existing = current.operations.find((op) => op.id === id);
+        if (existing && !['failed', 'expired'].includes(existing.state)) return publicOperation(existing);
+        const lifetime = await gateway.lifetime();
+        const unsigned = await compileWithSponsor(await escrowInstructions([action], t, sponsor.address), 200_000, lifetime);
+        const transactionBase64 = Buffer.from(unsigned).toString('base64');
+        if (current.operations.some((item) =>
+          item.action.kind === 'payout' && item.transactionBase64 === transactionBase64))
+          fail('payout_blockhash_unchanged', 'A fresh blockhash is required to replace this payout.');
+        let simulation: SolanaSimulation;
+        try {
+          simulation = await gateway.simulate(unsigned, sponsor.address, sponsor.address);
+        } catch (error) {
+          if (!(error instanceof Error) || error.message !== 'Exact transaction simulation failed') throw error;
+          await store.update<Lane>(laneKey, (row) => ({
+            ...row,
+            payoutAttempts: [...(row.payoutAttempts ?? []), {
+              side, nonce: t.nextNonce, at: new Date(now()).toISOString(), error: error.message,
+            }],
+          }));
+          simulationFailure = error;
+          continue;
+        }
+        if (atomic(simulation.sponsorDebitCeilingLamports) > atomic(config.maximumSponsorLamports))
+          fail('sponsor_limit', 'The sponsor fee limit would be exceeded.');
+        const signed = await sponsor.sign(unsigned);
+        const payerSignature = getTransactionDecoder().decode(signed).signatures[address(sponsor.address)];
+        if (!payerSignature) throw new Error('Sponsor did not sign the payout');
+        const createdAt = new Date(now()).toISOString();
+        const op: SolanaOperation = {
+          id,
+          requestId: `payout-${t.nextNonce}-${side}-${attempt}`,
+          fingerprint: hash(JSON.stringify(action)),
+          agreementId: config.agreementId,
+          subject: identity.subject,
+          walletId: verified.wallet.id,
+          actor: sponsor.address,
+          role: verified.role,
+          action,
+          steps: 1,
+          deployment: { genesisHash: config.genesisHash, escrowProgram: config.escrowProgram, programSha256: config.programSha256 },
+          nonce: t.nextNonce,
+          state: 'signed',
+          createdAt,
+          expiresAt: new Date(now() + 60_000).toISOString(),
+          lastValidBlockHeight: lifetime.lastValidBlockHeight,
+          messageSha256: await messageDigest(unsigned),
+          transactionBase64,
+          signedTxBase64: Buffer.from(signed).toString('base64'),
+          signature: getBase58Decoder().decode(payerSignature),
+          simulation,
+          expectedDeltas: await deltasFor(action, verified.snapshot, config),
+          receipt: null,
+          lastError: null,
+        };
+        const stored = await store.update<Lane>(laneKey, (row) => {
+          if (row.operations.some((item) => item.id === id)) return row;
+          if (row.operations.some((item) =>
+            item.action.kind === 'payout' && item.transactionBase64 === transactionBase64))
+            fail('payout_blockhash_unchanged', 'A fresh blockhash is required to replace this payout.');
+          if (row.operations.some((item) => item.nonce === op.nonce && !['failed', 'expired', 'finalized'].includes(item.state)))
+            fail('nonce_reserved', 'Another operation already reserves this tenancy nonce. Reconcile it first.');
+          return { ...row, operations: [...row.operations, op] };
+        });
+        const saved = stored.operations.find((item) => item.id === id)!;
+        return publicOperation(saved.signedTxBase64 === op.signedTxBase64 ? await sendStored(saved) : saved);
+      }
+      throw simulationFailure;
     },
     reconcileStored,
     laneKey,

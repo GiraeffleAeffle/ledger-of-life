@@ -584,6 +584,8 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
   const [view, setView] = useState<PortfolioView | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [purchase, setPurchase] = useState<'none' | 'pending'>('none');
+  const [signedAttempt, setSignedAttempt] = useState<{ id: string; signedTxBase64: string } | null>(null);
   const refresh = useCallback(async () => {
     const { portfolio } = await request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio');
     setView(portfolio.available ? portfolio : null);
@@ -591,6 +593,9 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
   }, [request, onBalance]);
   useEffect(() => {
     let active = true;
+    request<{ result: { state: string } }>('/api/portfolio', { action: 'purchase_status' })
+      .then(({ result }) => { if (active && result.state === 'pending') setPurchase('pending'); })
+      .catch(() => {});
     let retry: ReturnType<typeof setTimeout> | undefined;
     request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio')
       .then(({ portfolio }) => {
@@ -604,31 +609,88 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
       });
     return () => { active = false; clearTimeout(retry); };
   }, [request, onBalance, refresh]);
+  useEffect(() => {
+    if (purchase !== 'pending') return;
+    let active = true;
+    let checking = false;
+    const timer = setInterval(() => {
+      if (checking) return;
+      checking = true;
+      request<{ result: { state: 'none' | 'pending' | 'finalized' | 'failed' } }>('/api/portfolio', { action: 'purchase_status' })
+        .then(async ({ result }) => {
+          if (!active) return;
+          let state = result.state;
+          if (state === 'pending') return;
+          if (state === 'none' && signedAttempt) {
+            try {
+              const response = await request<{ result: { state: 'none' | 'pending' | 'finalized' | 'failed' } }>('/api/portfolio', {
+                action: 'submit_buy', ...signedAttempt,
+              });
+              if (!active) return;
+              state = response.result.state;
+              if (state === 'pending') return;
+            } catch (error) {
+              if (!active) return;
+              if (!(error && typeof error === 'object' && 'code' in error && error.code === 'operation_expired')) return;
+              setMessage('The signed test purchase expired without broadcast. You can try again.');
+            }
+          }
+          if (state === 'finalized') {
+            setMessage('Bought. Your test holding is updated.');
+            void refresh().catch(() => {});
+          } else if (state === 'failed') {
+            setMessage('The test purchase failed on the network. You can try again.');
+          } else if (state === 'none') {
+            setMessage('The purchase was not broadcast. You can try again.');
+          }
+          setSignedAttempt(null);
+          setPurchase('none');
+        })
+        .catch(() => { /* A status timeout is not evidence that the purchase failed. */ })
+        .finally(() => { checking = false; });
+    }, 4000);
+    return () => { active = false; clearInterval(timer); };
+  }, [purchase, request, refresh, signedAttempt]);
   if (!view) return null;
   async function invest() {
+    if (busy || purchase === 'pending') return;
     setBusy(true);
     setMessage('');
-    const buyOnce = async () => {
+    let submitted = false;
+    try {
       const { buy } = await request<{ buy: { id: string; walletId: string; feePayer: string; expiresAt: string; transactionBase64: string } }>(
         '/api/portfolio', { action: 'prepare_buy', usdcInAtomic: '5000000' });
       const signed = await wallet.signSolanaTransaction({
         operationId: buy.id, walletId: buy.walletId, chain: 'solana:devnet', feePayer: buy.feePayer,
         expiresAt: buy.expiresAt, transaction: b64(buy.transactionBase64), description: 'Invest 5 test USDC in tSPYx',
       });
-      await request('/api/portfolio', { action: 'submit_buy', id: buy.id, signedTxBase64: toB64(signed) });
-    };
-    try {
-      try {
-        await buyOnce();
-      } catch (e) {
-        if (!(e && typeof e === 'object' && 'code' in e && e.code === 'operation_expired')) throw e;
-        setMessage('The price quote expired. Please approve once more.');
-        await buyOnce();
+      const attempt = { id: buy.id, signedTxBase64: toB64(signed) };
+      setSignedAttempt(attempt);
+      submitted = true;
+      const { result } = await request<{ result: { state: 'pending' | 'finalized' | 'failed' } }>(
+        '/api/portfolio', { action: 'submit_buy', ...attempt });
+      if (result.state === 'pending') {
+        setPurchase('pending');
+        setMessage('Test purchase pending, checking the network.');
+      } else {
+        setSignedAttempt(null);
+        setMessage(result.state === 'finalized' ? 'Bought. Your test holding is updated.' : 'The test purchase failed on the network.');
+        await refresh();
       }
-      setMessage('Bought. Your holding is updated.');
-      await refresh();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'The purchase failed.');
+      if (submitted && !(e && typeof e === 'object' && 'code' in e && e.code === 'operation_expired')) {
+        setPurchase('pending');
+        setMessage('Test purchase pending, checking the network. Please do not start another.');
+      } else {
+        setSignedAttempt(null);
+        const code = e && typeof e === 'object' && 'code' in e ? e.code : undefined;
+        if (code === 'buy_pending') {
+          setPurchase('pending');
+          setMessage('Test purchase pending, checking the network.');
+        } else {
+          setMessage(code === 'operation_expired' ? 'The price quote expired. Please approve again.' : e instanceof Error ? e.message : 'The test purchase failed.');
+        }
+      }
     } finally {
       setBusy(false);
     }
@@ -649,8 +711,8 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
         Deposit earnings above the required deposit are yours to invest. Devnet lending pays no interest, so you can
         invest your own test USDC here. Distributions raise your displayed shares, as they do for xStocks.
       </p>
-      <button className="button primary" disabled={busy || BigInt(view.testUsdcAtomic) < 5_000_000n} onClick={invest}>
-        {busy ? <Loader2 className="spin" size={16} /> : null} Invest 5 test USDC <ArrowRight size={16} />
+      <button className="button primary" disabled={busy || purchase === 'pending' || BigInt(view.testUsdcAtomic) < 5_000_000n} onClick={invest}>
+        {busy ? <Loader2 className="spin" size={16} /> : null} {purchase === 'pending' ? 'Purchase pending, checking' : 'Invest 5 test USDC'} <ArrowRight size={16} />
       </button>
       {message && <p className="note" role="status">{message}</p>}
     </section>

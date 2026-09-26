@@ -32,3 +32,7 @@ Keys and state live in the ignored `.testnet-secrets/test-signer/` directory (mo
 ## Investment rail
 
 `scripts/solana-test-market.mjs` adds the portfolio half on devnet: a Token-2022 copy of SPYx (`tSPYx`, no value) with the xStocks scaled-UI-amount mechanism, an atomic buy/sell against a test market maker at the live mainnet SPYx reference price, and test distributions through multiplier updates. The Robinhood testnet equivalent is `scripts/robinhood-testnet-cycle.mjs`. See the [testnet comparison](TESTNET_STACK_COMPARISON.md).
+
+## Operator test capability
+
+Test-only actions (test helpers, simulated yield, Robinhood test earn, test-market purchases) share one server-side check, `operatorTestCapability` in `src/server/test-capability.ts`. Request hostnames are not trusted. The capability is off on Vercel, off when `NODE_ENV=production` unless `ALLOW_OPERATOR_TEST_ACTIONS=1`, and otherwise follows the test-signer rules (`SOLANA_TEST_SIGNER_MODE=1`, local store). Robinhood test earn runs once per wallet. Test-market purchases keep the market maker's signature on the server until the exact quote is checked, simulated and a per-account budget (five attempts) is reserved; a purchase that times out stays pending and reconciles by signature instead of allowing a second buy.

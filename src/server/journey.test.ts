@@ -42,6 +42,38 @@ test('choosing an applicant creates an agreement binding landlord and that appli
   await store.close();
 });
 
+test('concurrent choices leave one agreement and retrying the winner is idempotent', async () => {
+  const store = new LocalStore(':memory:');
+  try {
+    const [landlord, alice, bob] = ['landlord', 'alice', 'bob'].map(person);
+    const listing = await createListing(store, landlord, {
+      title: 'Lindenstraße 12, 2 rooms', rentMonthly: '900000000', requiredSecurity: '2700000000', releaseAllowed: true,
+    });
+    await applyToListing(store, alice, listing.id, { name: 'Alice', message: 'Quiet, employed, two cats.' });
+    await applyToListing(store, bob, listing.id, { name: 'Bob', message: 'Student, references attached.' });
+    const applications = (await listListings(store, landlord)).find((item) => item.id === listing.id)!.applications!;
+    const aliceId = applications.find((item) => item.name === 'Alice')!.id;
+    const bobId = applications.find((item) => item.name === 'Bob')!.id;
+    const results = await Promise.allSettled([
+      chooseApplicant(store, landlord, listing.id, aliceId),
+      chooseApplicant(store, landlord, listing.id, bobId),
+    ]);
+    const winners = results.filter((result) => result.status === 'fulfilled');
+    const losers = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+    assert.equal(winners.length, 1);
+    assert.equal(losers.length, 1);
+    assert.match(String(losers[0].reason), /already chosen/);
+    const agreementId = winners[0].value.agreementId!;
+    const chosenId = winners[0] === results[0] ? aliceId : bobId;
+    assert.equal((await chooseApplicant(store, landlord, listing.id, chosenId)).agreementId, agreementId);
+    const agreements = await store.scan<Agreement>('agreement:');
+    assert.deepEqual(agreements.map((row) => row.value.id), [agreementId]);
+    assert.equal(agreements[0].value.parties.tenant?.subject, chosenId === aliceId ? alice.subject : bob.subject);
+  } finally {
+    await store.close();
+  }
+});
+
 test('agreement steps: arbitrator first, then each side accepts the same digest', () => {
   const party = (name: string) => ({ subject: name, wallet: { id: name, address: name, chainType: 'solana' as const } });
   const agreement: Agreement = {

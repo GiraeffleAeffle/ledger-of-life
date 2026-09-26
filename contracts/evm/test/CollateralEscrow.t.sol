@@ -155,6 +155,25 @@ contract CollateralEscrowTest {
         require(escrow.state() == CollateralEscrow.State.Closed, "OPEN");
     }
 
+    function testClaimIsFullyPaidWhenSaleExecutesWithinSlippageBound() public {
+        _pledge(3.75e18);
+        desk.setPrice(392e6); // oracle $400, execution $392 (within the 2% bound)
+        vm.prank(LANDLORD);
+        escrow.proposeClaim(120e6);
+        vm.prank(TENANT);
+        escrow.acceptClaim();
+
+        escrow.settle();
+
+        uint256 executionPrice = desk.price();
+        uint256 sharesSold = (120e6 * 1e18 + executionPrice - 1) / executionPrice;
+        require(usd.balanceOf(LANDLORD) == 120e6, "CLAIM_UNDERPAID");
+        require(stock.balanceOf(TENANT) == 10e18 - sharesSold, "TENANT_SHARES");
+        require(usd.balanceOf(TENANT) == sharesSold * executionPrice / 1e18 - 120e6, "TENANT_CASH");
+        require(escrow.stockHeld() == 0 && escrow.cashHeld() == 0, "ESCROW_NOT_EMPTY");
+        require(escrow.state() == CollateralEscrow.State.Closed, "OPEN");
+    }
+
     function testDisputeOnlyArbitratorDecidesUpToTheClaim() public {
         _pledge(3.75e18);
         vm.prank(LANDLORD);

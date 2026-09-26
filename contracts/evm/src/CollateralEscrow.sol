@@ -222,12 +222,23 @@ contract CollateralEscrow {
         _approve(amount);
     }
 
-    /// @notice Anyone may execute: landlord gets the approved claim in cash (cash first, then an
-    /// oracle-bounded sale of just enough stock); the tenant gets the rest back in kind.
+    /// @notice Anyone may execute: landlord gets the approved claim in cash (cash first, then
+    /// oracle-bounded sales until covered or stock is exhausted); the tenant gets the rest.
     function settle() external nonReentrant {
         if (state != State.ReadyToSettle) revert InvalidState();
         uint256 owed = approvedClaim;
-        if (owed > cashHeld) _sell(owed - cashHeld);
+        if (owed > cashHeld && stockHeld != 0) {
+            uint256 initialStock = stockHeld;
+            uint256 proceeds = _sell(owed - cashHeld);
+            if (owed > cashHeld && stockHeld != 0 && proceeds != 0) {
+                uint256 sharesSold = initialStock - stockHeld;
+                uint256 additional = ((owed - cashHeld) * sharesSold + proceeds - 1) / proceeds;
+                if (additional > stockHeld) additional = stockHeld;
+                _sellShares(additional);
+            }
+            // Execution may vary between sales or round down to the smallest cash unit.
+            if (owed > cashHeld && stockHeld != 0) _sellShares(stockHeld);
+        }
         if (owed > cashHeld) owed = cashHeld; // collateral exhausted: landlord bears the remainder
         state = State.Closed;
         cashHeld -= owed;
@@ -255,6 +266,10 @@ contract CollateralEscrow {
         uint256 p = price();
         uint256 amount = (cashNeeded * 1e18 + p - 1) / p;
         if (amount > stockHeld) amount = stockHeld;
+        return _sellShares(amount);
+    }
+
+    function _sellShares(uint256 amount) private returns (uint256 cashOut) {
         uint256 minOut = stockValue(amount) * (10_000 - maxSlippageBps) / 10_000;
         stockHeld -= amount;
         _call(address(stock), abi.encodeCall(IERC20Asset.approve, (address(sale), amount)));
