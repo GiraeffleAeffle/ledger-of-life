@@ -2986,3 +2986,6 @@ dd {
 .listing-photo img { position: absolute; inset: 0; }
 .listing-body header strong { min-width: 0; }
 .listing-form label.policy-check { display: flex; align-items: center; gap: 8px; }
+.earnings-panel { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 16px; background: linear-gradient(135deg, #f1f8ee, #fdf6e3); border: 1px solid rgba(31, 122, 77, 0.18); }
+.earnings-panel > div:first-child { display: grid; gap: 4px; }
+.earnings-panel strong { font-size: 1.35rem; }

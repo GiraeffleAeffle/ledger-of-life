@@ -116,3 +116,23 @@ export async function buildInitializeEscrow(input: {
     meta(m.depositMint), meta(m.receiptMint), meta(derived.cash, AccountRole.WRITABLE), meta(derived.receipts, AccountRole.WRITABLE), meta(input.tenantDestination), meta(input.landlordDestination), meta(m.reserve), meta(m.market), meta(SOLANA_IDS.token), meta(SOLANA_IDS.system),
   ] };
 }
+
+/** TEST DEPLOYMENTS ONLY: credit stand-in lending interest to an active escrow (see test_credit_yield). */
+export async function buildTestCreditYield(input: { manifest: DeploymentManifest; tenancy: TenancyAccount; funder: string; source: string; amountAtomic: string }): Promise<Instruction> {
+  const { manifest, tenancy: t } = input;
+  const derived = await deriveEscrowAddresses(manifest.escrowProgram, t.tenant, t.leaseId);
+  const amount = new Uint8Array(8);
+  new DataView(amount.buffer).setBigUint64(0, BigInt(input.amountAtomic), true);
+  return {
+    programAddress: address(manifest.escrowProgram),
+    data: concat([Uint8Array.of(20, 213, 145, 106, 246, 95, 216, 159), amount]),
+    accounts: [
+      meta(input.funder, AccountRole.READONLY_SIGNER),
+      meta(t.address, AccountRole.WRITABLE),
+      meta(t.depositMint),
+      meta(input.source, AccountRole.WRITABLE),
+      meta(derived.cash, AccountRole.WRITABLE),
+      meta(SOLANA_IDS.token),
+    ],
+  };
+}

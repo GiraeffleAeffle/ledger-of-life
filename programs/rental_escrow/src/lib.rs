@@ -261,6 +261,38 @@ pub mod rental_escrow {
         Ok(())
     }
 
+    /// TEST DEPLOYMENTS ONLY: stand-in for lending interest on test networks without borrowers.
+    /// Anyone may transfer test USDC into an active escrow as accounted earnings; it can only be
+    /// released to the tenant's fixed account or returned to the tenant at settlement.
+    pub fn test_credit_yield(ctx: Context<TestCreditYield>, amount: u64) -> Result<()> {
+        require!(cfg!(feature = "test-deployment"), EscrowError::DeploymentDisabled);
+        let t = &ctx.accounts.tenancy;
+        require!(t.phase == Phase::Active, EscrowError::InvalidPhase);
+        require!(amount > 0 && amount <= 100_000_000, EscrowError::InvalidAmount);
+        let before = ctx.accounts.cash.amount;
+        token::transfer_checked(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                TransferChecked {
+                    from: ctx.accounts.source.to_account_info(),
+                    mint: ctx.accounts.deposit_mint.to_account_info(),
+                    to: ctx.accounts.cash.to_account_info(),
+                    authority: ctx.accounts.funder.to_account_info(),
+                },
+            ),
+            amount,
+            6,
+        )?;
+        ctx.accounts.cash.reload()?;
+        require!(
+            ctx.accounts.cash.amount.checked_sub(before) == Some(amount),
+            EscrowError::UnexpectedTokenDelta
+        );
+        let t = &mut ctx.accounts.tenancy;
+        t.accounted_idle = accounting::checked_add(t.accounted_idle, amount)?;
+        Ok(())
+    }
+
     pub fn propose_claim(ctx: Context<Party>, amount: u64, nonce: u64) -> Result<()> {
         ctx.accounts
             .tenancy
@@ -575,6 +607,20 @@ pub struct Finance<'info> {
     /// CHECK: exact native instructions sysvar required by KLend.
     #[account(address=anchor_lang::solana_program::sysvar::instructions::ID)]
     pub instructions_sysvar: UncheckedAccount<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct TestCreditYield<'info> {
+    pub funder: Signer<'info>,
+    #[account(mut,seeds=[b"tenancy",tenancy.tenant.as_ref(),&tenancy.lease_id],bump=tenancy.bump)]
+    pub tenancy: Account<'info, Tenancy>,
+    #[account(address=tenancy.deposit_mint)]
+    pub deposit_mint: Account<'info, Mint>,
+    #[account(mut,token::mint=deposit_mint,token::authority=funder)]
+    pub source: Account<'info, TokenAccount>,
+    #[account(mut,seeds=[b"cash",tenancy.key().as_ref()],bump,token::mint=deposit_mint,token::authority=tenancy)]
+    pub cash: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
 }
 

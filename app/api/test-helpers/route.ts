@@ -1,5 +1,5 @@
 import { authenticated } from '@/server/authenticated';
-import { actForTestParties, addTestApplicant, postTestHome, testHelpersEnabled } from '@/server/test-helpers';
+import { actForTestParties, addTestApplicant, creditTestYield, postTestHome, testHelpersEnabled } from '@/server/test-helpers';
 import { getStore } from '@/server/store';
 import { readBody, sameOrigin } from '@/server/http';
 export const runtime = 'nodejs';
@@ -18,6 +18,8 @@ export async function POST(request: Request) {
     if (body.action === 'post_home') return Response.json({ listings: await postTestHome(store) }, noStore);
     if (body.action === 'apply' && typeof body.listingId === 'string')
       return Response.json({ listing: await addTestApplicant(store, user, body.listingId) }, noStore);
+    if (body.action === 'interest' && typeof body.agreementId === 'string')
+      return Response.json({ done: await creditTestYield(store, user, body.agreementId) }, noStore);
     if (body.action === 'act')
       return Response.json({
         done: await actForTestParties(store, user, {

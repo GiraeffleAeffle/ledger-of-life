@@ -346,6 +346,26 @@ function TenancyCard({ journey, request, reload, openConnections, helper, helper
           </button>
         )}
       </div>
+      {chain && chain.phase === 'active' && journey.role === 'tenant' && (
+        <div className="earnings-panel">
+          <div>
+            <span className="eyebrow">YOUR DEPOSIT EARNINGS</span>
+            <strong>{money(chain.claimableAtomic)} ready to claim</strong>
+            <span className="small-copy">Already claimed: {money(chain.releasedAtomic)}. The deposit itself stays locked; only what it earns is yours now.</span>
+          </div>
+          <div className="button-row">
+            <button className="button primary" disabled={busy || BigInt(chain.claimableAtomic) === 0n}
+              onClick={() => run(() => operation({ kind: 'release_earnings', amountAtomic: chain.claimableAtomic }, 'Claim deposit earnings to your wallet'))}>
+              Claim to my wallet <ArrowRight size={16} />
+            </button>
+            {helper && (
+              <button className="button test-helper" disabled={helperBusy} onClick={() => helper({ action: 'interest', agreementId })}>
+                Simulate a month of interest
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {chain && (
         <dl className="journey-facts">
           <div><dt>Required deposit</dt><dd>{money(journey.requiredSecurity)}</dd></div>

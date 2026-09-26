@@ -44,6 +44,9 @@ export interface TenancyJourney {
     landlordOwedAtomic: string;
     tenantPaidAtomic: string;
     landlordPaidAtomic: string;
+    /** Earnings above the required deposit the tenant may claim now (release rules of the program). */
+    claimableAtomic: string;
+    releasedAtomic: string;
     walletId: string;
     feePayer: string;
     walletChain: 'solana:devnet' | null;
@@ -194,6 +197,13 @@ export async function tenancyJourney(
       landlordOwedAtomic: t.landlordOwedAtomic,
       tenantPaidAtomic: paid(false),
       landlordPaidAtomic: paid(true),
+      claimableAtomic: (() => {
+        if (!t.releasePermitted || t.phase !== 'active') return '0';
+        const idle = BigInt(t.accountedIdleAtomic);
+        const surplus = idle + BigInt(snapshot.receiptValueAtomic) - BigInt(t.requiredSecurityAtomic);
+        return (surplus <= 0n ? 0n : surplus < idle ? surplus : idle).toString();
+      })(),
+      releasedAtomic: t.releasedEarningsAtomic,
       walletId: snapshot.walletId,
       feePayer: snapshot.feePayer,
       walletChain: snapshot.walletChain === 'solana:devnet' ? 'solana:devnet' : null,

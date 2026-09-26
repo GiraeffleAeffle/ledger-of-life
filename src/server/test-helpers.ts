@@ -1,12 +1,29 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { createKeyPairSignerFromBytes, type KeyPairSigner } from '@solana/kit';
+import {
+  address,
+  appendTransactionMessageInstructions,
+  blockhash,
+  compileTransaction,
+  createKeyPairSignerFromBytes,
+  createTransactionMessage,
+  getBase58Decoder,
+  getTransactionDecoder,
+  getTransactionEncoder,
+  partiallySignTransaction,
+  setTransactionMessageFeePayer,
+  setTransactionMessageLifetimeUsingBlockhash,
+  type KeyPairSigner,
+} from '@solana/kit';
+import { buildTestCreditYield, derivePayoutAddress } from '../finance/solana/index.ts';
+import { RpcSolanaGateway } from './solana-rpc.ts';
+import { configuredFeeSponsor } from './solana-service.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { acceptAgreement, addAgreementRecord, inviteToAgreement, joinAgreement, type Agreement } from './agreements.ts';
 import { tenancyJourney, type JourneyRole } from './journey.ts';
 import { applyToListing, chooseApplicant, createListing, PRESET_PHOTOS, type Listing } from './listings.ts';
-import { ensurePayoutAccounts, solanaServicesFor } from './solana-tenancies.ts';
+import { ensurePayoutAccounts, solanaConfigurationFor, solanaServicesFor } from './solana-tenancies.ts';
 import { assertTestSignerAllowed, signPrepared, testIdentity, TEST_SUBJECT_PREFIX, type TestRole } from './test-signer.ts';
 import { solanaConfiguration } from './solana-rpc.ts';
 import type { Store } from './store.ts';
@@ -182,4 +199,41 @@ export async function actForTestParties(
     if (!acted) break;
   }
   return done;
+}
+
+/**
+ * Test networks have no borrowers, so lending pays nothing. This credits stand-in interest
+ * (default 0.25 test USDC, "about a month") from the test funder into the escrow via the
+ * test-only program instruction; it then follows the real earnings-release rules.
+ */
+export async function creditTestYield(store: Store, user: VerifiedIdentity, agreementId: string, amountAtomic = '250000', environment = process.env) {
+  const agreement = await store.get<Agreement>(`agreement:${agreementId}`);
+  if (!agreement || !Object.values(agreement.parties).some((party) => party?.subject === user.subject))
+    throw new Error('You are not part of this tenancy.');
+  const [config, sponsor, people] = await Promise.all([solanaConfigurationFor(store, agreementId, environment), configuredFeeSponsor(environment), signers(environment)]);
+  if (!config || !sponsor) throw new Error('The deposit service is not configured.');
+  const gateway = new RpcSolanaGateway(config);
+  const { tenancy } = await gateway.snapshot();
+  if (tenancy.phase !== 'active') throw new Error('Interest accrues only while the deposit is active.');
+  const funder = people.tenant.signer;
+  const source = await derivePayoutAddress(funder.address, config.depositMint);
+  const instruction = await buildTestCreditYield({ manifest: config, tenancy, funder: funder.address, source, amountAtomic });
+  const lifetime = await gateway.lifetime();
+  const message = appendTransactionMessageInstructions([instruction], setTransactionMessageLifetimeUsingBlockhash(
+    { blockhash: blockhash(lifetime.blockhash), lastValidBlockHeight: BigInt(lifetime.lastValidBlockHeight) },
+    setTransactionMessageFeePayer(address(sponsor.address), createTransactionMessage({ version: 0 })),
+  ));
+  const funderSigned = await partiallySignTransaction([funder.keyPair], compileTransaction(message));
+  const signed = await sponsor.sign(new Uint8Array(getTransactionEncoder().encode(funderSigned)));
+  const signature = getBase58Decoder().decode(getTransactionDecoder().decode(signed).signatures[address(sponsor.address)]!);
+  if ((await gateway.broadcast(signed)) !== signature) throw new Error('RPC returned another signature');
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const status = (await gateway.rpc('getSignatureStatuses', [[signature]])) as { value: ({ err: unknown; confirmationStatus?: string } | null)[] };
+    if (status.value[0]?.err) throw new Error('Crediting test interest failed.');
+    if (status.value[0]?.confirmationStatus === 'finalized') return ['Credited ' + (Number(amountAtomic) / 1e6).toFixed(2) + ' test USDC of simulated interest'];
+    const pause = Promise.withResolvers<void>();
+    setTimeout(pause.resolve, 2000);
+    await pause.promise;
+  }
+  throw new Error('Still confirming. Refresh in a moment.');
 }
