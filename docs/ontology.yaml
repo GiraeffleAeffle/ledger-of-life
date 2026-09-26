@@ -261,7 +261,7 @@ concepts:
     reality: roadmap
 
   LifeTimeline:
-    definition: The person's private history of places and events: moves, tenancies, deposits returned, memberships, first local investment.
+    definition: "The person's private history of places and events: moves, tenancies, deposits returned, memberships, first local investment."
     sources:
       in_app_tenancies: {reality: testnet_real, note: "Derivable from Agreements today; timeline view not built."}
       self_declared_moves: {reality: roadmap, note: "Labeled self-declared."}
