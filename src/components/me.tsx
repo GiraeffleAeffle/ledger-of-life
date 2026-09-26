@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Building2, Cpu, History, KeyRound, Link2, Sun, Wallet } from 'lucide-react';
+import type { PlaceEntry } from '@/server/timeline';
 import { useRentalWallet } from '@/wallets';
 import type { TenancyJourney } from '@/server/journey';
 import type { PublicAdapterConfig } from '@/server/adapters';
@@ -8,6 +9,8 @@ import type { CityResult } from '@/server/city';
 import { IdentityStrip } from './identity';
 import type { Area } from './areas';
 
+
+const emptyPlace = { city: '', from: '', to: '', note: '' };
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 const STAGE_LABEL: Record<string, string> = {
   agreement: 'Agreement', space: 'Deposit space', deposit: 'Deposit', living: 'Living here', 'move-out': 'Move-out', paid: 'Paid out',
@@ -20,10 +23,15 @@ export function MeArea({ request, role, tenancies, onChangeRole, go, openConnect
   const wallet = useRentalWallet();
   const [adapters, setAdapters] = useState<PublicAdapterConfig | null>(null);
   const [city, setCity] = useState<CityResult | null>(null);
+  const [places, setPlaces] = useState<PlaceEntry[]>([]);
+  const [placeForm, setPlaceForm] = useState(emptyPlace);
+  const [placeError, setPlaceError] = useState('');
+  const [savingPlace, setSavingPlace] = useState(false);
   useEffect(() => {
     let active = true;
     request<{ adapters: PublicAdapterConfig }>('/api/assets').then((r) => active && setAdapters(r.adapters)).catch(() => {});
     request<{ city: CityResult }>('/api/city').then((r) => active && setCity(r.city)).catch(() => {});
+    request<{ places: PlaceEntry[] }>('/api/timeline').then((r) => active && setPlaces(r.places)).catch(() => {});
     return () => { active = false; };
   }, [request]);
 
@@ -37,6 +45,30 @@ export function MeArea({ request, role, tenancies, onChangeRole, go, openConnect
     { icon: Cpu, name: 'Validator', state: adapters?.validator ? `${adapters.validator.chain} · ${adapters.validator.id}` : 'Not connected', level: 'Read-only, live', area: 'money' as Area },
     { icon: Building2, name: 'Stadtstack atlas', state: city?.available ? city.name : city && 'name' in city && city.name ? city.name : 'No city chosen', level: 'Read-only, research preview', area: 'places' as Area },
   ];
+
+  async function submitPlace(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPlaceError('');
+    setSavingPlace(true);
+    try {
+      const response = await request<{ places: PlaceEntry[] }>('/api/timeline', { action: 'add', ...placeForm });
+      setPlaces(response.places);
+      setPlaceForm(emptyPlace);
+    } catch (error) {
+      setPlaceError(error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setSavingPlace(false);
+    }
+  }
+
+  async function deletePlace(id: string) {
+    try {
+      const response = await request<{ places: PlaceEntry[] }>('/api/timeline', { action: 'remove', id });
+      setPlaces(response.places);
+    } catch (error) {
+      setPlaceError(error instanceof Error ? error.message : 'Please try again.');
+    }
+  }
 
   return (
     <div className="area-stack">
@@ -61,7 +93,25 @@ export function MeArea({ request, role, tenancies, onChangeRole, go, openConnect
               <span>Tenancy as {t.role} · {STAGE_LABEL[t.stage] ?? t.stage} · recorded by this app</span>
             </li>
           ))}
-          <li className="planned"><strong>Earlier places</strong><span>Planned: add where you lived before (labeled as your own statement), later proven by a residence attestation.</span></li>
+          {places.toSorted((a, b) => b.to.localeCompare(a.to) || b.from.localeCompare(a.from)).map((place) => (
+            <li key={place.id}>
+              <strong>{place.city} · {place.from}–{place.to}</strong>
+              <span>Your own statement{place.note ? ` · ${place.note}` : ''}</span>
+              <button className="text-button" type="button" onClick={() => deletePlace(place.id)}>Remove</button>
+            </li>
+          ))}
+          <li>
+            <strong>Add an earlier place</strong>
+            <form className="inline-form" onSubmit={submitPlace}>
+              <label>City<input required maxLength={80} value={placeForm.city} onChange={(event) => setPlaceForm({ ...placeForm, city: event.target.value })} /></label>
+              <label>From<input required pattern="[0-9]{4}(-[0-9]{2})?" placeholder="YYYY or YYYY-MM" value={placeForm.from} onChange={(event) => setPlaceForm({ ...placeForm, from: event.target.value })} /></label>
+              <label>To<input required pattern="[0-9]{4}(-[0-9]{2})?" placeholder="YYYY or YYYY-MM" value={placeForm.to} onChange={(event) => setPlaceForm({ ...placeForm, to: event.target.value })} /></label>
+              <label>Note (optional)<input maxLength={140} value={placeForm.note} onChange={(event) => setPlaceForm({ ...placeForm, note: event.target.value })} /></label>
+              {placeError && <span role="alert">{placeError}</span>}
+              <button className="button primary" type="submit" disabled={savingPlace}>{savingPlace ? 'Adding…' : 'Add place'}</button>
+            </form>
+            <span>Later, an EU wallet residence attestation could prove a place you lived.</span>
+          </li>
         </ol>
       </section>
 
