@@ -1,10 +1,10 @@
 import { authenticated } from '@/server/authenticated';
-import { readCitySignals } from '@/server/city-signals';
+import { readCitySignal, readCitySignals } from '@/server/city-signals';
 
 export const runtime = 'nodejs';
 const headers = { 'Cache-Control': 'private, no-store', Vary: 'Authorization' };
 
-/** Public city-wide files only. Reject all location filters rather than accidentally recording private coordinates. */
+/** Public city-wide records only. Reject private location filters and all unrecognised parameters. */
 export async function GET(request: Request) {
   try {
     await authenticated(request);
@@ -12,10 +12,14 @@ export async function GET(request: Request) {
     return Response.json({ error: error instanceof Error ? error.message : 'Sign in again.' }, { status: 401, headers });
   }
   const params = new URL(request.url).searchParams;
-  if ([...params.keys()].some((key) => key !== 'city') || params.getAll('city').length > 1) {
-    return Response.json({ error: 'Only a city ID is accepted. Home, work, and map coordinates stay on your device.' }, { status: 400, headers });
+  if ([...params.keys()].some((key) => key !== 'city' && key !== 'id') || params.getAll('city').length > 1 || params.getAll('id').length > 1 || (params.has('id') && (!params.get('id') || !params.get('city')))) {
+    return Response.json({ error: 'Only a city ID and optional public signal ID are accepted. Home, work, and map coordinates stay on your device.' }, { status: 400, headers });
   }
   try {
+    if (params.has('id')) {
+      const feature = await readCitySignal(params.get('city')!, params.get('id')!);
+      return feature ? Response.json({ feature }, { headers }) : Response.json({ error: 'Public city item not found.' }, { status: 404, headers });
+    }
     const result = await readCitySignals(params.get('city') ?? '');
     return Response.json(result, { headers });
   } catch (error) {

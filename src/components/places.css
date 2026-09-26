@@ -32,6 +32,11 @@
 .personal-map-section { min-width: 0; padding: 22px; display: grid; gap: 12px; }
 .personal-map-section h2 { margin: 5px 0 0; font-size: 1.3rem; }
 .personal-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.personal-city-switcher { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 600; }
+.personal-city-switcher select { max-width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface, #fff); color: inherit; }
+.personal-interests { border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px 12px; min-width: 0; }
+.personal-interests legend { font-weight: 600; padding: 0 6px; }
+.personal-interests p { font-size: .82rem; color: var(--muted); margin: 2px 0 6px; }
 .personal-pin-controls { display: flex; flex-wrap: wrap; gap: 10px; }
 .personal-pin-controls > div { display: flex; flex: 1 1 280px; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
 .personal-pin-controls button { font-size: .8rem; }
@@ -43,6 +48,10 @@
 .personal-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; font-size: .83rem; }
 .personal-legend label { display: inline-flex; align-items: center; gap: 5px; }
 .personal-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; }
+.personal-category-picker { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin-top: 10px; font-size: .83rem; }
+.personal-category-picker label { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; width: min(100%, 330px); min-width: 0; }
+.personal-category-picker select { width: 100%; min-width: 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface, #fff); color: inherit; }
+.personal-panel-holder { min-width: 0; }
 .personal-feature-panel { position: relative; border: 1px solid var(--line); border-radius: 12px; padding: 16px; max-height: 590px; overflow: auto; overflow-wrap: anywhere; }
 .personal-feature-panel h3 { margin: 8px 0; }
 .personal-close { float: right; border: 0; background: transparent; font-size: 1.6rem; cursor: pointer; }
@@ -59,6 +68,7 @@
 .personal-ring li { border-top: 1px solid var(--line); padding: 10px 0; }
 .personal-ring li button { display: grid; gap: 5px; width: 100%; padding: 0; text-align: left; border: 0; background: transparent; color: inherit; cursor: pointer; }
 .personal-ring li button span { font-size: .82rem; line-height: 1.4; }
+.personal-show-more { margin-top: 10px; }
 .personal-overview { display: grid; gap: 8px; }
 .personal-overview button { justify-self: start; border: 0; background: transparent; padding: 0; cursor: pointer; }
 @media (max-width: 900px) { .personal-rings { grid-template-columns: 1fr; } }

@@ -1,9 +1,9 @@
-import type { Coordinate, Signal, SignalGeometry } from '../server/city-signals';
+import type { CityFeature, Coordinate, SignalGeometry } from '../server/city-signals';
 
 export const HOME_RADIUS_METRES = 1000;
 export const COMMUTE_CORRIDOR_METRES = 400;
 export type PersonalPins = { home?: Coordinate; work?: Coordinate };
-export type MatchedSignal = { feature: Signal; distanceMetres: number | null; explanation: string };
+export type MatchedSignal = { feature: CityFeature; distanceMetres: number | null; explanation: string };
 export type PersonalRings = { home: MatchedSignal[]; commute: MatchedSignal[]; city: MatchedSignal[] };
 
 // Local tangent plane for neighbourhood-scale distances; no network-based geocoding or routing.
@@ -78,19 +78,19 @@ export function distanceToCorridor(geometry: SignalGeometry, home: Coordinate, w
 }
 
 /** Device-derived state takes precedence over a stale source status, without rewriting the original. */
-export function displayStatus(feature: Signal, today = new Date().toISOString().slice(0, 10)): string {
+export function displayStatus(feature: CityFeature, today = new Date().toISOString().slice(0, 10)): string {
   const { kind, endDate, nextStep, status } = feature.properties;
   if (endDate && endDate < today && kind === 'consultation') return `Consultation closed on ${endDate}; next step: ${nextStep || 'not established'}`;
   if (endDate && endDate < today && kind === 'roadworks') return `Roadworks ended on ${endDate} (scheduled end; completion not verified)`;
   return status || 'Status not established';
 }
 
-function priority(feature: Signal, today: string): number {
+function priority(feature: CityFeature, today: string): number {
   const { startDate, endDate, status } = feature.properties;
   if ((endDate && endDate < today) || /closed|complete|cancelled|ended|abgeschlossen|beendet/i.test(status)) return 2;
   return startDate && startDate > today ? 1 : 0;
 }
-function means(feature: Signal, ring: 'home' | 'commute' | 'city', distance: number | null, today: string): string {
+function means(feature: CityFeature, ring: 'home' | 'commute' | 'city', distance: number | null, today: string): string {
   const { kind, title, statement, endDate, nextStep, startDate, status } = feature.properties;
   if (kind === 'consultation' && endDate && endDate < today) return `${displayStatus(feature, today).replace(/[.]+$/, '')}. A closed window is not open for comments.`;
   if (kind === 'roadworks' && endDate && endDate < today) return `${displayStatus(feature, today)}.`;
@@ -100,18 +100,40 @@ function means(feature: Signal, ring: 'home' | 'commute' | 'city', distance: num
   if (ring === 'home' && distance !== null) return `${Math.round(distance)} m from your home: ${title}${nextStep ? `; next: ${nextStep.replace(/[.]+$/, '')}` : ''}. Nearby does not necessarily mean your street is affected.`;
   return `${title}: ${statement}${nextStep ? ` Next: ${nextStep.replace(/[.]+$/, '')}.` : ''}`;
 }
-/** All matching and human-readable templates execute in the browser, never on the server. */
-export function matchPersonalRings(features: Signal[], pins: PersonalPins, today = new Date().toISOString().slice(0, 10)): PersonalRings {
+export const interestOptions = ['sport', 'kids', 'shops', 'health', 'culture'] as const;
+export type Interest = typeof interestOptions[number];
+const interestWords: Record<Interest, RegExp> = {
+  sport: /sport|fitness|gym|schwimm|turn|fußball|fussball|stadion|athlet/i,
+  kids: /kid|child|kinder|jugend|spielplatz|schule|kita|daycare|famil/i,
+  shops: /shop|shopping|laden|geschäft|geschaeft|supermarkt|markt|retail|einzelhandel/i,
+  health: /health|gesund|arzt|ärzt|aerzt|klinik|krankenhaus|apotheke|pharmacy|hospital/i,
+  culture: /cultur|kultur|museum|bibliothek|library|theater|theatre|kino|kunst|music|musik/i,
+};
+function interestMatch(feature: CityFeature, interests: readonly Interest[]): boolean {
+  if (feature.properties.kind !== 'place' && feature.properties.kind !== 'council_paper' && feature.properties.kind !== 'council_meeting') return false;
+  const words = `${feature.properties.title} ${feature.properties.category}`;
+  return interests.some((interest) => interestWords[interest].test(words));
+}
+/** All matching and ranking execute in the browser, never on the server. */
+export function matchPersonalRings(features: CityFeature[], pins: PersonalPins, today = new Date().toISOString().slice(0, 10), interests: readonly Interest[] = [], cityPlaceCategories: readonly string[] = []): PersonalRings {
   const result: PersonalRings = { home: [], commute: [], city: [] };
   for (const feature of features) {
+    const { kind, scale, category } = feature.properties;
     const distance = pins.home ? distanceToGeometry(pins.home, feature.geometry) : null;
     const onWay = pins.home && pins.work ? distanceToCorridor(feature.geometry, pins.home, pins.work) : null;
-    const citywide = !feature.geometry || feature.properties.scale === 'city';
+    const citywide = !feature.geometry || scale === 'city';
     if (!citywide && distance !== null && distance <= HOME_RADIUS_METRES) result.home.push({ feature, distanceMetres: distance, explanation: means(feature, 'home', distance, today) });
     if (!citywide && onWay !== null && onWay <= COMMUTE_CORRIDOR_METRES) result.commute.push({ feature, distanceMetres: onWay, explanation: means(feature, 'commute', onWay, today) });
-    // The city ring remains a complete browseable public inventory, even before a home is placed.
-    result.city.push({ feature, distanceMetres: distance, explanation: means(feature, 'city', distance, today) });
+    // The city ring is for civic citywide matters, not an unbounded dump of every street/place.
+    if ((kind === 'place' && cityPlaceCategories.includes(category)) ||
+      (kind !== 'place' && (kind === 'council_paper' || kind === 'council_meeting' || kind === 'budget' || citywide))) {
+      result.city.push({ feature, distanceMetres: null, explanation: means(feature, 'city', null, today) });
+    }
   }
-  for (const items of Object.values(result)) items.sort((a, b) => priority(a.feature, today) - priority(b.feature, today) || (a.distanceMetres ?? Infinity) - (b.distanceMetres ?? Infinity) || a.feature.properties.title.localeCompare(b.feature.properties.title));
+  for (const items of Object.values(result)) items.sort((a, b) =>
+    Number(interestMatch(b.feature, interests)) - Number(interestMatch(a.feature, interests)) ||
+    priority(a.feature, today) - priority(b.feature, today) ||
+    (a.distanceMetres ?? Infinity) - (b.distanceMetres ?? Infinity) ||
+    a.feature.properties.title.localeCompare(b.feature.properties.title));
   return result;
 }

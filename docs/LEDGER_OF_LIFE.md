@@ -114,12 +114,16 @@ interests would stay with the person and matching would require explicit consent
 ### 2.6 Personal city map (built; public signal coverage varies)
 
 The authenticated `GET /api/city-signals?city=<id>` reads the published
-`stadtstack-data/out/catalogue.json`, `cities/<id>/signals.geojson` and `changes.json`
-(or `STADTSTACK_DATA_DIR`), caching file contents by mtime; it accepts **city ID only**, never home,
-work or commute coordinates. City selection comes from the opted-in EU-wallet locality or the
-chosen city; uncovered cities offer the catalogue's covered cities for exploration. The hand-written
-fictional Strausberg fixture is under `test/fixtures/city-signals/out/` for geometric tests only,
-not app data; real published files are the runtime source.
+`stadtstack-data/out/catalogue.json`, compact `cities/<id>/signals.min.geojson`
+when the catalogue advertises `minUrl` (otherwise `signals.geojson`), and `changes.json`
+(or `STADTSTACK_DATA_DIR`), caching file contents by mtime. The compact file drives map
+and lists; selecting an item fetches its full record and source locators through
+`GET /api/city-signals?city=<id>&id=<publicSignalId>`. These endpoints accept **only city
+and optional public signal ID**, never home, work, interests, categories or commute
+coordinates. City selection comes from the opted-in EU-wallet locality or chosen city,
+but the resident can explore **any** covered city in the catalogue without changing it.
+The hand-written fictional Strausberg fixture is under `test/fixtures/city-signals/out/`
+for geometric tests only, not app data; real published files are the runtime source.
 
 The resident clicks to place home and work pins (or separately requests browser geolocation).
 They are stored only in per-city `localStorage` and can be removed. The map does not recenter on
@@ -127,13 +131,20 @@ private pins, and no geocoding, routing or private-coordinate request is made. M
 OpenFreeMap tiles: **tile requests disclose the viewed map area to the tile provider**, even though
 saved pin coordinates are never transmitted; self-hosted tiles could reduce this later.
 
-The browser matches published public geometries to a 1 km straight-line neighbourhood radius and
-a 400 m approximate corridor around the straight line from home to work—not a walking or
-driving route. Citywide items and a full city list remain available without a pin. Feature cards
-show source locators, as-of date, review state (`candidate` means **not yet reviewed**), geometry
-precision and an LLM faithfulness score when present. Source status is retained for provenance;
-dated consultations whose windows have passed display **closed**, and past roadworks display
-**ended (scheduled end; completion not verified)**. Coverage is not a complete inventory.
+The browser matches published public geometries to a 1 km straight-line neighbourhood
+radius and a 400 m approximate corridor around the straight line from home to work—not
+a walking or driving route. Pins are scoped by city; exploring a different city never
+matches the first city's pins. Each ring initially shows its ten most relevant items
+with a "Show more" control. The city list shows citywide council matters, budgets and
+city-scale projects, not thousands of local places; a place appears there only when
+its category is switched on. Optional sport/kids/shops/health/culture interests, stored
+**on this device only**, rank matching places and council items by title/category.
+MapLibre clusters points by kind and loads polygons only at street-level zoom. Feature
+cards fetch the full record and show source locators, as-of date, review state
+(`candidate` means **not yet reviewed**), geometry precision and an LLM faithfulness
+score when present. Source status is retained for provenance; expired consultations
+are **closed**, and past roadworks are **ended (scheduled end; completion not verified)**.
+Coverage is not a complete inventory.
 
 ## 3. How the app should be organised
 

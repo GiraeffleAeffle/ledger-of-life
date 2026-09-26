@@ -36,15 +36,26 @@ test('near-home and commute corridor boundaries distinguish geometry just inside
   assert.ok((distanceToCorridor(outside, home, work) ?? 0) > 400);
 });
 
-test('citywide council/budget only appear in the city ring, nearby and commute include mapped geometry', () => {
+test('city ring contains civic citywide records, not a flood of local streets or places', () => {
   const rings = matchPersonalRings(fixture.features, { home, work }, '2026-09-26');
   assert.ok(rings.home.some((entry) => entry.feature.properties.id === 'fictional-plan'));
+  assert.ok(rings.home.some((entry) => entry.feature.properties.id === 'fictional-club'));
   assert.ok(rings.commute.some((entry) => entry.feature.properties.id === 'fictional-roadworks'));
   assert.ok(!rings.home.some((entry) => entry.feature.properties.id === 'fictional-budget'));
   assert.ok(!rings.commute.some((entry) => entry.feature.properties.id === 'fictional-council'));
-  assert.equal(rings.city.length, fixture.features.length);
+  assert.deepEqual(rings.city.map((entry) => entry.feature.properties.id).sort(), ['fictional-budget', 'fictional-council']);
   assert.match(rings.city.find((entry) => entry.feature.properties.id === 'fictional-budget')!.explanation, /^Planned, not spent:/);
   assert.equal(matchPersonalRings(fixture.features, {}).home.length, 0);
+  assert.ok(!matchPersonalRings(fixture.features, {}).city.some((entry) => entry.feature.properties.kind === 'place'));
+  assert.ok(matchPersonalRings(fixture.features, {}, '2026-09-26', [], ['club']).city.some((entry) => entry.feature.properties.id === 'fictional-club'));
+});
+
+test('interest matching changes relevance order without moving items between rings', () => {
+  const paper = fixture.features.find((feature) => feature.properties.id === 'fictional-council')!;
+  const healthPaper = { ...paper, properties: { ...paper.properties, id: 'health-agenda', title: 'Health clinic agenda', category: 'services' } };
+  const city = matchPersonalRings([paper, healthPaper], {}, '2026-09-26', ['health']).city;
+  assert.deepEqual(city.map((entry) => entry.feature.properties.id), ['health-agenda', 'fictional-council']);
+  assert.deepEqual(matchPersonalRings([paper, healthPaper], {}, '2026-09-26').city.map((entry) => entry.feature.properties.id), ['fictional-council', 'health-agenda']);
 });
 
 test('expired consultation overrides stale source status and expired roadworks do not read as active', () => {

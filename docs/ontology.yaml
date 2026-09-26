@@ -96,21 +96,23 @@ concepts:
 
   CitySignal:
     definition: A public, versioned city-wide statement or place published by Stadtstack; its source, as-of, review state, geometry precision and (for LLM extraction) faithfulness score qualify every claim.
-    source: stadtstack-data/out/catalogue.json and cities/<cityId>/signals.geojson
+    source: stadtstack-data/out/catalogue.json plus cities/<cityId>/signals.min.geojson for browsing and signals.geojson for detail
     reality: read_only_live
     levels:
       public_snapshot: {reality: read_only_live, note: "Actual sourced city data; candidate means not yet human-reviewed and coverage is not a complete city inventory."}
       fictional_test_fixture: {reality: illustration, note: "Hand-written fixture under test/fixtures only; never app data."}
+      compact_browse: {reality: read_only_live, note: "Map and lists read compact public records; selecting an item loads full sources by public ID only."}
     relations: {located_in: Context (city), relevant_to: Person (matched in the browser with MyPlaces)}
     code: [src/server/city-signals.ts, app/api/city-signals/route.ts, src/components/personal-map.tsx]
 
   MyPlaces:
-    definition: Optional home and work pins self-declared by clicking the map or explicitly requesting browser geolocation.
+    definition: Optional home and work pins self-declared by clicking the map or explicitly requesting browser geolocation, plus self-selected interests for local ranking.
     reality: self_declared_local
     invariants:
-      - Home and work coordinates are stored only in this device's localStorage and can be removed.
-      - Neither exact coordinates nor a commute route is sent to our server or a geocoder/router.
-      - The browser matches public CitySignals within 1 km of home and an approximate 400 m straight-line commute corridor.
+      - Home and work coordinates are stored only in this device's per-city localStorage and can be removed.
+      - Sport, kids, shops, health and culture interests are stored only on this device and rank places and council items locally.
+      - Neither exact coordinates, interests nor a commute route is sent to our server or a geocoder/router.
+      - The browser matches public CitySignals within 1 km of home and an approximate 400 m straight-line commute corridor only when viewing the pin's city.
       - Map tile requests reveal the viewed map area to OpenFreeMap, not saved pin coordinates.
     relations: {belongs_to: Person, matches: CitySignal (on device)}
     code: [src/components/personal-map.tsx, src/components/personal-map-relevance.ts]

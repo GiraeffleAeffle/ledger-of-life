@@ -54,12 +54,15 @@ flowchart LR
 
 **City signals and private places.** Stadtstack publishes public, versioned **CitySignals** with
 source locators, as-of time, review state, geometry precision and LLM faithfulness if applicable.
-They are read-only public data; `candidate` means **not yet human-reviewed**, not a fact checked
-by the city. A **Person** may mark optional **MyPlaces** home/work pins, self-declared and kept only
-in that device's localStorage. The person sees relevant CitySignals through matching performed
-entirely in the browser (1 km near home; approximate 400 m straight-line home-to-work corridor).
-Neither pin nor route is sent to the app server; map tiles do reveal the viewed area to OpenFreeMap.
-The fictional test fixture is an illustration, never an app data source.
+Compact city records drive the map and lists; clicking an item requests its full public record by
+signal ID for source detail. They are read-only public data; `candidate` means **not yet
+human-reviewed**, not fact-checked by the city. A **Person** may mark optional **MyPlaces**
+home/work pins per city and select sport/kids/shops/health/culture interests, all kept only in that
+device's localStorage. The person sees relevant CitySignals through ranking and matching entirely
+in the browser (1 km near home; approximate 400 m straight-line home-to-work corridor). A city
+switch uses only pins saved for that city. No pin, interest or route is sent to the app server;
+map tiles do reveal the viewed area to OpenFreeMap. The fictional test fixture is an illustration,
+never an app data source.
 
 ## Money flow of one tenancy
 

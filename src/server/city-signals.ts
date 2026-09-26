@@ -12,7 +12,7 @@ export type SignalGeometry =
   | null;
 export interface SignalSource {
   url: string; title: string; publisher: string; locator: string; retrievedAt: string;
-  sha256: string; licence: string; reuse: string;
+  sha256: string | null; licence: string; reuse: string;
 }
 export interface Signal {
   type: 'Feature'; geometry: SignalGeometry;
@@ -23,16 +23,27 @@ export interface Signal {
     geometryPrecision: 'exact' | 'approximate' | 'area' | 'none';
     sources: SignalSource[];
     extraction: { method: 'structured' | 'llm'; model?: string; faithfulness?: { score: number; reason: string; evaluator: string; threshold: number } };
-    reviewState: 'candidate' | 'auto_checked' | 'reviewed'; asOf: string;
+    reviewState: 'candidate' | 'auto_checked' | 'reviewed' | 'rejected'; asOf: string;
   };
 }
 export interface SignalCollection { type: 'FeatureCollection'; features: Signal[] }
+/** Compact public map/list record; detail is read from the full city file only on selection. */
+export type SignalSummary = Omit<Signal, 'properties'> & {
+  properties: Omit<Signal['properties'], 'sources' | 'unknowns' | 'extraction'> & {
+    sourceCount: number;
+    primarySource?: Pick<SignalSource, 'url' | 'title' | 'publisher' | 'licence' | 'reuse'>;
+    faithfulness?: { score: number; threshold: number };
+  };
+};
+export type CityFeature = Signal | SignalSummary;
+export interface CityCollection { type: 'FeatureCollection'; features: CityFeature[] }
 export interface SignalCity {
   id: string; name: string; state: string; center: Coordinate; bbox: [number, number, number, number];
+  minUrl?: string; minBytes?: number; fullBytes?: number;
   sources: { id: string; kind: string; publisher: string; url: string; licence: string; reuse: string; retrievedAt: string }[];
 }
 export interface SignalCatalogue { schemaVersion: 'stadtstack-signals-v1'; generatedAt: string; cities: SignalCity[] }
-export interface CitySignals { catalogue: SignalCity; generatedAt: string; signals: SignalCollection; changes: { added: string[]; changed: string[]; removed: string[] } }
+export interface CitySignals { catalogue: SignalCity; coveredCities: SignalCity[]; generatedAt: string; signals: CityCollection; changes: { added: string[]; changed: string[]; removed: string[] } }
 export type SignalResult = { state: 'covered'; data: CitySignals } | { state: 'not_covered'; city: string; coveredCities: SignalCity[] };
 
 // mtime and file path are both part of the key: switching STADTSTACK_DATA_DIR never serves an old city.
@@ -58,9 +69,18 @@ export async function readCitySignals(cityId: string): Promise<SignalResult> {
   if (!city) return { state: 'not_covered', city: cityId, coveredCities: catalogue.cities };
   const directory = join(dataDirectory(), 'cities', city.id);
   const [signals, changes] = await Promise.all([
-    jsonFile<SignalCollection>(join(directory, 'signals.geojson')),
+    jsonFile<CityCollection>(join(directory, city.minUrl ? 'signals.min.geojson' : 'signals.geojson')),
     jsonFile<CitySignals['changes']>(join(directory, 'changes.json')),
   ]);
   if (signals.type !== 'FeatureCollection' || !Array.isArray(signals.features)) throw new Error('Invalid city signals collection.');
-  return { state: 'covered', data: { catalogue: city, generatedAt: catalogue.generatedAt, signals, changes } };
+  return { state: 'covered', data: { catalogue: city, coveredCities: catalogue.cities, generatedAt: catalogue.generatedAt, signals, changes } };
+}
+
+export async function readCitySignal(cityId: string, signalId: string): Promise<Signal | null> {
+  const catalogue = await readSignalsCatalogue();
+  const city = catalogue.cities.find((entry) => entry.id === cityId && /^[a-z0-9-]+$/.test(entry.id));
+  if (!city) return null;
+  const signals = await jsonFile<SignalCollection>(join(dataDirectory(), 'cities', city.id, 'signals.geojson'));
+  if (signals.type !== 'FeatureCollection' || !Array.isArray(signals.features)) throw new Error('Invalid city signals collection.');
+  return signals.features.find((feature) => feature.properties.id === signalId) ?? null;
 }
