@@ -50,7 +50,7 @@ Suggested refresh: check city plan/changes on each annual budget adoption and an
 
 ```json
 {
-  "municipality": {"ags": null, "name": "Strausberg", "district": "Märkisch-Oderland", "state": "Brandenburg"},
+  "municipality": {"ags": "12064472", "name": "Strausberg", "district": "Märkisch-Oderland", "state": "Brandenburg"},
   "fiscalYear": 2025,
   "measures": [{
     "id": "gemeindeanteil_einkommensteuer",
@@ -67,7 +67,7 @@ Suggested refresh: check city plan/changes on each annual budget adoption and an
 }
 ```
 
-The AGS is left null rather than inferred. Until the city plan and dataset terms are obtained, the honestly publishable result is **source map + missing-value disclosure**, not invented budget totals.
+The AGS is **12064472**, verified against the official Destatis GV-ISys and Amt für Statistik Berlin-Brandenburg municipal-directory sources ([directory entry point](https://www.destatis.de/DE/Themen/Laender-Regionen/Regionales/Gemeindeverzeichnis/_inhalt.html); [official statistical profile keyed by Strausberg's ARS](https://www.statistik-berlin-brandenburg.de/zensus/gdb/bev/bb/12/12064/120640472472_Strausberg_Stadt_bev.pdf)). The plan amounts remain unavailable; until the city plan and dataset terms are obtained, publish **source map + missing-value disclosure**, not invented budget totals.
 
 ## Not found / next source checks
 
