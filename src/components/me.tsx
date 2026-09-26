@@ -4,6 +4,7 @@ import { Building2, Cpu, History, KeyRound, Link2, Sun, Wallet } from 'lucide-re
 import type { PlaceEntry } from '@/server/timeline';
 import { useRentalWallet } from '@/wallets';
 import type { TenancyJourney } from '@/server/journey';
+import type { PublicListing } from '@/server/listings';
 import type { PublicAdapterConfig } from '@/server/adapters';
 import type { CityResult } from '@/server/city';
 import { IdentityStrip } from './identity';
@@ -17,8 +18,8 @@ const STAGE_LABEL: Record<string, string> = {
 };
 
 /** Me: identity, roles, life timeline and every connection with how real it is. */
-export function MeArea({ request, role, tenancies, onChangeRole, go, openConnections }: {
-  request: Request; role: string; tenancies: TenancyJourney[]; onChangeRole: () => void; go: (area: Area) => void; openConnections: () => void;
+export function MeArea({ request, tenancies, listings, go, openConnections }: {
+  request: Request; tenancies: TenancyJourney[]; listings: PublicListing[]; go: (area: Area) => void; openConnections: () => void;
 }) {
   const wallet = useRentalWallet();
   const [adapters, setAdapters] = useState<PublicAdapterConfig | null>(null);
@@ -27,6 +28,7 @@ export function MeArea({ request, role, tenancies, onChangeRole, go, openConnect
   const [placeForm, setPlaceForm] = useState(emptyPlace);
   const [placeError, setPlaceError] = useState('');
   const [savingPlace, setSavingPlace] = useState(false);
+  const [addingPlace, setAddingPlace] = useState(false);
   useEffect(() => {
     let active = true;
     request<{ adapters: PublicAdapterConfig }>('/api/assets').then((r) => active && setAdapters(r.adapters)).catch(() => {});
@@ -45,6 +47,11 @@ export function MeArea({ request, role, tenancies, onChangeRole, go, openConnect
     { icon: Cpu, name: 'Validator', state: adapters?.validator ? `${adapters.validator.chain} · ${adapters.validator.id}` : 'Not connected', level: 'Read-only, live', area: 'money' as Area },
     { icon: Building2, name: 'Stadtstack atlas', state: city?.available ? city.name : city && 'name' in city && city.name ? city.name : 'No city chosen', level: 'Read-only, research preview', area: 'places' as Area },
   ];
+  const memberships = [
+    ...tenancies.map((t) => ({ key: t.agreementId, role: t.role, context: t.property })),
+    ...listings.filter((l) => l.relation === 'landlord').map((l) => ({ key: l.id, role: 'landlord', context: l.title })),
+    ...(city?.available ? [{ key: 'city', role: 'resident', context: `${city.name} (${city.source === 'identity' ? 'from your EU wallet' : 'city you chose'})` }] : []),
+  ];
 
   async function submitPlace(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,6 +61,7 @@ export function MeArea({ request, role, tenancies, onChangeRole, go, openConnect
       const response = await request<{ places: PlaceEntry[] }>('/api/timeline', { action: 'add', ...placeForm });
       setPlaces(response.places);
       setPlaceForm(emptyPlace);
+      setAddingPlace(false);
     } catch (error) {
       setPlaceError(error instanceof Error ? error.message : 'Please try again.');
     } finally {
@@ -74,11 +82,18 @@ export function MeArea({ request, role, tenancies, onChangeRole, go, openConnect
     <div className="area-stack">
       <IdentityStrip request={request} />
 
-      <section className="card">
-        <h2><KeyRound size={18} /> Your roles</h2>
-        <p>You use the app as <strong>{role}</strong>. In a tenancy your role comes from the agreement itself, not from this choice.</p>
-        <button className="text-button" onClick={onChangeRole}>Change role</button>
-      </section>
+      {memberships.length > 0 && (
+        <section className="card">
+          <h2><KeyRound size={18} /> Your roles</h2>
+          <ul className="membership-list">
+            {memberships.map((membership) => (
+              <li key={membership.key}>
+                <strong>{membership.role[0].toUpperCase() + membership.role.slice(1)}</strong> · {membership.context}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="card">
         <h2><History size={18} /> Life timeline</h2>
@@ -100,19 +115,23 @@ export function MeArea({ request, role, tenancies, onChangeRole, go, openConnect
               <button className="text-button" type="button" onClick={() => deletePlace(place.id)}>Remove</button>
             </li>
           ))}
-          <li>
-            <strong>Add an earlier place</strong>
-            <form className="inline-form" onSubmit={submitPlace}>
-              <label>City<input required maxLength={80} value={placeForm.city} onChange={(event) => setPlaceForm({ ...placeForm, city: event.target.value })} /></label>
-              <label>From<input required pattern="[0-9]{4}(-[0-9]{2})?" placeholder="YYYY or YYYY-MM" value={placeForm.from} onChange={(event) => setPlaceForm({ ...placeForm, from: event.target.value })} /></label>
-              <label>To<input required pattern="[0-9]{4}(-[0-9]{2})?" placeholder="YYYY or YYYY-MM" value={placeForm.to} onChange={(event) => setPlaceForm({ ...placeForm, to: event.target.value })} /></label>
-              <label>Note (optional)<input maxLength={140} value={placeForm.note} onChange={(event) => setPlaceForm({ ...placeForm, note: event.target.value })} /></label>
-              {placeError && <span role="alert">{placeError}</span>}
-              <button className="button primary" type="submit" disabled={savingPlace}>{savingPlace ? 'Adding…' : 'Add place'}</button>
-            </form>
-            <span>Later, an EU wallet residence attestation could prove a place you lived.</span>
-          </li>
         </ol>
+        {!addingPlace ? (
+          <button className="text-button" type="button" onClick={() => setAddingPlace(true)}>Add an earlier place</button>
+        ) : (
+          <form className="inline-form place-form" onSubmit={submitPlace}>
+            <label>City<input required maxLength={80} value={placeForm.city} onChange={(event) => setPlaceForm({ ...placeForm, city: event.target.value })} /></label>
+            <label>From<input required pattern="[0-9]{4}(-[0-9]{2})?" placeholder="YYYY or YYYY-MM" value={placeForm.from} onChange={(event) => setPlaceForm({ ...placeForm, from: event.target.value })} /></label>
+            <label>To<input required pattern="[0-9]{4}(-[0-9]{2})?" placeholder="YYYY or YYYY-MM" value={placeForm.to} onChange={(event) => setPlaceForm({ ...placeForm, to: event.target.value })} /></label>
+            <label>Note (optional)<input maxLength={140} value={placeForm.note} onChange={(event) => setPlaceForm({ ...placeForm, note: event.target.value })} /></label>
+            {placeError && <span role="alert">{placeError}</span>}
+            <div className="button-row">
+              <button className="button primary" type="submit" disabled={savingPlace}>{savingPlace ? 'Adding…' : 'Add place'}</button>
+              <button className="text-button" type="button" onClick={() => { setAddingPlace(false); setPlaceForm(emptyPlace); setPlaceError(''); }}>Cancel</button>
+            </div>
+            <span className="small-copy">Later, an EU wallet residence attestation could prove a place you lived.</span>
+          </form>
+        )}
       </section>
 
       <section className="card">

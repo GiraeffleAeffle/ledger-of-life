@@ -32,7 +32,6 @@ import {
 import type { RentalWallet, RentalWalletAccess } from './types.ts';
 import { validateRecoveryRequest } from './recovery.ts';
 import { prepareEscrowTypedData } from './escrow-signing.ts';
-import { pendingInvitationRole } from './pending-invitation.ts';
 
 /** Local demo builds let the app's own step card be the approval instead of Privy's review modals. */
 const DEVNET_RPC = process.env.NEXT_PUBLIC_SOLANA_DEVNET_RPC_URL || 'https://api.devnet.solana.com';
@@ -42,12 +41,10 @@ const unavailable = async (): Promise<never> => {
   throw new Error('Account access is not configured yet.');
 };
 
-/** A distinct label per account so several demo roles are distinguishable in the device's passkey chooser. */
+/** A distinct label per account in the device's passkey chooser, independent of tenancy roles. */
 function passkeyLabel() {
-  const chosen = typeof window === 'undefined' ? null : window.localStorage.getItem('deposit-workspace.role');
-  const role = pendingInvitationRole() ?? chosen ?? 'account';
   const stamp = new Date().toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  return `Ledger of Life · ${role} · ${stamp}`;
+  return `Ledger of Life · ${stamp}`;
 }
 
 /**

@@ -113,7 +113,7 @@ concepts:
       - A role is granted by an Agreement, never by a UI selector.
       - One person and one wallet per role per agreement.
       - The arbitrator only acts on a disputed claim.
-    note: The onboarding "Who are you?" choice is a display preference, not a Role.
+    note: No global role is chosen at onboarding. Find a home, rent out a home and invitations add context; agreement parties alone grant tenancy roles.
     code: [src/server/agreements.ts#agreementRole]
 
   Home:

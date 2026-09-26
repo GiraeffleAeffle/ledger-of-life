@@ -8,7 +8,7 @@ import { CityCard } from './city';
 import { IdentityStrip } from './identity';
 import { IdeasArea, PlannedHere } from './ideas';
 import { MeArea } from './me';
-import { AccountSetup, RoleIntro, RolePicker, useChosenRole, type ChosenRole } from './onboarding';
+import { AccountSetup } from './onboarding';
 import { parseAmount } from '@/domain/assets';
 import type { JourneyStage, TenancyJourney } from '@/server/journey';
 import type { PublicListing } from '@/server/listings';
@@ -31,7 +31,6 @@ const BUTTON_LABEL: Record<string, string> = {
   settle: 'Settle',
   finish_setup: 'Open account check',
 };
-const ROLE_LABEL: Record<ChosenRole, string> = { tenant: 'TENANT', landlord: 'LANDLORD', arbitrator: 'ARBITRATOR' };
 const AUTO: Record<string, true> = { confirming: true, paying_out: true, wait: true };
 type Unavailable = { agreementId: string; property: string; unavailable: string };
 /** Typed view of our own same-origin API responses. */
@@ -59,27 +58,23 @@ function useAuthorizedRequest(): Request {
   }, [getAccessToken]) as Request;
 }
 
-export function MyHome({ area, go, openConnections, openDemo }: { area: Area; go: (area: Area) => void; openConnections: () => void; openDemo: () => void }) {
+export function MyHome({ area, go, openConnections }: { area: Area; go: (area: Area) => void; openConnections: () => void }) {
   const wallet = useRentalWallet();
-  const [role, choose] = useChosenRole();
   const [readyFor, setReadyFor] = useState<string | null>(null);
   const request = useAuthorizedRequest();
   const markReady = useCallback(() => setReadyFor(wallet.subject), [wallet.subject]);
-  if (!role) return <RolePicker onPick={choose} onDemo={openDemo} />;
   if (!wallet.authenticated || readyFor !== wallet.subject)
-    return <AccountSetup key={wallet.subject ?? 'signed-out'} role={role} authorized={request} onChangeRole={() => choose(null)} onReady={markReady} />;
-  return <SignedInHome key={wallet.subject} area={area} go={go} role={role} onChangeRole={() => choose(null)} openConnections={openConnections} />;
+    return <AccountSetup key={wallet.subject ?? 'signed-out'} authorized={request} onReady={markReady} />;
+  return <SignedInHome key={wallet.subject} area={area} go={go} openConnections={openConnections} />;
 }
 
-function SignedInHome({ area, go, role, onChangeRole, openConnections }: { area: Area; go: (area: Area) => void; role: ChosenRole; onChangeRole: () => void; openConnections: () => void }) {
-  const wallet = useRentalWallet();
+function SignedInHome({ area, go, openConnections }: { area: Area; go: (area: Area) => void; openConnections: () => void }) {
   const [tenancies, setTenancies] = useState<(TenancyJourney | Unavailable)[] | null>(null);
   const [listings, setListings] = useState<PublicListing[]>([]);
   const [error, setError] = useState('');
   const [helpers, setHelpers] = useState(false);
   const [helperBusy, setHelperBusy] = useState(false);
   const [helperLog, setHelperLog] = useState('');
-  const [usdc, setUsdc] = useState<string | null>(null);
   useEffect(() => {
     fetch('/api/test-helpers').then((r) => r.json()).then((d) => setHelpers(Boolean(d.enabled))).catch(() => {});
   }, []);
@@ -140,7 +135,7 @@ function SignedInHome({ area, go, role, onChangeRole, openConnections }: { area:
   const heading: Record<Area, string> = {
     overview: 'Your overview',
     me: 'Me',
-    home: role === 'landlord' ? 'Your homes' : role === 'arbitrator' ? 'Your cases' : 'Your home',
+    home: 'Home',
     money: 'Money',
     places: 'Places',
     ideas: 'Ideas',
@@ -150,7 +145,7 @@ function SignedInHome({ area, go, role, onChangeRole, openConnections }: { area:
     <div className="home">
       <div className="page-heading">
         <div>
-          <span className="eyebrow">{ROLE_LABEL[role]} · TEST NETWORKS</span>
+          <span className="eyebrow">LEDGER OF LIFE</span>
           <h1>{heading[area]}</h1>
           <p>{meta.question}</p>
         </div>
@@ -158,38 +153,49 @@ function SignedInHome({ area, go, role, onChangeRole, openConnections }: { area:
       {error && <p className="note" role="alert">{error}</p>}
       {area === 'overview' && (
         <div className="overview-grid">
-          <NextStepSummary tenancies={tenancies} role={role} go={go} />
+          <NextStepSummary tenancies={tenancies} listings={listings} invitation={Boolean(invitation)} go={go} />
           <IdentityStrip request={request} compact onOpen={() => go('me')} />
-          {role !== 'arbitrator' && tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="summary" go={go} />}
+          {tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="summary" go={go} />}
           <CityCard request={request} compact onOpen={() => go('places')} />
         </div>
       )}
 
       {area === 'me' && (
         <>
-          <MeArea request={request} role={ROLE_LABEL[role].toLowerCase()} tenancies={ready} onChangeRole={onChangeRole} go={go} openConnections={openConnections} />
+          <MeArea request={request} tenancies={ready} listings={listings} go={go} openConnections={openConnections} />
           <PlannedHere area="me" go={go} />
         </>
       )}
 
       {area === 'home' && (
         <>
-          <RoleIntro role={role} solanaAddress={wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? null} testUsdcAtomic={usdc} />
           {invitation && <JoinInvitation request={request} encoded={invitation} onDone={load} />}
           {tenancies === null ? (
             <section className="card"><Loader2 className="spin" size={18} /> Loading…</section>
           ) : (
-            tenancies.map((t) =>
-              'unavailable' in t ? (
-                <section className="card" key={t.agreementId}><h2>{t.property}</h2><p className="note">{t.unavailable}</p></section>
-              ) : (
+            <>
+              {ready.filter((t) => t.next.kind !== 'done').map((t) => (
                 <TenancyCard key={t.agreementId} journey={t} request={request} reload={load} openConnections={openConnections} />
-              ),
-            )
+              ))}
+              {tenancies.filter((t): t is Unavailable => 'unavailable' in t).map((t) => (
+                <section className="card" key={t.agreementId}><h2>{t.property}</h2><p className="note">{t.unavailable}</p></section>
+              ))}
+              {ready.some((t) => t.next.kind === 'done') && (
+                <details className="card past-tenancies">
+                  <summary>Past tenancies ({ready.filter((t) => t.next.kind === 'done').length})</summary>
+                  {ready.filter((t) => t.next.kind === 'done').map((t) => (
+                    <div className="past-tenancy" key={t.agreementId}>
+                      <strong>{t.property}</strong><span className="small-copy">Paid out · {t.role}</span>
+                      <TenancyDetails journey={t} request={request} />
+                    </div>
+                  ))}
+                </details>
+              )}
+            </>
           )}
-          {helpers && helper && <TestTools role={role} tenancies={ready} listings={listings} request={request} helper={helper} busy={helperBusy} log={helperLog} />}
-          {role !== 'arbitrator' && <Homes role={role} listings={listings} request={request} reload={load} />}
-          {role !== 'arbitrator' && tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="home" go={go} />}
+          {helpers && helper && <TestTools tenancies={ready} listings={listings} request={request} helper={helper} busy={helperBusy} log={helperLog} />}
+          <Homes listings={listings} request={request} reload={load} />
+          {tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="home" go={go} />}
           <PlannedHere area="home" go={go} />
         </>
       )}
@@ -197,7 +203,7 @@ function SignedInHome({ area, go, role, onChangeRole, openConnections }: { area:
       {area === 'money' && (
         <>
           {tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="money" go={go} />}
-          <Portfolio request={request} onBalance={setUsdc} />
+          <Portfolio request={request} />
           <PlannedHere area="money" go={go} />
         </>
       )}
@@ -214,24 +220,29 @@ function SignedInHome({ area, go, role, onChangeRole, openConnections }: { area:
   );
 }
 
-/** The single most useful thing to do now, across all tenancies. */
-function NextStepSummary({ tenancies, role, go }: { tenancies: (TenancyJourney | Unavailable)[] | null; role: ChosenRole; go: (area: Area) => void }) {
+/** Surface real actions before waiting states, never a hypothetical move-out. */
+function NextStepSummary({ tenancies, listings, invitation, go }: {
+  tenancies: (TenancyJourney | Unavailable)[] | null; listings: PublicListing[]; invitation: boolean; go: (area: Area) => void;
+}) {
   const ready = (tenancies ?? []).filter((t): t is TenancyJourney => !('unavailable' in t));
-  const actionable = ready.find((t) => !AUTO[t.next.kind] && t.next.kind !== 'done');
-  const waiting = ready.find((t) => AUTO[t.next.kind]);
-  const pick = actionable ?? waiting;
+  const actionable = ready.find((t) => !AUTO[t.next.kind] && t.next.kind !== 'done' && t.next.kind !== 'propose_claim');
+  const waiting = ready.find((t) => AUTO[t.next.kind] && t.next.kind !== 'paying_out' && t.stage !== 'living');
+  const living = ready.find((t) => t.stage === 'living' && t.chain?.phase === 'active');
+  const applicants = listings.find((l) => l.relation === 'landlord' && l.status === 'open' && l.applicants > 0);
+  const passive = waiting ?? ready.find((t) => t.next.kind === 'paying_out');
+  const title = invitation ? 'Join your invitation' : actionable ? actionable.next.label : applicants ? 'Review applicants' : living ? 'Living here' : passive ? passive.next.label : 'Explore your home options';
+  const detail = invitation ? 'Open the private invitation in Home.' : actionable ? actionable.property
+    : applicants ? `${applicants.title} · ${applicants.applicants} applicant(s)`
+      : living ? `${living.property} · move-out starts only when the landlord proposes a deduction`
+        : passive ? `${passive.property} · nothing for you to do right now`
+          : 'Find a home or rent one out when you are ready.';
   return (
     <section className="card overview-tile next clickable" onClick={() => go('home')}>
-      <span className="eyebrow">YOUR NEXT STEP</span>
-      {tenancies === null ? <Loader2 className="spin" size={18} /> : pick ? (
+      <span className="eyebrow">{invitation || actionable || applicants ? 'YOUR NEXT STEP' : 'HOME RIGHT NOW'}</span>
+      {tenancies === null ? <Loader2 className="spin" size={18} /> : (
         <>
-          <strong className="overview-figure small">{pick.next.label}</strong>
-          <span className="small-copy">{pick.property}{actionable ? '' : ' · nothing for you to do right now'}</span>
-        </>
-      ) : (
-        <>
-          <strong className="overview-figure small">{role === 'landlord' ? 'List a home' : role === 'arbitrator' ? 'No open cases' : 'Find a home'}</strong>
-          <span className="small-copy">{role === 'tenant' ? 'Apply for a listed home; the deposit then earns for you.' : ''}</span>
+          <strong className="overview-figure small">{title}</strong>
+          <span className="small-copy">{detail}</span>
         </>
       )}
       <span className="text-button">Open Home →</span>
@@ -239,11 +250,11 @@ function NextStepSummary({ tenancies, role, go }: { tenancies: (TenancyJourney |
   );
 }
 
-function Progress({ stage, finished }: { stage: JourneyStage; finished: boolean }) {
+function Progress({ stage, finished, showMoveOut }: { stage: JourneyStage; finished: boolean; showMoveOut: boolean }) {
   const current = STAGES.findIndex((s) => s.id === stage) + (finished ? 1 : 0);
   return (
-    <ol className="journey-progress" aria-label="Tenancy progress">
-      {STAGES.map((s, index) => (
+    <ol className={`journey-progress${showMoveOut ? '' : ' living'}`} aria-label="Tenancy progress">
+      {STAGES.slice(0, showMoveOut ? undefined : 4).map((s, index) => (
         <li key={s.id} className={index < current ? 'done' : index === current ? 'current' : ''} aria-current={index === current ? 'step' : undefined}>
           <span className="journey-dot">{index < current ? <Check size={12} /> : index + 1}</span>
           {s.label}
@@ -262,8 +273,10 @@ function TenancyCard({ journey, request, reload, openConnections }: {
   const [amount, setAmount] = useState('0');
   const [reason, setReason] = useState('');
   const [link, setLink] = useState('');
+  const [showMoveOut, setShowMoveOut] = useState(false);
   const advancing = useRef(false);
   const { next, chain, agreementId } = journey;
+  const living = journey.stage === 'living' && chain?.phase === 'active';
   const q = `?agreement=${encodeURIComponent(agreementId)}`;
 
   // Payouts need no wallet: the sponsor runs them as soon as the settlement is final.
@@ -359,10 +372,18 @@ function TenancyCard({ journey, request, reload, openConnections }: {
     <section className="card tenancy-card">
       <div className="section-heading">
         <h2><HomeIcon size={18} /> {journey.property}</h2>
-        <Badge tone="neutral">You are the {journey.role}</Badge>
+        <Badge tone="neutral">{journey.role} · Solana devnet test USDC</Badge>
       </div>
-      <Progress stage={journey.stage} finished={next.kind === 'done'} />
-      <div className={`next-step-card ${AUTO[next.kind] || next.kind === 'done' ? 'passive' : ''}`}>
+      <Progress stage={journey.stage} finished={next.kind === 'done'} showMoveOut={!living || showMoveOut} />
+      {living && (
+        <div className="move-out-preview">
+          <button className="text-button" type="button" aria-expanded={showMoveOut} onClick={() => setShowMoveOut(!showMoveOut)}>Moving out?</button>
+          {showMoveOut && (
+            <p className="small-copy">The landlord proposes a deduction (including zero). The tenant agrees or disputes it; if disputed, the arbitrator decides. Then the deposit is settled and paid out on the test network.</p>
+          )}
+        </div>
+      )}
+      {(!living || showMoveOut || next.kind === 'confirming') && <div className={`next-step-card ${AUTO[next.kind] || next.kind === 'done' ? 'passive' : ''}`}>
         <span className="eyebrow">{next.kind === 'wait' ? 'NOTHING TO DO RIGHT NOW' : next.kind === 'done' ? 'FINISHED' : 'YOUR NEXT STEP'}</span>
         <h3>{AUTO[next.kind] && next.kind !== 'wait' && <Loader2 className="spin" size={18} />} {next.label}</h3>
         <p>{next.detail}</p>
@@ -372,6 +393,9 @@ function TenancyCard({ journey, request, reload, openConnections }: {
             {BUTTON_LABEL[next.kind] ?? next.label}
             <ArrowRight size={17} />
           </button>
+        )}
+        {next.kind === 'secure_deposit' && (
+          <p className="small-copy faucet-note">Need test USDC? Get it from <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer">Circle’s faucet</a> on Solana Devnet, sent to your wallet {wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? 'address in Me'}.</p>
         )}
         {next.kind === 'propose_claim' && (
           <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void run(() => operation({ kind: 'propose_claim', amountAtomic: parseAmount(amount) }, 'Move-out deduction', needsReason(reason))); }}>
@@ -409,25 +433,25 @@ function TenancyCard({ journey, request, reload, openConnections }: {
           </div>
         )}
         {message && <p className="note" role="status">{message}</p>}
-      </div>
-      {chain && chain.phase === 'active' && journey.role === 'tenant' && (
+      </div>}
+      {chain && chain.phase === 'active' && journey.role === 'tenant' && (BigInt(chain.claimableAtomic) > 0n || BigInt(chain.releasedAtomic) > 0n) && (
         <div className="earnings-panel">
           <div>
-            <span className="eyebrow">YOUR DEPOSIT EARNINGS</span>
-            <strong>{money(chain.claimableAtomic)} ready to claim</strong>
-            <span className="small-copy">Already claimed: {money(chain.releasedAtomic)}. The deposit itself stays locked; only what it earns is yours now. On devnet, earnings are simulated interest in test tokens.</span>
+            <span className="eyebrow">YOUR DEPOSIT EARNINGS · SIMULATED INTEREST</span>
+            <strong>{BigInt(chain.claimableAtomic) > 0n ? `${money(chain.claimableAtomic)} ready to claim` : `${money(chain.releasedAtomic)} already claimed`}</strong>
+            <span className="small-copy">{BigInt(chain.claimableAtomic) > 0n ? `Already claimed: ${money(chain.releasedAtomic)}. ` : ''}The deposit itself stays locked; only what it earns is yours now. On devnet, earnings are simulated interest in test tokens.</span>
           </div>
-          <div className="button-row">
-            <button className="button primary" disabled={busy || BigInt(chain.claimableAtomic) === 0n}
+          {BigInt(chain.claimableAtomic) > 0n && (
+            <button className="button primary" disabled={busy}
               onClick={() => run(() => operation({ kind: 'release_earnings', amountAtomic: chain.claimableAtomic }, 'Claim deposit earnings to your wallet'))}>
               Claim to my wallet <ArrowRight size={16} />
             </button>
-          </div>
+          )}
         </div>
       )}
       {chain && (
         <dl className="journey-facts">
-          <div><dt>Required deposit</dt><dd>{money(journey.requiredSecurity)}</dd></div>
+          <div><dt>Required deposit · test USDC</dt><dd>{money(journey.requiredSecurity)}</dd></div>
           {chain.phase === 'closed' ? (
             <>
               <div><dt>Tenant received</dt><dd>{money(chain.tenantPaidAtomic)}</dd></div>
@@ -436,7 +460,7 @@ function TenancyCard({ journey, request, reload, openConnections }: {
           ) : (
             <>
               <div><dt>In lending</dt><dd>{money(chain.lendingValueAtomic)}</dd></div>
-              <div><dt>Deduction proposed</dt><dd>{money(chain.claimAtomic)}</dd></div>
+              {chain.phase !== 'active' && <div><dt>Deduction proposed</dt><dd>{money(chain.claimAtomic)}</dd></div>}
             </>
           )}
         </dl>
@@ -616,10 +640,11 @@ function ListingCard({ listing, children }: { listing: PublicListing; children?:
   );
 }
 
-function Homes({ role, listings, request, reload }: {
-  role: ChosenRole; listings: PublicListing[]; request: Request; reload: () => Promise<void>;
+function Homes({ listings, request, reload }: {
+  listings: PublicListing[]; request: Request; reload: () => Promise<void>;
 }) {
-  const [posting, setPosting] = useState(role === 'landlord' && !listings.some((l) => l.relation === 'landlord'));
+  const [posting, setPosting] = useState(false);
+  const [finding, setFinding] = useState(false);
   const [form, setForm] = useState({ title: '', city: '', rooms: '2', sizeSqm: '55', availableFrom: '', description: '', rent: '900', deposit: '1', releaseAllowed: true });
   const [photos, setPhotos] = useState<string[]>([PRESETS[0]]);
   const [applyTo, setApplyTo] = useState<string | null>(null);
@@ -642,9 +667,10 @@ function Homes({ role, listings, request, reload }: {
   return (
     <section className="card homes">
       <div className="section-heading">
-        <h2>{role === 'landlord' ? 'Your listings' : 'Homes you can apply for'}</h2>
+        <h2>Homes</h2>
         <div className="button-row">
-          {role === 'landlord' && <button className="button secondary" onClick={() => setPosting(!posting)}><Plus size={15} /> Post a home</button>}
+          <button className="button secondary" aria-expanded={finding} onClick={() => setFinding(!finding)}>Find a home</button>
+          <button className="button secondary" aria-expanded={posting} onClick={() => setPosting(!posting)}><Plus size={15} /> Rent out a home</button>
         </div>
       </div>
       {message && <p className="note" role="alert">{message}</p>}
@@ -687,19 +713,26 @@ function Homes({ role, listings, request, reload }: {
           <button className="button primary large">Publish home</button>
         </form>
       )}
-      <div className="listing-grid">
-        {mine.map((l) => (
-          <ListingCard listing={l} key={l.id}>
-            <Badge tone={l.status === 'open' ? 'green' : 'neutral'}>{l.status === 'open' ? `${l.applicants} applicant(s)` : 'Tenant chosen'}</Badge>
-            {l.status === 'open' && l.applications?.map((a) => (
-              <div className="applicant" key={a.id}>
-                <div><strong>{a.name}</strong><p>{a.message}</p></div>
-                <button className="button primary" onClick={() => act(() => request(`/api/listings/${l.id}`, { action: 'choose', applicationId: a.id }))}>Choose</button>
-              </div>
-            ))}
-          </ListingCard>
-        ))}
-        {role === 'tenant' && others.map((l) => (
+      {mine.length > 0 && (
+        <div className="my-listings">
+          <h3>My listings</h3>
+          {mine.map((l) => (
+            <details key={l.id}>
+              <summary><strong>{l.title}</strong> · {l.status === 'open' ? `${l.applicants} applicant(s)` : 'Tenant chosen'}</summary>
+              <ListingCard listing={l}>
+                {l.status === 'open' && l.applications?.map((a) => (
+                  <div className="applicant" key={a.id}>
+                    <div><strong>{a.name}</strong><p>{a.message}</p></div>
+                    <button className="button primary" onClick={() => act(() => request(`/api/listings/${l.id}`, { action: 'choose', applicationId: a.id }))}>Choose</button>
+                  </div>
+                ))}
+              </ListingCard>
+            </details>
+          ))}
+        </div>
+      )}
+      {finding && <div className="listing-grid">
+        {others.map((l) => (
           <ListingCard listing={l} key={l.id}>
             {l.relation !== null && (
               <Badge tone={l.relation === 'chosen' ? 'green' : 'neutral'}>
@@ -720,16 +753,14 @@ function Homes({ role, listings, request, reload }: {
             ))}
           </ListingCard>
         ))}
-      </div>
-      {others.length === 0 && mine.length === 0 && !posting && (
-        <p className="small-copy">{role === 'landlord' ? 'Post your first home.' : 'No homes are listed yet.'}</p>
-      )}
+      </div>}
+      {finding && others.length === 0 && <p className="small-copy">No homes are listed yet.</p>}
     </section>
   );
 }
 
-function TestTools({ role, tenancies, listings, request, helper, busy, log }: {
-  role: ChosenRole; tenancies: TenancyJourney[]; listings: PublicListing[];
+function TestTools({ tenancies, listings, request, helper, busy, log }: {
+  tenancies: TenancyJourney[]; listings: PublicListing[];
   request: Request; helper: Helper; busy: boolean; log: string;
 }) {
   const [earning, setEarning] = useState(false);
@@ -755,12 +786,12 @@ function TestTools({ role, tenancies, listings, request, helper, busy, log }: {
     <details className="card test-tools">
       <summary>Test tools · simulated actions only</summary>
       <p className="small-copy">For test networks only. These shortcuts use test people or simulated earnings; your own tenancy actions remain in its card.</p>
-      {role === 'tenant' && <div className="test-tool-row">
+      <div className="test-tool-row">
         <span>Test listings</span>
         <button className="button test-helper" disabled={disabled} onClick={() => runHelper({ action: 'post_home' })}>Add sample homes</button>
-      </div>}
+      </div>
       {tenancies.map((tenancy) => {
-        const act = tenancy.next.kind === 'invite_arbitrator' || tenancy.next.kind === 'wait';
+        const act = tenancy.next.kind === 'invite_arbitrator' || (tenancy.next.kind === 'wait' && tenancy.chain?.phase !== 'active');
         const interest = tenancy.chain?.phase === 'active' && tenancy.role === 'tenant';
         if (!act && !interest) return null;
         return <div className="test-tool-row" key={tenancy.agreementId}>
@@ -771,7 +802,7 @@ function TestTools({ role, tenancies, listings, request, helper, busy, log }: {
           {interest && <button className="button test-helper" disabled={disabled} onClick={() => runHelper({ action: 'interest', agreementId: tenancy.agreementId })}>Simulate a month of interest</button>}
         </div>;
       })}
-      {listings.filter((listing) => listing.status === 'open' && (listing.relation === 'landlord' || (role === 'tenant' && listing.relation === 'applicant'))).map((listing) => (
+      {listings.filter((listing) => listing.status === 'open' && (listing.relation === 'landlord' || listing.relation === 'applicant')).map((listing) => (
         <div className="test-tool-row" key={listing.id}>
           <span>{listing.title}</span>
           {listing.relation === 'landlord'
@@ -788,7 +819,7 @@ function TestTools({ role, tenancies, listings, request, helper, busy, log }: {
   );
 }
 
-function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomic: string) => void }) {
+function Portfolio({ request }: { request: Request }) {
   const wallet = useRentalWallet();
   const [view, setView] = useState<PortfolioView | null>(null);
   const [unavailable, setUnavailable] = useState(false);
@@ -799,8 +830,7 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
   const refresh = useCallback(async () => {
     const { portfolio } = await request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio');
     setView(portfolio.available ? portfolio : null);
-    if (portfolio.available) onBalance(portfolio.testUsdcAtomic);
-  }, [request, onBalance]);
+  }, [request]);
   useEffect(() => {
     let active = true;
     request<{ result: { state: string } }>('/api/portfolio', { action: 'purchase_status' })
@@ -812,7 +842,6 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
         const { portfolio } = await request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio');
         if (!active) return;
         setView(portfolio.available ? portfolio : null);
-        if (portfolio.available) onBalance(portfolio.testUsdcAtomic);
         setUnavailable(false);
         if (portfolio.available && portfolio.referencePriceStale) retry = setTimeout(loadPortfolio, 60_000);
       } catch {
@@ -823,7 +852,7 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
     }
     void loadPortfolio();
     return () => { active = false; clearTimeout(retry); };
-  }, [request, onBalance, refresh]);
+  }, [request, refresh]);
   useEffect(() => {
     if (purchase !== 'pending') return;
     let active = true;

@@ -779,7 +779,7 @@ export function Workspace() {
             </>
           )}
           {view === 'home' && (HomeView
-            ? <HomeView area={area} go={openArea} openConnections={() => setView('connections')} openDemo={() => setView('overview')} />
+            ? <HomeView area={area} go={openArea} openConnections={() => setView('connections')} />
             : <section className="card"><h1>Loading…</h1></section>)}
           {view === 'connections' &&
             (connections || (

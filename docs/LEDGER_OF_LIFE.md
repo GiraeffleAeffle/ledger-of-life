@@ -100,8 +100,8 @@ person; matching happens on the device or with explicit consent.
 
 ### Today (why it feels cobbled together)
 
-- The signed-in home is one long page: role heading "Your home", identity, city, portfolio tiles mixed with
-  roadmap tiles, a role intro, tenancy cards, listings, and a separate "Invest" card with its own portfolio.
+- Previously the signed-in home mixed a role heading, identity, city, portfolio tiles, roadmap tiles, a
+  role intro, tenancy cards, listings, and a separate "Invest" card with its own portfolio.
 - The sidebar still belongs to the earlier deposit app: Rental deposit, Claims & settlement, Shared records,
   Activity, and a demo that is not the signed-in journey.
 - Built features and roadmap ideas sit side by side with the same visual weight.
@@ -112,8 +112,8 @@ person; matching happens on the device or with explicit consent.
 | Navigation item | Contains | Moves from |
 |---|---|---|
 | **Overview** | Identity line, portfolio total, the one next step across all areas, what changed since last visit | Page heading, identity strip, portfolio total |
-| **Me** | Identity and credentials, roles per context, life timeline, connected adapters and their permissions | Identity strip details, adapter settings |
-| **Home** | Current tenancy with its journey, listings (tenant: find a home; landlord: my listings), service charges, home energy | Tenancy cards, Homes card, solar tile |
+| **Me** | Identity and credentials, roles derived per context (agreement party, owned listing, chosen or wallet city), life timeline with an on-demand earlier-place form, connected adapters and their permissions | Identity strip details, adapter settings |
+| **Home** | Active tenancies with a journey that stops at "Living here" until move-out starts, compact past tenancies, on-demand find/rent actions, service charges, home energy | Tenancy cards, Homes card, solar tile |
 | **Money** | All holdings in one list (deposit entitlement, stocks per network, validator, later local investments), earnings, invest actions | Portfolio tiles, Invest card, Robinhood tile, validator tile |
 | **Places** | My city (atlas projects, consultations, later budget), then wider scales | City card |
 | **Ideas** (or "Coming") | Roadmap items, clearly separate and labeled | Dashed roadmap tiles |
@@ -126,6 +126,10 @@ records. The fictional workflow stays in a separate **Explore demo · made-up pe
 views do not appear in the signed-in areas. Test-only shortcuts, including simulated interest and sample
 people/listings, sit in one collapsible **Test tools** panel in Home; actions on one's own tenancy remain
 in its card.
+
+Account setup is role-free. The person sees their agreement roles and owned listings, not a saved display
+preference; browsing homes and posting a listing open only on request. While a tenancy is active its move-out
+details stay behind a quiet "Moving out?" action, and finished tenancies move to **Past tenancies**.
 
 Money's Solana and Robinhood test stocks use read-only Jupiter reference prices. Server reads share one
 in-flight request per mint and cache quotes for 60 seconds; an upstream throttle retains the last good

@@ -2894,6 +2894,7 @@ dd {
 .tenancy-card { display: grid; gap: 18px; }
 .tenancy-card h2 { display: flex; gap: 8px; align-items: center; }
 .journey-progress { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; list-style: none; margin: 0; padding: 0; counter-reset: none; }
+.journey-progress.living { grid-template-columns: repeat(4, 1fr); }
 .journey-progress li { display: grid; justify-items: center; gap: 6px; font-size: 0.78rem; text-align: center; opacity: 0.55; position: relative; }
 .journey-progress li::before { content: ''; position: absolute; top: 13px; left: -50%; width: 100%; height: 2px; background: rgba(0, 0, 0, 0.1); z-index: 0; }
 .journey-progress li:first-child::before { display: none; }
@@ -2902,10 +2903,19 @@ dd {
 .journey-dot { position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #eee; font-weight: 700; font-size: 0.8rem; }
 .journey-progress li.done .journey-dot { background: #1f7a4d; color: white; }
 .journey-progress li.current .journey-dot { background: #e0a526; color: #1b1b1b; box-shadow: 0 0 0 4px rgba(224, 165, 38, 0.25); }
+.move-out-preview { display: grid; gap: 8px; justify-items: start; }
+.move-out-preview p { margin: 0; }
+.past-tenancies summary, .my-listings summary { cursor: pointer; }
+.past-tenancies .past-tenancy, .my-listings details { padding: 12px 0; border-top: 1px solid var(--line); }
+.past-tenancy { display: grid; gap: 4px; }
+.my-listings { display: grid; gap: 8px; }
+.my-listings h3 { margin: 0; }
+.my-listings .listing-card { margin-top: 12px; }
 .next-step-card { display: grid; gap: 10px; padding: 22px; border-radius: 18px; background: #f4f8f3; border: 1px solid rgba(31, 122, 77, 0.2); }
 .next-step-card.passive { background: rgba(0, 0, 0, 0.03); border-color: rgba(0, 0, 0, 0.06); }
 .next-step-card h3 { display: flex; gap: 8px; align-items: center; margin: 0; font-size: 1.35rem; }
 .next-step-card p { margin: 0; }
+.faucet-note { overflow-wrap: anywhere; }
 .button.large { justify-self: start; padding: 14px 22px; font-size: 1.02rem; }
 .inline-form { display: grid; gap: 10px; max-width: 520px; }
 .inline-form label { display: grid; gap: 4px; font-size: 0.88rem; }
@@ -2923,7 +2933,7 @@ dd {
 .applicant p { margin: 2px 0 0; font-size: 0.88rem; opacity: 0.8; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (max-width: 700px) { .journey-progress { grid-template-columns: repeat(3, 1fr); row-gap: 14px; } .journey-progress li::before { display: none; } }
+@media (max-width: 700px) { .journey-progress { grid-template-columns: repeat(3, 1fr); row-gap: 14px; } .journey-progress.living { grid-template-columns: repeat(2, 1fr); } .journey-progress li::before { display: none; } }
 .test-helper-note { margin: 0; padding: 10px 14px; border: 1px dashed #b98a1a; border-radius: 12px; background: #fff8e6; font-size: 0.88rem; }
 .button.test-helper { justify-self: start; border: 1px dashed #b98a1a; background: #fff8e6; color: #6b4e00; }
 .tenancy-details { border-top: 1px solid var(--line); padding-top: 14px; }
@@ -2937,17 +2947,10 @@ dd {
 .test-tool-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
 .test-tool-row > span { min-width: 160px; flex: 1; font-weight: 600; }
 
-/* Onboarding: role choice and guided account setup */
+/* Guided account setup */
 .onboarding { display: grid; gap: 18px; max-width: 920px; }
 .onboarding h1 { margin: 0; font-size: clamp(2rem, 4vw, 2.8rem); letter-spacing: -0.03em; }
-.onboarding h2 { margin: 12px 0 0; font-size: 1.15rem; }
 .onboarding .lede { margin: 0; font-size: 1.08rem; opacity: 0.8; max-width: 640px; }
-.role-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-.role-card { display: grid; gap: 10px; align-content: start; text-align: left; padding: 22px; border-radius: 20px; border: 1px solid rgba(0, 0, 0, 0.1); background: white; cursor: pointer; font: inherit; color: inherit; transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; }
-.role-card:hover, .role-card:focus-visible { transform: translateY(-2px); border-color: #1f7a4d; box-shadow: 0 10px 30px rgba(31, 94, 69, 0.12); }
-.role-card strong { font-size: 1.15rem; }
-.role-card span { opacity: 0.75; font-size: 0.92rem; line-height: 1.45; }
-.role-card .role-go { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; opacity: 1; font-weight: 700; color: #1f7a4d; }
 .setup-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .setup-step { display: flex; gap: 14px; padding: 16px 18px; border-radius: 16px; border: 1px solid rgba(0, 0, 0, 0.08); background: white; }
 .setup-step > div { display: grid; gap: 10px; flex: 1; }
@@ -3069,9 +3072,11 @@ a.city-row:hover strong { text-decoration: underline; }
 .life-timeline li.planned { opacity: 0.7; }
 .life-timeline li.planned::before { background: #fff; border: 2px dashed #1f7a4d; width: 6px; height: 6px; }
 .life-timeline span { font-size: 0.85rem; opacity: 0.75; }
-.life-timeline .inline-form { width: min(100%, 520px); max-width: none; margin: 8px 0; padding: 16px; border-radius: 14px; background: #f7f9f5; }
-.life-timeline .inline-form input { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 10px; background: white; }
+.place-form { width: min(100%, 520px); max-width: none; margin: 8px 0; padding: 16px; border-radius: 14px; background: #f7f9f5; }
+.place-form input { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 10px; background: white; }
 .life-timeline li > .text-button { justify-self: start; }
+.membership-list { list-style: none; margin: 0; padding: 0; }
+.membership-list li { padding: 8px 0; border-bottom: 1px solid rgba(0, 0, 0, 0.05); }
 .connection-list { display: grid; }
 .connection-row { display: grid; grid-template-columns: 20px 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(0, 0, 0, 0.05); font-size: 0.9rem; }
 .connection-level { font-size: 0.75rem; opacity: 0.65; }

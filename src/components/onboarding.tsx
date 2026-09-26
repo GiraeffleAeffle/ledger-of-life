@@ -1,59 +1,9 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowRight, Check, Copy, Gavel, Home as HomeIcon, KeyRound, Loader2, Mail, ShieldCheck, Sparkles, Wallet } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, Copy, KeyRound, Loader2, Mail, ShieldCheck, Wallet } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
 import { useRecovery, type AuthorizedRequest } from './use-recovery';
 
-export type ChosenRole = 'tenant' | 'landlord' | 'arbitrator';
-const ROLE_KEY = 'deposit-workspace.role';
-
-/** The role only shapes what you see first; permissions always come from each agreement. */
-export function useChosenRole() {
-  const [role, setRole] = useState<ChosenRole | null>(null);
-  useEffect(() => {
-    const saved = window.localStorage.getItem(ROLE_KEY);
-    if (saved === 'tenant' || saved === 'landlord' || saved === 'arbitrator') queueMicrotask(() => setRole(saved));
-  }, []);
-  const choose = useCallback((next: ChosenRole | null) => {
-    if (next) window.localStorage.setItem(ROLE_KEY, next);
-    else window.localStorage.removeItem(ROLE_KEY);
-    setRole(next);
-  }, []);
-  return [role, choose] as const;
-}
-
-const ROLES: { id: ChosenRole; title: string; text: string; icon: typeof HomeIcon }[] = [
-  { id: 'tenant', title: 'I’m looking for a home', text: 'Apply for a flat. Your deposit stays yours, earns while you live there and comes back at move-out.', icon: KeyRound },
-  { id: 'landlord', title: 'I rent out a home', text: 'Post your flat, choose a tenant and get a secured deposit without holding anyone’s money.', icon: HomeIcon },
-  { id: 'arbitrator', title: 'I resolve disputes', text: 'Be the neutral person who decides only if tenant and landlord disagree at move-out.', icon: Gavel },
-];
-
-export function RolePicker({ onPick, onDemo }: { onPick: (role: ChosenRole) => void; onDemo: () => void }) {
-  return (
-    <section className="onboarding">
-      <span className="eyebrow">WELCOME</span>
-      <h1>A rental deposit that works for you.</h1>
-      <p className="lede">
-        Your deposit stays locked for the home, earns while you live there, and every payout goes straight to
-        the right person. Test network only; no real money.
-      </p>
-      <h2>Who are you?</h2>
-      <div className="role-grid">
-        {ROLES.map((role) => (
-          <button key={role.id} className="role-card" onClick={() => onPick(role.id)}>
-            <role.icon size={26} />
-            <strong>{role.title}</strong>
-            <span>{role.text}</span>
-            <span className="role-go">Continue <ArrowRight size={16} /></span>
-          </button>
-        ))}
-      </div>
-      <button className="text-button" onClick={onDemo}>
-        <Sparkles size={16} /> Just look around: open the demo with made-up people, no account needed
-      </button>
-    </section>
-  );
-}
 
 type StepState = 'done' | 'current' | 'todo';
 function Step({ n, state, title, children }: { n: number; state: StepState; title: string; children?: React.ReactNode }) {
@@ -69,10 +19,8 @@ function Step({ n, state, title, children }: { n: number; state: StepState; titl
 }
 
 /** Guided account setup; renders nothing once the account can hold and sign for a deposit. */
-export function AccountSetup({ role, authorized, onChangeRole, onReady }: {
-  role: ChosenRole;
+export function AccountSetup({ authorized, onReady }: {
   authorized: AuthorizedRequest;
-  onChangeRole: () => void;
   onReady: () => void;
 }) {
   const wallet = useRentalWallet();
@@ -109,10 +57,9 @@ export function AccountSetup({ role, authorized, onChangeRole, onReady }: {
 
   const state = (done: boolean, previous: boolean): StepState => (done ? 'done' : previous ? 'current' : 'todo');
   const link = typeof window === 'undefined' ? '' : window.location.origin;
-  const roleName = ROLES.find((r) => r.id === role)!.title;
   return (
     <section className="onboarding">
-      <span className="eyebrow">SET UP YOUR ACCOUNT · {roleName.toUpperCase()}</span>
+      <span className="eyebrow">SET UP YOUR ACCOUNT</span>
       <h1>{recoveryCheck ? 'Four quick steps, once.' : 'Two quick steps, once.'}</h1>
       <p className="lede">Your passkey signs you in. Your own wallet holds your money; nobody else can move it.</p>
       <ol className="setup-steps">
@@ -190,37 +137,6 @@ export function AccountSetup({ role, authorized, onChangeRole, onReady }: {
         </p>
       )}
       {wallet.error && <p className="note" role="alert">{wallet.error}</p>}
-      <button className="text-button" onClick={onChangeRole}>Not a {role}? Choose another role</button>
     </section>
   );
-}
-
-export function RoleIntro({ role, solanaAddress, testUsdcAtomic }: { role: ChosenRole; solanaAddress: string | null; testUsdcAtomic: string | null }) {
-  const [copied, setCopied] = useState(false);
-  if (role === 'tenant' && solanaAddress && testUsdcAtomic !== null && BigInt(testUsdcAtomic) < 1_000_000n)
-    return (
-      <section className="card next-step-card">
-        <span className="eyebrow">BEFORE YOU APPLY</span>
-        <h3>Get test USDC for your deposit</h3>
-        <p>
-          Open <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer">Circle’s faucet</a>, choose
-          <strong> Solana Devnet</strong> and paste your wallet address. It takes a few seconds; this card disappears when it arrives.
-        </p>
-        <div className="invite-link">
-          <input readOnly value={solanaAddress} />
-          <button className="button secondary" onClick={() => { void navigator.clipboard.writeText(solanaAddress); setCopied(true); }}>
-            <Copy size={15} /> {copied ? 'Copied' : 'Copy address'}
-          </button>
-        </div>
-      </section>
-    );
-  if (role === 'arbitrator')
-    return (
-      <section className="card next-step-card passive">
-        <span className="eyebrow">YOU’RE READY</span>
-        <h3>Wait for an invitation</h3>
-        <p>A landlord sends you a private link. Open it here and join; you’ll only be asked to act if tenant and landlord disagree.</p>
-      </section>
-    );
-  return null;
 }

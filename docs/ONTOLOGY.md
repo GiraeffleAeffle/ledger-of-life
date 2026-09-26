@@ -75,7 +75,7 @@ sequenceDiagram
 
 - **The deposit is protected.** The required security is never released as earnings. Only what it earns can be claimed.
 - **Fixed recipients, pull payouts.** Money only goes to each party's canonical account, and a party that breaks its own account blocks only itself.
-- **Roles come from agreements.** The "Who are you?" choice in onboarding is a display preference, not a permission.
+- **Roles come from contexts.** A listing's owner is its landlord; agreement parties grant tenancy roles, never onboarding choices or client state.
 - **The tenant's portfolio is theirs.** Landlord and arbitrator have no authority beyond the escrow.
 - **Adapters are read-only**, and their credentials stay on the server.
 - **Privacy by predicates.** Others learn facts ("verified adult, income at least 3× rent"), not documents. No personal data goes on-chain, and identity is never linked to a wallet address on-chain.
@@ -97,9 +97,9 @@ sequenceDiagram
 
 | Person | Steps |
 | --- | --- |
-| Tenant | Choose role → account → test USDC → browse → apply → accept → secure deposit → **claim earnings any time → invest** → move-out answer → payout |
-| Landlord | Choose role → account → post a home → choose applicant → invite arbitrator → accept → create deposit space → propose deduction → payout |
-| Arbitrator | Choose role → account → join by invitation → decide a dispute |
+| Tenant | Account → find a home → apply → accept → secure deposit → **claim earnings any time → invest** → move-out answer → payout |
+| Landlord | Account → rent out a home → choose applicant → invite arbitrator → accept → create deposit space → propose deduction at move-out → payout |
+| Arbitrator | Account → join by invitation → decide a dispute |
 | Any owner | Connect adapters → see everything owned |
 
 In each tenancy phase exactly one person has an action; everyone else sees what they are waiting for (`src/server/journey.ts`).
