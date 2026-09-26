@@ -85,8 +85,8 @@ concepts:
     definition: A shared space a Person takes part in, with its own members, rules, decisions and feed. A tenancy is one Context; so are a sports club, a house community, a neighbourhood or a city.
     open_ended: true   # kinds are examples, not a closed list; a life has many more
     kinds:
-      tenancy: {reality: testnet_real, note: "Agreement plus escrow; the only context built today."}
-      city: {reality: read_only_live, note: "Built: 'What is changing in <city>' reads the Stadtstack project atlas read model (atlas-city-read-model-v1, STADTSTACK_ATLAS_URL) for the EU-wallet city (opt-in address.locality) or a chosen city; shows open consultations and latest changes with the atlas's as-of date and review state. The atlas owns collection and review; council data upstream can come from CCF (komma-systems/ccf, OParl)."}
+      tenancy: {reality: testnet_real, note: "Agreement plus escrow; the only transactional shared context built today. City is read-only."}
+      city: {reality: read_only_live, note: "Built read-only: atlas projects and consultations for the EU-wallet city (opt-in locality) or chosen city, retaining the atlas's source time and review state; Bright Sky/DWD weather, nearby uncalibrated sensor.community PM readings and named OSM clubs/sports facilities have their own time, licence and stale labels. Strausberg official directories and ALLRIS calendar/documents are outbound links only; no OParl meeting feed was confirmed. Budget flows and the city-to-EU hierarchy are illustrations without city budget totals."}
       house_community: {reality: roadmap, note: "Shared building costs; ties to ServiceChargeAccount."}
       examples: [work/employer, health/insurer, mobility, family, learning, club, bank, energy supplier]
     rules:
@@ -240,7 +240,7 @@ concepts:
       bank_account: {reality: roadmap}
 
   ServiceChargeAccount:
-    definition: Future monthly service-charge prepayments (Nebenkosten) secured alongside the deposit, with a running statement. The current app only calculates a prototype from a stored test prepayment, example annual allocations and optional daily Home Assistant consumption; no billing, escrow funding or release is implemented.
+    definition: Future monthly service-charge prepayments (Nebenkosten) secured alongside the deposit, with a running statement. The current prototype is only an example statement using a landlord-set test prepayment, example annual allocations and optional live daily Home Assistant consumption; no escrow funding, legal bill or payout is implemented.
     grounding:
       - HeizkostenV requires monthly consumption information where meters are remotely readable (since 2022).
       - §556 BGB gives landlords up to 12 months after the period for the annual statement; the app shortens the wait, not the legal right.
@@ -250,7 +250,7 @@ concepts:
     code: [src/server/service-charges.ts, src/components/service-charges.tsx]
 
   LocalInvestment:
-    definition: Future holding in a company, cooperative or property in the person's own city; the app currently lists unverified research leads and legal forms only, without an offer or transaction.
+    definition: Future holding in a company, cooperative or property in the person's own city; currently only an illustration of four legal forms and unverified Strausberg cooperative leads, with no available offers, investment or transactions.
     forms:
       cooperative_share: {reality: roadmap, note: "Genossenschaft (housing, energy); proven, no tokens needed. First step: directory via the Stadtstack atlas."}
       electronic_security: {reality: roadmap, note: "eWpG; electronic shares since 1 Jan 2024 (ZuFinG), crypto registers need a BaFin-licensed operator. The app shows and holds; issuers do the regulated part."}
@@ -260,6 +260,7 @@ concepts:
       - No real offers without a licensed partner and legal review; until then illustration or test network, labeled.
     relations: {held_by: Person, located_in: Context (city), shown_in: Portfolio}
     reality: illustration
+    code: [src/components/local-investments.tsx, src/data/local-investments.ts]
 
   LifeTimeline:
     definition: "The person's private history of places and events: moves, tenancies, deposits returned, memberships, first local investment."
@@ -273,8 +274,8 @@ concepts:
     reality: roadmap
 
   CollateralDeposit:
-    definition: Securing an Agreement with SecurityTokens (for example 150 %) instead of cash; top-up grace period; forced sale only of what's needed; rest returned in kind.
-    code: [contracts/evm/src/CollateralEscrow.sol]
+    definition: Future option to secure an Agreement with SecurityTokens (for example 150 %) instead of cash. Today only a 150 % calculator and Robinhood Chain testnet contract exist; no pledge flow, top-up or forced-sale tenancy is implemented in the app.
+    code: [contracts/evm/src/CollateralEscrow.sol, src/components/stock-collateral.tsx]
     reality: prototype
     legal_note: German law (§551 BGB) allows other securities only by agreement; the landlord accepts the price risk.
 
@@ -311,23 +312,28 @@ test_tooling:   # never presented as wallet or user evidence
 # ---------------------------------------------------------------------------
 vision:
   scales:
+    reality: illustration
     order: [person, household, neighbourhood, municipality, neighbouring_municipalities, landkreis, land, federation, eu, world]
     rule: Every Context sits at one scale; the app starts from what affects the person and widens outward.
+    current: "Places links Strausberg city → Märkisch-Oderland district → Brandenburg state → Germany → EU official portals; street/neighbourhood and world feeds are not built."
   public_money_flow:
-    reality: roadmap
-    idea: Show where a person's taxes go and come back, and what their city can realistically spend.
+    reality: illustration
+    current: "Partly built: Places links primary tax/equalisation laws and Strausberg's gazette, inspection and AIG access route; no verified budget totals or personal tax attribution."
+    idea: Show where taxes go and what a person's city can realistically spend once the city publishes or provides a complete plan with reusable terms.
     grounding_de:
-      - Income tax is shared; municipalities receive a share (Gemeindeanteil, currently 15 %) allocated by residents' income, so it follows where you live.
-      - Trade tax (Gewerbesteuer) goes to the municipality where the employer operates, so it follows where you work.
-      - The Land redistributes to municipalities through the kommunaler Finanzausgleich (e.g. Brandenburg to Strausberg); Länder balance each other federally.
-      - The municipal budget (Haushalt) and council decisions (RIS/OParl, e.g. via CCF) show what is planned and decided.
-    caution: Figures must come from published budgets and statistics with source and as-of date; per-person attribution is an estimate and must be labeled as one.
+      - Income tax is shared; municipalities receive 15 % of wage and assessed income tax under GemFinRefG § 1, distributed by statutory keys linked to residence, not 15 % of each resident's personal bill.
+      - Trade tax (Gewerbesteuer) belongs to the municipality where business operations take place; Gewerbesteuerumlage reduces gross municipal receipts under GemFinRefG § 6.
+      - Brandenburg distributes key allocations to municipalities under BbgFAG; its provisions are legal rules, not a Strausberg allocation dataset.
+      - Strausberg's 2025/26 budget ordinance is published, but the detailed plan is offered for inspection under BbgKVerf § 69; an electronic copy may be requested under Brandenburg's AIG.
+    caution: Figures require an underlying published plan or statistics with source, reference date and licence; per-person attribution is an estimate. No budget totals are verified here.
   measurable_city:
-    reality: roadmap
-    idea: Sensors and open data (Stadtstack layers 1-2) make needs and the impact of measures measurable, so participation decisions rest on evidence.
+    reality: read_only_live
+    current: "Partly built: current DWD weather via Bright Sky and nearby outdoor PM2.5/PM10 from uncalibrated sensor.community contributors, with station/sensor distance, observation time, licence and stale status; not city-wide calibrated coverage."
+    idea: Broader sensors and open data (Stadtstack layers 1-2) could make needs and effects of measures measurable.
   newcomer_welcome:
-    reality: roadmap
-    idea: On moving to a city, see what is being built (3D atlas), what is decided, and personalised offers such as sports clubs matching interests, possibly with a welcome voucher; invite people to contribute expertise.
-    privacy: Interests stay with the person; offers are matched on the device or on explicit consent, never sold or shared by default.
+    reality: read_only_live
+    current: "Partly built: named OSM clubs and sports facilities grouped by type, ODbL object links and Strausberg official directory links; OSM is not an official directory."
+    idea: Registration help, interest-based offers, city partners and a welcome voucher are roadmap, not live product features.
+    privacy: Interests stay with the person; future matching would occur on device or with explicit consent, never sold or shared by default.
   residence_proof:
     note: The EU PID may omit the address (test issuer form asks birthplace; address fields optional). Fall back to a chosen city, or a residence attestation where issued.

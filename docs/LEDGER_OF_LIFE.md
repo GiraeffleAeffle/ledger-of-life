@@ -38,8 +38,8 @@ flowchart TB
 | **1 · Me** | Who am I here, and what may others learn? | Passkey sign-in and own wallets (built) · EU Digital Identity Wallet check: adult, optional city (built, test environment) · roles per context: tenant, landlord, member, resident (partly built: tenancy roles) · **life timeline**: where I lived, moves, tenancies (new, roadmap) |
 | **2 · Home** | Where do I live, and what is locked or owed there? | Listing → application → agreement (built) · deposit escrow that earns, claimable earnings, move-out payouts (built, Solana devnet, simulated yield) · service-charge account (prototype, example costs and test prepayment, optional live Home Assistant daily consumption) · stocks as the deposit (calculator only; testnet contract prototype) · home solar via Home Assistant (built, read-only) |
 | **3 · Money & ownership** | What do I own and earn? | Portfolio total (built) · tokenized stocks on Solana and Robinhood Chain (built, test tokens) · validator stake (built, read-only) · local investment leads for Strausberg (illustration, not verified offers) · home tokens towards owning a home (roadmap) · EV and device income (roadmap) |
-| **4 · Places** | What is changing where I live, and what can my city afford? | "What is changing in <city>" from the Stadtstack atlas (built, read-only) · public money flow: taxes, redistribution, city budget (roadmap) · measurable city: sensors and open data (roadmap, Stadtstack) · 3D map of projects (exists in the Stadtstack atlas) |
-| **5 · Have a say** | Where can I take part, and where am I welcome? | Open consultations with deadlines (built, via atlas) · council decisions (upstream: CCF/OParl) · newcomer welcome: clubs, interests, voucher (roadmap) · offering expertise (roadmap) |
+| **4 · Places** | What is changing where I live, and what can my city afford? | Stadtstack atlas projects and consultations (built, read-only) · current DWD weather and nearby uncalibrated citizen PM readings (read-only live) · named OSM clubs/sports facilities (read-only live, not an official directory) · statutory money-flow explainer and Strausberg budget publication/access links (illustration; budget totals unavailable) · city → Landkreis → Land → Germany → EU links (illustration) · ALLRIS calendar/document links (illustration, no OParl feed) · atlas 3D project map (in Stadtstack) |
+| **5 · Have a say** | Where can I take part, and where am I welcome? | Open consultations with deadlines (built, via atlas) · Strausberg ALLRIS council calendar/document links (illustration, no imported meetings) · newcomer clubs/sports discovery (read-only live OSM), with interests, registration help and voucher still planned · offering expertise (roadmap) |
 
 ### 2.1 Scales
 
@@ -61,25 +61,37 @@ A personal, private timeline of where the person lived and what happened there:
 - **Privacy:** the timeline belongs to the person and is never shared by default; each context sees only what
   it needs (a landlord might see "3 completed tenancies, all deposits returned", not the addresses).
 
-### 2.3 Public money flow (roadmap)
+### 2.3 Public money flow (explainer built; budget figures unavailable)
 
-Show where a person's taxes go and what comes back to their city, for Germany:
+Places now links the primary laws for how money reaches municipalities in Germany:
 
-- Income tax is shared; the municipality where the person **lives** receives a share (Gemeindeanteil, currently 15 %).
-- Trade tax (Gewerbesteuer) goes to the municipality where the **employer operates**.
-- The state redistributes to municipalities through the kommunaler Finanzausgleich (Brandenburg → Strausberg).
-- The city budget (Haushalt) and council decisions show what is planned and decided.
+- Municipalities receive a **15 % share** of wage and assessed income tax under GemFinRefG § 1, allocated
+  by statutory keys linked to residence. This is **not** 15 % of an individual's tax bill paid to their city.
+- Trade tax (Gewerbesteuer) belongs to the municipality where business operations take place, and
+  Gewerbesteuerumlage reduces gross municipal receipts under GemFinRefG § 6.
+- Brandenburg redistributes to municipalities through its BbgFAG fiscal equalisation system.
+- The city budget and council records show plans and decisions only if the underlying sources are available.
+
+**Why the budget isn't in the app:** Strausberg's 2025/26 ordinance is published in the Amtsblatt, but
+the detailed plan and annexes were offered for inspection at the Kämmerei. BbgKVerf § 69 provides for
+public notice and inspection, not a duty to publish the complete plan online. An electronic copy may be
+requested from the city under Brandenburg's AIG, subject to its access rules. The full plan, reusable
+licence and verified line items were not obtained, so Places quotes no budget totals. See
+[Strausberg budget research](research/CITY_BUDGET_DATA_STRAUSBERG_BRANDENBURG.md#legal-obligations-and-where-the-plan-actually-is)
+and [Places source checks](research/ROADMAP_DATA_SOURCES_STRAUSBERG.md).
 
 Rule: figures come only from published budgets and statistics with source and as-of date. Anything
 per person ("your taxes paid for …") is an estimate and must say so.
 
-### 2.4 Local investments (new, roadmap)
+### 2.4 Local investments (illustration; real investment roadmap)
 
-Invest directly in companies and houses in one's own city, using the same portfolio as tokenized stocks.
+Money currently illustrates four legal forms and links to unverified Strausberg cooperative leads. There
+are no offers, available shares, transactions or tokenized home ownership in the app. The future idea is
+to invest directly in local companies and property alongside the existing portfolio:
 
 | Form | How it works | What is realistic now |
 |---|---|---|
-| **Cooperative shares** (Genossenschaft: housing, energy, shop) | Members buy shares, one member one vote; common for community solar and housing | Proven, no tokens needed. Best first step: a directory of local cooperatives from the atlas, with how to join |
+| **Cooperative shares** (Genossenschaft: housing, energy, shop) | Members buy shares, one member one vote; common for community solar and housing | The app shows unverified Strausberg leads, not a directory of joinable cooperatives or open offers |
 | **Local company shares or bonds as electronic securities** | Germany's eWpG allows electronic securities; since 1 January 2024 (Zukunftsfinanzierungsgesetz) also electronic shares, including crypto shares in a crypto securities register run by a BaFin-licensed operator | Possible, but issuance is regulated; the app would only show and hold, issuers do the regulated part |
 | **Crowdfunding of local projects** | EU crowdfunding regulation (ECSPR) lets a project owner raise up to €5 million per 12 months through licensed platforms | Link out to licensed platforms; show local projects next to the city's plans |
 | **Tokenized real estate** | Tokens cannot carry a German land-register title; they represent shares or bonds of a property company (SPV) or profit participation | Test-network illustration only (fits the existing "home tokens" idea); real offers need a licensed partner |
@@ -89,12 +101,12 @@ park in the atlas), the cooperative or company behind it, and can take part fina
 consultation. Rule: no real offers without a licensed partner and legal review; until then everything here
 is illustration or test network and labeled as such.
 
-### 2.5 Newcomer welcome (roadmap)
+### 2.5 Newcomer welcome (clubs partly built; remainder roadmap)
 
-When a person moves (a new entry in the timeline, or a new city from the EU wallet), the app shows the new
-city at once: what is being built (3D atlas), what is decided, how to register, and offers that match their
-interests (sports clubs, groups), possibly with a welcome voucher from the city. Interests stay with the
-person; matching happens on the device or with explicit consent.
+Places shows named OSM clubs and sports facilities for a chosen or EU-wallet city, plus links to
+Strausberg's city and district directories. These OSM contributions are not an official directory.
+Registration help, interest matching, city-partner offers and a welcome voucher are still planned;
+interests would stay with the person and matching would require explicit consent.
 
 ## 3. How the app should be organised
 
@@ -115,12 +127,13 @@ person; matching happens on the device or with explicit consent.
 | **Me** | Identity and credentials, roles derived per context (agreement party, owned listing, chosen or wallet city), life timeline with an on-demand earlier-place form, connected adapters and their permissions | Identity strip details, adapter settings |
 | **Home** | Active tenancies with a journey that stops at "Living here" until move-out starts, compact past tenancies, on-demand find/rent actions, service charges, home energy | Tenancy cards, Homes card, solar tile |
 | **Money** | All holdings in one list (deposit entitlement, stocks per network, validator, later local investments), earnings, invest actions | Portfolio tiles, Invest card, Robinhood tile, validator tile |
-| **Places** | My city (atlas projects, consultations, later budget), then wider scales | City card |
+| **Places** | My city (atlas projects and consultations; read-only weather, citizen PM and OSM clubs), sourced money-flow explainer, official directories and wider-scale link illustration | City card |
 | **Ideas** (or "Coming") | Roadmap items, clearly separate and labeled | Dashed roadmap tiles |
 
-Built: the sidebar and the mobile tab bar show these areas; each renders only its own content, and planned
-items appear in a dashed "Planned in this area · not built yet" box that links to **Ideas** (one list in
-`src/components/ideas.tsx`). Each real tenancy in **Home** has a read-only detail for its agreement terms,
+Built: the sidebar and the mobile tab bar show these areas; each renders only its own content. Remaining
+roadmap work appears in a dashed "More to build in this area" box that links to **Ideas** (one list in
+`src/components/ideas.tsx`); illustrations are labeled separately. Each real tenancy in **Home** has a
+read-only detail for its agreement terms,
 claim/settlement state, shared evidence and test-network operations from that tenancy's authenticated
 records. The fictional workflow stays in a separate **Explore demo · made-up people** entry; its internal
 views do not appear in the signed-in areas. Test-only shortcuts, including simulated interest and sample
@@ -176,26 +189,33 @@ Today each connection is built differently (`adapters.ts`, `eudi.ts`, `city.ts`,
 | Rental deposit escrow (Solana) | Home | Built | **Keep**, core story |
 | Stocks: Solana (tSPYx) | Money | Built | **Keep**, merge the two portfolio views |
 | Stocks: Robinhood Chain (TSLA) | Money | Built | **Keep** as second network; decide if the pitch needs two chains |
-| Stadtstack atlas (city projects) | Places | Built | **Keep**, add budget next |
+| Stadtstack atlas (city projects) | Places | Built, read-only live | **Keep** atlas provenance and review state |
+| DWD via Bright Sky and sensor.community | Places | Read-only live weather and nearby uncalibrated citizen PM sensors | **Keep** times, distances, licences and stale labels; no city-wide air-quality claim |
+| OSM clubs and sports via Overpass | Places | Read-only live named objects, not an official directory | **Keep** ODbL attribution and official Strausberg directory links; no partner offer implied |
+| Public money flow and Strausberg budget access | Places | Partly built: sourced statutory explainer and publication/inspection links, no budget totals | **Next**: obtain complete plan, reuse terms and verified line items before showing figures |
+| From your street to the world | Places | Illustration: Strausberg → Landkreis → Brandenburg → Germany → EU portals | **Keep** links only; street and world feeds not built |
+| Council decisions | Places | Partly built: Strausberg ALLRIS calendar and document links only; no confirmed OParl endpoint | **Later**: a permitted, reviewed structured feed before showing meetings |
 | Home Assistant solar | Home | Built, read-only | **Keep** |
 | Validator (Gnosis/Ethereum/Solana) | Money | Built, read-only | **Keep** |
-| Life timeline | Me | New | **Next**: tenancies automatic, earlier moves self-declared |
-| City budget and money flow | Places | New | **Next**: data through the Stadtstack atlas, not in this app |
-| Real-time service charges | Home | Prototype statement, simulated costs and stored test prepayment; optional live daily Home Assistant consumption | **Next**: authorized utility meters, invoices and escrow-based settlement |
-| Local investments | Money | Illustration: four legal forms and unverified Strausberg cooperative leads; no offers | **Later**: direct provider verification and licensed partner before any investment |
-| Newcomer welcome, clubs, voucher | Have a say | Idea | **Later**: needs city partners and interest matching |
-| CCF council decisions | Have a say | External, running | **Later**, via the atlas or directly from the CCF store |
-| Stocks as the deposit | Home | CollateralEscrow testnet contract + illustration calculator, not an app flow | **Park** real integration pending review and legal agreement |
-| Home tokens towards owning | Money | Idea | **Park**, becomes part of local investments |
-| EV and device tokenization | Money | Idea | **Park** |
+| Life timeline | Me | Partly built: app tenancies and labeled self-declared earlier places | **Next**: residence attestations where issued, private milestones |
+| Real-time service charges | Home | Prototype example statement with landlord-set test prepayment, optional live daily Home Assistant consumption; no escrow funding or payouts | **Next**: authorized meters, invoices and escrow settlement |
+| Local investments | Money | Illustration: four legal forms and unverified Strausberg cooperative leads; no offers or investment | **Later**: verify providers and find a licensed partner |
+| Newcomer welcome | Places | Partly built: live OSM clubs and official directories; no matching, registration or voucher | **Later**: city partners and consent-based matching |
+| Stocks as the deposit | Home | Prototype: 150 % collateral calculator and Robinhood Chain testnet contract; no pledge flow | **Park** real integration pending legal and security review |
+| Home tokens towards owning | Money | Planned; part of local investments | **Park** until legal wrapper and partner exist |
+| EV and device tokenization | Money | Planned | **Park** |
 
 ### 4.4 Suggested order
 
-1. Reorganise the app into the structure in section 3; no new features. This fixes the cobbled-together feel.
-2. Introduce the common adapter contract while moving the existing adapters into their areas.
-3. Life timeline (small, personal, shows the "life" in Ledger of Life).
-4. City budget via the Stadtstack atlas.
-5. Service charges, then local investments.
+1. **Done:** reorganise the signed-in overview and build a partial life timeline, a service-charge
+   prototype, local-investment illustrations and sourced read-only Places feeds.
+2. **Next:** obtain Strausberg's full 2025/26 plan and reuse terms through inspection or an AIG request.
+   Only then consider verified budget figures; statutory percentages are not city budget amounts.
+3. Introduce the common adapter provenance/permission contract while preserving each feed's reality
+   level, observation time, licence and stale state.
+4. Pursue authorized meter/invoice inputs before any service-charge settlement, and confirm a permitted
+   council feed before presenting meeting records.
+5. Verify local providers and secure a licensed partner before offering investments or vouchers.
 
 ## 5. Decisions (2026-09-26)
 
@@ -207,7 +227,7 @@ Today each connection is built differently (`adapters.ts`, `eudi.ts`, `city.ts`,
 
 Still to research:
 
-- City budget data: what Strausberg, Brandenburg and other cities publish (Haushalt, Finanzausgleich), in
-  which format, and how it enters the Stadtstack protocol.
+- Strausberg's complete 2025/26 budget plan, reuse terms and verified line items (current ordinance links
+  to inspection, not a complete online dataset); comparable cities publish plans online.
 - Newcomer welcome: which cities or clubs would offer listings or a welcome voucher (idea stage).
 - A licensed partner for local investments (cooperatives, eWpG registers, ECSPR platforms).
