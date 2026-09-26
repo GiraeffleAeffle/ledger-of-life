@@ -8,7 +8,7 @@ import type { PublicAdapterConfig, SolarReading, ValidatorReading } from '@/serv
 import type { RobinhoodHoldings } from '@/server/robinhood-demo';
 import type { Area } from './areas';
 
-type Settled<T> = { ok: true; value: T } | { ok: false; error: string } | null;
+type Settled<T> = { ok: true; value: T } | { ok: false; error: string; code?: 'price_unavailable' } | null;
 type AssetsResponse = { robinhood: Settled<RobinhoodHoldings>; solar: Settled<SolarReading>; validator: Settled<ValidatorReading>; adapters: PublicAdapterConfig };
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 type BuyStep = { description: string; transaction: { chainId: 46630; to: string; data: string; value: string; nonce: number; gas: string; maxFeePerGas: string; maxPriorityFeePerGas: string } };
@@ -40,6 +40,7 @@ export function AssetsOverview({ request, tenancies, show, go }: {
   const wallet = useRentalWallet();
   const [assets, setAssets] = useState<AssetsResponse | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioView | null>(null);
+  const [portfolioUnavailable, setPortfolioUnavailable] = useState(false);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [open, setOpen] = useState<'solar' | 'validator' | null>(null);
@@ -48,24 +49,45 @@ export function AssetsOverview({ request, tenancies, show, go }: {
 
   const refresh = useCallback(async () => {
     const [a, p] = await Promise.all([
-      request<AssetsResponse>('/api/assets'),
-      request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio').catch(() => null),
+      request<AssetsResponse>(show === 'home' ? '/api/assets?area=home' : '/api/assets'),
+      show === 'home' ? Promise.resolve(null) : request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio').catch(() => null),
     ]);
     setAssets(a);
     if (p?.portfolio.available) setPortfolio(p.portfolio);
-  }, [request]);
+    if (show !== 'home') setPortfolioUnavailable(p === null);
+  }, [request, show]);
   useEffect(() => {
     let active = true;
-    Promise.all([
-      request<AssetsResponse>('/api/assets'),
-      request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio').catch(() => null),
-    ]).then(([a, p]) => {
-      if (!active) return;
-      setAssets(a);
-      if (p?.portfolio.available) setPortfolio(p.portfolio);
-    }).catch(() => {});
-    return () => { active = false; };
-  }, [request]);
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let retryAssets: ReturnType<typeof setTimeout> | undefined;
+    async function loadAssets() {
+      try {
+        const a = await request<AssetsResponse>(show === 'home' ? '/api/assets?area=home' : '/api/assets');
+        if (!active) return;
+        setAssets(a);
+        if (show !== 'home' && a.robinhood && (!a.robinhood.ok || a.robinhood.value.referencePriceStale))
+          retryAssets = setTimeout(loadAssets, a.robinhood.ok || a.robinhood.code === 'price_unavailable' ? 60_000 : 8000);
+      } catch {}
+    }
+    void loadAssets();
+    if (show !== 'home') {
+      async function loadPortfolio() {
+        try {
+          const { portfolio } = await request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio');
+          if (!active) return;
+          setPortfolio(portfolio.available ? portfolio : null);
+          setPortfolioUnavailable(false);
+          if (portfolio.available && portfolio.referencePriceStale) retry = setTimeout(loadPortfolio, 60_000);
+        } catch {
+          if (!active) return;
+          setPortfolioUnavailable(true);
+          retry = setTimeout(loadPortfolio, 8000);
+        }
+      }
+      void loadPortfolio();
+    }
+    return () => { active = false; clearTimeout(retry); clearTimeout(retryAssets); };
+  }, [request, show]);
 
   async function run(label: string, work: () => Promise<void>) {
     setBusy(label);
@@ -102,17 +124,26 @@ export function AssetsOverview({ request, tenancies, show, go }: {
   const rh = assets?.robinhood?.ok ? assets.robinhood.value : null;
   const solar = assets?.solar?.ok ? assets.solar.value : null;
   const validator = assets?.validator?.ok ? assets.validator.value : null;
+  const robinhoodUnavailable = Boolean(assets?.robinhood && !assets.robinhood.ok);
+  const robinhoodError = assets?.robinhood && !assets.robinhood.ok
+    ? assets.robinhood.code === 'price_unavailable' ? 'Reference price temporarily unavailable; retrying…' : assets.robinhood.error
+    : null;
+  const unavailableHoldings = portfolioUnavailable
+    ? robinhoodUnavailable ? 'Solana portfolio and Robinhood holdings' : 'Solana portfolio'
+    : robinhoodUnavailable ? 'Robinhood holdings' : '';
   const total = locked + (portfolio ? portfolio.valueUsd + atomicUsd(portfolio.testUsdcAtomic) : 0) + (rh ? rh.tslaValueUsd + atomicUsd(rh.testUsdAtomic) : 0);
 
   if (show === 'summary')
     return (
       <section className="card overview-tile clickable" onClick={() => go('money')}>
         <span className="eyebrow">MONEY · TEST NETWORKS</span>
-        <strong className="overview-figure">{assets ? usd(total) : <Loader2 className="spin" size={20} />}</strong>
+        <strong className="overview-figure">{assets ? unavailableHoldings ? '—' : usd(total) : <Loader2 className="spin" size={20} />}</strong>
         <span className="small-copy">
-          Deposit {usd(locked)} · stocks {usd((portfolio?.valueUsd ?? 0) + (rh?.tslaValueUsd ?? 0))}
+          {unavailableHoldings ? `${unavailableHoldings} temporarily unavailable; retrying…` : `Deposit ${usd(locked)} · stocks ${usd((portfolio?.valueUsd ?? 0) + (rh?.tslaValueUsd ?? 0))}`}
           {validator ? ` · validator ${validator.stake.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${validator.unit}` : ''}
         </span>
+        {portfolio?.referencePriceStale && <span className="small-copy">Solana reference price as of {new Date(portfolio.referencePriceObservedAt).toLocaleString()}</span>}
+        {rh?.referencePriceStale && <span className="small-copy">Robinhood reference price as of {new Date(rh.referencePriceObservedAt).toLocaleString()}</span>}
         <span className="text-button">Open Money →</span>
       </section>
     );
@@ -123,8 +154,9 @@ export function AssetsOverview({ request, tenancies, show, go }: {
         <div className="assets-head">
           <div>
             <span className="eyebrow">EVERYTHING YOU OWN · TEST NETWORKS</span>
-            <h2>{assets ? usd(total) : <Loader2 className="spin" size={20} />}</h2>
-            <p className="small-copy">Your deposit, stocks and what your hardware earns. Test assets have no real value.</p>
+            <h2>{assets ? unavailableHoldings ? '—' : usd(total) : <Loader2 className="spin" size={20} />}</h2>
+            <p className="small-copy">{unavailableHoldings ? `${unavailableHoldings} temporarily unavailable; retrying…` : 'Your deposit, stocks and what your hardware earns. Test assets have no real value.'}</p>
+            {(portfolio?.referencePriceStale || rh?.referencePriceStale) && <p className="small-copy">Total includes last known stock prices; observation times below.</p>}
           </div>
         </div>
       ) : (
@@ -146,17 +178,19 @@ export function AssetsOverview({ request, tenancies, show, go }: {
         <article className="asset-tile">
           <header><LineChart size={18} /> Stocks · Solana</header>
           <strong>{portfolio ? usd(portfolio.valueUsd) : '—'}</strong>
-          <span>{portfolio ? `${portfolio.shares.toFixed(4)} tSPYx (S&P 500 copy)` : 'Loading…'}</span>
+          <span>{portfolio ? `${portfolio.shares.toFixed(4)} tSPYx (S&P 500 copy)` : portfolioUnavailable ? 'Temporarily unavailable; retrying…' : 'Loading…'}</span>
+          {portfolio?.referencePriceStale && <span>Reference price as of {new Date(portfolio.referencePriceObservedAt).toLocaleString()} · live price unavailable</span>}
           {portfolio && portfolio.multiplier > 1 && <span className="asset-gain"><TrendingUp size={13} /> +{((portfolio.multiplier - 1) * 100).toFixed(2)} % from simulated distributions (test market)</span>}
         </article>
 
         <article className="asset-tile">
           <header><LineChart size={18} /> Stocks · Robinhood Chain</header>
           <strong>{rh ? usd(rh.tslaValueUsd) : '—'}</strong>
-          <span>{rh ? `${rh.tslaShares.toFixed(5)} TSLA (official test token) · ${usd(atomicUsd(rh.testUsdAtomic))} test USD` : assets?.robinhood && !assets.robinhood.ok ? assets.robinhood.error : 'Loading…'}</span>
+          <span>{rh ? `${rh.tslaShares.toFixed(5)} TSLA (official test token) · ${usd(atomicUsd(rh.testUsdAtomic))} test USD` : robinhoodError ?? 'Loading…'}</span>
+          {rh?.referencePriceStale && <span>Reference price as of {new Date(rh.referencePriceObservedAt).toLocaleString()} · live price unavailable</span>}
           <div className="button-row">
             {rh && BigInt(rh.testUsdAtomic) > 0n && (
-              <button className="button primary" disabled={Boolean(busy)} onClick={() => run('buy', buyTsla)}>
+              <button className="button primary" disabled={Boolean(busy) || rh.referencePriceStale} onClick={() => run('buy', buyTsla)}>
                 {busy === 'buy' ? <Loader2 className="spin" size={14} /> : null} Invest in TSLA <ArrowRight size={14} />
               </button>
             )}

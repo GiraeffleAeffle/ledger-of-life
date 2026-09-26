@@ -1,24 +1,29 @@
 import { authenticated } from '@/server/authenticated';
 import { readAdapterConfig, readSolar, readValidator, saveAdapterConfig, type AdapterConfig } from '@/server/adapters';
 import { earnOnRobinhood, prepareRobinhoodBuy, robinhoodEnabled, robinhoodHoldings, submitRobinhoodTransaction } from '@/server/robinhood-demo';
+import { ReferencePriceUnavailable } from '@/server/reference-price';
 import { getStore } from '@/server/store';
 import { readBody, sameOrigin } from '@/server/http';
 import { operatorTestCapability } from '@/server/test-capability';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };
-const settle = <T,>(work: Promise<T>) => work.then((value) => ({ ok: true as const, value })).catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : 'Unavailable' }));
+const settle = <T,>(work: Promise<T>) => work.then((value) => ({ ok: true as const, value })).catch((e: unknown) => ({
+  ok: false as const, error: e instanceof Error ? e.message : 'Unavailable',
+  ...(e instanceof ReferencePriceUnavailable ? { code: 'price_unavailable' as const } : {}),
+}));
 
 /** Everything the person owns beyond the rental escrow: Robinhood testnet holdings and adapters. */
 export async function GET(request: Request) {
   try {
     const identity = await authenticated(request);
+    const homeOnly = new URL(request.url).searchParams.get('area') === 'home';
     const store = await getStore();
     const evm = identity.wallets.find((w) => w.chainType === 'ethereum');
     const config = (await store.get<AdapterConfig>(`adapters:${identity.subject}`)) ?? {};
     const [robinhood, solar, validator] = await Promise.all([
-      evm && (await robinhoodEnabled()) ? settle(robinhoodHoldings(evm.address)) : Promise.resolve(null),
+      !homeOnly && evm && (await robinhoodEnabled()) ? settle(robinhoodHoldings(evm.address)) : Promise.resolve(null),
       config.homeAssistant ? settle(readSolar(config.homeAssistant)) : Promise.resolve(null),
-      config.validator ? settle(readValidator(config.validator)) : Promise.resolve(null),
+      !homeOnly && config.validator ? settle(readValidator(config.validator)) : Promise.resolve(null),
     ]);
     return Response.json({ robinhood, solar, validator, adapters: await readAdapterConfig(store, identity) }, noStore);
   } catch (error) {

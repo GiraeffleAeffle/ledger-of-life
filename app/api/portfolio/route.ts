@@ -1,11 +1,14 @@
 import { authenticated } from '@/server/authenticated';
 import { prepareBuy, purchaseStatus, readPortfolio, submitBuy } from '@/server/portfolio';
 import { SolanaServiceError } from '@/server/solana-service';
+import { ReferencePriceUnavailable } from '@/server/reference-price';
 import { getStore } from '@/server/store';
 import { errorResponse, readBody, sameOrigin } from '@/server/http';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };
 function failure(error: unknown) {
+  if (error instanceof ReferencePriceUnavailable)
+    return Response.json({ error: error.message, code: 'price_unavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   if (error instanceof SolanaServiceError)
     return Response.json({ error: error.message, code: error.code }, { status: error.status, headers: { 'Cache-Control': 'no-store' } });
   return errorResponse(error);

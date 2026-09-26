@@ -32,13 +32,14 @@ import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { walletFor } from './agreements.ts';
 import { solanaConfiguration } from './solana-rpc.ts';
 import { SolanaServiceError } from './solana-service.ts';
+import { referencePrice } from './reference-price.ts';
 import type { Store } from './store.ts';
 import { operatorTestCapability } from './test-capability.ts';
 
 /**
  * Devnet test market for the tenant's personal portfolio: `tSPYx`, a Token-2022 copy of SPYx
  * (no value) with the xStocks scaled-UI-amount mechanism. Buys are one atomic transaction the
- * tenant approves once: test USDC to the test market maker, tSPYx back, at the live mainnet
+ * tenant approves once: test USDC to the test market maker, tSPYx back, at a recent mainnet
  * SPYx reference price. Nothing here touches the rental escrow.
  */
 const TEST_USDC = address('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
@@ -105,18 +106,10 @@ async function market(environment: Record<string, string | undefined>) {
   try {
     const { mint } = JSON.parse(await readFile(resolve(dir, 'market.json'), 'utf8')) as { mint: string };
     const maker = await createKeyPairSignerFromBytes(new Uint8Array(JSON.parse(await readFile(resolve(dir, 'market-maker.json'), 'utf8'))));
-    return { rpc: createSolanaRpcFromTransport(retryingTransport(config.rpcUrl)), mint: address(mint), maker };
+    return { rpc: createSolanaRpcFromTransport(retryingTransport(config.rpcUrl)), rpcUrl: config.rpcUrl, mint: address(mint), maker };
   } catch {
     return null;
   }
-}
-
-async function referencePrice() {
-  const response = await fetch(`https://lite-api.jup.ag/price/v3?ids=${SPYX_MAINNET}`, { signal: AbortSignal.timeout(8000) });
-  const body: Record<string, { usdPrice?: number }> = await response.json();
-  const price = body[SPYX_MAINNET]?.usdPrice;
-  if (!response.ok || !price || !(price > 0)) throw new SolanaServiceError(503, 'price_unavailable', 'The reference price is unavailable. Retry shortly.');
-  return price;
 }
 
 export interface PortfolioView {
@@ -127,33 +120,51 @@ export interface PortfolioView {
   shares: number;
   multiplier: number;
   referencePriceUsd: number;
+  referencePriceObservedAt: string;
+  referencePriceStale: boolean;
   valueUsd: number;
 }
+
+const portfolioReads = new Map<string, { expiresAt: number; wallet: string; result: Promise<PortfolioView> }>();
 
 export async function readPortfolio(identity: VerifiedIdentity, environment = process.env): Promise<PortfolioView | { available: false }> {
   const m = await market(environment);
   if (!m) return { available: false };
   const owner = address(walletFor(identity, 'solana').address);
-  const [usdcAta] = await findAssociatedTokenPda({ owner, mint: TEST_USDC, tokenProgram: CLASSIC_TOKEN });
-  const [stockAta] = await findAssociatedTokenPda({ owner, mint: m.mint, tokenProgram: TOKEN_2022_PROGRAM_ADDRESS });
-  const balance = async (account: typeof usdcAta) => {
-    try {
-      return (await m.rpc.getTokenAccountBalance(account, { commitment: 'confirmed' }).send()).value.amount;
-    } catch {
-      return '0';
-    }
-  };
-  const [testUsdcAtomic, rawAtomic, mint, referencePriceUsd] = await Promise.all([
-    balance(usdcAta), balance(stockAta), fetchMint(m.rpc, m.mint, { commitment: 'confirmed' }), referencePrice(),
-  ]);
-  const config = mint.data.extensions.__option === 'Some'
-    ? mint.data.extensions.value.find((item) => item.__kind === 'ScaledUiAmountConfig')
-    : undefined;
-  const now = BigInt(Math.floor(Date.now() / 1000));
-  const multiplier = !config || config.__kind !== 'ScaledUiAmountConfig' ? 1
-    : now >= config.newMultiplierEffectiveTimestamp ? config.newMultiplier : config.multiplier;
-  const shares = (Number(rawAtomic) / 10 ** DECIMALS) * multiplier;
-  return { available: true, symbol: 'tSPYx', testUsdcAtomic, rawAtomic, shares, multiplier, referencePriceUsd, valueUsd: Number((shares * referencePriceUsd).toFixed(2)) };
+  const key = `${m.rpcUrl}:${m.mint}:${owner}`;
+  const cached = portfolioReads.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
+  const result = (async (): Promise<PortfolioView> => {
+    const [usdcAta] = await findAssociatedTokenPda({ owner, mint: TEST_USDC, tokenProgram: CLASSIC_TOKEN });
+    const [stockAta] = await findAssociatedTokenPda({ owner, mint: m.mint, tokenProgram: TOKEN_2022_PROGRAM_ADDRESS });
+    const balance = async (account: typeof usdcAta) => {
+      try {
+        return (await m.rpc.getTokenAccountBalance(account, { commitment: 'confirmed' }).send()).value.amount;
+      } catch {
+        return '0';
+      }
+    };
+    const [testUsdcAtomic, rawAtomic, mint, quote] = await Promise.all([
+      balance(usdcAta), balance(stockAta), fetchMint(m.rpc, m.mint, { commitment: 'confirmed' }), referencePrice(SPYX_MAINNET),
+    ]);
+    const config = mint.data.extensions.__option === 'Some'
+      ? mint.data.extensions.value.find((item) => item.__kind === 'ScaledUiAmountConfig')
+      : undefined;
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const multiplier = !config || config.__kind !== 'ScaledUiAmountConfig' ? 1
+      : now >= config.newMultiplierEffectiveTimestamp ? config.newMultiplier : config.multiplier;
+    const shares = (Number(rawAtomic) / 10 ** DECIMALS) * multiplier;
+    return { available: true, symbol: 'tSPYx', testUsdcAtomic, rawAtomic, shares, multiplier, referencePriceUsd: quote.usdPrice,
+      referencePriceObservedAt: quote.observedAt, referencePriceStale: quote.stale, valueUsd: Number((shares * quote.usdPrice).toFixed(2)) };
+  })();
+  const entry = { expiresAt: Infinity, wallet: owner, result };
+  portfolioReads.set(key, entry);
+  if (portfolioReads.size > 128) portfolioReads.delete(portfolioReads.keys().next().value!);
+  void result.then(
+    () => { if (portfolioReads.get(key) === entry) entry.expiresAt = Date.now() + 4_000; },
+    () => { if (portfolioReads.get(key) === entry) portfolioReads.delete(key); },
+  );
+  return result;
 }
 
 /** Builds an unsigned quote; only the person's wallet signs before server-side simulation. */
@@ -170,7 +181,9 @@ export async function prepareBuy(store: Store, identity: VerifiedIdentity, usdcI
     throw new SolanaServiceError(409, 'buy_pending', 'Your existing purchase is still being checked.');
   const wallet = walletFor(identity, 'solana');
   const tenant = address(wallet.address);
-  const price = await referencePrice();
+  const quote = await referencePrice(SPYX_MAINNET);
+  if (quote.stale) throw new SolanaServiceError(503, 'price_unavailable', 'A current reference price is required to prepare a purchase. Try again shortly.');
+  const price = quote.usdPrice;
   const mint = await fetchMint(m.rpc, m.mint, { commitment: 'confirmed' });
   const view = await readPortfolio(identity, environment);
   const multiplier = 'multiplier' in view ? view.multiplier : 1;
@@ -238,6 +251,11 @@ export async function purchaseStatus(store: Store, identity: VerifiedIdentity, e
       await store.update<PreparedBuy>(key, (current) => ({ ...current, state }));
       await store.update<BuyAccount>(`portfolio-buy-account:${identity.subject}`, (current) =>
         current.activeId === purchase.id ? { ...current, activeId: null, activeState: null, lastId: purchase.id } : current);
+      if (state === 'finalized') {
+        const wallet = walletFor(identity, 'solana').address;
+        for (const [cacheKey, read] of portfolioReads)
+          if (read.wallet === wallet) portfolioReads.delete(cacheKey);
+      }
       return { state, id: purchase.id, signature: purchase.signature, rawOutAtomic: purchase.rawOutAtomic };
     }
     if (!status && BigInt(await m.rpc.getBlockHeight({ commitment: 'finalized' }).send()) <= BigInt(purchase.lastValidBlockHeight)) {

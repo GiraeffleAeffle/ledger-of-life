@@ -16,6 +16,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { defineChain } from 'viem';
 import type { Store } from './store.ts';
 import { operatorTestCapability } from './test-capability.ts';
+import { referencePrice } from './reference-price.ts';
 
 /**
  * Robinhood Chain TESTNET demo: a real on-chain rental escrow whose released earnings go to the
@@ -55,14 +56,6 @@ const MAX = 2n ** 256n - 1n;
 const client = createPublicClient({ chain, transport: http() });
 const TSLAX_MAINNET = 'XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB';
 
-async function tslaPrice() {
-  const response = await fetch(`https://lite-api.jup.ag/price/v3?ids=${TSLAX_MAINNET}`, { signal: AbortSignal.timeout(8000) });
-  const body: Record<string, { usdPrice?: number }> = await response.json();
-  const price = body[TSLAX_MAINNET]?.usdPrice;
-  if (!price || !(price > 0)) throw new Error('TSLA reference price unavailable');
-  return price;
-}
-
 export async function robinhoodEnabled(environment = process.env) {
   if (!operatorTestCapability(environment)) return false;
   try {
@@ -89,6 +82,8 @@ export interface RobinhoodHoldings {
   tslaValueUsd: number;
   ethBalance: string;
   referencePriceUsd: number;
+  referencePriceObservedAt: string;
+  referencePriceStale: boolean;
 }
 
 export async function robinhoodHoldings(owner: string): Promise<RobinhoodHoldings> {
@@ -97,12 +92,13 @@ export async function robinhoodHoldings(owner: string): Promise<RobinhoodHolding
     client.readContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'balanceOf', args: [address] }),
     client.readContract({ address: ROBINHOOD_TESTNET.tsla, abi: erc20, functionName: 'balanceOf', args: [address] }),
     client.getBalance({ address }),
-    tslaPrice(),
+    referencePrice(TSLAX_MAINNET),
   ]);
   const shares = Number(tsla) / 1e18;
   return {
     address, testUsdAtomic: usd.toString(), tslaRaw: tsla.toString(), tslaShares: shares,
-    tslaValueUsd: Number((shares * price).toFixed(2)), ethBalance: formatEther(eth), referencePriceUsd: price,
+    tslaValueUsd: Number((shares * price.usdPrice).toFixed(2)), ethBalance: formatEther(eth), referencePriceUsd: price.usdPrice,
+    referencePriceObservedAt: price.observedAt, referencePriceStale: price.stale,
   };
 }
 
@@ -171,8 +167,10 @@ export async function earnOnRobinhood(store: Store, personalWallet: string, envi
   const releasable = (upperBound * 99n) / 100n;
   if (releasable === 0n) throw new Error('No earnings accrued yet.');
   await wait(await tenant.writeContract({ address: escrow, abi: escrowAbi, functionName: 'releaseEarnings', args: [releasable, MAX, 4n, deadline] }));
-  // Keep the desk priced at the live TSLAx reference.
-  await wait(await op.writeContract({ address: ROBINHOOD_TESTNET.desk, abi: deskAbi, functionName: 'setPrice', args: [BigInt(Math.round((await tslaPrice()) * 1e6))] }));
+  // Keep the desk priced at a recent, non-stale TSLAx reference.
+  const price = await referencePrice(TSLAX_MAINNET);
+  if (price.stale) throw new Error('The TSLA reference price is temporarily unavailable. Try again shortly.');
+  await wait(await op.writeContract({ address: ROBINHOOD_TESTNET.desk, abi: deskAbi, functionName: 'setPrice', args: [BigInt(Math.round(price.usdPrice * 1e6))] }));
   const result = { escrow, releasedAtomic: releasable.toString() };
   await store.update<Job>(key, () => ({ state: 'done', result }));
   return result;

@@ -42,9 +42,9 @@ const toB64 = (bytes: Uint8Array) => btoa(Array.from(bytes, (b) => String.fromCh
 
 /** Authenticated same-origin JSON requests with the current Privy token. */
 function useAuthorizedRequest(): Request {
-  const wallet = useRentalWallet();
+  const getAccessToken = useRentalWallet().getAccessToken;
   return useCallback(async <T,>(path: string, body?: unknown): Promise<T> => {
-    const token = await wallet.getAccessToken();
+    const token = await getAccessToken();
     if (!token) throw new Error('Sign in again to continue.');
     const response = await fetch(path, {
       method: body ? 'POST' : 'GET',
@@ -56,7 +56,7 @@ function useAuthorizedRequest(): Request {
     // Same-origin API: the route defines this shape.
     const typed: T = data;
     return typed;
-  }, [wallet]) as Request;
+  }, [getAccessToken]) as Request;
 }
 
 export function MyHome({ area, go, openConnections, openDemo }: { area: Area; go: (area: Area) => void; openConnections: () => void; openDemo: () => void }) {
@@ -791,6 +791,7 @@ function TestTools({ role, tenancies, listings, request, helper, busy, log }: {
 function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomic: string) => void }) {
   const wallet = useRentalWallet();
   const [view, setView] = useState<PortfolioView | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [purchase, setPurchase] = useState<'none' | 'pending'>('none');
@@ -806,16 +807,21 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
       .then(({ result }) => { if (active && result.state === 'pending') setPurchase('pending'); })
       .catch(() => {});
     let retry: ReturnType<typeof setTimeout> | undefined;
-    request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio')
-      .then(({ portfolio }) => {
+    async function loadPortfolio() {
+      try {
+        const { portfolio } = await request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio');
         if (!active) return;
         setView(portfolio.available ? portfolio : null);
         if (portfolio.available) onBalance(portfolio.testUsdcAtomic);
-      })
-      .catch(() => {
-        // Busy public RPC: try again shortly instead of hiding the portfolio.
-        if (active) retry = setTimeout(() => active && refresh().catch(() => {}), 8000);
-      });
+        setUnavailable(false);
+        if (portfolio.available && portfolio.referencePriceStale) retry = setTimeout(loadPortfolio, 60_000);
+      } catch {
+        if (!active) return;
+        setUnavailable(true);
+        retry = setTimeout(loadPortfolio, 8000);
+      }
+    }
+    void loadPortfolio();
     return () => { active = false; clearTimeout(retry); };
   }, [request, onBalance, refresh]);
   useEffect(() => {
@@ -860,7 +866,12 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
     }, 4000);
     return () => { active = false; clearInterval(timer); };
   }, [purchase, request, refresh, signedAttempt]);
-  if (!view) return null;
+  if (!view) return unavailable ? (
+    <section className="card portfolio-card" role="status">
+      <h2>Invest · stocks on Solana</h2>
+      <p>Test-network portfolio temporarily unavailable; retrying…</p>
+    </section>
+  ) : null;
   async function invest() {
     if (busy || purchase === 'pending') return;
     setBusy(true);
@@ -910,9 +921,11 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
         <h2>Invest · stocks on Solana</h2>
         <Badge tone="neutral">Devnet test market · no value</Badge>
       </div>
+      {unavailable && <p className="note" role="status">Test-network portfolio temporarily unavailable; retrying…</p>}
+      {view.referencePriceStale && <p className="note" role="status">Reference price as of {new Date(view.referencePriceObservedAt).toLocaleString()}; live price temporarily unavailable. Investing resumes when refreshed.</p>}
       <dl className="journey-facts">
         <div><dt>tSPYx (S&amp;P 500 copy)</dt><dd>{view.shares.toFixed(6)} shares</dd></div>
-        <div><dt>Value at live SPYx price</dt><dd>${view.valueUsd.toFixed(2)}</dd></div>
+        <div><dt>{view.referencePriceStale ? 'Value at last known SPYx price' : 'Value at recent SPYx price'}</dt><dd>${view.valueUsd.toFixed(2)}</dd></div>
         <div><dt>Simulated distributions so far</dt><dd>{((view.multiplier - 1) * 100).toFixed(2)} %</dd></div>
         <div><dt>Test USDC available</dt><dd>{money(view.testUsdcAtomic)}</dd></div>
       </dl>
@@ -920,7 +933,7 @@ function Portfolio({ request, onBalance }: { request: Request; onBalance: (atomi
         Deposit earnings above the required deposit are yours to invest. Devnet lending pays no interest, so you can
         invest your own test USDC here. Distributions raise your displayed shares, as they do for xStocks.
       </p>
-      <button className="button primary" disabled={busy || purchase === 'pending' || BigInt(view.testUsdcAtomic) < 5_000_000n} onClick={invest}>
+      <button className="button primary" disabled={busy || purchase === 'pending' || view.referencePriceStale || BigInt(view.testUsdcAtomic) < 5_000_000n} onClick={invest}>
         {busy ? <Loader2 className="spin" size={16} /> : null} {purchase === 'pending' ? 'Purchase pending, checking' : 'Invest 5 test USDC'} <ArrowRight size={16} />
       </button>
       {message && <p className="note" role="status">{message}</p>}

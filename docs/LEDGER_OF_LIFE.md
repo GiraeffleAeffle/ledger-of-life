@@ -127,6 +127,14 @@ views do not appear in the signed-in areas. Test-only shortcuts, including simul
 people/listings, sit in one collapsible **Test tools** panel in Home; actions on one's own tenancy remain
 in its card.
 
+Money's Solana and Robinhood test stocks use read-only Jupiter reference prices. Server reads share one
+in-flight request per mint and cache quotes for 60 seconds; an upstream throttle retains the last good
+price with its original observation time and waits another minute before trying again. Without a prior
+quote, the affected holding shows a temporary-unavailability state and retries rather than displaying a
+partial portfolio total or a raw JSON error. Stale prices are labeled and disable test buy controls;
+Solana buy preparation also requires a current quote. Solana portfolio chain reads coalesce per wallet
+for four seconds, and Home's solar-only tile skips stock reads.
+
 ## 4. Adapters: one contract, then a decision
 
 ### 4.1 Common contract
