@@ -86,7 +86,7 @@ concepts:
     open_ended: true   # kinds are examples, not a closed list; a life has many more
     kinds:
       tenancy: {reality: testnet_real, note: "Agreement plus escrow; the only context built today."}
-      city: {reality: live_readonly, note: "Built: 'What is changing in <city>' reads the Stadtstack project atlas read model (atlas-city-read-model-v1, STADTSTACK_ATLAS_URL) for the EU-wallet city (opt-in address.locality) or a chosen city; shows open consultations and latest changes with the atlas's as-of date and review state. The atlas owns collection and review; council data upstream can come from CCF (komma-systems/ccf, OParl)."}
+      city: {reality: read_only_live, note: "Built: 'What is changing in <city>' reads the Stadtstack project atlas read model (atlas-city-read-model-v1, STADTSTACK_ATLAS_URL) for the EU-wallet city (opt-in address.locality) or a chosen city; shows open consultations and latest changes with the atlas's as-of date and review state. The atlas owns collection and review; council data upstream can come from CCF (komma-systems/ccf, OParl)."}
       house_community: {reality: roadmap, note: "Shared building costs; ties to ServiceChargeAccount."}
       examples: [work/employer, health/insurer, mobility, family, learning, club, bank, energy supplier]
     rules:
