@@ -4,13 +4,15 @@ The machine-readable source of truth is [`ontology.yaml`](ontology.yaml). This p
 
 **Thesis.** Money and assets that everyday life forces people to lock away (rental deposits first) should keep working for their owner, without weakening the protection they exist for.
 
+**Positioning (decided 2026-09-26).** A household-ownership app. Your verified identity is the root, and everything you own, rent or run attaches to it through adapters. The rental deposit is the first and most complete building block.
+
 **The app in one sentence.** A home-centred app that shows everything you own. It secures rental deposits in escrows that earn, lets tenants claim and invest those earnings, and connects the other things a household owns that produce value.
 
 ## Six layers
 
 | Layer | Question it answers | Concepts |
 | --- | --- | --- |
-| 1. Identity | Who is acting, and with which keys? | Person, Wallet, IdentityAssurance |
+| 1. Identity | Who is acting, with which keys, and what may others learn? | Person, Wallet, IdentityAssurance, Credential, DisclosurePolicy |
 | 2. Homes | Which home, which terms, who is involved? | Home, Listing, Application, Agreement, Role |
 | 3. Custody | Where is the deposit, and who may move it? | Escrow, Operation, Claim, Settlement, Payout |
 | 4. Earnings | What does the locked deposit earn? | YieldSource, Earnings, Release |
@@ -72,6 +74,7 @@ sequenceDiagram
 - **Roles come from agreements.** The "Who are you?" choice in onboarding is a display preference, not a permission.
 - **The tenant's portfolio is theirs.** Landlord and arbitrator have no authority beyond the escrow.
 - **Adapters are read-only**, and their credentials stay on the server.
+- **Privacy by predicates.** Others learn facts ("verified adult, income at least 3× rent"), not documents. No personal data goes on-chain, and identity is never linked to a wallet address on-chain.
 - **Everything shown has a reality level** (below). Never present simulated or illustrative values as real.
 
 ## How real each part is (2026-09-26)
@@ -117,5 +120,5 @@ In each tenancy phase exactly one person has an action; everyone else sees what 
 1. **Name and positioning:** is this a deposit product with a portfolio, or a household-ownership app whose first adapter is the rental deposit?
 2. **Home shares:** which issuer or legal wrapper (a Germany-compatible security), and is "down-payment credit" enough for the vision?
 3. **Device income:** stay read-only, or pilot selling future solar or validator income (regulatory scope)?
-4. **Identity:** EUDI Wallet pilot versus German eID via a provider for tenant verification.
+4. **Identity:** EUDI Wallet pilot versus German eID via a provider. The EUDI framework offers selective disclosure (SD-JWT VC, mdoc) but no zero-knowledge proofs yet; income thresholds without revealing income need them.
 5. **Mainnet path:** which network holds the first real deposit, and which yield source and stock venue are eligible there?

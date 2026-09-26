@@ -10,6 +10,10 @@ product:
   thesis: >-
     Money and assets that everyday life forces people to lock away (rental deposits first)
     should keep working for their owner, without weakening the protection they exist for.
+  positioning: >-
+    Decided 2026-09-26: a household-ownership app. The person's verified identity is the root;
+    everything they own, rent or run is attached through adapters. The rental deposit is the
+    first and most complete building block.
   one_sentence: >-
     A home-centred app that shows everything you own, secures rental deposits in escrows that
     earn, lets tenants claim and invest those earnings, and connects the other things a
@@ -27,7 +31,7 @@ reality_levels:
 
 layers:  # product architecture, bottom-up
   - id: identity
-    concepts: [Person, Wallet, IdentityAssurance]
+    concepts: [Person, Wallet, IdentityAssurance, Credential, DisclosurePolicy]
   - id: homes
     concepts: [Home, Listing, Application, Agreement, Role]
   - id: custody
@@ -62,6 +66,23 @@ concepts:
       backup_email_and_recovery_proof: testnet_real   # skipped in local demo mode (DEMO_SKIP_RECOVERY=1)
       eu_digital_identity_wallet: roadmap              # EUDI Wallet, eIDAS 2.0; German eID as interim
     code: [src/server/recovery.ts, src/components/onboarding.tsx]
+
+  Credential:
+    definition: A signed attestation about a Person (identity, age, income band, rental history) held in the Person's own wallet, for example the EU Digital Identity Wallet.
+    formats:
+      sd_jwt_vc: {reality: roadmap, note: "Selective disclosure; linkable across presentations unless issued in single-use batches."}
+      iso_mdoc: {reality: roadmap, note: "Selective disclosure; same linkability caveat."}
+      zero_knowledge_predicate: {reality: roadmap, note: "For example 'income >= 3x rent' without revealing income. Not in the EUDI framework yet (an open discussion topic)."}
+    relations: {held_by: Person, presented_to: Person (verifier role in an Agreement or Listing)}
+
+  DisclosurePolicy:
+    definition: What each party may learn about another, stated as predicates rather than raw data.
+    rules:
+      - A landlord learns only predicates needed for a decision (verified person, adult, income band), never raw documents.
+      - No personal data on-chain. Agreements are hashed; identity is never linked to a wallet address on-chain.
+      - For real deposits use a fresh wallet address per tenancy (chains are public).
+      - Adapter data stays server-side; share derived facts, not raw readings.
+    reality: roadmap   # the on-chain and adapter rules already hold; predicate disclosure is not built
 
   Role:
     definition: The relation between a Person and an Agreement. One of tenant, landlord, arbitrator.
