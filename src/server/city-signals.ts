@@ -1,5 +1,5 @@
 import 'server-only';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 export type Coordinate = [number, number];
@@ -39,12 +39,47 @@ export type CityFeature = Signal | SignalSummary;
 export interface CityCollection { type: 'FeatureCollection'; features: CityFeature[] }
 export interface SignalCity {
   id: string; name: string; state: string; center: Coordinate; bbox: [number, number, number, number];
-  minUrl?: string; minBytes?: number; fullBytes?: number;
+  minUrl?: string; minBytes?: number; fullBytes?: number; feedUrl?: string;
   sources: { id: string; kind: string; publisher: string; url: string; licence: string; reuse: string; retrievedAt: string }[];
 }
 export interface SignalCatalogue { schemaVersion: 'stadtstack-signals-v1'; generatedAt: string; cities: SignalCity[] }
 export interface CitySignals { catalogue: SignalCity; coveredCities: SignalCity[]; generatedAt: string; signals: CityCollection; changes: { added: string[]; changed: string[]; removed: string[] } }
 export type SignalResult = { state: 'covered'; data: CitySignals } | { state: 'not_covered'; city: string; coveredCities: SignalCity[] };
+export interface CityFeedItem {
+  id: string; kind: 'news' | 'event'; title: string; url: string; publisher: string;
+  publishedAt: string; eventStart: string | null; sourceId: string; reuse: string;
+  retrievedAt: string; reviewState: string;
+}
+export interface CityFeed {
+  schemaVersion: 'stadtstack-feed-v1'; cityId: string; generatedAt: string;
+  sources: { id: string; kind: 'press' | 'events'; publisher: string; url: string; licence: string; reuse: string; retrievedAt: string; status: string; pageUrl?: string }[];
+  items: CityFeedItem[];
+}
+export type CityFeedResult =
+  | { state: 'available'; cityId: string; cityName: string; feed: CityFeed }
+  | { state: 'not_available'; cityId: string; cityName: string };
+export interface RegionalTopicItem {
+  title: string; url: string; date: string | null; sourceType: 'planningProcedure' | 'cityWebsite' | 'councilAgenda';
+  locator: string; stage: string;
+}
+export interface RelevantRegionalTopic {
+  id: string; label: string; summary: string; reviewState: 'candidate' | 'auto_checked' | 'reviewed';
+  stage: string; items: RegionalTopicItem[];
+  neighbours: { name: string; stage: string; source: RegionalTopicItem }[];
+}
+interface RegionalPublication {
+  schemaVersion: 'stadtstack-regional-topics-v1';
+  region: { id: string; name: string };
+  cityRegions: Record<string, string>;
+  municipalities: { id: string; name: string }[];
+  topics: {
+    id: string; label: string; summary: string; reviewState: RelevantRegionalTopic['reviewState'];
+    municipalities: { municipalityId: string; stage: string; items: RegionalTopicItem[] }[];
+  }[];
+}
+export type RegionalTopicResult =
+  | { state: 'available'; regionName: string; cityId: string; topics: RelevantRegionalTopic[] }
+  | { state: 'not_available'; cityId: string };
 
 // mtime and file path are both part of the key: switching STADTSTACK_DATA_DIR never serves an old city.
 const files = new Map<string, { mtimeMs: number; size: number; value: unknown }>();
@@ -83,4 +118,48 @@ export async function readCitySignal(cityId: string, signalId: string): Promise<
   const signals = await jsonFile<SignalCollection>(join(dataDirectory(), 'cities', city.id, 'signals.geojson'));
   if (signals.type !== 'FeatureCollection' || !Array.isArray(signals.features)) throw new Error('Invalid city signals collection.');
   return signals.features.find((feature) => feature.properties.id === signalId) ?? null;
+}
+
+export async function readCityFeed(cityId: string): Promise<CityFeedResult> {
+  const catalogue = await readSignalsCatalogue();
+  const city = catalogue.cities.find((entry) => entry.id === cityId && /^[a-z0-9-]+$/.test(entry.id));
+  if (!city || !city.feedUrl) return { state: 'not_available', cityId, cityName: city?.name ?? cityId };
+  // A catalogue entry, never request input, selects the only allowed feed path.
+  if (city.feedUrl !== `cities/${city.id}/feed.json`) throw new Error('Invalid city feed path.');
+  const feed = await jsonFile<CityFeed>(join(dataDirectory(), city.feedUrl));
+  if (feed.schemaVersion !== 'stadtstack-feed-v1' || feed.cityId !== city.id || !Array.isArray(feed.sources) || !Array.isArray(feed.items))
+    throw new Error('Invalid city feed publication.');
+  return { state: 'available', cityId: city.id, cityName: city.name, feed };
+}
+
+/** An optional published region applies only to cities explicitly named in its manifest. */
+export async function readRegionalTopics(cityId: string): Promise<RegionalTopicResult> {
+  if (!/^[a-z0-9-]+$/.test(cityId)) return { state: 'not_available', cityId };
+  const directory = join(dataDirectory(), 'regions');
+  const regions = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
+  for (const entry of regions) {
+    if (!entry.isDirectory() || !/^[a-z0-9-]+$/.test(entry.name)) continue;
+    const published = await jsonFile<RegionalPublication>(join(directory, entry.name, 'topics.json'));
+    if (published.schemaVersion !== 'stadtstack-regional-topics-v1' || published.region?.id !== entry.name ||
+      !Array.isArray(published.topics) || !Array.isArray(published.municipalities) || !published.cityRegions || typeof published.cityRegions !== 'object')
+      throw new Error('Invalid regional topics publication.');
+    if (published.cityRegions[cityId] !== entry.name) continue;
+    const names = new Map(published.municipalities.map((municipality) => [municipality.id, municipality.name]));
+    const topics = published.topics.flatMap((topic) => topic.municipalities
+      .filter((municipality) => municipality.municipalityId === cityId && municipality.items.length)
+      .map((municipality) => ({
+        id: topic.id, label: topic.label, summary: topic.summary, reviewState: topic.reviewState,
+        stage: municipality.stage, items: municipality.items,
+        neighbours: topic.municipalities.flatMap((other) => {
+          const name = names.get(other.municipalityId);
+          return name && other.municipalityId !== cityId && other.items[0]
+            ? [{ name, stage: other.stage, source: other.items[0] }] : [];
+        }),
+      })));
+    return { state: 'available', regionName: published.region.name, cityId, topics };
+  }
+  return { state: 'not_available', cityId };
 }
