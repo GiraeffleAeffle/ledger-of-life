@@ -14,9 +14,9 @@ The rental deposit is the first complete building block. The bigger frame is
 [Stadtstack](https://stadtstack.giraeffleaeffle.chatgpt.site): this app is the personal entry point into a
 city that perceives, decides, acts and learns.
 
-## 2. One person's overview
+## 2. One person's life
 
-Everything a person sees fits into five areas. Each concept has exactly one home.
+Five domains organise the person’s life below; **Today** is the news-first entry point across them, while **Ideas** keeps future work separate. “Have a say” lives in Places rather than a duplicate navigation area.
 
 ```mermaid
 flowchart TB
@@ -106,10 +106,11 @@ is illustration or test network and labeled as such.
 
 ### 2.5 Newcomer welcome (clubs partly built; remainder roadmap)
 
-Places shows named OSM clubs and sports facilities for a chosen or EU-wallet city, plus links to
-Strausberg's city and district directories. These OSM contributions are not an official directory.
-Registration help, interest matching, city-partner offers and a welcome voucher are still planned;
-interests would stay with the person and matching would require explicit consent.
+Places shows named OSM clubs and sport places in the published city map, plus a separate live
+Overpass list only for leisure facilities without those tags. Strausberg's city and district
+directories remain outbound links. OSM contributions are not an official directory.
+Registration help, city-partner offers and a welcome voucher are still planned; interest
+ranking is on-device.
 
 ### 2.6 Personal city map (built; public signal coverage varies)
 
@@ -141,10 +142,11 @@ its category is switched on. Optional sport/kids/shops/health/culture interests,
 **on this device only**, rank matching places and council items by title/category.
 MapLibre clusters points by kind and loads polygons only at street-level zoom. Feature
 cards fetch the full record and show source locators, as-of date, review state
-(`candidate` means **not yet reviewed**), geometry precision and an LLM faithfulness
-score when present. Source status is retained for provenance; expired consultations
-are **closed**, and past roadworks are **ended (scheduled end; completion not verified)**.
-Coverage is not a complete inventory.
+(`candidate` means **Not yet checked**), geometry precision and the publisher's extraction
+metadata when present. Official sensors and city news are automatically attributed; only
+our own interpretations require human review. Source status is retained for provenance;
+expired consultations are **closed**, and past roadworks are **ended (scheduled end;
+completion not verified)**. Coverage is not a complete inventory.
 
 ## 3. How the app should be organised
 
@@ -161,16 +163,17 @@ Coverage is not a complete inventory.
 
 | Navigation item | Contains | Moves from |
 |---|---|---|
-| **Overview** | Identity line, portfolio total, the one next step across all areas, compact \"Near you / in your city\" counts and top sourced signals matched on-device | Page heading, identity strip, portfolio total |
+| **Today** | Latest dated headlines from the selected city's published official press feed; one real Home action if any; device-local meaningful differences from the last visit; regional topics only when a published region names this city; quiet Home and Money things, including wallet and contract-held test positions | Replaces five generic preview tiles |
 | **Me** | Identity and credentials, roles derived per context (agreement party, owned listing, chosen or wallet city), life timeline with an on-demand earlier-place form, connected adapters and their permissions | Identity strip details, adapter settings |
 | **Home** | Active tenancies with a journey that stops at "Living here" until move-out starts, compact past tenancies, on-demand find/rent actions, service charges, home energy | Tenancy cards, Homes card, solar tile |
-| **Money** | All holdings in one list (deposit entitlement, stocks per network, validator, later local investments), earnings, invest actions | Portfolio tiles, Invest card, Robinhood tile, validator tile |
-| **Places** | Map-first private home/work neighbourhood, straight-line commute and city-wide signals (MapLibre, OpenFreeMap tiles); then existing atlas, weather/air, OSM clubs, money-flow explainer, official directories and wider-scale links | City card |
-| **Ideas** (or "Coming") | Roadmap items, clearly separate and labeled | Dashed roadmap tiles |
+| **Money** | Deposit entitlement, stocks per network, validator, test share-backed deposit and borrowing workflows, earnings and illustrated local investments; wallet shares plus shares held by test contracts and loan debt are counted once at the stated test market price | Portfolio tiles, Invest card, Robinhood tile, validator tile |
+| **Places** | Published city news/events and a sourced personal MapLibre map; chosen city picker, live weather/air, OSM leisure-only gaps, compact budget facts with the long legal explainer behind details, official links and wider-scale context | City card, single map source of city signals |
+| **Ideas** | Future work and illustrations clearly separate from working areas, available from both desktop and mobile navigation | Former repeated “More to build” cards |
 
-Built: the sidebar and the mobile tab bar show these areas; each renders only its own content. Remaining
-roadmap work appears in a dashed "More to build in this area" box that links to **Ideas** (one list in
-`src/components/ideas.tsx`); illustrations are labeled separately. Each real tenancy in **Home** has a
+The sidebar and mobile tab bar show all six areas, including Ideas. Each working concept has one
+destination: Today leads with news rather than duplicate city/identity cards, Places owns the
+single city map and dated feed, and Ideas owns the roadmap instead of repeated in-area boxes.
+Each real tenancy in **Home** has a
 read-only detail for its agreement terms,
 claim/settlement state, shared evidence and test-network operations from that tenancy's authenticated
 records. The fictional workflow stays in a separate **Explore demo · made-up people** entry; its internal
@@ -196,6 +199,24 @@ quote, the affected holding shows a temporary-unavailability state and retries r
 partial portfolio total or a raw JSON error. Stale prices are labeled and disable test buy controls;
 Solana buy preparation also requires a current quote. Solana portfolio chain reads coalesce per wallet
 for four seconds, and Home's solar-only tile skips stock reads.
+
+The independent Robinhood share-backed test deposit and loan use a **simulated per-wallet test
+oracle price**, not the Jupiter reference quote. Money and Today count wallet shares/cash,
+pledged deposit value and loan collateral, then subtract open loan debt. When workflow positions
+cannot be read or the route is disabled, the prior wallet-only total is explicitly labeled
+“workflow positions unavailable”; it is not silently treated as a complete balance.
+
+The published city press feeds live at `cities/<cityId>/feed.json` for eight covered cities.
+Today shows only official press news with publisher, date and source link; Places also lists
+dated events, displaying an event start only when supplied. A city with no imported news shows
+“No news feed from <city> yet” and its official page link rather than fabricated headlines.
+One published regional file, `regions/brandenburg-mol/topics.json`, supplies candidate topics
+only for municipalities explicitly named by that region; Today previews local source items and
+Places links related municipalities with their own dates and stages. No decision is implied unless
+its sourced stage is adopted. Device-only visit snapshots compare public signal status, review,
+dates, details and precision, plus dated feed additions/corrections; news already in Today’s
+three headline leads is not repeated as a change. Version hashes and feed retrieval timestamps
+alone do not count; home/work pins never enter a snapshot or an API request.
 
 ## 4. Adapters: one contract, then a decision
 
@@ -227,9 +248,9 @@ Today each connection is built differently (`adapters.ts`, `eudi.ts`, `city.ts`,
 | Rental deposit escrow (Solana) | Home | Built | **Keep**, core story |
 | Stocks: Solana (tSPYx) | Money | Built | **Keep**, merge the two portfolio views |
 | Stocks: Robinhood Chain (TSLA) | Money | Built | **Keep** as second network; decide if the pitch needs two chains |
-| Stadtstack atlas (city projects) | Places | Built, read-only live | **Keep** atlas provenance and review state |
+| Stadtstack city data | Today, Places | Published city press feeds for eight cities, city map signals with source/review/precision and optional regional candidate topics when relevant; separate project atlas link | Show dated sources, “Not yet checked” interpretations and honest no-feed states |
 | DWD via Bright Sky and sensor.community | Places | Read-only live weather and nearby uncalibrated citizen PM sensors | **Keep** times, distances, licences and stale labels; no city-wide air-quality claim |
-| OSM clubs and sports via Overpass | Places | Read-only live named objects, not an official directory | **Keep** ODbL attribution and official Strausberg directory links; no partner offer implied |
+| OSM sports and leisure | Places | Published map contains OSM club and sport tags; live Overpass adds only leisure-tagged facilities absent from that pipeline | **Keep** ODbL attribution, gap labeling and official Strausberg directory links |
 | Public money flow and Strausberg budget access | Places | Sourced statutory explainer and ordinance headline **planned** investment outlays (2025 €17,941,270; 2026 €12,609,320), no actual spending or detailed project allocations | Obtain complete plan and reuse terms before a spending breakdown |
 | From your street to the world | Places | Personal map's home-neighbourhood, city and approximate straight-line commute matching built; district/state/country/EU links remain illustration | Expand reviewed city coverage, then wider-scale feeds |
 | Council decisions | Places | Strausberg ALLRIS links only; where the public signals feed covers other cities, distinguish sourced papers/meetings from adopted decisions | Reviewed/rights-cleared council data and explicit decisions |
@@ -239,7 +260,8 @@ Today each connection is built differently (`adapters.ts`, `eudi.ts`, `city.ts`,
 | Real-time service charges | Home | Prototype example statement with landlord-set test prepayment, optional live daily Home Assistant consumption; no escrow funding or payouts | **Next**: authorized meters, invoices and escrow settlement |
 | Local investments | Money | Illustration: four legal forms and unverified Strausberg cooperative leads; no offers or investment | **Later**: verify providers and find a licensed partner |
 | Newcomer welcome | Places | Partly built: live OSM clubs and official directories; no matching, registration or voucher | **Later**: city partners and consent-based matching |
-| Stocks as the deposit | Home | Prototype: 150 % collateral calculator and Robinhood Chain testnet contract; no pledge flow | **Park** real integration pending legal and security review |
+| Shares as a test deposit | Money | Working Robinhood Chain testnet pledge, simulated price drop, top-up or protective sale, move-out claim and return of remaining shares; separate from the Solana tenancy | Keep simulated test market price and test-only custody explicit |
+| Borrow against test shares | Money | Working TestLendingPool with operator-funded test USD, per-wallet simulated test oracle, 50 % max LTV and liquidation at 80 % | Count loan collateral and open debt in wallet totals without double-counting |
 | Home tokens towards owning | Money | Planned; part of local investments | **Park** until legal wrapper and partner exist |
 | EV and device tokenization | Money | Planned | **Park** |
 

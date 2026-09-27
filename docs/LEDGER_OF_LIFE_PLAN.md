@@ -10,7 +10,7 @@ Build plan · 27 September 2026 · owner decisions applied after the [signed-in 
 - **What should finance show?** A coherent **“what your shares can do”** workflow, even with fake test stock and test tokens; borrowing, city investment, home shares and welcome vouchers can be illustrated rather than parked for legal reasons. State exactly which balances and outcomes are simulated.
 - **What should Ledger reuse?** Keep `stadtstack-data`'s city feed/signals and the atlas interpretation separate from Ledger's private, device-side relevance. Do not add a new hosted city platform to build the cockpit.
 
-## The cockpit: Heute
+## The cockpit: Today
 
 One column on desktop and 390 px: official news **first**, then one required action, 1–3 meaningful personal changes, conditional regional topics and a quiet test-money/adapter line. No duplicate mini-dashboards, mandatory map or roadmap tile. A first visit establishes history rather than inventing unread changes; a failed check remains visibly unavailable rather than “nothing happened.”
 
@@ -18,12 +18,12 @@ One column on desktop and 390 px: official news **first**, then one required act
 | --- | --- |
 | 1. **Your city today** | **New:** read `feed.json` through a city-only API and show the top three official **press** headlines, publisher, publication date and outbound link. Never reproduce article text; if uncovered, show a source link or honest no-coverage state. |
 | 2. **Needs you** | **Built:** `/api/journey` and `/api/listings` know tenancy/applicant steps. Show one actual action linked to Home, otherwise “Nothing needs you today”; test earnings are labelled simulated. |
-| 3. **Since your last visit** | **Built:** `/api/city-signals` public ID/version/review/precision and browser relevance matching. **Missing:** successful per-device comparison of meaningful fields, including feed items and review-only changes. At most 1–3 qualified, dated changes; unreviewed interpretations say **“Not yet checked”**. |
-| 4. **In your region** | **Conditional:** consume published shared topics from `out/regions/<regionId>/topics.json` once available. Show only topics relevant to the person across neighbouring municipalities, with municipal source/date and a Places detail link; hide the entire row until real region data exists. Relevance matching stays on-device. |
-| 5. **Your things** | **Built:** Home deposit/claim, test shares, solar and validator (`/api/journey`, `/api/portfolio`, `/api/assets`). **Missing:** one quiet summary and relevant adapter failure, not a portfolio clone. Do not sum ETH and test USD or show partially loaded totals as complete. |
+| 3. **Since your last visit** | Public city signals and feed items are compared per account/city in browser storage. Review, public details, dates and precision count; version hashes and retrieval-only changes do not. News already in the three headline leads is not duplicated. At most 1–3 changes; unreviewed interpretations say **“Not yet checked”**. |
+| 4. **In your region** | **Conditional:** read published topics from `out/regions/<regionId>/topics.json` only where the file names the selected city. Show a sourced local item, related municipalities with their distinct stages and a Places detail link; no regional row without relevant published topics. No pins leave the device. |
+| 5. **Your things** | A quiet Home summary and complete Money total combine wallet and contract-held test positions minus open debt; if a workflow route fails, wallet-only values are visibly qualified. Never sum ETH and test USD or show a partially loaded total as complete. |
 
 ```text
-HEUTE                               Strausberg · city you chose
+TODAY                               Strausberg · city you chose
 ┌ Your city today: 3 official press headlines        → Places ┐
 ├ Needs you: one step / Nothing needs you today        → Home ┤
 ├ Since your last visit: 1–3 qualified changes      → Places ┤
@@ -37,21 +37,21 @@ HEUTE                               Strausberg · city you chose
 
 ## Information architecture: one detailed home per fact
 
-A preview in Heute may point to detail, but no second editable/authoritative representation. Collapse other content until requested.
+A preview in Today may point to detail, but no second editable/authoritative representation. Collapse other content until requested.
 
 | Information | Single detail home; what to remove, merge or move |
 | --- | --- |
-| Adult proof, chosen city, contextual roles, wallet and connection permissions | **Me**. Say “city you chose” unless residence verified. Move read-only adapter credential/settings forms here; Home and Money show readings and link to the *one* settings location. Heute shows proof only if an action requires it. |
+| Adult proof, chosen city, contextual roles, wallet and connection permissions | **Me**. Say “city you chose” unless residence verified. Move read-only adapter credential/settings forms here; Home and Money show readings and link to the *one* settings location. Today shows proof only if an action requires it. |
 | Current/past tenancy, agreement, deposit, claim, simulated earnings, service-charge example, home solar reading | **Home**. Money links to a deposit entitlement, not a second claim action. Me's timeline is compact history linking here. |
-| Test stocks/cash, buys, validator, local-investment illustrations | **Money**. Merge duplicate Solana holding and Invest/buy card; do not show the partial $1.16 total while quotes load. Test assets have no redeemable value; keep reference prices and ETH units distinct. |
+| Test stocks/cash, buys, validator, local-investment illustrations, share-backed deposit and loan | **Money**. Merge duplicate Solana holding and Invest/buy card; count Robinhood wallet shares/cash plus contract-held deposit and loan collateral minus debt exactly once at the test market price. Do not show a partial total while quotes or workflow positions load; if workflow reading fails, show wallet-only values and an explicit unavailable state. Test assets have no redeemable value; keep reference prices and ETH units distinct. |
 | Planning/works/consultations, council **papers/meetings**, OSM places, budget facts | **Places**: one feed/list, optional three-ring map and sourced detail. Show each atlas project signal once, link curated atlas context. Pipeline OSM should replace live Overpass clubs **only after** category/coverage/ODbL parity. Put planned budget/tax explanation behind one detail; ALLRIS links are papers, not decisions. Weather/PM are dated point readings, not whole-city conditions; district/state/EU links stay optional. |
-| News/events and shared regional topics | **Places** owns a single city feed with sourced headlines, publisher, publication date and link; event date appears only when `eventStart` exists, otherwise label “published <date>”. Today previews three **official press** headlines; a separate conditional region preview links to one Places detail. No full article text or invented event occurrence. |
-| Roadmap and prototypes | **Ideas**, clearly separated; remove repeated “More to build in this area” and built-map cards. Mobile Ideas already has an in-area link—preserve it when removing repeated cards; consider a visible navigation route. |
-| Personal daily priorities and previews | **Heute (former Overview)** only: city press leads; one Home action; locally compared change(s); conditional region topics; quiet things. Remove duplicate atlas city summary, “Near you” list, standalone identity tile and portfolio total. |
+| News/events and shared regional topics | **Places** owns a single city feed with sourced headlines, publisher, publication date and link; event date appears only when `eventStart` exists, otherwise label “published <date>”. Today previews three **official press** headlines; a separate conditional regional preview links to Places detail. No full article text or invented event occurrence. |
+| Roadmap and prototypes | **Ideas**, clearly separated; remove repeated “More to build in this area” and built-map cards. Keep Ideas in the mobile tab bar. |
+| Personal daily priorities and previews | **Today (former Overview)** only: city press leads; one Home action; locally compared change(s); conditional regional topics; quiet things including an accurate Money total. Remove duplicate atlas city summary, “Near you” list and standalone identity tile. |
 
 ## Shares and deposit: honest illustrated workflow
 
-**Working pieces:** Solana's signed-in test-USDC tenancy supports simulated earnings claims; its separate tSPYx buy spends wallet funds. Robinhood test actors can simulate yield and a signed test-TSLA purchase. A stock-collateral contract cycle was scripted, but no signed-in app workflow links these pieces. The new Money component owns the demonstration; Today only links to it.
+**Working pieces:** Solana's signed-in test-USDC tenancy supports simulated earnings claims; its separate tSPYx buy spends wallet funds. Robinhood test actors can simulate yield and a signed test-TSLA purchase. Money's independent share workflow demonstrates a pledged illustrated deposit and a test-USD loan against shares; its test oracle price is simulated per wallet. Today only links to Money and includes those contract-held positions in its quiet total.
 
 1. **Earn and hold:** show simulated test earnings → claim → wallet receipt → purchase of test shares, with balances and transaction order. Fungible funds cannot prove a specific earnings coin funded shares; disclose extra test funds.
 2. **Show what shares can do:** for a *new* illustrated tenancy, show a landlord accepting fake test stock as deposit security, a 150% example buffer, pledged versus spendable shares and a price-change/top-up outcome. This is a workflow sketch, not a claim that today's Solana tSPYx bridges to Robinhood TSLA or that operator-held test signers are the logged-in parties.
@@ -90,11 +90,11 @@ Queue **our own** low-scoring, ambiguous, conflicting or consequential interpret
 | Welcome to your new city (partly built) | **Now** OSM discovery with private interests; **next** illustrated welcome vouchers/test-token offers without partner claims. |
 | Cockpit + personal last-visit changes (new) | **Now** official city press leads, personal comparison, conditional region row and quiet things. |
 | City events and news (new) | **Now** official press feed in Today and dated city news/events list in Places; event start only when sourced. |
-| Borrow against stocks to fund deposit (new) | **Next** illustrated borrowing/repayment/price-drop scenario, separate from direct stock pledge. |
+| Borrow against stocks to fund deposit (new) | **Now** illustrated testnet borrowing/repayment/price-drop scenario, separate from direct stock pledge. |
 
 ## Build order: five reviewable slices
 
-1. **Today led by official news.** City-only feed API, three official press headlines, one existing Home action, quiet things and honest no-coverage/error states in one column at desktop and 390 px. “Not yet checked” remains visible for unreviewed interpretations. No Money component changes here.
+1. **Today led by official news.** City-only feed API, three official press headlines, one existing Home action, quiet things and honest no-coverage/error states in one column at desktop and 390 px. “Not yet checked” remains visible for unreviewed interpretations. Today reads Money's public test-position values without duplicating its action flow.
 2. **Meaningful return visit.** Device-side account/city baseline and acknowledgement, user-facing field/review changes (not hash churn), first/return visit, pin re-ranking and outage recovery. Add the **In your region** card when published topics exist; otherwise render no row and never upload pins.
 3. **Places feed and information-architecture cleanup.** One news/events list from published city feed; attributed headline, publication date and source link; event date only with `eventStart`. Show each atlas project once, reconcile pipeline versus Overpass place categories, tuck budget explanation behind detail, rename council papers/meetings, remove duplicated roadmap boxes and use plain-language status/precision labels. Preserve mobile Ideas access.
 4. **Money workflow (separate owner).** Demonstrate test earnings → shares → illustrated new-deposit pledge, then an independent share-backed loan example, with accurate test values and transitions. The new `money-area.tsx` belongs to that worker.
