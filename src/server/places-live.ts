@@ -156,7 +156,7 @@ async function loadAir({ lat, lon }: Coordinates): Promise<AirQuality> {
 
 async function loadClubs(city: string): Promise<Clubs> {
   const safeName = city.replace(/["\\\[\]]/g, '');
-  const query = `[out:json][timeout:8];area["name"="${safeName}"]["boundary"="administrative"]["admin_level"="8"]->.city;(nwr(area.city)["club"]["name"];nwr(area.city)["sport"]["name"];nwr(area.city)["leisure"~"^(sports_centre|fitness_centre|sports_hall|stadium|pitch|swimming_pool)$"]["name"];);out center;`;
+  const query = `[out:json][timeout:8];area["name"="${safeName}"]["boundary"="administrative"]["admin_level"="8"]->.city;(nwr(area.city)["leisure"~"^(sports_centre|fitness_centre|sports_hall|stadium|pitch|swimming_pool)$"]["name"];);out center;`;
   let url = '';
   let elements: { type: string; id: number; tags?: Record<string, string> }[] | undefined;
   for (const instance of OVERPASS_INSTANCES) {
@@ -172,8 +172,9 @@ async function loadClubs(city: string): Promise<Clubs> {
   const groups = new Map<string, Club[]>();
   for (const object of elements) {
     const name = object.tags?.name;
-    if (!name || !['node', 'way', 'relation'].includes(object.type) || !Number.isSafeInteger(object.id)) continue;
-    const kind = object.tags?.club ? `Club · ${object.tags.club}` : object.tags?.sport ? `Sport · ${object.tags.sport}` : `Facility · ${object.tags?.leisure ?? 'other'}`;
+    // Published city signals already collect every named club/sport OSM object.
+    if (!name || object.tags?.club || object.tags?.sport || !['node', 'way', 'relation'].includes(object.type) || !Number.isSafeInteger(object.id)) continue;
+    const kind = `Facility · ${object.tags?.leisure ?? 'other'}`;
     const items = groups.get(kind) ?? [];
     items.push({ id: `${object.type}/${object.id}`, name, kind, url: `https://www.openstreetmap.org/${object.type}/${object.id}` });
     groups.set(kind, items);
@@ -182,7 +183,7 @@ async function loadClubs(city: string): Promise<Clubs> {
   return {
     total: sorted.reduce((sum, group) => sum + group.count, 0), groups: sorted,
     source: { name: 'OpenStreetMap via Overpass', url, licence: 'OpenStreetMap contributors · ODbL 1.0', licenceUrl: OSM_COPYRIGHT },
-    caveat: 'OpenStreetMap contributions, not an official directory. Named entries only; incomplete and not verified by the city.',
+    caveat: 'Leisure-tagged places without club or sport tags; those tags already appear in the published city map. OpenStreetMap contributions, not an official directory; incomplete and not verified by the city.',
     directories: citySlug(city) === 'strausberg' ? strausbergSources.directories : [],
   };
 }

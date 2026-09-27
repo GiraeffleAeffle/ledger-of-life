@@ -1,5 +1,4 @@
 'use client';
-import { Lightbulb } from 'lucide-react';
 import { AREAS, type Area } from './areas';
 
 type Status = 'planned' | 'prototype' | 'partly built' | 'illustration' | 'built';
@@ -25,9 +24,6 @@ export const IDEAS: Idea[] = [
     how: 'Example service-charge statement with a landlord-set test prepayment and optional live daily Home Assistant consumption; no escrow funding or payouts.',
     enables: 'See an illustrative running balance. It is not a legal annual statement or money movement.',
     needs: 'Real meter/invoice integration and an authorized payment design before balances or refunds can become real.' },
-  { id: 'stock-deposit', area: 'home', status: 'prototype', title: 'Stocks as your deposit',
-    how: '150 % collateral calculator and Robinhood Chain testnet contract; no pledge flow in the app.',
-    enables: 'Explore how tokenized shares might secure a deposit without claiming a working collateral tenancy.' },
   { id: 'local-investments', area: 'money', status: 'illustration', title: 'Invest in your own city',
     how: 'Four legal forms and unverified Strausberg cooperative leads; no offers or investment in the app.',
     enables: 'Understand possible forms of participation without implying membership, available shares or real investable projects.',
@@ -38,9 +34,6 @@ export const IDEAS: Idea[] = [
   { id: 'devices', area: 'money', status: 'planned', title: 'Electric car and other devices',
     how: 'Charging and vehicle-to-grid income read like the solar and validator adapters.',
     enables: 'Everything your hardware earns in one total.' },
-  { id: 'personal-map', area: 'places', status: 'built', title: 'Personal map · near home, in my city, on my way to work',
-    how: 'MapLibre overlays published, sourced public city signals. Optional home/work pins are kept only in this browser; distance and straight-line commute matching run entirely on-device. Candidate signals remain visibly not yet reviewed.',
-    enables: 'See what public sources say may matter nearby without giving your home or work coordinates to the app server. Coverage and review vary by city.' },
   { id: 'budget', area: 'places', status: 'partly built', title: 'Where the money goes',
     how: 'Places explains statutory flows and links Strausberg’s 2025/26 ordinance, with planned investment outlays of €17,941,270 (2025) and €12,609,320 (2026). The full detailed plan is offered for inspection; no actual spending is inferred.',
     enables: 'Distinguish an adopted headline plan from money spent or an individual tax receipt.',
@@ -65,26 +58,6 @@ export const IDEAS: Idea[] = [
 
 const STATUS_LABEL: Record<Status, string> = { planned: 'Planned', prototype: 'Prototype', 'partly built': 'Partly built', illustration: 'Illustration', built: 'Built' };
 
-/** Roadmap work left in an area, separate from the built features and illustrations above. */
-export function PlannedHere({ area, go }: { area: Idea['area']; go: (area: Area) => void }) {
-  const ideas = IDEAS.filter((i) => i.area === area && i.status !== 'illustration' && i.status !== 'built');
-  if (!ideas.length) return null;
-  return (
-    <section className="planned-here">
-      <span className="eyebrow"><Lightbulb size={12} /> MORE TO BUILD IN THIS AREA</span>
-      <div className="planned-grid">
-        {ideas.map((idea) => (
-          <div key={idea.id} className="planned-item">
-            <strong>{idea.title}</strong>
-            <span className={`idea-status ${idea.status.replace(' ', '-')}`}>{STATUS_LABEL[idea.status]}</span>
-            <p>{idea.enables}</p>
-          </div>
-        ))}
-      </div>
-      <button className="text-button" onClick={() => go('ideas')}>All ideas, how they would work and what they need →</button>
-    </section>
-  );
-}
 
 /** Every idea with how it would work, what it enables and what it still needs. */
 export function IdeasArea() {

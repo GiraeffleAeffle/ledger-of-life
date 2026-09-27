@@ -800,7 +800,7 @@ export function Workspace() {
           )}
         </main>
         <nav className="mobile-nav" aria-label="Mobile navigation">
-          {!demoView && AREAS.filter((a) => a.id !== 'ideas').map((item) => (
+          {!demoView && AREAS.map((item) => (
             <button key={item.id} aria-current={view === 'home' && area === item.id ? 'page' : undefined} onClick={() => openArea(item.id)}>
               <item.icon size={19} />
               <span>{item.label}</span>
@@ -812,7 +812,7 @@ export function Workspace() {
           </button>}
           {demoView && <button onClick={() => openArea('overview')}>
             <House size={19} />
-            <span>My overview</span>
+            <span>My Today</span>
           </button>}
           {demoView && nav.slice(0, 3).map((item) => (
             <button

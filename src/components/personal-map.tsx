@@ -1,10 +1,11 @@
 'use client';
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GeoJSONSource, GeoJSONSourceSpecification, Map as LibreMap, Marker } from 'maplibre-gl';
 import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
 import type { Coordinate, CityFeature, Signal, SignalKind } from '../server/city-signals';
-import { displayStatus, interestOptions, matchPersonalRings, type Interest, type MatchedSignal, type PersonalPins } from './personal-map-relevance';
+import { displayStatus, interestOptions, matchPersonalRings, PRECISION_LABELS, REVIEW_LABELS, type MatchedSignal } from './personal-map-relevance';
 import { CITY_CHANGED_EVENT, PINS_CHANGED_EVENT, pinsKey, useCitySignals, type AuthorizedRequest } from './use-city-signals';
+import { parsePins, saveInterests, useInterests, usePersonalPins } from './personal-map-preferences';
 
 const kinds: { id: SignalKind; label: string; color: string }[] = [
   { id: 'planning', label: 'Planning', color: '#7750ac' },
@@ -26,56 +27,17 @@ const countLayer = (kind: SignalKind) => `signals-${kind}-count`;
 const layers = ['signals-fill', 'signals-line', 'signals-boundary', ...kinds.flatMap(({ id }) => [pointLayer(id), clusterLayer(id), countLayer(id)])];
 const noSignals: CityFeature[] = [];
 const emptyCategories: string[] = [];
-const INTEREST_KEY = 'ledger-of-life:personal-map-interests:v1';
-const INTEREST_CHANGED_EVENT = 'ledger-personal-map-interests-changed';
-function subscribeInterests(update: () => void) {
-  window.addEventListener(INTEREST_CHANGED_EVENT, update);
-  window.addEventListener('storage', update);
-  return () => { window.removeEventListener(INTEREST_CHANGED_EVENT, update); window.removeEventListener('storage', update); };
-}
-function useInterests(): Interest[] {
-  const raw = useSyncExternalStore(subscribeInterests, () => localStorage.getItem(INTEREST_KEY) ?? '', () => '');
-  return useMemo(() => {
-    try {
-      const value: unknown = JSON.parse(raw);
-      return Array.isArray(value) ? interestOptions.filter((item) => value.includes(item)) : [];
-    } catch { return []; }
-  }, [raw]);
-}
-function saveInterests(values: Interest[]) {
-  if (values.length) localStorage.setItem(INTEREST_KEY, JSON.stringify(values));
-  else localStorage.removeItem(INTEREST_KEY);
-  window.dispatchEvent(new Event(INTEREST_CHANGED_EVENT));
-}
-function subscribePins(update: () => void) {
-  window.addEventListener(PINS_CHANGED_EVENT, update);
-  window.addEventListener('storage', update);
-  return () => { window.removeEventListener(PINS_CHANGED_EVENT, update); window.removeEventListener('storage', update); };
-}
-function parsePins(raw: string): PersonalPins {
-  try {
-    const value = JSON.parse(raw || '{}') as PersonalPins;
-    const valid = (p?: Coordinate) => Array.isArray(p) && p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]) && Math.abs(p[0]) <= 180 && Math.abs(p[1]) <= 90;
-    return { home: valid(value.home) ? value.home : undefined, work: valid(value.work) ? value.work : undefined };
-  } catch { return {}; }
-}
-function usePersonalPins(cityId: string): PersonalPins {
-  const raw = useSyncExternalStore(subscribePins, () => cityId ? localStorage.getItem(pinsKey(cityId)) ?? '' : '', () => '');
-  return useMemo(() => parsePins(raw), [raw]);
-}
-const localPins = (cityId: string): PersonalPins => parsePins(localStorage.getItem(pinsKey(cityId)) ?? '');
 const date = (value: string | null) => value ? new Date(`${value.slice(0, 10)}T12:00:00Z`).toLocaleDateString('en-GB') : 'not established';
 
 function SignalMeta({ feature, compact = false }: { feature: CityFeature; compact?: boolean }) {
   const { reviewState, geometryPrecision, asOf } = feature.properties;
   const source = 'sources' in feature.properties ? feature.properties.sources[0] : feature.properties.primarySource;
   const count = 'sources' in feature.properties ? feature.properties.sources.length : feature.properties.sourceCount;
-  const score = 'extraction' in feature.properties ? feature.properties.extraction.faithfulness?.score : feature.properties.faithfulness?.score;
-  if (compact) return <p className="personal-source-meta">Source: {source?.publisher || 'not supplied'}{count > 1 && ` + ${count - 1} more`} · as of {date(asOf)} · {reviewState}{reviewState === 'candidate' ? ' (not yet reviewed)' : reviewState === 'auto_checked' ? ' (not human-reviewed)' : ''} · {geometryPrecision}{score !== undefined && ` · faithfulness ${score}`}</p>;
+  if (compact) return <p className="personal-source-meta">Source: {source?.publisher || 'not supplied'}{count > 1 && ` + ${count - 1} more`} · as of {date(asOf)} · {REVIEW_LABELS[reviewState]} · {PRECISION_LABELS[geometryPrecision]}</p>;
   if (!('sources' in feature.properties)) return null;
   const { sources, extraction } = feature.properties;
   return <div className="personal-source-meta">
-    <p>As of {date(asOf)} · review: <strong>{reviewState}{reviewState === 'candidate' ? ' · not yet reviewed' : reviewState === 'auto_checked' ? ' · automated check only, not human-reviewed' : ''}</strong> · location precision: <strong>{geometryPrecision}</strong></p>
+    <p>As of {date(asOf)} · review: <strong>{REVIEW_LABELS[reviewState]}{reviewState === 'auto_checked' ? ' · automated source check, not human-reviewed' : ''}</strong> · location: <strong>{PRECISION_LABELS[geometryPrecision]}</strong></p>
     {extraction.method === 'llm' && <p>LLM extraction{extraction.model ? ` (${extraction.model})` : ''} · faithfulness: {extraction.faithfulness ? `${extraction.faithfulness.score} (threshold ${extraction.faithfulness.threshold}; ${extraction.faithfulness.evaluator}: ${extraction.faithfulness.reason})` : 'not scored'}. A score is not a human fact check.</p>}
     {sources.map((source) => <p key={`${source.url}:${source.locator}`}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title || source.publisher}</a> · {source.publisher} · {source.locator} · retrieved {date(source.retrievedAt)} · {source.licence} ({source.reuse})</p>)}
     {!sources.length && <p>No source supplied; do not treat this as verified.</p>}
@@ -234,7 +196,7 @@ export function PersonalMap({ request }: { request: AuthorizedRequest }) {
         }
         const feature = byId.get(clicked.properties?.id);
         if (feature) {
-          const matched = matchPersonalRings([feature], localPins(city.id), undefined, [], [feature.properties.category]);
+          const matched = matchPersonalRings([feature], parsePins(localStorage.getItem(pinsKey(city.id)) ?? ''), undefined, [], [feature.properties.category]);
           openRef.current(matched.home[0] ?? matched.commute[0] ?? matched.city[0] ?? { feature, distanceMetres: null, explanation: `${feature.properties.title}: ${feature.properties.statement}` });
         }
       });
@@ -349,19 +311,5 @@ export function PersonalMap({ request }: { request: AuthorizedRequest }) {
   </section>;
 }
 
-export function NearYouCard({ request, go }: { request: AuthorizedRequest; go: () => void }) {
-  const { cityId, result, error } = useCitySignals(request);
-  const pins = usePersonalPins(cityId);
-  const interests = useInterests();
-  const features = result?.state === 'covered' ? result.data.signals.features : noSignals;
-  const rings = useMemo(() => matchPersonalRings(features, pins, undefined, interests), [features, pins, interests]);
-  const top = pins.home ? [...rings.home, ...rings.commute.filter((item) => !rings.home.some((near) => near.feature.properties.id === item.feature.properties.id)), ...rings.city.filter((item) => !rings.home.some((near) => near.feature.properties.id === item.feature.properties.id))].slice(0, 2) : rings.city.slice(0, 2);
-  return <section className="card overview-tile personal-overview"><span className="eyebrow">NEAR YOU / IN YOUR CITY</span>
-    {result?.state === 'covered' ? <><strong className="overview-figure small">{result.data.catalogue.name}</strong><span className="small-copy">{pins.home ? `${rings.home.length} near home · ${pins.work ? `${rings.commute.length} on your way · ` : ''}` : 'Set home in Places · '}{rings.city.length} in city</span>
-      {top.map((item) => <div className="small-copy" key={item.feature.properties.id}><strong>{item.feature.properties.title}</strong> · {item.distanceMetres !== null ? `${Math.round(item.distanceMetres)} m nearby` : 'citywide'} · {item.feature.properties.kind.replaceAll('_', ' ')} · {displayStatus(item.feature)}<SignalMeta feature={item.feature} compact /></div>)}
-      <span className="small-copy">Sources and details in Places · generated {date(result.data.generatedAt)}</span></> : <span className="small-copy">{error || (result?.state === 'not_covered' ? 'Your city is not covered yet; explore a covered city in Places.' : 'Reading public city data…')}</span>}
-    <button type="button" className="text-button" onClick={go}>Open personal map in Places →</button>
-  </section>;
-}
 
 export { CITY_CHANGED_EVENT };

@@ -1,4 +1,15 @@
 .places-area { display: grid; gap: 16px; }
+.city-feed-card { display: grid; gap: 12px; min-width: 0; }
+.city-feed-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.city-feed-list li { display: grid; gap: 4px; padding: 11px 0; border-top: 1px solid var(--line, #c8d0d3); }
+.city-feed-list a { display: inline-flex; align-items: baseline; gap: 5px; color: inherit; text-decoration: none; }
+.city-feed-list a:hover { text-decoration: underline; }
+.regional-topics-list { list-style: none; padding: 0 !important; }
+.regional-topics-list > li { border-top: 1px solid var(--line, #c8d0d3); padding: 12px 0; }
+.regional-topics-list h3 { margin: 0 0 5px; }
+.regional-topics-list p { margin: 4px 0; }
+.regional-topic-neighbours { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line, #c8d0d3); border-radius: 9px; }
+.regional-topic-neighbours summary { cursor: pointer; font-weight: 600; }
 .places-section { padding: 22px; min-width: 0; }
 .places-section h2 { margin: 5px 0 0; font-size: 1.25rem; }
 .places-section h3 { margin: 0 0 8px; font-size: 1rem; }
@@ -22,6 +33,8 @@
 .places-groups ul { max-height: 240px; overflow-y: auto; }
 .places-directories, .places-publications { margin-top: 14px; }
 .places-flow { display: grid; gap: 5px; }
+.places-section > details { margin-top: 12px; padding: 10px 14px; border: 1px solid var(--line, #c8d0d3); border-radius: 10px; }
+.places-section > details > summary { cursor: pointer; font-weight: 600; }
 .places-scales { list-style: none; padding: 0 !important; display: grid; gap: 7px; }
 .places-scales li { display: grid; grid-template-columns: minmax(145px, 1fr) 2fr; gap: 10px; margin: 0; padding: 10px 12px; border-left: 3px solid var(--line, #9baaae); background: rgba(110, 130, 130, .06); border-radius: 3px 8px 8px 3px; }
 .places-links { display: flex; flex-wrap: wrap; gap: 14px; }
@@ -69,7 +82,5 @@
 .personal-ring li button { display: grid; gap: 5px; width: 100%; padding: 0; text-align: left; border: 0; background: transparent; color: inherit; cursor: pointer; }
 .personal-ring li button span { font-size: .82rem; line-height: 1.4; }
 .personal-show-more { margin-top: 10px; }
-.personal-overview { display: grid; gap: 8px; }
-.personal-overview button { justify-self: start; border: 0; background: transparent; padding: 0; cursor: pointer; }
 @media (max-width: 900px) { .personal-rings { grid-template-columns: 1fr; } }
 @media (max-width: 680px) { .personal-map-section { padding: 16px; } .personal-map-layout { grid-template-columns: minmax(0, 1fr); } .personal-map-canvas { min-height: 320px; } .personal-feature-panel { max-height: none; } }

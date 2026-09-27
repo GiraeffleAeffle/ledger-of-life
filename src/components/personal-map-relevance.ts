@@ -5,6 +5,18 @@ export const COMMUTE_CORRIDOR_METRES = 400;
 export type PersonalPins = { home?: Coordinate; work?: Coordinate };
 export type MatchedSignal = { feature: CityFeature; distanceMetres: number | null; explanation: string };
 export type PersonalRings = { home: MatchedSignal[]; commute: MatchedSignal[]; city: MatchedSignal[] };
+export const REVIEW_LABELS: Record<CityFeature['properties']['reviewState'], string> = {
+  candidate: 'Not yet checked',
+  auto_checked: 'Automatically checked',
+  reviewed: 'Human-reviewed',
+  rejected: 'Rejected interpretation',
+};
+export const PRECISION_LABELS: Record<CityFeature['properties']['geometryPrecision'], string> = {
+  exact: 'Mapped location',
+  approximate: 'Approximate location',
+  area: 'General area',
+  none: 'Citywide',
+};
 
 // Local tangent plane for neighbourhood-scale distances; no network-based geocoding or routing.
 function project(point: Coordinate, origin: Coordinate): [number, number] {

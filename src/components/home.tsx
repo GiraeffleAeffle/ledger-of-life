@@ -4,19 +4,17 @@ import { ArrowRight, Check, Copy, Home as HomeIcon, Loader2, Plus } from 'lucide
 import { useRentalWallet } from '@/wallets';
 import { AssetsOverview } from './assets';
 import { AREAS, type Area } from './areas';
-import { CityCard } from './city';
-import { IdentityStrip } from './identity';
-import { IdeasArea, PlannedHere } from './ideas';
+import { IdeasArea } from './ideas';
 import { MeArea } from './me';
 import { MoneyArea } from './money-area';
 import { AccountSetup } from './onboarding';
 import { PlacesArea } from './places';
-import { NearYouCard } from './personal-map';
 import { ServiceCharges } from './service-charges';
 import { StockCollateral } from './stock-collateral';
 import { parseAmount } from '@/domain/assets';
 import type { JourneyStage, TenancyJourney } from '@/server/journey';
 import type { PublicListing } from '@/server/listings';
+import { Today } from './today';
 import { Badge, money } from './workspace-panels';
 
 const STAGES: { id: JourneyStage; label: string }[] = [
@@ -73,6 +71,7 @@ export function MyHome({ area, go, openConnections }: { area: Area; go: (area: A
 }
 
 function SignedInHome({ area, go, openConnections }: { area: Area; go: (area: Area) => void; openConnections: () => void }) {
+  const wallet = useRentalWallet();
   const [tenancies, setTenancies] = useState<(TenancyJourney | Unavailable)[] | null>(null);
   const [listings, setListings] = useState<PublicListing[]>([]);
   const [error, setError] = useState('');
@@ -137,7 +136,7 @@ function SignedInHome({ area, go, openConnections }: { area: Area; go: (area: Ar
   const invitation = typeof window !== 'undefined' ? new URLSearchParams(window.location.hash.slice(1)).get('invitation') : null;
   const ready = (tenancies ?? []).filter((t): t is TenancyJourney => !('unavailable' in t));
   const heading: Record<Area, string> = {
-    overview: 'Your overview',
+    overview: 'Today',
     me: 'Me',
     home: 'Home',
     money: 'Money',
@@ -154,23 +153,10 @@ function SignedInHome({ area, go, openConnections }: { area: Area; go: (area: Ar
           <p>{meta.question}</p>
         </div>
       </div>
-      {error && <p className="note" role="alert">{error}</p>}
-      {area === 'overview' && (
-        <div className="overview-grid">
-          <NextStepSummary tenancies={tenancies} listings={listings} invitation={Boolean(invitation)} go={go} />
-          <IdentityStrip request={request} compact onOpen={() => go('me')} />
-          {tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="summary" go={go} />}
-          <CityCard request={request} compact onOpen={() => go('places')} />
-          <NearYouCard request={request} go={() => go('places')} />
-        </div>
-      )}
+      {error && area !== 'overview' && <p className="note" role="alert">{error}</p>}
+      {area === 'overview' && <Today request={request} accountId={wallet.subject ?? ''} tenancies={tenancies} listings={listings} invitation={Boolean(invitation)} homeError={error} go={go} />}
 
-      {area === 'me' && (
-        <>
-          <MeArea request={request} tenancies={ready} listings={listings} go={go} openConnections={openConnections} />
-          <PlannedHere area="me" go={go} />
-        </>
-      )}
+      {area === 'me' && <MeArea request={request} tenancies={ready} listings={listings} go={go} openConnections={openConnections} />}
 
       {area === 'home' && (
         <>
@@ -206,47 +192,13 @@ function SignedInHome({ area, go, openConnections }: { area: Area; go: (area: Ar
 
       {area === 'money' && <MoneyArea request={request} tenancies={ready} loaded={tenancies !== null} go={go} />}
 
-      {area === 'places' && (
-        <>
-          <PlacesArea request={request} go={go} />
-          <PlannedHere area="places" go={go} />
-        </>
-      )}
+      {area === 'places' && <PlacesArea request={request} />}
 
       {area === 'ideas' && <IdeasArea />}
     </div>
   );
 }
 
-/** Surface real actions before waiting states, never a hypothetical move-out. */
-function NextStepSummary({ tenancies, listings, invitation, go }: {
-  tenancies: (TenancyJourney | Unavailable)[] | null; listings: PublicListing[]; invitation: boolean; go: (area: Area) => void;
-}) {
-  const ready = (tenancies ?? []).filter((t): t is TenancyJourney => !('unavailable' in t));
-  const actionable = ready.find((t) => !AUTO[t.next.kind] && t.next.kind !== 'done' && t.next.kind !== 'propose_claim');
-  const waiting = ready.find((t) => AUTO[t.next.kind] && t.next.kind !== 'paying_out' && t.stage !== 'living');
-  const living = ready.find((t) => t.stage === 'living' && t.chain?.phase === 'active');
-  const applicants = listings.find((l) => l.relation === 'landlord' && l.status === 'open' && l.applicants > 0);
-  const passive = waiting ?? ready.find((t) => t.next.kind === 'paying_out');
-  const title = invitation ? 'Join your invitation' : actionable ? actionable.next.label : applicants ? 'Review applicants' : living ? 'Living here' : passive ? passive.next.label : 'Explore your home options';
-  const detail = invitation ? 'Open the private invitation in Home.' : actionable ? actionable.property
-    : applicants ? `${applicants.title} · ${applicants.applicants} applicant(s)`
-      : living ? `${living.property} · move-out starts only when the landlord proposes a deduction`
-        : passive ? `${passive.property} · nothing for you to do right now`
-          : 'Find a home or rent one out when you are ready.';
-  return (
-    <section className="card overview-tile next clickable" onClick={() => go('home')}>
-      <span className="eyebrow">{invitation || actionable || applicants ? 'YOUR NEXT STEP' : 'HOME RIGHT NOW'}</span>
-      {tenancies === null ? <Loader2 className="spin" size={18} /> : (
-        <>
-          <strong className="overview-figure small">{title}</strong>
-          <span className="small-copy">{detail}</span>
-        </>
-      )}
-      <span className="text-button">Open Home →</span>
-    </section>
-  );
-}
 
 function Progress({ stage, finished, showMoveOut }: { stage: JourneyStage; finished: boolean; showMoveOut: boolean }) {
   const current = STAGES.findIndex((s) => s.id === stage) + (finished ? 1 : 0);

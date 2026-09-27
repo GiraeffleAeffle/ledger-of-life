@@ -45,12 +45,12 @@ export function MeArea({ request, tenancies, listings, go, openConnections }: {
     { icon: Wallet, name: 'Robinhood Chain wallet (testnet)', state: short(evm?.address), level: 'Test network' },
     { icon: Sun, name: 'Home Assistant', state: adapters?.homeAssistant ? 'Connected' : 'Not connected', level: 'Read-only, live', area: 'home' as Area },
     { icon: Cpu, name: 'Validator', state: adapters?.validator ? `${adapters.validator.chain} · ${adapters.validator.id}` : 'Not connected', level: 'Read-only, live', area: 'money' as Area },
-    { icon: Building2, name: 'Stadtstack atlas', state: city?.available ? city.name : city && 'name' in city && city.name ? city.name : 'No city chosen', level: 'Read-only, research preview', area: 'places' as Area },
+    { icon: Building2, name: 'City sources', state: city?.available ? city.name : city && 'name' in city && city.name ? city.name : 'No city chosen', level: 'Read-only public data', area: 'places' as Area },
   ];
   const memberships = [
     ...tenancies.map((t) => ({ key: t.agreementId, role: t.role, context: t.property })),
     ...listings.filter((l) => l.relation === 'landlord').map((l) => ({ key: l.id, role: 'landlord', context: l.title })),
-    ...(city?.available ? [{ key: 'city', role: 'resident', context: `${city.name} (${city.source === 'identity' ? 'from your EU wallet' : 'city you chose'})` }] : []),
+    ...(city?.available ? [{ key: 'city', role: city.source === 'identity' ? 'city on identity' : 'chosen city', context: city.name }] : []),
   ];
 
   async function submitPlace(event: React.FormEvent<HTMLFormElement>) {

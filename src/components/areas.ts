@@ -4,7 +4,7 @@ import { Building2, Fingerprint, Home, LayoutDashboard, Lightbulb, Wallet, type 
 export type Area = 'overview' | 'me' | 'home' | 'money' | 'places' | 'ideas';
 
 export const AREAS: { id: Area; label: string; icon: LucideIcon; question: string }[] = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard, question: 'What needs you now, and what changed?' },
+  { id: 'overview', label: 'Today', icon: LayoutDashboard, question: 'What is happening in my city, and what needs me?' },
   { id: 'me', label: 'Me', icon: Fingerprint, question: 'Who am I here, and what may others learn?' },
   { id: 'home', label: 'Home', icon: Home, question: 'Where do I live, and what is locked or owed there?' },
   { id: 'money', label: 'Money', icon: Wallet, question: 'What do I own and earn?' },
