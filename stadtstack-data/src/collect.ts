@@ -8,10 +8,11 @@ import {collectCcf,collectOparl} from './council.ts';
 import {collectGeodata} from './geodata.ts';
 import {geoFeeds} from './geodata-registry.ts';
 import {deduplicateCitySignals,duplicateStats} from './dedupe.ts';
+import {collectFeeds} from './feeds.ts';
 import type {Catalogue,FeatureCollection,Signal} from './schema.ts';
 const target=process.argv.includes('--city')?process.argv[process.argv.indexOf('--city')+1]:'all';const selected=target==='all'?cities:cities.filter(c=>c.id===target);if(!selected.length)throw Error(`Unknown city ${target}`);
 const old=await jsonFile<Catalogue>(join(cacheDir,'staging','catalogue.json'));const catalogue:Catalogue={schemaVersion:'stadtstack-signals-v1',generatedAt:new Date().toISOString(),publisher:'Stadtstack (independent derived factual summaries)',cities:target==='all'?[]:old?.cities.filter(c=>c.id!==target)??[]};
-for(const city of selected){let features:Signal[]=[],sources:Catalogue['cities'][number]['sources']=[];
+for(const city of selected){await collectFeeds(city);let features:Signal[]=[],sources:Catalogue['cities'][number]['sources']=[];
  try{
   const q=new URLSearchParams({q:`${city.name}, ${city.state}, Deutschland`,format:'json',limit:'1',polygon_geojson:'1'});
   const e=await cachedJson<{boundingbox:[string,string,string,string];lon:string;lat:string;osm_type?:string;osm_id?:number}[]>(`https://nominatim.openstreetmap.org/search?${q}`,365*86400000);
@@ -49,6 +50,6 @@ for(const city of selected){let features:Signal[]=[],sources:Catalogue['cities']
  console.log(`${city.id}/duplicates: OParl URL ${before.councilUrl} -> ${after.councilUrl}; title+date+kind ${before.titleDate} -> ${after.titleDate}; OSM node/way ${before.osmNodeWay} -> ${after.osmNodeWay}`);
  const collection:FeatureCollection={type:'FeatureCollection',features:deduplicated};
  await save(join(cacheDir,'staging','cities',city.id,'signals.geojson'),JSON.stringify(collection));
- catalogue.cities.push({id:city.id,name:city.name,state:city.state,center:city.center,bbox:city.bbox,sources,temporalCoverage:{start:null,end:new Date().toISOString()},spatialCoverage:`bbox:${city.bbox.join(',')}`,licence:'Mixed; see each source'});
+ catalogue.cities.push({id:city.id,name:city.name,state:city.state,center:city.center,bbox:city.bbox,sources,feedUrl:`cities/${city.id}/feed.json`,temporalCoverage:{start:null,end:new Date().toISOString()},spatialCoverage:`bbox:${city.bbox.join(',')}`,licence:'Mixed; see each source'});
  await save(join(cacheDir,'staging','catalogue.json'),JSON.stringify(catalogue));
 }

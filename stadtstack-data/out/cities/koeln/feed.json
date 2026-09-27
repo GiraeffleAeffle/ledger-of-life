@@ -1,0 +1,110 @@
+{
+  "schemaVersion": "stadtstack-feed-v1",
+  "cityId": "koeln",
+  "generatedAt": "2026-09-27T10:02:27.938Z",
+  "sources": [
+    {
+      "id": "koeln-events",
+      "kind": "events",
+      "publisher": "koeln.de",
+      "url": "https://www.koeln.de/events/?ical=1",
+      "licence": "unknown",
+      "reuse": "facts_with_attribution",
+      "retrievedAt": "2026-09-27T10:02:27.927Z",
+      "status": "ok"
+    }
+  ],
+  "items": [
+    {
+      "id": "koeln-events:d9cda7afbc71e9e6981277caba5085f1c6dd168c391c51db6c3365a7537657ea",
+      "kind": "event",
+      "title": "Kita-Flohmarkt in Sürth",
+      "url": "https://www.koeln.de/event/kita-flohmarkt-in-suerth/",
+      "publisher": "koeln.de",
+      "publishedAt": "2026-09-27T10:02:27.927Z",
+      "eventStart": "2026-09-27T11:00:00.000Z",
+      "sourceId": "koeln-events",
+      "reuse": "facts_with_attribution",
+      "retrievedAt": "2026-09-27T10:02:27.927Z",
+      "reviewState": "auto_checked"
+    },
+    {
+      "id": "koeln-events:20d6446be9a7eab2f26e8630ed1f2fa7cc71470e1c2f68ecd175564fa6dc9393",
+      "kind": "event",
+      "title": "SENTA - Das Mitmach-Popkonzert für die ganze Familie - Zusatzshow",
+      "url": "https://www.koeln.de/event/senta-das-mitmach-popkonzert-fuer-die-ganze-familie-zusatzshow/",
+      "publisher": "koeln.de",
+      "publishedAt": "2026-09-27T10:02:27.927Z",
+      "eventStart": "2026-09-27T11:00:00.000Z",
+      "sourceId": "koeln-events",
+      "reuse": "facts_with_attribution",
+      "retrievedAt": "2026-09-27T10:02:27.927Z",
+      "reviewState": "auto_checked"
+    },
+    {
+      "id": "koeln-events:ddf9efb16ba8bc51379bc2b8813769990690eb207bfd701c166b9e2f984568b0",
+      "kind": "event",
+      "title": "Die Königs vom Kiez",
+      "url": "https://www.koeln.de/event/die-koenigs-vom-kiez-30/",
+      "publisher": "koeln.de",
+      "publishedAt": "2026-09-27T10:02:27.927Z",
+      "eventStart": "2026-09-27T12:00:00.000Z",
+      "sourceId": "koeln-events",
+      "reuse": "facts_with_attribution",
+      "retrievedAt": "2026-09-27T10:02:27.927Z",
+      "reviewState": "auto_checked"
+    },
+    {
+      "id": "koeln-events:104daa3f4750bc1c4d86ff1e740324638fc6311403b40f0e020326d5dc914141",
+      "kind": "event",
+      "title": "Kinderstück: Dr Künning vun Knolledörp",
+      "url": "https://www.koeln.de/event/kinderstueck-dr-kuenning-vun-knolledoerp-2/",
+      "publisher": "koeln.de",
+      "publishedAt": "2026-09-27T10:02:27.927Z",
+      "eventStart": "2026-09-27T12:30:00.000Z",
+      "sourceId": "koeln-events",
+      "reuse": "facts_with_attribution",
+      "retrievedAt": "2026-09-27T10:02:27.927Z",
+      "reviewState": "auto_checked"
+    },
+    {
+      "id": "koeln-events:82efbbf1fa633a4f4bd67e51a81fcd1a4f6672a7282a43cad8f126c6b9e4c424",
+      "kind": "event",
+      "title": "SENTA - Das Mitmach-Popkonzert für die ganze Familie",
+      "url": "https://www.koeln.de/event/senta-das-mitmach-popkonzert-fuer-die-ganze-familie/",
+      "publisher": "koeln.de",
+      "publishedAt": "2026-09-27T10:02:27.927Z",
+      "eventStart": "2026-09-27T14:00:00.000Z",
+      "sourceId": "koeln-events",
+      "reuse": "facts_with_attribution",
+      "retrievedAt": "2026-09-27T10:02:27.927Z",
+      "reviewState": "auto_checked"
+    },
+    {
+      "id": "koeln-events:fe0df5c511f0507990c5989e0f5d86c82038854930c72bd4328f8581ea3e391d",
+      "kind": "event",
+      "title": "Der Rosenkavalier",
+      "url": "https://www.koeln.de/event/der-rosenkavalier/",
+      "publisher": "koeln.de",
+      "publishedAt": "2026-09-27T10:02:27.927Z",
+      "eventStart": "2026-09-27T14:00:00.000Z",
+      "sourceId": "koeln-events",
+      "reuse": "facts_with_attribution",
+      "retrievedAt": "2026-09-27T10:02:27.927Z",
+      "reviewState": "auto_checked"
+    },
+    {
+      "id": "koeln-events:3bea228c03a164c691a7e1da67e249015ebceea24bc0ebbf533d3776dfaaaeea",
+      "kind": "event",
+      "title": "Kalter Weisser Mann - Komödie von Dietmar Jacobs und Moritz Netenjakob",
+      "url": "https://www.koeln.de/event/kalter-weisser-mann-komoedie-von-dietmar-jacobs-und-moritz-netenjakob-15/",
+      "publisher": "koeln.de",
+      "publishedAt": "2026-09-27T10:02:27.927Z",
+      "eventStart": "2026-09-27T15:00:00.000Z",
+      "sourceId": "koeln-events",
+      "reuse": "facts_with_attribution",
+      "retrievedAt": "2026-09-27T10:02:27.927Z",
+      "reviewState": "auto_checked"
+    }
+  ]
+}

@@ -18,7 +18,7 @@
       },
       "properties": {
         "id": "autobahn:2024-013524--vi-bs.2026-07-31_15-00-00-000.devi-zus.2026-04-13_00-00-00-000_015.de28",
-        "version": "d28a20fecd5b37ad3367158debf41e7126967e38350a243e26871afeacc95bec",
+        "version": "beaf68534c4cf70ff261946b656f6895b364bea8a7d3b8d7a7d4b4b1ffb599dd",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -40,8 +40,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2024-013524--vi-bs.2026-07-31_15-00-00-000.devi-zus.2026-04-13_00-00-00-000_015.de28]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -51,7 +51,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -71,7 +71,7 @@
       },
       "properties": {
         "id": "autobahn:2024-013524--vi-bs.2026-07-31_15-00-00-000.devi-zus.2026-04-13_00-00-00-000_015.de30",
-        "version": "b6e301acf2db5a9eea79cadcfebbf008847e94c745b27d61981f597bc8aa43d6",
+        "version": "6c0ff8fc3f779bdf8f2bb24142a5b7f1c2db7d6a368cb4847effade16087fccf",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -93,8 +93,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2024-013524--vi-bs.2026-07-31_15-00-00-000.devi-zus.2026-04-13_00-00-00-000_015.de30]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -104,7 +104,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -124,7 +124,7 @@
       },
       "properties": {
         "id": "autobahn:2024-013524--vi-bs.2026-07-31_15-00-00-000.devi-zus.2026-04-13_00-00-00-000_015.de32",
-        "version": "e319be81b69c41033e57059cb29b1d40e4c4cd8a92c43968392a727c2fa65deb",
+        "version": "e1f83d2a2a3f2808aa729c16a4e450d3c400ae0913c1d0ef2995acd83a27c1f8",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -146,8 +146,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2024-013524--vi-bs.2026-07-31_15-00-00-000.devi-zus.2026-04-13_00-00-00-000_015.de32]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -157,7 +157,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -177,7 +177,7 @@
       },
       "properties": {
         "id": "autobahn:2024-013524--vi-bs.2026-07-31_15-00-00-000.devi-zus.2026-04-13_00-00-00-000_015.de34",
-        "version": "370f714b223210d26f939fc31e5b8b51617866291e990eab449110a8c16b3eb9",
+        "version": "5934215a747a82873003bd2212656c5e6fbbaf2c746de1755bbd97ea9f80c6e5",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -199,8 +199,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2024-013524--vi-bs.2026-07-31_15-00-00-000.devi-zus.2026-04-13_00-00-00-000_015.de34]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -210,7 +210,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -230,7 +230,7 @@
       },
       "properties": {
         "id": "autobahn:2024-013524--vi-bs.2026-07-31_15-00-00-000.devi-zus.2026-04-13_00-00-00-000_015.de36",
-        "version": "6222e88db3f8b72668d5d5190addc0986b988d6934f342c17ecce454491cb121",
+        "version": "d94bded20a4b4cf43b74e196962e7576d5635e8be52797ccab15770b79583f39",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -252,8 +252,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2024-013524--vi-bs.2026-07-31_15-00-00-000.devi-zus.2026-04-13_00-00-00-000_015.de36]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -263,7 +263,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -283,7 +283,7 @@
       },
       "properties": {
         "id": "autobahn:2024-013524--vi-bs.2026-07-31_15-00-00-000.devi-zus.2026-04-13_00-00-00-000_015.de38",
-        "version": "935d0082deb1cda94f0caecca31d7fad499e019c9577a1a7c8b8f2c9182a5fd3",
+        "version": "ddf3f0422f76800ce569018136e081796e09f702fd3b14422a9537d44e0846a5",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -305,8 +305,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2024-013524--vi-bs.2026-07-31_15-00-00-000.devi-zus.2026-04-13_00-00-00-000_015.de38]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -316,7 +316,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -358,7 +358,7 @@
             "title": "Autobahn A4 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2024-013524--vi-fbm.2026-07-31_15-00-00-000.devi-zus.2026-04-13_00-00-00-000_015.de40]",
-            "retrievedAt": "2026-09-26T16:50:19.791Z",
+            "retrievedAt": "2026-09-27T10:02:28.746Z",
             "sha256": "1de3d0e3ecc24baf96dbbba60602eea45b866563cdfbb0fb27938c93d06b386c",
             "snapshot": true,
             "licence": "unknown",
@@ -369,7 +369,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.791Z"
+        "asOf": "2026-09-27T10:02:28.746Z"
       }
     },
     {
@@ -389,7 +389,7 @@
       },
       "properties": {
         "id": "autobahn:2025-057527--vi-bs.2026-05-26_08-00-00-000.devi-zus.2025-11-21_20-00-00-000_003.de1",
-        "version": "76cf0331f979eccbbfcb96bdd661a3ad0551dab087938c3a6d56b51ca4787f20",
+        "version": "de1379f3cdbb4e2ea5e7d8c4865226d7ce50099fdf6eeff962285fc9e8e0c2bc",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -411,8 +411,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-057527--vi-bs.2026-05-26_08-00-00-000.devi-zus.2025-11-21_20-00-00-000_003.de1]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -422,7 +422,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -442,7 +442,7 @@
       },
       "properties": {
         "id": "autobahn:2025-057527--vi-bs.2026-05-26_08-00-00-000.devi-zus.2025-11-21_20-00-00-000_003.de11",
-        "version": "e48148712589bc8719bbd92df9a501e6fd9e77313eed7f6933edeccfa7838e21",
+        "version": "f4af942f8843e67c7f7e3fb9dc02aa490d33d40e285bb9fc620776057607defb",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -464,8 +464,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-057527--vi-bs.2026-05-26_08-00-00-000.devi-zus.2025-11-21_20-00-00-000_003.de11]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -475,7 +475,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -495,7 +495,7 @@
       },
       "properties": {
         "id": "autobahn:2025-057527--vi-bs.2026-05-26_08-00-00-000.devi-zus.2025-11-21_20-00-00-000_003.de3",
-        "version": "f635f0ff884fdb0047ae0c6b2491e0b85208b49224785db4c1978b0ec091a7d2",
+        "version": "362e2e88d9ffa5aa8b19e8e573753a3df2babc3903304825fe440afe2f3498d4",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -517,8 +517,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-057527--vi-bs.2026-05-26_08-00-00-000.devi-zus.2025-11-21_20-00-00-000_003.de3]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -528,7 +528,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -548,7 +548,7 @@
       },
       "properties": {
         "id": "autobahn:2025-057527--vi-bs.2026-05-26_08-00-00-000.devi-zus.2025-11-21_20-00-00-000_003.de5",
-        "version": "546ef04224917b589f9d386cffb6f51429b738e3be1e4721f3193d6be2a7e3fc",
+        "version": "3ed980ce64b7a5d1f0aefa6ce3e7d6dbbf12f98b45915c9cd43b9bb1886dd535",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -570,8 +570,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-057527--vi-bs.2026-05-26_08-00-00-000.devi-zus.2025-11-21_20-00-00-000_003.de5]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -581,7 +581,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -601,7 +601,7 @@
       },
       "properties": {
         "id": "autobahn:2025-057527--vi-bs.2026-05-26_08-00-00-000.devi-zus.2025-11-21_20-00-00-000_003.de7",
-        "version": "8591dccfa84c94c3474983514ef85c26d7f2e5300dfd5a135f9862edf14dfb9e",
+        "version": "6043375e1ec8045c26d41d0e1b4a5e0ebc5e3375bff4f2f3b8bae6dacb7884b9",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -623,8 +623,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-057527--vi-bs.2026-05-26_08-00-00-000.devi-zus.2025-11-21_20-00-00-000_003.de7]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -634,7 +634,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -654,7 +654,7 @@
       },
       "properties": {
         "id": "autobahn:2025-057527--vi-bs.2026-05-26_08-00-00-000.devi-zus.2025-11-21_20-00-00-000_003.de9",
-        "version": "22b4eded28be49b5e8c8f432bfa103c56c43aa592e7ae2f4d3d92a5c8f5f361a",
+        "version": "ead2cab35372cf15c4de5af57660a108af15612c6924cc4d367e64f1d368a0db",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -676,8 +676,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-057527--vi-bs.2026-05-26_08-00-00-000.devi-zus.2025-11-21_20-00-00-000_003.de9]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -687,7 +687,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -707,7 +707,7 @@
       },
       "properties": {
         "id": "autobahn:2026-000860--vi-bs.2026-09-21_08-00-00-000.devi-zus.2026-09-21_08-00-00-000.de11",
-        "version": "c848b1577322ea3c5a5d49efe218a5d7a7021f0ba4155847f940e1edd4153ed5",
+        "version": "250b247dfb81ecb80082097bd8ee933596e44038b908edadd73d80bf176ca94f",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -729,8 +729,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-000860--vi-bs.2026-09-21_08-00-00-000.devi-zus.2026-09-21_08-00-00-000.de11]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -740,7 +740,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -760,7 +760,7 @@
       },
       "properties": {
         "id": "autobahn:2026-000860--vi-bs.2026-09-21_08-00-00-000.devi-zus.2026-09-21_08-00-00-000.de9",
-        "version": "b4f17f1f491a0fedc740144e309d4616e58925a2fddb57fe4ababb72f161957b",
+        "version": "6e523d85f37243a9557f6fa4813be0ee5538daa78440a70818cbecb9eb4f4b8a",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -782,8 +782,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-000860--vi-bs.2026-09-21_08-00-00-000.devi-zus.2026-09-21_08-00-00-000.de9]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -793,7 +793,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -835,7 +835,7 @@
             "title": "Autobahn A4 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2026-019984--vi-fbm.2026-04-22_08-00-00-000.devi-zus.2026-04-22_08-00-00-000_010.de1]",
-            "retrievedAt": "2026-09-26T16:50:19.791Z",
+            "retrievedAt": "2026-09-27T10:02:28.746Z",
             "sha256": "1de3d0e3ecc24baf96dbbba60602eea45b866563cdfbb0fb27938c93d06b386c",
             "snapshot": true,
             "licence": "unknown",
@@ -846,7 +846,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.791Z"
+        "asOf": "2026-09-27T10:02:28.746Z"
       }
     },
     {
@@ -888,7 +888,7 @@
             "title": "Autobahn A4 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2026-019984--vi-fbm.2026-04-22_08-00-00-000.devi-zus.2026-04-22_08-00-00-000_010.de2]",
-            "retrievedAt": "2026-09-26T16:50:19.791Z",
+            "retrievedAt": "2026-09-27T10:02:28.746Z",
             "sha256": "1de3d0e3ecc24baf96dbbba60602eea45b866563cdfbb0fb27938c93d06b386c",
             "snapshot": true,
             "licence": "unknown",
@@ -899,7 +899,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.791Z"
+        "asOf": "2026-09-27T10:02:28.746Z"
       }
     },
     {
@@ -919,7 +919,7 @@
       },
       "properties": {
         "id": "autobahn:2026-019984--vi-fbm.2026-04-22_08-00-00-000.devi-zus.2026-04-22_08-00-00-000_010.de3",
-        "version": "a0833db63eca94a21168c4bb8347c295d4d722eb53131df5badb7073ebfb3f0f",
+        "version": "27f1a6c1520546f53f7e86b40d4a78434ae675589571381674964d8124ceaae9",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -941,8 +941,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-019984--vi-fbm.2026-04-22_08-00-00-000.devi-zus.2026-04-22_08-00-00-000_010.de3]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -952,7 +952,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -972,7 +972,7 @@
       },
       "properties": {
         "id": "autobahn:2026-019984--vi-fbm.2026-04-22_08-00-00-000.devi-zus.2026-04-22_08-00-00-000_010.de5",
-        "version": "10e942c30fc6b4f819b5266c5f37a4842a97deefde02c585e0a53de7a9f3457f",
+        "version": "03ebdc533429cfad52f42e26578d5ff176f01361cbe4b0e7aa6e8981bab3eaad",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -994,8 +994,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-019984--vi-fbm.2026-04-22_08-00-00-000.devi-zus.2026-04-22_08-00-00-000_010.de5]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -1005,7 +1005,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -1047,7 +1047,7 @@
             "title": "Autobahn A17 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-022882--vi-bs.2026-05-13_07-00-00-000_012.de0]",
-            "retrievedAt": "2026-09-26T16:57:32.670Z",
+            "retrievedAt": "2026-09-27T10:06:19.786Z",
             "sha256": "5d3d2521016272093be4ee5b8e362c03510f32387aa8f931933fe10b5d5378bc",
             "snapshot": true,
             "licence": "unknown",
@@ -1058,7 +1058,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:57:32.670Z"
+        "asOf": "2026-09-27T10:06:19.786Z"
       }
     },
     {
@@ -1100,7 +1100,7 @@
             "title": "Autobahn A17 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-042435--vi-bs.2026-09-21_09-00-00-000.devi-zus.2026-09-01_09-00-00-000_001.de5]",
-            "retrievedAt": "2026-09-26T16:57:32.670Z",
+            "retrievedAt": "2026-09-27T10:06:19.786Z",
             "sha256": "5d3d2521016272093be4ee5b8e362c03510f32387aa8f931933fe10b5d5378bc",
             "snapshot": true,
             "licence": "unknown",
@@ -1111,7 +1111,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:57:32.670Z"
+        "asOf": "2026-09-27T10:06:19.786Z"
       }
     },
     {
@@ -1153,7 +1153,7 @@
             "title": "Autobahn A17 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2026-042435--vi-fbm.2026-09-21_09-00-00-000.devi-zus.2026-09-01_09-00-00-000_001.de4]",
-            "retrievedAt": "2026-09-26T16:57:32.699Z",
+            "retrievedAt": "2026-09-27T10:06:19.843Z",
             "sha256": "f42b19465f8ba2a6afef389d3be749f21d3b230613c996f1857433b2339001d1",
             "snapshot": true,
             "licence": "unknown",
@@ -1164,7 +1164,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:57:32.699Z"
+        "asOf": "2026-09-27T10:06:19.843Z"
       }
     },
     {
@@ -1184,7 +1184,7 @@
       },
       "properties": {
         "id": "autobahn:2026-044881--vi-bs.2026-10-05_21-00-00-000.devi-bs.2026-10-05_21-00-00-000.de1",
-        "version": "723faf7b2693c97b19b05686ad4d8b0bfe2966e8d3cc9327bf16cffae262c980",
+        "version": "4cce45e2cd8cd9c510248ed484e324536af01ada0b3e665c58ea489e89aa2ccd",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -1206,8 +1206,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-044881--vi-bs.2026-10-05_21-00-00-000.devi-bs.2026-10-05_21-00-00-000.de1]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -1217,7 +1217,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -1259,7 +1259,7 @@
             "title": "Autobahn A4 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2026-044881--vi-fbm.2026-10-05_21-00-00-000.devi-bs.2026-10-05_21-00-00-000.de3]",
-            "retrievedAt": "2026-09-26T16:50:19.791Z",
+            "retrievedAt": "2026-09-27T10:02:28.746Z",
             "sha256": "1de3d0e3ecc24baf96dbbba60602eea45b866563cdfbb0fb27938c93d06b386c",
             "snapshot": true,
             "licence": "unknown",
@@ -1270,7 +1270,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.791Z"
+        "asOf": "2026-09-27T10:02:28.746Z"
       }
     },
     {
@@ -1312,7 +1312,7 @@
             "title": "Autobahn A4 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2026-044881--vi-fbm.2026-10-05_21-00-00-000.devi-bs.2026-10-05_21-00-00-000.de4]",
-            "retrievedAt": "2026-09-26T16:50:19.791Z",
+            "retrievedAt": "2026-09-27T10:02:28.746Z",
             "sha256": "1de3d0e3ecc24baf96dbbba60602eea45b866563cdfbb0fb27938c93d06b386c",
             "snapshot": true,
             "licence": "unknown",
@@ -1323,7 +1323,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.791Z"
+        "asOf": "2026-09-27T10:02:28.746Z"
       }
     },
     {
@@ -1343,7 +1343,7 @@
       },
       "properties": {
         "id": "autobahn:2026-045154--vi-bs.2026-09-21_18-00-00-000.devi-bs.2026-09-21_20-00-00-000_001.de1",
-        "version": "0b3e7f7682ac9de96e71e7742013f655fb475e70455049cc0950800464fd93dd",
+        "version": "4b5ec71340303331358657f92cd42c0f456687048628dd4284c05d35df006993",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -1365,8 +1365,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-045154--vi-bs.2026-09-21_18-00-00-000.devi-bs.2026-09-21_20-00-00-000_001.de1]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -1376,7 +1376,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -1396,7 +1396,7 @@
       },
       "properties": {
         "id": "autobahn:2026-045154--vi-bs.2026-09-21_18-00-00-000.devi-bs.2026-09-21_20-00-00-000_001.de3",
-        "version": "218ddd337d4d67b2f52307b28440d52291e111aab2bcaf9224007f65de445737",
+        "version": "53f5bcbb7fa7d9b2bf8a664549db72395eed38fd2735a0488770657bb8861614",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -1418,8 +1418,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-045154--vi-bs.2026-09-21_18-00-00-000.devi-bs.2026-09-21_20-00-00-000_001.de3]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -1429,7 +1429,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -1449,7 +1449,7 @@
       },
       "properties": {
         "id": "autobahn:2026-046416--vi-bs.2026-09-21_21-00-00-000.devi-bs.2026-09-21_21-00-00-000.de1",
-        "version": "c238f1809262bdd3220c45dba2be102f3ef6f0e992413f652bdd3ea5b9549af3",
+        "version": "00ec41feafabba350fe885c445e9d3f2a4a0de6d535c543cef68513da0c9411b",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -1471,8 +1471,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-046416--vi-bs.2026-09-21_21-00-00-000.devi-bs.2026-09-21_21-00-00-000.de1]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -1482,7 +1482,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -1502,7 +1502,7 @@
       },
       "properties": {
         "id": "autobahn:2026-046416--vi-bs.2026-09-21_21-00-00-000.devi-bs.2026-09-21_21-00-00-000.de5",
-        "version": "c255f0c5f817c2f97e5c12545a907e769f329f06f8acaab6257d08168d1e5462",
+        "version": "7428582d0e368ab0485531a74cecbddbb80f8cfde8f037f9e9836e50fe13b84e",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -1524,8 +1524,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-046416--vi-bs.2026-09-21_21-00-00-000.devi-bs.2026-09-21_21-00-00-000.de5]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -1535,7 +1535,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -1577,7 +1577,7 @@
             "title": "Autobahn A4 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2026-046416--vi-fbm.2026-09-21_21-00-00-000.devi-bs.2026-09-21_21-00-00-000.de3]",
-            "retrievedAt": "2026-09-26T16:50:19.791Z",
+            "retrievedAt": "2026-09-27T10:02:28.746Z",
             "sha256": "1de3d0e3ecc24baf96dbbba60602eea45b866563cdfbb0fb27938c93d06b386c",
             "snapshot": true,
             "licence": "unknown",
@@ -1588,7 +1588,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.791Z"
+        "asOf": "2026-09-27T10:02:28.746Z"
       }
     },
     {
@@ -1630,7 +1630,7 @@
             "title": "Autobahn A4 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2026-046416--vi-fbm.2026-09-21_21-00-00-000.devi-bs.2026-09-21_21-00-00-000.de4]",
-            "retrievedAt": "2026-09-26T16:50:19.791Z",
+            "retrievedAt": "2026-09-27T10:02:28.746Z",
             "sha256": "1de3d0e3ecc24baf96dbbba60602eea45b866563cdfbb0fb27938c93d06b386c",
             "snapshot": true,
             "licence": "unknown",
@@ -1641,7 +1641,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.791Z"
+        "asOf": "2026-09-27T10:02:28.746Z"
       }
     },
     {
@@ -1661,7 +1661,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048963--vi-bs.2026-09-29_08-00-00-000_003.de0",
-        "version": "1946deaa3520e8a7162e666a2475f0fb0c63c76e595536cc005d14a9ce4fde68",
+        "version": "6d96c8c9ce3990904582defa4dbc7cc4f364ecc04d52aad82fc8d7372a7d5ab0",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -1683,8 +1683,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048963--vi-bs.2026-09-29_08-00-00-000_003.de0]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -1694,7 +1694,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -1714,7 +1714,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048966--vi-bs.2026-09-30_08-00-00-000_005.de0",
-        "version": "a420903623bdf3997ed816735f8b31a7ad5ba23afa9a21c99179bfa71be20e63",
+        "version": "91e67e6f37758df15a379a0fdfee5e0d6cc8114b169bce46a0c27c58a87fb28e",
         "cityId": "dresden",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -1736,8 +1736,8 @@
             "title": "Autobahn A4 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048966--vi-bs.2026-09-30_08-00-00-000_005.de0]",
-            "retrievedAt": "2026-09-26T16:50:19.749Z",
-            "sha256": "1ed09cde7c0e6328d5e55f21a9cfd3b7825ce00586b004bfefe97dff1f78e5d6",
+            "retrievedAt": "2026-09-27T10:02:28.695Z",
+            "sha256": "135b966bc2dfbdb6df19a815348e31fb35c7840ec2da1861bd2fa7385211afc5",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -1747,7 +1747,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:50:19.749Z"
+        "asOf": "2026-09-27T10:02:28.695Z"
       }
     },
     {
@@ -1789,7 +1789,7 @@
             "title": "Autobahn A17 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-049262--vi-bs.2026-09-28_19-00-00-000_008.de0]",
-            "retrievedAt": "2026-09-26T16:57:32.670Z",
+            "retrievedAt": "2026-09-27T10:06:19.786Z",
             "sha256": "5d3d2521016272093be4ee5b8e362c03510f32387aa8f931933fe10b5d5378bc",
             "snapshot": true,
             "licence": "unknown",
@@ -1800,7 +1800,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:57:32.670Z"
+        "asOf": "2026-09-27T10:06:19.786Z"
       }
     },
     {
@@ -1831,7 +1831,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17012; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.922Z",
+            "retrievedAt": "2026-09-27T10:06:21.049Z",
             "sha256": "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a",
             "snapshot": true,
             "licence": "unknown",
@@ -1874,7 +1874,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17013; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.922Z",
+            "retrievedAt": "2026-09-27T10:06:21.049Z",
             "sha256": "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a",
             "snapshot": true,
             "licence": "unknown",
@@ -1917,7 +1917,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17014; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.922Z",
+            "retrievedAt": "2026-09-27T10:06:21.049Z",
             "sha256": "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a",
             "snapshot": true,
             "licence": "unknown",
@@ -1960,7 +1960,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17015; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.922Z",
+            "retrievedAt": "2026-09-27T10:06:21.049Z",
             "sha256": "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a",
             "snapshot": true,
             "licence": "unknown",
@@ -2003,7 +2003,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17016; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.922Z",
+            "retrievedAt": "2026-09-27T10:06:21.049Z",
             "sha256": "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a",
             "snapshot": true,
             "licence": "unknown",
@@ -2046,7 +2046,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17017; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.922Z",
+            "retrievedAt": "2026-09-27T10:06:21.049Z",
             "sha256": "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a",
             "snapshot": true,
             "licence": "unknown",
@@ -2089,7 +2089,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17018; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.922Z",
+            "retrievedAt": "2026-09-27T10:06:21.049Z",
             "sha256": "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a",
             "snapshot": true,
             "licence": "unknown",
@@ -2132,7 +2132,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17019; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.922Z",
+            "retrievedAt": "2026-09-27T10:06:21.049Z",
             "sha256": "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a",
             "snapshot": true,
             "licence": "unknown",
@@ -2175,7 +2175,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17020; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.922Z",
+            "retrievedAt": "2026-09-27T10:06:21.049Z",
             "sha256": "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a",
             "snapshot": true,
             "licence": "unknown",
@@ -2218,7 +2218,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17021; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.922Z",
+            "retrievedAt": "2026-09-27T10:06:21.049Z",
             "sha256": "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a",
             "snapshot": true,
             "licence": "unknown",
@@ -2261,7 +2261,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17022; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.715Z",
+            "retrievedAt": "2026-09-27T10:06:20.797Z",
             "sha256": "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326",
             "snapshot": true,
             "licence": "unknown",
@@ -2304,7 +2304,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17023; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.715Z",
+            "retrievedAt": "2026-09-27T10:06:20.797Z",
             "sha256": "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326",
             "snapshot": true,
             "licence": "unknown",
@@ -2347,7 +2347,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17024; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.715Z",
+            "retrievedAt": "2026-09-27T10:06:20.797Z",
             "sha256": "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326",
             "snapshot": true,
             "licence": "unknown",
@@ -2390,7 +2390,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17025; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.715Z",
+            "retrievedAt": "2026-09-27T10:06:20.797Z",
             "sha256": "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326",
             "snapshot": true,
             "licence": "unknown",
@@ -2433,7 +2433,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17026; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.715Z",
+            "retrievedAt": "2026-09-27T10:06:20.797Z",
             "sha256": "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326",
             "snapshot": true,
             "licence": "unknown",
@@ -2476,7 +2476,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17027; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.715Z",
+            "retrievedAt": "2026-09-27T10:06:20.797Z",
             "sha256": "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326",
             "snapshot": true,
             "licence": "unknown",
@@ -2519,7 +2519,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17028; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.715Z",
+            "retrievedAt": "2026-09-27T10:06:20.797Z",
             "sha256": "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326",
             "snapshot": true,
             "licence": "unknown",
@@ -2562,7 +2562,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17029; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.715Z",
+            "retrievedAt": "2026-09-27T10:06:20.797Z",
             "sha256": "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326",
             "snapshot": true,
             "licence": "unknown",
@@ -2605,7 +2605,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17030; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.715Z",
+            "retrievedAt": "2026-09-27T10:06:20.797Z",
             "sha256": "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326",
             "snapshot": true,
             "licence": "unknown",
@@ -2648,7 +2648,7 @@
             "title": "OParl Sitzung",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/meetings/17031; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:33.715Z",
+            "retrievedAt": "2026-09-27T10:06:20.797Z",
             "sha256": "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326",
             "snapshot": true,
             "licence": "unknown",
@@ -2691,7 +2691,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30941; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:46.764Z",
+            "retrievedAt": "2026-09-27T10:06:34.555Z",
             "sha256": "e45f9e5c61fcac908dcfd7a09fd0c7fc414b58e386108ed47f9b7e3450fb7027",
             "snapshot": true,
             "licence": "unknown",
@@ -2740,7 +2740,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30942; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:46.764Z",
+            "retrievedAt": "2026-09-27T10:06:34.555Z",
             "sha256": "e45f9e5c61fcac908dcfd7a09fd0c7fc414b58e386108ed47f9b7e3450fb7027",
             "snapshot": true,
             "licence": "unknown",
@@ -2783,7 +2783,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30943; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:46.764Z",
+            "retrievedAt": "2026-09-27T10:06:34.555Z",
             "sha256": "e45f9e5c61fcac908dcfd7a09fd0c7fc414b58e386108ed47f9b7e3450fb7027",
             "snapshot": true,
             "licence": "unknown",
@@ -2826,7 +2826,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30944; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:46.764Z",
+            "retrievedAt": "2026-09-27T10:06:34.555Z",
             "sha256": "e45f9e5c61fcac908dcfd7a09fd0c7fc414b58e386108ed47f9b7e3450fb7027",
             "snapshot": true,
             "licence": "unknown",
@@ -2869,7 +2869,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30947; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:46.764Z",
+            "retrievedAt": "2026-09-27T10:06:34.555Z",
             "sha256": "e45f9e5c61fcac908dcfd7a09fd0c7fc414b58e386108ed47f9b7e3450fb7027",
             "snapshot": true,
             "licence": "unknown",
@@ -2918,7 +2918,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30959; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:46.764Z",
+            "retrievedAt": "2026-09-27T10:06:34.555Z",
             "sha256": "e45f9e5c61fcac908dcfd7a09fd0c7fc414b58e386108ed47f9b7e3450fb7027",
             "snapshot": true,
             "licence": "unknown",
@@ -2961,7 +2961,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30961; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:46.764Z",
+            "retrievedAt": "2026-09-27T10:06:34.555Z",
             "sha256": "e45f9e5c61fcac908dcfd7a09fd0c7fc414b58e386108ed47f9b7e3450fb7027",
             "snapshot": true,
             "licence": "unknown",
@@ -3004,7 +3004,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30966; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:46.764Z",
+            "retrievedAt": "2026-09-27T10:06:34.555Z",
             "sha256": "e45f9e5c61fcac908dcfd7a09fd0c7fc414b58e386108ed47f9b7e3450fb7027",
             "snapshot": true,
             "licence": "unknown",
@@ -3047,7 +3047,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30972; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:46.764Z",
+            "retrievedAt": "2026-09-27T10:06:34.555Z",
             "sha256": "e45f9e5c61fcac908dcfd7a09fd0c7fc414b58e386108ed47f9b7e3450fb7027",
             "snapshot": true,
             "licence": "unknown",
@@ -3090,7 +3090,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30974; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:46.764Z",
+            "retrievedAt": "2026-09-27T10:06:34.555Z",
             "sha256": "e45f9e5c61fcac908dcfd7a09fd0c7fc414b58e386108ed47f9b7e3450fb7027",
             "snapshot": true,
             "licence": "unknown",
@@ -3139,7 +3139,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30982; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:39.472Z",
+            "retrievedAt": "2026-09-27T10:06:27.277Z",
             "sha256": "7f2f5762f42408e3d5a9239e21d926e5e12df3dec1bf0c5d0b583bf99e69d54c",
             "snapshot": true,
             "licence": "unknown",
@@ -3182,7 +3182,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30986; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:39.472Z",
+            "retrievedAt": "2026-09-27T10:06:27.277Z",
             "sha256": "7f2f5762f42408e3d5a9239e21d926e5e12df3dec1bf0c5d0b583bf99e69d54c",
             "snapshot": true,
             "licence": "unknown",
@@ -3225,7 +3225,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30987; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:39.472Z",
+            "retrievedAt": "2026-09-27T10:06:27.277Z",
             "sha256": "7f2f5762f42408e3d5a9239e21d926e5e12df3dec1bf0c5d0b583bf99e69d54c",
             "snapshot": true,
             "licence": "unknown",
@@ -3268,7 +3268,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30989; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:39.472Z",
+            "retrievedAt": "2026-09-27T10:06:27.277Z",
             "sha256": "7f2f5762f42408e3d5a9239e21d926e5e12df3dec1bf0c5d0b583bf99e69d54c",
             "snapshot": true,
             "licence": "unknown",
@@ -3311,7 +3311,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30990; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:39.472Z",
+            "retrievedAt": "2026-09-27T10:06:27.277Z",
             "sha256": "7f2f5762f42408e3d5a9239e21d926e5e12df3dec1bf0c5d0b583bf99e69d54c",
             "snapshot": true,
             "licence": "unknown",
@@ -3354,7 +3354,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30992; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:39.472Z",
+            "retrievedAt": "2026-09-27T10:06:27.277Z",
             "sha256": "7f2f5762f42408e3d5a9239e21d926e5e12df3dec1bf0c5d0b583bf99e69d54c",
             "snapshot": true,
             "licence": "unknown",
@@ -3397,7 +3397,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30996; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:39.472Z",
+            "retrievedAt": "2026-09-27T10:06:27.277Z",
             "sha256": "7f2f5762f42408e3d5a9239e21d926e5e12df3dec1bf0c5d0b583bf99e69d54c",
             "snapshot": true,
             "licence": "unknown",
@@ -3440,7 +3440,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/30998; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:39.472Z",
+            "retrievedAt": "2026-09-27T10:06:27.277Z",
             "sha256": "7f2f5762f42408e3d5a9239e21d926e5e12df3dec1bf0c5d0b583bf99e69d54c",
             "snapshot": true,
             "licence": "unknown",
@@ -3483,7 +3483,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/31004; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:39.472Z",
+            "retrievedAt": "2026-09-27T10:06:27.277Z",
             "sha256": "7f2f5762f42408e3d5a9239e21d926e5e12df3dec1bf0c5d0b583bf99e69d54c",
             "snapshot": true,
             "licence": "unknown",
@@ -3526,7 +3526,7 @@
             "title": "OParl Vorlage",
             "publisher": "Dresden",
             "locator": "record http://oparl.dresden.de/bodies/0001/papers/vo/31014; data.name, data.date, data.consultation",
-            "retrievedAt": "2026-09-26T16:57:39.472Z",
+            "retrievedAt": "2026-09-27T10:06:27.277Z",
             "sha256": "7f2f5762f42408e3d5a9239e21d926e5e12df3dec1bf0c5d0b583bf99e69d54c",
             "snapshot": true,
             "licence": "unknown",

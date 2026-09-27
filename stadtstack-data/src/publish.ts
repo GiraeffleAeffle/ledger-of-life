@@ -2,11 +2,11 @@ import {join} from 'node:path';
 import {readFile} from 'node:fs/promises';
 import {diff} from './changes.ts';
 import {cacheDir,outDir,jsonFile,save} from './common.ts';
-import {validatePublication} from './schema.ts';
+import {validatePublication,cityFeedSchema} from './schema.ts';
 import {compactCollection} from './min.ts';
-import type {Catalogue,FeatureCollection} from './schema.ts';
-const catalogue=await jsonFile<Catalogue>(join(cacheDir,'staging','catalogue.json'));if(!catalogue)throw Error('Run npm run collect first');const collections:Record<string,unknown>={};for(const city of catalogue.cities)collections[city.id]=await jsonFile<FeatureCollection>(join(cacheDir,'staging','cities',city.id,'signals.geojson'));
-const validated=validatePublication(catalogue,collections);
+import type {Catalogue,FeatureCollection,CityFeed} from './schema.ts';
+const catalogue=await jsonFile<Catalogue>(join(cacheDir,'staging','catalogue.json'));if(!catalogue)throw Error('Run npm run collect first');const collections:Record<string,unknown>={},feeds:Record<string,unknown>={};for(const city of catalogue.cities){collections[city.id]=await jsonFile<FeatureCollection>(join(cacheDir,'staging','cities',city.id,'signals.geojson'));feeds[city.id]=await jsonFile(join(cacheDir,'staging','cities',city.id,'feed.json'));}
+const validated=validatePublication(catalogue,collections);const validatedFeeds:Record<string,CityFeed>=Object.fromEntries(Object.entries(feeds).map(([id,feed])=>[id,cityFeedSchema.parse(feed)]));for(const city of catalogue.cities)if(validatedFeeds[city.id].cityId!==city.id)throw Error(`Wrong feed city for ${city.id}`);
 const prepared=validated.catalogue.cities.map(city=>{
  const collection=validated.collections[city.id],full=JSON.stringify(collection,null,2)+'\n',min=JSON.stringify(compactCollection(collection))+'\n';
  city.minUrl=`cities/${city.id}/signals.min.geojson`;
@@ -26,6 +26,7 @@ for(const {city,collection,full,min} of prepared){
   await save(changesPath,JSON.stringify(changes,null,2)+'\n');
  }else if(!await jsonFile(changesPath))throw Error(`Missing change manifest for ${city.id}`);
  await save(join(directory,'signals.min.geojson'),min);
+ const feed=validatedFeeds[city.id];await save(join(directory,'feed.json'),JSON.stringify(feed,null,2)+'\n');
  console.log(city.id,collection.features.length,city.fullBytes,city.minBytes);
 }
 await save(join(outDir,'catalogue.json'),JSON.stringify(validated.catalogue,null,2)+'\n');
@@ -37,7 +38,7 @@ const summary=[
  '## Attribution and reuse',
  '',
  ...catalogue.cities.flatMap(c=>[`${c.name} (${c.id}): ${c.sources.map(s=>`${s.id} — ${s.publisher}, ${s.licence}, ${s.reuse}${s.status==='failed'?' (failed; '+s.error+')':''}`).join('; ') || 'no source available'}`, '']),
- 'OpenStreetMap place records are an ODbL 1.0 derivative database: © OpenStreetMap contributors, https://www.openstreetmap.org/copyright ; reuse and share-alike obligations apply to that separable subset. Source-specific licence and reuse metadata on each record controls other records; a public PDF is not itself an open-data licence. Ordinance facts are attributed under § 5 UrhG; council papers are short original factual summaries with outbound links, not copied attachments. Autobahn API licence is not verified.',
+ 'OpenStreetMap place records are an ODbL 1.0 derivative database: © OpenStreetMap contributors, https://www.openstreetmap.org/copyright ; reuse and share-alike obligations apply to that separable subset. Source-specific licence and reuse metadata on each record controls other records; a public PDF is not itself an open-data licence. Ordinance facts are attributed under § 5 UrhG; council papers are short original factual summaries with outbound links, not copied attachments. Autobahn API licence is not verified. The city feeds contain only headlines, publisher names, publication/event dates and source links; feed licences are unknown, and no article body is reproduced. Treat feed items as attribution-linked factual notices, not licensed article text.',
  '',
  '## Compact map display',
  '',

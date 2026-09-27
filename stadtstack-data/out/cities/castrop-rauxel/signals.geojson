@@ -18,7 +18,7 @@
       },
       "properties": {
         "id": "autobahn:2023-001227--vi-bs.2022-05-03_19-00-00-000.devi-zus.2022-05-03_19-00-00-000.f_001.de1",
-        "version": "c4d5979d468112be98d69f8c087c8b6dbf678c6282d2aef3f2f567900afcd798",
+        "version": "8b167f2d5b9111ba2218ce10f3af36a8025b2be96e674f27395b2258b189be18",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -40,8 +40,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-001227--vi-bs.2022-05-03_19-00-00-000.devi-zus.2022-05-03_19-00-00-000.f_001.de1]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -51,7 +51,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -71,7 +71,7 @@
       },
       "properties": {
         "id": "autobahn:2023-001227--vi-bs.2022-05-03_19-00-00-000.devi-zus.2022-05-03_19-00-00-000.f_001.de3",
-        "version": "986a0232bec2a1aca02b112b7fb2f6a7f58c322c5b273662bf2d9206bbd9278b",
+        "version": "a4ce866e7c478cc72c27415e38969399d11ac1baa86077b2c71c4ed2da9bf608",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -93,8 +93,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-001227--vi-bs.2022-05-03_19-00-00-000.devi-zus.2022-05-03_19-00-00-000.f_001.de3]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -104,7 +104,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -124,7 +124,7 @@
       },
       "properties": {
         "id": "autobahn:2023-001227--vi-bs.2022-05-03_19-00-00-000.devi-zus.2022-05-03_19-00-00-000.f_001.de5",
-        "version": "bfda98eba82f020c8f64cfe3fa3ebdb855fd5591a0c222a8bba980b2f0d2efa5",
+        "version": "43bd8c6422dcbd630bf28a483f07627ffd60b2d04bdac7ec287a0cc3426598ac",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -146,8 +146,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-001227--vi-bs.2022-05-03_19-00-00-000.devi-zus.2022-05-03_19-00-00-000.f_001.de5]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -157,7 +157,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -177,7 +177,7 @@
       },
       "properties": {
         "id": "autobahn:2023-001227--vi-bs.2022-05-20_19-00-00-000.devi-zus.2022-05-03_19-00-00-000.f_001.de11",
-        "version": "db5aabd911e426d3064ec48c2b7ebbd13a1cff837ad4e1fb7936c99bef78538b",
+        "version": "45e528b1e400197a8e10e7842ed668d38ec5da4747f39551f9b1c0cbff65d3b2",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -199,8 +199,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-001227--vi-bs.2022-05-20_19-00-00-000.devi-zus.2022-05-03_19-00-00-000.f_001.de11]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -210,7 +210,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -230,7 +230,7 @@
       },
       "properties": {
         "id": "autobahn:2023-001227--vi-bs.2022-05-20_19-00-00-000.devi-zus.2022-05-03_19-00-00-000.f_001.de7",
-        "version": "6b62f66a47f4d14b5b1f933a1d5d69cfc486b630ddc7538896b244d94b463468",
+        "version": "d9baaa2c8d906dadca2f464b79c8ef7ba3fbeb9d02e423ab9f16b753c36ef002",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -252,8 +252,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-001227--vi-bs.2022-05-20_19-00-00-000.devi-zus.2022-05-03_19-00-00-000.f_001.de7]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -263,7 +263,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -283,7 +283,7 @@
       },
       "properties": {
         "id": "autobahn:2023-001227--vi-bs.2022-05-20_19-00-00-000.devi-zus.2022-05-03_19-00-00-000.f_001.de9",
-        "version": "6cbb02ca2ab2925742c3b29fff1e7fd9ff35f2d0890223815237e6622f2b4388",
+        "version": "e4c81eb3e56cc64d8133b1d21d91f8a819cf5dc8970fb6a007dd7710487c4870",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -305,8 +305,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-001227--vi-bs.2022-05-20_19-00-00-000.devi-zus.2022-05-03_19-00-00-000.f_001.de9]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -316,7 +316,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -358,7 +358,7 @@
             "title": "Autobahn A2 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-001445--vi-fbm.2021-04-12_05-00-00-000.devi-zus.2021-04-12_05-00-00-000_001.de1]",
-            "retrievedAt": "2026-09-26T16:53:35.030Z",
+            "retrievedAt": "2026-09-27T10:04:55.015Z",
             "sha256": "e0fc2b853e0f9d9d12ae4928faca5062e3d11c3004900d212bb1b58ef369db2b",
             "snapshot": true,
             "licence": "unknown",
@@ -369,7 +369,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.030Z"
+        "asOf": "2026-09-27T10:04:55.015Z"
       }
     },
     {
@@ -411,7 +411,7 @@
             "title": "Autobahn A2 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-001445--vi-fbm.2021-04-12_05-00-00-000.devi-zus.2021-04-12_05-00-00-000_001.de2]",
-            "retrievedAt": "2026-09-26T16:53:35.030Z",
+            "retrievedAt": "2026-09-27T10:04:55.015Z",
             "sha256": "e0fc2b853e0f9d9d12ae4928faca5062e3d11c3004900d212bb1b58ef369db2b",
             "snapshot": true,
             "licence": "unknown",
@@ -422,7 +422,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.030Z"
+        "asOf": "2026-09-27T10:04:55.015Z"
       }
     },
     {
@@ -442,7 +442,7 @@
       },
       "properties": {
         "id": "autobahn:2023-002164--vi-bs.2026-04-16_13-00-00-000.devi-zus.2023-01-18_05-00-00-000.de5",
-        "version": "68eebd6f153224be954ffe6772a8aee250d9813950897de6b89bb968d0b79125",
+        "version": "919a568bf80bd79e8f353573ea2f1e25135d37d3680e1d7f1f8508ce9713079e",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -464,8 +464,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-002164--vi-bs.2026-04-16_13-00-00-000.devi-zus.2023-01-18_05-00-00-000.de5]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -475,7 +475,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -495,7 +495,7 @@
       },
       "properties": {
         "id": "autobahn:2023-002164--vi-bs.2026-04-16_13-00-00-000.devi-zus.2023-01-18_05-00-00-000.de7",
-        "version": "d58370da9a9007fd3c5d41fecc3d0e4a03817cd23823d892d291510dd1ba21fa",
+        "version": "48c51666307fed804bf28706c3bd7b9cfa86a6e0ce0ab7e3a84f8e4d12c778d5",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -517,8 +517,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-002164--vi-bs.2026-04-16_13-00-00-000.devi-zus.2023-01-18_05-00-00-000.de7]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -528,7 +528,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -570,7 +570,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-002969--vi-bs.2024-03-16_12-00-00-000.devi-zus.2023-11-17_11-00-00-000.de27]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -581,7 +581,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -623,7 +623,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-002969--vi-bs.2024-03-28_12-00-00-000.devi-zus.2023-11-17_11-00-00-000.de29]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -634,7 +634,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -676,7 +676,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-002969--vi-bs.2024-03-28_12-00-00-000.devi-zus.2023-11-17_11-00-00-000.de31]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -687,7 +687,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -729,7 +729,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-002969--vi-fbm.2023-12-11_03-00-00-000.devi-zus.2023-11-17_11-00-00-000.de11]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -740,7 +740,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -782,7 +782,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-002969--vi-fbm.2023-12-11_03-00-00-000.devi-zus.2023-11-17_11-00-00-000.de12]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -793,7 +793,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -835,7 +835,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-002969--vi-fbm.2023-12-11_03-00-00-000.devi-zus.2023-11-17_11-00-00-000.de7]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -846,7 +846,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -888,7 +888,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-03-18_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de163]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -899,7 +899,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -941,7 +941,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-03-18_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de165]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -952,7 +952,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -994,7 +994,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-03-18_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de167]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1005,7 +1005,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1047,7 +1047,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-03-18_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de169]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1058,7 +1058,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1100,7 +1100,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-03-18_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de171]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1111,7 +1111,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1153,7 +1153,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-03-18_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de173]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1164,7 +1164,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1206,7 +1206,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-03-18_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de176]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1217,7 +1217,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1259,7 +1259,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-03-18_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de179]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1270,7 +1270,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1312,7 +1312,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-03-18_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de181]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1323,7 +1323,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1365,7 +1365,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-03-18_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de183]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1376,7 +1376,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1418,7 +1418,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-09-29_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de204]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1429,7 +1429,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1471,7 +1471,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-09-29_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de206]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1482,7 +1482,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1524,7 +1524,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-09-29_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de208]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1535,7 +1535,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1577,7 +1577,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-09-29_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de210]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1588,7 +1588,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1630,7 +1630,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-09-29_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de212]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1641,7 +1641,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1683,7 +1683,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-09-29_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de215]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1694,7 +1694,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1736,7 +1736,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-09-29_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de218]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1747,7 +1747,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1789,7 +1789,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-09-29_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de220]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1800,7 +1800,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1842,7 +1842,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004133--vi-bs.2026-09-29_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de222]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -1853,7 +1853,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -1895,7 +1895,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-03-18_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de178]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -1906,7 +1906,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -1948,7 +1948,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-03-18_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de185]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -1959,7 +1959,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2001,7 +2001,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-09-25_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de196]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2012,7 +2012,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2054,7 +2054,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-09-25_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de197]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2065,7 +2065,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2107,7 +2107,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-09-25_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de198]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2118,7 +2118,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2160,7 +2160,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-09-25_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de199]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2171,7 +2171,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2213,7 +2213,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-09-25_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de200]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2224,7 +2224,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2266,7 +2266,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-09-25_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de201]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2277,7 +2277,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2319,7 +2319,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-09-25_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de202]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2330,7 +2330,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2372,7 +2372,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-09-29_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de217]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2383,7 +2383,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2425,7 +2425,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-09-29_05-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de224]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2436,7 +2436,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2478,7 +2478,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-10-02_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de225]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2489,7 +2489,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2531,7 +2531,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-10-02_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de226]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2542,7 +2542,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2584,7 +2584,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-10-02_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de227]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2595,7 +2595,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2637,7 +2637,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-10-02_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de228]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2648,7 +2648,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2690,7 +2690,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-10-02_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de229]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2701,7 +2701,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2743,7 +2743,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-10-02_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de230]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2754,7 +2754,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2796,7 +2796,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004133--vi-fbm.2026-10-02_21-00-00-000.devi-zus.2022-01-03_20-00-00-000_008.f.de231]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -2807,7 +2807,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -2849,7 +2849,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004405--vi-bs.2026-03-01_20-15-00-000.devi-zus.2024-05-02_20-00-00-000_008.f.de26]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -2860,7 +2860,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -2902,7 +2902,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004405--vi-bs.2026-03-01_20-15-00-000.devi-zus.2024-05-02_20-00-00-000_008.f.de28]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -2913,7 +2913,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -2955,7 +2955,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004405--vi-bs.2026-03-01_20-15-00-000.devi-zus.2024-05-02_20-00-00-000_008.f.de30]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -2966,7 +2966,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -3008,7 +3008,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004405--vi-bs.2026-03-01_20-15-00-000.devi-zus.2024-05-02_20-00-00-000_008.f.de32]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -3019,7 +3019,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -3061,7 +3061,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004405--vi-bs.2026-03-01_20-15-00-000.devi-zus.2024-05-02_20-00-00-000_008.f.de34]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -3072,7 +3072,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -3114,7 +3114,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004405--vi-bs.2026-03-01_20-15-00-000.devi-zus.2024-05-02_20-00-00-000_008.f.de36]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -3125,7 +3125,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -3167,7 +3167,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004424--vi-bs.2026-03-22_20-00-00-000.devi-zus.2021-06-14_20-00-00-000_006.f.de137]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -3178,7 +3178,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -3220,7 +3220,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004424--vi-bs.2026-03-22_20-00-00-000.devi-zus.2021-06-14_20-00-00-000_006.f.de139]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -3231,7 +3231,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -3273,7 +3273,7 @@
             "title": "Autobahn A42 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2023-004424--vi-fbm.2026-03-22_20-00-00-000.devi-zus.2021-06-14_20-00-00-000_006.f.de136]",
-            "retrievedAt": "2026-09-26T16:53:35.112Z",
+            "retrievedAt": "2026-09-27T10:04:55.121Z",
             "sha256": "4b1a9ffda8e6e4df9b096693334a3f3eff6e0288b5e3220b1f9a79e6187a41a3",
             "snapshot": true,
             "licence": "unknown",
@@ -3284,7 +3284,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.112Z"
+        "asOf": "2026-09-27T10:04:55.121Z"
       }
     },
     {
@@ -3304,7 +3304,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004446--vi-bs.2026-09-11_20-00-00-000.devi-zus.2025-03-03_20-00-00-000_009.f.de11",
-        "version": "621c97e5a26f780a0720034454bc99c3e7871e83bc750e2226a29870b884aa66",
+        "version": "7cf266f605c80df6e22ed8c34712d25f25f9797d790ee6235b9823e51993c595",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -3326,8 +3326,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004446--vi-bs.2026-09-11_20-00-00-000.devi-zus.2025-03-03_20-00-00-000_009.f.de11]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -3337,7 +3337,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -3357,7 +3357,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004446--vi-bs.2026-09-11_20-00-00-000.devi-zus.2025-03-03_20-00-00-000_009.f.de5",
-        "version": "660ed2d31a28302bbad3f23bd8eb3e304dc106e0d4eefd00d8330030ae2595f9",
+        "version": "d70b350438d728d1df0999d57e0bc83532db78627c33ec78b2235081102e889f",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -3379,8 +3379,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004446--vi-bs.2026-09-11_20-00-00-000.devi-zus.2025-03-03_20-00-00-000_009.f.de5]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -3390,7 +3390,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -3410,7 +3410,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004446--vi-bs.2026-09-11_20-00-00-000.devi-zus.2025-03-03_20-00-00-000_009.f.de7",
-        "version": "6183a8d5b29ecf057cff3cffea10fdac4fad146fb22f248e1ef5b6ef27956e8b",
+        "version": "5460a8a74669bc9108644085fe1530739650f34c24799e5e65cbb8f466e167be",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -3432,8 +3432,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004446--vi-bs.2026-09-11_20-00-00-000.devi-zus.2025-03-03_20-00-00-000_009.f.de7]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -3443,7 +3443,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -3463,7 +3463,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004446--vi-bs.2026-09-11_20-00-00-000.devi-zus.2025-03-03_20-00-00-000_009.f.de9",
-        "version": "748e6798d7fd47b240a88f564499cfbd5b7baad7d30a4f81500a41424b585af8",
+        "version": "746e4a1f0257122d0ac50e378106e200ef2ef4b57e66ac9ba04f062822c8e3b1",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -3485,8 +3485,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004446--vi-bs.2026-09-11_20-00-00-000.devi-zus.2025-03-03_20-00-00-000_009.f.de9]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -3496,7 +3496,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -3516,7 +3516,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004457--vi-bs.2026-09-07_19-00-00-000.devi-zus.2023-06-01_05-00-00-000_006.f.de53",
-        "version": "e29ea1a26baafdfd6a2c075c220d710084a0672ad6b81e26330a6b220093c171",
+        "version": "7d6f78960852904df6d5757e31c5284e453f521ea93b88ade1536de83523306a",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -3538,8 +3538,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004457--vi-bs.2026-09-07_19-00-00-000.devi-zus.2023-06-01_05-00-00-000_006.f.de53]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -3549,7 +3549,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -3569,7 +3569,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004457--vi-bs.2026-09-07_19-00-00-000.devi-zus.2023-06-01_05-00-00-000_006.f.de55",
-        "version": "3ee4f78de1bff191da85eae81b7e1f302fb74917e041aa0448c7e4ff26ba5e49",
+        "version": "293fc0be6edcd5f6156a5997fca2e44e123e02d7e3eb3f590c4746b8c928d396",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -3591,8 +3591,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004457--vi-bs.2026-09-07_19-00-00-000.devi-zus.2023-06-01_05-00-00-000_006.f.de55]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -3602,7 +3602,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -3622,7 +3622,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004457--vi-bs.2026-09-07_19-00-00-000.devi-zus.2023-06-01_05-00-00-000_006.f.de57",
-        "version": "cf0dd82bcaaed15667523750dc6d106d8395004d6e49d161a61f034a7b872117",
+        "version": "0dbe85e0ca317ac28191fb8c512a5027845a38b1d9d0b73a82f8dee62c0b5303",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -3644,8 +3644,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004457--vi-bs.2026-09-07_19-00-00-000.devi-zus.2023-06-01_05-00-00-000_006.f.de57]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -3655,7 +3655,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -3675,7 +3675,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004457--vi-bs.2026-09-07_19-00-00-000.devi-zus.2023-06-01_05-00-00-000_006.f.de59",
-        "version": "435365748cc3be73e9938ca750e8fdacf614fba7f73a319351322651a89cceee",
+        "version": "b5944480298b54a1fc2caa8d7b9fbf6c7bad2dc709ea713d7b41c2c91530e2a8",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -3697,8 +3697,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004457--vi-bs.2026-09-07_19-00-00-000.devi-zus.2023-06-01_05-00-00-000_006.f.de59]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -3708,7 +3708,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -3728,7 +3728,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004457--vi-bs.2026-09-07_19-00-00-000.devi-zus.2023-06-01_05-00-00-000_006.f.de61",
-        "version": "aa250d7e85ec54a6de4dbaee12b7480d6f6c795b4272048f740d4c4ada568c17",
+        "version": "d159b6e48e25b4034d68d7f6cbfe8261ddd1e74078d8f910731f60dc1b51042a",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -3750,8 +3750,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004457--vi-bs.2026-09-07_19-00-00-000.devi-zus.2023-06-01_05-00-00-000_006.f.de61]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -3761,7 +3761,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -3781,7 +3781,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004457--vi-bs.2026-09-07_19-00-00-000.devi-zus.2023-06-01_05-00-00-000_006.f.de63",
-        "version": "00eeb3849fbc709e5972e6bf5dbbe08b63e7d8382bffc35e6e913a2ef546c74a",
+        "version": "2c069607fb0fe9b08e3f7d1f10a12c1a18bf6854537cf9801d764a102227bb19",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -3803,8 +3803,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004457--vi-bs.2026-09-07_19-00-00-000.devi-zus.2023-06-01_05-00-00-000_006.f.de63]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -3814,7 +3814,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -3834,7 +3834,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004527--vi-bs.2024-11-25_05-00-00-000.devi-zus.2024-05-11_20-00-00-000_001.f.de1",
-        "version": "a360e365e37b040b138356e98a1a138db710ef6c4f61b5c4010b847a61edccc0",
+        "version": "633db417d31b63f5f8fb1e977e317ef4833944138e65cbe288f0bb759bb58c83",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -3856,8 +3856,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004527--vi-bs.2024-11-25_05-00-00-000.devi-zus.2024-05-11_20-00-00-000_001.f.de1]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -3867,7 +3867,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -3887,7 +3887,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004527--vi-bs.2024-11-25_05-00-00-000.devi-zus.2024-05-11_20-00-00-000_001.f.de3",
-        "version": "3b4499e8d16f867a7f390db2ea47d74c46163b0249257644868d27d4056cf233",
+        "version": "74ff1393e550e0011eb107a95ffcc2347cb04787e1627b7726deaaa4afa95c1b",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -3909,8 +3909,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004527--vi-bs.2024-11-25_05-00-00-000.devi-zus.2024-05-11_20-00-00-000_001.f.de3]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -3920,7 +3920,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -3940,7 +3940,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004527--vi-bs.2024-11-25_05-00-00-000.devi-zus.2024-05-11_20-00-00-000_001.f.de5",
-        "version": "8070966cc7b6a0fe0ce3d440fac6a3c4adab189830ad08acf8760a1a7dd6aef5",
+        "version": "fb92a2734fa015331297166e5c96cf060b1a2669bded37751b917f2404711bd2",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -3962,8 +3962,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004527--vi-bs.2024-11-25_05-00-00-000.devi-zus.2024-05-11_20-00-00-000_001.f.de5]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -3973,7 +3973,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -3993,7 +3993,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004527--vi-bs.2024-11-25_05-00-00-000.devi-zus.2024-05-11_20-00-00-000_001.f.de7",
-        "version": "37c4a2f85b74a10bc3d9b8a55ebd6ba0e06f91d0dec070ce8b462008e603dce9",
+        "version": "3af5080c4d0644ac62350eadf6fe198361cf1cf2b2599d9e7568f22c51feb135",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4015,8 +4015,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004527--vi-bs.2024-11-25_05-00-00-000.devi-zus.2024-05-11_20-00-00-000_001.f.de7]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4026,7 +4026,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4046,7 +4046,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004557--vi-bs.2026-09-07_20-00-00-000.devi-zus.2025-08-05_20-00-00-000_005.f.de15",
-        "version": "c5013ce3ec7dc16e2c6fd460baae1479dfc45bb0302cd2d9c6a0cea5902a3f1d",
+        "version": "6129e739e15e64f1ec79d6023e6274f6d563b70bb9cfeef8b6b35b19a0207222",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4068,8 +4068,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004557--vi-bs.2026-09-07_20-00-00-000.devi-zus.2025-08-05_20-00-00-000_005.f.de15]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4079,7 +4079,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -4099,7 +4099,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004557--vi-bs.2026-09-07_20-00-00-000.devi-zus.2025-08-05_20-00-00-000_005.f.de17",
-        "version": "e07fef14d2452ce503ea7d9e366b5924c290520c44df86cfc5d41fae2445079f",
+        "version": "314c83e44020120ed9032413a7367f10d6fb33ddcfd489c4f7680b0c146731c3",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4121,8 +4121,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004557--vi-bs.2026-09-07_20-00-00-000.devi-zus.2025-08-05_20-00-00-000_005.f.de17]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4132,7 +4132,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -4152,7 +4152,7 @@
       },
       "properties": {
         "id": "autobahn:2023-004557--vi-bs.2026-09-07_20-00-00-000.devi-zus.2025-08-05_20-00-00-000_005.f.de19",
-        "version": "663824631d3ad5cd6d1e8c4fff2ae0bc33d893f811f59395ddcf8b3d13e40ae4",
+        "version": "b04476db761044629c927be8398fe26c2ef6fd4afae79a1ca1c875e920041469",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4174,8 +4174,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2023-004557--vi-bs.2026-09-07_20-00-00-000.devi-zus.2025-08-05_20-00-00-000_005.f.de19]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4185,7 +4185,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -4205,7 +4205,7 @@
       },
       "properties": {
         "id": "autobahn:2024-019555--vi-bs.2026-08-22_20-00-00-000.devi-bs.2025-04-14_20-00-00-000.f.de11",
-        "version": "5734596f434f77c88b813a37709330ddcc693548c7d237f22afb8dc50efded19",
+        "version": "7eacb60b93a3d09f2ab2981ebddca2e23aa33333c9af69344badc1d6bdba79db",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4227,8 +4227,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2024-019555--vi-bs.2026-08-22_20-00-00-000.devi-bs.2025-04-14_20-00-00-000.f.de11]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4238,7 +4238,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4258,7 +4258,7 @@
       },
       "properties": {
         "id": "autobahn:2024-019555--vi-bs.2026-08-22_20-00-00-000.devi-bs.2025-04-14_20-00-00-000.f.de7",
-        "version": "428a573c4a2a47960142b2e30ea4c849d8a056b536a198ab665f9f859a778504",
+        "version": "9773af0ddfbceace6d0eb5043bc80da56d4356aaafe6c26ad5b39ea279756c83",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4280,8 +4280,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2024-019555--vi-bs.2026-08-22_20-00-00-000.devi-bs.2025-04-14_20-00-00-000.f.de7]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4291,7 +4291,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4311,7 +4311,7 @@
       },
       "properties": {
         "id": "autobahn:2024-019555--vi-bs.2026-08-22_20-00-00-000.devi-bs.2025-04-14_20-00-00-000.f.de9",
-        "version": "e7f5757c6baac1bed120f8eb7d9119965e99d8a6865ecceaa69af22e8abf66dc",
+        "version": "f9cd0598863845d5cd77cbcf405cfd5c293b34bf597bd8e141bc37d14a39102b",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4333,8 +4333,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2024-019555--vi-bs.2026-08-22_20-00-00-000.devi-bs.2025-04-14_20-00-00-000.f.de9]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4344,7 +4344,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4364,7 +4364,7 @@
       },
       "properties": {
         "id": "autobahn:2024-048526--vi-bs.2026-07-15_20-00-00-000.devi-zus.2026-03-01_20-00-00-000.de11",
-        "version": "28936c167a061e23a692db550ef464f338b0b34da3b990f94761c44fa6edf741",
+        "version": "62ee1d7c8c2dad387569934d06ca29023c6ed2e4ee5f30ff30890f7db47b13ad",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4386,8 +4386,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2024-048526--vi-bs.2026-07-15_20-00-00-000.devi-zus.2026-03-01_20-00-00-000.de11]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4397,7 +4397,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4417,7 +4417,7 @@
       },
       "properties": {
         "id": "autobahn:2024-048526--vi-bs.2026-07-15_20-00-00-000.devi-zus.2026-03-01_20-00-00-000.de13",
-        "version": "14bffaf4b48ade7a3875bc0db93aca17243b9171d5860d585d7d9b569cd1e17c",
+        "version": "ea9cf32d88408afc025cedc428179f27597facdf1e54f3568b2aebbf33ed2dfa",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4439,8 +4439,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2024-048526--vi-bs.2026-07-15_20-00-00-000.devi-zus.2026-03-01_20-00-00-000.de13]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4450,7 +4450,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4470,7 +4470,7 @@
       },
       "properties": {
         "id": "autobahn:2024-048526--vi-bs.2026-07-15_20-00-00-000.devi-zus.2026-03-01_20-00-00-000.de15",
-        "version": "960f68f96694ea041937c0ad90feb6587ee65dad29c027a0eac177a7161dc8dc",
+        "version": "65edc3830c2a6b47165b9916cf16658fc1cffb8a5bc15b7cf426892c45c8828a",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4492,8 +4492,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2024-048526--vi-bs.2026-07-15_20-00-00-000.devi-zus.2026-03-01_20-00-00-000.de15]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4503,7 +4503,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4523,7 +4523,7 @@
       },
       "properties": {
         "id": "autobahn:2024-048526--vi-bs.2026-07-15_20-00-00-000.devi-zus.2026-03-01_20-00-00-000.de17",
-        "version": "3fef202fb47081cb4456bb969bee959f3d9140d2d5a67f12e6408eeefa8e72bc",
+        "version": "9d93c272a863d69989a72e9de42eef56f57ad88fb64048e3ffd5c741785cd181",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4545,8 +4545,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2024-048526--vi-bs.2026-07-15_20-00-00-000.devi-zus.2026-03-01_20-00-00-000.de17]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4556,7 +4556,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4576,7 +4576,7 @@
       },
       "properties": {
         "id": "autobahn:2025-001946--vi-bs.2026-02-25_05-00-00-000.devi-zus.2025-03-01_19-00-00-000.de23",
-        "version": "2fb4a158d00063a308e8151fd8c74604ea3b64aeb78c805c5c504abc2a89b1c8",
+        "version": "9f801ce014e137731ed5e3c5dfddef9dec5672b706741d4b3940d3adac1e95f1",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4598,8 +4598,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-001946--vi-bs.2026-02-25_05-00-00-000.devi-zus.2025-03-01_19-00-00-000.de23]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4609,7 +4609,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4629,7 +4629,7 @@
       },
       "properties": {
         "id": "autobahn:2025-001946--vi-bs.2026-02-25_05-00-00-000.devi-zus.2025-03-01_19-00-00-000.de25",
-        "version": "bc638c5a71e56e89ad72fdf2bf3f97eb556161d9bb4524876343477573be9735",
+        "version": "192daf7c9a8b7f39ad22e298c0721b7b121325a72080a7278f9fcb34ae0fb2c0",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4651,8 +4651,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-001946--vi-bs.2026-02-25_05-00-00-000.devi-zus.2025-03-01_19-00-00-000.de25]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4662,7 +4662,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4682,7 +4682,7 @@
       },
       "properties": {
         "id": "autobahn:2025-001946--vi-bs.2026-02-26_06-00-00-000.devi-zus.2025-03-01_19-00-00-000.de19",
-        "version": "535750198ab1d63bd839a21af816bee2e779cfaf5c0d1b6b4dc31e0126a25e18",
+        "version": "d0165f07c93c65358553ce7ee5faff83d3211ad9137470cee10cdfa1872d50be",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4704,8 +4704,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-001946--vi-bs.2026-02-26_06-00-00-000.devi-zus.2025-03-01_19-00-00-000.de19]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4715,7 +4715,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4735,7 +4735,7 @@
       },
       "properties": {
         "id": "autobahn:2025-001946--vi-bs.2026-02-26_06-00-00-000.devi-zus.2025-03-01_19-00-00-000.de21",
-        "version": "9590e6d9664838955c5ecd4e335b76477ba0205c8fe71626677278a68b83e01e",
+        "version": "5b295c6dab2f233f0cd33786582ff2e9669aa9c678636334525fac6dd73c86a9",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4757,8 +4757,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-001946--vi-bs.2026-02-26_06-00-00-000.devi-zus.2025-03-01_19-00-00-000.de21]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4768,7 +4768,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4788,7 +4788,7 @@
       },
       "properties": {
         "id": "autobahn:2025-037554--vi-bs.2026-05-20_20-00-00-000.devi-zus.2025-11-03_20-00-00-000.de5",
-        "version": "df3e4fdf399c24eb11a44d42d440372477da6461f386080d9e3fccf6f9bc93e2",
+        "version": "d900e36f3bec63e3f0d3bc0bb6677c0321e9e52c8ff19dab64bbe14ff1136462",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4810,8 +4810,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-037554--vi-bs.2026-05-20_20-00-00-000.devi-zus.2025-11-03_20-00-00-000.de5]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4821,7 +4821,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4841,7 +4841,7 @@
       },
       "properties": {
         "id": "autobahn:2025-037554--vi-bs.2026-05-20_20-00-00-000.devi-zus.2025-11-03_20-00-00-000.de7",
-        "version": "b6138d229c9671f7b89159c8fcd7d6a4ee7e936dc6ef14436d79ce8987681cc3",
+        "version": "4e3e2bce0c72be742cb6c3c9a4155a93e6959fb491156d6788e44379eef96131",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4863,8 +4863,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-037554--vi-bs.2026-05-20_20-00-00-000.devi-zus.2025-11-03_20-00-00-000.de7]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4874,7 +4874,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4894,7 +4894,7 @@
       },
       "properties": {
         "id": "autobahn:2025-037554--vi-bs.2026-05-20_20-00-00-000.devi-zus.2025-11-03_20-00-00-000.de9",
-        "version": "2ee75692381e83ebf130425948dbfcccca0d4db8eeaf1273c978ffbe132aa38d",
+        "version": "8e33478197a4b701d5558f01fb7b4865ff79c361ea47b6bcd5e72caaddf90841",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -4916,8 +4916,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-037554--vi-bs.2026-05-20_20-00-00-000.devi-zus.2025-11-03_20-00-00-000.de9]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -4927,7 +4927,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -4969,7 +4969,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-055007--vi-bs.2025-12-11_11-00-00-000.devi-zus.2025-02-24_20-00-00-000_006.de1]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -4980,7 +4980,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -5022,7 +5022,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-055007--vi-bs.2025-12-11_11-00-00-000.devi-zus.2025-02-24_20-00-00-000_006.de3]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -5033,7 +5033,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -5075,7 +5075,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-062194--vi-bs.2026-09-04_00-00-00-000.devi-zus.2026-09-04_22-00-00-000.de1]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -5086,7 +5086,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -5128,7 +5128,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-062194--vi-bs.2026-09-04_00-00-00-000.devi-zus.2026-09-04_22-00-00-000.de3]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -5139,7 +5139,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -5181,7 +5181,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-062194--vi-bs.2026-09-04_00-00-00-000.devi-zus.2026-09-04_22-00-00-000.de5]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -5192,7 +5192,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -5234,7 +5234,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-003679--vi-bs.2026-03-09_05-00-00-000.devi-zus.2026-02-23_20-00-00-000_001.de1]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -5245,7 +5245,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -5287,7 +5287,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-003679--vi-bs.2026-03-09_05-00-00-000.devi-zus.2026-02-23_20-00-00-000_001.de11]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -5298,7 +5298,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -5340,7 +5340,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-003679--vi-bs.2026-03-09_05-00-00-000.devi-zus.2026-02-23_20-00-00-000_001.de3]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -5351,7 +5351,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -5393,7 +5393,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-003679--vi-bs.2026-03-09_05-00-00-000.devi-zus.2026-02-23_20-00-00-000_001.de5]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -5404,7 +5404,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -5446,7 +5446,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-003679--vi-bs.2026-03-09_05-00-00-000.devi-zus.2026-02-23_20-00-00-000_001.de7]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -5457,7 +5457,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -5499,7 +5499,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-003679--vi-bs.2026-03-09_05-00-00-000.devi-zus.2026-02-23_20-00-00-000_001.de9]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -5510,113 +5510,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            7.398757043938649,
-            51.47191860299104
-          ],
-          [
-            7.408666037547604,
-            51.466134159546975
-          ]
-        ]
-      },
-      "properties": {
-        "id": "autobahn:2026-007701--vi-bs.2026-07-04_20-00-00-000.devi-zus.2026-06-02_20-00-00-000.de1",
-        "version": "84b84bd0422c95d8e9256fc50e3367a0df8f9b06cf619eed7af6ce8daed83e75",
-        "cityId": "castrop-rauxel",
-        "kind": "roadworks",
-        "category": "Autobahn-Baustelle",
-        "title": "A45 | Dortmund-Eichlinghofen - Dortmund/Witten",
-        "statement": "A45 | Dortmund-Eichlinghofen - Dortmund/Witten: eine Baustelle ist im Autobahn-Verkehrsdienst verzeichnet. A45: Dortmund -> Hagen, zwischen 1.0 km hinter AS Dortmund-Eichlinghofen und 0.4 km vor AK Dortmund/Witten Die Lage kann auch eine Pendelstrecke außerhalb des Stadtgebiets betreffen.",
-        "status": "im Verkehrsdienst geführt",
-        "startDate": "2026-07-04",
-        "endDate": "2026-11-06",
-        "nextStep": "Aktuelle Verkehrs- und Sperrinformationen beim Betreiber prüfen.",
-        "unknowns": [
-          "Genauer Verkehrsverlauf und tatsächliche Dauer vor Ort"
-        ],
-        "scale": "district",
-        "geometryPrecision": "approximate",
-        "sources": [
-          {
-            "url": "https://verkehr.autobahn.de/o/autobahn/A45/services/roadworks",
-            "snapshotUrl": "https://verkehr.autobahn.de/o/autobahn/A45/services/roadworks",
-            "title": "Autobahn A45 roadworks",
-            "publisher": "Autobahn GmbH",
-            "locator": "roadworks[identifier=2026-007701--vi-bs.2026-07-04_20-00-00-000.devi-zus.2026-06-02_20-00-00-000.de1]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
-            "snapshot": true,
-            "licence": "unknown",
-            "reuse": "unknown"
-          }
-        ],
-        "extraction": {
-          "method": "structured"
-        },
-        "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            7.408666037547604,
-            51.466134159546975
-          ],
-          [
-            7.4188117737840376,
-            51.459940250355714
-          ]
-        ]
-      },
-      "properties": {
-        "id": "autobahn:2026-007701--vi-bs.2026-07-04_20-00-00-000.devi-zus.2026-06-02_20-00-00-000.de3",
-        "version": "1e5803c52b2526865b6ff7879fbd06264663a5dbca30982edccf313f9193766c",
-        "cityId": "castrop-rauxel",
-        "kind": "roadworks",
-        "category": "Autobahn-Baustelle",
-        "title": "A45 | Dortmund-Eichlinghofen - Johannes Erbstollen",
-        "statement": "A45 | Dortmund-Eichlinghofen - Johannes Erbstollen: eine Baustelle ist im Autobahn-Verkehrsdienst verzeichnet. A45: Dortmund -> Hagen, zwischen 2.0 km hinter AS Dortmund-Eichlinghofen und 2.6 km vor Johannes Erbstollen Die Lage kann auch eine Pendelstrecke außerhalb des Stadtgebiets betreffen.",
-        "status": "im Verkehrsdienst geführt",
-        "startDate": "2026-07-04",
-        "endDate": "2026-11-06",
-        "nextStep": "Aktuelle Verkehrs- und Sperrinformationen beim Betreiber prüfen.",
-        "unknowns": [
-          "Genauer Verkehrsverlauf und tatsächliche Dauer vor Ort"
-        ],
-        "scale": "district",
-        "geometryPrecision": "approximate",
-        "sources": [
-          {
-            "url": "https://verkehr.autobahn.de/o/autobahn/A45/services/roadworks",
-            "snapshotUrl": "https://verkehr.autobahn.de/o/autobahn/A45/services/roadworks",
-            "title": "Autobahn A45 roadworks",
-            "publisher": "Autobahn GmbH",
-            "locator": "roadworks[identifier=2026-007701--vi-bs.2026-07-04_20-00-00-000.devi-zus.2026-06-02_20-00-00-000.de3]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
-            "snapshot": true,
-            "licence": "unknown",
-            "reuse": "unknown"
-          }
-        ],
-        "extraction": {
-          "method": "structured"
-        },
-        "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -5636,7 +5530,7 @@
       },
       "properties": {
         "id": "autobahn:2026-008846--vi-bs.2026-09-01_20-00-00-000.de0",
-        "version": "1047935791115a53d045d463fbdbe10f5bc862f362a722920dc840f0fa7cc753",
+        "version": "63f8bdc387945f299b0306437b1c0dd0d635c7453776a6ab3eabee71ea3fac08",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -5658,8 +5552,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-008846--vi-bs.2026-09-01_20-00-00-000.de0]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -5669,7 +5563,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -5711,7 +5605,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-016836--vi-bs.2026-04-13_09-00-00-000.devi-bs.2026-04-13_09-00-00-000_011.de1]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -5722,7 +5616,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -5742,7 +5636,7 @@
       },
       "properties": {
         "id": "autobahn:2026-019464--vi-bs.2026-04-24_20-00-00-000.devi-zus.2026-04-24_09-00-00-000.de1",
-        "version": "5d37dafaec3bd0f4862c17cb305dba68bf068aaccb7c758864dfe1e8f83dfb5e",
+        "version": "b5224742451383e7e19843fae2d82f52772bb7156dbb4c3564f3fbbeae18d93a",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -5764,8 +5658,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-019464--vi-bs.2026-04-24_20-00-00-000.devi-zus.2026-04-24_09-00-00-000.de1]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -5775,7 +5669,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -5795,7 +5689,7 @@
       },
       "properties": {
         "id": "autobahn:2026-044922--vi-bs.2026-09-28_20-00-00-000.devi-zus.2026-09-28_20-00-00-000_002.de1",
-        "version": "894edf047ee5b83a213d89a5d9b4202a317d43526d8869aadaff0af52e9fc42a",
+        "version": "8874f1b192ce8913ad821e73bf20fe2cf61bd9f98988da32abd7bf042be810ee",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -5817,8 +5711,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-044922--vi-bs.2026-09-28_20-00-00-000.devi-zus.2026-09-28_20-00-00-000_002.de1]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -5828,7 +5722,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -5848,7 +5742,7 @@
       },
       "properties": {
         "id": "autobahn:2026-044922--vi-bs.2026-09-28_20-00-00-000.devi-zus.2026-09-28_20-00-00-000_002.de3",
-        "version": "c6057c26afe510e8c858fdf79bc1f466fbf2d7bac33e66eecce51a365319f57b",
+        "version": "d6e37ce4c64a0e13f7a6292daa7f5ce972ad69ffa87ba32f62a3a8c17b8e3a76",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -5870,8 +5764,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-044922--vi-bs.2026-09-28_20-00-00-000.devi-zus.2026-09-28_20-00-00-000_002.de3]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -5881,7 +5775,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -5901,7 +5795,7 @@
       },
       "properties": {
         "id": "autobahn:2026-044922--vi-bs.2026-09-28_20-00-00-000.devi-zus.2026-09-28_20-00-00-000_002.de5",
-        "version": "c553b2e3440a3e646b3dcc202b61ec75446a4a1e157aaf8a58ee5b1e142cdd6d",
+        "version": "bad1e21088a9f165de4969cc232ad4f65d67de5cfac92e171e47e38ddca1e19d",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -5923,8 +5817,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-044922--vi-bs.2026-09-28_20-00-00-000.devi-zus.2026-09-28_20-00-00-000_002.de5]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -5934,7 +5828,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -5954,7 +5848,7 @@
       },
       "properties": {
         "id": "autobahn:2026-044922--vi-bs.2026-09-28_20-00-00-000.devi-zus.2026-09-28_20-00-00-000_002.de7",
-        "version": "f3234995a121f9f67f544c14ff12f9890b9d0db7076be3f8fd7349df8584afe6",
+        "version": "d08008e2516d117a65da37f09e610495433a17b8aa1feb7ed326b2712b91d900",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -5976,8 +5870,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-044922--vi-bs.2026-09-28_20-00-00-000.devi-zus.2026-09-28_20-00-00-000_002.de7]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -5987,7 +5881,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -6007,7 +5901,7 @@
       },
       "properties": {
         "id": "autobahn:2026-047146--vi-fbm.2026-10-05_18-00-00-000.devi-zus.2026-10-05_18-00-00-000.de1",
-        "version": "4073e0493f1a76ca23cca3718eabf52b563a717a8f022374af0a0d64f2c6357d",
+        "version": "d644000feb9436f62e1f9d8b81993276f22e86089d255966bcb01ce098b8cf65",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6029,8 +5923,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-047146--vi-fbm.2026-10-05_18-00-00-000.devi-zus.2026-10-05_18-00-00-000.de1]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6040,7 +5934,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -6060,7 +5954,7 @@
       },
       "properties": {
         "id": "autobahn:2026-047146--vi-fbm.2026-10-05_19-00-00-000.devi-zus.2026-10-05_18-00-00-000.de3",
-        "version": "91af3a7c1c91e8aab5a3730f7eef0030c6233303e566a408dea4c81a86534c9c",
+        "version": "6147753bf97b5b92bf19d7e7eec739ce590042f97ae31c0f462d5c6dc60e67e6",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6082,8 +5976,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-047146--vi-fbm.2026-10-05_19-00-00-000.devi-zus.2026-10-05_18-00-00-000.de3]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6093,7 +5987,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -6113,7 +6007,7 @@
       },
       "properties": {
         "id": "autobahn:2026-047146--vi-fbm.2026-10-05_19-00-00-000.devi-zus.2026-10-05_18-00-00-000.de5",
-        "version": "a0606fcc6ddbe4dfb966f75acd50b346dfac186aa6a73117abbc4a9a5f3beee2",
+        "version": "03912a270555064a5dcf356f67769afa66d6e7e3659c4dd9985407f361bc9e30",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6135,8 +6029,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-047146--vi-fbm.2026-10-05_19-00-00-000.devi-zus.2026-10-05_18-00-00-000.de5]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6146,7 +6040,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -6166,7 +6060,7 @@
       },
       "properties": {
         "id": "autobahn:2026-047148--vi-fbm.2026-10-06_18-00-00-000.devi-fbm.2026-10-06_18-00-00-000.de1",
-        "version": "6b2ca348dd48b9759384e5053980c3ff6848f823bdfc41e26247ad0d081ce7b2",
+        "version": "c6b77698744cbbd004eeeafdc93765c848ea5ccb4782d5346672d035205b1421",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6188,8 +6082,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-047148--vi-fbm.2026-10-06_18-00-00-000.devi-fbm.2026-10-06_18-00-00-000.de1]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6199,7 +6093,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -6219,7 +6113,7 @@
       },
       "properties": {
         "id": "autobahn:2026-047148--vi-fbm.2026-10-06_19-00-00-000.devi-fbm.2026-10-06_18-00-00-000.de3",
-        "version": "07074a638a32b03806cba0c90e15a49c9544a2cc70fe43125a0958e758600ad1",
+        "version": "b4d081361215b662d9b82e26800916e28b28d155787a789f3245802befa39096",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6241,8 +6135,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-047148--vi-fbm.2026-10-06_19-00-00-000.devi-fbm.2026-10-06_18-00-00-000.de3]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6252,7 +6146,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -6272,7 +6166,7 @@
       },
       "properties": {
         "id": "autobahn:2026-047148--vi-fbm.2026-10-06_19-00-00-000.devi-fbm.2026-10-06_18-00-00-000.de5",
-        "version": "2f755cb1d72a594a4f576006ceabb44e7e5bfa40245edf91114d1ac2b5bd9a86",
+        "version": "9d3d9c30c45d1f2ea7a40e6ad91e2e33399527c1fd0b76c770c5fba702af9e1c",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6294,8 +6188,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-047148--vi-fbm.2026-10-06_19-00-00-000.devi-fbm.2026-10-06_18-00-00-000.de5]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6305,7 +6199,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -6325,7 +6219,7 @@
       },
       "properties": {
         "id": "autobahn:2026-047359--vi-bs.2026-10-07_08-00-00-000_004.de0",
-        "version": "202d9a0618a6c4a73a394b3bda85282e040b4bd5485c3bd0e4cab2ea52b51d77",
+        "version": "66df4e5ee4aba3883f87298194efe449acef2d2a4d4e794402eaad63c314a6a2",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6347,8 +6241,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-047359--vi-bs.2026-10-07_08-00-00-000_004.de0]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6358,7 +6252,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -6378,7 +6272,7 @@
       },
       "properties": {
         "id": "autobahn:2026-047604--vi-bs.2026-09-21_09-00-00-000.devi-zus.2026-09-21_09-00-00-000_007.de1",
-        "version": "a63f63b6c3003fa41649df21d023f51abe1f17693269423462d770f8162eb26a",
+        "version": "a48c0417ecbf328cc4cc3e97a4975f649d69f55a5c110b75c4a5db88fc434088",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6400,8 +6294,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-047604--vi-bs.2026-09-21_09-00-00-000.devi-zus.2026-09-21_09-00-00-000_007.de1]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6411,7 +6305,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -6431,7 +6325,7 @@
       },
       "properties": {
         "id": "autobahn:2026-047604--vi-bs.2026-09-21_09-00-00-000.devi-zus.2026-09-21_09-00-00-000_007.de3",
-        "version": "a600f4369c875da8b2a82eb0dff63022b598150924b181433d4f8f26252d43ed",
+        "version": "cb5ccf7f755b6256808db6343ad1224e638d658c5a67ec23d3518d0de8fc625e",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6453,8 +6347,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-047604--vi-bs.2026-09-21_09-00-00-000.devi-zus.2026-09-21_09-00-00-000_007.de3]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6464,7 +6358,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -6484,7 +6378,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048249--vi-bs.2026-09-28_20-00-00-000.devi-zus.2026-09-28_20-00-00-000_007.de1",
-        "version": "0aff8ccc3e03b92f581a790d67addfc43ed82fe90380328540615c0dae532d40",
+        "version": "17c11d79699f4f7fa3a88e4ef25fbfd8ef382364058311608f8326d73ed96363",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6506,8 +6400,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048249--vi-bs.2026-09-28_20-00-00-000.devi-zus.2026-09-28_20-00-00-000_007.de1]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6517,7 +6411,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -6537,7 +6431,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048675--vi-bs.2026-09-28_20-00-00-000.devi-zus.2026-09-28_20-00-00-000_008.de1",
-        "version": "2adde4aa10ccc8832f62e1f1f33423715ca60d8bd0a95bbd3ff85972912282c5",
+        "version": "6a233872f23c04dfc5a73b2a29c6690a7a332a2618f8db34c25eae97ff49bcf0",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6559,8 +6453,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048675--vi-bs.2026-09-28_20-00-00-000.devi-zus.2026-09-28_20-00-00-000_008.de1]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6570,7 +6464,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -6612,7 +6506,7 @@
             "title": "Autobahn A2 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2026-048675--vi-fbm.2026-09-28_20-00-00-000.devi-zus.2026-09-28_20-00-00-000_008.de3]",
-            "retrievedAt": "2026-09-26T16:53:35.030Z",
+            "retrievedAt": "2026-09-27T10:04:55.015Z",
             "sha256": "e0fc2b853e0f9d9d12ae4928faca5062e3d11c3004900d212bb1b58ef369db2b",
             "snapshot": true,
             "licence": "unknown",
@@ -6623,7 +6517,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.030Z"
+        "asOf": "2026-09-27T10:04:55.015Z"
       }
     },
     {
@@ -6643,7 +6537,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048939--vi-bs.2026-09-28_20-00-00-000_008.de0",
-        "version": "ff7e0de079d3f89f60bbc44699e0b9a11557ff3ebe4f5d0121c133c29a0e3889",
+        "version": "a1899d3de34e58c30906632bd30ab5787a85fcefbe937023c4e04c7e009850ac",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6665,8 +6559,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048939--vi-bs.2026-09-28_20-00-00-000_008.de0]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6676,7 +6570,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -6696,7 +6590,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048947--vi-bs.2026-09-28_20-00-00-000_010.de0",
-        "version": "4715c1a6614d5f94d843e698a38e61be07c6f9b1eb322c53d6b4f3e9ce6c6b22",
+        "version": "eaf38877b715b1c4a58add514342d100747226f21a0d7e0ca01369ede4220ddd",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6718,8 +6612,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048947--vi-bs.2026-09-28_20-00-00-000_010.de0]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6729,7 +6623,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -6749,7 +6643,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048949--vi-bs.2026-09-28_20-00-00-000_005.de0",
-        "version": "afcd5aa31fd479d6a0569aa439b2d1b74193f0d9b7e042d137b389467227833b",
+        "version": "2dc357b1ca589f87aed4e6465a165f0baf8f557156e1e9d29724a19a8b88e749",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6771,8 +6665,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048949--vi-bs.2026-09-28_20-00-00-000_005.de0]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6782,7 +6676,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -6802,7 +6696,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048962--vi-bs.2026-09-28_20-00-00-000_004.de0",
-        "version": "62b7ad7fbd3ba3c7a9a45297134d21bd688863528cc0505605d7afe25cd8b5bd",
+        "version": "86f691c55b3d9c67041bd4ea903811b29b9881477d03db752a60edf3b40a8604",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6824,8 +6718,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048962--vi-bs.2026-09-28_20-00-00-000_004.de0]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6835,7 +6729,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -6855,7 +6749,7 @@
       },
       "properties": {
         "id": "autobahn:2026-049013--vi-bs.2026-09-28_07-00-00-000.devi-zus.2026-09-28_07-00-00-000_011.de1",
-        "version": "b45aaa4e4331c5240fc0428d0ad7748dbe66af0c8c86ae1706fc116234cd2c6d",
+        "version": "8c69844a0c4a1005ac576fe80472ec9c9156cf1c019573edc770856642c18c60",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6877,8 +6771,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-049013--vi-bs.2026-09-28_07-00-00-000.devi-zus.2026-09-28_07-00-00-000_011.de1]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6888,7 +6782,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -6908,7 +6802,7 @@
       },
       "properties": {
         "id": "autobahn:2026-049013--vi-bs.2026-09-28_07-00-00-000.devi-zus.2026-09-28_07-00-00-000_011.de3",
-        "version": "611b5de3826f23455a64657c84e45224bdab65dbd15902f10b29a4f3428fa298",
+        "version": "e2636039699adac2e0cf80f3ed210d17a5e79d429e71304e54d0614942f4ff72",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6930,8 +6824,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-049013--vi-bs.2026-09-28_07-00-00-000.devi-zus.2026-09-28_07-00-00-000_011.de3]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6941,7 +6835,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -6961,7 +6855,7 @@
       },
       "properties": {
         "id": "autobahn:2026-049039--vi-bs.2026-09-30_20-00-00-000_007.de0",
-        "version": "c927f15cd03b406e5701541b3a1991717b1e00d2e874db3f3a94f19d2407ffde",
+        "version": "dd406190100ea9e0372e4b434e1e2cbc899e366add4f2153081daba39e36261b",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -6983,8 +6877,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-049039--vi-bs.2026-09-30_20-00-00-000_007.de0]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -6994,7 +6888,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -7014,7 +6908,7 @@
       },
       "properties": {
         "id": "autobahn:2026-049137--vi-bs.2026-09-28_09-00-00-000.devi-zus.2026-09-28_09-00-00-000_006.de1",
-        "version": "7a83642bf413636fa94ad3c39195a27d89d055c1a066ba1ad34f2cb2beee0106",
+        "version": "eac1b96a76beb32f0982d9b8a12ffc6f920fb7f9216b51c49a05b6de10e485d0",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -7036,8 +6930,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-049137--vi-bs.2026-09-28_09-00-00-000.devi-zus.2026-09-28_09-00-00-000_006.de1]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -7047,7 +6941,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -7067,7 +6961,7 @@
       },
       "properties": {
         "id": "autobahn:2026-049137--vi-bs.2026-09-28_09-00-00-000.devi-zus.2026-09-28_09-00-00-000_006.de3",
-        "version": "afd313f00192d234dbcb0e4ed6f04704169e4c54c696b1eb743689c8843b905b",
+        "version": "08753fa1bffff758d1339adffd092a93128a9887ebed1861b3ad10909ec3cf13",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -7089,8 +6983,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-049137--vi-bs.2026-09-28_09-00-00-000.devi-zus.2026-09-28_09-00-00-000_006.de3]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -7100,7 +6994,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -7120,7 +7014,7 @@
       },
       "properties": {
         "id": "autobahn:2026-049152--vi-bs.2026-10-06_09-00-00-000_002.de0",
-        "version": "edb83e49be7a82ef851c1cfd0e6f298a04b4edfd563eef62ecb87723d9ed552d",
+        "version": "69c5e22e04761adc48150cc6640b6571f8df9463f1cd2e913822899c37a7e1db",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -7142,8 +7036,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-049152--vi-bs.2026-10-06_09-00-00-000_002.de0]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -7153,7 +7047,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -7195,7 +7089,7 @@
             "title": "Autobahn A42 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-049204--vi-bs.2026-09-28_12-00-00-000.de0]",
-            "retrievedAt": "2026-09-26T16:53:35.071Z",
+            "retrievedAt": "2026-09-27T10:04:55.065Z",
             "sha256": "ebaba7bfc71be9413ef32b44996785d3c29d73509073f402d356f02f9006176d",
             "snapshot": true,
             "licence": "unknown",
@@ -7206,7 +7100,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.071Z"
+        "asOf": "2026-09-27T10:04:55.065Z"
       }
     },
     {
@@ -7226,7 +7120,7 @@
       },
       "properties": {
         "id": "autobahn:2026-049211--vi-bs.2026-10-06_08-00-00-000.devi-zus.2026-10-06_08-00-00-000_001.de1",
-        "version": "e5fbfe5a7cb63e248b65ecd3c355efe83ddc4bd3e7f471a7a6a8b3c041ec3e3d",
+        "version": "2c55571efa0163429948202f92968b57bd459ea6f5a03fe8100536b95766ae80",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -7248,8 +7142,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-049211--vi-bs.2026-10-06_08-00-00-000.devi-zus.2026-10-06_08-00-00-000_001.de1]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -7259,7 +7153,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -7279,7 +7173,7 @@
       },
       "properties": {
         "id": "autobahn:2026-049211--vi-bs.2026-10-06_09-00-00-000.devi-zus.2026-10-06_08-00-00-000_001.de3",
-        "version": "178e981cae77d52e7214a826df5eb77563dcace920b1cf88249f7b30ea785aa5",
+        "version": "cfe2fd44f3d63a23857e98ff570199b93c189a04263b301a7aebc72aeaaf3668",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -7301,8 +7195,8 @@
             "title": "Autobahn A2 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-049211--vi-bs.2026-10-06_09-00-00-000.devi-zus.2026-10-06_08-00-00-000_001.de3]",
-            "retrievedAt": "2026-09-26T16:53:34.994Z",
-            "sha256": "6c8b0058537db2c89c717a80019c32a6f9c56448e685ca8249a0664fe5a96712",
+            "retrievedAt": "2026-09-27T10:04:54.955Z",
+            "sha256": "c804267dc5877a8c8f12dbe271aa5cfb44ee37680d573729ef630a2ff3aa4039",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -7312,7 +7206,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:34.994Z"
+        "asOf": "2026-09-27T10:04:54.955Z"
       }
     },
     {
@@ -7332,7 +7226,7 @@
       },
       "properties": {
         "id": "autobahn:2026-049233--vi-bs.2026-09-29_09-00-00-000.devi-bs.2026-09-29_09-00-00-000_009.de1",
-        "version": "c381efe3ea8b36f8b5da50406564d473a04df485e57e45c2cf6114a0827772e5",
+        "version": "bd7117ecc0236745332b647608679393515114a80e6dbcb54d354d7402b65a2b",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -7354,8 +7248,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-049233--vi-bs.2026-09-29_09-00-00-000.devi-bs.2026-09-29_09-00-00-000_009.de1]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -7365,7 +7259,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -7385,7 +7279,7 @@
       },
       "properties": {
         "id": "autobahn:2026-049233--vi-bs.2026-09-29_09-00-00-000.devi-bs.2026-09-29_09-00-00-000_009.de3",
-        "version": "f19486e3b8268acfbfe16f2b12634e71bb180f8497baa86d4dd765db7292f2ba",
+        "version": "6284c4480132ab18739362601f9f3c9abe5466e3b11122db961d8630b9184e1f",
         "cityId": "castrop-rauxel",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -7407,8 +7301,8 @@
             "title": "Autobahn A45 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-049233--vi-bs.2026-09-29_09-00-00-000.devi-bs.2026-09-29_09-00-00-000_009.de3]",
-            "retrievedAt": "2026-09-26T16:53:35.186Z",
-            "sha256": "bd4ec4c75ec1bbab229b03b5b86758578f46996b775d490817a289c82da17d4f",
+            "retrievedAt": "2026-09-27T10:04:55.206Z",
+            "sha256": "899dadd1276fe1a0ae37fcbdd6ce770519354c047492a34601291c62f62b9542",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -7418,7 +7312,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T16:53:35.186Z"
+        "asOf": "2026-09-27T10:04:55.206Z"
       }
     },
     {
@@ -7449,7 +7343,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-ABES-12; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -7461,7 +7355,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-ABES-12; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "da4d28925a32cc244c9df1b7078466a55b7666c5d3ef93e50e288039676c09aa",
             "snapshot": true,
             "licence": "unknown",
@@ -7504,7 +7398,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-ACI-3; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -7516,7 +7410,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-ACI-3; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "7dc5dc58644aa79e48d8748795c0e5974835cb87b03520d2a05a3d7a7c31968c",
             "snapshot": true,
             "licence": "unknown",
@@ -7559,7 +7453,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-AGID-12; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -7571,7 +7465,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-AGID-12; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.435Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "35e3ebec4ba806dfff4d374b9137f191cc1379498dd1bec44cc77417f8b3fec9",
             "snapshot": true,
             "licence": "unknown",
@@ -7614,7 +7508,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-AGID-13; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -7626,7 +7520,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-AGID-13; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "f1d1431940e2f90ad922288f7f1c019a95aefae06ccbe9140b2791a6dc8e3894",
             "snapshot": true,
             "licence": "unknown",
@@ -7669,7 +7563,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-AKUM-3; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -7681,7 +7575,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-AKUM-3; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.435Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "311b4374157c18350befdd338f38be2e253b5ba9e9d2e5ef31c1c0d562d624a3",
             "snapshot": true,
             "licence": "unknown",
@@ -7724,7 +7618,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-AKUM-4; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -7736,7 +7630,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-AKUM-4; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "959f52d5255ca8cf3f644f31d06f218e0d946271ad15a4335d47ed76f17b48da",
             "snapshot": true,
             "licence": "unknown",
@@ -7779,7 +7673,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-AuWi-61; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -7791,7 +7685,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-AuWi-61; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.435Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "ddf95c9b80c4cd01cee1255ded4206f287384b44a744287714d0a065da73aaac",
             "snapshot": true,
             "licence": "unknown",
@@ -7834,7 +7728,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-AuWi-62; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -7846,7 +7740,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-AuWi-62; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "b795813bc178e6d364ed4a01f70c6603cb03c928429b4dc0b32ac40f273c7d89",
             "snapshot": true,
             "licence": "unknown",
@@ -7889,7 +7783,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-B1-134; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -7901,7 +7795,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-B1-134; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.435Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "678b6d7be6d419b59e718a166103bade39f1a9962aa391b732667a070c437b47",
             "snapshot": true,
             "licence": "unknown",
@@ -7944,7 +7838,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-B1-135; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -7956,7 +7850,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-B1-135; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "68f8c601a37e0eb039914c6b8242a5f059c1b701e32bad9793c43e65eb810fbb",
             "snapshot": true,
             "licence": "unknown",
@@ -7999,7 +7893,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-B2-132; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -8011,7 +7905,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-B2-132; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.435Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "a4d7ea98e1861d41d544b5bded8478c348453fb7d898fd3ef02aeb7655f36197",
             "snapshot": true,
             "licence": "unknown",
@@ -8054,7 +7948,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-B2-133; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -8066,7 +7960,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-B2-133; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "c92a42c6f4ecec37c6348042d70342abd8ea075d74f56464cffa29ad51ecad57",
             "snapshot": true,
             "licence": "unknown",
@@ -8109,7 +8003,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-B3-129; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -8121,7 +8015,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-B3-129; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.435Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "19f375241d0585451646843f53558d2dc762c3597dfeafde5e7c45ce9ea463e2",
             "snapshot": true,
             "licence": "unknown",
@@ -8164,7 +8058,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-B3-130; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -8176,7 +8070,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-B3-130; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "fc316816188a7951c8bc04315baff4efb7fa5497fec422fa8e1f2766fc7eee39",
             "snapshot": true,
             "licence": "unknown",
@@ -8219,7 +8113,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-EUV-64; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:37.139Z",
+            "retrievedAt": "2026-09-27T10:04:57.584Z",
             "sha256": "cedf8c3cf6ff840f543a63e185de1c1bc95191b419983a1e3f5dab70bfae8cef",
             "snapshot": true,
             "licence": "unknown",
@@ -8231,7 +8125,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-EUV-64; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.435Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "3d8102558054082142261c49c67d117446ad3448374c3304da26646e1d399ece",
             "snapshot": true,
             "licence": "unknown",
@@ -8274,7 +8168,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-EUV-65; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:37.139Z",
+            "retrievedAt": "2026-09-27T10:04:57.584Z",
             "sha256": "cedf8c3cf6ff840f543a63e185de1c1bc95191b419983a1e3f5dab70bfae8cef",
             "snapshot": true,
             "licence": "unknown",
@@ -8286,7 +8180,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-EUV-65; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "2959ca9da5834dce59bbc4bfd6536fb8131c43c0d6fbffe35024973785fa9c99",
             "snapshot": true,
             "licence": "unknown",
@@ -8329,7 +8223,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-HFA-139; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -8341,7 +8235,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-HFA-139; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "f25afa77e0c0be5e6b6cc47a2fc67b999d0a0ee65d98cbe72d149cbc473a92ab",
             "snapshot": true,
             "licence": "unknown",
@@ -8384,7 +8278,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-HFA-140; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -8396,7 +8290,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-HFA-140; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "173d9fe5996ff047b48d7c92a14cf3d4ffedaf89707207297f47a2ea1b29b097",
             "snapshot": true,
             "licence": "unknown",
@@ -8439,7 +8333,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-JHA-111; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -8451,7 +8345,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-JHA-111; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "f9ae3c8ead94e8f7851793ac804027b01de4a0ff69185284026be20c28266b1b",
             "snapshot": true,
             "licence": "unknown",
@@ -8494,7 +8388,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-JHA-113; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -8506,7 +8400,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-JHA-113; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "a8eaa645663056f3203a56986841abdad29611858db057a0200b1221cb3cf3b7",
             "snapshot": true,
             "licence": "unknown",
@@ -8549,7 +8443,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-RAT-164; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -8561,7 +8455,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-RAT-164; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "4faf43a79825398b4f2f93511d5527a2b369545b98cd30f5fc27957f9c32c3ea",
             "snapshot": true,
             "licence": "unknown",
@@ -8604,7 +8498,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-RAT-165; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -8616,7 +8510,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-RAT-165; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "c2c08556726a4332c724d0ac2f5989c71064a16e8230c594ab310ccc36c001b1",
             "snapshot": true,
             "licence": "unknown",
@@ -8659,7 +8553,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-RAT-166; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -8671,7 +8565,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-RAT-166; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "e228d140abdfbc4f79dbc6d0fe2ac79dfda563629ebd67f4ba7c62dd029019d9",
             "snapshot": true,
             "licence": "unknown",
@@ -8714,7 +8608,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-RPA-52; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T16:53:41.401Z",
+            "retrievedAt": "2026-09-27T10:05:01.875Z",
             "sha256": "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
             "snapshot": true,
             "licence": "unknown",
@@ -8726,7 +8620,7 @@
             "title": "OParl Sitzung",
             "publisher": "Castrop-Rauxel",
             "locator": "record https://castroprauxel.gremien.info/oparl/meeting/2026-RPA-52; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T18:13:52.434Z",
+            "retrievedAt": "2026-09-27T10:04:55.392Z",
             "sha256": "6b3104df689324a774d6833301a95a595ed77c8470903cbf0f2713bb1acf1c4a",
             "snapshot": true,
             "licence": "unknown",

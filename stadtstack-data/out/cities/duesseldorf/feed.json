@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "stadtstack-feed-v1",
+  "cityId": "duesseldorf",
+  "generatedAt": "2026-09-27T10:05:06.500Z",
+  "sources": [
+    {
+      "id": "duesseldorf-press",
+      "kind": "press",
+      "publisher": "Landeshauptstadt Düsseldorf",
+      "url": "https://www.duesseldorf.de/aktuelles/news",
+      "licence": "unknown",
+      "reuse": "facts_with_attribution",
+      "retrievedAt": "2026-09-27T10:05:06.500Z",
+      "status": "not_available",
+      "pageUrl": "https://www.duesseldorf.de/aktuelles/news"
+    }
+  ],
+  "items": []
+}

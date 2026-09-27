@@ -1807,8 +1807,8 @@
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17012",
-        "version": "0ecfe3ebbfc21a783615f89f224849d01b910b54c529ebf6d1023e26c1061ac7",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17012",
+        "version": "143d4bc57f5b00e04ff9003d789f0c500680dcb6760f96c92ef695d130b5100d",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1842,15 +1842,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T14:07:15+02:00"
+        "asOf": "2026-09-22T14:07:15+02:00",
+        "upstreamModified": "2026-09-22T14:07:15+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17013",
-        "version": "3e0ee4cdef434fb03fb3d18c2c0de9124d08cea6363a72ee41dedf3bb6f02c7e",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17013",
+        "version": "46d7466a1130165d07249e8282c9d2f41afccc2e888719204a35f1df606ddf46",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1884,15 +1885,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T14:08:08+02:00"
+        "asOf": "2026-09-22T14:08:08+02:00",
+        "upstreamModified": "2026-09-22T14:08:08+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17014",
-        "version": "789c8238f0026e3f2f7f858c95bb6d97b00a4e508339af20c08c45aea684b5e1",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17014",
+        "version": "1bfee3f9236d383c6850659a4375bed80d200708d07fa36b9a651fedcf232d47",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1926,15 +1928,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T14:10:41+02:00"
+        "asOf": "2026-09-22T14:10:41+02:00",
+        "upstreamModified": "2026-09-22T14:10:41+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17015",
-        "version": "1c321dca1f91258871273aee65739d36de20ab3861b8aba211f33bf280f0013b",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17015",
+        "version": "c0b5f7971bd670eac87c4abb52dce2221c874ef04bbdfac6d4f2e89a2ffba1fd",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -1968,15 +1971,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T14:10:10+02:00"
+        "asOf": "2026-09-22T14:10:10+02:00",
+        "upstreamModified": "2026-09-22T14:10:10+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17016",
-        "version": "ada13e4076bb3ba2a351332dcc28fa44d3f071455a6622f0d0f2c8af21cda932",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17016",
+        "version": "d5f59aa303cdc76fdb47d6f2c003f07163f5ca09391d8e5cefea47fb68eb8fd1",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2010,15 +2014,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T14:11:48+02:00"
+        "asOf": "2026-09-22T14:11:48+02:00",
+        "upstreamModified": "2026-09-22T14:11:48+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17017",
-        "version": "c62847a182125a0b212f4a50ee60588f94f2ebb79f57f3c68f23f2de1464416e",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17017",
+        "version": "e06879313cb9062c902d230d1cd4b83682b8a1e64b2d188ff85bf1d790264240",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2052,15 +2057,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T14:19:13+02:00"
+        "asOf": "2026-09-22T14:19:13+02:00",
+        "upstreamModified": "2026-09-22T14:19:13+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17018",
-        "version": "dc4b2d2a0b3e31e2ad540589cecd3f82d2423922417306b4f292aba9a1e350d5",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17018",
+        "version": "5473b32e7100a3f1811992ca48d9ec3dab1e69b2c06761463abdf3780489f135",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2094,15 +2100,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T14:23:16+02:00"
+        "asOf": "2026-09-22T14:23:16+02:00",
+        "upstreamModified": "2026-09-22T14:23:16+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17019",
-        "version": "154b3f5a32cdce164803e53adae9e581ede26f72f5927a6bd19d4c7c6a371e3d",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17019",
+        "version": "2823e531541ce2f987da77693a8352908356aa32c1f9e8ff231b8d5578b74f14",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2136,15 +2143,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T14:34:46+02:00"
+        "asOf": "2026-09-22T14:34:46+02:00",
+        "upstreamModified": "2026-09-22T14:34:46+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17020",
-        "version": "bb22fd679ff512fd2276e1ab4e30511751464f6ebba732de10d75949f133d491",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17020",
+        "version": "9a97be7187caf8559c682ec4fa4670e695739c371c3938342963eebeae54ab89",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2178,15 +2186,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T14:35:36+02:00"
+        "asOf": "2026-09-22T14:35:36+02:00",
+        "upstreamModified": "2026-09-22T14:35:36+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17021",
-        "version": "5425e5dcd2c01efbe12504a14b8db9bf6aca08f4b32469cc80bbe9d27d6f5b25",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17021",
+        "version": "6f6a5ec2b2017809934424efbe2c63d9b2e9b60b539024ad39ad8b730bf73d2d",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2220,15 +2229,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T14:52:59+02:00"
+        "asOf": "2026-09-22T14:52:59+02:00",
+        "upstreamModified": "2026-09-22T14:52:59+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17022",
-        "version": "237d68fbf0135cf0f0c00a49df82368149dd60e36225aab4ce74369b8813ad27",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17022",
+        "version": "64b729f28072cd07c908b7833ae22e07910f8021820105ea308a9c02c74feb0d",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2262,15 +2272,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T14:54:11+02:00"
+        "asOf": "2026-09-22T14:54:11+02:00",
+        "upstreamModified": "2026-09-22T14:54:11+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17023",
-        "version": "d29e1c0fb69da1707c052233a3dfdd799ab2d005df0df6311fc38f67565920ac",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17023",
+        "version": "b5af3a02774c52fecb9efe3bc8405d5d8df2893f65530085ab73a0d645c4f9eb",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2304,15 +2315,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T14:54:57+02:00"
+        "asOf": "2026-09-22T14:54:57+02:00",
+        "upstreamModified": "2026-09-22T14:54:57+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17024",
-        "version": "83f061255be67e3dea1bec3087bddf750205d79eaefdae9e506e385a3bc63b72",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17024",
+        "version": "672d17b581b5f4286eb072268a5d2f4602a16da2071b756af325e5bf179e5de4",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2346,15 +2358,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T15:02:53+02:00"
+        "asOf": "2026-09-22T15:02:53+02:00",
+        "upstreamModified": "2026-09-22T15:02:53+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17025",
-        "version": "e7255b29586efe8aaeb098db526f5177be1690e9cc1b058d1c13c6f1b2b8bc45",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17025",
+        "version": "73bf444181c1bba1e495205c73f8ff08d8fe77eb9b03b050bd515eae905036ef",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2388,15 +2401,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T15:03:49+02:00"
+        "asOf": "2026-09-22T15:03:49+02:00",
+        "upstreamModified": "2026-09-22T15:03:49+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17026",
-        "version": "40a2fa5e6c246c1043575b2f8a49e2dc68cd50d769b2c0cd024b2ee165c867b4",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17026",
+        "version": "03c6214306ca7a569490126cc52e0940ed58becd203af53f1dd538b58f7e289a",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2430,15 +2444,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T15:04:51+02:00"
+        "asOf": "2026-09-22T15:04:51+02:00",
+        "upstreamModified": "2026-09-22T15:04:51+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17027",
-        "version": "1cefc8af8198714ecac90f634d43bcf6bd1e51a4c7e5d27a1fc221f3091c537c",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17027",
+        "version": "dbfac5eb3ba7d6d56d5da5127ed27874f0249b6197653cdb66c19e828235066c",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2472,15 +2487,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T15:05:35+02:00"
+        "asOf": "2026-09-22T15:05:35+02:00",
+        "upstreamModified": "2026-09-22T15:05:35+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17028",
-        "version": "0ed8161060951e1e8c0195c4e3baa532cfa04cf6c0b6396b0c75cf5adacf8a86",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17028",
+        "version": "858dce67e4471944ae4bf7202d9affe760245a827992bd374c195adac5b17190",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2514,15 +2530,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T15:06:36+02:00"
+        "asOf": "2026-09-22T15:06:36+02:00",
+        "upstreamModified": "2026-09-22T15:06:36+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17029",
-        "version": "2de256a219e170152467c8f15b1ca8067a5c55784d05fca7d443a2d01fdeea5a",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17029",
+        "version": "826a84cee8ff09def2b1f23a2cf3b6db6367e96487cfe7b84fdef2d1b0098666",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2556,15 +2573,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T15:07:20+02:00"
+        "asOf": "2026-09-22T15:07:20+02:00",
+        "upstreamModified": "2026-09-22T15:07:20+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17030",
-        "version": "02f8a3af0289394440ed4e3a066d8d365c025c7deff399bcb9755be5649dfb51",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17030",
+        "version": "f3ba2f4de36593511402022970d74481f58a5d8b223ce9d8b250120876e84803",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2598,15 +2616,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T15:07:54+02:00"
+        "asOf": "2026-09-22T15:07:54+02:00",
+        "upstreamModified": "2026-09-22T15:07:54+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17031",
-        "version": "074e903ac27eac733b82f6265c9364138c39d94f61ca09ba5976a2154e1f4a25",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17031",
+        "version": "255391a4b38e3661fbd12dd05e91224740dd554de50a3afffc8b1f91369dfa96",
         "cityId": "dresden",
         "kind": "council_meeting",
         "category": "Sitzung",
@@ -2640,15 +2659,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T15:16:05+02:00"
+        "asOf": "2026-09-22T15:16:05+02:00",
+        "upstreamModified": "2026-09-22T15:16:05+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30941",
-        "version": "24eaedbb6971fd628b308b156a177f786c3108477bd04a86cf364e417e182924",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30941",
+        "version": "313eafa6b1151b25ea7beedfb5f5a18dda702c4f1b9f269fe7c61bb42138ef3e",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -2682,7 +2702,8 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T10:56:41+02:00"
+        "asOf": "2026-09-22T10:56:41+02:00",
+        "upstreamModified": "2026-09-22T10:56:41+02:00"
       }
     },
     {
@@ -2695,8 +2716,8 @@
         ]
       },
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30942",
-        "version": "aa619ce88aafc925b6691e28cd56725dec6deb18e4501973f1d864e6667f0539",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30942",
+        "version": "c429f71239a0fc1693185609a06d294f90a410a40b35955fa1c6cedc1331420e",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -2730,15 +2751,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T11:50:08+02:00"
+        "asOf": "2026-09-25T11:50:08+02:00",
+        "upstreamModified": "2026-09-25T11:50:08+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30943",
-        "version": "1fd6c3533e0d8a306a6c902034ab6720eade121e41b15efdfc5166fedc0472c3",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30943",
+        "version": "e980cff0a3845b5abceea2d724e4666e5419fafd59494e649b9ef2e68c2ed659",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -2772,15 +2794,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T11:54:56+02:00"
+        "asOf": "2026-09-25T11:54:56+02:00",
+        "upstreamModified": "2026-09-25T11:54:56+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30944",
-        "version": "b8bfb47b877f2d7b9327c2c00b32ac6487d93ffe64e22ce7c703d95673c9240e",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30944",
+        "version": "42ec3f03e33128d9705fbb3aab6b65920e1b13ad777e4aa97d06b335923b0b33",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -2814,15 +2837,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T08:40:26+02:00"
+        "asOf": "2026-09-22T08:40:26+02:00",
+        "upstreamModified": "2026-09-22T08:40:26+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30947",
-        "version": "f039776d206ea9945d4e0809462f6d1cbdc1fc2603d4c02dd002e1641538789f",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30947",
+        "version": "e45b1785809a1ccad7a7e1220cbf9b045515cf690d27e1e4327e056faad63182",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -2856,7 +2880,8 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-21T13:51:13+02:00"
+        "asOf": "2026-09-21T13:51:13+02:00",
+        "upstreamModified": "2026-09-21T13:51:13+02:00"
       }
     },
     {
@@ -2869,8 +2894,8 @@
         ]
       },
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30959",
-        "version": "b905de0ed7ab79660995b84a8e9264cc9bba4d357229b616ff1db1a41cf554f9",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30959",
+        "version": "63eaed395e2cb7ebb3428b813ea8cc46be97f02ba72f97024e9d0ef71e34f2d9",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -2904,15 +2929,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-23T16:51:53+02:00"
+        "asOf": "2026-09-23T16:51:53+02:00",
+        "upstreamModified": "2026-09-23T16:51:53+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30961",
-        "version": "1b4f59be41bbc3187bd4a80c4c0dde83d708d9b428333f8cac4aa5b35adaf83a",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30961",
+        "version": "2842871b5f525f007331c64d530b542f4ded707c3f4da27f5d27548c5d4d6783",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -2946,15 +2972,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T14:58:22+02:00"
+        "asOf": "2026-09-22T14:58:22+02:00",
+        "upstreamModified": "2026-09-22T14:58:22+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30966",
-        "version": "0c9c8125d611b621deadf0ada0eb639772b9747118652ae9de6a02ae510e6f86",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30966",
+        "version": "1a1e14bef472195d6e5fa0a7e9d5f8cd9eccab658cc5479e38e38c20ad5397ab",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -2988,15 +3015,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-23T09:53:16+02:00"
+        "asOf": "2026-09-23T09:53:16+02:00",
+        "upstreamModified": "2026-09-23T09:53:16+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30972",
-        "version": "0ec3811b7af5e98722b6264c1ef7de73415487d50d6c8fec130702ff60e0a9d5",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30972",
+        "version": "0aaa2921c47c11de765d051bc356adb834ef7a97c409cf883dce43ad6126bb8e",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -3030,15 +3058,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T17:17:23+02:00"
+        "asOf": "2026-09-25T17:17:23+02:00",
+        "upstreamModified": "2026-09-25T17:17:23+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30974",
-        "version": "58121a321296842fc65bd96ac770101f8c17776b90ad075bcb09348cd0bc3667",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30974",
+        "version": "d68e21872ae889764a54adfdc56fc7706b2e2d153325eef2cd9802c64e209af2",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -3072,7 +3101,8 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-23T16:53:44+02:00"
+        "asOf": "2026-09-23T16:53:44+02:00",
+        "upstreamModified": "2026-09-23T16:53:44+02:00"
       }
     },
     {
@@ -3085,8 +3115,8 @@
         ]
       },
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30982",
-        "version": "ebce07a255eddf2ebfe6161157cf1002c22280805fa17de41b10c4c49181b019",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30982",
+        "version": "c3f8ce5b10e1b46b77e30c8aa89cf143a28905cc7a685567a5597c0dc5fa2063",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -3120,15 +3150,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T10:10:11+02:00"
+        "asOf": "2026-09-22T10:10:11+02:00",
+        "upstreamModified": "2026-09-22T10:10:11+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30986",
-        "version": "2a5469c411f32162881f4b232bfb82abd7b58048f1bda60c0e784065cfcd09d2",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30986",
+        "version": "4f890a822f34c2227daeb938bd4badedd867d50612dfbcae9ac1b3051962d5e8",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -3162,15 +3193,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T10:11:40+02:00"
+        "asOf": "2026-09-22T10:11:40+02:00",
+        "upstreamModified": "2026-09-22T10:11:40+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30987",
-        "version": "3af4e91a62d98f90d54ca11920cb0cd8e3aac9e97b54c1d9b99aeefbb4ff9871",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30987",
+        "version": "d6f2ff7897993994def9f0e77ef950e89d7968fd3e6e843514a773a5fe252009",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -3204,15 +3236,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T10:09:17+02:00"
+        "asOf": "2026-09-22T10:09:17+02:00",
+        "upstreamModified": "2026-09-22T10:09:17+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30989",
-        "version": "c0a3fb0c435f7c1ded8512ed3eb4e1e6fe81a69a19244fb8c4e08c3249eebf41",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30989",
+        "version": "3ae96b4659907f9239ce37896400a0a40f21a0ae892b38dce1b330eaadfe1332",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -3246,15 +3279,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T08:33:59+02:00"
+        "asOf": "2026-09-22T08:33:59+02:00",
+        "upstreamModified": "2026-09-22T08:33:59+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30990",
-        "version": "e0ce8722302b0faae79cf974262d11f149ef8dbf962923f07ba7f543321c30ce",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30990",
+        "version": "76690409d67427b6dad2d8d86995ca6d9d6f37b6339a604339d4a794291f2d71",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -3288,15 +3322,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T08:33:15+02:00"
+        "asOf": "2026-09-22T08:33:15+02:00",
+        "upstreamModified": "2026-09-22T08:33:15+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30992",
-        "version": "b638f35c549d45cb97d872cd1afefcbfb103dae32a689f145322a2b90c9a9f9f",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30992",
+        "version": "978e4af89981e03133dd06e489c4289f50a21df70b80751f05cb781c024aa40c",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -3330,15 +3365,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-25T11:47:10+02:00"
+        "asOf": "2026-09-25T11:47:10+02:00",
+        "upstreamModified": "2026-09-25T11:47:10+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30996",
-        "version": "3c331a42437217811d34ae173f0ec7c05e284467b69f8a661f73a4019ca64393",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30996",
+        "version": "ad050f90a450c39b3df04b6a338279efeada92cf7b78843e52464519ef8769a2",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -3372,15 +3408,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-17T15:48:10+02:00"
+        "asOf": "2026-09-17T15:48:10+02:00",
+        "upstreamModified": "2026-09-17T15:48:10+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30998",
-        "version": "9ac477d6dfd917f084d1b680d48e5bc9d0bad7c62cfdcb0858f8cec4238baf11",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F30998",
+        "version": "722011c8ebba3ddf9c7741c40b536503b44c9ccff419acbb4c0699f02dda9aa5",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -3414,15 +3451,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-22T08:31:35+02:00"
+        "asOf": "2026-09-22T08:31:35+02:00",
+        "upstreamModified": "2026-09-22T08:31:35+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F31004",
-        "version": "b0a40b2758098ce625b9f1ab8f0ad736508a234a43d60204ca066b6b6b5a1ee0",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F31004",
+        "version": "055423bfefe8f04167a32eb06c0271bdd6d2a684cf00d6d105504d4ae8f37ce4",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -3456,15 +3494,16 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-24T07:10:43+02:00"
+        "asOf": "2026-09-24T07:10:43+02:00",
+        "upstreamModified": "2026-09-24T07:10:43+02:00"
       }
     },
     {
       "type": "Feature",
       "geometry": null,
       "properties": {
-        "id": "oparl:http%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F31014",
-        "version": "8cc13a0596d379792b5152c3d9d6f8d11f726eb05ee0d5814ef1374b99ebf375",
+        "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F31014",
+        "version": "195d0130eb478b3d747cc1363ad3df79f11bbb3bffdc0f25b65b3d9dda187a5a",
         "cityId": "dresden",
         "kind": "council_paper",
         "category": "Ratsvorlage",
@@ -3498,7 +3537,8 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-24T07:11:22+02:00"
+        "asOf": "2026-09-24T07:11:22+02:00",
+        "upstreamModified": "2026-09-24T07:11:22+02:00"
       }
     },
     {
@@ -27576,7 +27616,7 @@
       },
       "properties": {
         "id": "osm:node-2705437376",
-        "version": "25d9ccbb3fa8e65c013d4682b0b02df4ed92a86a6356095fc846c24df7038c42",
+        "version": "d0f4915df45203e444584998e8a8960f06fe311a0d1712f80bbf363b8f6d5cfa",
         "cityId": "dresden",
         "kind": "place",
         "category": "supermarket",
@@ -27598,6 +27638,18 @@
             "title": "OpenStreetMap contributors",
             "publisher": "OpenStreetMap contributors",
             "locator": "node/2705437376; tags.name, tags.shop",
+            "retrievedAt": "2026-09-26T17:28:26.278Z",
+            "sha256": "92cbc733d5363f2206d4c873fa50e953db8b549e7ae527b018279864404443ee",
+            "snapshot": true,
+            "licence": "ODbL 1.0",
+            "reuse": "open_licence"
+          },
+          {
+            "url": "https://www.openstreetmap.org/way/230352219",
+            "snapshotUrl": "https://gall.openstreetmap.de/api/interpreter",
+            "title": "OpenStreetMap contributors",
+            "publisher": "OpenStreetMap contributors",
+            "locator": "way/230352219; tags.name, tags.shop",
             "retrievedAt": "2026-09-26T17:28:26.278Z",
             "sha256": "92cbc733d5363f2206d4c873fa50e953db8b549e7ae527b018279864404443ee",
             "snapshot": true,
@@ -30067,7 +30119,7 @@
       },
       "properties": {
         "id": "osm:node-295878504",
-        "version": "a7186166f1190a424e1e0525ffd3814f01e1d972e3d106a649e173075d7faaf7",
+        "version": "96ab6528ac8f808b750f40e9b7efd4bae52550cddf4999f9cc50435caa4fa16c",
         "cityId": "dresden",
         "kind": "place",
         "category": "kindergarten",
@@ -30089,6 +30141,18 @@
             "title": "OpenStreetMap contributors",
             "publisher": "OpenStreetMap contributors",
             "locator": "node/295878504; tags.name, tags.amenity",
+            "retrievedAt": "2026-09-26T17:28:26.278Z",
+            "sha256": "92cbc733d5363f2206d4c873fa50e953db8b549e7ae527b018279864404443ee",
+            "snapshot": true,
+            "licence": "ODbL 1.0",
+            "reuse": "open_licence"
+          },
+          {
+            "url": "https://www.openstreetmap.org/way/264741917",
+            "snapshotUrl": "https://gall.openstreetmap.de/api/interpreter",
+            "title": "OpenStreetMap contributors",
+            "publisher": "OpenStreetMap contributors",
+            "locator": "way/264741917; tags.name, tags.amenity",
             "retrievedAt": "2026-09-26T17:28:26.278Z",
             "sha256": "92cbc733d5363f2206d4c873fa50e953db8b549e7ae527b018279864404443ee",
             "snapshot": true,
@@ -81949,53 +82013,6 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          13.7290188,
-          51.082552
-        ]
-      },
-      "properties": {
-        "id": "osm:way-230352219",
-        "version": "32b160ce02ac724f0055c69c8a44ea37d3b38d16b553bab30adc56545199ec69",
-        "cityId": "dresden",
-        "kind": "place",
-        "category": "supermarket",
-        "title": "EDEKA",
-        "statement": "EDEKA ist in OpenStreetMap als supermarket eingetragen. Öffnungszeiten in OSM eingetragen; nicht unabhängig bestätigt.",
-        "status": "OSM-Eintrag, nicht offiziell geprüft",
-        "startDate": null,
-        "endDate": null,
-        "nextStep": "Aktuelle Angaben direkt beim Ort prüfen.",
-        "unknowns": [
-          "Aktueller Betrieb und tatsächliche Öffnungszeiten"
-        ],
-        "scale": "street",
-        "geometryPrecision": "approximate",
-        "sources": [
-          {
-            "url": "https://www.openstreetmap.org/way/230352219",
-            "snapshotUrl": "https://gall.openstreetmap.de/api/interpreter",
-            "title": "OpenStreetMap contributors",
-            "publisher": "OpenStreetMap contributors",
-            "locator": "way/230352219; tags.name, tags.shop",
-            "retrievedAt": "2026-09-26T17:28:26.278Z",
-            "sha256": "92cbc733d5363f2206d4c873fa50e953db8b549e7ae527b018279864404443ee",
-            "snapshot": true,
-            "licence": "ODbL 1.0",
-            "reuse": "open_licence"
-          }
-        ],
-        "extraction": {
-          "method": "structured"
-        },
-        "reviewState": "candidate",
-        "asOf": "2026-09-26T17:28:26.278Z"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
           13.6206567,
           51.0922638
         ]
@@ -88745,53 +88762,6 @@
             "title": "OpenStreetMap contributors",
             "publisher": "OpenStreetMap contributors",
             "locator": "way/264252899; tags.name, tags.amenity",
-            "retrievedAt": "2026-09-26T17:28:26.278Z",
-            "sha256": "92cbc733d5363f2206d4c873fa50e953db8b549e7ae527b018279864404443ee",
-            "snapshot": true,
-            "licence": "ODbL 1.0",
-            "reuse": "open_licence"
-          }
-        ],
-        "extraction": {
-          "method": "structured"
-        },
-        "reviewState": "candidate",
-        "asOf": "2026-09-26T17:28:26.278Z"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          13.7267545,
-          51.0345672
-        ]
-      },
-      "properties": {
-        "id": "osm:way-264741917",
-        "version": "21f71b06079b24df68faf7490a8ce26084a879e1eb1deceeb73c417e540bdb53",
-        "cityId": "dresden",
-        "kind": "place",
-        "category": "kindergarten",
-        "title": "Regenbogen",
-        "statement": "Regenbogen ist in OpenStreetMap als kindergarten eingetragen. Betrieb und Öffnungszeiten nicht geprüft.",
-        "status": "OSM-Eintrag, nicht offiziell geprüft",
-        "startDate": null,
-        "endDate": null,
-        "nextStep": "Aktuelle Angaben direkt beim Ort prüfen.",
-        "unknowns": [
-          "Aktueller Betrieb und tatsächliche Öffnungszeiten"
-        ],
-        "scale": "street",
-        "geometryPrecision": "approximate",
-        "sources": [
-          {
-            "url": "https://www.openstreetmap.org/way/264741917",
-            "snapshotUrl": "https://gall.openstreetmap.de/api/interpreter",
-            "title": "OpenStreetMap contributors",
-            "publisher": "OpenStreetMap contributors",
-            "locator": "way/264741917; tags.name, tags.amenity",
             "retrievedAt": "2026-09-26T17:28:26.278Z",
             "sha256": "92cbc733d5363f2206d4c873fa50e953db8b549e7ae527b018279864404443ee",
             "snapshot": true,

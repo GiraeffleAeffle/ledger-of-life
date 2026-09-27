@@ -18,7 +18,7 @@
       },
       "properties": {
         "id": "autobahn:2025-062919--vi-bs.2026-04-26_05-00-00-000.devi-zus.2026-04-19_20-00-00-000.de1",
-        "version": "10b13a20fe5556733c4cacbbfbf726f73b6f616e4fb7b88da5950ffaadf7e1a4",
+        "version": "f65ac49375c304c615728ec441560e6ad323d31ec4906a557a5a5e6e06b1fc60",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -40,8 +40,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2025-062919--vi-bs.2026-04-26_05-00-00-000.devi-zus.2026-04-19_20-00-00-000.de1]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -51,7 +51,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -71,7 +71,7 @@
       },
       "properties": {
         "id": "autobahn:2026-001477--vi-bs.2026-07-20_07-00-00-000.devi-zus.2026-02-02_00-00-00-000_002.de15",
-        "version": "686609856bc7c2f57428449bc3b694ec2f6e57b0d54d952873b64926ade949d2",
+        "version": "a0e8e7319ebb48609351e860961d9def1b4d525a798debde7e5b89904da6eac0",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -93,8 +93,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-001477--vi-bs.2026-07-20_07-00-00-000.devi-zus.2026-02-02_00-00-00-000_002.de15]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -104,7 +104,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -124,7 +124,7 @@
       },
       "properties": {
         "id": "autobahn:2026-001477--vi-bs.2026-07-20_07-00-00-000.devi-zus.2026-02-02_00-00-00-000_002.de17",
-        "version": "f6ccb1bb8a314da4229e452a1aa81bb128da775fcc0d77a5dcc71471e0e18644",
+        "version": "52dbe347d864183f8f5e083f71236e1987e144dc2b69c1ee6c1d3eeb0608071c",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -146,8 +146,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-001477--vi-bs.2026-07-20_07-00-00-000.devi-zus.2026-02-02_00-00-00-000_002.de17]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -157,7 +157,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -199,7 +199,7 @@
             "title": "Autobahn A5 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2026-001477--vi-fbm.2026-10-05_00-00-00-000.devi-zus.2026-02-02_00-00-00-000_002.de19]",
-            "retrievedAt": "2026-09-26T17:00:29.221Z",
+            "retrievedAt": "2026-09-27T10:06:36.239Z",
             "sha256": "560392f89a20553c0e7b599692550f06428cd1aee02dce5c427ed37e2a13c4f0",
             "snapshot": true,
             "licence": "unknown",
@@ -210,7 +210,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.221Z"
+        "asOf": "2026-09-27T10:06:36.239Z"
       }
     },
     {
@@ -252,7 +252,7 @@
             "title": "Autobahn A5 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2026-001477--vi-fbm.2026-10-05_00-00-00-000.devi-zus.2026-02-02_00-00-00-000_002.de20]",
-            "retrievedAt": "2026-09-26T17:00:29.221Z",
+            "retrievedAt": "2026-09-27T10:06:36.239Z",
             "sha256": "560392f89a20553c0e7b599692550f06428cd1aee02dce5c427ed37e2a13c4f0",
             "snapshot": true,
             "licence": "unknown",
@@ -263,7 +263,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.221Z"
+        "asOf": "2026-09-27T10:06:36.239Z"
       }
     },
     {
@@ -283,7 +283,7 @@
       },
       "properties": {
         "id": "autobahn:2026-019244--vi-bs.2026-09-15_00-00-00-000.devi-zus.2026-07-06_00-00-00-000_004.de149",
-        "version": "0de27dedd96b19378f1ce7f4b7321c422858110c57328d72d796f38bd1379eec",
+        "version": "e2085cb49cd7f382eb8d511e112faf8e535db333074c5c19d76b8d81d1ce7b4d",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -305,8 +305,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-019244--vi-bs.2026-09-15_00-00-00-000.devi-zus.2026-07-06_00-00-00-000_004.de149]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -316,7 +316,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -336,7 +336,7 @@
       },
       "properties": {
         "id": "autobahn:2026-019244--vi-bs.2026-09-15_00-00-00-000.devi-zus.2026-07-06_00-00-00-000_004.de151",
-        "version": "61375e8239fb0a3865657c65176c9dda0f06149f4c99706cf9dcd6fe8c3c845a",
+        "version": "27a84f3a7ad7ba9943e74052c5a5c0fc59748edfac3b885c413160af4197d84a",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -358,8 +358,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-019244--vi-bs.2026-09-15_00-00-00-000.devi-zus.2026-07-06_00-00-00-000_004.de151]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -369,7 +369,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -389,7 +389,7 @@
       },
       "properties": {
         "id": "autobahn:2026-023785--vi-bs.2026-08-14_19-00-00-000.devi-zus.2026-08-10_00-00-00-000_001.de3",
-        "version": "9206ef09199a60939b3a4c23aedf1f537488cf949e3d716b8ee9f2e97e735b17",
+        "version": "8584295e7b62188d63055bc5510616d62d88d8bdc4c2c036e076852d8b0f506a",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -411,8 +411,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-023785--vi-bs.2026-08-14_19-00-00-000.devi-zus.2026-08-10_00-00-00-000_001.de3]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -422,7 +422,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -442,7 +442,7 @@
       },
       "properties": {
         "id": "autobahn:2026-023785--vi-bs.2026-08-14_19-00-00-000.devi-zus.2026-08-10_00-00-00-000_001.de5",
-        "version": "b9a83189e0434b76a2c1b549c810fd943b922a500a58730a902e1dd3982ff623",
+        "version": "9246e6eb0d69b97878adaeb5d9eab5feb7c9faf9349118c33e3c5584c7e86817",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -464,8 +464,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-023785--vi-bs.2026-08-14_19-00-00-000.devi-zus.2026-08-10_00-00-00-000_001.de5]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -475,7 +475,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -517,7 +517,7 @@
             "title": "Autobahn A5 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2026-023785--vi-fbm.2026-08-14_19-00-00-000.devi-zus.2026-08-10_00-00-00-000_001.de1]",
-            "retrievedAt": "2026-09-26T17:00:29.221Z",
+            "retrievedAt": "2026-09-27T10:06:36.239Z",
             "sha256": "560392f89a20553c0e7b599692550f06428cd1aee02dce5c427ed37e2a13c4f0",
             "snapshot": true,
             "licence": "unknown",
@@ -528,7 +528,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.221Z"
+        "asOf": "2026-09-27T10:06:36.239Z"
       }
     },
     {
@@ -570,7 +570,7 @@
             "title": "Autobahn A5 closure",
             "publisher": "Autobahn GmbH",
             "locator": "closure[identifier=2026-023785--vi-fbm.2026-08-14_19-00-00-000.devi-zus.2026-08-10_00-00-00-000_001.de2]",
-            "retrievedAt": "2026-09-26T17:00:29.221Z",
+            "retrievedAt": "2026-09-27T10:06:36.239Z",
             "sha256": "560392f89a20553c0e7b599692550f06428cd1aee02dce5c427ed37e2a13c4f0",
             "snapshot": true,
             "licence": "unknown",
@@ -581,7 +581,113 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.221Z"
+        "asOf": "2026-09-27T10:06:36.239Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            7.672707154605152,
+            47.95200984590398
+          ],
+          [
+            7.588050560381673,
+            47.905795477064814
+          ]
+        ]
+      },
+      "properties": {
+        "id": "autobahn:2026-024342--vi-bs.2026-10-12_00-00-00-000.devi-zus.2026-09-21_19-00-00-000_005.de1",
+        "version": "a6c5d31f01e74719f1ae55c3908a51640d46a579eff2ae541e324407083057bf",
+        "cityId": "freiburg",
+        "kind": "roadworks",
+        "category": "Autobahn-Baustelle",
+        "title": "A5 | Breisgau - Köpfle",
+        "statement": "A5 | Breisgau - Köpfle: eine Baustelle ist im Autobahn-Verkehrsdienst verzeichnet. A5: Karlsruhe -> Basel, zwischen 4.2 km hinter Breisgau und 3.7 km vor Köpfle Die Lage kann auch eine Pendelstrecke außerhalb des Stadtgebiets betreffen.",
+        "status": "angekündigt",
+        "startDate": "2026-10-12",
+        "endDate": "2027-04-28",
+        "nextStep": "Aktuelle Verkehrs- und Sperrinformationen beim Betreiber prüfen.",
+        "unknowns": [
+          "Genauer Verkehrsverlauf und tatsächliche Dauer vor Ort"
+        ],
+        "scale": "district",
+        "geometryPrecision": "approximate",
+        "sources": [
+          {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A5/services/roadworks",
+            "snapshotUrl": "https://verkehr.autobahn.de/o/autobahn/A5/services/roadworks",
+            "title": "Autobahn A5 roadworks",
+            "publisher": "Autobahn GmbH",
+            "locator": "roadworks[identifier=2026-024342--vi-bs.2026-10-12_00-00-00-000.devi-zus.2026-09-21_19-00-00-000_005.de1]",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "unknown"
+          }
+        ],
+        "extraction": {
+          "method": "structured"
+        },
+        "reviewState": "candidate",
+        "asOf": "2026-09-27T10:06:36.200Z"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            7.5883464094242985,
+            47.90574752947081
+          ],
+          [
+            7.672759002945349,
+            47.95188210062028
+          ]
+        ]
+      },
+      "properties": {
+        "id": "autobahn:2026-024342--vi-bs.2026-10-12_00-00-00-000.devi-zus.2026-09-21_19-00-00-000_005.de3",
+        "version": "6e62447dafb56b7ebf549eafab403daae0ad35caf7f0b42a27f80d34d4b1d026",
+        "cityId": "freiburg",
+        "kind": "roadworks",
+        "category": "Autobahn-Baustelle",
+        "title": "A5 | Köpfle - Breisgau",
+        "statement": "A5 | Köpfle - Breisgau: eine Baustelle ist im Autobahn-Verkehrsdienst verzeichnet. A5: Basel -> Karlsruhe, zwischen 3.7 km hinter Köpfle und 4.2 km vor Breisgau Die Lage kann auch eine Pendelstrecke außerhalb des Stadtgebiets betreffen.",
+        "status": "angekündigt",
+        "startDate": "2026-10-12",
+        "endDate": "2027-04-28",
+        "nextStep": "Aktuelle Verkehrs- und Sperrinformationen beim Betreiber prüfen.",
+        "unknowns": [
+          "Genauer Verkehrsverlauf und tatsächliche Dauer vor Ort"
+        ],
+        "scale": "district",
+        "geometryPrecision": "approximate",
+        "sources": [
+          {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A5/services/roadworks",
+            "snapshotUrl": "https://verkehr.autobahn.de/o/autobahn/A5/services/roadworks",
+            "title": "Autobahn A5 roadworks",
+            "publisher": "Autobahn GmbH",
+            "locator": "roadworks[identifier=2026-024342--vi-bs.2026-10-12_00-00-00-000.devi-zus.2026-09-21_19-00-00-000_005.de3]",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "unknown"
+          }
+        ],
+        "extraction": {
+          "method": "structured"
+        },
+        "reviewState": "candidate",
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -601,14 +707,14 @@
       },
       "properties": {
         "id": "autobahn:2026-048657--vi-bs.2026-09-22_06-00-00-000.de0",
-        "version": "05adf5ceb12dd19f0a0d7dcba812f30d03c16386a2925ca214ea8afe7eccae78",
+        "version": "eedb0702ee349285d2d41dcb20212538892eb4bb2206319b81cc53e8b9b0787a",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
         "title": "A5 | Blauenblick - Galgenloch",
-        "statement": "A5 | Blauenblick - Galgenloch: eine Baustelle ist im Autobahn-Verkehrsdienst verzeichnet. A5: Karlsruhe -> Basel, zwischen 0.9 km hinter Blauenblick und 3.0 km vor Galgenloch Die Lage kann auch eine Pendelstrecke außerhalb des Stadtgebiets betreffen.",
-        "status": "im Verkehrsdienst geführt",
-        "startDate": "2026-09-26",
+        "statement": "A5 | Blauenblick - Galgenloch: eine Baustelle ist im Autobahn-Verkehrsdienst verzeichnet. 05.10.26 von 00:00 bis 10:00 Uhr Die Lage kann auch eine Pendelstrecke außerhalb des Stadtgebiets betreffen.",
+        "status": "im Verkehrsdienst geführt; 05.10.26 von 00:00 bis 10:00 Uhr",
+        "startDate": "2026-09-27",
         "endDate": "2026-10-05",
         "nextStep": "Aktuelle Verkehrs- und Sperrinformationen beim Betreiber prüfen.",
         "unknowns": [
@@ -623,8 +729,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048657--vi-bs.2026-09-22_06-00-00-000.de0]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -634,7 +740,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -654,7 +760,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048673--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_016.de1",
-        "version": "d0cf0e2b6b41010bdf7a2db8ddf1ca4d37e7551bfa8e9f6eb0872488903cf8a5",
+        "version": "117cdf9e8c3602d3c4e53415a3afd19addf43ca765058c634cb94d731ee2f762",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -676,8 +782,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048673--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_016.de1]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -687,7 +793,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -707,7 +813,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048673--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_016.de11",
-        "version": "1baedc509c734ea3812907dc5d8e21538e91cffbd35c5717881f3504beb9a15f",
+        "version": "25d153e2ccbe03ebd6a1b20d2f0b195fc2ca3445e0f927bd05894d5267defb56",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -729,8 +835,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048673--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_016.de11]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -740,7 +846,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -760,7 +866,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048673--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_016.de3",
-        "version": "57c75b72ae35e57642b10367c0e509c378ffc1c3a0473120f3601ffd1cea8012",
+        "version": "84007b84e0b0ec79f1640831712a168a34f407531d65f9f2d2a6415ba5a0f96f",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -782,8 +888,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048673--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_016.de3]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -793,7 +899,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -813,7 +919,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048673--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_016.de5",
-        "version": "c940d6015ef1da12f8484c36a36a24298a0136e7188dc55dafafd7f074e5ee16",
+        "version": "c1dd36425a14ad0f0bb1bb44dae5aeeccf42323dd5f959f8911b3cee3fa59491",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -835,8 +941,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048673--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_016.de5]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -846,7 +952,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -866,7 +972,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048673--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_016.de7",
-        "version": "dc76adf3c6fecd495b1a45999d96eb3b573ac36ec1d69a19b9a120a1503283b6",
+        "version": "b77cd1311046508fbf050b897b8650b428a375524841c95cba8269923b7a3a0a",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -888,8 +994,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048673--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_016.de7]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -899,7 +1005,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -919,7 +1025,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048673--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_016.de9",
-        "version": "3c9cc156b7a54a43c1f7afa5ad08151d9f88978ee9321b5579e86de73a9d22db",
+        "version": "74596c35bb2d84a100861385ecb66f18a53e6994e2169def9285cab8e5ec7709",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -941,8 +1047,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048673--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_016.de9]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -952,7 +1058,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -972,7 +1078,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048712--vi-bs.2026-10-01_08-00-00-000.devi-zus.2026-10-01_08-00-00-000_001.de11",
-        "version": "ef711320f13b749d1e4181a38ed92c200017dee955e2b5521f9ce38090289e4c",
+        "version": "473178bac1b5481dfd399c473dc1de4a3dcf4c76deec94c469118a0a6b0d4909",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -994,8 +1100,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048712--vi-bs.2026-10-01_08-00-00-000.devi-zus.2026-10-01_08-00-00-000_001.de11]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -1005,7 +1111,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -1025,7 +1131,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048712--vi-bs.2026-10-01_08-00-00-000.devi-zus.2026-10-01_08-00-00-000_001.de9",
-        "version": "87767d6057e4b177d594278d73b2732a0b1c2432edbddd943b79e7a8f8aea0c7",
+        "version": "39e1a6331e00b88d97592db3ac45e362833b75c8de597849abe1905fa0435987",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -1047,8 +1153,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048712--vi-bs.2026-10-01_08-00-00-000.devi-zus.2026-10-01_08-00-00-000_001.de9]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -1058,7 +1164,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -1078,7 +1184,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048771--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_005.de1",
-        "version": "4296cecb5311134f4e9080ea4aeaed4d0e697ae59b92c66e596b838490e24980",
+        "version": "c7a0fa9c1aa20ded54fcb6220529bd1de3dfe94bdb53c3aa910f2df1332e90ca",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -1100,8 +1206,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048771--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_005.de1]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -1111,7 +1217,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -1131,7 +1237,7 @@
       },
       "properties": {
         "id": "autobahn:2026-048771--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_005.de3",
-        "version": "6f4077ce65a63fe13d4f9379832900c7d7f9584f4d23b6e4b2960b05fe53c3d3",
+        "version": "08e8a11fc0aa05479ffcb5240628bf1cbed121eb634299ebdfcc1b3065eca79b",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -1153,8 +1259,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-048771--vi-bs.2026-09-28_08-00-00-000.devi-zus.2026-09-28_08-00-00-000_005.de3]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -1164,7 +1270,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -1184,7 +1290,7 @@
       },
       "properties": {
         "id": "autobahn:2026-049216--vi-bs.2026-09-30_19-00-00-000.devi-bs.2026-09-28_19-00-00-000_006.de5",
-        "version": "44b1bf5d8ced849a964586920a70f10af720a18f95c6dfc43bc7ca37a05d8851",
+        "version": "2251c609c0b4b55d2fa4f269bb76c56bf1510fee4861d6df7960d111a045214c",
         "cityId": "freiburg",
         "kind": "roadworks",
         "category": "Autobahn-Baustelle",
@@ -1206,8 +1312,8 @@
             "title": "Autobahn A5 roadworks",
             "publisher": "Autobahn GmbH",
             "locator": "roadworks[identifier=2026-049216--vi-bs.2026-09-30_19-00-00-000.devi-bs.2026-09-28_19-00-00-000_006.de5]",
-            "retrievedAt": "2026-09-26T17:00:29.177Z",
-            "sha256": "994cf04a8c033a9df1d5e47bd11557fef943bc6028f82e365da88424df13535a",
+            "retrievedAt": "2026-09-27T10:06:36.200Z",
+            "sha256": "642e829223d827f4435b367e061080b927613365c400362549835f1ecf033a06",
             "snapshot": true,
             "licence": "unknown",
             "reuse": "unknown"
@@ -1217,7 +1323,7 @@
           "method": "structured"
         },
         "reviewState": "candidate",
-        "asOf": "2026-09-26T17:00:29.177Z"
+        "asOf": "2026-09-27T10:06:36.200Z"
       }
     },
     {
@@ -1248,7 +1354,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2022-BehB-26; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1291,7 +1397,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-ASW-151; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1334,7 +1440,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-AWW-17; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1377,7 +1483,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-AWW-18; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1420,7 +1526,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-BaUStA-73; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1463,7 +1569,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-BaUStA-74; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1506,7 +1612,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-BaUStA-75; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1549,7 +1655,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-BaUStA-76; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1592,7 +1698,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-BehB-25; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1635,7 +1741,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-GR-300; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1678,7 +1784,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-GR-301; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1721,7 +1827,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-GR-302; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1764,7 +1870,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-GR-303; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1807,7 +1913,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-GR-304; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1850,7 +1956,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-GR-305; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1893,7 +1999,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-HFA-120; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1936,7 +2042,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-HFA-121; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -1979,7 +2085,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-HFA-122; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2022,7 +2128,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-HFA-123; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2065,7 +2171,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-KA-168; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2108,7 +2214,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-KJHA-155; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2151,7 +2257,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-KJHA-156; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2194,7 +2300,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-MIA-26; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2237,7 +2343,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-MIA-27; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2280,7 +2386,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-Mobi-26; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2323,7 +2429,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-Mobi-27; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2366,7 +2472,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_EB-116; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2409,7 +2515,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_EB-117; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2452,7 +2558,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_EB-118; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2495,7 +2601,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_EB-119; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2538,7 +2644,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_HD-251; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2581,7 +2687,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_HD-252; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2624,7 +2730,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_HD-253; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2667,7 +2773,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_KA-112; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2710,7 +2816,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_KA-113; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2753,7 +2859,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_KA-114; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2796,7 +2902,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_KA-115; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2839,7 +2945,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_LE-138; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2882,7 +2988,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_LE-139; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2925,7 +3031,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_LE-140; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -2968,7 +3074,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_MU-121; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3011,7 +3117,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_MU-122; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3054,7 +3160,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_MU-123; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3097,7 +3203,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_OPF-127; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3140,7 +3246,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_OPF-128; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3183,7 +3289,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_OPF-129; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3226,7 +3332,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_TI-144; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3269,7 +3375,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_TI-145; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3312,7 +3418,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_TI-146; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3355,7 +3461,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_TI-147; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3398,7 +3504,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_WA-123; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3441,7 +3547,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_WA-124; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3484,7 +3590,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_WA-125; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3527,7 +3633,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-OR_WA-126; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3570,7 +3676,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-SO-211; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3613,7 +3719,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-SO-212; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3656,7 +3762,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-SP-105; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3699,7 +3805,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-Strat-36; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3742,7 +3848,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-Strat-37; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3785,7 +3891,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-The-90; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3828,7 +3934,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-UKA-42; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3871,7 +3977,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/2026-UKA-43; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3914,7 +4020,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/ni_2026-HFA-119; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -3957,7 +4063,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/ni_2026-OR_HD-250; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -4000,7 +4106,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/ni_2026-OR_HD-264; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -4043,7 +4149,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/ni_2026-OR_HD-265; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -4086,7 +4192,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/ni_2026-OR_LE-137; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -4129,7 +4235,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/ni_2026-OR_MU-120; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -4172,7 +4278,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/ni_2026-OR_OPF-126; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
@@ -4215,7 +4321,7 @@
             "title": "OParl Sitzung",
             "publisher": "Freiburg",
             "locator": "record https://ris.freiburg.de/oparl/meeting/ni_2026-OR_TI-143; data.name, data.start, data.consultation",
-            "retrievedAt": "2026-09-26T17:00:38.461Z",
+            "retrievedAt": "2026-09-27T10:06:45.153Z",
             "sha256": "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9",
             "snapshot": true,
             "licence": "unknown",
