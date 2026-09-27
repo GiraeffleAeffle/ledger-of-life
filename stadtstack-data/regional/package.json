@@ -1,0 +1,16 @@
+{
+  "name": "stadtstack-regional-topics",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "all": "npm ci --no-audit --no-fund && node build.mjs"
+  },
+  "dependencies": {
+    "cheerio": "1.1.2",
+    "proj4": "2.19.10"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

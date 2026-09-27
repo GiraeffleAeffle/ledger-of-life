@@ -1,0 +1,1409 @@
+{
+  "schemaVersion": "stadtstack-regional-topics-v1",
+  "generatedAt": "2026-09-27T10:30:35.145Z",
+  "asOf": "2026-09-27",
+  "region": {
+    "id": "brandenburg-mol",
+    "name": "Landkreis Märkisch-Oderland",
+    "state": "Brandenburg",
+    "ags": "12064",
+    "sourceUrl": "https://service.brandenburg.de/service/de/adressen/kommunalverzeichnis/ansicht/~12064-maerkisch-oderland",
+    "municipalityCount": 45,
+    "centreMeaning": "Approximate administrative address, not municipal polygon centroid"
+  },
+  "sources": [
+    {
+      "id": "brandenburg-kommunalverzeichnis",
+      "type": "officialRegistry",
+      "url": "https://service.brandenburg.de/service/de/adressen/kommunalverzeichnis/kvdaten.csv",
+      "licence": "dl-de/by-2-0",
+      "licenceUrl": "https://www.govdata.de/dl-de/by-2-0",
+      "attribution": "Service Brandenburg, Kommunalverzeichnis",
+      "changes": "Filtered to MOL; regional keys converted to AGS; administrative UTM addresses converted to approximate WGS84 coordinates",
+      "retrievedAt": "2026-09-27"
+    },
+    {
+      "id": "diplan-brandenburg",
+      "type": "planningProcedure",
+      "url": "https://bb.beteiligung.diplanung.de/list/json",
+      "publicList": "https://bb.beteiligung.diplanung.de/",
+      "licence": "unknown",
+      "reuse": "facts_with_attribution",
+      "statewideProcedures": 887,
+      "note": "Only title, dates, phase, URL and locator are republished; point coordinates and any procedure geometry are not redistributed"
+    },
+    {
+      "id": "hoppegarten-sessionnet",
+      "type": "councilAgenda",
+      "url": "https://buergerinfo.gemeinde-hoppegarten.de/si0040.asp",
+      "licence": "unknown",
+      "reuse": "facts_with_attribution",
+      "checkedMeetings": 3
+    },
+    {
+      "id": "wriezen-ical",
+      "type": "councilCalendar",
+      "url": "https://wriezen.ratsinfomanagement.net/termine/ics/SD.NET_RIM.ics",
+      "licence": "unknown",
+      "reuse": "coverage_only",
+      "note": "Meeting titles do not identify policy topics"
+    },
+    {
+      "id": "curated-official-pages",
+      "type": "cityWebsite",
+      "url": null,
+      "licence": "unknown",
+      "reuse": "facts_with_attribution",
+      "checkedPages": 11
+    }
+  ],
+  "coverage": {
+    "since": "2025-03-27",
+    "diPlan": {
+      "statewideProcedures": 887,
+      "inWindow": 748,
+      "mapPointCoordinates": 887,
+      "molMatchedItems": 65,
+      "molMunicipalities": 18,
+      "titleOrJurisdictionUnresolved": 683,
+      "boundaryGeometryPublished": false
+    },
+    "council": {
+      "checkedMeetings": 3,
+      "meetingsRequested": 3,
+      "topicItems": 4
+    },
+    "wriezenCalendar": {
+      "allMeetings": 246,
+      "meetingsSinceCutoff": 187,
+      "topicalItems": 0
+    },
+    "curatedOfficialItems": 16,
+    "cityWebsiteItems": 14,
+    "municipalityWithItems": 22,
+    "warnings": []
+  },
+  "offices": [
+    {
+      "id": "amt-barnim-oderbruch",
+      "name": "Amt Barnim-Oderbruch",
+      "regionKey": "120645414"
+    },
+    {
+      "id": "amt-falkenberg-hoehe",
+      "name": "Amt Falkenberg-Höhe",
+      "regionKey": "120645403"
+    },
+    {
+      "id": "amt-golzow",
+      "name": "Amt Golzow",
+      "regionKey": "120645404"
+    },
+    {
+      "id": "amt-lebus",
+      "name": "Amt Lebus",
+      "regionKey": "120645406"
+    },
+    {
+      "id": "amt-maerkische-schweiz",
+      "name": "Amt Märkische Schweiz",
+      "regionKey": "120645408"
+    },
+    {
+      "id": "amt-seelow-land",
+      "name": "Amt Seelow-Land",
+      "regionKey": "120645412"
+    }
+  ],
+  "municipalities": [
+    {
+      "id": "alt-tucheband",
+      "name": "Alt Tucheband",
+      "ags": "12064009",
+      "center": [
+        14.51236,
+        52.53677
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-golzow"
+    },
+    {
+      "id": "altlandsberg",
+      "name": "Altlandsberg",
+      "ags": "12064029",
+      "center": [
+        13.72225,
+        52.55967
+      ],
+      "centerPrecision": "administrative_address_approximate"
+    },
+    {
+      "id": "bad-freienwalde-oder",
+      "name": "Bad Freienwalde (Oder)",
+      "ags": "12064044",
+      "center": [
+        14.02981,
+        52.78774
+      ],
+      "centerPrecision": "administrative_address_approximate"
+    },
+    {
+      "id": "beiersdorf-freudenberg",
+      "name": "Beiersdorf-Freudenberg",
+      "ags": "12064053",
+      "center": [
+        13.81668,
+        52.69951
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-falkenberg-hoehe"
+    },
+    {
+      "id": "bleyen-genschmar",
+      "name": "Bleyen-Genschmar",
+      "ags": "12064057",
+      "center": [
+        14.58388,
+        52.59746
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-golzow"
+    },
+    {
+      "id": "bliesdorf",
+      "name": "Bliesdorf",
+      "ags": "12064061",
+      "center": [
+        14.14019,
+        52.68998
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-barnim-oderbruch"
+    },
+    {
+      "id": "buckow-maerkische-schweiz",
+      "name": "Buckow (Märkische Schweiz)",
+      "ags": "12064084",
+      "center": [
+        14.07488,
+        52.56837
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-maerkische-schweiz"
+    },
+    {
+      "id": "falkenberg",
+      "name": "Falkenberg",
+      "ags": "12064125",
+      "center": [
+        13.99251,
+        52.76602
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-falkenberg-hoehe"
+    },
+    {
+      "id": "falkenhagen-mark",
+      "name": "Falkenhagen (Mark)",
+      "ags": "12064128",
+      "center": [
+        14.31456,
+        52.42842
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-seelow-land"
+    },
+    {
+      "id": "fichtenhoehe",
+      "name": "Fichtenhöhe",
+      "ags": "12064130",
+      "center": [
+        14.44082,
+        52.45236
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-seelow-land"
+    },
+    {
+      "id": "fredersdorf-vogelsdorf",
+      "name": "Fredersdorf-Vogelsdorf",
+      "ags": "12064136",
+      "center": [
+        13.75516,
+        52.52831
+      ],
+      "centerPrecision": "administrative_address_approximate"
+    },
+    {
+      "id": "garzau-garzin",
+      "name": "Garzau-Garzin",
+      "ags": "12064153",
+      "center": [
+        13.94939,
+        52.53175
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-maerkische-schweiz"
+    },
+    {
+      "id": "golzow",
+      "name": "Golzow",
+      "ags": "12064172",
+      "center": [
+        14.49167,
+        52.5737
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-golzow"
+    },
+    {
+      "id": "gusow-platkow",
+      "name": "Gusow-Platkow",
+      "ags": "12064190",
+      "center": [
+        14.33585,
+        52.58218
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-seelow-land"
+    },
+    {
+      "id": "heckelberg-brunow",
+      "name": "Heckelberg-Brunow",
+      "ags": "12064205",
+      "center": [
+        13.871,
+        52.72993
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-falkenberg-hoehe"
+    },
+    {
+      "id": "hoehenland",
+      "name": "Höhenland",
+      "ags": "12064222",
+      "center": [
+        13.88501,
+        52.70281
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-falkenberg-hoehe"
+    },
+    {
+      "id": "hoppegarten",
+      "name": "Hoppegarten",
+      "ags": "12064227",
+      "center": [
+        13.66736,
+        52.51557
+      ],
+      "centerPrecision": "administrative_address_approximate"
+    },
+    {
+      "id": "kuestriner-vorland",
+      "name": "Küstriner Vorland",
+      "ags": "12064266",
+      "center": [
+        14.57225,
+        52.5563
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-golzow"
+    },
+    {
+      "id": "lebus",
+      "name": "Lebus",
+      "ags": "12064268",
+      "center": [
+        14.48737,
+        52.45702
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-lebus"
+    },
+    {
+      "id": "letschin",
+      "name": "Letschin",
+      "ags": "12064274",
+      "center": [
+        14.35711,
+        52.64049
+      ],
+      "centerPrecision": "administrative_address_approximate"
+    },
+    {
+      "id": "lietzen",
+      "name": "Lietzen",
+      "ags": "12064288",
+      "center": [
+        14.34218,
+        52.46978
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-seelow-land"
+    },
+    {
+      "id": "lindendorf",
+      "name": "Lindendorf",
+      "ags": "12064290",
+      "center": [
+        14.4403,
+        52.49281
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-seelow-land"
+    },
+    {
+      "id": "maerkische-hoehe",
+      "name": "Märkische Höhe",
+      "ags": "12064303",
+      "center": [
+        14.11853,
+        52.6356
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-maerkische-schweiz"
+    },
+    {
+      "id": "muencheberg",
+      "name": "Müncheberg",
+      "ags": "12064317",
+      "center": [
+        14.13984,
+        52.50366
+      ],
+      "centerPrecision": "administrative_address_approximate"
+    },
+    {
+      "id": "neuenhagen-bei-berlin",
+      "name": "Neuenhagen bei Berlin",
+      "ags": "12064336",
+      "center": [
+        13.68854,
+        52.52649
+      ],
+      "centerPrecision": "administrative_address_approximate"
+    },
+    {
+      "id": "neuhardenberg",
+      "name": "Neuhardenberg",
+      "ags": "12064340",
+      "center": [
+        14.23405,
+        52.59703
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-seelow-land"
+    },
+    {
+      "id": "neulewin",
+      "name": "Neulewin",
+      "ags": "12064349",
+      "center": [
+        14.27481,
+        52.72445
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-barnim-oderbruch"
+    },
+    {
+      "id": "neutrebbin",
+      "name": "Neutrebbin",
+      "ags": "12064365",
+      "center": [
+        14.22674,
+        52.66407
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-barnim-oderbruch"
+    },
+    {
+      "id": "oberbarnim",
+      "name": "Oberbarnim",
+      "ags": "12064370",
+      "center": [
+        13.95385,
+        52.59182
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-maerkische-schweiz"
+    },
+    {
+      "id": "oderaue",
+      "name": "Oderaue",
+      "ags": "12064371",
+      "center": [
+        14.15767,
+        52.79203
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-barnim-oderbruch"
+    },
+    {
+      "id": "petershagen-eggersdorf",
+      "name": "Petershagen/Eggersdorf",
+      "ags": "12064380",
+      "center": [
+        13.81663,
+        52.53851
+      ],
+      "centerPrecision": "administrative_address_approximate"
+    },
+    {
+      "id": "podelzig",
+      "name": "Podelzig",
+      "ags": "12064388",
+      "center": [
+        14.53459,
+        52.47286
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-lebus"
+    },
+    {
+      "id": "proetzel",
+      "name": "Prötzel",
+      "ags": "12064393",
+      "center": [
+        13.98348,
+        52.63481
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-barnim-oderbruch"
+    },
+    {
+      "id": "rehfelde",
+      "name": "Rehfelde",
+      "ags": "12064408",
+      "center": [
+        13.92461,
+        52.53057
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-maerkische-schweiz"
+    },
+    {
+      "id": "reichenow-moeglin",
+      "name": "Reichenow-Möglin",
+      "ags": "12064417",
+      "center": [
+        14.06851,
+        52.66129
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-barnim-oderbruch"
+    },
+    {
+      "id": "reitwein",
+      "name": "Reitwein",
+      "ags": "12064420",
+      "center": [
+        14.58345,
+        52.50234
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-lebus"
+    },
+    {
+      "id": "ruedersdorf-bei-berlin",
+      "name": "Rüdersdorf bei Berlin",
+      "ags": "12064428",
+      "center": [
+        13.78608,
+        52.47042
+      ],
+      "centerPrecision": "administrative_address_approximate"
+    },
+    {
+      "id": "seelow",
+      "name": "Seelow",
+      "ags": "12064448",
+      "center": [
+        14.38286,
+        52.53415
+      ],
+      "centerPrecision": "administrative_address_approximate"
+    },
+    {
+      "id": "strausberg",
+      "name": "Strausberg",
+      "ags": "12064472",
+      "center": [
+        13.88243,
+        52.57493
+      ],
+      "centerPrecision": "administrative_address_approximate"
+    },
+    {
+      "id": "treplin",
+      "name": "Treplin",
+      "ags": "12064480",
+      "center": [
+        14.39294,
+        52.4026
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-lebus"
+    },
+    {
+      "id": "vierlinden",
+      "name": "Vierlinden",
+      "ags": "12064482",
+      "center": [
+        14.27924,
+        52.4867
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-seelow-land"
+    },
+    {
+      "id": "waldsieversdorf",
+      "name": "Waldsieversdorf",
+      "ags": "12064484",
+      "center": [
+        14.06731,
+        52.54244
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-maerkische-schweiz"
+    },
+    {
+      "id": "wriezen",
+      "name": "Wriezen",
+      "ags": "12064512",
+      "center": [
+        14.13431,
+        52.72114
+      ],
+      "centerPrecision": "administrative_address_approximate"
+    },
+    {
+      "id": "zechin",
+      "name": "Zechin",
+      "ags": "12064538",
+      "center": [
+        14.44635,
+        52.60962
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-golzow"
+    },
+    {
+      "id": "zeschdorf",
+      "name": "Zeschdorf",
+      "ags": "12064539",
+      "center": [
+        14.3824,
+        52.4206
+      ],
+      "centerPrecision": "administrative_address_approximate",
+      "amtId": "amt-lebus"
+    }
+  ],
+  "cityRegions": {
+    "alt-tucheband": "brandenburg-mol",
+    "altlandsberg": "brandenburg-mol",
+    "bad-freienwalde-oder": "brandenburg-mol",
+    "beiersdorf-freudenberg": "brandenburg-mol",
+    "bleyen-genschmar": "brandenburg-mol",
+    "bliesdorf": "brandenburg-mol",
+    "buckow-maerkische-schweiz": "brandenburg-mol",
+    "falkenberg": "brandenburg-mol",
+    "falkenhagen-mark": "brandenburg-mol",
+    "fichtenhoehe": "brandenburg-mol",
+    "fredersdorf-vogelsdorf": "brandenburg-mol",
+    "garzau-garzin": "brandenburg-mol",
+    "golzow": "brandenburg-mol",
+    "gusow-platkow": "brandenburg-mol",
+    "heckelberg-brunow": "brandenburg-mol",
+    "hoehenland": "brandenburg-mol",
+    "hoppegarten": "brandenburg-mol",
+    "kuestriner-vorland": "brandenburg-mol",
+    "lebus": "brandenburg-mol",
+    "letschin": "brandenburg-mol",
+    "lietzen": "brandenburg-mol",
+    "lindendorf": "brandenburg-mol",
+    "maerkische-hoehe": "brandenburg-mol",
+    "muencheberg": "brandenburg-mol",
+    "neuenhagen-bei-berlin": "brandenburg-mol",
+    "neuhardenberg": "brandenburg-mol",
+    "neulewin": "brandenburg-mol",
+    "neutrebbin": "brandenburg-mol",
+    "oberbarnim": "brandenburg-mol",
+    "oderaue": "brandenburg-mol",
+    "petershagen-eggersdorf": "brandenburg-mol",
+    "podelzig": "brandenburg-mol",
+    "proetzel": "brandenburg-mol",
+    "rehfelde": "brandenburg-mol",
+    "reichenow-moeglin": "brandenburg-mol",
+    "reitwein": "brandenburg-mol",
+    "ruedersdorf-bei-berlin": "brandenburg-mol",
+    "seelow": "brandenburg-mol",
+    "strausberg": "brandenburg-mol",
+    "treplin": "brandenburg-mol",
+    "vierlinden": "brandenburg-mol",
+    "waldsieversdorf": "brandenburg-mol",
+    "wriezen": "brandenburg-mol",
+    "zechin": "brandenburg-mol",
+    "zeschdorf": "brandenburg-mol"
+  },
+  "topics": [
+    {
+      "id": "solarpark",
+      "label": "Freiflächen-Photovoltaik",
+      "summary": "Mehrere Orte bearbeiten Flächen für Photovoltaik; eine Beteiligung ist noch keine Genehmigung oder Inbetriebnahme.",
+      "categoryKeywords": [
+        "Solarpark",
+        "Agri-PV",
+        "Freiflächen-Photovoltaik"
+      ],
+      "municipalities": [
+        {
+          "municipalityId": "beiersdorf-freudenberg",
+          "stage": "adopted",
+          "items": [
+            {
+              "title": "Satzungsbeschluss Bebauungsplan Nr. 9 „Solarpark Beiersdorf-Freudenberg“",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/fe0bf214-b1b8-418a-9ae5-2e8727ea5454/public/detail",
+              "date": "2026-01-05",
+              "sourceType": "planningProcedure",
+              "locator": "„Planungsanlass“: Beschluss-Nr. 98/2025 vom 23.07.2025; Bekanntmachung und Inkrafttreten",
+              "stage": "adopted"
+            },
+            {
+              "title": "Bebauungsplan Nr. 9 \"Solarpark Beiersdorf-Freudenberg\" der Gemeinde Beiersdorf-Freudenberg",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/ac69cf67-c898-47cc-b55d-9e726f028c99/public/detail",
+              "date": "2025-03-03",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=ac69cf67-c898-47cc-b55d-9e726f028c99]: externalName, publicParticipationStartDate 2025-03-03, publicParticipationEndDate 2025-04-04, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Beiersdorf-Freudenberg“, operator „Amt Falkenberg-Höhe“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-04-04"
+            }
+          ]
+        },
+        {
+          "municipalityId": "falkenberg",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Bebauungsplan Nr. 5 \"Solarpark Falkenberg\" der Gemeinde Falkenberg im Ortsteil Falkenberg/Mark",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/aef6d148-70e6-4d3f-bb03-fe8a7aeb0328/public/detail",
+              "date": "2025-07-28",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=aef6d148-70e6-4d3f-bb03-fe8a7aeb0328]: externalName, publicParticipationStartDate 2025-07-28, publicParticipationEndDate 2025-09-12, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Falkenberg“, operator „Amt Falkenberg-Höhe“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-09-12"
+            },
+            {
+              "title": "Bebauungsplan Nr. 6 \"Solarpark Kruge\" der Gemeinde Falkenberg im Ortsteil Kruge/Gersdorf",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/da1c8022-b811-466f-83ff-a52f98cc694c/public/detail",
+              "date": "2025-07-28",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=da1c8022-b811-466f-83ff-a52f98cc694c]: externalName, publicParticipationStartDate 2025-07-28, publicParticipationEndDate 2025-09-12, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Falkenberg“, operator „Amt Falkenberg-Höhe“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-09-12"
+            }
+          ]
+        },
+        {
+          "municipalityId": "fichtenhoehe",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "förmliche Beteiligung Solarpark Plötzenhof, Alt Mahlisch Gemeinde Fichtenhöhe",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/b3842cea-3f7d-41d7-9c5d-e8eca1fd9d35/public/detail",
+              "date": "2025-05-26",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=b3842cea-3f7d-41d7-9c5d-e8eca1fd9d35]: externalName, publicParticipationStartDate 2025-05-26, publicParticipationEndDate 2025-06-30, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Fichtenhöhe“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-06-30"
+            }
+          ]
+        },
+        {
+          "municipalityId": "garzau-garzin",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Solarpark Garzau-Garzin III",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/d7cf3386-369b-4eeb-8a69-32d0624ae2a6/public/detail",
+              "date": "2025-08-27",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=d7cf3386-369b-4eeb-8a69-32d0624ae2a6]: externalName, publicParticipationStartDate 2025-08-27, publicParticipationEndDate 2025-10-01, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Garzau“, operator „Amt Märkische Schweiz“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-10-01"
+            }
+          ]
+        },
+        {
+          "municipalityId": "heckelberg-brunow",
+          "stage": "adopted",
+          "items": [
+            {
+              "title": "Bekanntmachung Satzungsbeschluss Bebauungsplan Nr. 5 „PVA Beerbaum“",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/dc3bd402-ad6b-4cd1-bdc7-465b5ee41449/public/detail",
+              "date": "2025-04-30",
+              "sourceType": "planningProcedure",
+              "locator": "„Planungsanlass“: Satzungsbeschluss und Inkraftsetzung",
+              "stage": "adopted"
+            }
+          ]
+        },
+        {
+          "municipalityId": "lebus",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Vorentwurf vorhabenbezogener Bebauungsplan „Freiflächen-Photovoltaik-Anlage-Schönfließ“ der Stadt Lebus",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/a0f8f5c0-f0c1-46ab-a32c-7296fdefddc8/public/detail",
+              "date": "2026-02-09",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=a0f8f5c0-f0c1-46ab-a32c-7296fdefddc8]: externalName, publicParticipationStartDate 2026-02-09, publicParticipationEndDate 2026-03-13, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „Lebus“, operator „Amt Lebus“",
+              "stage": "consultation_closed",
+              "participationEnd": "2026-03-13"
+            }
+          ]
+        },
+        {
+          "municipalityId": "neuhardenberg",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "frühzeitige Beteiligung vorhabenbezogener B-Plan \"Solarpark Wulkow\", Gemeinde Neuhardenberg",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/b37516a5-9ef4-4914-8445-7aad72bd2e36/public/detail",
+              "date": "2026-02-23",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=b37516a5-9ef4-4914-8445-7aad72bd2e36]: externalName, publicParticipationStartDate 2026-02-23, publicParticipationEndDate 2026-03-27, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „Neuhardenberg“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
+              "stage": "consultation_closed",
+              "participationEnd": "2026-03-27"
+            },
+            {
+              "title": "vorhabenbezogener Bebauungsplan \"Solarpark Gottesgabe III\", Gemeinde Neuhardenberg",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/e959fa65-e3eb-4b63-89ba-6982bf2dae7d/public/detail",
+              "date": "2025-12-15",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=e959fa65-e3eb-4b63-89ba-6982bf2dae7d]: externalName, publicParticipationStartDate 2025-12-15, publicParticipationEndDate 2026-01-23, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Altfriedland“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
+              "stage": "consultation_closed",
+              "participationEnd": "2026-01-23"
+            }
+          ]
+        },
+        {
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Bebauungsplan Nr. 56 \"Agri-Photovoltaikanlage Lichtenow\"",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/bplan56agripvlichtenow/public/detail",
+              "date": "2026-08-24",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=cc1c9aab-581c-4f0e-b20c-42eeda2563ad]: externalName, publicParticipationStartDate 2026-08-24, publicParticipationEndDate 2026-09-27, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „Rüdersdorf bei Berlin“, operator „Gemeinde Rüdersdorf“",
+              "stage": "consultation",
+              "participationEnd": "2026-09-27"
+            },
+            {
+              "title": "11. Änderung des Flächennutzungsplans für den Bereich des Bebauungsplans Nr. 57 \"Photovoltaikanlage Hennickendorf Nord\"",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/11fnpaenderung/public/detail",
+              "date": "2025-11-03",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=c446b21b-151b-43c2-bc97-fe385512abcc]: externalName, publicParticipationStartDate 2025-11-03, publicParticipationEndDate 2025-12-15, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „Rüdersdorf bei Berlin“, operator „Gemeinde Rüdersdorf“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-12-15"
+            },
+            {
+              "title": "Bebauungsplan Nr. 57 \"Photovoltaikanlage Hennickendorf Nord\"",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/bplan57pvffahennickendorfnord/public/detail",
+              "date": "2025-11-03",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=f2f640d4-c785-4774-807b-0a5ac87674df]: externalName, publicParticipationStartDate 2025-11-03, publicParticipationEndDate 2025-12-15, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „Rüdersdorf bei Berlin“, operator „Gemeinde Rüdersdorf“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-12-15"
+            }
+          ]
+        },
+        {
+          "municipalityId": "strausberg",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Bebauungsplan Nr. 68/23 \"Solarpark am Flugplatz\"",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/solarpark-flugplatz/public/detail",
+              "date": "2025-11-24",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=f3d226ee-4f6b-4149-905a-c04fc2f82415]: externalName, publicParticipationStartDate 2025-11-24, publicParticipationEndDate 2026-01-12, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Strausberg“, operator „Stadtverwaltung Strausberg“",
+              "stage": "consultation_closed",
+              "participationEnd": "2026-01-12"
+            }
+          ]
+        },
+        {
+          "municipalityId": "zeschdorf",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Bebauungsplan „Solarpark Zeschdorf“ der Gemeinde Zeschdorf, Gemarkung Alt Zeschdorf",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/b3cc13a9-9896-4936-bdd1-d740b6428ff1/public/detail",
+              "date": "2026-05-04",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=b3cc13a9-9896-4936-bdd1-d740b6428ff1]: externalName, publicParticipationStartDate 2026-05-04, publicParticipationEndDate 2026-06-08, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „“, operator „Amt Lebus“",
+              "stage": "consultation_closed",
+              "participationEnd": "2026-06-08"
+            }
+          ]
+        }
+      ],
+      "firstSeen": "2025-03-03",
+      "lastSeen": "2026-08-24",
+      "method": "keyword",
+      "reviewState": "candidate"
+    },
+    {
+      "id": "waermeplanung",
+      "label": "Kommunale Wärmeplanung",
+      "summary": "Gemeinden untersuchen künftige Wärmeversorgung; ein Wärmeplan ist keine Bauzusage und kein Heizungsgebot.",
+      "categoryKeywords": [
+        "Wärmeplanung",
+        "Wärmeplan"
+      ],
+      "municipalities": [
+        {
+          "municipalityId": "altlandsberg",
+          "stage": "planning",
+          "items": [
+            {
+              "title": "Kommunale Wärmeplanung: Mitglied im Planungsverbund",
+              "url": "https://www.gemeinde-hoppegarten.de/news/1/1240589/nachrichten/kommunale-w%C3%A4rmeplanung-in-hoppegarten.html",
+              "date": "2026-05-27",
+              "sourceType": "cityWebsite",
+              "locator": "Absatz „Die Gemeinde Hoppegarten handelt dabei nicht isoliert“: Stadt Altlandsberg",
+              "stage": "planning"
+            }
+          ]
+        },
+        {
+          "municipalityId": "fredersdorf-vogelsdorf",
+          "stage": "planning",
+          "items": [
+            {
+              "title": "Kommunale Wärmeplanung in Fredersdorf-Vogelsdorf",
+              "url": "https://www.fredersdorf-vogelsdorf.de/seite/857189/kommunale-w%C3%A4rmeplanung.html",
+              "date": null,
+              "sourceType": "cityWebsite",
+              "locator": "Abschnitt „Start der kommunalen Wärmeplanung“ (März 2026)",
+              "stage": "planning"
+            }
+          ]
+        },
+        {
+          "municipalityId": "hoppegarten",
+          "stage": "planning",
+          "items": [
+            {
+              "title": "Kommunale Wärmeplanung in Hoppegarten",
+              "url": "https://www.gemeinde-hoppegarten.de/news/1/1240589/nachrichten/kommunale-w%C3%A4rmeplanung-in-hoppegarten.html",
+              "date": "2026-05-27",
+              "sourceType": "cityWebsite",
+              "locator": "Abschnitt zum Planungsverbund; „Veröffentlichung“",
+              "stage": "planning"
+            }
+          ]
+        },
+        {
+          "municipalityId": "neuenhagen-bei-berlin",
+          "stage": "planning",
+          "items": [
+            {
+              "title": "Interkommunale Wärmeplanung als Sitzungsthema",
+              "url": "https://www.neuenhagen-bei-berlin.de/startseite-de/aktuelles/2026/schulentwicklungsplan-gruschewegpoller-und-blumen-liebe-areal/",
+              "date": "2026-06-01",
+              "sourceType": "cityWebsite",
+              "locator": "Liste „Gemeindevertretersitzung am 1. Juni 2026“, 4. Punkt",
+              "stage": "agenda"
+            },
+            {
+              "title": "Kommunale Wärmeplanung: Mitglied im Planungsverbund",
+              "url": "https://www.gemeinde-hoppegarten.de/news/1/1240589/nachrichten/kommunale-w%C3%A4rmeplanung-in-hoppegarten.html",
+              "date": "2026-05-27",
+              "sourceType": "cityWebsite",
+              "locator": "Absatz „Die Gemeinde Hoppegarten handelt dabei nicht isoliert“: Neuenhagen b. Berlin",
+              "stage": "planning"
+            }
+          ]
+        },
+        {
+          "municipalityId": "petershagen-eggersdorf",
+          "stage": "planning",
+          "items": [
+            {
+              "title": "Das steckt dahinter: Die neue Wärmeplanung",
+              "url": "https://doppeldorf.de/aktuelles/details/das-steckt-dahinter",
+              "date": "2026-03-24",
+              "sourceType": "cityWebsite",
+              "locator": "Abschnitte „Wir nehmen Sie mit in die Zukunft der Wärmeplanung“ und „Zusammen statt alleine“",
+              "stage": "planning"
+            }
+          ]
+        },
+        {
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "stage": "adopted",
+          "items": [
+            {
+              "title": "Kommunale Wärmeplanung: Wärmeplan beschlossen",
+              "url": "https://www.ruedersdorf.de/meine-gemeinde/konzepte/kommunale-waermeplanung/",
+              "date": "2025-07-22",
+              "sourceType": "cityWebsite",
+              "locator": "Abschnitt „Wärmeplan beschlossen“, erster Absatz",
+              "stage": "adopted"
+            }
+          ]
+        },
+        {
+          "municipalityId": "strausberg",
+          "stage": "draft",
+          "items": [
+            {
+              "title": "Kommunale Wärmeplanung: Abschlussbericht zur Beratung",
+              "url": "https://www.stadt-strausberg.de/stadtentwicklung-2/kommunale-waermeplanung/",
+              "date": "2026-04-12",
+              "sourceType": "cityWebsite",
+              "locator": "Abschnitt „Öffentlichkeitsbeteiligung abgeschlossen“, Abschlussbericht und geplanter Beschluss",
+              "stage": "draft"
+            }
+          ]
+        }
+      ],
+      "firstSeen": "2025-07-22",
+      "lastSeen": "2026-06-01",
+      "method": "keyword",
+      "reviewState": "candidate"
+    },
+    {
+      "id": "bioenergie",
+      "label": "Bioenergie und Biogasanlagen",
+      "summary": "Mehrere Gemeinden bearbeiten die Nutzung von Biomasse und Biogas; Bauleitplanungen belegen weder Bauabschluss noch Anlagenbetrieb.",
+      "categoryKeywords": [
+        "Biogasanlage",
+        "Biomassezentrum",
+        "Biogasaufbereitung"
+      ],
+      "municipalities": [
+        {
+          "municipalityId": "gusow-platkow",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "2. Änderung des Bebauungsplanes \"Biogasanlage Karlshof\" der Gemeinde Gusow-Platkow im vereinfachten Verfahren gem. § 13 BauGB",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/a9f922a3-bc17-49b5-8c66-13af2462a1b6/public/detail",
+              "date": "2025-11-10",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=a9f922a3-bc17-49b5-8c66-13af2462a1b6]: externalName, publicParticipationStartDate 2025-11-10, publicParticipationEndDate 2025-12-15, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Gusow“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-12-15"
+            }
+          ]
+        },
+        {
+          "municipalityId": "neuhardenberg",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Bebauungsplan \"Erweiterung Biogasanlage Neuhardenberg\", Gemeinde Neuhardenberg",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/c50a838c-6c48-4504-93e1-6bee812c5dd8/public/detail",
+              "date": "2025-09-08",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=c50a838c-6c48-4504-93e1-6bee812c5dd8]: externalName, publicParticipationStartDate 2025-09-08, publicParticipationEndDate 2025-10-17, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-10-17"
+            }
+          ]
+        },
+        {
+          "municipalityId": "neulewin",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Entwurf des vorhabenbezogenen Bebauungsplans „Erweiterung Biogasanlage Neulewin II“ der Gemeinde Neulewin",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/cb18cab3-e8d9-4a03-a3c6-5965882f50f1/public/detail",
+              "date": "2026-03-27",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=cb18cab3-e8d9-4a03-a3c6-5965882f50f1]: externalName, publicParticipationStartDate 2026-03-27, publicParticipationEndDate 2026-05-12, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Neulewin“, operator „Amt Barnim-Oderbruch“",
+              "stage": "consultation_closed",
+              "participationEnd": "2026-05-12"
+            }
+          ]
+        },
+        {
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Bebauungsplan Nr. 53 \"Biomassezentrum Hennickendorf\"",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/bplan53biomassezentrum/public/detail",
+              "date": "2026-01-28",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=bb345d97-134b-448b-be2a-0beef0dd7d97]: externalName, publicParticipationStartDate 2026-01-28, publicParticipationEndDate 2026-03-04, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Rüdersdorf bei Berlin“, operator „Gemeinde Rüdersdorf“",
+              "stage": "consultation_closed",
+              "participationEnd": "2026-03-04"
+            }
+          ]
+        }
+      ],
+      "firstSeen": "2025-09-08",
+      "lastSeen": "2026-03-27",
+      "method": "keyword",
+      "reviewState": "candidate"
+    },
+    {
+      "id": "windenergie",
+      "label": "Windenergie",
+      "summary": "Kommunen befassen sich mit Flächen für Windenergie; Planverfahren sind nicht mit gebauten Anlagen gleichzusetzen.",
+      "categoryKeywords": [
+        "Windenergie",
+        "Windpark",
+        "Windkraft"
+      ],
+      "municipalities": [
+        {
+          "municipalityId": "altlandsberg",
+          "stage": "evaluation",
+          "items": [
+            {
+              "title": "1. Änderung des Teilflächennutzungsplans Windenergienutzung",
+              "url": "https://www.altlandsberg.de/wirtschaft-stadtentwicklung/stadtentwicklung/aktuelle-massnahmen/strassenbaumassnahmen-1-1-1/",
+              "date": "2026-07-27",
+              "sourceType": "cityWebsite",
+              "locator": "„Wo stehen wir in diesem Verfahren?“: erneute beschränkte Beteiligung; Feststellungsbeschluss noch offen",
+              "stage": "evaluation"
+            }
+          ]
+        },
+        {
+          "municipalityId": "lebus",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Entwurf Bebauungsplan „Windpark Lebus“, als Ergebnis der 1. Änderung und Erweiterung des vorhabenbezogenen Bebauungsplans „Windpark Podelzig – Lebus, hier Stadt Lebus“",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/fda4f9e7-a78e-4bf4-bc8c-de8789d6443c/public/detail",
+              "date": "2026-05-04",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=fda4f9e7-a78e-4bf4-bc8c-de8789d6443c]: externalName, publicParticipationStartDate 2026-05-04, publicParticipationEndDate 2026-06-08, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Lebus“, operator „Amt Lebus“",
+              "stage": "consultation_closed",
+              "participationEnd": "2026-06-08"
+            },
+            {
+              "title": "Vorentwurf Bebauungsplan „Windpark Lebus“ als Ergebnis der 1. Änderung des vorhabenbezogenen Bebauungsplans „Windpark Podelzig –Lebus“, hier Stadt Lebus",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/ca229a6b-0bfe-4dbb-979a-643ee4e76211/public/detail",
+              "date": "2025-07-07",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=ca229a6b-0bfe-4dbb-979a-643ee4e76211]: externalName, publicParticipationStartDate 2025-07-07, publicParticipationEndDate 2025-08-06, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „Lebus“, operator „Amt Lebus“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-08-06"
+            }
+          ]
+        },
+        {
+          "municipalityId": "podelzig",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Entwurf Bebauungsplan „Windpark Podelzig“, als Ergebnis der 1. Änderung und Erweiterung des vorhabenbezogenen Bebauungsplans „Windpark Podelzig – Lebus, hier Gemeinde Podelzig“",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/d1f2a796-a032-4e1b-9e51-d2ae7a78736a/public/detail",
+              "date": "2026-02-02",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=d1f2a796-a032-4e1b-9e51-d2ae7a78736a]: externalName, publicParticipationStartDate 2026-02-02, publicParticipationEndDate 2026-03-06, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Podelzig“, operator „Amt Lebus“",
+              "stage": "consultation_closed",
+              "participationEnd": "2026-03-06"
+            },
+            {
+              "title": "Vorentwurf Bebauungsplan „Windpark Podelzig“, als Ergebnis der 1. Änderung des vorhabenbezogenen Bebauungsplans „Windpark Podelzig –Lebus“, hier Gemeinde Podelzig",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/ef3800db-a629-4ac2-9336-7d70261c51a9/public/detail",
+              "date": "2025-05-12",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=ef3800db-a629-4ac2-9336-7d70261c51a9]: externalName, publicParticipationStartDate 2025-05-12, publicParticipationEndDate 2025-06-16, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „Podelzig“, operator „Amt Lebus“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-06-16"
+            }
+          ]
+        },
+        {
+          "municipalityId": "treplin",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Entwurf der 1. Änderung des Sachlichen Teilflächennutzungsplans Windenergie der Gemeinde Treplin",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/ef0f992a-6412-4076-b0ae-8c2de2724a28/public/detail",
+              "date": "2026-01-12",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=ef0f992a-6412-4076-b0ae-8c2de2724a28]: externalName, publicParticipationStartDate 2026-01-12, publicParticipationEndDate 2026-02-27, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Treplin“, operator „Amt Lebus“",
+              "stage": "consultation_closed",
+              "participationEnd": "2026-02-27"
+            },
+            {
+              "title": "Entwurf der 1. Änderung des Bebauungsplans „Windpark Treplin“ der Gemeinde Treplin",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/bddf5612-82f1-4019-92c4-bd520e084a88/public/detail",
+              "date": "2026-01-12",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=bddf5612-82f1-4019-92c4-bd520e084a88]: externalName, publicParticipationStartDate 2026-01-12, publicParticipationEndDate 2026-02-27, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Treplin“, operator „Amt Lebus“",
+              "stage": "consultation_closed",
+              "participationEnd": "2026-02-27"
+            }
+          ]
+        }
+      ],
+      "firstSeen": "2025-05-12",
+      "lastSeen": "2026-07-27",
+      "method": "keyword",
+      "reviewState": "candidate"
+    },
+    {
+      "id": "gewerbe",
+      "label": "Gewerbe und Industrieflächen",
+      "summary": "Kommunen planen Flächen für Gewerbe oder Industrie; eine Flächenplanung belegt noch keine Ansiedlung.",
+      "categoryKeywords": [
+        "Gewerbegebiet",
+        "Industriegebiet",
+        "Gewerbepark"
+      ],
+      "municipalities": [
+        {
+          "municipalityId": "altlandsberg",
+          "stage": "evaluation",
+          "items": [
+            {
+              "title": "Gewerbegebiet A10: Energie- und Innovationspark",
+              "url": "https://www.altlandsberg.de/wirtschaft-stadtentwicklung/stadtentwicklung/aktuelle-massnahmen/strassenbaumassnahmen/a10-energie-und-innovationspark-altlandsberg/",
+              "date": "2026-04-09",
+              "sourceType": "cityWebsite",
+              "locator": "„Wo stehen wir in diesem Verfahren?“: Beteiligung 16.02.–09.04.2026; Satzungsbeschluss offen",
+              "stage": "evaluation"
+            }
+          ]
+        },
+        {
+          "municipalityId": "fredersdorf-vogelsdorf",
+          "stage": "planning",
+          "items": [
+            {
+              "title": "Bebauungsplan Nr. 43 „Gewerbegebiet Triftweg/Rechenzentrum Vogelsdorf“",
+              "url": "https://www.fredersdorf-vogelsdorf.de/seite/163341/bauleitplanung.html",
+              "date": null,
+              "sourceType": "cityWebsite",
+              "locator": "Abschnitt „In Planung befindliche Bauleitpläne“, BP 43 und 12. Änderung FNP",
+              "stage": "planning"
+            }
+          ]
+        },
+        {
+          "municipalityId": "neuhardenberg",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Bebauungsplan \"Gewerbegebiet Handel und Dienstleistungen\", Gemeinde Neuhardenberg",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/bee633fc-90b4-4f6a-8d04-680080a058a0/public/detail",
+              "date": "2025-09-08",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=bee633fc-90b4-4f6a-8d04-680080a058a0]: externalName, publicParticipationStartDate 2025-09-08, publicParticipationEndDate 2025-10-17, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-10-17"
+            },
+            {
+              "title": "Bebauungsplan \"Gewerbepark Airport-Center Neuhardenberg\", Gemeinde Neuhardenberg",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/e46f7d4f-3865-4b5b-9c15-dc5aa6f268ba/public/detail",
+              "date": "2025-09-08",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=e46f7d4f-3865-4b5b-9c15-dc5aa6f268ba]: externalName, publicParticipationStartDate 2025-09-08, publicParticipationEndDate 2025-10-17, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „Neuhardenberg“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-10-17"
+            },
+            {
+              "title": "1. Änderung des Bebauungsplanes \"Gewerbegebiet Nord Airport Neuhardenberg\", Gemeinde Neuhardenberg",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/a69ab57e-3846-4977-9c13-7caf35ce6bf9/public/detail",
+              "date": "2025-09-08",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=a69ab57e-3846-4977-9c13-7caf35ce6bf9]: externalName, publicParticipationStartDate 2025-09-08, publicParticipationEndDate 2025-10-17, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-10-17"
+            }
+          ]
+        }
+      ],
+      "firstSeen": "2025-09-08",
+      "lastSeen": "2026-04-09",
+      "method": "keyword",
+      "reviewState": "candidate"
+    },
+    {
+      "id": "schule",
+      "label": "Schule und Hort",
+      "summary": "Kommunen befassen sich mit Schul- und Hortstandorten; Kapazitäten und Termine müssen separat geprüft werden.",
+      "categoryKeywords": [
+        "Schule",
+        "Schulstandort",
+        "Hort"
+      ],
+      "municipalities": [
+        {
+          "municipalityId": "fredersdorf-vogelsdorf",
+          "stage": "planning",
+          "items": [
+            {
+              "title": "Bebauungsplan BP 39 „Schulstandort Försterweg“",
+              "url": "https://www.fredersdorf-vogelsdorf.de/seite/163341/bauleitplanung.html",
+              "date": null,
+              "sourceType": "cityWebsite",
+              "locator": "Abschnitt „In Planung befindliche Bauleitpläne“, BP 39; Bekanntmachung zur frühzeitigen Beteiligung",
+              "stage": "planning"
+            }
+          ]
+        },
+        {
+          "municipalityId": "hoppegarten",
+          "stage": "evaluation",
+          "items": [
+            {
+              "title": "Offenlage des Entwurfs des B-Planes \"Schulcampus Lindenallee/ Virchowstraße\" der Gemeinde Hoppegarten gem. §§ 3 (2) und 4 (2) Abs. 2 BauGB - im beschleunigten Verfahren gem. § 13a BauGB",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/eb568622-04ec-41e7-8069-fd8204fa88d8/public/detail",
+              "date": "2025-06-27",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=eb568622-04ec-41e7-8069-fd8204fa88d8]: externalName, publicParticipationStartDate 2025-06-27, publicParticipationEndDate 2025-07-31, publicParticipationPhaseName „Auswertung Öffentlichkeit“; list municipality „Neuenhagen bei Berlin“, operator „Gemeinde Hoppegarten“",
+              "stage": "evaluation",
+              "participationEnd": "2025-07-31"
+            }
+          ]
+        },
+        {
+          "municipalityId": "neuenhagen-bei-berlin",
+          "stage": "agenda",
+          "items": [
+            {
+              "title": "Schulentwicklungsplanung 2025 bis 2032 auf der Tagesordnung",
+              "url": "https://www.neuenhagen-bei-berlin.de/startseite-de/aktuelles/2026/schulentwicklungsplan-gruschewegpoller-und-blumen-liebe-areal/",
+              "date": "2026-06-01",
+              "sourceType": "cityWebsite",
+              "locator": "Liste „Gemeindevertretersitzung am 1. Juni 2026“, 2. Punkt",
+              "stage": "agenda"
+            }
+          ]
+        }
+      ],
+      "firstSeen": "2025-06-27",
+      "lastSeen": "2026-06-01",
+      "method": "keyword",
+      "reviewState": "candidate"
+    },
+    {
+      "id": "wohnbau",
+      "label": "Wohnbau und Quartiere",
+      "summary": "An mehreren Orten werden neue oder veränderte Wohnbauflächen beraten; Umfang und Baubeginn bleiben projektabhängig.",
+      "categoryKeywords": [
+        "Wohnbebauung",
+        "Wohngebiet",
+        "Quartier"
+      ],
+      "municipalities": [
+        {
+          "municipalityId": "hoppegarten",
+          "stage": "decision_recorded",
+          "items": [
+            {
+              "title": "Freigabe zur Ausschreibung der weiteren Planungsleistungen kommunaler Wohnungsbau (Rudolf-Breitscheid-Str. 35)",
+              "url": "https://buergerinfo.gemeinde-hoppegarten.de/to0050.asp?__ktonr=72211",
+              "date": "2026-09-07",
+              "sourceType": "councilAgenda",
+              "locator": "Ö 11.6 · Sitzung 2026-09-07 · DS 155/2025/24-29/1 · Beschluss: geändert beschlossen",
+              "stage": "decision_recorded"
+            }
+          ]
+        },
+        {
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "stage": "evaluation",
+          "items": [
+            {
+              "title": "Bebauungsplan Nr. 49 \"Wohngebiet Herzfelder Straße\"",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/b06bc81b-6d56-4f26-abf3-c8c52d73c6c8/public/detail",
+              "date": "2025-09-11",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=b06bc81b-6d56-4f26-abf3-c8c52d73c6c8]: externalName, publicParticipationStartDate 2025-09-11, publicParticipationEndDate 2025-10-19, publicParticipationPhaseName „Auswertung Öffentlichkeit“; list municipality „Rüdersdorf bei Berlin“, operator „Gemeinde Rüdersdorf“",
+              "stage": "evaluation",
+              "participationEnd": "2025-10-19"
+            }
+          ]
+        },
+        {
+          "municipalityId": "strausberg",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Bebauungsplan Nr. 72/25 \"Wohnbebauung Ernst-Thälmann-Straße Nord-West\"",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/wohnbebauung-thaelmannstrasse-nw/public/detail",
+              "date": "2026-02-01",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=a1611c30-52d6-4fd2-9bb9-cc0a5d5b074b]: externalName, publicParticipationStartDate 2026-02-01, publicParticipationEndDate 2026-03-01, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „Strausberg“, operator „Stadtverwaltung Strausberg“",
+              "stage": "consultation_closed",
+              "participationEnd": "2026-03-01"
+            }
+          ]
+        }
+      ],
+      "firstSeen": "2025-09-11",
+      "lastSeen": "2026-09-07",
+      "method": "keyword",
+      "reviewState": "candidate"
+    },
+    {
+      "id": "sport",
+      "label": "Sport und Freizeitflächen",
+      "summary": "Mehrere Orte beraten Sport- oder Freizeitflächen; ein Haushaltsantrag ist keine Eröffnung und ein Plan noch kein Bau.",
+      "categoryKeywords": [
+        "Sportstätte",
+        "Sportplatz",
+        "Skateanlage",
+        "Freizeitanlage"
+      ],
+      "municipalities": [
+        {
+          "municipalityId": "fredersdorf-vogelsdorf",
+          "stage": "planning",
+          "items": [
+            {
+              "title": "Bebauungsplan BP 41 „Freizeit- und Erholungsstandort Landstraße“",
+              "url": "https://www.fredersdorf-vogelsdorf.de/seite/163341/bauleitplanung.html",
+              "date": null,
+              "sourceType": "cityWebsite",
+              "locator": "Abschnitt „In Planung befindliche Bauleitpläne“, BP 41",
+              "stage": "planning"
+            }
+          ]
+        },
+        {
+          "municipalityId": "hoppegarten",
+          "stage": "referred",
+          "items": [
+            {
+              "title": "Antrag Sportstätten Betriebskosten",
+              "url": "https://buergerinfo.gemeinde-hoppegarten.de/to0050.asp?__ktonr=72206",
+              "date": "2026-09-07",
+              "sourceType": "councilAgenda",
+              "locator": "Ö 11.1 · Sitzung 2026-09-07 · AN 126/2026/24-29 · Beschluss: in die GV verwiesen",
+              "stage": "referred"
+            },
+            {
+              "title": "Außerplanmäßige Aufwendungen Skateanlage Hönow",
+              "url": "https://buergerinfo.gemeinde-hoppegarten.de/to0050.asp?__ktonr=72225",
+              "date": "2026-09-07",
+              "sourceType": "councilAgenda",
+              "locator": "Ö 11.10 · Sitzung 2026-09-07 · DS 284/2026/24-29 · Beschluss: an Ausschuss/Fraktion verwiesen",
+              "stage": "referred"
+            }
+          ]
+        }
+      ],
+      "firstSeen": "2026-09-07",
+      "lastSeen": "2026-09-07",
+      "method": "keyword",
+      "reviewState": "candidate"
+    }
+  ]
+}
