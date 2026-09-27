@@ -90,7 +90,7 @@ The unpenalized and ambiguity-penalized cache results for the five currently gen
 | Münster council paper | 1.0 | 1.0 | `auto_checked` |
 | Wuppertal council paper | 1.0 | 1.0 | `auto_checked` |
 
-The 2025 statement says that the ordinance specifies planned outlays and explicitly clarifies they are not actual expenses. Its new score is `0.0`, while the evaluator reason says “no contradictions are listed,” an internally inconsistent result. It remains `candidate` (“Not yet checked”), not automatically approved; this is a calibration false-low to investigate rather than evidence that the statement is contradicted. The independent plan-versus-actual publication guard remains in place.
+The 2025 statement says that the ordinance specifies planned outlays and explicitly clarifies they are not actual expenses. Its new score is `0.0`, while the evaluator reason says “no contradictions are listed,” an internally inconsistent result. It remains `candidate` (“Not yet checked”), not automatically approved; this is a potential false-low that needs source-level review, not evidence that the statement is contradicted. The independent plan-versus-actual publication guard remains in place.
 
 ### Recommendation
 
