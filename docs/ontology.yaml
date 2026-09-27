@@ -41,13 +41,13 @@ layers:  # product architecture, bottom-up
   - id: homes
     concepts: [Home, Listing, Application, Agreement, Role]
   - id: custody
-    concepts: [Escrow, Operation, Claim, Settlement, Payout]
+    concepts: [Escrow, Operation, Claim, Settlement, Payout, CollateralDeposit]
   - id: earnings
     concepts: [YieldSource, Earnings, Release]
   - id: ownership
-    concepts: [Asset, Position, Venue, Distribution, Adapter]
+    concepts: [Asset, Position, BorrowAgainstShares, Venue, Distribution, Adapter]
   - id: vision
-    concepts: [ServiceChargeAccount, CollateralDeposit, HomeEquityPath, DeviceTokenization, LocalInvestment, LifeTimeline]
+    concepts: [ServiceChargeAccount, HomeEquityPath, DeviceTokenization, LocalInvestment, LifeTimeline]
 
 concepts:
   Person:
@@ -234,8 +234,8 @@ concepts:
       ProductiveDevice: {examples: [home solar, staking validator, electric car], reality: read_only_live, note: "Observed through Adapters; not tokenized."}
 
   Position:
-    definition: A quantity of an Asset held in a Person's wallet, valued at a reference price.
-    code: [src/server/portfolio.ts, src/server/robinhood-demo.ts#robinhoodHoldings, src/components/assets.tsx]
+    definition: A quantity of an Asset held in a Person's wallet or in a test contract as their deposit/loan collateral, valued at a stated price.
+    code: [src/server/portfolio.ts, src/server/robinhood-demo.ts#robinhoodHoldings, src/server/share-workflows.ts, src/components/assets.tsx]
 
   Venue:
     definition: Where a Person exchanges cash for an Asset.
@@ -298,10 +298,20 @@ concepts:
     reality: roadmap
 
   CollateralDeposit:
-    definition: Future option to secure an Agreement with SecurityTokens (for example 150 %) instead of cash. Today only a 150 % calculator and Robinhood Chain testnet contract exist; no pledge flow, top-up or forced-sale tenancy is implemented in the app.
-    code: [contracts/evm/src/CollateralEscrow.sol, src/components/stock-collateral.tsx]
-    reality: prototype
-    legal_note: German law (§551 BGB) allows other securities only by agreement; the landlord accepts the price risk.
+    definition: A working Robinhood Chain testnet flow that secures a separate illustrated deposit with official test TSLA shares at a simulated per-wallet test price, not a cash deposit in a production rental agreement.
+    lifecycle: [test_landlord_accepts, tenant_pledges_shares, simulated_price_drop, tenant_tops_up_or_operator_protectively_sells, test_move_out_claim, tenant_accepts_claim, settlement_returns_remaining_shares]
+    invariant: Share and cash collateral remains in the contract until its test claim and settlement rules release it.
+    code: [contracts/evm/src/CollateralEscrow.sol, contracts/evm/src/testnet/TestnetMarket.sol, src/server/share-workflows.ts, src/components/share-workflows.tsx, src/components/stock-collateral.tsx]
+    reality: testnet_simulated
+
+  BorrowAgainstShares:
+    definition: A separate Robinhood Chain testnet TestLendingPool accepts official test TSLA as collateral and lends operator-funded test USD; a per-wallet test oracle supplies a simulated price.
+    rules:
+      - Borrowing is limited to 50 % of the current test-price collateral value.
+      - Liquidation is available at 80 % loan-to-value.
+      - Repayment includes accrued test interest; remaining collateral can be withdrawn.
+    code: [contracts/evm/src/testnet/TestLendingPool.sol, contracts/evm/src/testnet/TestnetMarket.sol, src/server/share-workflows.ts, src/components/share-workflows.tsx]
+    reality: testnet_simulated
 
   HomeEquityPath:
     definition: Accumulating HomeShares that count toward acquiring a whole home.
@@ -322,7 +332,7 @@ journeys:
 
 networks:
   solana_devnet: {used_for: [Escrow, Operation, tSPYx market], rpc: "Helius (SOLANA_RPC_URL)"}
-  robinhood_testnet: {chain_id: 46630, used_for: [RentalEscrow earnings demo, CollateralEscrow prototype, official test TSLA]}
+  robinhood_testnet: {chain_id: 46630, used_for: [RentalEscrow earnings demo, official test TSLA, CollateralDeposit with simulated per-wallet TestPriceOracle, BorrowAgainstShares in operator-funded TestLendingPool]}
   gnosis_beacon: {used_for: [validator adapter]}
   solana_mainnet_read: {used_for: [validator adapter, SPYx/TSLAx reference prices via Jupiter]}
 

@@ -6,7 +6,7 @@ The machine-readable source of truth is [`ontology.yaml`](ontology.yaml). This p
 
 **Positioning (decided 2026-09-26).** A household-ownership app. Your verified identity is the root, and everything you own, rent or run attaches to it through adapters. The rental deposit is the first and most complete building block.
 
-**Overview for people.** Start with [`LEDGER_OF_LIFE.md`](LEDGER_OF_LIFE.md): the five areas of one person's overview, the proposed app structure, and the adapter decision.
+**Start here for people.** [`LEDGER_OF_LIFE.md`](LEDGER_OF_LIFE.md) describes the Today landing page, the signed-in areas and adapter choices.
 
 **Bigger picture.** Part of [Stadtstack](https://stadtstack.giraeffleaeffle.chatgpt.site): one verified identity, many contexts (tenancy, club, house community, city). Each context gives the person roles, a feed of what is decided, and what they own there. The tenancy is the first context that is built.
 
@@ -18,10 +18,10 @@ The machine-readable source of truth is [`ontology.yaml`](ontology.yaml). This p
 | --- | --- | --- |
 | 1. Identity and contexts | Who is acting, with which keys, in which contexts, and what may they see? | Person, Wallet, IdentityAssurance, Credential, DisclosurePolicy, Context, Membership, CitySignal, MyPlaces |
 | 2. Homes | Which home, which terms, who is involved? | Home, Listing, Application, Agreement, Role |
-| 3. Custody | Where is the deposit, and who may move it? | Escrow, Operation, Claim, Settlement, Payout |
+| 3. Custody | Where is the deposit, and who may move it? | Escrow, Operation, Claim, Settlement, Payout, CollateralDeposit |
 | 4. Earnings | What does the locked deposit earn? | YieldSource, Earnings, Release |
-| 5. Ownership | What do I own and what does it pay me? | Asset, Position, Venue, Distribution, Adapter |
-| 6. Vision | Where can this go? | CollateralDeposit, HomeEquityPath, DeviceTokenization |
+| 5. Ownership | What do I own, owe and earn? | Asset, Position, BorrowAgainstShares, Venue, Distribution, Adapter |
+| 6. Vision | Where can this go? | HomeEquityPath, DeviceTokenization |
 
 Each layer builds on the ones below it. For example, an **Earnings Release** (4) requires an active **Escrow** (3), which requires an accepted **Agreement** (2) between verified **People** (1).
 
@@ -38,6 +38,10 @@ flowchart LR
   EA -- Release --> C[Cash in own wallet]
   C -- buys at Venue --> S[Security token]
   S -- pays --> D[Distribution]
+  S -- pledges --> CD[Share-backed test deposit]
+  CD -- test move-out settlement --> C
+  S -- secures --> BL[TestLendingPool loan]
+  BL -- operator-funded test USD --> C
   E -- move-out Claim --> ST[Settlement] --> PO[Payouts]
   P -- configures --> AD[Adapter]
   AD -- observes --> DEV[Solar / validator / car]
@@ -100,10 +104,10 @@ sequenceDiagram
 | --- | --- | --- |
 | Live mainnet | Real assets | Nothing yet |
 | Testnet, real | Real execution with test tokens | Accounts and wallets; listings and agreements; Solana escrow (setup, deposit, lending, claims, settlement, payouts); Robinhood escrow; tSPYx and test TSLA purchases |
-| Testnet, simulated input | Real execution, one input faked on purpose | Deposit yield (Solana `test_credit_yield`, Robinhood test vault) and therefore earnings claims; tSPYx distributions |
+| Testnet, simulated input | Real testnet execution with an intentionally simulated price or yield | Deposit yield (Solana `test_credit_yield`, Robinhood test vault) and therefore earnings claims; tSPYx distributions; **CollateralDeposit**: test TSLA pledge, simulated price drop, top-up or protective sale, move-out claim and return of remaining shares; **BorrowAgainstShares**: operator-funded test USD loan secured by test TSLA at a per-wallet test oracle price, 50 % max LTV and liquidation at 80 % LTV |
 | Read-only live | Real third-party data, with source and review caveats | CitySignals from Stadtstack public files (candidate items not yet reviewed); Home Assistant solar/savings and optional daily consumption reading; Gnosis, Ethereum and Solana validators; SPYx and TSLA reference prices |
 | Self-declared local | Unverified information a person places on their device | MyPlaces home/work map pins, removable from localStorage; not a verified address |
-| Prototype | A working test/counterpart exists but this is not a money-moving app flow | Stocks as deposit (`CollateralEscrow` testnet contract and calculator); service-charge example statement with server-stored test prepayment; Morpho on a mainnet fork |
+| Prototype | A working test/counterpart exists but this is not a money-moving app flow | Standalone stock-collateral calculator; service-charge example statement with server-stored test prepayment; Morpho on a mainnet fork |
 | Illustration | Visual or researched lead only | Unverified local cooperative candidates (no offers); home shares and the home-token grid |
 | Roadmap | Idea only | Home tokens toward owning a home; EU Digital Identity Wallet; EV adapter; tokenizing device income |
 
@@ -126,7 +130,8 @@ In each tenancy phase exactly one person has an action; everyone else sees what 
 | Listing, Application | `src/server/listings.ts` |
 | Agreement, Role | `src/server/agreements.ts` |
 | Escrow (Solana) | `programs/rental_escrow/src/` |
-| Escrow (Robinhood), CollateralDeposit | `contracts/evm/src/` |
+| CollateralDeposit | `contracts/evm/src/CollateralEscrow.sol`, `src/server/share-workflows.ts`, `src/components/share-workflows.tsx` |
+| BorrowAgainstShares | `contracts/evm/src/testnet/TestLendingPool.sol`, `src/server/share-workflows.ts`, `src/components/share-workflows.tsx` |
 | Operation, Release, Payout | `src/server/solana-service.ts`, `src/server/solana-initialization.ts` |
 | Journey (next step per person) | `src/server/journey.ts`, `src/components/home.tsx` |
 | Position, Venue, Distribution | `src/server/portfolio.ts`, `src/server/robinhood-demo.ts` |
