@@ -147,12 +147,11 @@ export function Today({ request, accountId, tenancies, listings, invitation, hom
       {regionView.error && <p className="small-copy" role="status">{regionView.error} Showing last checked topics.</p>}
       <ul className="today-change-list">{regionalTopics.map((topic) => <li key={topic.id}>
         <strong>{topic.label}</strong>
-        <span>{topic.summary} · {topic.stage === 'adopted' ? 'Adopted' : `Stage: ${topic.stage}`} · {REVIEW_LABELS[topic.reviewState] ?? 'Not yet checked'}</span>
-        {topic.neighbours.length > 0 && <small>Related source items also appear in {topic.neighbours.slice(0, 3).map((city) => city.name).join(', ')}{topic.neighbours.length > 3 ? ` and ${topic.neighbours.length - 3} more municipalities` : ''}. Stages differ by municipality.</small>}
+        <span>{topic.stage === 'adopted' ? 'Adopted' : `Stage: ${topic.stage}`} · {REVIEW_LABELS[topic.reviewState] ?? 'Not yet checked'}{topic.neighbours.length ? ` · related sources in ${topic.neighbours.length} other municipalities` : ''}</span>
         {topic.items.filter((item) => externalUrl(item.url)).slice(0, 2).map((item) => <small key={`${item.url}:${item.locator}`}>
           <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title} <ArrowUpRight size={12} aria-hidden /></a>
           {' · '}{item.sourceType === 'planningProcedure' ? 'Planning procedure' : item.sourceType === 'councilAgenda' ? 'Council agenda' : 'City website'}
-          {item.date ? ` · ${date.format(new Date(item.date))}` : ' · date not supplied'} · {item.locator}
+          {item.date ? ` · ${date.format(new Date(item.date))}` : ' · date not supplied'} · source locator in Places
         </small>)}
       </li>)}</ul>
     </section>}
