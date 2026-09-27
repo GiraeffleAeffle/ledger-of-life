@@ -12,9 +12,8 @@ type Settled<T> = { ok: true; value: T } | { ok: false; error: string; code?: 'p
 type AssetsResponse = { robinhood: Settled<RobinhoodHoldings>; solar: Settled<SolarReading>; validator: Settled<ValidatorReading>; adapters: PublicAdapterConfig };
 type SharePositions = {
   enabled: boolean;
-  walletValueAtomic: string;
   testUsdAtomic: string;
-  sharesRaw: string;
+  fakeStock: null | { symbol: 'tTSLA'; walletRaw: string; walletValueAtomic: string; priceAtomic: string };
   deposit: { valueAtomic: string } | null;
   loan: { valueAtomic: string; debtAtomic: string } | null;
 };
@@ -165,7 +164,7 @@ export function AssetsOverview({ request, tenancies, show, go }: {
   const rh = assets?.robinhood?.ok ? assets.robinhood.value : null;
   const solar = assets?.solar?.ok ? assets.solar.value : null;
   const validator = assets?.validator?.ok ? assets.validator.value : null;
-  const robinhoodUnavailable = Boolean(assets?.robinhood && !assets.robinhood.ok && workflowStatus !== 'available');
+  const robinhoodUnavailable = Boolean(assets?.robinhood && !assets.robinhood.ok);
   const robinhoodError = assets?.robinhood && !assets.robinhood.ok
     ? assets.robinhood.code === 'price_unavailable' ? 'Reference price temporarily unavailable; retrying…' : assets.robinhood.error
     : null;
@@ -173,14 +172,16 @@ export function AssetsOverview({ request, tenancies, show, go }: {
     ? robinhoodUnavailable ? 'Solana portfolio and Robinhood holdings' : 'Solana portfolio'
     : robinhoodUnavailable ? 'Robinhood holdings' : '';
   const positions = workflowStatus === 'available' ? workflow : null;
-  const inWallet = positions
-    ? atomicUsd(positions.walletValueAtomic) + atomicUsd(positions.testUsdAtomic)
-    : rh ? rh.tslaValueUsd + atomicUsd(rh.testUsdAtomic) : 0;
+  // Both endpoints read the same test-USD wallet. The workflow's top-level walletValueAtomic
+  // repeats fakeStock.walletValueAtomic once the fake token is deployed; never add both.
+  const walletTestUsd = rh ? atomicUsd(rh.testUsdAtomic) : atomicUsd(positions?.testUsdAtomic);
+  const robinhoodValue = (rh?.tslaValueUsd ?? 0) + walletTestUsd;
+  const fakeStockWalletValue = atomicUsd(positions?.fakeStock?.walletValueAtomic);
   const pledged = atomicUsd(positions?.deposit?.valueAtomic);
   const collateral = atomicUsd(positions?.loan?.valueAtomic);
   const debt = atomicUsd(positions?.loan?.debtAtomic);
-  const robinhoodValue = inWallet + pledged + collateral - debt;
-  const total = locked + (portfolio ? portfolio.valueUsd + atomicUsd(portfolio.testUsdcAtomic) : 0) + robinhoodValue;
+  const fakeStockValue = fakeStockWalletValue + pledged + collateral - debt;
+  const total = locked + (portfolio ? portfolio.valueUsd + atomicUsd(portfolio.testUsdcAtomic) : 0) + robinhoodValue + fakeStockValue;
   const totalLoading = !assets || !portfolioChecked || workflowStatus === 'loading';
 
   if (show === 'summary')
@@ -189,12 +190,12 @@ export function AssetsOverview({ request, tenancies, show, go }: {
         <span className="eyebrow">TEST MONEY · NO REAL VALUE</span>
         <strong className="overview-figure">{totalLoading ? <Loader2 className="spin" size={20} /> : unavailableHoldings ? '—' : usd(total)}</strong>
         <span className="small-copy">
-          {unavailableHoldings ? `${unavailableHoldings} temporarily unavailable; retrying…` : `Deposit ${usd(locked)} · stocks ${usd((portfolio?.valueUsd ?? 0) + robinhoodValue)}`}
+          {unavailableHoldings ? `${unavailableHoldings} temporarily unavailable; retrying…` : `Deposit ${usd(locked)} · stocks ${usd((portfolio?.valueUsd ?? 0) + robinhoodValue + fakeStockValue)}`}
           {validator ? ` · validator ${validator.stake.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${validator.unit}` : ''}
         </span>
-        {positions && <span className="small-copy">Robinhood shares and contract-held positions use the simulated test market price; open loan debt is subtracted.</span>}
+        {positions?.fakeStock && <span className="small-copy">tTSLA · fake test stock (test market price): {usd(fakeStockWalletValue)} in wallet · {usd(pledged)} pledged · {usd(collateral)} loan collateral · loan −{usd(debt)}</span>}
         {portfolio?.referencePriceStale && <span className="small-copy">Solana reference price as of {new Date(portfolio.referencePriceObservedAt).toLocaleString()}</span>}
-        {rh?.referencePriceStale && !positions && <span className="small-copy">Robinhood reference price as of {new Date(rh.referencePriceObservedAt).toLocaleString()}</span>}
+        {rh?.referencePriceStale && <span className="small-copy">Robinhood reference price as of {new Date(rh.referencePriceObservedAt).toLocaleString()}</span>}
         {workflowStatus === 'unavailable' && <span className="small-copy" role="status">Workflow positions unavailable; wallet-only values shown.</span>}
         <button className="text-button" onClick={() => go('money')}>Open Money →</button>
       </div>
@@ -208,8 +209,8 @@ export function AssetsOverview({ request, tenancies, show, go }: {
             <span className="eyebrow">EVERYTHING YOU OWN · TEST NETWORKS</span>
             <h2>{totalLoading ? <Loader2 className="spin" size={20} /> : unavailableHoldings ? '—' : usd(total)}</h2>
             <p className="small-copy">{unavailableHoldings ? `${unavailableHoldings} temporarily unavailable; retrying…` : 'Your deposit, stocks and what your hardware earns. Test assets have no real value.'}</p>
-            {positions && <p className="small-copy">Robinhood shares and contract-held positions use the simulated test market price; open loan debt is subtracted.</p>}
-            {(portfolio?.referencePriceStale || (rh?.referencePriceStale && !positions)) && <p className="small-copy">Total includes last known stock prices; observation times below.</p>}
+            {positions?.fakeStock && <p className="small-copy">Fake tTSLA shares and contract-held positions use the simulated test market price; open loan debt is subtracted.</p>}
+            {(portfolio?.referencePriceStale || rh?.referencePriceStale) && <p className="small-copy">Total includes last known stock prices; observation times below.</p>}
             {workflowStatus === 'unavailable' && <p className="small-copy" role="status">Workflow positions unavailable; wallet-only values shown.</p>}
           </div>
         </div>
@@ -239,13 +240,10 @@ export function AssetsOverview({ request, tenancies, show, go }: {
 
         <article className="asset-tile">
           <header><LineChart size={18} /> Stocks · Robinhood Chain</header>
-          <strong>{workflowStatus === 'loading' ? 'Loading…' : rh || positions ? usd(robinhoodValue) : '—'}</strong>
-          <span>{positions
-            ? `${(Number(positions.sharesRaw) / 1e18).toFixed(5)} TSLA (official test token) · ${usd(atomicUsd(positions.testUsdAtomic))} test USD in wallet`
-            : rh ? `${rh.tslaShares.toFixed(5)} TSLA (official test token) · ${usd(atomicUsd(rh.testUsdAtomic))} test USD in wallet` : robinhoodError ?? 'Loading…'}</span>
-          {positions && <span>Test market price · in wallet {usd(inWallet)} · pledged for a deposit {usd(pledged)} · loan collateral {usd(collateral)} · loan −{usd(debt)}</span>}
+          <strong>{!assets || workflowStatus === 'loading' ? 'Loading…' : rh ? usd(robinhoodValue) : '—'}</strong>
+          <span>{rh ? `${rh.tslaShares.toFixed(5)} TSLA (official test token) · ${usd(walletTestUsd)} test USD in wallet` : robinhoodError ?? 'Loading…'}</span>
           {workflowStatus === 'unavailable' && <span role="status">Workflow positions unavailable; wallet-only values shown.</span>}
-          {rh?.referencePriceStale && !positions && <span>Reference price as of {new Date(rh.referencePriceObservedAt).toLocaleString()} · live price unavailable</span>}
+          {rh?.referencePriceStale && <span>Reference price as of {new Date(rh.referencePriceObservedAt).toLocaleString()} · live price unavailable</span>}
           <div className="button-row">
             {rh && BigInt(rh.testUsdAtomic) > 0n && (
               <button className="button primary" disabled={Boolean(busy) || rh.referencePriceStale} onClick={() => run('buy', buyTsla)}>
@@ -254,6 +252,12 @@ export function AssetsOverview({ request, tenancies, show, go }: {
             )}
           </div>
         </article>
+        {positions?.fakeStock && <article className="asset-tile">
+          <header><LineChart size={18} /> tTSLA · fake test stock (test market price)</header>
+          <strong>{usd(fakeStockValue)}</strong>
+          <span>{(Number(positions.fakeStock.walletRaw) / 1e18).toFixed(5)} tTSLA in wallet · simulated price {usd(atomicUsd(positions.fakeStock.priceAtomic))} per share</span>
+          <span>In wallet {usd(fakeStockWalletValue)} · pledged for a deposit {usd(pledged)} · loan collateral {usd(collateral)} · loan −{usd(debt)}</span>
+        </article>}
         </>}
 
         {show === 'home' && (

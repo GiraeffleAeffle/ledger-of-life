@@ -200,11 +200,14 @@ partial portfolio total or a raw JSON error. Stale prices are labeled and disabl
 Solana buy preparation also requires a current quote. Solana portfolio chain reads coalesce per wallet
 for four seconds, and Home's solar-only tile skips stock reads.
 
-The independent Robinhood share-backed test deposit and loan use a **simulated per-wallet test
-oracle price**, not the Jupiter reference quote. Money and Today count wallet shares/cash,
-pledged deposit value and loan collateral, then subtract open loan debt. When workflow positions
-cannot be read or the route is disabled, the prior wallet-only total is explicitly labeled
-“workflow positions unavailable”; it is not silently treated as a complete balance.
+The independent Robinhood share-backed test deposit and loan use **tTSLA · fake test stock**,
+valued at a simulated per-wallet test oracle price, not the Jupiter reference quote for the
+separate official Robinhood test TSLA holding. Money and Today count fake tTSLA in the wallet
+and in pledged deposit or loan collateral once, then subtract open loan debt. Test USD in the
+wallet is also counted once: the workflow's aggregate wallet value overlaps the separately
+reported fake-stock wallet value and cash, so it is not added on top. When workflow positions
+cannot be read or the route is disabled, the prior official wallet-only total is explicitly
+labeled “workflow positions unavailable”; it is not silently treated as complete.
 
 The published city press feeds live at `cities/<cityId>/feed.json` for eight covered cities.
 Today shows only official press news with publisher, date and source link; Places also lists
