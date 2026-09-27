@@ -185,8 +185,8 @@ export function AssetsOverview({ request, tenancies, show, go }: {
 
   if (show === 'summary')
     return (
-      <section className="card overview-tile clickable" onClick={() => go('money')}>
-        <span className="eyebrow">MONEY · TEST NETWORKS</span>
+      <div className="today-money">
+        <span className="eyebrow">TEST MONEY · NO REAL VALUE</span>
         <strong className="overview-figure">{totalLoading ? <Loader2 className="spin" size={20} /> : unavailableHoldings ? '—' : usd(total)}</strong>
         <span className="small-copy">
           {unavailableHoldings ? `${unavailableHoldings} temporarily unavailable; retrying…` : `Deposit ${usd(locked)} · stocks ${usd((portfolio?.valueUsd ?? 0) + robinhoodValue)}`}
@@ -196,8 +196,8 @@ export function AssetsOverview({ request, tenancies, show, go }: {
         {portfolio?.referencePriceStale && <span className="small-copy">Solana reference price as of {new Date(portfolio.referencePriceObservedAt).toLocaleString()}</span>}
         {rh?.referencePriceStale && !positions && <span className="small-copy">Robinhood reference price as of {new Date(rh.referencePriceObservedAt).toLocaleString()}</span>}
         {workflowStatus === 'unavailable' && <span className="small-copy" role="status">Workflow positions unavailable; wallet-only values shown.</span>}
-        <span className="text-button">Open Money →</span>
-      </section>
+        <button className="text-button" onClick={() => go('money')}>Open Money →</button>
+      </div>
     );
 
   return (

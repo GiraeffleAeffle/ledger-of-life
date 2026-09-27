@@ -2214,15 +2214,18 @@ dd {
 .skip-link {
   position: fixed;
   left: 12px;
-  top: -70px;
+  top: 0;
+  transform: translateY(calc(-100% - 12px));
   z-index: 100;
   background: white;
   color: var(--green);
   border-radius: 8px;
   padding: 12px;
+  white-space: nowrap;
 }
 .skip-link:focus {
   top: 12px;
+  transform: none;
 }
 
 @media (min-width: 1500px) {
@@ -3047,9 +3050,7 @@ dd {
 .today-needs { border-left: 4px solid #1f7a4d; }
 .today-needs p { margin: 0; }
 .today-links { display: flex; gap: 18px; flex-wrap: wrap; }
-.overview-tile { display: grid; gap: 6px; align-content: start; }
-.overview-tile.clickable { cursor: pointer; text-align: left; }
-.overview-tile.clickable:hover { border-color: #1f7a4d; }
+.today-money { display: grid; gap: 6px; align-content: start; padding-top: 12px; border-top: 1px solid rgba(0, 0, 0, 0.08); }
 .overview-figure { font-size: 1.9rem; line-height: 1.1; }
 .idea-status { justify-self: start; font-size: 0.7rem; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: #eef0f3; color: #4a5160; }
 .idea-status.prototype { background: #fff4db; color: #8a5a00; }

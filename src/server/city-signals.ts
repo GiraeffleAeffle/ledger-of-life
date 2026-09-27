@@ -64,8 +64,9 @@ export interface RegionalTopicItem {
 }
 export interface RelevantRegionalTopic {
   id: string; label: string; summary: string; reviewState: 'candidate' | 'auto_checked' | 'reviewed';
-  stage: string; items: RegionalTopicItem[];
+  stage: string | null; items: RegionalTopicItem[];
   neighbours: { name: string; stage: string; source: RegionalTopicItem }[];
+  furthest: { name: string; stage: string; source: RegionalTopicItem };
 }
 interface RegionalPublication {
   schemaVersion: 'stadtstack-regional-topics-v1';
@@ -132,6 +133,9 @@ export async function readCityFeed(cityId: string): Promise<CityFeedResult> {
   return { state: 'available', cityId: city.id, cityName: city.name, feed };
 }
 
+const stageOrder = ['adopted', 'decision_recorded', 'evaluation', 'decision_pending', 'consultation_closed', 'consultation', 'draft', 'planning', 'referred', 'agenda'];
+const stageRank = (stage: string) => { const index = stageOrder.indexOf(stage); return index < 0 ? stageOrder.length : index; };
+
 /** An optional published region applies only to cities explicitly named in its manifest. */
 export async function readRegionalTopics(cityId: string): Promise<RegionalTopicResult> {
   if (!/^[a-z0-9-]+$/.test(cityId)) return { state: 'not_available', cityId };
@@ -148,17 +152,22 @@ export async function readRegionalTopics(cityId: string): Promise<RegionalTopicR
       throw new Error('Invalid regional topics publication.');
     if (published.cityRegions[cityId] !== entry.name) continue;
     const names = new Map(published.municipalities.map((municipality) => [municipality.id, municipality.name]));
-    const topics = published.topics.flatMap((topic) => topic.municipalities
-      .filter((municipality) => municipality.municipalityId === cityId && municipality.items.length)
-      .map((municipality) => ({
+    const topics = published.topics.flatMap((topic) => {
+      const participants = topic.municipalities.flatMap((municipality) => {
+        const name = names.get(municipality.municipalityId);
+        return name && municipality.items[0]
+          ? [{ id: municipality.municipalityId, name, stage: municipality.stage, source: municipality.items[0] }] : [];
+      });
+      if (participants.length < 2) return [];
+      const furthest = participants.toSorted((a, b) => stageRank(a.stage) - stageRank(b.stage))[0];
+      const own = topic.municipalities.find((municipality) => municipality.municipalityId === cityId);
+      return [{
         id: topic.id, label: topic.label, summary: topic.summary, reviewState: topic.reviewState,
-        stage: municipality.stage, items: municipality.items,
-        neighbours: topic.municipalities.flatMap((other) => {
-          const name = names.get(other.municipalityId);
-          return name && other.municipalityId !== cityId && other.items[0]
-            ? [{ name, stage: other.stage, source: other.items[0] }] : [];
-        }),
-      })));
+        stage: own?.stage ?? null, items: own?.items ?? [],
+        neighbours: participants.filter((participant) => participant.id !== cityId),
+        furthest,
+      }];
+    }).toSorted((a, b) => Number(b.items.length > 0) - Number(a.items.length > 0));
     return { state: 'available', regionName: published.region.name, cityId, topics };
   }
   return { state: 'not_available', cityId };

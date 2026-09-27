@@ -130,7 +130,7 @@ export function PlacesArea({ request }: { request: Request }) {
         <p className="places-meta">Sources: linked official city, district, state, Bundestag and EU portals · checked {checked} · link-only; page reuse licences not established · illustration.</p>
       </section>
       <section className="card places-section">
-        <div className="places-heading"><div><span className="eyebrow">OFFICIAL COUNCIL LINKS</span><h2>Council decisions</h2></div><Badge level="illustration" /></div>
+        <div className="places-heading"><div><span className="eyebrow">OFFICIAL COUNCIL LINKS</span><h2>Council papers &amp; meetings</h2></div><Badge level="illustration" /></div>
         {strausbergCity ? <>
           <p>Strausberg’s public ALLRIS portal exposes a calendar and document search. No working public OParl endpoint was confirmed; meeting names and dates are not mirrored here.</p>
           <div className="places-links"><Link url={strausberg.calendar}>Open meeting calendar</Link><Link url={strausberg.documents}>Search public documents</Link></div>

@@ -29,7 +29,10 @@ export function useCitySignals(request: AuthorizedRequest, explorationCity?: str
         return request<SignalResult>(`/api/city-signals?city=${encodeURIComponent(id)}`);
       })
       .then((result) => { if (current && result) setView({ cityId: id, result, error: '', revision, explorationCity }); })
-      .catch((cause) => { if (current) setView({ cityId: id, result: null, error: cause instanceof Error ? cause.message : 'City signals unavailable.', revision, explorationCity }); });
+      .catch((cause) => { if (current) setView((previous) => ({
+        cityId: id, result: previous.cityId === id ? previous.result : null,
+        error: cause instanceof Error ? cause.message : 'City signals unavailable.', revision, explorationCity,
+      })); });
     return () => { current = false; };
   }, [request, explorationCity, revision]);
   return view.revision === revision && view.explorationCity === explorationCity ? view : { cityId: '', result: null, error: '' };

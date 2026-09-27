@@ -101,8 +101,8 @@ to invest directly in local companies and property alongside the existing portfo
 
 The link to the city makes this interesting: a person sees a planned project (for example a community solar
 park in the atlas), the cooperative or company behind it, and can take part financially and in the
-consultation. Rule: no real offers without a licensed partner and legal review; until then everything here
-is illustration or test network and labeled as such.
+consultation. The current build uses clearly labelled illustrations and test networks;
+real offers are not presented here.
 
 ### 2.5 Newcomer welcome (clubs partly built; remainder roadmap)
 
@@ -210,10 +210,13 @@ The published city press feeds live at `cities/<cityId>/feed.json` for eight cov
 Today shows only official press news with publisher, date and source link; Places also lists
 dated events, displaying an event start only when supplied. A city with no imported news shows
 “No news feed from <city> yet” and its official page link rather than fabricated headlines.
-One published regional file, `regions/brandenburg-mol/topics.json`, supplies candidate topics
-only for municipalities explicitly named by that region; Today previews local source items and
-Places links related municipalities with their own dates and stages. No decision is implied unless
-its sourced stage is adopted. Device-only visit snapshots compare public signal status, review,
+One published regional file, `regions/brandenburg-mol/topics.json`, supplies eight candidate
+shared topics only to cities explicitly named in its `cityRegions` mapping. Today ranks
+topics with the chosen city's own source items first, showing three municipality counts,
+furthest-stage source links and local source links. Places links all municipalities with
+their own dates and stages; interpretive summaries are “Not yet checked”. Administrative
+address points in the source file are not map areas. No decision is implied unless
+its municipality's sourced stage is adopted. Device-only visit snapshots compare public signal status, review,
 dates, details and precision, plus dated feed additions/corrections; news already in Today’s
 three headline leads is not repeated as a change. Version hashes and feed retrieval timestamps
 alone do not count; home/work pins never enter a snapshot or an API request.
@@ -237,7 +240,7 @@ Today each connection is built differently (`adapters.ts`, `eudi.ts`, `city.ts`,
 1. Does it make the personal overview more complete for the pitch?
 2. Is there a standard or an existing source (EUDI/OpenID4VP, OParl/CCF, Stadtstack atlas, Home Assistant, beacon APIs)?
 3. Effort to a working test-network or read-only version.
-4. Legal and trust risk (money, securities, personal data).
+4. Trust risk (money, source interpretation and private personal data).
 5. Does it reuse what is proven (escrow, portfolio, atlas)?
 
 ### 4.3 Proposed decision
@@ -251,19 +254,19 @@ Today each connection is built differently (`adapters.ts`, `eudi.ts`, `city.ts`,
 | Stadtstack city data | Today, Places | Published city press feeds for eight cities, city map signals with source/review/precision and optional regional candidate topics when relevant; separate project atlas link | Show dated sources, “Not yet checked” interpretations and honest no-feed states |
 | DWD via Bright Sky and sensor.community | Places | Read-only live weather and nearby uncalibrated citizen PM sensors | **Keep** times, distances, licences and stale labels; no city-wide air-quality claim |
 | OSM sports and leisure | Places | Published map contains OSM club and sport tags; live Overpass adds only leisure-tagged facilities absent from that pipeline | **Keep** ODbL attribution, gap labeling and official Strausberg directory links |
-| Public money flow and Strausberg budget access | Places | Sourced statutory explainer and ordinance headline **planned** investment outlays (2025 €17,941,270; 2026 €12,609,320), no actual spending or detailed project allocations | Obtain complete plan and reuse terms before a spending breakdown |
+| Public money flow and Strausberg budget access | Places | Sourced statutory explainer and ordinance headline **planned** investment outlays (2025 €17,941,270; 2026 €12,609,320), no actual spending or detailed project allocations | Obtain the complete plan and verified line items before a spending breakdown |
 | From your street to the world | Places | Personal map's home-neighbourhood, city and approximate straight-line commute matching built; district/state/country/EU links remain illustration | Expand reviewed city coverage, then wider-scale feeds |
-| Council decisions | Places | Strausberg ALLRIS links only; where the public signals feed covers other cities, distinguish sourced papers/meetings from adopted decisions | Reviewed/rights-cleared council data and explicit decisions |
+| Council papers & meetings | Places | Strausberg ALLRIS links only; where public signals cover other cities, distinguish sourced papers/meetings from adopted decisions | Reviewed council data and explicitly evidenced decisions |
 | Home Assistant solar | Home | Built, read-only | **Keep** |
 | Validator (Gnosis/Ethereum/Solana) | Money | Built, read-only | **Keep** |
 | Life timeline | Me | Partly built: app tenancies and labeled self-declared earlier places | **Next**: residence attestations where issued, private milestones |
 | Real-time service charges | Home | Prototype example statement with landlord-set test prepayment, optional live daily Home Assistant consumption; no escrow funding or payouts | **Next**: authorized meters, invoices and escrow settlement |
-| Local investments | Money | Illustration: four legal forms and unverified Strausberg cooperative leads; no offers or investment | **Later**: verify providers and find a licensed partner |
-| Newcomer welcome | Places | Partly built: live OSM clubs and official directories; no matching, registration or voucher | **Later**: city partners and consent-based matching |
+| Local investments | Money | Illustration: four legal forms and unverified Strausberg cooperative leads; no offers or investment | **Next**: illustrated test-token path tied to verified local sources |
+| Newcomer welcome | Places | Partly built: live OSM clubs and official directories; no matching, registration or voucher | **Next**: clearly simulated vouchers; partners only for real redemption |
 | Shares as a test deposit | Money | Working Robinhood Chain testnet pledge, simulated price drop, top-up or protective sale, move-out claim and return of remaining shares; separate from the Solana tenancy | Keep simulated test market price and test-only custody explicit |
 | Borrow against test shares | Money | Working TestLendingPool with operator-funded test USD, per-wallet simulated test oracle, 50 % max LTV and liquidation at 80 % | Count loan collateral and open debt in wallet totals without double-counting |
-| Home tokens towards owning | Money | Planned; part of local investments | **Park** until legal wrapper and partner exist |
-| EV and device tokenization | Money | Planned | **Park** |
+| Home tokens towards owning | Money | Planned; part of local investments | **Next**: illustrate home-share accumulation and a milestone without claiming registered property |
+| EV and device tokenization | Money | Planned | **Later**: read-only device adapter if a dependable user source appears |
 
 ### 4.4 Suggested order
 

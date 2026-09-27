@@ -1,7 +1,7 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ArrowUpRight, Loader2 } from 'lucide-react';
-import type { CityFeature, CityFeedResult, SignalResult } from '@/server/city-signals';
+import type { CityFeature } from '@/server/city-signals';
 import type { TenancyJourney } from '@/server/journey';
 import type { PublicListing } from '@/server/listings';
 import { AssetsOverview } from './assets';
@@ -9,9 +9,9 @@ import type { Area } from './areas';
 import { useCityFeed } from './city-feed';
 import { useInterests, usePersonalPins } from './personal-map-preferences';
 import { matchPersonalRings, REVIEW_LABELS } from './personal-map-relevance';
-import { useRegionalTopics } from './region-topics';
+import { regionalStageLabel, useRegionalTopics } from './region-topics';
 import { useCitySignals, type AuthorizedRequest } from './use-city-signals';
-import { meaningfulFeedChanges, meaningfulVisitChanges, snapshotCityFeed, snapshotCitySignals, type FeedVisitBaseline, type VisitBaseline, type VisitChange } from './visit-diff';
+import { meaningfulFeedChanges, meaningfulVisitChanges, snapshotCityFeed, snapshotCitySignals, type FeedVisitBaseline, type VisitBaseline } from './visit-diff';
 
 const date = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'Europe/Berlin' });
 const emptyFeatures: CityFeature[] = [];
@@ -28,21 +28,11 @@ export function Today({ request, accountId, tenancies, listings, invitation, hom
   const { cityId, result: currentSignals, error: signalError } = useCitySignals(request);
   const { result: currentFeed, error: feedError } = useCityFeed(request, cityId);
   const regionView = useRegionalTopics(request, cityId);
-  const [lastSignals, setLastSignals] = useState<{ cityId: string; result: SignalResult } | null>(null);
-  const [lastFeed, setLastFeed] = useState<{ cityId: string; result: CityFeedResult } | null>(null);
-  const [changesByCity, setChangesByCity] = useState<Record<string, VisitChange[]>>({});
-  const [feedChangesByCity, setFeedChangesByCity] = useState<Record<string, VisitChange[]>>({});
   const pins = usePersonalPins(cityId);
   const interests = useInterests();
 
-  useEffect(() => {
-    if (cityId && currentSignals?.state === 'covered') setLastSignals({ cityId, result: currentSignals });
-  }, [cityId, currentSignals]);
-  useEffect(() => {
-    if (cityId && currentFeed?.state === 'available') setLastFeed({ cityId, result: currentFeed });
-  }, [cityId, currentFeed]);
-  const signalResult = signalError && lastSignals?.cityId === cityId ? lastSignals.result : currentSignals;
-  const feedResult = feedError && lastFeed?.cityId === cityId ? lastFeed.result : currentFeed;
+  const signalResult = currentSignals;
+  const feedResult = currentFeed;
   const features = signalResult?.state === 'covered' ? signalResult.data.signals.features : emptyFeatures;
   const rings = useMemo(() => matchPersonalRings(features, pins, undefined, interests), [features, pins, interests]);
   const relevant = useMemo(() => {
@@ -53,37 +43,31 @@ export function Today({ request, accountId, tenancies, listings, invitation, hom
     return found;
   }, [rings]);
 
-  // The baseline is per person and city. It contains only public display fields, never home or work coordinates.
-  useEffect(() => {
-    if (!accountId || !cityId || currentSignals?.state !== 'covered') return;
-    const key = visitKey(accountId, cityId);
-    const snapshot = snapshotCitySignals(currentSignals.data.signals.features);
+  // The baseline is per person and city. It contains public display fields, never saved pin coordinates.
+  const signalSnapshot = useMemo(() => currentSignals?.state === 'covered'
+    ? snapshotCitySignals(currentSignals.data.signals.features) : null, [currentSignals]);
+  const feedSnapshot = useMemo(() => currentFeed?.state === 'available'
+    ? snapshotCityFeed(currentFeed.feed) : null, [currentFeed]);
+  const signalChanges = useMemo(() => {
+    if (!accountId || !cityId || !signalSnapshot || typeof window === 'undefined') return [];
     let previous: VisitBaseline | null = null;
-    try { previous = JSON.parse(localStorage.getItem(key) ?? 'null') as VisitBaseline | null; } catch { /* Invalid local baseline is a first visit. */ }
-    const changed = meaningfulVisitChanges(previous, snapshot, new Set(Object.keys(snapshot.records)));
-    setChangesByCity((old) => {
-      if (!changed.length) return old;
-      const prior = old[key] ?? [];
-      const ids = new Set(changed.map((entry) => entry.id));
-      return { ...old, [key]: [...prior.filter((entry) => !ids.has(entry.id)), ...changed] };
-    });
-    try { localStorage.setItem(key, JSON.stringify(snapshot)); } catch { /* Storage may be disabled; news and map still work. */ }
-  }, [accountId, cityId, currentSignals]);
-  useEffect(() => {
-    if (!accountId || !cityId || currentFeed?.state !== 'available') return;
-    const key = feedVisitKey(accountId, cityId);
-    const snapshot = snapshotCityFeed(currentFeed.feed);
+    try { previous = JSON.parse(localStorage.getItem(visitKey(accountId, cityId)) ?? 'null') as VisitBaseline | null; } catch { /* Invalid local baseline is a first visit. */ }
+    return meaningfulVisitChanges(previous, signalSnapshot, new Set(Object.keys(signalSnapshot.records)));
+  }, [accountId, cityId, signalSnapshot]);
+  const feedChanges = useMemo(() => {
+    if (!accountId || !cityId || !feedSnapshot || typeof window === 'undefined') return [];
     let previous: FeedVisitBaseline | null = null;
-    try { previous = JSON.parse(localStorage.getItem(key) ?? 'null') as FeedVisitBaseline | null; } catch { /* First feed visit. */ }
-    const changed = meaningfulFeedChanges(previous, snapshot);
-    setFeedChangesByCity((old) => {
-      if (!changed.length) return old;
-      const prior = old[key] ?? [];
-      const ids = new Set(changed.map((entry) => entry.id));
-      return { ...old, [key]: [...prior.filter((entry) => !ids.has(entry.id)), ...changed] };
-    });
-    try { localStorage.setItem(key, JSON.stringify(snapshot)); } catch { /* The feed still works without local storage. */ }
-  }, [accountId, cityId, currentFeed]);
+    try { previous = JSON.parse(localStorage.getItem(feedVisitKey(accountId, cityId)) ?? 'null') as FeedVisitBaseline | null; } catch { /* First feed visit. */ }
+    return meaningfulFeedChanges(previous, feedSnapshot);
+  }, [accountId, cityId, feedSnapshot]);
+  useEffect(() => {
+    if (!accountId || !cityId || !signalSnapshot) return;
+    try { localStorage.setItem(visitKey(accountId, cityId), JSON.stringify(signalSnapshot)); } catch { /* City map still works without storage. */ }
+  }, [accountId, cityId, signalSnapshot]);
+  useEffect(() => {
+    if (!accountId || !cityId || !feedSnapshot) return;
+    try { localStorage.setItem(feedVisitKey(accountId, cityId), JSON.stringify(feedSnapshot)); } catch { /* City news still works without storage. */ }
+  }, [accountId, cityId, feedSnapshot]);
   const pressIds = feedResult?.state === 'available'
     ? new Set(feedResult.feed.sources.filter((source) => source.kind === 'press').map((source) => source.id)) : new Set<string>();
   const news = feedResult?.state === 'available' ? feedResult.feed.items
@@ -91,14 +75,14 @@ export function Today({ request, accountId, tenancies, listings, invitation, hom
     .toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, 3) : [];
   const leadIds = new Set(news.map((item) => `feed:${item.id}`));
   const changes = [
-    ...(changesByCity[visitKey(accountId, cityId)] ?? []).filter((change) => relevant.has(change.id)),
-    ...(feedChangesByCity[feedVisitKey(accountId, cityId)] ?? []).filter((change) => !leadIds.has(change.id)),
+    ...signalChanges.filter((change) => relevant.has(change.id)),
+    ...feedChanges.filter((change) => !leadIds.has(change.id)),
   ].slice(0, 3);
   const noFeed = feedResult?.state === 'available'
     ? feedResult.feed.sources.find((source) => source.kind === 'press' && source.status === 'not_available') : undefined;
   const cityName = feedResult?.cityName || (signalResult?.state === 'covered' ? signalResult.data.catalogue.name : 'your city');
   const regional = regionView.cityId === cityId && regionView.result?.state === 'available' ? regionView.result : null;
-  const regionalTopics = regional?.topics.filter((topic) => topic.items.some((item) => externalUrl(item.url))).slice(0, 2) ?? [];
+  const regionalTopics = regional?.topics.filter((topic) => externalUrl(topic.furthest.source.url)).slice(0, 3) ?? [];
 
   const ready = (tenancies ?? []).filter((tenancy): tenancy is TenancyJourney => !('unavailable' in tenancy));
   const actionable = ready.find((tenancy) => !waitingKinds.has(tenancy.next.kind) && tenancy.next.kind !== 'done' && tenancy.next.kind !== 'propose_claim');
@@ -142,16 +126,14 @@ export function Today({ request, accountId, tenancies, listings, invitation, hom
       <p className="small-copy">Nearby is based on your saved map pins in this browser. They are never sent with this request.</p>
     </section>
 
-    {regional && regionalTopics.length > 0 && <section className="card today-region" aria-label="Regional topics affecting your city">
-      <div className="section-heading"><div><span className="eyebrow">ACROSS {regional.regionName.toUpperCase()} · PUBLISHED SOURCES</span><h2>Topics involving {cityName}</h2></div><button className="text-button" onClick={() => go('places')}>All regional sources in Places →</button></div>
+    {regional && regionalTopics.length > 0 && <section className="card today-region" aria-label="In your region">
+      <div className="section-heading"><div><span className="eyebrow">ACROSS {regional.regionName.toUpperCase()} · PUBLISHED SOURCES</span><h2>In your region</h2></div><button className="text-button" onClick={() => go('places')}>All regional sources in Places →</button></div>
       {regionView.error && <p className="small-copy" role="status">{regionView.error} Showing last checked topics.</p>}
       <ul className="today-change-list">{regionalTopics.map((topic) => <li key={topic.id}>
-        <strong>{topic.label}</strong>
-        <span>{topic.stage === 'adopted' ? 'Adopted' : `Stage: ${topic.stage}`} · {REVIEW_LABELS[topic.reviewState] ?? 'Not yet checked'}{topic.neighbours.length ? ` · related sources in ${topic.neighbours.length} other municipalities` : ''}</span>
-        {topic.items.filter((item) => externalUrl(item.url)).slice(0, 2).map((item) => <small key={`${item.url}:${item.locator}`}>
-          <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title} <ArrowUpRight size={12} aria-hidden /></a>
-          {' · '}{item.sourceType === 'planningProcedure' ? 'Planning procedure' : item.sourceType === 'councilAgenda' ? 'Council agenda' : 'City website'}
-          {item.date ? ` · ${date.format(new Date(item.date))}` : ' · date not supplied'} · source locator in Places
+        <strong>{topic.neighbours.length + Number(topic.items.length > 0)} municipalities are working on {topic.label}</strong>
+        <span>Furthest along: <a href={topic.furthest.source.url} target="_blank" rel="noopener noreferrer">{topic.furthest.name} <ArrowUpRight size={12} aria-hidden /></a> · {regionalStageLabel(topic.furthest.stage)} · {REVIEW_LABELS[topic.reviewState] ?? 'Not yet checked'}</span>
+        {topic.items.filter((item) => externalUrl(item.url)).slice(0, 1).map((item) => <small key={`${item.url}:${item.locator}`}>
+          In {cityName}: <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title} <ArrowUpRight size={12} aria-hidden /></a> · {regionalStageLabel(topic.stage)}
         </small>)}
       </li>)}</ul>
     </section>}
@@ -161,7 +143,7 @@ export function Today({ request, accountId, tenancies, listings, invitation, hom
       <p>{tenancies === null ? homeError ? 'Home information is unavailable right now.' : 'Checking your Home…'
         : <>{ready.length ? `${ready.length} tenancy ${ready.length === 1 ? 'journey' : 'journeys'} in Home` : 'No tenancy journey yet'}{listings.some((listing) => listing.relation === 'landlord') ? ' · Your listed homes are in Home' : ''}.</>}</p>
       <div className="today-links"><button className="text-button" onClick={() => go('home')}>Open Home →</button><button className="text-button" onClick={() => go('me')}>Open Me →</button></div>
+      {tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="summary" go={go} />}
     </section>
-    {tenancies !== null && <AssetsOverview request={request} tenancies={ready} show="summary" go={go} />}
   </div>;
 }

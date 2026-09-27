@@ -5,7 +5,7 @@ Build plan · 27 September 2026 · owner decisions applied after the [signed-in 
 ## Owner decisions, answered
 
 - **What leads Today?** **Official city press news**: the three latest attributed headlines, dates and source links. “Nothing needs you today” is a separate second card, not the lead.
-- **What belongs beyond the chosen city?** Show relevant shared topics from neighbouring municipalities in an **In your region** card, hidden until `stadtstack-data/out/regions/<regionId>/topics.json` exists. Rank relevance locally; never send home/work pins to the server.
+- **What belongs beyond the chosen city?** Show shared topics in an **In your region** card only when the selected city's slug appears in the published region's `cityRegions` mapping. Rank topics with local source items first, then show how many municipalities participate and link the furthest-stage source. The Brandenburg-MOL publication now supplies this context; home/work pins never leave the browser.
 - **Should unreviewed interpretations appear?** Yes, in Today with **“Not yet checked”**. Official press news and sensor readings are taken over automatically with publisher, date and freshness; human editorial review is for **our own interpretations**, not automatic source facts. DeepEval Jev/hybrid and ambiguity-penalty experiments may improve triage but do not replace provenance or human correction.
 - **What should finance show?** A coherent **“what your shares can do”** workflow, even with fake test stock and test tokens; borrowing, city investment, home shares and welcome vouchers can be illustrated rather than parked for legal reasons. State exactly which balances and outcomes are simulated.
 - **What should Ledger reuse?** Keep `stadtstack-data`'s city feed/signals and the atlas interpretation separate from Ledger's private, device-side relevance. Do not add a new hosted city platform to build the cockpit.
@@ -19,7 +19,7 @@ One column on desktop and 390 px: official news **first**, then one required act
 | 1. **Your city today** | **New:** read `feed.json` through a city-only API and show the top three official **press** headlines, publisher, publication date and outbound link. Never reproduce article text; if uncovered, show a source link or honest no-coverage state. |
 | 2. **Needs you** | **Built:** `/api/journey` and `/api/listings` know tenancy/applicant steps. Show one actual action linked to Home, otherwise “Nothing needs you today”; test earnings are labelled simulated. |
 | 3. **Since your last visit** | Public city signals and feed items are compared per account/city in browser storage. Review, public details, dates and precision count; version hashes and retrieval-only changes do not. News already in the three headline leads is not duplicated. At most 1–3 changes; unreviewed interpretations say **“Not yet checked”**. |
-| 4. **In your region** | **Conditional:** read published topics from `out/regions/<regionId>/topics.json` only where the file names the selected city. Show a sourced local item, related municipalities with their distinct stages and a Places detail link; no regional row without relevant published topics. No pins leave the device. |
+| 4. **In your region** | **Conditional:** read `out/regions/<regionId>/topics.json` only where its `cityRegions` mapping names the selected city. Show three locally ranked shared topics, municipality counts, the furthest-stage source and an own-city source when available; Places shows all topics and municipality source details. Every interpretive summary says “Not yet checked”. No pins leave the device. |
 | 5. **Your things** | A quiet Home summary and complete Money total combine wallet and contract-held test positions minus open debt; if a workflow route fails, wallet-only values are visibly qualified. Never sum ETH and test USD or show a partially loaded total as complete. |
 
 ```text
@@ -27,9 +27,9 @@ TODAY                               Strausberg · city you chose
 ┌ Your city today: 3 official press headlines        → Places ┐
 ├ Needs you: one step / Nothing needs you today        → Home ┤
 ├ Since your last visit: 1–3 qualified changes      → Places ┤
-├ In your region: relevant neighbouring topics*     → Places ┤
-└ Your things: test deposit · shares · adapters        → Home ┘
-* Hidden until published region data exists
+├ In your region: 3 shared topics, own-city first*   → Places ┤
+└ Your things: home status + complete test total  → Home/Money/Me ┘
+* Hidden when this city has no published region
               Me | Home | Money | Places | Ideas
 ```
 
@@ -71,26 +71,27 @@ Queue **our own** low-scoring, ambiguous, conflicting or consequential interpret
 
 ## Planned-feature triage
 
-“Now” is the current app build; “next” is a clearly labelled test/illustrated workflow; “later” needs a usable data source or design. These cover **all 13** `ideas.tsx` entries plus cockpit, city feed, regional topics and borrowing. Rollout prerequisites do not block hackathon illustrations.
+“Now” is the current app build; “next” is a clearly labelled test/illustrated workflow; “later” needs a usable data source or design. These cover all **16** current `ideas.tsx` entries. Rollout prerequisites do not block hackathon illustrations.
 
 | Item | When and why |
 | --- | --- |
 | Life timeline (partly built) | **Later** refine private dates/history once briefing is useful; keep current compact tenancy entries in Me. |
 | Roles in every part of life (planned) | **Later** only when a second real shared context exists; no fake club memberships. |
 | Real-time service charges (prototype) | **Later** pending usable meter/invoice data; keep the example collapsed in Home. |
-| Stocks as your deposit (prototype) | **Next** a visibly fake-stock pledge and buffer/top-up workflow in Money. |
+| Stocks as your deposit (prototype) | **Now** a working Robinhood Chain testnet pledge, simulated price-drop top-up/protective sale and move-out claim with remaining shares returned. |
 | Invest in your own city (illustration) | **Next** illustrated/test-token local investment path, clearly not a live offer. |
 | Home shares towards owning (planned) | **Next** illustrated home-share accumulation and ownership milestone, not a claim of registered property. |
 | Electric car and other devices (planned) | **Later** only a read-only adapter if a reliable user source is found; income tokenization parked. |
 | Personal map (built) | **Now** reuse and simplify into Places' three rings; remove double atlas/OSM lists, do not rebuild map. |
-| Where the money goes (partly built) | **Now** keep planned budget record/source; move statutory essay into detail. Actual spending breakdown **later** only with source/rights. |
-| From your street to the world (partly built) | **Park** extra-scale live feeds; keep links only behind “Explore further.” |
+| Where the money goes (partly built) | **Now** keep planned budget record/source; move statutory essay into detail. Actual spending breakdown **later** only with verified source line items. |
+| From your street to the world (partly built) | **Later** extra-scale live feeds where reliable coverage exists; keep links as an optional navigation map. |
 | A measurable city (partly built) | **Later** optional local observations, not a core morning card or city-wide pollution claim. |
-| Council decisions (partly built) | **Now** rename/present available council *papers/meetings* and official Strausberg links honestly; confirmed decisions **later** when evidenced. |
+| Council papers & meetings (partly built) | **Now** present sourced papers/meetings and official Strausberg links honestly; confirmed decisions **later** when evidenced. |
 | Welcome to your new city (partly built) | **Now** OSM discovery with private interests; **next** illustrated welcome vouchers/test-token offers without partner claims. |
 | Cockpit + personal last-visit changes (new) | **Now** official city press leads, personal comparison, conditional region row and quiet things. |
 | City events and news (new) | **Now** official press feed in Today and dated city news/events list in Places; event start only when sourced. |
-| Borrow against stocks to fund deposit (new) | **Now** illustrated testnet borrowing/repayment/price-drop scenario, separate from direct stock pledge. |
+| Shared regional topics (new) | **Now** MOL topics ranked with the chosen city's source items first; counts and furthest-stage links in Today, all original source items and “Not yet checked” summaries in Places. |
+| Borrow against stocks to fund deposit (prototype) | **Now** working Robinhood Chain testnet loan, per-second interest, 50 % LTV and 80 % liquidation; separate from the direct stock pledge. |
 
 ## Build order: five reviewable slices
 
@@ -98,7 +99,7 @@ Queue **our own** low-scoring, ambiguous, conflicting or consequential interpret
 2. **Meaningful return visit.** Device-side account/city baseline and acknowledgement, user-facing field/review changes (not hash churn), first/return visit, pin re-ranking and outage recovery. Add the **In your region** card when published topics exist; otherwise render no row and never upload pins.
 3. **Places feed and information-architecture cleanup.** One news/events list from published city feed; attributed headline, publication date and source link; event date only with `eventStart`. Show each atlas project once, reconcile pipeline versus Overpass place categories, tuck budget explanation behind detail, rename council papers/meetings, remove duplicated roadmap boxes and use plain-language status/precision labels. Preserve mobile Ideas access.
 4. **Money workflow (separate owner).** Demonstrate test earnings → shares → illustrated new-deposit pledge, then an independent share-backed loan example, with accurate test values and transitions. The new `money-area.tsx` belongs to that worker.
-5. **Illustrated city/home benefits.** Test-token local investment, home-share progress and welcome vouchers in their single detail homes; add more official press sources city by city and rank shared regional topics when that publication contract is available.
+5. **Illustrated city/home benefits.** Test-token local investment, home-share progress and welcome vouchers in their single detail homes; expand official press and reviewed regional coverage city by city.
 
 Stadtstack's automated source intake and experimental evaluation advance independently. Human correction remains for our own interpretation; the Ledger shows the published review state instead of waiting for an editorial gate.
 
