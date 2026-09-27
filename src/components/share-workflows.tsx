@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
 import './share-workflows.css';
 
