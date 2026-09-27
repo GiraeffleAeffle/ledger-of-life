@@ -3,11 +3,12 @@
 // node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local contracts/evm/script/share-workflows-cycle.mjs
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { createPublicClient, defineChain, http, parseAbi, parseAbiItem } from 'viem';
+import { createPublicClient, defineChain, http, parseAbi } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { LocalStore } from '../../../src/server/store.ts';
-import { earnOnRobinhood, prepareRobinhoodBuy, ROBINHOOD_TESTNET, submitRobinhoodTransaction } from '../../../src/server/robinhood-demo.ts';
+import { prepareRobinhoodBuy, ROBINHOOD_TESTNET, submitRobinhoodTransaction } from '../../../src/server/robinhood-demo.ts';
 import { controlShareMarket, prepareShareAction, readShareWorkflows, startShareMarket, submitShareTransaction } from '../../../src/server/share-workflows.ts';
+import { addSimulatedShareYield, prepareShareEarnings, readShareEarnings, startShareEarnings, submitShareEarnings } from '../../../src/server/share-earnings.ts';
 import { operatorTestCapability } from '../../../src/server/test-capability.ts';
 
 const chain = defineChain({ id: 46630, name: 'Robinhood Chain Testnet', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://rpc.testnet.chain.robinhood.com'] } }, testnet: true });
@@ -23,13 +24,13 @@ const evidence = {
 };
 async function step(name, action) {
   const result = await action();
-  const hashes = typeof result === 'string' ? [result] : result?.hash ? [result.hash, result.deskHash, result.mint, result.approve].filter(Boolean) : [];
+  const hashes = typeof result === 'string' ? [result] : result?.hashes ?? (result?.hash ? [result.hash, result.deskHash, result.mint, result.approve].filter(Boolean) : []);
   evidence.transactionHashes[name] = hashes;
   console.log(JSON.stringify({ step: name, hashes }));
   return result;
 }
-async function signWork(name, action, quantity) {
-  const prepared = await prepareShareAction(store, tenant.address, action, quantity);
+async function signWork(name, action, quantity, rail = 'shares') {
+  const prepared = rail === 'earnings' ? await prepareShareEarnings(store, tenant.address, action) : await prepareShareAction(store, tenant.address, action, quantity);
   const hashes = [];
   for (const { transaction } of prepared) {
     const serialized = await tenant.signTransaction({
@@ -37,21 +38,23 @@ async function signWork(name, action, quantity) {
       gas: BigInt(transaction.gas), maxFeePerGas: BigInt(transaction.maxFeePerGas),
       maxPriorityFeePerGas: BigInt(transaction.maxPriorityFeePerGas), type: 'eip1559',
     });
-    hashes.push((await submitShareTransaction(store, tenant.address, serialized)).hash);
+    hashes.push((rail === 'earnings' ? await submitShareEarnings(store, tenant.address, serialized) : await submitShareTransaction(store, tenant.address, serialized)).hash);
   }
   evidence.transactionHashes[name] = hashes;
   console.log(JSON.stringify({ step: name, hashes }));
 }
 try {
-  const earnings = await step('simulatedEarnings', async () => earnOnRobinhood(store, tenant.address));
+  const earnings = await startShareEarnings(store, tenant.address);
   evidence.deployed.earningsEscrow = earnings.escrow;
-  evidence.final.claimedEarningsAtomic = earnings.releasedAtomic;
-  const released = await rpc.getLogs({
-    address: earnings.escrow, event: parseAbiItem('event EarningsReleased(address indexed tenantWallet,uint256 assets,uint256 indexed operationNonce)'),
-    args: { tenantWallet: tenant.address }, fromBlock: (await rpc.getBlockNumber()) - 1000n,
-  });
-  if (released.length !== 1) throw new Error('Expected one test earnings-release event.');
-  evidence.transactionHashes.simulatedEarnings = [released[0].transactionHash];
+  evidence.transactionHashes.earningsDeploymentLandlordAndFaucet = earnings.transactionHashes;
+  await signWork('signedEarningsAgreement', 'accept', undefined, 'earnings');
+  await signWork('signedDepositFunding', 'fund', undefined, 'earnings');
+  await signWork('signedVaultSupply', 'supply', undefined, 'earnings');
+  await step('operatorSimulatedYield', () => addSimulatedShareYield(store, tenant.address));
+  await signWork('signedEarningsClaim', 'claim', undefined, 'earnings');
+  const earned = await readShareEarnings(store, tenant.address);
+  if (!earned || BigInt(earned.releasedAtomic) === 0n) throw new Error('The signed-in test tenant did not claim earnings.');
+  evidence.final.claimedEarningsAtomic = earned.releasedAtomic;
   const purchase = await prepareRobinhoodBuy(tenant.address);
   const buyHashes = [];
   for (const { transaction } of purchase) {

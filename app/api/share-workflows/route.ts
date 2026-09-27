@@ -4,6 +4,7 @@ import { readBody, sameOrigin } from '@/server/http';
 import {
   controlShareMarket, prepareShareAction, readShareWorkflows, startShareMarket, submitShareTransaction,
 } from '@/server/share-workflows';
+import { addSimulatedShareYield, prepareShareEarnings, readShareEarnings, startShareEarnings, submitShareEarnings } from '@/server/share-earnings';
 import { operatorTestCapability } from '@/server/test-capability';
 
 export const runtime = 'nodejs';
@@ -15,7 +16,9 @@ export async function GET(request: Request) {
     const identity = await authenticated(request);
     const wallet = identity.wallets.find((item) => item.chainType === 'ethereum');
     if (!wallet) throw new Error('Your account has no Robinhood Chain wallet yet.');
-    return Response.json({ workflow: await readShareWorkflows(await getStore(), wallet.address) }, noStore);
+    const store = await getStore();
+    const [workflow, earnings] = await Promise.all([readShareWorkflows(store, wallet.address), readShareEarnings(store, wallet.address)]);
+    return Response.json({ workflow: { ...workflow, earnings } }, noStore);
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : 'Unavailable' }, { status: 401 });
   }
@@ -33,7 +36,13 @@ export async function POST(request: Request) {
       return Response.json({ walletId: wallet.id, steps: await prepareShareAction(store, wallet.address, body.operation, typeof body.quantity === 'string' ? body.quantity : undefined) }, noStore);
     if (body.action === 'submit' && typeof body.signed === 'string')
       return Response.json(await submitShareTransaction(store, wallet.address, body.signed), noStore);
+    if (body.action === 'earn_prepare' && typeof body.operation === 'string')
+      return Response.json({ walletId: wallet.id, steps: await prepareShareEarnings(store, wallet.address, body.operation) }, noStore);
+    if (body.action === 'earn_submit' && typeof body.signed === 'string')
+      return Response.json(await submitShareEarnings(store, wallet.address, body.signed), noStore);
     if (!operatorTestCapability()) throw new Error('Test market controls are disabled.');
+    if (body.action === 'earn_start') return Response.json({ result: await startShareEarnings(store, wallet.address) }, noStore);
+    if (body.action === 'earn_yield') return Response.json({ result: await addSimulatedShareYield(store, wallet.address) }, noStore);
     if (body.action === 'start') return Response.json({ deployment: await startShareMarket(store, wallet.address) }, noStore);
     if (body.action === 'control' && typeof body.operation === 'string')
       return Response.json(await controlShareMarket(store, wallet.address, body.operation), noStore);

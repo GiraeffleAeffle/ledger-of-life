@@ -13,6 +13,7 @@ type View = {
   deployment: null | { oracle: string; desk: string; pool: string; escrow?: string };
   deposit: null | { state: number; sharesRaw: string; cashAtomic: string; valueAtomic: string; depositAtomic: string; bufferAtomic: string; deadline: number; claimAtomic: string };
   loan: Position | null;
+  earnings: null | { escrow: string; state: number; nonce: string; supplied: boolean; yieldDone: boolean; releasableAtomic: string; releasedAtomic: string; securityAtomic: string };
 };
 const usd = (atomic: string) => `$${(Number(atomic) / 1e6).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
 const shares = (raw: string) => (Number(raw) / 1e18).toLocaleString('en-US', { maximumFractionDigits: 6 });
@@ -24,7 +25,6 @@ export function ShareWorkflows({ request }: { request: Request }) {
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [earnResult, setEarnResult] = useState('');
   const [tick, setTick] = useState(0);
   const refresh = useCallback(async () => {
     const response = await request<{ workflow: View }>('/api/share-workflows');
@@ -56,15 +56,15 @@ export function ShareWorkflows({ request }: { request: Request }) {
       setBusy('');
     }
   }
-  async function sign(operation: string, quantity?: string) {
-    const { walletId, steps } = await request<{ walletId: string; steps: Step[] }>('/api/share-workflows', { action: 'prepare', operation, quantity });
+  async function sign(operation: string, quantity?: string, rail: 'shares' | 'earnings' = 'shares') {
+    const { walletId, steps } = await request<{ walletId: string; steps: Step[] }>('/api/share-workflows', { action: rail === 'earnings' ? 'earn_prepare' : 'prepare', operation, quantity });
     let lastHash = '';
     for (const step of steps) {
       const signed = await wallet.signEvmTransaction({
         operationId: `shares-${step.transaction.nonce}`, walletId, description: step.description,
         expiresAt: new Date(Date.now() + 120_000).toISOString(), transaction: step.transaction,
       });
-      const result = await request<{ hash: string }>('/api/share-workflows', { action: 'submit', signed });
+      const result = await request<{ hash: string }>('/api/share-workflows', { action: rail === 'earnings' ? 'earn_submit' : 'submit', signed });
       lastHash = result.hash;
     }
     return operation === 'withdraw_collateral' ? `Loan repaid; remaining test shares returned to your wallet · ${lastHash}` : lastHash;
@@ -80,6 +80,7 @@ export function ShareWorkflows({ request }: { request: Request }) {
   }
 
   const d = view?.deposit;
+  const earnings = view?.earnings;
   const loan = view?.loan;
   const walletShares = BigInt(view?.sharesRaw ?? '0');
   const testUsd = BigInt(view?.testUsdAtomic ?? '0');
@@ -108,18 +109,25 @@ export function ShareWorkflows({ request }: { request: Request }) {
       </div>
       {view.enabled && <ol className="share-flow-steps">
         <li>
-          <strong>Let a test deposit earn</strong>
-          <p>The test tenant, landlord and vault are played by operator test keys. Simulated earnings are released to your wallet; this is not a claim you signed for that test tenancy.</p>
-          {button('Generate test earnings', async () => {
-            const { result } = await request<{ result: { releasedAtomic: string } }>('/api/assets', { action: 'robinhood_earn' });
-            setEarnResult(usd(result.releasedAtomic));
-            return `${usd(result.releasedAtomic)} simulated earnings reached your wallet`;
-          }, false, Boolean(earnResult || walletShares || testUsd))}
-          {earnResult && <span className="small-copy">{earnResult} test earnings released</span>}
+          <strong>Your test deposit earns</strong>
+          <p>A test landlord accepts a separate {usd(earnings?.securityAtomic ?? '10000000')} deposit. A test faucet places the funding in your wallet; you sign the agreement, fund and supply the deposit, then claim simulated yield to your own wallet.</p>
+          {!earnings && button('Open your signed earnings deposit', async () => {
+            const { result } = await request<{ result: { escrow: string } }>('/api/share-workflows', { action: 'earn_start' });
+            return `Test landlord accepted your new earnings agreement · ${result.escrow}`;
+          }, true)}
+          {earnings?.state === 0 && button('Sign test earnings agreement', () => sign('accept', undefined, 'earnings'), true)}
+          {earnings?.state === 1 && button('Sign funding of your test deposit', () => sign('fund', undefined, 'earnings'), true)}
+          {earnings?.state === 2 && !earnings.supplied && button('Sign test vault supply', () => sign('supply', undefined, 'earnings'), true)}
+          {earnings?.state === 2 && earnings.supplied && !earnings.yieldDone && button('Simulate test deposit earnings', async () => {
+            const { result } = await request<{ result: { hashes: string[] } }>('/api/share-workflows', { action: 'earn_yield' });
+            return `Operator contributed simulated yield · ${result.hashes.at(-1)}`;
+          })}
+          {earnings && BigInt(earnings.releasableAtomic) > 0n && (BigInt(earnings.releasedAtomic) === 0n || BigInt(earnings.releasableAtomic) >= 10_000n) && button(`Sign claim of up to ${usd(earnings.releasableAtomic)} test earnings`, () => sign('claim', undefined, 'earnings'), true)}
+          {earnings && BigInt(earnings.releasedAtomic) > 0n && <span className="small-copy">Claimed {usd(earnings.releasedAtomic)} of simulated yield to your wallet with your signature.</span>}
         </li>
         <li>
           <strong>Buy test shares with your wallet</strong>
-          <p>Use the single “Invest in TSLA” action in your Robinhood holding above. It asks you to sign test USD approval and a test-desk buy. Return here after it confirms.</p>
+          <p>Use the single “Invest in TSLA” action in your Robinhood holding above. It signs test USD approval and a test-desk buy. The desk spends the wallet’s whole test-USD balance, including any other test cash already there.</p>
           {button('Refresh shares', async () => { await refresh(); return 'Wallet shares refreshed'; })}
         </li>
       </ol>}

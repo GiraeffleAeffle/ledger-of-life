@@ -5,13 +5,17 @@ The signed-in tenant uses **their own Privy EVM wallet** on Robinhood Chain test
 ```mermaid
 sequenceDiagram
   actor T as Tenant (signed-in wallet)
-  actor O as Test tenant (operator key)
+  actor O as Test operator (faucet and simulated yield)
   participant E as Test rental earnings escrow
   participant D as Test stock desk
   participant C as New collateral tenancy
   actor L as Landlord (test actor)
-  O->>E: Fund test deposit and claim simulated yield
-  E-->>T: Release test USD earnings to signed-in wallet
+  O->>T: Mint test USD for the new earnings deposit
+  L->>E: Accept signed-in tenant's new test agreement
+  T->>E: Sign acceptance, funding, and test-vault supply
+  O->>E: Contribute simulated test yield to vault
+  T->>E: Sign earnings claim
+  E-->>T: Release test USD earnings to own wallet
   T->>D: Sign test USD approval and buy official test TSLA
   L->>C: Accept a new test tenancy backed by the tenant's TSLA
   T->>C: Sign TSLA approval + pledge shares (150% of new deposit)
@@ -40,7 +44,7 @@ sequenceDiagram
 
 | What the person sees | On-chain execution | Test-only input/actor |
 | --- | --- | --- |
-| “Earn”: a test deposit generates simulated earnings and releases test USD to their wallet. | Rental escrow, vault and ERC-20 transfers. | Operator creates/funds the separate test tenancy, injects simulated yield and signs as its tenant. This is **not** a claim signed by the signed-in tenant; wallet receives the release. |
+| “Earn”: tenant signs a new test tenancy, funds its deposit with operator-faucet test USD, supplies it to the test vault and signs the simulated-yield claim into their own wallet. | Rental escrow, vault and ERC-20 transfers, with the signed-in tenant as the escrow tenant. | Operator landlord accepts; operator funds the test-USD faucet and injects simulated yield. This earnings tenancy is separate from the later share-backed tenancy. |
 | “Buy”: approve test USD and buy official test TSLA with their own wallet signature. | ERC-20 allowance and test stock desk swap. | Desk quote and test USD liquidity are synthetic. |
 | “Secure a new deposit”: see required shares, sign approval and pledge; landlord accepts. | New `CollateralEscrow` per wallet, 150% opening / 125% maintenance, on-chain stock custody. | Operator acts as landlord and arbitrator; per-wallet oracle + sale desk set the simulated price. This new tenancy is separate from the earnings tenancy. |
 | Price falls: see new value, buffer and top-up request; choose to sign top-up, or let grace pass and trigger partial protective sale. | `flagShortfall`, `pledge`, `liquidate`. | Price and sale quote both change in the isolated test market. Grace period is real chain time. |
@@ -51,6 +55,6 @@ A real implementation would use the same consent and transaction boundaries with
 
 ## Executed testnet proof
 
-The operator script `contracts/evm/script/share-workflows-cycle.mjs` exercised simulated earnings release → signed test-USD/official-test-TSLA buy → 150% share pledge → 30% test-price drop and signed top-up → move-out claim and in-kind return → signed loan/collateral → 60% test-price drop, liquidation, repayment and share withdrawal. [Deployment addresses, transaction hashes and final balances](evidence/SHARE_WORKFLOWS_ROBINHOOD_TESTNET.json) come from an ephemeral scripted test wallet, **not** from a Privy session. The same two choices were then exercised with a signed-in browser wallet; screenshots are local test artifacts in `/tmp/share-shots/`.
+The operator script `contracts/evm/script/share-workflows-cycle.mjs` exercised a wallet-signed test earnings agreement → signed deposit funding/vault supply → operator-contributed simulated yield → tenant-signed claim → signed test-USD/official-test-TSLA buy → 150% share pledge → 30% test-price drop and signed top-up → move-out claim and in-kind return → signed loan/collateral → 60% test-price drop, liquidation, repayment and share withdrawal. [Deployment addresses, transaction hashes and final balances](evidence/SHARE_WORKFLOWS_ROBINHOOD_TESTNET.json) come from an ephemeral scripted test wallet, **not** from a Privy session. The same actions were then exercised with a signed-in browser wallet; screenshots are local test artifacts in `/tmp/share-shots/`.
 
 To repeat locally: compile Foundry contracts with `cd contracts/evm && forge build`, then from the repository root run `SOLANA_TEST_SIGNER_MODE=1 node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local contracts/evm/script/share-workflows-cycle.mjs`. The operator test capability and the ignored `.testnet-secrets/robinhood-testnet/` key files must already be configured; neither the script nor the evidence prints keys. This creates fresh isolated test contracts and replaces the evidence file with the new run.
