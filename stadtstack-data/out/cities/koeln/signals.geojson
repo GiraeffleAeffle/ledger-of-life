@@ -13936,25 +13936,32 @@
     },
     {
       "type": "Feature",
-      "geometry": null,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.8916472,
+          51.0220635
+        ]
+      },
       "properties": {
         "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fpapers%2Fvo%2F134834",
-        "version": "9580e256b1e9d7d628e068f0216b8c4ab894c788647a2d13a37665c17f0fc541",
+        "version": "efb36ffb0babf0f3d1f6d31f6d7cae81bbe033a60326c3cb1950b23f566ab6e4",
         "cityId": "koeln",
         "kind": "council_paper",
         "category": "Ratsvorlage",
         "title": "Änderungsantrag zu 8.3.1 AN 1384/2026",
-        "statement": "Eine Ratsvorlage mit dem Titel „Änderungsantrag zu 8.3.1 AN 1384/2026“ ist im Ratsinformationssystem verzeichnet. Eine Vorlage ist keine bestätigte Entscheidung oder Umsetzung.",
+        "statement": "Der Änderungsantrag schlägt vor, Mittel aus dem Stadtklima- und Stadtverschönerungsprogramm 2026 unter anderem für drei Kreisverkehre im Stadtbezirk Chorweiler einzusetzen, mit jeweils 3.000 Euro für Zwiebelpflanzungen.",
         "status": "Vorlage, Beschlussstatus ungeprüft",
         "startDate": "2026-09-23",
         "endDate": null,
-        "nextStep": "Beratung und Beschluss im Ratsinformationssystem prüfen.",
+        "nextStep": "Der Antrag ist für die Sitzung der Bezirksvertretung 6 (Chorweiler) am 24.09.2026 vorgesehen.",
         "unknowns": [
           "Ob ein Beschluss gefasst wurde",
-          "Genauer räumlicher Bezug"
+          "Genauer räumlicher Bezug",
+          "Lage aus PDF-Ortsnennung näherungsweise geokodiert"
         ],
-        "scale": "city",
-        "geometryPrecision": "none",
+        "scale": "street",
+        "geometryPrecision": "approximate",
         "sources": [
           {
             "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/papers/vo/134834",
@@ -13979,12 +13986,43 @@
             "snapshot": true,
             "licence": "unknown",
             "reuse": "facts_with_attribution"
+          },
+          {
+            "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/downloadfiles/01113003.pdf",
+            "snapshotUrl": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/downloadfiles/01113003.pdf",
+            "title": "Ratsvorlage PDF, Seite 1",
+            "publisher": "Köln",
+            "locator": "PDF Seite 1; Textauszug der Vorlage",
+            "retrievedAt": "2026-09-26T17:28:40.980Z",
+            "sha256": "d4db5796baad577e81f6aca02177009da7dcd37aedff95e5237d32a816540edf",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "facts_with_attribution"
+          },
+          {
+            "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/downloadfiles/01113003.pdf",
+            "snapshotUrl": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/downloadfiles/01113003.pdf",
+            "title": "Ratsvorlage PDF, Seite 1",
+            "publisher": "Köln",
+            "locator": "PDF Seite 1; Textauszug der Vorlage",
+            "retrievedAt": "2026-09-26T17:28:40.980Z",
+            "sha256": "d4db5796baad577e81f6aca02177009da7dcd37aedff95e5237d32a816540edf",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "facts_with_attribution"
           }
         ],
         "extraction": {
-          "method": "structured"
+          "method": "llm",
+          "model": "codex:gpt-6-luna",
+          "faithfulness": {
+            "score": 1,
+            "reason": "The score is 1.00 because no contradictions are listed, so the actual output aligns fully with the retrieval context.",
+            "evaluator": "DeepEval FaithfulnessMetric / codex:gpt-6-luna",
+            "threshold": 0.8
+          }
         },
-        "reviewState": "candidate",
+        "reviewState": "auto_checked",
         "asOf": "2026-09-23T13:15:34+02:00",
         "upstreamModified": "2026-09-23T13:15:34+02:00"
       }

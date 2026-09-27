@@ -5745,16 +5745,16 @@
       "geometry": null,
       "properties": {
         "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F2004056677",
-        "version": "32741d9b50339fb335f05d118153b7b416848785b44caa1b25534a06118e6a5d",
+        "version": "89c29a220ee1ef9b8904e1533d0fce64c02b1482fa41435bbbd86855c6a3a0fd",
         "cityId": "muenster",
         "kind": "council_paper",
         "category": "Ratsvorlage",
         "title": "Zuschüsse des Ausschusses für Chancengerechtigkeit und Integration",
-        "statement": "Eine Ratsvorlage mit dem Titel „Zuschüsse des Ausschusses für Chancengerechtigkeit und Integration“ ist im Ratsinformationssystem verzeichnet. Eine Vorlage ist keine bestätigte Entscheidung oder Umsetzung.",
+        "statement": "Die Vorlage V/0523/2026 führt Zuschussanträge für das Projekt „Offene Küche – offener Tisch“, einen Vortrag und ein tamilisches Sportfest mit Familientreffen auf.",
         "status": "Vorlage, Beschlussstatus ungeprüft",
         "startDate": "2026-09-21",
         "endDate": null,
-        "nextStep": "Beratung und Beschluss im Ratsinformationssystem prüfen.",
+        "nextStep": "Der Ausschuss für Chancengerechtigkeit und Integration berät die Vorlage am 30.09.2026 zur Entscheidung.",
         "unknowns": [
           "Ob ein Beschluss gefasst wurde",
           "Genauer räumlicher Bezug"
@@ -5785,12 +5785,43 @@
             "snapshot": true,
             "licence": "unknown",
             "reuse": "facts_with_attribution"
+          },
+          {
+            "url": "https://oparl.stadt-muenster.de/bodies/0001/downloadfiles/00589703.pdf",
+            "snapshotUrl": "https://oparl.stadt-muenster.de/bodies/0001/downloadfiles/00589703.pdf",
+            "title": "Ratsvorlage PDF, Seite 1",
+            "publisher": "Münster",
+            "locator": "PDF Seite 1; Textauszug der Vorlage",
+            "retrievedAt": "2026-09-26T17:29:38.273Z",
+            "sha256": "595a0c27ee10e0f31a6bebef5beb4ff2e7f84deafa4f6a8e44d371082bef6950",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "facts_with_attribution"
+          },
+          {
+            "url": "https://oparl.stadt-muenster.de/bodies/0001/downloadfiles/00589703.pdf",
+            "snapshotUrl": "https://oparl.stadt-muenster.de/bodies/0001/downloadfiles/00589703.pdf",
+            "title": "Ratsvorlage PDF, Seite 1",
+            "publisher": "Münster",
+            "locator": "PDF Seite 1; Textauszug der Vorlage",
+            "retrievedAt": "2026-09-26T17:29:38.273Z",
+            "sha256": "595a0c27ee10e0f31a6bebef5beb4ff2e7f84deafa4f6a8e44d371082bef6950",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "facts_with_attribution"
           }
         ],
         "extraction": {
-          "method": "structured"
+          "method": "llm",
+          "model": "codex:gpt-6-luna",
+          "faithfulness": {
+            "score": 1,
+            "reason": "The score is 1.00 because there are no contradictions listed, so the actual output aligns with the retrieval context.",
+            "evaluator": "DeepEval FaithfulnessMetric / codex:gpt-6-luna",
+            "threshold": 0.8
+          }
         },
-        "reviewState": "candidate",
+        "reviewState": "auto_checked",
         "asOf": "2026-09-23T17:46:55+02:00",
         "upstreamModified": "2026-09-23T17:46:55+02:00"
       }

@@ -25266,16 +25266,16 @@
       "geometry": null,
       "properties": {
         "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fpapers%2Fvo%2F36329",
-        "version": "f38cfb7b3225f975fab1ffba130fd766c2296a5af4803a439ded32169491d8b4",
+        "version": "b08495c47e45c3968ad48f394a639127165b149b955d94a36ca2e66a0d81f6f6",
         "cityId": "wuppertal",
         "kind": "council_paper",
         "category": "Ratsvorlage",
         "title": "Antrag gemäß § 24 GO - Einrichtung einer zentralen, öffentlich zugänglichen Informationsseite zur BUGA 2031",
-        "statement": "Eine Ratsvorlage mit dem Titel „Antrag gemäß § 24 GO - Einrichtung einer zentralen, öffentlich zugänglichen Informationsseite zur BUGA 2031“ ist im Ratsinformationssystem verzeichnet. Eine Vorlage ist keine bestätigte Entscheidung oder Umsetzung.",
+        "statement": "Ein Bürgerantrag fordert eine zentrale, öffentlich zugängliche und leicht auffindbare Informationsseite zur BUGA 2031 auf der Website der Stadt Wuppertal.",
         "status": "Vorlage, Beschlussstatus ungeprüft",
         "startDate": "2026-09-23",
         "endDate": null,
-        "nextStep": "Beratung und Beschluss im Ratsinformationssystem prüfen.",
+        "nextStep": "Der Planungsbeirat BUGA soll am 30.09.2026 über den Antrag beraten und entscheiden.",
         "unknowns": [
           "Ob ein Beschluss gefasst wurde",
           "Genauer räumlicher Bezug"
@@ -25306,12 +25306,43 @@
             "snapshot": true,
             "licence": "unknown",
             "reuse": "facts_with_attribution"
+          },
+          {
+            "url": "http://oparl.wuppertal.de/oparl/bodies/0001/downloadfiles/00370084.pdf",
+            "snapshotUrl": "http://oparl.wuppertal.de/oparl/bodies/0001/downloadfiles/00370084.pdf",
+            "title": "Ratsvorlage PDF, Seite 1",
+            "publisher": "Wuppertal",
+            "locator": "PDF Seite 1; Textauszug der Vorlage",
+            "retrievedAt": "2026-09-26T17:30:31.515Z",
+            "sha256": "1b500b57877939a9d1afed68326750bab4a72559d996b8b731f60a5070c34788",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "facts_with_attribution"
+          },
+          {
+            "url": "http://oparl.wuppertal.de/oparl/bodies/0001/downloadfiles/00370084.pdf",
+            "snapshotUrl": "http://oparl.wuppertal.de/oparl/bodies/0001/downloadfiles/00370084.pdf",
+            "title": "Ratsvorlage PDF, Seite 1",
+            "publisher": "Wuppertal",
+            "locator": "PDF Seite 1; Textauszug der Vorlage",
+            "retrievedAt": "2026-09-26T17:30:31.515Z",
+            "sha256": "1b500b57877939a9d1afed68326750bab4a72559d996b8b731f60a5070c34788",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "facts_with_attribution"
           }
         ],
         "extraction": {
-          "method": "structured"
+          "method": "llm",
+          "model": "codex:gpt-6-luna",
+          "faithfulness": {
+            "score": 1,
+            "reason": "The score is 1.00 because no contradictions were identified; the actual output aligns with the retrieval context.",
+            "evaluator": "DeepEval FaithfulnessMetric / codex:gpt-6-luna",
+            "threshold": 0.8
+          }
         },
-        "reviewState": "candidate",
+        "reviewState": "auto_checked",
         "asOf": "2026-09-23T12:32:14+02:00",
         "upstreamModified": "2026-09-23T12:32:14+02:00"
       }

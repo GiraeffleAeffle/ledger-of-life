@@ -127,6 +127,24 @@
           "reuse": "unknown",
           "retrievedAt": "2026-09-27T10:02:26.776Z",
           "status": "ok"
+        },
+        {
+          "id": "budget-ordinance",
+          "kind": "budget",
+          "publisher": "Stadt Strausberg",
+          "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
+          "licence": "§ 5 UrhG – amtliches Werk",
+          "reuse": "official_work",
+          "retrievedAt": "2026-09-26T16:49:24.355Z"
+        },
+        {
+          "id": "budget-ordinance",
+          "kind": "budget",
+          "publisher": "Stadt Strausberg",
+          "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
+          "licence": "§ 5 UrhG – amtliches Werk",
+          "reuse": "official_work",
+          "retrievedAt": "2026-09-26T16:49:24.355Z"
         }
       ],
       "temporalCoverage": {
@@ -137,8 +155,8 @@
       "licence": "Mixed; see each source",
       "feedUrl": "cities/strausberg/feed.json",
       "minUrl": "cities/strausberg/signals.min.geojson",
-      "fullBytes": 300814,
-      "minBytes": 147130
+      "fullBytes": 305356,
+      "minBytes": 149206
     },
     {
       "id": "koeln",
@@ -514,8 +532,8 @@
       "licence": "Mixed; see each source",
       "feedUrl": "cities/koeln/feed.json",
       "minUrl": "cities/koeln/signals.min.geojson",
-      "fullBytes": 15499116,
-      "minBytes": 5985108
+      "fullBytes": 15501065,
+      "minBytes": 5985287
     },
     {
       "id": "muenster",
@@ -721,8 +739,8 @@
       "licence": "Mixed; see each source",
       "feedUrl": "cities/muenster/feed.json",
       "minUrl": "cities/muenster/signals.min.geojson",
-      "fullBytes": 11125398,
-      "minBytes": 2270579
+      "fullBytes": 11126998,
+      "minBytes": 2270634
     },
     {
       "id": "wuppertal",
@@ -878,8 +896,8 @@
       "licence": "Mixed; see each source",
       "feedUrl": "cities/wuppertal/feed.json",
       "minUrl": "cities/wuppertal/signals.min.geojson",
-      "fullBytes": 2949917,
-      "minBytes": 1496792
+      "fullBytes": 2951434,
+      "minBytes": 1496766
     },
     {
       "id": "castrop-rauxel",
