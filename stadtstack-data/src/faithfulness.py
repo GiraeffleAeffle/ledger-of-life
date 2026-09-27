@@ -36,7 +36,7 @@ class CodexJudge(DeepEvalBaseLLM):
 
 if __name__ == '__main__':
     payload = json.load(sys.stdin)
-    evaluator = FaithfulnessMetric(threshold=payload.get('threshold', 0.8), model=CodexJudge(), async_mode=False, include_reason=True, penalize_ambiguous_claims=payload.get('penalize_ambiguous_claims', False))
+    evaluator = FaithfulnessMetric(threshold=payload.get('threshold', 0.8), model=CodexJudge(), async_mode=False, include_reason=True, penalize_ambiguous_claims=payload.get('penalize_ambiguous_claims', True))
     case = LLMTestCase(input='Fasse ausschließlich den folgenden öffentlichen Quellenausschnitt in eigenen Worten zusammen.', actual_output=payload['statement'], retrieval_context=[payload['source']])
     with redirect_stdout(StringIO()):
         evaluator.measure(case)
