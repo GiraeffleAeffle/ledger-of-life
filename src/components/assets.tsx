@@ -10,6 +10,14 @@ import type { Area } from './areas';
 
 type Settled<T> = { ok: true; value: T } | { ok: false; error: string; code?: 'price_unavailable' } | null;
 type AssetsResponse = { robinhood: Settled<RobinhoodHoldings>; solar: Settled<SolarReading>; validator: Settled<ValidatorReading>; adapters: PublicAdapterConfig };
+type SharePositions = {
+  enabled: boolean;
+  walletValueAtomic: string;
+  testUsdAtomic: string;
+  sharesRaw: string;
+  deposit: { valueAtomic: string } | null;
+  loan: { valueAtomic: string; debtAtomic: string } | null;
+};
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 type BuyStep = { description: string; transaction: { chainId: 46630; to: string; data: string; value: string; nonce: number; gas: string; maxFeePerGas: string; maxPriorityFeePerGas: string } };
 
@@ -41,6 +49,9 @@ export function AssetsOverview({ request, tenancies, show, go }: {
   const [assets, setAssets] = useState<AssetsResponse | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioView | null>(null);
   const [portfolioUnavailable, setPortfolioUnavailable] = useState(false);
+  const [portfolioChecked, setPortfolioChecked] = useState(false);
+  const [workflow, setWorkflow] = useState<SharePositions | null>(null);
+  const [workflowStatus, setWorkflowStatus] = useState<'loading' | 'available' | 'unavailable'>('loading');
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [open, setOpen] = useState<'solar' | 'validator' | null>(null);
@@ -48,22 +59,32 @@ export function AssetsOverview({ request, tenancies, show, go }: {
   const [validatorForm, setValidatorForm] = useState({ chain: 'gnosis', id: '' });
 
   const refresh = useCallback(async () => {
-    const [a, p] = await Promise.all([
+    const [a, p, w] = await Promise.all([
       request<AssetsResponse>(show === 'home' ? '/api/assets?area=home' : '/api/assets'),
       show === 'home' ? Promise.resolve(null) : request<{ portfolio: PortfolioView | { available: false } }>('/api/portfolio').catch(() => null),
+      show === 'home' ? Promise.resolve(null) : request<{ workflow: SharePositions }>('/api/share-workflows').catch(() => null),
     ]);
     setAssets(a);
-    if (p?.portfolio.available) setPortfolio(p.portfolio);
-    if (show !== 'home') setPortfolioUnavailable(p === null);
+    if (show !== 'home') {
+      setPortfolio(p?.portfolio.available ? p.portfolio : null);
+      setPortfolioUnavailable(p === null);
+      setPortfolioChecked(true);
+      setWorkflow(w?.workflow.enabled ? w.workflow : null);
+      setWorkflowStatus(w?.workflow.enabled ? 'available' : 'unavailable');
+    }
   }, [request, show]);
   useEffect(() => {
     let active = true;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let retryAssets: ReturnType<typeof setTimeout> | undefined;
+    let assetsRevision = 0;
+    let workflowRevision = 0;
     async function loadAssets() {
+      const revision = ++assetsRevision;
+      clearTimeout(retryAssets);
       try {
         const a = await request<AssetsResponse>(show === 'home' ? '/api/assets?area=home' : '/api/assets');
-        if (!active) return;
+        if (!active || revision !== assetsRevision) return;
         setAssets(a);
         if (show !== 'home' && a.robinhood && (!a.robinhood.ok || a.robinhood.value.referencePriceStale))
           retryAssets = setTimeout(loadAssets, a.robinhood.ok || a.robinhood.code === 'price_unavailable' ? 60_000 : 8000);
@@ -77,14 +98,34 @@ export function AssetsOverview({ request, tenancies, show, go }: {
           if (!active) return;
           setPortfolio(portfolio.available ? portfolio : null);
           setPortfolioUnavailable(false);
+          setPortfolioChecked(true);
           if (portfolio.available && portfolio.referencePriceStale) retry = setTimeout(loadPortfolio, 60_000);
         } catch {
           if (!active) return;
           setPortfolioUnavailable(true);
+          setPortfolioChecked(true);
           retry = setTimeout(loadPortfolio, 8000);
         }
       }
       void loadPortfolio();
+      async function loadWorkflow() {
+        const revision = ++workflowRevision;
+        setWorkflowStatus('loading');
+        try {
+          const { workflow } = await request<{ workflow: SharePositions }>('/api/share-workflows');
+          if (!active || revision !== workflowRevision) return;
+          setWorkflow(workflow.enabled ? workflow : null);
+          setWorkflowStatus(workflow.enabled ? 'available' : 'unavailable');
+        } catch {
+          if (!active || revision !== workflowRevision) return;
+          setWorkflow(null);
+          setWorkflowStatus('unavailable');
+        }
+      }
+      void loadWorkflow();
+      const reloadShareBalances = () => { void loadAssets(); void loadWorkflow(); };
+      window.addEventListener('ledger-share-workflows-changed', reloadShareBalances);
+      return () => { active = false; clearTimeout(retry); clearTimeout(retryAssets); window.removeEventListener('ledger-share-workflows-changed', reloadShareBalances); };
     }
     return () => { active = false; clearTimeout(retry); clearTimeout(retryAssets); };
   }, [request, show]);
@@ -124,26 +165,37 @@ export function AssetsOverview({ request, tenancies, show, go }: {
   const rh = assets?.robinhood?.ok ? assets.robinhood.value : null;
   const solar = assets?.solar?.ok ? assets.solar.value : null;
   const validator = assets?.validator?.ok ? assets.validator.value : null;
-  const robinhoodUnavailable = Boolean(assets?.robinhood && !assets.robinhood.ok);
+  const robinhoodUnavailable = Boolean(assets?.robinhood && !assets.robinhood.ok && workflowStatus !== 'available');
   const robinhoodError = assets?.robinhood && !assets.robinhood.ok
     ? assets.robinhood.code === 'price_unavailable' ? 'Reference price temporarily unavailable; retrying…' : assets.robinhood.error
     : null;
   const unavailableHoldings = portfolioUnavailable
     ? robinhoodUnavailable ? 'Solana portfolio and Robinhood holdings' : 'Solana portfolio'
     : robinhoodUnavailable ? 'Robinhood holdings' : '';
-  const total = locked + (portfolio ? portfolio.valueUsd + atomicUsd(portfolio.testUsdcAtomic) : 0) + (rh ? rh.tslaValueUsd + atomicUsd(rh.testUsdAtomic) : 0);
+  const positions = workflowStatus === 'available' ? workflow : null;
+  const inWallet = positions
+    ? atomicUsd(positions.walletValueAtomic) + atomicUsd(positions.testUsdAtomic)
+    : rh ? rh.tslaValueUsd + atomicUsd(rh.testUsdAtomic) : 0;
+  const pledged = atomicUsd(positions?.deposit?.valueAtomic);
+  const collateral = atomicUsd(positions?.loan?.valueAtomic);
+  const debt = atomicUsd(positions?.loan?.debtAtomic);
+  const robinhoodValue = inWallet + pledged + collateral - debt;
+  const total = locked + (portfolio ? portfolio.valueUsd + atomicUsd(portfolio.testUsdcAtomic) : 0) + robinhoodValue;
+  const totalLoading = !assets || !portfolioChecked || workflowStatus === 'loading';
 
   if (show === 'summary')
     return (
       <section className="card overview-tile clickable" onClick={() => go('money')}>
         <span className="eyebrow">MONEY · TEST NETWORKS</span>
-        <strong className="overview-figure">{assets ? unavailableHoldings ? '—' : usd(total) : <Loader2 className="spin" size={20} />}</strong>
+        <strong className="overview-figure">{totalLoading ? <Loader2 className="spin" size={20} /> : unavailableHoldings ? '—' : usd(total)}</strong>
         <span className="small-copy">
-          {unavailableHoldings ? `${unavailableHoldings} temporarily unavailable; retrying…` : `Deposit ${usd(locked)} · stocks ${usd((portfolio?.valueUsd ?? 0) + (rh?.tslaValueUsd ?? 0))}`}
+          {unavailableHoldings ? `${unavailableHoldings} temporarily unavailable; retrying…` : `Deposit ${usd(locked)} · stocks ${usd((portfolio?.valueUsd ?? 0) + robinhoodValue)}`}
           {validator ? ` · validator ${validator.stake.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${validator.unit}` : ''}
         </span>
+        {positions && <span className="small-copy">Robinhood shares and contract-held positions use the simulated test market price; open loan debt is subtracted.</span>}
         {portfolio?.referencePriceStale && <span className="small-copy">Solana reference price as of {new Date(portfolio.referencePriceObservedAt).toLocaleString()}</span>}
-        {rh?.referencePriceStale && <span className="small-copy">Robinhood reference price as of {new Date(rh.referencePriceObservedAt).toLocaleString()}</span>}
+        {rh?.referencePriceStale && !positions && <span className="small-copy">Robinhood reference price as of {new Date(rh.referencePriceObservedAt).toLocaleString()}</span>}
+        {workflowStatus === 'unavailable' && <span className="small-copy" role="status">Workflow positions unavailable; wallet-only values shown.</span>}
         <span className="text-button">Open Money →</span>
       </section>
     );
@@ -154,9 +206,11 @@ export function AssetsOverview({ request, tenancies, show, go }: {
         <div className="assets-head">
           <div>
             <span className="eyebrow">EVERYTHING YOU OWN · TEST NETWORKS</span>
-            <h2>{assets ? unavailableHoldings ? '—' : usd(total) : <Loader2 className="spin" size={20} />}</h2>
+            <h2>{totalLoading ? <Loader2 className="spin" size={20} /> : unavailableHoldings ? '—' : usd(total)}</h2>
             <p className="small-copy">{unavailableHoldings ? `${unavailableHoldings} temporarily unavailable; retrying…` : 'Your deposit, stocks and what your hardware earns. Test assets have no real value.'}</p>
-            {(portfolio?.referencePriceStale || rh?.referencePriceStale) && <p className="small-copy">Total includes last known stock prices; observation times below.</p>}
+            {positions && <p className="small-copy">Robinhood shares and contract-held positions use the simulated test market price; open loan debt is subtracted.</p>}
+            {(portfolio?.referencePriceStale || (rh?.referencePriceStale && !positions)) && <p className="small-copy">Total includes last known stock prices; observation times below.</p>}
+            {workflowStatus === 'unavailable' && <p className="small-copy" role="status">Workflow positions unavailable; wallet-only values shown.</p>}
           </div>
         </div>
       ) : (
@@ -185,9 +239,13 @@ export function AssetsOverview({ request, tenancies, show, go }: {
 
         <article className="asset-tile">
           <header><LineChart size={18} /> Stocks · Robinhood Chain</header>
-          <strong>{rh ? usd(rh.tslaValueUsd) : '—'}</strong>
-          <span>{rh ? `${rh.tslaShares.toFixed(5)} TSLA (official test token) · ${usd(atomicUsd(rh.testUsdAtomic))} test USD` : robinhoodError ?? 'Loading…'}</span>
-          {rh?.referencePriceStale && <span>Reference price as of {new Date(rh.referencePriceObservedAt).toLocaleString()} · live price unavailable</span>}
+          <strong>{workflowStatus === 'loading' ? 'Loading…' : rh || positions ? usd(robinhoodValue) : '—'}</strong>
+          <span>{positions
+            ? `${(Number(positions.sharesRaw) / 1e18).toFixed(5)} TSLA (official test token) · ${usd(atomicUsd(positions.testUsdAtomic))} test USD in wallet`
+            : rh ? `${rh.tslaShares.toFixed(5)} TSLA (official test token) · ${usd(atomicUsd(rh.testUsdAtomic))} test USD in wallet` : robinhoodError ?? 'Loading…'}</span>
+          {positions && <span>Test market price · in wallet {usd(inWallet)} · pledged for a deposit {usd(pledged)} · loan collateral {usd(collateral)} · loan −{usd(debt)}</span>}
+          {workflowStatus === 'unavailable' && <span role="status">Workflow positions unavailable; wallet-only values shown.</span>}
+          {rh?.referencePriceStale && !positions && <span>Reference price as of {new Date(rh.referencePriceObservedAt).toLocaleString()} · live price unavailable</span>}
           <div className="button-row">
             {rh && BigInt(rh.testUsdAtomic) > 0n && (
               <button className="button primary" disabled={Boolean(busy) || rh.referencePriceStale} onClick={() => run('buy', buyTsla)}>
