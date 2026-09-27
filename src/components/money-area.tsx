@@ -6,9 +6,9 @@ import type { TenancyJourney } from '@/server/journey';
 import type { PortfolioView } from '@/server/portfolio';
 import { AssetsOverview } from './assets';
 import type { Area } from './areas';
-import { PlannedHere } from './ideas';
+import { ShareWorkflows } from './share-workflows';
 import { LocalInvestments } from './local-investments';
-import { Badge, money } from './workspace-panels';
+import { money } from './workspace-panels';
 
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 const b64 = (value: string) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
@@ -20,9 +20,9 @@ export function MoneyArea({ request, tenancies, loaded, go }: {
   return (
     <>
       {loaded && <AssetsOverview request={request} tenancies={tenancies} show="money" go={go} />}
-      <LocalInvestments request={request} />
       <Portfolio request={request} />
-      <PlannedHere area="money" go={go} />
+      <ShareWorkflows request={request} />
+      <LocalInvestments request={request} />
     </>
   );
 }
@@ -104,10 +104,9 @@ function Portfolio({ request }: { request: Request }) {
     return () => { active = false; clearInterval(timer); };
   }, [purchase, request, refresh, signedAttempt]);
   if (!view) return unavailable ? (
-    <section className="card portfolio-card" role="status">
-      <h2>Invest · stocks on Solana</h2>
-      <p>Test-network portfolio temporarily unavailable; retrying…</p>
-    </section>
+    <div className="solana-buy-row" role="status">
+      <span>Solana test share buy temporarily unavailable; retrying…</span>
+    </div>
   ) : null;
   async function invest() {
     if (busy || purchase === 'pending') return;
@@ -153,27 +152,14 @@ function Portfolio({ request }: { request: Request }) {
     }
   }
   return (
-    <section className="card portfolio-card">
-      <div className="section-heading">
-        <h2>Invest · stocks on Solana</h2>
-        <Badge tone="neutral">Devnet test market · no value</Badge>
-      </div>
-      {unavailable && <p className="note" role="status">Test-network portfolio temporarily unavailable; retrying…</p>}
-      {view.referencePriceStale && <p className="note" role="status">Reference price as of {new Date(view.referencePriceObservedAt).toLocaleString()}; live price temporarily unavailable. Investing resumes when refreshed.</p>}
-      <dl className="journey-facts">
-        <div><dt>tSPYx (S&amp;P 500 copy)</dt><dd>{view.shares.toFixed(6)} shares</dd></div>
-        <div><dt>{view.referencePriceStale ? 'Value at last known SPYx price' : 'Value at recent SPYx price'}</dt><dd>${view.valueUsd.toFixed(2)}</dd></div>
-        <div><dt>Simulated distributions so far</dt><dd>{((view.multiplier - 1) * 100).toFixed(2)} %</dd></div>
-        <div><dt>Test USDC available</dt><dd>{money(view.testUsdcAtomic)}</dd></div>
-      </dl>
-      <p className="small-copy">
-        Deposit earnings above the required deposit are yours to invest. Devnet lending pays no interest, so you can
-        invest your own test USDC here. Distributions raise your displayed shares, as they do for xStocks.
-      </p>
+    <div className="solana-buy-row" role="group" aria-label="Buy tSPYx with test USDC">
+      <span>tSPYx · Solana devnet · {money(view.testUsdcAtomic)} test USDC available · no real value</span>
+      {unavailable && <p className="note" role="status">Test portfolio temporarily unavailable; retrying…</p>}
+      {view.referencePriceStale && <p className="note" role="status">Reference price as of {new Date(view.referencePriceObservedAt).toLocaleString()}; live price temporarily unavailable. Buying resumes when refreshed.</p>}
       <button className="button primary" disabled={busy || purchase === 'pending' || view.referencePriceStale || BigInt(view.testUsdcAtomic) < 5_000_000n} onClick={invest}>
         {busy ? <Loader2 className="spin" size={16} /> : null} {purchase === 'pending' ? 'Purchase pending, checking' : 'Invest 5 test USDC'} <ArrowRight size={16} />
       </button>
       {message && <p className="note" role="status">{message}</p>}
-    </section>
+    </div>
   );
 }

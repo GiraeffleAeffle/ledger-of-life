@@ -1,0 +1,117 @@
+{
+  "network": "Robinhood Chain testnet",
+  "chainId": 46630,
+  "mode": "ephemeral signed test wallet and operator-held test actors; not a Privy/signed-in wallet proof",
+  "token": "official test TSLA and freely minted test USD (no real value)",
+  "inputs": "simulated vault yield, isolated operator-set test price and stock desk",
+  "tenant": "0x803FdFbD435bB1A7C42d0f74231AbBd389854323",
+  "deployed": {
+    "earningsEscrow": "0xbac9145924046240742d12235b02a803dde81ea5",
+    "oracle": "0x07139e46cebd491e2908a5d32473c197a84c1e97",
+    "desk": "0x9a15873279b71a4fceb21bcee876414d36e2476e",
+    "pool": "0x2ae7996b00989ff0e1d40a509c15d74d5d2bd4f7",
+    "collateralEscrow": "0xe3ca925dbbe34030859e8894d299d66182c6bf52"
+  },
+  "transactionHashes": {
+    "simulatedEarnings": [
+      "0x54d4601e0ef97d85d067311f07f8bb86fab156f2a4c7a15cf6ad949cbe528e53"
+    ],
+    "earningsToTestTslaBuy": [
+      "0x5f6b08c3590036158e5f72a6a3ef5c264b1a75e2c413b7d363d8da33e150682d",
+      "0x42b86e3adc98fefa440f7d24b9be617b024168fdc16accacbd378ca4bfc3626e"
+    ],
+    "marketDeploymentAndFunding": [
+      "0x4515655037064b802f7c08b9b231034286626582c3483bcea3e6f9587f3d890f",
+      "0xdd469aaaf5c4cfd5ed953e767bb246df642fc4d90e1964f99b42220f7aba76ec",
+      "0x15fe75b6c9f5858588732afc6d16ce8d89839e67605bdd18da15815b9ebecbbf",
+      "0x815deb9429dbc331829e64c4f0332f3e197e9f4621426ef37b84c938de0bdf07",
+      "0x4570f0c7775a433d454ba0272f2d78d3865e00e7838c75db4df3c2a5d5c6a2d7"
+    ],
+    "testLandlordAcceptance": [
+      "0x364e0a522832c764e371661376774dbf9fd13d5ecd291079b35ab74d80b2ecff"
+    ],
+    "signedDepositPledge": [
+      "0x2639e221b83c3541a0ece67f2be0b3a3447c7bf2fc40c36bdbc95575ad7f723f",
+      "0x69d49d8d9568cadd24b4078b75a8f7b3a6a4517e74be0e6be9f2f20647e57700"
+    ],
+    "testPriceDown30": [
+      "0x520e268c7b32b4cabade56f604a043fba5bea7795ff32028bca98f96b6eddab7",
+      "0xdea3daac19d63025fd646550c327b765a91811139f27990566290c4989d7ed54"
+    ],
+    "shortfallFlagged": [
+      "0x106cc6a5dc57d48ac0ae1cc8e05019dcdfa9ea158f9b4fc1b55b4fecb6231f99"
+    ],
+    "signedDepositTopUp": [
+      "0x2ae6407c000bbfa1ae6fc28a106f275919db0ddc587d8f990ed9a353faf758f9",
+      "0x1f7a9667fd914ae7990bd5d692629f456ff25f9f56fa62b5b8e43c70519bbbe8"
+    ],
+    "testMoveOutClaim": [
+      "0xdec1d7087364d92703163b32a67c5c6b5a931d6c0301f06c2fe182ffe6c593ea"
+    ],
+    "signedMoveOutAcceptance": [
+      "0x18ebb586b5de7a521c78aaf05a15cb66df8500bf79fc70fe9e875bde85de199a"
+    ],
+    "claimSaleAndShareReturn": [
+      "0x6d05d50b7bf5379a91cee54deb3ed470e24de02c6bc1be27c84cb3a9adce5775"
+    ],
+    "restoreTestPrice": [
+      "0xe377af83bb9f2dc97dc906373a5c885600aa9d8d1f8c2cfd5696292fc610f032",
+      "0xd2c4a3e2fa497538508589922ed48504c4122cbfd7b16b22d105e243a96d7b97"
+    ],
+    "signedLoanCollateral": [
+      "0x50dcb98f86df424ab1e5a93b57f61280445c8cb5c03c536806c0f0804d6ab48d",
+      "0x7a8f14b4751bc281e7a72c8056c166fde9e78f1b618dcbf543a673b80e7c201d"
+    ],
+    "signedBorrow": [
+      "0x6fce95e5b9cc74b274dfc45ea54c8a1427ad01c06192ae40a2181036cffea186"
+    ],
+    "testPriceDown60": [
+      "0x674da9bc8cdfef093ed5e873bfe1d90c82225dc257cee98b4f16aa3950ef69f9",
+      "0xd71186e1d4e7d37d7cd8ca4bd9949df8ab20195cf23d776d346a01a893e59973"
+    ],
+    "testLiquidation": [
+      "0xd091759e77500fdb09d0e744b362b022ee0b37a468192b2f75e8925f561da604",
+      "0xbe5bc712404def25347fc7d1f656fbb1d57f615596ab0eb272ce724bd663ba5e",
+      "0x3d4f23190dcbde2ab55243b47cc7f887d4f6d822dcbee954d3982adc7294c29e"
+    ],
+    "restoreTestPriceAfterLiquidation": [
+      "0x0d8669919d5f8167113c2b506d47ea3668d6cbd88fdb49877dc4662913029665",
+      "0xf0d4dfc29e4383b01af3fa767d1b48bd946e40c418e2dab2d6f01246e0d1a748"
+    ],
+    "testRepaymentFaucet": [
+      "0x8210e40e293fd627211f8586d16a466e474a996b607f6c7c4e334cb6e5bb8f53"
+    ],
+    "signedRepayment": [
+      "0xbb9e703179503d18e55599143ff0dc56e0dfb1f546deed6c542b3269e224bcf4",
+      "0x590b782eafe454d09a394589380c3dcdcfc638db7db645e37b3b0f6967464502"
+    ],
+    "signedShareWithdrawal": [
+      "0x3f0d167dd1030c6757d40cc2a29fea4cc4bcf58e98e762997a862189d2cc670b"
+    ]
+  },
+  "final": {
+    "claimedEarningsAtomic": "80332",
+    "acceptedDepositAtomic": "26776",
+    "openingRatioBps": 15000,
+    "deposit": {
+      "state": 5,
+      "sharesRaw": "0",
+      "cashAtomic": "0",
+      "valueAtomic": "0",
+      "depositAtomic": "26776",
+      "bufferAtomic": "-33470",
+      "deadline": 0,
+      "claimAtomic": "5355"
+    },
+    "loan": {
+      "sharesRaw": "0",
+      "debtAtomic": "0",
+      "valueAtomic": "0",
+      "ltvBps": 0,
+      "healthBps": 0,
+      "availableAtomic": "0"
+    },
+    "walletSharesRaw": "87614965454999",
+    "landlordClaimReceivedAtomic": "5355"
+  }
+}
