@@ -25318,6 +25318,18 @@
             "snapshot": true,
             "licence": "unknown",
             "reuse": "facts_with_attribution"
+          },
+          {
+            "url": "http://oparl.wuppertal.de/oparl/bodies/0001/downloadfiles/00370084.pdf",
+            "snapshotUrl": "http://oparl.wuppertal.de/oparl/bodies/0001/downloadfiles/00370084.pdf",
+            "title": "Ratsvorlage PDF, Seite 1",
+            "publisher": "Wuppertal",
+            "locator": "PDF Seite 1; Textauszug der Vorlage",
+            "retrievedAt": "2026-09-26T17:30:31.515Z",
+            "sha256": "1b500b57877939a9d1afed68326750bab4a72559d996b8b731f60a5070c34788",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "facts_with_attribution"
           }
         ],
         "extraction": {

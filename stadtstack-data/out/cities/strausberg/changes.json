@@ -1,9 +1,9 @@
 {
-  "added": [
+  "added": [],
+  "changed": [
     "budget:investment-outlays-2025",
     "budget:investment-outlays-2026"
   ],
-  "changed": [],
   "removed": [],
   "generatedAt": "2026-09-27T10:02:23.207Z"
 }

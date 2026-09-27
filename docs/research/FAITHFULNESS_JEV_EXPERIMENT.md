@@ -80,17 +80,19 @@ The ambiguity penalty changed four false passes to failures and did not flip any
 
 ### Pipeline rerun
 
-The unpenalized and ambiguity-penalized cache results for the five currently generated LLM statements compare as follows:
+Budget faithfulness checks now score only the ordinance-backed year, amount and line item. The statement no longer carries an unsupported “not actual expenses” caveat; the plan-versus-actual meaning is retained in the UI-visible `status` (`Plan (Haushaltssatzung)`) and `unknowns` (`Tatsächliche Ausgaben nicht belegt`), neither of which is part of the faithfulness input. The 2025 published statement is: “Für das Haushaltsjahr 2025 sind 17.941.270 EUR als Auszahlungen aus Investitionstätigkeit im Haushaltsplan festgesetzt.” The deterministic guard still requires plan wording and rejects actual-spending wording.
 
-| Published statement | Before | After | Result |
+We ran the evaluator twice against the same cached generated statements, clearing the faithfulness-result cache between runs so each score was freshly evaluated:
+
+| Published statement | Run 1 | Run 2 | Result in both runs |
 | --- | ---: | ---: | --- |
-| Strausberg 2025 planned investment outlays | 1.0 | 0.0 | `candidate` (below 0.8) |
+| Strausberg 2025 planned investment outlays | 1.0 | 1.0 | `auto_checked` |
 | Strausberg 2026 planned investment outlays | 1.0 | 1.0 | `auto_checked` |
 | Köln council paper | 1.0 | 1.0 | `auto_checked` |
 | Münster council paper | 1.0 | 1.0 | `auto_checked` |
 | Wuppertal council paper | 1.0 | 1.0 | `auto_checked` |
 
-The 2025 statement says that the ordinance specifies planned outlays and explicitly clarifies they are not actual expenses. Its new score is `0.0`, while the evaluator reason says “no contradictions are listed,” an internally inconsistent result. It remains `candidate` (“Not yet checked”), not automatically approved; this is a potential false-low that needs source-level review, not evidence that the statement is contradicted. The independent plan-versus-actual publication guard remains in place.
+All five scores were stable; no statement flipped, so an extra two-call/minimum-score stability rule was not added. Both budget signals carry the separate plan status and the unknown about actual expenses in structured fields.
 
 ### Recommendation
 

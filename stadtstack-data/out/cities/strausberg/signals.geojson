@@ -8048,18 +8048,18 @@
       "geometry": null,
       "properties": {
         "id": "budget:investment-outlays-2025",
-        "version": "1b6eafbbcc3540570b354a3609295cda432032a85b5460fa0ee87aede9a99eee",
+        "version": "b89576aba67ef57d1f0e7261e21848f01c9c7b35045fc5b1bbb3902926b7cc0e",
         "cityId": "strausberg",
         "kind": "budget",
         "category": "Geplante Investitionsauszahlungen",
         "title": "Investitionsplan 2025: 17.941.270 €",
-        "statement": "§ 1 der Haushaltssatzung setzt für 2025 geplante Auszahlungen aus Investitionstätigkeit von 17.941.270 Euro fest; das ist kein Betrag tatsächlicher Ausgaben.",
-        "status": "Haushaltsansatz; keine tatsächliche Ausgabe",
+        "statement": "Für das Haushaltsjahr 2025 sind 17.941.270 EUR als Auszahlungen aus Investitionstätigkeit im Haushaltsplan festgesetzt.",
+        "status": "Plan (Haushaltssatzung)",
         "startDate": "2025-01-01",
         "endDate": "2025-12-31",
-        "nextStep": "Tatsächliche Auszahlungen gesondert prüfen.",
+        "nextStep": "Bei der Stadt Strausberg nach konkreten Projekten und dem tatsächlichen Ausgabestand fragen.",
         "unknowns": [
-          "Tatsächliche Ausgaben nicht durch Haushaltssatzung belegt",
+          "Tatsächliche Ausgaben nicht belegt",
           "Einzelprojekte und vollständiger Plan online nicht verfügbar"
         ],
         "scale": "city",
@@ -8082,13 +8082,13 @@
           "method": "llm",
           "model": "codex:gpt-6-luna",
           "faithfulness": {
-            "score": 0,
-            "reason": "The score is 0.00, but no contradictions are listed, so there is no stated mismatch to justify that score.",
+            "score": 1,
+            "reason": "The score is 1.00 because there are no contradictions; the actual output aligns with the retrieval context. Great job!",
             "evaluator": "DeepEval FaithfulnessMetric / codex:gpt-6-luna",
             "threshold": 0.8
           }
         },
-        "reviewState": "candidate",
+        "reviewState": "auto_checked",
         "asOf": "2026-09-26T16:49:24.355Z"
       }
     },
@@ -8097,18 +8097,18 @@
       "geometry": null,
       "properties": {
         "id": "budget:investment-outlays-2026",
-        "version": "02fe062da7ba03d3295b5de4e7fa449bb2a3dbcca35b8ffdcb90cec3823ed245",
+        "version": "48722002402d0f3910c84563961a50a05b301ecee424c2edcfe3c0e4a48622d3",
         "cityId": "strausberg",
         "kind": "budget",
         "category": "Geplante Investitionsauszahlungen",
         "title": "Investitionsplan 2026: 12.609.320 €",
-        "statement": "Die Haushaltssatzung setzt für 2026 geplante Auszahlungen aus Investitionstätigkeit von 12.609.320 Euro fest.",
-        "status": "Haushaltsansatz; keine tatsächliche Ausgabe",
+        "statement": "Für das Haushaltsjahr 2026 sind 12.609.320 EUR als Auszahlungen aus Investitionstätigkeit im Haushaltsplan festgesetzt.",
+        "status": "Plan (Haushaltssatzung)",
         "startDate": "2026-01-01",
         "endDate": "2026-12-31",
-        "nextStep": "Weitere Angaben stehen in § 1 der Haushaltssatzung.",
+        "nextStep": "Bei der Stadt Strausberg nach konkreten Projekten und dem tatsächlichen Ausgabestand fragen.",
         "unknowns": [
-          "Tatsächliche Ausgaben nicht durch Haushaltssatzung belegt",
+          "Tatsächliche Ausgaben nicht belegt",
           "Einzelprojekte und vollständiger Plan online nicht verfügbar"
         ],
         "scale": "city",
@@ -8132,7 +8132,7 @@
           "model": "codex:gpt-6-luna",
           "faithfulness": {
             "score": 1,
-            "reason": "The score is 1.00 because there are no contradictions; the output aligns with the retrieval context.",
+            "reason": "The score is 1.00 because there are no contradictions; the output aligns with the retrieval context. Great job!",
             "evaluator": "DeepEval FaithfulnessMetric / codex:gpt-6-luna",
             "threshold": 0.8
           }
