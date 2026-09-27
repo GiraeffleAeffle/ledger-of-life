@@ -1,7 +1,7 @@
 {
   "schemaVersion": "stadtstack-feed-v1",
   "cityId": "freiburg",
-  "generatedAt": "2026-09-27T10:06:35.675Z",
+  "generatedAt": "2026-09-27T10:09:52.098Z",
   "sources": [
     {
       "id": "freiburg-press",
@@ -10,7 +10,7 @@
       "url": "https://www.freiburg.de/pressemitteilungen/index.html",
       "licence": "unknown",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:06:35.675Z",
+      "retrievedAt": "2026-09-27T10:09:52.098Z",
       "status": "not_available",
       "pageUrl": "https://www.freiburg.de/pressemitteilungen/index.html"
     }

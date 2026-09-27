@@ -1,7 +1,7 @@
 {
   "schemaVersion": "stadtstack-feed-v1",
   "cityId": "koeln",
-  "generatedAt": "2026-09-27T10:02:27.938Z",
+  "generatedAt": "2026-09-27T10:09:52.084Z",
   "sources": [
     {
       "id": "koeln-events",

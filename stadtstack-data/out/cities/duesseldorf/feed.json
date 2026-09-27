@@ -1,7 +1,7 @@
 {
   "schemaVersion": "stadtstack-feed-v1",
   "cityId": "duesseldorf",
-  "generatedAt": "2026-09-27T10:05:06.500Z",
+  "generatedAt": "2026-09-27T10:09:52.092Z",
   "sources": [
     {
       "id": "duesseldorf-press",
@@ -10,7 +10,7 @@
       "url": "https://www.duesseldorf.de/aktuelles/news",
       "licence": "unknown",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:05:06.500Z",
+      "retrievedAt": "2026-09-27T10:09:52.092Z",
       "status": "not_available",
       "pageUrl": "https://www.duesseldorf.de/aktuelles/news"
     }

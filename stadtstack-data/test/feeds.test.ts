@@ -7,6 +7,12 @@ test('parses RSS CDATA and entities with pubDate and GUID',()=>{
  const items=parseSyndication(`<rss><channel><item><title><![CDATA[Wetter &amp; Stadt]]></title><link>https://example.org/a?x=1&amp;y=2</link><guid>unique-1</guid><pubDate>Sat, 26 Sep 2026 10:00:00 GMT</pubDate></item></channel></rss>`,source,retrieved,new Date('2026-09-27T12:00:00Z'));
  assert.equal(items.length,1);assert.equal(items[0].title,'Wetter & Stadt');assert.equal(items[0].url,'https://example.org/a?x=1&y=2');assert.equal(items[0].publishedAt,'2026-09-26T10:00:00.000Z');assert.equal(items[0].eventStart,null);assert.match(items[0].id,/^test:[a-f0-9]{64}$/);
 });
+test('strips tracking parameters and hashes canonical URL GUIDs',()=>{
+ const item=(url:string,guid:string)=>parseSyndication(`<rss><channel><item><title>Neu</title><link>${url}</link><guid>${guid}</guid><pubDate>Sat, 26 Sep 2026 10:00:00 GMT</pubDate></item></channel></rss>`,source,retrieved,new Date('2026-09-27T12:00:00Z'))[0];
+ const first=item('https://example.org/post?utm_source=newsletter&keep=1','https://example.org/post?utm_campaign=launch&utm_source=mail');
+ const second=item('https://example.org/post?utm_medium=social&keep=1','https://example.org/post?utm_term=campaign');
+ assert.equal(first.url,'https://example.org/post?keep=1');assert.equal(second.url,first.url);assert.equal(second.id,first.id);
+});
 test('parses Atom alternate link and updated timestamp',()=>{
  const items=parseSyndication(`<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>Neu</title><link rel="alternate" href="https://example.org/post"/><id>tag:example.org,2026:1</id><updated>2026-09-26T09:00:00+02:00</updated></entry></feed>`,source,retrieved,new Date('2026-09-27T12:00:00Z'));
  assert.equal(items.length,1);assert.equal(items[0].url,'https://example.org/post');assert.equal(items[0].publishedAt,'2026-09-26T07:00:00.000Z');

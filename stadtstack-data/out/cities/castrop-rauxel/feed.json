@@ -1,7 +1,7 @@
 {
   "schemaVersion": "stadtstack-feed-v1",
   "cityId": "castrop-rauxel",
-  "generatedAt": "2026-09-27T10:03:16.606Z",
+  "generatedAt": "2026-09-27T10:09:52.092Z",
   "sources": [
     {
       "id": "castrop-rauxel-press",
@@ -10,7 +10,7 @@
       "url": "https://www.castrop-rauxel.de/news",
       "licence": "unknown",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:03:16.606Z",
+      "retrievedAt": "2026-09-27T10:09:52.092Z",
       "status": "not_available",
       "pageUrl": "https://www.castrop-rauxel.de/news"
     }
