@@ -8,6 +8,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import type { Store } from './store.ts';
 import { ROBINHOOD_TESTNET } from './robinhood-demo.ts';
 import { operatorTestCapability } from './test-capability.ts';
+import { startShareMarket } from './share-workflows.ts';
 
 const chain = defineChain({ id: 46630, name: 'Robinhood Chain Testnet', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://rpc.testnet.chain.robinhood.com'] } }, testnet: true });
 const rpc = createPublicClient({ chain, transport: http() });
@@ -19,12 +20,17 @@ const escrowAbi = parseAbi([
   'function acceptAgreement(uint256,uint256)', 'function fund(uint256,uint256)',
   'function supply(uint256,uint256,uint256,uint256)', 'function releaseEarnings(uint256,uint256,uint256,uint256)',
 ]);
-const SECURITY = 10_000_000n;
-const RESERVE = 10_000n;
+const SECURITY = 1_500_000_000n;
+const RESERVE = 1_000_000n;
+const DEMO_PURCHASE_FAUCET = 3_540_000_000n;
+const YIELD = 60_500_000n;
+const MAX_YIELDS_PER_DAY = 3;
 const MAX = 2n ** 256n - 1n;
-type EarningsRecord = { status: 'ready'; escrow: Address; yieldDone: boolean; transactionHashes: Hex[] };
+type EarningsRecord = { status: 'ready'; escrow: Address; vault?: Address; securityAtomic?: string; previousEscrow?: Address; purchaseFaucetDone?: boolean; yieldDay?: string; yieldCount?: number; yieldDone?: boolean; yieldPending?: boolean; transactionHashes: Hex[] };
 type Starting = { status: 'starting' };
 const recordKey = (wallet: Address) => `share-earnings:${wallet.toLowerCase()}`;
+const today = () => new Date().toISOString().slice(0, 10);
+const yieldsToday = (entry: EarningsRecord) => entry.yieldDay === today() ? (entry.yieldCount ?? 0) : entry.yieldDone ? 1 : 0;
 
 async function record(store: Store, owner: Address): Promise<EarningsRecord | null> {
   const value = await store.get<EarningsRecord | Starting>(recordKey(owner));
@@ -48,15 +54,24 @@ async function receipt(hash: Hex) {
 export async function startShareEarnings(store: Store, wallet: string) {
   const owner = getAddress(wallet);
   const prior = await record(store, owner);
-  if (prior) return prior;
+  if (prior?.vault) return prior;
+  if (prior) {
+    const released = await rpc.readContract({ address: prior.escrow, abi: escrowAbi, functionName: 'releasedEarnings' });
+    if (!released) throw new Error('Finish your earlier test earnings claim before preparing the new demo position.');
+    await store.create(`share-earnings:archive:${owner.toLowerCase()}:${prior.escrow.toLowerCase()}`, prior);
+    await store.update<EarningsRecord | Starting>(recordKey(owner), () => ({ status: 'starting' }));
+  } else await store.create(recordKey(owner), { status: 'starting' } satisfies Starting);
   const people = await actors();
-  await store.create(recordKey(owner), { status: 'starting' } satisfies Starting);
   const op = createWalletClient({ chain, account: people.operator, transport: http() });
   const landlord = createWalletClient({ chain, account: people.landlord, transport: http() });
   const artifact = JSON.parse(await readFile(resolve('contracts/evm/out/RentalEscrow.sol/RentalEscrow.json'), 'utf8')) as { abi: unknown[]; bytecode: { object: Hex } };
-  const hashes: Hex[] = [];
+  const yieldVault = JSON.parse(await readFile(resolve('contracts/evm/out/TestnetMarket.sol/TestYieldVault.json'), 'utf8')) as { abi: unknown[]; bytecode: { object: Hex } };
+  const vaultHash = await op.deployContract({ abi: yieldVault.abi, bytecode: yieldVault.bytecode.object, args: [ROBINHOOD_TESTNET.usd] });
+  const vaultAddress = (await receipt(vaultHash)).contractAddress;
+  if (!vaultAddress) throw new Error('The dedicated test yield vault was not deployed.');
+  const hashes: Hex[] = [vaultHash];
   const deployed = await op.deployContract({ abi: artifact.abi, bytecode: artifact.bytecode.object, args: [{
-    asset: ROBINHOOD_TESTNET.usd, vault: ROBINHOOD_TESTNET.vault, tenant: owner,
+    asset: ROBINHOOD_TESTNET.usd, vault: vaultAddress, tenant: owner,
     landlord: people.landlord.address, arbitrator: people.arbitrator.address, personalWallet: owner,
     securityRequirement: SECURITY, fundingReserve: RESERVE, earningsReleaseAllowed: true,
     agreementHash: keccak256(encodePacked(['string', 'address'], ['Ledger of Life · signed test earnings tenancy', owner])),
@@ -72,7 +87,8 @@ export async function startShareEarnings(store: Store, wallet: string) {
   }
   const accept = await landlord.writeContract({ address: escrow, abi: escrowAbi, functionName: 'acceptAgreement', args: [0n, MAX] });
   await receipt(accept); hashes.push(accept);
-  const value: EarningsRecord = { status: 'ready', escrow, yieldDone: false, transactionHashes: hashes };
+  const value: EarningsRecord = { status: 'ready', escrow, vault: vaultAddress, securityAtomic: SECURITY.toString(), previousEscrow: prior?.escrow,
+    yieldDay: today(), yieldCount: 0, purchaseFaucetDone: false, transactionHashes: hashes };
   await store.update<EarningsRecord | Starting>(recordKey(owner), () => value);
   return value;
 }
@@ -88,8 +104,11 @@ export async function readShareEarnings(store: Store, wallet: string) {
     rpc.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'releasableEarnings' }),
     rpc.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'releasedEarnings' }),
   ]);
+  const count = yieldsToday(item);
   return { escrow: item.escrow, state: Number(state), nonce: nonce.toString(), supplied: tracked > 0n,
-    yieldDone: item.yieldDone, releasableAtomic: releasable.toString(), releasedAtomic: released.toString(), securityAtomic: SECURITY.toString() };
+    yieldsToday: count, yieldAvailable: count < MAX_YIELDS_PER_DAY && !item.yieldPending && releasable < 10_000n, purchaseFaucetDone: Boolean(item.purchaseFaucetDone),
+    previousEscrow: item.previousEscrow ?? null,
+    releasableAtomic: releasable.toString(), releasedAtomic: released.toString(), securityAtomic: item.securityAtomic ?? '10000000' };
 }
 
 /** Only the signed-in tenant's own wallet can sign these prepared on-chain calls. */
@@ -103,15 +122,17 @@ export async function prepareShareEarnings(store: Store, wallet: string, action:
   const calls: { to: Address; data: Hex; description: string }[] = [];
   if (action === 'accept' && status!.state === 0) calls.push({ to: escrow, data: encodeFunctionData({ abi: escrowAbi, functionName: 'acceptAgreement', args: [nonce, MAX] }), description: 'Accept your test earnings agreement' });
   else if (action === 'fund' && status!.state === 1) {
+    const amount = BigInt(status!.securityAtomic) + (entry.vault ? RESERVE : 10_000n);
     const allowance = await rpc.readContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'allowance', args: [owner, escrow] });
-    if (allowance < SECURITY + RESERVE) calls.push({ to: ROBINHOOD_TESTNET.usd, data: encodeFunctionData({ abi: erc20, functionName: 'approve', args: [escrow, SECURITY + RESERVE] }), description: 'Approve only your test deposit amount' });
+    if (allowance < amount) calls.push({ to: ROBINHOOD_TESTNET.usd, data: encodeFunctionData({ abi: erc20, functionName: 'approve', args: [escrow, amount] }), description: 'Approve only your test deposit amount' });
     calls.push({ to: escrow, data: encodeFunctionData({ abi: escrowAbi, functionName: 'fund', args: [nonce, MAX] }), description: 'Fund your own test earnings deposit' });
   } else if (action === 'supply' && status!.state === 2 && !status!.supplied) {
-    const amount = SECURITY + RESERVE;
-    const minShares = await rpc.readContract({ address: ROBINHOOD_TESTNET.vault, abi: vault, functionName: 'previewDeposit', args: [amount] });
+    const amount = BigInt(status!.securityAtomic) + (entry.vault ? RESERVE : 10_000n);
+    const minShares = await rpc.readContract({ address: entry.vault ?? ROBINHOOD_TESTNET.vault, abi: vault, functionName: 'previewDeposit', args: [amount] });
     calls.push({ to: escrow, data: encodeFunctionData({ abi: escrowAbi, functionName: 'supply', args: [amount, minShares, nonce, MAX] }), description: 'Place your test deposit into the test yield vault' });
   } else if (action === 'claim' && status!.state === 2 && status!.supplied) {
-    const amount = BigInt(status!.releasableAtomic) * 99n / 100n;
+    const upperBound = BigInt(status!.releasableAtomic);
+    const amount = upperBound > 1_000n ? upperBound - 1_000n : upperBound * 99n / 100n;
     if (amount === 0n) throw new Error('Simulate test earnings before claiming.');
     calls.push({ to: escrow, data: encodeFunctionData({ abi: escrowAbi, functionName: 'releaseEarnings', args: [amount, MAX, nonce, MAX] }), description: 'Claim simulated earnings to your own wallet' });
   } else throw new Error('This earnings step is not ready yet.');
@@ -143,17 +164,37 @@ export async function addSimulatedShareYield(store: Store, wallet: string) {
   const owner = getAddress(wallet);
   const entry = await record(store, owner);
   if (!entry) throw new Error('Open your test earnings deposit first.');
-  if (entry.yieldDone || !(await readShareEarnings(store, owner))?.supplied) throw new Error('Simulated yield is available only after your test deposit is supplied.');
+  const status = await readShareEarnings(store, owner);
+  if (!status?.supplied || !status.yieldAvailable) throw new Error('Claim the current simulated yield first, or wait until tomorrow after three test runs.');
+  await store.update<EarningsRecord>(recordKey(owner), (state) => {
+    if (state.yieldPending || yieldsToday(state) >= MAX_YIELDS_PER_DAY) throw new Error('A test yield is pending, or all three daily runs are used.');
+    return { ...state, yieldDay: today(), yieldCount: yieldsToday(state) + 1, yieldPending: true };
+  });
   const people = await actors();
   const op = createWalletClient({ chain, account: people.operator, transport: http() });
   const hashes: Hex[] = [];
-  const amount = 500_000n;
+  const amount = entry.vault ? YIELD : 500_000n;
+  const targetVault = entry.vault ?? ROBINHOOD_TESTNET.vault;
   const mint = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'mint', args: [people.operator.address, amount] });
   await receipt(mint); hashes.push(mint);
-  const approve = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'approve', args: [ROBINHOOD_TESTNET.vault, amount] });
+  const approve = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'approve', args: [targetVault, amount] });
   await receipt(approve); hashes.push(approve);
-  const accrue = await op.writeContract({ address: ROBINHOOD_TESTNET.vault, abi: vault, functionName: 'accrue', args: [amount] });
+  const accrue = await op.writeContract({ address: targetVault, abi: vault, functionName: 'accrue', args: [amount] });
   await receipt(accrue); hashes.push(accrue);
-  await store.update<EarningsRecord>(recordKey(owner), (state) => ({ ...state, yieldDone: true, transactionHashes: [...state.transactionHashes, ...hashes] }));
+  await store.update<EarningsRecord>(recordKey(owner), (state) => ({ ...state, yieldPending: false, yieldDone: true, transactionHashes: [...state.transactionHashes, ...hashes] }));
   return { hashes };
+}
+
+/** One explicit test-mode setup: genuine signed earn/buy actions remain wallet-controlled. */
+export async function prepareDemoPosition(store: Store, wallet: string) {
+  const owner = getAddress(wallet);
+  const market = await startShareMarket(store, owner);
+  const earnings = await startShareEarnings(store, owner);
+  if (earnings.purchaseFaucetDone) return { escrow: earnings.escrow, vault: earnings.vault, stock: market.stock, faucet: null };
+  const people = await actors();
+  const op = createWalletClient({ chain, account: people.operator, transport: http() });
+  const faucet = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'mint', args: [owner, DEMO_PURCHASE_FAUCET] });
+  await receipt(faucet);
+  await store.update<EarningsRecord>(recordKey(owner), (state) => ({ ...state, purchaseFaucetDone: true, transactionHashes: [...state.transactionHashes, faucet] }));
+  return { escrow: earnings.escrow, vault: earnings.vault, stock: market.stock, faucet };
 }

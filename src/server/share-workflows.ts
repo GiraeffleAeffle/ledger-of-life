@@ -13,7 +13,7 @@ import { operatorTestCapability } from './test-capability.ts';
 const chain = defineChain({ id: 46630, name: 'Robinhood Chain Testnet', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://rpc.testnet.chain.robinhood.com'] } }, testnet: true });
 const rpc = createPublicClient({ chain, transport: http() });
 const tokenAbi = parseAbi(['function balanceOf(address) view returns (uint256)', 'function allowance(address,address) view returns (uint256)', 'function approve(address,uint256) returns (bool)', 'function transfer(address,uint256) returns (bool)', 'function mint(address,uint256)']);
-const deskAbi = parseAbi(['function price() view returns (uint256)', 'function setPrice(uint256)']);
+const deskAbi = parseAbi(['function price() view returns (uint256)', 'function setPrice(uint256)', 'function quoteBuy(uint256) view returns (uint256)', 'function buy(uint256,uint256) returns (uint256)']);
 const oracleAbi = parseAbi(['function latestPrice() view returns (uint256,uint256)', 'function setPrice(uint256)']);
 const escrowAbi = parseAbi([
   'function state() view returns (uint8)', 'function stockHeld() view returns (uint256)', 'function cashHeld() view returns (uint256)',
@@ -32,7 +32,7 @@ const DURATION = 365 * 24 * 60 * 60;
 const noMoney = 'No real value · test tokens and simulated test price';
 
 export type WorkflowDeployment = {
-  status: 'ready'; owner: Address; oracle: Address; desk: Address; pool: Address;
+  status: 'ready'; owner: Address; oracle: Address; desk: Address; pool: Address; stock?: Address;
   escrow?: Address; depositAtomic?: string; basePriceAtomic: string;
   transactions: Hex[];
 };
@@ -73,8 +73,14 @@ export async function startShareMarket(store: Store, wallet: string) {
   assertEnabled();
   const owner = checked(wallet);
   const prior = await existing(store, owner);
-  if (prior) return prior;
-  await store.create(key(owner), { status: 'starting' } satisfies Starting);
+  if (prior?.stock) return prior;
+  if (prior) {
+    const loan = await rpc.readContract({ address: prior.pool, abi: poolAbi, functionName: 'position', args: [owner] });
+    const escrowState = prior.escrow ? await rpc.readContract({ address: prior.escrow, abi: escrowAbi, functionName: 'state' }) : 5;
+    if (loan[0] || loan[1] || (escrowState !== 0 && escrowState !== 5))
+      throw new Error('Finish your existing share deposit or loan before preparing the fake-stock demo.');
+    await store.update<WorkflowDeployment | Starting>(key(owner), () => ({ status: 'starting' }));
+  } else await store.create(key(owner), { status: 'starting' } satisfies Starting);
   const people = await operator();
   const op = createWalletClient({ chain, account: people.signer, transport: http() });
   const basePrice = await rpc.readContract({ address: ROBINHOOD_TESTNET.desk, abi: deskAbi, functionName: 'price' });
@@ -87,18 +93,21 @@ export async function startShareMarket(store: Store, wallet: string) {
     transactions.push(hash);
     return address;
   }
+  const stock = await deploy('FakeTestTSLA', 'FakeTestTSLA', []);
   const oracle = await deploy('TestPriceOracle', 'TestnetMarket', [basePrice]);
-  const desk = await deploy('TestStockDesk', 'TestnetMarket', [ROBINHOOD_TESTNET.usd, ROBINHOOD_TESTNET.tsla, basePrice]);
-  const pool = await deploy('TestLendingPool', 'TestLendingPool', [ROBINHOOD_TESTNET.tsla, ROBINHOOD_TESTNET.usd, oracle, 500, DURATION]);
+  const desk = await deploy('TestStockDesk', 'TestnetMarket', [ROBINHOOD_TESTNET.usd, stock, basePrice]);
+  const pool = await deploy('TestLendingPool', 'TestLendingPool', [stock, ROBINHOOD_TESTNET.usd, oracle, 500, DURATION]);
+  const inventory = await op.writeContract({ address: stock, abi: tokenAbi, functionName: 'mint', args: [desk, 1_000n * shareScale] });
+  await confirm(inventory); transactions.push(inventory);
   for (const target of [desk, pool]) {
-    const hash = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'mint', args: [target, target === desk ? 20_000_000n : 10_000_000n] });
+    const hash = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'mint', args: [target, 8_000_000_000n] });
     await confirm(hash); transactions.push(hash);
   }
   if ((await rpc.getBalance({ address: owner })) < 100_000_000_000_000n) {
     const hash = await op.sendTransaction({ to: owner, value: 300_000_000_000_000n });
     await confirm(hash); transactions.push(hash);
   }
-  const state: WorkflowDeployment = { status: 'ready', owner, oracle, desk, pool, basePriceAtomic: basePrice.toString(), transactions };
+  const state: WorkflowDeployment = { status: 'ready', owner, stock, oracle, desk, pool, basePriceAtomic: basePrice.toString(), transactions };
   await store.update<WorkflowDeployment | Starting>(key(owner), () => state);
   return state;
 }
@@ -106,8 +115,9 @@ export async function startShareMarket(store: Store, wallet: string) {
 export async function readShareWorkflows(store: Store, wallet: string) {
   const owner = checked(wallet);
   const deployment = await existing(store, owner);
+  const stock = deployment?.stock ?? ROBINHOOD_TESTNET.tsla;
   const [shares, dollars, basePrice] = await Promise.all([
-    rpc.readContract({ address: ROBINHOOD_TESTNET.tsla, abi: tokenAbi, functionName: 'balanceOf', args: [owner] }),
+    rpc.readContract({ address: stock, abi: tokenAbi, functionName: 'balanceOf', args: [owner] }),
     rpc.readContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'balanceOf', args: [owner] }),
     rpc.readContract({ address: ROBINHOOD_TESTNET.desk, abi: deskAbi, functionName: 'price' }),
   ]);
@@ -131,6 +141,8 @@ export async function readShareWorkflows(store: Store, wallet: string) {
   const availableLoan = maxLoan > (loan?.[1] ?? 0n) ? maxLoan - loan![1] : 0n;
   return {
     enabled: operatorTestCapability(), disclaimer: noMoney, chainId: 46630, wallet: owner,
+    stockSymbol: deployment?.stock ? 'tTSLA · fake test stock' : 'official test TSLA',
+    fakeStock: deployment?.stock ? { symbol: 'tTSLA', walletRaw: shares.toString(), walletValueAtomic: (shares * price / shareScale).toString(), priceAtomic: price.toString() } : null,
     sharesRaw: shares.toString(), testUsdAtomic: dollars.toString(), priceAtomic: price.toString(),
     walletValueAtomic: (shares * price / shareScale).toString(), suggestedPledgeRaw: suggestedPledge.toString(),
     suggestedDepositAtomic: suggestedDeposit.toString(),
@@ -148,7 +160,7 @@ export type PreparedStep = { description: string; transaction: { chainId: 46630;
 export async function prepareShareAction(store: Store, wallet: string, action: string, quantity?: string) {
   const owner = checked(wallet);
   const config = await deployed(store, owner);
-  const allowed = ['pledge', 'top_up', 'accept_claim', 'deposit_collateral', 'borrow', 'repay', 'withdraw_collateral'];
+  const allowed = ['pledge', 'top_up', 'accept_claim', 'deposit_collateral', 'borrow', 'repay', 'withdraw_collateral', 'buy_fake'];
   if (!allowed.includes(action)) throw new Error('Unknown wallet action.');
   const amount = quantity === undefined ? 0n : BigInt(quantity);
   if (amount < 0n) throw new Error('Invalid test amount.');
@@ -161,12 +173,22 @@ export async function prepareShareAction(store: Store, wallet: string, action: s
   if (action === 'accept_claim' && !config.escrow) throw new Error('No new test tenancy yet.');
   if (action === 'pledge' || action === 'top_up' || action === 'deposit_collateral') {
     const target = stockTarget!;
-    const allowance = await rpc.readContract({ address: ROBINHOOD_TESTNET.tsla, abi: tokenAbi, functionName: 'allowance', args: [owner, target] });
-    if (allowance < amount) calls.push({ to: ROBINHOOD_TESTNET.tsla, data: encodeFunctionData({ abi: tokenAbi, functionName: 'approve', args: [target, amount] }), description: 'Allow this test contract to hold only the selected test TSLA' });
+    const stock = config.stock ?? ROBINHOOD_TESTNET.tsla;
+    const allowance = await rpc.readContract({ address: stock, abi: tokenAbi, functionName: 'allowance', args: [owner, target] });
+    if (allowance < amount) calls.push({ to: stock, data: encodeFunctionData({ abi: tokenAbi, functionName: 'approve', args: [target, amount] }), description: 'Allow this test contract to hold only the selected test shares' });
   }
   if (action === 'repay') {
     const allowance = await rpc.readContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'allowance', args: [owner, config.pool] });
     if (allowance < amount) calls.push({ to: ROBINHOOD_TESTNET.usd, data: encodeFunctionData({ abi: tokenAbi, functionName: 'approve', args: [config.pool, amount] }), description: 'Allow repayment of test USD' });
+  }
+  if (action === 'buy_fake') {
+    if (!config.stock || amount === 0n || amount > 3_600_000_000n) throw new Error('Choose at most $3,600 test USD for the fake-stock demo.');
+    const balance = await rpc.readContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'balanceOf', args: [owner] });
+    if (amount > balance) throw new Error('Claim simulated earnings or prepare test faucet funds before buying fake stock.');
+    const allowance = await rpc.readContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'allowance', args: [owner, config.desk] });
+    if (allowance < amount) calls.push({ to: ROBINHOOD_TESTNET.usd, data: encodeFunctionData({ abi: tokenAbi, functionName: 'approve', args: [config.desk, amount] }), description: 'Approve test USD for your fake-stock purchase' });
+    const quote = await rpc.readContract({ address: config.desk, abi: deskAbi, functionName: 'quoteBuy', args: [amount] });
+    calls.push({ to: config.desk, data: encodeFunctionData({ abi: deskAbi, functionName: 'buy', args: [amount, quote * 98n / 100n] }), description: 'Buy tTSLA fake test stock with your wallet' });
   }
   if (action === 'pledge' || action === 'top_up') calls.push({
     to: config.escrow!, data: encodeFunctionData({ abi: escrowAbi, functionName: 'pledge', args: [amount, 0n] }),
@@ -203,7 +225,8 @@ export async function submitShareTransaction(store: Store, wallet: string, signe
   const transaction = parseTransaction(serialized);
   if (transaction.chainId !== 46630 || (await recoverTransactionAddress({ serializedTransaction: serialized })).toLowerCase() !== owner.toLowerCase())
     throw new Error('This transaction was not signed by your Robinhood testnet wallet.');
-  if (!transaction.to || ![ROBINHOOD_TESTNET.tsla.toLowerCase(), ROBINHOOD_TESTNET.usd.toLowerCase(), config.pool.toLowerCase(), config.escrow?.toLowerCase()].includes(transaction.to.toLowerCase()))
+  const stock = config.stock ?? ROBINHOOD_TESTNET.tsla;
+  if (!transaction.to || ![stock.toLowerCase(), ROBINHOOD_TESTNET.usd.toLowerCase(), config.pool.toLowerCase(), config.desk.toLowerCase(), config.escrow?.toLowerCase()].includes(transaction.to.toLowerCase()))
     throw new Error('Not a transaction for your test share workflow.');
   const hash = await rpc.sendRawTransaction({ serializedTransaction: signed as Hex });
   await confirm(hash);
@@ -221,14 +244,14 @@ export async function controlShareMarket(store: Store, wallet: string, action: s
   let hash: Hex;
   if (action === 'landlord_accepts') {
     if (config.escrow) throw new Error('A test tenancy is already open.');
-    const shares = await rpc.readContract({ address: ROBINHOOD_TESTNET.tsla, abi: tokenAbi, functionName: 'balanceOf', args: [owner] });
+    const shares = await rpc.readContract({ address: config.stock ?? ROBINHOOD_TESTNET.tsla, abi: tokenAbi, functionName: 'balanceOf', args: [owner] });
     const price = (await rpc.readContract({ address: config.oracle, abi: oracleAbi, functionName: 'latestPrice' }))[0];
     const pledged = shares / 2n;
     const security = pledged * price / shareScale * 2n / 3n;
-    if (security < 10_000n) throw new Error('Buy test TSLA first, then ask the test landlord to accept it.');
+    if (security < 10_000n) throw new Error('Buy fake test stock first, then ask the test landlord to accept it.');
     const code = await artifact('CollateralEscrow', 'CollateralEscrow');
-    hash = await landlord.deployContract({ abi: code.abi, bytecode: code.bytecode.object, args: [{
-      stock: ROBINHOOD_TESTNET.tsla, usd: ROBINHOOD_TESTNET.usd, oracle: config.oracle, sale: config.desk,
+    hash = await landlord.deployContract({ abi: code.abi, bytecode: code.bytecode.object, gas: 3_000_000n, args: [{
+      stock: config.stock ?? ROBINHOOD_TESTNET.tsla, usd: ROBINHOOD_TESTNET.usd, oracle: config.oracle, sale: config.desk,
       tenant: owner, landlord: people.landlord.address, arbitrator: people.arbitrator.address,
       depositValue: security, initialRatioBps: 15_000, maintenanceRatioBps: 12_500,
       maxSlippageBps: 200, graceSeconds: 60, maxOracleAge: DURATION,

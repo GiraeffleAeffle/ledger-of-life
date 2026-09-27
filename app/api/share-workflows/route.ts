@@ -4,7 +4,7 @@ import { readBody, sameOrigin } from '@/server/http';
 import {
   controlShareMarket, prepareShareAction, readShareWorkflows, startShareMarket, submitShareTransaction,
 } from '@/server/share-workflows';
-import { addSimulatedShareYield, prepareShareEarnings, readShareEarnings, startShareEarnings, submitShareEarnings } from '@/server/share-earnings';
+import { addSimulatedShareYield, prepareDemoPosition, prepareShareEarnings, readShareEarnings, startShareEarnings, submitShareEarnings } from '@/server/share-earnings';
 import { operatorTestCapability } from '@/server/test-capability';
 
 export const runtime = 'nodejs';
@@ -41,6 +41,7 @@ export async function POST(request: Request) {
     if (body.action === 'earn_submit' && typeof body.signed === 'string')
       return Response.json(await submitShareEarnings(store, wallet.address, body.signed), noStore);
     if (!operatorTestCapability()) throw new Error('Test market controls are disabled.');
+    if (body.action === 'prepare_demo') return Response.json({ result: await prepareDemoPosition(store, wallet.address) }, noStore);
     if (body.action === 'earn_start') return Response.json({ result: await startShareEarnings(store, wallet.address) }, noStore);
     if (body.action === 'earn_yield') return Response.json({ result: await addSimulatedShareYield(store, wallet.address) }, noStore);
     if (body.action === 'start') return Response.json({ deployment: await startShareMarket(store, wallet.address) }, noStore);

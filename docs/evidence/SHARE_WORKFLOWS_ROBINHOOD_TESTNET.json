@@ -2,127 +2,154 @@
   "network": "Robinhood Chain testnet",
   "chainId": 46630,
   "mode": "ephemeral signed test wallet and operator-held test actors; not a Privy/signed-in wallet proof",
-  "token": "official test TSLA and freely minted test USD (no real value)",
-  "inputs": "simulated vault yield, isolated operator-set test price and stock desk",
-  "tenant": "0x66b1750560f00F75C1a2B2588d83AA52Bbba2f9B",
+  "token": "mintable tTSLA fake test stock and freely minted test USD (no real value); official TSLA untouched",
+  "inputs": "dedicated simulated yield vault, per-wallet test oracle, faucet, price and stock desk",
+  "tenant": "0xAb09f5e7BF2d590327d166ab531B9e778a4Ca1b8",
   "deployed": {
-    "earningsEscrow": "0x1efa94f75d11b0734bb6aba62fce08208517e568",
-    "oracle": "0x173b5144b4e8f45434cf9cd3576d7a00e297c295",
-    "desk": "0x8bfe709774afc34dad2115b4fc30c461706b602d",
-    "pool": "0xf76cd79e9a4ec220f10ad96d70ae2cb9ee34edd5",
-    "collateralEscrow": "0x38348689fa0915db7f177504ac6e9e3ca06fc20e"
+    "earningsEscrow": "0x5f7f9539c75dd31baf3823269050ad4a85d5f6fa",
+    "yieldVault": "0xbb810eb92a637b9d83d451c69097e4c3f411a82c",
+    "fakeStock": "0x9ab2a7e410af3e912d7c9a328377592fe79b4b9c",
+    "oracle": "0x9694009f6131c0d298c55f63928a13f64e23e5a0",
+    "desk": "0x9762d5f85264b0d8d42705cba10e47add957cd1e",
+    "pool": "0xf466d664bebd20e1d1750fcab8fe1b91b57a6999",
+    "collateralEscrow": "0x2a2d807c62936713bc9ef1faf52544d832a82c5c"
   },
   "transactionHashes": {
+    "marketDeploymentAndFunding": [
+      "0x5cfd6ca66c1fc3f9bbab12b7d93fb08932421059f30868641c1be7808da27951",
+      "0x96bde6306a320c42a51247bd99010d544e61ed198a5149a32e84959d77463184",
+      "0x6e36b05838c22f33cbb26dbf023de9ec644a74dd1b56c2f8d6716d947b30ab80",
+      "0xd608c7ff687a4d35b8fde4a7b9714ad06c5d36cf0818c49ce22067b3c7a8ce3b",
+      "0xd410d08eddc8137fa52c43c5bf8612ea1f5861920bab5d20a62d5b91b903b4bd",
+      "0x601e98daf81b8e05c64ab28991364127d05599a7e3c5c12fdf997040875700c7",
+      "0xcb0add7fe0c9455dd6ccad41370cd4e6872580a3c22c69ae7849c4d8d7635fcf",
+      "0xecc4254db9878c430f7c38fd5401e1e7d67974c8f8a0552cf169b3e2c8a85093"
+    ],
     "earningsDeploymentLandlordAndFaucet": [
-      "0x9edc3fd816cd5eb72f7491041f5cc8a90c591d89289273923f2546f156751dd8",
-      "0x7da97ce1cdfbf69c670adc9fceeefe406142125b7024298fb8785d61130ae599",
-      "0x9fd125100f5fb435bc2141510e420a98a8629ba29c48741e32e68c98521094ad",
-      "0xbaf0c2382761251e0ac0b9abebd7e963a3d24d359c3ef7f05e1836999f617bf9"
+      "0x08e8d7d7f6e36c1219fe1895888c68ee3a7494c7bd3eb0377783502f0772db9b",
+      "0x339db53c835f398e60d588c5847be8532288775ff2469efaa0b02fa266749c65",
+      "0x3acf18ea98106e74e24db1d52056c4b35d8f076daa6e5432fe605ff564069ee3",
+      "0xd7ad15ce5cb083ea1e699ee65aa93975a3a293af179f2b458f413720b89328f9",
+      "0x5cb9faf5f5871fba4c68a16a24a6e717b3018018f6d62ab5973ca2ccba890856"
+    ],
+    "demoPurchaseFaucet": [
+      "0x5cb9faf5f5871fba4c68a16a24a6e717b3018018f6d62ab5973ca2ccba890856"
     ],
     "signedEarningsAgreement": [
-      "0x0f522175f1848e3a0e1984da5d0364003987190c7ba81fb43cd112cf1990f936"
+      "0x51a8a1c66eaab7090e7e063bd0f5454a5319317e88fd45389bf85af699e7ffa4"
     ],
     "signedDepositFunding": [
-      "0x5b64db17c4465b669ff69e0afa8dde86ee45ba288febf3104b87dc9c2468884b",
-      "0xa84f9de8170512f47809982b4ed5411bee13bee2b653806b7f6b60df4710da31"
+      "0x3bd0eb2b6bd13863a7e10310923a87870a972ee57e43ade60ac80e29d57ebbd7",
+      "0x3651dd2246d89c43a5f71fe6eab865ffeffbc043779f8ab4e12afe22d6df4a84"
     ],
     "signedVaultSupply": [
-      "0x145eae3ffca1429c95f35a223e9c327d7abbb4dfadcf5ac3f378777d2b3d23d2"
+      "0x369ebd44be2822fa948e7be8f7277d5160ebfac192a614fd5c0faa6cdebc2a6c"
     ],
     "operatorSimulatedYield": [
-      "0xf756a6aab9827f79379a7326799415025ae2cc61b8fd0e75fedbc5179bec3f08",
-      "0xc3da7b55482c67b063c4a216ffffa89c558da291528c2b28bf7fc173759e6712",
-      "0xd9e2f28a95316e4ee93168e8ae0717a230aefed73a63e30e78ef946e326ec2e6"
+      "0xe78cb9c23ce59b177b0d605b04d6ecee4a91dc83946b4186de050ace4f1729c4",
+      "0x043106207367abf9cc4ac248c3288c8be63cbcb4a0b4d92500758b32621bee29",
+      "0x26ae4c51f487ff4d949a9cd2e2845af4bac874e1a3e4104740f20fb153a81ec3"
     ],
     "signedEarningsClaim": [
-      "0xa75be02cf6b42c6e967a7b3e51131c274e0e2f14295f02895198b1b8ddc5521d"
+      "0x8d6eba83a5cf5aec67b4b08c27023472a11b6d7efdce1b812e6a6f87015ac869"
     ],
-    "earningsToTestTslaBuy": [
-      "0x80f33bc5fb17a6da981169bdf5fc0405a1b77c6030ee0283f226b014fa5c8ae1",
-      "0xb72badc2a731c72d0a1e4a7e3ff8a8eece538bf52477d08f93a5ba6ebeac2476"
-    ],
-    "marketDeploymentAndFunding": [
-      "0xfb571cd19fd22930f8ac720c885af8a0dacef8832060d3e8cb0ee034146e8249",
-      "0x334bcf3f6a532b8f51e8abf74c98d52c8e6a4b9443fb19d68bb428499ebc85dd",
-      "0x030eb67d1c50d8968adc48e3b36d6ac81c91f8fac3398e86cf33843db4e285cf",
-      "0xa4eab55d14085618fa5a1bbb56535b7a75009fa68ddced82e1333ed8268ecadf",
-      "0x57be76cc2e495bd141f8d37ed3815c08a3208d3636fd0604e2b996db16be27e2"
+    "signedFakeStockBuy": [
+      "0xe69f3e9ed17e818c6b9b8a8802f3438c345983c8cdb88bb24a01994ec24a06db",
+      "0x32d3a5e1f02c8cdfe9ec8a0af8da4a758a51ea226aa33e255a44f30c1b5cec34"
     ],
     "testLandlordAcceptance": [
-      "0x041f3c375fa200f0fb327215f27d5f1423b69d22eb7bfa10886f853461d3f21f"
+      "0x162426ec0a74513f6a79efcc343fb6001c752491e4a587212378cb1fcf6ffe02"
     ],
     "signedDepositPledge": [
-      "0xaf46c1c8fa4f17faf6350a76d364274d2fa8e81dc23f8cc33db920547b5002e1",
-      "0x87f0ad44a0c41e6ed3ee691b09f74512d2bf1e17157a53912073f937dd525584"
+      "0x325ceb031b3146b0bc16cc634c987764bce591775ad1a2ac0ca7fa3986ca1852",
+      "0xf72d3c160c0ce8fb91acd0c944927adc169963cf1d2145563a4580b10c8a41ee"
     ],
     "testPriceDown30": [
-      "0xcb6e34dc4742bbf971e391d7e84e89f2a222717c6bf52702e3d2e218038d5e48",
-      "0xbc4df0cabb077d2f8eceb7341d9fb13776f225c2327d117535094d8879fcebe4"
+      "0xc20468ca868f31fe9a56230b2fbbbf57146a22ea778ff133e719f4a4ced1e3dd",
+      "0x838278f44f79987153a6510014d78865eb58b22e1c517a6ed2abc3916b68034d"
     ],
     "shortfallFlagged": [
-      "0xa1bb716a8ddf1ad7460dc55cc85a3684ec56250298b742e76e85124d0fc7fc3f"
+      "0x646a0b6bb103d64ec19e9c43a07feb773b38b606bb17f1a098848f86adc03c49"
     ],
     "signedDepositTopUp": [
-      "0xe0042a03f3b04e1959d52b5ace6399e00e94bec4bbd5ac7f12b27495f5dde3a8",
-      "0x4a01f01d31de7db269ba9e1b4d6bd24909d407ba1d6ce78cc2e170e331234098"
+      "0x3b23fa0e5ff61b0239566adae1e970c75df12011ad4562c3b1a6553a13ee5945",
+      "0xa762012b82054ab086b0b1fff4d893fa007016066d4f1ef60b80505f1c5b7b7d"
     ],
     "testMoveOutClaim": [
-      "0x814e85d6994725d9b5e53084615a9e7be94c11120459e1810c1bf07989318058"
+      "0xce41f19c84f00fd9722c6a2bf8cca0e758ce3b90668816cb2dcec7079bbd2db1"
     ],
     "signedMoveOutAcceptance": [
-      "0x1ecd7873508e61d5507ff122e5c4fabaf1f133b9571a142135d93fb2a350146d"
+      "0x0cff53a2d3a2f30291fbbc116138aff60b6bc5e633491da6c3016d5b872fd314"
     ],
     "claimSaleAndShareReturn": [
-      "0x1c35e1fb1de4970212b891b2274c161fa21adbd23532d24aa4407a25dd9f9bcf"
+      "0xee1e30203a173e25ecc40003bda18f1b36f8d460b39637d594cd01b97c2bf7d9"
     ],
     "restoreTestPrice": [
-      "0x9d619f729e879f9ffdd496439e5477e4f99e8ead8f6489081d812898b0cb7fdb",
-      "0xb2273f98df48061e6cc6be6c0640e2cd320c20df404fcd12fdbbc580ec8aad0c"
+      "0x183177749eeb5dccddbafc3fd0f154e6f3c2b1db012ba3e0e8c5f78b5408e11b",
+      "0x5ca8af160d47666d5a6f4c54169ad59ae7c488b01b0875824beec6470afe1d64"
     ],
     "signedLoanCollateral": [
-      "0x766bf1345d9977590e33219918384d5e1fc41b43102bd9611d560752e011c4e9",
-      "0x7a1140b0db6b14c016fa2b49e4475cad58842f179f9d2e818c87ccc6f9aff8c9"
+      "0x474d4b1a0c3488e449a64c0408cc49df7444200f3a578fe3d701a5ab45536e1c",
+      "0xade0de980f4fbb76ad7bebd4c395ac617438cd9fd110371cf618b71d2561ff19"
     ],
     "signedBorrow": [
-      "0xcfe5747d09f66ec01ade3f941606f08f07d468398d1fcb0983c2af9c7a993eda"
+      "0x13e3df44aa5e16792d9fb4eaa052c2b736bf22d73a5a63a72eaf1daaa9defca1"
     ],
     "testPriceDown60": [
-      "0xfb211dab750f2d1c0801ff0c6a51bd083ce0672ef2c30d62b46a2ec487527b10",
-      "0x775c68764308acfd40b7aaec9255936c2aa9ad8a18d2c420d16ff4b2e76728a8"
+      "0x56de2145cc69e3b3b343930f74eef48eb983770c2a0519e2bfedea8355337f8d",
+      "0x5518351d7c40d14b078fea429d6be8a4e3e24eaf4643f66d78c31290a7b268ad"
     ],
     "testLiquidation": [
-      "0x16ed5ed8463ca8919468a59b576bdddb45afeeef7fcd24320a9356b7f87c7ffb",
-      "0x14aa5c16c6463628429fe46d41d9df3216af701422828ed39cc91c38dcb2845f",
-      "0x37b5c2e937bf28af168d9c9bfadfa9fb92c5d718f71a9007f9214d903cee049f"
+      "0x1f18d5815282f0e8ed016302a08656264a7dbfdcda2a4f55ef562a4b53ec4e3d",
+      "0x8c13d890faee308086f8292332906907fbfdb36b68f03220efb7c717c961dac6",
+      "0x736e637b4dff2597527d3e282de00a49213bfebab03618451f5668f65819ac5b"
     ],
     "restoreTestPriceAfterLiquidation": [
-      "0xd05f6bea675d9bd1ee234ca83a8b48a13dff18a2416ec8f45013f0ff5ad5b666",
-      "0xc2579b8998fc9c69ad6f783526738b48a517216f6dc72b3868086bb1dd6f355c"
+      "0x42bb6182d1aea9823562cde727f40967adf94722eeb4a1460d8975bf807d26cc",
+      "0xde87c60712aab9273aaeb2c7ffb7cbe7e55113257e79d5d744c53fb9beb7e3c6"
     ],
     "testRepaymentFaucet": [
-      "0xa39807f3a533432a73fa0270cb80e58ef11049c3119b71cbe944709245ff8fd6"
+      "0x922af6a64cf991719ec4056ff04e157790638f6d53e79efe105f1b2b4074c8fc"
     ],
     "signedRepayment": [
-      "0x80cbbc430f3f5949d5f8cfa3bb83264b20079046043d57ac1f84f823251ce0cc",
-      "0x3d791975d87976b43c3d1f3d25889e5ed51a3042cdf9eded1cfae6e681af8d24"
+      "0xbd49d01a8cdfe4e2121f2f948f86db3698e4eb13e45a6cf9c9f144f471638e87",
+      "0x6591badb8dd85664a72a2e8256018ef490733327cddec7eadf30e436dda1a4e9"
     ],
     "signedShareWithdrawal": [
-      "0xc6728838623d4ca90237a3327dcf3b64e3458f1bd5ca8fd6b70c5a366149bd9a"
+      "0x9a0127d67399667bd7c837dd7ba565f39dbc8fe1aaaef1b3366a9cd9669d49fd"
+    ],
+    "operatorSimulatedYield2": [
+      "0x379f5d67c582f5561cf9badbcfa3b48a487dc902a0a4bf59687febfc3d2b93fd",
+      "0xbb4928690b2acc0d47385bdb97bca522d0eb95e5dbd1f551b934b6e34147a4c2",
+      "0x1967e8f6fc31873f60958d70195f64aea9a80bbdca8d2d99673393e0ba0dfc5f"
+    ],
+    "signedEarningsClaim2": [
+      "0xbbd4d264db4ff6224a93e3620390b0066c206fc7ac523846a29ff33e3ac55507"
+    ],
+    "operatorSimulatedYield3": [
+      "0xfffde1e53215867904cf7765ff1cacad176cf157bdb852e5d24d19b94dc1ed17",
+      "0xd84b0ecf2aa90fb6ab3ebcaa4e9f7376b1b483ee3be0381b9fdd8d3a78d10cf3",
+      "0x0a0b578b0d0654b72b2672840170d5937b84cf04303c8a8fe3a626eef696a143"
+    ],
+    "signedEarningsClaim3": [
+      "0xaaaa32af00c4e238da9816a87364072f254ab3ad39a6b2268d9d242e3ef92e86"
     ]
   },
   "final": {
-    "claimedEarningsAtomic": "68713",
-    "acceptedDepositAtomic": "22904",
+    "claimedEarningsAtomic": "60499000",
+    "acceptedDepositAtomic": "1199999999",
     "openingRatioBps": 15000,
+    "walletValueAtPurchaseAtomic": "3599999999",
+    "fakeStockSymbol": "tTSLA",
     "deposit": {
       "state": 5,
       "sharesRaw": "0",
       "cashAtomic": "0",
       "valueAtomic": "0",
-      "depositAtomic": "22904",
-      "bufferAtomic": "-28630",
+      "depositAtomic": "1199999999",
+      "bufferAtomic": "-1499999998",
       "deadline": 0,
-      "claimAtomic": "4580"
+      "claimAtomic": "239999999"
     },
     "loan": {
       "sharesRaw": "0",
@@ -132,7 +159,9 @@
       "healthBps": 0,
       "availableAtomic": "0"
     },
-    "walletSharesRaw": "74941072443296",
-    "landlordClaimReceivedAtomic": "4580"
+    "walletSharesRaw": "3926210830587857789",
+    "landlordClaimReceivedAtomic": "239999999",
+    "dailyYieldRuns": 3,
+    "totalClaimedEarningsAtomic": "181499000"
   }
 }

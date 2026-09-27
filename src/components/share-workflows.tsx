@@ -8,12 +8,13 @@ type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Pr
 type Step = { description: string; transaction: { chainId: 46630; to: string; data: string; value: string; nonce: number; gas: string; maxFeePerGas: string; maxPriorityFeePerGas: string } };
 type Position = { sharesRaw: string; debtAtomic: string; valueAtomic: string; ltvBps: number; healthBps: number; availableAtomic: string };
 type View = {
-  enabled: boolean; disclaimer: string; sharesRaw: string; testUsdAtomic: string; priceAtomic: string; walletValueAtomic: string;
+  enabled: boolean; disclaimer: string; stockSymbol: string; fakeStock: null | { symbol: 'tTSLA'; walletRaw: string; walletValueAtomic: string; priceAtomic: string };
+  sharesRaw: string; testUsdAtomic: string; priceAtomic: string; walletValueAtomic: string;
   suggestedPledgeRaw: string; suggestedDepositAtomic: string;
   deployment: null | { oracle: string; desk: string; pool: string; escrow?: string };
   deposit: null | { state: number; sharesRaw: string; cashAtomic: string; valueAtomic: string; depositAtomic: string; bufferAtomic: string; deadline: number; claimAtomic: string };
   loan: Position | null;
-  earnings: null | { escrow: string; state: number; nonce: string; supplied: boolean; yieldDone: boolean; releasableAtomic: string; releasedAtomic: string; securityAtomic: string };
+  earnings: null | { escrow: string; state: number; nonce: string; supplied: boolean; yieldsToday: number; yieldAvailable: boolean; purchaseFaucetDone: boolean; previousEscrow: string | null; releasableAtomic: string; releasedAtomic: string; securityAtomic: string };
 };
 const usd = (atomic: string) => `$${(Number(atomic) / 1e6).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
 const shares = (raw: string) => (Number(raw) / 1e18).toLocaleString('en-US', { maximumFractionDigits: 6 });
@@ -92,33 +93,34 @@ export function ShareWorkflows({ request }: { request: Request }) {
   const pledgeSize = BigInt(view?.suggestedPledgeRaw ?? '0');
   const heldInPool = BigInt(loan?.sharesRaw ?? '0');
   const remainingPledge = walletShares / 3n;
-  const start = !view?.deployment;
+  const purchaseAmount = testUsd < 3_600_000_000n ? testUsd : 3_600_000_000n;
 
   return <section className="card share-flow" aria-label="What your shares can do">
     <header className="share-flow-head">
       <div><span className="eyebrow">ROBINHOOD CHAIN · TEST MARKET</span><h2>What your shares can do</h2></div>
       <span className="share-flow-tag">No real value</span>
     </header>
-    <p className="small-copy">Simulated deposit yield and prices. Official test TSLA, test USD, and real testnet transactions signed by your own wallet.</p>
+    <p className="small-copy">Simulated yield and prices. tTSLA is a mintable fake test stock, separate from Robinhood’s official test TSLA above. Test USD and wallet-signed Robinhood testnet transactions have no real value.</p>
     {error && <p className="note" role="alert">{error}</p>}
     {message && <p className="note" role="status">Testnet result: {message}</p>}
     {!view ? <p className="small-copy"><Loader2 className="spin" size={15} /> Loading test shares…</p> : <>
       <div className="share-flow-overview">
-        <strong>Your wallet: {shares(view.sharesRaw)} test TSLA ≈ {usd(view.walletValueAtomic)}</strong>
-        <span>At simulated test price {usd(view.priceAtomic)} per share · {usd(view.testUsdAtomic)} test USD in wallet</span>
+        <strong>Your wallet: {shares(view.sharesRaw)} {view.stockSymbol} ≈ {usd(view.walletValueAtomic)}</strong>
+        <span>At simulated test price {usd(view.priceAtomic)} per fake share · {usd(view.testUsdAtomic)} test USD in wallet</span>
       </div>
       {view.enabled && <ol className="share-flow-steps">
         <li>
           <strong>Your test deposit earns</strong>
-          <p>A test landlord accepts a separate {usd(earnings?.securityAtomic ?? '10000000')} deposit. A test faucet places the funding in your wallet; you sign the agreement, fund and supply the deposit, then claim simulated yield to your own wallet.</p>
-          {!earnings && button('Open your signed earnings deposit', async () => {
-            const { result } = await request<{ result: { escrow: string } }>('/api/share-workflows', { action: 'earn_start' });
-            return `Test landlord accepted your new earnings agreement · ${result.escrow}`;
+          <p>Prepare a demo position: a test landlord accepts a $1,500 deposit (3 × $500 test rent). The demo faucet gives your wallet $1,501 test USD for the deposit and $3,540 test USD to buy fake test stock. You personally sign acceptance, funding, vault supply and the claim of roughly $60 simulated yield.</p>
+          {(!view.fakeStock || !earnings?.purchaseFaucetDone) && button('Prepare a demo position', async () => {
+            const { result } = await request<{ result: { escrow: string; stock: string; faucet: string | null } }>('/api/share-workflows', { action: 'prepare_demo' });
+            return `Fake test stock and $3,540 test-USD purchase faucet prepared; landlord accepted ${result.escrow}`;
           }, true)}
+          {earnings?.previousEscrow && <span className="small-copy">Earlier small test deposit remains on-chain at {earnings.previousEscrow}; this new demo uses a separate $1,500 test deposit.</span>}
           {earnings?.state === 0 && button('Sign test earnings agreement', () => sign('accept', undefined, 'earnings'), true)}
           {earnings?.state === 1 && button('Sign funding of your test deposit', () => sign('fund', undefined, 'earnings'), true)}
           {earnings?.state === 2 && !earnings.supplied && button('Sign test vault supply', () => sign('supply', undefined, 'earnings'), true)}
-          {earnings?.state === 2 && earnings.supplied && !earnings.yieldDone && button('Simulate test deposit earnings', async () => {
+          {earnings?.state === 2 && earnings.supplied && earnings.yieldAvailable && button(`Simulate test deposit earnings (${earnings.yieldsToday}/3 today)`, async () => {
             const { result } = await request<{ result: { hashes: string[] } }>('/api/share-workflows', { action: 'earn_yield' });
             return `Operator contributed simulated yield · ${result.hashes.at(-1)}`;
           })}
@@ -126,9 +128,10 @@ export function ShareWorkflows({ request }: { request: Request }) {
           {earnings && BigInt(earnings.releasedAtomic) > 0n && <span className="small-copy">Claimed {usd(earnings.releasedAtomic)} of simulated yield to your wallet with your signature.</span>}
         </li>
         <li>
-          <strong>Buy test shares with your wallet</strong>
-          <p>Use the single “Invest in TSLA” action in your Robinhood holding above. It signs test USD approval and a test-desk buy. The desk spends the wallet’s whole test-USD balance, including any other test cash already there.</p>
-          {button('Refresh shares', async () => { await refresh(); return 'Wallet shares refreshed'; })}
+          <strong>Buy fake test shares with your wallet</strong>
+          <p>After claiming, your wallet signs an approval and buys tTSLA · fake test stock through its isolated test desk. The $3,540 test-USD purchase faucet plus roughly $60 simulated earnings make about $3,600 of fake shares. Robinhood’s separate official test TSLA holding above is unchanged.</p>
+          {view.fakeStock && earnings && BigInt(earnings.releasedAtomic) > 0n && purchaseAmount >= 60_000_000n && button(`Sign buy of ${usd(purchaseAmount.toString())} tTSLA fake stock`, () => sign('buy_fake', purchaseAmount.toString()), true)}
+          {button('Refresh fake shares', async () => { await refresh(); return 'Fake test shares refreshed'; })}
         </li>
       </ol>}
       <div className="share-flow-choices" role="group" aria-label="Choose a share workflow">
@@ -136,14 +139,14 @@ export function ShareWorkflows({ request }: { request: Request }) {
         <button type="button" className={choice === 'borrow' ? 'selected' : ''} aria-pressed={choice === 'borrow'} onClick={() => setChoice('borrow')}><strong>Borrow against your shares</strong><span>Get test USD, then repay to get your shares back.</span></button>
       </div>
       {!view.enabled ? <p className="small-copy">Test market controls are not enabled on this server.</p> : <>
-        {start && <div className="share-flow-action"><p>Set up a separate test oracle, stock-sale desk and lending pool for your wallet. Their test price changes affect only this test market.</p>{button('Open your test market', () => control('start'), true, !walletShares)}</div>}
+        {!view.deployment && <p className="small-copy">Prepare your demo position above to open the test market, fund the deposit and receive a fake-stock purchase faucet.</p>}
         {choice === 'deposit' && <div className="share-flow-detail">
           <h3>A · Shares as your next deposit</h3>
-          {!d && <p>Test landlord accepts a new deposit of ≈ {usd(view.suggestedDepositAtomic)} in exchange for pledging half your available test TSLA ({shares(view.suggestedPledgeRaw)} shares), initially worth 150% of the deposit. This is separate from the earnings tenancy.</p>}
+          {!d && <p>Test landlord accepts a new deposit of ≈ {usd(view.suggestedDepositAtomic)} in exchange for pledging half your available {view.stockSymbol} ({shares(view.suggestedPledgeRaw)} shares), initially worth 150% of the deposit. This is separate from the earnings tenancy.</p>}
           {view.deployment && !view.deployment.escrow && button('Test landlord accepts new tenancy', () => control('landlord_accepts'), true, pledgeSize === 0n)}
           {view.deployment?.escrow && !d && <p>New test tenancy accepted. Reading its on-chain position…</p>}
           {d && <dl className="share-flow-facts">
-            <div><dt>Shares pledged</dt><dd>{shares(d.sharesRaw)} test TSLA</dd></div>
+            <div><dt>Shares pledged</dt><dd>{shares(d.sharesRaw)} {view.stockSymbol}</dd></div>
             <div><dt>Security at test price</dt><dd>{d.state === 0 || d.state === 5 ? '—' : `${usd(d.valueAtomic)} / ${usd(d.depositAtomic)} deposit`}</dd></div>
             <div><dt>Buffer above 125% maintenance</dt><dd>{d.state === 0 || d.state === 5 ? '—' : usd(d.bufferAtomic)}</dd></div>
             <div><dt>Test tenancy</dt><dd>{['Ready to pledge', 'Secured', 'Claim proposed', 'Claim contested', 'Claim approved', 'Closed'][d.state] ?? 'Unknown'}</dd></div>
@@ -162,13 +165,13 @@ export function ShareWorkflows({ request }: { request: Request }) {
           </>}
           {d?.state === 2 && <div className="share-flow-action"><p>Test landlord proposes a {usd(d.claimAtomic)} claim. Your wallet decides whether to accept it.</p>{button('Sign claim acceptance', () => sign('accept_claim'), true)}</div>}
           {d?.state === 4 && button('Pay claim and return remaining shares', () => control('settle'), true)}
-          {d?.state === 5 && <p className="share-flow-result">Move-out settled. The approved test claim was paid in test USD; unsold test TSLA returned to your wallet. Refresh to see your returned shares.</p>}
+          {d?.state === 5 && <p className="share-flow-result">Move-out settled. The approved test claim was paid in test USD; unsold {view.stockSymbol} returned to your wallet. Refresh to see your returned shares.</p>}
         </div>}
         {choice === 'borrow' && <div className="share-flow-detail">
           <h3>B · Borrow test USD against shares</h3>
           <p>Operator-funded test lending pool: 50% maximum LTV, 80% liquidation threshold, 5% annual simple interest accrued by elapsed seconds. At an unhealthy LTV, a liquidator can repay debt for shares.</p>
           {loan && <dl className="share-flow-facts">
-            <div><dt>Shares in pool</dt><dd>{shares(loan.sharesRaw)} test TSLA ≈ {usd(loan.valueAtomic)}</dd></div>
+            <div><dt>Shares in pool</dt><dd>{shares(loan.sharesRaw)} {view.stockSymbol} ≈ {usd(loan.valueAtomic)}</dd></div>
             <div><dt>Test USD owed, including interest</dt><dd>{usd(loan.debtAtomic)}</dd></div>
             <div><dt>Loan-to-value</dt><dd>{loan.ltvBps / 100}% · {loan.ltvBps >= 8_000 ? 'Liquidatable' : 'Below 80% threshold'}</dd></div>
             <div><dt>Health / room to 80%</dt><dd>{loan.healthBps ? `${(loan.healthBps / 10_000).toFixed(2)}×` : '—'} · {usd((BigInt(loan.valueAtomic) * 80n / 100n - activeLoan).toString())}</dd></div>
