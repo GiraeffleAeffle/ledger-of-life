@@ -12,7 +12,7 @@ function tests(directory) {
 }
 const result = spawnSync(
   process.execPath,
-  ['--experimental-strip-types', '--test', ...tests('src')],
+  ['--experimental-strip-types', '--test', ...tests('src'), 'host-connector/connector.test.mjs'],
   { stdio: 'inherit' },
 );
 process.exit(result.status ?? 1);

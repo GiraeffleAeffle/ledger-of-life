@@ -122,6 +122,7 @@ test('clearing the desk during inference revokes its in-flight result and all su
     finish(Response.json({ model: process.env.LOCAL_AI_MODEL || 'qwen3.8:27b-ud-q3-k-xl',
       done: true, done_reason: 'stop', message: { content: 'Private answer from the local model.' } }));
     await assert.rejects(pending, /session has ended/);
+    assert.equal((await store.get<{ request: LocalAiRequest }>(`local-ai:request:${id}`))?.request.answer, null);
     await assert.rejects(() => readAiRequest(store, id, owner), /session has ended/);
     await assert.rejects(() => executeAiRequest(store, id, owner, body, route(id), null), /session has ended/);
     await assert.rejects(() => readAiRequest(store, id, other), /another visitor/);
@@ -225,7 +226,7 @@ test('abandoned pre-payment quote purges after expiry; active inference and paym
   } finally { await store.close(); }
 });
 
-test('visitor clear is owner-specific, skips active records and scans every page; sweep cursor is idempotent', async () => {
+test('visitor clear erases its active and saved text across every page without erasing another visitor', async () => {
   const store = new LocalStore(':memory:');
   const now = Date.now();
   const old = new Date(now - 700_000).toISOString();
@@ -241,7 +242,10 @@ test('visitor clear is owner-specific, skips active records and scans every page
     }
     await purgeVisitorText(store, owner.visitor);
     assert.equal((await store.get<{ request: LocalAiRequest }>('local-ai:request:0202'))?.request.answer, null);
-    assert.equal((await store.get<{ request: LocalAiRequest }>('local-ai:request:0203'))?.request.answer, 'Private answer');
+    const interrupted = await store.get<{ request: LocalAiRequest }>('local-ai:request:0203');
+    assert.equal(interrupted?.request.state, 'interrupted');
+    assert.equal(interrupted?.request.prompt, '');
+    assert.equal(interrupted?.request.answer, null);
     assert.equal((await store.get<{ request: LocalAiRequest }>('local-ai:request:0204'))?.request.answer, 'Private answer');
     const firstPage = await sweepAiText(store, '', now);
     assert.equal(firstPage.scrubbed, 0);

@@ -12,10 +12,10 @@ import { AI_BUDGET, AI_CONTEXT_TOKENS, AI_MAX_OUTPUT, AI_MODEL, AI_PRICE, aiRpc,
 import { TEST_USDG_ADDRESS } from '../wallets/inference-token.ts';
 import { PERMIT2_ADDRESS } from '@x402/evm';
 import { createAiResource, facilitatorAccount, inspectAiReceipt, recoverExpiredUnsignedSettlement, validatePaymentPayload, type AiPayment } from './local-ai-payment.ts';
-import { assertVisitorActive } from './local-ai-session.ts';
+import { acquireVisitorLease, assertVisitorActive, type VisitorLease } from './local-ai-session.ts';
 import type { LocalAiApproval, LocalAiContext, LocalAiMode, LocalAiRequest } from './local-ai-types.ts';
 import { purged, textDue, textGraceMs } from './local-ai-retention.ts';
-import { cancelConnectorInference, chooseConnectorHost, enqueueConnectorInference } from './local-ai-hosts.ts';
+import { cancelConnectorInference, chooseConnectorHost, enqueueConnectorInference, reserveConnectorHost, releaseConnectorHost } from './local-ai-hosts.ts';
 
 export type AiInput = { mode: LocalAiMode; prompt: string; maxOutputTokens: number; context: LocalAiContext; hostScope: 'own' | 'city'; publicQuestion: boolean };
 export type PaidAiOwner = { subject: string; walletId: string; payer: Address };
@@ -38,7 +38,7 @@ function inputFingerprint(id: string, owner: AiOwner, input: AiInput, resourceUr
   return fingerprint(['local-ai-v2', id, input.mode, input.prompt, input.context, input.maxOutputTokens,
     AI_MODEL, AI_CONTEXT_TOKENS, 'think:false', 'temperature:0.35', owner, resourceUrl,
     input.hostScope, input.publicQuestion, hostId ?? 'direct',
-    input.mode === 'paid' ? ['eip155:46630', TEST_USDG_ADDRESS, AI_PRICE.toString(), payee] : ['library', '0']]);
+    input.mode === 'paid' && payee ? ['eip155:46630', TEST_USDG_ADDRESS, AI_PRICE.toString(), payee] : [input.mode === 'paid' ? 'own-compute' : 'library', '0']]);
 }
 function validId(id: string) { if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new WorkflowError('Use a UUID request ID.'); }
 export function paidOwner(identity: VerifiedIdentity): PaidAiOwner {
@@ -50,13 +50,13 @@ export function libraryOwner(visitor: string): VisitorAiOwner {
   return { visitor };
 }
 function publicRequest(record: AiRecord): LocalAiRequest {
-  const request = record.request;
-  if (record.mode === 'paid' && request.payment.state !== 'settled') return { ...request, answer: null, usage: null };
+  const stored = record.request;
+  // Explicit public host fields also protect reads of records written by an older release.
+  const request = stored.host ? { ...stored, host: {
+    id: stored.host.id, name: stored.host.name, own: stored.host.own === true, payoutWallet: stored.host.payoutWallet,
+  } } : stored;
+  if (record.mode === 'paid' && request.payment.state !== 'none' && request.payment.state !== 'settled') return { ...request, answer: null, usage: null };
   return request;
-}
-function canClearText(record: AiRecord) {
-  return !record.request.purgedAt && record.request.state !== 'running' && record.request.state !== 'settling' &&
-    record.request.payment.state !== 'authorized' && record.request.payment.state !== 'pending';
 }
 async function purgeDueText(store: Store, id: string, now: number, graceMs = textGraceMs()) {
   return store.update<AiRecord>(prefix + id, (current) =>
@@ -98,9 +98,16 @@ export async function purgeVisitorText(store: Store, visitor: string) {
     const rows = await store.scan<AiRecord>(prefix, after, 200);
     for (const { key, value } of rows) {
       after = key;
-      if (!('visitor' in value.owner) || value.owner.visitor !== visitor || !canClearText(value)) continue;
-      await store.update<AiRecord>(key, (current) =>
-        'visitor' in current.owner && current.owner.visitor === visitor && canClearText(current) ? purged(current, Date.now()) : current);
+      if (!('visitor' in value.owner) || value.owner.visitor !== visitor) continue;
+      await cancelConnectorInference(store, value.id);
+      await store.update<AiRecord>(key, (current) => {
+        if (!('visitor' in current.owner) || current.owner.visitor !== visitor) return current;
+        if (value.request.state === 'running' || value.request.state === 'ready' || current.request.state === 'running' || current.request.state === 'ready') {
+          current.request.state = 'interrupted'; current.request.error = 'This desk was cleared. The host cannot be made to forget a question already received.';
+          current.completedAt = new Date().toISOString();
+        }
+        return purged(current, Date.now());
+      });
     }
     if (rows.length < 200) break;
   } while (true);
@@ -169,9 +176,11 @@ async function prepareQuote(store: Store, id: string, owner: AiOwner, input: AiI
   const connector = process.env.LOCAL_AI_OLLAMA_URL ? null :
     await chooseConnectorHost(store, 'payer' in owner ? owner : {}, AI_MODEL, input.hostScope);
   if (!process.env.LOCAL_AI_OLLAMA_URL && !connector) throw new ConflictError('No online host serves this model within your chosen question privacy scope.');
-  const payee = input.mode === 'paid' ? connector ? getAddress(connector.payoutWallet!) : await inferencePayee() : null;
+  const ownCompute = !!connector && 'subject' in owner && connector.ownerSubject === owner.subject;
+  const charge = input.mode === 'paid' && !ownCompute;
+  const payee = charge ? connector ? getAddress(connector.payoutWallet!) : await inferencePayee() : null;
   const payer = 'payer' in owner ? owner.payer : null;
-  if (input.mode === 'paid') {
+  if (charge) {
     if (!payer || !payee || payee.toLowerCase() === payer.toLowerCase()) throw new ConflictError('Paid requests require separate payer and provider wallets.');
     if (!connector) await assertInferenceAvailable();
     await assertInferenceContracts();
@@ -182,7 +191,7 @@ async function prepareQuote(store: Store, id: string, owner: AiOwner, input: AiI
   const signature = inputFingerprint(id, owner, input, resourceUrl, payee, connector?.id);
   let required: PaymentRequired | null = null;
   const expiry = new Date(now + 18 * 60_000).toISOString();
-  if (input.mode === 'paid') {
+  if (charge) {
     const resource = await createAiResource(store, prefix + id, payer!, payee!);
     const requirements = await resource.buildPaymentRequirements({ scheme: 'exact', network: 'eip155:46630', payTo: payee!,
       price: { asset: TEST_USDG_ADDRESS, amount: AI_PRICE.toString() }, maxTimeoutSeconds: 1200,
@@ -191,17 +200,17 @@ async function prepareQuote(store: Store, id: string, owner: AiOwner, input: AiI
       { 'payment-identifier': declarePaymentIdentifierExtension(true) });
   }
   const request: LocalAiRequest = { id, mode: input.mode,
-    state: input.mode === 'paid' ? 'payment_required' : 'ready', model: AI_MODEL, prompt: input.prompt,
+    state: charge ? 'payment_required' : 'ready', model: AI_MODEL, prompt: input.prompt,
     maxOutputTokens: input.maxOutputTokens, requestFingerprint: signature, createdAt: new Date(now).toISOString(), expiresAt: expiry,
     answer: null, purgedAt: null, usage: null, error: null,
-    payment: { state: input.mode === 'paid' ? 'quoted' : 'none', amountAtomic: input.mode === 'paid' ? AI_PRICE.toString() : '0', receipt: null },
-    review: input.mode === 'paid' ? { walletId: (owner as Extract<AiOwner, { walletId: string }>).walletId,
+    payment: { state: charge ? 'quoted' : 'none', amountAtomic: charge ? AI_PRICE.toString() : '0', receipt: null },
+    review: charge ? { walletId: (owner as Extract<AiOwner, { walletId: string }>).walletId,
       operationId: id, description: 'Pay 0.01 tUSDG for one completed local Qwen answer', expiresAt: expiry,
       requestId: id, requestFingerprint: signature, resourceUrl, chainId: 46630,
       asset: TEST_USDG_ADDRESS, payTo: payee!, amountAtomic: AI_PRICE.toString() } : null,
     paymentRequired: required, approval: null,
   };
-  if (connector) request.host = { id: connector.id, name: connector.name, ownerSubject: connector.ownerSubject!, payoutWallet: connector.payoutWallet! };
+  if (connector) request.host = { id: connector.id, name: connector.name, own: ownCompute, payoutWallet: ownCompute ? null : connector.payoutWallet! };
   request.hostScope = input.hostScope; request.publicQuestion = input.publicQuestion;
   const record: AiRecord = { id, mode: input.mode, owner, request, context: input.context, payee, resourceUrl,
     paymentJournal: null, approvalJournal: null };
@@ -306,7 +315,7 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
     if (!value.paymentJournal) { value.request.state = 'expired'; value.request.error = 'Inference review expired without a payment.'; }
     return value;
   }));
-  if (input.mode === 'paid') {
+  if (input.mode === 'paid' && record.request.payment.state !== 'none') {
     if (!paymentHeader && !record.paymentJournal) return publicRequest(record);
     if (!record.paymentJournal) {
       const payer = (owner as Extract<AiOwner, { payer: Address }>).payer;
@@ -326,11 +335,13 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
     } else if (paymentHeader && JSON.stringify(decodePaymentSignatureHeader(paymentHeader)) !== JSON.stringify(record.paymentJournal.payload))
       throw new ConflictError('A different authorization cannot replace this operation.');
   }
-  if (!record.request.host) {
-    try { await reserveHost(store, id); }
-    catch { return publicRequest(record); }
-  }
   try {
+    if (record.request.host) await reserveConnectorHost(store, record.request.host.id, id, Date.now(), record.request.model);
+    else await reserveHost(store, id);
+  } catch { return publicRequest(record); }
+  let visitorLease: VisitorLease | null = null;
+  try {
+    if ('visitor' in owner) visitorLease = await acquireVisitorLease(store, owner.visitor);
     record = await store.update<AiRecord>(prefix + id, (value) => {
       if (value.request.state !== 'ready') throw new ConflictError('Inference already started.');
       value.request.state = 'running'; value.runningAt = Date.now(); return value;
@@ -361,17 +372,20 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
       }
     }
     try {
+      visitorLease?.assertActive();
       const inference = record.request.host ? await enqueueConnectorInference(store, record.request.host.id, id, {
         model: record.request.model,
         messages: [{ role: 'system', content: instructions[input.context] }, { role: 'user', content: input.prompt }],
         options: { num_ctx: AI_CONTEXT_TOKENS, num_predict: input.maxOutputTokens, temperature: 0.35 },
       }) : await runLocalInference(input);
       // Complete output and actual usage are durable before the settlement signer may write.
+      if ('visitor' in owner) await assertVisitorActive(store, owner.visitor);
       record = await store.update<AiRecord>(prefix + id, (value) => {
-        if (value.request.state !== 'running') throw new ConflictError('Inference ownership changed.');
+        visitorLease?.assertActive();
+        if (value.request.state !== 'running' || value.request.purgedAt) throw new ConflictError('Inference ownership changed.');
         value.request.answer = inference.answer; value.request.usage = inference.usage;
-        value.request.state = input.mode === 'paid' ? 'settling' : 'completed';
-        if (input.mode === 'library') value.completedAt = new Date().toISOString();
+        value.request.state = value.request.payment.state !== 'none' ? 'settling' : 'completed';
+        if (value.request.state === 'completed') value.completedAt = new Date().toISOString();
         return value;
       });
     } catch (error) {
@@ -382,7 +396,11 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
         return value;
       });
     }
-  } finally { if (!record.request.host) await releaseHost(store, id); }
+  } finally {
+    visitorLease?.release();
+    if (record.request.host) await releaseConnectorHost(store, record.request.host.id, id);
+    else await releaseHost(store, id);
+  }
   if (record.request.state === 'settling') record = await settleStored(store, record);
   if ('visitor' in owner) await assertVisitorActive(store, owner.visitor);
   return publicRequest(record);

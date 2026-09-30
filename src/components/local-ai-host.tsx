@@ -19,12 +19,12 @@ const fields: { key: keyof HostScenario; label: string; min: number; max?: numbe
 
 type HostRequest = <T,>(path: string, body?: object) => Promise<T>;
 
-export function LocalAiHost({ usage, error, service, subject, request, refresh }: {
-  usage: LocalAiUsageSummary | null; error: string; service: LocalAiServiceStatus | null; subject: string | null;
+export function LocalAiHost({ usage, error, service, request, refresh }: {
+  usage: LocalAiUsageSummary | null; error: string; service: LocalAiServiceStatus | null;
   request: HostRequest; refresh: () => Promise<void>;
 }) {
   const [inputs, setInputs] = useState<HostScenario>(DEFAULT_HOST_SCENARIO);
-  const [code, setCode] = useState('');
+  const [invitation, setInvitation] = useState<{ code: string; expiresAt: string } | null>(null);
   const [payoutWallet, setPayoutWallet] = useState('');
   const [busy, setBusy] = useState(false);
   const [hostError, setHostError] = useState('');
@@ -36,7 +36,7 @@ export function LocalAiHost({ usage, error, service, subject, request, refresh }
     const active = mounted;
     return () => { active.current = false; };
   }, []);
-  const hosts = subject ? service?.hosts?.filter((host) => host.ownerSubject === subject) ?? [] : [];
+  const hosts = service?.hosts?.filter((host) => host.own && host.state === 'active') ?? [];
   async function manageHost(operation: () => Promise<void>) {
     if (action.current) return;
     action.current = true; setBusy(true); setHostError(''); setNotice('');
@@ -44,10 +44,17 @@ export function LocalAiHost({ usage, error, service, subject, request, refresh }
     catch (cause) { if (mounted.current) setHostError(cause instanceof Error ? cause.message : 'The host could not be updated.'); }
     finally { action.current = false; if (mounted.current) setBusy(false); }
   }
-  function approvePairing() {
+  function createInvitation() {
     void manageHost(async () => {
-      await request('/api/local-ai/hosts/approve', { code: code.trim().toUpperCase(), ...(payoutWallet.trim() ? { payoutWallet: payoutWallet.trim() } : {}) });
-      if (mounted.current) { setCode(''); setPayoutWallet(''); setNotice('Host approved. It will appear online after its connector reports a reachable model.'); }
+      const next = await request<{ code: string; expiresAt: string }>('/api/local-ai/hosts/invitations', { ...(payoutWallet.trim() ? { payoutWallet: payoutWallet.trim() } : {}) });
+      if (mounted.current) { setInvitation(next); setPayoutWallet(''); }
+    });
+  }
+  function copyInvitation() {
+    if (!invitation) return;
+    void manageHost(async () => {
+      await navigator.clipboard.writeText(invitation.code);
+      if (mounted.current) setNotice('Invitation copied. Keep it private and paste it only into your own connector configuration.');
     });
   }
   function revokeHost(hostId: string) {
@@ -59,14 +66,19 @@ export function LocalAiHost({ usage, error, service, subject, request, refresh }
   const plan = hostEconomics(inputs, usage?.meanWallMs ?? null);
   return <div className="local-ai-host">
     <div className="local-ai-pairing">
-      <div className="local-ai-section-title"><span className="eyebrow">YOUR DEVICES</span><h3>Connect a host you run.</h3><p>The outbound connector runs beside Ollama on your device. No public Ollama port is needed. Approve only a pairing code displayed on a device you control.</p></div>
-      {service?.hostPairingAllowed ? <form className="local-ai-pairing-form" onSubmit={(event) => { event.preventDefault(); approvePairing(); }}>
-        <label>Connector pairing code<input value={code} maxLength={8} minLength={8} pattern="[A-HJ-NP-Z2-9]{8}" required autoCapitalize="characters" autoComplete="off" spellCheck={false} disabled={busy} placeholder="8-character code" onChange={(event) => setCode(event.target.value.toUpperCase())} /></label>
+      <div className="local-ai-section-title"><span className="eyebrow">YOUR DEVICES</span><h3>Connect a host you run.</h3><p>The outbound connector runs beside Ollama on your device. No public Ollama port is needed. Create a private invitation here, then put it in your connector configuration as pairingCode.</p></div>
+      {service?.mode !== 'direct' && service?.hostPairingAllowed ? invitation ? <div className="local-ai-invitation" role="status">
+        <strong>Keep this invitation private. It is shown only once.</strong>
+        <code>{invitation.code}</code>
+        <p>Paste it into <code>pairingCode</code> on a device you control. It expires at {new Date(invitation.expiresAt).toLocaleTimeString()} and can be used once. Pairing gives that device access to questions assigned to your host, not permission to spend from your wallet.</p>
+        <div><button type="button" className="primary-btn" disabled={busy} onClick={copyInvitation}>Copy invitation</button><button type="button" className="text-button" disabled={busy} onClick={() => { setInvitation(null); setNotice(''); }}>Hide &amp; reset invitation</button></div>
+        <small>This code is not saved in this browser. Leaving this view hides it permanently.</small>
+      </div> : <form className="local-ai-pairing-form" onSubmit={(event) => { event.preventDefault(); createInvitation(); }}>
         <label>Payout wallet (optional)<input value={payoutWallet} maxLength={42} autoComplete="off" spellCheck={false} disabled={busy} placeholder="Verified 0x address" onChange={(event) => setPayoutWallet(event.target.value)} /><small>Use an address verified for your account to receive paid-answer receipts. Leave blank to use your verified allowlisted EVM wallet.</small></label>
-        <p className="local-ai-meta">Codes expire after 10 minutes. Approval gives this connector access to questions assigned to your host. Host reads your question; approval does not authorize wallet payments.</p>
-        <button type="submit" className="primary-btn" disabled={busy || !/^[A-HJ-NP-Z2-9]{8}$/.test(code.trim())}>{busy ? <Loader2 size={16} className="spin" /> : <Cpu size={16} />}Approve this host</button>
+        <p className="local-ai-meta">Invitations expire after 10 minutes and bind your account and payout wallet to one connector. Only share the code with a device you control.</p>
+        <button type="submit" className="primary-btn" disabled={busy}>{busy ? <Loader2 size={16} className="spin" /> : <Cpu size={16} />}Create private host invitation</button>
       </form> : <p className="local-ai-meta">{service ? 'Host pairing is not enabled for this account. Existing hosts are shown below.' : 'Checking whether this account can pair a host…'}</p>}
-      <div className="local-ai-host-directory"><h4>Your connector hosts</h4>{hosts.length ? <ul>{hosts.map((host) => <li key={host.id}><div><strong>{host.name}</strong><small>{host.state} · {host.models.join(', ') || 'No models reported'}</small><small>Payout: {host.payoutWallet ? <code>{host.payoutWallet}</code> : 'Not configured'}</small><small>Last heartbeat: {host.lastHeartbeat ? new Date(host.lastHeartbeat).toLocaleString() : 'Not yet received'}</small></div><span className={`local-ai-node-state ${host.availability}`}><span />{host.availability}{host.availability === 'asleep' && host.canWake ? ' · wake available' : ''}</span>{host.state !== 'revoked' && <button type="button" className="text-button" disabled={busy} onClick={() => revokeHost(host.id)}>Revoke host</button>}</li>)}</ul> : <p className="local-ai-meta">No connector hosts belong to this account yet.</p>}</div>
+      <div className="local-ai-host-directory"><h4>Your connector hosts</h4>{hosts.length ? <ul>{hosts.map((host) => <li key={host.id}><div><strong>{host.name}</strong><small>{host.models.join(', ') || 'No models reported'}</small><small>Payout: {host.payoutWallet ? <code>{host.payoutWallet}</code> : 'Not configured'}</small><small>Last heartbeat: {host.lastHeartbeat ? new Date(host.lastHeartbeat).toLocaleString() : 'Not yet received'}</small></div><span className={`local-ai-node-state ${host.availability}`}><span />{host.availability}{host.availability === 'asleep' && host.canWake ? ' · wakes on request' : ''}</span><button type="button" className="text-button" disabled={busy} onClick={() => revokeHost(host.id)}>Revoke host</button></li>)}</ul> : <p className="local-ai-meta">No connector hosts belong to this account yet.</p>}</div>
       {notice && <p className="local-ai-meta" role="status">{notice}</p>}
       {hostError && <p className="local-ai-alert" role="alert">{hostError}</p>}
     </div>
@@ -78,7 +90,7 @@ export function LocalAiHost({ usage, error, service, subject, request, refresh }
       <div><Library size={19} /><strong>{usage?.successfulLibraryRequests ?? '—'}</strong><span>Free answers</span></div>
       <div><Cpu size={19} /><strong>{usage?.meanTokensPerSecond != null ? `${usage.meanTokensPerSecond.toFixed(1)} tok/s` : '—'}</strong><span>Measured mean decode rate</span></div>
     </div>
-    {usage && <p className="local-ai-meta">{usage.knownInputTokens.toLocaleString()} known input tokens · {usage.knownOutputTokens.toLocaleString()} known output tokens · {usage.pendingPayments} pending payments · {usage.failedRequests} unsuccessful requests{usage.requestsWithoutUsage > 0 ? ` · ${usage.requestsWithoutUsage} requests without token counts` : ''}{usage.lastSuccessAt ? ` · Last answer ${new Date(usage.lastSuccessAt).toLocaleString()}` : ''}</p>}
+    {usage && <p className="local-ai-meta">{usage.knownInputTokens.toLocaleString()} known input tokens · {usage.knownOutputTokens.toLocaleString()} known output tokens · {usage.successfulOwnRequests ?? 0} own-compute answers · {usage.pendingPayments} pending payments · {usage.failedRequests} unsuccessful requests{usage.requestsWithoutUsage > 0 ? ` · ${usage.requestsWithoutUsage} requests without token counts` : ''}{usage.lastSuccessAt ? ` · Last answer ${new Date(usage.lastSuccessAt).toLocaleString()}` : ''}</p>}
     <div className="local-ai-planner">
       <div className="local-ai-section-title"><span className="eyebrow">EDITABLE EURO SCENARIO</span><h3>Could the hardware pay its way?</h3><p>Plan paid access, a free library service, or both. Euro prices below are assumptions—not a conversion of the receipt ledger.</p></div>
       <div className="local-ai-plan-layout">

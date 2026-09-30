@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, randomBytes, sign, type KeyObject } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomBytes, sign, type KeyObject } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,9 +8,10 @@ import { setImmediate } from 'node:timers/promises';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { LocalStore } from './store.ts';
 import { AccessError } from './errors.ts';
-import { approveHostPairing, authenticateConnector, cancelConnectorInference, chooseConnectorHost, completeConnectorJob, connectorSigningBytes,
-  createHostPairing, enqueueConnectorInference, hostPairingAllowed, parseConnectorBody, pollConnectorJob, publicConnectorHosts,
-  readConnectorBody, recordHostHeartbeat, revokeConnectorHost, sanitizeConnectorAnswer, type ConnectorInferenceInput } from './local-ai-hosts.ts';
+import { authenticateConnector, cancelConnectorInference, checkConnectorHeaders, chooseConnectorHost, completeConnectorJob, connectorSigningBytes,
+  createHostInvitation, createHostPairing, enqueueConnectorInference, hostPairingAllowed, parseConnectorBody, pollConnectorJob, publicConnectorHosts,
+  readConnectorBody, recordHostHeartbeat, releaseConnectorHost, reserveConnectorHost, revokeConnectorHost, sanitizeConnectorAnswer, type ConnectorInferenceInput } from './local-ai-hosts.ts';
+import { signedHostRoute } from '../../app/api/local-ai/hosts/_http.ts';
 
 const wallet = '0x1111111111111111111111111111111111111111';
 const alternateWallet = '0x2222222222222222222222222222222222222222';
@@ -34,84 +35,135 @@ function signed(hostId: string, key: KeyObject, body = '{}', timestamp = Date.no
     'x-host-signature': sign(null, connectorSigningBytes(method, pathname, String(timestamp), nonce, raw), key).toString('base64') };
   return { raw, request: new Request(`https://app.example${pathname}`, { method, headers, ...(method === 'POST' ? { body: raw } : {}) }) };
 }
-async function pairing(store: LocalStore, now = Date.now(), address = 'address') {
+async function pairing(store: LocalStore, now = Date.now(), address = 'address', identity = owner) {
   const keys = generateKeyPairSync('ed25519');
-  const pair = await createHostPairing(store, { name: 'Home GPU', publicKey: keys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') }, address, now);
+  const invitation = await createHostInvitation(store, identity, { payoutWallet: identity.wallets[0].address }, now);
+  const pair = await createHostPairing(store, { code: invitation.code, name: 'Home GPU', publicKey: keys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') }, address, now);
   return { ...pair, keys };
 }
-async function approved(store: LocalStore, identity = owner) {
-  const pair = await pairing(store, Date.now(), identity.subject);
-  await approveHostPairing(store, identity, { code: pair.code });
+async function connected(store: LocalStore, identity = owner) {
+  const pair = await pairing(store, Date.now(), identity.subject, identity);
   await recordHostHeartbeat(store, pair.hostId, { models: [input.model], ollamaReachable: true, awake: true });
   return pair;
 }
 async function startJob(store: LocalStore, hostId: string, requestId = 'request') {
+  await reserveConnectorHost(store, hostId, requestId);
   const outcome = enqueueConnectorInference(store, hostId, requestId, input).then((value) => ({ value, error: null }), (error: Error) => ({ value: null, error }));
   await setImmediate();
   return { outcome };
 }
 
-test('pairing binds one canonical Ed25519 key, is single use, and exposes no authentication secrets', async () => {
+test('owner invitations are hashed, single use, account/payout bound and activate only their canonical Ed25519 key', async () => {
   const store = new LocalStore(':memory:');
   try {
-    const first = await pairing(store);
-    const second = await pairing(store);
-    assert.match(first.code, /^[A-HJ-NP-Z2-9]{8}$/);
-    assert.equal(Date.parse(first.expiresAt) > Date.now(), true);
-    assert.equal(hostPairingAllowed(owner), true); // Existing session is sufficient; no pretend passkey re-auth.
-    const results = await Promise.allSettled([approveHostPairing(store, owner, { code: first.code }), approveHostPairing(store, owner, { code: first.code })]);
+    const invitation = await createHostInvitation(store, owner, { payoutWallet: alternateWallet }, 1000000);
+    assert.match(invitation.code, /^[A-HJ-NP-Z2-9]{12}$/);
+    assert.equal(invitation.expiresAt, new Date(1600000).toISOString());
+    const persisted = JSON.stringify(await store.scan('local-ai:'));
+    assert.equal(persisted.includes(invitation.code), false);
+    assert.equal(persisted.includes(createHash('sha256').update(invitation.code).digest('hex')), true);
+    assert.deepEqual(await publicConnectorHosts(store, 1000001, owner.subject), []);
+    const keys = generateKeyPairSync('ed25519');
+    const body = { code: invitation.code, name: 'Home GPU', publicKey: keys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') };
+    const results = await Promise.allSettled([createHostPairing(store, body, 'one', 1000001), createHostPairing(store, body, 'two', 1000001)]);
+    const paired = results.find((result) => result.status === 'fulfilled') as PromiseFulfilledResult<{ hostId: string }>;
     assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
-    const list = await publicConnectorHosts(store);
-    assert.equal(list.find((host) => host.id === first.hostId)!.payoutWallet, wallet);
-    assert.equal(list.find((host) => host.id === second.hostId)!.state, 'pending');
-    for (const host of list) for (const key of ['publicKey', 'code', 'nonces', 'pairingExpiresAt']) assert.equal(key in host, false);
-    const wrong = signed(first.hostId, second.keys.privateKey);
-    await assert.rejects(authenticateConnector(store, wrong.request, wrong.raw), /Invalid connector signature/);
-    const good = signed(first.hostId, first.keys.privateKey);
-    assert.equal((await authenticateConnector(store, good.request, good.raw)).id, first.hostId);
+    const host = (await publicConnectorHosts(store, 1000001, owner.subject))[0];
+    assert.equal(host.id, paired.value.hostId);
+    assert.equal(host.state, 'active');
+    assert.equal(host.payoutWallet, alternateWallet);
+    assert.equal(host.own, true);
+    assert.equal((await publicConnectorHosts(store, 1000001, other.subject))[0].own, false);
+    assert.equal((await publicConnectorHosts(store, 1000001))[0].own, false);
+    for (const key of ['ownerSubject', 'publicKey', 'code', 'codeHash', 'nonces', 'pairingExpiresAt']) assert.equal(key in host, false);
+    const wrong = signed(host.id, generateKeyPairSync('ed25519').privateKey, '{}', 1000001);
+    await assert.rejects(authenticateConnector(store, wrong.request, wrong.raw, 1000001), /Invalid connector signature/);
+    const good = signed(host.id, keys.privateKey, '{}', 1000001);
+    assert.equal((await authenticateConnector(store, good.request, good.raw, 1000001)).ownerSubject, owner.subject);
+    await assert.rejects(revokeConnectorHost(store, other, host.id), /Only the host owner/);
+    await revokeConnectorHost(store, owner, host.id);
+    assert.deepEqual(await publicConnectorHosts(store, 1000001, owner.subject), []);
   } finally { await store.close(); }
 });
 
-test('pairing expires at ten minutes and cannot admit non-EVM, non-allowlisted or foreign payout wallets', async () => {
+test('invitations expire at ten minutes and require allowlisted EVM ownership with an unambiguous verified payout', async () => {
   const store = new LocalStore(':memory:');
   try {
-    const pair = await pairing(store, 1000000);
     const notAllowed = { ...owner, wallets: [{ id: 'foreign', address: alternateWallet, chainType: 'ethereum' as const }], passkeyCount: 10 };
     const notEvm = { ...owner, wallets: [{ id: 'solana', address: wallet, chainType: 'solana' as const }] };
     assert.equal(hostPairingAllowed(notAllowed), false);
     assert.equal(hostPairingAllowed(notEvm), false);
-    await assert.rejects(approveHostPairing(store, notAllowed, { code: pair.code }, 1000001), /allowlisted EVM/);
-    await assert.rejects(approveHostPairing(store, notEvm, { code: pair.code }, 1000001), /allowlisted EVM/);
-    await assert.rejects(approveHostPairing(store, owner, { code: pair.code, payoutWallet: thirdWallet }, 1000001), /own verified EVM/);
-    await assert.rejects(approveHostPairing(store, owner, { code: pair.code }, 1600000), /expired/);
-    assert.deepEqual(await publicConnectorHosts(store, 1600000), []);
-    const fresh = await pairing(store, 1600000);
-    assert.equal((await approveHostPairing(store, owner, { code: fresh.code, payoutWallet: alternateWallet }, 1600001)).payoutWallet, alternateWallet);
-    const rsa = generateKeyPairSync('rsa', { modulusLength: 1024 });
-    await assert.rejects(createHostPairing(store, { name: 'Wrong', publicKey: rsa.publicKey.export({ type: 'spki', format: 'der' }).toString('base64') }, 'wrong', 1600002), /Ed25519/);
-    await assert.rejects(createHostPairing(store, { name: 'Wrong', publicKey: 'not-base64' }, 'wrong', 1600002), /Ed25519/);
+    await assert.rejects(createHostInvitation(store, notAllowed, {}, 1000000), /allowlisted EVM/);
+    await assert.rejects(createHostInvitation(store, notEvm, {}, 1000000), /allowlisted EVM/);
+    await assert.rejects(createHostInvitation(store, owner, { payoutWallet: thirdWallet }, 1000000), /own verified EVM/);
+    await assert.rejects(createHostInvitation(store, owner, {}, 1000000), /Choose a verified/);
+    const invitation = await createHostInvitation(store, other, {}, 1000000);
+    const publicKey = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
+    await assert.rejects(createHostPairing(store, { code: invitation.code, name: 'Home GPU', publicKey }, 'expiry', 1600000), /expired/);
+    const fresh = await createHostInvitation(store, other, {}, 1600000);
+    const pair = await createHostPairing(store, { code: fresh.code, name: 'Home GPU', publicKey }, 'fresh', 1600001);
+    assert.equal((await publicConnectorHosts(store, 1600001, other.subject)).find((host) => host.id === pair.hostId)!.payoutWallet, thirdWallet);
   } finally { await store.close(); }
 });
 
-test('pairing has persistent per-address and global caps despite address rotation; windows and stored buckets expire', async () => {
+test('malformed pairing cannot spend source limits or consume invitations and unknown codes cannot fill shared capacity', async () => {
   const store = new LocalStore(':memory:');
   try {
-    for (let index = 0; index < 5; index++) await pairing(store, 1000000, 'one-address');
-    await assert.rejects(pairing(store, 1000000, 'one-address'), /Too many/);
-    for (let index = 0; index < 25; index++) await pairing(store, 1000000, `spoof-${index}`);
-    await assert.rejects(pairing(store, 1000000, 'another-spoof'), /Too many/);
-    await pairing(store, 1600000, 'one-address');
-    const record = await store.get<{ rate: { total: number; addresses: Record<string, number> }; hosts: unknown[] }>('local-ai:connector-registry');
-    assert.equal(record!.rate.total, 1);
-    assert.equal(Object.keys(record!.rate.addresses).length, 1);
-    assert.equal(record!.hosts.length, 1);
+    const invitation = await createHostInvitation(store, other, {}, 1000000);
+    const keys = generateKeyPairSync('ed25519');
+    const publicKey = keys.publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
+    const valid = { code: invitation.code, name: 'Home GPU', publicKey };
+    const rsa = generateKeyPairSync('rsa', { modulusLength: 1024 });
+    for (const body of [{ ...valid, code: 'BAD' }, { ...valid, name: 'x'.repeat(81) }, { ...valid, name: String.fromCharCode(0) },
+      { ...valid, publicKey: 'not-base64' }, { ...valid, publicKey: rsa.publicKey.export({ type: 'spki', format: 'der' }).toString('base64') },
+      { ...valid, publicKey: publicKey + String.fromCharCode(10) }, { ...valid, payoutWallet: wallet }]) {
+      await assert.rejects(createHostPairing(store, body, 'invalid', 1000000), /Unsupported|invitation code|name|Ed25519/);
+    }
+    const before = await store.get<{ hosts: unknown[]; invitations: unknown[]; rate: unknown[] }>('local-ai:connector-registry');
+    assert.deepEqual(before!.rate, []);
+    assert.deepEqual(before!.hosts, []);
+    assert.equal(before!.invitations.length, 1);
+    for (let index = 0; index < 1030; index++) {
+      await assert.rejects(createHostPairing(store, { ...valid, code: 'AAAAAAAAAAAA' }, `source-${index}`, 1000000), /expired, used, or unknown/);
+    }
+    const after = await store.get<typeof before>('local-ai:connector-registry');
+    assert.deepEqual(after!.hosts, before!.hosts);
+    assert.deepEqual(after!.invitations, before!.invitations);
+    assert.equal(after!.rate.length, 1024);
+    const pair = await createHostPairing(store, valid, 'invalid', 1000000);
+    assert.equal((await publicConnectorHosts(store, 1000000))[0].id, pair.hostId);
+    const next = await createHostInvitation(store, other, {}, 1000000);
+    await assert.rejects(createHostPairing(store, { ...valid, code: next.code }, 'duplicate', 1000000), /already has an active/);
+    const newKey = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
+    await createHostPairing(store, { ...valid, code: next.code, publicKey: newKey }, 'replacement', 1000000);
   } finally { await store.close(); }
+});
+
+test('pairing source limits are durable and expire without imposing a shared global pairing cap', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'connector-rate-'));
+  const filename = join(directory, 'test.sqlite');
+  let store = new LocalStore(filename);
+  try {
+    const publicKey = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
+    const body = { code: 'AAAAAAAAAAAA', name: 'Host', publicKey };
+    for (let index = 0; index < 5; index++) await assert.rejects(createHostPairing(store, body, 'one-source', 1000000), /expired, used, or unknown/);
+    await store.close();
+    store = new LocalStore(filename);
+    await assert.rejects(createHostPairing(store, body, 'one-source', 1000000), /Too many pairing/);
+    for (let index = 0; index < 35; index++) {
+      const identity = { ...other, subject: `operator-${index}` };
+      await pairing(store, 1000000, `source-${index}`, identity);
+    }
+    const invitation = await createHostInvitation(store, other, {}, 1600000);
+    const pair = await createHostPairing(store, { ...body, code: invitation.code }, 'one-source', 1600000);
+    assert.equal((await publicConnectorHosts(store, 1600000)).some((host) => host.id === pair.hostId), true);
+  } finally { await store.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
 test('signed requests bind exact bytes, method, path, timestamp, nonce and host ID; replay is atomic', async () => {
   const store = new LocalStore(':memory:');
   try {
-    const pair = await approved(store);
+    const pair = await connected(store);
     const timestamp = Date.now();
     const original = signed(pair.hostId, pair.keys.privateKey, '{}', timestamp);
     await assert.rejects(authenticateConnector(store, original.request, Buffer.from('{ }'), timestamp), /signature/);
@@ -153,7 +205,7 @@ test('reopening SQLite preserves replay rejection and revocation while no prompt
   let second: LocalStore | undefined;
   let firstClosed = false;
   try {
-    const pair = await approved(first);
+    const pair = await connected(first);
     const request = signed(pair.hostId, pair.keys.privateKey);
     await authenticateConnector(first, request.request, request.raw);
     const running = await startJob(first, pair.hostId);
@@ -178,35 +230,39 @@ test('reopening SQLite preserves replay rejection and revocation while no prompt
   }
 });
 
-test('pending and revoked keys cannot authenticate, heartbeat or lease jobs; only owner can revoke', async () => {
+test('unknown and revoked keys cannot authenticate, heartbeat or reserve jobs; only the owner can revoke', async () => {
   const store = new LocalStore(':memory:');
   try {
-    const pair = await pairing(store);
-    const pending = signed(pair.hostId, pair.keys.privateKey);
-    await assert.rejects(authenticateConnector(store, pending.request, pending.raw), AccessError);
-    await assert.rejects(pollConnectorJob(store, pair.hostId, 0), AccessError);
-    await assert.rejects(recordHostHeartbeat(store, pair.hostId, { models: [], awake: true, ollamaReachable: true }), AccessError);
-    await assert.rejects(enqueueConnectorInference(store, pair.hostId, 'pending', input), AccessError);
-    await approveHostPairing(store, owner, { code: pair.code });
+    const pair = await connected(store);
+    const unknown = signed('unknown-host', pair.keys.privateKey);
+    await assert.rejects(authenticateConnector(store, unknown.request, unknown.raw), AccessError);
+    await assert.rejects(pollConnectorJob(store, 'unknown-host', 0), AccessError);
+    await assert.rejects(recordHostHeartbeat(store, 'unknown-host', { models: [], awake: true, ollamaReachable: true }), AccessError);
+    await assert.rejects(reserveConnectorHost(store, 'unknown-host', 'unknown'), AccessError);
     await assert.rejects(revokeConnectorHost(store, other, pair.hostId), /Only the host owner/);
+    await reserveConnectorHost(store, pair.hostId, 'revoked-request');
     await revokeConnectorHost(store, owner, pair.hostId);
     const revoked = signed(pair.hostId, pair.keys.privateKey);
-    await assert.rejects(authenticateConnector(store, revoked.request, revoked.raw), /revoked/);
-    await assert.rejects(pollConnectorJob(store, pair.hostId, 0), /revoked/);
-    await assert.rejects(recordHostHeartbeat(store, pair.hostId, { models: [], awake: true, ollamaReachable: true }), /revoked/);
+    await assert.rejects(authenticateConnector(store, revoked.request, revoked.raw), AccessError);
+    await assert.rejects(pollConnectorJob(store, pair.hostId, 0), AccessError);
+    await assert.rejects(recordHostHeartbeat(store, pair.hostId, { models: [], awake: true, ollamaReachable: true }), AccessError);
+    await assert.rejects(reserveConnectorHost(store, pair.hostId, 'new-request'), AccessError);
+    await assert.rejects(enqueueConnectorInference(store, pair.hostId, 'revoked-request', input), /no matching reservation/);
+    assert.deepEqual(await publicConnectorHosts(store), []);
   } finally { await store.close(); }
 });
 
-test('routing honors own scope, model, heartbeat age, self-payment exclusion and explicit wake capability', async () => {
+test('routing honors own scope, model, heartbeat age, own-wallet compute and explicit wake capability', async () => {
   const store = new LocalStore(':memory:');
   try {
-    const city = await approved(store, other);
-    const own = await approved(store);
+    const city = await connected(store, other);
+    const own = await connected(store);
     const now = Date.now();
     assert.equal((await chooseConnectorHost(store, { subject: owner.subject }, input.model, 'city', now))!.id, own.hostId);
     assert.equal(await chooseConnectorHost(store, {}, input.model, 'own', now), null);
-    assert.equal(await chooseConnectorHost(store, { subject: owner.subject, payer: wallet.toUpperCase() }, input.model, 'own', now), null);
-    assert.equal((await chooseConnectorHost(store, { subject: owner.subject, payer: wallet }, input.model, 'city', now))!.id, city.hostId);
+    assert.equal((await chooseConnectorHost(store, { subject: owner.subject, payer: wallet.toUpperCase() }, input.model, 'own', now))!.id, own.hostId);
+    assert.equal((await chooseConnectorHost(store, { subject: owner.subject, payer: wallet }, input.model, 'city', now))!.id, own.hostId);
+    assert.equal((await chooseConnectorHost(store, { subject: 'unrelated', payer: wallet }, input.model, 'city', now))!.id, city.hostId);
     assert.equal(await chooseConnectorHost(store, { subject: owner.subject }, 'missing-model', 'city', now), null);
     await recordHostHeartbeat(store, own.hostId, { models: [input.model], ollamaReachable: false, awake: false }, now);
     assert.equal((await publicConnectorHosts(store, now)).find((host) => host.id === own.hostId)!.availability, 'asleep');
@@ -224,10 +280,10 @@ test('routing honors own scope, model, heartbeat age, self-payment exclusion and
 test('one lease is assigned only once to its chosen host and a complete result returns sanitized usage without persisting text', async () => {
   const store = new LocalStore(':memory:');
   try {
-    const host = await approved(store);
-    const unrelated = await approved(store, other);
+    const host = await connected(store);
+    const unrelated = await connected(store, other);
     const { outcome } = await startJob(store, host.hostId);
-    await assert.rejects(enqueueConnectorInference(store, host.hostId, 'second', input), /busy/);
+    await assert.rejects(reserveConnectorHost(store, host.hostId, 'second'), /busy/);
     assert.deepEqual(await pollConnectorJob(store, unrelated.hostId, 0), { job: null });
     const picked = await pollConnectorJob(store, host.hostId, 0);
     assert.deepEqual(picked.job!.messages, input.messages);
@@ -254,7 +310,7 @@ test('one lease is assigned only once to its chosen host and a complete result r
 test('incomplete, wrong-model, oversized and connector-error answers reject the lease with no success returned', async () => {
   const store = new LocalStore(':memory:');
   try {
-    const host = await approved(store);
+    const host = await connected(store);
     const invalid = [{ ...answer, done: false }, { ...answer, done_reason: 'length' }, { ...answer, model: 'wrong' }, { ...answer, model: undefined },
       { ...answer, message: { role: 'user', content: 'pretend' } }, { ...answer, message: { role: 'assistant', content: ' ' } },
       { ...answer, message: { role: 'assistant', content: 'x'.repeat(16001) } }, { ...answer, error: 'failed' }];
@@ -281,7 +337,7 @@ test('incomplete, wrong-model, oversized and connector-error answers reject the 
 test('pickup and result deadlines fail cleanly, release the host, and erase queued questions; retention cancellation does too', async () => {
   const store = new LocalStore(':memory:');
   try {
-    const host = await approved(store);
+    const host = await connected(store);
     const queued = await startJob(store, host.hostId, 'queued');
     await publicConnectorHosts(store, Date.now() + 30000);
     assert.match((await queued.outcome).error!.message, /expired/);
@@ -302,7 +358,7 @@ test('pickup and result deadlines fail cleanly, release the host, and erase queu
 test('long polling wakes for work, is bounded to one waiter, and revocation interrupts both polling and inference', async () => {
   const store = new LocalStore(':memory:');
   try {
-    const host = await approved(store);
+    const host = await connected(store);
     const poll = pollConnectorJob(store, host.hostId, 1000);
     await setImmediate();
     await assert.rejects(pollConnectorJob(store, host.hostId, 100), /one outstanding poll/);
@@ -315,7 +371,7 @@ test('long polling wakes for work, is bounded to one waiter, and revocation inte
     await revokeConnectorHost(store, owner, host.hostId);
     assert.match((await outcome).error!.message, /revoked/);
     assert.match((await idlePoll).error!.message, /revoked/);
-    assert.equal((await publicConnectorHosts(store))[0].availability, 'offline');
+    assert.deepEqual(await publicConnectorHosts(store), []);
     await assert.rejects(pollConnectorJob(store, host.hostId, 25001), /25 seconds/);
   } finally { await store.close(); }
 });
@@ -323,7 +379,7 @@ test('long polling wakes for work, is bounded to one waiter, and revocation inte
 test('text-only inference limits reject extra tools, images, roles, overlong messages and unsafe options before queuing', async () => {
   const store = new LocalStore(':memory:');
   try {
-    const host = await approved(store);
+    const host = await connected(store);
     const invalid = [{ ...input, tools: [] }, { ...input, model: 'm'.repeat(129) }, { ...input, messages: Array(9).fill(input.messages[0]) },
       { ...input, messages: [{ role: 'tool', content: 'text' }] }, { ...input, messages: [{ role: 'user', content: 'x'.repeat(4001) }] },
       { ...input, messages: Array(4).fill({ role: 'user', content: 'x'.repeat(4000) }) }, { ...input, messages: [{ role: 'user', content: 'hi', images: ['base64'] }] },
@@ -348,4 +404,191 @@ test('streaming body limits cancel oversized streams before JSON, preserve exact
   assert.throws(() => parseConnectorBody(Buffer.from([0xff])));
   await assert.rejects(readConnectorBody(new Request('https://app.example', { method: 'POST', headers: { 'content-type': 'application/json', 'content-length': '1000' }, body: '{}' }), 32), /too large/);
   await assert.rejects(readConnectorBody(new Request('https://app.example', { method: 'POST', headers: { 'content-type': 'application/json-invalid' }, body: '{}' }), 32), /Send JSON/);
+});
+
+test('a single-wallet owner routes to its own payout without self-payment while another account cannot buy from that wallet', async () => {
+  const store = new LocalStore(':memory:');
+  try {
+    const host = await connected(store, other);
+    const self = { subject: other.subject, payer: thirdWallet.toUpperCase() };
+    assert.equal((await chooseConnectorHost(store, self, input.model, 'own'))!.id, host.hostId);
+    assert.equal((await chooseConnectorHost(store, self, input.model, 'city'))!.id, host.hostId);
+    assert.equal(await chooseConnectorHost(store, { subject: owner.subject, payer: thirdWallet }, input.model, 'city'), null);
+  } finally { await store.close(); }
+});
+
+test('reservation races admit only one request, never expose a job, and return busy capacity without losing host quotes', async () => {
+  const store = new LocalStore(':memory:');
+  try {
+    const host = await connected(store, other);
+    const claims = await Promise.allSettled([reserveConnectorHost(store, host.hostId, 'first'), reserveConnectorHost(store, host.hostId, 'second')]);
+    assert.equal(claims.filter((claim) => claim.status === 'fulfilled').length, 1);
+    const requestId = claims[0].status === 'fulfilled' ? 'first' : 'second';
+    const loser = requestId === 'first' ? 'second' : 'first';
+    assert.match((claims.find((claim) => claim.status === 'rejected') as PromiseRejectedResult).reason.message, /busy/);
+    assert.deepEqual(await pollConnectorJob(store, host.hostId, 0), { job: null });
+    assert.equal((await chooseConnectorHost(store, { subject: other.subject, payer: thirdWallet }, input.model, 'own'))!.id, host.hostId);
+    releaseConnectorHost(store, host.hostId, loser);
+    await assert.rejects(reserveConnectorHost(store, host.hostId, loser), /busy/);
+    await assert.rejects(enqueueConnectorInference(store, host.hostId, loser, input), /no matching reservation/);
+    releaseConnectorHost(store, host.hostId, requestId);
+    await assert.rejects(enqueueConnectorInference(store, host.hostId, requestId, input), /no matching reservation/);
+    const { outcome } = await startJob(store, host.hostId, loser);
+    releaseConnectorHost(store, host.hostId, loser);
+    await assert.rejects(reserveConnectorHost(store, host.hostId, requestId), /busy/);
+    const picked = await pollConnectorJob(store, host.hostId, 0);
+    await completeConnectorJob(store, host.hostId, { jobId: picked.job!.id, response: answer });
+    assert.equal((await outcome).value!.answer, 'Complete answer.');
+  } finally { await store.close(); }
+});
+
+test('quotes prefer an unoccupied host with equal ownership and cancelled or expired reservations cannot enqueue later', async () => {
+  const store = new LocalStore(':memory:');
+  try {
+    const first = await connected(store);
+    const second = await connected(store);
+    const now = Date.now();
+    await reserveConnectorHost(store, first.hostId, 'cancelled', now);
+    assert.equal((await chooseConnectorHost(store, { subject: owner.subject }, input.model, 'own', now))!.id, second.hostId);
+    cancelConnectorInference(store, 'cancelled');
+    await assert.rejects(enqueueConnectorInference(store, first.hostId, 'cancelled', input), /no matching reservation/);
+    assert.deepEqual(await pollConnectorJob(store, first.hostId, 0), { job: null });
+    await reserveConnectorHost(store, first.hostId, 'expired', now);
+    await publicConnectorHosts(store, now + 30000);
+    await assert.rejects(enqueueConnectorInference(store, first.hostId, 'expired', input), /no matching reservation/);
+    await reserveConnectorHost(store, first.hostId, 'replacement', now + 30000);
+    releaseConnectorHost(store, first.hostId, 'replacement');
+    assert.equal((await chooseConnectorHost(store, { subject: owner.subject }, input.model, 'own', now + 30000))!.id, first.hostId);
+  } finally { await store.close(); }
+});
+
+test('aborted long polls release their waiter immediately and never claim subsequently queued work', async () => {
+  const store = new LocalStore(':memory:');
+  try {
+    const host = await connected(store);
+    const controller = new AbortController();
+    const poll = pollConnectorJob(store, host.hostId, 25000, undefined, controller.signal);
+    await setImmediate();
+    controller.abort();
+    const replacement = pollConnectorJob(store, host.hostId, 0);
+    assert.deepEqual(await poll, { job: null });
+    assert.deepEqual(await replacement, { job: null });
+    const { outcome } = await startJob(store, host.hostId);
+    assert.deepEqual(await pollConnectorJob(store, host.hostId, 0, undefined, controller.signal), { job: null });
+    const picked = await pollConnectorJob(store, host.hostId, 0);
+    assert.deepEqual(picked.job!.messages, input.messages);
+    await completeConnectorJob(store, host.hostId, { jobId: picked.job!.id, response: answer });
+    assert.equal((await outcome).value!.answer, 'Complete answer.');
+  } finally { await store.close(); }
+});
+
+test('an abort during a registry await releases polling capacity before that await finishes and leaves queued work unclaimed', async () => {
+  const store = new LocalStore(':memory:');
+  let unblock!: () => void;
+  const gate = new Promise<void>((resolve) => { unblock = resolve; });
+  try {
+    const host = await connected(store);
+    const update = store.update.bind(store);
+    let entered!: () => void;
+    const reached = new Promise<void>((resolve) => { entered = resolve; });
+    let delayed = true;
+    store.update = async <T>(key: string, change: (value: T) => T): Promise<T> => {
+      if (delayed) { delayed = false; entered(); await gate; }
+      return update(key, change);
+    };
+    const controller = new AbortController();
+    const poll = pollConnectorJob(store, host.hostId, 25000, undefined, controller.signal);
+    await reached;
+    controller.abort();
+    assert.deepEqual(await pollConnectorJob(store, host.hostId, 0), { job: null });
+    const { outcome } = await startJob(store, host.hostId);
+    unblock();
+    assert.deepEqual(await poll, { job: null });
+    const picked = await pollConnectorJob(store, host.hostId, 0);
+    assert.deepEqual(picked.job!.messages, input.messages);
+    await completeConnectorJob(store, host.hostId, { jobId: picked.job!.id, response: answer });
+    assert.equal((await outcome).value!.answer, 'Complete answer.');
+  } finally { unblock(); await store.close(); }
+});
+
+test('blocked body reads meet the overall deadline even if stream cancellation stalls or rejects', { timeout: 1000 }, async () => {
+  for (const rejectCancellation of [false, true]) {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(Buffer.from('{')); },
+      cancel() { cancelled = true; return rejectCancellation ? Promise.reject(new Error('cancel failed')) : new Promise<void>(() => {}); },
+    });
+    const request = new Request('https://app.example', { method: 'POST', headers: { 'content-type': 'application/json' }, body: stream, duplex: 'half' } as RequestInit);
+    await assert.rejects(readConnectorBody(request, 1024, 20), /deadline exceeded/);
+    assert.equal(cancelled, true);
+    assert.equal(stream.locked, false);
+  }
+});
+
+test('body abort cancels a stalled reader promptly and also rejects a request that was already aborted', { timeout: 1000 }, async () => {
+  for (const abortBeforeRead of [false, true]) {
+    const controller = new AbortController();
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({ pull() { return new Promise<void>(() => {}); }, cancel() { cancelled = true; return new Promise<void>(() => {}); } });
+    const request = new Request('https://app.example', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: controller.signal, body: stream, duplex: 'half' } as RequestInit);
+    if (abortBeforeRead) controller.abort();
+    const reading = readConnectorBody(request, 1024).then((value) => ({ value, error: null }), (error: Error) => ({ value: null, error }));
+    if (!abortBeforeRead) { await setImmediate(); controller.abort(); }
+    assert.match((await reading).error!.message, /aborted/);
+    assert.equal(cancelled, true);
+    assert.equal(stream.locked, false);
+  }
+});
+
+test('signed routes reject missing or malformed authentication headers before reading an indefinitely blocked body', { timeout: 1000 }, async () => {
+  const keys = generateKeyPairSync('ed25519');
+  const original = signed('valid-host', keys.privateKey);
+  for (const [field, value] of [['x-host-id', ''], ['x-host-timestamp', ''], ['x-host-timestamp', '1.5'],
+    ['x-host-timestamp', String(Date.now() - 60001)], ['x-host-nonce', ''], ['x-host-nonce', 'bad'],
+    ['x-host-signature', ''], ['x-host-signature', 'not-base64']]) {
+    const headers = new Headers(original.request.headers);
+    headers.set(field, value);
+    const stream = new ReadableStream<Uint8Array>({ pull() { return new Promise<void>(() => {}); } });
+    const request = new Request(original.request.url, { method: 'POST', headers, body: stream, duplex: 'half' } as RequestInit);
+    assert.throws(() => checkConnectorHeaders(request), AccessError);
+    const response = await signedHostRoute(request, 1024, async () => ({ ok: true }));
+    assert.equal(response.status, 403);
+    void stream.cancel().catch(() => {});
+  }
+});
+
+test('registry cutover preserves active paired keys and durable replay while discarding obsolete pending pairing secrets', async () => {
+  const store = new LocalStore(':memory:');
+  try {
+    const keys = generateKeyPairSync('ed25519');
+    const publicKey = keys.publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
+    const now = Date.now();
+    const previous = signed('existing-host', keys.privateKey, '{}', now);
+    const host = { id: 'existing-host', name: 'Existing GPU', publicKey, ownerSubject: other.subject, payoutWallet: thirdWallet,
+      models: [input.model], lastHeartbeat: now, state: 'active', ollamaReachable: true, awake: true, canWake: false,
+      code: null, pairingExpiresAt: now + 600000, nonces: [{ nonce: previous.request.headers.get('x-host-nonce'), timestamp: now }] };
+    await store.create('local-ai:connector-registry', {
+      hosts: [host, { ...host, id: 'pending-host', state: 'pending', code: 'ABCD2345', ownerSubject: null, payoutWallet: null, nonces: [] }],
+      rate: { started: now, total: 30, addresses: { unknown: 5 } },
+    });
+    const list = await publicConnectorHosts(store, now, other.subject);
+    assert.equal(list.length, 1);
+    assert.equal(list[0].id, host.id);
+    assert.equal(list[0].payoutWallet, thirdWallet);
+    assert.equal(list[0].own, true);
+    await assert.rejects(authenticateConnector(store, previous.request, previous.raw, now), /already been used/);
+    const fresh = signed(host.id, keys.privateKey, '{}', now);
+    assert.equal((await authenticateConnector(store, fresh.request, fresh.raw, now)).id, host.id);
+    const pending = signed('pending-host', keys.privateKey, '{}', now);
+    await assert.rejects(authenticateConnector(store, pending.request, pending.raw, now), AccessError);
+    const persisted = JSON.stringify(await store.scan('local-ai:'));
+    assert.equal(persisted.includes('ABCD2345'), false);
+    assert.equal(persisted.includes('pairingExpiresAt'), false);
+    const { outcome } = await startJob(store, host.id);
+    const picked = await pollConnectorJob(store, host.id, 0);
+    await completeConnectorJob(store, host.id, { jobId: picked.job!.id, response: answer });
+    assert.equal((await outcome).value!.answer, 'Complete answer.');
+    const newHost = await pairing(store, now, 'new-source', other);
+    assert.equal((await publicConnectorHosts(store, now)).some((entry) => entry.id === newHost.hostId), true);
+  } finally { await store.close(); }
 });

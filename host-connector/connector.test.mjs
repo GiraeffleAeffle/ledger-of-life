@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, createPublicKey, verify } from 'node:crypto';
+import { createSocket } from 'node:dgram';
 import { chmod, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { Connector, endpointOrigin, loadIdentity, validateConfig, validateJob, validateAnswer } from './connector.mjs';
+import { Connector, endpointOrigin, jobDeadline, loadIdentity, validateConfig, validateJob, validateAnswer } from './connector.mjs';
 
 const model = 'fixture:tiny';
 const configInput = { appOrigin: 'http://localhost:3000', ollamaUrl: 'http://localhost:11434', name: 'Fixture GPU', models: [model], stateDirectory: './state' };
@@ -42,7 +43,6 @@ async function runtime(t, options = {}) {
   const config = validateConfig({ ...configInput, appOrigin, ollamaUrl, stateDirectory: directory, ...options.config });
   const identity = await loadIdentity(config);
   identity.state.hostId = 'host-fixture';
-  identity.state.approved = true;
   identity.state.advertisedModels = [model];
   await identity.save();
   const connector = new Connector(config, identity, { log: () => {}, signal: options.signal });
@@ -74,8 +74,63 @@ test('job validation rejects extra capabilities, unsafe options, oversized text 
     job({ options: { num_ctx: 8192, num_predict: 15, temperature: 0 } }),
     job({ options: { num_ctx: 8192, num_predict: 96, temperature: 1.1 } }),
     job({ options: { num_ctx: 8192, num_predict: 96, temperature: 0, seed: 1 } }),
-    job({ expiresAt: new Date(Date.now() - 1).toISOString() }), job({ expiresAt: new Date(Date.now() + 100_000).toISOString() }),
+    job({ expiresAt: new Date(Date.now() - 1).toISOString() }), job({ expiresAt: 'not-a-date' }), job({ expiresAt: undefined }),
   ]) assert.throws(() => validateJob(invalid, [model]));
+});
+
+test('future server deadlines tolerate clock skew but never extend the local 90-second bound', async (t) => {
+  const now = Date.parse('2026-09-30T12:00:00Z');
+  const skewed = job({ expiresAt: new Date(now + 95_000).toISOString() });
+  validateJob(skewed, [model], now);
+  assert.equal(jobDeadline(skewed, now), now + 90_000);
+  assert.equal(jobDeadline(job({ expiresAt: new Date(now + 20_000).toISOString() }), now), now + 20_000);
+  assert.equal(jobDeadline(job({ expiresAt: new Date(now + 86_400_000).toISOString() }), now), now + 90_000);
+  const { connector, results } = await runtime(t);
+  await connector.execute(job({ expiresAt: new Date(Date.now() + 95_000).toISOString() }));
+  assert.equal(results[0].response.message.content, 'A complete fixture answer.');
+});
+
+test('wake configuration rejects ambiguous modes, malformed UDP targets and implicit plaintext HA', () => {
+  const wakeOnLan = { mac: '34:5A:60:69:E2:73', broadcastAddress: '192.168.178.255' };
+  assert.equal(validateConfig({ ...configInput, wakeOnLan }).wakeOnLan.port, 9);
+  for (const invalid of [
+    { mac: '34:5A:60:69:E2', broadcastAddress: '192.168.178.255' },
+    { mac: 'ff:ff:ff:ff:ff:ff', broadcastAddress: '192.168.178.255' },
+    { mac: '00:00:00:00:00:00', broadcastAddress: '192.168.178.255' },
+    { ...wakeOnLan, broadcastAddress: 'gpu.example' }, { ...wakeOnLan, broadcastAddress: '::1' },
+    { ...wakeOnLan, broadcastAddress: '0.0.0.0' }, { ...wakeOnLan, broadcastAddress: '224.0.0.1' },
+    { ...wakeOnLan, port: 0 }, { ...wakeOnLan, port: 65536 }, { ...wakeOnLan, port: 9.5 },
+    { ...wakeOnLan, token: 'not-a-capability' },
+  ]) assert.throws(() => validateConfig({ ...configInput, wakeOnLan: invalid }));
+  const homeAssistant = { url: 'http://localhost:8123', tokenFile: './token' };
+  assert.throws(() => validateConfig({ ...configInput, homeAssistant }), /HTTPS/);
+  assert.throws(() => validateConfig({ ...configInput, homeAssistant: { ...homeAssistant, DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN: false } }), /HTTPS/);
+  assert.throws(() => validateConfig({ ...configInput, homeAssistant: { ...homeAssistant, DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN: 'true' } }), /boolean/);
+  assert.equal(validateConfig({ ...configInput, homeAssistant: { url: 'https://ha.example', tokenFile: './token' } }).homeAssistant.url, 'https://ha.example');
+  validateConfig({ ...configInput, homeAssistant: { ...homeAssistant, DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN: true } });
+  assert.throws(() => validateConfig({ ...configInput, wakeOnLan, homeAssistant }), /one wake mode/);
+  for (const pairingCode of ['ABCDEFGH', 'ABCDEFGHIJKL', 'abcdefgh2345', 'ABCDEFGH234!']) assert.throws(() => validateConfig({ ...configInput, pairingCode }));
+});
+
+test('tokenless WoL sends exactly one magic packet to a synthetic loopback UDP receiver and resumes inference', { timeout: 5000 }, async (t) => {
+  const receiver = createSocket('udp4');
+  receiver.bind(0, '127.0.0.1');
+  await once(receiver, 'listening');
+  t.after(() => new Promise((done) => receiver.close(done)));
+  const packet = once(receiver, 'message');
+  let awake = false;
+  receiver.on('message', () => { awake = true; });
+  const { connector, results, heartbeats } = await runtime(t, {
+    config: { wakeOnLan: { mac: '34:5A:60:69:E2:73', broadcastAddress: '127.0.0.1', port: receiver.address().port } },
+    ollama: (request, response) => !awake ? json(response, {}, 503) : request.url === '/api/tags' ? json(response, { models: [{ name: model }] }) : json(response, answer()),
+  });
+  await connector.heartbeat();
+  assert.equal(heartbeats[0].canWake, true);
+  assert.equal(heartbeats[0].ollamaReachable, false);
+  await connector.execute(job());
+  const [received] = await packet;
+  assert.deepEqual(received, Buffer.concat([Buffer.alloc(6, 0xff), ...Array.from({ length: 16 }, () => Buffer.from('345a6069e273', 'hex'))]));
+  assert.equal(results[0].response.message.content, 'A complete fixture answer.');
 });
 
 test('only a complete matching-model assistant answer can settle a job', () => {
@@ -143,10 +198,9 @@ test('a first-boot asleep host offers configured wake models, then narrows to in
   let asleep = true;
   const appOrigin = await server(t, async (request, response) => { heartbeats.push(JSON.parse(await body(request))); json(response, {}); });
   const ollamaUrl = await server(t, (request, response) => asleep ? json(response, {}, 503) : json(response, { models: [{ name: model }] }));
-  const config = validateConfig({ ...configInput, appOrigin, ollamaUrl, models: [model, 'not-installed:tiny'], stateDirectory: join(directory, 'state'), homeAssistant: { url: 'http://localhost:8123', tokenFile } });
+  const config = validateConfig({ ...configInput, appOrigin, ollamaUrl, models: [model, 'not-installed:tiny'], stateDirectory: join(directory, 'state'), homeAssistant: { url: 'http://localhost:8123', tokenFile, DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN: true } });
   const identity = await loadIdentity(config);
   identity.state.hostId = 'host-new';
-  identity.state.approved = true;
   await identity.save();
   const connector = new Connector(config, identity, { log: () => {} });
   await connector.initialize();
@@ -175,7 +229,7 @@ test('redirects never receive an app signature, HA token, or forwarded inference
   const tokenFile = join(await temporary(t), 'ha-token');
   await writeFile(tokenFile, 'fixture-ha-secret', { mode: 0o600 });
   const ha = await server(t, (request, response) => { response.writeHead(307, { location: target }); response.end(); });
-  const asleep = await runtime(t, { config: { homeAssistant: { url: ha, tokenFile } }, ollama: (request, response) => json(response, {}, 503) });
+  const asleep = await runtime(t, { config: { homeAssistant: { url: ha, tokenFile, DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN: true } }, ollama: (request, response) => json(response, {}, 503) });
   await asleep.connector.execute(job());
   assert.deepEqual(received, []);
 });
@@ -191,9 +245,9 @@ test('HA reads only an owner-private token file and invokes only the verified wa
     awake = true;
     json(response, []);
   });
-  await assert.rejects(runtime(t, { config: { homeAssistant: { url: ha, tokenFile } } }), /owner-only/);
+  await assert.rejects(runtime(t, { config: { homeAssistant: { url: ha, tokenFile, DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN: true } } }), /owner-only/);
   await chmod(tokenFile, 0o600);
-  const { connector, results, heartbeats } = await runtime(t, { config: { homeAssistant: { url: ha, tokenFile } }, ollama: (request, response) => !awake ? json(response, {}, 503) : request.url === '/api/tags' ? json(response, { models: [{ name: model }] }) : json(response, answer()) });
+  const { connector, results, heartbeats } = await runtime(t, { config: { homeAssistant: { url: ha, tokenFile, DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN: true } }, ollama: (request, response) => !awake ? json(response, {}, 503) : request.url === '/api/tags' ? json(response, { models: [{ name: model }] }) : json(response, answer()) });
   await connector.heartbeat();
   assert.equal(heartbeats[0].canWake, true);
   assert.equal(heartbeats[0].ollamaReachable, false);
@@ -210,7 +264,7 @@ test('a stalled wake is aborted at the job deadline before any prompt reaches Ol
   const ha = await server(t, (request, response) => { response.on('close', disconnected); });
   let chatRequested = false;
   const { connector, results } = await runtime(t, {
-    config: { homeAssistant: { url: ha, tokenFile } },
+    config: { homeAssistant: { url: ha, tokenFile, DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN: true } },
     ollama: (request, response) => { if (request.url === '/api/chat') chatRequested = true; json(response, {}, 503); },
   });
   await connector.execute(job({ expiresAt: new Date(Date.now() + 300).toISOString() }));
@@ -244,14 +298,13 @@ test('job expiry aborts local inference and shutdown cancels it without submitti
   assert.deepEqual(canceled.results, []);
 });
 
-test('executable pairs, waits for approval, signs exact bytes and keeps heartbeats fresh during a job', { timeout: 35_000 }, async (t) => {
+test('executable consumes an owner invitation, signs exact bytes and keeps heartbeats fresh during a job', { timeout: 35_000 }, async (t) => {
   const directory = await temporary(t);
   let publicKey;
   const nonces = new Set();
   let heartbeats = 0;
   let chatResponse;
   let pickedUp = false;
-  let pendingRejected = false;
   let complete;
   let failure;
   const completed = new Promise((resolve, reject) => { complete = resolve; failure = reject; });
@@ -262,7 +315,9 @@ test('executable pairs, waits for approval, signs exact bytes and keeps heartbea
       if (request.url.endsWith('/pair')) {
         publicKey = createPublicKey({ key: Buffer.from(input.publicKey, 'base64'), format: 'der', type: 'spki' });
         assert.equal(input.name, 'Fixture GPU');
-        return json(response, { code: 'ABCDEFGH', hostId: 'host-executable', expiresAt: new Date(Date.now() + 600_000).toISOString() });
+        assert.equal(input.code, 'ABCDEFGH2345');
+        assert.deepEqual(Object.keys(input).sort(), ['code', 'name', 'publicKey']);
+        return json(response, { hostId: 'host-executable' });
       }
       assert.equal(request.headers['x-host-id'], 'host-executable');
       const nonce = request.headers['x-host-nonce'];
@@ -276,12 +331,11 @@ test('executable pairs, waits for approval, signs exact bytes and keeps heartbea
         heartbeats++;
         assert.deepEqual(input.models, [model]);
         assert.equal(input.ollamaReachable, true);
-        if (heartbeats >= 2 && chatResponse) json(chatResponse, answer());
+        if (heartbeats >= 2 && chatResponse && !chatResponse.writableEnded) json(chatResponse, answer());
         return json(response, {});
       }
       if (request.url.endsWith('/poll')) {
         assert.deepEqual(input, {});
-        if (!pendingRejected) { pendingRejected = true; return json(response, {}, 403); }
         if (!pickedUp && heartbeats) { pickedUp = true; return json(response, { job: job() }); }
         return json(response, { job: null });
       }
@@ -301,7 +355,7 @@ test('executable pairs, waits for approval, signs exact bytes and keeps heartbea
     chatResponse = response;
   });
   const configFile = join(directory, 'config.json');
-  await writeFile(configFile, JSON.stringify({ ...configInput, appOrigin, ollamaUrl, stateDirectory: join(directory, 'state') }));
+  await writeFile(configFile, JSON.stringify({ ...configInput, appOrigin, ollamaUrl, stateDirectory: join(directory, 'state'), pairingCode: 'ABCDEFGH2345' }));
   const child = spawn(process.execPath, [new URL('./connector.mjs', import.meta.url).pathname, '--config', configFile], { stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   child.stdout.on('data', (chunk) => { output += chunk; });
@@ -311,12 +365,15 @@ test('executable pairs, waits for approval, signs exact bytes and keeps heartbea
   await Promise.race([completed, exit.then(([code]) => { throw new Error(`Connector exited before completion (${code}): ${output}`); })]);
   child.kill('SIGTERM');
   assert.equal((await exit)[0], 0);
-  assert.match(output, /Pairing code: ABCDEFGH/);
-  assert.match(output, /Host pairing approved/);
+  assert(!output.includes('ABCDEFGH2345'));
   assert(!output.includes('PRIVATE KEY'));
   assert(!output.includes('A fixture question'));
-  assert(pendingRejected);
   const state = JSON.parse(await readFile(join(directory, 'state', 'host-state.json'), 'utf8'));
-  assert.equal(state.approved, true);
-  assert.equal(state.code, undefined);
+  assert.equal(state.hostId, 'host-executable');
+  assert.deepEqual(Object.keys(state).sort(), ['advertisedModels', 'appOrigin', 'hostId', 'publicKey']);
+  await writeFile(configFile, JSON.stringify({ ...configInput, appOrigin, ollamaUrl, stateDirectory: join(directory, 'state') }));
+  const restartConfig = validateConfig(JSON.parse(await readFile(configFile, 'utf8')));
+  const restarted = new Connector(restartConfig, await loadIdentity(restartConfig), { log: () => {} });
+  await restarted.initialize();
+  await restarted.heartbeat();
 });

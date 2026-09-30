@@ -53,6 +53,11 @@
 .local-ai-pairing-form small { color: #61745f; font-size: .72rem; line-height: 1.6; }
 .local-ai-pairing-form .local-ai-meta { margin: 0; }
 .local-ai-pairing-form .primary-btn { justify-self: start; }
+.local-ai-invitation { display: grid; gap: 12px; max-width: 580px; margin-top: 20px; padding: 18px; border: 1px solid #dfc996; border-radius: 10px; background: #fbf1da; color: #75592c; }
+.local-ai-invitation > strong { font-size: .85rem; }
+.local-ai-invitation > code { font-size: 1.6rem; letter-spacing: .12em; font-weight: 650; user-select: all; }
+.local-ai-invitation p, .local-ai-invitation small { margin: 0; font-size: .76rem; line-height: 1.7; }
+.local-ai-invitation > div { display: flex; flex-wrap: wrap; gap: 10px; }
 .local-ai-question > label { display: block; font-weight: 650; font-size: .9rem; margin-bottom: 11px; }
 .local-ai-samples { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .local-ai-samples button { border: 1px solid #dce4d2; border-radius: 6px; background: #f4f7ec; color: #5c7850; padding: 7px 9px; font: inherit; font-size: .72rem; cursor: pointer; }

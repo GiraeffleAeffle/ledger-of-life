@@ -1,6 +1,6 @@
 # Outbound GPU host connector
 
-A standalone Node.js **22 or newer**, ESM, zero-dependency connector. It opens no listening socket. The public app receives signed outbound requests; Ollama and optional Home Assistant remain reachable only from this device. No npm install, app build, browser, shell execution, tools or model downloads are involved.
+A standalone Node.js **22 or newer**, ESM, zero-dependency connector. It opens no listening service. The public app receives signed outbound requests; Ollama and optional Home Assistant remain reachable only from this device. Tokenless direct Wake-on-LAN uses an ephemeral outbound UDP socket. No npm install, app build, browser, shell execution, tools or model downloads are involved.
 
 ## Owner setup on Linux
 
@@ -23,7 +23,7 @@ install -d -m 700 "$HOME/.local/state/stadtstack-host"
 }
 ```
 
-Replace the model tag and absolute state path. Relative file/directory paths resolve relative to the configuration file. Endpoints must be origin-only HTTP(S) URLs: no user/password, path, query or fragment. The **app requires HTTPS**; `http://localhost` is the only development exception. An HTTP app URL using `127.0.0.1` is intentionally rejected. Ollama and Home Assistant can use configured LAN/loopback HTTP origins; prefer HTTPS wherever the network is not trusted. Redirects are rejected for every endpoint, including model discovery, pairing, generation and wake.
+Replace the model tag and absolute state path. Relative file/directory paths resolve relative to the configuration file. Endpoints must be origin-only HTTP(S) URLs: no user/password, path, query or fragment. The **app requires HTTPS**; `http://localhost` is the only development exception. An HTTP app URL using `127.0.0.1` is intentionally rejected. Ollama may use LAN/loopback HTTP, but an untrusted LAN observer can **read submitted questions and forge model answers**; HTTPS or loopback is needed outside a trusted network. Home Assistant requires HTTPS unless the explicit dangerous opt-in below is set. Redirects are rejected for every endpoint, including model discovery, pairing, generation and wake.
 
 ```sh
 chmod 600 "$HOME/.config/stadtstack-host/config.json"
@@ -33,9 +33,23 @@ node /opt/stadtstack/host-connector/connector.mjs \
 
 First run generates an Ed25519 PKCS#8 PEM `private-key.pem` with mode `0600`, derives the base64 DER/SPKI public key, and saves `host-state.json` with mode `0600`. The state directory must be owner-only (`0700` recommended); private files must have no group/other permissions, belong to the running user and not be symlinks. Unsafe existing permissions are rejected, not silently repaired. State binds the key to one app origin. The private key, pairing state and any Home Assistant token remain local. Questions and answers are never saved to this directory or printed in logs.
 
-The connector prints an eight-character pairing code, not its key/token. Log in to the app's host desk as an allowed host owner and approve that code with an eligible verified payout wallet. Wallet ownership and the app's owner allowlist are server-side requirements; possessing a code alone cannot approve a host. Polling returns `403` until approval. The code is single-use and expires after ten minutes; if it expires, restart the connector to request another code. Keep the device clock synchronized: signed calls require timestamps within 60 seconds of server time and fresh random nonces. Pairing endpoints are rate-limited; do not continually restart to request codes.
+Before first registration, log in to the app's host desk as an allowed host owner and create an invitation, optionally selecting an eligible verified payout wallet. The app displays the **12-character code once**; copy it into a `"pairingCode"` field in the owner-private configuration, then start the connector within ten minutes. The code is single-use, stored only as a hash by the server, and bound to the creating account and selected payout wallet. Treat it as a short-lived credential: do not put it in command arguments, logs or source control. The connector consumes it with `POST /api/local-ai/hosts/pair` (`{code, publicKey, name}`) and receives `{hostId}`; the host becomes active immediately. It never prints the invitation, creates its own code, or waits for a second approval. On successful registration, remove `"pairingCode"` from the configuration; subsequent starts use the saved host ID and key and do not need a code. If an unused invitation expires, create a new one in the app rather than restarting to request a connector-issued code.
 
-Server pairing limits are five attempts per source address and 30 globally per ten-minute window, with at most 128 pending/active hosts. Expired pending registrations are purged; revocation history retains the latest 32 records. Host names are at most 80 characters. The server stores at most 256 live nonces per host, expiring each at its signed timestamp plus 60 seconds; running multiple copies against one host key is unsupported.
+Keep the device clock synchronized: signed calls require timestamps within 60 seconds of server time and fresh random nonces. Pairing uses a bounded per-source attempt limit, not a shared global request budget. Malformed unauthenticated requests cannot consume host or invitation capacity. Host names are at most 80 characters. Running multiple copies against one host key is unsupported.
+
+### Tokenless direct Wake-on-LAN
+
+An always-on connector on the GPU's trusted LAN can send the wake packet itself, without Home Assistant or any token:
+
+```json
+"wakeOnLan": {
+  "mac": "34:5A:60:69:E2:73",
+  "broadcastAddress": "192.168.178.255",
+  "port": 9
+}
+```
+
+Replace these owner-specific example values for another network. The connector validates a colon-separated unicast device MAC, an IPv4 destination literal (no DNS or URL), and an integer UDP port from 1 to 65535; port defaults to 9. Configure the actual subnet broadcast address. The only packet is the standard fixed 102-byte magic packet: six `FF` bytes followed by sixteen repetitions of the configured MAC. A job cannot change its target or payload. This is an unauthenticated LAN wake mechanism, not a remote command channel; keep it inside the intended trusted LAN and do not expose UDP wake ports publicly. Choose either `wakeOnLan` or `homeAssistant`, never both.
 
 ### Optional Home Assistant wake
 
@@ -48,11 +62,13 @@ Only configure this if the always-on connector device can reach Home Assistant a
 }
 ```
 
-Save the token directly into that local file without adding it to command arguments, environment variables, configuration JSON or this repository. Set mode `0600`; the connector checks ownership, file type and permissions before reading it. The token is sent **only** to the configured Home Assistant origin and never to the app or Ollama. HTTP Home Assistant exposes the token on that LAN, so use HTTPS unless that transport is trusted. Use the least-privileged Home Assistant account your installation supports; this connector does not claim its token is restricted by Home Assistant to one service.
+Save the token directly into that local file without adding it to command arguments, environment variables, configuration JSON or this repository. Set mode `0600`; the connector checks ownership, file type and permissions before reading it. Create a **dedicated non-admin Home Assistant user** and a long-lived token for that user; do not reuse an administrator token. The token is sent **only** to the configured Home Assistant origin and never to the app or Ollama. This connector does not claim Home Assistant restricts the token to one service: a stolen token can exercise that user's other permissions.
 
-The one allowed call is `POST /api/services/script/desktop_ai_wake_gpu_host` with `{}`. Its existence and meaning were verified read-only against the owner homelab's `home-ops/DESKTOP-AI-OLLAMA.md` and `home-ops/packages/desktop_ai_ollama.yaml`: the script sends the desktop's Wake-on-LAN magic packet. The connector does **not** invoke prepare, warm, gaming, shell-command or arbitrary Home Assistant services and does not embed that owner's IP/MAC. Your installation must supply this script and arrange for Ollama to start after wake. No owner endpoint was contacted during implementation or tests.
+HTTPS is required by default, even for loopback. Only if you deliberately trust the entire LAN path may you add `"DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN": true` inside `homeAssistant`. **Plaintext HTTP exposes the bearer token to network observers and permits tampering with the wake call.** This loud opt-in is not an encryption substitute; prefer tokenless direct Wake-on-LAN where possible.
 
-With Home Assistant configured, heartbeat `canWake` is true, allowing the app to route to a recent asleep host. An unreachable API is reported as asleep, not proof the machine is physically sleeping. On first boot while Ollama is offline, the configured model allowlist is advertised as an **unverified host claim** so a wake job can be assigned. Successful `/api/tags` discovery narrows advertisement to the intersection of installed and configured names. That last subset is persisted and retained while asleep; models outside the configured allowlist are never advertised or used. The actual requested model is checked again after wake. Wake, repeated tag discovery and generation share the job's deadline; wake does not extend it or load/download a missing model.
+The one allowed call is `POST /api/services/script/desktop_ai_wake_gpu_host` with `{}`. Its existence and meaning were verified read-only against the owner homelab's `home-ops/DESKTOP-AI-OLLAMA.md` and `home-ops/packages/desktop_ai_ollama.yaml`: the script sends the desktop's Wake-on-LAN magic packet. The connector does **not** invoke prepare, warm, gaming, shell-command or arbitrary Home Assistant services. Your installation must supply this script and arrange for Ollama to start after wake. No owner endpoint was contacted during implementation or tests.
+
+With either wake mode configured, heartbeat `canWake` is true, allowing the app to route to a recent asleep host. An unreachable API is reported as asleep, not proof the machine is physically sleeping. On first boot while Ollama is offline, the configured model allowlist is advertised as an **unverified host claim** so a wake job can be assigned. Successful `/api/tags` discovery narrows advertisement to the intersection of installed and configured names. That last subset is persisted and retained while asleep; models outside the configured allowlist are never advertised or used. The actual requested model is checked again after wake. Wake, repeated tag discovery and generation share the job's locally bounded deadline; wake does not extend it or load/download a missing model.
 
 ### The owner's NUC and Windows desktop
 
@@ -65,14 +81,15 @@ Use a dedicated unprivileged Linux service user on an always-on device in the ho
   "name": "Owner desktop GPU",
   "models": ["qwen3.8:27b-ud-q3-k-xl"],
   "stateDirectory": "/home/ledger-host/.local/state/stadtstack-host",
-  "homeAssistant": {
-    "url": "http://192.168.178.135:8123",
-    "tokenFile": "/home/ledger-host/.config/stadtstack-host/ha-token"
+  "wakeOnLan": {
+    "mac": "34:5A:60:69:E2:73",
+    "broadcastAddress": "192.168.178.255",
+    "port": 9
   }
 }
 ```
 
-These addresses come from the read-only homelab `home-ops/DESKTOP-AI-OLLAMA.md`, `REMOTE-ACCESS.md` and `README.md`; they were not contacted. The desktop is native Windows Ollama, not WSL. The `:11435` endpoint mentioned in the homelab is an Ollama-facing desktop endpoint, **not** the Home Assistant REST server. The optional wake script only sends Wake-on-LAN; Ollama must already be arranged to start/resume on Windows, and the connector waits for `/api/tags` rather than running any preparation shell. The owner must supply the HA token locally and accept that these LAN HTTP transports are unencrypted. Use the systemd unit below with this service user's paths, then approve the printed code on the public site's Money host desk. No GPU port forwarding, cluster LAN route, Tailscale operator, or cluster-held HA credential is involved.
+These addresses and wake parameters come from the read-only homelab documentation and `home-ops/packages/desktop_ai_ollama.yaml`; they were not contacted. The desktop is native Windows Ollama, not WSL. This default uses tokenless direct UDP Wake-on-LAN; no HA token is needed. Ollama must already be arranged to start/resume on Windows, and the connector waits for `/api/tags` rather than running any preparation shell. The owner must accept that this LAN HTTP Ollama transport allows question disclosure and forged answers on an untrusted LAN. Use the systemd unit below with this service user's paths. For first registration, create an invitation on the public site's Money host desk, add it locally as `"pairingCode"`, and remove it after registration. No GPU port forwarding, cluster LAN route, Tailscale operator, or cluster-held HA credential is involved.
 
 
 ### User systemd service
@@ -106,12 +123,12 @@ systemctl --user enable --now stadtstack-host.service
 journalctl --user -u stadtstack-host.service -f
 ```
 
-Enable lingering for this service user if it must run without a logged-in session (an administrator can use `loginctl enable-linger gpu-owner`). Run only one connector instance per state directory. Keep service logs private: the initial short pairing code appears there. `SIGINT`/`SIGTERM` abort active network requests, including local generation.
+Enable lingering for this service user if it must run without a logged-in session (an administrator can use `loginctl enable-linger gpu-owner`). Run only one connector instance per state directory. Logs omit invitation codes, private keys, tokens, questions and answers. `SIGINT`/`SIGTERM` abort active network requests, including local generation.
 
 ## Bounds and failure behavior
 
 - Poll requests allow a server wait of at most 25 seconds. Independent heartbeat/discovery runs approximately every 20 seconds, unaffected by long-polls, wake waits or generation. The server considers a reachable host online only with a heartbeat at most 75 seconds old.
-- The server owns one lease per host, a 30-second pickup window and a 90-second total job lifetime. All local wake/discovery/generation requests are bounded by the supplied expiry; an expired job is not turned into a completed answer.
+- The server owns one lease per host, a 30-second pickup window and a 90-second total job lifetime. The connector requires a valid future server expiry and clamps the local deadline to `min(server expiry, local now + 90 seconds)`. A small clock skew that puts the server expiry slightly beyond 90 local seconds is accepted, but cannot extend local execution. All wake/discovery/generation requests share that deadline; an expired job is not turned into a completed answer.
 - At most 16 configured model names, each at most 128 characters. Jobs allow 1–8 text-only system/user/assistant messages, at most 4,000 characters each and 12,000 total. Unknown job/message/option fields, images, tools and unadvertised models are rejected before forwarding.
 - `/api/chat` is constructed locally with `stream:false`, `think:false`, and only `num_ctx` (1–8192), `num_predict` (16–192), and `temperature` (0–1). Jobs cannot supply an endpoint, arbitrary Ollama options, or capabilities.
 - Answers require a matching model, `done:true`, `done_reason:"stop"`, and nonempty assistant text of at most 16,000 characters, without an error or tool/image output. Truncated, failed and incomplete replies produce an error result, not an answer. Response bodies are size-bounded. Error logs/results do not echo endpoint bodies, prompts or credentials.
@@ -119,9 +136,9 @@ Enable lingering for this service user if it must run without a logged-in sessio
 
 ## Revoke and rotate
 
-Revoke a host from its authenticated owner's app host desk. The app disables the paired key immediately; subsequent signed requests are rejected. Stop/disable its service locally too. A connector that has observed approval exits on authorization rejection instead of silently re-pairing a revoked identity; systemd's restart policy will not bypass revocation.
+Revoke a host from its authenticated owner's app host desk. The app disables the paired key immediately; subsequent signed requests are rejected. Stop/disable its service locally too. Every registered connector exits on authorization rejection instead of silently re-pairing a revoked identity; systemd's restart policy will not bypass revocation.
 
-For key rotation, first revoke the old host, stop its connector, choose a **new owner-private state directory**, update the configuration/unit writable path, then restart and approve the newly generated code. Old quotes/jobs remain bound to the old host/key; rotation is a new registration, not a key-swapping alias. Protect or securely dispose of retired local keys/tokens according to your device policy. Changing app origins also requires a fresh state directory and new approval. There is no remote command execution, automatic cloud fallback, LAN exposure, or remote credential recovery.
+For key rotation, first revoke the old host and stop its connector. Create a new invitation in the app, choose a **new owner-private state directory**, update the configuration/unit writable path, add the invitation as `"pairingCode"`, then start and remove that field after successful registration. Old quotes/jobs remain bound to the old host/key; rotation is a new registration, not a key-swapping alias. Protect or securely dispose of retired local keys/tokens according to your device policy. Changing app origins also requires a fresh state directory and a new invitation. State from the retired connector-issued-code/approval protocol is not supported: revoke that registration and use this rotation procedure. There is no remote command execution, automatic cloud fallback, LAN exposure, or remote credential recovery.
 
 ## Scoped verification
 
@@ -130,4 +147,4 @@ cd host-connector
 npm test
 ```
 
-The permanent Node behavioral tests use disposable files and synthetic `localhost` HTTP servers only. They cover URL/shape boundaries, persistent key and token permissions, configured/discovered/asleep model advertisement, redirect credential containment, fixed Ollama requests, incomplete-answer rejection, wake service restrictions, deadline/shutdown cancellation, and the actual CLI pairing/signature flow with an independent heartbeat during a held-open inference. No real Ollama or Home Assistant endpoint is required.
+The permanent Node behavioral tests use disposable files and synthetic loopback HTTP/UDP servers only. They cover URL/shape boundaries, persistent key and token permissions, configured/discovered/asleep model advertisement, redirect credential containment, fixed Ollama requests, incomplete-answer rejection, the exact tokenless 102-byte magic packet, wake service restrictions, explicit plaintext HA opt-in, skew-tolerant bounded deadlines, shutdown cancellation, and the actual CLI invitation/signature flow with an independent heartbeat during a held-open inference. Registered restart requires no invitation and invitations are absent from logs and saved host state. No real Ollama, Home Assistant or owner endpoint is required.

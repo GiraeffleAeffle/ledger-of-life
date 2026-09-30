@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
+import { createSocket } from 'node:dgram';
+import { isIP } from 'node:net';
 import { constants } from 'node:fs';
 import { mkdir, open, lstat, readFile, rename } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
@@ -23,22 +25,72 @@ export function endpointOrigin(value, app = false) {
 }
 
 export function validateConfig(input, baseDirectory = process.cwd()) {
-  assert(keys(input, ['appOrigin', 'ollamaUrl', 'models', 'name', 'stateDirectory', 'homeAssistant']), 'Unknown connector configuration field');
+  assert(keys(input, ['appOrigin', 'ollamaUrl', 'models', 'name', 'stateDirectory', 'pairingCode', 'wakeOnLan', 'homeAssistant']), 'Unknown connector configuration field');
   assert(text(input.name, 80) && input.name.trim(), 'Host name is required (max 80 characters)');
   assert(Array.isArray(input.models) && input.models.length > 0 && input.models.length <= 16 && input.models.every((model) => text(model, 128)) && new Set(input.models).size === input.models.length, 'Configure 1–16 unique model names, at most 128 characters each');
   assert(text(input.stateDirectory, 4096), 'stateDirectory is required');
+  assert(input.pairingCode === undefined || (typeof input.pairingCode === 'string' && /^[A-HJ-NP-Z2-9]{12}$/.test(input.pairingCode)), 'pairingCode must be a 12-character owner invitation');
+  assert(input.homeAssistant === undefined || input.wakeOnLan === undefined, 'Configure only one wake mode');
+  let wakeOnLan;
+  if (input.wakeOnLan !== undefined) {
+    const wake = input.wakeOnLan;
+    assert(keys(wake, ['mac', 'broadcastAddress', 'port']) && typeof wake.mac === 'string' && /^[0-9a-f]{2}(?::[0-9a-f]{2}){5}$/i.test(wake.mac), 'Wake-on-LAN requires a colon-separated MAC address');
+    const mac = Buffer.from(wake.mac.replaceAll(':', ''), 'hex');
+    assert((mac[0] & 1) === 0 && mac.some((byte) => byte !== 0), 'Wake-on-LAN requires a unicast device MAC');
+    assert(typeof wake.broadcastAddress === 'string' && isIP(wake.broadcastAddress) === 4 && wake.broadcastAddress !== '0.0.0.0' && (Number(wake.broadcastAddress.split('.')[0]) < 224 || wake.broadcastAddress === '255.255.255.255'), 'Wake-on-LAN requires an IPv4 broadcast address');
+    assert(wake.port === undefined || (Number.isInteger(wake.port) && wake.port > 0 && wake.port <= 65535), 'Invalid Wake-on-LAN UDP port');
+    wakeOnLan = { mac: wake.mac, broadcastAddress: wake.broadcastAddress, port: wake.port ?? 9 };
+  }
   let homeAssistant;
   if (input.homeAssistant !== undefined) {
-    assert(keys(input.homeAssistant, ['url', 'tokenFile']) && text(input.homeAssistant.tokenFile, 4096), 'Home Assistant requires only url and tokenFile');
-    homeAssistant = { url: endpointOrigin(input.homeAssistant.url), tokenFile: resolve(baseDirectory, input.homeAssistant.tokenFile) };
+    assert(keys(input.homeAssistant, ['url', 'tokenFile', 'DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN']) && text(input.homeAssistant.tokenFile, 4096), 'Invalid Home Assistant configuration');
+    const optIn = input.homeAssistant.DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN;
+    assert(optIn === undefined || typeof optIn === 'boolean', 'Home Assistant plaintext opt-in must be boolean');
+    const url = endpointOrigin(input.homeAssistant.url);
+    assert(url.startsWith('https:') || optIn === true, 'Home Assistant requires HTTPS unless DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN is explicitly true');
+    homeAssistant = { url, tokenFile: resolve(baseDirectory, input.homeAssistant.tokenFile) };
   }
-  return { appOrigin: endpointOrigin(input.appOrigin, true), ollamaUrl: endpointOrigin(input.ollamaUrl), models: [...input.models], name: input.name.trim(), stateDirectory: resolve(baseDirectory, input.stateDirectory), homeAssistant };
+  return { appOrigin: endpointOrigin(input.appOrigin, true), ollamaUrl: endpointOrigin(input.ollamaUrl), models: [...input.models], name: input.name.trim(), stateDirectory: resolve(baseDirectory, input.stateDirectory), pairingCode: input.pairingCode, wakeOnLan, homeAssistant };
+}
+
+export function jobDeadline(job, now = Date.now()) {
+  const deadline = typeof job.expiresAt === 'string' ? Date.parse(job.expiresAt) : NaN;
+  assert(Number.isFinite(deadline) && deadline > now, 'Invalid job deadline');
+  return Math.min(deadline, now + 90_000);
+}
+
+export function sendWakePacket(wake, signal) {
+  const packet = Buffer.alloc(102, 0xff);
+  const mac = Buffer.from(wake.mac.replaceAll(':', ''), 'hex');
+  for (let offset = 6; offset < packet.length; offset += mac.length) mac.copy(packet, offset);
+  return new Promise((resolveSend, reject) => {
+    const socket = createSocket('udp4');
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener('abort', abort);
+      try { socket.close(); } catch { /* Socket may not have bound before cancellation. */ }
+      if (error) reject(error); else resolveSend();
+    };
+    const abort = () => finish(signal.reason);
+    if (signal?.aborted) { abort(); return; }
+    signal?.addEventListener('abort', abort, { once: true });
+    socket.once('error', finish);
+    socket.bind(0, () => {
+      if (settled) { socket.close(); return; }
+      try {
+        socket.setBroadcast(true);
+        socket.send(packet, wake.port, wake.broadcastAddress, finish);
+      } catch (error) { finish(error); }
+    });
+  });
 }
 
 export function validateJob(job, models, now = Date.now()) {
   assert(keys(job, ['id', 'model', 'messages', 'options', 'expiresAt']) && text(job.id, 200), 'Invalid job shape');
   assert(models.includes(job.model) && text(job.model, 128), 'Job model is not advertised');
-  assert(typeof job.expiresAt === 'string' && Number.isFinite(Date.parse(job.expiresAt)) && Date.parse(job.expiresAt) > now && Date.parse(job.expiresAt) <= now + 90_000, 'Invalid job deadline');
+  jobDeadline(job, now);
   assert(Array.isArray(job.messages) && job.messages.length > 0 && job.messages.length <= 8, 'Invalid job messages');
   let total = 0;
   for (const message of job.messages) {
@@ -99,7 +151,7 @@ export async function loadIdentity(config) {
   let state = { appOrigin: config.appOrigin, publicKey, advertisedModels: [...config.models] };
   try {
     state = JSON.parse(await readPrivate(statePath));
-    assert(object(state) && state.appOrigin === config.appOrigin && state.publicKey === publicKey && Array.isArray(state.advertisedModels) && state.advertisedModels.every((model) => text(model, 128)) && (!state.hostId || text(state.hostId, 200)), 'Host state does not match this app and key');
+    assert(keys(state, ['appOrigin', 'publicKey', 'advertisedModels', 'hostId']) && state.appOrigin === config.appOrigin && state.publicKey === publicKey && Array.isArray(state.advertisedModels) && state.advertisedModels.every((model) => text(model, 128)) && (state.hostId === undefined || text(state.hostId, 200)), 'Host state does not match this app and key');
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
   let saving = Promise.resolve();
   const save = () => {
@@ -154,36 +206,19 @@ export class Connector {
       assert(text(this.haToken, 16384) && !/\s/.test(this.haToken), 'Invalid Home Assistant token file');
     }
     const { state } = this.identity;
-    if (state.hostId && (state.approved || Date.parse(state.expiresAt) > Date.now())) {
-      if (!state.approved) this.log(`Pairing code: ${state.code} (expires ${state.expiresAt}). Approve it in the app host desk.`);
-      return;
-    }
-    const pairing = await fetchJson(`${this.config.appOrigin}${API}pair`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ publicKey: this.identity.publicKey, name: this.config.name }) }, 10_000, this.signal);
-    assert(object(pairing) && /^[A-HJ-NP-Z2-9]{8}$/.test(pairing.code) && text(pairing.hostId, 200) && Number.isFinite(Date.parse(pairing.expiresAt)) && Date.parse(pairing.expiresAt) > Date.now() && Date.parse(pairing.expiresAt) <= Date.now() + 600_000, 'Invalid pairing response');
-    Object.assign(state, { hostId: pairing.hostId, code: pairing.code, expiresAt: pairing.expiresAt, approved: false });
+    if (state.hostId) return;
+    assert(this.config.pairingCode, 'Create an owner invitation in the app and set pairingCode before first registration');
+    const pairing = await fetchJson(`${this.config.appOrigin}${API}pair`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: this.config.pairingCode, publicKey: this.identity.publicKey, name: this.config.name }) }, 10_000, this.signal);
+    assert(keys(pairing, ['hostId']) && text(pairing.hostId, 200), 'Invalid pairing response');
+    state.hostId = pairing.hostId;
     await this.identity.save();
-    this.log(`Pairing code: ${pairing.code} (expires ${pairing.expiresAt}). Approve it in the app host desk.`);
+    this.log('Host registered. Remove pairingCode from the local configuration.');
   }
 
   async app(action, body, timeout = 10_000) {
     const raw = JSON.stringify(body);
     const pathname = `${API}${action}`;
-    const wasApproved = Boolean(this.identity.state.approved);
-    let result;
-    try {
-      result = await fetchJson(`${this.config.appOrigin}${pathname}`, { method: 'POST', body: raw, headers: signedHeaders(this.identity.privateKey, this.identity.state.hostId, pathname, raw) }, timeout, this.signal);
-    } catch (error) {
-      error.wasApproved = wasApproved;
-      throw error;
-    }
-    if (!this.identity.state.approved) {
-      this.identity.state.approved = true;
-      delete this.identity.state.code;
-      delete this.identity.state.expiresAt;
-      await this.identity.save();
-      this.log('Host pairing approved.');
-    }
-    return result;
+    return fetchJson(`${this.config.appOrigin}${pathname}`, { method: 'POST', body: raw, headers: signedHeaders(this.identity.privateKey, this.identity.state.hostId, pathname, raw) }, timeout, this.signal);
   }
 
   async discover(timeout = 4000) {
@@ -206,18 +241,26 @@ export class Connector {
 
   async heartbeat() {
     const reachable = await this.discover();
-    await this.app('heartbeat', { models: this.models, ollamaReachable: reachable, awake: reachable, canWake: Boolean(this.config.homeAssistant) });
+    await this.app('heartbeat', { models: this.models, ollamaReachable: reachable, awake: reachable, canWake: Boolean(this.config.homeAssistant || this.config.wakeOnLan) });
   }
 
   async execute(job) {
     let result;
     let deadline;
     try {
-      const body = validateJob(job, this.models);
-      deadline = Date.parse(job.expiresAt);
+      const now = Date.now();
+      const body = validateJob(job, this.models, now);
+      deadline = jobDeadline(job, now);
       let reachable = await this.discover(Math.min(4000, deadline - Date.now()));
-      if (!reachable && this.config.homeAssistant) {
-        await fetchJson(`${this.config.homeAssistant.url}/api/services/script/${WAKE_SCRIPT}`, { method: 'POST', headers: { authorization: `Bearer ${this.haToken}`, 'content-type': 'application/json' }, body: '{}' }, Math.min(5000, deadline - Date.now()), this.signal);
+      if (!reachable && (this.config.homeAssistant || this.config.wakeOnLan)) {
+        if (this.config.wakeOnLan) {
+          const remaining = deadline - Date.now();
+          assert(remaining > 0, 'Job deadline elapsed');
+          const signal = AbortSignal.timeout(remaining);
+          await sendWakePacket(this.config.wakeOnLan, this.signal ? AbortSignal.any([this.signal, signal]) : signal);
+        } else {
+          await fetchJson(`${this.config.homeAssistant.url}/api/services/script/${WAKE_SCRIPT}`, { method: 'POST', headers: { authorization: `Bearer ${this.haToken}`, 'content-type': 'application/json' }, body: '{}' }, Math.min(5000, deadline - Date.now()), this.signal);
+        }
         while (!reachable && Date.now() < deadline) {
           await delay(Math.min(2000, deadline - Date.now()), this.signal);
           reachable = await this.discover(Math.min(4000, deadline - Date.now()));
@@ -249,9 +292,8 @@ export class Connector {
         }
       } catch (error) {
         if (this.signal?.aborted) return;
-        if ((error.status === 403 || error.status === 401) && error.wasApproved) throw new Error('Host authorization rejected; stop this connector and check revocation in the app');
-        if (error.status === 403 && !this.identity.state.approved && Date.parse(this.identity.state.expiresAt) <= Date.now()) throw new Error('Pairing expired; restart to request a new code');
-        if (error.status !== 403) this.log(`${kind === 'heartbeat' ? 'Heartbeat' : 'Poll'} unavailable; retrying without exposing endpoint details.`);
+        if (error.status === 403 || error.status === 401) throw new Error('Host authorization rejected; stop this connector and check revocation in the app');
+        this.log(`${kind === 'heartbeat' ? 'Heartbeat' : 'Poll'} unavailable; retrying without exposing endpoint details.`);
         await delay(3000, this.signal).catch(() => {});
       }
       await delay(kind === 'heartbeat' ? 20_000 : 250, this.signal).catch(() => {});
@@ -279,5 +321,5 @@ export async function main(argv = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  main().catch(() => { console.error('Connector stopped. Check configuration, owner-only key/token permissions, pairing expiry and host approval/revocation. No endpoint credentials were logged.'); process.exitCode = 1; });
+  main().catch(() => { console.error('Connector stopped. Check configuration, owner-only key/token permissions, invitation expiry and host revocation. No endpoint credentials were logged.'); process.exitCode = 1; });
 }
