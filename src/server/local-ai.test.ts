@@ -5,7 +5,7 @@ import type { LocalAiRequest } from './local-ai-types.ts';
 import { LocalStore } from './store.ts';
 import { executeAiRequest, libraryOwner, purgeVisitorText, readAiRequest, sweepAiText } from './local-ai.ts';
 import { localAiUsage } from './local-ai-operations.ts';
-import { inspectAiReceipt, recoverExpiredUnsignedSettlement, validatePaymentPayload, verifyCanonicalTransfer, type AiPaidRecord, type AiPayment } from './local-ai-payment.ts';
+import { facilitatorAccount, inspectAiReceipt, recoverExpiredUnsignedSettlement, validatePaymentPayload, verifyCanonicalTransfer, type AiPaidRecord, type AiPayment } from './local-ai-payment.ts';
 import { prepareInferencePayment } from '../wallets/inference-signing.ts';
 import { validateEvmSigningRequest } from '../wallets/signing-policy.ts';
 import { revokeVisitor } from './local-ai-session.ts';
@@ -436,4 +436,22 @@ test('expired unsigned fee envelope is fenced and released, but signed ambiguity
     assert.equal(await recoverExpiredUnsignedSettlement(store, key, payer, payee, rpc, facilitator, 2_000_000), false);
     assert.equal((await store.get<{ id: string }>('local-ai:fee-lane'))?.id, id);
   } finally { await store.close(); }
+});
+
+test('a facilitator key from the environment wins over the key file and must be a private key', async () => {
+  const saved = { key: process.env.LOCAL_AI_FACILITATOR_PRIVATE_KEY, file: process.env.LOCAL_AI_FACILITATOR_KEY_FILE };
+  const key = `0x${'1'.repeat(64)}` as Hex;
+  try {
+    // The file does not exist: only the environment can supply the key.
+    process.env.LOCAL_AI_FACILITATOR_KEY_FILE = '/nonexistent/facilitator.key';
+    process.env.LOCAL_AI_FACILITATOR_PRIVATE_KEY = key;
+    assert.equal((await facilitatorAccount()).address, privateKeyToAccount(key).address);
+    process.env.LOCAL_AI_FACILITATOR_PRIVATE_KEY = 'not-a-key';
+    await assert.rejects(facilitatorAccount(), /Invalid dedicated facilitator key/);
+    delete process.env.LOCAL_AI_FACILITATOR_PRIVATE_KEY;
+    await assert.rejects(facilitatorAccount(), /ENOENT/);
+  } finally {
+    if (saved.key === undefined) delete process.env.LOCAL_AI_FACILITATOR_PRIVATE_KEY; else process.env.LOCAL_AI_FACILITATOR_PRIVATE_KEY = saved.key;
+    if (saved.file === undefined) delete process.env.LOCAL_AI_FACILITATOR_KEY_FILE; else process.env.LOCAL_AI_FACILITATOR_KEY_FILE = saved.file;
+  }
 });

@@ -68,7 +68,7 @@ Supplied when the container runs, never built in, with two exceptions: the image
 
 The hosted app uses the [outbound host connector](../host-connector/README.md), not a VPN or an inbound home-network connection ([ADR 0013](adr/0013-outbound-host-connector.md)). Ollama has no authentication and must stay private. The always-on Linux device initiates HTTPS to `https://ledger.stadtstack.eu` and signs polls/results/heartbeats with its local Ed25519 key. The owner's default wake sends a tokenless UDP magic packet locally to desktop MAC `34:5A:60:69:E2:73`, broadcast `192.168.178.255`, port 9 (recorded read-only in the homelab package). Optional Home Assistant invokes only `script.desktop_ai_wake_gpu_host`, with a dedicated non-admin local token; HTTPS is required unless `homeAssistant.DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN` is explicitly `true` in the connector's JSON configuration.
 
-Hosted release requirements (the connector implementation does not modify `deploy/`):
+Hosted release requirements:
 
 | Setting/material | Required hosted value |
 |---|---|
@@ -78,7 +78,7 @@ Hosted release requirements (the connector implementation does not modify `deplo
 | `LOCAL_AI_MODEL` | Exact advertised model name, owner `qwen3.8:27b-ud-q3-k-xl`. Third-party paid answers cost 10000 atomic tUSDG; own-host compute has no payment. |
 | `LOCAL_AI_LIBRARY_ENABLED` | `0` on the public release. The isolated smoke enabled it only for synthetic, zero-cost requests. |
 | `LOCAL_AI_TEXT_GRACE_SECONDS` | `600` by default; keep the reconcile job's `local-ai` scope running. |
-| `LOCAL_AI_FACILITATOR_KEY_FILE` | Path of a dedicated funded Robinhood-testnet fee key, separate from payer and host payout. Copy the mounted Secret into a private volume using an init container, owner uid/gid 1000 and mode `0600`; mount that volume read-only into the app at this path. A group-readable Secret mount is rejected. Never put this key in the connector or image. |
+| `LOCAL_AI_FACILITATOR_PRIVATE_KEY` | The hosted build takes the dedicated Robinhood-testnet fee key from the Secret (it wins over `LOCAL_AI_FACILITATOR_KEY_FILE`, which stays the owner-only file for local runs). A key used only by this host, separate from payer and host payout; it can settle only Permit2 authorizations people already signed, to the payee and amount in them. It needs a little test ETH. Never put it in the connector or the image. |
 | App storage/replicas | Existing persistent SQLite volume (`ALLOW_LOCAL_STORE=1`, `LOCAL_DATABASE_PATH=/data/rental.sqlite`), exactly one app replica. Registry is durable; bounded jobs and leases are process-local and fail without charging after restart. |
 | Ingress timeout | At least 120 s. Connector polls are at most 25 s; pickup expires at 30 s and answer at 90 s, including wake time. |
 

@@ -33,8 +33,12 @@ SOLANA_RPC_URL=https://api.devnet.solana.com
 # Generate a fresh key used ONLY by this host; never reuse a personal wallet or commit the filled file.
 SOLANA_SPONSOR_KEYPAIR=REPLACE_ME
 
-# Optional dedicated Robinhood testnet price updater key (0x-prefixed 32-byte hex).
-# Its only contract power is pushing the mirror, bounded 20% per hour on-chain.
+# Dedicated Robinhood testnet price updater key (0x-prefixed 32-byte hex), the one the shared market's feed names as
+# its updater. Its only power is copying the TSLA price: at most one push per hour, within 20% of the previous one.
 # Fund only with test ETH from https://faucet.testnet.chain.robinhood.com/.
-# Without it or the shared-market manifest, price reconciliation is unconfigured.
-# ROBINHOOD_PRICE_UPDATER_PRIVATE_KEY=
+# Without it the price scope is unconfigured and the market pauses borrowing once the last price is 26 h old.
+ROBINHOOD_PRICE_UPDATER_PRIVATE_KEY=REPLACE_ME
+
+# Dedicated Robinhood testnet fee key for paid AI answers (0x-prefixed 32-byte hex), used only by this host. It settles
+# only Permit2 authorizations people already signed, to the payee and amount in them. Fund it with a little test ETH.
+LOCAL_AI_FACILITATOR_PRIVATE_KEY=REPLACE_ME

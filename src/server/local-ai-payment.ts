@@ -23,6 +23,13 @@ type FeeLane = { id: string; envelope: FeeEnvelope | null };
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 const keyFile = () => resolve(/* turbopackIgnore: true */ process.env.LOCAL_AI_FACILITATOR_KEY_FILE || '.testnet-secrets/local-ai/facilitator.key');
 export async function facilitatorAccount() {
+  // A hosted deployment supplies the key from its Secret, like the sponsor and price-updater keys; a local run keeps
+  // it in an owner-only file.
+  const fromEnvironment = process.env.LOCAL_AI_FACILITATOR_PRIVATE_KEY?.trim();
+  if (fromEnvironment) {
+    if (!/^0x[a-fA-F0-9]{64}$/.test(fromEnvironment)) throw new ConflictError('Invalid dedicated facilitator key.');
+    return privateKeyToAccount(fromEnvironment as Hex);
+  }
   const filename = keyFile();
   const metadata = await stat(/* turbopackIgnore: true */ filename);
   if (metadata.mode & 0o077) throw new ConflictError('Dedicated fee signer key is not owner-only.');
