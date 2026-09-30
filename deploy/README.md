@@ -1,6 +1,6 @@
 # Ledger of Life on the Talos cluster: Helm release for review
 
-**Live since 30 September** (Helm revision 1 from commit `090608b`; what was checked is in `docs/DEPLOYMENT.md`). Applying runs through `infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh` in `strausberg-zk-residency`, which opens the owner's rootless session and runs one mode of `deploy/apply.sh`; every change needs a typed confirmation. Test networks only; no real money. This is a bounded, digest-pinned release, not a claim of production readiness.
+**Live since 30 September.** Revision 1 from commit `090608b`; revision 2 from `ffb2d96` (image `sha256:6cbf8c0b…6193`) the same day. What was checked is in `docs/DEPLOYMENT.md`. Applying runs through `infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh` in `strausberg-zk-residency`, which opens the owner's rootless session and runs one mode of `deploy/apply.sh`; every change needs a typed confirmation. Test networks only; no real money. This is a bounded, digest-pinned release, not a claim of production readiness.
 
 ## Why helmfile
 
@@ -46,15 +46,15 @@ Read on 29 Sep 2026 through the read-only Freelens viewer, plus the owner's repo
 
 ## What you must supply or decide
 
-1. **Public GHCR image.** `.github/workflows/image.yml` (manual) builds `ghcr.io/giraeffleaeffle/ledger-of-life` for linux/amd64 from a pushed commit, with the public build arguments `NEXT_PUBLIC_PRIVY_APP_ID` and `APP_ORIGIN` (repository variables, set on 30 Sep) and `NEXT_PUBLIC_PRIVY_CLIENT_ID` (repository variable, not set yet). A first push creates a private package: make it public once in the package settings, because the cluster pulls without a secret. The job summary prints the digest.
+1. **Public GHCR image.** `.github/workflows/image.yml` builds `ghcr.io/giraeffleaeffle/ledger-of-life` for linux/amd64 when a tag `image-*` is pushed, with the public build arguments `NEXT_PUBLIC_PRIVY_APP_ID` and `APP_ORIGIN` (repository variables, set on 30 Sep). The package is public, because the cluster pulls without a secret. The job summary prints the digest.
 2. **Digest.** Paste that digest into `values/ledger.stadtstack.eu.yaml`. The empty default is intentional: neither rendering nor the script can proceed without `sha256:` plus 64 lowercase hex characters.
-3. **Privy app client.** In the Privy dashboard (App settings > Clients > Add app client, web), create a client whose Allowed Origins is only `https://ledger.stadtstack.eu`, and set its id as the repository variable `NEXT_PUBLIC_PRIVY_CLIENT_ID`. A client keeps the same users as the development app; Privy has no API for this, so it is a dashboard step. Fill the private Secret file outside this repository.
+3. **Privy.** Not needed any more: the owner added `https://ledger.stadtstack.eu` to the app's own Allowed Origins on 30 Sep, so no app client id is set. Fill the private Secret file outside this repository.
 4. **DNS is DONE.** `ledger` A → `77.42.11.9` was created 30 Sep 2026 and resolves to the public ingress load balancer. No AAAA; the apex address must not be copied. No CAA blocks Let's Encrypt.
 5. **SQLite acceptance.** There is no backup or restore test, and this volume holds account identifiers, selected cities and test tenancy records. The owner's production model is PostgreSQL with backups. Keep this small; do not call it production.
 
 ## Order
 
-Every external change requires the owner's approval. Nothing here was applied by the assistant.
+Every external change requires the owner's approval. Revision 1 was applied by the owner. Revision 2 (`--secret`, `--release`, `--network-test`) was run by the assistant through the same wrapper and typed confirmations, at the owner's explicit request, on 30 September.
 
 1. DNS is done. Privy: `https://ledger.stadtstack.eu` is in the app's own Allowed Origins (30 Sep; the wallet iframe's `frame-ancestors` lists it), so no app client id is needed.
 2. The image comes from `.github/workflows/image.yml`, run by pushing a tag `image-*` on a commit whose CI passed. Make the package public once, then paste the digest from the job summary into `deploy/values/ledger.stadtstack.eu.yaml`, commit and push.
@@ -136,8 +136,8 @@ Kubeconform was not available locally for revalidating the new hooks against Kub
 ## Not verified
 
 - **What the first release proved (30 September).** The wrapper's `--namespace`, `--secret` and `--release` modes against the live cluster; certificate issuance through the HTTP-01 solver policy; public readiness. The claim bound and the Hetzner volume attached (after one transient `FailedMount` while the device appeared), and the store opens on it as uid 1000, so `fsGroup` works: opening runs `CREATE TABLE`, and `/api/status` answers `storeAvailable: true`. A reconcile job completes every minute, and `scripts/reconcile.mjs` fails on any non-2xx answer, so the Secret, in-cluster DNS and the reconcile-to-web path work. Rollback was not exercised.
-- **NetworkPolicy enforcement.** The `kube-flannel` pods run a `kube-network-policies` container. The two-Pod Helm probe now exists but **has not been run on the cluster**. Until an owner runs `--network-test`, enforcement remains unverified: accepted policies could be ignored.
-- **The HAProxy source addresses.** The site answers through ingress, but this alone cannot distinguish correct sources from unenforced policies. A successful probe plus site reachability proves admission on the tested node, not which source clause or whether all addresses are needed.
+- **NetworkPolicy enforcement: proven on 30 September** (revision 2, `--network-test`). On the web pod's node: the `reconcile` identity got DNS and HTTP 200 from the web Service and timed out connecting to `api.privy.io:443`; the `isolated` identity timed out on DNS and on the web Service. So default deny, the reconcile policy and the web policy's admission of the reconcile identity are enforced. The limits listed under "NetworkPolicy enforcement probe" still apply (one node, point in time, web egress not probed).
+- **The HAProxy source addresses.** With enforcement proven on that node and the site answering through the ingress, HAProxy's real source is admitted there. Which clause admits it, and whether every listed address is needed, is still not known.
 - **The project atlas.** No project atlas is deployed. Hosted values explicitly set `STADTSTACK_ATLAS_URL` empty; city choice and bundled snapshots remain separate from the local research prototype.
 - **Resource sizes** (request 192 Mi, limit 768 Mi) come from about 120 MB idle in Docker. They were not load tested.
 - **No GPU path.** `LOCAL_AI_OLLAMA_URL` is unset, so the paid AI desk reports itself unconfigured. See `docs/DEPLOYMENT.md`, "The GPU".
