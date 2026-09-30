@@ -49,7 +49,7 @@ layers:  # product architecture, bottom-up
   - id: ownership
     concepts: [Asset, Position, TestFunds, BorrowAgainstShares, Venue, Distribution, Adapter]
   - id: local_services
-    concepts: [LocalInferenceRequest, InferencePayment, HostEconomicsScenario]
+    concepts: [LocalInferenceRequest, InferencePayment, InferenceHost, HostPairingInvitation, HostEconomicsScenario]
   - id: civic_system
     concepts: [Organization, CityEvent, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence]
   - id: vision
@@ -441,15 +441,17 @@ concepts:
     code: [src/data/local-investments.ts, src/components/local-investments.tsx, src/components/city-flywheel.tsx, src/server/local-investments.ts, app/api/local-investments/route.ts, contracts/evm/src/testnet/FictionalCityUnit.sol]
 
   LocalInferenceRequest:
-    definition: An owned immutable question executed on the configured local Ollama model, with a persisted result and measured token/timing observations; never a canned or fallback model answer.
-    relations: {requested_by: Person or visitor session, served_by: Adapter, may_require: InferencePayment}
+    definition: An owned immutable question executed through an outbound paired Ollama connector or the configured direct local endpoint; complete results and reported token/timing observations are persisted, never replaced by canned answers.
+    relations: {requested_by: Person or visitor session, served_by: InferenceHost or Adapter, may_require: InferencePayment}
     lifecycle: [payment_required, approval_required, ready, running, settling, completed, failed, interrupted, expired]
     invariants:
-      - Server configuration fixes provider, model and options; request fingerprint and ownership cannot change on replay.
+      - Server configuration fixes model and options; the quote binds provider host, payout wallet, question privacy scope and ownership, which cannot change on replay.
       - A complete paid result is persisted before settlement and delivered only with a confirmed receipt.
+      - A person's own paired host is their own compute, with no x402 authorization, payout or receipt; its completed answer is delivered without requiring token balances or a facilitator.
       - Incomplete or interrupted inference never becomes paid revenue; an unresolved payment reuses its exact journal rather than recomputing the answer.
+      - A connector host reads questions in clear; city hosts receive only explicitly public questions, while own-host-only is the default. Signatures do not prove which model ran or prevent host retention.
       - Free access establishes a revocable HttpOnly visitor session before execution, permits three attempts per visitor and thirty per UTC day, and creates no paid receipt.
-      - Clearing a visitor session revokes saved and in-flight access and removes that visitor's saved question and answer text at once; it does not revoke the person's independent paid receipts.
+      - Clearing a visitor session cancels its connector jobs and reservations, interrupts in-flight requests and removes both text fields before reporting cleared; a synchronous visitor lease fences late answer persistence. A host that already fetched a question cannot be made to forget it.
       - Question and answer text is retained only while the request is running, settling or has a payment in flight, then removed after a grace period (default 600 s, `LOCAL_AI_TEXT_GRACE_SECONDS`); fingerprint, usage, state and the payment receipt are kept. A removed request shows no text. On the SQLite store the removal also reaches the database file and its write-ahead log (`secure_delete` plus a truncating checkpoint, `Store.reclaim`); on Postgres, dead rows remain until autovacuum.
     reality: prototype
     code: [src/server/local-ai.ts, src/server/local-ai-retention.ts, src/server/local-ai-runtime.ts, src/server/local-ai-session.ts, src/components/local-ai.tsx, "app/(wallet)/library/page.tsx"]
@@ -463,8 +465,39 @@ concepts:
       - Request ownership and a globally reserved payer/nonce bind authorization to one immutable request; base Permit2 does not cryptographically sign the prompt.
       - Immutable unsigned envelope and exact signed bytes are durable before broadcast; canonical receipt and matching token effects establish settlement.
       - Only settled transfers count as recorded receipts; signatures, quotes, failed jobs and free access do not.
+      - Own-compute answers are counted separately and never contribute to paid answers or settled revenue.
     reality: testnet_real
     code: [src/server/local-ai-payment.ts, src/server/local-ai-operations.ts, src/wallets/inference-signing.ts, src/components/local-ai-payment.ts, scripts/setup-local-ai-facilitator.mjs]
+
+  HostPairingInvitation:
+    definition: An allowlisted authenticated owner's private one-time capability to register an outbound connector key to that account and its selected verified payout wallet.
+    relations: {created_by: Person, consumed_by: InferenceHost}
+    lifecycle: [issued, consumed, expired]
+    invariants:
+      - The twelve-character code is shown once, stored only as SHA-256, expires in ten minutes and is consumed atomically with registration.
+      - Only a verified EVM account in LOCAL_AI_HOST_OWNER_WALLETS creates invitations; no unauthenticated request can spend shared host or invitation capacity without a valid invitation.
+      - A bounded canonical Ed25519 key and body are validated before coarse per-source rate accounting; there is no shared global pairing window.
+    reality: prototype
+    code: [src/server/local-ai-hosts.ts, app/api/local-ai/hosts/invitations/route.ts, src/components/local-ai-host.tsx]
+
+
+  InferenceHost:
+    definition: An operator-invited account's GPU reached exclusively through an outbound Ed25519-authenticated connector, with a verified EVM payout wallet and reported models and liveness.
+    relations: {owned_by: Person, paired_by: HostPairingInvitation, serves: LocalInferenceRequest, may_receive: InferencePayment}
+    lifecycle: [active, revoked]
+    invariants:
+      - Registration consumes an owner-created hashed invitation and binds its account, verified payout and connector public key; no public pending hosts or owner account identifiers appear in status.
+      - The private key stays on the connector; tokenless UDP Wake-on-LAN is the owner default. Optional Home Assistant requires HTTPS absent an explicit plaintext trusted-LAN opt-in and uses a dedicated non-admin local token; the app never dials a connector-supplied URL.
+      - Signed method, path, timestamp, nonce and body hash prevent tampering and replay within a sixty-second clock window.
+      - A recent heartbeat reports online or asleep; absent heartbeats report offline. Liveness and model names are host claims, not hardware or execution attestation.
+      - One slot is reserved per host before request state or quota changes; busy or unavailable quotes remain ready to resume. Assigned hosts alone fetch and answer bounded text-only jobs. Pickup expires after thirty seconds and completion after ninety seconds. Aborted polls release their waiter without claiming work.
+      - Queued question copies live only in bounded process memory and are discarded after completion, timeout, revocation or process exit; existing database retention rules still apply.
+      - Every connector request body has a three-second read deadline, and malformed signature headers are rejected before reading.
+      - LAN HTTP Ollama permits anyone on that transport to read questions or forge complete answers; host signatures and payment gating do not authenticate model execution.
+      - One app replica is required; multi-replica queue and coordinated leases are not built.
+    reality: prototype
+    code: [src/server/local-ai-hosts.ts, host-connector/connector.mjs, app/api/local-ai/hosts, src/components/local-ai-host.tsx]
+
 
   HostEconomicsScenario:
     definition: Editable thirty-day euro planning from assumed hardware allocation, whole-host watts, online hours, electricity tariff, other costs, prices and paid/free demand.

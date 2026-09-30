@@ -9,6 +9,7 @@ import { AI_BUDGET, AI_MAX_OUTPUT, AI_MODEL, AI_PRICE, AI_CONTEXT_TOKENS, aiRpc,
 import type { AiOwner, PaidAiOwner } from './local-ai.ts';
 import type { LocalAiApproval, LocalAiRequest, LocalAiServiceStatus, LocalAiUsageSummary } from './local-ai-types.ts';
 import { facilitatorAccount } from './local-ai-payment.ts';
+import { publicConnectorHosts } from './local-ai-hosts.ts';
 type ApprovalRecord = { signed: Hex | null; hash: Hex | null; transaction: NonNullable<LocalAiApproval['request']>['transaction'] };
 type RecordRow = { id: string; mode: string; owner: AiOwner; request: LocalAiRequest; approvalJournal: ApprovalRecord | null; completedAt?: string };
 function checked(record: RecordRow | null, owner: PaidAiOwner): asserts record is RecordRow {
@@ -120,7 +121,7 @@ export async function aiApproval(store: Store, id: string, owner: PaidAiOwner, a
   })).request.approval;
 }
 export async function localAiUsage(store: Store): Promise<LocalAiUsageSummary> {
-  const result: LocalAiUsageSummary = { successfulPaidRequests: 0, successfulLibraryRequests: 0, failedRequests: 0,
+  const result: LocalAiUsageSummary = { successfulPaidRequests: 0, successfulLibraryRequests: 0, successfulOwnRequests: 0, failedRequests: 0,
     pendingPayments: 0, knownInputTokens: 0, knownOutputTokens: 0, requestsWithoutUsage: 0,
     meanWallMs: null, meanTokensPerSecond: null, settledAtomic: '0', asset: TEST_USDG_ADDRESS,
     network: 'eip155:46630', model: AI_MODEL, lastSuccessAt: null };
@@ -133,8 +134,9 @@ export async function localAiUsage(store: Store): Promise<LocalAiUsageSummary> {
       if (request.state === 'failed' || request.state === 'interrupted') result.failedRequests++;
       if (request.mode === 'paid' && request.payment.state === 'pending') result.pendingPayments++;
       if (request.state !== 'completed') continue;
-      if (request.mode === 'paid') result.successfulPaidRequests++;
-      else result.successfulLibraryRequests++;
+      if (request.payment.state === 'settled') result.successfulPaidRequests++;
+      else if (request.mode === 'library') result.successfulLibraryRequests++;
+      else result.successfulOwnRequests = (result.successfulOwnRequests ?? 0) + 1;
       if (value.completedAt && (!result.lastSuccessAt || value.completedAt > result.lastSuccessAt))
         result.lastSuccessAt = value.completedAt;
       if (!request.usage) result.requestsWithoutUsage++;
@@ -154,10 +156,16 @@ export async function localAiUsage(store: Store): Promise<LocalAiUsageSummary> {
   return result;
 }
 export async function localAiStatus(store: Store, owner?: AiOwner): Promise<LocalAiServiceStatus> {
-  const configured = !!process.env.LOCAL_AI_OLLAMA_URL;
+  const hosts = await publicConnectorHosts(store, Date.now(), owner && 'subject' in owner ? owner.subject : undefined);
+  const connectorHosts = hosts.filter((host) => host.models.includes(AI_MODEL) && host.payoutWallet);
+  connectorHosts.sort((a, b) => Number(b.own) - Number(a.own) || Number(b.availability === 'online') - Number(a.availability === 'online'));
+  const direct = !!process.env.LOCAL_AI_OLLAMA_URL;
+  const selected = connectorHosts.find((host) => host.availability === 'online' || host.availability === 'asleep' && host.canWake);
+  const ownHostAvailable = !direct && connectorHosts.some((host) => host.own && (host.availability === 'online' || host.availability === 'asleep' && host.canWake));
+  const configured = direct || connectorHosts.length > 0;
   let reachable = false, modelResident = false, vramBytes: number | null = null, error: string | null = null, paidEnabled = false;
   let payee: Address | null = null;
-  if (configured) {
+  if (direct) {
     try {
       const response = await fetch(`${process.env.LOCAL_AI_OLLAMA_URL!.replace(/\/$/, '')}/api/ps`, { signal: AbortSignal.timeout(3000) });
       if (!response.ok) throw new Error('Local model status is unavailable.');
@@ -167,9 +175,11 @@ export async function localAiStatus(store: Store, owner?: AiOwner): Promise<Loca
       modelResident = !!resident;
       vramBytes = resident && Number.isFinite(resident.size_vram) ? resident.size_vram! : null;
     } catch { error = 'Local model endpoint is unreachable.'; }
-  } else error = 'Local model endpoint is not configured.';
-  try {
-    payee = await inferencePayee();
+  } else if (selected) { reachable = true; }
+  else error = configured ? 'Connector hosts are asleep or offline.' : 'No paired inference host is configured.';
+  if (!ownHostAvailable) try {
+    payee = direct ? await inferencePayee() : selected ? selected.payoutWallet as Address : null;
+    if (!payee) throw new ConflictError('No online connector payout is available.');
     await assertInferenceContracts();
     const account = await facilitatorAccount();
     const gas = await aiRpc.getBalance({ address: account.address });
@@ -180,7 +190,7 @@ export async function localAiStatus(store: Store, owner?: AiOwner): Promise<Loca
   let wallet: LocalAiServiceStatus['wallet'] = null;
   if (owner && 'payer' in owner) {
     wallet = { walletId: owner.walletId, address: owner.payer, cashAtomic: null, nativeAtomic: null, allowanceAtomic: null, error: null };
-    try {
+    if (!ownHostAvailable) try {
       const [cash, native, allowance] = await Promise.all([
         aiRpc.readContract({ address: TEST_USDG_ADDRESS, abi: aiTokenAbi, functionName: 'balanceOf', args: [owner.payer] }),
         aiRpc.getBalance({ address: owner.payer }),
@@ -197,12 +207,13 @@ export async function localAiStatus(store: Store, owner?: AiOwner): Promise<Loca
     remainingRequests = Math.min(remainingRequests, Math.max(0, 3 - (quota?.count ?? 0)));
   } else remainingRequests = Math.min(remainingRequests, 3);
   const usage = await localAiUsage(store);
-  return { configured, reachable, model: AI_MODEL, contextTokens: AI_CONTEXT_TOKENS, maxOutputTokens: AI_MAX_OUTPUT,
+  return { configured, reachable, model: AI_MODEL, contextTokens: AI_CONTEXT_TOKENS, maxOutputTokens: AI_MAX_OUTPUT, hosts: direct ? [] : hosts,
+    mode: direct ? 'direct' : 'connector', availability: direct ? reachable ? 'online' : 'offline' : selected?.availability ?? 'offline', ownHostAvailable,
     lastSuccessAt: usage.lastSuccessAt, modelResident, vramBytes,
-    hardwareLabel: process.env.LOCAL_AI_HARDWARE_LABEL || 'Local inference host',
+    hardwareLabel: direct ? process.env.LOCAL_AI_HARDWARE_LABEL || 'Local inference host' : selected?.name || 'Outbound connector hosts',
     paidEnabled: paidEnabled && configured && reachable, error,
     price: payee ? { network: 'eip155:46630', asset: TEST_USDG_ADDRESS, symbol: 'tUSDG', decimals: 6,
       amountAtomic: AI_PRICE.toString(), payTo: payee, permit2: PERMIT2_ADDRESS,
       proxy: '0x402085c248EeA27D92E8b30b2C58ed07f9E20001', approvalBudgetAtomic: AI_BUDGET.toString() } : null,
-    wallet, library: { enabled: free && configured && reachable, maxOutputTokens: AI_MAX_OUTPUT, remainingRequests } };
+    wallet, library: { enabled: free && direct && reachable, maxOutputTokens: AI_MAX_OUTPUT, remainingRequests } };
 }

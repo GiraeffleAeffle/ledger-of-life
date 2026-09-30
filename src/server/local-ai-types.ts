@@ -19,6 +19,12 @@ export interface LocalAiApproval {
   id: string; state: 'review' | 'pending' | 'completed' | 'failed' | 'expired';
   budgetAtomic: string; request: EvmSigningRequest | null; hash: string | null; error: string | null;
 }
+export interface ConnectorHostStatus {
+  id: string; name: string; own: boolean; payoutWallet: string | null; models: string[];
+  lastHeartbeat: number | null; state: 'pending' | 'active' | 'revoked';
+  ollamaReachable: boolean; awake: boolean; availability: 'online' | 'asleep' | 'offline';
+  canWake?: boolean;
+}
 export interface LocalAiRequest {
   id: string; mode: LocalAiMode;
   state: 'payment_required' | 'approval_required' | 'ready' | 'running' | 'settling' | 'completed' | 'failed' | 'interrupted' | 'expired';
@@ -26,6 +32,8 @@ export interface LocalAiRequest {
   createdAt: string; expiresAt: string; answer: string | null; purgedAt?: string | null; usage: LocalAiRequestUsage | null; error: string | null;
   payment: { state: 'none' | 'quoted' | 'authorized' | 'pending' | 'settled' | 'failed'; amountAtomic: string; receipt: SettleResponse | null };
   review: InferencePaymentReview | null; paymentRequired: PaymentRequired | null; approval: LocalAiApproval | null;
+  host?: { id: string; name: string; own: boolean; payoutWallet: string | null };
+  hostScope?: 'own' | 'city'; publicQuestion?: boolean;
 }
 export interface LocalAiServiceStatus {
   configured: boolean; reachable: boolean; model: string; contextTokens: number; maxOutputTokens: number;
@@ -34,9 +42,12 @@ export interface LocalAiServiceStatus {
   price: null | { network: 'eip155:46630'; asset: string; symbol: string; decimals: 6; amountAtomic: string; payTo: string; permit2: string; proxy: string; approvalBudgetAtomic: string };
   wallet: null | { walletId: string; address: string; cashAtomic: string | null; nativeAtomic: string | null; allowanceAtomic: string | null; error: string | null };
   library: { enabled: boolean; maxOutputTokens: number; remainingRequests: number | null };
+  hosts?: ConnectorHostStatus[]; hostPairingAllowed?: boolean;
+  mode?: 'direct' | 'connector'; availability?: 'online' | 'asleep' | 'offline'; ownHostAvailable?: boolean;
 }
 export interface LocalAiUsageSummary {
   successfulPaidRequests: number; successfulLibraryRequests: number; failedRequests: number; pendingPayments: number;
+  successfulOwnRequests?: number;
   knownInputTokens: number; knownOutputTokens: number; requestsWithoutUsage: number;
   meanWallMs: number | null; meanTokensPerSecond: number | null; settledAtomic: string;
   asset: string | null; network: string | null; model: string; lastSuccessAt: string | null;

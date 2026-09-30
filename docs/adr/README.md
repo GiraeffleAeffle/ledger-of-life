@@ -18,6 +18,7 @@ These records cover the separate rental asset-building hackathon project. They d
 | [0010](0010-one-home-per-feature.md)                            | Accepted                             | Give every feature one home area where it is operated; every other area shows a one-line reference that links there.   |
 | [0011](0011-ask-for-recovery-at-the-first-wallet-action.md)     | Accepted                             | End setup after the passkey, backup email and two wallets; ask for the second-browser recovery proof at the first wallet action on a tenancy. |
 | [0012](0012-public-pages-outside-the-wallet-group.md)           | Accepted                             | Mount the wallet SDK only in the `(wallet)` route group, so public pages such as the welcome guide load nothing from a third party. |
+| [0013](0013-outbound-host-connector.md)                       | Accepted                             | Pair outbound Ed25519 GPU connectors; keep the home LAN private, bind payment to the host, and disclose cleartext questions and absent model attestation. |
 
 ## Coverage of the three implementation plans
 
