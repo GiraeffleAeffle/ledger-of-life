@@ -12,6 +12,11 @@
 scripts/*
 !scripts/reconcile.mjs
 
+# Self-hosted fonts (SIL OFL files and their licence), served from /fonts by the standalone server.
+!public
+public/*
+!public/fonts
+
 # The published city data the Places area reads at runtime. Its collector cache and node_modules stay out.
 !stadtstack-data
 stadtstack-data/*

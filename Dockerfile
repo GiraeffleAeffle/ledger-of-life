@@ -53,6 +53,8 @@ ENV NODE_ENV=production \
 RUN mkdir /data /app/.next /app/.next/cache && chown -R node:node /data /app/.next
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
+# Standalone output does not include public/; the server serves it from ./public (the self-hosted fonts).
+COPY --chown=node:node public ./public
 COPY --chown=node:node stadtstack-data/out ./stadtstack-data/out
 # Public testnet deployments read at their default paths: Local stakes and the AI desk's payee
 # (src/server/local-investments.ts), and the shared loan market and its price mirror (src/server/shared-market.ts,
