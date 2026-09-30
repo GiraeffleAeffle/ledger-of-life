@@ -171,7 +171,7 @@ sequenceDiagram
 | Landlord | Account → rent out a home → choose applicant → invite arbitrator → accept → create deposit space → propose deduction at move-out → payout |
 | Arbitrator | Account → join by invitation → decide a dispute |
 | Any owner | Connect adapters → see everything owned |
-| Local owner/customer | Available shares → separately signed collateral and loan → housing/company units → an owned local AI answer and checked x402 receipt; free library access is an independent visitor service |
+| Local owner/customer | Available shares → separately signed collateral and loan → housing/company units → an owned AI answer; own-host compute has no payment, while a city-host answer has a checked x402 receipt; free library access is an independent visitor service |
 
 In each tenancy phase exactly one person has an action; everyone else sees what they are waiting for (`src/server/journey.ts`).
 
@@ -181,19 +181,30 @@ local Ollama endpoint) produces actual answers and reports usage. The quote bind
 and its verified payout wallet. Own-host-only is the default; routing to city hosts requires
 marking the question public. The host reads the question in clear, and neither a signature
 nor a model label proves which model ran or whether the host retained a copy.
+A person's own paired host has no payout, authorization or receipt: their own compute
+works with a single verified EVM wallet and requires neither token balances nor a facilitator.
 An **InferencePayment** uses official x402 v2 exact/Permit2 and existing tUSDG; a finite
 allowance is not a completed payment. The result is saved before settlement, failed/incomplete
 inference is not charged, and canonical token effects establish revenue. A free library
 visitor has a separate revocable session, bounded attempts and no fabricated sponsor receipt.
 The **HostEconomicsScenario** is an editable euro calculation, not actual profit or a conversion
 of test receipts.
-An **InferenceHost** is paired by a ten-minute single-use public-key-bound code, approved
-by an operator-allowlisted account, and authenticated by Ed25519 request signatures with
-clock and replay checks. Its private key and optional Home Assistant wake token stay on
-the LAN connector. The server never connects into that LAN. Heartbeats distinguish online,
-asleep and offline; one lease allows only the assigned host to answer a bounded text-only
-job. Failed or timed-out jobs are not charged. The single-replica queue holds question copies
-only in memory, erased on completion, timeout, revocation or process exit.
+An allowlisted signed-in owner creates a **HostPairingInvitation**: a twelve-character
+code shown once, stored hashed, expiring in ten minutes and consumed once. The connector
+presents it with its locally generated public key to register the **InferenceHost** to that
+account and verified payout. Ed25519 request signatures enforce clock and replay checks.
+Public status has active hosts and caller-relative ownership, never the owner's account DID.
+Tokenless UDP Wake-on-LAN is the owner default; optional Home Assistant requires HTTPS
+unless explicitly opting into trusted-LAN plaintext, with a dedicated non-admin local token.
+LAN HTTP Ollama lets anyone on that transport read questions or forge complete replies,
+which payment gating cannot detect. The server never connects into that LAN.
+Heartbeats distinguish online, asleep and offline. One slot is reserved before consuming
+quota or starting a request; busy quotes remain ready to resume. Aborted polls cannot
+claim jobs, and short body-read deadlines limit unauthenticated holds. Clearing a visitor
+cancels queued jobs, interrupts requests and purges both text fields before success;
+revocation fences late answer persistence, but a host cannot be made to forget received text.
+Failed or timed-out jobs are not charged. The single-replica queue holds copies only in
+memory, erased on completion, timeout, revocation, clear or process exit.
 
 
 ## Where concepts live in code
@@ -214,6 +225,7 @@ only in memory, erased on completion, timeout, revocation or process exit.
 | LocalInferenceRequest and visitor access | `src/server/local-ai.ts`, `src/server/local-ai-runtime.ts`, `src/server/local-ai-session.ts`, `src/components/local-ai.tsx`, `app/(wallet)/library/page.tsx` |
 | InferencePayment | `src/server/local-ai-payment.ts`, `src/server/local-ai-operations.ts`, `src/wallets/inference-signing.ts`; explicit Permit2 review, owner/nonce binding and dedicated fee account |
 | InferenceHost | `src/server/local-ai-hosts.ts`, `app/api/local-ai/hosts/`, `host-connector/connector.mjs`, `src/components/local-ai-host.tsx`; outbound-only connector, invited pairing, signed jobs and heartbeat status |
+| HostPairingInvitation | `src/server/local-ai-hosts.ts`, `app/api/local-ai/hosts/invitations/route.ts`, `src/components/local-ai-host.tsx`; private, owner-created, hashed, ten-minute and single-use |
 | HostEconomicsScenario | `src/components/local-ai-economics.ts`, `src/components/local-ai-host.tsx`; euro assumptions separate from measured usage and settled test-token receipts |
 | Adapter catalogue, state and settings | `src/data/ledger-catalogue.ts`, `src/components/ledger-adapter-state.ts`, `src/components/ledger-adapters.tsx`, `src/components/adapter-settings.tsx`, `app/api/adapters/route.ts` |
 | Adapter observations (home solar, validator) | `src/server/adapters.ts`, `src/components/device-readings.tsx`, `app/api/assets/route.ts` (`?area=devices`); existing financial and public-data readers retain their own contracts |

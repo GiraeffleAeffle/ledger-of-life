@@ -82,21 +82,27 @@ if the preview deliberately overrides `DATABASE_URL=`, use that override for its
 `.env.example`; the Next server must reach that endpoint. Never publish Ollama or keys.
 **Hosted mode:** leave the direct URL empty and run the zero-dependency [outbound host
 connector](host-connector/README.md) on an always-on Linux device beside Ollama. It creates
-an owner-only Ed25519 key and prints a ten-minute pairing code. An account whose verified
-EVM wallet is in `LOCAL_AI_HOST_OWNER_WALLETS` can approve it in Money → Devices & income
-→ Pair hosts & income, choose its verified payout wallet, and revoke it there. The connector
-dials the app over HTTPS; the cluster never dials the home LAN. Optional Home Assistant
-wake credentials stay only on that device. See [ADR 0013](docs/adr/0013-outbound-host-connector.md)
+an owner-only Ed25519 key. An account whose verified EVM wallet is in
+`LOCAL_AI_HOST_OWNER_WALLETS` creates a private, single-use twelve-character invitation in
+Money → Devices & income → Pair hosts & income, chooses its verified payout, and puts the
+invitation in the connector's private configuration. The app shows it once, stores only its
+hash and expires it after ten minutes. Revoke the registered host in the same view.
+The connector dials the app over HTTPS; the cluster never dials the home LAN. Tokenless
+UDP Wake-on-LAN is the owner's default; optional Home Assistant requires HTTPS unless a
+loud trusted-LAN plaintext opt-in is configured. See [ADR 0013](docs/adr/0013-outbound-host-connector.md)
 and the exact [hosted release requirements](docs/DEPLOYMENT.md#the-gpu).
 
 - **Money → Devices & income → Local AI & GPU hosting** is the one home of this service; Me's GPU adapter, the project sketch's GPU option and the library profile link to it.
-- Personal access uses official **x402 v2 exact/Permit2**, the existing six-decimal `tUSDG`
-  on `eip155:46630`, and **0.01 tUSDG per completed answer**. The reviewed Permit2 allowance
-  is finite (**0.10 tUSDG**), and each answer needs its own bounded wallet authorization.
+- Other people's hosts use official **x402 v2 exact/Permit2**, the existing six-decimal `tUSDG`
+  on `eip155:46630`, and **0.01 tUSDG per completed answer**. Your own paired host is your
+  own compute: no authorization, payout, balance prerequisite or payment receipt. The reviewed Permit2 allowance
+  is finite (**0.10 tUSDG**), and each paid answer needs its own bounded wallet authorization.
   Connector quotes bind the selected host and its payout wallet; own hosts are preferred.
   Own-host-only is the default. City routing requires an explicitly public question:
   **the host reads the question in clear**, and nothing proves which model ran or whether
   that operator retained it. No confidential question should go to a third-party host.
+  LAN HTTP Ollama also allows anyone on that transport to read questions or forge replies;
+  use authenticated TLS or a trusted LAN. A shape-complete answer does not prove its model.
 - The model must produce a complete answer before settlement. Failed or length-capped
   inference is not charged; an already-sent allowance approval can still cost network gas.
   The saved output and exact settlement bytes survive an interrupted response, so recovery does not
@@ -108,8 +114,9 @@ and the exact [hosted release requirements](docs/DEPLOYMENT.md#the-gpu).
 - Set `LOCAL_AI_LIBRARY_ENABLED=1` to enable [the wallet-free desk](http://localhost:4175/library).
   It establishes an HttpOnly visitor session before inference, allows three attempts per
   visitor and thirty shared attempts per UTC day, with one model request at a time per host.
-  **Finish & clear this desk** revokes the visitor session and removes that visitor's saved
-  questions and answers now. No sponsor payment or paid receipt is fabricated for free access.
+  **Finish & clear this desk** revokes the visitor session, cancels its connector jobs and
+  purges saved and in-flight question/answer text before returning. A host that already
+  fetched a question cannot be made to forget it. No sponsor payment or receipt is fabricated.
 - Recorded token usage, request duration, decode rate and settled receipts are observations.
   The separate euro planner uses editable power, hardware, price and demand assumptions.
   It does not convert test receipts to fiat or treat one short GPU run as sustained capacity.
