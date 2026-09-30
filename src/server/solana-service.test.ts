@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 import {
+  address,
   generateKeyPairSigner,
   getAddressDecoder,
   getAddressEncoder,
@@ -21,12 +22,15 @@ import {
   type SolanaGateway,
   type SolanaSnapshot,
 } from './solana-rpc.ts';
+import { RpcInitializationGateway } from './solana-initialization.ts';
 import {
   deriveEscrowAddresses,
+  deriveKaminoAddresses,
   derivePayoutAddress,
   SOLANA_DEVNET_MANIFEST,
   SOLANA_IDS,
   SOLANA_MAINNET_MANIFEST,
+  SOLANA_TEST_USDC_MINT,
 } from '../finance/solana/index.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 
@@ -236,6 +240,182 @@ async function fixture() {
     sponsor,
   };
 }
+
+test('site test dollars fund cash only and forbid lending earnings even with donated cash', async () => {
+  const f = await fixture();
+  try {
+    f.config.ledgerDepositMint = SOLANA_TEST_USDC_MINT;
+    const t = f.snapshot.tenancy;
+    t.depositMint = SOLANA_TEST_USDC_MINT;
+    t.tenantDestination = await derivePayoutAddress(t.tenant, t.depositMint);
+    t.landlordDestination = await derivePayoutAddress(t.landlord, t.depositMint);
+    const op = await f.service.prepare(f.identity, 'test_dollars_funding', { kind: 'fund_and_supply' });
+    assert.equal(op.action.kind, 'fund');
+    assert.equal(op.steps, 1);
+    const cash = (await deriveEscrowAddresses(f.config.escrowProgram, t.tenant, t.leaseId)).cash;
+    assert.deepEqual(op.expectedDeltas.map((delta) => [delta.account, delta.mint, delta.direction, delta.minimumAtomic]), [
+      [t.tenantDestination, SOLANA_TEST_USDC_MINT, 'debit', t.requiredSecurityAtomic],
+      [cash, SOLANA_TEST_USDC_MINT, 'credit', t.requiredSecurityAtomic],
+    ]);
+    await f.service.authorize(f.identity, op.id, await f.sign(op));
+    f.state.receiptFinal = true;
+    f.snapshot.slot = '51';
+    t.nextNonce = '1';
+    t.phase = 'active';
+    t.accountedIdleAtomic = '3001000000';
+    f.snapshot.cashAtomic = t.accountedIdleAtomic;
+    assert.equal((await f.service.reconcile(f.identity, op.id)).state, 'finalized');
+    for (const action of [
+      { kind: 'supply', amountAtomic: '3000000000' },
+      { kind: 'release_earnings', amountAtomic: '1000000' },
+    ]) {
+      await assert.rejects(f.service.prepare(f.identity, `forbidden_${action.kind}`, action),
+        (error: unknown) => error instanceof Error && 'code' in error && error.code === 'action_not_available');
+    }
+  } finally {
+    await f.store.close();
+  }
+});
+
+test('an existing Circle tenancy keeps Circle ATAs and fund plus supply after configuration cutover', async () => {
+  const f = await fixture();
+  try {
+    f.config.ledgerDepositMint = SOLANA_TEST_USDC_MINT;
+    const view = await f.service.snapshot(f.identity);
+    assert.equal(view.tenancy.depositMint, SOLANA_DEVNET_MANIFEST.deposit.mint);
+    const op = await f.service.prepare(f.identity, 'legacy_circle_funding', { kind: 'fund_and_supply' });
+    assert.equal(op.action.kind, 'fund_and_supply');
+    assert.equal(op.steps, 2);
+    assert.deepEqual(op.expectedDeltas.map((delta) => [delta.account, delta.mint, delta.direction]), [
+      [f.snapshot.tenancy.tenantDestination, SOLANA_DEVNET_MANIFEST.deposit.mint, 'debit'],
+      [(await deriveEscrowAddresses(f.config.escrowProgram, f.tenant.address, f.snapshot.tenancy.leaseId)).receipts, f.config.receiptMint, 'credit'],
+    ]);
+    f.snapshot.tenancy.tenantDestination = await derivePayoutAddress(f.tenant.address, SOLANA_TEST_USDC_MINT);
+    await assert.rejects(f.service.snapshot(f.identity),
+      (error: unknown) => error instanceof Error && 'code' in error && error.code === 'tenancy_binding_mismatch');
+  } finally {
+    await f.store.close();
+  }
+});
+
+test('RPC uses each tenancy mint while new cash-only initialization retains the Circle reserve', async () => {
+  const f = await fixture();
+  try {
+    f.config.ledgerDepositMint = SOLANA_TEST_USDC_MINT;
+    f.config.marketAuthority = (await deriveKaminoAddresses(f.config.reserve, f.config.market)).marketAuthority;
+    const t = f.snapshot.tenancy;
+    t.marketAuthority = f.config.marketAuthority;
+    const derived = await deriveEscrowAddresses(f.config.escrowProgram, t.tenant, t.leaseId);
+    const code = new Uint8Array(1000).fill(1);
+    f.config.programSha256 = createHash('sha256').update(code).digest('hex');
+    const immutableLoader = 'BPFLoader2111111111111111111111111111111111';
+    const rows = new Map<string, { owner: string; executable: boolean; lamports: number; data: [string, string] }>();
+    const put = (key: string, owner: string, data: Uint8Array, executable = false) =>
+      rows.set(key, { owner, executable, lamports: 1_000_000, data: [Buffer.from(data).toString('base64'), 'base64'] });
+    const writeKey = (data: Uint8Array, offset: number, key: string) =>
+      data.set(getAddressEncoder().encode(address(key)), offset);
+    const token = (mint: string, owner: string, amount: bigint) => {
+      const data = new Uint8Array(165);
+      writeKey(data, 0, mint);
+      writeKey(data, 32, owner);
+      new DataView(data.buffer).setBigUint64(64, amount, true);
+      data[108] = 1;
+      return data;
+    };
+    const mint = (authority?: string) => {
+      const data = new Uint8Array(82);
+      data[44] = 6;
+      data[45] = 1;
+      if (authority) {
+        new DataView(data.buffer).setUint32(0, 1, true);
+        writeKey(data, 4, authority);
+      }
+      return data;
+    };
+    const reserve = new Uint8Array(8624);
+    reserve.set([43, 242, 204, 202, 26, 247, 59, 127]);
+    for (const [offset, key] of [[32, f.config.market], [128, f.config.depositMint], [160, f.config.liquiditySupply], [408, SOLANA_IDS.token], [2560, f.config.receiptMint]] as const)
+      writeKey(reserve, offset, key);
+    const reserveView = new DataView(reserve.buffer);
+    reserveView.setBigUint64(16, 50n, true);
+    reserveView.setBigUint64(224, 10_000_000_000n, true);
+    reserveView.setBigUint64(272, 6n, true);
+    const market = new Uint8Array(4664);
+    market.set([246, 114, 50, 98, 72, 157, 28, 120]);
+    put(f.config.escrowProgram, immutableLoader, code, true);
+    put(SOLANA_IDS.klend, immutableLoader, new Uint8Array(), true);
+    put(f.config.reserve, SOLANA_IDS.klend, reserve);
+    put(f.config.market, SOLANA_IDS.klend, market);
+    put(f.config.liquiditySupply, SOLANA_IDS.token, token(f.config.depositMint, f.config.marketAuthority, 10_000_000_000n));
+    put(f.config.receiptMint, SOLANA_IDS.token, mint(f.config.marketAuthority));
+    put(SOLANA_TEST_USDC_MINT, SOLANA_IDS.token, mint());
+    put(f.config.depositMint, SOLANA_IDS.token, mint());
+    const fetcher: typeof fetch = async (_url, options) => {
+      const request = JSON.parse(String(options?.body));
+      const result = request.method === 'getGenesisHash' ? f.config.genesisHash
+        : request.method === 'getMultipleAccounts'
+          ? { context: { slot: 50 }, value: request.params[0].map((key: string) => rows.get(key) ?? null) }
+          : undefined;
+      if (result === undefined) throw new Error('Unexpected RPC method');
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }));
+    };
+    for (const asset of [SOLANA_TEST_USDC_MINT, f.config.depositMint]) {
+      t.depositMint = asset;
+      t.tenantDestination = await derivePayoutAddress(t.tenant, asset);
+      t.landlordDestination = await derivePayoutAddress(t.landlord, asset);
+      put(t.tenantDestination, SOLANA_IDS.token, token(asset, t.tenant, 3_000_000_000n));
+      put(t.landlordDestination, SOLANA_IDS.token, token(asset, t.landlord, 2_000_000n));
+      const data = new Uint8Array(483);
+      data.set([251, 53, 106, 214, 69, 170, 131, 234]);
+      data.set(t.leaseId, 8);
+      let offset = 40;
+      for (const key of [t.tenant, t.landlord, t.arbitrator, t.depositMint, t.reserve, t.market, t.receiptMint, t.liquiditySupply, t.marketAuthority, t.tenantDestination, t.landlordDestination]) {
+        writeKey(data, offset, key);
+        offset += 32;
+      }
+      data.set(t.policyHash, offset);
+      offset += 32;
+      data[offset++] = 1;
+      const view = new DataView(data.buffer);
+      for (const amount of [t.requiredSecurityAtomic, '0', '0', '0', '0', '0', '0']) {
+        view.setBigUint64(offset, BigInt(amount), true);
+        offset += 8;
+      }
+      data[offset++] = 0;
+      data[offset] = t.bump;
+      put(t.address, f.config.escrowProgram, data);
+      put(derived.cash, SOLANA_IDS.token, token(asset, t.address, 7_000_000n));
+      put(derived.receipts, SOLANA_IDS.token, token(t.receiptMint, t.address, 0n));
+      const gateway = new RpcSolanaGateway(f.config, fetcher);
+      const observed = await gateway.snapshot();
+      assert.equal(observed.tenancy.depositMint, asset);
+      assert.equal(observed.cashAtomic, '7000000');
+      assert.equal(observed.tenantCashAtomic, '3000000000');
+      assert.equal(observed.landlordCashAtomic, '2000000');
+      put(derived.cash, SOLANA_IDS.token, token(key(99), t.address, 7_000_000n));
+      await assert.rejects(gateway.snapshot(), /finance token account/);
+    }
+    rows.delete(t.address);
+    rows.delete(derived.cash);
+    rows.delete(derived.receipts);
+    const tenantDestination = await derivePayoutAddress(t.tenant, SOLANA_TEST_USDC_MINT);
+    const landlordDestination = await derivePayoutAddress(t.landlord, SOLANA_TEST_USDC_MINT);
+    await new RpcInitializationGateway(f.config, fetcher).preflight({
+      tenant: t.tenant, landlord: t.landlord, tenantDestination, landlordDestination,
+      tenancyAddress: t.address, cashAddress: derived.cash, receiptAddress: derived.receipts,
+    });
+    // A Circle reserve is still required: the cash-only mint must not loosen its identity pin.
+    writeKey(reserve, 128, SOLANA_TEST_USDC_MINT);
+    put(f.config.reserve, SOLANA_IDS.klend, reserve);
+    await assert.rejects(new RpcInitializationGateway(f.config, fetcher).preflight({
+      tenant: t.tenant, landlord: t.landlord, tenantDestination, landlordDestination,
+      tenancyAddress: t.address, cashAddress: derived.cash, receiptAddress: derived.receipts,
+    }), /Lending account identity mismatch/);
+  } finally {
+    await f.store.close();
+  }
+});
+
 
 test('accepted tenancy rejects a substituted non-ATA payout destination', async () => {
   const f = await fixture();

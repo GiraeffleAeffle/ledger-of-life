@@ -76,11 +76,45 @@ function TestMoney({ request }: { request: Request }) {
     <h2 id="test-money-title">Test money</h2>
     <p>Nothing here has monetary value. Each chain&apos;s test tokens work only on that chain.</p>
     <ul className="test-money-list">
-      <li><strong>For the Home deposit (Solana devnet):</strong> test USDC from <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle&apos;s faucet</a>, sent to your Solana wallet (address in Me).</li>
+      <li><strong>For site-tUSDC Home deposits (Solana devnet):</strong> site-minted test USDC (tUSDC), below. These test tokens have no monetary value and are not Circle USDC.</li>
+      <li><strong>For existing Circle-USDC deposits and Solana portfolio trades only:</strong> <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle&apos;s devnet faucet</a> supplies their different legacy token. It cannot fund a site-tUSDC cash deposit.</li>
       <li><strong>For loans, lending, local stakes and paid AI answers (Robinhood Chain testnet):</strong> test ETH for fees and test dollars (tUSDG), below. Test TSLA for collateral comes from the <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet</a>.</li>
     </ul>
+    <TestUsdc request={request} />
     <TestDollars request={request} ethBalance={ethBalance} refresh={refresh} />
   </section>;
+}
+
+type TestUsdcResult = { status: 'unconfigured' } | { status: 'pending'; signature: string } | { status: 'confirmed'; signature: string; amountAtomic: string };
+
+/** The authenticated request helper binds this infrastructure faucet to the current account. */
+export function TestUsdc({ request }: { request: Request }) {
+  const wallet = useRentalWallet();
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<TestUsdcResult | null>(null);
+  const [error, setError] = useState('');
+  const hasWallet = wallet.wallets.some((item) => item.chainType === 'solana');
+  async function getTestUsdc() {
+    if (busy) return;
+    setBusy(true); setError('');
+    try {
+      const received = await request<TestUsdcResult>('/api/test-usdc', {});
+      setResult(received);
+      if (received.status === 'confirmed') window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'solana' } }));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Test USDC was not confirmed. Retry to check the same request.'); }
+    finally { setBusy(false); }
+  }
+  return <div className="test-usdc">
+    <p>Site-minted test USDC (tUSDC) · Solana devnet · tests only, no monetary value. Sent to your verified Solana wallet. Default allowance: 10,000 tUSDC once per 24 hours per account and wallet, subject to the site&apos;s daily cap.</p>
+    <button type="button" className="button primary" disabled={busy || !hasWallet} onClick={() => { void getTestUsdc(); }}>
+      {busy ? 'Checking test USDC…' : result?.status === 'pending' ? 'Check pending test USDC request' : 'Get test USDC (tUSDC)'}
+    </button>
+    {!hasWallet && <p>Connect your Solana wallet in Me first.</p>}
+    {result?.status === 'unconfigured' && <p className="note" role="status">The site test-USDC faucet is not configured. Circle&apos;s faucet supplies a different token and cannot fund a tUSDC deposit.</p>}
+    {result?.status === 'pending' && <p className="note" role="status">Test USDC mint pending. Check this request again to recover its result; do not start a separate mint. <a href={`https://explorer.solana.com/tx/${encodeURIComponent(result.signature)}?cluster=devnet`} target="_blank" rel="noopener noreferrer">View devnet transaction</a>.</p>}
+    {result?.status === 'confirmed' && <p className="note" role="status">{(Number(result.amountAtomic) / 1e6).toLocaleString('en-US', { maximumFractionDigits: 6 })} tUSDC received (no value). <a href={`https://explorer.solana.com/tx/${encodeURIComponent(result.signature)}?cluster=devnet`} target="_blank" rel="noopener noreferrer">View devnet transaction</a>.</p>}
+    {error && <p className="note" role="alert">{error}</p>}
+  </div>;
 }
 
 type RecordedOperation = { id: string; action: { kind: string; amountAtomic?: string }; role: string; state: string; createdAt: string; signature: string | null };

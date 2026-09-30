@@ -22,6 +22,7 @@ import {
   derivePayoutAddress,
   messageDigest,
   SOLANA_MAINNET_MANIFEST,
+  SOLANA_TEST_USDC_MINT,
   type EscrowAction,
   type ExpectedTokenDelta,
 } from '../finance/solana/index.ts';
@@ -183,6 +184,9 @@ export function decodeSolanaAction(value: unknown, source: string): ServiceActio
 function allowed(action: ServiceAction, role: string, snapshot: SolanaSnapshot, config: SolanaConfiguration) {
   const phase = snapshot.tenancy.phase;
   const pull = config.escrowVersion === 'pull-v2';
+  if (snapshot.tenancy.depositMint === SOLANA_TEST_USDC_MINT &&
+    (action.kind === 'supply' || action.kind === 'release_earnings' || action.kind === 'redeem'))
+    fail('action_not_available', 'This test-dollar deposit stays in cash and has no lending earnings.', 403);
   const valid =
     action.kind === 'fund' || action.kind === 'fund_and_supply'
       ? role === 'tenant' && phase === 'awaiting-funding'
@@ -372,8 +376,8 @@ export function createSolanaService(dependencies: Dependencies) {
       );
     const snapshot = await gateway.snapshot();
     const [tenantDestination, landlordDestination] = await Promise.all([
-      derivePayoutAddress(agreement.parties.tenant!.wallet.address, config.depositMint),
-      derivePayoutAddress(agreement.parties.landlord!.wallet.address, config.depositMint),
+      derivePayoutAddress(agreement.parties.tenant!.wallet.address, snapshot.tenancy.depositMint),
+      derivePayoutAddress(agreement.parties.landlord!.wallet.address, snapshot.tenancy.depositMint),
     ]);
     const t = snapshot.tenancy;
     if (
@@ -617,7 +621,10 @@ export function createSolanaService(dependencies: Dependencies) {
         fail('invalid_request_id', 'Use a stable request identifier.', 400);
       const verified = await access(identity),
         t = verified.snapshot.tenancy;
-      const action = decodeSolanaAction(input, t.tenantDestination);
+      const decoded = decodeSolanaAction(input, t.tenantDestination);
+      const action: ServiceAction = decoded.kind === 'fund_and_supply' && t.depositMint === SOLANA_TEST_USDC_MINT
+        ? { kind: 'fund', source: t.tenantDestination }
+        : decoded;
       allowed(action, verified.role, verified.snapshot, config);
       if ((action.kind === 'fund' || action.kind === 'fund_and_supply') &&
         atomic(verified.snapshot.tenantCashAtomic) < atomic(t.requiredSecurityAtomic))

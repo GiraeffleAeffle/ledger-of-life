@@ -259,6 +259,7 @@ concepts:
     lifecycle: [open, let | closed]   # closed: the landlord withdrew it before choosing; a chosen (let) listing cannot be cancelled
     relations: {offered_by: Person(landlord), receives: Application, results_in: Agreement}
     code: [src/server/listings.ts]
+    guidance: "Listing UI suggests three months' cold rent (900 → 2700 test USDC), follows rent edits until overridden, and explains §551 BGB's at-most-three-months security rule excluding separately stated operating costs; no legal advice or claim that token escrow meets legal requirements."
     reality: testnet_real   # off-chain record
 
   Application:
@@ -288,6 +289,9 @@ concepts:
       - Payouts go only to fixed, canonical recipient accounts.
       - Pull payouts; a party breaking its own account blocks only itself.
       - Each action consumes the next nonce; replays are rejected.
+      - Optional manifest ledgerDepositMint selects site-owned classic-Token tUSDC (6 decimals, BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE) for new tenancies only; existing tenancies keep their recorded mint.
+      - Site tUSDC is cash escrow, never supplied to KLend or lent, and earns nothing; any deposit earnings belong to the tenant.
+      - Absent ledgerDepositMint preserves the Circle devnet USDC and KLend path.
     relations: {secures: Agreement, supplies_to: YieldSource, produces: Earnings, settles_via: Settlement}
 
   Operation:
@@ -361,11 +365,13 @@ concepts:
   TestFunds:
     definition: How a Person gets test money with no value without an operator acting for them.
     implementations:
+      site_tusdc_faucet: {reality: testnet_real, note: "Authenticated same-origin POST /api/test-usdc mints site-owned classic-Token devnet tUSDC (6 decimals) to the account's verified Solana wallet. No value, not Circle USDC. Default 10000 tokens once per 24h per account and wallet, capped at 200 requests per UTC day; durable reservation and signed-mint recovery avoid duplicate retry mints. Returns unconfigured, pending with signature, or confirmed with signature and amountAtomic; errors are {error}. Server-only mint authority is a JSON byte array in the deployment Secret."}
       tusdg_self_mint: {reality: testnet_real, note: "The person's own wallet calls the open tUSDG mint on Robinhood Chain testnet (the token caps a call at 10,000; the app asks for 1,000). The server only checks and broadcasts that signed transaction."}
       robinhood_gas_drip: {reality: testnet_real, note: "Host-only infrastructure faucet sends exactly 0.00005 test ETH to the signed-in person's verified wallet below 0.00001 ETH: once per 24 hours per account and wallet, at most 200 per UTC day. Journaled transfers recover exact signed bytes; no operator acts for the person and no paymaster is used."}
       robinhood_faucet: {reality: testnet_real, note: "Robinhood's public faucet: test ETH for gas and the official test TSLA. External."}
-      circle_usdc_faucet: {reality: testnet_real, note: "Circle's public faucet: Solana devnet test USDC for a deposit. External."}
-    code: [src/server/test-dollars.ts, src/server/gas-drip.ts, src/components/test-dollars.tsx]
+      circle_usdc_faucet: {reality: testnet_real, note: "Circle's public faucet supplies the legacy Solana devnet USDC mint; existing Circle tenancies and manifests without ledgerDepositMint retain that path. Its tokens cannot fund a site-tUSDC tenancy."}
+    boundary: "Site tUSDC is tenancy cash and a separately reported wallet balance; Solana portfolio trades remain Circle-USDC-backed."
+    code: [src/server/test-dollars.ts, src/server/gas-drip.ts, src/server/test-usdc.ts, src/components/test-dollars.tsx, src/components/money-area.tsx, app/api/test-usdc/route.ts]
 
   Distribution:
     definition: Value an Asset pays its holder (dividends, rent, staking rewards, energy savings).

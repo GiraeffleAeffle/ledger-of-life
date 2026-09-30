@@ -20,6 +20,7 @@ import {
   decodeClassicTokenAccount,
   derivePayoutAddress,
   deriveEscrowAddresses,
+  ledgerDepositMint,
   messageDigest,
   SOLANA_IDS,
   validateKaminoAccounts,
@@ -61,7 +62,7 @@ export function leaseIdForAgreement(config: SolanaConfiguration, agreementId: st
   );
 }
 export async function payoutTokenAccount(config: SolanaConfiguration, owner: string) {
-  return derivePayoutAddress(owner, config.depositMint);
+  return derivePayoutAddress(owner, ledgerDepositMint(config));
 }
 
 type PartyRole = 'tenant' | 'landlord';
@@ -78,6 +79,7 @@ export type SolanaInitialization = {
   landlord: string;
   arbitrator: string;
   requiredSecurityAtomic: string;
+  depositMint?: string;
   releasePermitted: boolean;
   state: InitState;
   transactionBase64: string;
@@ -96,6 +98,7 @@ type View = Omit<SolanaInitialization, 'signatures' | 'signedTxBase64'> & {
   role: 'tenant' | 'landlord' | 'arbitrator';
   walletId: string;
   feePayer: string;
+  depositMint: string;
   cluster: 'devnet' | 'localnet';
   walletChain: 'solana:devnet' | null;
 };
@@ -127,7 +130,7 @@ export class RpcInitializationGateway extends RpcSolanaGateway implements Initia
       config.market,
       config.liquiditySupply,
       SOLANA_IDS.klend,
-      config.depositMint,
+      ledgerDepositMint(config),
       config.receiptMint,
       input.tenantDestination,
       input.landlordDestination,
@@ -162,7 +165,7 @@ export class RpcInitializationGateway extends RpcSolanaGateway implements Initia
           .getBigUint64(36, true)
           .toString(),
       },
-      { mint: config.depositMint, tokenProgram: SOLANA_IDS.token, decimals: 6 },
+      { mint: ledgerDepositMint(config), tokenProgram: SOLANA_IDS.token, decimals: 6 },
     );
     if (ready[5].data.length !== 82)
       throw new Error('Unreviewed lending receipt mint layout');
@@ -197,7 +200,7 @@ export class RpcInitializationGateway extends RpcSolanaGateway implements Initia
       const account = decodeClassicTokenAccount(row);
       if (
         account.authority !== owner ||
-        account.mint !== config.depositMint ||
+        account.mint !== ledgerDepositMint(config) ||
         !account.initialized ||
         account.frozen
       )
@@ -272,6 +275,7 @@ export function createSolanaInitializationService(input: {
     return {
       ...visible,
       setupMode: record.setupMode ?? 'joint',
+      depositMint: record.depositMint ?? config.depositMint,
       signedRoles: requiredRoles.filter((role) => Boolean(signatures[role])),
       role: verified.role,
       walletId: verified.wallet.id,
@@ -313,8 +317,8 @@ export function createSolanaInitializationService(input: {
       t.tenant !== verified.tenant ||
       t.landlord !== verified.landlord ||
       t.arbitrator !== verified.arbitrator ||
-      t.tenantDestination !== verified.tenantDestination ||
-      t.landlordDestination !== verified.landlordDestination ||
+      t.tenantDestination !== await derivePayoutAddress(verified.tenant, t.depositMint) ||
+      t.landlordDestination !== await derivePayoutAddress(verified.landlord, t.depositMint) ||
       t.requiredSecurityAtomic !== verified.agreement.requiredSecurity ||
       t.releasePermitted !== verified.agreement.releaseAllowed ||
       !['awaiting-funding', 'active', 'claim-proposed', 'disputed', 'settling', 'closed'].includes(t.phase)
@@ -456,6 +460,7 @@ export function createSolanaInitializationService(input: {
         landlord: verified.landlord,
         arbitrator: verified.arbitrator,
         requiredSecurityAtomic: verified.agreement.requiredSecurity,
+        depositMint: ledgerDepositMint(config),
         releasePermitted: verified.agreement.releaseAllowed,
         state: 'prepared',
         transactionBase64: Buffer.from(bytes).toString('base64'),

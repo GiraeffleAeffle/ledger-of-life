@@ -16,7 +16,7 @@ use litesvm::{types::TransactionResult, LiteSVM};
 use rental_escrow::{
     accounts, instruction,
     state::{Phase, Tenancy},
-    InitializeArgs, ID, TEST_USDC,
+    InitializeArgs, ID, LEDGER_TEST_USDC, TEST_USDC,
 };
 use solana_account::Account;
 use solana_keypair::Keypair;
@@ -28,12 +28,15 @@ use std::{path::PathBuf, str::FromStr};
 const PRINCIPAL: u64 = 3_000_000_000;
 const CLAIM: u64 = 120_000_000;
 fn ata(owner: Pubkey) -> Pubkey {
+    ata_for_mint(owner, TEST_USDC)
+}
+fn ata_for_mint(owner: Pubkey, mint: Pubkey) -> Pubkey {
     let program = Pubkey::from_str("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL").unwrap();
     Pubkey::find_program_address(
         &[
             owner.as_ref(),
             anchor_spl::token::ID.as_ref(),
-            TEST_USDC.as_ref(),
+            mint.as_ref(),
         ],
         &program,
     )
@@ -246,7 +249,17 @@ impl Fixture {
         );
         self.svm.send_transaction(tx)
     }
+    fn prepare_deposit_mint(&mut self, mint: Pubkey) {
+        put(&mut self.svm, mint, anchor_spl::token::ID, mint_data(self.tenant.pubkey(), PRINCIPAL));
+        self.tenant_token = ata_for_mint(self.tenant.pubkey(), mint);
+        self.landlord_token = ata_for_mint(self.landlord.pubkey(), mint);
+        put(&mut self.svm, self.tenant_token, anchor_spl::token::ID, token_data(mint, self.tenant.pubkey(), PRINCIPAL));
+        put(&mut self.svm, self.landlord_token, anchor_spl::token::ID, token_data(mint, self.landlord.pubkey(), 0));
+    }
     fn initialize(&mut self) {
+        self.initialize_with_mint(TEST_USDC).unwrap();
+    }
+    fn initialize_with_mint(&mut self, mint: Pubkey) -> TransactionResult {
         let ix = Instruction {
             program_id: ID,
             accounts: accounts::Initialize {
@@ -254,7 +267,7 @@ impl Fixture {
                 tenant: self.tenant.pubkey(),
                 landlord: self.landlord.pubkey(),
                 tenancy: self.tenancy,
-                deposit_mint: TEST_USDC,
+                deposit_mint: mint,
                 receipt_mint: self.receipt_mint,
                 cash: self.cash,
                 receipts: self.receipts,
@@ -279,9 +292,12 @@ impl Fixture {
             }
             .data(),
         };
-        self.send(ix, "both").unwrap();
+        self.send(ix, "both")
     }
     fn staged_initialize(&mut self, role: &str) -> TransactionResult {
+        self.staged_initialize_with_mint(TEST_USDC, role)
+    }
+    fn staged_initialize_with_mint(&mut self, mint: Pubkey, role: &str) -> TransactionResult {
         let ix = Instruction {
             program_id: ID,
             accounts: accounts::InitializeStaged {
@@ -289,7 +305,7 @@ impl Fixture {
                 tenant: self.tenant.pubkey(),
                 landlord: self.landlord.pubkey(),
                 tenancy: self.tenancy,
-                deposit_mint: TEST_USDC,
+                deposit_mint: mint,
                 receipt_mint: self.receipt_mint,
                 cash: self.cash,
                 receipts: self.receipts,
@@ -458,6 +474,131 @@ impl Fixture {
         }
     }
 }
+
+#[test]
+#[ignore = "requires explicit SBF and public KLend fixture paths; see program README"]
+fn ledger_test_usdc_initializes_with_existing_reserve_keys() {
+    for staged in [false, true] {
+        let mut f = Fixture::new();
+        f.prepare_deposit_mint(LEDGER_TEST_USDC);
+        if staged {
+            f.staged_initialize_with_mint(LEDGER_TEST_USDC, "landlord").unwrap();
+        } else {
+            f.initialize_with_mint(LEDGER_TEST_USDC).unwrap();
+        }
+        let t = f.state();
+        assert_eq!(t.deposit_mint, LEDGER_TEST_USDC);
+        assert_eq!(t.reserve, f.reserve);
+        assert_eq!(t.market, f.market);
+        assert_eq!(t.receipt_mint, f.receipt_mint);
+        assert_eq!(t.liquidity_supply, f.supply);
+        assert_eq!(t.market_authority, f.market_authority);
+        assert_eq!(t.phase, Phase::AwaitingFunding);
+        let reserve = f.svm.get_account(&f.reserve).unwrap();
+        let reserve = bytemuck::from_bytes::<Reserve>(&reserve.data[8..]);
+        assert_eq!(reserve.liquidity.mint_pubkey, TEST_USDC);
+    }
+}
+
+#[test]
+#[ignore = "requires explicit SBF and public KLend fixture paths; see program README"]
+fn initialization_rejects_a_third_six_decimal_classic_token_mint() {
+    for staged in [false, true] {
+        let mut f = Fixture::new();
+        let mint = Pubkey::new_unique();
+        f.prepare_deposit_mint(mint);
+        let result = if staged {
+            f.staged_initialize_with_mint(mint, "landlord")
+        } else {
+            f.initialize_with_mint(mint)
+        };
+        let failure = result.unwrap_err();
+        assert!(failure.meta.logs.iter().any(|line| line.contains("Error Code: InvalidAsset")));
+        assert!(f.svm.get_account(&f.tenancy).is_none());
+    }
+}
+#[test]
+#[ignore = "requires explicit SBF and public KLend fixture paths; see program README"]
+fn circle_initialization_still_rejects_a_mismatched_reserve_mint() {
+    for staged in [false, true] {
+        let mut f = Fixture::new();
+        let mut reserve = f.svm.get_account(&f.reserve).unwrap();
+        bytemuck::from_bytes_mut::<Reserve>(&mut reserve.data[8..]).liquidity.mint_pubkey = LEDGER_TEST_USDC;
+        f.svm.set_account(f.reserve, reserve).unwrap();
+        let result = if staged {
+            f.staged_initialize("landlord")
+        } else {
+            f.initialize_with_mint(TEST_USDC)
+        };
+        let failure = result.unwrap_err();
+        assert!(failure.meta.logs.iter().any(|line| line.contains("Error Code: InvalidAsset")));
+        assert!(f.svm.get_account(&f.tenancy).is_none());
+    }
+}
+
+#[test]
+#[ignore = "requires explicit SBF and public KLend fixture paths; see program README"]
+fn ledger_cash_dispute_and_payout_work_but_circle_supply_is_rejected() {
+    let mut f = Fixture::new();
+    f.prepare_deposit_mint(LEDGER_TEST_USDC);
+    f.staged_initialize_with_mint(LEDGER_TEST_USDC, "landlord").unwrap();
+    let ix = Instruction {
+        program_id: ID,
+        accounts: accounts::Fund {
+            tenant: f.tenant.pubkey(),
+            tenancy: f.tenancy,
+            deposit_mint: LEDGER_TEST_USDC,
+            source: f.tenant_token,
+            cash: f.cash,
+            token_program: anchor_spl::token::ID,
+        }.to_account_metas(None),
+        data: instruction::Fund { nonce: 0 }.data(),
+    };
+    f.send(ix, "tenant").unwrap();
+    let mut supply = f.finance(instruction::Supply { amount: PRINCIPAL, nonce: 1 }.data(), f.tenant.pubkey());
+    for account in &mut supply.accounts {
+        if account.pubkey == TEST_USDC {
+            account.pubkey = LEDGER_TEST_USDC;
+        }
+    }
+    let failure = f.send(supply, "tenant").unwrap_err();
+    assert!(failure.meta.logs.iter().any(|line| line.contains("Error Code: ConstraintTokenMint")));
+    assert_eq!(f.balance(f.cash), PRINCIPAL);
+    assert_eq!(f.state().accounted_receipts, 0);
+    assert_eq!(f.state().next_nonce, 1);
+    let ix = f.party(f.landlord.pubkey(), instruction::ProposeClaim { amount: CLAIM, nonce: 1 }.data());
+    f.send(ix, "landlord").unwrap();
+    let ix = f.party(f.tenant.pubkey(), instruction::RespondToClaim { accept: false, nonce: 2 }.data());
+    f.send(ix, "tenant").unwrap();
+    assert_eq!(f.state().phase, Phase::Disputed);
+    let ix = f.party(f.arbitrator.pubkey(), instruction::ResolveClaim { amount: CLAIM, nonce: 3 }.data());
+    f.send(ix, "arbitrator").unwrap();
+    let mut settle = f.settle(4);
+    for account in &mut settle.accounts {
+        if account.pubkey == TEST_USDC {
+            account.pubkey = LEDGER_TEST_USDC;
+        }
+    }
+    f.send(settle, "tenant").unwrap();
+    assert_eq!(f.state().tenant_owed, PRINCIPAL - CLAIM);
+    assert_eq!(f.state().landlord_owed, CLAIM);
+    for (destination, landlord, nonce) in [(f.landlord_token, true, 5), (f.tenant_token, false, 6)] {
+        let mut payout = f.payout(destination, landlord, nonce);
+        for account in &mut payout.accounts {
+            if account.pubkey == TEST_USDC {
+                account.pubkey = LEDGER_TEST_USDC;
+            }
+        }
+        f.send(payout, "tenant").unwrap();
+    }
+    assert_eq!(f.balance(f.landlord_token), CLAIM);
+    assert_eq!(f.balance(f.tenant_token), PRINCIPAL - CLAIM);
+    assert_eq!(f.balance(f.cash), 0);
+    assert_eq!(f.state().accounted_idle, 0);
+    assert_eq!(f.state().tenant_owed, 0);
+    assert_eq!(f.state().landlord_owed, 0);
+}
+
 
 #[test]
 #[ignore = "requires a newly built staged SBF and public KLend fixture paths; see program README"]

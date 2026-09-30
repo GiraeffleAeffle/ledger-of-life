@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
 import {
+  address,
   generateKeyPairSigner,
   getAddressDecoder,
   getCompiledTransactionMessageDecoder,
@@ -19,11 +20,11 @@ import {
   type SolanaInitialization,
 } from './solana-initialization.ts';
 import type { SolanaConfiguration, SolanaSnapshot } from './solana-rpc.ts';
-import { deriveEscrowAddresses, SOLANA_DEVNET_MANIFEST } from '../finance/solana/index.ts';
+import { deriveEscrowAddresses, ledgerDepositMint, SOLANA_DEVNET_MANIFEST, SOLANA_TEST_USDC_MINT } from '../finance/solana/index.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 
 const addressFor = (byte: number) => getAddressDecoder().decode(new Uint8Array(32).fill(byte));
-async function fixture(setupMode: 'joint' | 'staged' = 'joint') {
+async function fixture(setupMode: 'joint' | 'staged' = 'joint', depositMint?: string) {
   const [tenant, landlord, arbitrator, sponsor] = await Promise.all(
     Array.from({ length: 4 }, () => generateKeyPairSigner()),
   );
@@ -71,6 +72,7 @@ async function fixture(setupMode: 'joint' | 'staged' = 'joint') {
     escrowProgram: addressFor(10),
     programSha256: 'a'.repeat(64),
     depositMint: SOLANA_DEVNET_MANIFEST.deposit.mint,
+    ledgerDepositMint: depositMint,
     market: addressFor(11),
     reserve: addressFor(12),
     receiptMint: addressFor(13),
@@ -108,7 +110,7 @@ async function fixture(setupMode: 'joint' | 'staged' = 'joint') {
       tenant: tenant.address,
       landlord: landlord.address,
       arbitrator: arbitrator.address,
-      depositMint: config.depositMint,
+      depositMint: ledgerDepositMint(config),
       reserve: config.reserve,
       market: config.market,
       receiptMint: config.receiptMint,
@@ -179,6 +181,41 @@ async function fixture(setupMode: 'joint' | 'staged' = 'joint') {
     )).toString('base64');
   return { store, config, state, service, identities, tenant, landlord, arbitrator, sign, snapshot };
 }
+
+test('new site-dollar initialization uses its own mint and canonical payout accounts', async () => {
+  const f = await fixture('staged', SOLANA_TEST_USDC_MINT);
+  try {
+    const plan = await f.service.prepare(f.identities.landlord);
+    assert.equal(plan.depositMint, SOLANA_TEST_USDC_MINT);
+    assert.equal(plan.tenantDestination, f.snapshot.tenancy.tenantDestination);
+    const transaction = getTransactionDecoder().decode(Buffer.from(plan.transactionBase64, 'base64'));
+    const message = getCompiledTransactionMessageDecoder().decode(transaction.messageBytes);
+    assert.ok(message.staticAccounts.includes(address(SOLANA_TEST_USDC_MINT)));
+    assert.ok(!message.staticAccounts.includes(address(SOLANA_DEVNET_MANIFEST.deposit.mint)));
+    const submitted = await f.service.sign(f.identities.landlord, await f.sign(plan.transactionBase64, f.landlord));
+    assert.equal(submitted.state, 'broadcast');
+    f.state.final = true;
+    assert.equal((await f.service.reconcile(f.identities.landlord)).state, 'finalized');
+  } finally {
+    await f.store.close();
+  }
+});
+
+test('a pending Circle initialization reconciles after new deposits switch to site dollars', async () => {
+  const f = await fixture('staged');
+  try {
+    const plan = await f.service.prepare(f.identities.landlord);
+    await f.service.sign(f.identities.landlord, await f.sign(plan.transactionBase64, f.landlord));
+    f.config.ledgerDepositMint = SOLANA_TEST_USDC_MINT;
+    f.state.final = true;
+    const result = await f.service.reconcile(f.identities.landlord);
+    assert.equal(result.state, 'finalized');
+    assert.equal(result.depositMint, SOLANA_DEVNET_MANIFEST.deposit.mint);
+  } finally {
+    await f.store.close();
+  }
+});
+
 
 test('separate recovered wallets sign one accepted agreement; sponsor persists before send', async () => {
   const f = await fixture();

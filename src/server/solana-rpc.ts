@@ -272,7 +272,7 @@ export class RpcSolanaGateway implements SolanaGateway {
       c.market,
       c.liquiditySupply,
       SOLANA_IDS.klend,
-      c.depositMint,
+      first.depositMint,
       c.receiptMint,
       derived.cash,
       derived.receipts,
@@ -286,7 +286,7 @@ export class RpcSolanaGateway implements SolanaGateway {
     const rows = observed.accounts;
     const tenancy = decodeTenancy(rows[0]!, c);
     for (const [index, mint] of [
-      [5, c.depositMint],
+      [5, tenancy.depositMint],
       [6, c.receiptMint],
     ] as const) {
       const row = rows[index]!;
@@ -313,7 +313,7 @@ export class RpcSolanaGateway implements SolanaGateway {
     const cash = decodeClassicTokenAccount(rows[7]!);
     const receipts = decodeClassicTokenAccount(rows[8]!);
     for (const [token, owner, mint] of [
-      [cash, tenancy.address, c.depositMint],
+      [cash, tenancy.address, tenancy.depositMint],
       [receipts, tenancy.address, c.receiptMint],
     ] as const) {
       if (token.authority !== owner || token.mint !== mint || !token.initialized || token.frozen)
@@ -323,7 +323,7 @@ export class RpcSolanaGateway implements SolanaGateway {
       if (!row) return '0';
       try {
         const token = decodeClassicTokenAccount(row);
-        if (token.authority !== owner || token.mint !== c.depositMint || !token.initialized || token.frozen)
+        if (token.authority !== owner || token.mint !== tenancy.depositMint || !token.initialized || token.frozen)
           throw new Error('Unavailable payout');
         return token.amountAtomic;
       } catch {

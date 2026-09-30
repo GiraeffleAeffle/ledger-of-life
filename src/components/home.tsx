@@ -7,7 +7,8 @@ import { authorizedRequest } from './authorized-request';
 import { AREAS, goToSection, openShareWorkflow, type Area } from './areas';
 import { IdeasArea } from './ideas';
 import { MeArea } from './me';
-import { MoneyArea } from './money-area';
+import { MoneyArea, TestUsdc } from './money-area';
+import { SOLANA_TEST_USDC_MINT } from '@/finance/solana/manifest';
 import { accountSetupStep } from './account-setup-state';
 import { AccountSetup, SigningIn } from './onboarding';
 import { RecoveryGate, RecoveryStep } from './recovery-step';
@@ -292,6 +293,7 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
   const recordedOperations = useRef(new Set<string>());
   const advancing = useRef(false);
   const { next, chain, agreementId } = journey;
+  const cashOnly = chain?.depositMint === SOLANA_TEST_USDC_MINT;
   const living = journey.stage === 'living' && chain?.phase === 'active';
   const q = `?agreement=${encodeURIComponent(agreementId)}`;
   const linkKey = invitationKey(accountId, agreementId);
@@ -467,7 +469,7 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
         {next.kind === 'confirming' && confirmationSince !== null && confirmationStalled(confirmationSince, clock) && <p role="status">This is taking longer than usual. <button className="button secondary" onClick={() => void run(reconcile)} disabled={busy}>Check again</button></p>}
         {next.kind === 'paying_out' && <p className="small-copy">Payouts run while Home is open. A failed attempt retries here.</p>}
         {next.kind === 'accept_agreement' && <div className="small-copy">
-          <p>These terms cover {journey.property}, the {money(journey.requiredSecurity)} test USDC required deposit, and whether the tenant may claim surplus while the tenancy is active. The tenant keeps deposit assets above an approved deduction at settlement, whatever the release setting. Devnet lending pays nothing, so earnings are simulated.</p>
+          <p>These terms cover {journey.property}, the {money(journey.requiredSecurity)} test USDC required deposit, and whether the tenant may claim surplus while the tenancy is active. The tenant keeps deposit assets above an approved deduction at settlement, whatever the release setting. Site-minted tUSDC stays in cash escrow: it is not lent and earns nothing. Any deposit earnings belong to the tenant; separately credited test earnings are simulated, not income.</p>
           <p><strong>These terms cover the deposit and its parties, not monthly rent or tenancy dates.</strong> The landlord chooses the arbitrator before acceptance.</p>
           {agreement && <p>Tenant: {agreement.parties.tenant?.wallet?.address ? `${agreement.parties.tenant.wallet.address.slice(0, 5)}…${agreement.parties.tenant.wallet.address.slice(-5)}` : 'not available'} · Landlord: {agreement.parties.landlord?.wallet?.address ? `${agreement.parties.landlord.wallet.address.slice(0, 5)}…${agreement.parties.landlord.wallet.address.slice(-5)}` : 'not available'} · Arbitrator: {agreement.parties.arbitrator?.wallet?.address ? `${agreement.parties.arbitrator.wallet.address.slice(0, 5)}…${agreement.parties.arbitrator.wallet.address.slice(-5)}` : 'not available'}</p>}
           {agreement && <p>Tenant acceptance: {agreement.accepted.tenant?.digest === agreement.digest ? 'accepted' : 'waiting'} · Landlord acceptance: {agreement.accepted.landlord?.digest === agreement.digest ? 'accepted' : 'waiting'}. Surplus: {agreement.releaseAllowed ? 'tenant may claim during the tenancy' : 'locked until settlement'}.</p>}
@@ -475,7 +477,9 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
         {next.kind === 'finish_setup' && <RecoveryStep request={request} onVerified={() => void reload()} />}
         {next.kind === 'accept_agreement' && recordBlocker && <p className="action-blocker" role="status">{recordBlocker}</p>}
         {oneButton && (next.kind === 'create_space' ? <RecoveryGate request={request}>{actionButton}</RecoveryGate> : actionButton)}
-        {next.kind === 'secure_deposit' && <p className="small-copy faucet-note">Need test USDC? Get it from <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer">Circle’s faucet</a> on Solana Devnet, sent to your wallet {wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? 'address in Me'}.</p>}
+        {next.kind === 'secure_deposit' && <div className="small-copy faucet-note">
+          {cashOnly ? <TestUsdc request={request} /> : <p>This existing tenancy uses Circle devnet test USDC, not the site&apos;s tUSDC. Use <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle&apos;s faucet</a> on Solana devnet, sent to your wallet {wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? 'address in Me'}.</p>}
+        </div>}
         {next.kind === 'propose_claim' && (
           <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void run(() => operation({ kind: 'propose_claim', amountAtomic: claimAmount(amount, next.maximumAtomic) }, 'Move-out deduction', needsReason(reason))); }}>
             <p>0 is allowed; the reason is required. The maximum is {money(next.maximumAtomic)} test USDC. No notification is sent to the tenant; tell them yourself.</p>
@@ -531,7 +535,7 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
       </div>}
       {agreementError && <p className="note" role="alert">Agreement records are unavailable. Review the reasons before signing. <button className="button secondary" onClick={() => setAgreementRetry((count) => count + 1)}>Retry records</button></p>}
       {message && <p className="note" role="status">{message}</p>}
-      {chain && chain.phase === 'active' && journey.role === 'tenant' && (BigInt(chain.claimableAtomic) > 0n || BigInt(chain.releasedAtomic) > 0n) && (
+      {chain && !cashOnly && chain.phase === 'active' && journey.role === 'tenant' && (BigInt(chain.claimableAtomic) > 0n || BigInt(chain.releasedAtomic) > 0n) && (
         <div className="earnings-panel">
           <div>
             <span className="eyebrow">YOUR DEPOSIT EARNINGS · SIMULATED INTEREST</span>
@@ -640,7 +644,7 @@ function TenancyDetails({ journey, request }: { journey: TenancyJourney; request
           <dl className="journey-facts">
             <div><dt>Agreement</dt><dd>{agreement.digest && agreement.accepted.tenant?.digest === agreement.digest && agreement.accepted.landlord?.digest === agreement.digest ? 'Accepted by both parties' : 'Awaiting acceptance'}</dd></div>
             <div><dt>Required deposit · test USDC</dt><dd>{money(agreement.requiredSecurity)} test USDC</dd></div>
-            <div><dt>Earnings release policy</dt><dd>{agreement.releaseAllowed ? 'Tenant may claim surplus during tenancy' : 'Surplus remains locked until settlement'} · devnet lending pays nothing; earnings are simulated.</dd></div>
+            <div><dt>Earnings release policy</dt><dd>{agreement.releaseAllowed ? 'Tenant may claim surplus during tenancy' : 'Surplus remains locked until settlement'} · {!chain ? 'test tokens only; any deposit earnings belong to the tenant.' : chain.depositMint === SOLANA_TEST_USDC_MINT ? 'the deposit is held as cash in the escrow and earns nothing.' : 'devnet lending pays nothing; earnings are simulated.'}</dd></div>
             {chain && <div><dt>Claim status</dt><dd>{chain.phase === 'claim-proposed' ? 'Awaiting tenant answer' : chain.phase === 'disputed' ? 'Disputed' : chain.phase === 'settling' ? 'Settling' : chain.phase === 'closed' ? 'Closed' : BigInt(chain.claimAtomic) > 0n ? 'Claim recorded' : 'No deduction proposed'}</dd></div>}
             {chain && BigInt(chain.claimAtomic) > 0n && <div><dt>Requested deduction</dt><dd>{money(chain.claimAtomic)} test USDC</dd></div>}
             {chain && (chain.phase === 'settling' || chain.phase === 'closed') && <div><dt>Approved deduction</dt><dd>{money(chain.approvedClaimAtomic)} test USDC</dd></div>}
@@ -746,7 +750,7 @@ function ListingCard({ listing, children }: { listing: PublicListing; children?:
         <header><strong>{listing.title}{listing.sample && !listing.title.toLowerCase().includes('sample') ? ' · sample home' : ''}</strong><span className="listing-rent">{money(listing.rentMonthly)}<small>/month · test USDC</small></span></header>
         {facts.length > 0 && <p className="listing-facts">{facts.join(' · ')}</p>}
         <p className="listing-deposit"><span>Required deposit · Solana devnet</span><strong>{money(listing.requiredSecurity)} test USDC</strong></p>
-        <p className="small-copy">{listing.sample ? 'Sample home · local rehearsal. ' : ''}{listing.releaseAllowed ? 'Tenant may claim surplus during the tenancy.' : 'Surplus stays locked until settlement.'} Devnet lending pays no interest.</p>
+        <p className="small-copy">{listing.sample ? 'Sample home · local rehearsal. ' : ''}{listing.releaseAllowed ? 'Tenant may claim surplus during the tenancy.' : 'Surplus stays locked until settlement.'} Site-minted tUSDC stays in cash escrow, is not lent and earns nothing. Any deposit earnings belong to the tenant.</p>
         {children}
         {(listing.description || d.photos.length > 1) && <details className="listing-details">
           <summary>Description & photos</summary>
@@ -767,7 +771,7 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
   listings: PublicListing[]; request: Request; reload: () => Promise<void>; go: (area: Area) => void; loaded: boolean; loadError: string; testTools: boolean; tenancyIds: Set<string>;
 }) {
   const [posting, setPosting] = useState(false);
-  const [form, setForm] = useState({ title: '', city: '', rooms: '2', sizeSqm: '55', availableFrom: '', description: '', rent: '900', deposit: '1', releaseAllowed: true });
+  const [form, setForm] = useState({ title: '', city: '', rooms: '2', sizeSqm: '55', availableFrom: '', description: '', rent: '900', deposit: '2700', releaseAllowed: true });
   const [photos, setPhotos] = useState<string[]>([]);
   const [applyTo, setApplyTo] = useState<string | null>(null);
   const [application, setApplication] = useState({ name: '', message: '' });
@@ -783,7 +787,16 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
   }
   const togglePhoto = (url: string) =>
     setPhotos((current) => (current.includes(url) ? current.filter((p) => p !== url) : current.length >= 4 ? current : [...current, url]));
-  const field = (key: keyof typeof form) => ({ value: String(form[key]), onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }) });
+  const field = (key: keyof typeof form) => ({ value: String(form[key]), onChange: (e: { target: { value: string } }) => setForm((current) => {
+    const value = e.target.value;
+    if (key === 'rent') {
+      const previousRent = Number(current.rent.replace(',', '.'));
+      const nextRent = Number(value.replace(',', '.'));
+      const tracksRent = Number(current.deposit.replace(',', '.')) === previousRent * 3;
+      return { ...current, rent: value, ...(tracksRent && value.trim() && Number.isFinite(nextRent) && nextRent >= 0 ? { deposit: String(Math.round(nextRent * 300) / 100) } : {}) };
+    }
+    return { ...current, [key]: value };
+  }) });
   const mine = listings.filter((l) => l.relation === 'landlord');
   const others = listings.filter((l) => l.relation !== 'landlord');
   return (
@@ -808,8 +821,9 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
           <label>Rooms<input type="number" min={1} max={20} {...field('rooms')} /></label>
           <label>Size (m²)<input type="number" min={10} max={1000} {...field('sizeSqm')} /></label>
           <label>Available from<input type="date" {...field('availableFrom')} /></label>
-          <label>Monthly rent (test USDC)<input inputMode="decimal" {...field('rent')} /></label>
+          <label>Monthly cold rent (test USDC)<input inputMode="decimal" {...field('rent')} /></label>
           <label>Deposit (test USDC)<input inputMode="decimal" {...field('deposit')} /></label>
+          <p className="wide small-copy">The suggested deposit is three months&apos; cold rent (900 → 2,700 test USDC). For German residential tenancies, §551 BGB generally limits security to at most three months&apos; rent excluding separately stated operating costs. This test setup is not legal advice or a statement that token escrow meets legal requirements.</p>
           <label className="wide">Description<textarea rows={3} placeholder="Balcony, fitted kitchen, 5 minutes to the U-Bahn…" {...field('description')} /></label>
           <div className="wide">
             <span className="field-label">Photos (up to 4): pick samples or upload your own</span>
@@ -830,7 +844,7 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
               </label>
             </div>
           </div>
-          <label className="policy-check wide"><input type="checkbox" checked={form.releaseAllowed} onChange={(e) => setForm({ ...form, releaseAllowed: e.target.checked })} /> Let the tenant claim surplus during the tenancy (devnet lending pays nothing; earnings are simulated). The tenant keeps deposit value above an approved deduction at settlement either way.</label>
+          <label className="policy-check wide"><input type="checkbox" checked={form.releaseAllowed} onChange={(e) => setForm({ ...form, releaseAllowed: e.target.checked })} /> Let the tenant claim surplus during the tenancy. Site tUSDC stays in cash escrow and earns nothing; this policy does not create earnings. Any deposit earnings belong to the tenant, who keeps deposit value above an approved deduction at settlement either way.</label>
           {feedback.target === 'post' && feedback.message && <p className="note wide" role="alert">{feedback.message}</p>}
           <button className="button primary large">Publish home</button>
         </form>

@@ -11,13 +11,12 @@ import {
   setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash,
 } from '@solana/kit';
-import { decodeClassicTokenAccount, deriveEscrowAddresses, SOLANA_IDS } from '../finance/solana/index.ts';
+import { decodeClassicTokenAccount, decodeTenancy, deriveEscrowAddresses, derivePayoutAddress, ledgerDepositMint, SOLANA_IDS } from '../finance/solana/index.ts';
 import type { Agreement } from './agreements.ts';
 import type { RecoveryGate } from './recovery.ts';
 import {
   createSolanaInitializationService,
   leaseIdForAgreement,
-  payoutTokenAccount,
   RpcInitializationGateway,
 } from './solana-initialization.ts';
 import { RpcSolanaGateway, solanaConfiguration, type SolanaConfiguration } from './solana-rpc.ts';
@@ -93,13 +92,15 @@ export async function ensurePayoutAccounts(
     throw new SolanaServiceError(409, 'parties_missing', 'Tenant and landlord must both be recorded.');
   const gateway = new RpcInitializationGateway(config);
   await gateway.checkedGenesis();
-  const destinations = await Promise.all(owners.map((owner) => payoutTokenAccount(config, owner!)));
+  const existing = (await gateway.multiple([config.tenancyAddress])).accounts[0];
+  const mint = existing ? decodeTenancy(existing, config).depositMint : ledgerDepositMint(config);
+  const destinations = await Promise.all(owners.map((owner) => derivePayoutAddress(owner!, mint)));
   const { accounts } = await gateway.multiple(destinations);
   const missing = owners.flatMap((owner, index) => {
     const row = accounts[index];
     if (!row) return [index];
     const token = decodeClassicTokenAccount(row);
-    if (token.authority !== owner || token.mint !== config.depositMint || !token.initialized || token.frozen)
+    if (token.authority !== owner || token.mint !== mint || !token.initialized || token.frozen)
       throw new SolanaServiceError(409, 'payout_account_mismatch', 'An existing payout account does not match its party.');
     return [];
   });
@@ -113,7 +114,7 @@ export async function ensurePayoutAccounts(
         { address: address(sponsor.address), role: AccountRole.WRITABLE_SIGNER },
         { address: address(destinations[index]), role: AccountRole.WRITABLE },
         { address: address(owners[index]!), role: AccountRole.READONLY },
-        { address: address(config.depositMint), role: AccountRole.READONLY },
+        { address: address(mint), role: AccountRole.READONLY },
         { address: address(SOLANA_IDS.system), role: AccountRole.READONLY },
         { address: address(SOLANA_IDS.token), role: AccountRole.READONLY },
       ],

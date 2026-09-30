@@ -24,6 +24,8 @@ export const SOLANA_DEVNET_MANIFEST = Object.freeze({
   deposit: { mint: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", tokenProgram: SOLANA_IDS.token, decimals: 6 },
   evidence: "test-assets-only" as const,
 });
+/** Site-owned classic SPL test dollars; no monetary value and no KLend reserve. */
+export const SOLANA_TEST_USDC_MINT = "BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE";
 export type Cluster = "mainnet-beta" | "devnet" | "localnet";
 export type DeploymentManifest = {
   cluster: "devnet" | "localnet";
@@ -33,6 +35,8 @@ export type DeploymentManifest = {
   /** Legacy manifests omit this field; pull payouts require a separately pinned deployment. */
   escrowVersion?: "direct-v1" | "pull-v2";
   depositMint: string;
+  /** Selects cash-only deposits for new tenancies; depositMint still pins the KLend asset. */
+  ledgerDepositMint?: string;
   market: string;
   reserve: string;
   receiptMint: string;
@@ -42,6 +46,14 @@ export type DeploymentManifest = {
   maxObservationAgeMs: number;
 };
 export type Availability<T> = { available: true; value: T } | { available: false; reason: string };
+
+export function ledgerDepositMint(manifest: DeploymentManifest): string {
+  return manifest.ledgerDepositMint ?? manifest.depositMint;
+}
+
+export function isSupportedDepositMint(mint: string): boolean {
+  return mint === SOLANA_DEVNET_MANIFEST.deposit.mint || mint === SOLANA_TEST_USDC_MINT;
+}
 
 /** Reference mainnet addresses do not enable writes. No deployment is implicit. */
 export function resolveSolanaManifest(input: {
@@ -55,6 +67,7 @@ export function resolveSolanaManifest(input: {
     return { available: false, reason: "cluster-genesis-mismatch" };
   }
   if (deployment.depositMint !== SOLANA_DEVNET_MANIFEST.deposit.mint) return { available: false, reason: "test-mint-required" };
+  if (deployment.ledgerDepositMint !== undefined && deployment.ledgerDepositMint !== SOLANA_TEST_USDC_MINT) return { available: false, reason: "invalid-ledger-deposit-mint" };
   if (deployment.escrowVersion !== undefined && !["direct-v1", "pull-v2"].includes(deployment.escrowVersion)) return { available: false, reason: "invalid-escrow-version" };
   if (deployment.escrowVersion === "pull-v2" &&
     (deployment.escrowProgram === "B1hjmapwssey8AbpjAtw5qF87DvvtuSisGov4kHec7Yc" ||

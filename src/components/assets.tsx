@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { KeyRound, LineChart, TrendingUp } from 'lucide-react';
 import type { TenancyJourney } from '@/server/journey';
+import { SOLANA_TEST_USDC_MINT } from '@/finance/solana/manifest';
 import type { PortfolioPartial, PortfolioView } from '@/server/portfolio';
 import { goToSection, openShareWorkflow, type Area } from './areas';
 import { NetPosition, NetPositionStrip } from './net-position';
@@ -209,7 +210,9 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
           <header><KeyRound size={18} /> Rental home &amp; deposit · Solana devnet</header>
           <strong>{usd(locked)} test value</strong>
           <span>{entitled.length === 0 && !tenancies.some((t) => t.chain) ? 'No active deposit' : asTenant > 0
-            ? `Your deposit for ${asTenant} home${asTenant > 1 ? 's' : ''} is supplied to lending. Devnet lending pays nothing; deposit earnings here are simulated.`
+            ? tenancies.some((t) => t.role === 'tenant' && t.chain && t.chain.depositMint !== SOLANA_TEST_USDC_MINT)
+              ? `Your deposit for ${asTenant} home${asTenant > 1 ? 's' : ''} is supplied to lending. Devnet lending pays nothing; deposit earnings here are simulated.`
+              : `Your deposit for ${asTenant} home${asTenant > 1 ? 's' : ''} is locked in the escrow as cash and earns nothing.`
             : 'Deposit assets are held for a tenancy where you are landlord or arbitrator; they are not yours. Only an approved claim or settlement payout may be owed to you.'}</span>
           {tenancies.some((t) => t.chain && t.role !== 'tenant') && <span>Held for your tenancy: {usd(tenancies.reduce((sum, t) => sum + (t.role !== 'tenant' && t.chain ? atomicUsd(t.chain.lendingValueAtomic) + atomicUsd(t.chain.escrowAtomic) : 0), 0))} test value · not yours</span>}
           {claimed > 0 && <span className="asset-gain"><TrendingUp size={13} /> {usd(claimed)} test deposit earnings claimed (simulated)</span>}
@@ -241,7 +244,7 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
       <details className="money-funds">
         <summary>Wallet addresses &amp; funding networks</summary>
         <div className="money-funds-wallets">
-          <div><strong>For the Solana deposit or tSPYx: test USDC on Solana devnet</strong><p>{solanaAddress ? <><code>{solanaAddress}</code> <button className="text-button" type="button" onClick={() => void copyAddress(solanaAddress, 'Solana')}>Copy Solana address</button></> : 'Connect your Solana wallet in Me.'}</p><p>Request test USDC from the <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle faucet (Solana Devnet)</a>. Robinhood test dollars cannot fund a Solana deposit.</p></div>
+          <div><strong>For the Solana deposit or tSPYx: test tokens on Solana devnet</strong><p>{solanaAddress ? <><code>{solanaAddress}</code> <button className="text-button" type="button" onClick={() => void copyAddress(solanaAddress, 'Solana')}>Copy Solana address</button></> : 'Connect your Solana wallet in Me.'}</p><p>A new Home deposit uses test USDC (tUSDC) from this site: Get test USDC in the Test money card below. tSPYx and older tenancies use Circle&apos;s devnet USDC from the <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle faucet (Solana Devnet)</a>. Robinhood test dollars cannot fund a Solana deposit.</p></div>
           <div><strong>For Robinhood tasks: test ETH for fees, plus test TSLA or tUSDG</strong><p>{robinhoodAddress ? <><code>{robinhoodAddress}</code> <button className="text-button" type="button" onClick={() => void copyAddress(robinhoodAddress, 'Robinhood Chain')}>Copy Robinhood address</button></> : 'Connect your Robinhood Chain wallet in Me.'}</p><p>Borrowing uses test TSLA; lending uses test dollars, not TSLA. Funding help appears beside the selected task in Shares &amp; loans.</p></div>
         </div>
         {copied && <p role="status">{copied === 'Copy failed; select the address instead.' ? copied : `${copied} address copied.`}</p>}

@@ -9,6 +9,7 @@ use state::{Phase, Tenancy};
 declare_id!("DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb");
 
 pub const TEST_USDC: Pubkey = pubkey!("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
+pub const LEDGER_TEST_USDC: Pubkey = pubkey!("BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE");
 const ASSOCIATED_TOKEN_PROGRAM: Pubkey = pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 
 fn payout_address(party: &Pubkey, mint: &Pubkey) -> Pubkey {
@@ -401,7 +402,10 @@ fn initialize_tenancy(
         cfg!(feature = "test-deployment"),
         EscrowError::DeploymentDisabled
     );
-    require_keys_eq!(deposit_mint, TEST_USDC, EscrowError::InvalidAsset);
+    require!(
+        deposit_mint == TEST_USDC || deposit_mint == LEDGER_TEST_USDC,
+        EscrowError::InvalidAsset
+    );
     require!(
         args.required_security > 0 && args.required_security <= 10_000_000_000,
         EscrowError::InvalidAmount
@@ -449,8 +453,11 @@ fn initialize_tenancy(
     t.landlord_owed = 0;
     t.phase = Phase::AwaitingFunding;
     t.bump = bump;
-    let snapshot = lending::inspect(reserve, market, t)?;
-    require!(snapshot.healthy, EscrowError::ProtocolUnavailable);
+    // Site-owned tUSDC is cash-only; retain the configured reserve keys without using its liquidity.
+    if deposit_mint != LEDGER_TEST_USDC {
+        let snapshot = lending::inspect(reserve, market, t)?;
+        require!(snapshot.healthy, EscrowError::ProtocolUnavailable);
+    }
     emit!(FinanceEvent {
         tenancy: t.key(),
         nonce: 0,

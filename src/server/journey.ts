@@ -1,4 +1,5 @@
 import type { TenancyAccount } from '../finance/solana/program.ts';
+import { SOLANA_TEST_USDC_MINT } from '../finance/solana/manifest.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { agreementDigest, agreementRole, type Agreement } from './agreements.ts';
 import { RecoveryError } from './recovery.ts';
@@ -37,6 +38,7 @@ export interface TenancyJourney {
   next: NextAction;
   chain: null | {
     phase: TenancyAccount['phase'];
+    depositMint: string;
     escrowAtomic: string;
     lendingValueAtomic: string;
     claimAtomic: string;
@@ -69,7 +71,7 @@ export function agreementStep(agreement: Agreement, role: JourneyRole): NextActi
     return {
       kind: 'accept_agreement',
       label: 'Review the deposit agreement',
-      detail: `${agreement.property} · ${usd(agreement.requiredSecurity)} deposit · tenant keeps value above an approved deduction at settlement. ${agreement.releaseAllowed ? 'Tenant may claim surplus during the tenancy.' : 'Surplus remains locked until settlement.'} Devnet lending pays nothing, so earnings are simulated.`,
+      detail: `${agreement.property} · ${usd(agreement.requiredSecurity)} deposit · tenant keeps value above an approved deduction at settlement. ${agreement.releaseAllowed ? 'Tenant may claim surplus during the tenancy.' : 'Surplus remains locked until settlement.'} Test tokens only; a deposit here earns nothing.`,
       digest,
     };
   if (!accepted('tenant') || !accepted('landlord'))
@@ -80,15 +82,17 @@ export function agreementStep(agreement: Agreement, role: JourneyRole): NextActi
 /** Pure: next step from finalized chain state and this person's role. */
 export function chainStep(
   role: JourneyRole,
-  t: Pick<TenancyAccount, 'phase' | 'requiredSecurityAtomic' | 'claimAtomic' | 'tenantOwedAtomic' | 'landlordOwedAtomic'>,
+  t: Pick<TenancyAccount, 'phase' | 'requiredSecurityAtomic' | 'claimAtomic' | 'tenantOwedAtomic' | 'landlordOwedAtomic'> & { depositMint?: string },
   pull: boolean,
 ): { stage: JourneyStage; next: NextAction } {
+  // Site-minted tUSDC stays in the escrow as cash; older Circle-USDC tenancies are supplied to devnet lending.
+  const cashOnly = t.depositMint === SOLANA_TEST_USDC_MINT;
   switch (t.phase) {
     case 'awaiting-funding':
       return {
         stage: 'deposit',
         next: role === 'tenant'
-          ? { kind: 'secure_deposit', label: `Secure your ${usd(t.requiredSecurityAtomic)} deposit`, detail: 'One approval locks the deposit for this home and supplies it to devnet lending. Devnet lending pays nothing, so earnings are simulated.' }
+          ? { kind: 'secure_deposit', label: `Secure your ${usd(t.requiredSecurityAtomic)} deposit`, detail: cashOnly ? 'One approval locks the deposit for this home in the escrow, where it stays as cash until move-out. Test tokens only; it earns nothing.' : 'One approval locks the deposit for this home and supplies it to devnet lending. Devnet lending pays nothing, so earnings are simulated.' }
           : waiting('Waiting for the tenant’s deposit', 'The empty escrow is ready; the tenant approves the deposit.'),
       };
     case 'active':
@@ -97,7 +101,7 @@ export function chainStep(
         next: role === 'landlord'
           ? { kind: 'propose_claim', label: 'Propose a move-out deduction', detail: 'Enter any deduction (0 if none) with a reason. The tenant must agree or the arbitrator decides.', maximumAtomic: t.requiredSecurityAtomic }
           : role === 'tenant'
-            ? waiting('Your deposit is secured in devnet lending', 'At move-out the landlord proposes a deduction (or none); you then agree or dispute. Devnet lending pays nothing, so earnings are simulated.')
+            ? waiting(cashOnly ? 'Your deposit is locked in the escrow' : 'Your deposit is secured in devnet lending', `At move-out the landlord proposes a deduction (or none); you then agree or dispute. ${cashOnly ? 'The deposit is held as cash and earns nothing.' : 'Devnet lending pays nothing, so earnings are simulated.'}`)
             : waiting('Nothing to decide', 'You are only needed if tenant and landlord disagree.'),
       };
     case 'claim-proposed':
@@ -191,6 +195,7 @@ export async function tenancyJourney(
     next: pending ? { kind: 'confirming', label: 'Waiting for network confirmation', detail: 'Your approval was sent. Check again if it takes longer than usual.', operationId: pending.id } : next,
     chain: {
       phase: t.phase,
+      depositMint: t.depositMint,
       escrowAtomic: t.accountedIdleAtomic,
       lendingValueAtomic: snapshot.receiptValueAtomic,
       claimAtomic: t.claimAtomic,
@@ -200,7 +205,7 @@ export async function tenancyJourney(
       tenantPaidAtomic: paid(false),
       landlordPaidAtomic: paid(true),
       claimableAtomic: (() => {
-        if (!t.releasePermitted || t.phase !== 'active') return '0';
+        if (!t.releasePermitted || t.phase !== 'active' || t.depositMint === SOLANA_TEST_USDC_MINT) return '0';
         const idle = BigInt(t.accountedIdleAtomic);
         const surplus = idle + BigInt(snapshot.receiptValueAtomic) - BigInt(t.requiredSecurityAtomic);
         return (surplus <= 0n ? 0n : surplus < idle ? surplus : idle).toString();

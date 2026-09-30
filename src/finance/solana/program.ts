@@ -1,6 +1,6 @@
 import { AccountRole, address, getAddressDecoder, getAddressEncoder, getProgramDerivedAddress, type Instruction } from "@solana/kit";
 import { atomic } from "./amounts.ts";
-import { SOLANA_IDS, type DeploymentManifest } from "./manifest.ts";
+import { isSupportedDepositMint, ledgerDepositMint, SOLANA_IDS, type DeploymentManifest } from "./manifest.ts";
 import type { AccountObservation } from "./observations.ts";
 
 const phases = ["awaiting-funding", "active", "claim-proposed", "disputed", "settling", "closed"] as const;
@@ -29,7 +29,7 @@ export function decodeTenancy(account: AccountObservation, manifest: DeploymentM
   const requiredSecurityAtomic = u64(), accountedIdleAtomic = u64(), accountedReceiptsAtomic = u64(), releasedEarningsAtomic = u64(), nextNonce = u64(), claimAtomic = u64(), approvedClaimAtomic = u64();
   const phase = phases[data[offset++]]; const bump = data[offset++];
   const tenantOwedAtomic = pull ? u64() : "0", landlordOwedAtomic = pull ? u64() : "0";
-  if (!phase || depositMint !== manifest.depositMint || reserve !== manifest.reserve || market !== manifest.market || receiptMint !== manifest.receiptMint || liquiditySupply !== manifest.liquiditySupply || marketAuthority !== manifest.marketAuthority) throw new Error("Tenancy differs from configured deployment");
+  if (!phase || !isSupportedDepositMint(depositMint) || reserve !== manifest.reserve || market !== manifest.market || receiptMint !== manifest.receiptMint || liquiditySupply !== manifest.liquiditySupply || marketAuthority !== manifest.marketAuthority) throw new Error("Tenancy differs from configured deployment");
   return { address: account.address, leaseId, tenant, landlord, arbitrator, depositMint, reserve, market, receiptMint, liquiditySupply, marketAuthority, tenantDestination, landlordDestination, policyHash, releasePermitted, requiredSecurityAtomic, accountedIdleAtomic, accountedReceiptsAtomic, releasedEarningsAtomic, nextNonce, claimAtomic, approvedClaimAtomic, phase, bump, tenantOwedAtomic, landlordOwedAtomic };
 }
 export async function deriveEscrowAddresses(program: string, tenant: string, leaseId: Uint8Array) {
@@ -75,7 +75,7 @@ export async function buildEscrowInstruction(input: {
   const { manifest, tenancy: t, action } = input;
   const derived = await deriveEscrowAddresses(manifest.escrowProgram, t.tenant, t.leaseId);
   if (t.address !== derived.tenancy || t.bump !== derived.bump || input.nonce !== t.nextNonce) throw new Error("Tenancy PDA or operation nonce mismatch");
-  if (t.depositMint !== manifest.depositMint || t.reserve !== manifest.reserve || t.market !== manifest.market || t.receiptMint !== manifest.receiptMint || t.liquiditySupply !== manifest.liquiditySupply || t.marketAuthority !== manifest.marketAuthority) throw new Error("Wrong tenancy deployment");
+  if (!isSupportedDepositMint(t.depositMint) || t.reserve !== manifest.reserve || t.market !== manifest.market || t.receiptMint !== manifest.receiptMint || t.liquiditySupply !== manifest.liquiditySupply || t.marketAuthority !== manifest.marketAuthority) throw new Error("Wrong tenancy deployment");
   const actor = meta(input.actor, AccountRole.READONLY_SIGNER), tenancy = meta(t.address, AccountRole.WRITABLE);
   let accounts;
   if (action.kind === "fund") {
@@ -113,7 +113,7 @@ export async function buildInitializeEscrow(input: {
   const staged = input.mode === "staged";
   return { programAddress: address(m.escrowProgram), data: concat([Uint8Array.from(staged ? discriminators.initialize_staged : discriminators.initialize), ...args]), accounts: [
     meta(input.payer, AccountRole.WRITABLE_SIGNER), meta(input.tenant, staged ? AccountRole.READONLY : AccountRole.READONLY_SIGNER), meta(input.landlord, AccountRole.READONLY_SIGNER), meta(derived.tenancy, AccountRole.WRITABLE),
-    meta(m.depositMint), meta(m.receiptMint), meta(derived.cash, AccountRole.WRITABLE), meta(derived.receipts, AccountRole.WRITABLE), meta(input.tenantDestination), meta(input.landlordDestination), meta(m.reserve), meta(m.market), meta(SOLANA_IDS.token), meta(SOLANA_IDS.system),
+    meta(ledgerDepositMint(m)), meta(m.receiptMint), meta(derived.cash, AccountRole.WRITABLE), meta(derived.receipts, AccountRole.WRITABLE), meta(input.tenantDestination), meta(input.landlordDestination), meta(m.reserve), meta(m.market), meta(SOLANA_IDS.token), meta(SOLANA_IDS.system),
   ] };
 }
 

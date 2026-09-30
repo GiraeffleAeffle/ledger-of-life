@@ -209,7 +209,7 @@ export async function creditTestYield(store: Store, user: VerifiedIdentity, agre
   const { tenancy } = await gateway.snapshot();
   if (tenancy.phase !== 'active') throw new Error('Interest accrues only while the deposit is active.');
   const funder = people.tenant.signer;
-  const source = await derivePayoutAddress(funder.address, config.depositMint);
+  const source = await derivePayoutAddress(funder.address, tenancy.depositMint);
   const instruction = await buildTestCreditYield({ manifest: config, tenancy, funder: funder.address, source, amountAtomic });
   const lifetime = await gateway.lifetime();
   const message = appendTransactionMessageInstructions([instruction], setTransactionMessageLifetimeUsingBlockhash(

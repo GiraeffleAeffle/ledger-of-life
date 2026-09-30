@@ -7,6 +7,7 @@ import {
   decodeKaminoReserve, validateMintObservation, quoteInvestment, parseJupiterQuote, validateQuoteForAuthorization,
   reconcileSolanaSignature, inspectMetisRoute, type DeploymentManifest, type TenancyAccount, type JupiterQuote,
   inspectInvestmentTransaction, messageDigest, observeSolanaSignature,
+  SOLANA_TEST_USDC_MINT, ledgerDepositMint,
 } from "./index.ts";
 const key = (byte: number) => getAddressDecoder().decode(new Uint8Array(32).fill(byte));
 const tenant = key(1), landlord = key(2), arbitrator = key(3), sponsor = key(4), inputAccount = key(5), outputAccount = key(6);
@@ -46,6 +47,15 @@ test("deployment remains explicitly gated by test mint and genesis identity", ()
   assert.equal(resolveSolanaManifest({ cluster: "mainnet-beta", genesisHash: SOLANA_MAINNET_MANIFEST.genesisHash }).available, false);
   assert.equal(resolveSolanaManifest({ cluster: "devnet", genesisHash: manifest.genesisHash, deployment: manifest }).available, true);
   assert.equal(resolveSolanaManifest({ cluster: "devnet", genesisHash: manifest.genesisHash, deployment: { ...manifest, depositMint: pair.inputMint } }).available, false);
+});
+test("only the site mint may select cash-only new deposits", () => {
+  const selected = { ...manifest, ledgerDepositMint: SOLANA_TEST_USDC_MINT };
+  assert.equal(resolveSolanaManifest({ cluster: "devnet", genesisHash: manifest.genesisHash, deployment: selected }).available, true);
+  assert.equal(ledgerDepositMint(selected), SOLANA_TEST_USDC_MINT);
+  assert.equal(ledgerDepositMint(manifest), SOLANA_DEVNET_MANIFEST.deposit.mint);
+  for (const mint of [manifest.depositMint, pair.inputMint, key(99), ""]) {
+    assert.equal(resolveSolanaManifest({ cluster: "devnet", genesisHash: manifest.genesisHash, deployment: { ...manifest, ledgerDepositMint: mint } }).available, false);
+  }
 });
 test("reserve decoder validates owner, discriminator, exact pinned layout and all fee buckets", () => {
   const data = new Uint8Array(8624); data.set([43, 242, 204, 202, 26, 247, 59, 127]); const view = new DataView(data.buffer);
@@ -96,6 +106,12 @@ test("tenancy binary decoder mirrors the 483-byte Anchor account ABI", async () 
   for (const amount of [t.requiredSecurityAtomic,t.accountedIdleAtomic,t.accountedReceiptsAtomic,t.releasedEarningsAtomic,t.nextNonce,t.claimAtomic,t.approvedClaimAtomic]) { view.setBigUint64(offset, BigInt(amount), true);offset += 8; }
   data[offset++] = 1;data[offset] = t.bump;
   assert.deepEqual(decodeTenancy({ address: t.address, owner: program, executable: false, data }, manifest), t);
+  const selected = { ...manifest, ledgerDepositMint: SOLANA_TEST_USDC_MINT };
+  assert.equal(decodeTenancy({ address: t.address, owner: program, executable: false, data }, selected).depositMint, manifest.depositMint);
+  data.set(getAddressEncoder().encode(address(SOLANA_TEST_USDC_MINT)), 136);
+  assert.equal(decodeTenancy({ address: t.address, owner: program, executable: false, data }, manifest).depositMint, SOLANA_TEST_USDC_MINT);
+  data.set(getAddressEncoder().encode(address(pair.inputMint)), 136);
+  assert.throws(() => decodeTenancy({ address: t.address, owner: program, executable: false, data }, selected), /configured deployment/);
 });
 test("pull deployment decodes owed balances and builds one exact payout instruction", async () => {
   const t = await tenancyFixture();

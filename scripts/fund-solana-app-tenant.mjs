@@ -23,10 +23,10 @@ import {
 } from '@solana/kit';
 import { agreementDigest } from '../src/server/agreements.ts';
 import { decodeClassicTokenAccount } from '../src/finance/solana/observations.ts';
+import { derivePayoutAddress } from '../src/finance/solana/program.ts';
 import { SOLANA_DEVNET_MANIFEST, SOLANA_IDS } from '../src/finance/solana/manifest.ts';
 import { configuredFeeSponsor } from '../src/server/solana-service.ts';
 import {
-  payoutTokenAccount,
   RpcInitializationGateway,
 } from '../src/server/solana-initialization.ts';
 import { solanaConfiguration } from '../src/server/solana-rpc.ts';
@@ -66,7 +66,8 @@ if (
   agreement.accepted.landlord?.digest !== digest
 ) throw new Error('An accepted 10 test-USDC Solana agreement is required');
 const tenant = agreement.parties.tenant.wallet.address;
-const destination = await payoutTokenAccount(config, tenant);
+// This historical operator source holds Circle USDC, not site-owned tUSDC.
+const destination = await derivePayoutAddress(tenant, evidence.depositMint);
 const source = evidence.tenantUsdcAccount;
 const sponsor = await configuredFeeSponsor();
 if (!sponsor || new Set([sponsor.address, evidence.tenant, tenant]).size !== 3)
