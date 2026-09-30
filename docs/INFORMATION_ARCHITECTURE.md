@@ -1,6 +1,6 @@
 # Information architecture: where a feature lives
 
-Status: 2026-09-29. This page owns the placement rule. [`LEDGER_OF_LIFE.md`](LEDGER_OF_LIFE.md) describes what each area contains, [`ontology.yaml`](ontology.yaml) defines the concepts, [`src/data/sections.ts`](../src/data/sections.ts) lists every jump target and its one owning area, and [`src/data/ledger-catalogue.ts`](../src/data/ledger-catalogue.ts) holds the topics, capability status and each capability's single destination.
+Status: 2026-09-30. This page owns the placement rule and the order in which a person meets things. [`LEDGER_OF_LIFE.md`](LEDGER_OF_LIFE.md) describes what each area contains, [`ontology.yaml`](ontology.yaml) defines the concepts, [`src/data/sections.ts`](../src/data/sections.ts) lists every jump target and its one owning area, [`src/data/ledger-catalogue.ts`](../src/data/ledger-catalogue.ts) holds the topics, capability status and each capability's single destination, and [`src/data/path.ts`](../src/data/path.ts) holds the thread and its four stages.
 
 ## The rule
 
@@ -10,17 +10,37 @@ Status: 2026-09-29. This page owns the placement rule. [`LEDGER_OF_LIFE.md`](LED
 4. **Topics are subject matter; areas are places to operate.** The five topics (Identity & life, Home & living, Money & ownership, Energy & devices, Places & participation) organise browsing in Today, the Me directory and Ideas. A feature can belong to a topic without being operated in the topic's namesake area. Energy & devices is operated in Money. Home shares belong to Home & living but are bought as test units in Money → Local stakes. The catalogue test fails when an adapter is operated outside the area that owns its topic.
 5. **Rental security and personal money never share a card** ([ADR 0001](adr/0001-separate-rental-security-and-personal-portfolio.md), [`CONTEXT.md`](../CONTEXT.md)).
 6. **Every section states how real it is.** Money's sections carry the ontology's reality level as a chip; the levels are defined in [`ontology.yaml`](ontology.yaml) (`reality_levels`) and `src/components/reality-chip.tsx`.
+7. **The thread decides the order.** Placement says where a feature lives; the thread says what comes next (section below). Every screen uses the same four stage names, and a person always has exactly one next step.
+
+## The thread and the next step
+
+One sentence, the owner's destination line with the deposit as its hinge: **Find a home, secure the deposit, keep your assets, help build your city.** It is `THREAD` in `src/data/path.ts`, and the door's heading. Its four stages (`STAGES`) are the only names for the path, used on the door, Today, the area eyebrows, Home and the Roadmap:
+
+| # | Stage | Operated in | Counts as done |
+|---|---|---|---|
+| 1 | Find a home | Home | a listing, an application or a tenancy exists |
+| 2 | Secure the deposit | Home (tenancy card) | a deposit is locked (living or later) |
+| 3 | Keep your assets | Money | never done; a status (free, locked, pledged, lent, owed) |
+| 4 | Help build your city | Places (local stakes and the AI desk are operated in Money) | a city is chosen |
+
+- **One next step** (`src/components/next-step.ts`, `next-step-card.tsx`). Precedence: an opened invitation, a home step waiting for this person, applicants to review, a step waiting on someone else or the network, an application in progress, a failed read, a secured or paid-out home, then a fresh account's "Start with a home" with two equal alternatives. It is a full card on Today. On Money, Places and Me it appears only when something waits for this person (an invitation, their own home step, applicants to review); Home never repeats it, because its own path already shows the step. A read that failed or is still running is never offered as done or empty.
+- **Today shows where you are** (`path-strip.tsx`, pure `path-progress.ts`): the four stages as done, in progress, to do, or not known yet, then three status tiles titled by stage.
+- **Navigation follows the path:** Today, Home, Money, Places, then Me (the toolbox for every stage). The Roadmap (area id `ideas`) is secondary: the sidebar foot, Today's stage links and the explainer lead there. Signed-out visitors see only what works without an account (the welcome guide and the public AI desk).
+- **What is real here** lives in one place: the "Test networks · no real money" chip opens the explainer with four availability labels (Available on this site, Needs a local setup, Contract prototype, Planned). Reality chips still say how real the data is; availability says whether you can do it on this site.
+- **Ways to hold the deposit** (Home, `deposit-options`) is the one answer to "a deposit with shares, or lent out?": the test-USDC deposit (available on this site), the deposit lent out to earn (devnet pays nothing here; earnings in test dollars exist only in a local rehearsal, where the deposit is lent to the shared loan pool, and they belong to the tenant), and a share-backed deposit (contract prototype). Nothing in it signs.
 
 ## The six areas
 
+In navigation order; the Roadmap is reached from the sidebar foot rather than the main navigation.
+
 | Area | The one question | Operated here | Not operated here (link instead) |
 |---|---|---|---|
-| **Today** | Your identity, home, assets and place, connected | Nothing. A glance at every area and what needs you now | Every control. Cards link to the area that owns them |
-| **Me** | Who am I here, and what may others learn? | Passkeys, wallets, recovery, EU proof, roles, timeline, and the settings of every connection (Home Assistant, validator) | Readings and income from those connections (Money), the tenancy (Home) |
-| **Home** | Where do I live, and what is locked or owed there? | Listings, application, agreement, deposit, service charges, move-out, payouts | Shares, loans, stakes, device readings (Money) |
-| **Money** | What do I own, owe and earn? | Holdings, shared official-stock loans and lender positions, local stakes, devices that earn | The rental itself (Home), connection settings (Me), public projects (Places) |
-| **Places** | What is changing where I live, and where can I have a say? | Public map, projects, city feed, evidence, following, city choice | Anything with a personal balance. Fictional project markers are illustrations; buying is in Money |
-| **Ideas** | What works, what comes next, and which adapter connects it? | Nothing. Status of every capability, with one link to where it works | — |
+| **Today** | Your next step, and where you are on the path | Nothing. The next step, the stage strip and three status tiles | Every control. Tiles link to the area that owns them |
+| **Home** | Find a home, agree the deposit, and see what is owed | Listings, application, agreement, deposit, service charges, move-out, payouts | Shares, loans, stakes, device readings (Money) |
+| **Money** | Your test holdings, collateral, loans and recorded activity | Holdings, shared official-stock loans and lender positions, local stakes, devices that earn | The rental itself (Home), connection settings (Me), public projects (Places) |
+| **Places** | Get settled, see what's changing, and find the published ways to take part | Public map, projects, city feed, evidence, following, city choice | Anything with a personal balance. Fictional project markers are illustrations; buying is in Money |
+| **Me** | Your access, private history and connections | Passkeys, wallets, recovery, EU proof, roles, timeline, and the settings of every connection (Home Assistant, validator) | Readings and income from those connections (Money), the tenancy (Home) |
+| **Roadmap** (id `ideas`) | What is built, what is a prototype, and what is planned? | Nothing. Every capability grouped by availability, with one link to where it works | — |
 
 ## Money has four sections
 
@@ -59,14 +79,14 @@ Ask in order; the first yes decides.
 2. Does its life cycle belong to a dwelling or tenancy (listing, agreement, deposit, service charges, move-out)? → **Home**.
 3. Does it hold a balance, position or debt, or produce or spend money for the person? → **Money**, then pick the section: Holdings for balances and positions, Shares & loans for collateral workflows, Local stakes for issuer units, Devices & income for things the person runs.
 4. Is it public information about a place with no personal position? → **Places**.
-5. Is it not built yet? → **Ideas**: one catalogue entry with a status and, once it works, one destination.
+5. Is it not built yet? → **Roadmap** (area id `ideas`): one catalogue entry with a status and an availability, and, once it works, one destination.
 
 Worked examples: your own solar panel reads a sensor and produces savings → question 3 → Money → Devices & income. A city's 48 MWp solar plan is public evidence → question 4 → Places. A share in a local workshop with a wallet balance → question 3 → Money → Local stakes; its map marker is a reference in Places. A GPU node that earns per answer → question 3 → Money → Devices & income. A flat you rent → question 2 → Home. A path to owning that flat → question 5 until it exists.
 
 ## Reference conventions
 
 - A reference is one line plus one link. It uses the canonical name below and jumps with `goToSection`, which selects the tab, opens closed disclosures and focuses the target.
-- Capability destinations (`Idea.destination`) and adapter actions (`LedgerAdapter.action`) come from the catalogue; the Ideas map and the Me directory read them from there, and Today reads the topic names. They are typed with `SectionId`.
+- Capability destinations (`Idea.destination`) and adapter actions (`LedgerAdapter.action`) come from the catalogue; the Roadmap and the Me directory read them from there. They are typed with `SectionId`.
 - "Connect … in Me" is the only way a reading links to its settings.
 
 ## Canonical names
@@ -81,16 +101,21 @@ Worked examples: your own solar panel reads a sensor and produces savings → qu
 | Shares & loans, Devices & income, Holdings (Money sections) | Goals, Ownership path (as a section) |
 | Home ownership path | A path towards ownership |
 | Reality level chips | Prototype, illustration, test used as unlabeled prose |
+| Find a home · Secure the deposit · Keep your assets · Help build your city (the four stages, from `src/data/path.ts`) | Set up your ledger, Getting started, Your home journey, Settle into my city (as a stage) |
+| Your next step | What to do next lists, setup checklists, Next on your path |
+| Ways to hold the deposit | Deposit options panel, Rental deposit tab |
+| Roadmap (the area; its id stays `ideas`) | Ideas (as the area name) |
+| Available on this site, Needs a local setup, Contract prototype, Planned (availability) | Hosted-only, demo-only, coming soon, Localhost only |
 
 ## First run
 
-A new person meets three things in order, and each says what it is:
+A new person meets these in order, and each says what it is:
 
-1. **Setup wizard** (`onboarding.tsx`, progress from `account-setup-state.ts`). It opens by saying what Ledger of Life is and that the money features run on test networks. Steps: passkey, backup email, two wallets (named: Solana and Robinhood Chain). It ends there. Until the wallet SDK and the server have answered, a neutral "Checking your sign-in…" shows instead, so a returning person never sees the welcome steps. It has an exit ("Use a different account") and says plainly when sign-in is not configured on the server. The second-browser recovery proof is not part of it ([ADR 0011](adr/0011-ask-for-recovery-at-the-first-wallet-action.md)): a reminder card sits under the guide on Today, the same steps appear in the tenancy card the first time a wallet acts, and Me shows them under the account panel.
-2. **Getting-started guide** (top of Today, directly under the page title, `getting-started.tsx`). One card, hidden per account on this device. It lists the adapters the catalogue marks `setup` (`Adapter.setup.order`): sign in, choose your city, find or add a home, then three optional steps (EU proof, home solar, validator) under an "Optional" label. Only the next step (`nextSetupStep`) shows the adapter's own `explain.brings`, effort and reality level; the other open steps show their title and one button that goes to where it is done. The card adds no list of its own: state and next action come from `adapterState` and `adapterAction`, the same functions Me uses. For a new account on a phone, the first action is on the first screen.
-3. **The five Today cards**, which stay as references, under a small "One person. Connected parts of life." heading. The Home status bar above the guide shows only when there is a home, listing, invitation or error to report.
+1. **The door** (`onboarding.tsx`, progress from `account-setup-state.ts`). Its heading is the thread; the four stages follow, then what you can do, "Test networks only. Nothing here has monetary value.", the two things that need no account (the Strausberg welcome guide and the public AI desk), and only then "Start with two quick steps": a passkey, then the two wallets (named: Solana and Robinhood Chain). The backup email is a third step where recovery is required. Until the wallet SDK and the server have answered, a neutral "Checking your sign-in…" shows instead, so a returning person never sees the welcome steps. The second-browser recovery proof is not part of it ([ADR 0011](adr/0011-ask-for-recovery-at-the-first-wallet-action.md)): it appears in the tenancy card the first time a wallet acts, and Me shows it under the account panel.
+2. **Your next step** (under every area's heading). For a new account on Today: "Your account is ready. Start with a home." with Find a home, and Choose your city and Get test money as equal alternatives.
+3. **The stage strip and three status tiles** on Today (1–2 · Your home, 3 · Your assets, 4 · Your city). Optional connections (EU proof, home solar, validator) are not a completion score; they live in Me.
 
-A step is done when the adapter's state says it is configured; the guide stays hidden while any of those observations is still loading, so nothing flashes as "to do". A step whose observation failed says "We could not check this just now" with **Try again**; it is never offered as the next step, because the person may already have done it. An unfinished step sends the person to the section that owns it (`city-choice`, `home-options`, `adapter-home-assistant`, `adapter-validator`, `identity-eudi`). Places without a chosen city shows only the city picker and one "look at a covered city" row; its other sections appear once a city is chosen or explored.
+A stage is done by the rules in the table above. While a reading is still running, or after it failed, the stage says "Not known yet", never "To do", because the person may already have done it. Places without a chosen city shows the city chooser first, with "Preview … — don't save" separate from "Make this my city"; nothing picks a city for the person.
 
 ## Explaining an adapter
 
@@ -146,12 +171,22 @@ Add or change an adapter by reading the code first, then editing the statements.
 - Home reads Journey and Listings independently and offers Retry; the arbitrator invitation survives a reload and is previewed before joining; claims and decisions show reasons, limits and the split before anyone signs; a landlord can close a listing and an applicant withdraw before a tenant is chosen.
 - Getting onboarded into a city has a first slice: `/welcome/strausberg`, a public, account-free guide (a sourced first-months plan, what is on, clubs and groups, who to ask). The wallet SDK now loads only inside the `(wallet)` route group, so this page contacts no third party ([ADR 0012](adr/0012-public-pages-outside-the-wallet-group.md)). The interest vocabulary is now one list shared by Places and the guide (sport, kids, shops, health, culture, nature, volunteering).
 
+## What changed on 2026-09-30
+
+- One thread through the whole app (section "The thread and the next step" above): `src/data/path.ts` holds the sentence and the four stages; the door, Today, every area eyebrow ("STAGE 3 OF 4 · KEEP YOUR ASSETS") and the Roadmap use them. Two design proposals (GPT-6.1 and Claude Opus) and a Claude Sonnet screen inventory and review informed it.
+- One next step replaces Today's six-step getting-started guide (deleted with `setup-steps.ts`), the four "Choose my city" prompts and the Home hero's own button. Money's six-step "shares to stakes" funnel became three optional choices.
+- Navigation follows the path; Ideas became the Roadmap, grouped by availability, reached from the sidebar foot. Signed-out visitors see only what works without an account.
+- Home: one seven-step path (Find, Apply, Agree, Secure, Live, Move out, Paid out) replaces the four-step hero, the six-step walkthrough and the per-tenancy six-stage bar; listing cards show rent, deposit and "Apply for this home" without opening anything; the tenant sees "Agree and settle" and "Dispute deduction" as equal choices; "Ways to hold the deposit" answers the stocks and lending questions with availability labels.
+- Money: holdings and the five categories first, test-money funding next to the action that needs it; Shares & loans offers two tasks (Loan against shares, Lend test dollars) with the protocol details behind one disclosure and no "Rental deposit" panel; the share-backed deposit calculator moved to the Roadmap as the prototype's illustration.
+- The "Test networks · no real money" chip opens the one explainer of what is real here.
+- The market's preflight checks refuse a shortfall before any signature (`src/domain/market-preflight.ts`).
+
 ## Still open
 
 - Places lists the fictional `tHOME`/`tWORK` issuers as map markers and a detail sheet. They are labelled illustrations with a link to Money, but they are the last personal-investment surface outside Money.
 - Today still shows civic blocks (city press, followed updates, visit changes) and a "mark update read" control that Places also offers. `LEDGER_OF_LIFE.md` describes Today as links only.
 - Outside Money and the adapter directory, sections use free-text reality labels and the five-value capability status rather than the ontology chips.
-- Setup lets the sidebar stay clickable although every area shows the wizard until the wallets exist.
+- Setup lets the sidebar stay clickable although every area shows the wizard until the wallets exist (signed-out visitors now see only the no-account links).
 - Dead code found while mapping: `src/components/neighborhood.tsx`, `openCityEvent` and the `capabilityIds` of `SYSTEM_NODES` in `civic-system.ts` have no consumer.
 - The Me directory's state chips for the four city adapters still all read "City selected" whatever their coverage.
 - The welcome guide exists only in English and only for Strausberg; it has no registration-desk handout or QR code yet, and Places and Today still need an account, so a visitor without one cannot preview them.

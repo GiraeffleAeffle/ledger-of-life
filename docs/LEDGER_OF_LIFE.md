@@ -16,7 +16,7 @@ city that perceives, decides, acts and learns.
 
 ## 2. One person's life
 
-Five domains organise the person's ledger. **Today** gives a household-first overview across them; **Me** owns the shared adapter catalogue and connection settings; **Ideas** separates the roadmap from working features. Public life is one domain, not the whole product. Which area operates which feature follows one rule, [INFORMATION_ARCHITECTURE.md](INFORMATION_ARCHITECTURE.md): each feature has one home, and every other area shows only a reference that links there.
+Five domains organise the person's ledger, and one thread runs through them: find a home, secure the deposit, keep your assets, help build your city ([INFORMATION_ARCHITECTURE.md](INFORMATION_ARCHITECTURE.md#the-thread-and-the-next-step)). **Today** gives the next step and where the person is on that path; **Me** owns the shared adapter catalogue and connection settings; the **Roadmap** (area id `ideas`) separates what is planned from working features. Public life is one domain, not the whole product. Which area operates which feature follows one rule: each feature has one home, and every other area shows only a reference that links there.
 
 ```mermaid
 flowchart TB
@@ -100,17 +100,28 @@ The shared test USD can already be held in the wallet or come from the separate 
 test loan. Borrowing and buying are distinct approvals; buying units does not repay debt.
 The original faucet-funded purchase proof remains separate. The historical Privy route
 completed two-share collateral → 12 tUSDG borrowing → 5 tHOME and 5 tWORK →
-0.01 tUSDG local inference payment. Its [connected evidence](evidence/BORROW_TO_LOCAL_AI_ROBINHOOD_TESTNET.json)
+0.01 tUSDG local inference payment under the former flat-price scheme. Its [connected evidence](evidence/BORROW_TO_LOCAL_AI_ROBINHOOD_TESTNET.json)
 used **per-wallet fake stock and an operator-set price**, not the new official-stock shared pool.
-It proves those historical transfers, not mirror pricing or borrower-funded earnings.
+It proves those historical transfers, not mirror pricing, borrower-funded earnings or per-token `upto` settlement.
 See also [the earlier purchase proof](evidence/LOCAL_CITY_INVESTMENTS_ROBINHOOD_TESTNET.json).
 
 The building, workshop supply relationship, solar/heat-pump choices and city flywheel remain
 project ideas, shown as a labelled sketch inside Money → Local stakes. Local Qwen GPU inference is a
 working service operated in Money → Devices & income; Me's adapter, the sketch's GPU option, the
-ownership path and the library profile link there. Official x402 v2 exact/Permit2 transfers
-0.01 tUSDG only after a complete answer is saved; a finite 0.10-tUSDG allowance never grants
-general wallet authority. `/library` uses a revocable visitor session and no payment.
+ownership path and the library profile link there. Official x402 v2 `upto`/Permit2 authorizes
+at most `maxOutputTokens × 100` atomic tUSDG and settles 100 atomic tUSDG (0.0001 tUSDG)
+per reported output token only after a complete answer with `done: true` and `done_reason: "stop"`
+is saved. Token-limit, incomplete, interrupted or failed inference costs nothing. The existing
+finite 0.10-tUSDG approval and dedicated facilitator key are unchanged; the signed `to`,
+`facilitator` and `validAfter` witness restricts settlement through the `upto` proxy
+`0x4020A4f3b7b90ccA423B9fabCc0CE57C6C240002` to the named payee and facilitator within the
+maximum and validity window, not general wallet authority. Public city AI is available to
+anyone; residence is not checked. With
+`LOCAL_AI_LIBRARY_ENABLED=1`, `/library` enables connector and direct free mode using a revocable
+visitor session: 30 shared attempts per UTC day and three per visitor. Connector free answers
+require explicit public-question consent and an owner-opted-in host (`freePublicAnswers`,
+default `false`); they create no payment or payout. Paid third-party answers use the same
+bounded per-output-token price. This describes the intended configuration, not a new public release.
 Observed usage and confirmed receipts remain separate from editable euro host-cost scenarios.
 
 The test units establish neither company equity, cooperative membership nor property title.
@@ -289,15 +300,16 @@ No push/email service or invented action deadline.
 | **Home** | Visual find → apply/agree → deposit → live journey; role-specific next steps, service charges and test controls on demand. A hosted tenancy needs actual distinct parties; no fake-stock deposit setup | Reuses listing/agreement/tenancy handlers |
 | **Money** | **Holdings** (wallets, deposit entitlement, lent value and subtotal), **Shares & loans** (official-stock shared loan and lender actions; deposit unavailable without actual parties), **Local stakes** (fictional units and receipts), **Devices & income** (solar, validators, local AI); collateral/debt/cash counted once | Deployment-dependent wallet-signed actions, honest provenance and liquidity limits |
 | **Places** | Persistent OSM 2D/3D context, public planning areas/local places, prominent selected-project Follow and one detail sheet; distinct opt-in fictional issuer markers, unlocated events and source details | One map and one selection, not a stack of prose dashboards |
-| **Ideas** | All 18 capability IDs/statuses, including the bank-account roadmap item; five topic groups built from `Idea.topic`, one selected detail, exact working destinations (`Idea.destination`) and links back to the related adapters | One capability definition in `src/data/ledger-catalogue.ts` |
+| **Roadmap** (id `ideas`) | Every capability from `src/data/ledger-catalogue.ts`, grouped by availability (available on this site, needs a local setup, contract prototype, planned), one selected detail, exact working destinations (`Idea.destination`) and links back to the related adapters | One capability definition in `src/data/ledger-catalogue.ts` |
 
-The sidebar and mobile tab bar show all six areas, including Ideas. Account management lives on demand
-under Me rather than in a global proof dashboard. Today is the household overview, not a civic
+The sidebar and mobile tab bar show five areas in path order: Today, Home, Money, Places, Me. The Roadmap
+is reached from the sidebar foot, Today and the "Test networks" explainer. Account management lives on demand
+under Me rather than in a global proof dashboard. Today is the next step and the stage strip, not a civic
 dashboard or a second set of editable workflows. Places owns the map and public-life detail;
-Ideas owns the capability roadmap. A feature that could fit several areas has one home and a reference elsewhere.
+the Roadmap owns the capability list. A feature that could fit several areas has one home and a reference elsewhere.
 
-The landing page shows an attention line only when relevant, then Identity, Home, Money,
-Energy/devices and Places. Money uses the existing complete-snapshot valuation rather than
+Today shows one next step, the four stages as done, in progress or to do, then three status tiles titled
+by stage (your home, your assets, your city). Money uses the existing complete-snapshot valuation rather than
 adding a second total. Official city press and personally relevant public developments remain below.
 The generic city visit comparison eagerly advances successful city snapshots and is not the
 followed unread queue. The latter starts from first follow, retains individual pending events
@@ -462,7 +474,7 @@ Home/Money link to these settings and retain the existing `/api/assets` observat
 | Life timeline | Me | Partly built: app tenancies and labeled self-declared earlier places | **Next**: residence attestations where issued, private milestones |
 | Real-time service charges | Home | Prototype example statement with landlord-set test prepayment, optional live daily Home Assistant consumption; no escrow funding or payouts | **Next**: authorized meters, invoices and escrow settlement |
 | Local investments | Money (Local stakes) | Wallet-signed test-USD purchases of separate fictional `tHOME`/`tWORK` units, checked receipts and actual holdings; building/city effects remain illustrative | Real issuers, defined rights, legal arrangements and verified projects before actual local investment offers |
-| Local AI & GPU hosting | Money (Devices & income); public `/library` | Actual Ollama answers through paired outbound GPU connectors or direct local mode; signed host pairing, heartbeats, privacy-scoped routing and official x402 test-token settlement, proven on the hosted site on 30 September; wallet-free bounded visitor access | Security review, a proven real wake, reliable operations, sustained demand and metered costs before any real-income claim; signatures do not attest a model |
+| Local AI & GPU hosting | Money (Devices & income); public `/library` | Actual Ollama answers through paired outbound GPU connectors or direct local mode; signed pairing, heartbeats and privacy-scoped routing. Own-compute and the former flat-price x402 test-token path were proven on the hosted site on 30 September, not the new per-token `upto` path. Public city AI requires no residence check: opt-in free connector hosts (`freePublicAnswers`, default `false`), explicit public-question consent, 30 shared attempts/day and three/visitor, or 100 atomic test tUSDG per output token for a complete stop, with a signed maximum of `maxOutputTokens × 100`; own/free has no payment/payout and incomplete inference costs nothing. `LOCAL_AI_LIBRARY_ENABLED=1` enables connector and direct free mode. New wake/preload, free-host and per-token payment behavior is not claimed released | 240 s total connector lifetime including wake/preload, 30 s pickup, max 90 s generation; promptly returned resumable requests with polling, unchanged job envelope/signatures and 120 s ingress. Security review, a proven real wake, reliable operations, sustained demand and metered costs before any real-income claim; signatures do not attest a model |
 | Newcomer welcome | Places | Partly built: live OSM clubs and official directories; no matching, registration or voucher | **Next**: clearly simulated vouchers; partners only for real redemption |
 | Shares as a test deposit | Contract prototype only | Former per-wallet fake-stock/operator-desk app flow removed; historical evidence remains labelled | Needs actual parties and an independent sale venue before any hosted rental offer |
 | Borrow/lend against official test shares | Money (Shares & loans); deployed on Robinhood testnet and live on the hosted site | SharedLendingPool: official faucet TSLA, mirrored token price, 50% borrow LTV, 80% liquidation, 90% utilization, continuous 5% nominal annual interest (about 5.13% effective, read from contract) | Cash-limited withdrawal, bad-debt losses, issuer suspension, burned seed disclosure; no projections. Every operation except liquidation ran with a real Privy wallet on localhost; on the hosted site it awaits a person's first loan |

@@ -11,7 +11,7 @@ Start with the [roadmap](ROADMAP.md) for where the project stands and what is ne
 | [Validation](VALIDATION.md)                                         | Reproducible checks, evidence and known toolchain limits              |
 | [Test-signer mode](TEST_SIGNER_MODE.md)                             | Running a whole tenancy with operator-held test keys (never evidence) |
 | [Build spec](HACKATHON_BUILD_SPEC.md)                               | Product behavior, acceptance scenario and scope                       |
-| [Ledger of Life](LEDGER_OF_LIFE.md)                                 | The product idea, the six areas and the adapter choices               |
+| [Ledger of Life](LEDGER_OF_LIFE.md)                                 | The product idea, the thread through five areas and the adapter choices |
 | [Information architecture](INFORMATION_ARCHITECTURE.md)             | Where each feature lives, and how to place a new one                  |
 | [Product ontology](ONTOLOGY.md)                                     | Concepts, invariants and reality levels; machine-readable in `ontology.yaml` |
 | [Domain glossary](../CONTEXT.md)                                    | Shared meanings for security, earnings, claims and personal assets    |

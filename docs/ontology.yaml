@@ -4,7 +4,7 @@
 # Human-readable companion: docs/ONTOLOGY.md. Keep both in sync when concepts change.
 
 version: 1
-updated: 2026-09-29
+updated: 2026-09-30
 product:
   working_name: Ledger of Life   # chosen 2026-09-26; technical identifiers unchanged
   thesis: >-
@@ -395,8 +395,8 @@ concepts:
       rules:
         - Every adapter explains itself in plain language, and each statement is checked against the code that implements it, including what the operator can see and what disconnecting does not undo.
         - reality is one of the ontology reality levels. A roadmap adapter (connection future) has effort "not available yet", reality roadmap and says it does nothing yet; a live adapter never does.
-        - Getting-started steps are adapters marked setup, in order; the guide adds no second list.
-      surfaces: [src/components/ledger-adapters.tsx, src/components/getting-started.tsx]
+        - The next step is derived from tenancy, listing and read state (src/components/next-step.ts), not from a setup list; adapters carry no step order.
+      surfaces: [src/components/ledger-adapters.tsx, src/components/next-step-card.tsx]
     configuration:
       api: app/api/adapters/route.ts
       ui: src/components/adapter-settings.tsx
@@ -447,23 +447,27 @@ concepts:
     lifecycle: [payment_required, approval_required, ready, running, settling, completed, failed, interrupted, expired]
     invariants:
       - Server configuration fixes model and options; the quote binds provider host, payout wallet, question privacy scope and ownership, which cannot change on replay.
-      - A complete paid result is persisted before settlement and delivered only with a confirmed receipt.
+      - A paid result with done true and done_reason stop is persisted before settlement and delivered only with a confirmed receipt; a token-limit result is incomplete and free.
       - A person's own paired host is their own compute, with no x402 authorization, payout or receipt; its completed answer is delivered without requiring token balances or a facilitator.
       - Incomplete or interrupted inference never becomes paid revenue; an unresolved payment reuses its exact journal rather than recomputing the answer.
       - A connector host reads questions in clear; city hosts receive only explicitly public questions, while own-host-only is the default. Signatures do not prove which model ran or prevent host retention.
-      - Free access establishes a revocable HttpOnly visitor session before execution, permits three attempts per visitor and thirty per UTC day, and creates no paid receipt.
+      - Public city AI is available to anyone without a residence check. LOCAL_AI_LIBRARY_ENABLED=1 enables connector and direct free library mode; a revocable HttpOnly visitor session permits three attempts per visitor and thirty shared attempts per UTC day, with no payment, payout or paid receipt.
+      - Free connector requests require explicit publicQuestion consent and route only to hosts whose owner opted into freePublicAnswers; paid third-party complete-stop answers cost 100 atomic test tUSDG per reported output token within the signed maximum.
+      - Saved resumable requests return promptly while connector work is running and are polled through the existing ownership/session boundary, without a new signature or authorization.
       - Clearing a visitor session cancels its connector jobs and reservations, interrupts in-flight requests and removes both text fields before reporting cleared; a synchronous visitor lease fences late answer persistence. A host that already fetched a question cannot be made to forget it.
       - Question and answer text is retained only while the request is running, settling or has a payment in flight, then removed after a grace period (default 600 s, `LOCAL_AI_TEXT_GRACE_SECONDS`); fingerprint, usage, state and the payment receipt are kept. A removed request shows no text. On the SQLite store the removal also reaches the database file and its write-ahead log (`secure_delete` plus a truncating checkpoint, `Store.reclaim`); on Postgres, dead rows remain until autovacuum.
     reality: prototype
     code: [src/server/local-ai.ts, src/server/local-ai-retention.ts, src/server/local-ai-runtime.ts, src/server/local-ai-session.ts, src/components/local-ai.tsx, "app/(wallet)/library/page.tsx"]
 
   InferencePayment:
-    definition: Official x402 v2 exact/Permit2 authorization and settlement of 10000 atomic tUSDG for one completed local answer on eip155:46630.
+    definition: Official x402 v2 upto/Permit2 authorization on eip155:46630 for at most maxOutputTokens times 100 atomic tUSDG, settling 100 atomic tUSDG per reported output token only after a saved complete-stop local answer.
     relations: {authorizes: LocalInferenceRequest, paid_by: Person (owned wallet), settles_in: Asset}
     invariants:
       - Approval is a finite 100000-atomic Permit2 budget; each answer needs a separate bounded authorization.
-      - The dedicated facilitator pays gas but cannot alter the payer, recipient, asset or amount.
-      - Request ownership and a globally reserved payer/nonce bind authorization to one immutable request; base Permit2 does not cryptographically sign the prompt.
+      - The same dedicated facilitator key pays gas; the signed witness binds to, facilitator and validAfter, restricting settlement to the named facilitator and payee within the authorized maximum and validity window.
+      - The upto settlement proxy is 0x4020A4f3b7b90ccA423B9fabCc0CE57C6C240002, replacing the former exact-payment proxy.
+      - The quote amountAtomic is the maximum, status.price.amountAtomic is the 100-atomic unit price, and request.payment.amountAtomic becomes the actual output-token charge after inference; review.maxOutputTokens and review.facilitatorAddress expose the signed bounds.
+      - Request ownership and a globally reserved payer/nonce bind authorization to one immutable request; the Permit2 witness does not cryptographically sign the prompt.
       - Immutable unsigned envelope and exact signed bytes are durable before broadcast; canonical receipt and matching token effects establish settlement.
       - Only settled transfers count as recorded receipts; signatures, quotes, failed jobs and free access do not.
       - Own-compute answers are counted separately and never contribute to paid answers or settled revenue.
@@ -491,7 +495,9 @@ concepts:
       - The private key stays on the connector; tokenless UDP Wake-on-LAN is the owner default. Optional Home Assistant requires HTTPS absent an explicit plaintext trusted-LAN opt-in and uses a dedicated non-admin local token; the app never dials a connector-supplied URL.
       - Signed method, path, timestamp, nonce and body hash prevent tampering and replay within a sixty-second clock window.
       - A recent heartbeat reports online or asleep; absent heartbeats report offline. Liveness and model names are host claims, not hardware or execution attestation.
-      - One slot is reserved per host before request state or quota changes; busy or unavailable quotes remain ready to resume. Assigned hosts alone fetch and answer bounded text-only jobs. Pickup expires after thirty seconds and completion after ninety seconds. Aborted polls release their waiter without claiming work.
+      - One slot is reserved per host before request state or quota changes; busy or unavailable quotes remain ready to resume. Assigned hosts alone fetch and answer bounded text-only jobs. Pickup expires after thirty seconds; the total lifetime is 240 seconds including wake, readiness and explicit cold-model preload, with generation capped at ninety seconds or the remaining lifetime. Aborted polls release their waiter without claiming work.
+      - The job envelope remains {id, model, messages, options, expiresAt}; updated connectors honor expiresAt across wake, preload and generation. Client polling keeps the existing 120-second ingress boundary independent of the total job lifetime.
+      - Each host's owner controls freePublicAnswers, default false; only opted-in hosts serve free public connector jobs. Own-host compute and paid third-party settlement are unchanged.
       - Queued question copies live only in bounded process memory and are discarded after completion, timeout, revocation or process exit; existing database retention rules still apply.
       - Every connector request body has a three-second read deadline, and malformed signature headers are rejected before reading.
       - LAN HTTP Ollama permits anyone on that transport to read questions or forge complete answers; host signatures and payment gating do not authenticate model execution.
@@ -575,6 +581,8 @@ journeys:
   arbitrator: [create_account, join_by_invitation, decide_disputed_claim]
   owner_of_things: [connect_adapter, see_everything_owned]   # any role
   journey_ui: {stages: [agreement, space, deposit, living, move-out, paid], code: src/server/journey.ts, rule: "Exactly one person has an action per phase; the others see what they wait for."}
+  path: {stages: [home, deposit, assets, city], code: src/data/path.ts, next_step: src/components/next-step.ts, progress: src/components/path-progress.ts, rule: "One thread for the whole app; one next step at a time. A failed or unfinished read is never shown as done or empty."}
+  home_path_ui: {stages: [Find, Apply, Agree, Secure, Live, Move out, Paid out], code: src/components/home-journey-logic.ts, rule: "Person-facing progress only; never advances a pending chain operation."}
 
 networks:
   solana_devnet: {used_for: [Escrow, Operation, tSPYx market], rpc: "Helius (SOLANA_RPC_URL)"}

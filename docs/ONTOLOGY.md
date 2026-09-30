@@ -175,7 +175,7 @@ Borrowers accrue interest continuously at 5% nominal annually (approximately 5.1
 | Landlord | Account → rent out a home → choose applicant → invite arbitrator → accept → create deposit space → propose deduction at move-out → payout |
 | Arbitrator | Account → join by invitation → decide a dispute |
 | Any owner | Connect adapters → see everything owned |
-| Local owner/customer | Available shares → separately signed collateral and loan → housing/company units → an owned AI answer; own-host compute has no payment, while a city-host answer has a checked x402 receipt; free library access is an independent visitor service |
+| Local owner/customer | Available shares → separately signed collateral and loan → housing/company units → an owned AI answer; own-host compute has no payment, paid city-host complete-stop answers have checked x402 `upto` receipts at 100 atomic test tUSDG per output token within a signed maximum; free public city AI is an independent visitor service with no residence check |
 
 In each tenancy phase exactly one person has an action; everyone else sees what they are waiting for (`src/server/journey.ts`).
 
@@ -187,10 +187,22 @@ marking the question public. The host reads the question in clear, and neither a
 nor a model label proves which model ran or whether the host retained a copy.
 A person's own paired host has no payout, authorization or receipt: their own compute
 works with a single verified EVM wallet and requires neither token balances nor a facilitator.
-An **InferencePayment** uses official x402 v2 exact/Permit2 and existing tUSDG; a finite
-allowance is not a completed payment. The result is saved before settlement, failed/incomplete
-inference is not charged, and canonical token effects establish revenue. A free library
-visitor has a separate revocable session, bounded attempts and no fabricated sponsor receipt.
+An **InferencePayment** uses official x402 v2 `upto`/Permit2 and existing tUSDG at
+100 atomic tUSDG (0.0001 tUSDG) per reported output token. The quote authorizes at most
+`maxOutputTokens × 100` atomic tUSDG, not a flat answer price; `review.maxOutputTokens`
+and `review.facilitatorAddress` expose the signed bounds. Quote `amountAtomic` is the maximum,
+`status.price.amountAtomic` is the unit price, and `request.payment.amountAtomic` becomes the
+actual charge after inference. The finite 0.10-tUSDG approval and dedicated facilitator key
+stay unchanged; allowance is not payment. The signed `to`, `facilitator` and `validAfter`
+witness restricts settlement through `0x4020A4f3b7b90ccA423B9fabCc0CE57C6C240002` to the named
+facilitator and payee within the maximum and validity window. Only a saved complete answer
+with `done: true` and `done_reason: "stop"` can be charged; token-limit, failed, interrupted
+and incomplete inference costs nothing. Canonical token effects establish revenue. Public city AI is
+available to anyone, without a residence check. `LOCAL_AI_LIBRARY_ENABLED=1` enables connector
+and direct free library mode: a revocable visitor session, three attempts per visitor and
+30 shared attempts per UTC day, with no payment or payout. Free connector jobs require explicit
+`publicQuestion` consent and owner opt-in on the selected host (`freePublicAnswers`, default
+`false`); paid third-party complete-stop answers use the bounded per-output-token price.
 The **HostEconomicsScenario** is an editable euro calculation, not actual profit or a conversion
 of test receipts.
 An allowlisted signed-in owner creates a **HostPairingInvitation**: a twelve-character
@@ -207,6 +219,14 @@ quota or starting a request; busy quotes remain ready to resume. Aborted polls c
 claim jobs, and short body-read deadlines limit unauthenticated holds. Clearing a visitor
 cancels queued jobs, interrupts requests and purges both text fields before success;
 revocation fences late answer persistence, but a host cannot be made to forget received text.
+
+Connector pickup remains 30 seconds; the total job lifetime is 240 seconds including wake,
+readiness and explicit cold-model preload. Generation is capped at 90 seconds or the
+remaining lifetime. Updated connectors respect `expiresAt` in the unchanged
+`{id, model, messages, options, expiresAt}` envelope. Saved resumable running requests return
+promptly for client polling through the existing authorization boundary; no new signature or
+authorization is needed, and ingress remains at least 120 seconds. These contracts do not
+claim a new release or a proven real sleeping-GPU wake.
 Failed or timed-out jobs are not charged. The single-replica queue holds copies only in
 memory, erased on completion, timeout, revocation, clear or process exit.
 
@@ -224,6 +244,7 @@ memory, erased on completion, timeout, revocation, clear or process exit.
 | PriceSource | `contracts/evm/src/testnet/MirroredPriceFeed.sol`, `src/server/tsla-price-mirror.ts`: mainnet source and testnet copy provenance |
 | Operation, Release, Payout | `src/server/solana-service.ts`, `src/server/solana-initialization.ts` |
 | Journey (next step per person) | `src/server/journey.ts`, `src/components/home.tsx` |
+| Path (four stages) and next step | `src/data/path.ts`, `src/components/next-step.ts`, `src/components/path-progress.ts`, `src/components/home-journey-logic.ts` (Home's seven steps) |
 | Position, Venue, Distribution | `src/server/portfolio.ts`, `src/server/robinhood-demo.ts` |
 | TestFunds | `src/server/test-dollars.ts`, `src/server/gas-drip.ts`, `src/components/test-dollars.tsx`: the person's own wallet mints tUSDG. `robinhood_gas_drip` is an optional host-only infrastructure faucet: exactly 0.00005 test ETH to a verified wallet below 0.00001 ETH, once per 24 h per account and wallet, capped at 200 per UTC day, with durable exact-transfer recovery. Robinhood's public faucet remains the alternative for test ETH and official test TSLA; Circle supplies devnet USDC. No paymaster or operator action for the person. |
 | LocalInvestment (test units) | `src/data/local-investments.ts`, `src/server/local-investments.ts`, `src/components/local-investments.tsx`, `contracts/evm/src/testnet/FictionalCityUnit.sol`, `contracts/evm/script/local-investments.mjs` |
