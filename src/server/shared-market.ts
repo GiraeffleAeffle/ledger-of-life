@@ -240,7 +240,7 @@ export async function prepareMarketAction(store: Store, wallet: string, operatio
         const [known, nonce] = await Promise.all([client.request({ method: 'eth_getTransactionByHash', params: [record.pendingHash] }), client.getTransactionCount({ address: owner, blockTag: 'latest' })]);
         assert((record.pendingNonce !== undefined && nonce > record.pendingNonce) || (known === null && now() - (record.pendingAt ?? now()) >= 120_000), 'Your market transaction is still pending.');
       }
-      await store.update<MarketRecord>(key, value => ({ ...value, pendingHash: undefined, pendingAt: undefined, pendingNonce: undefined }));
+      await store.update<MarketRecord>(key, value => value.pendingHash === record.pendingHash ? { ...value, pendingHash: undefined, pendingAt: undefined, pendingNonce: undefined } : value);
     }
     assert(await client.getBalance({ address: owner }) > 0n, 'Get test ETH from Robinhood’s faucet for network fees.');
     let to = config.pool; let data: Hex; let approval = false;
@@ -296,11 +296,14 @@ export async function submitMarketTransaction(store: Store, wallet: string, sign
     throw error;
   }
   let receipt;
-  try { receipt = await client.waitForTransactionReceipt({ hash, timeout: 10_000, confirmations: 1 }); }
+  // Only this exact transaction settles the review: viem would otherwise resolve with a same-nonce replacement's receipt.
+  try { receipt = await client.waitForTransactionReceipt({ hash, timeout: 10_000, confirmations: 1, checkReplacement: false }); }
   catch { return { hash, status: 'pending' as const }; }
+  assert(receipt.transactionHash?.toLowerCase() === hash.toLowerCase(), 'Market transaction was replaced by another transaction from your wallet.');
   // A confirmed transaction cost its signer gas and a signature, so the next step or action (the call after an
   // approval, or borrowing right after adding collateral) need not wait; unsigned reviews and reverts still do.
-  await store.update<MarketRecord>(key, value => ({ ...value, pendingHash: undefined, pendingAt: undefined, pendingNonce: undefined, ...(receipt.status === 'success' ? { nextPrepareAt: now(), submitAttempts: 0 } : {}) }));
+  // Hash-owned: a late completion must not clear a newer pending transaction or reset its windows.
+  await store.update<MarketRecord>(key, value => value.pendingHash !== hash ? value : { ...value, pendingHash: undefined, pendingAt: undefined, pendingNonce: undefined, ...(receipt.status === 'success' ? { nextPrepareAt: now(), submitAttempts: 0 } : {}) });
   assert(receipt.status === 'success', 'Market transaction reverted.');
   return { hash, status: 'confirmed' as const };
 }

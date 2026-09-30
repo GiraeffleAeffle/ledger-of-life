@@ -117,26 +117,26 @@ test('the reviewed self deposit broadcasts once and cannot be replayed', async t
   t.after(async () => { store.close(); if (old === undefined) delete process.env.SHARED_MARKET_MANIFEST_FILE; else process.env.SHARED_MARKET_MANIFEST_FILE = old; await rm(dir, { recursive: true, force: true }); });
   await store.create(`shared-market:${owner.address.toLowerCase()}`, { nextPrepareAt: 0, submitWindowAt: 0, submitAttempts: 0, prepared: { transaction: reviewed, expiresAt: 200_000, operation: 'lend', quantity: '100', approval: false } });
   let broadcasts = 0;
-  const client = { ...verification, sendRawTransaction: async () => { broadcasts++; }, waitForTransactionReceipt: async () => ({ status: 'success' }) } as unknown as NonNullable<Parameters<typeof submitMarketTransaction>[3]>;
+  const client = { ...verification, sendRawTransaction: async () => { broadcasts++; }, waitForTransactionReceipt: async ({ hash }: { hash: string }) => ({ status: 'success', transactionHash: hash }) } as unknown as NonNullable<Parameters<typeof submitMarketTransaction>[3]>;
   const serialized = await signed();
   assert.deepEqual(await submitMarketTransaction(store, owner.address, serialized, client, () => 100_000), { hash: keccak256(serialized), status: 'confirmed' });
   await assert.rejects(submitMarketTransaction(store, owner.address, serialized, client, () => 100_000), /expired/);
   assert.equal(broadcasts, 1);
 });
 
-test('a confirmed transaction lets the wallet prepare its next action at once; a failed unsigned review still waits a minute', async t => {
+test('a confirmed transaction lets the wallet prepare its next action at once; a failed review or a replaced transaction still waits a minute', async t => {
   const dir = await mkdtemp(join(tmpdir(), 'market-window-'));
   const old = process.env.SHARED_MARKET_MANIFEST_FILE;
   process.env.SHARED_MARKET_MANIFEST_FILE = join(dir, 'manifest.json');
   await writeFile(process.env.SHARED_MARKET_MANIFEST_FILE, JSON.stringify(config));
   const store = new LocalStore(':memory:');
   t.after(async () => { store.close(); if (old === undefined) delete process.env.SHARED_MARKET_MANIFEST_FILE; else process.env.SHARED_MARKET_MANIFEST_FILE = old; await rm(dir, { recursive: true, force: true }); });
-  let time = 100_000; let gas = 1n;
+  let time = 100_000; let gas = 1n; let replacement: string | null = null;
   const client = { ...verification,
     readContract: async (request: { functionName: string; address: string }) => request.functionName === 'allowance' ? 10n ** 30n : verification.readContract(request),
     getBalance: async () => gas, getTransactionCount: async () => 0, estimateGas: async () => 100_000n,
     estimateFeesPerGas: async () => ({ maxFeePerGas: 2n, maxPriorityFeePerGas: 1n }),
-    sendRawTransaction: async () => {}, waitForTransactionReceipt: async () => ({ status: 'success' }),
+    sendRawTransaction: async () => {}, waitForTransactionReceipt: async ({ hash }: { hash: string }) => ({ status: 'success', transactionHash: replacement ?? hash }),
   } as unknown as NonNullable<Parameters<typeof prepareMarketAction>[5]>;
   const now = () => time;
   const prepare = () => prepareMarketAction(store, owner.address, 'lend', '100', undefined, client, now);
@@ -150,6 +150,11 @@ test('a confirmed transaction lets the wallet prepare its next action at once; a
   await assert.rejects(prepare(), /Wait one minute between market requests/);
   time += 1_000;
   assert.equal((await prepare()).steps.length, 1);
+  // A same-nonce replacement from the wallet is not the reviewed transaction: no confirmation, no reset.
+  replacement = keccak256('0x01');
+  await assert.rejects(submitMarketTransaction(store, owner.address, await signed(), client, now), /replaced/);
+  time += 1_000;
+  await assert.rejects(prepare(), /Wait one minute between market requests/);
 });
 
 for (const trigger of ['paused', 'isBlocked', 'collateralShortfall', 'implementation', 'ACCESS_CONTROLLED_REGISTRY', 'beacon storage', 'issuer code'] as const) {
@@ -222,7 +227,7 @@ test('issuer suspension rejects a reviewed borrow but preserves reviewed dollar 
   const client = { ...verification,
     readContract: async (request: { functionName: string; address: string }) => request.functionName === 'paused' ? true : verification.readContract(request),
     sendRawTransaction: async () => { broadcasts++; },
-    waitForTransactionReceipt: async () => ({ status: 'success' }),
+    waitForTransactionReceipt: async ({ hash }: { hash: string }) => ({ status: 'success', transactionHash: hash }),
   } as unknown as NonNullable<Parameters<typeof submitMarketTransaction>[3]>;
   const borrowData = encodeFunctionData({ abi: SHARED_POOL_ABI, functionName: 'borrow', args: [1_000_000n] });
   const key = `shared-market:${owner.address.toLowerCase()}`;
