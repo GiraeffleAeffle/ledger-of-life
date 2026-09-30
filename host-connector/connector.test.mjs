@@ -14,6 +14,7 @@ const model = 'fixture:tiny';
 const configInput = { appOrigin: 'http://localhost:3000', ollamaUrl: 'http://localhost:11434', name: 'Fixture GPU', models: [model], stateDirectory: './state' };
 const job = (extra = {}) => ({ id: 'job-fixture', model, messages: [{ role: 'user', content: 'A fixture question' }], options: { num_ctx: 8192, num_predict: 96, temperature: 0.2 }, expiresAt: new Date(Date.now() + 60_000).toISOString(), ...extra });
 const answer = (extra = {}) => ({ model, done: true, done_reason: 'stop', message: { role: 'assistant', content: 'A complete fixture answer.' }, prompt_eval_count: 4, eval_count: 5, ...extra });
+const preload = (extra = {}) => ({ model, done: true, done_reason: 'load', response: '', ...extra });
 const json = (response, value, status = 200) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(value)); };
 
 async function temporary(t) {
@@ -39,7 +40,7 @@ async function runtime(t, options = {}) {
     if (request.url.endsWith('/heartbeat')) heartbeats.push(input);
     json(response, {});
   });
-  const ollamaUrl = await server(t, options.ollama ?? ((request, response) => request.url === '/api/tags' ? json(response, { models: [{ name: model }, { name: 'unconfigured:huge' }] }) : json(response, answer())));
+  const ollamaUrl = await server(t, options.ollama ?? ((request, response) => request.url === '/api/tags' ? json(response, { models: [{ name: model }, { name: 'unconfigured:huge' }] }) : json(response, request.url === '/api/generate' ? preload() : answer())));
   const config = validateConfig({ ...configInput, appOrigin, ollamaUrl, stateDirectory: directory, ...options.config });
   const identity = await loadIdentity(config);
   identity.state.hostId = 'host-fixture';
@@ -87,15 +88,15 @@ test('job validation rejects extra capabilities, unsafe options, oversized text 
   ]) assert.throws(() => validateJob(invalid, [model]));
 });
 
-test('future server deadlines tolerate clock skew but never extend the local 90-second bound', async (t) => {
+test('future server deadlines tolerate clock skew but never extend the local four-minute bound', async (t) => {
   const now = Date.parse('2026-09-30T12:00:00Z');
-  const skewed = job({ expiresAt: new Date(now + 95_000).toISOString() });
+  const skewed = job({ expiresAt: new Date(now + 245_000).toISOString() });
   validateJob(skewed, [model], now);
-  assert.equal(jobDeadline(skewed, now), now + 90_000);
+  assert.equal(jobDeadline(skewed, now), now + 240_000);
   assert.equal(jobDeadline(job({ expiresAt: new Date(now + 20_000).toISOString() }), now), now + 20_000);
-  assert.equal(jobDeadline(job({ expiresAt: new Date(now + 86_400_000).toISOString() }), now), now + 90_000);
+  assert.equal(jobDeadline(job({ expiresAt: new Date(now + 86_400_000).toISOString() }), now), now + 240_000);
   const { connector, results } = await runtime(t);
-  await connector.execute(job({ expiresAt: new Date(Date.now() + 95_000).toISOString() }));
+  await connector.execute(job({ expiresAt: new Date(Date.now() + 245_000).toISOString() }));
   assert.equal(results[0].response.message.content, 'A complete fixture answer.');
 });
 
@@ -131,7 +132,7 @@ test('tokenless WoL sends exactly one magic packet to a synthetic loopback UDP r
   receiver.on('message', () => { awake = true; });
   const { connector, results, heartbeats } = await runtime(t, {
     config: { wakeOnLan: { mac: '34:5A:60:69:E2:73', broadcastAddress: '127.0.0.1', port: receiver.address().port } },
-    ollama: (request, response) => !awake ? json(response, {}, 503) : request.url === '/api/tags' ? json(response, { models: [{ name: model }] }) : json(response, answer()),
+    ollama: (request, response) => !awake ? json(response, {}, 503) : request.url === '/api/tags' ? json(response, { models: [{ name: model }] }) : json(response, request.url === '/api/generate' ? preload() : answer()),
   });
   await connector.heartbeat();
   assert.equal(heartbeats[0].canWake, true);
@@ -140,6 +141,101 @@ test('tokenless WoL sends exactly one magic packet to a synthetic loopback UDP r
   const [received] = await packet;
   assert.deepEqual(received, Buffer.concat([Buffer.alloc(6, 0xff), ...Array.from({ length: 16 }, () => Buffer.from('345a6069e273', 'hex'))]));
   assert.equal(results[0].response.message.content, 'A complete fixture answer.');
+});
+
+test('the first sleeping-host answer survives delayed reachability and a cold load beyond the old budget', { timeout: 5000 }, async (t) => {
+  const receiver = createSocket('udp4');
+  receiver.bind(0, '127.0.0.1');
+  await once(receiver, 'listening');
+  t.after(() => new Promise((done) => receiver.close(done)));
+  let awake = false;
+  let offset = 0;
+  const realNow = Date.now;
+  t.mock.method(Date, 'now', () => realNow() + offset);
+  receiver.on('message', () => { awake = true; });
+  let cold = true;
+  let loading;
+  const loadStarted = new Promise((resolve) => { loading = resolve; });
+  let finishLoad;
+  const loaded = new Promise((resolve) => { finishLoad = resolve; });
+  let chatRequested = false;
+  const { connector, results, heartbeats } = await runtime(t, {
+    config: { wakeOnLan: { mac: '34:5A:60:69:E2:73', broadcastAddress: '127.0.0.1', port: receiver.address().port } },
+    ollama: async (request, response) => {
+      if (!awake) return json(response, {}, 503);
+      if (request.url === '/api/tags') {
+        if (cold) { offset += 70_000; cold = false; }
+        return json(response, { models: [{ name: model }] });
+      }
+      if (request.url === '/api/generate') {
+        loading();
+        await loaded;
+        offset += 80_000;
+        return json(response, preload());
+      }
+      chatRequested = true;
+      json(response, answer());
+    },
+  });
+  const execution = connector.execute(job({ expiresAt: new Date(Date.now() + 240_000).toISOString() }));
+  await loadStarted;
+  await connector.heartbeat();
+  assert.equal(heartbeats[0].ollamaReachable, true);
+  assert.equal(chatRequested, false, 'the question must wait for cold loading');
+  finishLoad();
+  await execution;
+  assert.equal(results[0].response.message.content, 'A complete fixture answer.');
+});
+
+test('failed or incomplete preloads never send the question to chat', async (t) => {
+  let load = preload();
+  let chats = 0;
+  const { connector, results } = await runtime(t, { ollama: (request, response) => {
+    if (request.url === '/api/tags') return json(response, { models: [{ name: model }] });
+    if (request.url === '/api/generate') return json(response, load);
+    chats++;
+    json(response, answer());
+  } });
+  for (const invalid of [null, preload({ model: 'wrong' }), preload({ done: false }), preload({ done_reason: 'length' }), preload({ error: 'load failed' }), preload({ response: 'unexpected generation' }), preload({ response: undefined })]) {
+    load = invalid;
+    await connector.execute(job());
+    assert.deepEqual(results.at(-1), { jobId: 'job-fixture', error: 'Connector could not produce a complete bounded answer' });
+  }
+  assert.equal(chats, 0);
+  for (const reason of ['stop', undefined]) {
+    load = preload({ done_reason: reason });
+    await connector.execute(job());
+    assert.equal(results.at(-1).response.message.content, 'A complete fixture answer.');
+  }
+});
+
+test('a stalled preload exhausts remaining time without sending the question', async (t) => {
+  let chats = 0;
+  const { connector, results } = await runtime(t, { ollama: (request, response) => {
+    if (request.url === '/api/tags') return json(response, { models: [{ name: model }] });
+    if (request.url === '/api/generate') return;
+    chats++;
+    json(response, answer());
+  } });
+  await connector.execute(job({ expiresAt: new Date(Date.now() + 150).toISOString() }));
+  assert.equal(chats, 0);
+  assert.deepEqual(results[0], { jobId: 'job-fixture', error: 'Connector could not produce a complete bounded answer' });
+});
+
+test('chat has its own 90-second ceiling even when the total job has time left', async (t) => {
+  const timeout = AbortSignal.timeout;
+  t.mock.method(AbortSignal, 'timeout', (ms) => timeout(ms === 90_000 ? 100 : ms));
+  let chatStarted = false;
+  const { connector, results } = await runtime(t, { ollama: (request, response) => {
+    if (request.url === '/api/tags') return json(response, { models: [{ name: model }] });
+    if (request.url === '/api/generate') return json(response, preload());
+    chatStarted = true;
+  } });
+  const expiresAt = new Date(Date.now() + 240_000).toISOString();
+  await connector.execute(job({ expiresAt }));
+  assert.equal(chatStarted, true);
+  assert(Date.now() < Date.parse(expiresAt));
+  assert.deepEqual(results[0], { jobId: 'job-fixture', error: 'Connector could not produce a complete bounded answer' });
 });
 
 test('only a complete matching-model assistant answer can settle a job', () => {
@@ -188,6 +284,7 @@ test('unsafe jobs never reach Ollama; truncated generation reports failure inste
   const chats = [];
   const { connector, results } = await runtime(t, { ollama: async (request, response) => {
     if (request.url === '/api/tags') return json(response, { models: [{ name: model }] });
+    if (request.url === '/api/generate') return json(response, preload());
     chats.push(JSON.parse(await body(request)));
     json(response, answer({ done_reason: 'length' }));
   } });
@@ -256,7 +353,7 @@ test('HA reads only an owner-private token file and invokes only the verified wa
   });
   await assert.rejects(runtime(t, { config: { homeAssistant: { url: ha, tokenFile, DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN: true } } }), /owner-only/);
   await chmod(tokenFile, 0o600);
-  const { connector, results, heartbeats } = await runtime(t, { config: { homeAssistant: { url: ha, tokenFile, DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN: true } }, ollama: (request, response) => !awake ? json(response, {}, 503) : request.url === '/api/tags' ? json(response, { models: [{ name: model }] }) : json(response, answer()) });
+  const { connector, results, heartbeats } = await runtime(t, { config: { homeAssistant: { url: ha, tokenFile, DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN: true } }, ollama: (request, response) => !awake ? json(response, {}, 503) : request.url === '/api/tags' ? json(response, { models: [{ name: model }] }) : json(response, request.url === '/api/generate' ? preload() : answer()) });
   await connector.heartbeat();
   assert.equal(heartbeats[0].canWake, true);
   assert.equal(heartbeats[0].ollamaReachable, false);
@@ -289,6 +386,7 @@ test('job expiry aborts local inference and shutdown cancels it without submitti
   const closed = new Promise((resolve) => { disconnected = resolve; });
   const { connector, results } = await runtime(t, { ollama: (request, response) => {
     if (request.url === '/api/tags') return json(response, { models: [{ name: model }] });
+    if (request.url === '/api/generate') return json(response, preload());
     response.on('close', disconnected);
     started();
   } });
@@ -299,7 +397,7 @@ test('job expiry aborts local inference and shutdown cancels it without submitti
   const controller = new AbortController();
   let chatStarted;
   const chat = new Promise((resolve) => { chatStarted = resolve; });
-  const canceled = await runtime(t, { signal: controller.signal, ollama: (request, response) => request.url === '/api/tags' ? json(response, { models: [{ name: model }] }) : chatStarted() });
+  const canceled = await runtime(t, { signal: controller.signal, ollama: (request, response) => request.url === '/api/tags' ? json(response, { models: [{ name: model }] }) : request.url === '/api/generate' ? json(response, preload()) : chatStarted() });
   const execution = canceled.connector.execute(job());
   await chat;
   controller.abort(new Error('fixture shutdown'));
@@ -307,12 +405,13 @@ test('job expiry aborts local inference and shutdown cancels it without submitti
   assert.deepEqual(canceled.results, []);
 });
 
-test('executable consumes an owner invitation, signs exact bytes and keeps heartbeats fresh during a job', { timeout: 35_000 }, async (t) => {
+test('executable consumes an owner invitation, signs exact bytes and keeps heartbeats fresh during preload and chat', { timeout: 55_000 }, async (t) => {
   const directory = await temporary(t);
   let publicKey;
   const nonces = new Set();
   let heartbeats = 0;
   let chatResponse;
+  let preloadResponse;
   let pickedUp = false;
   let complete;
   let failure;
@@ -340,7 +439,8 @@ test('executable consumes an owner invitation, signs exact bytes and keeps heart
         heartbeats++;
         assert.deepEqual(input.models, [model]);
         assert.equal(input.ollamaReachable, true);
-        if (heartbeats >= 2 && chatResponse && !chatResponse.writableEnded) json(chatResponse, answer());
+        if (heartbeats >= 2 && preloadResponse && !preloadResponse.writableEnded) json(preloadResponse, preload());
+        if (heartbeats >= 3 && chatResponse && !chatResponse.writableEnded) json(chatResponse, answer());
         return json(response, {});
       }
       if (request.url.endsWith('/poll')) {
@@ -349,7 +449,7 @@ test('executable consumes an owner invitation, signs exact bytes and keeps heart
         return json(response, { job: null });
       }
       if (request.url.endsWith('/result')) {
-        assert.equal(heartbeats >= 2, true, 'heartbeat was delayed by generation');
+        assert.equal(heartbeats >= 3, true, 'heartbeat was delayed by loading or generation');
         assert.equal(input.response.message.content, 'A complete fixture answer.');
         json(response, {});
         complete();
@@ -359,6 +459,11 @@ test('executable consumes an owner invitation, signs exact bytes and keeps heart
   const ollamaUrl = await server(t, async (request, response) => {
     if (request.url === '/api/tags') return json(response, { models: [{ name: model }, { name: 'unconfigured:huge' }] });
     const input = JSON.parse(await body(request));
+    if (request.url === '/api/generate') {
+      assert.deepEqual(input, { model, keep_alive: '5m', stream: false });
+      preloadResponse = response;
+      return;
+    }
     assert.equal(input.stream, false);
     assert.equal(input.think, false);
     chatResponse = response;

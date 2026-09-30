@@ -63,7 +63,7 @@ export function validateConfig(input, baseDirectory = process.cwd()) {
 export function jobDeadline(job, now = Date.now()) {
   const deadline = typeof job.expiresAt === 'string' ? Date.parse(job.expiresAt) : NaN;
   assert(Number.isFinite(deadline) && deadline > now, 'Invalid job deadline');
-  return Math.min(deadline, now + 90_000);
+  return Math.min(deadline, now + 240_000);
 }
 
 export function sendWakePacket(wake, signal) {
@@ -274,7 +274,9 @@ export class Connector {
         }
       }
       assert(reachable && this.models.includes(job.model), 'Requested Ollama model is unavailable');
-      const response = validateAnswer(await fetchJson(`${this.config.ollamaUrl}/api/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, deadline - Date.now(), this.signal), job.model);
+      const preload = await fetchJson(`${this.config.ollamaUrl}/api/generate`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model: job.model, keep_alive: '5m', stream: false }) }, deadline - Date.now(), this.signal);
+      assert(object(preload) && preload.error === undefined && preload.model === job.model && preload.done === true && [undefined, 'load', 'stop'].includes(preload.done_reason) && preload.response === '', 'Ollama returned an incomplete or invalid preload');
+      const response = validateAnswer(await fetchJson(`${this.config.ollamaUrl}/api/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, Math.min(90_000, deadline - Date.now()), this.signal), job.model);
       assert(Date.now() < deadline, 'Job deadline elapsed');
       result = { jobId: job.id, response };
       assert(Buffer.byteLength(JSON.stringify(result)) <= MAX_JSON_BYTES, 'Result exceeds protocol body limit');
