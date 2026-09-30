@@ -11,6 +11,7 @@ export interface InferencePaymentReview {
   walletId: string; operationId: string; description: string; expiresAt: string;
   requestId: string; requestFingerprint: `0x${string}`; resourceUrl: string;
   chainId: 46630; asset: `0x${string}`; payTo: `0x${string}`; amountAtomic: string;
+  maxOutputTokens: number; facilitatorAddress: `0x${string}`;
 }
 export interface InferencePaymentSigningRequest extends InferencePaymentReview {
   nonce: string; validAfter: string; deadline: string;
@@ -24,6 +25,7 @@ export interface ConnectorHostStatus {
   lastHeartbeat: number | null; state: 'pending' | 'active' | 'revoked';
   ollamaReachable: boolean; awake: boolean; availability: 'online' | 'asleep' | 'offline';
   canWake?: boolean;
+  freePublicAnswers?: boolean;
 }
 export interface LocalAiRequest {
   id: string; mode: LocalAiMode;

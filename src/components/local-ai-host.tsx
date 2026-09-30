@@ -63,6 +63,12 @@ export function LocalAiHost({ usage, error, service, request, refresh }: {
       if (mounted.current) setNotice('Host revoked. This connector can no longer collect new questions.');
     });
   }
+  function setFreePublicAnswers(hostId: string, enabled: boolean) {
+    void manageHost(async () => {
+      await request('/api/local-ai/hosts/settings', { hostId, freePublicAnswers: enabled });
+      if (mounted.current) setNotice(enabled ? 'This host now offers free public answers within the shared allowance. No payment or payout.' : 'Free public answers disabled. Paid and own-compute access are unchanged.');
+    });
+  }
   const plan = hostEconomics(inputs, usage?.meanWallMs ?? null);
   return <div className="local-ai-host">
     <div className="local-ai-pairing">
@@ -78,7 +84,7 @@ export function LocalAiHost({ usage, error, service, request, refresh }: {
         <p className="local-ai-meta">Invitations expire after 10 minutes and bind your account and payout wallet to one connector. Only share the code with a device you control.</p>
         <button type="submit" className="primary-btn" disabled={busy}>{busy ? <Loader2 size={16} className="spin" /> : <Cpu size={16} />}Create private host invitation</button>
       </form> : <p className="local-ai-meta">{service ? 'Host pairing is not enabled for this account. Existing hosts are shown below.' : 'Checking whether this account can pair a host…'}</p>}
-      <div className="local-ai-host-directory"><h4>Your connector hosts</h4>{hosts.length ? <ul>{hosts.map((host) => <li key={host.id}><div><strong>{host.name}</strong><small>{host.models.join(', ') || 'No models reported'}</small><small>Payout: {host.payoutWallet ? <code>{host.payoutWallet}</code> : 'Not configured'}</small><small>Last heartbeat: {host.lastHeartbeat ? new Date(host.lastHeartbeat).toLocaleString() : 'Not yet received'}</small></div><span className={`local-ai-node-state ${host.availability}`}><span />{host.availability}{host.availability === 'asleep' && host.canWake ? ' · wakes on request' : ''}</span><button type="button" className="text-button" disabled={busy} onClick={() => revokeHost(host.id)}>Revoke host</button></li>)}</ul> : <p className="local-ai-meta">No connector hosts belong to this account yet.</p>}</div>
+      <div className="local-ai-host-directory"><h4>Your connector hosts</h4>{hosts.length ? <ul>{hosts.map((host) => <li key={host.id}><div><strong>{host.name}</strong><small>{host.models.join(', ') || 'No models reported'}</small><small>Payout: {host.payoutWallet ? <code>{host.payoutWallet}</code> : 'Not configured'}</small><small>Last heartbeat: {host.lastHeartbeat ? new Date(host.lastHeartbeat).toLocaleString() : 'Not yet received'}</small><label className="local-ai-consent"><input type="checkbox" checked={host.freePublicAnswers === true} disabled={busy} onChange={(event) => setFreePublicAnswers(host.id, event.target.checked)} /><span>Offer free public answers · no payout</span></label><small>Off by default. Anyone may use the shared allowance: 30 attempts per day, up to 3 per visitor. You cover the compute; residence is not checked.</small></div><span className={`local-ai-node-state ${host.availability}`}><span />{host.availability}{host.availability === 'asleep' && host.canWake ? ' · wakes on request' : ''}</span><button type="button" className="text-button" disabled={busy} onClick={() => revokeHost(host.id)}>Revoke host</button></li>)}</ul> : <p className="local-ai-meta">No connector hosts belong to this account yet.</p>}</div>
       {notice && <p className="local-ai-meta" role="status">{notice}</p>}
       {hostError && <p className="local-ai-alert" role="alert">{hostError}</p>}
     </div>

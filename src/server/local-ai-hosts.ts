@@ -16,6 +16,7 @@ export interface ConnectorHost {
   ollamaReachable: boolean;
   awake: boolean;
   canWake?: boolean;
+  freePublicAnswers?: boolean;
 }
 interface StoredHost extends ConnectorHost {
   publicKey: string;
@@ -35,6 +36,7 @@ interface Registry {
 const KEY = 'local-ai:connector-registry';
 const PAIR_TTL = 600000;
 const SKEW = 60000;
+export const CONNECTOR_JOB_TIMEOUT_MS = 240000;
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const shared = globalThis as typeof globalThis & {
   __localAiConnectorState?: { registries: WeakMap<Store, Promise<void>>; runtimes: WeakMap<Store, Runtime> };
@@ -61,8 +63,8 @@ async function ready(store: Store) {
   }
   await promise;
 }
-const rawHost = ({ id, name, ownerSubject, payoutWallet, models, lastHeartbeat, state, ollamaReachable, awake, canWake }: StoredHost): ConnectorHost =>
-  ({ id, name, ownerSubject, payoutWallet, models, lastHeartbeat, state, ollamaReachable, awake, canWake: canWake === true });
+const rawHost = ({ id, name, ownerSubject, payoutWallet, models, lastHeartbeat, state, ollamaReachable, awake, canWake, freePublicAnswers }: StoredHost): ConnectorHost =>
+  ({ id, name, ownerSubject, payoutWallet, models, lastHeartbeat, state, ollamaReachable, awake, canWake: canWake === true, freePublicAnswers: freePublicAnswers === true });
 const availability = (host: ConnectorHost, now: number): 'online' | 'asleep' | 'offline' =>
   host.state !== 'active' || host.lastHeartbeat === null || now - host.lastHeartbeat > 75000 || now < host.lastHeartbeat
     ? 'offline' : host.ollamaReachable ? 'online' : 'asleep';
@@ -173,12 +175,12 @@ export async function connectorHosts(store: Store, now = Date.now()) {
 export async function publicConnectorHosts(store: Store, now = Date.now(), subject?: string) {
   return (await connectorHosts(store, now)).map(({ ownerSubject, ...host }) => ({ ...host, own: Boolean(subject && ownerSubject === subject) }));
 }
-export async function chooseConnectorHost(store: Store, owner: { subject?: string; payer?: string }, model: string, scope: 'own' | 'city', now = Date.now()) {
+export async function chooseConnectorHost(store: Store, owner: { subject?: string; payer?: string }, model: string, scope: 'own' | 'city', now = Date.now(), freePublic = false) {
   if (scope !== 'own' && scope !== 'city') throw new WorkflowError('Choose own or city host scope.');
   const runtime = state(store);
   const candidates = (await connectorHosts(store, now)).filter((host) => (host.availability === 'online' || (host.availability === 'asleep' && host.canWake)) && host.models.includes(model) &&
     host.payoutWallet && (Boolean(owner.subject && host.ownerSubject === owner.subject) || host.payoutWallet.toLowerCase() !== owner.payer?.toLowerCase()) &&
-    (scope === 'city' || Boolean(owner.subject && host.ownerSubject === owner.subject)));
+    (scope === 'city' || Boolean(owner.subject && host.ownerSubject === owner.subject)) && (!freePublic || host.freePublicAnswers === true));
   const busy = (host: ConnectorHost) => runtime.jobs.has(host.id) || runtime.reservations.has(host.id);
   candidates.sort((a, b) => Number(b.ownerSubject === owner.subject) - Number(a.ownerSubject === owner.subject) ||
     Number(busy(a)) - Number(busy(b)) || Number(b.availability === 'online') - Number(a.availability === 'online'));
@@ -250,6 +252,7 @@ interface Job extends ConnectorInferenceInput {
   pickupDeadline: number;
   pickedUp: boolean;
   started: number;
+  freePublic: boolean;
   timer: NodeJS.Timeout;
   resolve: (value: { answer: string; usage: LocalAiRequestUsage }) => void;
   reject: (error: Error) => void;
@@ -295,7 +298,7 @@ function validateInference(input: ConnectorInferenceInput) {
     throw new WorkflowError('Invalid connector inference options.');
 }
 /** Reserve capacity before changing request state or spending an attempt. No question is queued yet. */
-export async function reserveConnectorHost(store: Store, hostId: string, requestId: string, now = Date.now(), model?: string): Promise<void> {
+export async function reserveConnectorHost(store: Store, hostId: string, requestId: string, now = Date.now(), model?: string, freePublic = false): Promise<void> {
   if (!text(requestId, 128)) throw new WorkflowError('A request ID is required.');
   await ready(store);
   const runtime = state(store);
@@ -307,6 +310,7 @@ export async function reserveConnectorHost(store: Store, hostId: string, request
       const status = availability(host, now);
       if (status !== 'online' && !(status === 'asleep' && host.canWake)) throw new ConflictError('Selected connector is unavailable.');
       if (model !== undefined && !host.models.includes(model)) throw new ConflictError('Selected connector model is unavailable.');
+      if (freePublic && host.freePublicAnswers !== true) throw new ConflictError('Selected connector does not offer free public answers.');
       const reservation = runtime.reservations.get(hostId);
       if (runtime.jobs.has(hostId) || (reservation && reservation.requestId !== requestId)) throw new ConflictError('Selected connector is busy.');
       if (!reservation) {
@@ -330,7 +334,7 @@ export function releaseConnectorHost(store: Store, hostId: string, requestId: st
 }
 
 /** Questions exist only in this replica's memory, never in SQLite or a durable job record. */
-export async function enqueueConnectorInference(store: Store, hostId: string, requestId: string, input: ConnectorInferenceInput): Promise<{ answer: string; usage: LocalAiRequestUsage }> {
+export async function enqueueConnectorInference(store: Store, hostId: string, requestId: string, input: ConnectorInferenceInput, freePublic = false): Promise<{ answer: string; usage: LocalAiRequestUsage }> {
   validateInference(input);
   await ready(store);
   const runtime = state(store);
@@ -346,10 +350,11 @@ export async function enqueueConnectorInference(store: Store, hostId: string, re
       const status = availability(host, now);
       if ((status !== 'online' && !(status === 'asleep' && host.canWake)) || !host.models.includes(input.model))
         throw new ConflictError('Selected connector model is unavailable.');
+      if (freePublic && host.freePublicAnswers !== true) throw new ConflictError('Selected connector does not offer free public answers.');
       if (runtime.jobs.has(hostId) || runtime.reservations.get(hostId)?.requestId !== requestId)
         throw new ConflictError('Selected connector is busy.');
       const job: Job = { ...input, messages: input.messages.map((message) => ({ ...message })), options: { ...input.options },
-        id: randomUUID(), requestId, started: now, expiresAt: now + 90000, pickupDeadline: now + 30000, pickedUp: false,
+        id: randomUUID(), requestId, started: now, expiresAt: now + CONNECTOR_JOB_TIMEOUT_MS, pickupDeadline: now + 30000, pickedUp: false, freePublic,
         resolve, reject, timer: setTimeout(() => expireJobs(store, Date.now()), 30000) };
       releaseConnectorHost(store, hostId, requestId);
       runtime.jobs.set(hostId, job);
@@ -451,6 +456,20 @@ export async function completeConnectorJob(store: Store, hostId: string, input: 
   });
   return { ok: true };
 }
+export async function setConnectorFreePublicAnswers(store: Store, identity: VerifiedIdentity, hostId: string, enabled: boolean) {
+  if (!text(hostId, 64) || typeof enabled !== 'boolean') throw new WorkflowError('Choose a host and a free public answer setting.');
+  await ready(store);
+  await store.update<Registry>(KEY, (registry) => {
+    const host = active(registry, hostId);
+    if (host.ownerSubject !== identity.subject) throw new AccessError('Only the host owner may change its public allowance.');
+    host.freePublicAnswers = enabled;
+    return registry;
+  });
+  if (!enabled && state(store).jobs.get(hostId)?.freePublic)
+    finish(store, hostId, new ConflictError('Host stopped offering free public answers. No payment was sent.'));
+  return { ok: true };
+}
+
 export async function revokeConnectorHost(store: Store, identity: VerifiedIdentity, hostId: string) {
   await ready(store);
   await store.update<Registry>(KEY, (registry) => {

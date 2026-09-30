@@ -344,7 +344,7 @@ test('pickup and result deadlines fail cleanly, release the host, and erase queu
     assert.deepEqual(await pollConnectorJob(store, host.hostId, 0), { job: null });
     const running = await startJob(store, host.hostId, 'running');
     const picked = await pollConnectorJob(store, host.hostId, 0);
-    await assert.rejects(completeConnectorJob(store, host.hostId, { jobId: picked.job!.id, response: answer }, Date.now() + 90000), /expired/);
+    await assert.rejects(completeConnectorJob(store, host.hostId, { jobId: picked.job!.id, response: answer }, Date.parse(picked.job!.expiresAt)), /expired/);
     assert.match((await running.outcome).error!.message, /expired/);
     const canceled = await startJob(store, host.hostId, 'erased-request');
     cancelConnectorInference(store, 'different-request');

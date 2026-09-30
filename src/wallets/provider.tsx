@@ -421,8 +421,8 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
           uiOptions: {
             showWalletUIs: SHOW_WALLET_UIS, isCancellable: true,
             title: 'Authorize one local AI answer',
-            description: request.description,
-            buttonText: 'Authorize inference payment',
+            description: `Pay per token: 0.0001 tUSDG per generated token, at most ${Number(BigInt(request.amountAtomic)) / 1e6} tUSDG for this answer`,
+            buttonText: 'Authorize per-token payment',
           },
         });
         return signature as `0x${string}`;

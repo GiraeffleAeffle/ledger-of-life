@@ -45,7 +45,8 @@ test('an altered approval cannot bypass the finite policy by changing its operat
   quoted.review = { walletId: 'reviewed-wallet', requestId: id, requestFingerprint: quoted.requestFingerprint as `0x${string}`,
     operationId: `local-ai:${id}`, description: 'One answer', expiresAt: quoted.expiresAt,
     resourceUrl: `http://localhost/api/local-ai/requests/${id}`, chainId: 46630,
-    asset: '0xA6e10E426A738aEF586dB5191177658D67C78A14', payTo: '0x0000000000000000000000000000000000000002', amountAtomic: '10000' };
+    asset: '0xA6e10E426A738aEF586dB5191177658D67C78A14', payTo: '0x0000000000000000000000000000000000000002', amountAtomic: '6400',
+    maxOutputTokens: 64, facilitatorAddress: '0x0000000000000000000000000000000000000003' };
   const approval: LocalAiApproval = { id, state: 'review', budgetAtomic: '100000', hash: null, error: null,
     request: { walletId: 'reviewed-wallet', operationId: `local-ai-approval:${id}`, description: 'Finite budget',
       expiresAt: quoted.expiresAt, transaction: { chainId: 46630, to: quoted.review.asset, value: 0n } } };

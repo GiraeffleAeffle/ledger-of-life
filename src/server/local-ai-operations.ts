@@ -5,7 +5,8 @@ import { TEST_USDG_ADDRESS } from '../wallets/inference-token.ts';
 import type { Store } from './store.ts';
 import { AccessError, ConflictError } from './errors.ts';
 import { WorkflowError } from '../domain/errors.ts';
-import { AI_BUDGET, AI_MAX_OUTPUT, AI_MODEL, AI_PRICE, AI_CONTEXT_TOKENS, aiRpc, aiTokenAbi, assertInferenceContracts, inferencePayee } from './local-ai-runtime.ts';
+import { AI_PRICE, AI_MAX_OUTPUT } from '../domain/ai-pricing.ts';
+import { AI_BUDGET, AI_MODEL, AI_CONTEXT_TOKENS, aiRpc, aiTokenAbi, assertInferenceContracts, inferencePayee } from './local-ai-runtime.ts';
 import type { AiOwner, PaidAiOwner } from './local-ai.ts';
 import type { LocalAiApproval, LocalAiRequest, LocalAiServiceStatus, LocalAiUsageSummary } from './local-ai-types.ts';
 import { facilitatorAccount } from './local-ai-payment.ts';
@@ -27,7 +28,7 @@ export async function aiApproval(store: Store, id: string, owner: PaidAiOwner, a
       throw new ConflictError('This paid inference quote expired; create a new reviewed request.');
     await assertInferenceContracts();
     const allowance = await aiRpc.readContract({ address: TEST_USDG_ADDRESS, abi: aiTokenAbi, functionName: 'allowance', args: [owner.payer, PERMIT2_ADDRESS] });
-    if (allowance >= AI_PRICE && allowance <= AI_BUDGET) {
+    if (allowance >= BigInt(row.request.payment.amountAtomic) && allowance <= AI_BUDGET) {
       return { id: `local-ai-approval:${id}`, state: 'completed', budgetAtomic: AI_BUDGET.toString(),
         request: null, hash: null, error: null } satisfies LocalAiApproval;
     }
@@ -48,7 +49,7 @@ export async function aiApproval(store: Store, id: string, owner: PaidAiOwner, a
       maxFeePerGas: `0x${fees.maxFeePerGas.toString(16)}` as Hex,
       maxPriorityFeePerGas: `0x${(fees.maxPriorityFeePerGas ?? 0n).toString(16)}` as Hex };
     const approval: LocalAiApproval = { id: `local-ai-approval:${randomUUID()}`, state: 'review', budgetAtomic: AI_BUDGET.toString(),
-      request: { walletId: owner.walletId, operationId: `local-ai-approval:${id}`, description: 'Approve a finite 0.10 tUSDG budget for Permit2; each answer separately authorizes exactly 0.01 tUSDG', expiresAt: expiry, transaction }, hash: null, error: null };
+      request: { walletId: owner.walletId, operationId: `local-ai-approval:${id}`, description: 'Approve a finite 0.10 tUSDG budget for Permit2; each answer separately authorizes its maximum at 0.0001 tUSDG per generated token', expiresAt: expiry, transaction }, hash: null, error: null };
     const result = await store.update<RecordRow>(key, (value) => {
       checked(value, owner);
       if (!value.approvalJournal?.signed && (!value.request.approval || value.request.approval.state !== 'pending')) {
@@ -113,7 +114,7 @@ export async function aiApproval(store: Store, id: string, owner: PaidAiOwner, a
     checked(value, owner);
     if (value.approvalJournal?.hash !== journal.hash) throw new ConflictError('Signed approval changed.');
     if (value.request.approval?.state !== 'pending') return value;
-    value.request.approval.state = receipt.status === 'success' && allowance >= AI_PRICE && allowance <= AI_BUDGET ? 'completed' : 'failed';
+    value.request.approval.state = receipt.status === 'success' && allowance >= BigInt(value.request.payment.amountAtomic) && allowance <= AI_BUDGET ? 'completed' : 'failed';
     value.request.approval.error = value.request.approval.state === 'failed' ? 'Finite approval did not confirm; no inference payment was sent.' : null;
     if (value.request.approval.state === 'completed' && value.request.state === 'approval_required')
       value.request.state = 'payment_required';
@@ -134,7 +135,10 @@ export async function localAiUsage(store: Store): Promise<LocalAiUsageSummary> {
       if (request.state === 'failed' || request.state === 'interrupted') result.failedRequests++;
       if (request.mode === 'paid' && request.payment.state === 'pending') result.pendingPayments++;
       if (request.state !== 'completed') continue;
-      if (request.payment.state === 'settled') result.successfulPaidRequests++;
+      if (request.payment.state === 'settled') {
+        result.successfulPaidRequests++;
+        result.settledAtomic = (BigInt(result.settledAtomic) + BigInt(request.payment.receipt?.amount ?? request.payment.amountAtomic)).toString();
+      }
       else if (request.mode === 'library') result.successfulLibraryRequests++;
       else result.successfulOwnRequests = (result.successfulOwnRequests ?? 0) + 1;
       if (value.completedAt && (!result.lastSuccessAt || value.completedAt > result.lastSuccessAt))
@@ -152,7 +156,6 @@ export async function localAiUsage(store: Store): Promise<LocalAiUsageSummary> {
   } while (true);
   if (counted) result.meanWallMs = Math.round(result.meanWallMs! / counted);
   if (speedCount) result.meanTokensPerSecond = Math.round(speed / speedCount * 100) / 100;
-  result.settledAtomic = (BigInt(result.successfulPaidRequests) * AI_PRICE).toString();
   return result;
 }
 export async function localAiStatus(store: Store, owner?: AiOwner): Promise<LocalAiServiceStatus> {
@@ -214,6 +217,7 @@ export async function localAiStatus(store: Store, owner?: AiOwner): Promise<Loca
     paidEnabled: paidEnabled && configured && reachable, error,
     price: payee ? { network: 'eip155:46630', asset: TEST_USDG_ADDRESS, symbol: 'tUSDG', decimals: 6,
       amountAtomic: AI_PRICE.toString(), payTo: payee, permit2: PERMIT2_ADDRESS,
-      proxy: '0x402085c248EeA27D92E8b30b2C58ed07f9E20001', approvalBudgetAtomic: AI_BUDGET.toString() } : null,
-    wallet, library: { enabled: free && direct && reachable, maxOutputTokens: AI_MAX_OUTPUT, remainingRequests } };
+      proxy: '0x4020A4f3b7b90ccA423B9fabCc0CE57C6C240002', approvalBudgetAtomic: AI_BUDGET.toString() } : null,
+    wallet, library: { enabled: free && (direct ? reachable : connectorHosts.some((host) => host.freePublicAnswers === true &&
+      (host.availability === 'online' || host.availability === 'asleep' && host.canWake))), maxOutputTokens: AI_MAX_OUTPUT, remainingRequests } };
 }

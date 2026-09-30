@@ -10,7 +10,8 @@ import { prepareInferencePayment } from '../wallets/inference-signing.ts';
 import { validateEvmSigningRequest } from '../wallets/signing-policy.ts';
 import { revokeVisitor } from './local-ai-session.ts';
 import { TEST_USDG_ADDRESS } from '../wallets/inference-token.ts';
-import { x402ExactPermit2ProxyABI, x402ExactPermit2ProxyAddress } from '@x402/evm';
+import { inferenceCharge, inferenceMaximum } from './local-ai-runtime.ts';
+import { x402UptoPermit2ProxyABI, x402UptoPermit2ProxyAddress } from '@x402/evm';
 import { encodeAbiParameters, encodeEventTopics, encodeFunctionData, hashTypedData, keccak256, parseAbi, parseAbiParameters, parseTransaction, recoverTypedDataAddress, type Hex, type TransactionReceipt, type TypedData } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 
@@ -265,7 +266,7 @@ test('JSON-RPC inference signing preserves uint256 precision and rejects altered
     expiresAt: new Date(Date.now() + 600_000).toISOString(), requestId: first,
     requestFingerprint: `0x${'ab'.repeat(32)}` as Hex, resourceUrl: route(first),
     chainId: 46630 as const, asset: TEST_USDG_ADDRESS, payTo: privateKeyToAccount(`0x${'72'.repeat(32)}`).address,
-    amountAtomic: '10000', nonce: ((1n << 255n) + 12345n).toString(), validAfter: '0', deadline: `${Math.floor(Date.now() / 1000) + 600}` };
+    maxOutputTokens: 100, facilitatorAddress: privateKeyToAccount(`0x${'77'.repeat(32)}`).address, amountAtomic: '10000', nonce: ((1n << 255n) + 12345n).toString(), validAfter: '0', deadline: `${Math.floor(Date.now() / 1000) + 600}` };
   const typed = prepareInferencePayment(review, wallet);
   const wire = JSON.parse(JSON.stringify(typed)) as typeof typed;
   const signature = await account.signTypedData<TypedData, 'PermitWitnessTransferFrom'>(wire);
@@ -282,26 +283,31 @@ test('JSON-RPC inference signing preserves uint256 precision and rejects altered
   assert.throws(() => prepareInferencePayment(review, { ...wallet, connected: false }), /does not match/);
 });
 
-test('payment identifier, owner, nonce, recipient and exact amount must match immutable quote', () => {
+test('payment identifier, owner, nonce, recipient and maximum amount must match immutable quote', () => {
   const payer = privateKeyToAccount(`0x${'73'.repeat(32)}`).address;
   const payee = privateKeyToAccount(`0x${'74'.repeat(32)}`).address;
-  const accepted: PaymentRequirements = { scheme: 'exact', network: 'eip155:46630', asset: TEST_USDG_ADDRESS,
-    amount: '10000', payTo: payee, maxTimeoutSeconds: 1200, extra: { assetTransferMethod: 'permit2' } };
+  const facilitator = privateKeyToAccount(`0x${'78'.repeat(32)}`).address;
+  const accepted: PaymentRequirements = { scheme: 'upto', network: 'eip155:46630', asset: TEST_USDG_ADDRESS,
+    amount: '10000', payTo: payee, maxTimeoutSeconds: 1200, extra: { assetTransferMethod: 'permit2', facilitatorAddress: facilitator } };
   const authorization = { from: payer, permitted: { token: TEST_USDG_ADDRESS, amount: '10000' },
-    spender: '0x402085c248EeA27D92E8b30b2C58ed07f9E20001',
+    spender: x402UptoPermit2ProxyAddress,
     nonce: '234', deadline: String(Math.floor(Date.now() / 1000) + 600),
-    witness: { to: payee, validAfter: '0' } };
+    witness: { to: payee, facilitator, validAfter: '0' } };
   const payload: PaymentPayload = { x402Version: 2, accepted, resource: { url: route(first) },
     extensions: { 'payment-identifier': { info: { required: true, id: first } } },
     payload: { signature: `0x${'55'.repeat(65)}`, permit2Authorization: authorization } };
-  assert.equal(validatePaymentPayload(payload, accepted, first, payer, payee, route(first)).nonce, '234');
-  assert.throws(() => validatePaymentPayload(payload, accepted, first, payer, payer, route(first)), /reviewed/);
-  assert.throws(() => validatePaymentPayload(payload, { ...accepted, amount: '20000' }, first, payer, payee, route(first)), /reviewed/);
-  assert.throws(() => validatePaymentPayload(payload, accepted, second, payer, payee, route(first)), /reviewed/);
-  assert.throws(() => validatePaymentPayload(payload, accepted, first, payer, payee, route(second)), /reviewed/);
+  assert.equal(validatePaymentPayload(payload, accepted, first, payer, payee, route(first), 10000n, facilitator).nonce, '234');
+  assert.throws(() => validatePaymentPayload(payload, accepted, first, payer, payer, route(first), 10000n, facilitator), /reviewed/);
+  assert.throws(() => validatePaymentPayload(payload, { ...accepted, amount: '20000' }, first, payer, payee, route(first), 10000n, facilitator), /reviewed/);
+  assert.throws(() => validatePaymentPayload(payload, accepted, second, payer, payee, route(first), 10000n, facilitator), /reviewed/);
+  assert.throws(() => validatePaymentPayload(payload, accepted, first, payer, payee, route(second), 10000n, facilitator), /reviewed/);
   const changed: PaymentPayload = { ...payload, payload: { signature: `0x${'55'.repeat(65)}`,
     permit2Authorization: { ...authorization, nonce: '01' } } };
-  assert.throws(() => validatePaymentPayload(changed, accepted, first, payer, payee, route(first)), /reviewed/);
+  assert.throws(() => validatePaymentPayload(changed, accepted, first, payer, payee, route(first), 10000n, facilitator), /reviewed/);
+  assert.throws(() => validatePaymentPayload(payload, accepted, first, payer, payee, route(first), 9900n, facilitator), /reviewed/);
+  assert.throws(() => validatePaymentPayload({ ...payload, payload: { signature: `0x${'55'.repeat(65)}`,
+    permit2Authorization: { ...authorization, witness: { ...authorization.witness, facilitator: payer } } } },
+    accepted, first, payer, payee, route(first), 10000n, facilitator), /reviewed/);
 });
 
 test('finite Permit2 approval cannot become an unlimited or redirected wallet signature', () => {
@@ -332,37 +338,37 @@ test('canonical receipt requires exactly one matching token Transfer, not merely
     topics: encodeEventTopics({ abi, eventName: 'Transfer', args: { from: payer, to: payee } }),
     data: encodeAbiParameters(parseAbiParameters('uint256'), [amount]) });
   const receipt = (amounts: bigint[]) => ({ status: 'success', logs: amounts.map(event) });
-  assert.equal(verifyCanonicalTransfer(receipt([10000n]) as unknown as TransactionReceipt, payer, payee), true);
-  assert.equal(verifyCanonicalTransfer(receipt([]) as unknown as TransactionReceipt, payer, payee), false);
-  assert.equal(verifyCanonicalTransfer(receipt([9000n]) as unknown as TransactionReceipt, payer, payee), false);
-  assert.equal(verifyCanonicalTransfer(receipt([10000n, 10000n]) as unknown as TransactionReceipt, payer, payee), false);
+  assert.equal(verifyCanonicalTransfer(receipt([10000n]) as unknown as TransactionReceipt, payer, payee, 10000n), true);
+  assert.equal(verifyCanonicalTransfer(receipt([]) as unknown as TransactionReceipt, payer, payee, 10000n), false);
+  assert.equal(verifyCanonicalTransfer(receipt([9000n]) as unknown as TransactionReceipt, payer, payee, 10000n), false);
+  assert.equal(verifyCanonicalTransfer(receipt([10000n, 10000n]) as unknown as TransactionReceipt, payer, payee, 10000n), false);
 });
 
-test('confirmed settlement requires the journaled exact proxy call and canonical matching receipt', async () => {
+test('confirmed settlement requires the journaled upto proxy call and canonical matching receipt', async () => {
   const facilitator = privateKeyToAccount(`0x${'91'.repeat(32)}`);
   const payer = privateKeyToAccount(`0x${'92'.repeat(32)}`).address;
   const payee = privateKeyToAccount(`0x${'93'.repeat(32)}`).address;
   const signature = `0x${'55'.repeat(65)}` as Hex;
   const authorization = { from: payer, permitted: { token: TEST_USDG_ADDRESS, amount: '10000' },
-    spender: x402ExactPermit2ProxyAddress, nonce: '314', deadline: String(Math.floor(Date.now() / 1000) + 600),
-    witness: { to: payee, validAfter: '0' } };
-  const accepted: PaymentRequirements = { scheme: 'exact', network: 'eip155:46630',
+    spender: x402UptoPermit2ProxyAddress, nonce: '314', deadline: String(Math.floor(Date.now() / 1000) + 600),
+    witness: { to: payee, facilitator: facilitator.address, validAfter: '0' } };
+  const accepted: PaymentRequirements = { scheme: 'upto', network: 'eip155:46630',
     asset: TEST_USDG_ADDRESS, amount: '10000', payTo: payee, maxTimeoutSeconds: 1200,
-    extra: { assetTransferMethod: 'permit2' } };
+    extra: { assetTransferMethod: 'permit2', facilitatorAddress: facilitator.address } };
   const payload: PaymentPayload = { x402Version: 2, accepted, payload: { signature, permit2Authorization: authorization } };
-  const data = encodeFunctionData({ abi: x402ExactPermit2ProxyABI, functionName: 'settle', args: [
+  const data = encodeFunctionData({ abi: x402UptoPermit2ProxyABI, functionName: 'settle', args: [
     { permitted: { token: TEST_USDG_ADDRESS, amount: 10000n }, nonce: 314n, deadline: BigInt(authorization.deadline) },
-    payer, { to: payee, validAfter: 0n }, signature,
+    600n, payer, { to: payee, facilitator: facilitator.address, validAfter: 0n }, signature,
   ] });
   const sign = (callData: Hex) => facilitator.signTransaction({ type: 'eip1559', chainId: 46630,
-    to: x402ExactPermit2ProxyAddress, data: callData, value: 0n, nonce: 5,
+    to: x402UptoPermit2ProxyAddress, data: callData, value: 0n, nonce: 5,
     gas: 300000n, maxFeePerGas: 1000000000n, maxPriorityFeePerGas: 0n });
-  const journal: AiPayment = { payload, requirements: accepted, signed: await sign(data), hash: null, nonce: 5 };
+  const journal: AiPayment = { payload, amount: '600', requirements: accepted, signed: await sign(data), hash: null, nonce: 5 };
   journal.hash = keccak256(journal.signed!);
   const abi = parseAbi(['event Transfer(address indexed from,address indexed to,uint256 value)']);
   const transfer = { address: TEST_USDG_ADDRESS,
     topics: encodeEventTopics({ abi, eventName: 'Transfer', args: { from: payer, to: payee } }),
-    data: encodeAbiParameters(parseAbiParameters('uint256'), [10000n]) };
+    data: encodeAbiParameters(parseAbiParameters('uint256'), [600n]) };
   const blockHash = `0x${'ab'.repeat(32)}` as Hex;
   let tip = 44n;
   let canonicalBlockHash = blockHash;
@@ -374,7 +380,7 @@ test('confirmed settlement requires the journaled exact proxy call and canonical
       return { status: 'success', transactionHash: hash, blockHash, blockNumber: 42n, logs: [transfer] };
     },
     getTransaction: async ({ hash }: { hash: Hex }) => ({
-      hash, blockHash, from: facilitator.address, to: x402ExactPermit2ProxyAddress,
+      hash, blockHash, from: facilitator.address, to: x402UptoPermit2ProxyAddress,
       input, nonce: 5, value: 0n, chainId: 46630, gas: 300000n,
       maxFeePerGas: 1000000000n, maxPriorityFeePerGas: 0n,
     }),
@@ -382,6 +388,9 @@ test('confirmed settlement requires the journaled exact proxy call and canonical
     getBlockNumber: async () => tip,
   } as unknown as Parameters<typeof inspectAiReceipt>[3];
   assert.equal(await inspectAiReceipt(journal, payer, payee, rpc, facilitator.address), 'settled');
+  journal.amount = '700';
+  assert.equal(await inspectAiReceipt(journal, payer, payee, rpc, facilitator.address), 'pending');
+  journal.amount = '600';
   tip = 43n;
   assert.equal(await inspectAiReceipt(journal, payer, payee, rpc, facilitator.address), 'pending');
   tip = 44n; canonicalBlockHash = `0x${'cd'.repeat(32)}` as Hex;
@@ -401,24 +410,24 @@ test('expired unsigned fee envelope is fenced and released, but signed ambiguity
   const facilitator = privateKeyToAccount(`0x${'96'.repeat(32)}`).address;
   const signature = `0x${'55'.repeat(65)}` as Hex;
   const auth = { from: payer, permitted: { token: TEST_USDG_ADDRESS, amount: '10000' },
-    spender: x402ExactPermit2ProxyAddress, nonce: '99', deadline: '1999', witness: { to: payee, validAfter: '0' } };
-  const requirements: PaymentRequirements = { scheme: 'exact', network: 'eip155:46630',
+    spender: x402UptoPermit2ProxyAddress, nonce: '99', deadline: '1999', witness: { to: payee, facilitator, validAfter: '0' } };
+  const requirements: PaymentRequirements = { scheme: 'upto', network: 'eip155:46630',
     asset: TEST_USDG_ADDRESS, amount: '10000', payTo: payee, maxTimeoutSeconds: 1200,
-    extra: { assetTransferMethod: 'permit2' } };
+    extra: { assetTransferMethod: 'permit2', facilitatorAddress: facilitator } };
   const payment: AiPayment = { payload: { x402Version: 2, accepted: requirements,
-    payload: { signature, permit2Authorization: auth } }, requirements, signed: null, hash: null, nonce: null };
-  const data = encodeFunctionData({ abi: x402ExactPermit2ProxyABI, functionName: 'settle', args: [
+    payload: { signature, permit2Authorization: auth } }, requirements, amount: '600', signed: null, hash: null, nonce: null };
+  const data = encodeFunctionData({ abi: x402UptoPermit2ProxyABI, functionName: 'settle', args: [
     { permitted: { token: TEST_USDG_ADDRESS, amount: 10000n }, nonce: 99n, deadline: 1999n },
-    payer, { to: payee, validAfter: 0n }, signature,
+    600n, payer, { to: payee, facilitator, validAfter: 0n }, signature,
   ] });
   const id = '88888888-8888-4888-8888-888888888888';
   const key = `local-ai:request:${id}`;
-  const lane = { id, envelope: { chainId: 46630, to: x402ExactPermit2ProxyAddress, data,
+  const lane = { id, envelope: { chainId: 46630, to: x402UptoPermit2ProxyAddress, data,
     value: '0', nonce: 7, gas: '300000', maxFeePerGas: '1000000000', maxPriorityFeePerGas: '0' } };
   const rpc = { getTransactionCount: async () => 7 } as unknown as Parameters<typeof recoverExpiredUnsignedSettlement>[4];
   try {
     await store.create(key, { id, owner: { payer }, payee, request: {
-      answer: 'saved answer', state: 'settling', error: null, payment: { state: 'authorized' },
+      answer: 'saved answer', state: 'settling', error: null, maxOutputTokens: 100, usage: { outputTokens: 6 }, payment: { state: 'authorized', amountAtomic: '600' },
     }, paymentJournal: payment });
     await store.create('local-ai:fee-lane', lane);
     assert.equal(await recoverExpiredUnsignedSettlement(store, key, payer, payee, rpc, facilitator, 2_000_000), true);
@@ -454,4 +463,15 @@ test('a facilitator key from the environment wins over the key file and must be 
     if (saved.key === undefined) delete process.env.LOCAL_AI_FACILITATOR_PRIVATE_KEY; else process.env.LOCAL_AI_FACILITATOR_PRIVATE_KEY = saved.key;
     if (saved.file === undefined) delete process.env.LOCAL_AI_FACILITATOR_KEY_FILE; else process.env.LOCAL_AI_FACILITATOR_KEY_FILE = saved.file;
   }
+});
+
+test('per-token charging permits zero and exact cap while rejecting unmeasured or excessive output', () => {
+  const cap = inferenceMaximum(64);
+  assert.equal(cap, 6400n);
+  assert.equal(inferenceCharge(0, cap), 0n);
+  assert.equal(inferenceCharge(1, cap), 100n);
+  assert.equal(inferenceCharge(63, cap), 6300n);
+  assert.equal(inferenceCharge(64, cap), cap);
+  for (const tokens of [null, -1, 0.5, 65, Number.MAX_SAFE_INTEGER + 1]) assert.throws(() => inferenceCharge(tokens, cap));
+  for (const limit of [0, -1, 1.5, Number.MAX_SAFE_INTEGER]) assert.throws(() => inferenceMaximum(limit));
 });

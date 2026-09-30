@@ -8,14 +8,15 @@ import { walletFor } from './agreements.ts';
 import type { Store } from './store.ts';
 import { ConflictError, AccessError } from './errors.ts';
 import { WorkflowError } from '../domain/errors.ts';
-import { AI_BUDGET, AI_CONTEXT_TOKENS, AI_MAX_OUTPUT, AI_MODEL, AI_PRICE, aiRpc, aiTokenAbi, assertInferenceAvailable, assertInferenceContracts, inferencePayee, instructions, releaseHost, reserveHost, runLocalInference } from './local-ai-runtime.ts';
+import { AI_MAX_OUTPUT } from '../domain/ai-pricing.ts';
+import { AI_BUDGET, AI_CONTEXT_TOKENS, AI_MODEL, inferenceMaximum, inferenceCharge, aiRpc, aiTokenAbi, assertInferenceAvailable, assertInferenceContracts, inferencePayee, instructions, releaseHost, reserveHost, runLocalInference } from './local-ai-runtime.ts';
 import { TEST_USDG_ADDRESS } from '../wallets/inference-token.ts';
 import { PERMIT2_ADDRESS } from '@x402/evm';
 import { createAiResource, facilitatorAccount, inspectAiReceipt, recoverExpiredUnsignedSettlement, validatePaymentPayload, type AiPayment } from './local-ai-payment.ts';
 import { acquireVisitorLease, assertVisitorActive, type VisitorLease } from './local-ai-session.ts';
 import type { LocalAiApproval, LocalAiContext, LocalAiMode, LocalAiRequest } from './local-ai-types.ts';
 import { purged, textDue, textGraceMs } from './local-ai-retention.ts';
-import { cancelConnectorInference, chooseConnectorHost, enqueueConnectorInference, reserveConnectorHost, releaseConnectorHost } from './local-ai-hosts.ts';
+import { CONNECTOR_JOB_TIMEOUT_MS, cancelConnectorInference, chooseConnectorHost, enqueueConnectorInference, reserveConnectorHost, releaseConnectorHost } from './local-ai-hosts.ts';
 
 export type AiInput = { mode: LocalAiMode; prompt: string; maxOutputTokens: number; context: LocalAiContext; hostScope: 'own' | 'city'; publicQuestion: boolean };
 export type PaidAiOwner = { subject: string; walletId: string; payer: Address };
@@ -27,6 +28,7 @@ type AiRecord = {
   approvalJournal: { signed: Hex | null; hash: Hex | null; transaction: NonNullable<LocalAiApproval['request']>['transaction'] } | null;
 };
 const prefix = 'local-ai:request:';
+const connectorRequestTimeoutMs = CONNECTOR_JOB_TIMEOUT_MS + 5000;
 const own = (record: AiRecord, owner: AiOwner) => {
   if ('visitor' in record.owner) {
     if (!('visitor' in owner) || !owner.visitor || record.owner.visitor !== owner.visitor) throw new AccessError('This answer belongs to another visitor.');
@@ -38,7 +40,7 @@ function inputFingerprint(id: string, owner: AiOwner, input: AiInput, resourceUr
   return fingerprint(['local-ai-v2', id, input.mode, input.prompt, input.context, input.maxOutputTokens,
     AI_MODEL, AI_CONTEXT_TOKENS, 'think:false', 'temperature:0.35', owner, resourceUrl,
     input.hostScope, input.publicQuestion, hostId ?? 'direct',
-    input.mode === 'paid' && payee ? ['eip155:46630', TEST_USDG_ADDRESS, AI_PRICE.toString(), payee] : [input.mode === 'paid' ? 'own-compute' : 'library', '0']]);
+    input.mode === 'paid' && payee ? ['eip155:46630', TEST_USDG_ADDRESS, inferenceMaximum(input.maxOutputTokens).toString(), payee] : [input.mode === 'paid' ? 'own-compute' : 'library', '0']]);
 }
 function validId(id: string) { if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new WorkflowError('Use a UUID request ID.'); }
 export function paidOwner(identity: VerifiedIdentity): PaidAiOwner {
@@ -68,12 +70,12 @@ export async function sweepAiText(store: Store, after: string, now = Date.now())
   let scrubbed = 0;
   for (const { key, value: scanned } of rows) {
     let value = scanned;
-    if (value.request.host && value.request.state === 'running' && value.runningAt && now - value.runningAt >= 95000) {
+    if (value.request.host && value.request.state === 'running' && value.runningAt && now - value.runningAt >= connectorRequestTimeoutMs) {
       await cancelConnectorInference(store, value.id);
       value = await store.update<AiRecord>(key, (current) => {
-        if (current.request.state === 'running' && current.runningAt && now - current.runningAt >= 95000) {
+        if (current.request.state === 'running' && current.runningAt && now - current.runningAt >= connectorRequestTimeoutMs) {
           current.request.state = 'interrupted'; current.request.error = 'Connector answer timed out. No inference tokens were charged.';
-          current.completedAt = new Date(current.runningAt + 95000).toISOString();
+          current.completedAt = new Date(current.runningAt + connectorRequestTimeoutMs).toISOString();
         }
         return current;
       });
@@ -145,12 +147,12 @@ export async function readAiRequest(store: Store, id: string, owner: AiOwner) {
     await recoverExpiredUnsignedSettlement(store, prefix + id, record.owner.payer, record.payee);
     return publicRequest((await store.get<AiRecord>(prefix + id))!);
   }
-  if (record.request.state === 'running' && record.runningAt && Date.now() - record.runningAt > (record.request.host ? 95000 : 150000)) {
+  if (record.request.state === 'running' && record.runningAt && Date.now() - record.runningAt > (record.request.host ? connectorRequestTimeoutMs : 150000)) {
     if (record.request.host) await cancelConnectorInference(store, id);
     const interrupted = await store.update<AiRecord>(prefix + id, (current) => {
       if (current.request.state === 'running') {
         current.request.state = 'interrupted'; current.request.error = 'Inference was interrupted. No inference tokens were charged.';
-        if (current.request.host && current.runningAt) current.completedAt = new Date(current.runningAt + 95000).toISOString();
+        if (current.request.host && current.runningAt) current.completedAt = new Date(current.runningAt + connectorRequestTimeoutMs).toISOString();
       }
       return current;
     });
@@ -169,12 +171,14 @@ function parseInput(body: Record<string, unknown>): AiInput {
   if (hostScope !== 'own' && hostScope !== 'city') throw new WorkflowError('Choose your own host or city hosts.');
   const publicQuestion = body.publicQuestion === true;
   if (hostScope === 'city' && !publicQuestion) throw new WorkflowError('City hosts may receive only questions you explicitly mark public.');
+  if (body.mode === 'library' && !process.env.LOCAL_AI_OLLAMA_URL && (hostScope !== 'city' || !publicQuestion))
+    throw new WorkflowError('Free city hosts may receive only questions you explicitly mark public.');
   return { mode: body.mode, prompt: body.prompt.trim(), maxOutputTokens: body.maxOutputTokens as number, context: body.context as LocalAiContext, hostScope, publicQuestion };
 }
 async function prepareQuote(store: Store, id: string, owner: AiOwner, input: AiInput, resourceUrl: string) {
   const now = Date.now();
   const connector = process.env.LOCAL_AI_OLLAMA_URL ? null :
-    await chooseConnectorHost(store, 'payer' in owner ? owner : {}, AI_MODEL, input.hostScope);
+    await chooseConnectorHost(store, 'payer' in owner ? owner : {}, AI_MODEL, input.hostScope, now, input.mode === 'library');
   if (!process.env.LOCAL_AI_OLLAMA_URL && !connector) throw new ConflictError('No online host serves this model within your chosen question privacy scope.');
   const ownCompute = !!connector && 'subject' in owner && connector.ownerSubject === owner.subject;
   const charge = input.mode === 'paid' && !ownCompute;
@@ -193,8 +197,8 @@ async function prepareQuote(store: Store, id: string, owner: AiOwner, input: AiI
   const expiry = new Date(now + 18 * 60_000).toISOString();
   if (charge) {
     const resource = await createAiResource(store, prefix + id, payer!, payee!);
-    const requirements = await resource.buildPaymentRequirements({ scheme: 'exact', network: 'eip155:46630', payTo: payee!,
-      price: { asset: TEST_USDG_ADDRESS, amount: AI_PRICE.toString() }, maxTimeoutSeconds: 1200,
+    const requirements = await resource.buildPaymentRequirements({ scheme: 'upto', network: 'eip155:46630', payTo: payee!,
+      price: { asset: TEST_USDG_ADDRESS, amount: inferenceMaximum(input.maxOutputTokens).toString() }, maxTimeoutSeconds: 1200,
       extra: { assetTransferMethod: 'permit2', paymentFlow: 'authorization' } });
     required = await resource.createPaymentRequiredResponse(requirements, { url: resourceUrl, description: 'One completed local Qwen inference answer', mimeType: 'application/json' }, undefined,
       { 'payment-identifier': declarePaymentIdentifierExtension(true) });
@@ -203,14 +207,15 @@ async function prepareQuote(store: Store, id: string, owner: AiOwner, input: AiI
     state: charge ? 'payment_required' : 'ready', model: AI_MODEL, prompt: input.prompt,
     maxOutputTokens: input.maxOutputTokens, requestFingerprint: signature, createdAt: new Date(now).toISOString(), expiresAt: expiry,
     answer: null, purgedAt: null, usage: null, error: null,
-    payment: { state: charge ? 'quoted' : 'none', amountAtomic: charge ? AI_PRICE.toString() : '0', receipt: null },
+    payment: { state: charge ? 'quoted' : 'none', amountAtomic: charge ? inferenceMaximum(input.maxOutputTokens).toString() : '0', receipt: null },
     review: charge ? { walletId: (owner as Extract<AiOwner, { walletId: string }>).walletId,
-      operationId: id, description: 'Pay 0.01 tUSDG for one completed local Qwen answer', expiresAt: expiry,
+      operationId: id, description: `Pay per token: 0.0001 tUSDG per generated token, at most ${Number(inferenceMaximum(input.maxOutputTokens)) / 1e6} tUSDG for this answer`, expiresAt: expiry,
       requestId: id, requestFingerprint: signature, resourceUrl, chainId: 46630,
-      asset: TEST_USDG_ADDRESS, payTo: payee!, amountAtomic: AI_PRICE.toString() } : null,
+      asset: TEST_USDG_ADDRESS, payTo: payee!, amountAtomic: inferenceMaximum(input.maxOutputTokens).toString(),
+      maxOutputTokens: input.maxOutputTokens, facilitatorAddress: (await facilitatorAccount()).address } : null,
     paymentRequired: required, approval: null,
   };
-  if (connector) request.host = { id: connector.id, name: connector.name, own: ownCompute, payoutWallet: ownCompute ? null : connector.payoutWallet! };
+  if (connector) request.host = { id: connector.id, name: connector.name, own: ownCompute, payoutWallet: charge ? connector.payoutWallet! : null };
   request.hostScope = input.hostScope; request.publicQuestion = input.publicQuestion;
   const record: AiRecord = { id, mode: input.mode, owner, request, context: input.context, payee, resourceUrl,
     paymentJournal: null, approvalJournal: null };
@@ -245,7 +250,7 @@ async function settleStored(store: Store, record: AiRecord): Promise<AiRecord> {
     return (await store.get<AiRecord>(prefix + record.id))!;
   const resource = await createAiResource(store, prefix + record.id, record.owner.payer, record.payee);
   let receipt: SettleResponse;
-  try { receipt = await resource.settlePayment(record.paymentJournal.payload, record.paymentJournal.requirements, record.request.paymentRequired?.extensions); }
+  try { receipt = await resource.settlePayment(record.paymentJournal.payload, { ...record.paymentJournal.requirements, amount: record.request.payment.amountAtomic }, record.request.paymentRequired?.extensions); }
   catch {
     return store.update<AiRecord>(prefix + record.id, (value) => {
       if (value.request.state === 'completed' || value.request.state === 'failed') return value;
@@ -259,10 +264,10 @@ async function settleStored(store: Store, record: AiRecord): Promise<AiRecord> {
     try { outcome = await inspectAiReceipt(latest.paymentJournal, record.owner.payer, record.payee); }
     catch { /* RPC evidence is indeterminate, not a failed payment. */ }
   }
-  if (receipt.success && outcome === 'settled') {
+  if (receipt.success && (outcome === 'settled' || receipt.amount === '0' && receipt.transaction === '' && record.request.payment.amountAtomic === '0')) {
     return store.update<AiRecord>(prefix + record.id, (value) => {
       if (value.request.state === 'completed' || value.request.state === 'failed') return value;
-      if (value.paymentJournal?.hash !== receipt.transaction) throw new ConflictError('Settlement journal changed.');
+      if (receipt.amount !== '0' && value.paymentJournal?.hash !== receipt.transaction) throw new ConflictError('Settlement journal changed.');
       value.request.payment.state = 'settled'; value.request.payment.receipt = receipt;
       value.request.state = 'completed'; value.request.error = null; value.completedAt = new Date().toISOString();
       return value;
@@ -320,7 +325,7 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
     if (!record.paymentJournal) {
       const payer = (owner as Extract<AiOwner, { payer: Address }>).payer;
       const allowance = await aiRpc.readContract({ address: TEST_USDG_ADDRESS, abi: aiTokenAbi, functionName: 'allowance', args: [payer, PERMIT2_ADDRESS] });
-      if (allowance < AI_PRICE || allowance > AI_BUDGET)
+      if (allowance < inferenceMaximum(record.request.maxOutputTokens) || allowance > AI_BUDGET)
         throw new ConflictError('Review and confirm the exact finite Permit2 approval before authorizing payment.');
       const payload = decodePaymentSignatureHeader(paymentHeader!);
       const resource = await createAiResource(store, prefix + id, (owner as Extract<AiOwner, { payer: Address }>).payer, payee!);
@@ -328,7 +333,7 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
       if (!resource.validateExtensions(required, payload).valid) throw new ConflictError('Invalid payment identifier extension.');
       const matching = resource.findMatchingRequirements(required.accepts, payload);
       if (!matching) throw new ConflictError('Payment differs from the immutable quote.');
-      await validatePaymentPayload(payload, matching, id, (owner as Extract<AiOwner, { payer: Address }>).payer, payee!, resourceUrl);
+      await validatePaymentPayload(payload, matching, id, (owner as Extract<AiOwner, { payer: Address }>).payer, payee!, resourceUrl, inferenceMaximum(record.request.maxOutputTokens), (await facilitatorAccount()).address);
       const result = await resource.verifyPayment(payload, matching, required.extensions);
       if (!result.isValid || result.payer?.toLowerCase() !== (owner as Extract<AiOwner, { payer: Address }>).payer.toLowerCase()) throw new ConflictError('Signed payment could not be verified. Check balance and finite Permit2 allowance.');
       record = await reserveNonce(store, record, payload);
@@ -336,9 +341,11 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
       throw new ConflictError('A different authorization cannot replace this operation.');
   }
   try {
-    if (record.request.host) await reserveConnectorHost(store, record.request.host.id, id, Date.now(), record.request.model);
+    if (record.request.host) await reserveConnectorHost(store, record.request.host.id, id, Date.now(), record.request.model, input.mode === 'library');
     else await reserveHost(store, id);
   } catch { return publicRequest(record); }
+  const connectorRequest = Boolean(record.request.host);
+  const completion = (async (record: AiRecord) => {
   let visitorLease: VisitorLease | null = null;
   try {
     if ('visitor' in owner) visitorLease = await acquireVisitorLease(store, owner.visitor);
@@ -377,12 +384,16 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
         model: record.request.model,
         messages: [{ role: 'system', content: instructions[input.context] }, { role: 'user', content: input.prompt }],
         options: { num_ctx: AI_CONTEXT_TOKENS, num_predict: input.maxOutputTokens, temperature: 0.35 },
-      }) : await runLocalInference(input);
+      }, input.mode === 'library') : await runLocalInference(input);
       // Complete output and actual usage are durable before the settlement signer may write.
       if ('visitor' in owner) await assertVisitorActive(store, owner.visitor);
       record = await store.update<AiRecord>(prefix + id, (value) => {
         visitorLease?.assertActive();
         if (value.request.state !== 'running' || value.request.purgedAt) throw new ConflictError('Inference ownership changed.');
+        if (value.request.payment.state !== 'none') {
+          value.request.payment.amountAtomic = inferenceCharge(inference.usage.outputTokens, BigInt(value.paymentJournal!.requirements.amount)).toString();
+          value.paymentJournal!.amount = value.request.payment.amountAtomic;
+        }
         value.request.answer = inference.answer; value.request.usage = inference.usage;
         value.request.state = value.request.payment.state !== 'none' ? 'settling' : 'completed';
         if (value.request.state === 'completed') value.completedAt = new Date().toISOString();
@@ -392,6 +403,7 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
       record = await store.update<AiRecord>(prefix + id, (value) => {
         if (value.request.state === 'running') {
           value.request.state = 'failed'; value.request.error = error instanceof Error ? error.message : 'Local inference failed. No inference payment was sent.';
+          value.request.payment.amountAtomic = '0';
         }
         return value;
       });
@@ -404,4 +416,18 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
   if (record.request.state === 'settling') record = await settleStored(store, record);
   if ('visitor' in owner) await assertVisitorActive(store, owner.visitor);
   return publicRequest(record);
+  })(record);
+  if (!connectorRequest) return completion;
+  // Detached completion failures are observed; the durable request records the outcome.
+  void completion.catch(() => {});
+  // One replica owns the bounded job. The HTTP caller receives its saved state rather
+  // than holding an ingress connection through boot and cold model loading.
+  let timer!: NodeJS.Timeout;
+  try {
+    const result = await Promise.race([
+      completion,
+      new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), 1000); }),
+    ]);
+    return result ?? await readAiRequest(store, id, owner);
+  } finally { clearTimeout(timer); }
 }

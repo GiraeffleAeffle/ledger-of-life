@@ -1,23 +1,34 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createPublicClient, defineChain, getAddress, http, keccak256, parseAbi, type Address } from 'viem';
-import { PERMIT2_ADDRESS, x402ExactPermit2ProxyABI, x402ExactPermit2ProxyAddress } from '@x402/evm';
+import { PERMIT2_ADDRESS, x402UptoPermit2ProxyABI, x402UptoPermit2ProxyAddress } from '@x402/evm';
 import { TEST_USDG_ADDRESS } from '../wallets/inference-token.ts';
 import { ConflictError } from './errors.ts';
 import type { LocalAiContext, LocalAiRequestUsage } from './local-ai-types.ts';
 import type { Store } from './store.ts';
+import { AI_PRICE, AI_MAX_OUTPUT } from '../domain/ai-pricing.ts';
 
 export const AI_CHAIN = defineChain({ id: 46630, name: 'Robinhood Chain Testnet', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://rpc.testnet.chain.robinhood.com'] } }, testnet: true });
 export const aiRpc = createPublicClient({ chain: AI_CHAIN, transport: http() });
 export const aiTokenAbi = parseAbi(['function name() view returns (string)', 'function symbol() view returns (string)', 'function decimals() view returns (uint8)', 'function allowance(address,address) view returns (uint256)', 'function balanceOf(address) view returns (uint256)', 'function approve(address,uint256) returns (bool)', 'event Transfer(address indexed from,address indexed to,uint256 value)']);
-export const AI_PRICE = 10000n;
+export function inferenceMaximum(maxOutputTokens: number): bigint {
+  if (!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > AI_MAX_OUTPUT)
+    throw new ConflictError('Invalid answer token limit.');
+  return BigInt(maxOutputTokens) * AI_PRICE;
+}
+export function inferenceCharge(outputTokens: number | null, maximum: bigint): bigint {
+  if (outputTokens === null || !Number.isSafeInteger(outputTokens) || outputTokens < 0)
+    throw new ConflictError('Completed paid inference requires measured output tokens.');
+  const amount = BigInt(outputTokens) * AI_PRICE;
+  if (amount > maximum) throw new ConflictError('Inference usage exceeds the signed maximum. No inference payment was sent.');
+  return amount;
+}
 export const AI_BUDGET = 100000n;
 export const AI_CONTEXT_TOKENS = 8192;
-export const AI_MAX_OUTPUT = 192;
 export const AI_MODEL = process.env.LOCAL_AI_MODEL || 'qwen3.8:27b-ud-q3-k-xl';
 export const AI_CONTRACT_HASHES = {
   permit2: '0x0117e0ed818bc3f2a8729ffc336c837e63e965f04b473047b39b35ad86aac259',
-  proxy: '0xce6429c0bb49284660683287c0a8fe548a88379072327d026626909d202048b9',
+  proxy: '0x4662dc27323421a3698be49ac95f7b0dba141c238d31ef543248d1a11f8d8eec',
   token: '0x3e4adb6eab9d495c72d672fb619614979f38b422e49fcdb1b5e4c3b53744fe80',
 } as const;
 const deployment = 'contracts/evm/deployments/local-investments-46630.json';
@@ -29,8 +40,8 @@ export async function inferencePayee(): Promise<Address> {
 }
 export async function assertInferenceContracts(rpc: typeof aiRpc = aiRpc) {
   const [chainId, permitCode, proxyCode, tokenCode, linked, decimals, name, symbol] = await Promise.all([
-    rpc.getChainId(), rpc.getCode({ address: PERMIT2_ADDRESS }), rpc.getCode({ address: x402ExactPermit2ProxyAddress }),
-    rpc.getCode({ address: TEST_USDG_ADDRESS }), rpc.readContract({ address: x402ExactPermit2ProxyAddress, abi: x402ExactPermit2ProxyABI, functionName: 'PERMIT2' }),
+    rpc.getChainId(), rpc.getCode({ address: PERMIT2_ADDRESS }), rpc.getCode({ address: x402UptoPermit2ProxyAddress }),
+    rpc.getCode({ address: TEST_USDG_ADDRESS }), rpc.readContract({ address: x402UptoPermit2ProxyAddress, abi: x402UptoPermit2ProxyABI, functionName: 'PERMIT2' }),
     rpc.readContract({ address: TEST_USDG_ADDRESS, abi: aiTokenAbi, functionName: 'decimals' }),
     rpc.readContract({ address: TEST_USDG_ADDRESS, abi: aiTokenAbi, functionName: 'name' }),
     rpc.readContract({ address: TEST_USDG_ADDRESS, abi: aiTokenAbi, functionName: 'symbol' }),
