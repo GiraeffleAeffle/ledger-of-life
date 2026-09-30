@@ -146,7 +146,7 @@ flowchart LR
 | Layer          | Implemented choice                                                                                   |
 | -------------- | ---------------------------------------------------------------------------------------------------- |
 | Shared product | Next.js 16 / React 19, exact native token units, separate security and portfolio records             |
-| Persistence    | SQLite locally; PostgreSQL for hosted operation; durable intent and receipt records                  |
+| Persistence    | SQLite locally and, for the contest window, on the hosted demo's volume; PostgreSQL for longer-lived hosting; durable intent and receipt records |
 | Identity       | Privy passkeys, backup access, user-owned EVM/Solana wallets and server-verified recovery challenges |
 | Robinhood      | USDG, immutable Solidity escrow, Morpho adapter, bounded EIP-712 gas sponsor                         |
 | Solana         | Test-only Anchor escrow, USDC, validated Kamino CPI, separate message-bound fee sponsor              |

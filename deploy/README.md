@@ -1,6 +1,6 @@
 # Ledger of Life on the Talos cluster: Helm release for review
 
-**Nothing here has been applied yet.** Applying runs through `infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh` in `strausberg-zk-residency`, which opens the owner's rootless session and runs one mode of `deploy/apply.sh`; every change needs a typed confirmation. Test networks only; no real money. This is a bounded, digest-pinned release, not a claim of production readiness.
+**Live since 30 September** (Helm revision 1 from commit `090608b`; what was checked is in `docs/DEPLOYMENT.md`). Applying runs through `infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh` in `strausberg-zk-residency`, which opens the owner's rootless session and runs one mode of `deploy/apply.sh`; every change needs a typed confirmation. Test networks only; no real money. This is a bounded, digest-pinned release, not a claim of production readiness.
 
 ## Why helmfile
 
@@ -91,11 +91,9 @@ The old Kustomize render (11 objects) and Helm render (10 plus the external Name
 
 ## Not verified
 
-- **Nothing was applied or dry-run on the server.** No live release, certificate issuance, public readiness, rollback, Secret values or apply-script cluster-changing path was exercised.
-- **`fsGroup` on this volume.** Existing pods use the same pattern (for example `roebel-case-steward-control`, uid/fsGroup 1000 with a claim, running on 29 Sep). It was not tried for this app.
-- **The live StorageClass** is not readable through the viewer; only its name is proven, by existing claims.
+- **What the first release proved (30 September).** The wrapper's `--namespace`, `--secret` and `--release` modes against the live cluster; certificate issuance through the HTTP-01 solver policy; public readiness. The claim bound and the Hetzner volume attached (after one transient `FailedMount` while the device appeared), and the store opens on it as uid 1000, so `fsGroup` works: opening runs `CREATE TABLE`, and `/api/status` answers `storeAvailable: true`. A reconcile job completes every minute, and `scripts/reconcile.mjs` fails on any non-2xx answer, so the Secret, in-cluster DNS and the reconcile-to-web path work. Rollback was not exercised.
 - **NetworkPolicy enforcement.** The `kube-flannel` pods run a `kube-network-policies` container, which Talos documents as what makes Flannel enforce policy. Enforcement was not probed. Unenforced policies would be accepted and ignored.
-- **The HAProxy source addresses** are copied from another app's policy for the same three nodes. If they are wrong, the symptom is a 504 through the ingress.
+- **The HAProxy source addresses.** The site answers through the ingress, so there is no 504. That holds whether the addresses are right or policies are not enforced; probing enforcement tells the two apart.
 - **The project atlas.** `STADTSTACK_ATLAS_URL` is unset, so it defaults to `localhost:4317`, which does not exist in a pod. City choice and the bundled city snapshots still work, and Places says the atlas is unavailable. Deploying the atlas, or setting that variable, is separate work.
 - **Resource sizes** (request 192 Mi, limit 768 Mi) come from about 120 MB idle in Docker. They were not load tested.
 - **No GPU path.** `LOCAL_AI_OLLAMA_URL` is unset, so the paid AI desk reports itself unconfigured. See `docs/DEPLOYMENT.md`, "The GPU".

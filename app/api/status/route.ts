@@ -9,8 +9,11 @@ export async function GET() {
   } catch {
     /* Configuration state is returned without secrets. */
   }
+  // The public app id is compiled into the build (identity.ts reads it the same way); a hosted container does not
+  // carry it in its runtime environment, so passing process.env alone would report sign-in as unconfigured.
+  const environment = { ...process.env, NEXT_PUBLIC_PRIVY_APP_ID: process.env.NEXT_PUBLIC_PRIVY_APP_ID };
   return Response.json(
-    { ...connectionStatus(process.env), storeAvailable },
+    { ...connectionStatus(environment), storeAvailable },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }
