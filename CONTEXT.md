@@ -1,6 +1,6 @@
 # Rental security and tenant asset building
 
-This context describes the rental security shared by a tenant and landlord, and the tenant's separate accumulation of personal assets while renting.
+This context describes the rental security shared by a tenant and landlord, and the tenant's separate accumulation of personal assets while renting. It also names the parts of the Ledger of Life workspace, so the interface, the code and the docs use the same words.
 
 ## Language
 
@@ -116,3 +116,45 @@ _Avoid_: Decision recorded, transaction submitted.
 **Personal cash withdrawal**:
 A transfer of settled, uncommitted personal cash to the tenant's permitted destination.
 _Avoid_: Earnings release, investment sale; those are separate actions.
+
+### The workspace
+
+**Area**:
+One of the six places in the signed-in app (Today, Me, Home, Money, Places, Ideas). Each answers one question, and a feature is operated in exactly one area.
+_Avoid_: Page, module, tab.
+
+**Feature home**:
+The one area, and the section inside it, where a person operates a feature. Every other area shows a reference to it.
+_Avoid_: Owner, canonical page.
+
+**Reference**:
+One line and one link, in an area that is not a feature's home, pointing to that home. It never repeats a control, a calculator or a promotion.
+_Avoid_: Teaser, shortcut, duplicate.
+
+**Topic**:
+A subject that groups capabilities and adapters for browsing: Identity & life, Home & living, Money & ownership, Energy & devices, Places & participation. A topic is not an area, and its subject can be operated in a different area.
+_Avoid_: Section, category.
+
+**Adapter**:
+One way something enters the person's ledger: a wallet, a contract, a device, a public data source, or a roadmap idea. It states what it brings, reads, keeps, who can see it, what it needs and how to disconnect.
+_Avoid_: Integration, plugin. A connector is the operator-side mechanism a hosted adapter may need.
+
+**Capability**:
+A feature of the product with a build status (planned, prototype, partly built, illustration, built), independent of which adapter supplies it.
+_Avoid_: Idea, except as the name of the Ideas area.
+
+**Reality level**:
+How real something is: test-network execution, simulated input, live read-only data, on this device, your own statement, prototype, illustration or roadmap. Everything shown states one.
+_Avoid_: Maturity. A capability's build status is not how real it is.
+
+**Device reading**:
+A live, read-only observation of something the person runs, such as home solar or a validator. It is outside the priced subtotal.
+_Avoid_: Asset, holding.
+
+**Local stake**:
+A fictional test unit of a housing project or a workshop, bought with test cash. It grants no company, cooperative or property right.
+_Avoid_: Investment, share, equity, home ownership.
+
+**Priced test-asset subtotal**:
+What the person holds in test assets that have a price, shown as four parts that add up to it: free to use, locked in the rental deposit, pledged as collateral, minus what is owed. The deposit is a locked part of it: counted, never spendable, never described as an investment. Local stakes and validator stake are outside it.
+_Avoid_: Net worth, portfolio value, balance (a balance is spendable; the subtotal is not).

@@ -1,0 +1,139 @@
+# The pattern of the other application namespaces (for example agentcart-demo): deny everything, then allow only what
+# each pod needs. The cluster enforces NetworkPolicy (the kube-flannel pods run the kube-network-policies container).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ledger.helmLabels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# cert-manager answers the Let's Encrypt HTTP-01 challenge from a short-lived solver pod in this namespace. Without this
+# policy the default deny blocks it and the certificate is never issued.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cert-manager-http01
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ledger.helmLabels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      acme.cert-manager.io/http01-solver: "true"
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: 8089
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ledger-of-life-web
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ledger.helmLabels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ledger-of-life
+      app.kubernetes.io/component: web
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-system
+        # HAProxy runs on the host network, so its traffic arrives from the node addresses and the Flannel gateway
+        # addresses, not from a pod. Copied from agentcart-demo/woo-eur-storefront.
+        {{- range .Values.ingress.haproxySources }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+        # The scheduled reconcile job, in this namespace.
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ledger-of-life
+              app.kubernetes.io/component: reconcile
+      ports:
+        - port: 4175
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # The internet on 443 only: identity, chain RPCs and city sources need it. Never private, CGNAT, loopback or
+    # link-local ranges (the cluster, the metadata address, home LANs), and never this cluster's own public node and
+    # load-balancer addresses (egress.excludePublic). Other public addresses stay reachable on 443, including a home's
+    # public IP if it has one: add such addresses to egress.excludePublic. An abused pod can still send data out over
+    # HTTPS; this policy limits where it can knock, not what it can say.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 100.64.0.0/10
+              - 127.0.0.0/8
+              - 169.254.0.0/16
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              {{- range .Values.egress.excludePublic }}
+              - {{ . | quote }}
+              {{- end }}
+      ports:
+        - port: 443
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ledger-of-life-reconcile
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ledger.helmLabels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ledger-of-life
+      app.kubernetes.io/component: reconcile
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ledger-of-life
+              app.kubernetes.io/component: web
+      ports:
+        - port: 4175
+          protocol: TCP

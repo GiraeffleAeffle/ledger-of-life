@@ -54,10 +54,7 @@ export function WalletAccessPanel({ recoveryProof }: { recoveryProof?: WalletRec
       <section className={styles.panel} aria-labelledby="wallet-access-title">
         <div className={styles.eyebrow}>Account access</div>
         <h3 id="wallet-access-title">Your assets, your account</h3>
-        <p>
-          Passkey access and personal wallets are being connected. The walkthrough uses fictional
-          balances until account setup is complete.
-        </p>
+        <p>Passkey sign-in and personal wallets are not configured yet. Once available, you can access your own account and the test-network services it is eligible to use.</p>
         <span className={styles.pending}>Provider setup pending</span>
       </section>
     );

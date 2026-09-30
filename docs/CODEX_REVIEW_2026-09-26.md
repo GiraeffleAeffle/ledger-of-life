@@ -6,7 +6,7 @@ Independent read-only review of `06e9f0f..b769078` (23 commits). Report verbatim
 
 | # | Severity | Finding | Status |
 |---|---|---|---|
-| 1 | High | SSRF via Home Assistant URL | Partly fixed: redirects refused, link-local/metadata addresses blocked, private addresses blocked on Vercel. DNS rebinding between check and fetch remains; hosted use needs a connector or allowlist. |
+| 1 | High | SSRF via Home Assistant URL | Fixed for hosted builds (29 Sep): a production build never fetches a Home Assistant address unless the operator sets `ALLOW_HOME_ASSISTANT_PULL=1`, and Vercel always refuses. The address check itself (DNS is resolved again by `fetch`, so a rebinding name can pass it) is best effort and is not relied on; tailnet/CGNAT and IPv4-mapped addresses are now treated as private. |
 | 2 | High | One failing recipient stalls Solana payouts | Fixed: definitive failures recorded per recipient, other payout proceeds, fresh operation after confirmed failure/expiry |
 | 3 | High | CollateralEscrow forgives claims on slippage | Fixed: sells more at the realized price until the claim is covered or collateral is exhausted ($400/$392/$120 test) |
 | 4 | High | `/api/identity` overwritten, breaking recovery | Fixed: original recovery route restored; EU wallet moved to `/api/eudi` |

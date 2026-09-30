@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { VerifiedIdentity, VerifiedWallet } from '../wallets/identity-policy.ts';
 import { atomic } from '../domain/assets.ts';
-import { WorkflowError } from '../domain/workflow.ts';
+import { WorkflowError } from '../domain/errors.ts';
 import { requireReady, walletFor, type Agreement } from './agreements.ts';
-import { AccessError, ConflictError } from './workspaces.ts';
+import { AccessError, ConflictError } from './errors.ts';
 import type { Store } from './store.ts';
 
 /**
@@ -29,7 +29,7 @@ export interface Listing {
   rentMonthly: string;
   requiredSecurity: string;
   releaseAllowed: boolean;
-  status: 'open' | 'let';
+  status: 'open' | 'let' | 'closed';
   createdAt: string;
   applications: Application[];
   agreementId: string | null;
@@ -68,6 +68,7 @@ export interface PublicListing {
   relation: 'landlord' | 'applicant' | 'chosen' | null;
   applications?: Omit<Application, 'subject' | 'wallet'>[];
   agreementId: string | null;
+  sample?: boolean;
 }
 
 const key = (id: string) => `listing:${id}`;
@@ -101,7 +102,8 @@ export function publicListing(value: Listing, identity: VerifiedIdentity | null)
     applicants: value.applications.length,
     relation: own ? 'landlord' : application ? (chosen ? 'chosen' : 'applicant') : null,
     // Only the landlord sees applicants; applicants never see each other.
-    applications: own ? value.applications.map(({ id, name, message, at }) => ({ id, name, message, at })) : undefined,
+    applications: own ? value.applications.map(({ id, name, message, at, subject }) => ({ id, name: subject.startsWith('test-signer:') && !name.toLowerCase().includes('sample') ? `${name} · sample fixture` : name, message, at })) : undefined,
+    sample: value.landlord.subject.startsWith('test-signer:'),
     agreementId: own || chosen ? value.agreementId : null,
   };
 }
@@ -180,6 +182,26 @@ export async function applyToListing(store: Store, identity: VerifiedIdentity, i
     return { ...value, applications: [...value.applications, application] };
   });
   return publicListing(next, identity);
+}
+
+/** Closing an unchosen listing changes only its availability; no tenancy or deposit exists yet. */
+export async function closeListing(store: Store, identity: VerifiedIdentity, id: string) {
+  const listing = await store.update<Listing>(key(id), (value) => {
+    if (value.landlord.subject !== identity.subject) throw new AccessError('Only the landlord can close this listing.');
+    if (value.status === 'let') throw new ConflictError('A chosen tenancy cannot be cancelled here.');
+    return { ...value, status: 'closed' };
+  });
+  return publicListing(listing, identity);
+}
+
+export async function withdrawApplication(store: Store, identity: VerifiedIdentity, id: string) {
+  const listing = await store.update<Listing>(key(id), (value) => {
+    if (value.status !== 'open') throw new ConflictError('This application is already part of a chosen or closed listing.');
+    if (!value.applications.some((application) => application.subject === identity.subject))
+      throw new AccessError('You have no application for this listing.');
+    return { ...value, applications: value.applications.filter((application) => application.subject !== identity.subject) };
+  });
+  return publicListing(listing, identity);
 }
 
 /** The landlord's choice creates the agreement with landlord and tenant already bound. */

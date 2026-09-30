@@ -1,0 +1,88 @@
+{
+  "network": 46630,
+  "mode": "Actual disposable Privy passkey account; wallet-signed test purchases; no real issuer/property rights",
+  "wallet": "0xcE2fe8cffAA56B8AEb42e7ED843f0EA4266BfEe6",
+  "cashAtomic": "0",
+  "holdings": [
+    {
+      "projectId": "demo-neighbourhood-homes",
+      "token": "0x2b95D13BDFEB4202281Cea72494263fdC7b0cbFb",
+      "market": "0xD9B44B63fd4A195A4a92531d4b0F8BE6583A3Dde",
+      "holdingRaw": "5000000000000000000",
+      "totalSupplyRaw": "10000000000000000000000"
+    },
+    {
+      "projectId": "demo-retrofit-workshop",
+      "token": "0xD7AF0952465b85d94E1b725ec286EE4152C898bA",
+      "market": "0xb831f0C0E5E944f70a8611A5d6B5a41cC4fc5A91",
+      "holdingRaw": "5000000000000000000",
+      "totalSupplyRaw": "10000000000000000000000"
+    }
+  ],
+  "purchases": [
+    {
+      "projectId": "demo-neighbourhood-homes",
+      "orderId": "c8334b1c-3d7b-4769-aa6e-6a6ae97235f7",
+      "cashAtomic": "5000000",
+      "minimumUnitsRaw": "5000000000000000000",
+      "transactions": [
+        {
+          "kind": "approve",
+          "hash": "0x9e8abf65e47ff11c01dcbb912205551e57976821c44decddb566adccb87a9025",
+          "state": "confirmed"
+        },
+        {
+          "kind": "buy",
+          "hash": "0xe274f18dbf7dd9e248dc18b02b715385f10ad18566516e6222f69b88d60d782a",
+          "state": "confirmed"
+        }
+      ]
+    },
+    {
+      "projectId": "demo-retrofit-workshop",
+      "orderId": "fd585c7f-5a11-4ccf-92a6-594cd07b3bbe",
+      "cashAtomic": "5000000",
+      "minimumUnitsRaw": "5000000000000000000",
+      "transactions": [
+        {
+          "kind": "approve",
+          "hash": "0x3ee6d9a43e89f80f0597869ff75f1c555c56f0e1e69784b98a79f85b00da90dc",
+          "state": "confirmed"
+        },
+        {
+          "kind": "buy",
+          "hash": "0x11009c8c767b18b3e89a8ff55f4c69107a32c44aebb9d91acf3fb890dee88e91",
+          "state": "confirmed"
+        }
+      ]
+    }
+  ],
+  "verifiedAt": "2026-09-28T16:36:33.125Z",
+  "manifest": "contracts/evm/deployments/local-investments-46630.json",
+  "funding": {
+    "kind": "bounded operator test faucet, not earnings or borrowed funds",
+    "cashAtomic": "10000000",
+    "nativeAtomic": "300000000000000",
+    "cashTransaction": "0xd0a5e77e4b6243309fd6912a78c509d00e6fe935769b2c6c572dd64d465e27e6",
+    "gasTransaction": "0x9d9d7b126a9778985d65f574a40a6d45d35450b25c9b29c1b0354136ba6ff531",
+    "responseLossInjected": true,
+    "repeatCommandReturnedSameTransactions": true
+  },
+  "independentVerification": {
+    "method": "read-only CLI: canonical receipt, buyer, Bought event and matching cash/unit transfers",
+    "blocks": {
+      "demo-neighbourhood-homes": "125786366",
+      "demo-retrofit-workshop": "125786532"
+    },
+    "cashAtomic": "0",
+    "nativeAtomic": "297087520000000",
+    "holdingRawPerIssuer": "5000000000000000000",
+    "inventoryRawPerIssuer": "9995000000000000000000"
+  },
+  "boundaries": [
+    "No existing user tenancy or position was reset or transacted.",
+    "No real company equity, cooperative membership or property title was acquired.",
+    "This proves faucet-funded test purchases, not a complete borrowed-funds-to-investment rehearsal.",
+    "Building systems, supplier relationships, jobs and fiscal outcomes remain illustrative."
+  ]
+}

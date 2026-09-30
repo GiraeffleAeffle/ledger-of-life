@@ -32,6 +32,7 @@ import {
 import type { RentalWallet, RentalWalletAccess } from './types.ts';
 import { validateRecoveryRequest } from './recovery.ts';
 import { prepareEscrowTypedData } from './escrow-signing.ts';
+import { prepareInferencePayment } from './inference-signing.ts';
 
 /** Local demo builds let the app's own step card be the approval instead of Privy's review modals. */
 const DEVNET_RPC = process.env.NEXT_PUBLIC_SOLANA_DEVNET_RPC_URL || 'https://api.devnet.solana.com';
@@ -80,16 +81,16 @@ function walletActionError(cause: unknown, action: 'passkey' | 'wallet') {
     typeof rawCode === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(rawCode) ? rawCode : undefined;
   if (name === 'NotAllowedError' || code === 'passkey_not_allowed')
     return action === 'passkey'
-      ? 'The passkey request was cancelled or blocked. Try again from a supported browser.'
+      ? 'Request cancelled. You can try again, or continue with email.'
       : 'Request cancelled. You can try again.';
   if (action === 'passkey') {
     if (code === 'disallowed_login_method')
       return 'Passkey sign-up is disabled in the Privy app settings. Ask the app operator to enable it.';
     if (name === 'SecurityError' || name === 'NotSupportedError' || code === 'not_supported')
-      return 'This browser or address cannot create a passkey. Open http://localhost:4175 in a supported browser.';
+      return `This browser or address cannot create a passkey. Open ${typeof window !== 'undefined' ? window.location.origin : 'this web address'} in a supported browser.`;
     if (code === 'client_request_timeout')
       return 'The passkey service timed out. Check your connection and try again.';
-    return `Passkey setup did not complete${code ? ` (${code})` : ''}. Open http://localhost:4175 in a supported browser and try again.`;
+    return `Passkey setup did not complete${code ? ` (${code})` : ''}. Open ${typeof window !== 'undefined' ? window.location.origin : 'this web address'} in a supported browser and try again.`;
   }
   return 'The wallet request was not completed. Check your connection and try again.';
 }
@@ -117,6 +118,7 @@ const inactiveAccess: RentalWalletAccess = {
   signSolanaTransaction: unavailable,
   signRecoveryChallenge: unavailable,
   signEvmTypedData: unavailable,
+  signInferencePayment: unavailable,
 };
 
 const WalletContext = createContext<RentalWalletAccess>(inactiveAccess);
@@ -137,6 +139,9 @@ const robinhoodTestnet = defineChain({
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim();
+  // Optional: a Privy app client carries its own allowed origins, so the hosted build and local development can share
+  // one app (and its users) while each is restricted to its own domain.
+  const clientId = process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID?.trim() || undefined;
   if (!appId)
     return <WalletContext.Provider value={inactiveAccess}>{children}</WalletContext.Provider>;
 
@@ -147,6 +152,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     >
       <PrivyProvider
         appId={appId}
+        clientId={clientId}
         config={{
           loginMethods: ['email', 'passkey'],
           appearance: {
@@ -404,6 +410,21 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
           },
         });
         return signature;
+      }),
+    signInferencePayment: (request) =>
+      runAction(async () => {
+        requireSession();
+        const typedData = prepareInferencePayment(request, wallets.find((wallet) => wallet.id === request.walletId));
+        const { signature } = await signTypedData(typedData, {
+          address: wallets.find((wallet) => wallet.id === request.walletId)!.address,
+          uiOptions: {
+            showWalletUIs: SHOW_WALLET_UIS, isCancellable: true,
+            title: 'Authorize one local AI answer',
+            description: request.description,
+            buttonText: 'Authorize inference payment',
+          },
+        });
+        return signature as `0x${string}`;
       }),
   };
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

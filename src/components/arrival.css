@@ -1,0 +1,35 @@
+.welcome-page { width: min(100% - 32px, 880px); margin: 28px auto 64px; display: grid; gap: 20px; color: var(--ink); line-height: 1.6; }
+.welcome-page *, .welcome-page *::before, .welcome-page *::after { box-sizing: border-box; }
+.welcome-page .card { min-width: 0; }
+.welcome-page h1 { font-size: clamp(2rem, 6vw, 3.2rem); line-height: 1.18; margin: 12px 0; }
+.welcome-page h2 { font-size: clamp(1.4rem, 4vw, 1.9rem); line-height: 1.25; margin: 0 0 14px; }
+.welcome-page h3 { font-size: 1.1rem; margin: 18px 0 10px; }
+.welcome-page h4 { font-size: 1rem; margin: 0; }
+.welcome-page p { margin: 9px 0; max-width: 72ch; }
+.welcome-page a { color: var(--green-dark); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.welcome-hero { background: var(--soft) !important; }
+.welcome-optional, .welcome-meta, .welcome-source { color: var(--muted); font-size: .88rem; }
+.welcome-chips { display: flex; flex-wrap: wrap; gap: 9px; }
+.welcome-page .welcome-chip { font-size: .88rem; min-height: 42px; white-space: normal; text-align: center; }
+.welcome-page .welcome-chip[aria-pressed="true"] { background: var(--green); color: white; border-color: var(--green); }
+.welcome-forget { margin-top: 22px; }
+.welcome-phase { margin-top: 26px; border-top: 1px solid var(--line); }
+.welcome-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 12px; }
+.welcome-item { min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: 16px; overflow-wrap: anywhere; }
+.welcome-highlight { border-left: 4px solid var(--green); background: var(--soft); }
+.welcome-item-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.welcome-badge, .welcome-match { display: inline-block; border-radius: 6px; background: var(--soft); color: var(--green-dark); padding: 3px 7px; font-size: .75rem; font-weight: 600; margin: 2px 6px 2px 0; }
+.welcome-highlight .welcome-match { background: var(--panel); }
+.welcome-caveat { color: var(--amber); }
+.welcome-source { display: block; margin-top: 12px; }
+.welcome-keywords { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.welcome-keywords summary { cursor: pointer; font-weight: 600; }
+.welcome-keywords li { overflow-wrap: anywhere; }
+.welcome-search { display: grid; gap: 6px; max-width: 390px; font-weight: 600; }
+.welcome-search input { width: 100%; padding: 10px 12px; font: inherit; border: 1px solid var(--muted); border-radius: 7px; }
+.welcome-group-toggle { display: flex; align-items: center; gap: 10px; margin-top: 14px; cursor: pointer; }
+.welcome-group-toggle input { width: 18px; height: 18px; accent-color: var(--green); }
+.welcome-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }
+@media (max-width: 500px) { .welcome-page { width: calc(100% - 24px); margin: 12px auto 40px; gap: 12px; } .welcome-page .card { padding: 18px; } .welcome-item { padding: 12px; } }
+@media (prefers-reduced-motion: reduce) { .welcome-page *, .welcome-page *::before, .welcome-page *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
+@media print { body:has(.welcome-page) > * { color: #000; } .welcome-page { display: block; width: 100%; margin: 0; color: #000; } .welcome-page > :not(.welcome-print) { display: none !important; } .welcome-page .welcome-print { display: block; border: 0; padding: 0; box-shadow: none; break-after: auto; } .welcome-page .welcome-print + .welcome-print { margin-top: 2rem; } .welcome-page .welcome-item { break-inside: avoid; } .welcome-page a { color: #000; } }

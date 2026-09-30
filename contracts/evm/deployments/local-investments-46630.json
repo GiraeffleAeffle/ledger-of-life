@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "chainId": 46630,
+  "cashAddress": "0xA6e10E426A738aEF586dB5191177658D67C78A14",
+  "cashCodeHash": "0x3e4adb6eab9d495c72d672fb619614979f38b422e49fcdb1b5e4c3b53744fe80",
+  "operator": "0xFD01B12A52ba92C4766BE64117D546957FF8e819",
+  "assets": {
+    "demo-neighbourhood-homes": {
+      "unitAddress": "0x2b95D13BDFEB4202281Cea72494263fdC7b0cbFb",
+      "marketAddress": "0xD9B44B63fd4A195A4a92531d4b0F8BE6583A3Dde",
+      "unitCodeHash": "0xb5fb5c637f95b99fd213060f58555cd2cdb380c0a0665a773ec9476fe8a287bd",
+      "marketCodeHash": "0x677b2e2bfe8d4c8c29af5f601df39a97c2570903459098f687e88a63d8dd2ee0",
+      "priceAtomic": "1000000",
+      "totalSupplyRaw": "10000000000000000000000",
+      "name": "Neighbourhood Homes · test issuer",
+      "symbol": "tHOME",
+      "deployment": {
+        "unitHash": "0x3b4da89484fafd02a161cc3f8a2b1892f53d945b72e61b218612a3dee48511f0",
+        "deskHash": "0xa209708c102c0fd98b5a94ba92a09cb4dc6d9d8c3a9d8e24b833a7714b7cf852",
+        "seedHash": "0x6a250d1217a097069ce6c7ab1dd404bd69d165ac917659e5e0dbd8f313b5df71"
+      }
+    },
+    "demo-retrofit-workshop": {
+      "unitAddress": "0xD7AF0952465b85d94E1b725ec286EE4152C898bA",
+      "marketAddress": "0xb831f0C0E5E944f70a8611A5d6B5a41cC4fc5A91",
+      "unitCodeHash": "0xb5fb5c637f95b99fd213060f58555cd2cdb380c0a0665a773ec9476fe8a287bd",
+      "marketCodeHash": "0xb6e84afc5a86ed6b09629fd838435a9eaa14d526106f30ed49b2f1c4539e5599",
+      "priceAtomic": "1000000",
+      "totalSupplyRaw": "10000000000000000000000",
+      "name": "Neighbourhood Works · test issuer",
+      "symbol": "tWORK",
+      "deployment": {
+        "unitHash": "0x5694aa246c1fa9002489909c3e1d1a7d63045709b7917844e46e7c3f77f01307",
+        "deskHash": "0xa3231da713493aad6a674dd530245dfcc2cf4ca61f81ffe8e987090d0237e15f",
+        "seedHash": "0xd04b8912d7eb12b9b4225c697cf1c86bbf1629222c700fdbed52f5ed45845978"
+      }
+    }
+  }
+}

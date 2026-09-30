@@ -1,5 +1,5 @@
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
-import { WorkflowError } from '../domain/workflow.ts';
+import { WorkflowError } from '../domain/errors.ts';
 import type { Store } from './store.ts';
 
 /**
@@ -15,6 +15,11 @@ export interface PublicAdapterConfig {
   validator?: AdapterConfig['validator'];
 }
 const key = (subject: string) => `adapters:${subject}`;
+export const HOME_ASSISTANT_UNAVAILABLE_MESSAGE = 'This host does not connect to Home Assistant. Run Ledger of Life on your own network to use it.';
+
+export function homeAssistantPullAllowed(environment: Record<string, string | undefined> = process.env): boolean {
+  return environment.VERCEL === undefined && (environment.NODE_ENV !== 'production' || environment.ALLOW_HOME_ASSISTANT_PULL === '1');
+}
 
 export async function readAdapterConfig(store: Store, identity: VerifiedIdentity): Promise<PublicAdapterConfig> {
   const config = (await store.get<AdapterConfig>(key(identity.subject))) ?? {};
@@ -25,35 +30,46 @@ export async function readAdapterConfig(store: Store, identity: VerifiedIdentity
 }
 
 export async function saveAdapterConfig(store: Store, identity: VerifiedIdentity, input: Record<string, unknown>) {
-  const current = (await store.get<AdapterConfig>(key(identity.subject))) ?? {};
-  const next: AdapterConfig = { ...current };
-  if (input.kind === 'homeAssistant') {
-    if (input.remove === true) delete next.homeAssistant;
-    else {
-      let url: URL;
-      try {
-        url = new URL(String(input.url));
-      } catch {
-        throw new WorkflowError('Enter your Home Assistant address, e.g. http://homeassistant.local:8123');
+  const recordKey = key(identity.subject);
+  if (!(await store.get<AdapterConfig>(recordKey))) {
+    try {
+      await store.create<AdapterConfig>(recordKey, {});
+    } catch (error) {
+      // Another connection may have created this person's record concurrently.
+      if (!(await store.get<AdapterConfig>(recordKey))) throw error;
+    }
+  }
+  await store.update<AdapterConfig>(recordKey, (current) => {
+    const next: AdapterConfig = { ...current };
+    if (input.kind === 'homeAssistant') {
+      if (input.remove === true) delete next.homeAssistant;
+      else {
+        if (!homeAssistantPullAllowed()) throw new WorkflowError(HOME_ASSISTANT_UNAVAILABLE_MESSAGE);
+        let url: URL;
+        try {
+          url = new URL(String(input.url));
+        } catch {
+          throw new WorkflowError('Enter your Home Assistant address, e.g. http://homeassistant.local:8123');
+        }
+        if (!['http:', 'https:'].includes(url.protocol)) throw new WorkflowError('Use an http(s) address.');
+        const token = typeof input.token === 'string' && input.token.length > 20 ? input.token : current.homeAssistant?.token;
+        if (!token) throw new WorkflowError('Paste a long-lived access token (Profile → Security in Home Assistant).');
+        const entity = typeof input.entity === 'string' && /^sensor\.[a-z0-9_]+$/.test(input.entity) ? input.entity : undefined;
+        const price = Number(input.pricePerKwh ?? 0.3);
+        next.homeAssistant = { url: url.origin, token, entity, pricePerKwh: Number.isFinite(price) && price > 0 && price < 5 ? price : 0.3 };
       }
-      if (!['http:', 'https:'].includes(url.protocol)) throw new WorkflowError('Use an http(s) address.');
-      const token = typeof input.token === 'string' && input.token.length > 20 ? input.token : current.homeAssistant?.token;
-      if (!token) throw new WorkflowError('Paste a long-lived access token (Profile → Security in Home Assistant).');
-      const entity = typeof input.entity === 'string' && /^sensor\.[a-z0-9_]+$/.test(input.entity) ? input.entity : undefined;
-      const price = Number(input.pricePerKwh ?? 0.3);
-      next.homeAssistant = { url: url.origin, token, entity, pricePerKwh: Number.isFinite(price) && price > 0 && price < 5 ? price : 0.3 };
-    }
-  } else if (input.kind === 'validator') {
-    if (input.remove === true) delete next.validator;
-    else {
-      const chain = input.chain === 'ethereum' || input.chain === 'gnosis' ? input.chain : 'solana';
-      const id = String(input.id ?? '').trim();
-      if (chain === 'solana' ? !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(id) : !/^(\d{1,8}|0x[0-9a-fA-F]{96})$/.test(id))
-        throw new WorkflowError(chain === 'solana' ? 'Enter your vote account address.' : 'Enter your validator index or public key.');
-      next.validator = { chain, id };
-    }
-  } else throw new WorkflowError('Choose an adapter.');
-  await store.update<AdapterConfig>(key(identity.subject), () => next).catch(async () => store.create(key(identity.subject), next));
+    } else if (input.kind === 'validator') {
+      if (input.remove === true) delete next.validator;
+      else {
+        const chain = input.chain === 'ethereum' || input.chain === 'gnosis' ? input.chain : 'solana';
+        const id = String(input.id ?? '').trim();
+        if (chain === 'solana' ? !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(id) : !/^(\d{1,8}|0x[0-9a-fA-F]{96})$/.test(id))
+          throw new WorkflowError(chain === 'solana' ? 'Enter your vote account address.' : 'Enter your validator index or public key.');
+        next.validator = { chain, id };
+      }
+    } else throw new WorkflowError('Choose an adapter.');
+    return next;
+  });
   return readAdapterConfig(store, identity);
 }
 
@@ -72,9 +88,9 @@ export interface SolarReading {
 }
 
 /**
- * Home Assistant usually lives on the home network, so private addresses are allowed for local
- * runs. Hosted deployments (Vercel) may only reach public addresses, and link-local/metadata
- * addresses are never allowed. DNS is checked at fetch time; redirects are refused.
+ * Ordinary private home addresses are allowed for local runs; tailnet and mapped-private
+ * addresses are not. This check is best effort, not a security boundary: fetch re-resolves DNS.
+ * Production builds do not reach it without operator opt-in.
  */
 async function assertReachableHost(origin: string) {
   const { lookup } = await import('node:dns/promises');
@@ -82,12 +98,19 @@ async function assertReachableHost(origin: string) {
   const addresses = await lookup(hostname.replace(/^\[|\]$/g, ''), { all: true }).catch(() => []);
   if (!addresses.length) throw new WorkflowError('That Home Assistant address cannot be resolved from the server.');
   for (const { address } of addresses) {
-    const linkLocal = /^169\.254\./.test(address) || /^fe80:/i.test(address) || address === '100.100.100.200' || /^fd00:ec2::/i.test(address);
-    const privateNet = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.)/.test(address) || address === '::1' || /^f[cd]/i.test(address);
-    if (linkLocal || (privateNet && process.env.VERCEL)) throw new WorkflowError('That Home Assistant address is not allowed from this server.');
+    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
+    const mappedHex = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(address);
+    const hi = mappedHex ? Number.parseInt(mappedHex[1], 16) : 0;
+    const lo = mappedHex ? Number.parseInt(mappedHex[2], 16) : 0;
+    const ip = mappedHex ? `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}` : mapped?.[1] ?? address;
+    const linkLocal = /^169\.254\./.test(ip) || /^fe80:/i.test(ip) || ip === '100.100.100.200' || /^fd00:ec2::/i.test(ip);
+    const privateNet = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.)/.test(ip) || ip === '::1' || /^f[cd]/i.test(ip);
+    const tailnet = /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip);
+    if (linkLocal || tailnet || (privateNet && (process.env.VERCEL || mapped !== null || mappedHex !== null))) throw new WorkflowError('That Home Assistant address is not allowed from this server.');
   }
 }
 async function homeAssistantStates(config: NonNullable<AdapterConfig['homeAssistant']>): Promise<HaState[]> {
+  if (!homeAssistantPullAllowed()) throw new WorkflowError(HOME_ASSISTANT_UNAVAILABLE_MESSAGE);
   await assertReachableHost(config.url);
   const response = await fetch(`${config.url}/api/states`, {
     headers: { Authorization: `Bearer ${config.token}` },

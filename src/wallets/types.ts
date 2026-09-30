@@ -2,6 +2,7 @@ import type { UnsignedTransactionRequest } from '@privy-io/react-auth';
 import type { WalletChainType } from './identity-policy.ts';
 import type { RecoverySignature } from './recovery.ts';
 import type { EscrowSigningRequest } from './escrow-signing.ts';
+import type { InferencePaymentSigningRequest } from '../server/local-ai-types.ts';
 
 export interface RentalWallet {
   id: string;
@@ -54,4 +55,5 @@ export interface RentalWalletAccess {
     message: string,
   ) => Promise<RecoverySignature>;
   signEvmTypedData: (request: EscrowSigningRequest) => Promise<string>;
+  signInferencePayment: (request: InferencePaymentSigningRequest) => Promise<`0x${string}`>;
 }

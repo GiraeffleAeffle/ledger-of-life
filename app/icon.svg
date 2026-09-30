@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
+  <g transform="rotate(-8 22 22) translate(4.5 4.5)" fill="#28583e">
+    <path id="leaf" d="M0 7Q0 0 7 0H15Q16 0 16 1V9Q16 16 9 16H1Q0 16 0 15Z"/>
+    <use href="#leaf" x="19"/>
+    <use href="#leaf" y="19"/>
+    <use href="#leaf" x="19" y="19" fill="#bed1ad"/>
+  </g>
+</svg>

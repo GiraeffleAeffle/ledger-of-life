@@ -2,8 +2,8 @@ import { authenticated } from '@/server/authenticated';
 import { createAgreement } from '@/server/agreements';
 import { getStore } from '@/server/store';
 import { readBody, sameOrigin, errorResponse } from '@/server/http';
-import { decodeNetwork } from '@/server/workspaces';
-import { WorkflowError } from '@/domain/workflow';
+import { isNetwork } from '@/domain/assets';
+import { WorkflowError } from '@/domain/errors';
 export const runtime = 'nodejs';
 export async function POST(request: Request) {
   try {
@@ -16,10 +16,11 @@ export async function POST(request: Request) {
       typeof body.releaseAllowed !== 'boolean'
     )
       throw new WorkflowError('A property label, atomic amount and release policy are required.');
+    if (!isNetwork(body.network)) throw new WorkflowError('Choose a supported network.');
     return Response.json(
       {
         agreement: await createAgreement(await getStore(), identity, {
-          network: decodeNetwork(body.network),
+          network: body.network,
           property: body.property,
           requiredSecurity: body.requiredSecurity,
           releaseAllowed: body.releaseAllowed,

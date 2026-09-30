@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ledger-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ledger.helmLabels" . | nindent 4 }}
+    app.kubernetes.io/name: ledger-of-life
+data:
+  # The exact public origin. Passkeys, same-origin checks and the Privy allow-list all depend on it.
+  APP_ORIGIN: {{ printf "https://%s" (include "ledger.host" .) | quote }}
+  # SQLite on the volume mounted at /data (the image sets LOCAL_DATABASE_PATH=/data/rental.sqlite).
+
+  # The free desk stays off on a public host; see docs/DEPLOYMENT.md.
+
+  # Deliberately NOT set here, so a shared host refuses them:
+  #   ALLOW_HOME_ASSISTANT_PULL, SOLANA_TEST_SIGNER_MODE, ALLOW_OPERATOR_TEST_ACTIONS, LOCAL_AI_OLLAMA_URL.
+{{- range $key, $value := .Values.config }}
+{{- if ne $key "APP_ORIGIN" }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}
+{{- end }}

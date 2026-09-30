@@ -10,7 +10,7 @@ export type JourneyRole = 'tenant' | 'landlord' | 'arbitrator';
 export type JourneyStage = 'agreement' | 'space' | 'deposit' | 'living' | 'move-out' | 'paid';
 export const JOURNEY_STAGES: { id: JourneyStage; label: string }[] = [
   { id: 'agreement', label: 'Agreement' },
-  { id: 'space', label: 'Deposit space' },
+  { id: 'space', label: 'Prepared escrow' },
   { id: 'deposit', label: 'Deposit secured' },
   { id: 'living', label: 'Living here' },
   { id: 'move-out', label: 'Move-out' },
@@ -32,6 +32,7 @@ export interface TenancyJourney {
   property: string;
   role: JourneyRole;
   requiredSecurity: string;
+  sampleParties?: boolean;
   stage: JourneyStage;
   next: NextAction;
   chain: null | {
@@ -53,7 +54,7 @@ export interface TenancyJourney {
   };
 }
 
-const usd = (atomic: string) => (Number(atomic) / 1e6).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+const usd = (atomic: string) => `${(Number(atomic) / 1e6).toLocaleString('en-US', { style: 'currency', currency: 'USD' })} test USDC`;
 const waiting = (label: string, detail: string): NextAction => ({ kind: 'wait', label, detail });
 
 /** Pure: agreement-level next step before any chain state exists. */
@@ -68,7 +69,7 @@ export function agreementStep(agreement: Agreement, role: JourneyRole): NextActi
     return {
       kind: 'accept_agreement',
       label: 'Review and accept the agreement',
-      detail: `${agreement.property} · ${usd(agreement.requiredSecurity)} deposit${agreement.releaseAllowed ? ' · earnings above the deposit go to the tenant' : ''}`,
+      detail: `${agreement.property} · ${usd(agreement.requiredSecurity)} deposit · tenant keeps value above an approved deduction at settlement. ${agreement.releaseAllowed ? 'Tenant may claim surplus during the tenancy.' : 'Surplus remains locked until settlement.'} Devnet lending pays nothing, so earnings are simulated.`,
       digest,
     };
   if (!accepted('tenant') || !accepted('landlord'))
@@ -87,8 +88,8 @@ export function chainStep(
       return {
         stage: 'deposit',
         next: role === 'tenant'
-          ? { kind: 'secure_deposit', label: `Secure your ${usd(t.requiredSecurityAtomic)} deposit`, detail: 'One approval: the deposit is locked for this home and starts earning in lending.' }
-          : waiting('Waiting for the tenant’s deposit', 'The deposit space is ready; the tenant approves the deposit.'),
+          ? { kind: 'secure_deposit', label: `Secure your ${usd(t.requiredSecurityAtomic)} deposit`, detail: 'One approval locks the deposit for this home and supplies it to devnet lending. Devnet lending pays nothing, so earnings are simulated.' }
+          : waiting('Waiting for the tenant’s deposit', 'The empty escrow is ready; the tenant approves the deposit.'),
       };
     case 'active':
       return {
@@ -96,7 +97,7 @@ export function chainStep(
         next: role === 'landlord'
           ? { kind: 'propose_claim', label: 'Tenancy ended? Start the move-out', detail: 'Enter any deduction (0 if none) with a reason. The tenant must agree or the arbitrator decides.', maximumAtomic: t.requiredSecurityAtomic }
           : role === 'tenant'
-            ? waiting('Your deposit is secured and earning', 'At move-out the landlord proposes a deduction (or none); you then agree or dispute.')
+            ? waiting('Your deposit is secured in devnet lending', 'At move-out the landlord proposes a deduction (or none); you then agree or dispute. Devnet lending pays nothing, so earnings are simulated.')
             : waiting('Nothing to decide', 'You are only needed if tenant and landlord disagree.'),
       };
     case 'claim-proposed':
@@ -125,7 +126,7 @@ export function chainStep(
       return {
         stage: 'paid',
         next: owed > 0n
-          ? { kind: 'paying_out', label: 'Paying out', detail: 'Payouts are sent automatically to each side’s own account.' }
+          ? { kind: 'paying_out', label: 'Paying out', detail: 'Payouts go to each side’s own account while Home is open. Keep Home open; failed attempts retry here.' }
           : { kind: 'done', label: 'All paid out', detail: 'This tenancy is closed.' },
       };
     }
@@ -148,7 +149,8 @@ export async function tenancyJourney(
   const role = agreementRole(agreement, identity);
   const cached = finished.get(`${agreement.id}:${role}`);
   if (cached && resolveServices === solanaServicesFor) return cached;
-  const base = { agreementId: agreement.id, property: agreement.property, role, requiredSecurity: agreement.requiredSecurity, chain: null };
+  const base = { agreementId: agreement.id, property: agreement.property, role, requiredSecurity: agreement.requiredSecurity, chain: null,
+    sampleParties: Object.values(agreement.parties).some((party) => party?.subject.startsWith('test-signer:')) };
   const early = agreementStep(agreement, role);
   if (early) return { ...base, stage: 'agreement', next: early };
   const services = await resolveServices(store, agreement.id);
@@ -161,10 +163,10 @@ export async function tenancyJourney(
       ...base,
       stage: 'space',
       next: pending
-        ? { kind: 'confirming', label: 'Creating the deposit space…', detail: 'Waiting for final confirmation on the network.', operationId: null }
+        ? { kind: 'confirming', label: 'Preparing the escrow…', detail: 'Waiting for final confirmation on the network.', operationId: null }
         : role === 'landlord'
-          ? { kind: 'create_space', label: 'Create the deposit space', detail: 'One approval. It holds no money until the tenant deposits.' }
-          : waiting('Waiting for the landlord', 'The landlord creates the deposit space for these terms.'),
+          ? { kind: 'create_space', label: 'Prepare the escrow', detail: 'One approval creates the empty escrow. It holds no security until the tenant funds it.' }
+          : waiting('Waiting for the landlord', 'The landlord prepares the empty escrow for these terms.'),
     };
   }
   let snapshot;
@@ -172,7 +174,7 @@ export async function tenancyJourney(
     snapshot = await services.service.snapshot(identity);
   } catch (error) {
     if (error instanceof RecoveryError || (error instanceof SolanaServiceError && error.code === 'identity_expired'))
-      return { ...base, stage: 'space', next: { kind: 'finish_setup', label: 'Confirm your account recovery', detail: 'A one-time check that your backup login controls the same wallet. Open Connections to finish it.' } };
+      return { ...base, stage: 'space', next: { kind: 'finish_setup', label: 'Prove you can recover your wallets', detail: 'A one-time check that your backup email leads to the same two wallets. Do it below, then carry on.' } };
     throw error;
   }
   const t = snapshot.tenancy;
@@ -186,7 +188,7 @@ export async function tenancyJourney(
   const result: TenancyJourney = {
     ...base,
     stage,
-    next: pending ? { kind: 'confirming', label: 'Confirming on the network…', detail: 'Your approval was sent. This usually takes a few seconds.', operationId: pending.id } : next,
+    next: pending ? { kind: 'confirming', label: 'Confirming on the network…', detail: 'Your approval was sent. Check again if it takes longer than usual.', operationId: pending.id } : next,
     chain: {
       phase: t.phase,
       escrowAtomic: t.accountedIdleAtomic,

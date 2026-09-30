@@ -1,0 +1,229 @@
+{
+  "verifiedAt": "2026-09-28T20:43:12.600Z",
+  "network": "eip155:46630",
+  "chainId": 46630,
+  "mode": "Actual disposable Privy passkey account; reviewed wallet signatures and native test-token execution",
+  "wallet": "0x34A64D498056ec046dcC7812b210a47cBd47841F",
+  "initial": {
+    "cashAtomic": "0",
+    "nativeAtomic": "0",
+    "holdings": [
+      {
+        "projectId": "demo-neighbourhood-homes",
+        "holdingRaw": "0"
+      },
+      {
+        "projectId": "demo-retrofit-workshop",
+        "holdingRaw": "0"
+      }
+    ]
+  },
+  "provisioning": {
+    "authority": "0x313Df952011ec3670aeaFc829C343eC8D8dC79aE",
+    "nativeBudgetWei": "1000000000000000",
+    "fundingHash": "0x219fecbb558e7b14e8722b258ba9d029268db547fd2f44db24a22119640c85e8",
+    "sharesRaw": "2000000000000000000",
+    "buyerCashAfterPreparation": "0",
+    "buyerGasGrantWei": "300000000000000",
+    "mintHash": "0xab87f184dcc198bcba030d6e393665c60c221182b6754a96451711857862acfc",
+    "market": {
+      "stock": "0xd9a9e6ded161edf875c182a93d0b484ffd04d226",
+      "pool": "0x2feade3a1e64a4896630d68d636a0e000c3a48d1",
+      "oracle": "0xa31053dd147b0d102a35d9a86cfb56fe898b1784",
+      "desk": "0xff1577e0893207bafce580e0a544d8a5cc10654e",
+      "provisioner": "0x313Df952011ec3670aeaFc829C343eC8D8dC79aE",
+      "setupHashes": [
+        "0x364918842c6a60ebc937d28047760b63582208c7d8806dab2581cb1b925de55e",
+        "0x3f0f51d6a27fc4cfbd054ad71b71de348e6ea99b97a02f9bd7121aae6c00fcf6",
+        "0x70c2705004c5a582c3ce77df14920b04319d4b6bfa73434aef713ec7a060181d",
+        "0x61be0e6c5dce977713b57d9e22c3d9445a819e658fd03264febd93369668f39a",
+        "0xc29473bf033dbafaffdfc62307bc9ee55a0cd354ebe807b639a9b12ba7e32220",
+        "0x603e1f977811a55c5b6e0185b7c9cb47a59fc38ce66c142e808ed8952180b0c5",
+        "0x929617dab2504357a2a86996e8e108522a690dfe7479cf4a7d079b05f4b46e90",
+        "0x50e4f915d9e949ed1a62cb0d0199047cd246ff47d3b87c40f92e69d912943181"
+      ]
+    }
+  },
+  "collateral": {
+    "hash": "0x67073a94007359e50da805280d8b33912823e1321c08e86e03308d00fb9e2b1a",
+    "block": "125858719",
+    "sharesRaw": "2000000000000000000"
+  },
+  "borrowing": {
+    "hash": "0x6df6f2857b4b44f1acae3bc5855adcf13052ab2263092ba83c80c3fc2aec4b92",
+    "block": "125858941",
+    "amountAtomic": "12000000",
+    "debtAtBorrowAtomic": "12000000"
+  },
+  "investments": [
+    {
+      "projectId": "demo-neighbourhood-homes",
+      "cashAtomic": "5000000",
+      "holdingRaw": "5000000000000000000",
+      "orderId": "ae4344ed-d25f-45ef-b980-1356b4eb6044",
+      "transactions": [
+        {
+          "kind": "approve",
+          "hash": "0x3cdb2388c786e1155c0844438f75a5592dae0e2be496bd59398008b946adf803"
+        },
+        {
+          "kind": "buy",
+          "hash": "0x26b44ea435529eda06c417c0f91b5f0e9a8a3cf0274abffef22c6d148e730658"
+        }
+      ],
+      "purchaseBlock": "125859767"
+    },
+    {
+      "projectId": "demo-retrofit-workshop",
+      "cashAtomic": "5000000",
+      "holdingRaw": "5000000000000000000",
+      "orderId": "5960fbde-a91d-4261-9812-b889548c2012",
+      "transactions": [
+        {
+          "kind": "approve",
+          "hash": "0xeb45551dd8b31ac49afbbd99bc16a0a81b2bd7b84b4c7aab1489678a26115279"
+        },
+        {
+          "kind": "buy",
+          "hash": "0xf45dc7f4755bf1532eed5e1517941b869cca708d975daf4bd2fdfe0d69c80e9c"
+        }
+      ],
+      "purchaseBlock": "125859985"
+    }
+  ],
+  "afterInvestments": {
+    "cashAtomic": "2000000",
+    "loan": {
+      "sharesRaw": "2000000000000000000",
+      "debtAtomic": "12000004",
+      "valueAtomic": "746630436",
+      "ltvBps": 160,
+      "healthBps": 497753,
+      "availableAtomic": "361315214"
+    }
+  },
+  "inference": {
+    "model": "qwen3.8:27b-ud-q3-k-xl",
+    "hardware": "NVIDIA GeForce RTX 5070 Ti",
+    "runtime": "Ollama 0.32.13",
+    "contextTokens": 8192,
+    "think": false,
+    "protocol": "x402 v2 exact/Permit2",
+    "requestId": "2c773f40-49ff-41a6-9ad7-06549e21fd3f",
+    "state": "completed",
+    "answer": "A local workshop can help maintain shared housing by providing residents with the skills and tools needed to perform routine repairs and upkeep themselves.",
+    "usage": {
+      "inputTokens": 59,
+      "outputTokens": 26,
+      "wallMs": 1371,
+      "totalMs": 1364.7404,
+      "loadMs": 192.3909,
+      "evalMs": 489.337,
+      "tokensPerSecond": 53.13
+    },
+    "approvalBudgetAtomic": "100000",
+    "approvalHash": "0x050a73d28c33f4b73d602d6fb177dbd4709f3d2e874f26f655a92a45ace262ca",
+    "payment": {
+      "state": "settled",
+      "amountAtomic": "10000",
+      "receipt": {
+        "success": true,
+        "transaction": "0x923cefaff4c35f8142ee214b5c187ce4c81ce9e98b3176d8a8e5cd8e820db14b",
+        "network": "eip155:46630",
+        "payer": "0x34A64D498056ec046dcC7812b210a47cBd47841F",
+        "amount": "10000"
+      }
+    },
+    "canonicalTransfer": {
+      "hash": "0x923cefaff4c35f8142ee214b5c187ce4c81ce9e98b3176d8a8e5cd8e820db14b",
+      "block": "125862503",
+      "gasUsed": "97550",
+      "gasPrice": "10000000",
+      "payer": "0x34A64D498056ec046dcC7812b210a47cBd47841F",
+      "payTo": "0xFD01B12A52ba92C4766BE64117D546957FF8e819",
+      "amountAtomic": "10000",
+      "facilitator": "0xaa9e2e9e539d03433d92627287f7af2fca64c76d",
+      "canonical": true
+    },
+    "remainingAllowanceAtomic": "90000"
+  },
+  "facilitatorFunding": {
+    "amountWei": "2000000000000000",
+    "hash": "0x7651606f15a0bf23318846946dbfef33f2f5cd7fa4eed805bc039f837b5b69c7",
+    "manifest": "contracts/evm/deployments/local-ai-facilitator-46630.json"
+  },
+  "freeAccess": {
+    "requestId": "70e4ac05-22d7-48e4-b195-b309e8828267",
+    "state": "completed",
+    "usage": {
+      "inputTokens": 88,
+      "outputTokens": 85,
+      "wallMs": 12646,
+      "totalMs": 12616.6486,
+      "loadMs": 10723.3095,
+      "evalMs": 1603.462,
+      "tokensPerSecond": 53.01
+    },
+    "payment": {
+      "state": "none",
+      "amountAtomic": "0",
+      "receipt": null
+    },
+    "additionalOwnedRequestId": "4f8f1a70-b461-4761-8bb3-825725dce6ea",
+    "revokedCookieReplayStatus": 403,
+    "otherTabCleared": true,
+    "paidReceiptSurvives": true
+  },
+  "failureNoCharge": {
+    "requestId": "deb1ae7d-b5b0-4ac7-9cae-92b013804298",
+    "httpStatus": 502,
+    "state": "failed",
+    "reason": "The local model returned an incomplete answer. No inference payment was sent.",
+    "paymentState": "authorized",
+    "receipt": null,
+    "cashAtomicAfter": "1990000",
+    "allowanceAtomicAfter": "90000",
+    "reloadRecovered": true
+  },
+  "boundaries": {
+    "sameRequestReplayStatus": 200,
+    "sameSettledReceiptReturned": true,
+    "standardPaymentResponseHeader": true,
+    "changedBodyStatus": 409,
+    "reusedNonceNewRequestStatus": 409,
+    "otherRealAccountReadStatus": 403,
+    "otherRealAccountAnswerExposed": false,
+    "existingUserPositionsReset": false,
+    "ownershipMilestonesVerified": 6
+  },
+  "finalCashAtomic": "1990000",
+  "deliveryCheck": {
+    "workspaceHttpStatus": 200,
+    "publicLibraryHttpStatus": 200,
+    "protectedApiStatuses": [200, 200, 200, 200],
+    "modelReachable": true,
+    "paidEnabled": true,
+    "modelResident": true,
+    "gpuVramBytes": 13514204772,
+    "afterWakeAnswer": "READY",
+    "afterWakePaymentState": "none",
+    "cashAtomic": "1990000",
+    "loanDebtAtomic": "12000102",
+    "existingWakeOnLanPathUsed": true,
+    "pcRebootRequested": false,
+    "pcConfigurationChanged": false
+  },
+  "verification": [
+    "Real Chromium passkey and wallet UI; virtual WebAuthn authenticator, not a physical-phone claim",
+    "Read-only CLI verified both Bought receipts and exact cash/unit effects",
+    "Independent RPC verified collateral/borrow events, matching pool-to-wallet cash transfer and canonical x402 token transfer",
+    "Desktop 1440px and mobile 390px surfaces; no document overflow observed in Money or Places"
+  ],
+  "limits": [
+    "Test-token settlement is not fiat income, company equity or property title",
+    "The GPU rate is a short measured request, not sustained capacity or a customer-demand forecast",
+    "Euro host economics use editable assumptions; power consumption is not metered",
+    "The loan remains open and accrues interest; buying units and inference did not repay it",
+    "Historical funded user tenancies and previous test-investment positions were not reused"
+  ]
+}

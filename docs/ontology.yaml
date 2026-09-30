@@ -4,7 +4,7 @@
 # Human-readable companion: docs/ONTOLOGY.md. Keep both in sync when concepts change.
 
 version: 1
-updated: 2026-09-26
+updated: 2026-09-29
 product:
   working_name: Ledger of Life   # chosen 2026-09-26; technical identifiers unchanged
   thesis: >-
@@ -12,9 +12,10 @@ product:
     should keep working for their owner, without weakening the protection they exist for.
   bigger_picture: >-
     Part of the Stadtstack vision (https://stadtstack.giraeffleaeffle.chatgpt.site): a city in four
-    levels (infrastructure, perceive and understand, deliberate and decide, act and implement).
+    lenses (infrastructure; observe and explain; deliberate and decide; act and check).
+    The same place persists across lenses and measured effects feed back into knowledge.
     This app is the personal entry point: one verified identity, many contexts (tenancy, club,
-    neighbourhood, city), each showing what matters to the person, what is decided and what they own.
+    neighbourhood, city), with evidence and scenarios visibly distinguished.
   positioning: >-
     Decided 2026-09-26: a household-ownership app. The person's verified identity is the root;
     everything they own, rent or run is attached through adapters. The rental deposit is the
@@ -30,14 +31,15 @@ reality_levels:
   testnet_real: Real program/contract execution on a test network with test tokens.
   testnet_simulated: Real execution, but an input is simulated on purpose (for example test yield).
   read_only_live: Real third-party data, read-only (Home Assistant, validators, prices).
-  self_declared_local: A person's unverified pin placed on their own device; never sent to the server.
-  prototype: Code exists and ran (tests or a script), but it is not an app feature yet.
-  illustration: Visual or copy only; no execution.
+  self_declared_local: A person's unverified pins or public-project bookmarks/comparison state kept only on their device; never sent to the server.
+  self_declared_private: Unverified information entered by the person and stored under their authenticated account, not shared with other contexts.
+  prototype: A working limited app flow or counterpart, not a production financial or legal workflow.
+  illustration: Labeled exploratory visual or computation with fictional inputs; no real transaction or measured outcome.
   roadmap: Idea recorded; nothing built.
 
 layers:  # product architecture, bottom-up
   - id: identity
-    concepts: [Person, Wallet, IdentityAssurance, Credential, DisclosurePolicy, Context, Membership, CitySignal, MyPlaces]
+    concepts: [Person, Wallet, IdentityAssurance, Credential, DisclosurePolicy, Context, Membership, CitySignal, MyPlaces, ArrivalGuide]
   - id: homes
     concepts: [Home, Listing, Application, Agreement, Role]
   - id: custody
@@ -46,6 +48,10 @@ layers:  # product architecture, bottom-up
     concepts: [YieldSource, Earnings, Release]
   - id: ownership
     concepts: [Asset, Position, BorrowAgainstShares, Venue, Distribution, Adapter]
+  - id: local_services
+    concepts: [LocalInferenceRequest, InferencePayment, HostEconomicsScenario]
+  - id: civic_system
+    concepts: [Organization, CityEvent, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence]
   - id: vision
     concepts: [ServiceChargeAccount, HomeEquityPath, DeviceTokenization, LocalInvestment, LifeTimeline]
 
@@ -70,15 +76,18 @@ concepts:
     levels:
       passkey: testnet_real
       backup_email_and_recovery_proof: testnet_real   # skipped in local demo mode (DEMO_SKIP_RECOVERY=1)
-      eu_digital_identity_wallet: roadmap              # EUDI Wallet, eIDAS 2.0; German eID as interim
-    code: [src/server/recovery.ts, src/components/onboarding.tsx]
+      eu_digital_identity_wallet: testnet_real # OpenID4VP PID adult check and opt-in locality built; phone-wallet iOS flow confirmed in test environment, not production issuance.
+    session_verification:
+      - Privy access JWT must verify against the app's ES256 public key/JWKS with exact issuer, audience and expiry; then current provider user and embedded-wallet sole ownership are checked.
+      - Invalid, expired or foreign credentials fail closed; JWKS transport failure is service unavailable, never anonymous success or a forced sign-out.
+    code: [src/server/identity.ts, src/wallets/privy-access-token.ts, src/wallets/identity-policy.ts, src/server/recovery.ts, src/components/onboarding.tsx]
 
   Credential:
     definition: A signed attestation about a Person (identity, age, income band, rental history) held in the Person's own wallet, for example the EU Digital Identity Wallet.
     formats:
-      sd_jwt_vc: {reality: testnet_real, note: "Built: OpenID4VP via the EU hosted reference verifier (test environment, TEST-01). Requests the PID birthdate (the current EU PID has no age-over-18 flag) and, opt-in, address.locality; stores only 'adult' and the city. Not tested end-to-end with a phone wallet yet. Linkable across presentations unless issued in single-use batches."}
+      sd_jwt_vc: {reality: testnet_real, note: "OpenID4VP via EU hosted reference verifier (TEST-01); iOS phone-wallet presentation confirmed. Requests PID birthdate and, opt-in, address.locality; stores only adult and city. Credential linkability across presentations remains unless single-use batches are issued."}
       iso_mdoc: {reality: roadmap, note: "Selective disclosure; same linkability caveat."}
-      integration: {reality: roadmap, note: "App acts as verifier via OpenID4VP; issuance via OpenID4VCI; EU reference wallet, verifier endpoint and Kotlin/Swift libraries at github.com/eu-digital-identity-wallet; commercial SDKs (walt.id, Sphereon, Procivis)."}
+      integration: {reality: testnet_real, note: "Verifier-side OpenID4VP test integration built; issuance via OpenID4VCI and production wallet/provider integration are not built."}
       zero_knowledge_predicate: {reality: roadmap, note: "For example 'income >= 3x rent' without revealing income. Not in the EUDI framework yet (an open discussion topic)."}
     relations: {held_by: Person, presented_to: Person (verifier role in an Agreement or Listing)}
 
@@ -105,17 +114,117 @@ concepts:
     relations: {located_in: Context (city), relevant_to: Person (matched in the browser with MyPlaces)}
     code: [src/server/city-signals.ts, app/api/city-signals/route.ts, src/components/personal-map.tsx]
 
+  Organization:
+    definition: A public body, enterprise, cooperative or builder in a city Context; sourced Strausberg profiles describe products, participation channels, published opportunities and documented group membership. These independent organizations are separate from fictional test issuers.
+    relations: {participates_in: Context, may_deliver: Project, may_perform: Activity}
+    reality: read_only_live
+    rules:
+      - A published job or partner-network invitation is attributed source information, not guaranteed availability or a signed contract.
+      - No supplier relationship, map location or issuer affiliation is inferred from proximity, sector or group membership.
+    code: [src/data/cities/strausberg-organizations.ts, src/components/organization-profile.tsx]
+
+  CityEvent:
+    definition: A source-attributed public event with publisher identity, optional actual event time, venue text and independently evidenced point geometry.
+    relations: {published_by: Organization, located_in: Context (city)}
+    invariants:
+      - Publication time never substitutes for eventStart; unknown dates and locations remain unknown.
+      - Calendar enrichment joins publisher record ID and title, not loose similarity or nearby venues.
+      - Coordinates retain exact or approximate precision plus location source, geometry licence and attribution; null geometry never creates a pin.
+    reality: read_only_live
+    code: [stadtstack-data/src/feeds.ts, stadtstack-data/src/event-venues.ts, src/server/city-signals.ts, src/components/city-feed.tsx, src/components/personal-map.tsx]
+
+  Project:
+    definition: One place or policy across map, status, outputs and outcomes; published CitySignal IDs retain original source status and geometry, while an unlocated official report can document a project without gaining an invented CitySignal.
+    relations: {evidenced_by: CitySignal or source report, may_receive: Funding, may_trigger: Activity, produces: Output, may_affect: Outcome}
+    rule: A plan boundary is proposed-area context, never an affected-area or built-footprint claim; unlocated projects stay off map. Browsing a historical project in another city does not change chosen city or device pins.
+    code: [src/components/civic-place-lenses.tsx, src/data/civic-outcome-evidence.ts]
+    reality: read_only_live
+
+  ProjectFollow:
+    definition: A browser-local, account-scoped bookmark of a public city plus canonical researched case or exact signal; linked signals share one case target. Not membership, role, investment or notification subscription.
+    relations: {person_marks: Project, compared_against: CitySignal or researched case evidence}
+    invariants:
+      - First follow re-reads every current full public signal in the target; partial/failed linked reads cannot establish a baseline, and material already visible at follow time is not a fresh decision.
+      - An in-flight first follow cannot save after any intervening selection/review generation, even if the same project is selected again; failed/late reads do not replace newer detail.
+      - Sourced status/date/evidence-review, meaningful published next-step note changes, budget-description figures and structured output/measurement facts create unread changes; metadata and cosmetic text do not.
+      - Every pending event survives other refreshes, absent targets and outages until individually acknowledged; newer-event acknowledgment does not consume an older unseen event.
+      - Unlocated researched cases are app evidence records, not live PDF monitoring; linked cases require every published signal source.
+      - Disappearing individual facts are labelled no longer stated, not zero or cancellation. Unfollow invalidates in-flight source reads for that instance.
+      - Only the public city and exact signal ID enter refresh requests; private follow state, pins and interests never upload.
+    code: [src/components/project-following.ts, src/components/use-project-following.ts, src/components/civic-place-lenses.tsx, src/components/today.tsx]
+    reality: self_declared_local
+
+  Funding:
+    definition: A source and allocation of capital for an Organization or Project; reported planned-versus-provisional trial spending is not proof of its funding source, appropriation, final cost or an investment offer. Planned annual public budget outlays are not actual expenditure.
+    relations: {may_finance: Activity, belongs_to: Organization}
+    reality: illustration
+
+  Activity:
+    definition: Work, procurement, construction or service undertaken by an Organization; the Münster trial reports added bus-only lane work, whereas a scenario allocates fictional capital among wages, suppliers, external purchases and reserve.
+    relations: {performed_by: Organization, may_produce: Output}
+    reality: read_only_live
+
+  Output:
+    definition: A separately sourced delivered, reported or planned thing such as a phase-one facility, scheduled opening or nominal solar capacity; each output retains its own basis, URL, locator and date (null if unknown), and none proves benefit.
+    relations: {produced_by: Project, may_contribute_to: Outcome}
+    code: [src/data/civic-outcome-evidence.ts]
+    reality: read_only_live
+
+  Outcome:
+    definition: A change in lived conditions assessed with an Indicator and comparable baseline/follow-up; an observed before/during difference is not an isolated causal benefit without control for other conditions.
+    relations: {may_follow: Output, assessed_by: Indicator, feeds_back_to: Context}
+    code: [src/components/civic-place-lenses.tsx]
+    reality: read_only_live
+
+  Indicator:
+    definition: A quantity with unit, measurement boundary, sample period, evidence basis and exact source locator; Münster's official GPS report compares complete-route bus running-time means (251 vs 235 seconds in 2019/2021), not summed segment means or passenger-wide benefits. Other cases retain their missing benefit indicators; nearby PM/weather is not project evidence.
+    relations: {assesses: Outcome, sourced_from: CitySignal or official project report}
+    code: [src/data/civic-outcome-evidence.ts]
+    reality: read_only_live
+
+  Scenario:
+    definition: A fictional, editable allocation and independent municipal-balance assumption; never a municipal forecast, investment offer, portfolio Position or public CitySignal.
+    relations: {models: Activity, hypothesizes: Outcome, uses_assumed: Funding}
+    invariants:
+      - Wages plus local suppliers plus external purchases plus reserve equal illustrative capital exactly.
+      - Wage allocation divided by assumed cost per job-year yields job-years, not permanent hires.
+      - Municipal receipts, redistribution and service costs are independently assumed; no conversion from investment capital to local tax receipts.
+    code: [src/components/civic-system.ts, src/components/civic-loop.tsx]
+    reality: illustration
+
+  RelationEvidence:
+    definition: >-
+      A source-backed actor → role → project/work/data relation has an exact source locator;
+      a proposed relation describes a plan but not its effects; a modeled causal assumption
+      uses a dashed line with editable assumptions and cannot inherit adjacent source status.
+    modes: [evidence_backed, proposed, modeled_assumption]
+    rule: Reported work and a measured before/during indicator do not alone prove a causal benefit; planned spending and provisional actual costs do not reveal funding source.
+    reality: read_only_live
+
+
   MyPlaces:
     definition: Optional home and work pins self-declared by clicking the map or explicitly requesting browser geolocation, plus self-selected interests for local ranking.
     reality: self_declared_local
     invariants:
       - Home and work coordinates are stored only in this device's per-city localStorage and can be removed.
-      - Sport, kids, shops, health and culture interests are stored only on this device and rank places and council items locally.
+      - Sport, kids, shops, health, culture, nature and volunteering interests are stored only on this device and rank places and council items locally; the welcome guide reads and writes the same interests.
       - Neither exact coordinates, interests nor a commute route is sent to our server or a geocoder/router.
       - The browser matches public CitySignals within 1 km of home and an approximate 400 m straight-line commute corridor only when viewing the pin's city.
       - Map tile requests reveal the viewed map area to OpenFreeMap, not saved pin coordinates.
     relations: {belongs_to: Person, matches: CitySignal (on device)}
     code: [src/components/personal-map.tsx, src/components/personal-map-relevance.ts]
+
+  ArrivalGuide:
+    definition: A city's welcome guide for newcomers, meant to be handed over at registration as a link or QR code. It holds a sourced plan for the first months by phase, the organisations to ask, and the clubs, facilities and groups a newcomer can try. Curated public information, not an official city service.
+    reality: read_only_live   # dated snapshots of real public pages, like CitySignal snapshots; nothing here is live-fetched except the published city feed
+    invariants:
+      - Every step, contact and group cites a page that was read, with the date it was read. A step is official only when its source is the city, the district, the state, the federal government or a body they own.
+      - Contacts are organisations and facilities. No private person's phone number or email is published.
+      - The page needs no account, sets no cookies and loads nothing from a third party. The reader's situation and interests are chosen and kept on the device; nothing ticked or typed is sent to the server.
+      - A situation or an interest highlights and orders steps, groups and events; it never hides one.
+      - An entry whose source is inactive, or that cannot be verified, is dropped rather than shown with a caveat.
+    relations: {about: Context (city), personalised_by: MyPlaces interests (on device), draws_on: CitySignal and CityEvent (published feed)}
+    code: [src/data/arrival/, src/data/interests.ts, src/components/arrival-guide.tsx, src/components/arrival-logic.ts, src/server/welcome-feed.ts, "app/welcome/[city]/page.tsx"]
 
   Membership:
     definition: Person × Context × Role (tenant, landlord, member, board, resident), optionally backed by a Credential proving eligibility (adult, resident of the city, club member).
@@ -147,14 +256,14 @@ concepts:
 
   Listing:
     definition: A landlord's offer of a Home, with rent, required deposit, earnings policy and details (city, rooms, size, move-in date, photos).
-    lifecycle: [open, let]
+    lifecycle: [open, let | closed]   # closed: the landlord withdrew it before choosing; a chosen (let) listing cannot be cancelled
     relations: {offered_by: Person(landlord), receives: Application, results_in: Agreement}
     code: [src/server/listings.ts]
     reality: testnet_real   # off-chain record
 
   Application:
     definition: A Person's request to rent a Listing. Applicants never see each other.
-    lifecycle: [submitted, chosen | not_chosen]
+    lifecycle: [submitted, chosen | not_chosen | withdrawn]   # withdrawn: removed by the applicant while the listing is open
     code: [src/server/listings.ts]
 
   Agreement:
@@ -231,7 +340,7 @@ concepts:
       LockedDeposit: {definition: "The tenant's residual claim on an active Escrow.", reality: testnet_real}
       SecurityToken: {examples: [tSPYx (our Token-2022 copy of SPYx), official Robinhood testnet TSLA], reality: testnet_real, future: [xStocks, Robinhood Stock Tokens on mainnet]}
       HomeShare: {definition: "Fractional claim on a home's value and rent.", reality: illustration}
-      ProductiveDevice: {examples: [home solar, staking validator, electric car], reality: read_only_live, note: "Observed through Adapters; not tokenized."}
+      ProductiveDevice: {examples: [home solar, staking validator, electric car], reality: read_only_live, note: "Observed through Adapters; not tokenized. Operated in Money → Devices & income and configured in Me (see docs/INFORMATION_ARCHITECTURE.md).", code: [src/components/device-readings.tsx, src/server/adapters.ts]}
 
   Position:
     definition: A quantity of an Asset held in a Person's wallet or in a test contract as their deposit/loan collateral, valued at a stated price.
@@ -253,13 +362,39 @@ concepts:
       home_rent_share: {reality: roadmap}
 
   Adapter:
-    definition: A read-only connector that observes an Asset or ProductiveDevice outside the app and reports its value or income.
+    definition: A connector between the person's assets and an external system; observation adapters and signed financial flows have different authority.
     invariants:
-      - Read-only. Adapters never move money.
-      - Credentials are stored server-side, per Person.
+      - Home Assistant, validator and public-price adapters are read-only in what this app does with them. A credential the person supplies (a Home Assistant token) may allow more than reading, and the adapter's explanation says so.
+      - Financial actions require the existing user-authorized signing policy and persist as Operation; a read failure never implies a transaction failed.
+      - Provider credentials are stored server-side, per Person; the server never holds the person's wallet key.
+      - A saved connection is not a healthy provider or proof of asset ownership; failed reads remain unavailable.
+      - Me owns device configuration; Home and Money show observations and link to that single settings location.
+    catalogue:
+      topics: [identity, home, money, devices, places]
+      definition: src/data/ledger-catalogue.ts
+      state: src/components/ledger-adapter-state.ts
+      surfaces: [src/components/ledger-overview.tsx, src/components/ledger-adapters.tsx, src/components/ideas.tsx]
+      note: Shared display/action metadata, not a common backend ingestion or execution API. Existing readers retain value provenance and timestamps.
+    explanation:
+      definition: src/data/ledger-catalogue.ts#AdapterExplanation
+      fields: [brings, reads, keeps, visibility, needs, disconnect, effort, reality, caveat]
+      rules:
+        - Every adapter explains itself in plain language, and each statement is checked against the code that implements it, including what the operator can see and what disconnecting does not undo.
+        - reality is one of the ontology reality levels. A roadmap adapter (connection future) has effort "not available yet", reality roadmap and says it does nothing yet; a live adapter never does.
+        - Getting-started steps are adapters marked setup, in order; the guide adds no second list.
+      surfaces: [src/components/ledger-adapters.tsx, src/components/getting-started.tsx]
+    configuration:
+      api: app/api/adapters/route.ts
+      ui: src/components/adapter-settings.tsx
+      rules:
+        - Authenticated GET returns redacted saved configuration without provider reads.
+        - Same-origin authenticated POST saves or removes one account-owned connection.
+        - Home Assistant tokens never return to the client; blank preserves the saved token.
+        - Removal deletes this ledger's stored credential, not the provider-issued token.
     implementations:
       home_assistant_solar: {reality: read_only_live, code: src/server/adapters.ts#readSolar}
       validator: {chains: [gnosis, ethereum, solana], reality: read_only_live, code: src/server/adapters.ts#readValidator}
+      signed_financial_flows: {reality: testnet_real, code: src/server/share-workflows.ts, note: "User-approved signed testnet actions; not passive read adapters."}
       electric_car: {reality: roadmap}
       bank_account: {reality: roadmap}
 
@@ -274,38 +409,82 @@ concepts:
     code: [src/server/service-charges.ts, src/components/service-charges.tsx]
 
   LocalInvestment:
-    definition: Future holding in a company, cooperative or property in the person's own city; currently only an illustration of four legal forms and unverified Strausberg cooperative leads, with no available offers, investment or transactions.
+    definition: Wallet-held units of a distinctly fictional housing or workshop issuer on Robinhood testnet; actual test-token transfers are separate from real cooperative research leads and hypothetical city effects.
     forms:
+      fictional_test_units: {reality: testnet_simulated, note: "Distinct fixed-supply tHOME/tWORK tokens, shared 6-decimal test USD, operator-set test issue price; no real issuer, cooperative or property rights."}
       cooperative_share: {reality: roadmap, note: "Genossenschaft (housing, energy); proven, no tokens needed. First step: directory via the Stadtstack atlas."}
       electronic_security: {reality: roadmap, note: "eWpG; electronic shares since 1 Jan 2024 (ZuFinG), crypto registers need a BaFin-licensed operator. The app shows and holds; issuers do the regulated part."}
       crowdfunding: {reality: roadmap, note: "ECSPR: up to EUR 5 million per project owner per 12 months via licensed platforms; link out."}
       tokenized_real_estate: {reality: roadmap, note: "Tokens cannot carry a German land-register title; they represent SPV shares/bonds or profit participation. Test-network illustration only; absorbs HomeEquityPath."}
     rules:
       - No real offers without a licensed partner and legal review; until then illustration or test network, labeled.
-    relations: {held_by: Person, located_in: Context (city), shown_in: Portfolio}
+      - Buying project units does not repay a share-backed loan; its collateral and debt remain separate.
+      - Test issue price is not market/resale value. Project units stay outside the priced-asset subtotal; shared cash is counted once.
+      - Each exact spend is wallet-authorized; approval alone is not a completed investment.
+      - Completion requires the reviewed transaction, canonical confirmed receipt and exact cash/unit effects. Unknown evidence stays unresolved.
+      - Fictional issuer map markers are illustrative placements, not real property identities or offers.
+    relations: {hypothetically_funds: Organization (Scenario only), located_in: Context (city illustration), held_by: Person (test wallet units)}
+    reality: testnet_simulated
+    code: [src/data/local-investments.ts, src/components/local-investments.tsx, src/components/city-flywheel.tsx, src/server/local-investments.ts, app/api/local-investments/route.ts, contracts/evm/src/testnet/FictionalCityUnit.sol]
+
+  LocalInferenceRequest:
+    definition: An owned immutable question executed on the configured local Ollama model, with a persisted result and measured token/timing observations; never a canned or fallback model answer.
+    relations: {requested_by: Person or visitor session, served_by: Adapter, may_require: InferencePayment}
+    lifecycle: [payment_required, approval_required, ready, running, settling, completed, failed, interrupted, expired]
+    invariants:
+      - Server configuration fixes provider, model and options; request fingerprint and ownership cannot change on replay.
+      - A complete paid result is persisted before settlement and delivered only with a confirmed receipt.
+      - Incomplete or interrupted inference never becomes paid revenue; an unresolved payment reuses its exact journal rather than recomputing the answer.
+      - Free access establishes a revocable HttpOnly visitor session before execution, permits three attempts per visitor and thirty per UTC day, and creates no paid receipt.
+      - Clearing a visitor session revokes saved and in-flight access and removes that visitor's saved question and answer text at once; it does not revoke the person's independent paid receipts.
+      - Question and answer text is retained only while the request is running, settling or has a payment in flight, then removed after a grace period (default 600 s, `LOCAL_AI_TEXT_GRACE_SECONDS`); fingerprint, usage, state and the payment receipt are kept. A removed request shows no text. On the SQLite store the removal also reaches the database file and its write-ahead log (`secure_delete` plus a truncating checkpoint, `Store.reclaim`); on Postgres, dead rows remain until autovacuum.
+    reality: prototype
+    code: [src/server/local-ai.ts, src/server/local-ai-retention.ts, src/server/local-ai-runtime.ts, src/server/local-ai-session.ts, src/components/local-ai.tsx, "app/(wallet)/library/page.tsx"]
+
+  InferencePayment:
+    definition: Official x402 v2 exact/Permit2 authorization and settlement of 10000 atomic tUSDG for one completed local answer on eip155:46630.
+    relations: {authorizes: LocalInferenceRequest, paid_by: Person (owned wallet), settles_in: Asset}
+    invariants:
+      - Approval is a finite 100000-atomic Permit2 budget; each answer needs a separate bounded authorization.
+      - The dedicated facilitator pays gas but cannot alter the payer, recipient, asset or amount.
+      - Request ownership and a globally reserved payer/nonce bind authorization to one immutable request; base Permit2 does not cryptographically sign the prompt.
+      - Immutable unsigned envelope and exact signed bytes are durable before broadcast; canonical receipt and matching token effects establish settlement.
+      - Only settled transfers count as recorded receipts; signatures, quotes, failed jobs and free access do not.
+    reality: testnet_real
+    code: [src/server/local-ai-payment.ts, src/server/local-ai-operations.ts, src/wallets/inference-signing.ts, src/components/local-ai-payment.ts, scripts/setup-local-ai-facilitator.mjs]
+
+  HostEconomicsScenario:
+    definition: Editable thirty-day euro planning from assumed hardware allocation, whole-host watts, online hours, electricity tariff, other costs, prices and paid/free demand.
+    relations: {may_use_timing_from: LocalInferenceRequest}
+    invariants:
+      - Euro assumptions never convert test-token receipts to fiat or establish actual profit.
+      - Observed request timing can bound compute demand but is not sustained capacity, measured power or customer demand.
+      - Electricity includes all entered online hours, including idle time; free access still needs a host budget.
     reality: illustration
-    code: [src/components/local-investments.tsx, src/data/local-investments.ts]
+    code: [src/components/local-ai-economics.ts, src/components/local-ai-host.tsx]
 
   LifeTimeline:
     definition: "The person's private history of places and events: moves, tenancies, deposits returned, memberships, first local investment."
     sources:
-      in_app_tenancies: {reality: testnet_real, note: "Derivable from Agreements today; timeline view not built."}
-      self_declared_moves: {reality: roadmap, note: "Labeled self-declared."}
+      in_app_tenancies: {reality: testnet_real, note: "Built compact timeline entries derived from the person's Agreements."}
+      self_declared_moves: {reality: self_declared_private, note: "Built earlier-place entries, explicitly self-declared and private to the account."}
       residence_attestation: {reality: roadmap, note: "EU wallet attestation where authorities issue one."}
     rules:
-      - Owned by the person; never shared by default. Contexts see derived facts only (e.g. '3 tenancies, all deposits returned').
+      - Owned by the person; never shared by default. Derived disclosure to another context is planned, not implemented.
     relations: {belongs_to: Person, spans: Context}
-    reality: roadmap
+    reality: prototype
+    implementation: Partial; tenancy and earlier-place entries built, verified residence and broader milestones planned.
+    code: [src/server/timeline.ts, src/components/me.tsx]
 
   CollateralDeposit:
-    definition: A working Robinhood Chain testnet flow that secures a separate illustrated deposit with official test TSLA shares at a simulated per-wallet test price, not a cash deposit in a production rental agreement.
+    definition: A working Robinhood Chain testnet flow secures a separate illustrated deposit with fake tTSLA at a simulated per-wallet price; existing legacy positions may use official test TSLA. It is not a cash deposit in a production rental agreement.
     lifecycle: [test_landlord_accepts, tenant_pledges_shares, simulated_price_drop, tenant_tops_up_or_operator_protectively_sells, test_move_out_claim, tenant_accepts_claim, settlement_returns_remaining_shares]
     invariant: Share and cash collateral remains in the contract until its test claim and settlement rules release it.
     code: [contracts/evm/src/CollateralEscrow.sol, contracts/evm/src/testnet/TestnetMarket.sol, src/server/share-workflows.ts, src/components/share-workflows.tsx, src/components/stock-collateral.tsx]
     reality: testnet_simulated
 
   BorrowAgainstShares:
-    definition: A separate Robinhood Chain testnet TestLendingPool accepts official test TSLA as collateral and lends operator-funded test USD; a per-wallet test oracle supplies a simulated price.
+    definition: A separate Robinhood Chain testnet TestLendingPool accepts fake tTSLA as collateral and lends operator-funded test USD at a simulated per-wallet oracle price; existing legacy positions may use official test TSLA.
     rules:
       - Borrowing is limited to 50 % of the current test-price collateral value.
       - Liquidation is available at 80 % loan-to-value.
@@ -314,7 +493,7 @@ concepts:
     reality: testnet_simulated
 
   HomeEquityPath:
-    definition: Accumulating HomeShares that count toward acquiring a whole home.
+    definition: Future legally defined housing interests or down-payment credit toward acquiring a home; the current fictional test-unit purchase does not grant those rights.
     reality: roadmap
     constraint: A real swap needs a legal wrapper, a notary and the land register; model it as down-payment credit.
 
@@ -352,14 +531,14 @@ vision:
     current: "Places links Strausberg city → Märkisch-Oderland district → Brandenburg state → Germany → EU official portals; street/neighbourhood and world feeds are not built."
   public_money_flow:
     reality: illustration
-    current: "Partly built: Places links primary tax/equalisation laws and Strausberg's gazette, inspection and AIG access route; no verified budget totals or personal tax attribution."
+    current: "Places shows the sourced Strausberg budget ordinance's planned 2025 and 2026 investment outlays, never actual spending or personal tax receipts; an independently assumed local-economy balance is explicitly fictional."
     idea: Show where taxes go and what a person's city can realistically spend once the city publishes or provides a complete plan with reusable terms.
     grounding_de:
       - Income tax is shared; municipalities receive 15 % of wage and assessed income tax under GemFinRefG § 1, distributed by statutory keys linked to residence, not 15 % of each resident's personal bill.
       - Trade tax (Gewerbesteuer) belongs to the municipality where business operations take place; Gewerbesteuerumlage reduces gross municipal receipts under GemFinRefG § 6.
       - Brandenburg distributes key allocations to municipalities under BbgFAG; its provisions are legal rules, not a Strausberg allocation dataset.
       - Strausberg's 2025/26 budget ordinance is published, but the detailed plan is offered for inspection under BbgKVerf § 69; an electronic copy may be requested under Brandenburg's AIG.
-    caution: Figures require an underlying published plan or statistics with source, reference date and licence; per-person attribution is an estimate. No budget totals are verified here.
+    caution: Budget figures are planned yearly outlays, not actuals or project allocations; scenario receipts are independent inputs and no personal tax attribution is calculated.
   measurable_city:
     reality: read_only_live
     current: "Partly built: current DWD weather via Bright Sky and nearby outdoor PM2.5/PM10 from uncalibrated sensor.community contributors, with station/sensor distance, observation time, licence and stale status; not city-wide calibrated coverage."

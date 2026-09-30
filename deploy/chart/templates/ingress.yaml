@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ledger-of-life
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ledger.helmLabels" . | nindent 4 }}
+    app.kubernetes.io/name: ledger-of-life
+  annotations:
+    # Same issuer as the other sites (checked: the load balancer serves Let's Encrypt certificates).
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer | quote }}
+    haproxy-ingress.github.io/ssl-redirect: "true"
+    # HAProxy's default server timeout is shorter than an AI answer. Add a longer `timeout-server` here only when
+    # a GPU path is switched on (see docs/DEPLOYMENT.md); nothing needs it in this first deployment.
+spec:
+  ingressClassName: haproxy
+  rules:
+    - host: {{ include "ledger.host" . | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ledger-of-life
+                port:
+                  name: http
+  tls:
+    - hosts:
+        - {{ include "ledger.host" . | quote }}
+      secretName: ledger-of-life-tls

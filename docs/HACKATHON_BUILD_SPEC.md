@@ -1,20 +1,37 @@
 # Rental asset-building hackathon build spec
 
-Updated: 22 September 2026. Status: accepted implementation scope; completion evidence is tracked separately. Brand and production market remain undecided.
+Updated: 28 September 2026. The original native architecture and acceptance goals below remain; the current Ledger of Life scope extension is explicit. Production market/provider arrangements remain undecided.
 
 **Build assets while renting:** eligible deposit earnings become contributions to the tenant's separate personal portfolio. The same application also gives landlords understandable security and claims, and arbitrators a bounded evidence-and-decision workflow.
 
 This is the entry point for what the hackathon app should build. The [glossary](../CONTEXT.md) defines the domain, the [ADRs](adr/README.md) record durable decisions, and the [parallel exploration](PARALLEL_STACK_EXPLORATION_2026-09-22.md) plus its stack reports retain technical evidence. Earlier Base recommendations are fallbacks. This scope does not replace the existing Gnosis product or its launch proof.
 
+### Current scope extension
+
+The [Ledger implementation plan](LEDGER_OF_LIFE_PLAN.md) prioritizes a visual housing-to-city
+journey: find/apply/agree, keep shares through a separate test pledge or loan, and buy distinctly
+fictional housing/workshop units on Robinhood testnet. The real-account borrowed-funds route,
+both unit purchases, a paid local GPU answer and 2D/3D map handoffs are exercised; exact
+evidence is in [validation](VALIDATION.md).
+The existing Solana tenancy remains a separate cash-deposit workflow. No token grants real
+company, cooperative or property rights, and no bridge or automatic loan-to-investment action exists.
+
+Physical building systems and the city flywheel remain ideas, not promised jobs or tax effects.
+Local GPU inference itself is connected: official x402 test-token access and a wallet-free
+library desk use the same model. Measured receipts/usage stay separate from assumed euro
+economics. Public organizations have sourced products, participation and event context;
+they are not automatically partners or test-token issuers.
+
+
 ## Scope and current baseline
 
 The build target is the existing public `rental-deposit-hackathon` project. Selected architecture documents are now maintained in this public implementation. Read [implementation status](IMPLEMENTATION_STATUS.md) for completed code and remaining proof gates. Public implementation should reuse reviewed workflows and business rules without copying private operational material or secrets.
 
-The original public baseline was an interactive simulation. The new implementation adds persistent demonstration records, verified account and agreement services, and independent native finance proofs. Its `src/domain/rental.ts` uses integer cents, a role selector and a fictional $800 claim-settlement example; `portfolioHeld` means a landlord's aggregate rental security, not the tenant's investment portfolio. It is not connected custody, authorization or investing. The new acceptance scenario below deliberately replaces that example; the existing simulator is useful design evidence, not finance proof.
+The original public baseline was an interactive simulation. Its integer-cent rental fixture and actor-switch UI are now retired; they are not part of the signed-in workspace or an API path. The former fictional $800 claim-settlement example did not represent connected custody, authorization or investing. Verified account and agreement services and independent native finance proofs remain separate, account-bound workflows.
 
 The existing private code also needs adaptation: tenancy access uses Safe fields and lowercases wallet strings, while Solana public keys must retain their case. Funding and custody encode Gnosis/Aave assumptions. Reuse requires explicit network-aware identity, authorization and accounting work.
 
-First-demo scope is one funded tenancy per scenario, one supply-only lending position, one eligible investment instrument, explicit approval of each trade, one ordinary settlement and one disputed settlement. Optional personal contributions can use the same personal cash account. The first investment proof excludes US users because the proposed xStock route is unavailable to them. A wallet address, IP address or user assertion alone does not establish issuer eligibility; an executable route needs a current, verified eligible profile. The eventual production market remains undecided. RealT, guaranteed property ownership, insurance pooling, borrowing, automatic recurring trades, cross-chain custody and utility-meter ingestion are outside this version. Bank funding and withdrawals require a separate verified provider route; the initial exit is to a permitted personal stablecoin destination.
+The original first-demo acceptance is one funded tenancy per scenario, one supply-only lending position, one eligible investment instrument, explicit trade approval and ordinary/disputed settlement. Production xStock access still needs a verified eligible profile and is not proved by wallet/IP/user assertions; the proposed route excludes US users. The later explicitly fictional test-unit rail does not claim such issuer access. RealT, guaranteed property ownership, insurance pooling, production borrowing, automatic recurring trades and cross-chain custody remain outside scope. Separate test borrowing and local-unit purchases are included. Bank funding/withdrawals still need a verified provider route.
 
 ## Role journeys and screens
 
@@ -26,7 +43,7 @@ First-demo scope is one funded tenancy per scenario, one supply-only lending pos
 
 The tenant home should lead with personal asset progress and the next useful action, with rental security clearly distinct. Landlord views prioritize funded security and pending actions; arbitrator views prioritize assigned cases. Use one primary action per task and readable mobile layouts. Explain money, consent and pending status in normal language; place chain evidence and technical identifiers in an expandable details area.
 
-Passkey access, verified recovery to the same wallet and fees sponsored for the full declared flow are required on both tracks. A browser wallet remains a technical testing option, not completion of the consumer journey. Recovery and financial consent are separate checks. The visual role switch may remain in a labeled simulation, but actual access comes from verified identity and tenancy/case membership.
+Passkey access, verified recovery to the same wallet and fees sponsored for the full declared flow are required on both tracks. A browser wallet remains a technical testing option, not completion of the consumer journey. Recovery and financial consent are separate checks. The application exposes one real-account journey; tenancy and case roles come from actual membership, not an actor-switch simulation.
 
 ## Money flow and invariants
 

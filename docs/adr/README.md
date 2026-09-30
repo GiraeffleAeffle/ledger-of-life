@@ -15,6 +15,9 @@ These records cover the separate rental asset-building hackathon project. They d
 | [0007](0007-reconcile-financial-operations-in-durable-steps.md) | Accepted                             | Persist and reconcile individually confirmed financial steps, preserving partial completion and safe retries.          |
 | [0008](0008-durable-runtime-and-bounded-sponsors.md)            | Accepted for the test implementation | Persist native operations and use bounded, separately funded sponsors.                                                 |
 | [0009](0009-stage-solana-escrow-setup-and-funding.md)           | Accepted for the next test implementation | For new Solana tenancies, let the landlord prepare empty custody and the tenant fund later; preserve the deployed joint-signature program. |
+| [0010](0010-one-home-per-feature.md)                            | Accepted                             | Give every feature one home area where it is operated; every other area shows a one-line reference that links there.   |
+| [0011](0011-ask-for-recovery-at-the-first-wallet-action.md)     | Accepted                             | End setup after the passkey, backup email and two wallets; ask for the second-browser recovery proof at the first wallet action on a tenancy. |
+| [0012](0012-public-pages-outside-the-wallet-group.md)           | Accepted                             | Mount the wallet SDK only in the `(wallet)` route group, so public pages such as the welcome guide load nothing from a third party. |
 
 ## Coverage of the three implementation plans
 

@@ -56,6 +56,33 @@ sequenceDiagram
 
 A non-test implementation would use the same consent and transaction boundaries with eligible assets and valuation rules specified in the tenancy, independent price sources and executable liquidity, an independently funded lending venue, and wallet-signed tenant actions. The fake tTSLA faucet, test USD, simulated yield and operator-set quote would be replaced by verifiable inputs and actual parties; none of these test tokens is redeemable.
 
+## Connected ownership and local-service route
+
+The **Build local ownership** path (Money → Holdings) is separate from the earnings/deposit
+fixture above. An approved test environment can prepare a **wholly empty** real account:
+an isolated market, at most two fake tTSLA shares, and at most 0.0003 test ETH for wallet fees.
+It does **not** mint cash into the buyer's wallet. Existing shares, collateral, loans, deposits
+and legacy markets are not reset or migrated.
+
+A dedicated provisioner signs this setup and retains authority over its own oracle/desk.
+Every setup/mint/gas/control envelope is journaled before broadcast. Preparation has a
+read-only status and explicit resume action; operator-control request IDs survive reload.
+A provably unsigned failed control is fenced before its nonce lane is released. Signed
+ambiguity retains the same-byte recovery path.
+
+The borrow amount is editable, defaults to 12 tUSDG, and stays within the authoritative
+available limit. The exercised real Privy wallet pledged two shares, borrowed 12 tUSDG,
+bought five units of each issuer for 5 tUSDG each, then paid 0.01 tUSDG for a completed
+local AI answer through x402. Cash ended at 1.99 tUSDG; collateral stayed locked and debt
+continued to accrue. The service milestone uses an owned settled receipt, never host-wide
+revenue or merely holding cash.
+
+[Public connected evidence](evidence/BORROW_TO_LOCAL_AI_ROBINHOOD_TESTNET.json) records
+the exact wallet, collateral/borrow events, purchase receipts and AI transfer. Follow
+[README operator setup](../README.md#test-local-investment--robinhood-chain) for explicit
+dedicated-account funding; funding commands run serially while the preview and other
+shared-operator activity are stopped.
+
 ## Executed testnet proof
 
 The operator script `contracts/evm/script/share-workflows-cycle.mjs` executes the $1,500 test escrow and dedicated vault → ~$60 personally signed yield claim → $3,540 purchase faucet plus yield, signed ~$3,600 fake-stock buy → 150% share pledge for ~$1,200 deposit → 30% test-price drop and signed top-up → move-out claim and in-kind return → signed loan/collateral → 60% test-price drop, liquidation, repayment and fake-share withdrawal. It then signs two more yield claims and confirms a fourth simulated yield on the same UTC day is blocked. [Deployment addresses, transaction hashes and final balances](evidence/SHARE_WORKFLOWS_ROBINHOOD_TESTNET.json) come from an ephemeral scripted test wallet, **not** from a Privy session. Signed-in browser checks and responsive screenshots are local artifacts in `/tmp/share-shots/`.

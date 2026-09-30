@@ -8,7 +8,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import type { Store } from './store.ts';
 import { ROBINHOOD_TESTNET } from './robinhood-demo.ts';
 import { operatorTestCapability } from './test-capability.ts';
-import { startShareMarket } from './share-workflows.ts';
+import { readShareWorkflows, startShareMarket } from './share-workflows.ts';
 
 const chain = defineChain({ id: 46630, name: 'Robinhood Chain Testnet', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://rpc.testnet.chain.robinhood.com'] } }, testnet: true });
 const rpc = createPublicClient({ chain, transport: http() });
@@ -55,13 +55,13 @@ export async function startShareEarnings(store: Store, wallet: string) {
   const owner = getAddress(wallet);
   const prior = await record(store, owner);
   if (prior?.vault) return prior;
+  const people = await actors();
   if (prior) {
     const released = await rpc.readContract({ address: prior.escrow, abi: escrowAbi, functionName: 'releasedEarnings' });
     if (!released) throw new Error('Finish your earlier test earnings claim before preparing the new demo position.');
     await store.create(`share-earnings:archive:${owner.toLowerCase()}:${prior.escrow.toLowerCase()}`, prior);
     await store.update<EarningsRecord | Starting>(recordKey(owner), () => ({ status: 'starting' }));
   } else await store.create(recordKey(owner), { status: 'starting' } satisfies Starting);
-  const people = await actors();
   const op = createWalletClient({ chain, account: people.operator, transport: http() });
   const landlord = createWalletClient({ chain, account: people.landlord, transport: http() });
   const artifact = JSON.parse(await readFile(resolve('contracts/evm/out/RentalEscrow.sol/RentalEscrow.json'), 'utf8')) as { abi: unknown[]; bytecode: { object: Hex } };
@@ -93,22 +93,37 @@ export async function startShareEarnings(store: Store, wallet: string) {
   return value;
 }
 
-export async function readShareEarnings(store: Store, wallet: string) {
+export async function readShareEarnings(store: Store, wallet: string, readClient: Pick<typeof rpc, 'readContract'> = rpc) {
   const owner = getAddress(wallet);
   const item = await record(store, owner);
   if (!item) return null;
   const [state, nonce, tracked, releasable, released] = await Promise.all([
-    rpc.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'state' }),
-    rpc.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'nonce' }),
-    rpc.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'trackedShares' }),
-    rpc.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'releasableEarnings' }),
-    rpc.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'releasedEarnings' }),
+    readClient.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'state' }),
+    readClient.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'nonce' }),
+    readClient.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'trackedShares' }),
+    readClient.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'releasableEarnings' }),
+    readClient.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'releasedEarnings' }),
   ]);
   const count = yieldsToday(item);
   return { escrow: item.escrow, state: Number(state), nonce: nonce.toString(), supplied: tracked > 0n,
     yieldsToday: count, yieldAvailable: count < MAX_YIELDS_PER_DAY && !item.yieldPending && releasable < 10_000n, purchaseFaucetDone: Boolean(item.purchaseFaucetDone),
     previousEscrow: item.previousEscrow ?? null,
     releasableAtomic: releasable.toString(), releasedAtomic: released.toString(), securityAtomic: item.securityAtomic ?? '10000000' };
+}
+
+/** An earnings read must never hide independent wallet, pledge and loan positions. */
+export async function readShareOverview(
+  store: Store, wallet: string,
+  workflowClient?: Parameters<typeof readShareWorkflows>[2],
+  earningsClient?: Parameters<typeof readShareEarnings>[2],
+) {
+  const [workflow, earnings] = await Promise.all([
+    readShareWorkflows(store, wallet, workflowClient),
+    readShareEarnings(store, wallet, earningsClient)
+      .then((value) => ({ value, error: null }))
+      .catch((error: unknown) => ({ value: null, error: error instanceof Error ? error.message : 'Earnings temporarily unavailable.' })),
+  ]);
+  return { ...workflow, earnings: earnings.value, earningsError: earnings.error };
 }
 
 /** Only the signed-in tenant's own wallet can sign these prepared on-chain calls. */
@@ -166,11 +181,11 @@ export async function addSimulatedShareYield(store: Store, wallet: string) {
   if (!entry) throw new Error('Open your test earnings deposit first.');
   const status = await readShareEarnings(store, owner);
   if (!status?.supplied || !status.yieldAvailable) throw new Error('Claim the current simulated yield first, or wait until tomorrow after three test runs.');
+  const people = await actors();
   await store.update<EarningsRecord>(recordKey(owner), (state) => {
     if (state.yieldPending || yieldsToday(state) >= MAX_YIELDS_PER_DAY) throw new Error('A test yield is pending, or all three daily runs are used.');
     return { ...state, yieldDay: today(), yieldCount: yieldsToday(state) + 1, yieldPending: true };
   });
-  const people = await actors();
   const op = createWalletClient({ chain, account: people.operator, transport: http() });
   const hashes: Hex[] = [];
   const amount = entry.vault ? YIELD : 500_000n;

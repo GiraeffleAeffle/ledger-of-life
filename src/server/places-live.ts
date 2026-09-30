@@ -188,6 +188,12 @@ async function loadClubs(city: string): Promise<Clubs> {
   };
 }
 
+/** Geocode only a city name; do not download weather or directories for an uncovered place. */
+export function locateCity(city: string): Promise<LiveSection<Coordinates>> {
+  const id = citySlug(city);
+  return cached(locationCache, id, LOCATION_TTL, () => locate(city, id));
+}
+
 /** All feeds run on the server and fail independently, so one outage does not hide other sections. */
 export async function readPlaces(city: string): Promise<PlacesResult> {
   const cityId = citySlug(city);

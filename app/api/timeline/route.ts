@@ -1,7 +1,7 @@
 import { authenticated } from '@/server/authenticated';
 import { addPlace, listPlaces, removePlace } from '@/server/timeline';
 import { getStore } from '@/server/store';
-import { readBody, sameOrigin } from '@/server/http';
+import { errorResponse, readBody, sameOrigin } from '@/server/http';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };
 
@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const identity = await authenticated(request);
     return Response.json({ places: await listPlaces(await getStore(), identity) }, noStore);
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'Unavailable' }, { status: 401 });
+    return errorResponse(error);
   }
 }
 

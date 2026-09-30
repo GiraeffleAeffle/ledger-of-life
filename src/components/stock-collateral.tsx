@@ -2,6 +2,7 @@
 import { useState } from 'react';
 
 const dollars = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+const illustrative = (value: number) => `${dollars.format(value)} illustrative test value`;
 
 /** Illustration of the contract's example ratios, not a pledge or price quote. */
 export function StockCollateral({ initialDeposit = 1200 }: { initialDeposit?: number }) {
@@ -18,21 +19,21 @@ export function StockCollateral({ initialDeposit = 1200 }: { initialDeposit?: nu
   const saleValue = Math.min(currentValue, approvedClaim / 0.98);
   return (
     <details className="stock-collateral">
-      <summary>Alternative: secure with stocks · prototype explainer</summary>
+      <summary>Calculator: how much would a share-backed deposit pledge? · illustration</summary>
       <div className="prototype-content">
-        <p className="small-copy">Illustration only, no live stock price or app transaction. The CollateralEscrow contract ran on Robinhood Chain testnet; stock-backed deposits are not an app flow.</p>
+        <p className="small-copy">This calculator is an illustration, not a quote or transaction. The wallet-signed Robinhood testnet share-deposit and loan workflows above are the real test flows; neither replaces the cash deposit of a Solana tenancy in Home.</p>
         <div className="collateral-inputs">
-          <label>Deposit to secure ($)<input type="number" min="1" max="100000" step="1" value={deposit} onChange={(event) => setDeposit(event.target.value)} /></label>
+          <label>Illustrative test deposit to secure ($)<input type="number" min="1" max="100000" step="1" value={deposit} onChange={(event) => setDeposit(event.target.value)} /></label>
           <label>Example stock price drop (%)<input type="number" min="0" max="80" step="1" value={drop} onChange={(event) => setDrop(event.target.value)} /></label>
-          <label>Example approved claim ($)<input type="number" min="0" max={security} step="1" value={claim} onChange={(event) => setClaim(event.target.value)} /></label>
+          <label>Illustrative approved test claim ($)<input type="number" min="0" max={security} step="1" value={claim} onChange={(event) => setClaim(event.target.value)} /></label>
         </div>
         <dl className="journey-facts">
-          <div><dt>Shares pledged at 150%</dt><dd>{dollars.format(pledgedValue)}</dd></div>
-          <div><dt>After {decline}% price drop</dt><dd>{dollars.format(currentValue)}</dd></div>
-          <div><dt>Buffer above deposit</dt><dd>{dollars.format(buffer)}</dd></div>
+          <div><dt>Shares pledged at 150%</dt><dd>{illustrative(pledgedValue)}</dd></div>
+          <div><dt>After {decline}% price drop</dt><dd>{illustrative(currentValue)}</dd></div>
+          <div><dt>Buffer above deposit</dt><dd>{illustrative(buffer)}</dd></div>
         </dl>
-        <p>{currentValue < maintenance ? `Below the example 125% maintenance level (${dollars.format(maintenance)}): the tenant gets a top-up grace period; after it, a sale can secure the deposit as cash.` : `Above the example 125% maintenance level (${dollars.format(maintenance)}); no shortfall flag at this price.`}</p>
-        <p>At an approved claim of {dollars.format(approvedClaim)}, the contract sells only enough shares to pay the claim. With illustrative 2% slippage, about {dollars.format(saleValue)} in shares could be sold; if proceeds fall short, it sells more (up to the shares held). The rest returns to the tenant in kind{saleValue < approvedClaim ? '; if collateral is exhausted, the landlord bears the remaining shortfall' : ''}.</p>
+        <p>{currentValue < maintenance ? `Below the example 125% maintenance level (${illustrative(maintenance)}): the tenant gets a top-up grace period; after it, a contract-controlled protective sale can secure the test deposit as cash.` : `Above the example 125% maintenance level (${illustrative(maintenance)}); no shortfall flag at this simulated test price.`}</p>
+        <p>At an approved claim of {illustrative(approvedClaim)}, the separate test contract sells only enough pledged shares to pay the claim. This is not a way to sell wallet holdings. With illustrative 2% slippage, about {illustrative(saleValue)} in shares could be sold; if proceeds fall short, it sells more (up to the shares held). The rest returns to the tenant in kind{saleValue < approvedClaim ? '; if collateral is exhausted, the landlord bears the remaining shortfall' : ''}.</p>
         <p className="small-copy">Ratios, oracle protection, grace period and sale slippage are contract parameters. This calculator is not a quote, investment advice or an offer; German rental law requires agreement on alternative security.</p>
       </div>
     </details>

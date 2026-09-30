@@ -1,0 +1,18 @@
+helmDefaults:
+  atomic: true
+  cleanupOnFail: true
+  createNamespace: false
+  historyMax: 10
+  timeout: 600
+  wait: true
+  waitForJobs: true
+
+releases:
+  - name: ledger-of-life
+    namespace: ledger-of-life
+    chart: ./chart
+    installed: true
+    labels:
+      app: ledger-of-life
+    values:
+      - ./values/ledger.stadtstack.eu.yaml

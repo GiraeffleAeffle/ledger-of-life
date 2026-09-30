@@ -102,7 +102,7 @@ export async function addTestApplicant(store: Store, user: VerifiedIdentity, lis
   const listing = await store.get<Listing>(`listing:${listingId}`);
   if (!listing || listing.landlord.subject !== user.subject) throw new Error('Add test applicants only to your own listing.');
   const { tenant } = await signers(environment);
-  return applyToListing(store, tenant.identity, listingId, { name: 'Test tenant (fixture)', message: 'A local test tenant applying so you can continue.' });
+  return applyToListing(store, tenant.identity, listingId, { name: 'Sample tenant (fixture)', message: 'A sample test tenant applying so you can continue.' });
 }
 
 /** Performs every step that is currently up to a test party in this listing or tenancy. */
@@ -147,8 +147,8 @@ export async function actForTestParties(
       const services = await resolveServices(store, agreement.id);
       const operation = async (action: Record<string, unknown>, evidence?: string) => {
         const op = await services!.service.prepare(identity, `test-${randomUUID()}`, action);
-        if (evidence) await addAgreementRecord(store, agreement.id, identity, 'Test party evidence', `${evidence}\n\nPrepared operation ${op.id}.`);
         await services!.service.authorize(identity, op.id, await signPrepared(signer, op.transactionBase64));
+        if (evidence) await addAgreementRecord(store, agreement.id, identity, action.kind === 'propose_claim' ? 'Move-out deduction' : action.kind === 'respond_to_claim' ? 'Dispute the deduction' : 'Arbitration decision', `${evidence}\n\nSigned sample operation ${op.id}.`);
         await finalize(() => services!.service.reconcile(identity, op.id));
       };
       switch (next.kind) {
@@ -171,13 +171,13 @@ export async function actForTestParties(
           await operation({ kind: 'fund_and_supply' });
           break;
         case 'propose_claim':
-          await operation({ kind: 'propose_claim', amountAtomic: '100000' }, 'Test landlord: small cleaning fee of 0.10 USDC.');
+          await operation({ kind: 'propose_claim', amountAtomic: '100000' }, 'Sample test landlord: small cleaning fee of 0.10 test USDC.');
           break;
         case 'respond_claim':
           await operation({ kind: 'accept_and_settle' });
           break;
         case 'decide_claim':
-          await operation({ kind: 'resolve_and_settle', amountAtomic: (BigInt(next.claimAtomic) / 2n).toString() }, 'Test arbitrator: split the disputed amount.');
+          await operation({ kind: 'resolve_and_settle', amountAtomic: (BigInt(next.claimAtomic) / 2n).toString() }, 'Sample test arbitrator: split the disputed amount.');
           break;
         case 'settle':
           await operation({ kind: 'redeem_and_settle' });

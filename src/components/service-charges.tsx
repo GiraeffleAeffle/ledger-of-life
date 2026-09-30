@@ -46,7 +46,7 @@ export function ServiceCharges({ agreementId, request }: { agreementId: string; 
 
   return (
     <details className="service-charge-card" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>Service charges · prototype · simulated figures</summary>
+      <summary id={`service-charges-${agreementId}`}>Service charges · prototype · simulated figures</summary>
       {error && <p role="alert" className="note">{error}</p>}
       {!account && !error && <p className="small-copy">Loading this tenancy’s example account…</p>}
       {account && (
@@ -71,7 +71,7 @@ export function ServiceCharges({ agreementId, request }: { agreementId: string; 
               <p>Example daily consumption (kWh, Mon–Sun): {account.consumption.exampleWeekKwh?.map((value) => value.toFixed(1)).join(' · ')}. The example {account.consumption.dailyKwh.toFixed(1)} kWh/day drives the cost estimate.</p>
             )}
             {account.consumption.solarTodayKwh !== null && <p className="small-copy">Home Assistant solar production today: {account.consumption.solarTodayKwh.toFixed(2)} kWh (live reading, not consumption).</p>}
-            {account.consumption.adapterUnavailable && <p className="small-copy">Home Assistant is unavailable; showing an example consumption series instead.</p>}
+            {account.consumption.adapterUnavailable && <p className="small-copy">{account.consumption.adapterUnavailableReason ? `${account.consumption.adapterUnavailableReason} Showing the labelled example consumption series instead.` : 'Home Assistant is unavailable; showing the labelled example consumption series instead.'}</p>}
           </div>
           <div>
             <h3>Annual example cost items</h3>

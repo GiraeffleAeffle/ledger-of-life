@@ -1,0 +1,15 @@
+.tenancy-walkthrough { padding: 18px 22px; }
+.tenancy-walkthrough > summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; cursor: pointer; font-size: 1.05rem; }
+.tenancy-walkthrough > summary > span { color: var(--muted); font-size: .85rem; }
+.tenancy-walkthrough-body { display: grid; gap: 12px; margin-top: 12px; }
+.tenancy-walkthrough-body > p { margin: 0; color: #4b6352; line-height: 1.55; }
+.tenancy-walkthrough-body > ol { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; counter-reset: walkthrough; }
+.tenancy-walkthrough-body > ol > li { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 2px 16px; padding: 11px 0; border-top: 1px solid var(--line); counter-increment: walkthrough; }
+.tenancy-walkthrough-body > ol > li > strong::before { content: counter(walkthrough) '. '; color: var(--muted); font-weight: 600; }
+.tenancy-walkthrough-body > ol > li > small { grid-column: 1; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.tenancy-walkthrough-body > ol > li > span { grid-column: 2; grid-row: 1 / span 2; font-size: 14px; line-height: 1.55; }
+@media (max-width: 640px) {
+  .tenancy-walkthrough { padding: 16px; }
+  .tenancy-walkthrough-body > ol > li { grid-template-columns: minmax(0, 1fr); }
+  .tenancy-walkthrough-body > ol > li > span { grid-column: 1; grid-row: auto; }
+}

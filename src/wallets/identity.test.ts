@@ -151,6 +151,22 @@ test('rejects a tampered signature and never treats provider outage as anonymous
   await assert.rejects(outage.verify(token), { code: 'identity_unavailable' });
 });
 
+test('a verification-key outage is unavailable, then the same valid session recovers without sign-out', async () => {
+  const { dependencies } = fixture();
+  let available = false;
+  const verify = createIdentityVerifier({
+    ...dependencies,
+    verifyToken: async (value) => {
+      if (!available) throw new IdentityError('identity_unavailable', 'Account verification is temporarily unavailable.');
+      return dependencies.verifyToken(value);
+    },
+  });
+  const signed = accessToken();
+  await assert.rejects(verify(signed), { code: 'identity_unavailable' });
+  available = true;
+  assert.equal((await verify(signed)).subject, subject);
+});
+
 test('rejects fetched user mismatch and guests', async () => {
   for (const user of [{ id: 'did:privy:other' }, { id: subject, is_guest: true }]) {
     const { verify } = fixture({ getUser: async () => ({ ...user, linked_accounts: [] }) });

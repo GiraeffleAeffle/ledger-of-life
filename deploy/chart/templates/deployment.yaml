@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-of-life
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ledger.helmLabels" . | nindent 4 }}
+    app.kubernetes.io/name: ledger-of-life
+    app.kubernetes.io/component: web
+spec:
+  # One replica and Recreate: SQLite lives on a ReadWriteOnce volume, so two pods must never run at once.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ledger-of-life
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ledger-of-life
+        app.kubernetes.io/component: web
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          # Both workloads use the same digest; rendering refuses an empty or invalid digest.
+          image: {{ include "ledger.image" . | quote }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 4175
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: ledger-config
+            - secretRef:
+                name: ledger-env
+                optional: false
+          startupProbe:
+            httpGet:
+              path: /api/status
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/status
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+            timeoutSeconds: 5
+          # Ready only when the store answers. An httpGet probe cannot read the JSON body, so this asks node,
+          # exactly as the image's own HEALTHCHECK does.
+          readinessProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:4175/api/status').then(r=>r.json()).then(s=>process.exit(s.storeAvailable?0:1)).catch(()=>process.exit(1))"
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 10
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: next-cache
+              mountPath: /app/.next/cache
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ledger-data
+        - name: next-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

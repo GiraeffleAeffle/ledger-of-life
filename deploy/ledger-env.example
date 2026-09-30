@@ -1,0 +1,20 @@
+# KEY NAMES ONLY. Copy this file OUTSIDE the repository (for example to ~/ledger-env.local), fill in the real values there,
+# and never commit or paste the filled file.
+#
+# Create the Secret after deploy/namespace.yaml is applied (deploy/apply.sh does that before checking the Secret):
+#
+#   kubectl create secret generic ledger-env --namespace ledger-of-life --from-env-file="$HOME/ledger-env.local"
+#
+# Generate the reconcile secret locally, do not reuse another one:
+#
+#   openssl rand -base64 48 | tr -d '\n=' | tr '+/' '-_'
+#
+# The public Privy app id is NOT here: it is compiled into the browser bundle, so it is a build argument of the image.
+
+# The Privy app's secret and, optionally, the verification key of its access tokens.
+# The key is a PEM on one line with literal \n between the lines (the app converts them back).
+PRIVY_APP_SECRET=REPLACE_ME
+PRIVY_VERIFICATION_KEY=REPLACE_ME
+
+# Bearer secret of the scheduled reconcile job (at least 32 random characters).
+RECONCILE_SECRET=REPLACE_ME

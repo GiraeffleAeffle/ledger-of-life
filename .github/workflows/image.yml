@@ -1,0 +1,95 @@
+name: Image
+
+# Builds the linux/amd64 image that deploy/ runs on the Talos cluster and pushes it to GHCR.
+# Manual only: a release is a decision. Run it on a commit whose "Validate workspace" run passed, either from the
+# Actions tab (once this file is on the default branch; GitHub dispatches only workflows found there) or by pushing a
+# tag named image-* on that commit, which works from any branch.
+# The job summary prints the digest. deploy/values/ledger.stadtstack.eu.yaml pins that digest, never a tag.
+# Actions are pinned to commit SHAs because this job can publish packages.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'image-*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/giraeffleaeffle/ledger-of-life
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Require the public build values
+        env:
+          PRIVY_APP_ID: ${{ vars.NEXT_PUBLIC_PRIVY_APP_ID }}
+          ORIGIN: ${{ vars.APP_ORIGIN }}
+        run: |
+          if [ -z "$PRIVY_APP_ID" ]; then
+            echo "::error::Set the repository variable NEXT_PUBLIC_PRIVY_APP_ID (Settings > Secrets and variables > Actions > Variables)."
+            exit 1
+          fi
+          case "$ORIGIN" in
+            https://*) ;;
+            *) echo "::error::Set the repository variable APP_ORIGIN to the public https origin, for example https://ledger.stadtstack.eu."; exit 1 ;;
+          esac
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          tags: type=sha,format=long
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Public by design: NEXT_PUBLIC_* values are compiled into the browser bundle, and APP_ORIGIN only sets the
+          # absolute link-preview URLs of prerendered pages. Never pass a secret here.
+          build-args: |
+            NEXT_PUBLIC_PRIVY_APP_ID=${{ vars.NEXT_PUBLIC_PRIVY_APP_ID }}
+            NEXT_PUBLIC_PRIVY_CLIENT_ID=${{ vars.NEXT_PUBLIC_PRIVY_CLIENT_ID }}
+            APP_ORIGIN=${{ vars.APP_ORIGIN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Report the digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          {
+            echo "### Ledger of Life image"
+            echo
+            echo "Image: \`${IMAGE}@${DIGEST}\`"
+            echo
+            echo "Source commit: \`${GITHUB_SHA}\`"
+            echo
+            echo "Pin it in \`deploy/values/ledger.stadtstack.eu.yaml\`:"
+            echo
+            echo '```yaml'
+            echo 'image:'
+            echo "  digest: ${DIGEST}"
+            echo '```'
+            echo
+            echo "A first push creates a private package. Make it public once in the package settings, or the cluster cannot pull it."
+          } >> "$GITHUB_STEP_SUMMARY"

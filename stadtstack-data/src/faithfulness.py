@@ -36,8 +36,21 @@ class CodexJudge(DeepEvalBaseLLM):
 
 if __name__ == '__main__':
     payload = json.load(sys.stdin)
-    evaluator = FaithfulnessMetric(threshold=payload.get('threshold', 0.8), model=CodexJudge(), async_mode=False, include_reason=True, penalize_ambiguous_claims=payload.get('penalize_ambiguous_claims', True))
+    mode = payload.get('mode', 'llm')
+    if mode not in ('llm', 'hybrid', 'system_one'):
+        raise ValueError('mode must be llm, hybrid, or system_one')
+    if mode != 'llm' and not os.environ.get('TYPESAFE_API_KEY'):
+        raise RuntimeError('TYPESAFE_API_KEY is required for Jev modes (value redacted)')
+    kwargs = {'threshold': payload.get('threshold', 0.8), 'async_mode': False, 'include_reason': True,
+              'penalize_ambiguous_claims': payload.get('penalize_ambiguous_claims', True)}
+    if mode != 'llm':
+        kwargs['eval_mode'] = mode
+    if mode != 'system_one':
+        kwargs['model'] = CodexJudge()
+
+    evaluator = FaithfulnessMetric(**kwargs)
     case = LLMTestCase(input='Fasse ausschließlich den folgenden öffentlichen Quellenausschnitt in eigenen Worten zusammen.', actual_output=payload['statement'], retrieval_context=[payload['source']])
     with redirect_stdout(StringIO()):
         evaluator.measure(case)
-    print(json.dumps({'score': evaluator.score, 'reason': evaluator.reason, 'threshold': evaluator.threshold, 'evaluator':'DeepEval FaithfulnessMetric / codex:gpt-6-luna'}))
+    print(json.dumps({'score': evaluator.score, 'reason': evaluator.reason, 'threshold': evaluator.threshold,
+                      'evaluator': f'DeepEval FaithfulnessMetric / {mode}' + (' / Jev' if mode != 'llm' else ' / codex:gpt-6-luna')}))

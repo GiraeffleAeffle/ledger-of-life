@@ -3,7 +3,9 @@ import {
   getTransactionDecoder,
   isAddress as isSolanaAddress,
 } from '@solana/kit';
-import { isAddress as isEthereumAddress } from 'viem';
+import { decodeFunctionData, isAddress as isEthereumAddress, parseAbi } from 'viem';
+import { PERMIT2_ADDRESS } from '@x402/evm';
+import { TEST_USDG_ADDRESS } from './inference-token.ts';
 import type {
   EvmSigningRequest,
   RentalWallet,
@@ -47,6 +49,22 @@ export function validateEvmSigningRequest(
     throw new Error('The transaction destination is invalid.');
   if (transaction.from && transaction.from.toLowerCase() !== selected.address.toLowerCase()) {
     throw new Error('The transaction was prepared for another wallet.');
+  }
+  if (request.operationId.startsWith('local-ai-approval:')) {
+    const tx = transaction;
+    const decoded = decodeFunctionData({
+      abi: parseAbi(['function approve(address,uint256) returns (bool)']),
+      data: tx.data as `0x${string}`,
+    });
+    if (tx.chainId !== 46630 || tx.to.toLowerCase() !== TEST_USDG_ADDRESS.toLowerCase() ||
+        decoded.functionName !== 'approve' || decoded.args[0].toLowerCase() !== PERMIT2_ADDRESS.toLowerCase() ||
+        decoded.args[1] !== 100000n || (tx.value !== undefined && BigInt(tx.value) !== 0n) ||
+        typeof tx.nonce !== 'number' || !Number.isSafeInteger(tx.nonce) || tx.nonce < 0 ||
+        !tx.gasLimit || BigInt(tx.gasLimit) > 120000n ||
+        !tx.maxFeePerGas || BigInt(tx.maxFeePerGas) <= 0n ||
+        BigInt(tx.maxFeePerGas) > 100000000000n ||
+        (tx.maxPriorityFeePerGas !== undefined && BigInt(tx.maxPriorityFeePerGas) > BigInt(tx.maxFeePerGas)))
+      throw new Error('Inference approval exceeds the finite reviewed testnet allowance.');
   }
   return selected;
 }

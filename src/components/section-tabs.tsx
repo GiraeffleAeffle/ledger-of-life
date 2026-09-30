@@ -1,0 +1,69 @@
+'use client';
+import { createContext, useContext, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { tabFromSearch, withTab } from './workspace-location';
+import { RealityChips } from './reality-chip';
+import type { RealityLevel } from '@/data/reality';
+import './section-tabs.css';
+
+export interface SectionTab {
+  /** Also the panel's element id, so it is a jump target (see `SECTIONS` in data/sections.ts). */
+  id: string;
+  label: string;
+  /** One sentence: what this section is for, and what it deliberately does not include. */
+  summary: string;
+  reality: RealityLevel[];
+  content: ReactNode;
+}
+
+const ActiveTabContext = createContext(true);
+export function useSectionTabActive() { return useContext(ActiveTabContext); }
+
+/**
+ * The sections of one area, one at a time. Every panel stays mounted and is only hidden, so a
+ * half-finished workflow keeps its state when the person looks at another section, and
+ * `goToSection` can find a target in any panel and select the tab that contains it.
+ */
+export function SectionTabs({ label, tabs }: { label: string; tabs: SectionTab[] }) {
+  const ids = tabs.map((tab) => tab.id).join('|');
+  const [active, setActive] = useState(tabs[0].id);
+  useEffect(() => {
+    const sync = () => setActive(tabFromSearch(window.location.search, ids.split('|')));
+    sync();
+    window.addEventListener('popstate', sync);
+    return () => window.removeEventListener('popstate', sync);
+  }, [ids]);
+  function select(id: string) {
+    if (active === id) return;
+    window.history.pushState(null, '', withTab(window.location.href, id));
+    setActive(id);
+  }
+  function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    const direction = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+      : direction ? (index + direction + tabs.length) % tabs.length : -1;
+    if (next < 0) return;
+    event.preventDefault();
+    select(tabs[next].id);
+    document.getElementById(`${tabs[next].id}-tab`)?.focus();
+  }
+  return (
+    <div className="section-tabs">
+      <nav className="section-tabs-nav" role="tablist" aria-label={label}>
+        {tabs.map((tab, index) => (
+          <button key={tab.id} id={`${tab.id}-tab`} type="button" role="tab" data-section-tab={tab.id} aria-controls={tab.id}
+            aria-selected={active === tab.id} tabIndex={active === tab.id ? 0 : -1}
+            onKeyDown={(event) => moveTab(event, index)} onClick={() => select(tab.id)}>{tab.label}</button>
+        ))}
+      </nav>
+      {tabs.map((tab) => (
+        <section key={tab.id} id={tab.id} role="tabpanel" aria-labelledby={`${tab.id}-tab`} className="section-panel" data-section-panel={tab.id} tabIndex={-1}
+          hidden={active !== tab.id}>
+          <ActiveTabContext.Provider value={active === tab.id}>
+            <header className="section-panel-head"><p>{tab.summary}</p><RealityChips levels={tab.reality} /></header>
+            {tab.content}
+          </ActiveTabContext.Provider>
+        </section>
+      ))}
+    </div>
+  );
+}

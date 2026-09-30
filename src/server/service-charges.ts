@@ -1,9 +1,9 @@
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
-import { WorkflowError } from '../domain/workflow.ts';
+import { WorkflowError } from '../domain/errors.ts';
 import { getAgreement } from './agreements.ts';
-import { readHomeEnergy, type AdapterConfig } from './adapters.ts';
+import { HOME_ASSISTANT_UNAVAILABLE_MESSAGE, homeAssistantPullAllowed, readHomeEnergy, type AdapterConfig } from './adapters.ts';
 import type { Store } from './store.ts';
-import { AccessError } from './workspaces.ts';
+import { AccessError } from './errors.ts';
 
 const EXAMPLE_WEEK_KWH = [5.8, 6.2, 6.4, 6.1, 5.9, 6.6, 6.4];
 const DEFAULT_PREPAYMENT_CENTS = 15000;
@@ -21,6 +21,7 @@ export interface ServiceChargeView {
     exampleWeekKwh: number[] | null;
     solarTodayKwh: number | null;
     adapterUnavailable: boolean;
+    adapterUnavailableReason: string | null;
   };
   items: { name: string; annualBuildingCents: number; allocation: string; annualShareCents: number }[];
   estimatedMonthlyCostCents: number;
@@ -38,7 +39,7 @@ export async function readServiceCharges(
   const agreement = await getAgreement(store, agreementId, identity);
   const saved = await store.get<{ prepaymentCents: number }>(key(agreementId));
   const config = (await store.get<AdapterConfig>(`adapters:${identity.subject}`))?.homeAssistant;
-  const reading = config ? await energyReader(config).catch(() => null) : null;
+  const reading = config && homeAssistantPullAllowed() ? await energyReader(config).catch(() => null) : null;
   const realConsumption = reading?.consumptionTodayKwh !== null && reading?.consumptionTodayKwh !== undefined
     && Number.isFinite(reading.consumptionTodayKwh) && reading.consumptionTodayKwh <= 200;
   const dailyKwh = realConsumption ? reading.consumptionTodayKwh! : 6.2;
@@ -58,6 +59,7 @@ export async function readServiceCharges(
       exampleWeekKwh: realConsumption ? null : EXAMPLE_WEEK_KWH,
       solarTodayKwh: reading?.solarTodayKwh ?? null,
       adapterUnavailable: Boolean(config && !reading),
+      adapterUnavailableReason: config && !homeAssistantPullAllowed() ? HOME_ASSISTANT_UNAVAILABLE_MESSAGE : null,
     },
     items, estimatedMonthlyCostCents, balanceCents, projectedReleaseCents: Math.max(0, balanceCents),
   };

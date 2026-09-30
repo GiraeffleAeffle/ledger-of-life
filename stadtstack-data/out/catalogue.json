@@ -1,181 +1,8 @@
 {
   "schemaVersion": "stadtstack-signals-v1",
-  "generatedAt": "2026-09-27T10:02:23.207Z",
+  "generatedAt": "2026-09-28T18:37:13.581Z",
   "publisher": "Stadtstack (independent derived factual summaries)",
   "cities": [
-    {
-      "id": "strausberg",
-      "name": "Strausberg",
-      "state": "Brandenburg",
-      "center": [
-        13.9042481,
-        52.5588942
-      ],
-      "bbox": [
-        13.8131843,
-        52.5142025,
-        14.020926,
-        52.6035192
-      ],
-      "sources": [
-        {
-          "id": "nominatim",
-          "kind": "boundary",
-          "publisher": "OpenStreetMap contributors",
-          "url": "https://nominatim.openstreetmap.org/search?q=Strausberg%2C+Brandenburg%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
-          "licence": "ODbL 1.0",
-          "reuse": "open_licence",
-          "retrievedAt": "2026-09-26T17:13:32.905Z",
-          "status": "ok"
-        },
-        {
-          "id": "atlas",
-          "kind": "atlas",
-          "publisher": "Stadtstack Atlas",
-          "url": "http://localhost:4317/api/atlas/strausberg",
-          "licence": "unknown",
-          "reuse": "facts_with_attribution",
-          "retrievedAt": "2026-09-27T10:02:26.093Z",
-          "status": "ok"
-        },
-        {
-          "id": "atlas-map",
-          "kind": "atlas",
-          "publisher": "Stadtstack Atlas",
-          "url": "http://localhost:4317/api/atlas/strausberg/map",
-          "licence": "unknown",
-          "reuse": "facts_with_attribution",
-          "retrievedAt": "2026-09-27T10:02:26.140Z",
-          "status": "ok"
-        },
-        {
-          "id": "osm",
-          "kind": "places",
-          "publisher": "OpenStreetMap contributors",
-          "url": "https://www.openstreetmap.org/copyright",
-          "licence": "ODbL 1.0",
-          "reuse": "open_licence",
-          "retrievedAt": "2026-09-26T17:13:34.916Z",
-          "status": "ok"
-        },
-        {
-          "id": "osm-boundary",
-          "kind": "boundary",
-          "publisher": "OpenStreetMap contributors",
-          "url": "https://nominatim.openstreetmap.org/search?q=Strausberg%2C+Brandenburg%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
-          "licence": "ODbL 1.0",
-          "reuse": "open_licence",
-          "retrievedAt": "2026-09-26T17:13:32.905Z",
-          "status": "ok"
-        },
-        {
-          "id": "autobahn-A10-roadworks",
-          "kind": "roadworks",
-          "publisher": "Autobahn GmbH",
-          "url": "https://verkehr.autobahn.de/o/autobahn/A10/services/roadworks",
-          "licence": "unknown",
-          "reuse": "unknown",
-          "retrievedAt": "2026-09-27T10:02:26.598Z",
-          "status": "ok"
-        },
-        {
-          "id": "autobahn-A10-closure",
-          "kind": "roadworks",
-          "publisher": "Autobahn GmbH",
-          "url": "https://verkehr.autobahn.de/o/autobahn/A10/services/closure",
-          "licence": "unknown",
-          "reuse": "unknown",
-          "retrievedAt": "2026-09-27T10:02:26.632Z",
-          "status": "ok"
-        },
-        {
-          "id": "autobahn-A11-roadworks",
-          "kind": "roadworks",
-          "publisher": "Autobahn GmbH",
-          "url": "https://verkehr.autobahn.de/o/autobahn/A11/services/roadworks",
-          "licence": "unknown",
-          "reuse": "unknown",
-          "retrievedAt": "2026-09-27T10:02:26.666Z",
-          "status": "ok"
-        },
-        {
-          "id": "autobahn-A11-closure",
-          "kind": "roadworks",
-          "publisher": "Autobahn GmbH",
-          "url": "https://verkehr.autobahn.de/o/autobahn/A11/services/closure",
-          "licence": "unknown",
-          "reuse": "unknown",
-          "retrievedAt": "2026-09-27T10:02:26.699Z",
-          "status": "ok"
-        },
-        {
-          "id": "autobahn-A12-roadworks",
-          "kind": "roadworks",
-          "publisher": "Autobahn GmbH",
-          "url": "https://verkehr.autobahn.de/o/autobahn/A12/services/roadworks",
-          "licence": "unknown",
-          "reuse": "unknown",
-          "retrievedAt": "2026-09-27T10:02:26.746Z",
-          "status": "ok"
-        },
-        {
-          "id": "autobahn-A12-closure",
-          "kind": "roadworks",
-          "publisher": "Autobahn GmbH",
-          "url": "https://verkehr.autobahn.de/o/autobahn/A12/services/closure",
-          "licence": "unknown",
-          "reuse": "unknown",
-          "retrievedAt": "2026-09-27T10:02:26.776Z",
-          "status": "ok"
-        },
-        {
-          "id": "budget-ordinance",
-          "kind": "budget",
-          "publisher": "Stadt Strausberg",
-          "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
-          "licence": "§ 5 UrhG – amtliches Werk",
-          "reuse": "official_work",
-          "retrievedAt": "2026-09-26T16:49:24.355Z"
-        },
-        {
-          "id": "budget-ordinance",
-          "kind": "budget",
-          "publisher": "Stadt Strausberg",
-          "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
-          "licence": "§ 5 UrhG – amtliches Werk",
-          "reuse": "official_work",
-          "retrievedAt": "2026-09-26T16:49:24.355Z"
-        },
-        {
-          "id": "budget-ordinance",
-          "kind": "budget",
-          "publisher": "Stadt Strausberg",
-          "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
-          "licence": "§ 5 UrhG – amtliches Werk",
-          "reuse": "official_work",
-          "retrievedAt": "2026-09-26T16:49:24.355Z"
-        },
-        {
-          "id": "budget-ordinance",
-          "kind": "budget",
-          "publisher": "Stadt Strausberg",
-          "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
-          "licence": "§ 5 UrhG – amtliches Werk",
-          "reuse": "official_work",
-          "retrievedAt": "2026-09-26T16:49:24.355Z"
-        }
-      ],
-      "temporalCoverage": {
-        "start": null,
-        "end": "2026-09-27T10:02:26.788Z"
-      },
-      "spatialCoverage": "bbox:13.8131843,52.5142025,14.020926,52.6035192",
-      "licence": "Mixed; see each source",
-      "feedUrl": "cities/strausberg/feed.json",
-      "minUrl": "cities/strausberg/signals.min.geojson",
-      "fullBytes": 305353,
-      "minBytes": 149226
-    },
     {
       "id": "koeln",
       "name": "Köln",
@@ -1604,6 +1431,143 @@
       "minUrl": "cities/freiburg/signals.min.geojson",
       "fullBytes": 1948513,
       "minBytes": 1008574
+    },
+    {
+      "id": "strausberg",
+      "name": "Strausberg",
+      "state": "Brandenburg",
+      "center": [
+        13.9042481,
+        52.5588942
+      ],
+      "bbox": [
+        13.8131843,
+        52.5142025,
+        14.020926,
+        52.6035192
+      ],
+      "sources": [
+        {
+          "id": "nominatim",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=Strausberg%2C+Brandenburg%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:13:32.905Z",
+          "status": "ok"
+        },
+        {
+          "id": "atlas",
+          "kind": "atlas",
+          "publisher": "Stadtstack Atlas",
+          "url": "http://localhost:4317/api/atlas/strausberg",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-28T18:37:21.572Z",
+          "status": "ok"
+        },
+        {
+          "id": "atlas-map",
+          "kind": "atlas",
+          "publisher": "Stadtstack Atlas",
+          "url": "http://localhost:4317/api/atlas/strausberg/map",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-09-28T18:37:21.590Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm",
+          "kind": "places",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://www.openstreetmap.org/copyright",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-28T18:37:25.186Z",
+          "status": "ok"
+        },
+        {
+          "id": "osm-boundary",
+          "kind": "boundary",
+          "publisher": "OpenStreetMap contributors",
+          "url": "https://nominatim.openstreetmap.org/search?q=Strausberg%2C+Brandenburg%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+          "licence": "ODbL 1.0",
+          "reuse": "open_licence",
+          "retrievedAt": "2026-09-26T17:13:32.905Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A10-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A10/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-28T18:37:25.483Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A10-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A10/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-28T18:37:25.526Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A11-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A11/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-28T18:37:25.561Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A11-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A11/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-28T18:37:25.594Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A12-roadworks",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A12/services/roadworks",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-28T18:37:25.630Z",
+          "status": "ok"
+        },
+        {
+          "id": "autobahn-A12-closure",
+          "kind": "roadworks",
+          "publisher": "Autobahn GmbH",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A12/services/closure",
+          "licence": "unknown",
+          "reuse": "unknown",
+          "retrievedAt": "2026-09-28T18:37:25.667Z",
+          "status": "ok"
+        }
+      ],
+      "temporalCoverage": {
+        "start": null,
+        "end": "2026-09-28T18:37:25.675Z"
+      },
+      "spatialCoverage": "bbox:13.8131843,52.5142025,14.020926,52.6035192",
+      "licence": "Mixed; see each source",
+      "feedUrl": "cities/strausberg/feed.json",
+      "minUrl": "cities/strausberg/signals.min.geojson",
+      "fullBytes": 300828,
+      "minBytes": 147144
     }
   ]
 }

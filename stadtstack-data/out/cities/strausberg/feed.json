@@ -1,7 +1,7 @@
 {
   "schemaVersion": "stadtstack-feed-v1",
   "cityId": "strausberg",
-  "generatedAt": "2026-09-27T10:09:52.072Z",
+  "generatedAt": "2026-09-28T18:37:21.517Z",
   "sources": [
     {
       "id": "strausberg-press",
@@ -10,7 +10,7 @@
       "url": "https://www.stadt-strausberg.de/aktuelles/feed/",
       "licence": "unknown",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:24.497Z",
+      "retrievedAt": "2026-09-28T18:37:14.669Z",
       "status": "ok"
     },
     {
@@ -20,7 +20,37 @@
       "url": "https://www.stadt-strausberg.de/veranstaltungen/feed/",
       "licence": "unknown",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:25.828Z",
+      "retrievedAt": "2026-09-28T18:37:15.796Z",
+      "status": "ok"
+    },
+    {
+      "id": "strausberg-calendar-2026-09",
+      "kind": "events",
+      "publisher": "Stadt Strausberg",
+      "url": "https://www.stadt-strausberg.de/veranstaltungen/2026-09-01/september-2026/",
+      "licence": "unknown",
+      "reuse": "facts_with_attribution",
+      "retrievedAt": "2026-09-28T18:37:17.748Z",
+      "status": "ok"
+    },
+    {
+      "id": "strausberg-calendar-2026-10",
+      "kind": "events",
+      "publisher": "Stadt Strausberg",
+      "url": "https://www.stadt-strausberg.de/veranstaltungen/2026-10-01/oktober-2026/",
+      "licence": "unknown",
+      "reuse": "facts_with_attribution",
+      "retrievedAt": "2026-09-28T18:37:19.721Z",
+      "status": "ok"
+    },
+    {
+      "id": "strausberg-calendar-2026-11",
+      "kind": "events",
+      "publisher": "Stadt Strausberg",
+      "url": "https://www.stadt-strausberg.de/veranstaltungen/2026-11-01/november-2026/",
+      "licence": "unknown",
+      "reuse": "facts_with_attribution",
+      "retrievedAt": "2026-09-28T18:37:21.503Z",
       "status": "ok"
     }
   ],
@@ -33,9 +63,14 @@
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-24T12:15:00.000Z",
       "eventStart": null,
+      "publisherRecordId": null,
+      "venue": null,
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": null,
       "sourceId": "strausberg-press",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:24.497Z",
+      "retrievedAt": "2026-09-28T18:37:14.669Z",
       "reviewState": "auto_checked"
     },
     {
@@ -46,9 +81,14 @@
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-24T12:13:06.000Z",
       "eventStart": null,
+      "publisherRecordId": null,
+      "venue": null,
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": null,
       "sourceId": "strausberg-press",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:24.497Z",
+      "retrievedAt": "2026-09-28T18:37:14.669Z",
       "reviewState": "auto_checked"
     },
     {
@@ -59,9 +99,14 @@
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-24T12:09:13.000Z",
       "eventStart": null,
+      "publisherRecordId": null,
+      "venue": null,
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": null,
       "sourceId": "strausberg-press",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:24.497Z",
+      "retrievedAt": "2026-09-28T18:37:14.669Z",
       "reviewState": "auto_checked"
     },
     {
@@ -72,9 +117,14 @@
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-24T12:07:21.000Z",
       "eventStart": null,
+      "publisherRecordId": null,
+      "venue": null,
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": null,
       "sourceId": "strausberg-press",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:24.497Z",
+      "retrievedAt": "2026-09-28T18:37:14.669Z",
       "reviewState": "auto_checked"
     },
     {
@@ -85,9 +135,14 @@
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-24T12:06:20.000Z",
       "eventStart": null,
+      "publisherRecordId": null,
+      "venue": null,
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": null,
       "sourceId": "strausberg-press",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:24.497Z",
+      "retrievedAt": "2026-09-28T18:37:14.669Z",
       "reviewState": "auto_checked"
     },
     {
@@ -98,9 +153,14 @@
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-24T12:04:58.000Z",
       "eventStart": null,
+      "publisherRecordId": null,
+      "venue": null,
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": null,
       "sourceId": "strausberg-press",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:24.497Z",
+      "retrievedAt": "2026-09-28T18:37:14.669Z",
       "reviewState": "auto_checked"
     },
     {
@@ -111,9 +171,14 @@
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-18T12:10:16.000Z",
       "eventStart": null,
+      "publisherRecordId": null,
+      "venue": null,
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": null,
       "sourceId": "strausberg-press",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:24.497Z",
+      "retrievedAt": "2026-09-28T18:37:14.669Z",
       "reviewState": "auto_checked"
     },
     {
@@ -124,9 +189,14 @@
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-18T12:08:52.000Z",
       "eventStart": null,
+      "publisherRecordId": null,
+      "venue": null,
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": null,
       "sourceId": "strausberg-press",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:24.497Z",
+      "retrievedAt": "2026-09-28T18:37:14.669Z",
       "reviewState": "auto_checked"
     },
     {
@@ -137,9 +207,14 @@
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-18T12:07:31.000Z",
       "eventStart": null,
+      "publisherRecordId": null,
+      "venue": null,
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": null,
       "sourceId": "strausberg-press",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:24.497Z",
+      "retrievedAt": "2026-09-28T18:37:14.669Z",
       "reviewState": "auto_checked"
     },
     {
@@ -150,9 +225,14 @@
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-18T12:06:27.000Z",
       "eventStart": null,
+      "publisherRecordId": null,
+      "venue": null,
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": null,
       "sourceId": "strausberg-press",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:24.497Z",
+      "retrievedAt": "2026-09-28T18:37:14.669Z",
       "reviewState": "auto_checked"
     },
     {
@@ -162,10 +242,20 @@
       "url": "https://www.stadt-strausberg.de/veranstaltungen/der-seniorenbeirat-baerbel-gesell-berichtet-ueber-ziele-und-ergebnisse-der-arbeit-des-seniorenbeirates/",
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-23T10:23:06.000Z",
-      "eventStart": null,
+      "eventStart": "2026-10-28T13:00:00.000Z",
+      "publisherRecordId": "30377",
+      "venue": "Begegnungsstätte der Volkssolidarität Strausberg, Gerhart-Hauptmann-Straße 6, 15344 Strausberg",
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": {
+        "url": "https://www.stadt-strausberg.de/veranstaltungen/2026-10-01/oktober-2026/",
+        "publisher": "Stadt Strausberg",
+        "method": "official_event",
+        "retrievedAt": "2026-09-28T18:37:19.721Z"
+      },
       "sourceId": "strausberg-events",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:25.828Z",
+      "retrievedAt": "2026-09-28T18:37:15.796Z",
       "reviewState": "auto_checked"
     },
     {
@@ -176,9 +266,14 @@
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-23T10:21:55.000Z",
       "eventStart": null,
+      "publisherRecordId": "30376",
+      "venue": null,
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": null,
       "sourceId": "strausberg-events",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:25.828Z",
+      "retrievedAt": "2026-09-28T18:37:15.796Z",
       "reviewState": "auto_checked"
     },
     {
@@ -188,10 +283,20 @@
       "url": "https://www.stadt-strausberg.de/veranstaltungen/spiele-quizznachmittag/",
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-23T10:19:44.000Z",
-      "eventStart": null,
+      "eventStart": "2026-10-14T12:00:00.000Z",
+      "publisherRecordId": "30375",
+      "venue": "Begegnungsstätte der Volkssolidarität Strausberg, Gerhart-Hauptmann-Straße 6, 15344 Strausberg",
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": {
+        "url": "https://www.stadt-strausberg.de/veranstaltungen/2026-10-01/oktober-2026/",
+        "publisher": "Stadt Strausberg",
+        "method": "official_event",
+        "retrievedAt": "2026-09-28T18:37:19.721Z"
+      },
       "sourceId": "strausberg-events",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:25.828Z",
+      "retrievedAt": "2026-09-28T18:37:15.796Z",
       "reviewState": "auto_checked"
     },
     {
@@ -201,10 +306,20 @@
       "url": "https://www.stadt-strausberg.de/veranstaltungen/ein-lustiger-bilderraetsel-nachmittag-welcher-begriff-verbirgt-sich-hinter-dem-bild/",
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-23T09:52:31.000Z",
-      "eventStart": null,
+      "eventStart": "2026-10-07T12:00:00.000Z",
+      "publisherRecordId": "30374",
+      "venue": "Begegnungsstätte der Volkssolidarität Strausberg, Gerhart-Hauptmann-Straße 6, 15344 Strausberg",
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": {
+        "url": "https://www.stadt-strausberg.de/veranstaltungen/2026-10-01/oktober-2026/",
+        "publisher": "Stadt Strausberg",
+        "method": "official_event",
+        "retrievedAt": "2026-09-28T18:37:19.721Z"
+      },
       "sourceId": "strausberg-events",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:25.828Z",
+      "retrievedAt": "2026-09-28T18:37:15.796Z",
       "reviewState": "auto_checked"
     },
     {
@@ -214,10 +329,29 @@
       "url": "https://www.stadt-strausberg.de/veranstaltungen/kuerbisfest/",
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-22T06:45:22.000Z",
-      "eventStart": null,
+      "eventStart": "2026-10-30T14:00:00.000Z",
+      "publisherRecordId": "30366",
+      "venue": "Vor der Marienkirche in Strausberg, Predigerstr. 2, 15344 Strausberg",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          13.8804803,
+          52.5801295
+        ]
+      },
+      "geometryPrecision": "approximate",
+      "locationSource": {
+        "url": "https://www.stadt-strausberg.de/veranstaltungen/2026-10-01/oktober-2026/",
+        "publisher": "Stadt Strausberg",
+        "method": "venue_registry",
+        "retrievedAt": "2026-09-28T18:37:19.721Z",
+        "geometrySourceUrl": "https://www.openstreetmap.org/way/38496130",
+        "geometryLicence": "ODbL-1.0",
+        "geometryAttribution": "© OpenStreetMap contributors"
+      },
       "sourceId": "strausberg-events",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:25.828Z",
+      "retrievedAt": "2026-09-28T18:37:15.796Z",
       "reviewState": "auto_checked"
     },
     {
@@ -227,10 +361,20 @@
       "url": "https://www.stadt-strausberg.de/veranstaltungen/2-strausberger-kuerbisfest-altstadtverein-e-v/",
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-16T09:32:08.000Z",
-      "eventStart": null,
+      "eventStart": "2026-10-30T16:00:00.000Z",
+      "publisherRecordId": "30334",
+      "venue": "Kirchplatz/Umzug Altstadt, Predigerstr. 2, 15344 Strausberg",
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": {
+        "url": "https://www.stadt-strausberg.de/veranstaltungen/2026-10-01/oktober-2026/",
+        "publisher": "Stadt Strausberg",
+        "method": "official_event",
+        "retrievedAt": "2026-09-28T18:37:19.721Z"
+      },
       "sourceId": "strausberg-events",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:25.828Z",
+      "retrievedAt": "2026-09-28T18:37:15.796Z",
       "reviewState": "auto_checked"
     },
     {
@@ -240,10 +384,20 @@
       "url": "https://www.stadt-strausberg.de/veranstaltungen/zu-zweit-tanz-und-orgel/",
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-16T09:31:03.000Z",
-      "eventStart": null,
+      "eventStart": "2026-10-11T14:00:00.000Z",
+      "publisherRecordId": "30333",
+      "venue": "Kirche St. Marien, Predigerstr. 2, 15344 Strausberg",
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": {
+        "url": "https://www.stadt-strausberg.de/veranstaltungen/2026-10-01/oktober-2026/",
+        "publisher": "Stadt Strausberg",
+        "method": "official_event",
+        "retrievedAt": "2026-09-28T18:37:19.721Z"
+      },
       "sourceId": "strausberg-events",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:25.828Z",
+      "retrievedAt": "2026-09-28T18:37:15.796Z",
       "reviewState": "auto_checked"
     },
     {
@@ -253,10 +407,20 @@
       "url": "https://www.stadt-strausberg.de/veranstaltungen/film-zum-800-todestag-von-franz-von-assisi/",
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-16T07:43:08.000Z",
-      "eventStart": null,
+      "eventStart": "2026-10-04T14:00:00.000Z",
+      "publisherRecordId": "30332",
+      "venue": "Gemeindesaal Kirche St. Marien, Predigerstr. 2, 15344 Strausberg",
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": {
+        "url": "https://www.stadt-strausberg.de/veranstaltungen/2026-10-01/oktober-2026/",
+        "publisher": "Stadt Strausberg",
+        "method": "official_event",
+        "retrievedAt": "2026-09-28T18:37:19.721Z"
+      },
       "sourceId": "strausberg-events",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:25.828Z",
+      "retrievedAt": "2026-09-28T18:37:15.796Z",
       "reviewState": "auto_checked"
     },
     {
@@ -266,10 +430,20 @@
       "url": "https://www.stadt-strausberg.de/veranstaltungen/saalfelder-maedelchor-2/",
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-16T07:41:44.000Z",
-      "eventStart": null,
+      "eventStart": "2026-10-14T16:00:00.000Z",
+      "publisherRecordId": "30331",
+      "venue": "Kirche St. Marien, Predigerstr. 2, 15344 Strausberg",
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": {
+        "url": "https://www.stadt-strausberg.de/veranstaltungen/2026-10-01/oktober-2026/",
+        "publisher": "Stadt Strausberg",
+        "method": "official_event",
+        "retrievedAt": "2026-09-28T18:37:19.721Z"
+      },
       "sourceId": "strausberg-events",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:25.828Z",
+      "retrievedAt": "2026-09-28T18:37:15.796Z",
       "reviewState": "auto_checked"
     },
     {
@@ -279,10 +453,20 @@
       "url": "https://www.stadt-strausberg.de/veranstaltungen/handwerk-herbstdeko/",
       "publisher": "Stadt Strausberg",
       "publishedAt": "2026-09-16T07:21:02.000Z",
-      "eventStart": null,
+      "eventStart": "2026-10-15T12:00:00.000Z",
+      "publisherRecordId": "30328",
+      "venue": "Mehrgenerationenhaus, Am Annatal 52a, 15344 Strausberg",
+      "geometry": null,
+      "geometryPrecision": "none",
+      "locationSource": {
+        "url": "https://www.stadt-strausberg.de/veranstaltungen/2026-11-01/november-2026/",
+        "publisher": "Stadt Strausberg",
+        "method": "official_event",
+        "retrievedAt": "2026-09-28T18:37:21.503Z"
+      },
       "sourceId": "strausberg-events",
       "reuse": "facts_with_attribution",
-      "retrievedAt": "2026-09-27T10:02:25.828Z",
+      "retrievedAt": "2026-09-28T18:37:15.796Z",
       "reviewState": "auto_checked"
     }
   ]

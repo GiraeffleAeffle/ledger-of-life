@@ -1,7 +1,7 @@
 import { authenticated } from '@/server/authenticated';
 import { forgetIdentity, identityStatus, pollIdentityRequest, startIdentityRequest } from '@/server/eudi';
 import { getStore } from '@/server/store';
-import { readBody, sameOrigin } from '@/server/http';
+import { errorResponse, readBody, sameOrigin } from '@/server/http';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };
 
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const identity = await authenticated(request);
     return Response.json({ identity: await identityStatus(await getStore(), identity) }, noStore);
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'Unavailable' }, { status: 401 });
+    return errorResponse(error);
   }
 }
 

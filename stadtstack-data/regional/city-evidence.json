@@ -160,5 +160,35 @@
     "stage": "adopted",
     "sourceType": "planningProcedure",
     "category": "solarpark"
+  },
+  {
+    "municipality": "wriezen",
+    "title": "Bebauungsplan Freiflächen-Photovoltaik-Anlage „Altes Holzlager in Wriezen“",
+    "url": "https://www.wriezen.de/seite/651890/bebauungspl%C3%A4ne.html",
+    "date": null,
+    "locator": "Bebauungspläne, Link „B-Plan - Freiflächen-Photovoltaik-Anlage Altes Holzlager in Wriezen“",
+    "evidence": "Altes Holzlager in Wriezen",
+    "stage": "unknown",
+    "category": "solarpark"
+  },
+  {
+    "municipality": "wriezen",
+    "title": "Bebauungsplan Gewerbepark Mahlerstraße / Am Oderbruch",
+    "url": "https://www.wriezen.de/seite/651890/bebauungspl%C3%A4ne.html",
+    "date": null,
+    "locator": "Bebauungspläne, Link „B-Plan - Gewerbepark Mahlerstraße / Am Oderbruch“",
+    "evidence": "Gewerbepark Mahlerstraße / Am Oderbruch",
+    "stage": "unknown",
+    "category": "gewerbe"
+  },
+  {
+    "municipality": "seelow",
+    "title": "Bebauungsplan Freiflächenphotovoltaik „Anlage Werbig“: Beschlussbekanntmachung",
+    "url": "https://www.seelow.de/seite/528897/%C3%B6ffentliche-beteiligungsverfahren.html",
+    "date": null,
+    "locator": "Archiv, „Bekanntmachungen zum Bauvorhaben Freiflächenphotovoltaik Anlage Werbig“; Link „Öffentliche Bekanntmachung des Beschlusses des Bebauungsplanes“",
+    "evidence": "Öffentliche Bekanntmachung des Beschlusses des Bebauungsplanes",
+    "stage": "decision_recorded",
+    "category": "solarpark"
   }
 ]

@@ -2,7 +2,8 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import type { Coordinate } from '@/server/city-signals';
 import { interestOptions, type Interest, type PersonalPins } from './personal-map-relevance';
-import { PINS_CHANGED_EVENT, pinsKey } from './use-city-signals';
+import { PINS_CHANGED_EVENT } from './use-city-signals';
+import { readAccountPins } from './personal-map-storage';
 
 const INTEREST_KEY = 'ledger-of-life:personal-map-interests:v1';
 const INTEREST_CHANGED_EVENT = 'ledger-personal-map-interests-changed';
@@ -38,7 +39,7 @@ export function parsePins(raw: string): PersonalPins {
     return { home: valid(value.home) ? value.home : undefined, work: valid(value.work) ? value.work : undefined };
   } catch { return {}; }
 }
-export function usePersonalPins(cityId: string): PersonalPins {
-  const raw = useSyncExternalStore(subscribePins, () => cityId ? localStorage.getItem(pinsKey(cityId)) ?? '' : '', () => '');
+export function usePersonalPins(cityId: string, accountId: string): PersonalPins {
+  const raw = useSyncExternalStore(subscribePins, () => readAccountPins(localStorage, cityId, accountId), () => '');
   return useMemo(() => parsePins(raw), [raw]);
 }

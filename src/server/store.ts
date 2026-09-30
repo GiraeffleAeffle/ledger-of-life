@@ -8,6 +8,11 @@ export interface Store {
   update<T>(key: string, change: (value: T) => T): Promise<T>;
   scan<T>(prefix: string, after?: string, limit?: number): Promise<{ key: string; value: T }[]>;
   close(): Promise<void>;
+  /**
+   * Physically drops what an update or delete already removed logically. Only file-backed stores need it, so it is optional.
+   * Call it after removing personal text; it is not needed for ordinary writes.
+   */
+  reclaim?(): Promise<void>;
 }
 
 export class LocalStore implements Store {
@@ -16,9 +21,14 @@ export class LocalStore implements Store {
     if (filename !== ':memory:') mkdirSync(dirname(filename), { recursive: true, mode: 0o700 });
     this.database = new DatabaseSync(filename);
     if (filename !== ':memory:') chmodSync(filename, 0o600);
+    // secure_delete zeroes freed content, and rewriting a record otherwise leaves its old bytes in the file; reclaim() below
+    // truncates the write-ahead log, which still holds old page images. Both are needed to make removed text unrecoverable.
     this.database.exec(
-      'PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS rental_records (key TEXT PRIMARY KEY, body TEXT NOT NULL) STRICT;',
+      'PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA secure_delete=ON; CREATE TABLE IF NOT EXISTS rental_records (key TEXT PRIMARY KEY, body TEXT NOT NULL) STRICT;',
     );
+  }
+  async reclaim() {
+    this.database.exec('PRAGMA wal_checkpoint(TRUNCATE)');
   }
   async get<T>(key: string): Promise<T | null> {
     const row = this.database.prepare('SELECT body FROM rental_records WHERE key = ?').get(key) as

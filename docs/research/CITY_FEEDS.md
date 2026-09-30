@@ -13,6 +13,25 @@ Requests used `User-Agent: LedgerOfLifeResearch/1.0`, small bounded reads (up to
 | Wuppertal — news | [official press RSS](https://www.wuppertal.de/presse/aktuelle-meldungen.php?sp%3Aout=rss), GET 200, `application/rss+xml; charset=utf-8` | 30; max publication date 2026-09-25 15:26 +0200; “Kontrollaktion des Städtenetzwerks der Gemeinsamen Koordinierungsstelle Rhein-Wupper”; “Denkmalgerecht saniert: Jakobstreppe offiziell eröffnet” | RSS contains copyright metadata; no open licence identified. Attribute/link, avoid republishing article body absent terms. |
 | Dresden — press | [official press RSS](https://www.dresden.de/konfiguration/rss/rss-feed-pressemitteilungen.rss), GET 200, `application/x-rss+xml` | 118; RSS order begins 2026-09-25; max parsed publication date is 2026-09-25 00:00 +0200; first two titles: “Stadtrat beschließt städtischen Wärmeplan”; “Neustadt: Verkehrseinschränkungen auf der Königsbrücker Straße ab 28. September” | RSS contains copyright metadata, no open licence identified; use attribution and source links, check city press terms before republishing text. |
 
+## Venue and date enrichment · 28 September 2026
+
+The current Strausberg publication joins event RSS records to the city's
+[October calendar](https://www.stadt-strausberg.de/veranstaltungen/2026-10-01/oktober-2026/)
+using publisher post ID and title. Event time and venue remain nullable; publication time
+is never substituted. `publisherRecordId`, venue, point/precision and location provenance
+now travel through `stadtstack-feed-v1` and the app's event detail.
+
+Record **30366**, “Kürbisfest”, is **30 October 2026, 15:00 Europe/Berlin**
+(`2026-10-30T14:00:00Z`), in front of Marienkirche, Predigerstr. 2.
+Its point `[13.8804803, 52.5801295]` is the **approximate church footprint centre** from
+[OSM way 38496130](https://www.openstreetmap.org/way/38496130), not an exact event standing point.
+The separate record **30334**, “2. Strausberger Kürbisfest”, has a different time and is not
+merged with this record or automatically given its geometry.
+
+The published feed was regenerated and the actual browser selected this venue on the
+existing 3D map. Other event cards retain sourced dates/venue text where available and
+stay unlocated when no coordinate source is established.
+
 ## Per-city discovery and non-feed findings
 
 ### Strausberg

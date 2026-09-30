@@ -28,13 +28,15 @@ The signed-in browser called `GET /api/identity`, which passed the server's toke
 Remaining setup:
 
 1. Use the existing development app and preserve the technical repository name while the brand is undecided. In Authentication → Login methods → Passkeys, enable both passkeys and the separate **Enable passkeys for sign up** option. A production plan has not been activated.
-2. Add the exact stable HTTPS preview origin before testing passkeys there. Confirm relying-party/domain behavior on a real device; a credential enrolled at the local origin may not work on a different hostname.
+2. For the hosted origin, add an **app client** (App settings → Clients → Add app client, web) whose allowed origins list only `https://ledger.stadtstack.eu`, and build with its id as `NEXT_PUBLIC_PRIVY_CLIENT_ID`. A client shares the app's users; its own origin list keeps the hosted build restricted to its domain. Confirm relying-party/domain behavior on a real device; a credential enrolled at the local origin may not work on a different hostname.
 3. Keep user-owned embedded Ethereum and Solana wallets with TEE, without server/session/additional signers or wallet automations. The application explicitly requests each missing wallet after passkey and backup-email setup.
 4. Set `PRIVY_APP_SECRET` in each additional development or deployment environment. Never put a server secret in a `NEXT_PUBLIC_` variable, public repository, URL or screenshot.
 5. Restart local development or rebuild a deployment after configuration changes. Prove real passkey access and original-wallet recovery before connected finance.
 
 ```dotenv
 NEXT_PUBLIC_PRIVY_APP_ID=
+# Optional app client id (public), for a build whose allowed origins differ from the app's defaults.
+NEXT_PUBLIC_PRIVY_CLIENT_ID=
 PRIVY_APP_SECRET=
 # Optional PEM public verification key; literal \n escapes are supported.
 PRIVY_VERIFICATION_KEY=

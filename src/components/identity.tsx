@@ -6,39 +6,37 @@ import type { IdentityStatus } from '@/server/eudi';
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 
 /** Passkey sign-in and optional EU Digital Identity Wallet check in Me. */
-export function IdentityStrip({ request }: { request: Request }) {
-  const [status, setStatus] = useState<IdentityStatus | null>(null);
+export function IdentityStrip({ request, status, loading, readError, onStatusChange, onRefresh }: {
+  request: Request; status: IdentityStatus | null; loading: boolean; readError: string;
+  onStatusChange: (status: IdentityStatus) => void; onRefresh: () => Promise<void>;
+}) {
   const [offer, setOffer] = useState<{ walletLink: string; qr: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [shareCity, setShareCity] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    request<{ identity: IdentityStatus }>('/api/eudi').then((r) => active && setStatus(r.identity)).catch(() => {});
-    return () => { active = false; };
-  }, [request]);
 
   useEffect(() => {
     if (!offer) return;
     const timer = setInterval(async () => {
       try {
         const r = await request<{ identity: IdentityStatus }>('/api/eudi', { action: 'poll' });
-        if (r.identity.state === 'verified') { setStatus(r.identity); setOffer(null); }
-        if (r.identity.state === 'none') { setOffer(null); setError('The request expired. Please start again.'); }
+        if (r.identity.state === 'verified') { onStatusChange(r.identity); setOffer(null); }
+        if (r.identity.state === 'none') { onStatusChange(r.identity); setOffer(null); setError('The request expired. Please start again.'); }
       } catch (e) {
         setOffer(null);
         setError(e instanceof Error ? e.message : 'Please try again.');
       }
     }, 2500);
     return () => clearInterval(timer);
-  }, [offer, request]);
+  }, [offer, request, onStatusChange]);
 
   async function start() {
     setBusy(true);
     setError('');
     try {
       setOffer(await request<{ walletLink: string; qr: string }>('/api/eudi', { action: 'start', shareCity }));
+      void onRefresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Please try again.');
     } finally {
@@ -47,21 +45,21 @@ export function IdentityStrip({ request }: { request: Request }) {
   }
   async function forget() {
     const r = await request<{ identity: IdentityStatus }>('/api/eudi', { action: 'forget' });
-    setStatus(r.identity);
+    onStatusChange(r.identity);
   }
 
   const verified = status?.state === 'verified' ? status.statement : null;
   return (
-    <div className={`identity-strip${verified ? ' verified' : ''}`}>
+    <div id="identity-eudi" tabIndex={-1} className={`identity-strip${verified ? ' verified' : ''}`}>
       {verified ? <BadgeCheck size={20} /> : <Fingerprint size={18} />}
       <div className="identity-copy">
         <strong>{verified ? `Verified adult${verified.city ? ` · city ${verified.city}` : ''} · EU Digital Identity Wallet` : 'Signed in with passkey'}</strong>
         <span>
           {verified
             ? `Test credential, checked ${new Date(verified.verifiedAt).toLocaleDateString()}. Kept: "18 or over"${verified.city ? ' and your city' : ''}. Not kept: name, birth date, street address.`
-            : 'Own wallets on Solana and Robinhood Chain. Add your EU identity wallet to prove you are a real adult; the app keeps only that fact.'}
+            : loading ? 'Checking the saved identity proof…' : readError ? 'The saved identity proof could not be checked.' : 'Optional adult predicate and city from the EU test wallet. No birth date is retained.'}
         </span>
-        {!verified && !offer && (
+        {!verified && !offer && !loading && !readError && (
           <label className="identity-option">
             <input type="checkbox" checked={shareCity} onChange={(e) => setShareCity(e.target.checked)} />
             Also share my city (not the street) for local news and decisions
@@ -69,9 +67,9 @@ export function IdentityStrip({ request }: { request: Request }) {
         )}
       </div>
       {verified
-        ? <button className="text-button" onClick={forget}>Forget</button>
-        : <button className="secondary-button" onClick={start} disabled={busy || !!offer}>
-            {busy ? <Loader2 className="spin" size={15} /> : <ShieldCheck size={15} />} Verify with EU wallet
+        ? <button className="text-button" onClick={forget} disabled={busy || loading}>Forget</button>
+        : <button className="secondary-button" onClick={start} disabled={busy || !!offer || loading || Boolean(readError)}>
+            {busy || loading ? <Loader2 className="spin" size={15} /> : <ShieldCheck size={15} />} Verify with EU wallet
           </button>}
       {offer && (
         <div className="identity-offer">
@@ -92,6 +90,7 @@ export function IdentityStrip({ request }: { request: Request }) {
         </div>
       )}
       {error && <span className="identity-error">{error}</span>}
+      {readError && <span className="identity-error" role="status">{readError} <button type="button" className="text-button" onClick={() => void onRefresh()}>Retry identity check</button></span>}
     </div>
   );
 }

@@ -1,4 +1,8 @@
 import type { CityFeature, Coordinate, SignalGeometry } from '../server/city-signals';
+import { formatCityDate } from './city-coverage.ts';
+import { interestOptions, type Interest } from '../data/interests.ts';
+
+export { interestOptions, type Interest };
 
 export const HOME_RADIUS_METRES = 1000;
 export const COMMUTE_CORRIDOR_METRES = 400;
@@ -7,7 +11,7 @@ export type MatchedSignal = { feature: CityFeature; distanceMetres: number | nul
 export type PersonalRings = { home: MatchedSignal[]; commute: MatchedSignal[]; city: MatchedSignal[] };
 export const REVIEW_LABELS: Record<CityFeature['properties']['reviewState'], string> = {
   candidate: 'Not yet checked',
-  auto_checked: 'Automatically checked',
+  auto_checked: 'Automatically checked · not reviewed by a person',
   reviewed: 'Human-reviewed',
   rejected: 'Rejected interpretation',
 };
@@ -92,8 +96,8 @@ export function distanceToCorridor(geometry: SignalGeometry, home: Coordinate, w
 /** Device-derived state takes precedence over a stale source status, without rewriting the original. */
 export function displayStatus(feature: CityFeature, today = new Date().toISOString().slice(0, 10)): string {
   const { kind, endDate, nextStep, status } = feature.properties;
-  if (endDate && endDate < today && kind === 'consultation') return `Consultation closed on ${endDate}; next step: ${nextStep || 'not established'}`;
-  if (endDate && endDate < today && kind === 'roadworks') return `Roadworks ended on ${endDate} (scheduled end; completion not verified)`;
+  if (endDate && endDate < today && kind === 'consultation') return `Consultation closed on ${formatCityDate(endDate)}; next step: ${nextStep || 'not established'}`;
+  if (endDate && endDate < today && kind === 'roadworks') return `Roadworks scheduled to end on ${formatCityDate(endDate)} (completion not verified)`;
   return status || 'Status not established';
 }
 
@@ -107,20 +111,28 @@ function means(feature: CityFeature, ring: 'home' | 'commute' | 'city', distance
   if (kind === 'consultation' && endDate && endDate < today) return `${displayStatus(feature, today).replace(/[.]+$/, '')}. A closed window is not open for comments.`;
   if (kind === 'roadworks' && endDate && endDate < today) return `${displayStatus(feature, today)}.`;
   if (kind === 'budget') return `Planned, not spent: ${statement}`;
-  if (kind === 'council_paper' || kind === 'council_meeting') return `${/agenda/i.test(status) ? 'Your city council has on its agenda' : kind === 'council_paper' ? 'Council paper' : 'Council meeting'}: ${title}${startDate ? ` (${startDate})` : ''}. A paper or meeting does not confirm a decision.`;
-  if (ring === 'commute' && kind === 'roadworks') return `Near your approximate way to work: ${title}${endDate ? ` until ${endDate}` : ''}. Check its status before travelling.`;
+  if (kind === 'council_paper' || kind === 'council_meeting') return `${/agenda/i.test(status) ? 'Your city council has on its agenda' : kind === 'council_paper' ? 'Council paper' : 'Council meeting'}: ${title}${startDate ? ` (${formatCityDate(startDate)})` : ''}. A paper or meeting does not confirm a decision.`;
+  if (ring === 'commute' && kind === 'roadworks') return `Near your approximate way to work: ${title}${endDate ? ` until ${formatCityDate(endDate)}` : ''}. Check its status before travelling.`;
   if (ring === 'home' && distance !== null) return `${Math.round(distance)} m from your home: ${title}${nextStep ? `; next: ${nextStep.replace(/[.]+$/, '')}` : ''}. Nearby does not necessarily mean your street is affected.`;
   return `${title}: ${statement}${nextStep ? ` Next: ${nextStep.replace(/[.]+$/, '')}.` : ''}`;
 }
-export const interestOptions = ['sport', 'kids', 'shops', 'health', 'culture'] as const;
-export type Interest = typeof interestOptions[number];
 const interestWords: Record<Interest, RegExp> = {
   sport: /sport|fitness|gym|schwimm|turn|fußball|fussball|stadion|athlet/i,
   kids: /kid|child|kinder|jugend|spielplatz|schule|kita|daycare|famil/i,
   shops: /shop|shopping|laden|geschäft|geschaeft|supermarkt|markt|retail|einzelhandel/i,
   health: /health|gesund|arzt|ärzt|aerzt|klinik|krankenhaus|apotheke|pharmacy|hospital/i,
   culture: /cultur|kultur|museum|bibliothek|library|theater|theatre|kino|kunst|music|musik/i,
+  nature: /natur|wald|forst|park|garten|umwelt|grün|gruen|straussee|\bsee\b|ufer|strand|tier/i,
+  volunteering: /ehrenamt|freiwillig|volunteer|spende|helfer|tafel|initiative/i,
 };
+/** The single matcher for interest words, so places, council items and the welcome guide agree. */
+export function interestMatchesText(text: string, interest: Interest): boolean {
+  return interestWords[interest].test(text);
+}
+/** The words behind an interest, read from the matcher itself so what people are shown cannot drift from what it does. */
+export function interestWordList(interest: Interest): string[] {
+  return interestWords[interest].source.split('|').map((word) => /^\\b.+\\b$/.test(word) ? `${word.slice(2, -2)} (whole word)` : word);
+}
 function interestMatch(feature: CityFeature, interests: readonly Interest[]): boolean {
   if (feature.properties.kind !== 'place' && feature.properties.kind !== 'council_paper' && feature.properties.kind !== 'council_meeting') return false;
   const words = `${feature.properties.title} ${feature.properties.category}`;

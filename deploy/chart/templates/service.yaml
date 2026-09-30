@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger-of-life
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ledger.helmLabels" . | nindent 4 }}
+    app.kubernetes.io/name: ledger-of-life
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ledger-of-life
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 4175
+      targetPort: http
+      protocol: TCP

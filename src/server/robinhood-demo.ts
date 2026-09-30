@@ -16,7 +16,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { defineChain } from 'viem';
 import type { Store } from './store.ts';
 import { operatorTestCapability } from './test-capability.ts';
-import { referencePrice } from './reference-price.ts';
+import { referencePrice, ReferencePriceUnavailable } from './reference-price.ts';
 
 /**
  * Robinhood Chain TESTNET demo: a real on-chain rental escrow whose released earnings go to the
@@ -85,20 +85,30 @@ export interface RobinhoodHoldings {
   referencePriceObservedAt: string;
   referencePriceStale: boolean;
 }
+/** Confirmed wallet balances without a usable reference valuation. */
+export type RobinhoodPartialHoldings = Pick<
+  RobinhoodHoldings, 'address' | 'testUsdAtomic' | 'tslaRaw' | 'tslaShares' | 'ethBalance'
+> & { status: 'price_unavailable' };
 
-export async function robinhoodHoldings(owner: string): Promise<RobinhoodHoldings> {
+export async function robinhoodHoldings(owner: string, readClient: Pick<typeof client, 'readContract' | 'getBalance'> = client): Promise<RobinhoodHoldings | RobinhoodPartialHoldings> {
   const address = getAddress(owner);
   const [usd, tsla, eth, price] = await Promise.all([
-    client.readContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'balanceOf', args: [address] }),
-    client.readContract({ address: ROBINHOOD_TESTNET.tsla, abi: erc20, functionName: 'balanceOf', args: [address] }),
-    client.getBalance({ address }),
-    referencePrice(TSLAX_MAINNET),
+    readClient.readContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'balanceOf', args: [address] }),
+    readClient.readContract({ address: ROBINHOOD_TESTNET.tsla, abi: erc20, functionName: 'balanceOf', args: [address] }),
+    readClient.getBalance({ address }),
+    referencePrice(TSLAX_MAINNET).catch((error: unknown) => {
+      if (!(error instanceof ReferencePriceUnavailable)) throw error;
+      return null;
+    }),
   ]);
-  const shares = Number(tsla) / 1e18;
+  const balances = {
+    address, testUsdAtomic: usd.toString(), tslaRaw: tsla.toString(), tslaShares: Number(tsla) / 1e18,
+    ethBalance: formatEther(eth),
+  };
+  if (!price) return { ...balances, status: 'price_unavailable' };
   return {
-    address, testUsdAtomic: usd.toString(), tslaRaw: tsla.toString(), tslaShares: shares,
-    tslaValueUsd: Number((shares * price.usdPrice).toFixed(2)), ethBalance: formatEther(eth), referencePriceUsd: price.usdPrice,
-    referencePriceObservedAt: price.observedAt, referencePriceStale: price.stale,
+    ...balances, tslaValueUsd: Number((balances.tslaShares * price.usdPrice).toFixed(2)),
+    referencePriceUsd: price.usdPrice, referencePriceObservedAt: price.observedAt, referencePriceStale: price.stale,
   };
 }
 
@@ -176,20 +186,32 @@ export async function earnOnRobinhood(store: Store, personalWallet: string, envi
   return result;
 }
 
-/** Unsigned approve (if needed) + buy transactions for the person's own wallet to sign. */
-export async function prepareRobinhoodBuy(owner: string) {
+/** Unsigned approve (if needed) + buy calls for a chosen test-USD amount. */
+export function planRobinhoodBuy({ balance, amount, allowance, minOut }: {
+  balance: bigint; amount: bigint; allowance: bigint; minOut: bigint;
+}): { to: Address; data: Hex; description: string }[] {
+  if (amount <= 0n) throw new Error('Enter an amount above zero.');
+  if (amount > balance) throw new Error('That is more than the test USD in your wallet.');
+  if (minOut <= 0n) throw new Error('That amount is too small to buy any TSLA.');
+  const calls: { to: Address; data: Hex; description: string }[] = [];
+  if (allowance < amount)
+    calls.push({ to: ROBINHOOD_TESTNET.usd, data: encodeFunctionData({ abi: erc20, functionName: 'approve', args: [ROBINHOOD_TESTNET.desk, amount] }), description: 'Allow the test desk to use your test USD' });
+  calls.push({ to: ROBINHOOD_TESTNET.desk, data: encodeFunctionData({ abi: deskAbi, functionName: 'buy', args: [amount, minOut] }), description: 'Buy test TSLA with your test USD' });
+  return calls;
+}
+
+export async function prepareRobinhoodBuy(owner: string, amount: bigint) {
   const from = getAddress(owner);
   const balance = await client.readContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'balanceOf', args: [from] });
   if (balance === 0n) throw new Error('No test USD on Robinhood Chain yet. Earn some first.');
-  const minOut = await client.readContract({ address: ROBINHOOD_TESTNET.desk, abi: deskAbi, functionName: 'quoteBuy', args: [balance] });
+  if (amount <= 0n) throw new Error('Enter an amount above zero.');
+  if (amount > balance) throw new Error('That is more than the test USD in your wallet.');
+  const minOut = await client.readContract({ address: ROBINHOOD_TESTNET.desk, abi: deskAbi, functionName: 'quoteBuy', args: [amount] });
   const allowance = await client.readContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'allowance', args: [from, ROBINHOOD_TESTNET.desk] });
+  const calls = planRobinhoodBuy({ balance, amount, allowance, minOut });
   const fees = await client.estimateFeesPerGas();
   let nonce = await client.getTransactionCount({ address: from, blockTag: 'pending' });
-  const calls: { to: Address; data: Hex; description: string }[] = [];
-  if (allowance < balance)
-    calls.push({ to: ROBINHOOD_TESTNET.usd, data: encodeFunctionData({ abi: erc20, functionName: 'approve', args: [ROBINHOOD_TESTNET.desk, balance] }), description: 'Allow the test desk to use your test USD' });
-  calls.push({ to: ROBINHOOD_TESTNET.desk, data: encodeFunctionData({ abi: deskAbi, functionName: 'buy', args: [balance, minOut] }), description: 'Buy test TSLA with your earnings' });
-  return calls.map((call) => ({
+  return { quote: { spendAtomic: amount.toString(), tslaRaw: minOut.toString() }, steps: calls.map((call) => ({
     description: call.description,
     transaction: {
       chainId: 46630 as const, to: call.to, data: call.data, value: '0x0',
@@ -197,9 +219,7 @@ export async function prepareRobinhoodBuy(owner: string) {
       maxFeePerGas: '0x' + (fees.maxFeePerGas! * 2n).toString(16),
       maxPriorityFeePerGas: '0x' + (fees.maxPriorityFeePerGas ?? 0n).toString(16),
     },
-    spendAtomic: balance.toString(),
-    minTslaRaw: minOut.toString(),
-  }));
+  })) };
 }
 
 export async function submitRobinhoodTransaction(signed: string) {

@@ -1,0 +1,22 @@
+.reality-chips { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.reality-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid currentColor; border-radius: 999px; background: #fff; font-size: 11px; font-weight: 700; letter-spacing: .02em; line-height: 1.4; }
+.reality-chip::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.reality-chip.testnet_real { color: #1f6b43; }
+.reality-chip.testnet_simulated { color: #8a622b; }
+.reality-chip.read_only_live { color: #34558a; }
+.reality-chip.self_declared_local, .reality-chip.self_declared_private { color: #5b4a86; }
+.reality-chip.prototype { color: #6b5a1f; border-style: dashed; }
+.reality-chip.illustration, .reality-chip.roadmap { color: #5f6b78; border-style: dashed; }
+.reality-levels { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; min-width: 0; }
+.reality-levels > .reality-chips { max-width: calc(100% - 30px); }
+.reality-meaning { display: contents; font-size: 11px; color: var(--ink); }
+.reality-meaning::details-content { display: contents; }
+.reality-meaning summary { display: inline-flex; flex: none; align-items: center; justify-content: center; box-sizing: border-box; width: 24px; height: 24px; border: 1px solid currentColor; border-radius: 50%; background: #fff; cursor: pointer; font-family: Georgia, serif; font-size: 14px; font-weight: 700; line-height: 1; list-style: none; }
+.reality-meaning summary::-webkit-details-marker { display: none; }
+.reality-meaning summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.reality-meaning[open] summary { background: var(--ink); color: #fff; }
+.reality-meaning dl { flex-basis: 100%; min-width: 0; box-sizing: border-box; margin: 0; padding: 10px 12px; border: 1px solid #d9dee3; border-radius: 8px; background: #fff; overflow-wrap: anywhere; }
+.reality-meaning:not([open]) dl { display: none; }
+.reality-meaning dt { font-weight: 700; }
+.reality-meaning dd { margin: 0 0 5px; }
+.reality-meaning dl > div:last-child dd { margin-bottom: 0; }

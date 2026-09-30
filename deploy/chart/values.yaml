@@ -1,0 +1,47 @@
+host: ""
+image:
+  repository: ghcr.io/giraeffleaeffle/ledger-of-life
+  digest: ""
+storage:
+  className: hcloud-volumes
+  size: 2Gi
+web:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: "1"
+      memory: 768Mi
+reconcile:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 192Mi
+ingress:
+  clusterIssuer: letsencrypt-prod
+  haproxySources:
+    - 10.42.0.10/32
+    - 10.42.0.11/32
+    - 10.42.0.12/32
+    - 10.244.0.0/32
+    - 10.244.1.0/32
+    - 10.244.2.0/32
+    - 10.244.0.1/32
+    - 10.244.1.1/32
+    - 10.244.2.1/32
+egress:
+  # This cluster's own public addresses, read on 30 Sep 2026 (nodes from the cluster, load balancers from the Hetzner
+  # API). Update from the infrastructure inventory whenever a node or load balancer changes.
+  excludePublic:
+    - 95.217.232.29/32    # stadtstack-talos-cp-1
+    - 65.21.109.240/32    # stadtstack-talos-cp-2
+    - 204.168.149.174/32  # stadtstack-talos-cp-3
+    - 77.42.11.9/32       # stadtstack-talos-ingress-lb
+    - 95.217.175.170/32   # stadtstack-talos-controlplane-lb (public side disabled today)
+config:
+  ALLOW_LOCAL_STORE: "1"
+  LOCAL_AI_LIBRARY_ENABLED: "0"

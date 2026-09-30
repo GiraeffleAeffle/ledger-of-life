@@ -6,6 +6,7 @@ const defaults = {
   APP_ORIGIN: 'http://localhost:4175',
   LOCAL_DATABASE_PATH: '.data/rental.sqlite',
   ALLOW_LOCAL_STORE: '1',
+  ALLOW_HOME_ASSISTANT_PULL: '1',
   RECONCILE_SECRET: randomBytes(32).toString('hex'),
 };
 const added = [];

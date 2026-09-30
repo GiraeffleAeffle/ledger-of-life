@@ -12,6 +12,11 @@ type FeedVisitRecord = {
   url: string; publishedAt: string; eventStart: string | null; reviewState: string;
 };
 export type FeedVisitBaseline = { schemaVersion: 1; records: Record<string, FeedVisitRecord> };
+/** A visit does not acknowledge published changes. Only the explicit seen action advances a valid baseline. */
+export function baselineForVisit<T extends VisitBaseline | FeedVisitBaseline>(previous: T | null, current: T): T {
+  return previous?.schemaVersion === 1 && previous.records ? previous : current;
+}
+
 
 /** Feed retrieval timestamps and source order are not publication changes. */
 export function snapshotCityFeed(feed: CityFeed): FeedVisitBaseline {

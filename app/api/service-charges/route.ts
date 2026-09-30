@@ -3,7 +3,7 @@ import { IdentityError } from '@/server/identity';
 import { readBody, sameOrigin } from '@/server/http';
 import { readServiceCharges, saveServiceChargePrepayment } from '@/server/service-charges';
 import { getStore } from '@/server/store';
-import { AccessError } from '@/server/workspaces';
+import { AccessError } from '@/server/errors';
 
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };

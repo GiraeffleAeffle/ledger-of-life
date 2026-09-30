@@ -1,14 +1,20 @@
 # Implementation status
 
-24 September 2026. The implementation target is the public `rental-deposit-hackathon` repository. The temporary name is unchanged. The legacy Gnosis application and its launch configuration are independent.
+Updated 28 September 2026. The target is the public `rental-deposit-hackathon` repository, branded **Ledger of Life**. Technical package/environment identifiers are unchanged; the legacy Gnosis launch configuration is independent.
 
-**The complete product journey runs as a persistent demonstration. Solana has a deployed operator-key devnet custody cycle. One Privy-connected tenancy remains active after funding and Kamino supply; a separate staged tenancy has independently completed funding, supply, redemption, zero-claim acceptance and final return of 10 test USDC to the tenant. Earned yield and the investment journey remain unproved.**
+**The app now proves a connected real-account route: two tTSLA shares → locked collateral → 12 tUSDG borrowed → 5 tHOME + 5 tWORK → a 0.01-tUSDG x402 payment for actual local Qwen inference. The wallet retains 1.99 tUSDG and its loan remains owed.** A separate free library route runs the same GPU model without a payment. Company participation profiles and a sourced event-venue layer connect this to Places. These are test-token transactions and real local compute, not real property rights, fiat profit or measured city impact; earlier Solana proofs retain their own actors and dates.
+
+The current demo scope and priorities are in [the Ledger plan](LEDGER_OF_LIFE_PLAN.md).
+The [connected native evidence](evidence/BORROW_TO_LOCAL_AI_ROBINHOOD_TESTNET.json) records
+the new loan, both stakes, exact x402 settlement, free access and failure/replay/isolation checks.
+The [earlier faucet-funded investment proof](evidence/LOCAL_CITY_INVESTMENTS_ROBINHOOD_TESTNET.json) remains separate.
+
 
 ## What now exists
 
 | Area                    | Implemented and checked                                                                                                                                | Remaining connected proof                                                                                      |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| Product                 | Tenant asset progress, separate deposit, optional personal savings, claims, human arbitration, evidence, ledger export and responsive views            | Multi-user role rehearsal and further small-screen polish                                                      |
+| Product                 | Six real-account areas; photo-led finding/applying/home journey; goal-led deposit/loan/local-stake Money; persistent OSM 2D/3D Places with public Follow and distinct fictional issuers | Further real-person usability work and broader source coverage |
 | Persistence             | SQLite locally, PostgreSQL implementation for hosted use, atomic revisions/idempotency, durable operation recovery and a separately invocable worker   | Provisioned PostgreSQL, backups, monitoring, abuse limits and a scheduled hosted worker                                      |
 | Access                  | Privy passkey/backup hooks, explicit original-wallet creation, verified JWT/user/sole-owner wallet checks, actual EIP-191/Ed25519 recovery challenges; phone recovery rehearsal | Cancelled-signature rehearsal and recovery on a stable deployment origin |
 | Agreements              | Verified distinct parties, hashed expiring invitations, immutable term digest, both acceptances, membership-protected text evidence                    | Attachment storage, access audit and retention policy for real personal data                                   |
@@ -16,19 +22,21 @@
 | Robinhood authorization | Exact EIP-712 action, gas ceilings, persisted signed envelope before broadcast, safe ambiguous retry and canonical receipt checks                      | Initial USDG allowance with the complete fee sponsorship story; real wallet signing and measured costs         |
 | Solana custody          | Compiled Anchor escrow and KLend CPI in LiteSVM; operator-key devnet cycle through settlement; first Privy tenancy active after funding/supply; separate staged Privy tenancy through no-claim settlement | Earned yield and disputed-claim proof |
 | Solana authorization    | Exact Ed25519 message, separate fee payer, fee/rent ceiling, persisted signed bytes, finality and bounded token-delta checks; separate browser approvals have finalized staged setup through no-claim settlement | Full recovery/replay rehearsal on a stable origin and measured end-to-end sponsor costs |
-| Investments             | Separate portfolio, precision and accumulating-exposure accounting; gated 0x/Jupiter validation; real read-only Jupiter prices                         | Eligible user/instrument, reviewed live route, actual buy/sale/withdrawal and complete costs                   |
+| Investments | Actual Privy-signed borrowed-funds purchases of 5 tHOME and 5 tWORK; persisted debt, separate holdings and independently checked token effects | Real issuers/rights, regulated provider routes and exit/cost evidence |
+| Local AI | Actual LAN Qwen GPU answers; official x402 v2/Permit2 with finite allowance and dedicated fee account; free visitor desk, revocation, measured usage and separate euro planner | Sustained demand/capacity, metered electricity, production settlement assets and hosted operations |
+| City data and physical ideas | OSM 3D/source geometry; four sourced organization profiles; published STEMME career/partner channels; event-time sorting and one evidenced approximate event venue | Broader verified venues/relationships, real project financing and measured physical/fiscal outcomes |
 
 ## Money and authority
 
-The walkthrough's 3,000 → 10 → 120 → 2,880 example uses fictional amounts and a fixed sample investment price. Its “add sample return” and accumulated exposure controls are test fixtures. They never claim a real yield, purchase or cash dividend.
+The retired walkthrough's 3,000 → 10 → 120 → 2,880 example used fictional amounts and a fixed sample investment price. Its “add sample return” and accumulated exposure controls were test fixtures; they never represented actual yield, purchases or cash dividends.
 
-Connected actions use independently configured deployments, provider-verified wallets and actual native observations. A demo role selector cannot authorize a native request. Released earnings and optional savings enter personal funds; they do not increase the landlord's security claim. A failed buy retains personal cash. Neither landlord, arbitrator nor fee sponsor obtains general personal-wallet spending authority.
+Connected actions use independently configured deployments, provider-verified wallets and actual native observations. Released earnings and optional savings enter personal funds; they do not increase the landlord's security claim. A failed buy retains personal cash. Neither landlord, arbitrator nor fee sponsor obtains general personal-wallet spending authority. The fictional actor-switch UI is no longer part of the signed-in workspace.
 
 Private evidence is currently bounded text stored behind agreement membership, off chain. On Robinhood, a proposed claim can carry its evidence hash. Solana claim actions record the amount/approval phase; their supporting reasons remain in the private agreement history. This is not an encrypted document vault or a complete evidentiary audit system.
 
 ## Provider setup and environment
 
-Local configuration and SQLite are prepared automatically with `npm run setup`; no credentials are checked in. The `.env.example` documents every application integration variable. `npm run reconcile` performs one authenticated pass across demo, Robinhood and Solana records. A scheduler is still required for unattended hosted operation.
+Local configuration and SQLite are prepared automatically with `npm run setup`; no credentials are checked in. The `.env.example` documents every application integration variable. `npm run reconcile` calls the explicit Robinhood and Solana native scopes only; missing and retired demo scopes are rejected. A scheduler is still required for unattended hosted operation.
 
 The user signed in and created a Privy development app. Email and passkeys are enabled, `http://localhost:4175` is allowed, and the TEE wallet environment is active without additional signing keys. The public app ID and a new server secret are set in the user's ignored local configuration. A read-only SDK users-list request authenticated successfully and returned zero users before signup retries. The first passkey signup attempt on the former `127.0.0.1` origin failed before a device prompt. A retry on `localhost` returned `disallowed_login_method`: the separate dashboard option for passkey sign-up was off. That option is now on and the client login-method list includes passkey. The user completed passkey signup and linked a verified backup email. Account readiness no longer waits for absent wallet connectors. Privy's email modal emitted a non-fatal `stacked` DOM-prop warning, which the app filters on HTML elements.
 

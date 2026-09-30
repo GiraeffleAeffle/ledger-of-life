@@ -26,9 +26,9 @@ Keep deposit yield disabled. A separate personal savings adapter can follow only
 
 ### 2. Connect the interface to verified state
 
-Replace the demo role switch with authenticated identities and server-enforced tenancy membership. Handle email verification, wallet ownership, enrollment, recovery, and assigned arbitrators. Model submitted, confirmed, failed, and reconciled transactions separately. Reject client-supplied balances or claims of authority.
+Bind every workspace area to authenticated identities and server-enforced tenancy membership. Handle email verification, wallet ownership, enrollment, recovery, and assigned arbitrators. Model submitted, confirmed, failed, and reconciled transactions separately. Reject client-supplied balances or claims of authority.
 
-Maintain a demonstration mode that is unmistakably separate from any real signing flow. Do not mix sample balances with actual on-chain balances. Keep network, token, recipients, and amounts visible before a signature.
+Keep test-network and sample states clearly labeled and separate from actual account balances. Keep network, token, recipients, and amounts visible before a signature.
 
 ### 3. Add private evidence and operator controls
 

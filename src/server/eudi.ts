@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import QRCode from 'qrcode';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
-import { WorkflowError } from '../domain/workflow.ts';
+import { WorkflowError } from '../domain/errors.ts';
 import type { Store } from './store.ts';
 
 /**

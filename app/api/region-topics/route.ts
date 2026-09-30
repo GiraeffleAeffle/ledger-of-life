@@ -1,5 +1,6 @@
 import { authenticated } from '@/server/authenticated';
 import { readRegionalTopics } from '@/server/city-signals';
+import { errorResponse } from '@/server/http';
 
 export const runtime = 'nodejs';
 const headers = { 'Cache-Control': 'private, no-store', Vary: 'Authorization' };
@@ -9,7 +10,7 @@ export async function GET(request: Request) {
   try {
     await authenticated(request);
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'Sign in again.' }, { status: 401, headers });
+    return errorResponse(error);
   }
   const params = new URL(request.url).searchParams;
   if ([...params.keys()].some((key) => key !== 'city') || params.getAll('city').length !== 1 || !params.get('city'))

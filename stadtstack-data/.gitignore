@@ -1,4 +1,7 @@
 node_modules/
 cache/
 .deepeval/
+__pycache__/
 !out/
+.env*
+!.env.example

@@ -1,20 +1,24 @@
 import { getStore } from '@/server/store';
-import { reconcileDemonstrations } from '@/server/jobs';
 import { requireJobSecret, errorResponse } from '@/server/http';
-import { WorkflowError } from '@/domain/workflow';
+import { WorkflowError } from '@/domain/errors';
 import { createPublicClient, http } from 'viem';
 import { loadRobinhoodConfig, reconcileRobinhoodOperations } from '@/server/robinhood-service';
 import { reconcileSolanaOperations } from '@/server/solana-service';
+import { sweepAiText } from '@/server/local-ai';
 export const runtime = 'nodejs';
 export async function POST(request: Request) {
   try {
     requireJobSecret(request);
     const url = new URL(request.url);
-    const scope = url.searchParams.get('scope') || 'demo';
+    const scope = url.searchParams.get('scope');
     const after = url.searchParams.get('after') || '';
     if (after.length > 160) throw new Error('Invalid cursor.');
-    if (!['demo', 'robinhood', 'solana'].includes(scope))
+    if (!scope || !['robinhood', 'solana', 'local-ai'].includes(scope))
       throw new WorkflowError('Unknown reconciliation scope.');
+    if (scope === 'local-ai') {
+      const { scrubbed, next } = await sweepAiText(await getStore(), after);
+      return Response.json({ scope, status: 'checked', scrubbed, nextCursor: next }, { headers: { 'Cache-Control': 'no-store' } });
+    }
     if (scope === 'robinhood') {
       if (
         !process.env.ROBINHOOD_RPC_URL ||
@@ -36,21 +40,14 @@ export async function POST(request: Request) {
         { headers: { 'Cache-Control': 'no-store' } },
       );
     }
-    if (scope === 'solana') {
-      const result = await reconcileSolanaOperations(await getStore(), after);
-      return Response.json(
-        {
-          scope,
-          status: result.available ? 'checked' : 'unconfigured',
-          ...result,
-          nextCursor: result.next,
-        },
-        { headers: { 'Cache-Control': 'no-store' } },
-      );
-    }
-    const result = await reconcileDemonstrations(await getStore(), after);
+    const result = await reconcileSolanaOperations(await getStore(), after);
     return Response.json(
-      { scope, status: 'checked', ...result, nextCursor: result.next },
+      {
+        scope,
+        status: result.available ? 'checked' : 'unconfigured',
+        ...result,
+        nextCursor: result.next,
+      },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {

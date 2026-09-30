@@ -3,12 +3,13 @@ import 'server-only';
 import { PrivyClient } from '@privy-io/node';
 import { isAddress as isSolanaAddress } from '@solana/kit';
 import { isAddress as isEthereumAddress } from 'viem';
-import { createIdentityVerifier, IdentityError } from '../wallets/identity-policy.ts';
+import { createIdentityVerifier, IdentityError, type VerifiedIdentity } from '../wallets/identity-policy.ts';
+import { createPrivyAccessTokenVerifier } from '../wallets/privy-access-token.ts';
 
 export { IdentityError };
 export type { VerifiedIdentity, VerifiedWallet } from '../wallets/identity-policy.ts';
 
-let configuredVerifier: ReturnType<typeof createIdentityVerifier> | undefined;
+let configuredVerifier: ((token: string) => Promise<VerifiedIdentity>) | undefined;
 
 /** Verifies an access token and current wallet ownership; never signs or assigns roles. */
 export async function verifyPrivyToken(token: string) {
@@ -21,22 +22,14 @@ export async function verifyPrivyToken(token: string) {
     const client = new PrivyClient({
       appId,
       appSecret,
-      jwtVerificationKey: process.env.PRIVY_VERIFICATION_KEY?.replace(/\\n/g, '\n'),
       timeout: 10_000,
       maxRetries: 1,
     });
     configuredVerifier = createIdentityVerifier({
       appId,
-      verifyToken: async (accessToken) => {
-        const claims = await client.utils().auth().verifyAccessToken(accessToken);
-        return {
-          appId: claims.app_id,
-          subject: claims.user_id,
-          issuer: claims.issuer,
-          expiresAt: claims.expiration,
-          sessionId: claims.session_id,
-        };
-      },
+      verifyToken: createPrivyAccessTokenVerifier(
+        appId, process.env.PRIVY_VERIFICATION_KEY?.replace(/\\n/g, '\n'), process.env.PRIVY_API_BASE_URL,
+      ),
       getUser: (subject) => client.users()._get(subject),
       getWallet: (id) => client.wallets().get(id),
       getOwner: (id) => client.keyQuorums().get(id),

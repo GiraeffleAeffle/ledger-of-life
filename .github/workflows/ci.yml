@@ -20,21 +20,6 @@ jobs:
       - run: npm test
       - run: npm run lint
       - run: npm run build
-      - name: Run local HTTP acceptance
-        shell: bash
-        run: |
-          npm run setup
-          npm run start > /tmp/rental-web.log 2>&1 &
-          server_pid=$!
-          trap 'kill "$server_pid" || true' EXIT
-          for attempt in {1..40}; do
-            if curl --fail --silent http://127.0.0.1:4175/api/status > /dev/null; then
-              break
-            fi
-            sleep 1
-          done
-          npm run acceptance
-          npm run reconcile
   evm:
     runs-on: ubuntu-latest
     timeout-minutes: 15

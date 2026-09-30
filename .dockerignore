@@ -1,0 +1,18 @@
+# Deny by default. Only what the image needs is allowed back in, so private keys, local databases and
+# environment files can never enter a build, whatever the working tree happens to contain.
+*
+
+!package.json
+!package-lock.json
+!next.config.ts
+!tsconfig.json
+!app
+!src
+!scripts
+scripts/*
+!scripts/reconcile.mjs
+
+# The published city data the Places area reads at runtime. Its collector cache and node_modules stay out.
+!stadtstack-data
+stadtstack-data/*
+!stadtstack-data/out

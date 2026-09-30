@@ -2,7 +2,7 @@ import { authenticated } from '@/server/authenticated';
 import { chooseCity, readCity } from '@/server/city';
 import { identityStatus } from '@/server/eudi';
 import { getStore } from '@/server/store';
-import { readBody, sameOrigin } from '@/server/http';
+import { errorResponse, readBody, sameOrigin } from '@/server/http';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };
 
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   try {
     return Response.json({ city: await view(request) }, noStore);
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'Unavailable' }, { status: 401 });
+    return errorResponse(error);
   }
 }
 
@@ -30,6 +30,6 @@ export async function POST(request: Request) {
     await chooseCity(await getStore(), identity, String(body.city ?? ''));
     return Response.json({ city: await view(request) }, noStore);
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'Please try again.' }, { status: 409 });
+    return errorResponse(error);
   }
 }

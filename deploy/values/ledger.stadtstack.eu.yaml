@@ -1,0 +1,4 @@
+host: ledger.stadtstack.eu
+image:
+  # The image workflow's job summary prints the registry digest to paste here.
+  digest: ""

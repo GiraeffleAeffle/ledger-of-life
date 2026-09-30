@@ -1,0 +1,5 @@
+apiVersion: v2
+name: ledger-of-life
+version: 0.1.0
+description: Ledger of Life test-network deployment
+type: application

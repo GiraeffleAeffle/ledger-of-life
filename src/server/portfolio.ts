@@ -20,10 +20,14 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
   getBase58Decoder,
   signature,
+  type Address,
+  type Rpc,
+  type SolanaRpcApi,
 } from '@solana/kit';
 import {
   TOKEN_2022_PROGRAM_ADDRESS,
   fetchMint,
+  fetchMaybeToken,
   findAssociatedTokenPda,
   getCreateAssociatedTokenIdempotentInstruction,
   getTransferCheckedInstruction,
@@ -32,7 +36,7 @@ import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { walletFor } from './agreements.ts';
 import { solanaConfiguration } from './solana-rpc.ts';
 import { SolanaServiceError } from './solana-service.ts';
-import { referencePrice } from './reference-price.ts';
+import { referencePrice, ReferencePriceUnavailable } from './reference-price.ts';
 import type { Store } from './store.ts';
 import { operatorTestCapability } from './test-capability.ts';
 
@@ -99,14 +103,26 @@ function retryingTransport(url: string) {
   }) as typeof transport;
 }
 
-async function market(environment: Record<string, string | undefined>) {
+async function marketRead(environment: Record<string, string | undefined>) {
   const config = solanaConfiguration(environment);
-  if (!operatorTestCapability(environment) || !config || config.cluster !== 'devnet') return null;
+  if (!config || config.cluster !== 'devnet') return null;
   const dir = resolve(environment.SOLANA_TEST_SIGNER_DIR || '.testnet-secrets/test-signer');
   try {
     const { mint } = JSON.parse(await readFile(resolve(dir, 'market.json'), 'utf8')) as { mint: string };
+    return { rpc: createSolanaRpcFromTransport(retryingTransport(config.rpcUrl)), rpcUrl: config.rpcUrl, mint: address(mint) };
+  } catch {
+    return null;
+  }
+}
+
+async function market(environment: Record<string, string | undefined>) {
+  if (!operatorTestCapability(environment)) return null;
+  const observed = await marketRead(environment);
+  if (!observed) return null;
+  const dir = resolve(environment.SOLANA_TEST_SIGNER_DIR || '.testnet-secrets/test-signer');
+  try {
     const maker = await createKeyPairSignerFromBytes(new Uint8Array(JSON.parse(await readFile(resolve(dir, 'market-maker.json'), 'utf8'))));
-    return { rpc: createSolanaRpcFromTransport(retryingTransport(config.rpcUrl)), rpcUrl: config.rpcUrl, mint: address(mint), maker };
+    return { ...observed, maker };
   } catch {
     return null;
   }
@@ -124,39 +140,57 @@ export interface PortfolioView {
   referencePriceStale: boolean;
   valueUsd: number;
 }
+/** Confirmed amounts without a usable stock valuation (cash remains known). */
+export type PortfolioPartial = Pick<PortfolioView, 'available' | 'symbol' | 'testUsdcAtomic' | 'rawAtomic' | 'shares' | 'multiplier'> & {
+  status: 'price_unavailable';
+  referencePriceUsd: null;
+  referencePriceObservedAt: null;
+  referencePriceStale: true;
+  valueUsd: null;
+};
 
-const portfolioReads = new Map<string, { expiresAt: number; wallet: string; result: Promise<PortfolioView> }>();
+/** Wallet balances remain observable even when Jupiter has no current price. */
+export async function readPortfolioPosition(
+  rpc: Rpc<SolanaRpcApi>,
+  owner: Address,
+  stockMint: Address,
+): Promise<PortfolioView | PortfolioPartial> {
+  const [usdcAta] = await findAssociatedTokenPda({ owner, mint: TEST_USDC, tokenProgram: CLASSIC_TOKEN });
+  const [stockAta] = await findAssociatedTokenPda({ owner, mint: stockMint, tokenProgram: TOKEN_2022_PROGRAM_ADDRESS });
+  const balance = async (account: typeof usdcAta) => {
+    const token = await fetchMaybeToken(rpc, account, { commitment: 'confirmed' });
+    return token.exists ? token.data.amount.toString() : '0';
+  };
+  const [testUsdcAtomic, rawAtomic, mint, quote] = await Promise.all([
+    balance(usdcAta), balance(stockAta), fetchMint(rpc, stockMint, { commitment: 'confirmed' }),
+    referencePrice(SPYX_MAINNET).catch((error: unknown) => {
+      if (!(error instanceof ReferencePriceUnavailable)) throw error;
+      return null;
+    }),
+  ]);
+  const config = mint.data.extensions.__option === 'Some'
+    ? mint.data.extensions.value.find((item) => item.__kind === 'ScaledUiAmountConfig')
+    : undefined;
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const multiplier = !config || config.__kind !== 'ScaledUiAmountConfig' ? 1
+    : now >= config.newMultiplierEffectiveTimestamp ? config.newMultiplier : config.multiplier;
+  const shares = (Number(rawAtomic) / 10 ** DECIMALS) * multiplier;
+  if (!quote) return { available: true, status: 'price_unavailable', symbol: 'tSPYx', testUsdcAtomic, rawAtomic,
+    shares, multiplier, referencePriceUsd: null, referencePriceObservedAt: null, referencePriceStale: true, valueUsd: null };
+  return { available: true, symbol: 'tSPYx', testUsdcAtomic, rawAtomic, shares, multiplier, referencePriceUsd: quote.usdPrice,
+    referencePriceObservedAt: quote.observedAt, referencePriceStale: quote.stale, valueUsd: Number((shares * quote.usdPrice).toFixed(2)) };
+}
 
-export async function readPortfolio(identity: VerifiedIdentity, environment = process.env): Promise<PortfolioView | { available: false }> {
-  const m = await market(environment);
+const portfolioReads = new Map<string, { expiresAt: number; wallet: string; result: Promise<PortfolioView | PortfolioPartial> }>();
+
+export async function readPortfolio(identity: VerifiedIdentity, environment = process.env): Promise<PortfolioView | PortfolioPartial | { available: false }> {
+  const m = await marketRead(environment);
   if (!m) return { available: false };
   const owner = address(walletFor(identity, 'solana').address);
   const key = `${m.rpcUrl}:${m.mint}:${owner}`;
   const cached = portfolioReads.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.result;
-  const result = (async (): Promise<PortfolioView> => {
-    const [usdcAta] = await findAssociatedTokenPda({ owner, mint: TEST_USDC, tokenProgram: CLASSIC_TOKEN });
-    const [stockAta] = await findAssociatedTokenPda({ owner, mint: m.mint, tokenProgram: TOKEN_2022_PROGRAM_ADDRESS });
-    const balance = async (account: typeof usdcAta) => {
-      try {
-        return (await m.rpc.getTokenAccountBalance(account, { commitment: 'confirmed' }).send()).value.amount;
-      } catch {
-        return '0';
-      }
-    };
-    const [testUsdcAtomic, rawAtomic, mint, quote] = await Promise.all([
-      balance(usdcAta), balance(stockAta), fetchMint(m.rpc, m.mint, { commitment: 'confirmed' }), referencePrice(SPYX_MAINNET),
-    ]);
-    const config = mint.data.extensions.__option === 'Some'
-      ? mint.data.extensions.value.find((item) => item.__kind === 'ScaledUiAmountConfig')
-      : undefined;
-    const now = BigInt(Math.floor(Date.now() / 1000));
-    const multiplier = !config || config.__kind !== 'ScaledUiAmountConfig' ? 1
-      : now >= config.newMultiplierEffectiveTimestamp ? config.newMultiplier : config.multiplier;
-    const shares = (Number(rawAtomic) / 10 ** DECIMALS) * multiplier;
-    return { available: true, symbol: 'tSPYx', testUsdcAtomic, rawAtomic, shares, multiplier, referencePriceUsd: quote.usdPrice,
-      referencePriceObservedAt: quote.observedAt, referencePriceStale: quote.stale, valueUsd: Number((shares * quote.usdPrice).toFixed(2)) };
-  })();
+  const result = readPortfolioPosition(m.rpc, owner, m.mint);
   const entry = { expiresAt: Infinity, wallet: owner, result };
   portfolioReads.set(key, entry);
   if (portfolioReads.size > 128) portfolioReads.delete(portfolioReads.keys().next().value!);

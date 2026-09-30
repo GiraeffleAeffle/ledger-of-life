@@ -4,9 +4,9 @@ _Formerly "Deposit workspace". Package names, repository name and environment ke
 
 Start with [docs/LEDGER_OF_LIFE.md](docs/LEDGER_OF_LIFE.md) for the idea, structure and adapter overview.
 
-**Build assets while renting.** A tenant's eligible deposit earnings can become contributions to a separate personal portfolio. Landlords retain a bounded rental-security workflow; assigned human arbitrators can resolve disputed claims. The product name is still undecided.
+**Ledger of Life** keeps a person’s home, deposit, money and places in one real-account workspace. A tenant's eligible deposit earnings can become contributions to a separate personal portfolio. Landlords retain a bounded rental-security workflow; assigned human arbitrators can resolve disputed claims.
 
-This public hackathon implementation explores **Robinhood Chain and Solana in parallel**. It includes a persistent walkthrough, verified-account and private-agreement services, restricted native escrows, and signing/reconciliation APIs. Local native proofs passed on both stacks. A separate operator-key Solana devnet rehearsal completed test-USDC funding, Kamino supply/redemption and no-claim settlement. One Privy-connected tenancy remains active after funding and supplying 10 test USDC to Kamino. A second Privy-connected tenancy on the staged program completed asynchronous setup, funding, supply, redemption, zero-claim acceptance and a full 10-test-USDC return to the tenant's fixed payout account. **Earned yield, a personal investment order and production deployment are not yet proved.** See [implementation status](docs/IMPLEMENTATION_STATUS.md) for the exact boundaries.
+This public hackathon implementation explores **Robinhood Chain and Solana in parallel**. It includes verified-account and private-agreement services, restricted native escrows, and signing/reconciliation APIs. Local native proofs passed on both stacks. A separate operator-key Solana devnet rehearsal completed test-USDC funding, Kamino supply/redemption and no-claim settlement. One Privy-connected tenancy remains active after funding and supplying 10 test USDC to Kamino. A second Privy-connected tenancy on the staged program completed asynchronous setup, funding, supply, redemption, zero-claim acceptance and a full 10-test-USDC return to the tenant's fixed payout account.
 
 ## Run locally
 
@@ -18,19 +18,112 @@ npm run setup
 npm run dev
 ```
 
-Open [the workspace](http://localhost:4175). Use this hostname for passkeys; WebAuthn cannot use an IP address as its relying-party ID. Setup creates a private `.env.local` without printing secrets. The walkthrough works without accounts, wallets or funds and persists in local SQLite across reloads. All walkthrough people, homes, balances and transactions are fictional; the role selector belongs only to this demonstration.
+Open [the workspace](http://localhost:4175). Use this hostname for passkeys; WebAuthn cannot use an IP address as its relying-party ID. Setup creates a private `.env.local` without printing secrets. Account setup and the six signed-in areas use the real account; test-network balance and finance workflows require the relevant wallet, connection, and test-network configuration.
 
-1. Choose Robinhood or Solana. Accept the agreement as tenant and landlord.
-2. As tenant, review and authorize the 3,000-unit deposit, then check its result and supply it to lending.
-3. Add the explicitly labeled 10-unit sample return, release it, and review a personal investment. Optional savings go to personal cash separately.
-4. Review accumulated investment exposure. It creates no second cash dividend.
-5. As landlord, propose a 120-unit claim. The tenant can agree or dispute it; only the assigned arbitrator can decide a disputed allocation.
-6. Authorize and reconcile settlement. A 120-unit allocation returns 2,880 of the original security to the tenant. Personal holdings remain theirs and can subsequently be sold and withdrawn in the walkthrough.
-7. Open **Connections** for native proof details, real read-only Jupiter prices and provider setup status.
+For the real, passkey-signed flow on the Solana test network (post a home → apply → choose → deposit → move-out → payout, one next step at a time), open **Home**. See [the home journey](docs/HOME_JOURNEY.md).
 
-For the real, passkey-signed flow on the Solana test network (post a home → apply → choose → deposit → move-out → payout, one next step at a time), open **My home**. See [the home journey](docs/HOME_JOURNEY.md).
+Today starts with **Identity & life, Home & living, Money & ownership, Energy & devices, and Places & participation**. **Explore all adapters** opens Me's shared catalogue: working actions, saved connection state, source/permission details and explicitly planned capabilities. Home Assistant and validator settings have one home in Me; their readings live in **Money → Devices & income**. Each feature has one home area and a reference elsewhere: see [where a feature lives](docs/INFORMATION_ARCHITECTURE.md).
+
+To follow a public project: **Today → Explore & follow projects → Follow** on a project card. With no covered city selected, use the covered-city map or the clearly dated historical example. Follows are account-scoped on this device, not project membership; saved developments appear in Today and can be reviewed in Places.
 
 Every financial action has a review, an explicit authorization and a separate result check. A failed purchase leaves personal cash intact. A claim decision alone does not pay anyone.
+
+## Test local investment · Robinhood Chain
+
+**Money** has four sections: **Holdings**, **Shares & loans**, **Local stakes** and **Devices & income**. Its **Holdings** tab
+carries the ownership path (available shares, an explicitly reviewed loan, and wallet-signed housing/workshop
+stakes `tHOME`, `tWORK` in **Local stakes**). The separate rental-deposit route remains available in Home. Issuer
+examples have separate markers on the OSM 3D map; real public projects retain source-based Follow actions.
+
+The [public deployment manifest](contracts/evm/deployments/local-investments-46630.json) pins the
+contracts. [Actual Privy purchase evidence](docs/evidence/LOCAL_CITY_INVESTMENTS_ROBINHOOD_TESTNET.json)
+records two 5-test-USD purchases and independently checked receipts/holdings.
+Project units confer no real company equity, cooperative membership or property title.
+Their issue price is not a resale quote; units remain separate from the priced-asset subtotal.
+
+Operator-only provisioning uses the existing private test operator key. Run commands serially;
+never reset a user's share market or use an existing funded user wallet as a fixture:
+
+```sh
+forge build --root contracts/evm
+node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local contracts/evm/script/local-investments.mjs setup --send
+node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local contracts/evm/script/local-investments.mjs fund --wallet "$FRESH_TEST_WALLET" --cash 10000000 --gas 300000000000000 --send
+```
+
+Setup preserves an existing verified manifest. Funding is bounded and journals signed bytes
+before broadcast; repeating a command verifies the same transactions rather than topping up.
+Normal viewing/signing/receipt reads do not need the operator key. Use the CLI `proof --wallet
+ADDRESS --tx HASH` for an independent read-only purchase check.
+
+For the complete borrowed-funds route, use a fresh real account with an empty share position.
+**Prepare example shares** creates only a new isolated market, two fake `tTSLA` shares and
+bounded fee gas—never test cash in the buyer's wallet. Review the editable loan amount,
+then buy the two stakes from that borrowed same-chain cash. Debt and locked collateral
+remain visible. Existing positions and legacy markets are preserved; interrupted preparation
+and operator controls expose their saved recovery actions.
+
+The preparation API uses a dedicated provisioner, not the shared legacy operator nonce lane.
+Stop the local preview and other operator activity for explicit setup funding, then restart:
+
+```sh
+node --env-file-if-exists=.env.local --experimental-strip-types scripts/ownership-provisioner.mjs prepare
+node --env-file-if-exists=.env.local --experimental-strip-types scripts/ownership-provisioner.mjs fund --send
+node --env-file-if-exists=.env.local --experimental-strip-types scripts/ownership-provisioner.mjs check
+```
+
+This grants **0.001 test ETH** once, with estimated rollup gas and an immutable signed journal.
+Repeated funding commands reconcile that grant; they do not top it up. Keep the key and
+journals for recovery. The CLI and preview must use the same database configuration;
+if the preview deliberately overrides `DATABASE_URL=`, use that override for its operator commands too.
+
+## Local AI and the public library desk
+
+Set the server-only Ollama URL/model in `.env.local` using `.env.example`. The Next server
+must reach the LAN host; a public cloud deployment cannot reach a private LAN address
+without an explicitly configured network connection. Do not publish the Ollama port or keys.
+If the host sleeps, use its existing wake controls first. The app does not power on,
+reboot or reconfigure the PC, and it does not replace an unavailable local model.
+
+- **Money → Devices & income → Local AI & GPU hosting** is the one home of this service; Me's GPU adapter, the project sketch's GPU option and the library profile link to it.
+- Personal access uses official **x402 v2 exact/Permit2**, the existing six-decimal `tUSDG`
+  on `eip155:46630`, and **0.01 tUSDG per completed answer**. The reviewed Permit2 allowance
+  is finite (**0.10 tUSDG**), and each answer needs its own bounded wallet authorization.
+- The model must produce a complete answer before settlement. Failed or length-capped
+  inference is not charged; an already-sent allowance approval can still cost network gas.
+  The saved output and exact settlement bytes survive an interrupted response, so recovery does not
+  generate another answer or sign another payment. Once an answer ends, the question and
+  answer text are removed after `LOCAL_AI_TEXT_GRACE_SECONDS` (default 600). The reconcile job
+  (`scope=local-ai`) enforces it, and a read also removes overdue text. Usage counts, timings and
+  receipts stay. On the SQLite store the removal also reaches the database file and its log
+  (`secure_delete` plus a truncating checkpoint); Postgres keeps dead rows until autovacuum.
+- Set `LOCAL_AI_LIBRARY_ENABLED=1` to enable [the wallet-free desk](http://localhost:4175/library).
+  It establishes an HttpOnly visitor session before inference, allows three attempts per
+  visitor and thirty shared attempts per UTC day, and runs one model request at a time.
+  **Finish & clear this desk** revokes the visitor session and removes that visitor's saved
+  questions and answers now. No sponsor payment or paid receipt is fabricated for free access.
+- Recorded token usage, request duration, decode rate and settled receipts are observations.
+  The separate euro planner uses editable power, hardware, price and demand assumptions.
+  It does not convert test receipts to fiat or treat one short GPU run as sustained capacity.
+
+Prepare the dedicated facilitator while the preview and other shared-operator writers are
+stopped. These commands never use a customer wallet and never run automatically on a page visit:
+
+```sh
+node --env-file-if-exists=.env.local --experimental-strip-types scripts/setup-local-ai-facilitator.mjs --prepare
+node --env-file-if-exists=.env.local --experimental-strip-types scripts/setup-local-ai-facilitator.mjs --fund
+node --env-file-if-exists=.env.local --experimental-strip-types scripts/setup-local-ai-facilitator.mjs --check
+```
+
+The explicit funding envelope grants **0.002 test ETH** once. The app and CLI share the
+same chain, runtime-hash, proxy, token-name/symbol and decimals checks. A separate
+private fee account pays settlement gas; the public manifest records only its address
+and purpose. No public arbitrary-payload settlement sponsor is exposed.
+
+Protocol: [x402 exact EVM](https://github.com/x402-foundation/x402/blob/main/specs/schemes/exact/scheme_exact_evm.md),
+[v2 HTTP transport](https://github.com/x402-foundation/x402/blob/main/specs/transports-v2/http.md),
+and [Robinhood rollup gas accounting](https://docs.robinhood.com/chain/gas-and-fees/).
+
+
 
 ## Architecture
 
@@ -59,23 +152,22 @@ flowchart LR
 | Solana         | Test-only Anchor escrow, USDC, validated Kamino CPI, separate message-bound fee sponsor              |
 | Investments    | Gated 0x/Jupiter adapters; keyless Jupiter price inspection; live buys/sales remain a proof gate     |
 
-Account credentials being present is not a successful onboarding test. Native APIs authenticate actual provider identities and fixed tenancy roles; they never inherit the walkthrough's role selector or balances. The sponsor pays fees and receives no general investment authority.
+Account credentials being present is not a successful onboarding test. Native APIs authenticate actual provider identities and fixed tenancy roles; test-network actions remain bound to their real account and wallet. The sponsor pays fees and receives no general investment authority.
 
 Start with the [product ontology](docs/ONTOLOGY.md) (machine-readable: [`ontology.yaml`](docs/ontology.yaml)). Read the [build spec](docs/HACKATHON_BUILD_SPEC.md), [ADRs](docs/adr/README.md), [wallet setup](docs/WALLET_SETUP.md), [Robinhood operator guide](docs/ROBINHOOD_NATIVE_API.md), and [Solana operator guide](docs/SOLANA_NATIVE_API.md).
 
 ## Validate
 
 ```sh
-npm test
+npx tsc --noEmit
 npm run lint
+npm test
 npm run build
-# Against the running local server; uses fresh fictional sessions:
-npm run acceptance
-# One authenticated reconciliation pass; schedule separately for hosted operation:
-npm run reconcile
 ```
 
-[Validation evidence](docs/VALIDATION.md) distinguishes application tests, actual local protocol execution, public price observations and unperformed live acceptance. Native contract/program commands are in [the EVM guide](contracts/evm/README.md) and [the Solana guide](programs/rental_escrow/README.md).
+These checks do not authorize financial actions. `npm run reconcile` is a separate operator action that may advance configured test-network state; do not run it as a smoke check.
+
+For a local preview use `DATABASE_URL= WATCHPACK_POLLING=true npm run dev` on port 4175 from a shell with working outbound DNS. Without a configured Privy verification key, the server must retrieve Privy's public JWKS over HTTPS to authenticate actual passkey sessions. A process supervisor that replaces working DNS with an isolated resolver can leave the page reachable while its authenticated APIs report provider unavailability; fix the launch environment rather than resetting accounts or weakening token checks.
 
 ## Whole-city data for the map
 
@@ -83,16 +175,16 @@ npm run reconcile
 
 ## Project map
 
-- `src/domain/` — exact amounts, demonstration accounting and savings illustrations.
+- `src/domain/` — exact amounts and shared domain errors.
 - `src/server/` — authenticated tenancy/evidence services, persistence, recovery and native operation orchestration.
 - `src/wallets/` — account onboarding and user-controlled signatures.
 - `src/finance/` — independent native observations, transaction plans and receipt validation.
 - `contracts/evm/` and `programs/rental_escrow/` — restricted custody implementations and native tests.
-- `src/components/` and `app/` — role journeys, connection controls and same-origin APIs.
+- `src/components/` and `app/` — the real-account areas, connection controls and same-origin APIs.
 - `docs/` — build scope, decisions, evidence and operator handoff.
 
 ## Provenance and scope
 
 This work grows out of the earlier **Smart Rental Deposit** Gnosis prototype. Pre-existing product research and tenancy rules informed this implementation. The new public interface started on September 21, 2026; the parallel native implementation and selected architecture records were added on September 22. The prior private checkout reference was `07573bd3fa66f1af6c99b2d264af39ee767154a3`, with additional uncommitted work. This is a review reference, not a complete competition baseline. The submission must disclose prior work and distinguish competition-period changes. See the [official hackathon rules](https://colosseum.com/legal/Crypto%20World%27s%20Fair%20Hackathon%20Rules.pdf).
 
-This repository does not contain the private backend, tenant data, environment files, keys or old Git history. No hackathon submission, financial-provider approval, bank transfer or real-money deployment has been performed. RealT, insurance pooling, borrowing, guaranteed returns and automatic recurring investment are outside this version. Public visibility is not a project-wide license decision; that remains to be chosen.
+This repository does not contain the private backend, tenant data, environment files, keys or old Git history. No hackathon submission, financial-provider approval, bank transfer or real-money deployment has been performed. RealT, insurance pooling, production borrowing, guaranteed returns and automatic recurring investment are outside this version; the share-backed loan is a separate test-network workflow with simulated pricing. Public visibility is not a project-wide license decision; that remains to be chosen.

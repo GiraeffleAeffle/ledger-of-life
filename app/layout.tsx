@@ -2,9 +2,20 @@ import type { Metadata } from 'next';
 import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/manrope';
 import './globals.css';
-import { WalletProvider } from '@/wallets';
+
+function metadataBaseFromOrigin(): URL | undefined {
+  if (!process.env.APP_ORIGIN) return undefined;
+  try {
+    return new URL(process.env.APP_ORIGIN);
+  } catch {
+    return undefined;
+  }
+}
+
+const metadataBase = metadataBaseFromOrigin();
 
 export const metadata: Metadata = {
+  ...(metadataBase ? { metadataBase } : {}),
   title: 'Ledger of Life · Everything that is yours, in one place',
   description:
     'Your verified identity, your home and deposit, what you own and earn, and what is changing in your city. A test-network prototype.',
@@ -14,7 +25,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body>
-        <WalletProvider>{children}</WalletProvider>
+        {children}
       </body>
     </html>
   );

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "chainId": 46630,
+  "facilitator": "0xaA9E2E9e539D03433d92627287F7af2FCa64c76D",
+  "purpose": "local-ai-exact-permit2-fee-only",
+  "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+  "exactProxy": "0x402085c248EeA27D92E8b30b2C58ed07f9E20001",
+  "asset": "0xA6e10E426A738aEF586dB5191177658D67C78A14"
+}

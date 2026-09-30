@@ -2,7 +2,7 @@
 const origin = process.env.APP_ORIGIN;
 const secret = process.env.RECONCILE_SECRET;
 if (!origin || !secret) throw new Error('APP_ORIGIN and RECONCILE_SECRET are required.');
-for (const scope of ['demo', 'robinhood', 'solana']) {
+for (const scope of ['robinhood', 'solana', 'local-ai']) {
   let after = '';
   do {
     const url = new URL('/api/jobs/reconcile', origin);

@@ -1,13 +1,16 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
-  createPublicClient, createWalletClient, defineChain, encodeFunctionData, getAddress, http,
-  nonceManager, parseAbi, parseTransaction, recoverTransactionAddress, type Address, type Hex,
+  createPublicClient, createWalletClient, defineChain, encodeDeployData, encodeFunctionData, getAddress, http,
+  keccak256, nonceManager, parseAbi, parseTransaction, recoverTransactionAddress, type Address, type Hex,
 } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
+import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 import type { Store } from './store.ts';
 import { ROBINHOOD_TESTNET } from './robinhood-demo.ts';
 import { operatorTestCapability } from './test-capability.ts';
+import { executeFundingStep, type SignedFundingStep } from './local-investment-provisioning.ts';
+import { acquireOperatorNonceLane, releaseOperatorNonceLane, releaseOperatorNonceLaneIfOwned } from './operator-nonce-lane.ts';
+import { reviewedOperatorFees, reviewedOperatorGas } from './ownership-gas.ts';
 
 // Robinhood Chain TESTNET only. The signed-in person's key never enters this module.
 const chain = defineChain({ id: 46630, name: 'Robinhood Chain Testnet', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://rpc.testnet.chain.robinhood.com'] } }, testnet: true });
@@ -32,11 +35,18 @@ const DURATION = 365 * 24 * 60 * 60;
 const noMoney = 'No real value · test tokens and simulated test price';
 
 export type WorkflowDeployment = {
-  status: 'ready'; owner: Address; oracle: Address; desk: Address; pool: Address; stock?: Address;
+  status: 'ready'; owner: Address; oracle: Address; desk: Address; pool: Address; stock?: Address; provisioner?: Address;
   escrow?: Address; depositAtomic?: string; basePriceAtomic: string;
   transactions: Hex[];
 };
-type Starting = { status: 'starting' };
+type Starting = { status: 'starting'; owner: Address; provisioner: Address; basePriceAtomic?: string; steps: Record<string, SignedFundingStep>; addresses: Partial<Record<'stock' | 'oracle' | 'desk' | 'pool', Address>>; transactions: Hex[] };
+/** Called inside Store.update's atomic transaction: a late resume must never erase a ready escrow. */
+export function finalizeShareMarket(current: WorkflowDeployment | Starting, completed: WorkflowDeployment): WorkflowDeployment {
+  if (current.status === 'ready') return current;
+  if (current.owner.toLowerCase() !== completed.owner.toLowerCase() || current.provisioner.toLowerCase() !== completed.provisioner?.toLowerCase())
+    throw new Error('The reserved market signer or owner changed before finalization.');
+  return { ...completed, transactions: current.transactions };
+}
 const key = (owner: Address) => `share-workflows:${owner.toLowerCase()}`;
 const assertEnabled = () => { if (!operatorTestCapability()) throw new Error('Test market controls are disabled.'); };
 const checked = (owner: string) => getAddress(owner);
@@ -47,6 +57,17 @@ async function operator() {
   const read = async (role: string) => privateKeyToAccount((await readFile(resolve(dir, `${role}.key`), 'utf8')).trim() as Hex, { nonceManager });
   const [signer, landlord, arbitrator] = await Promise.all(['operator', 'landlord', 'arbitrator'].map(read));
   return { signer, landlord, arbitrator };
+}
+/** A distinct, explicitly funded testnet signer owns newly created oracle and desk contracts. */
+export async function ownershipProvisioner() {
+  assertEnabled();
+  const filename = resolve(process.env.ROBINHOOD_OWNERSHIP_PROVISIONER_KEY_FILE || '.testnet-secrets/robinhood-testnet/ownership-provisioner.key');
+  const shared = resolve(process.env.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet', 'operator.key');
+  const [dedicatedKey, operatorKey] = await Promise.all([readFile(filename, 'utf8'), readFile(shared, 'utf8')]);
+  const signer = privateKeyToAccount(dedicatedKey.trim() as Hex, { nonceManager });
+  if (signer.address.toLowerCase() === privateKeyToAccount(operatorKey.trim() as Hex).address.toLowerCase())
+    throw new Error('Ownership provisioner must not reuse the shared test operator.');
+  return signer;
 }
 async function artifact(contract: string, source: string) {
   const file = JSON.parse(await readFile(resolve(`contracts/evm/out/${source}.sol/${contract}.json`), 'utf8')) as { abi: unknown[]; bytecode: { object: Hex } };
@@ -68,68 +89,123 @@ async function deployed(store: Store, owner: Address) {
   return item;
 }
 
-/** One isolated test oracle/desk/pool per signed-in wallet: price scenarios never affect another account. */
-export async function startShareMarket(store: Store, wallet: string) {
+/** One isolated test oracle/desk/pool per signed-in wallet. A previously created market is never replaced. */
+export async function startShareMarket(store: Store, wallet: string, laneOperation?: string) {
   assertEnabled();
   const owner = checked(wallet);
-  const prior = await existing(store, owner);
-  if (prior?.stock) return prior;
-  if (prior) {
-    const loan = await rpc.readContract({ address: prior.pool, abi: poolAbi, functionName: 'position', args: [owner] });
-    const escrowState = prior.escrow ? await rpc.readContract({ address: prior.escrow, abi: escrowAbi, functionName: 'state' }) : 5;
-    if (loan[0] || loan[1] || (escrowState !== 0 && escrowState !== 5))
-      throw new Error('Finish your existing share deposit or loan before preparing the fake-stock demo.');
-    await store.update<WorkflowDeployment | Starting>(key(owner), () => ({ status: 'starting' }));
-  } else await store.create(key(owner), { status: 'starting' } satisfies Starting);
-  const people = await operator();
-  const op = createWalletClient({ chain, account: people.signer, transport: http() });
-  const basePrice = await rpc.readContract({ address: ROBINHOOD_TESTNET.desk, abi: deskAbi, functionName: 'price' });
-  const transactions: Hex[] = [];
-  async function deploy(contract: string, source: string, args: readonly unknown[]) {
+  let state = await store.get<WorkflowDeployment | Starting>(key(owner));
+  if (state?.status === 'ready') {
+    if (!laneOperation && state.provisioner) {
+      const signer = await ownershipProvisioner();
+      if (signer.address.toLowerCase() !== state.provisioner.toLowerCase()) throw new Error('The dedicated signer no longer matches this market’s recorded owner.');
+      await releaseOperatorNonceLaneIfOwned(store, signer.address, `share-market:${owner.toLowerCase()}`);
+    }
+    return state;
+  }
+  const signer = await ownershipProvisioner();
+  if (!state) {
+    const existingShares = await rpc.readContract({ address: ROBINHOOD_TESTNET.tsla, abi: tokenAbi, functionName: 'balanceOf', args: [owner] });
+    if (existingShares > 0n) throw new Error('Existing official test TSLA remains separate; do not replace its share market with fake stock.');
+    try {
+      await store.create(key(owner), { status: 'starting', owner, provisioner: signer.address, steps: {}, addresses: {}, transactions: [] } satisfies Starting);
+    } catch (error) {
+      if (await store.get(key(owner))) throw new Error('This wallet already has a reserved market setup. Retry it without starting another.');
+      throw error;
+    }
+    state = await store.get<Starting>(key(owner));
+  }
+  if (!state || state.status !== 'starting' || state.owner?.toLowerCase() !== owner.toLowerCase() || !state.steps || !state.addresses ||
+    state.provisioner?.toLowerCase() !== signer.address.toLowerCase())
+    throw new Error('A previous market setup cannot be safely recovered; no replacement market was started.');
+  const operation = laneOperation ?? `share-market:${owner.toLowerCase()}`;
+  await acquireOperatorNonceLane(store, signer.address, operation);
+  if (!state.basePriceAtomic) {
+    const price = await rpc.readContract({ address: ROBINHOOD_TESTNET.desk, abi: deskAbi, functionName: 'price' });
+    state = await store.update<Starting>(key(owner), (current) => ({ ...current, basePriceAtomic: current.basePriceAtomic ?? price.toString() }));
+  }
+  const basePrice = BigInt(state.basePriceAtomic!);
+  async function sendStep(label: string, to: Address | undefined, data: Hex, value = 0n) {
+    const journal = (await store.get<Starting>(key(owner)))!.steps[label] ?? {};
+    const hash = await executeFundingStep(journal, async () => {
+      const [nonce, fees, gas] = await Promise.all([
+        rpc.getTransactionCount({ address: signer.address, blockTag: 'pending' }),
+        rpc.estimateFeesPerGas(),
+        rpc.estimateGas({ account: signer.address, to, data, value }),
+      ]);
+      const quoted = reviewedOperatorFees(fees);
+      return signer.signTransaction({
+        type: 'eip1559', chainId: chain.id, nonce, to, data, value, gas: reviewedOperatorGas(gas, to ? 'transfer' : 'deploy'),
+        ...quoted,
+      });
+    }, async () => {
+      await store.update<Starting>(key(owner), (current) => {
+        if (current.status !== 'starting') throw new Error('Market setup changed while its transaction was reserved.');
+        const saved = current.steps[label];
+        if (saved?.signed && saved.signed !== journal.signed) throw new Error('A different signed market transaction already reserves this step.');
+        if (saved?.hash && saved.hash !== keccak256(journal.signed!)) throw new Error('Market transaction journal changed.');
+        return { ...current, steps: { ...current.steps, [label]: { ...journal } } };
+      });
+    }, rpc);
+    const receipt = await rpc.getTransactionReceipt({ hash });
+    if (receipt.status !== 'success' || receipt.transactionHash !== hash) throw new Error('The reserved market step is not confirmed.');
+    return { hash, receipt };
+  }
+  async function deploy(label: 'stock' | 'oracle' | 'desk' | 'pool', contract: string, source: string, args: readonly unknown[]) {
+    const current = (await store.get<Starting>(key(owner)))!;
+    if (current.addresses[label]) return current.addresses[label];
     const code = await artifact(contract, source);
-    const hash = await op.deployContract({ abi: code.abi, bytecode: code.bytecode.object, args });
-    const address = (await confirm(hash)).contractAddress;
-    if (!address) throw new Error('The test contract was not deployed.');
-    transactions.push(hash);
-    return address;
+    const result = await sendStep(label, undefined, encodeDeployData({ abi: code.abi, bytecode: code.bytecode.object, args }));
+    if (!result.receipt.contractAddress) throw new Error('Reserved market deployment has no contract address.');
+    await store.update<Starting>(key(owner), (value) => ({
+      ...value, addresses: { ...value.addresses, [label]: result.receipt.contractAddress! },
+      transactions: value.transactions.includes(result.hash) ? value.transactions : [...value.transactions, result.hash],
+    }));
+    return result.receipt.contractAddress;
   }
-  const stock = await deploy('FakeTestTSLA', 'FakeTestTSLA', []);
-  const oracle = await deploy('TestPriceOracle', 'TestnetMarket', [basePrice]);
-  const desk = await deploy('TestStockDesk', 'TestnetMarket', [ROBINHOOD_TESTNET.usd, stock, basePrice]);
-  const pool = await deploy('TestLendingPool', 'TestLendingPool', [stock, ROBINHOOD_TESTNET.usd, oracle, 500, DURATION]);
-  const inventory = await op.writeContract({ address: stock, abi: tokenAbi, functionName: 'mint', args: [desk, 1_000n * shareScale] });
-  await confirm(inventory); transactions.push(inventory);
-  for (const target of [desk, pool]) {
-    const hash = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'mint', args: [target, 8_000_000_000n] });
-    await confirm(hash); transactions.push(hash);
+  async function transfer(label: string, to: Address, data: Hex, value = 0n) {
+    const current = (await store.get<Starting>(key(owner)))!;
+    if (current.transactions.includes(current.steps[label]?.hash as Hex)) return;
+    const { hash } = await sendStep(label, to, data, value);
+    await store.update<Starting>(key(owner), (value) => ({
+      ...value, transactions: value.transactions.includes(hash) ? value.transactions : [...value.transactions, hash],
+    }));
   }
-  if ((await rpc.getBalance({ address: owner })) < 100_000_000_000_000n) {
-    const hash = await op.sendTransaction({ to: owner, value: 300_000_000_000_000n });
-    await confirm(hash); transactions.push(hash);
-  }
-  const state: WorkflowDeployment = { status: 'ready', owner, stock, oracle, desk, pool, basePriceAtomic: basePrice.toString(), transactions };
-  await store.update<WorkflowDeployment | Starting>(key(owner), () => state);
-  return state;
+  const stock = await deploy('stock', 'FakeTestTSLA', 'FakeTestTSLA', []);
+  const oracle = await deploy('oracle', 'TestPriceOracle', 'TestnetMarket', [basePrice]);
+  const desk = await deploy('desk', 'TestStockDesk', 'TestnetMarket', [ROBINHOOD_TESTNET.usd, stock, basePrice]);
+  const pool = await deploy('pool', 'TestLendingPool', 'TestLendingPool', [stock, ROBINHOOD_TESTNET.usd, oracle, 500, DURATION]);
+  await transfer('inventory', stock, encodeFunctionData({ abi: tokenAbi, functionName: 'mint', args: [desk, 1_000n * shareScale] }));
+  await transfer('desk-usd', ROBINHOOD_TESTNET.usd, encodeFunctionData({ abi: tokenAbi, functionName: 'mint', args: [desk, 8_000_000_000n] }));
+  await transfer('pool-usd', ROBINHOOD_TESTNET.usd, encodeFunctionData({ abi: tokenAbi, functionName: 'mint', args: [pool, 8_000_000_000n] }));
+  const latest = (await store.get<WorkflowDeployment | Starting>(key(owner)))!;
+  if (latest.status === 'starting' && (latest.steps['owner-gas']?.signed || (await rpc.getBalance({ address: owner })) < 100_000_000_000_000n))
+    await transfer('owner-gas', owner, '0x', 300_000_000_000_000n);
+  const ready: WorkflowDeployment = { status: 'ready', owner, stock, oracle, desk, pool, provisioner: signer.address, basePriceAtomic: basePrice.toString(), transactions: [] };
+  const finalized = await store.update<WorkflowDeployment | Starting>(key(owner), (current) => finalizeShareMarket(current, ready));
+  if (finalized.status !== 'ready') throw new Error('Market completion did not persist.');
+  if (!laneOperation) await releaseOperatorNonceLane(store, signer.address, operation);
+  return finalized;
 }
 
-export async function readShareWorkflows(store: Store, wallet: string) {
+export async function readShareWorkflows(store: Store, wallet: string, readClient: Pick<typeof rpc, 'readContract'> = rpc) {
   const owner = checked(wallet);
   const deployment = await existing(store, owner);
   const stock = deployment?.stock ?? ROBINHOOD_TESTNET.tsla;
-  const [shares, dollars, basePrice] = await Promise.all([
-    rpc.readContract({ address: stock, abi: tokenAbi, functionName: 'balanceOf', args: [owner] }),
-    rpc.readContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'balanceOf', args: [owner] }),
-    rpc.readContract({ address: ROBINHOOD_TESTNET.desk, abi: deskAbi, functionName: 'price' }),
+  const [shares, dollars, price] = await Promise.all([
+    readClient.readContract({ address: stock, abi: tokenAbi, functionName: 'balanceOf', args: [owner] }),
+    readClient.readContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'balanceOf', args: [owner] }),
+    deployment
+      ? readClient.readContract({ address: deployment.oracle, abi: oracleAbi, functionName: 'latestPrice' }).then(([value]) => value)
+      : readClient.readContract({ address: ROBINHOOD_TESTNET.desk, abi: deskAbi, functionName: 'price' }),
   ]);
-  const price = deployment ? (await rpc.readContract({ address: deployment.oracle, abi: oracleAbi, functionName: 'latestPrice' }))[0] : basePrice;
   const pledged = deployment?.escrow ? await Promise.all([
-    rpc.readContract({ address: deployment.escrow, abi: escrowAbi, functionName: 'state' }),
-    rpc.readContract({ address: deployment.escrow, abi: escrowAbi, functionName: 'stockHeld' }),
-    rpc.readContract({ address: deployment.escrow, abi: escrowAbi, functionName: 'cashHeld' }),
-    rpc.readContract({ address: deployment.escrow, abi: escrowAbi, functionName: 'shortfallDeadline' }),
-    rpc.readContract({ address: deployment.escrow, abi: escrowAbi, functionName: 'claimAmount' }),
+    readClient.readContract({ address: deployment.escrow, abi: escrowAbi, functionName: 'state' }),
+    readClient.readContract({ address: deployment.escrow, abi: escrowAbi, functionName: 'stockHeld' }),
+    readClient.readContract({ address: deployment.escrow, abi: escrowAbi, functionName: 'cashHeld' }),
+    readClient.readContract({ address: deployment.escrow, abi: escrowAbi, functionName: 'shortfallDeadline' }),
+    readClient.readContract({ address: deployment.escrow, abi: escrowAbi, functionName: 'claimAmount' }),
   ]) : null;
-  const loan = deployment ? await rpc.readContract({ address: deployment.pool, abi: poolAbi, functionName: 'position', args: [owner] }) : null;
+  const loan = deployment ? await readClient.readContract({ address: deployment.pool, abi: poolAbi, functionName: 'position', args: [owner] }) : null;
   const collateral = pledged?.[1] ?? 0n;
   const cash = pledged?.[2] ?? 0n;
   const deposit = BigInt(deployment?.depositAtomic ?? 0);
@@ -146,7 +222,7 @@ export async function readShareWorkflows(store: Store, wallet: string) {
     sharesRaw: shares.toString(), testUsdAtomic: dollars.toString(), priceAtomic: price.toString(),
     walletValueAtomic: (shares * price / shareScale).toString(), suggestedPledgeRaw: suggestedPledge.toString(),
     suggestedDepositAtomic: suggestedDeposit.toString(),
-    deployment: deployment ? { oracle: deployment.oracle, desk: deployment.desk, pool: deployment.pool, escrow: deployment.escrow } : null,
+    deployment: deployment ? { oracle: deployment.oracle, desk: deployment.desk, pool: deployment.pool, escrow: deployment.escrow, provisioner: deployment.provisioner ?? null } : null,
     deposit: pledged && deployment ? {
       state: Number(pledged[0]), sharesRaw: collateral.toString(), cashAtomic: cash.toString(),
       valueAtomic: value.toString(), depositAtomic: deposit.toString(), bufferAtomic: (value - required).toString(),
@@ -233,13 +309,112 @@ export async function submitShareTransaction(store: Store, wallet: string, signe
   return { hash };
 }
 
+type ControlCall = { to: Address; data: Hex };
+type ControlJournal = { owner: Address; pool: Address; action: string; calls: ControlCall[]; steps: SignedFundingStep[]; state: 'running' | 'done' | 'failed_unsigned'; hashes: Hex[]; error?: string };
+function controlResult(hashes: Hex[]) {
+  if (hashes.length === 2) return { hash: hashes[0], deskHash: hashes[1] };
+  if (hashes.length === 3) return { hash: hashes[2], mint: hashes[0], approve: hashes[1] };
+  return { hash: hashes[0] };
+}
+/** Atomic fence: another instance cannot publish a signature after this unsigned failure. */
+export async function failUnsignedShareControl(store: Store, jobKey: string, reason: string) {
+  const journal = await store.update<ControlJournal>(jobKey, (current) => {
+    if (current.state !== 'running' || current.steps.some((step) => Boolean(step.signed))) return current;
+    return { ...current, state: 'failed_unsigned', error: reason };
+  });
+  return journal.state === 'failed_unsigned';
+}
+async function provisionedControl(store: Store, owner: Address, config: WorkflowDeployment, action: string, requestId: string, signer: PrivateKeyAccount) {
+  if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(requestId)) throw new Error('A unique control request is required to safely reconcile operator transactions.');
+  const jobKey = `share-control:${owner.toLowerCase()}:${requestId}`;
+  let journal = await store.get<ControlJournal>(jobKey);
+  if (!journal) {
+    const calls: ControlCall[] = [];
+    if (action === 'price_down_30' || action === 'price_down_60' || action === 'price_down_70' || action === 'price_reset') {
+      const price = BigInt(config.basePriceAtomic) * (action === 'price_down_30' ? 70n : action === 'price_down_60' ? 40n : action === 'price_down_70' ? 30n : 100n) / 100n;
+      calls.push({ to: config.oracle, data: encodeFunctionData({ abi: oracleAbi, functionName: 'setPrice', args: [price] }) },
+        { to: config.desk, data: encodeFunctionData({ abi: deskAbi, functionName: 'setPrice', args: [price] }) });
+    } else if (action === 'flag_shortfall' || action === 'protect_deposit' || action === 'settle') {
+      if (!config.escrow) throw new Error('No new test tenancy yet.');
+      calls.push({ to: config.escrow, data: encodeFunctionData({ abi: escrowAbi, functionName: action === 'flag_shortfall' ? 'flagShortfall' : action === 'protect_deposit' ? 'liquidate' : 'settle' }) });
+    } else if (action === 'faucet') {
+      calls.push({ to: ROBINHOOD_TESTNET.usd, data: encodeFunctionData({ abi: tokenAbi, functionName: 'mint', args: [owner, 1_000_000n] }) });
+    } else if (action === 'liquidate_loan') {
+      const debt = (await rpc.readContract({ address: config.pool, abi: poolAbi, functionName: 'position', args: [owner] }))[1];
+      calls.push(
+        { to: ROBINHOOD_TESTNET.usd, data: encodeFunctionData({ abi: tokenAbi, functionName: 'mint', args: [signer.address, debt] }) },
+        { to: ROBINHOOD_TESTNET.usd, data: encodeFunctionData({ abi: tokenAbi, functionName: 'approve', args: [config.pool, debt] }) },
+        { to: config.pool, data: encodeFunctionData({ abi: poolAbi, functionName: 'liquidate', args: [owner, debt] }) },
+      );
+    } else throw new Error('Unknown test market control.');
+    try { await store.create(jobKey, { owner, pool: config.pool, action, calls, steps: calls.map(() => ({})), hashes: [], state: 'running' } satisfies ControlJournal); }
+    catch (error) { if (!(await store.get(jobKey))) throw error; }
+    journal = await store.get<ControlJournal>(jobKey);
+  }
+  if (!journal || journal.owner !== owner || journal.pool !== config.pool || journal.action !== action)
+    throw new Error('Control request is bound to another market or operation.');
+  const operation = `share-control:${owner.toLowerCase()}:${requestId}`;
+  if (journal.state === 'done') {
+    await releaseOperatorNonceLaneIfOwned(store, signer.address, operation);
+    return controlResult(journal.hashes);
+  }
+  if (journal.state === 'failed_unsigned') {
+    await releaseOperatorNonceLaneIfOwned(store, signer.address, operation);
+    return { state: 'failed_unsigned' as const, error: journal.error ?? 'No operator transaction was signed.' };
+  }
+  await acquireOperatorNonceLane(store, signer.address, operation);
+  try {
+  for (let i = 0; i < journal.calls.length; i++) {
+    const call = journal.calls[i];
+    const step = (await store.get<ControlJournal>(jobKey))!.steps[i];
+    const hash = await executeFundingStep(step, async () => {
+      const [nonce, fees, gas] = await Promise.all([
+        rpc.getTransactionCount({ address: signer.address, blockTag: 'pending' }),
+        rpc.estimateFeesPerGas(), rpc.estimateGas({ account: signer.address, to: call.to, data: call.data }),
+      ]);
+      const quoted = reviewedOperatorFees(fees);
+      return signer.signTransaction({ type: 'eip1559', chainId: chain.id, nonce, to: call.to, data: call.data,
+        gas: reviewedOperatorGas(gas, 'deploy'), ...quoted });
+    }, async () => {
+      await store.update<ControlJournal>(jobKey, (value) => {
+        if (value.state !== 'running') throw new Error('Control was closed before signing; no transaction was sent.');
+        const saved = value.steps[i];
+        if (saved?.signed && saved.signed !== step.signed) throw new Error('Control transaction journal changed.');
+        return { ...value, steps: value.steps.map((item, index) => index === i ? { ...step } : item) };
+      });
+    }, rpc);
+    journal = await store.update<ControlJournal>(jobKey, (value) => ({
+      ...value, hashes: value.hashes[i] === hash ? value.hashes : [...value.hashes.slice(0, i), hash],
+    }));
+  }
+  await store.update<WorkflowDeployment>(key(owner), (value) => ({
+    ...value, transactions: [...value.transactions, ...journal!.hashes.filter((hash) => !value.transactions.includes(hash))],
+  }));
+  await store.update<ControlJournal>(jobKey, (value) => ({ ...value, state: 'done' }));
+  await releaseOperatorNonceLane(store, signer.address, operation);
+  return controlResult(journal.hashes);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'The control was unavailable before signing.';
+    if (await failUnsignedShareControl(store, jobKey, reason)) {
+      await releaseOperatorNonceLaneIfOwned(store, signer.address, operation);
+      return { state: 'failed_unsigned' as const, error: reason };
+    }
+    throw error;
+  }
+}
+
 /** Operator-only test controls, never invoked using a person's key. */
-export async function controlShareMarket(store: Store, wallet: string, action: string) {
+export async function controlShareMarket(store: Store, wallet: string, action: string, requestId?: string) {
   assertEnabled();
   const owner = checked(wallet);
   const config = await deployed(store, owner);
   const people = await operator();
-  const op = createWalletClient({ chain, account: people.signer, transport: http() });
+  const signer = config.provisioner ? await ownershipProvisioner() : people.signer;
+  if (config.provisioner && signer.address.toLowerCase() !== config.provisioner.toLowerCase())
+    throw new Error('The dedicated signer no longer matches this market’s recorded owner.');
+  if (config.provisioner && action !== 'landlord_accepts' && action !== 'move_out_claim')
+    return provisionedControl(store, owner, config, action, requestId ?? '', signer);
+  const op = createWalletClient({ chain, account: signer, transport: http() });
   const landlord = createWalletClient({ chain, account: people.landlord, transport: http() });
   let hash: Hex;
   if (action === 'landlord_accepts') {
@@ -284,7 +459,7 @@ export async function controlShareMarket(store: Store, wallet: string, action: s
     await confirm(hash);
   } else if (action === 'liquidate_loan') {
     const debt = (await rpc.readContract({ address: config.pool, abi: poolAbi, functionName: 'position', args: [owner] }))[1];
-    const mint = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'mint', args: [people.signer.address, debt] });
+    const mint = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'mint', args: [signer.address, debt] });
     await confirm(mint);
     const approve = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'approve', args: [config.pool, debt] });
     await confirm(approve);

@@ -11,7 +11,7 @@ export type SignalGeometry =
   | { type: 'MultiPolygon'; coordinates: Coordinate[][][] }
   | null;
 export interface SignalSource {
-  url: string; title: string; publisher: string; locator: string; retrievedAt: string;
+  url: string; snapshotUrl?: string; title: string; publisher: string; locator: string; retrievedAt: string;
   sha256: string | null; licence: string; reuse: string;
 }
 export interface Signal {
@@ -44,10 +44,13 @@ export interface SignalCity {
 }
 export interface SignalCatalogue { schemaVersion: 'stadtstack-signals-v1'; generatedAt: string; cities: SignalCity[] }
 export interface CitySignals { catalogue: SignalCity; coveredCities: SignalCity[]; generatedAt: string; signals: CityCollection; changes: { added: string[]; changed: string[]; removed: string[] } }
-export type SignalResult = { state: 'covered'; data: CitySignals } | { state: 'not_covered'; city: string; coveredCities: SignalCity[] };
+export type SignalResult = { state: 'covered'; data: CitySignals } | { state: 'not_covered'; city: string; coveredCities: SignalCity[]; generatedAt: string };
 export interface CityFeedItem {
   id: string; kind: 'news' | 'event'; title: string; url: string; publisher: string;
-  publishedAt: string; eventStart: string | null; sourceId: string; reuse: string;
+  publishedAt: string; eventStart: string | null; publisherRecordId: string | null; sourceId: string; reuse: string;
+  venue: string | null; geometry: { type: 'Point'; coordinates: Coordinate } | null;
+  geometryPrecision: 'exact' | 'approximate' | 'none';
+  locationSource: { url: string; publisher: string; method: 'ics_geo' | 'official_event' | 'venue_registry' | 'syndication_geo'; retrievedAt: string; geometrySourceUrl?: string; geometryLicence?: 'ODbL-1.0'; geometryAttribution?: '© OpenStreetMap contributors' } | null;
   retrievedAt: string; reviewState: string;
 }
 export interface CityFeed {
@@ -102,7 +105,7 @@ export async function readCitySignals(cityId: string): Promise<SignalResult> {
   const catalogue = await readSignalsCatalogue();
   // Never use raw input as a filesystem path: only catalogue IDs select directories.
   const city = catalogue.cities.find((entry) => entry.id === cityId && /^[a-z0-9-]+$/.test(entry.id));
-  if (!city) return { state: 'not_covered', city: cityId, coveredCities: catalogue.cities };
+  if (!city) return { state: 'not_covered', city: cityId, coveredCities: catalogue.cities, generatedAt: catalogue.generatedAt };
   const directory = join(dataDirectory(), 'cities', city.id);
   const [signals, changes] = await Promise.all([
     jsonFile<CityCollection>(join(directory, city.minUrl ? 'signals.min.geojson' : 'signals.geojson')),
@@ -110,6 +113,27 @@ export async function readCitySignals(cityId: string): Promise<SignalResult> {
   ]);
   if (signals.type !== 'FeatureCollection' || !Array.isArray(signals.features)) throw new Error('Invalid city signals collection.');
   return { state: 'covered', data: { catalogue: city, coveredCities: catalogue.cities, generatedAt: catalogue.generatedAt, signals, changes } };
+}
+export interface CityCoverage {
+  generatedAt: string;
+  cities: { id: string; name: string; news: boolean; events: boolean; projects: boolean; councilPapers: boolean; evidence: boolean }[];
+}
+/** Lightweight catalogue coverage; no map geometry enters the picker response. */
+export async function readCityCoverage(): Promise<CityCoverage> {
+  const catalogue = await readSignalsCatalogue();
+  const cities = await Promise.all(catalogue.cities.map(async (city) => {
+    const feed = await readCityFeed(city.id);
+    const items = feed.state === 'available' ? feed.feed.items : [];
+    return {
+      id: city.id, name: city.name,
+      news: items.some((item) => item.kind === 'news'),
+      events: items.some((item) => item.kind === 'event'),
+      projects: city.sources.some((source) => source.kind === 'planning' || source.kind === 'atlas'),
+      councilPapers: city.sources.some((source) => source.kind === 'council'),
+      evidence: city.sources.some((source) => source.kind === 'planning' || source.kind === 'atlas' || source.kind === 'council'),
+    };
+  }));
+  return { generatedAt: catalogue.generatedAt, cities };
 }
 
 export async function readCitySignal(cityId: string, signalId: string): Promise<Signal | null> {
@@ -130,7 +154,16 @@ export async function readCityFeed(cityId: string): Promise<CityFeedResult> {
   const feed = await jsonFile<CityFeed>(join(dataDirectory(), city.feedUrl));
   if (feed.schemaVersion !== 'stadtstack-feed-v1' || feed.cityId !== city.id || !Array.isArray(feed.sources) || !Array.isArray(feed.items))
     throw new Error('Invalid city feed publication.');
-  return { state: 'available', cityId: city.id, cityName: city.name, feed };
+  // Published files generated before venue enrichment carry no location fields.
+  const items = feed.items.map((item) => {
+    const geometry = item.geometry ?? null;
+    if (geometry && (item.kind !== 'event' || geometry.type !== 'Point' || !Array.isArray(geometry.coordinates) ||
+      geometry.coordinates.length !== 2 || !Number.isFinite(geometry.coordinates[0]) || !Number.isFinite(geometry.coordinates[1]) ||
+      Math.abs(geometry.coordinates[0]) > 180 || Math.abs(geometry.coordinates[1]) > 90 ||
+      item.geometryPrecision === 'none' || !item.locationSource?.url)) throw new Error('Invalid city event geometry.');
+    return { ...item, publisherRecordId: item.publisherRecordId ?? null, venue: item.venue ?? null, geometry, geometryPrecision: geometry ? (item.geometryPrecision ?? 'approximate') : 'none' as const, locationSource: item.locationSource ?? null };
+  });
+  return { state: 'available', cityId: city.id, cityName: city.name, feed: { ...feed, items } };
 }
 
 const stageOrder = ['adopted', 'decision_recorded', 'evaluation', 'decision_pending', 'consultation_closed', 'consultation', 'draft', 'planning', 'referred', 'agenda'];

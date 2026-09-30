@@ -98,6 +98,48 @@ All five scores were stable; no statement flipped, so an extra two-call/minimum-
 
 Use `llm` with `penalize_ambiguous_claims=True` in this pipeline: on these cases it caught the false passes without losing any supported or vague-but-true case. Jev could not be calibrated without the hosted TypeSafe key, so this experiment does not justify switching to `hybrid` or `system_one`. Keep the existing deterministic plan-versus-actual guard; it remains an independent invariant.
 
+## Live Jev run (2026-09-27)
+
+The user-saved key was present in the pipeline process and its Python child (`jev:check`: configured=true); no secret value was read or recorded. From `stadtstack-data`, `npm run jev:check` passed with `FAITHFULNESS_MODE=hybrid` from the existing environment. It confirmed DeepEval 4.2.6 and typesafe-sdk 0.7.2 and locally constructed the metric without a request. The actual evaluations explicitly used `mode="system_one"` with `penalize_ambiguous_claims=True`, threshold 0.8. Each request used the existing `cache/venv-jev/bin/python src/faithfulness.py` evaluator via a bounded inline Node runner using `node --env-file-if-exists=.env.local --input-type=module -e ...`; no evaluator, pipeline, or user configuration was changed. API calls were sequential, each capped at 70 seconds for the 12-case run (100 seconds per initial smoke). The 12 cases reused the statements and labels above; contexts were the cached `budget-ordinance.txt` and the corresponding cached council PDF text files (`pdf/0347ab78cdbde4a45940fd61.txt`, `pdf/d416c45c6cc9fe27d2958571.txt`, `pdf/a631fcb6c8ff69937419254c.txt`). These are public city-source excerpts, and no private data was sent.
+
+The separate initial smoke was a supported 2025 planned-outlay paraphrase and an unsupported claim that the city had already spent the amount building a new fire station. The full calibration run then made one request per listed case. Threshold outcomes are `score >= 0.8`; a “false accept” is an expected-fail claim above threshold, and a “false reject” is an expected-pass claim below threshold.
+
+| Case | Expected | Score | Result at 0.8 |
+| --- | --- | ---: | --- |
+| Supported paraphrase | Pass | 0.975 | Pass |
+| Supported planned amount | Pass | 0.979 | Pass |
+| Swapped years | Fail | 0.658 | Fail |
+| Wrong amount | Fail | 0.284 | Fail |
+| Unsupported “already spent” | Fail | 0.203 | Fail |
+| Plan stated as actual | Fail | 0.912 | Pass |
+| Wrong committee | Fail | 0.210 | Fail |
+| Wrong date | Fail | 0.177 | Fail |
+| Wrong place | Fail | 0.156 | Fail |
+| Partially supported, invented project | Fail | 0.398 | Fail |
+| Vague but true | Pass | 0.975 | Pass |
+| Invented next step | Fail | 0.181 | Fail |
+
+System One produced 11/12 correct (91.7%) at threshold 0.8: one false accept (plan stated as actual), zero false rejects. Separately, the initial supported paraphrase scored 0.715 (a false reject at that same threshold); the unsupported already-spent/new-fire-station smoke scored 0.333 (correctly rejected). This discrepancy on the supported paraphrase is material, not hidden by the calibration-set aggregate. Jev/DeepEval scores are weighted metric scores and should not be interpreted as a probability or directly compared as if they were the former LLM ratio. Mean wall time was about 0.94s per calibration call (range 0.86–1.02s); the two smoke calls took about 1.13s and 0.97s. The evaluator returned no SDK cost or server model-version field, so actual cost and exact deployed Jev version are unknown. The local versions observed were DeepEval 4.2.6 and typesafe-sdk 0.7.2; TypeSafe's cited catalogue elsewhere in this report lists Jev 1.13.0, but this run did not verify that serving version.
+
+This is evidence about consistency against these supplied examples, not a truth guarantee or broad benchmark.
+
+### Hybrid comparison: configured mode (2026-09-27)
+
+`jev:check` observed the user's existing configuration as `hybrid`; the preceding System One experiment used an explicitly selected system_one smoke path, not the configured production mode. In a separate inline run, `FAITHFULNESS_MODE=hybrid` and the existing Python evaluator were used for the same cached full-source contexts and four hard cases. The configured hybrid path needs CodexJudge as well as Jev. DeepEval's QAG verdict implementation sends one Jev decision request for the case's extracted claims; no retries were made.
+
+| Case | Expected | Score | Result at 0.8 | Wall time |
+| --- | --- | ---: | --- | ---: |
+| Supported paraphrase | Pass | 1.000 | Pass | 68.78s |
+| Plan stated as actual | Fail | 0.000 | Fail | 63.40s |
+| Swapped years | Fail | 0.000 | Fail | 50.71s |
+| Invented next step | Fail | Not available | No result; hybrid evaluator failed | 180.90s |
+
+The three completed hybrid cases were 3/3 correct: zero false accepts and zero false rejects among scored cases. Three Jev decision requests completed, one for each scored case. The fourth case was attempted once, timed out/failed after 180.90s, and was not retried; because the wrapper intentionally discarded failure traces, whether that attempt reached the Jev decision stage is not observable. Thus 3 Jev requests are confirmed, with at most 1 additional Jev request from the failed attempt; total confirmed requests across this experiment are 17 and the maximum possible is 18. No case had a second attempt. Cost was not exposed. The long failure makes hybrid operationally slower/less reliable in this tiny check, but these few samples do not support broad performance claims. The failure phase/provider could not be distinguished from the sanitized output.
+
+### Updated recommendation
+
+Do not lower the 0.8 threshold to make the supported smoke claim pass, and do not change the user's configured mode or default pipeline judge on this small evaluation. System One rejected the supported smoke claim (0.715) while accepting the plan-as-actual calibration claim (0.912), despite an 11/12 calibration-set result. Keep the existing production mode, ambiguity setting, and deterministic plan-versus-actual guard unchanged; the observed results do not justify promoting Jev as a replacement. The preceding recommendation and key-unavailable measurements remain historical results from the earlier run.
+
 ## Sources
 
 - [DeepEval FaithfulnessMetric: calculation, ambiguity option, and supported modes](https://deepeval.com/docs/metrics-faithfulness)

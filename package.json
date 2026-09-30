@@ -6,14 +6,13 @@
   "description": "An interactive rental deposit workspace for tenants, landlords, and human arbitrators.",
   "scripts": {
     "dev": "next dev --hostname localhost --port 4175",
-    "build": "next build --webpack",
+    "build": "next build",
     "start": "next start --hostname localhost --port 4175",
     "lint": "next typegen && tsc --noEmit && eslint .",
     "test": "node scripts/test.mjs",
     "setup": "node scripts/setup-local.mjs",
     "reconcile": "node --env-file-if-exists=.env.local scripts/reconcile.mjs",
-    "test-signer": "SOLANA_TEST_SIGNER_MODE=1 node --no-warnings --env-file-if-exists=.env.local --experimental-strip-types scripts/test-signer.mjs",
-    "acceptance": "node scripts/acceptance.mjs"
+    "test-signer": "SOLANA_TEST_SIGNER_MODE=1 node --no-warnings --env-file-if-exists=.env.local --experimental-strip-types scripts/test-signer.mjs"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "5.3.0",
@@ -23,6 +22,10 @@
     "@solana-program/memo": "0.10.0",
     "@solana-program/token-2022": "0.6.1",
     "@solana/kit": "5.5.1",
+    "@x402/core": "2.27.0",
+    "@x402/evm": "2.27.0",
+    "@x402/extensions": "2.27.0",
+    "jose": "6.2.12",
     "lucide-react": "1.47.0",
     "maplibre-gl": "^5.24.0",
     "next": "16.3.5",

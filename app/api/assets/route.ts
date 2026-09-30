@@ -1,9 +1,10 @@
+import { parseAmount } from '@/domain/assets';
 import { authenticated } from '@/server/authenticated';
-import { readAdapterConfig, readSolar, readValidator, saveAdapterConfig, type AdapterConfig } from '@/server/adapters';
-import { earnOnRobinhood, prepareRobinhoodBuy, robinhoodEnabled, robinhoodHoldings, submitRobinhoodTransaction } from '@/server/robinhood-demo';
+import { homeAssistantPullAllowed, readAdapterConfig, readSolar, readValidator, type AdapterConfig } from '@/server/adapters';
+import { earnOnRobinhood, prepareRobinhoodBuy, robinhoodHoldings, robinhoodEnabled, submitRobinhoodTransaction } from '@/server/robinhood-demo';
 import { ReferencePriceUnavailable } from '@/server/reference-price';
 import { getStore } from '@/server/store';
-import { readBody, sameOrigin } from '@/server/http';
+import { errorResponse, readBody, sameOrigin } from '@/server/http';
 import { operatorTestCapability } from '@/server/test-capability';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };
@@ -11,23 +12,36 @@ const settle = <T,>(work: Promise<T>) => work.then((value) => ({ ok: true as con
   ok: false as const, error: e instanceof Error ? e.message : 'Unavailable',
   ...(e instanceof ReferencePriceUnavailable ? { code: 'price_unavailable' as const } : {}),
 }));
+async function settleRobinhood(owner: string) {
+  const result = await settle(robinhoodHoldings(owner));
+  if (result.ok && 'status' in result.value)
+    return { ok: false as const, code: 'price_unavailable' as const, error: new ReferencePriceUnavailable().message, value: result.value };
+  return result;
+}
 
-/** Everything the person owns beyond the rental escrow: Robinhood testnet holdings and adapters. */
+/** Holdings plus adapter readings. area=holdings skips the optional device reads (Home solar, Validator) so the subtotal never waits on them; area=devices reads only those. */
 export async function GET(request: Request) {
+  let identity;
   try {
-    const identity = await authenticated(request);
-    const homeOnly = new URL(request.url).searchParams.get('area') === 'home';
+    identity = await authenticated(request);
+  } catch (error) {
+    return errorResponse(error);
+  }
+  try {
+    const area = new URL(request.url).searchParams.get('area');
+    const devicesOnly = area === 'devices';
+    const holdingsOnly = area === 'holdings';
     const store = await getStore();
     const evm = identity.wallets.find((w) => w.chainType === 'ethereum');
     const config = (await store.get<AdapterConfig>(`adapters:${identity.subject}`)) ?? {};
     const [robinhood, solar, validator] = await Promise.all([
-      !homeOnly && evm && (await robinhoodEnabled()) ? settle(robinhoodHoldings(evm.address)) : Promise.resolve(null),
-      config.homeAssistant ? settle(readSolar(config.homeAssistant)) : Promise.resolve(null),
-      !homeOnly && config.validator ? settle(readValidator(config.validator)) : Promise.resolve(null),
+      !devicesOnly && evm ? settleRobinhood(evm.address) : Promise.resolve(null),
+      !holdingsOnly && config.homeAssistant ? settle(readSolar(config.homeAssistant)) : Promise.resolve(null),
+      !holdingsOnly && config.validator ? settle(readValidator(config.validator)) : Promise.resolve(null),
     ]);
-    return Response.json({ robinhood, solar, validator, adapters: await readAdapterConfig(store, identity) }, noStore);
+    return Response.json({ robinhood, solar, validator, adapters: await readAdapterConfig(store, identity), homeAssistantPull: homeAssistantPullAllowed() }, noStore);
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'Unavailable' }, { status: 401 });
+    return Response.json({ error: error instanceof Error ? error.message : 'Unavailable' }, { status: 503, ...noStore });
   }
 }
 
@@ -38,14 +52,17 @@ export async function POST(request: Request) {
     const body = await readBody(request);
     const store = await getStore();
     const evm = identity.wallets.find((w) => w.chainType === 'ethereum');
-    if (body.action === 'save_adapter') return Response.json({ adapters: await saveAdapterConfig(store, identity, body) }, noStore);
     if (!evm) throw new Error('Your account has no Robinhood Chain wallet yet.');
     if (!operatorTestCapability()) throw new Error('The Robinhood testnet demo is disabled.');
     if (body.action === 'robinhood_earn') {
       if (!(await robinhoodEnabled())) throw new Error('The Robinhood testnet demo is disabled.');
       return Response.json({ result: await earnOnRobinhood(store, evm.address) }, noStore);
     }
-    if (body.action === 'robinhood_prepare_buy') return Response.json({ walletId: evm.id, steps: await prepareRobinhoodBuy(evm.address) }, noStore);
+    if (body.action === 'robinhood_prepare_buy') {
+      if (typeof body.amount !== 'string') throw new Error('Enter an amount in test USD.');
+      const prepared = await prepareRobinhoodBuy(evm.address, BigInt(parseAmount(body.amount, 6)));
+      return Response.json({ walletId: evm.id, ...prepared }, noStore);
+    }
     if (body.action === 'robinhood_submit' && typeof body.signed === 'string') return Response.json(await submitRobinhoodTransaction(body.signed), noStore);
     throw new Error('Unknown action.');
   } catch (error) {

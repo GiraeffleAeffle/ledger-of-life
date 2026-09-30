@@ -2,8 +2,8 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { VerifiedIdentity, VerifiedWallet } from '../wallets/identity-policy.ts';
 import type { Network, Role } from '../domain/assets.ts';
 import { atomic } from '../domain/assets.ts';
-import { WorkflowError } from '../domain/workflow.ts';
-import { AccessError, ConflictError } from './workspaces.ts';
+import { WorkflowError } from '../domain/errors.ts';
+import { AccessError, ConflictError } from './errors.ts';
 import type { Store } from './store.ts';
 import { recoveryCheckRequired } from './recovery.ts';
 
@@ -102,6 +102,15 @@ export async function getAgreement(store: Store, id: string, identity: VerifiedI
   if (!value) throw new AccessError('This tenancy is unavailable.');
   return publicAgreement(value, identity);
 }
+
+/** A bearer invitation discloses only the home and deposit before the invitee joins. */
+export async function previewAgreementInvitation(store: Store, id: string, role: 'tenant' | 'arbitrator', token: string) {
+  const value = await store.get<Agreement>(`agreement:${id}`);
+  if (!value || !/^[a-f0-9]{64}$/.test(token) || !value.invitations[role] ||
+    value.invitations[role].expiresAt < Date.now() || value.invitations[role].digest !== digest(token))
+    throw new AccessError('The invitation is invalid, expired or already used.');
+  return { property: value.property, requiredSecurity: value.requiredSecurity };
+}
 export async function inviteToAgreement(
   store: Store,
   id: string,
@@ -196,6 +205,7 @@ export async function addAgreementRecord(
   identity: VerifiedIdentity,
   name: string,
   body: string,
+  operationId?: string,
 ) {
   if (
     typeof name !== 'string' ||
@@ -206,8 +216,16 @@ export async function addAgreementRecord(
     body.length > 12000
   )
     throw new WorkflowError('Provide a title and evidence between 12 and 12,000 characters.');
+  if (operationId !== undefined && !/^[a-f0-9]{64}$/.test(operationId))
+    throw new WorkflowError('Invalid operation identifier for the recorded reason.');
   const next = await store.update<Agreement>(`agreement:${id}`, (value) => {
     agreementRole(value, identity);
+    const existing = operationId && value.records.find((record) => record.id === `operation:${operationId}`);
+    if (existing) {
+      if (existing.name !== name.trim() || existing.body !== body.trim() || existing.by !== identity.subject)
+        throw new ConflictError('This operation already has a different recorded reason.');
+      return value;
+    }
     if (value.records.length >= 100)
       throw new WorkflowError('This test tenancy has reached its evidence limit.');
     return {
@@ -216,7 +234,7 @@ export async function addAgreementRecord(
       records: [
         ...value.records,
         {
-          id: randomUUID(),
+          id: operationId ? `operation:${operationId}` : randomUUID(),
           name: name.trim(),
           body: body.trim(),
           by: identity.subject,

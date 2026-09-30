@@ -1,39 +1,100 @@
-# Ledger of Life · one calm morning view
+# Ledger of Life · household and adapter implementation plan
 
-Build plan · 27 September 2026 · owner decisions applied after the [signed-in audit](research/LEDGER_APP_AUDIT_2026-09-27.md) and [Astra review](vision/astra-ledger-round2.md). Stadtstack's eight-city infrastructure and shared knowledge feed a personal Ledger entry point; the atlas remains the city view. This hackathon shows **test/illustrated workflows**, not real assets or returns. Private pins and interests stay on the device.
+Build plan · updated 28 September 2026. The current direction is **find a home, keep your assets, help build your city**. A household ledger is the foundation; native test investment and a visual city make the connection tangible. Public observations, fictional issuers and modeled physical effects remain distinct. Private pins, interests and follows stay device-local.
+
+## Hackathon priority: one connected, demonstrable story
+
+The current [Crypto World's Fair rules](https://colosseum.com/legal/Crypto%20World%27s%20Fair%20Hackathon%20Rules.pdf)
+judge functionality, impact, novelty, UX, open-source composability and business viability.
+Both Solana and Robinhood Chain are supported tracks. A working, understandable capital-to-place
+demonstration is stronger than many disconnected dashboards or speculative revenue widgets.
+
+1. **Find a home.** Photo-led listings → application → agreement → the actual tenancy deposit.
+   The existing Solana tenancy uses test USDC; a share pledge does not silently replace it.
+2. **Keep shares working.** Choose a separate Robinhood share-backed test deposit, or borrow
+   test USD against shares. These are different contracts and risks. No upfront sale is required;
+   collateral is locked, and claims/shortfall/liquidation can still cause a sale.
+3. **Build a local stake.** Use the same Robinhood test USD for distinct `tHOME` and `tWORK`
+   units in fictional housing/workshop issuers. Each spend has an amount review, exact wallet
+   approval and checked on-chain receipt. No bridge, mortgage, real company equity or land title is implied.
+4. **See the place.** Explore the OSM 3D city, published planning areas and local places;
+   follow a real public project, or deliberately switch to the separately labelled test-issuer layer.
+5. **Use local infrastructure.** A real local Qwen node answers through paid x402 access or a
+   wallet-free public library desk. Me, the building's GPU option and the library profile all
+   open this working service. Record usage and settled receipts; keep euro cost scenarios separate.
+
+The connected rehearsal now uses a fresh real Privy passkey wallet: two tTSLA shares →
+collateral → 12 tUSDG borrowed → 5 tHOME + 5 tWORK → a 0.01-tUSDG local AI answer.
+The final cash is 1.99 tUSDG and the loan remains owed. The dedicated preparation signer
+never puts test cash directly in this buyer's wallet. See [executed evidence](evidence/BORROW_TO_LOCAL_AI_ROBINHOOD_TESTNET.json)
+and `VALIDATION.md`; existing funded tenancies and earlier investment positions are not reused.
+
+One compact **Demo mode** control supplies workspace context. Keep network, amount,
+ownership rights and source limitations in the relevant review/details, not repetitive banners.
+
+### Physical and economic realism
+
+- **Solar and heat pumps:** credible core building systems, not free-energy promises. Roof,
+  seasonal demand, grid connection, financing, maintenance and tariffs affect the outcome.
+  [Fraunhofer ISE's field study](https://www.ise.fraunhofer.de/en/press-media/press-releases/2025/fraunhofer-ise-research-project-completed-heat-pumps-provide-climate-friendly-heating-in-existing-buildings.html)
+  demonstrates varying efficiency and partial solar autonomy, not a forecast for our fictional building.
+- **Validators:** optional infrastructure requiring staking capital, reliable operations and security.
+  A watched validator ID is not ownership, and validator revenue is not assumed in the housing economics.
+- **GPU service:** real Ollama inference and settled test-token payments are implemented.
+  Per-request measurements are observations; the euro planner's price, customer demand,
+  whole-host power, hardware allocation and other costs are editable assumptions.
+  A short ~53-output-token/s observation is not a sustained revenue forecast.
+- **Heat reuse and physical co-location:** remain project-specific ideas. [IEA's heat-recovery analysis](https://www.iea.org/commentaries/opportunities-for-district-heating-in-the-changing-energy-landscape)
+  emphasizes location, temperature, timing and a viable business model.
+- **City flywheel:** local capital could support homes/firms, work and services, attractiveness,
+  residents and a tax base for public infrastructure. More residents also create public costs;
+  debt, vacancies, affordability, planning and fiscal rules can break the loop. No jobs or taxes
+  are inferred from test-token purchases.
+
+### What the city data can support now
+
+OpenFreeMap's existing Liberty style supplies OSM building extrusions; rendered heights can be
+estimated. Published project areas stay flat source geometry, not invented future buildings.
+Four independent Strausberg organizations have sourced services and participation links:
+SWG, Stadtwerke, STEMME and Heinrich-Mann-Bibliothek. STEMME's product page, published
+career listings and invitation to join its sales/service network are linked directly.
+Only the documented SWG/Stadtwerke shared-group relation is shown; no supply contract,
+issuer affiliation or hiring guarantee is inferred.
+
+The event feed now retains publisher record IDs, sourced event times, venue text, optional
+coordinates, precision and location provenance. Kürbisfest record `30366` is dated
+30 October 2026, 15:00 Berlin time; its approximate point uses the Marienkirche OSM footprint.
+Other records without sourced coordinates stay unlocated. Publication dates never substitute
+for event time, and the separate `30334` event is not merged into it.
+
+**Next useful data work:** extend verified venue coverage, keep published opportunities
+current, and work with a willing real housing/energy partner. Do not infer a city-wide supply
+chain or advertise real investments without issuer authority and defined rights.
+
 
 ## Owner decisions, answered
 
-- **What leads Today?** **Official city press news**: the three latest attributed headlines, dates and source links. “Nothing needs you today” is a separate second card, not the lead.
-- **What belongs beyond the chosen city?** Show shared topics in an **In your region** card only when the selected city's slug appears in the published region's `cityRegions` mapping. Rank topics with local source items first, then show how many municipalities participate and link the furthest-stage source. The Brandenburg-MOL publication now supplies this context; home/work pins never leave the browser.
-- **Should unreviewed interpretations appear?** Yes, in Today with **“Not yet checked”**. Official press news and sensor readings are taken over automatically with publisher, date and freshness; human editorial review is for **our own interpretations**, not automatic source facts. DeepEval Jev/hybrid and ambiguity-penalty experiments may improve triage but do not replace provenance or human correction.
-- **What should finance show?** A coherent **“what your shares can do”** workflow, even with fake test stock and test tokens; borrowing, city investment, home shares and welcome vouchers can be illustrated rather than parked for legal reasons. State exactly which balances and outcomes are simulated.
+- **What leads Today?** A five-domain household overview: Identity, Home, Money, Energy/devices and Places. An actionable Home prompt may precede it. Official city press, followed developments and compact chosen-city changes remain below; civic work is one part of the ledger.
+- **What belongs beyond the chosen city?** Places keeps original source stages for neighbouring municipalities in an expandable comparison. Its project selector, Map, Outcomes and Connections share one city/project identity. Geometry is published context only; unlocated topics do not receive polygons or pins. Home/work pins never leave the browser.
+- **Should unreviewed interpretations appear?** Yes, visibly **“Not yet checked”** with source and date; official press and sensor publisher facts are automatically attributed, not confused with human approval. Editorial review belongs to our interpretations. Evaluation experiments do not replace provenance or human correction.
+- **What should finance show?** A priced-test-assets subtotal and separate project-unit holdings. Issue price is not a resale/market quote; shared test cash is counted once. Home/holdings/pledge/loan/investment links reach exact destinations. Collateral and debt remain distinct; approval alone is not a purchase, and deployment hashes are not personal transactions. No Solana–Robinhood bridge is implied.
 - **What should Ledger reuse?** Keep `stadtstack-data`'s city feed/signals and the atlas interpretation separate from Ledger's private, device-side relevance. Do not add a new hosted city platform to build the cockpit.
+- **What should the public data become?** An increasingly useful versioned, source-attributed civic knowledge base reused by Ledger, atlas and MCP, demonstrating why interoperable municipal open data is valuable. Preserve URLs/locators, source dates where known, municipality, separate stages, review state, precision and rights. Do not pursue volume for its own sake, fake comparisons/statistics, a new ingestion/database project or an implied municipal endorsement.
 
-## The cockpit: Today
+## The daily entry point: Today
 
-One column on desktop and 390 px: official news **first**, then one required action, 1–3 meaningful personal changes, conditional regional topics and a quiet test-money/adapter line. No duplicate mini-dashboards, mandatory map or roadmap tile. A first visit establishes history rather than inventing unread changes; a failed check remains visibly unavailable rather than “nothing happened.”
+One household overview connects the working areas. It shows account/wallet context, Home state, the priced-test-assets subtotal, saved device connections and public-life entry points. Share-backed deposit and loan shortcuts select the Money panels without signing. **Explore & follow projects** opens Places. Source failures, unpriced holdings, test assets and planned capabilities remain explicit.
 
-| Order / card | Data and existing versus missing |
+| Order / section | Published or personal evidence |
 | --- | --- |
-| 1. **Your city today** | **New:** read `feed.json` through a city-only API and show the top three official **press** headlines, publisher, publication date and outbound link. Never reproduce article text; if uncovered, show a source link or honest no-coverage state. |
-| 2. **Needs you** | **Built:** `/api/journey` and `/api/listings` know tenancy/applicant steps. Show one actual action linked to Home, otherwise “Nothing needs you today”; test earnings are labelled simulated. |
-| 3. **Since your last visit** | Public city signals and feed items are compared per account/city in browser storage. Review, public details, dates and precision count; version hashes and retrieval-only changes do not. News already in the three headline leads is not duplicated. At most 1–3 changes; unreviewed interpretations say **“Not yet checked”**. |
-| 4. **In your region** | **Conditional:** read `out/regions/<regionId>/topics.json` only where its `cityRegions` mapping names the selected city. Show three locally ranked shared topics, municipality counts, the furthest-stage source and an own-city source when available; Places shows all topics and municipality source details. Every interpretive summary says “Not yet checked”. No pins leave the device. |
-| 5. **Your things** | A quiet Home summary and complete Money total combine wallet and contract-held test positions minus open debt; if a workflow route fails, wallet-only values are visibly qualified. Never sum ETH and test USD or show a partially loaded total as complete. |
+| 1. **Attention, only when needed** | `/api/journey` and `/api/listings`: an actionable step links to the exact tenancy where known; a failed Home read stays visible, not a false quiet state. |
+| 2. **Five-domain ledger** | Shared topic catalogue; actual account, saved proof, tenancy and redacted configuration states. Money reuses the complete-snapshot valuation. Configured is not healthy, linked is not funded, and roadmap items do not appear connected. |
+| 3. **Official city press** | One lead and up to two secondary source links, with publisher/date and honest no-coverage or refresh failure. |
+| 4. **Followed projects, if any** | Device-local account-scoped first-follow baseline, at most two unread developments and exact Places review links. Missing sources remain unavailable; unread changes require explicit acknowledgment. |
+| 5. **Personal changes** | Browser-local account/city comparison of published signals/feed; this visit baseline remains separate from durable followed unread state. |
+| 6. **Conditional civic preview** | Source-linked chosen-city outputs and explicit unknown outcomes. The historical Münster 2021 bus comparison appears here only for chosen Münster; it remains discoverable in Places for everyone. |
 
-```text
-TODAY                               Strausberg · city you chose
-┌ Your city today: 3 official press headlines        → Places ┐
-├ Needs you: one step / Nothing needs you today        → Home ┤
-├ Since your last visit: 1–3 qualified changes      → Places ┤
-├ In your region: 3 shared topics, own-city first*   → Places ┤
-└ Your things: home status + complete test total  → Home/Money/Me ┘
-* Hidden when this city has no published region
-              Me | Home | Money | Places | Ideas
-```
-
-**Last visit means this device, not the publisher run.** Keep a successful baseline per account/city: prior displayed fields, `id → version`, **separate review state/revision**, own journey/adapter transitions. `changes.json` is a publication diff, not personal unread history. `common.ts` and the separate council path in `evaluate.ts` hash evidence but omit review state. Compare meaningful status, amount/year, deadline, occurrence, location, action or review—not hash churn, timestamps or quote ticks. An imported old paper is “newly available here,” not a new proposal; approaching deadlines are reminders. First/new-city visit establishes baseline; returning city restores it. Pins/interests **re-rank history**, not reset it. Acknowledge only displayed/dismissed items after successful fetch; preserve visibly stale last-good data on failure. Missing IDs may indicate lost coverage/ID migration, not withdrawal; intermediate changes between visits can be missed. Separate accounts and allow clear history. No uploaded pins/interests, read receipts or account-city join in public data; browser reset loses history and tile provider sees viewed area.
+**Last visit means this device, not the publisher run.** The existing chosen-city visit-diff stores displayed public signal/feed fields per account/city and advances its whole successful city/feed baseline eagerly. It is a compact visit comparison, **not** an unread queue: changes to off-screen items or multiple intermediate publications can be missed. `changes.json` is a publisher diff, not personal history; hashes, generatedAt and retrievedAt are not project developments. Saved pins/interests re-rank rather than reset history. **Following uses a separate per-target account/city store** with a first-successful-source baseline and individually acknowledged pending transitions; an outage, 404 or another target's successful refresh never clears unread followed updates. Only public city/signal IDs leave the browser, not local follow state, pins, interests or read receipts. Browser reset loses these local histories; tiles reveal viewed area to the tile provider.
 
 ## Information architecture: one detailed home per fact
 
@@ -41,17 +102,18 @@ A preview in Today may point to detail, but no second editable/authoritative rep
 
 | Information | Single detail home; what to remove, merge or move |
 | --- | --- |
-| Adult proof, chosen city, contextual roles, wallet and connection permissions | **Me**. Say “city you chose” unless residence verified. Move read-only adapter credential/settings forms here; Home and Money show readings and link to the *one* settings location. Today shows proof only if an action requires it. |
-| Current/past tenancy, agreement, deposit, claim, simulated earnings, service-charge example, home solar reading | **Home**. Money links to a deposit entitlement, not a second claim action. Me's timeline is compact history linking here. |
-| Test stocks/cash, buys, validator, local-investment illustrations, share-backed deposit and loan | **Money**. Merge duplicate Solana holding and Invest/buy card; count Robinhood wallet shares/cash plus contract-held deposit and loan collateral minus debt exactly once at the test market price. Do not show a partial total while quotes or workflow positions load; if workflow reading fails, show wallet-only values and an explicit unavailable state. Test assets have no redeemable value; keep reference prices and ETH units distinct. |
-| Planning/works/consultations, council **papers/meetings**, OSM places, budget facts | **Places**: one feed/list, optional three-ring map and sourced detail. Show each atlas project signal once, link curated atlas context. Pipeline OSM should replace live Overpass clubs **only after** category/coverage/ODbL parity. Put planned budget/tax explanation behind one detail; ALLRIS links are papers, not decisions. Weather/PM are dated point readings, not whole-city conditions; district/state/EU links stay optional. |
-| News/events and shared regional topics | **Places** owns a single city feed with sourced headlines, publisher, publication date and link; event date appears only when `eventStart` exists, otherwise label “published <date>”. Today previews three **official press** headlines; a separate conditional regional preview links to Places detail. No full article text or invented event occurrence. |
-| Roadmap and prototypes | **Ideas**, clearly separated; remove repeated “More to build in this area” and built-map cards. Keep Ideas in the mobile tab bar. |
-| Personal daily priorities and previews | **Today (former Overview)** only: city press leads; one Home action; locally compared change(s); conditional regional topics; quiet things including an accurate Money total. Remove duplicate atlas city summary, “Near you” list and standalone identity tile. |
+| Adult proof, contextual roles, wallet and adapter permissions | **Me** owns the shared catalogue and Home Assistant/validator save/remove forms. Money → Devices & income shows their readings and links to that one configuration location. Today shows compact account/proof context, not account management or a proof dashboard. |
+| Current/past tenancy, agreement, deposit, claim, simulated earnings, service-charge example | **Home**. Money links to a deposit entitlement, not a second claim action. Me's timeline is compact history linking here. Service charges read the same Home Assistant consumption that Money → Devices & income shows. |
+| Test stocks/cash, buys, share-backed deposit and loan, local-investment units, home solar and validator readings | **Money**: Holdings, Shares & loans, Local stakes, Devices & income. One Solana holding includes its buy control. Robinhood wallet shares/cash plus contract-held deposit and loan collateral minus debt count once at the test market price; official test TSLA, fake tTSLA and Solana tSPYx never imply a bridge. On a failed read preserve the last complete total with a dated unavailable state, and show healthy quantities/cash independently rather than reclassifying a missing value as zero. ETH remains a separate unit. Solar and validator readings are outside the priced subtotal. |
+| Local AI access, usage and host economics | **Money → Devices & income → Local AI & GPU hosting** owns personal payment reviews, answers, receipts and measured host totals. `/library` is the wallet-free shared desk; Me and Places link here. A euro scenario never becomes a wallet balance or settled income. |
+| Planning/works/consultations, council papers, OSM places, budget facts and outcomes | **Places**: one selected city/project/topic across existing MapLibre geometry, output/indicator mini-charts and documented actor relations. Münster 2021 pilot's 500 m reported lane, €60k forecast versus provisional ~€42k spent by end-2021, and 251→235 s full-route observed bus running-time means are sourced to official PDF pages; no final cost/funding source, invented route or causal benefit. Unknown geometry stays off map; planned boundaries are not affected areas. Published signal stages and source URLs/locators stay in evidence drawers; weather/PM is independent context. |
+| News/events and regional topics | **Places** owns sourced feed and expanded per-municipality stage/evidence. Today keeps official news, the chosen-city project preview when linked and Münster historical evidence only for chosen Münster or explicit followed relevance. Event dates appear only when `eventStart` exists. |
+| Capabilities and roadmap | **Ideas** shows all 18 capability IDs/statuses. Definitions live in `src/data/ledger-catalogue.ts`, grouped into the same five topics as Me and Today by `Idea.topic`, with one working destination (`Idea.destination`) and adapter links. Placement rule: [INFORMATION_ARCHITECTURE.md](INFORMATION_ARCHITECTURE.md). |
+| Personal daily priorities and previews | **Today** owns the household-first overview and relevant developments, not a second editable workflow or project dashboard. |
 
 ## Shares and deposit: honest illustrated workflow
 
-**Working pieces:** Solana's signed-in test-USDC tenancy supports simulated earnings claims; its separate tSPYx buy spends wallet funds. Robinhood test actors can simulate yield and a signed test-TSLA purchase. Money's independent share workflow demonstrates a pledged illustrated deposit and a test-USD loan against shares; its test oracle price is simulated per wallet. Today only links to Money and includes those contract-held positions in its quiet total.
+**Working pieces:** Solana's signed-in test-USDC tenancy supports simulated earnings claims; its separate tSPYx buy spends wallet funds. Robinhood test actors can simulate yield and a signed test-TSLA purchase. Money's independent share workflow has working test contracts for a pledged illustrated deposit and test-USD loan against fake tTSLA; existing legacy positions may use official test TSLA. Its oracle price is simulated per wallet. Today links to the correct deposit/loan panel and counts contract-held positions and debt once.
 
 1. **Earn and hold:** show simulated test earnings → claim → wallet receipt → purchase of test shares, with balances and transaction order. Fungible funds cannot prove a specific earnings coin funded shares; disclose extra test funds.
 2. **Show what shares can do:** for a *new* illustrated tenancy, show a landlord accepting fake test stock as deposit security, a 150% example buffer, pledged versus spendable shares and a price-change/top-up outcome. This is a workflow sketch, not a claim that today's Solana tSPYx bridges to Robinhood TSLA or that operator-held test signers are the logged-in parties.
@@ -71,7 +133,7 @@ Queue **our own** low-scoring, ambiguous, conflicting or consequential interpret
 
 ## Planned-feature triage
 
-“Now” is the current app build; “next” is a clearly labelled test/illustrated workflow; “later” needs a usable data source or design. These cover all **16** current `ideas.tsx` entries. Rollout prerequisites do not block hackathon illustrations.
+“Now” is the current app build; “next” is a clearly labelled test/illustrated workflow; “later” needs a usable data source or design. All 16 original capability IDs remain in the shared catalogue; the previously documented bank adapter is now also visible as a planned Ideas entry. Rollout prerequisites do not block honest hackathon illustrations.
 
 | Item | When and why |
 | --- | --- |
@@ -79,30 +141,30 @@ Queue **our own** low-scoring, ambiguous, conflicting or consequential interpret
 | Roles in every part of life (planned) | **Later** only when a second real shared context exists; no fake club memberships. |
 | Real-time service charges (prototype) | **Later** pending usable meter/invoice data; keep the example collapsed in Home. |
 | Stocks as your deposit (prototype) | **Now** a working Robinhood Chain testnet pledge, simulated price-drop top-up/protective sale and move-out claim with remaining shares returned. |
-| Invest in your own city (illustration) | **Next** illustrated/test-token local investment path, clearly not a live offer. |
-| Home shares towards owning (planned) | **Next** illustrated home-share accumulation and ownership milestone, not a claim of registered property. |
+| Invest in your own city (testnet prototype) | **Now** wallet-signed Robinhood test-USD purchases of separate fictional `tHOME`/`tWORK` units, actual holdings and checked receipts. Real cooperative leads remain unverified offers; physical impacts stay illustrative. |
+| Home shares towards owning (planned rights; test-unit demonstration) | **Now** demonstrate a fractional test-issuer stake. **Later** a real issuer/legal wrapper, defined housing rights or down-payment credit and the necessary property transaction. Test units grant none of those rights. |
 | Electric car and other devices (planned) | **Later** only a read-only adapter if a reliable user source is found; income tokenization parked. |
-| Personal map (built) | **Now** reuse and simplify into Places' three rings; remove double atlas/OSM lists, do not rebuild map. |
+| Personal map (built) | **Now** map-first Places using existing 2D/3D OSM context, source-backed project/place selection, prominent Follow and an explicitly separate fictional-issuer overlay. No guessed building ownership or impact geometry. |
 | Where the money goes (partly built) | **Now** keep planned budget record/source; move statutory essay into detail. Actual spending breakdown **later** only with verified source line items. |
 | From your street to the world (partly built) | **Later** extra-scale live feeds where reliable coverage exists; keep links as an optional navigation map. |
 | A measurable city (partly built) | **Later** optional local observations, not a core morning card or city-wide pollution claim. |
 | Council papers & meetings (partly built) | **Now** present sourced papers/meetings and official Strausberg links honestly; confirmed decisions **later** when evidenced. |
-| Welcome to your new city (partly built) | **Now** OSM discovery with private interests; **next** illustrated welcome vouchers/test-token offers without partner claims. |
-| Cockpit + personal last-visit changes (new) | **Now** official city press leads, personal comparison, conditional region row and quiet things. |
-| City events and news (new) | **Now** official press feed in Today and dated city news/events list in Places; event start only when sourced. |
-| Shared regional topics (new) | **Now** MOL topics ranked with the chosen city's source items first; counts and furthest-stage links in Today, all original source items and “Not yet checked” summaries in Places. |
+| Welcome to your new city (built for Strausberg) | **Now** a public, account-free guide at `/welcome/<city>`: a sourced first-months plan, what is on, clubs and who to ask, personalised on the device; plus OSM discovery in Places. **Next** a German version, a registration-desk handout, more cities, and illustrated welcome vouchers/test-token offers without partner claims. |
+| Ledger overview + personal last-visit changes (built) | **Now** five-domain household overview, exact working actions, honest connection states, official press and private meaningful changes. No duplicate financial calculation or global proof panel. |
+| City events and news (partly built) | **Now** attributed source shelf and feed, with event time only when sourced. **Next** verified venue coordinates and temporal enrichment before event pins or calendar assertions. |
+| Shared regional topics (new) | **Now** local and named neighbouring municipality source items with separate stages and dates where supplied; all original source items and “Not yet checked” interpretations in Places. |
 | Borrow against stocks to fund deposit (prototype) | **Now** working Robinhood Chain testnet loan, per-second interest, 50 % LTV and 80 % liquidation; separate from the direct stock pledge. |
+| Bank accounts (planned) | **Later** after a permissioned provider and consent model are chosen; currently only a roadmap entry, with no bank connection, import or payment. |
 
-## Build order: five reviewable slices
+## Approved UX composition · current slice
 
-1. **Today led by official news.** City-only feed API, three official press headlines, one existing Home action, quiet things and honest no-coverage/error states in one column at desktop and 390 px. “Not yet checked” remains visible for unreviewed interpretations. Today reads Money's public test-position values without duplicating its action flow.
-2. **Meaningful return visit.** Device-side account/city baseline and acknowledgement, user-facing field/review changes (not hash churn), first/return visit, pin re-ranking and outage recovery. Add the **In your region** card when published topics exist; otherwise render no row and never upload pins.
-3. **Places feed and information-architecture cleanup.** One news/events list from published city feed; attributed headline, publication date and source link; event date only with `eventStart`. Show each atlas project once, reconcile pipeline versus Overpass place categories, tuck budget explanation behind detail, rename council papers/meetings, remove duplicated roadmap boxes and use plain-language status/precision labels. Preserve mobile Ideas access.
-4. **Money workflow (separate owner).** Demonstrate test earnings → shares → illustrated new-deposit pledge, then an independent share-backed loan example, with accurate test values and transitions. The new `money-area.tsx` belongs to that worker.
-5. **Illustrated city/home benefits.** Test-token local investment, home-share progress and welcome vouchers in their single detail homes; expand official press and reviewed regional coverage city by city.
+1. **Today:** household-first overview; actionable Home prompts when relevant; official news and at most two pending followed developments below; selected-city changes and a conditional historical example. No civic diagram takes over the landing page.
+2. **Home → Money:** Home is the visual housing journey, photo-led browsing, one role-specific next step and exact tenancy links, with nothing from Money. Money answers "what do I own, owe and earn" in four tabs: Holdings first, then Shares & loans, Local stakes and Devices & income, each stating its reality level. The actual Solana cash-deposit and separate Robinhood share workflows remain distinguished; Home keeps one link to the share-backed deposit.
+3. **Places/Ideas:** a persistent map with 2D/3D controls, concise story choices and one selected detail sheet. Real public-project Follow is a header/map-detail action. OSM heights may be estimated, plans are not built structures, and fictional test issuers never enter public follow baselines. Existing evidence/outcomes and capability IDs remain accessible.
+4. **Me adapters:** one five-topic directory of 19 sources and 18 capabilities, with source/environment/authority and runtime connection states. `GET /api/adapters` reads redacted configuration without provider probes; authenticated same-origin POST saves/removes the chosen connection. Token fields never hydrate secrets. Home and Money link here instead of hosting duplicate forms.
 
-Stadtstack's automated source intake and experimental evaluation advance independently. Human correction remains for our own interpretation; the Ledger shows the published review state instead of waiting for an editorial gate.
+Grow the existing published civic knowledge base for usefulness and provenance rather than volume; Ledger, atlas and MCP may consume its attributed versions. A compelling sourced comparison can invite municipalities to publish interoperable open data, without claiming their endorsement or launching another ingestion/database project.
 
 ## Why this sequence changed
 
-The [first Astra pass](vision/astra-ledger-round1.md), [second pass and critique](vision/astra-ledger-round2.md) identified genuine version/review and test-actor gaps. The owner resolved the product choices: official **news leads**, regional context follows when available, **“Not yet checked”** interpretations stay visible, official facts flow automatically, and speculative financial/home benefits can be shown as honestly labelled hackathon demonstrations. Existing historical reviews retain their earlier legal and production concerns; they no longer set the hackathon build order.
+The earlier [Astra passes](vision/astra-ledger-round1.md) and [critique](vision/astra-ledger-round2.md) informed the news, source-review and test-actor work. The latest correction supersedes the news-first composition: Ledger must show the full household/adapters product and keep advancing its working features. Public facts still flow automatically with provenance, interpretations remain “Not yet checked” where appropriate, and speculative benefits stay explicitly test/simulated or planned.

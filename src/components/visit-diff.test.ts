@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import type { CityFeature, CityFeed } from '../server/city-signals.ts';
-import { meaningfulFeedChanges, meaningfulVisitChanges, snapshotCityFeed, snapshotCitySignals } from './visit-diff.ts';
+import { baselineForVisit, meaningfulFeedChanges, meaningfulVisitChanges, snapshotCityFeed, snapshotCitySignals } from './visit-diff.ts';
 
 function cityItem(overrides: Partial<CityFeature['properties']> = {}): CityFeature {
   return {
@@ -21,6 +21,7 @@ function feedItem(kind: 'news' | 'event' = 'news'): CityFeed['items'][number] {
     id: `${kind}:42`, kind, title: 'City notice', url: 'https://city.example/notice',
     publisher: 'City Hall', publishedAt: '2026-09-20T10:00:00Z', eventStart: null,
     sourceId: 'press', reuse: 'facts_with_attribution', retrievedAt: '2026-09-21T10:00:00Z',
+    publisherRecordId: null, venue: null, geometry: null, geometryPrecision: 'none', locationSource: null,
     reviewState: 'auto_checked',
   };
 }
@@ -72,4 +73,16 @@ test('published feed additions and corrected event dates are distinct from publi
   const corrected = snapshotCityFeed(feed([feedItem(), { ...feedItem('event'), eventStart: '2026-10-03T12:00:00Z' }]));
   assert.deepEqual(meaningfulFeedChanges(incoming, corrected).map(({ description }) => description), ['Date corrected']);
   assert.deepEqual(meaningfulFeedChanges(incoming, old), []);
+});
+
+test('revisiting does not acknowledge unread source changes until marked seen', () => {
+  const baseline = snapshotCitySignals([cityItem()]);
+  const changed = snapshotCitySignals([cityItem({ reviewState: 'auto_checked' })]);
+  const repeatedVisit = baselineForVisit(baseline, changed);
+  assert.equal(meaningfulVisitChanges(repeatedVisit, changed, new Set(['council:42'])).length, 1);
+  assert.deepEqual(meaningfulVisitChanges(changed, changed, new Set(['council:42'])), []);
+  assert.equal(baselineForVisit(null, changed), changed);
+  const feedBaseline = snapshotCityFeed(feed([feedItem()]));
+  const changedFeed = snapshotCityFeed(feed([feedItem(), feedItem('event')]));
+  assert.equal(meaningfulFeedChanges(baselineForVisit(feedBaseline, changedFeed), changedFeed).length, 1);
 });

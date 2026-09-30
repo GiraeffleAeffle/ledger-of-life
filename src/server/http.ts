@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
-import { WorkflowError } from '../domain/workflow.ts';
-import { AccessError, ConflictError, type Access } from './workspaces.ts';
+import { WorkflowError } from '../domain/errors.ts';
+import { AccessError, ConflictError } from './errors.ts';
 import { IdentityError } from '../wallets/identity-policy.ts';
 
 export function sameOrigin(request: Request) {
@@ -46,23 +46,6 @@ export async function readBody(request: Request, maxBytes = 24000): Promise<Reco
   return result as Record<string, unknown>;
 }
 
-export function demoSession(request: Request) {
-  const value = request.headers
-    .get('cookie')
-    ?.split(';')
-    .map((item) => item.trim())
-    .find((item) => item.startsWith('rental_demo='))
-    ?.slice('rental_demo='.length);
-  return value && /^[a-f0-9]{64}$/.test(value) ? value : null;
-}
-
-export function demoAccess(request: Request, role: unknown): Access {
-  const session = demoSession(request);
-  if (!session) throw new AccessError('Open a demonstration before continuing.');
-  if (role !== 'tenant' && role !== 'landlord' && role !== 'arbitrator')
-    throw new WorkflowError('Select a demonstration role.');
-  return { kind: 'demo', session, role };
-}
 
 export function requireJobSecret(request: Request) {
   const secret = process.env.RECONCILE_SECRET;

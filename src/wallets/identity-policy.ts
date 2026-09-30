@@ -81,7 +81,8 @@ export function createIdentityVerifier(dependencies: IdentityVerificationDepende
     let claims: Awaited<ReturnType<typeof dependencies.verifyToken>>;
     try {
       claims = await dependencies.verifyToken(token);
-    } catch {
+    } catch (cause) {
+      if (cause instanceof IdentityError && cause.code === 'identity_unavailable') throw cause;
       throw new IdentityError(
         'unauthenticated',
         'Your session could not be verified. Sign in again.',

@@ -1,15 +1,19 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Building2, Cpu, History, KeyRound, Link2, Sun, Wallet } from 'lucide-react';
+import { History, KeyRound } from 'lucide-react';
 import type { PlaceEntry } from '@/server/timeline';
-import { useRentalWallet } from '@/wallets';
+import { WalletAccessPanel } from '@/wallets';
 import type { TenancyJourney } from '@/server/journey';
 import type { PublicListing } from '@/server/listings';
-import type { PublicAdapterConfig } from '@/server/adapters';
-import type { CityResult } from '@/server/city';
+import { citySlug, type CityResult } from '@/server/city';
 import { IdentityStrip } from './identity';
 import type { Area } from './areas';
-
+import { RecoveryStepView, useRecoveryFlow } from './recovery-step';
+import { useRecoveryRequired, type AuthorizedRequest } from './use-recovery';
+import { useLedgerConnections } from './use-ledger-connections';
+import { LedgerAdapters } from './ledger-adapters';
+import { AdapterSettings } from './adapter-settings';
+import type { LedgerStateInputs } from './ledger-adapter-state';
 
 const emptyPlace = { city: '', from: '', to: '', note: '' };
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
@@ -17,13 +21,14 @@ const STAGE_LABEL: Record<string, string> = {
   agreement: 'Agreement', space: 'Deposit space', deposit: 'Deposit', living: 'Living here', 'move-out': 'Move-out', paid: 'Paid out',
 };
 
-/** Me: identity, roles, life timeline and every connection with how real it is. */
-export function MeArea({ request, tenancies, listings, go, openConnections }: {
-  request: Request; tenancies: TenancyJourney[]; listings: PublicListing[]; go: (area: Area) => void; openConnections: () => void;
+/** One source catalogue and one settings owner, alongside identity and private life history. */
+export function MeArea({ request, tenancies, listings, homeState, go }: {
+  request: Request; tenancies: TenancyJourney[]; listings: PublicListing[];
+  homeState: Pick<LedgerStateInputs, 'homeLoading' | 'homeError' | 'tenancyCount' | 'listingCount'>; go: (area: Area) => void;
 }) {
-  const wallet = useRentalWallet();
-  const [adapters, setAdapters] = useState<PublicAdapterConfig | null>(null);
+  const connections = useLedgerConnections(request);
   const [city, setCity] = useState<CityResult | null>(null);
+  const [cityError, setCityError] = useState('');
   const [places, setPlaces] = useState<PlaceEntry[]>([]);
   const [placeForm, setPlaceForm] = useState(emptyPlace);
   const [placeError, setPlaceError] = useState('');
@@ -31,26 +36,24 @@ export function MeArea({ request, tenancies, listings, go, openConnections }: {
   const [addingPlace, setAddingPlace] = useState(false);
   useEffect(() => {
     let active = true;
-    request<{ adapters: PublicAdapterConfig }>('/api/assets').then((r) => active && setAdapters(r.adapters)).catch(() => {});
-    request<{ city: CityResult }>('/api/city').then((r) => active && setCity(r.city)).catch(() => {});
+    request<{ city: CityResult }>('/api/city').then((r) => { if (active) { setCity(r.city); setCityError(''); } })
+      .catch((cause) => { if (active) setCityError(cause instanceof Error ? cause.message : 'Your city could not be checked.'); });
     request<{ places: PlaceEntry[] }>('/api/timeline').then((r) => active && setPlaces(r.places)).catch(() => {});
     return () => { active = false; };
   }, [request]);
 
-  const solana = wallet.wallets.find((w) => w.chainType === 'solana');
-  const evm = wallet.wallets.find((w) => w.chainType === 'ethereum');
-  const short = (a?: string) => (a ? `${a.slice(0, 4)}…${a.slice(-4)}` : 'not created yet');
-  const connections = [
-    { icon: Wallet, name: 'Solana wallet (devnet)', state: short(solana?.address), level: 'Test network' },
-    { icon: Wallet, name: 'Robinhood Chain wallet (testnet)', state: short(evm?.address), level: 'Test network' },
-    { icon: Sun, name: 'Home Assistant', state: adapters?.homeAssistant ? 'Connected' : 'Not connected', level: 'Read-only, live', area: 'home' as Area },
-    { icon: Cpu, name: 'Validator', state: adapters?.validator ? `${adapters.validator.chain} · ${adapters.validator.id}` : 'Not connected', level: 'Read-only, live', area: 'money' as Area },
-    { icon: Building2, name: 'City sources', state: city?.available ? city.name : city && 'name' in city && city.name ? city.name : 'No city chosen', level: 'Read-only public data', area: 'places' as Area },
-  ];
+  const livingTenancy = tenancies.find((item) => item.stage === 'living' && item.chain?.phase === 'active');
+  const inputs: LedgerStateInputs = {
+    ...connections.facts, ...homeState,
+    serviceChargeTarget: livingTenancy ? `service-charges-${livingTenancy.agreementId}` : undefined,
+    cityId: city?.cityId ?? (city?.name ? citySlug(city.name) : ''),
+    selectedCity: Boolean(city?.cityId || (city?.source === 'chosen' && city?.name)),
+    cityName: city?.name ?? '', cityLoading: !city && !cityError, cityError,
+  };
   const memberships = [
     ...tenancies.map((t) => ({ key: t.agreementId, role: t.role, context: t.property })),
     ...listings.filter((l) => l.relation === 'landlord').map((l) => ({ key: l.id, role: 'landlord', context: l.title })),
-    ...(city?.available ? [{ key: 'city', role: city.source === 'identity' ? 'city on identity' : 'chosen city', context: city.name }] : []),
+    ...(city?.name && (city.available || city.cityId || city.source === 'chosen') ? [{ key: 'city', role: city.source === 'identity' ? 'city on identity' : 'chosen city', context: city.name }] : []),
   ];
 
   async function submitPlace(event: React.FormEvent<HTMLFormElement>) {
@@ -80,7 +83,14 @@ export function MeArea({ request, tenancies, listings, go, openConnections }: {
 
   return (
     <div className="area-stack">
-      <IdentityStrip request={request} />
+      <IdentityStrip request={request} status={connections.identity} loading={connections.identityLoading}
+        readError={connections.identityError} onStatusChange={connections.updateIdentity} onRefresh={connections.refreshIdentity} />
+      <details className="card account-settings">
+        <summary id="account-settings">Passkeys, wallets &amp; recovery</summary>
+        <AccountSettings request={request} />
+      </details>
+      <LedgerAdapters inputs={inputs} go={go} />
+      <AdapterSettings request={request} connection={connections.adapters} />
 
       {memberships.length > 0 && (
         <section className="card">
@@ -95,9 +105,9 @@ export function MeArea({ request, tenancies, listings, go, openConnections }: {
         </section>
       )}
 
-      <section className="card">
+      <section className="card" id="life-timeline" tabIndex={-1}>
         <h2><History size={18} /> Life timeline</h2>
-        <p className="small-copy">Private to you. Others only ever see derived facts, such as “all deposits returned”.</p>
+        <p className="small-copy">Private to your account. Sharing a derived tenancy history is planned; addresses are not shared here.</p>
         <ol className="life-timeline">
           {city?.available && (
             <li><strong>Now · {city.name}</strong><span>{city.source === 'identity' ? 'City from your EU wallet' : 'City you chose'}</span></li>
@@ -134,20 +144,18 @@ export function MeArea({ request, tenancies, listings, go, openConnections }: {
         )}
       </section>
 
-      <section className="card">
-        <h2><Link2 size={18} /> Connections</h2>
-        <div className="connection-list">
-          {connections.map((c) => (
-            <div key={c.name} className="connection-row">
-              <c.icon size={16} />
-              <span><strong>{c.name}</strong> · {c.state}</span>
-              <span className="connection-level">{c.level}</span>
-              {c.area && <button className="text-button" onClick={() => go(c.area!)}>Manage</button>}
-            </div>
-          ))}
-        </div>
-        <button className="text-button" onClick={openConnections}>Connections & proof →</button>
-      </section>
     </div>
   );
+}
+
+function AccountSettings({ request }: { request: Request }) {
+  const required = useRecoveryRequired();
+  const { recovery, view } = useRecoveryFlow(request as AuthorizedRequest, required === true);
+  return <div className="area-stack">
+    <WalletAccessPanel recoveryProof={recovery.identity?.recoveryProof ?? undefined} />
+    {required && <section className="card operation-section">
+      <h3>Same-wallet recovery check</h3>
+      <RecoveryStepView {...view} />
+    </section>}
+  </div>;
 }

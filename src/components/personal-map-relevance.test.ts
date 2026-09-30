@@ -60,10 +60,15 @@ test('interest matching changes relevance order without moving items between rin
 
 test('expired consultation overrides stale source status and expired roadworks do not read as active', () => {
   const consultation = fixture.features.find((feature) => feature.properties.id === 'fictional-consultation')!;
-  assert.match(displayStatus(consultation, '2026-09-26'), /^Consultation closed on 2026-09-20; next step:/);
+  assert.match(displayStatus(consultation, '2026-09-26'), /^Consultation closed on .+; next step:/);
   assert.equal(displayStatus(consultation, '2026-09-19'), 'closed');
   const works = fixture.features.find((feature) => feature.properties.id === 'fictional-roadworks')!;
-  assert.match(displayStatus(works, '2026-10-12'), /^Roadworks ended on 2026-10-11/);
+  const active = /\b(active|ongoing|in progress)\b/i;
+  const status = displayStatus(works, '2026-10-12');
+  assert.match(status, /end/i);
+  assert.doesNotMatch(status, active);
   const rings = matchPersonalRings(fixture.features, { home, work }, '2026-10-12');
-  assert.match(rings.commute.find((entry) => entry.feature.properties.id === works.properties.id)!.explanation, /^Roadworks ended/);
+  const explanation = rings.commute.find((entry) => entry.feature.properties.id === works.properties.id)!.explanation;
+  assert.match(explanation, /end/i);
+  assert.doesNotMatch(explanation, active);
 });

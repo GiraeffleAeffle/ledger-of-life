@@ -1,6 +1,6 @@
 {
   "schemaVersion": "stadtstack-regional-topics-v1",
-  "generatedAt": "2026-09-27T10:30:35.145Z",
+  "generatedAt": "2026-09-27T14:57:10.148Z",
   "asOf": "2026-09-27",
   "region": {
     "id": "brandenburg-mol",
@@ -54,7 +54,7 @@
       "url": null,
       "licence": "unknown",
       "reuse": "facts_with_attribution",
-      "checkedPages": 11
+      "checkedPages": 13
     }
   ],
   "coverage": {
@@ -78,9 +78,9 @@
       "meetingsSinceCutoff": 187,
       "topicalItems": 0
     },
-    "curatedOfficialItems": 16,
-    "cityWebsiteItems": 14,
-    "municipalityWithItems": 22,
+    "curatedOfficialItems": 19,
+    "cityWebsiteItems": 17,
+    "municipalityWithItems": 24,
     "warnings": []
   },
   "offices": [
@@ -822,6 +822,20 @@
           ]
         },
         {
+          "municipalityId": "seelow",
+          "stage": "decision_recorded",
+          "items": [
+            {
+              "title": "Bebauungsplan Freiflächenphotovoltaik „Anlage Werbig“: Beschlussbekanntmachung",
+              "url": "https://www.seelow.de/seite/528897/%C3%B6ffentliche-beteiligungsverfahren.html",
+              "date": null,
+              "sourceType": "cityWebsite",
+              "locator": "Archiv, „Bekanntmachungen zum Bauvorhaben Freiflächenphotovoltaik Anlage Werbig“; Link „Öffentliche Bekanntmachung des Beschlusses des Bebauungsplanes“",
+              "stage": "decision_recorded"
+            }
+          ]
+        },
+        {
           "municipalityId": "strausberg",
           "stage": "consultation_closed",
           "items": [
@@ -833,6 +847,20 @@
               "locator": "DiPlan mapVars[procedureId=f3d226ee-4f6b-4149-905a-c04fc2f82415]: externalName, publicParticipationStartDate 2025-11-24, publicParticipationEndDate 2026-01-12, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Strausberg“, operator „Stadtverwaltung Strausberg“",
               "stage": "consultation_closed",
               "participationEnd": "2026-01-12"
+            }
+          ]
+        },
+        {
+          "municipalityId": "wriezen",
+          "stage": "unknown",
+          "items": [
+            {
+              "title": "Bebauungsplan Freiflächen-Photovoltaik-Anlage „Altes Holzlager in Wriezen“",
+              "url": "https://www.wriezen.de/seite/651890/bebauungspl%C3%A4ne.html",
+              "date": null,
+              "sourceType": "cityWebsite",
+              "locator": "Bebauungspläne, Link „B-Plan - Freiflächen-Photovoltaik-Anlage Altes Holzlager in Wriezen“",
+              "stage": "unknown"
             }
           ]
         },
@@ -1055,6 +1083,97 @@
       "reviewState": "candidate"
     },
     {
+      "id": "gewerbe",
+      "label": "Gewerbe und Industrieflächen",
+      "summary": "Kommunen planen Flächen für Gewerbe oder Industrie; eine Flächenplanung belegt noch keine Ansiedlung.",
+      "categoryKeywords": [
+        "Gewerbegebiet",
+        "Industriegebiet",
+        "Gewerbepark"
+      ],
+      "municipalities": [
+        {
+          "municipalityId": "altlandsberg",
+          "stage": "evaluation",
+          "items": [
+            {
+              "title": "Gewerbegebiet A10: Energie- und Innovationspark",
+              "url": "https://www.altlandsberg.de/wirtschaft-stadtentwicklung/stadtentwicklung/aktuelle-massnahmen/strassenbaumassnahmen/a10-energie-und-innovationspark-altlandsberg/",
+              "date": "2026-04-09",
+              "sourceType": "cityWebsite",
+              "locator": "„Wo stehen wir in diesem Verfahren?“: Beteiligung 16.02.–09.04.2026; Satzungsbeschluss offen",
+              "stage": "evaluation"
+            }
+          ]
+        },
+        {
+          "municipalityId": "fredersdorf-vogelsdorf",
+          "stage": "planning",
+          "items": [
+            {
+              "title": "Bebauungsplan Nr. 43 „Gewerbegebiet Triftweg/Rechenzentrum Vogelsdorf“",
+              "url": "https://www.fredersdorf-vogelsdorf.de/seite/163341/bauleitplanung.html",
+              "date": null,
+              "sourceType": "cityWebsite",
+              "locator": "Abschnitt „In Planung befindliche Bauleitpläne“, BP 43 und 12. Änderung FNP",
+              "stage": "planning"
+            }
+          ]
+        },
+        {
+          "municipalityId": "neuhardenberg",
+          "stage": "consultation_closed",
+          "items": [
+            {
+              "title": "Bebauungsplan \"Gewerbegebiet Handel und Dienstleistungen\", Gemeinde Neuhardenberg",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/bee633fc-90b4-4f6a-8d04-680080a058a0/public/detail",
+              "date": "2025-09-08",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=bee633fc-90b4-4f6a-8d04-680080a058a0]: externalName, publicParticipationStartDate 2025-09-08, publicParticipationEndDate 2025-10-17, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-10-17"
+            },
+            {
+              "title": "Bebauungsplan \"Gewerbepark Airport-Center Neuhardenberg\", Gemeinde Neuhardenberg",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/e46f7d4f-3865-4b5b-9c15-dc5aa6f268ba/public/detail",
+              "date": "2025-09-08",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=e46f7d4f-3865-4b5b-9c15-dc5aa6f268ba]: externalName, publicParticipationStartDate 2025-09-08, publicParticipationEndDate 2025-10-17, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „Neuhardenberg“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-10-17"
+            },
+            {
+              "title": "1. Änderung des Bebauungsplanes \"Gewerbegebiet Nord Airport Neuhardenberg\", Gemeinde Neuhardenberg",
+              "url": "https://bb.beteiligung.diplanung.de/verfahren/a69ab57e-3846-4977-9c13-7caf35ce6bf9/public/detail",
+              "date": "2025-09-08",
+              "sourceType": "planningProcedure",
+              "locator": "DiPlan mapVars[procedureId=a69ab57e-3846-4977-9c13-7caf35ce6bf9]: externalName, publicParticipationStartDate 2025-09-08, publicParticipationEndDate 2025-10-17, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
+              "stage": "consultation_closed",
+              "participationEnd": "2025-10-17"
+            }
+          ]
+        },
+        {
+          "municipalityId": "wriezen",
+          "stage": "unknown",
+          "items": [
+            {
+              "title": "Bebauungsplan Gewerbepark Mahlerstraße / Am Oderbruch",
+              "url": "https://www.wriezen.de/seite/651890/bebauungspl%C3%A4ne.html",
+              "date": null,
+              "sourceType": "cityWebsite",
+              "locator": "Bebauungspläne, Link „B-Plan - Gewerbepark Mahlerstraße / Am Oderbruch“",
+              "stage": "unknown"
+            }
+          ]
+        }
+      ],
+      "firstSeen": "2025-09-08",
+      "lastSeen": "2026-04-09",
+      "method": "keyword",
+      "reviewState": "candidate"
+    },
+    {
       "id": "windenergie",
       "label": "Windenergie",
       "summary": "Kommunen befassen sich mit Flächen für Windenergie; Planverfahren sind nicht mit gebauten Anlagen gleichzusetzen.",
@@ -1153,83 +1272,6 @@
       ],
       "firstSeen": "2025-05-12",
       "lastSeen": "2026-07-27",
-      "method": "keyword",
-      "reviewState": "candidate"
-    },
-    {
-      "id": "gewerbe",
-      "label": "Gewerbe und Industrieflächen",
-      "summary": "Kommunen planen Flächen für Gewerbe oder Industrie; eine Flächenplanung belegt noch keine Ansiedlung.",
-      "categoryKeywords": [
-        "Gewerbegebiet",
-        "Industriegebiet",
-        "Gewerbepark"
-      ],
-      "municipalities": [
-        {
-          "municipalityId": "altlandsberg",
-          "stage": "evaluation",
-          "items": [
-            {
-              "title": "Gewerbegebiet A10: Energie- und Innovationspark",
-              "url": "https://www.altlandsberg.de/wirtschaft-stadtentwicklung/stadtentwicklung/aktuelle-massnahmen/strassenbaumassnahmen/a10-energie-und-innovationspark-altlandsberg/",
-              "date": "2026-04-09",
-              "sourceType": "cityWebsite",
-              "locator": "„Wo stehen wir in diesem Verfahren?“: Beteiligung 16.02.–09.04.2026; Satzungsbeschluss offen",
-              "stage": "evaluation"
-            }
-          ]
-        },
-        {
-          "municipalityId": "fredersdorf-vogelsdorf",
-          "stage": "planning",
-          "items": [
-            {
-              "title": "Bebauungsplan Nr. 43 „Gewerbegebiet Triftweg/Rechenzentrum Vogelsdorf“",
-              "url": "https://www.fredersdorf-vogelsdorf.de/seite/163341/bauleitplanung.html",
-              "date": null,
-              "sourceType": "cityWebsite",
-              "locator": "Abschnitt „In Planung befindliche Bauleitpläne“, BP 43 und 12. Änderung FNP",
-              "stage": "planning"
-            }
-          ]
-        },
-        {
-          "municipalityId": "neuhardenberg",
-          "stage": "consultation_closed",
-          "items": [
-            {
-              "title": "Bebauungsplan \"Gewerbegebiet Handel und Dienstleistungen\", Gemeinde Neuhardenberg",
-              "url": "https://bb.beteiligung.diplanung.de/verfahren/bee633fc-90b4-4f6a-8d04-680080a058a0/public/detail",
-              "date": "2025-09-08",
-              "sourceType": "planningProcedure",
-              "locator": "DiPlan mapVars[procedureId=bee633fc-90b4-4f6a-8d04-680080a058a0]: externalName, publicParticipationStartDate 2025-09-08, publicParticipationEndDate 2025-10-17, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
-              "stage": "consultation_closed",
-              "participationEnd": "2025-10-17"
-            },
-            {
-              "title": "Bebauungsplan \"Gewerbepark Airport-Center Neuhardenberg\", Gemeinde Neuhardenberg",
-              "url": "https://bb.beteiligung.diplanung.de/verfahren/e46f7d4f-3865-4b5b-9c15-dc5aa6f268ba/public/detail",
-              "date": "2025-09-08",
-              "sourceType": "planningProcedure",
-              "locator": "DiPlan mapVars[procedureId=e46f7d4f-3865-4b5b-9c15-dc5aa6f268ba]: externalName, publicParticipationStartDate 2025-09-08, publicParticipationEndDate 2025-10-17, publicParticipationPhaseName „Frühzeitige Beteiligung Öffentlichkeit - § 3 (1) BauGB“; list municipality „Neuhardenberg“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
-              "stage": "consultation_closed",
-              "participationEnd": "2025-10-17"
-            },
-            {
-              "title": "1. Änderung des Bebauungsplanes \"Gewerbegebiet Nord Airport Neuhardenberg\", Gemeinde Neuhardenberg",
-              "url": "https://bb.beteiligung.diplanung.de/verfahren/a69ab57e-3846-4977-9c13-7caf35ce6bf9/public/detail",
-              "date": "2025-09-08",
-              "sourceType": "planningProcedure",
-              "locator": "DiPlan mapVars[procedureId=a69ab57e-3846-4977-9c13-7caf35ce6bf9]: externalName, publicParticipationStartDate 2025-09-08, publicParticipationEndDate 2025-10-17, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „“, operator „Amt Seelow-Land Gemeinde Falkenhagen“",
-              "stage": "consultation_closed",
-              "participationEnd": "2025-10-17"
-            }
-          ]
-        }
-      ],
-      "firstSeen": "2025-09-08",
-      "lastSeen": "2026-04-09",
       "method": "keyword",
       "reviewState": "candidate"
     },
