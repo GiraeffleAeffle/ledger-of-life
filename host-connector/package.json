@@ -1,0 +1,9 @@
+{
+  "name": "stadtstack-host-connector",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "bin": { "stadtstack-host-connector": "./connector.mjs" },
+  "scripts": { "start": "node connector.mjs", "test": "node --test connector.test.mjs" }
+}
