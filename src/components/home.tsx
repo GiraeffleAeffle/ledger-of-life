@@ -181,7 +181,7 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
     <div className={area === 'home' ? 'home housing-page' : 'home'}>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">{meta.eyebrow}</span>
+          <span className={`eyebrow area-eyebrow area-eyebrow--${area}`}>{meta.eyebrow}</span>
           <h1 tabIndex={-1}>{meta.label}</h1>
           <p>{meta.question}</p>
         </div>

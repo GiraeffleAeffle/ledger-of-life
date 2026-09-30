@@ -1,7 +1,7 @@
-.next-step-card { display: grid; gap: 8px; margin: 0 0 22px; padding: 18px 22px; border: 1px solid var(--green); border-radius: 18px; background: #f3f8ee; box-shadow: 0 6px 18px #1d49321a; }
-.next-step-card .eyebrow { color: var(--green); }
-.next-step-title { margin: 0; font-size: clamp(1.05rem, 2vw, 1.25rem); font-weight: 650; line-height: 1.35; letter-spacing: -.01em; }
-.next-step-detail { margin: 0; max-width: 680px; color: #4b6352; font-size: 14px; line-height: 1.5; }
+.next-step-card { display: grid; gap: 8px; margin: 0 0 22px; padding: 18px 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--soft); color: var(--ink); box-shadow: 0 6px 18px #15263b0a; }
+.next-step-card .eyebrow { color: var(--ink); }
+.next-step-title { margin: 0; color: var(--ink); font-size: clamp(1.05rem, 2vw, 1.25rem); font-weight: 650; line-height: 1.35; letter-spacing: -.01em; }
+.next-step-detail { margin: 0; max-width: 680px; color: var(--muted); font-size: 14px; line-height: 1.5; }
 .next-step-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
 .next-step-actions .button { display: inline-flex; align-items: center; gap: 7px; }
 @media (max-width: 640px) {

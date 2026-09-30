@@ -1,0 +1,7 @@
+.brand-endorsement { display: inline-flex; align-items: baseline; gap: .3em; width: fit-content; color: var(--muted); font-size: .75rem; text-decoration: none; }
+.brand-endorsement:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.stadtstack-wordmark { color: var(--ink); font-family: var(--serif); font-size: 1.15em; }
+.stadtstack-period { color: var(--stage-4); }
+/* Aligned with the wordmark: brand padding 12px + mark 40px + gap 12px. */
+.sidebar > .brand-endorsement { margin: -6px 12px 24px 64px; }
+.onboarding > .brand-endorsement { margin-top: 4px; }

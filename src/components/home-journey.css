@@ -4,75 +4,75 @@
 .housing-page > .page-heading p { display: none; }
 .housing-page > .page-heading .eyebrow { margin-bottom: 3px; }
 .housing-journey { display: grid; gap: 22px; min-width: 0; }
-.housing-kicker { display: inline-flex; align-items: center; gap: 7px; color: #8dbb98; font-size: 10px; font-weight: 750; letter-spacing: .11em; line-height: 1.4; }
-.housing-header { display: grid; gap: 10px; background: #204631; color: #fbf7eb; border-radius: 16px; padding: 20px; min-width: 0; }
-.housing-header h2 { font-size: clamp(1.2rem, 2.3vw, 1.65rem); margin: 0; overflow-wrap: anywhere; color: #fbf7eb; }
+.housing-kicker { display: inline-flex; align-items: center; gap: 7px; color: var(--panel); font-size: 10px; font-weight: 750; letter-spacing: .11em; line-height: 1.4; }
+.housing-header { display: grid; gap: 10px; background: var(--ink); color: var(--panel); border-radius: 14px; padding: 20px; min-width: 0; }
+.housing-header h2 { font-size: clamp(1.2rem, 2.3vw, 1.65rem); margin: 0; overflow-wrap: anywhere; color: var(--panel); }
 /* Explicit colours: page-level paragraph rules would otherwise paint dark text on this dark card. */
-.housing-header p { margin: 0; line-height: 1.5; color: #e0eadd; }
-.housing-header .small-copy { color: #e0eadd; }
-.housing-stage { font-weight: 650; color: #fbf7eb; }
+.housing-header p { margin: 0; line-height: 1.5; color: var(--panel); }
+.housing-header .small-copy { color: var(--panel); }
+.housing-stage { font-weight: 650; color: var(--panel); }
 .housing-path-groups { display: flex; flex-wrap: wrap; gap: 10px 22px; }
 .housing-path-group { display: grid; gap: 6px; }
-.housing-path-stage { color: #8dbb98; font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.housing-path-stage { color: var(--panel); font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .housing-path { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
-.housing-path li { display: flex; gap: 6px; align-items: center; padding: 7px 9px; border: 1px solid #adc5af70; border-radius: 8px; color: #e0eadd; font-size: .8rem; }
-.housing-path li.active { background: #f3eacb; color: #204631; border-color: #f3eacb; }
+.housing-path li { display: flex; gap: 6px; align-items: center; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--panel); font-size: .8rem; }
+.housing-path li.active { background: var(--soft); color: var(--ink); border-color: var(--soft); }
 .housing-path li > span { font-size: .72rem; opacity: .8; }
 .housing-page .home-tenancy-anchor:empty { display: none; }
-.housing-page .tenancy-card { gap: 16px; border-color: #cbdaca; box-shadow: 0 10px 36px #20372b0a; }
+.housing-page .tenancy-card { gap: 16px; border-color: var(--ink); box-shadow: 0 10px 36px #15263b0a; }
 .housing-page .tenancy-card .section-heading { flex-wrap: wrap; }
 .housing-page .tenancy-card h2 { margin: 0; font-size: clamp(1.2rem, 2vw, 1.55rem); }
-.tenancy-action { display: grid; gap: 10px; padding: 18px; border-radius: 14px; background: #f2f6eb; border: 1px solid #d5e4d0; }
-.tenancy-action.passive { background: #f6f6f1; }
+.tenancy-action { display: grid; gap: 10px; padding: 18px; border-radius: 14px; background: var(--soft); border: 1px solid var(--line); }
+.tenancy-action.passive { background: var(--soft); }
 .tenancy-action h3 { display: flex; gap: 8px; align-items: center; margin: 0; font-size: 1.2rem; }
 .tenancy-action p, .secure-substeps p { margin: 0; }
 .secure-substeps { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
 .action-blocker { color: #715b38; font-size: .85rem; line-height: 1.5; }
 .deduction-choices { display: flex; flex-wrap: wrap; gap: 10px; }
 .deduction-choices > .button { flex: 1; min-height: 44px; }
-.housing-page .tenancy-card .inline-form textarea { width: 100%; min-height: 76px; resize: vertical; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.15); }
-.housing-living-note { display: grid; justify-items: start; gap: 7px; background: #f0f5ed; border-radius: 14px; padding: 16px 20px; }
-.housing-living-note .housing-kicker { color: #537c60; }
+.housing-page .tenancy-card .inline-form textarea { width: 100%; min-height: 76px; resize: vertical; font: inherit; padding: 10px; border-radius: 14px; border: 1px solid rgba(0, 0, 0, 0.15); }
+.housing-living-note { display: grid; justify-items: start; gap: 7px; background: var(--soft); border-radius: 14px; padding: 16px 20px; }
+.housing-living-note .housing-kicker { color: var(--muted); }
 .housing-living-note strong { font-size: 1.12rem; }
 .housing-living-note p { margin: 0; }
 .housing-listing-heading { display: flex; justify-content: space-between; align-items: start; gap: 18px; }
 .housing-listing-heading > div { max-width: 660px; }
-.housing-listing-heading .housing-kicker { color: #597d59; }
+.housing-listing-heading .housing-kicker { color: var(--muted); }
 .housing-listing-heading h2 { margin: 4px 0 8px; font-size: clamp(1.7rem, 3vw, 2.3rem); letter-spacing: -.04em; }
-.housing-listing-heading p { margin: 0; max-width: 62ch; line-height: 1.55; color: #536451; }
+.housing-listing-heading p { margin: 0; max-width: 62ch; line-height: 1.55; color: var(--muted); }
 .housing-listing-heading .button { white-space: nowrap; }
 .housing-page .homes { gap: 20px; padding: clamp(18px, 3vw, 30px); }
 .housing-page .listing-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 18px; }
-.housing-page .listing-card { grid-template-rows: auto 1fr; height: 100%; box-shadow: 0 8px 22px #20372b0a; }
+.housing-page .listing-card { grid-template-rows: auto 1fr; height: 100%; box-shadow: 0 8px 22px #15263b0a; }
 .housing-page .listing-photo { aspect-ratio: 16 / 9; }
-.housing-page .listing-photo > svg { color: #688870; }
+.housing-page .listing-photo > svg { color: var(--muted); }
 .housing-page .listing-body { padding: 16px; gap: 12px; }
 .housing-page .listing-body header { align-items: start; flex-wrap: wrap; }
 .housing-page .listing-body header strong { font-size: 1.14rem; line-height: 1.2; }
-.housing-page .listing-rent { color: #28583e; font-size: 1.16rem; }
+.housing-page .listing-rent { color: var(--ink); font-size: 1.16rem; }
 .housing-page .listing-rent small { display: block; font-size: .7rem; line-height: 1.5; }
 .housing-page .listing-facts { font-size: .83rem; }
 .housing-page .listing-description { display: block; overflow: visible; line-height: 1.5; margin-top: 10px; }
 .housing-page .listing-deposit { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; border-top: 1px solid var(--line); padding-top: 12px; margin: 0; font-size: .8rem; }
 .housing-page .listing-deposit strong { font-size: 1rem; }
 .housing-page .listing-body > .small-copy { margin: 0; }
-.housing-page .listing-body > .button { min-height: 42px; }
+.housing-page .listing-body > .button { min-height: 44px; }
 .listing-details > summary { cursor: pointer; font-size: .85rem; }
 .listing-gallery { display: flex; gap: 6px; padding: 8px 12px 0; }
-.listing-gallery button { flex: 0 1 52px; height: 38px; padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: #e6eee5; cursor: pointer; }
-.listing-gallery button[aria-pressed='true'] { border-color: #28583e; }
+.listing-gallery button { flex: 0 1 52px; height: 38px; padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: var(--soft); cursor: pointer; }
+.listing-gallery button[aria-pressed='true'] { border-color: var(--ink); }
 .listing-gallery img { width: 100%; height: 100%; object-fit: cover; }
 .housing-page .my-listings { border-top: 1px solid var(--line); padding-top: 18px; }
 .housing-page .my-listings h3 { font-size: 1.1rem; }
 .housing-page .my-listings > div, .housing-page .listing-grid > div { scroll-margin-top: 20px; }
 .housing-page .my-listings .listing-card { max-width: 640px; }
-.housing-empty { margin: 0; padding: 24px; border: 1px dashed #afc8ab; background: #f6f8f2; border-radius: 14px; color: #536451; }
+.housing-empty { margin: 0; padding: 24px; border: 1px dashed var(--line); background: var(--soft); border-radius: 14px; color: var(--muted); }
 .housing-unavailable { margin: 0; padding: 12px 16px; border: 1px solid #d9d5b9; border-radius: 10px; background: #f7f3e6; color: #715b38; }
 .housing-page .housing-other-tenancies { scroll-margin-top: 20px; }
 .housing-page .housing-other-tenancies summary, .housing-page .past-tenancies summary { cursor: pointer; font-weight: 650; }
 .housing-page .housing-other-tenancies[open] > summary { margin-bottom: 16px; }
 .housing-page .housing-other-tenancies .tenancy-card { margin-top: 14px; }
-.housing-page .tenancy-money-links .text-button { color: #28583e; }
+.housing-page .tenancy-money-links .text-button { color: var(--ink); }
 @media (max-width: 520px) {
   .housing-journey { gap: 16px; }
   .housing-header { padding: 16px; }

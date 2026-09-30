@@ -10,6 +10,7 @@ import { useRentalWallet } from '@/wallets';
 import { AreaErrorBoundary } from './area-error-boundary';
 import { areaFromSearch, withArea } from './workspace-location';
 import { THREAD } from '@/data/path';
+import { BrandEndorsement } from './brand-endorsement';
 import './workspace.css';
 
 const PRIMARY = AREAS.filter((item) => !item.secondary);
@@ -58,9 +59,17 @@ export function Workspace() {
       <a className="skip-link" href="#main">Skip to workspace</a>
       <aside className="sidebar">
         <button className="brand" onClick={() => openArea('overview')}>
-          <span className="brand-mark" aria-hidden="true"><span /><span /><span /><span /></span>
-          <span>Ledger<br /><strong>of Life</strong></span>
+          <svg className="brand-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 44" aria-hidden="true">
+            <path d="M5 31 20 39 35 31 20 23Z" fill="#76a753"/>
+            <path d="M5 24 20 32 35 24 20 16Z" fill="#39a7b9"/>
+            <path d="M5 17 20 25 35 17 20 9Z" fill="#e9ac43"/>
+            <path d="M5 10 20 18 35 10 20 2Z" fill="#e97661"/>
+            <path d="M5 10V31L20 39" fill="none" stroke="#15263b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M14 10 22 14" fill="none" stroke="#15263b" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+          <span className="ledger-wordmark">Ledger<br /><strong>of Life</strong></span>
         </button>
+        <BrandEndorsement />
         <nav aria-label={signedOut ? 'Without an account' : 'Your account'}>
           {signedOut ? PUBLIC_LINKS.map((item) => (
             <Link key={item.href} className="nav-item" href={item.href}><item.icon size={18} />{item.label}</Link>

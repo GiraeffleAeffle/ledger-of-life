@@ -5,22 +5,22 @@
 .share-workflows p { line-height: 1.55; }
 .share-market-head h2 { font-family: var(--serif); font-size: clamp(1.7rem, 3vw, 2.5rem); line-height: 1.2; }
 .share-market-head p { margin-top: 8px; color: var(--muted); }
-.share-market-overview { display: grid; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #f7f9f4; font-variant-numeric: tabular-nums; }
+.share-market-overview { display: grid; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); font-variant-numeric: tabular-nums; }
 .share-market-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .share-market-choices .button { min-height: 58px; text-align: left; justify-content: flex-start; }
-.share-market-choices .button[aria-pressed="true"], .share-market-operations .button[aria-pressed="true"] { border-color: var(--green); background: #e8f1e3; color: var(--green-dark); box-shadow: inset 0 0 0 1px var(--green); }
+.share-market-choices .button[aria-pressed="true"], .share-market-operations .button[aria-pressed="true"] { border-color: var(--ink); background: var(--soft); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--ink); }
 .share-market-task { display: grid; justify-items: start; gap: 14px; border-top: 1px solid var(--line); padding-top: 20px; }
 .share-market-task h3 { font-size: 1.4rem; }
 .share-market-operations { display: flex; flex-wrap: wrap; gap: 8px; }
 .share-market-amount { display: grid; gap: 7px; font-size: 13px; font-weight: 700; }
 .share-market-amount input { width: min(240px, 100%); box-sizing: border-box; min-height: 42px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); font: inherit; }
-.share-market-amount input:focus-visible, .share-workflows summary:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
-.share-market-funding { display: grid; gap: 10px; border: 1px solid #b6cbb9; border-radius: 12px; padding: 14px; background: #f7f9f4; }
+.share-market-amount input:focus-visible, .share-workflows summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.share-market-funding { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: var(--panel); }
 .share-market-funding p, .share-market-funding .button { margin-bottom: 10px; }
 .share-market-detail { min-width: 0; border-top: 1px solid var(--line); padding-top: 14px; }
-.share-market-detail summary { cursor: pointer; color: var(--green); font-weight: 650; }
+.share-market-detail summary { cursor: pointer; color: var(--ink); font-weight: 650; }
 .share-market-detail[open] > * + * { margin-top: 14px; }
-.share-market-review { display: flex; flex-wrap: wrap; gap: 12px; border: 1px solid var(--green); border-radius: 12px; padding: 16px; background: #f1f6ed; }
+.share-market-review { display: flex; flex-wrap: wrap; gap: 12px; border: 1px solid var(--ink); border-radius: 14px; padding: 16px; background: var(--panel); }
 .share-market-review p { flex-basis: 100%; }
 .share-market-risk { padding: 12px 14px; border-radius: 10px; background: #fcf1df; color: #654d29; }
 .share-workflows .button { max-width: 100%; white-space: normal; }

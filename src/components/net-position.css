@@ -1,9 +1,9 @@
-.net-position, .net-strip { --tone-free: var(--green); --tone-locked: #5f7f92; --tone-pledged: var(--amber); --tone-lent: #776390; --tone-owed: #a34a3c; }
+.net-position, .net-strip { --tone-free: #3f6f2c; --tone-locked: #5f7f92; --tone-pledged: var(--warn); --tone-lent: #776390; --tone-owed: #a34a3c; }
 .net-position { margin: 4px 0 18px; }
 .net-position > ul { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
 .net-position > ul > li { display: grid; grid-template-columns: minmax(150px, 1.1fr) minmax(80px, 2fr) minmax(90px, auto); align-items: center; gap: 3px 18px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .net-position-label { font-size: 14px; font-weight: 650; }
-.net-position-bar { display: block; height: 9px; border-left: 1px solid #b8c4b3; }
+.net-position-bar { display: block; height: 9px; border-left: 1px solid var(--line); }
 .net-position-bar > span { display: block; height: 100%; min-width: 3px; border-radius: 0 4px 4px 0; background: var(--tone-free); }
 .tone-locked .net-position-bar > span { background: var(--tone-locked); }
 .tone-pledged .net-position-bar > span { background: var(--tone-pledged); }

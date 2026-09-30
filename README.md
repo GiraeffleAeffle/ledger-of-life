@@ -8,6 +8,8 @@ Start with [docs/LEDGER_OF_LIFE.md](docs/LEDGER_OF_LIFE.md) for the idea, struct
 
 This public hackathon implementation explores **Robinhood Chain and Solana in parallel**. It includes verified-account and private-agreement services, restricted native escrows, and signing/reconciliation APIs. Local native proofs passed on both stacks. A separate operator-key Solana devnet rehearsal completed test-USDC funding, Kamino supply/redemption and no-claim settlement. One Privy-connected tenancy remains active after funding and supplying 10 test USDC to Kamino. A second Privy-connected tenancy on the staged program completed asynchronous setup, funding, supply, redemption, zero-claim acceptance and a full 10-test-USDC return to the tenant's fixed payout account.
 
+Ledger of Life is [part of Stadtstack](https://stadtstack.eu). Its bound-pages mark and four numbered stage accents share the family palette; stage colors decorate rather than carry text or meaning alone. Display type is Fraunces, UI type is Public Sans, and technical values use IBM Plex Mono. All six WOFF2 files are self-hosted in `public/fonts/` with their SIL OFL notices. Social images use the renderer's default font. The test-network and reality labels remain separate from the brand: test tokens have no monetary value, and city welcome guides are not official city services.
+
 ## Run locally
 
 Use Node.js 24 LTS (minimum 22.18).

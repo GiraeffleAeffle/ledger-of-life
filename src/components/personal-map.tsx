@@ -352,7 +352,7 @@ export function PersonalMap({ request, accountId, explorationCity = '', onExplor
     markerInstances.current = [];
     import('maplibre-gl').then(({ default: maplibre }) => {
       if (map.current !== instance) return;
-      for (const [which, color] of [['home', '#28583e'], ['work', '#315d9c']] as const) {
+      for (const [which, color] of [['home', '#76a753'], ['work', '#315d9c']] as const) {
         const point = pins[which];
         if (point) markerInstances.current.push(new maplibre.Marker({ color }).setLngLat(point).setPopup(new maplibre.Popup().setText(`My ${which} · only on this device`)).addTo(instance));
       }

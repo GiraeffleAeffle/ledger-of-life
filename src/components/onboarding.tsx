@@ -7,6 +7,7 @@ import { invitationPayload } from './home-journey-logic';
 import Link from 'next/link';
 import type { LocalAiServiceStatus } from '@/server/local-ai-types';
 import { STAGES, THREAD } from '@/data/path';
+import { BrandEndorsement } from './brand-endorsement';
 import './thread-public.css';
 
 type StepState = 'done' | 'current' | 'todo';
@@ -76,6 +77,7 @@ export function AccountSetup({ step, recoveryRequired }: { step: Exclude<SetupSt
       <span className="eyebrow">WELCOME TO LEDGER OF LIFE</span>
       <h1>{step === 'account' ? THREAD : 'Finish setting up your access.'}</h1>
       <p className="lede">Rent a flat with a deposit held in a test-network escrow, see what you own, and follow what your city decides. No real money moves.</p>
+      <BrandEndorsement />
       <ol className="onboarding-stages" aria-label="The Ledger of Life path">{STAGES.map((stage) => <li key={stage.id}><span>{stage.number}</span><strong>{stage.name}</strong></li>)}</ol>
       <ul className="onboarding-purposes">
         <li>Follow a home application and deposit</li>

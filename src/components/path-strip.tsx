@@ -23,7 +23,7 @@ export function PathStrip({ progress, go }: { progress: PathProgress; go: (area:
     {STAGES.map((stage) => {
       const state = progress[stage.id];
       const where = target(stage.id, state);
-      return <li key={stage.id} className={`path-stage ${state}`}>
+      return <li key={stage.id} className={`path-stage path-stage-${stage.number} ${state}`}>
         <button type="button" onClick={() => (where.section ? goToSection(go, where.area, where.section) : go(where.area))}>
           <span className="path-stage-mark" aria-hidden="true">{state === 'done' ? <Check size={14} /> : stage.number}</span>
           <span className="path-stage-copy"><strong>{stage.name}</strong><small>{STATE_LABEL[state]}</small></span>
