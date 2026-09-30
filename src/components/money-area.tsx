@@ -34,15 +34,15 @@ export function MoneyArea({ request, tenancies, loaded, homeError, retryHome, go
     <div className="money-journey">
       <SectionTabs label="Money sections" tabs={[
         { id: 'money-holdings', label: 'Holdings', reality: ['testnet_real', 'read_only_live'],
-          summary: 'What you hold and what is locked. The priced subtotal counts your rental deposit, shares and test cash. Local stakes and devices are not in it.',
+          summary: 'What you hold and what is locked. The priced subtotal counts your rental deposit, test TSLA, test dollars lent to the shared pool and test cash, minus what you borrowed. Local stakes and devices are not in it.',
           content: <>
             {loaded ? <AssetsOverview request={request} tenancies={tenancies} show="money" go={go} solanaAction={<Portfolio request={request} />} />
               : homeError ? <p className="note" role="alert">{homeError} <button className="button secondary" type="button" onClick={() => void retryHome()}>Retry Home read</button></p> : <p className="money-activity-pending" role="status">Reading your tenancies before the holdings subtotal…</p>}
             <div id="ownership-journey" tabIndex={-1}><OwnershipJourney request={request} go={go} /></div>
             {loaded && <MoneyActivity request={request} tenancies={tenancies} go={go} />}
           </> },
-        { id: 'money-shares', label: 'Shares & loans', reality: ['testnet_simulated'],
-          summary: 'Use test shares for a deposit or a loan. Collateral prices are simulated on a test market; nothing here trades on a live market.',
+        { id: 'money-shares', label: 'Shares & loans', reality: ['testnet_real', 'read_only_live'],
+          summary: "Borrow test dollars against Robinhood's official test TSLA, or lend test dollars to one shared pool. The TSLA price is copied from Chainlink on Robinhood Chain mainnet; everything else is test money with no value.",
           content: <><ShareWorkflows request={request} go={go} /><StockCollateral /></> },
         { id: 'money-stakes', label: 'Local stakes', reality: ['testnet_simulated'],
           summary: 'Buy fictional test units in a housing project or a workshop. They grant no company, cooperative or property rights.',
