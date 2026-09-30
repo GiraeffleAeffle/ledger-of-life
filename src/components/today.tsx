@@ -1,10 +1,12 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowUpRight, Loader2 } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import type { CityFeature } from '@/server/city-signals';
 import type { TenancyJourney } from '@/server/journey';
 import type { PublicListing } from '@/server/listings';
 import { LedgerOverview } from './ledger-overview';
+import { PathStrip } from './path-strip';
+import { pathProgress } from './path-progress';
 import { goToSection, openCivicProject, openCivicSignal, type Area } from './areas';
 import { useCityFeed } from './city-feed';
 import { formatCityDate } from './city-coverage';
@@ -21,18 +23,10 @@ const emptyFeatures: CityFeature[] = [];
 const visitKey = (accountId: string, cityId: string) => `ledger-of-life:today-visit:v1:${accountId}:${cityId}`;
 const feedVisitKey = (accountId: string, cityId: string) => `ledger-of-life:today-feed-visit:v1:${accountId}:${cityId}`;
 const externalUrl = (url: string) => url.startsWith('https://') || url.startsWith('http://');
-const waitingFor = (tenancy: TenancyJourney) => {
-  if (tenancy.next.kind === 'paying_out') return 'Waiting for the test-network payout';
-  if (tenancy.next.kind === 'confirming') return 'Waiting for test-network confirmation';
-  if (tenancy.next.kind !== 'wait' && tenancy.next.kind !== 'propose_claim') return '';
-  return tenancy.next.label.toLowerCase().includes('arbitrator') ? 'Waiting for the arbitrator'
-    : tenancy.next.label.toLowerCase().includes('landlord') ? 'Waiting for the landlord'
-      : tenancy.next.label.toLowerCase().includes('tenant') ? 'Waiting for the tenant' : `Waiting: ${tenancy.next.label}`;
-};
 
 
 type Unavailable = { agreementId: string; property: string; unavailable: string };
-export function Today({ request, accountId, tenancies, listings, invitation, homeError, go }: {
+export function Today({ request, accountId, tenancies, listings, homeError, go }: {
   request: AuthorizedRequest; accountId: string; tenancies: (TenancyJourney | Unavailable)[] | null;
   listings: PublicListing[]; invitation: boolean; homeError: string; go: (area: Area) => void;
 }) {
@@ -136,47 +130,18 @@ export function Today({ request, accountId, tenancies, listings, invitation, hom
     catch { return false; }
   }, [accountId, cityId]);
 
-  const ready = (tenancies ?? []).filter((tenancy): tenancy is TenancyJourney => !('unavailable' in tenancy));
-  const actionable = ready.find((tenancy) => !waitingFor(tenancy) && tenancy.next.kind !== 'done');
-  const waiting = ready.map((tenancy) => ({ tenancy, label: waitingFor(tenancy) })).filter(({ label }) => label);
-  const applicants = listings.find((listing) => listing.relation === 'landlord' && listing.status === 'open' && listing.applicants > 0);
-  const needsAction = invitation || Boolean(actionable || applicants);
-  const needTitle = invitation ? 'Join your invitation' : actionable?.next.label ?? (applicants ? 'Review applicants' : 'Nothing needs you today');
-  const needDetail = invitation ? 'Open the private invitation in Home.' : actionable?.property
-    ?? (applicants ? `${applicants.title} · ${applicants.applicants} applicant(s)` : 'Your Home is here when you need it.');
-  const showHomeStatus = tenancies === null || tenancies.length > 0 || invitation || Boolean(homeError)
-    || listings.some((listing) => listing.status === 'open' && (listing.relation === 'landlord' || listing.relation === 'applicant'));
 
+  const knownTenancies = (tenancies ?? []).filter((item): item is TenancyJourney => !('unavailable' in item));
+  const progress = pathProgress({
+    homeLoading: tenancies === null && !homeError, homeError: Boolean(homeError) || knownTenancies.length !== (tenancies?.length ?? 0),
+    tenancies: knownTenancies, listings, cityChosen: selectedCity, cityLoading: !currentSignals && !signalError, cityError: Boolean(signalError),
+  });
   return <div className="today-stack">
+    <PathStrip progress={progress} go={go} />
+    <LedgerOverview request={request} tenancies={tenancies} listings={listings} homeError={homeError} cityId={cityId} cityName={cityName}
+      selectedCity={selectedCity} cityLoading={!currentSignals && !signalError} cityError={signalError || feedError}
+      citySnapshot={feedResult?.state === 'available' ? formatCityDate(feedResult.feed.generatedAt) : null} go={go} />
 
-    {showHomeStatus && <section className={`today-attention${needsAction ? ' active' : ''}`} aria-label="Things needing your attention">
-      <span className="eyebrow">{needsAction ? 'NEEDS YOU' : 'HOME STATUS'}</span>
-      {tenancies === null && !invitation ? <span role="status">{homeError || <><Loader2 className="spin" size={17} /> Checking your home…</>}</span>
-        : <><strong>{needTitle}</strong><span>{needDetail}</span>{needsAction && <button className="text-button" onClick={() => actionable ? goToSection(go, 'home', `tenancy-${actionable.agreementId}`) : go('home')}>Take this step →</button>}</>}
-      {waiting.map(({ tenancy, label }) => <span key={tenancy.agreementId} className="today-waiting">{tenancy.property} · {label}</span>)}
-    </section>}
-
-    <LedgerOverview request={request} accountId={accountId} tenancies={tenancies} listings={listings} homeError={homeError} cityId={cityId} cityName={cityName}
-      selectedCity={selectedCity} cityLoading={!currentSignals && !signalError} cityError={signalError} followedCount={followed.length}
-      followingError={following.storageError} go={go} />
-
-    <section className="today-news" aria-label="Latest city news">
-      <div className="today-news-head"><span className="eyebrow">LATEST OFFICIAL PRESS · {cityName}</span><span>German{feedResult?.state === 'available' ? ` · ${pressCollected ? `press collected ${formatCityDate(pressCollected)}` : `feed prepared ${formatCityDate(feedResult.feed.generatedAt)}`} · refreshed only when the collector runs` : ''}</span></div>
-      {feedError && <p className="today-alert" role="status">City news could not be refreshed{feedResult?.state === 'available' ? '; showing the last checked feed.' : '.'}</p>}
-      {news.length ? <>
-        <a className="today-lead" href={news[0].url} target="_blank" rel="noopener noreferrer" lang="de"><span>OFFICIAL PRESS · GERMAN <ArrowUpRight size={16} aria-hidden /></span><strong>{news[0].title}</strong>
-          <small>{news[0].publisher} · published {date.format(new Date(news[0].publishedAt))}</small></a>
-        {news.length > 1 && <ol className="today-news-list">{news.slice(1).map((item) => <li key={item.id}>
-          <a href={item.url} target="_blank" rel="noopener noreferrer" lang="de"><strong>{item.title}</strong> <ArrowUpRight size={15} aria-hidden /></a>
-          <span>{item.publisher} · official press · German · published {date.format(new Date(item.publishedAt))}</span>
-        </li>)}</ol>}
-      </> : !cityId ? <p>{signalError ? 'Your city could not be checked right now.' : selectedCity ? <>No news feed from {cityName} yet. <button className="text-button" onClick={() => goToSection(go, 'places', 'city-choice')}>Choose a covered city in Places →</button></> : <>Choose your city to see official city news. <button className="text-button" onClick={() => goToSection(go, 'places', 'city-choice')}>Choose my city →</button></>}</p>
-        : !feedResult && !feedError ? <p role="status">Reading official city news…</p>
-          : feedResult?.state === 'not_available' ? <p>No news feed from {cityName} yet. Choose a covered city in Places.</p>
-            : noFeed ? <p>No news feed from {cityName} yet. {noFeed.pageUrl && externalUrl(noFeed.pageUrl) && <a href={noFeed.pageUrl} target="_blank" rel="noopener noreferrer">Open the official news page <ArrowUpRight size={14} aria-hidden /></a>}</p>
-              : <p>{feedError ? 'City news is temporarily unavailable.' : `No dated press news in the published feed for ${cityName}.`}</p>}
-      <button className="text-button" onClick={() => goToSection(go, 'places', 'city-news')}>All city news & events →</button>
-    </section>
     {(followed.length > 0 || following.storageError) && <section className="today-following" aria-label="Followed public projects">
       <div className="today-briefing-head"><div><span className="eyebrow">PUBLIC PROJECTS YOU FOLLOW</span><h2>{pending.length ? `${pending.length} update${pending.length === 1 ? '' : 's'} to review` : 'Followed projects'}</h2></div></div>
       {following.storageError && <p role="alert">{following.storageError}</p>}
@@ -193,7 +158,24 @@ export function Today({ request, accountId, tenancies, listings, invitation, hom
       {!pending.length && !sourceIssues.length && <p>{checkingSources ? 'Checking followed public sources…' : 'No unread sourced developments. Following does not join a project or grant a role.'}</p>}
       <button className="text-button" onClick={() => goToSection(go, 'places', 'followed-projects')}>See followed projects in Places →</button>
     </section>}
-    <div className="today-briefing">
+    {(cityId || selectedCity) && <section className="today-news" aria-label="Latest city news">
+      <div className="today-news-head"><span className="eyebrow">LATEST OFFICIAL PRESS · {cityName}</span><span>German{feedResult?.state === 'available' ? ` · ${pressCollected ? `press collected ${formatCityDate(pressCollected)}` : `feed prepared ${formatCityDate(feedResult.feed.generatedAt)}`} · refreshed only when the collector runs` : ''}</span></div>
+      {feedError && <p className="today-alert" role="status">City news could not be refreshed{feedResult?.state === 'available' ? '; showing the last checked feed.' : '.'}</p>}
+      {news.length ? <>
+        <a className="today-lead" href={news[0].url} target="_blank" rel="noopener noreferrer" lang="de"><span>OFFICIAL PRESS · GERMAN <ArrowUpRight size={16} aria-hidden /></span><strong>{news[0].title}</strong>
+          <small>{news[0].publisher} · published {date.format(new Date(news[0].publishedAt))}</small></a>
+        {news.length > 1 && <ol className="today-news-list">{news.slice(1).map((item) => <li key={item.id}>
+          <a href={item.url} target="_blank" rel="noopener noreferrer" lang="de"><strong>{item.title}</strong> <ArrowUpRight size={15} aria-hidden /></a>
+          <span>{item.publisher} · official press · German · published {date.format(new Date(item.publishedAt))}</span>
+        </li>)}</ol>}
+      </> : !cityId ? <p>{signalError ? 'Your city could not be checked right now.' : `No news feed from ${cityName} yet.`}</p>
+        : !feedResult && !feedError ? <p role="status">Reading official city news…</p>
+          : feedResult?.state === 'not_available' ? <p>No news feed from {cityName} yet. Choose a covered city in Places.</p>
+            : noFeed ? <p>No news feed from {cityName} yet. {noFeed.pageUrl && externalUrl(noFeed.pageUrl) && <a href={noFeed.pageUrl} target="_blank" rel="noopener noreferrer">Open the official news page <ArrowUpRight size={14} aria-hidden /></a>}</p>
+              : <p>{feedError ? 'City news is temporarily unavailable.' : `No dated press news in the published feed for ${cityName}.`}</p>}
+      <button className="text-button" onClick={() => goToSection(go, 'places', 'city-news')}>All city news & events →</button>
+    </section>}
+    {(cityId || selectedCity) && <div className="today-briefing">
       <section className="today-changes" aria-label="What changed near you">
         <div className="today-briefing-head"><div><span className="eyebrow">SINCE YOUR LAST VISIT</span><h2>What changed for you</h2></div></div>
         {signalError && <p role="status">City signals could not be refreshed{signalResult?.state === 'covered' ? '; showing last checked signals.' : '.'}</p>}
@@ -201,7 +183,7 @@ export function Today({ request, accountId, tenancies, listings, invitation, hom
         {changes.length ? <><ul className="today-change-list">{changes.map((change) => <li key={change.id}>
           <strong>{change.title}</strong><span>{change.description} · {REVIEW_LABELS[change.reviewState as keyof typeof REVIEW_LABELS] ?? 'Not yet checked'}</span>
           <small>{relevant.get(change.id)?.explanation ?? 'Published city feed item'} · {change.id.startsWith('feed:') ? 'published' : 'source as of'} {date.format(new Date(change.asOf))}</small>
-        </li>)}</ul><button type="button" className="secondary-button" onClick={markSeen}>Mark changes seen</button></> : !cityId ? <p>{selectedCity ? <>No published changes for {cityName} yet. <button className="text-button" onClick={() => goToSection(go, 'places', 'city-choice')}>Choose a covered city in Places →</button></> : <>Choose a city to see relevant changes. <button className="text-button" onClick={() => goToSection(go, 'places', 'city-choice')}>Choose my city →</button></>}</p>
+        </li>)}</ul><button type="button" className="secondary-button" onClick={markSeen}>Mark changes seen</button></> : !cityId ? <p>No published changes for {cityName} yet.</p>
           : !signalResult && !signalError ? <p role="status">Checking published city signals…</p>
             : signalResult?.state === 'not_covered' && feedResult?.state !== 'available' ? <p>This city does not have published signals yet.</p>
               : <p>{signalError || feedError ? 'No new changes in the last checked sources; refresh is currently unavailable.'
@@ -218,6 +200,7 @@ export function Today({ request, accountId, tenancies, listings, invitation, hom
           <strong>{historicalExample.title}</strong><small>Official bus GPS report: 251 → 235 seconds on the same whole route, before/during. Not a proven causal benefit or current city status.</small>
           <button className="text-button" onClick={() => openCivicProject(go, historicalExample.cityId, historicalExample.id)}>Explore the Münster evidence →</button></div>}
       </section>}
-    </div>
+    </div>}
+    <p className="today-roadmap-link"><button type="button" className="text-button" onClick={() => go('ideas')}>What is built and what is planned → Roadmap</button></p>
   </div>;
 }

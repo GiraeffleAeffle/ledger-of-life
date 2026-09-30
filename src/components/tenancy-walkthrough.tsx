@@ -1,42 +1,38 @@
-import { RealityChips } from './reality-chip';
+import { goToSection, type Area } from './areas';
 import './tenancy-walkthrough.css';
 
 /**
- * The whole journey in words, for a person who cannot run it alone. Each line restates what the journey
- * screens (src/server/journey.ts) say and do; change one only after reading the other.
+ * The answer to "can I hold the deposit with shares, or lend it?", visible without opening anything.
+ * Only the first way can be used on this site; the others say plainly where they exist. Nothing here signs.
  */
-const STEPS: { stage: string; who: string; what: string }[] = [
-  { stage: 'Agreement', who: 'Landlord, tenant, arbitrator',
-    what: 'The landlord posts a home and a tenant applies. Choosing a tenant cannot be undone. The landlord then sends a private link, valid once for 24 hours, to a neutral arbitrator. Tenant and landlord each accept the same terms: the home, the deposit and who keeps earnings.' },
-  { stage: 'Deposit space', who: 'Landlord',
-    what: 'One approval creates the deposit space on Solana devnet. It holds no money yet.' },
-  { stage: 'Deposit secured', who: 'Tenant',
-    what: 'One approval locks the deposit in test USDC and supplies it to lending. Devnet lending pays nothing, so any earnings you see are simulated.' },
-  { stage: 'Living here', who: 'Nobody',
-    what: 'Nothing to do. The tenant can claim earnings above the deposit when there are some (simulated on devnet).' },
-  { stage: 'Move-out', who: 'Landlord, then tenant, then the arbitrator only if they disagree',
-    what: 'The landlord proposes a deduction, zero is allowed, with a reason. The tenant agrees, which settles at once, or disputes it. The arbitrator then decides an amount up to the claim.' },
-  { stage: 'Paid out', who: 'Automatic',
-    what: 'One approval settles the deposit. Payouts go to each side’s own account. Today they are sent while one of the people involved has Home open.' },
-];
+export function DepositIdeas({ go }: { go?: (area: Area) => void }) {
+  return (
+    <section className="card deposit-ideas-card" id="deposit-options" tabIndex={-1} aria-labelledby="deposit-options-title">
+      <h2 id="deposit-options-title">Ways to hold the deposit</h2>
+      <dl className="deposit-ideas">
+        <div><dt>Test-USDC deposit <span className="deposit-availability available">Available on this site</span></dt>
+          <dd>The tenant locks the home&apos;s test-USDC deposit in a Solana devnet escrow. At move-out it comes back, minus any agreed or decided deduction.</dd></div>
+        <div><dt>Deposit lent out to earn <span className="deposit-availability">Needs a local setup</span></dt>
+          <dd>On this site the escrow lends the deposit on Solana devnet, which pays no interest. Earnings, in test dollars, exist only in a local rehearsal, where the deposit is lent to the shared loan pool. On a rental deposit they belong to the tenant.</dd></div>
+        <div><dt>Share-backed deposit <span className="deposit-availability">Contract prototype</span></dt>
+          <dd>A contract and a calculator exist; nothing is offered or signed here, and buying or borrowing against shares does not replace the deposit.
+            {go && <> <button type="button" className="text-button" onClick={() => goToSection(go, 'ideas', 'stock-deposit-illustration')}>See the illustration →</button></>}</dd></div>
+      </dl>
+    </section>
+  );
+}
 
 export function TenancyWalkthrough({ testTools }: { testTools: boolean }) {
   return (
-    <details className="card tenancy-walkthrough" open={!testTools}>
-      <summary><strong>How a tenancy works</strong><span>three people, six steps</span></summary>
+    <details className="card tenancy-walkthrough">
+      <summary>How it works</summary>
       <div className="tenancy-walkthrough-body">
-        <RealityChips levels={['testnet_simulated']} />
-        <p>
-          {testTools
-            ? 'The Test tools at the bottom of this page can play the other people, so one account can walk through all of it.'
-            : 'A tenancy is between three people who each need their own account: a landlord, a tenant and a neutral arbitrator. This build has no test tools to play the other two, so on your own you can read the journey here, post a home, or apply to one.'}
-        </p>
-        <ol>
-          {STEPS.map(({ stage, who, what }) => (
-            <li key={stage}><strong>{stage}</strong><small>{who}</small><span>{what}</span></li>
-          ))}
-        </ol>
-        <p className="small-copy">Nobody is notified when it is their turn: tell the other people yourself. Everything runs on Solana devnet with test USDC.</p>
+        <p>The landlord chooses a tenant and invites a neutral arbitrator. Choosing creates an agreement and cannot be undone here. Tenant and landlord accept the same deposit terms; these do not cover monthly rent or tenancy dates.</p>
+        <p>To secure the deposit, the landlord prepares an empty escrow, then the tenant funds it. At move-out, the landlord proposes a deduction with a reason; the tenant agrees or disputes it. Only a dispute needs the arbitrator, whose decision cannot exceed the proposed deduction.</p>
+        <p>The tenant keeps deposit assets above an approved deduction at settlement. The agreement determines whether surplus can be claimed while living here. Devnet lending pays no interest; any separately credited earnings are simulated test tokens.</p>
+        <p>Deposit options are listed under &ldquo;Ways to hold the deposit&rdquo; above.</p>
+        <p className="small-copy">Payouts go to each party’s own wallet. Keep Home open during payout; failed attempts retry here.</p>
+        {testTools && <p className="small-copy">In this local setup, the rehearsal tools at the bottom can use sample parties. They are outside the hosted tenancy path.</p>}
       </div>
     </details>
   );

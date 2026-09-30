@@ -4,6 +4,8 @@ import type { SectionId } from './sections';
 
 export type CapabilityStatus = 'planned' | 'prototype' | 'partly built' | 'illustration' | 'built';
 export const STATUS_LABEL: Record<CapabilityStatus, string> = { planned: 'Planned', prototype: 'Prototype', 'partly built': 'Partly built', illustration: 'Illustration', built: 'Built' };
+export const AVAILABILITY_LABELS = ['Available on this site', 'Needs a local setup', 'Contract prototype', 'Planned'] as const;
+export type CapabilityAvailability = typeof AVAILABILITY_LABELS[number];
 export interface Idea {
   id: string;
   topic: LedgerTopicId;
@@ -12,76 +14,84 @@ export interface Idea {
   how: string;
   enables: string;
   status: CapabilityStatus;
+  availability: CapabilityAvailability;
+  illustration?: 'stock-collateral';
   needs?: string;
 }
 
 /** Single source for capability status, topic and the one place each capability is operated; mirrors docs/LEDGER_OF_LIFE.md and the ontology's roadmap items. */
 export const IDEAS: Idea[] = [
-  { id: 'today-cockpit', topic: 'identity', destination: { area: 'overview' }, status: 'built', title: 'Your ledger at a glance',
+  { id: 'today-cockpit', availability: 'Available on this site', topic: 'identity', destination: { area: 'overview' }, status: 'built', title: 'Your ledger at a glance',
     how: 'A household-first overview connects identity, home, money, productive assets and public life. Real attention, followed projects and dated city news follow; each topic opens its working area.',
     enables: 'Understand what belongs in your ledger, what is connected and what you can do next.' },
-  { id: 'city-news-feed', topic: 'places', destination: { area: 'places', section: 'city-news' }, status: 'partly built', title: 'City news & events',
+  { id: 'city-news-feed', availability: 'Available on this site', topic: 'places', destination: { area: 'places', section: 'city-news' }, status: 'partly built', title: 'City news & events',
     how: 'Published city feed files show attributed headlines, original links and publication dates in Places. Today previews three official press headlines; event times appear only when sourced.',
     enables: 'Read a dated local source once, not a copied article or an invented event date.',
     needs: 'Published official feeds for more cities.' },
-  { id: 'regional-shared-topics', topic: 'places', destination: { area: 'places', section: 'regional-topics' }, status: 'partly built', title: 'In your region',
+  { id: 'regional-shared-topics', availability: 'Available on this site', topic: 'places', destination: { area: 'places', section: 'regional-topics' }, status: 'partly built', title: 'In your region',
     how: 'Published Märkisch-Oderland source items group topics shared by municipalities. Your city’s items rank first; original links and separate stages remain visible. Interpretive summaries say “Not yet checked”.',
     enables: 'See where neighbouring municipalities work on similar topics without treating an agenda or proposal as an adopted policy.',
     needs: 'Reviewed interpretation and published regional coverage beyond Märkisch-Oderland.' },
-  { id: 'timeline', topic: 'identity', destination: { area: 'me', section: 'life-timeline' }, status: 'partly built', title: 'Life timeline',
+  { id: 'timeline', availability: 'Available on this site', topic: 'identity', destination: { area: 'me', section: 'life-timeline' }, status: 'partly built', title: 'Life timeline',
     how: 'Tenancies from this app appear automatically; earlier places you add yourself (labeled as your own statement); later a residence attestation from the EU wallet.',
     enables: 'Keep a private history when moving. Sharing a person-approved derived tenancy history remains planned, not available to landlords today.' },
-  { id: 'roles', topic: 'identity', status: 'planned', title: 'Roles in every part of your life',
+  { id: 'roles', availability: 'Planned', topic: 'identity', status: 'planned', title: 'Roles in every part of your life',
     how: 'Each context (tenancy, club, building, city) grants you a role; the EU wallet proves eligibility such as residence or age.',
     enables: 'One identity for tenant, landlord, club member and resident, and each context learns only what it needs.' },
-  { id: 'service-charges', topic: 'home', destination: { area: 'home', section: 'home-tenancies' }, status: 'prototype', title: 'Real-time service charges',
+  { id: 'rental-deposit', availability: 'Available on this site', topic: 'home', destination: { area: 'home', section: 'deposit-options' }, status: 'built', title: 'Rent a home with a deposit in escrow',
+    how: 'Listing, application, agreement with a neutral arbitrator, a Solana devnet escrow for the test-USDC deposit, move-out claim and payouts. The agreement covers deposit terms, not rent or dates. Hosted devnet lending pays no interest; any simulated surplus exists only in a local setup and belongs to the tenant.',
+    enables: 'Follow a home application and test-USDC deposit through move-out and payout, with three real accounts.' },
+  { id: 'service-charges', availability: 'Available on this site', topic: 'home', destination: { area: 'home', section: 'home-tenancies' }, status: 'prototype', title: 'Service-charge illustration',
     how: 'Example service-charge statement with a landlord-set test prepayment and optional live daily Home Assistant consumption; no escrow funding or payouts.',
     enables: 'See an illustrative running balance. It is not a legal annual statement or money movement.',
     needs: 'Real meter and invoice data before an actual service-charge balance can be calculated.' },
-  { id: 'stock-deposit', topic: 'money', destination: { area: 'money', section: 'share-workflows' }, status: 'prototype', title: 'Share-backed deposit',
-    how: 'Retained stock-collateral contract prototype only. The former fake-stock/operator-desk app flow is removed; a hosted rental deposit needs actual distinct parties and is not prepared here.',
-    enables: 'Explore custody and in-kind return rules without mistaking historical simulated-price evidence for a current rental offer.' },
-  { id: 'borrow-against-shares', topic: 'money', destination: { area: 'money', section: 'share-workflows' }, status: 'prototype', title: 'Loan against shares',
+  { id: 'stock-deposit', availability: 'Contract prototype', topic: 'home', destination: { area: 'ideas', section: 'stock-deposit-illustration' }, illustration: 'stock-collateral', status: 'prototype', title: 'Share-backed deposit',
+    how: 'Retained stock-collateral contract prototype and illustrative calculator only. Not offered on the hosted site and not selectable for a Home tenancy. Buying test shares, borrowing against them or lending test dollars does not replace the Solana test-USDC deposit.',
+    enables: 'Contract prototype — not available for Home deposits.' },
+  { id: 'borrow-against-shares', availability: 'Available on this site', topic: 'money', destination: { area: 'money', section: 'share-workflows' }, status: 'prototype', title: 'Loan against shares, or lend test dollars',
     how: 'With a verified shared Robinhood testnet deployment, pledge official faucet test TSLA and borrow freely mintable test dollars up to 50 % of mirrored token value. Interest accrues continuously at 5 % nominal annually (about 5.13 % effective, read from the contract); anyone can liquidate at 80 % LTV with a fresh price while unsuspended.',
     enables: 'Review loan debt and collateral, or lend test dollars for borrower-funded interest, with cash-limited withdrawals and possible bad-debt losses.' },
-  { id: 'local-investments', topic: 'money', destination: { area: 'money', section: 'local-investments' }, status: 'prototype', title: 'Local stakes in your own city',
+  { id: 'local-investments', availability: 'Available on this site', topic: 'money', destination: { area: 'money', section: 'local-investments' }, status: 'prototype', title: 'Fictional local project stakes',
     how: 'Buy distinct fictional housing-project or local-workshop units with your own wallet on Robinhood testnet. Actual test cash, token holdings and checked receipts stay separate from the building concept and possible city effects.',
     enables: 'Use personal or borrowed same-chain test cash to acquire a visible test stake without selling the pledged shares. These units grant no real company, cooperative or property rights.',
     needs: 'Verified issuers, legal rights, regulated arrangements and project evidence before any real investment or impact claim.' },
-  { id: 'home-tokens', topic: 'home', destination: { area: 'money', section: 'local-investments' }, status: 'planned', title: 'Home shares towards owning a home',
+  { id: 'home-tokens', availability: 'Planned', topic: 'home', status: 'planned', title: 'Home shares towards owning a home',
     how: 'A future issuer could define a legal housing interest or down-payment credit. The separate test-investment example only transfers fictional issuer units; it does not grant those rights.',
     enables: 'Explore a possible renting-to-ownership path without presenting a test token as an apartment or land-register title.' },
-  { id: 'devices', topic: 'devices', status: 'planned', title: 'Electric car and other devices',
+  { id: 'devices', availability: 'Planned', topic: 'devices', status: 'planned', title: 'Electric car and other devices',
     how: 'Charging and vehicle-to-grid income read like the solar and validator adapters.',
     enables: 'Everything your hardware earns in one total.' },
-  { id: 'local-ai', topic: 'devices', destination: { area: 'money', section: 'local-ai' }, status: 'prototype', title: 'Local AI & GPU hosting',
-    how: 'A configured Ollama node answers real questions. Personal access uses a finite x402 authorization and a confirmed same-chain payment after successful inference; a public library desk uses the same node without a wallet.',
-    enables: 'Use local GPU capacity, inspect measured work and settled receipts, and compare paid or free access with editable host-cost assumptions.',
+  { id: 'local-ai', availability: 'Available on this site', topic: 'devices', destination: { area: 'money', section: 'local-ai' }, status: 'prototype', title: 'Local AI & GPU hosting',
+    how: 'An available configured host answers real questions. Your own host runs without payment; eligible public hosts offer free answers within a shared allowance; a paid city-host answer uses x402 and test tUSDG. The public AI desk needs no account. Check current service availability in the desk; availability is not guaranteed.',
+    enables: 'Ask a local model or manage a host you run. Host receipts and hypothetical euro cost scenarios remain separate.',
     needs: 'Reliable operating capacity and real customer demand before treating an earnings scenario as a business forecast.' },
-  { id: 'budget', topic: 'places', destination: { area: 'places', section: 'city-system' }, status: 'partly built', title: 'Where the money goes',
+  { id: 'budget', availability: 'Available on this site', topic: 'places', destination: { area: 'places', section: 'city-system' }, status: 'partly built', title: 'Where the money goes',
     how: 'Places links Strausberg’s 2025/26 ordinance and planned investment outlays of €17,941,270 (2025) and €12,609,320 (2026). The detailed plan is offered for inspection. The independent municipal-balance scenario is hypothetical, not an actual spending or tax breakdown.',
     enables: 'Distinguish an adopted headline plan from money spent or an individual tax receipt.',
     needs: 'The complete city budget plan and verified line items before a spending breakdown can be shown.' },
-  { id: 'scales', topic: 'places', destination: { area: 'places', section: 'personal-map' }, status: 'partly built', title: 'From your street to the world',
+  { id: 'scales', availability: 'Available on this site', topic: 'places', destination: { area: 'places', section: 'personal-map' }, status: 'partly built', title: 'From your street to the world',
     how: 'The private personal map now matches city-wide published signals against on-device home/work pins in a neighbourhood ring and approximate straight commute corridor. Places still links district → state → Germany → EU portals; those wider levels are not live feeds.',
     enables: 'Start with what may affect your neighbourhood and city without disclosing your exact home or work to the server.',
     needs: 'Reviewed coverage across more cities and district/state/world levels.' },
-  { id: 'measurable', topic: 'places', destination: { area: 'places', section: 'city-system' }, status: 'partly built', title: 'A measurable city',
+  { id: 'measurable', availability: 'Available on this site', topic: 'places', destination: { area: 'places', section: 'city-system' }, status: 'partly built', title: 'A measurable city',
     how: 'Places compares 251 s before with 235 s during Münster’s 2021 bus-priority trial on the same full route, sourced to an official GPS evaluation; nearby DWD weather and citizen PM readings remain separate context.',
     enables: 'Inspect a real historical before/during measurement without mistaking it for a proven lane effect or a calibrated city-wide sensor layer.',
     needs: 'Comparable longer-term or controlled observations to attribute benefits; verified environmental coverage and reviewed interpretation for broader city outcomes.' },
-  { id: 'decisions', topic: 'places', destination: { area: 'places', section: 'public-decisions' }, status: 'partly built', title: 'Council papers & meetings',
+  { id: 'decisions', availability: 'Available on this site', topic: 'places', destination: { area: 'places', section: 'public-decisions' }, status: 'partly built', title: 'Council papers & meetings',
     how: 'Strausberg ALLRIS meeting calendar and document search are linked; no working public OParl endpoint was confirmed and no agendas are imported.',
     enables: 'Reach the official source yourself, without presenting unverified meeting records as a feed.',
     needs: 'A structured meeting feed (OParl or reviewed atlas/CCF data) for read-only meetings.' },
-  { id: 'welcome', topic: 'places', destination: { area: 'places', section: 'community-discovery' }, status: 'partly built', title: 'Welcome to your new city',
-    how: 'Named OSM clubs and sports facilities are read-only, grouped by type and linked to OSM; Strausberg city and district directories are linked. Welcome vouchers can be illustrated without claiming a real offer.',
-    enables: 'Find nearby activities now and explore a clearly simulated welcome voucher next.',
-    needs: 'City partners for any real voucher redemption, registration help or consent-based matching.' },
-  { id: 'bank-accounts', topic: 'money', status: 'planned', title: 'Bank accounts in the same ledger',
+  { id: 'welcome', availability: 'Available on this site', topic: 'places', destination: { area: 'places', section: 'community-discovery' }, status: 'partly built', title: 'Get settled in your city',
+    how: 'The public Strausberg welcome guide offers sourced first-month steps, events, groups and contacts without an account. Places links public directories in covered cities. No welcome guide for other cities is offered yet.',
+    enables: 'Find sourced local activities and contacts. Choosing a city is not residence proof.',
+    needs: 'Published welcome guides for more cities.' },
+  { id: 'bank-accounts', availability: 'Planned', topic: 'money', status: 'planned', title: 'Bank accounts in the same ledger',
     how: 'A future authorized bank-data connection could place cash accounts beside wallet holdings. No bank account, transaction feed or payment authority is connected today.',
     enables: 'A broader household view without treating test-network balances as bank money.',
     needs: 'An authorized banking provider, a defined data/consent contract and revocation before any real account connection.' },
+  { id: 'rental-earnings', availability: 'Needs a local setup', topic: 'home', status: 'prototype', title: 'Rental earnings rehearsal',
+    how: 'A rehearsal in a local setup, where the operator plays the test landlord, uses borrower-funded interest in test dollars. Pool cash and actual borrower interest are required to claim. It is not connected to a hosted Home tenancy and is not real income.',
+    enables: 'Inspect a local test-lending rehearsal, not another deposit product on this site.' },
 ];
 
 export type LedgerTopicId = 'identity' | 'home' | 'money' | 'devices' | 'places';
@@ -90,7 +100,7 @@ export type AdapterDirection = 'account' | 'read-only' | 'signed' | 'device-loca
 export type AdapterAction =
   | { kind: 'area'; area: Area; section?: SectionId; label: string }
   | { kind: 'idea'; idea: string; label: string }
-  | { kind: 'share'; choice: 'deposit' | 'borrow'; label: string }
+  | { kind: 'share'; choice: 'borrow' | 'lend'; label: string }
   | { kind: 'scenario'; label: string };
 export type AdapterEffort = 'automatic' | 'one tap' | 'few minutes' | 'needs a device or service' | 'not available yet';
 /**
@@ -130,8 +140,6 @@ export interface LedgerAdapter {
   action: AdapterAction;
   secondaryAction?: AdapterAction;
   settings?: SectionId;
-  /** Part of Today's getting-started guide. Lower `order` comes first. */
-  setup?: { order: number; title: string; optional?: boolean };
 }
 export const LEDGER_TOPICS: { id: LedgerTopicId; name: string; question: string; area: Area }[] = [
   { id: 'identity', name: 'Identity & life', question: 'Who I am, my roles and my history', area: 'me' },
@@ -146,7 +154,7 @@ export const LEDGER_TOPICS: { id: LedgerTopicId; name: string; question: string;
  * Monetary observations remain with the existing account-bound Home/Money readers.
  */
 export const LEDGER_ADAPTERS: LedgerAdapter[] = [
-  { id: 'account', topic: 'identity', name: 'Passkey & own wallets', setup: { order: 1, title: 'Sign in' },
+  { id: 'account', topic: 'identity', name: 'Passkey & own wallets',
     source: 'Privy account and user-owned wallet records', environment: 'Privy development app · test networks', maturity: 'built',
     connection: 'account', direction: 'account', capabilities: ['roles'],
     action: { kind: 'area', area: 'me', section: 'account-settings', label: 'Account settings' },
@@ -160,7 +168,7 @@ export const LEDGER_ADAPTERS: LedgerAdapter[] = [
       effort: 'few minutes', reality: 'testnet_real',
       caveat: 'These are real wallets with real keys, but this app only uses them on test networks. Do not send real funds to them.',
     } },
-  { id: 'eudi', topic: 'identity', name: 'EU identity wallet', setup: { order: 4, title: 'Prove you are an adult', optional: true },
+  { id: 'eudi', topic: 'identity', name: 'EU identity wallet',
     source: 'EU Digital Identity test verifier', environment: 'EU test wallet', maturity: 'built',
     connection: 'eudi', direction: 'account', capabilities: ['roles', 'timeline'],
     action: { kind: 'area', area: 'me', section: 'identity-eudi', label: 'Manage identity proof' },
@@ -187,9 +195,9 @@ export const LEDGER_ADAPTERS: LedgerAdapter[] = [
       effort: 'automatic', reality: 'prototype',
       caveat: 'Places you add are your own statement, not a residence attestation.',
     } },
-  { id: 'tenancy', topic: 'home', name: 'Tenancy & earning deposit', setup: { order: 3, title: 'Find or add a home' },
-    source: 'Account-bound agreements and Solana escrow observations', environment: 'Solana devnet · simulated earnings', maturity: 'built',
-    connection: 'tenancy', direction: 'signed', capabilities: ['today-cockpit'],
+  { id: 'tenancy', topic: 'home', name: 'Home agreements and deposits',
+    source: 'Account-bound agreements and Solana escrow observations', environment: 'Solana devnet · test USDC', maturity: 'built',
+    connection: 'tenancy', direction: 'signed', capabilities: ['today-cockpit', 'rental-deposit'],
     action: { kind: 'area', area: 'home', section: 'home-tenancies', label: 'Open my home' },
     explain: {
       brings: 'An agreement between tenant, landlord and a neutral arbitrator, with the deposit held in a Solana test escrow and one guided next step from signing to move-out payout.',
@@ -198,8 +206,8 @@ export const LEDGER_ADAPTERS: LedgerAdapter[] = [
       visibility: 'Only the parties to an agreement can read it, and they see each other’s Privy id, wallet and evidence notes. Open listings are visible to every signed-in person; only the landlord sees applicants. Chain state is public.',
       needs: 'A finished account, a counterpart and an arbitrator you invite by link, and test USDC from Circle’s faucet. The operator must have set up the devnet escrow.',
       disconnect: 'A landlord can close a listing and an applicant can withdraw an application, but only before a tenant is chosen. After that there is no cancel: a tenancy ends through move-out, settlement and payout, and chain records are permanent.',
-      effort: 'needs a device or service', reality: 'testnet_simulated',
-      caveat: 'Deposit earnings are simulated on devnet. Once a settlement is final, payouts go to each party’s own account and are run by the app’s sponsor.',
+      effort: 'needs a device or service', reality: 'testnet_real',
+      caveat: 'Deposit terms, not rent or dates. Three real accounts are required. Devnet lending pays no interest; sample parties and simulated surplus exist only in a local setup. Final payouts go to each party’s own wallet and are run by the app’s sponsor.',
     } },
   { id: 'service-charges', topic: 'home', name: 'Service charges & meters',
     source: 'Tenancy example costs and optional daily Home Assistant readings', environment: 'Prototype statement', maturity: 'prototype',
@@ -259,18 +267,18 @@ export const LEDGER_ADAPTERS: LedgerAdapter[] = [
     } },
   { id: 'share-finance', topic: 'money', name: 'Shared test-share loans & lending',
     source: 'SharedLendingPool and MirroredPriceFeed observations', environment: 'Test network · deployment required', maturity: 'prototype',
-    connection: 'robinhood', direction: 'signed', capabilities: ['stock-deposit', 'borrow-against-shares'],
+    connection: 'robinhood', direction: 'signed', capabilities: ['borrow-against-shares'],
     action: { kind: 'share', choice: 'borrow', label: 'Loan against shares' },
-    secondaryAction: { kind: 'share', choice: 'deposit', label: 'Deposit prerequisites' },
+    secondaryAction: { kind: 'share', choice: 'lend', label: 'Lend test dollars' },
     explain: {
-      brings: 'Pledge official faucet test TSLA, borrow/repay, or lend/unlend test dollars in one shared pool. The deposit tab needs real parties and is not a hosted demo.',
+      brings: 'Pledge official faucet test TSLA, borrow/repay, or lend/unlend test dollars in one shared pool. This is separate from the Solana Home deposit; shares-as-deposit is a contract prototype only.',
       reads: 'Wallet balances, mirrored token-price provenance, loan and lender positions, pool cash/utilization/current contract rates and suspension reasons. Unhealthy loans are read separately on demand in bounded registry pages.',
       keeps: 'Reviewed signing steps and transaction recovery records, not per-wallet market deployments. Submit decodes supported calldata, zero value and the signer’s owner/receiver.',
       visibility: 'Your wallet view is account-bound and never scans the borrower registry; chain positions are public. Unhealthy loans load separately on demand in bounded pages. No operator plays the lender or liquidator.',
       needs: 'Verified shared-market manifest with immutable issuer/implementation pins, official faucet TSLA, test ETH and wallet-signed actions. Missing deployment is undeployed; stale pricing blocks price-sensitive actions. TSLA pause, pool block, implementation change or collateral shortfall suspends the market.',
       disconnect: 'Repay and withdraw your collateral, or withdraw lender value within available cash. Old per-wallet contracts/store keys remain unused without migration.',
       effort: 'needs a device or service', reality: 'testnet_real',
-      caveat: 'Continuous 5 % nominal borrower interest (about 5.13 % effective annually, read from the contract) is shared pro rata, not injected yield, a projection or income. Cash limits and bad debt apply. Disclose 10,000 tUSDG burn-address seed shares and locked interest. Localhost needs no updater key.',
+      caveat: 'Continuous 5 % nominal borrower interest (about 5.13 % effective annually, read from the contract) is shared pro rata, not injected yield, a projection or income. Cash limits and bad debt apply. Disclose 10,000 tUSDG burn-address seed shares and locked interest. A local setup needs no updater key.',
     } },
   { id: 'bank-accounts', topic: 'money', name: 'Bank accounts & cash flow',
     source: 'No banking provider is connected', environment: 'Planned', maturity: 'planned',
@@ -301,7 +309,7 @@ export const LEDGER_ADAPTERS: LedgerAdapter[] = [
       effort: 'needs a device or service', reality: 'testnet_simulated',
       caveat: 'No real company, cooperative, property right, resale value or city benefit is implied.',
     } },
-  { id: 'homeAssistant', topic: 'devices', name: 'Home solar (Home Assistant)', setup: { order: 5, title: 'Connect your solar panels', optional: true },
+  { id: 'homeAssistant', topic: 'devices', name: 'Home solar (Home Assistant)',
     source: 'Your Home Assistant, read by the app server', environment: 'Your Home Assistant · live readings', maturity: 'built',
     connection: 'homeAssistant', direction: 'read-only', capabilities: ['service-charges', 'devices'],
     action: { kind: 'area', area: 'money', section: 'solar-reading', label: 'View home solar' },
@@ -316,7 +324,7 @@ export const LEDGER_ADAPTERS: LedgerAdapter[] = [
       effort: 'needs a device or service', reality: 'read_only_live',
       caveat: 'The euro value is an estimate from your price per kWh (or a savings sensor), not a payment.',
     } },
-  { id: 'validator', topic: 'devices', name: 'Validator activity', setup: { order: 6, title: 'Follow a validator', optional: true },
+  { id: 'validator', topic: 'devices', name: 'Validator activity',
     source: 'Solana, Ethereum or Gnosis public validator APIs', environment: 'Real mainnet data · read-only', maturity: 'built',
     connection: 'validator', direction: 'read-only', capabilities: ['devices'],
     action: { kind: 'area', area: 'money', section: 'validator-reading', label: 'View validator reading' },
@@ -359,7 +367,7 @@ export const LEDGER_ADAPTERS: LedgerAdapter[] = [
       effort: 'not available yet', reality: 'roadmap',
       caveat: 'No vehicle connection, income or tokenized device position is shown or invented.',
     } },
-  { id: 'city', topic: 'places', name: 'City knowledge & projects', setup: { order: 2, title: 'Choose your city' },
+  { id: 'city', topic: 'places', name: 'City knowledge & projects',
     source: 'Stadtstack, municipal publications and source-attributed city records', environment: 'Dated snapshot · eight pilot cities', maturity: 'partly built',
     connection: 'city', direction: 'read-only', capabilities: ['city-news-feed', 'regional-shared-topics', 'scales', 'decisions'],
     action: { kind: 'area', area: 'places', section: 'project-browser', label: 'Explore & follow projects' },

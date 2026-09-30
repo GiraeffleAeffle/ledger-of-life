@@ -2,7 +2,7 @@
 import { NetPosition, NetPositionStrip } from './net-position';
 import { netPositionTotal, usd, type NetPositionParts } from './money-valuation';
 import { RecoveryCard, RecoveryStepView, type RecoveryView } from './recovery-step';
-import { TenancyWalkthrough } from './tenancy-walkthrough';
+import { DepositIdeas, TenancyWalkthrough } from './tenancy-walkthrough';
 import './design-lab.css';
 
 const HOLDINGS: { name: string; note: string; parts: NetPositionParts }[] = [
@@ -64,8 +64,9 @@ export function DesignLab() {
         ))}
       </section>
       <section aria-labelledby="lab-walkthrough">
-        <h2 id="lab-walkthrough">Home: a person with no tenancy yet</h2>
-        <p>Shown above the listings until a tenancy exists. Open when nothing can play the other people; closed when test tools exist.</p>
+        <h2 id="lab-walkthrough">Home: ways to hold the deposit, and how it works</h2>
+        <p>Under the Home path: the four ways to hold the deposit, always visible, then the optional &ldquo;How it works&rdquo;. The second explainer is the local build, where rehearsal tools exist.</p>
+        <DepositIdeas />
         <TenancyWalkthrough testTools={false} />
         <TenancyWalkthrough testTools />
       </section>

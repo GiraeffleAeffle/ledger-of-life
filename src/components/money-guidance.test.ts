@@ -1,14 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { needsTestFunds, stakeDisabledReason } from './money-guidance.ts';
+import { stakeDisabledReason } from './money-guidance.ts';
 import { visibleDepositActivity } from './deposit-activity.ts';
-
-test('funding directions expand only after both wallet balances are known and empty', () => {
-  assert.equal(needsTestFunds('0', '0'), true);
-  assert.equal(needsTestFunds(null, '0'), false);
-  assert.equal(needsTestFunds('5000000', '0'), false);
-  assert.equal(needsTestFunds('0', '1000000'), false);
-});
 
 test('stake funding blockers distinguish cash, gas and server cap', () => {
   const initial = { amountAtomic: '5000000', cashAtomic: '5000000', nativeAtomic: '1', hasWallet: true };

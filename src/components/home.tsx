@@ -14,29 +14,24 @@ import { RecoveryGate, RecoveryStep } from './recovery-step';
 import { useRecoveryRequired } from './use-recovery';
 import { PlacesArea } from './places';
 import { ServiceCharges } from './service-charges';
-import { TenancyWalkthrough } from './tenancy-walkthrough';
+import { DepositIdeas, TenancyWalkthrough } from './tenancy-walkthrough';
 import { parseAmount } from '@/domain/assets';
-import type { JourneyStage, TenancyJourney } from '@/server/journey';
+import type { TenancyJourney } from '@/server/journey';
 import type { PublicListing } from '@/server/listings';
 import { Today } from './today';
 import { Badge, money } from './workspace-panels';
 import './home-journey.css';
-import { claimAmount, confirmationStalled, invitationKey, invitationPayload, invitationStatus, pollingPaused, settlementSplit } from './home-journey-logic';
+import { claimAmount, confirmationStalled, HOME_STAGES, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, settlementSplit } from './home-journey-logic';
 import { operationLabels } from './deposit-activity';
+import { nextStep } from './next-step';
+import { NextStepCard } from './next-step-card';
+import { STAGES } from '@/data/path';
 
-const STAGES: { id: JourneyStage; label: string }[] = [
-  { id: 'agreement', label: 'Agreement' },
-  { id: 'space', label: 'Prepared escrow' },
-  { id: 'deposit', label: 'Deposit' },
-  { id: 'living', label: 'Living here' },
-  { id: 'move-out', label: 'Move-out' },
-  { id: 'paid', label: 'Paid out' },
-];
 const BUTTON_LABEL: Record<string, string> = {
   invite_arbitrator: 'Make invitation link',
-  accept_agreement: 'Accept these tenancy terms',
-  create_space: 'Prepare escrow',
-  secure_deposit: 'Approve deposit',
+  accept_agreement: 'Accept these deposit terms',
+  create_space: 'Prepare the empty escrow',
+  secure_deposit: 'Secure the test-USDC deposit',
   settle: 'Settle',
 };
 const AUTO: Record<string, true> = { confirming: true, paying_out: true, wait: true };
@@ -155,41 +150,44 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
     return () => window.removeEventListener('hashchange', update);
   }, []);
   const ready = (tenancies ?? []).filter((t): t is TenancyJourney => !('unavailable' in t));
-  const current = ready.find((t) => t.next.kind !== 'done' && t.next.kind !== 'wait' && t.next.kind !== 'confirming' && t.next.kind !== 'paying_out')
+  const current = ready.find((t) => t.next.kind === 'respond_claim' || t.next.kind === 'decide_claim')
+    ?? ready.find((t) => !AUTO[t.next.kind] && t.next.kind !== 'done' && t.next.kind !== 'propose_claim')
+    ?? ready.find((t) => t.next.kind !== 'done' && t.stage !== 'living')
     ?? ready.find((t) => t.next.kind !== 'done');
   const unavailable = (tenancies ?? []).filter((t): t is Unavailable => 'unavailable' in t);
   const myOpenListing = listings.find((l) => l.relation === 'landlord' && l.status === 'open' && (l.applications?.length ?? 0) > 0);
-  const focusListing = !current || AUTO[current.next.kind] ? myOpenListing : undefined;
+  const focusListing = !current || AUTO[current.next.kind] || current.next.kind === 'propose_claim' ? myOpenListing : undefined;
   const appliedListing = listings.find((l) => l.relation === 'chosen' && !ready.some((t) => t.agreementId === l.agreementId))
     ?? listings.find((l) => l.relation === 'applicant' && l.status === 'open');
   const finished = ready.find((t) => t.next.kind === 'done');
-  const housingStep = focusListing ? 1 : current ? (current.stage === 'agreement' ? 1 : current.stage === 'space' || current.stage === 'deposit' ? 2 : 3)
-    : finished ? 3 : appliedListing ? 1 : 0;
-  const housingTitle = focusListing ? `Choose a tenant for ${focusListing.title}` : current ? current.property
-    : finished ? `${finished.property}: paid out`
+  const pathListing = focusListing ?? (!current || current.stage === 'living' ? appliedListing : undefined);
+  const pathTenancy = pathListing ? undefined : current ?? finished;
+  const housingStep = homeStage(pathTenancy?.stage, pathListing);
+  const pathKnown = Boolean(pathListing || pathTenancy) || (tenancies !== null && listingsLoaded && !error && unavailable.length === 0);
+  const housingTitle = pathListing ? pathListing.title : pathTenancy ? pathTenancy.property
     : journeyError ? 'We could not read your homes'
-    : appliedListing?.relation === 'chosen' ? `${appliedListing.title}: agreement next`
-    : appliedListing ? `Application sent for ${appliedListing.title}`
-    : unavailable.length ? 'Your home record needs another look' : 'Find a place to call home';
-  const housingSubtitle = focusListing ? 'Review the applications and choose who to rent to.'
-    : current ? `${current.role} · ${current.next.label}${AUTO[current.next.kind] ? `. ${current.next.detail}` : ''}`
-    : finished ? `Tenant received ${money(finished.chain?.tenantPaidAtomic ?? '0')} test USDC · landlord received ${money(finished.chain?.landlordPaidAtomic ?? '0')} test USDC.`
-    : journeyError ? 'Your tenancy records are unavailable right now. Retry below.'
-    : appliedListing?.relation === 'chosen' ? 'The landlord chose you. Your agreement is being prepared.'
-    : appliedListing ? 'The landlord will review your application. Nothing notifies them: tell them yourself.'
-    : unavailable.length ? 'A tenancy reading is unavailable below. You can still browse homes.'
-    : 'Explore listed homes, apply, agree on the home, then secure a test-network deposit.';
-  const housingTarget = focusListing ? `listing-${focusListing.id}` : current ? `tenancy-${current.agreementId}` : finished ? `tenancy-${finished.agreementId}` : 'home-options';
+    : unavailable.length ? 'Your home record needs another look' : 'Find a home';
+  const housingSubtitle = pathTenancy ? `${pathTenancy.role} · ${HOME_STAGES[homeStage(pathTenancy.stage)]}`
+    : pathListing ? 'Your listing or application status is shown below.'
+    : journeyError ? 'Existing progress has not been reset. Retry the home reading.'
+    : 'Find a home, agree the terms, then secure a test-USDC deposit.';
+  const step = nextStep({
+    loading: (tenancies === null && !journeyError) || (!listingsLoaded && !listingsError),
+    invitation: Boolean(invitation), homeError: error, tenancies: ready, unavailable: unavailable.length, listings,
+  });
   const meta = AREAS.find((a) => a.id === area)!;
   return (
     <div className={area === 'home' ? 'home housing-page' : 'home'}>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">LEDGER OF LIFE</span>
+          <span className="eyebrow">{meta.eyebrow}</span>
           <h1 tabIndex={-1}>{meta.label}</h1>
           <p>{meta.question}</p>
         </div>
       </div>
+      {/* Today always leads with the next step; elsewhere only something waiting for this person follows them.
+          Home never repeats it: its path and tenancy cards carry the action. */}
+      {(area === 'overview' || (step.urgent && area !== 'home')) && <NextStepCard step={step} go={go} />}
       {(error || paused) && <p className="note" role="alert">{paused ? 'Updates are paused. Retry. ' : ''}{error} <button className="button secondary" onClick={() => void retryHome()}>Retry</button></p>}
       {area === 'overview' && <Today request={request} accountId={wallet.subject ?? ''} tenancies={tenancies} listings={listings} invitation={Boolean(invitation)} homeError={error} go={go} />}
 
@@ -199,24 +197,30 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
       {area === 'home' && (
         <div className="housing-journey">
           {invitation && <JoinInvitation key={invitation} request={request} encoded={invitation} onDone={load} />}
-          <section className="housing-hero" aria-label="Your housing journey">
-            <div className="housing-hero-main">
-              <span className="housing-kicker"><KeyRound size={14} /> YOUR HOME JOURNEY</span>
-              <h2>{tenancies === null && !error ? 'Finding your next home…' : housingTitle}</h2>
-              <p>{tenancies === null && !error ? 'Checking your homes and listings.' : housingSubtitle}</p>
-              {(tenancies !== null || error) && <button type="button" className="button primary large" onClick={() => goToSection(go, 'home', housingTarget)}>
-                {focusListing ? 'Review applicants' : current ? AUTO[current.next.kind] ? 'See my home’s status' : 'Open my next step' : finished ? 'See payout summary' : 'Explore homes'} <ArrowRight size={17} />
-              </button>}
-            </div>
-            <ol className="housing-path" aria-label="From finding a home to living there">
-              {['Find a flat', 'Apply & agree', 'Secure deposit', 'Live there'].map((label, index) => (
-                <li key={label} className={index < housingStep ? 'complete' : index === housingStep ? 'active' : ''} aria-current={index === housingStep ? 'step' : undefined}>
-                  <span>{index < housingStep ? <Check size={16} /> : index + 1}</span><strong>{label}</strong>
-                </li>
+          <section className="housing-header" aria-label="Your home path">
+            <span className="housing-kicker"><KeyRound size={14} /> YOUR HOME PATH</span>
+            <h2>{tenancies === null && !error ? 'Checking your homes…' : housingTitle}</h2>
+            <p>{housingSubtitle}</p>
+            {pathKnown ? <p className="housing-stage">Stage {housingStep < 2 ? '1 · Find a home' : '2 · Secure the deposit'} · tenancy step {housingStep + 1} of {HOME_STAGES.length}: {HOME_STAGES[housingStep]}</p> : <p className="small-copy">Current step not yet known.</p>}
+            <div className="housing-path-groups">
+              {([[STAGES[0], [0, 1]], [STAGES[1], [2, 3, 4, 5, 6]]] as const).map(([stage, steps]) => (
+                <div key={stage.id} className="housing-path-group">
+                  <span className="housing-path-stage">Stage {stage.number} · {stage.name}</span>
+                  <ol className="housing-path" aria-label={`Stage ${stage.number}, ${stage.name}`}>
+                    {steps.map((index) => (
+                      <li key={index} className={pathKnown && index === housingStep ? 'active' : ''} aria-current={pathKnown && index === housingStep ? 'step' : undefined}>
+                        <span>{index + 1}</span><strong>{HOME_STAGES[index]}</strong>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               ))}
-            </ol>
+            </div>
+            <p className="small-copy">A tenancy here needs a tenant, a landlord and a neutral arbitrator, each with their own account.</p>
+            <p className="small-copy">Test networks · no real money. No notification is sent when it is someone’s turn; tell them yourself.</p>
           </section>
-          {!current && !finished && helpers !== null && <TenancyWalkthrough testTools={helpers} />}
+          <DepositIdeas go={go} />
+          <TenancyWalkthrough testTools={helpers === true} />
           <div id="home-tenancies" tabIndex={-1} className="home-tenancy-anchor" aria-label="Your tenancies">
             {current && <TenancyCard key={current.agreementId} journey={current} request={request} reload={load} go={go} accountId={wallet.subject ?? ''} />}
             {!current && unavailable.map((t) => <section className="card" key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}>
@@ -224,6 +228,15 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
             </section>)}
           </div>
           {current && unavailable.length > 0 && <p className="housing-unavailable" role="status">{unavailable.length} other tenancy reading{unavailable.length === 1 ? ' is' : 's are'} unavailable. See other tenancies below.</p>}
+          {current && (ready.some((t) => t !== current && t.next.kind !== 'done') || unavailable.length > 0) && <details className="card housing-other-tenancies" open={unavailable.length > 0 || ready.some((t) => t !== current && t.stage !== 'living' && !AUTO[t.next.kind] && t.next.kind !== 'done')}>
+            <summary>Other tenancies ({ready.filter((t) => t !== current && t.next.kind !== 'done').length + unavailable.length})</summary>
+            {ready.filter((t) => t !== current && t.next.kind !== 'done').map((t) => (
+              <TenancyCard key={t.agreementId} journey={t} request={request} reload={load} go={go} accountId={wallet.subject ?? ''} />
+            ))}
+            {unavailable.map((t) => <section className="card" key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}>
+              <h2>{t.property}</h2><p className="note">{t.unavailable}</p>
+            </section>)}
+          </details>}
           {ready.some((t) => t.next.kind === 'done') && <details className="card past-tenancies" id="past-tenancies" open={!current}>
             <summary>Past tenancies ({ready.filter((t) => t.next.kind === 'done').length})</summary>
             {ready.filter((t) => t.next.kind === 'done').map((t) => (
@@ -235,15 +248,6 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
             ))}
           </details>}
           <Homes listings={listings} request={request} reload={load} go={go} loaded={listingsLoaded} loadError={listingsError} testTools={helpers === true} tenancyIds={new Set(ready.map((t) => t.agreementId))} />
-          {current && (ready.some((t) => t !== current && t.next.kind !== 'done') || unavailable.length > 0) && <details className="card housing-other-tenancies">
-            <summary>Other tenancies ({ready.filter((t) => t !== current && t.next.kind !== 'done').length + unavailable.length})</summary>
-            {ready.filter((t) => t !== current && t.next.kind !== 'done').map((t) => (
-              <TenancyCard key={t.agreementId} journey={t} request={request} reload={load} go={go} accountId={wallet.subject ?? ''} />
-            ))}
-            {unavailable.map((t) => <section className="card" key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}>
-              <h2>{t.property}</h2><p className="note">{t.unavailable}</p>
-            </section>)}
-          </details>}
 
           {helpers && helper && <TestTools tenancies={ready} listings={listings} request={request} helper={helper} busy={helperBusy} log={helperLog} />}
         </div>
@@ -259,19 +263,6 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
 }
 
 
-function Progress({ stage, finished, showMoveOut }: { stage: JourneyStage; finished: boolean; showMoveOut: boolean }) {
-  const current = STAGES.findIndex((s) => s.id === stage) + (finished ? 1 : 0);
-  return (
-    <ol className={`journey-progress${showMoveOut ? '' : ' living'}`} aria-label="Tenancy progress">
-      {STAGES.slice(0, showMoveOut ? undefined : 4).map((s, index) => (
-        <li key={s.id} className={index < current ? 'done' : index === current ? 'current' : ''} aria-current={index === current ? 'step' : undefined}>
-          <span className="journey-dot">{index < current ? <Check size={12} /> : index + 1}</span>
-          {s.label}
-        </li>
-      ))}
-    </ol>
-  );
-}
 
 /** The saved invitation link for one tenancy on this device; missing, malformed or blocked storage means none. */
 function readStoredInvite(key: string): { url: string; createdAt: number } | null {
@@ -291,6 +282,7 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
   const [reason, setReason] = useState('');
   const [link, setLink] = useState<{ url: string; createdAt: number } | null>(() => readStoredInvite(invitationKey(accountId, journey.agreementId)));
   const [showMoveOut, setShowMoveOut] = useState(false);
+  const [showDispute, setShowDispute] = useState(false);
   const [agreement, setAgreement] = useState<TenancyAgreement | null>(null);
   const [agreementError, setAgreementError] = useState(false);
   const [agreementRetry, setAgreementRetry] = useState(0);
@@ -423,7 +415,7 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
         return;
       }
       case 'secure_deposit':
-        return operation({ kind: 'fund_and_supply' }, 'Secure the deposit and start lending');
+        return operation({ kind: 'fund_and_supply' }, 'Secure the test-USDC deposit');
       case 'settle':
         return operation({ kind: 'redeem_and_settle' }, 'Complete the settlement');
     }
@@ -433,6 +425,15 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
     return value;
   };
   const oneButton = ['invite_arbitrator', 'accept_agreement', 'create_space', 'secure_deposit', 'settle'].includes(next.kind);
+  const recordBlocker = !agreement
+    ? agreementError ? 'Agreement records are unavailable. Retry records before signing.' : 'Loading agreement records before you can sign.'
+    : '';
+  const reasonBlocker = reason.trim().length < 12 ? 'Add a reason of at least 12 characters.' : '';
+  let amountBlocker = '';
+  if (next.kind === 'propose_claim' || next.kind === 'decide_claim') {
+    try { claimAmount(amount, next.kind === 'propose_claim' ? next.maximumAtomic : next.claimAtomic); }
+    catch (error) { amountBlocker = error instanceof Error ? error.message : 'Enter a valid deduction.'; }
+  }
   const actionButton = (
     <button className="button primary large" disabled={busy || (next.kind === 'accept_agreement' && !agreement)} onClick={() => run(primary)}>
       {busy ? <Loader2 className="spin" size={18} /> : null}
@@ -446,16 +447,20 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
         <h2><HomeIcon size={18} /> {journey.property}</h2>
         <Badge tone="neutral">{journey.role} · Solana devnet test USDC{journey.sampleParties ? ' · sample fixture party' : ''}</Badge>
       </div>
-      <Progress stage={journey.stage} finished={next.kind === 'done'} showMoveOut={!living || showMoveOut} />
+      <p className="small-copy">{HOME_STAGES[homeStage(journey.stage)]} · step {homeStage(journey.stage) + 1} of {HOME_STAGES.length}</p>
+      {(journey.stage === 'space' || journey.stage === 'deposit') && <div className="secure-substeps">
+        <p><strong>Landlord prepares</strong> · {journey.stage === 'deposit' ? 'Empty escrow ready.' : 'Create the empty escrow. No deposit is locked yet.'}</p>
+        <p><strong>Tenant funds</strong> · Secure {money(journey.requiredSecurity)} test USDC after the escrow is ready.</p>
+        <p className="small-copy">Only the test-USDC deposit can be used here; see &ldquo;Ways to hold the deposit&rdquo; above.</p>
+      </div>}
       {living && <div className="housing-living-note">
-        <span className="housing-kicker">LIVING HERE · SOLANA DEVNET</span>
-        <strong>{next.label}</strong>
-        <p>{next.detail}</p>
-        <button className="text-button" type="button" aria-expanded={showMoveOut} onClick={() => setShowMoveOut(!showMoveOut)}>Moving out? <ArrowRight size={14} /></button>
+        <strong>Deposit secured</strong>
+        <p>{next.kind === 'confirming' ? 'Approval sent. Waiting for network confirmation.' : 'Nothing needs your approval right now.'}</p>
+        <button className="button secondary" type="button" aria-expanded={showMoveOut} onClick={() => setShowMoveOut(!showMoveOut)}>{journey.role === 'landlord' ? 'Start move-out' : 'How move-out works'}</button>
         {showMoveOut && <p className="small-copy">The landlord proposes a deduction (including zero). The tenant agrees or disputes it; if disputed, the arbitrator decides. Then the deposit is settled and paid out on the test network.</p>}
       </div>}
-      {(!living || showMoveOut || next.kind === 'confirming') && <div className={`next-step-card ${AUTO[next.kind] || next.kind === 'done' ? 'passive' : ''}`}>
-        <span className="eyebrow">{next.kind === 'wait' ? 'NOTHING TO DO RIGHT NOW' : next.kind === 'done' ? 'FINISHED' : 'YOUR NEXT STEP'}</span>
+      {(!living || (showMoveOut && journey.role === 'landlord') || next.kind === 'confirming') && <div className={`tenancy-action ${AUTO[next.kind] || next.kind === 'done' ? 'passive' : ''}`}>
+        <span className="eyebrow">{next.kind === 'wait' ? 'WAITING ON ANOTHER PARTY' : next.kind === 'done' ? 'FINISHED' : 'THIS HOME · DEPOSIT STEP'}</span>
         <h3>{AUTO[next.kind] && next.kind !== 'wait' && <Loader2 className="spin" size={18} />} {next.label}</h3>
         <p>{next.detail}</p>
         {next.kind === 'wait' && <p className="small-copy">Nothing notifies them: tell them yourself.</p>}
@@ -463,34 +468,43 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
         {next.kind === 'paying_out' && <p className="small-copy">Payouts run while Home is open. A failed attempt retries here.</p>}
         {next.kind === 'accept_agreement' && <div className="small-copy">
           <p>These terms cover {journey.property}, the {money(journey.requiredSecurity)} test USDC required deposit, and whether the tenant may claim surplus while the tenancy is active. The tenant keeps deposit assets above an approved deduction at settlement, whatever the release setting. Devnet lending pays nothing, so earnings are simulated.</p>
-          <p>They do not cover monthly rent or tenancy dates. The landlord chooses the arbitrator before acceptance.</p>
+          <p><strong>These terms cover the deposit and its parties, not monthly rent or tenancy dates.</strong> The landlord chooses the arbitrator before acceptance.</p>
           {agreement && <p>Tenant: {agreement.parties.tenant?.wallet?.address ? `${agreement.parties.tenant.wallet.address.slice(0, 5)}…${agreement.parties.tenant.wallet.address.slice(-5)}` : 'not available'} · Landlord: {agreement.parties.landlord?.wallet?.address ? `${agreement.parties.landlord.wallet.address.slice(0, 5)}…${agreement.parties.landlord.wallet.address.slice(-5)}` : 'not available'} · Arbitrator: {agreement.parties.arbitrator?.wallet?.address ? `${agreement.parties.arbitrator.wallet.address.slice(0, 5)}…${agreement.parties.arbitrator.wallet.address.slice(-5)}` : 'not available'}</p>}
+          {agreement && <p>Tenant acceptance: {agreement.accepted.tenant?.digest === agreement.digest ? 'accepted' : 'waiting'} · Landlord acceptance: {agreement.accepted.landlord?.digest === agreement.digest ? 'accepted' : 'waiting'}. Surplus: {agreement.releaseAllowed ? 'tenant may claim during the tenancy' : 'locked until settlement'}.</p>}
         </div>}
         {next.kind === 'finish_setup' && <RecoveryStep request={request} onVerified={() => void reload()} />}
+        {next.kind === 'accept_agreement' && recordBlocker && <p className="action-blocker" role="status">{recordBlocker}</p>}
         {oneButton && (next.kind === 'create_space' ? <RecoveryGate request={request}>{actionButton}</RecoveryGate> : actionButton)}
         {next.kind === 'secure_deposit' && <p className="small-copy faucet-note">Need test USDC? Get it from <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer">Circle’s faucet</a> on Solana Devnet, sent to your wallet {wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? 'address in Me'}.</p>}
         {next.kind === 'propose_claim' && (
           <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void run(() => operation({ kind: 'propose_claim', amountAtomic: claimAmount(amount, next.maximumAtomic) }, 'Move-out deduction', needsReason(reason))); }}>
-            <p>Maximum deduction: {money(next.maximumAtomic)} test USDC (the deposit). Nothing notifies the tenant: tell them yourself.</p>
+            <p>0 is allowed; the reason is required. The maximum is {money(next.maximumAtomic)} test USDC. No notification is sent to the tenant; tell them yourself.</p>
             <label>Deduction in test USDC<input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
             <label>Reason<textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. No damage, flat handed over clean" /></label>
-            <button className="button primary large" disabled={busy}>Propose deduction to tenant <ArrowRight size={17} /></button>
+            {(amountBlocker || reasonBlocker) && <p className="action-blocker">{amountBlocker || reasonBlocker}</p>}
+            <button className="button primary large" disabled={busy || Boolean(amountBlocker || reasonBlocker)}>Propose deduction to tenant <ArrowRight size={17} /></button>
           </form>
         )}
         {next.kind === 'respond_claim' && (
           <div className="inline-form">
             <p>Landlord’s reason: {agreement ? agreement.records.filter((record) => record.name === 'Move-out deduction').at(-1)?.body ?? 'No recorded reason available.' : 'Loading the landlord’s recorded reason…'}</p>
-            <p>You get back {money(settlementSplit(journey.requiredSecurity, next.claimAtomic).tenantAtomic)} test USDC · landlord gets {money(next.claimAtomic)} test USDC (deposit principal preview; simulated earnings are accounted for at settlement).</p>
-            <button className="button primary large" disabled={busy || !agreement} onClick={() => run(() => operation({ kind: 'accept_and_settle' }, 'Agree and settle the deposit'))}>
-              Agree to deduction and settle <ArrowRight size={17} />
-            </button>
-            <details>
-              <summary>I disagree</summary>
-              <label>Why?<textarea value={reason} onChange={(e) => setReason(e.target.value)} /></label>
-              <button className="button secondary" disabled={busy || !agreement} onClick={() => run(() => operation({ kind: 'respond_to_claim', accept: false }, 'Dispute the deduction', needsReason(reason)))}>
-                Send to arbitrator
+            <p>You get back {money(settlementSplit(journey.requiredSecurity, next.claimAtomic).tenantAtomic)} test USDC · landlord gets {money(next.claimAtomic)} test USDC. Preview, not a confirmed payout; simulated earnings are accounted for at settlement.</p>
+            {recordBlocker && <p className="action-blocker" role="status">{recordBlocker}</p>}
+            <div className="deduction-choices">
+              <button className="button primary" disabled={busy || !agreement} onClick={() => run(() => operation({ kind: 'accept_and_settle' }, 'Agree and settle the deposit'))}>
+                Agree and settle
               </button>
-            </details>
+              <button className="button secondary" type="button" disabled={busy} aria-expanded={showDispute} onClick={() => setShowDispute(!showDispute)}>
+                Dispute deduction
+              </button>
+            </div>
+            {showDispute && <div className="inline-form">
+              <label>Dispute reason<textarea value={reason} onChange={(e) => setReason(e.target.value)} /></label>
+              {reasonBlocker && <p className="action-blocker">{reasonBlocker}</p>}
+              <button className="button secondary" disabled={busy || !agreement || Boolean(reasonBlocker)} onClick={() => run(() => operation({ kind: 'respond_to_claim', accept: false }, 'Dispute the deduction', needsReason(reason)))}>
+                Send dispute to arbitrator
+              </button>
+            </div>}
           </div>
         )}
         {next.kind === 'decide_claim' && (
@@ -499,9 +513,10 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
             <p>Tenant’s dispute reason: {agreement ? agreement.records.filter((record) => record.name === 'Dispute the deduction').at(-1)?.body ?? 'No recorded reason available.' : 'Loading reasons…'}</p>
             <p>Allowed deduction: 0 to {money(next.claimAtomic)} test USDC. You decide only this disputed claim.</p>
             <label>Landlord receives (test USDC)<input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
-            {(() => { try { const split = settlementSplit(journey.requiredSecurity, claimAmount(amount, next.claimAtomic)); return <p>Tenant gets back {money(split.tenantAtomic)} test USDC · landlord gets {money(split.landlordAtomic)} test USDC (deposit principal preview).</p>; } catch { return <p>Enter a deduction within the allowed range to preview the split.</p>; } })()}
+            {(() => { try { const split = settlementSplit(journey.requiredSecurity, claimAmount(amount, next.claimAtomic)); return <p>Tenant gets back {money(split.tenantAtomic)} test USDC · landlord gets {money(split.landlordAtomic)} test USDC. Preview, not a confirmed payout.</p>; } catch { return <p>Enter a deduction within the allowed range to preview the split.</p>; } })()}
             <label>Reason<textarea value={reason} onChange={(e) => setReason(e.target.value)} /></label>
-            <button className="button primary large" disabled={busy || !agreement}>Decide deduction and settle <ArrowRight size={17} /></button>
+            {(recordBlocker || amountBlocker || reasonBlocker) && <p className="action-blocker">{recordBlocker || amountBlocker || reasonBlocker}</p>}
+            <button className="button primary large" disabled={busy || !agreement || Boolean(amountBlocker || reasonBlocker)}>Decide deduction and settle <ArrowRight size={17} /></button>
           </form>
         )}
         {next.kind === 'invite_arbitrator' && link && (
@@ -676,7 +691,7 @@ function JoinInvitation({ request, encoded, onDone }: { request: Request; encode
     } finally { setBusy(false); }
   }
   return (
-    <section className="card next-step-card">
+    <section className="card tenancy-action">
       <span className="eyebrow">INVITATION</span>
       {!value ? <p>This invitation link is malformed. Ask the landlord for a new one.</p> : <>
         <h3>Join as {value.role}</h3>
@@ -718,7 +733,7 @@ async function compressPhoto(file: File): Promise<string> {
 function ListingCard({ listing, children }: { listing: PublicListing; children?: React.ReactNode }) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const d = listing.details;
-  const facts = [d.city, d.rooms ? `${d.rooms} room${d.rooms > 1 ? 's' : ''}` : '', d.sizeSqm ? `${d.sizeSqm} m²` : '',
+  const facts = [d.city || 'City not specified', d.rooms ? `${d.rooms} room${d.rooms > 1 ? 's' : ''}` : 'Rooms not specified', d.sizeSqm ? `${d.sizeSqm} m²` : '',
     d.availableFrom ? `from ${new Date(d.availableFrom).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''].filter(Boolean);
   return (
     <article className="listing-card">
@@ -727,19 +742,22 @@ function ListingCard({ listing, children }: { listing: PublicListing; children?:
         {d.photos[photoIndex] ? <img src={d.photos[photoIndex]} alt={`Photo ${photoIndex + 1} of ${listing.title}`} loading="lazy" /> : <HomeIcon size={42} aria-label="No listing photo" />}
         {d.photos.length > 1 && <span className="photo-count">{photoIndex + 1}/{d.photos.length}</span>}
       </div>
-      {d.photos.length > 1 && <div className="listing-gallery" aria-label={`Photos of ${listing.title}`}>
-        {d.photos.map((photo, index) => <button type="button" key={index} aria-label={`Show photo ${index + 1} of ${listing.title}`} aria-pressed={photoIndex === index} onClick={() => setPhotoIndex(index)}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- uploaded photos are data URLs */}
-          <img src={thumb(photo)} alt="" loading="lazy" />
-        </button>)}
-      </div>}
       <div className="listing-body">
         <header><strong>{listing.title}{listing.sample && !listing.title.toLowerCase().includes('sample') ? ' · sample home' : ''}</strong><span className="listing-rent">{money(listing.rentMonthly)}<small>/month · test USDC</small></span></header>
         {facts.length > 0 && <p className="listing-facts">{facts.join(' · ')}</p>}
-        {listing.description && <p className="listing-description">{listing.description}</p>}
-        <p className="listing-deposit"><span>Security · Solana test USDC</span><strong>{money(listing.requiredSecurity)}</strong></p>
-        <p className="small-copy">The tenant keeps deposit value above any approved deduction at settlement. {listing.releaseAllowed ? 'The tenant may claim surplus during the tenancy.' : 'Surplus remains in the deposit until settlement.'} Devnet lending pays nothing, so earnings are simulated.</p>
+        <p className="listing-deposit"><span>Required deposit · Solana devnet</span><strong>{money(listing.requiredSecurity)} test USDC</strong></p>
+        <p className="small-copy">{listing.sample ? 'Sample home · local rehearsal. ' : ''}{listing.releaseAllowed ? 'Tenant may claim surplus during the tenancy.' : 'Surplus stays locked until settlement.'} Devnet lending pays no interest.</p>
         {children}
+        {(listing.description || d.photos.length > 1) && <details className="listing-details">
+          <summary>Description & photos</summary>
+          {listing.description && <p className="listing-description">{listing.description}</p>}
+          {d.photos.length > 1 && <div className="listing-gallery" aria-label={`Photos of ${listing.title}`}>
+            {d.photos.map((photo, index) => <button type="button" key={index} aria-label={`Show photo ${index + 1} of ${listing.title}`} aria-pressed={photoIndex === index} onClick={() => setPhotoIndex(index)}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- uploaded photos are data URLs */}
+              <img src={thumb(photo)} alt="" loading="lazy" />
+            </button>)}
+          </div>}
+        </details>}
       </div>
     </article>
   );
@@ -771,8 +789,8 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
   return (
     <section className="card homes" id="home-options" tabIndex={-1}>
       <div className="housing-listing-heading">
-        <div><span className="housing-kicker">FIND → APPLY → AGREE</span><h2>Find your flat</h2>
-          <p>Explore available homes, then send an application. If the landlord chooses you, you both agree before the Solana test-USDC deposit is secured.</p>
+        <div><h2>Find a flat or house</h2>
+          <p>Apply to a listed home. If chosen, review the deposit terms before securing test USDC.</p>
         </div>
         <button type="button" className="button secondary" aria-expanded={posting} onClick={() => setPosting(!posting)}><Plus size={15} /> Rent out a home</button>
       </div>
@@ -821,33 +839,33 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
         <div className="my-listings">
           <h3>My listings</h3>
           {mine.map((l) => (
-            <details key={l.id} id={`listing-${l.id}`} tabIndex={-1} open={l.status === 'open' && (l.applications?.length ?? 0) > 0}>
-              <summary><strong>{l.title}</strong> · {l.status === 'open' ? `${l.applicants} applicant(s)` : l.status === 'closed' ? 'Listing closed' : 'Tenant chosen'}</summary>
+            <div key={l.id} id={`listing-${l.id}`} tabIndex={-1}>
               <ListingCard listing={l}>
+                <p className="small-copy">{l.status === 'open' ? `Review applications (${l.applicants})` : l.status === 'closed' ? 'Listing closed' : 'Tenant chosen'}</p>
+                {l.status === 'open' && (l.applications?.length ?? 0) > 0 && <p className="small-copy">Choosing creates the agreement and cannot be undone here.</p>}
                 {l.status === 'open' && l.applications?.map((a) => (
                   <div className="applicant" key={a.id}>
                     <div><strong>{a.name}</strong><p>{a.message}</p></div>
-                    <button className="button primary" onClick={() => { if (window.confirm(`Choose ${a.name} for ${l.title}? This cannot be undone; the tenancy agreement will be created.`)) void act(() => request(`/api/listings/${l.id}`, { action: 'choose', applicationId: a.id }), l.id); }}>Choose tenant</button>
+                    <button className="button primary" onClick={() => { if (window.confirm(`Choose ${a.name} for ${l.title}? This creates the agreement and cannot be undone here.`)) void act(() => request(`/api/listings/${l.id}`, { action: 'choose', applicationId: a.id }), l.id); }}>Choose this tenant</button>
                   </div>
                 ))}
                 {l.status === 'open' && <button className="button secondary" onClick={() => { if (window.confirm(`Close ${l.title}? Applicants will not be notified. This cannot be undone.`)) void act(() => request(`/api/listings/${l.id}`, { action: 'close' }), l.id); }}>Close listing</button>}
                 {l.agreementId && <button type="button" className="text-button" onClick={() => goToSection(go, 'home', `tenancy-${l.agreementId}`)}>Open the agreement →</button>}
                 {feedback.target === l.id && feedback.message && <p className="note" role="alert">{feedback.message}</p>}
               </ListingCard>
-            </details>
+            </div>
           ))}
         </div>
       )}
       <div className="listing-grid">
         {others.map((l) => (
-          <details className="listing-disclosure" key={l.id}>
-            <summary><strong>{l.title}{l.sample ? ' · sample' : ''}{l.relation === 'applicant' ? ' · application sent' : l.relation === 'chosen' ? ' · chosen' : ''}</strong><span>{l.details.city || 'Home'} · {money(l.rentMonthly)} / month · {money(l.requiredSecurity)} deposit · test USDC</span></summary>
+          <div key={l.id} id={`listing-${l.id}`} tabIndex={-1}>
             <ListingCard listing={l}>
             {l.relation !== null && <Badge tone={l.relation === 'chosen' ? 'green' : 'neutral'}>
               {l.relation === 'chosen' ? l.agreementId && tenancyIds.has(l.agreementId) ? 'Tenancy recorded' : 'Chosen · agreement next' : l.status === 'let' ? 'Not chosen' : l.status === 'closed' ? 'Listing closed' : 'Application sent'}
             </Badge>}
             {l.relation === 'chosen' && l.agreementId && <button type="button" className="text-button" onClick={() => goToSection(go, 'home', `tenancy-${l.agreementId}`)}>Open the agreement →</button>}
-            {l.relation === 'applicant' && l.status === 'open' && <div><p className="small-copy">Nothing notifies the landlord: tell them yourself.</p><button className="button secondary" onClick={() => { if (window.confirm(`Withdraw your application for ${l.title}? This cannot be undone.`)) void act(() => request(`/api/listings/${l.id}`, { action: 'withdraw' }), l.id); }}>Withdraw application</button></div>}
+            {l.relation === 'applicant' && l.status === 'open' && <div><p className="small-copy">Application sent. The landlord must review it; tell them yourself because the app sends no notification.</p><button className="button secondary" onClick={() => { if (window.confirm(`Withdraw your application for ${l.title}? This cannot be undone.`)) void act(() => request(`/api/listings/${l.id}`, { action: 'withdraw' }), l.id); }}>Withdraw application</button></div>}
             {l.relation === null && l.status !== 'open' && <Badge tone="neutral">No longer available</Badge>}
             {l.relation === null && l.status === 'open' && (applyTo === l.id ? (
               <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void act(async () => {
@@ -857,19 +875,20 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
                 <label>Your name<input required value={application.name} onChange={(e) => setApplication({ ...application, name: e.target.value })} /></label>
                 <label>A few words about you<input required value={application.message} onChange={(e) => setApplication({ ...application, message: e.target.value })} /></label>
                 {feedback.target === l.id && feedback.message && <p className="note" role="alert">{feedback.message}</p>}
+                <p className="small-copy">This sends your application. It does not reserve the home or lock a deposit.</p>
                 <button className="button primary">Send application</button>
               </form>
             ) : (
-              <button className="button primary" onClick={() => setApplyTo(l.id)}>Apply</button>
+              <button className="button primary" onClick={() => setApplyTo(l.id)}>Apply for this home</button>
             ))}
             {feedback.target === l.id && feedback.message && applyTo !== l.id && <p className="note" role="alert">{feedback.message}</p>}
             </ListingCard>
-          </details>
+          </div>
         ))}
       </div>
-      {loaded && others.length === 0 && <p className="housing-empty">No homes to apply for right now. {testTools
-        ? 'Rent one out above, or open Test tools below to add sample homes and play the other people.'
-        : 'You can rent one out above. On your own you can post a home or apply to one; a tenancy also needs a tenant, a landlord and a neutral arbitrator, each with their own account.'}</p>}
+      {loaded && !loadError && others.length === 0 && <p className="housing-empty">{testTools
+        ? 'No homes to apply for right now. The local rehearsal tools below can add labelled sample homes.'
+        : listings.length === 0 ? 'No homes have been listed here yet. A landlord can publish one; completing a tenancy needs three separate accounts.' : 'No homes to apply for right now. Your own listings remain above.'}</p>}
       {!loaded && !loadError && <p className="small-copy" role="status">Checking available homes…</p>}
     </section>
   );
@@ -885,7 +904,7 @@ function TestTools({ tenancies, listings, helper, busy, log }: {
   const disabled = busy;
   return (
     <details className="card test-tools">
-      <summary>Test tools · sample parties on devnet</summary>
+      <summary>Local rehearsal tools · needs a local setup</summary>
       <p className="small-copy">These sample parties sign real test-network transactions with operator-held test keys; they are not proof of a person’s wallet. Simulated earnings are separately credited test USDC. Your own tenancy actions remain in its card.</p>
       <div className="test-tool-row">
         <span>Test listings</span>

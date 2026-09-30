@@ -19,7 +19,7 @@ const interestLabels: Record<ArrivalInterest, string> = {
   sport: 'Sport', kids: 'Kids and family', shops: 'Shops and markets', health: 'Health',
   culture: 'Culture', nature: 'Nature and the lake', volunteering: 'Volunteering',
 };
-const phaseLabels = ['First two weeks', 'First month', 'Months two and three', 'Months four to six'];
+const phaseLabels = ['First two weeks', 'First month', 'Months 2–3', 'Months 4–6'];
 const SITUATIONS_CHANGED_EVENT = 'ledger-welcome-situations-changed';
 function subscribeSituations(update: () => void) {
   window.addEventListener(SITUATIONS_CHANGED_EVENT, update);
@@ -74,6 +74,11 @@ export function ArrivalGuideView({ guide, feed, now }: { guide: ArrivalGuide; fe
       <h1>Welcome to {guide.cityName}</h1>
       <p>A community guide, not an official city service. Each item links to its source. Prepared on {formatCityDate(guide.preparedOn)}.</p>
       <p>Nothing you tick here leaves this device. No account is needed.</p>
+      <nav className="welcome-jumps" aria-label="Welcome guide sections">
+        {ARRIVAL_PHASES.map((phase, index) => <a key={phase} href={`#welcome-${phase}`}>{phaseLabels[index]}</a>)}
+        <a href="#welcome-soon">Events</a><a href="#welcome-groups">Groups</a><a href="#welcome-contacts">Contacts</a>
+      </nav>
+      <button type="button" className="button secondary welcome-top-print" onClick={() => window.print()}>Print plan and contacts</button>
     </header>
 
     <section className="card welcome-section" aria-labelledby="welcome-about">
@@ -90,7 +95,7 @@ export function ArrivalGuideView({ guide, feed, now }: { guide: ArrivalGuide; fe
         <h3 id={`welcome-${phase}`}>{phaseLabels[index]}</h3>
         {guide.steps.filter((step) => step.phase === phase).length === 0 ? <p>No checked steps for this period yet.</p> : <ol className="welcome-list">{orderSteps(guide.steps.filter((step) => step.phase === phase), profile).map((step) => <li className={`welcome-item${stepMatches(step, profile) ? ' welcome-highlight' : ''}`} key={step.id}>
           <div className="welcome-item-heading"><h4>{step.title}</h4><span className="badge welcome-badge">{step.official ? 'Official' : 'Community'}</span>{stepMatches(step, profile) && <span className="welcome-match">Matches your choices</span>}</div>
-          <p>{step.why}</p><p><strong>What to do:</strong> {step.whatToDo}</p>
+          <p><strong>What to do:</strong> {step.whatToDo}</p><p>{step.why}</p>
           {step.caveat && <p className="welcome-caveat">Note: {step.caveat}</p>}
           <Source source={step.source} />
         </li>)}</ol>}

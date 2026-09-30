@@ -70,9 +70,15 @@ function Outcomes({ caseStudy, feature }: { caseStudy?: CivicOutcomeEvidence; fe
     {!feature?.geometry && <p className="civic-unlocated">No verified geometry · this selection has no map pin or affected-area claim.</p>}
   </div>;
 }
-export function CivicPlaceLenses({ request, accountId, onExplorationCityChange, onCityChange, go }: { request: AuthorizedRequest; accountId: string; onExplorationCityChange?: (cityId: string) => void; onCityChange?: () => void; go: (area: Area) => void }) {
+export function CivicPlaceLenses({ request, accountId, previewRequest, onExplorationCityChange, onCityChange, go }: { request: AuthorizedRequest; accountId: string; previewRequest?: { cityId: string } | null; onExplorationCityChange?: (cityId: string) => void; onCityChange?: () => void; go: (area: Area) => void }) {
   const eventClock = useEventClock();
   const [explorationCity, setExplorationCity] = useState('');
+  // A new preview request replaces the exploration city; adjusting state during render avoids an effect cascade.
+  const [seenPreview, setSeenPreview] = useState(previewRequest);
+  if (previewRequest !== seenPreview) {
+    setSeenPreview(previewRequest);
+    if (previewRequest) setExplorationCity(previewRequest.cityId);
+  }
   const { cityId, result, error, cityDisplayName, selectedCity } = useCitySignals(request, explorationCity || undefined);
   const [nearest, setNearest] = useState<{ id: string; name: string } | null>(null);
   useEffect(() => {
@@ -330,16 +336,15 @@ export function CivicPlaceLenses({ request, accountId, onExplorationCityChange, 
     onCityChange?.();
   }
   if (result?.state === 'not_covered' && !cityDisplayName) return <section className="civic-look-around" id="city-system" tabIndex={-1} aria-label="Explore a covered city">
-    <p>Not sure yet? Look around a covered city first; this does not choose it for you:</p>
-    {(nearest ?? result.coveredCities[0]) && <button type="button" className="secondary-button" onClick={() => setExplorationCity((nearest ?? result.coveredCities[0]).id)}>{nearest ? `Look at the nearest covered city · ${nearest.name}` : `Look at ${result.coveredCities[0].name}`} →</button>}
+    <p>After you choose or preview a city, its council papers, events, projects and map appear here.</p>
   </section>;
   if (result?.state === 'not_covered') return <section className="card civic-place" id="city-system" tabIndex={-1}>
     <h2>{cityDisplayName} is not covered yet</h2>
     <p>We have published information for eight cities. Choose one above to make it yours, or look at a covered city without changing yours.</p>
-    {(nearest ?? result.coveredCities[0]) && <button type="button" className="secondary-button" onClick={() => setExplorationCity((nearest ?? result.coveredCities[0]).id)}>{nearest ? `Look at the nearest covered city · ${nearest.name}` : `Look at ${result.coveredCities[0].name}`} →</button>}
+    {nearest && <button type="button" className="secondary-button" onClick={() => setExplorationCity(nearest.id)}>Preview {nearest.name} — don’t save</button>}
   </section>;
   return <section className="card civic-place" id="city-system" aria-label="City place, outcomes and connections" tabIndex={-1}>
-    <div className="civic-heading"><div><span className="eyebrow">PUBLISHED CITY INFORMATION</span><h2>What is changing in {cityName ?? 'your city'}</h2><p>Published snapshot from {result?.state === 'covered' ? formatCityDate(result.data.generatedAt) : 'the last collector run'} · refreshed only when the collector runs.</p></div><details className="civic-key"><summary>Map sources &amp; examples</summary><p>Public projects and places use their linked city or OpenStreetMap records. Fictional test projects are illustrative placements, not real properties or offers.</p></details></div>
+    <div className="civic-heading"><div><span className="eyebrow">PUBLISHED CITY INFORMATION</span><h2>What is changing in {cityName ?? 'your city'}</h2>{explorationCity && <p>Previewing {cityName ?? explorationCity} · your saved city and private pins have not changed.</p>}</div><details className="civic-key"><summary>Map sources &amp; examples</summary><p>Public projects and places use their linked city or OpenStreetMap records. Fictional test projects are illustrative placements, not real properties or offers.</p></details></div>
     {consultations && <section className="civic-open-windows" aria-label="Participation as published">
       <h3>Where can I have a say?</h3><p>Published dates describe the source record, not a guaranteed deadline. Check the source before taking part.</p>
       {consultations.open.length ? <><strong>Open now · as published</strong><ul>{consultations.open.map((item) => <li key={item.properties.id}><button type="button" className="text-button" onClick={() => choose(item.properties.id)}>{item.properties.title}</button> · end date as published {item.properties.endDate ? formatCityDate(item.properties.endDate) : 'not supplied'}</li>)}</ul></> : <p>Nothing open as of {formatCityDate(result?.state === 'covered' ? result.data.generatedAt : '')}.</p>}

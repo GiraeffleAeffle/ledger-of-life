@@ -16,6 +16,12 @@ test('navigation preserves an invitation hash and unrelated query parameters', (
   assert.equal(withArea(`https://example.org${money}`, 'overview'), '/?source=share#invitation=secret');
 });
 
+test('a tab stays with its area: leaving the area drops it, staying keeps it', () => {
+  assert.equal(withArea('https://example.org/?area=money&tab=money-devices', 'places'), '/?area=places');
+  assert.equal(withArea('https://example.org/?area=money&tab=money-devices', 'overview'), '/');
+  assert.equal(withArea('https://example.org/?area=money&tab=money-shares', 'money'), '/?area=money&tab=money-shares');
+});
+
 test('invalid Money tabs fall back to Holdings', () => {
   assert.equal(tabFromSearch('?tab=money-shares', ['money-holdings', 'money-shares']), 'money-shares');
   assert.equal(tabFromSearch('?tab=other', ['money-holdings', 'money-shares']), 'money-holdings');

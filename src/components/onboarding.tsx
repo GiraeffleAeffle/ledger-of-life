@@ -4,14 +4,19 @@ import { Check, KeyRound, Loader2, Mail } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
 import type { SetupStep } from './account-setup-state';
 import { invitationPayload } from './home-journey-logic';
+import Link from 'next/link';
+import type { LocalAiServiceStatus } from '@/server/local-ai-types';
+import { STAGES, THREAD } from '@/data/path';
+import './thread-public.css';
 
 type StepState = 'done' | 'current' | 'todo';
-function Step({ n, state, title, children }: { n: number; state: StepState; title: string; children?: React.ReactNode }) {
+function Step({ n, state, title, description, children }: { n: number; state: StepState; title: string; description?: string; children?: React.ReactNode }) {
   return (
     <li className={`setup-step ${state}`}>
       <span className="journey-dot">{state === 'done' ? <Check size={12} /> : n}</span>
       <div>
         <strong>{title}</strong>
+        {description && <p>{description}</p>}
         {state === 'current' && children}
       </div>
     </li>
@@ -42,6 +47,19 @@ export function AccountSetup({ step, recoveryRequired }: { step: Exclude<SetupSt
   const creating = useRef(false);
   const accountDone = step !== 'account';
   const backupDone = step === 'wallets';
+  const [deskStatus, setDeskStatus] = useState('Checking availability…');
+  useEffect(() => {
+    if (step !== 'account') return;
+    const controller = new AbortController();
+    void fetch('/api/local-ai/status', { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Status unavailable');
+        const { service } = await response.json() as { service: LocalAiServiceStatus };
+        if (!controller.signal.aborted) setDeskStatus(!service.library.enabled ? 'Public desk is closed right now.' : !service.reachable ? 'Public desk is unreachable right now.' : (service.library.remainingRequests ?? 0) <= 0 ? 'Shared free allowance is exhausted right now.' : 'Free public questions available within the shared allowance.');
+      })
+      .catch(() => { if (!controller.signal.aborted) setDeskStatus('Availability could not be checked. Check the desk for current status.'); });
+    return () => controller.abort();
+  }, [step]);
 
   const invitation = typeof window === 'undefined' ? null : new URLSearchParams(window.location.hash.slice(1)).get('invitation');
   const invitedRole = invitation ? invitationPayload(invitation)?.role : null;
@@ -56,23 +74,36 @@ export function AccountSetup({ step, recoveryRequired }: { step: Exclude<SetupSt
   return (
     <section className="onboarding">
       <span className="eyebrow">WELCOME TO LEDGER OF LIFE</span>
-      <h1>{recoveryRequired ? 'Three quick steps, once.' : 'Two quick steps, once.'}</h1>
-      <p className="lede">Ledger of Life keeps your home, your money and your city in one place. Your passkey signs you in, and your own wallets hold your assets: nobody else can move them.</p>
-      <p className="small-copy">The money features run on test networks with test tokens, so no real money moves.</p>
+      <h1>{step === 'account' ? THREAD : 'Finish setting up your access.'}</h1>
+      <p className="lede">Rent a flat with a deposit held in a test-network escrow, see what you own, and follow what your city decides. No real money moves.</p>
+      <ol className="onboarding-stages" aria-label="The Ledger of Life path">{STAGES.map((stage) => <li key={stage.id}><span>{stage.number}</span><strong>{stage.name}</strong></li>)}</ol>
+      <ul className="onboarding-purposes">
+        <li>Follow a home application and deposit</li>
+        <li>Try borrowing or lending with test tokens</li>
+        <li>Find sourced information for your city</li>
+      </ul>
+      <p className="onboarding-reality"><strong>Test networks only. Nothing here has monetary value.</strong></p>
+      {step === 'account' && <nav className="onboarding-public" aria-label="Explore without an account">
+        <Link href="/welcome/strausberg">Read the Strausberg welcome guide — no account needed</Link>
+        <div><Link href="/library">Public AI desk — no account needed</Link><p className="small-copy" role="status">{deskStatus}</p></div>
+      </nav>}
       {recoveryRequired && <p className="small-copy">After these steps you can look around. Before your first deposit you will also prove you can recover your wallets from a second browser (about two minutes).</p>}
       {!wallet.configured && <p className="note" role="alert">Sign-in is not set up on this server yet. The operator needs to add a Privy app id (see docs/WALLET_SETUP.md).</p>}
       {invitation && <p className="note" role="status">{invitedRole ? `You were invited to a tenancy as ${invitedRole === 'arbitrator' ? 'a neutral arbitrator' : 'a tenant'}. Finish these steps, then you can join.` : 'This invitation link is malformed. You can still finish setup and ask for a new link.'}</p>}
+      <h2 className="onboarding-access-heading" id="access-steps">Before you start: create your account</h2>
       <ol className="setup-steps">
         <Step n={1} state={state(accountDone, true)} title="Create your account with a passkey">
           <p>Uses Face ID, Touch ID or your device PIN. No password.</p>
-          <div className="button-row">
+          <div className="onboarding-access">
             <button className="button primary large" disabled={!wallet.configured || !wallet.ready || wallet.busy} onClick={() => void wallet.signupWithPasskey().catch(() => {})}>
               <KeyRound size={18} /> Create account
             </button>
-            <button className="button secondary" disabled={!wallet.configured || !wallet.ready || wallet.busy} onClick={() => void wallet.loginWithPasskey().catch(() => {})}>
-              I already have one
-            </button>
-            <button className="text-button" disabled={!wallet.configured || !wallet.ready} onClick={wallet.loginWithBackup}>Continue with email</button>
+            <div className="onboarding-signin"><span>Already have an account?</span>
+              <button className="button secondary large" disabled={!wallet.configured || !wallet.ready || wallet.busy} onClick={() => void wallet.loginWithPasskey().catch(() => {})}>Sign in</button>
+            </div>
+            <div className="onboarding-email"><span>Email alternative</span>
+              <button className="button secondary" disabled={!wallet.configured || !wallet.ready || wallet.busy} onClick={wallet.loginWithBackup}>Continue with email</button>
+            </div>
           </div>
           {wallet.authenticated && wallet.passkeyCount === 0 && (
             <button className="button primary" onClick={() => void wallet.addPasskey().catch(() => {})}>Add a passkey to this account</button>
@@ -86,7 +117,7 @@ export function AccountSetup({ step, recoveryRequired }: { step: Exclude<SetupSt
             {wallet.error && <p className="note" role="alert">{wallet.error}</p>}
           </Step>
         )}
-        <Step n={recoveryRequired ? 3 : 2} state={state(false, backupDone)} title="Create your two wallets">
+        <Step n={recoveryRequired ? 3 : 2} state={state(false, backupDone)} title="Create your two wallets" description="After sign-in, your Solana wallet holds the Home test-USDC deposit; your Robinhood Chain wallet is for separate test shares and loans. Creating wallets does not fund them.">
           <p><Loader2 className="spin" size={14} /> Creating your Solana and Robinhood Chain wallets. Only you can sign with them.</p>
           {wallet.error && <p className="note" role="alert">{wallet.error}</p>}
         </Step>

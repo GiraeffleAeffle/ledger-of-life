@@ -3,16 +3,15 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { KeyRound, LineChart, TrendingUp } from 'lucide-react';
 import type { TenancyJourney } from '@/server/journey';
 import type { PortfolioPartial, PortfolioView } from '@/server/portfolio';
-import { goToSection, type Area } from './areas';
+import { goToSection, openShareWorkflow, type Area } from './areas';
 import { NetPosition, NetPositionStrip } from './net-position';
 import { RealityChips } from './reality-chip';
 import { confirmedRobinhood, netPositionParts, netPositionTotal, shareValuationAvailable, usd, type RobinhoodRead, type SharePositionAmounts } from './money-valuation';
-import { needsTestFunds, TEST_EXIT_NOTICE } from './money-guidance';
+import { TEST_EXIT_NOTICE } from './money-guidance';
 import type { LocalInvestmentView } from '@/server/local-investments';
 import { TEST_CITY_INVESTMENTS } from '@/data/local-investments';
 import { useRentalWallet } from '@/wallets';
 import { useSectionTabActive } from './section-tabs';
-import { TestDollars } from './test-dollars';
 
 type AssetsResponse = { robinhood: RobinhoodRead };
 type SharePositions = SharePositionAmounts & { enabled: boolean; testUsdAtomic: string | null };
@@ -181,32 +180,30 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
 
   const solanaAddress = wallet.wallets.find((item) => item.chainType === 'solana')?.address;
   const robinhoodAddress = wallet.wallets.find((item) => item.chainType === 'ethereum')?.address;
-  const noCash = needsTestFunds(portfolio?.testUsdcAtomic ?? null, rh?.testUsdAtomic ?? null);
   async function copyAddress(address: string, chain: string) {
     try { await navigator.clipboard.writeText(address); setCopied(chain); }
     catch { setCopied('Copy failed; select the address instead.'); }
   }
   return (
     <section className={`card assets ${show}`} id="money-overview" tabIndex={-1}>
-      <p className="small-copy">{TEST_EXIT_NOTICE}</p>
-      <TestDollars request={request} ethBalance={rh?.ethBalance} refresh={refresh} />
-      <details className="money-funds" key={noCash ? 'empty' : 'funded'} open={noCash}>
-        <summary>{noCash ? 'Get test funds' : 'Need more test funds?'}</summary>
-        <div className="money-funds-wallets">
-          <div><strong>Solana devnet wallet · test USDC</strong><p>{solanaAddress ? <><code>{solanaAddress}</code> <button className="text-button" type="button" onClick={() => void copyAddress(solanaAddress, 'Solana')}>Copy</button></> : 'Connect your Solana wallet in Me.'}</p><p>Use the <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle faucet (Solana Devnet)</a> to request test USDC.</p></div>
-          <div><strong>Robinhood Chain wallet · test USD (tUSDG)</strong><p>{robinhoodAddress ? <><code>{robinhoodAddress}</code> <button className="text-button" type="button" onClick={() => void copyAddress(robinhoodAddress, 'Robinhood Chain')}>Copy</button></> : 'Connect your Robinhood Chain wallet in Me.'}</p><p>Use Get test dollars above; operator tools are not needed.</p></div>
-        </div>
-        {copied && <p role="status">{copied === 'Copy failed; select the address instead.' ? copied : `${copied} address copied.`}</p>}
-      </details>
       <div className="assets-head">
         <div>
           <span className="money-network-badge">YOUR HOLDINGS</span>
-          <h2>What you hold, what is locked</h2>
-          <p className="small-copy">See your home deposit, shares and cash in one place.</p>
+          <h2>What you have</h2>
+          <p className="small-copy">Test networks · no real money. Your home deposit, shares and cash, followed by optional actions.</p>
         </div>
         <div className="assets-total"><span>Priced test-asset subtotal</span><strong>{snapshot && !readError ? `${usd(total)} test value` : '—'}</strong><small role="status">{balanceStatus}</small><p>Test dollars anyone can mint have no monetary value. Local fictional units are outside this subtotal.</p></div>
       </div>
-      {parts && !readError && <NetPosition parts={parts} go={go} depositSection={depositSection} />}
+      <dl className="holdings-positions" aria-label="Free, locked, pledged, lent and owed test positions">
+        {([
+          ['free', 'Free', 'In your wallets'],
+          ['locked', 'Locked', 'Your Home deposit entitlement'],
+          ['pledged', 'Pledged', 'Test TSLA loan collateral'],
+          ['lent', 'Lent', 'Your shared-pool claim'],
+          ['owed', 'Owed', 'Debt subtracted from subtotal'],
+        ] as const).map(([key, label, meaning]) => <div key={key}><dt>{label}</dt><dd>{parts && !readError ? `${key === 'owed' ? '−' : ''}${usd(parts[key])} test value` : 'Unavailable'}</dd><small>{meaning}</small></div>)}
+      </dl>
+      {parts && !readError && <details className="holdings-breakdown"><summary>How this subtotal is counted</summary><NetPosition parts={parts} go={go} depositSection={depositSection} /></details>}
       <div className="asset-grid">
         <button type="button" className="asset-tile clickable" id="rental-deposit-holding" onClick={() => goToSection(go, 'home', depositSection)} aria-label="Open rental home and deposit">
           <header><KeyRound size={18} /> Rental home &amp; deposit · Solana devnet</header>
@@ -236,11 +233,20 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
           <strong>{officialTileValue === null ? '—' : `${usd(officialTileValue)} test value`}</strong>
           <span>{rh ? `${rh.tslaShares.toFixed(5)} TSLA in wallet · ${usd(walletTestUsd)} test USD (tUSDG) in Robinhood Chain wallet` : 'Balance not yet available'}</span>
           {positions && <span>Loan collateral: {(Number(positions.loan?.sharesRaw ?? '0') / 1e18).toFixed(5)} TSLA · debt {usd(debt)} test value. {hasFreshTokenPrice ? `Mirrored Robinhood TSLA token price: ${usd(atomicUsd(positions.priceAtomic))}.` : 'Fresh mirrored token price unavailable; no stock valuation shown.'}</span>}
-          <p className="small-copy"><a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Get 5 test TSLA and test ETH from Robinhood’s faucet</a>. No operator-priced stock desk.</p>
+          <button className="text-button" type="button" onClick={() => goToSection(go, 'money', 'share-workflows')}>Manage test TSLA &amp; loans</button>
         </article>
-        <article className="asset-tile"><header>Lent test dollars · shared pool</header><strong>{positions ? `${usd(lent)} test value` : '—'}</strong><span>Pool share value includes borrower interest and losses. Withdrawals depend on available pool cash.</span><button className="text-button" type="button" onClick={() => goToSection(go, 'money', 'share-workflows')}>Open shared market →</button></article>
+        <article className="asset-tile"><header>Lent test dollars · shared pool</header><strong>{positions ? `${usd(lent)} test value` : '—'}</strong><span>Pool share value includes borrower interest and losses. Withdrawals depend on available pool cash.</span><button className="text-button" type="button" onClick={() => openShareWorkflow(go, 'lend')}>Manage lent test dollars</button></article>
         <article className="asset-tile"><header>tHOME and tWORK · fictional test units</header><strong>Outside subtotal</strong>{stakes?.state === 'ready' ? stakes.assets.map((asset) => <span key={asset.projectId}>{TEST_CITY_INVESTMENTS.find((project) => project.id === asset.projectId)?.symbol ?? 'Test units'}: {asset.holdingRaw === null ? 'unavailable' : (Number(BigInt(asset.holdingRaw)) / 1e18).toFixed(4)} units · fictional test issuer</span>) : <span>{stakes ? 'Local stake balances unavailable.' : 'Checking wallet units…'}</span>}<span>Test issue prices are not resale prices, and these units grant no property or company rights.</span><button className="text-button" type="button" onClick={() => goToSection(go, 'money', 'local-investments')}>See your local stakes →</button></article>
       </div>
+      <details className="money-funds">
+        <summary>Wallet addresses &amp; funding networks</summary>
+        <div className="money-funds-wallets">
+          <div><strong>For the Solana deposit or tSPYx: test USDC on Solana devnet</strong><p>{solanaAddress ? <><code>{solanaAddress}</code> <button className="text-button" type="button" onClick={() => void copyAddress(solanaAddress, 'Solana')}>Copy Solana address</button></> : 'Connect your Solana wallet in Me.'}</p><p>Request test USDC from the <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle faucet (Solana Devnet)</a>. Robinhood test dollars cannot fund a Solana deposit.</p></div>
+          <div><strong>For Robinhood tasks: test ETH for fees, plus test TSLA or tUSDG</strong><p>{robinhoodAddress ? <><code>{robinhoodAddress}</code> <button className="text-button" type="button" onClick={() => void copyAddress(robinhoodAddress, 'Robinhood Chain')}>Copy Robinhood address</button></> : 'Connect your Robinhood Chain wallet in Me.'}</p><p>Borrowing uses test TSLA; lending uses test dollars, not TSLA. Funding help appears beside the selected task in Shares &amp; loans.</p></div>
+        </div>
+        {copied && <p role="status">{copied === 'Copy failed; select the address instead.' ? copied : `${copied} address copied.`}</p>}
+      </details>
+      <p className="small-copy">{TEST_EXIT_NOTICE}</p>
     </section>
   );
 }

@@ -1,3 +1,16 @@
+import type { JourneyStage } from '../server/journey.ts';
+import type { PublicListing } from '../server/listings.ts';
+
+export const HOME_STAGES = ['Find', 'Apply', 'Agree', 'Secure', 'Live', 'Move out', 'Paid out'] as const;
+
+/** Person-facing progress only; never advances a pending chain operation. */
+export function homeStage(stage?: JourneyStage, listing?: Pick<PublicListing, 'relation' | 'status'>): number {
+  if (stage) return { agreement: 2, space: 3, deposit: 3, living: 4, 'move-out': 5, paid: 6 }[stage];
+  if (listing?.relation === 'chosen') return 2;
+  if (listing?.status === 'open' && (listing.relation === 'applicant' || listing.relation === 'landlord')) return 1;
+  return 0;
+}
+
 export function claimAmount(value: string, maximumAtomic: string): string {
   const normalized = value.replace(',', '.');
   if (!/^(0|[1-9]\d{0,18})(\.\d{1,6})?$/.test(normalized)) throw new Error('Enter a test USDC amount with up to six decimal places.');

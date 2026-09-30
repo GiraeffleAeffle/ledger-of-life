@@ -5,11 +5,16 @@
 .civic-look-around { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; padding: 0 20px; font-size: .85rem; color: var(--muted); }
 .civic-look-around p { margin: 0; }
 .city-card header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.city-picker { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.city-picker { display: grid; grid-template-columns: minmax(0, 1fr); align-items: end; gap: 14px; }
 .city-picker label { display: grid; gap: 5px; min-width: 0; font-weight: 600; }
 .city-picker select, .city-picker input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 10px; color: inherit; background: #fff; }
 .city-picker p { grid-column: 1 / -1; margin: 0; }
 .city-source { color: #455f50; font-size: .82rem; }
+.city-picker-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.city-picker-actions button { min-height: 44px; white-space: normal; }
+.city-settled { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.city-settled h3 { margin: 0 0 8px; }
+.city-settled a { display: inline-block; padding: 8px 0; text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 680px) { .city-picker { grid-template-columns: minmax(0, 1fr); } }
 .city-feed-card { display: grid; gap: 12px; min-width: 0; }
 .city-feed-list { list-style: none; margin: 0; padding: 0; display: grid; }

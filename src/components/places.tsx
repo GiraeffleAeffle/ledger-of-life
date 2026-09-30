@@ -25,6 +25,7 @@ export function PlacesArea({ request, accountId, go }: { request: Request; accou
   const [reason, setReason] = useState('');
   const [version, setVersion] = useState(0);
   const [exploredCity, setExploredCity] = useState('');
+  const [previewRequest, setPreviewRequest] = useState<{ cityId: string } | null>(null);
   const onExplorationCityChange = useCallback((id: string) => { setExploredCity(id); setPlaces(null); }, []);
   const { cityId, result, error, cityDisplayName } = useCitySignals(request);
   useEffect(() => {
@@ -38,9 +39,8 @@ export function PlacesArea({ request, accountId, go }: { request: Request; accou
   const cityKnown = Boolean(exploredCity || result || error);
   const needsCity = cityKnown && !exploredCity && !cityId && !cityDisplayName && (reason === 'choose' || result?.state === 'not_covered');
   return <div className="places-area">
-    {result && <p className="places-meta">Published snapshot from {formatCityDate(result.state === 'covered' ? result.data.generatedAt : result.generatedAt)} · refreshed only when the collector runs.</p>}
-    <CityCard request={request} fallbackSectionIds={needsCity ? ['local-readings', 'community-discovery', 'public-decisions'] : undefined} onCityChange={() => { window.dispatchEvent(new Event(CITY_CHANGED_EVENT)); setPlaces(null); setVersion((value) => value + 1); }} />
-    <CivicPlaceLenses request={request} accountId={accountId} go={go} onExplorationCityChange={onExplorationCityChange}
+    <CityCard request={request} previewCity={exploredCity} onPreviewCity={(id) => setPreviewRequest({ cityId: id })} fallbackSectionIds={needsCity ? ['local-readings', 'community-discovery', 'public-decisions'] : undefined} onCityChange={() => { window.dispatchEvent(new Event(CITY_CHANGED_EVENT)); setPlaces(null); setVersion((value) => value + 1); }} />
+    <CivicPlaceLenses request={request} accountId={accountId} go={go} previewRequest={previewRequest} onExplorationCityChange={onExplorationCityChange}
       onCityChange={() => { window.dispatchEvent(new Event(CITY_CHANGED_EVENT)); setPlaces(null); setVersion((value) => value + 1); }} />
     {(exploredCity || cityId) === 'strausberg' && <details className="card places-section civic-support"><summary id="regional-topics">Nearby towns · compare source stages</summary><CityRegionTopics request={request} cityId="strausberg" cityName="Strausberg" /></details>}
     {cityKnown && !needsCity && <>
@@ -50,14 +50,14 @@ export function PlacesArea({ request, accountId, go }: { request: Request; accou
         <div className="places-measure"><h3>Air sensors near {places.city}</h3>{places.air.state === 'available' ? <><strong>{places.air.value.sensors.length} outdoor sensors within 5 km</strong><ul>{places.air.value.sensors.map((sensor) => <li key={sensor.id}><Link url={sensor.url}>Sensor {sensor.id}</Link> · {sensor.pm25} µg/m³ · {sensor.distanceKm.toFixed(1)} km · {day(sensor.timestamp)}</li>)}</ul><p>{places.air.value.caveat}</p></> : <p>Verified reading unavailable; no estimate.</p>}</div></div>}
       <p className="places-meta">Local observations are context, not measured outcomes of a project.</p>
     </details>
-    <details className="card places-section civic-support"><summary id="community-discovery">Community in {currentCity} · sport places &amp; official directories</summary>
+    <section className="card places-section civic-support"><h2 id="community-discovery">Community in {currentCity} · sport places &amp; official directories</h2>
       {!places ? <p>{reason === 'choose' ? 'Choose your city to discover local activities.' : reason || 'Checking local directories…'}</p>
         : <>{places.clubs.state === 'available' ? <div className="places-groups"><p>{places.clubs.value.caveat} <Link url={places.clubs.value.source.licenceUrl}>© OpenStreetMap contributors · ODbL 1.0</Link>.</p>{places.clubs.value.groups.map((group) => <details key={group.type}><summary>{group.type.split(';')[0].replaceAll('_', ' ')} · {group.count}</summary><ul>{group.items.map((item) => <li key={item.id}><Link url={item.url}>{item.name}</Link></li>)}</ul></details>)}</div> : <p>No verified directory reading available.</p>}{places.cityId === 'strausberg' && <div className="places-links">{strausberg.directories.map((item) => <Link key={item.url} url={item.url}>{item.label}</Link>)}</div>}</>}
-    </details>
-    <details className="card places-section civic-support"><summary id="public-decisions">Council in {currentCity} · papers, participation &amp; wider portals</summary>
+    </section>
+    <section className="card places-section civic-support"><h2 id="public-decisions">Council in {currentCity} · papers, participation &amp; wider portals</h2>
       {places?.cityId === 'strausberg' ? <div className="places-links"><Link url={strausberg.calendar}>Council calendar</Link><Link url={strausberg.documents}>Document search</Link>{strausberg.hierarchy.map((item) => item.url && <Link key={item.level} url={item.url}>{item.level}</Link>)}</div> : <p>{places ? 'No researched official links for this city.' : reason === 'choose' ? 'Choose a city to see its researched public links.' : reason || 'Checking city sources…'}</p>}
       <p className="places-meta">Official links checked {checked}; no live meetings or complete district/state/world feed claimed.</p>
-    </details>
+    </section>
     </>}
   </div>;
 }

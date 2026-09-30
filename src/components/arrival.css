@@ -30,6 +30,10 @@
 .welcome-group-toggle { display: flex; align-items: center; gap: 10px; margin-top: 14px; cursor: pointer; }
 .welcome-group-toggle input { width: 18px; height: 18px; accent-color: var(--green); }
 .welcome-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }
+.welcome-jumps { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 22px; }
+.welcome-jumps a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
+.welcome-top-print { margin-top: 18px; }
+.welcome-phase h3, .welcome-section h2 { scroll-margin-top: 24px; }
 @media (max-width: 500px) { .welcome-page { width: calc(100% - 24px); margin: 12px auto 40px; gap: 12px; } .welcome-page .card { padding: 18px; } .welcome-item { padding: 12px; } }
 @media (prefers-reduced-motion: reduce) { .welcome-page *, .welcome-page *::before, .welcome-page *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
 @media print { body:has(.welcome-page) > * { color: #000; } .welcome-page { display: block; width: 100%; margin: 0; color: #000; } .welcome-page > :not(.welcome-print) { display: none !important; } .welcome-page .welcome-print { display: block; border: 0; padding: 0; box-shadow: none; break-after: auto; } .welcome-page .welcome-print + .welcome-print { margin-top: 2rem; } .welcome-page .welcome-item { break-inside: avoid; } .welcome-page a { color: #000; } }

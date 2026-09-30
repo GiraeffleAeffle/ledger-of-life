@@ -1,8 +1,4 @@
-export const TEST_EXIT_NOTICE = 'Test units and test cash cannot be sold or withdrawn in this prototype.';
-
-export function needsTestFunds(solanaCash: string | null, robinhoodCash: string | null): boolean {
-  return solanaCash !== null && robinhoodCash !== null && BigInt(solanaCash) === 0n && BigInt(robinhoodCash) === 0n;
-}
+export const TEST_EXIT_NOTICE = 'Test units cannot be sold or withdrawn in this prototype. Test cash has no monetary value; supported shared-pool withdrawals return only test dollars.';
 
 export function stakeDisabledReason(input: { amountAtomic: string | null; cashAtomic: string | null; nativeAtomic: string | null; hasWallet: boolean }): string {
   if (!input.hasWallet) return 'Connect your Robinhood Chain wallet in Me first.';

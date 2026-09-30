@@ -81,7 +81,7 @@ export function adapterState(adapter: LedgerAdapter, input: LedgerStateInputs): 
 /** A jump into one tenancy's own service-charge card; its id is dynamic, so it is not in `SECTIONS`. */
 export type DynamicHomeAction = { kind: 'area'; area: 'home'; section: `service-charges-${string}`; label: string };
 
-/** The one next step for an adapter given what the person has already done. Shared by the directory and Today's start guide. */
+/** The contextual destination for a connection in Me's directory. */
 export function adapterAction(adapter: LedgerAdapter, inputs: LedgerStateInputs): AdapterAction | DynamicHomeAction {
   if (adapter.settings && !adapterState(adapter, inputs).configured)
     return { kind: 'area', area: 'me', section: adapter.settings, label: inputs.configError ? 'Check configuration' : adapter.connection === 'homeAssistant' && inputs.homeAssistantPull === false ? 'About Home Assistant on this host' : `Connect ${adapter.id === 'homeAssistant' ? 'Home Assistant' : 'validator'}` };

@@ -12,10 +12,10 @@ import { LocalInvestments } from './local-investments';
 import { OwnershipJourney } from './ownership-journey';
 import { LocalAiWorkspace } from './local-ai';
 import { SectionTabs, useSectionTabActive } from './section-tabs';
-import { StockCollateral } from './stock-collateral';
 import { createPortfolioRefresh, type PortfolioSnapshot } from './portfolio-refresh';
 import { operationLabels, visibleDepositActivity } from './deposit-activity';
 import { TEST_EXIT_NOTICE } from './money-guidance';
+import { TestDollars } from './test-dollars';
 import './money-area.css';
 
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
@@ -34,16 +34,17 @@ export function MoneyArea({ request, tenancies, loaded, homeError, retryHome, go
     <div className="money-journey">
       <SectionTabs label="Money sections" tabs={[
         { id: 'money-holdings', label: 'Holdings', reality: ['testnet_real', 'read_only_live'],
-          summary: 'What you hold and what is locked. The priced subtotal counts your rental deposit, test TSLA, test dollars lent to the shared pool and test cash, minus what you borrowed. Local stakes and devices are not in it.',
+          summary: 'Your test holdings, collateral, loans and recorded activity. The priced subtotal separates free, locked, pledged, lent and owed positions. Local stakes and devices are outside it.',
           content: <>
             {loaded ? <AssetsOverview request={request} tenancies={tenancies} show="money" go={go} solanaAction={<Portfolio request={request} />} />
               : homeError ? <p className="note" role="alert">{homeError} <button className="button secondary" type="button" onClick={() => void retryHome()}>Retry Home read</button></p> : <p className="money-activity-pending" role="status">Reading your tenancies before the holdings subtotal…</p>}
-            <div id="ownership-journey" tabIndex={-1}><OwnershipJourney request={request} go={go} /></div>
+            <TestMoney request={request} />
+            <div id="ownership-journey" tabIndex={-1}><OwnershipJourney go={go} /></div>
             {loaded && <MoneyActivity request={request} tenancies={tenancies} go={go} />}
           </> },
         { id: 'money-shares', label: 'Shares & loans', reality: ['testnet_real', 'read_only_live'],
-          summary: "Borrow test dollars against Robinhood's official test TSLA, or lend test dollars to one shared pool. The TSLA price is copied from Chainlink on Robinhood Chain mainnet; everything else is test money with no value.",
-          content: <><ShareWorkflows request={request} go={go} /><StockCollateral /></> },
+          summary: 'Robinhood Chain testnet; no real money. Borrowing and lending are separate optional tasks, not rental-deposit products.',
+          content: <ShareWorkflows request={request} go={go} /> },
         { id: 'money-stakes', label: 'Local stakes', reality: ['testnet_simulated'],
           summary: 'Buy fictional test units in a housing project or a workshop. They grant no company, cooperative or property rights.',
           content: <LocalInvestments request={request} go={go} /> },
@@ -53,6 +54,33 @@ export function MoneyArea({ request, tenancies, loaded, homeError, retryHome, go
       ]} />
     </div>
   );
+}
+
+/**
+ * Where "Get test money" leads: every test token a person needs, in the order the path uses them.
+ * Nothing here has monetary value; each chain's tokens pay for that chain only.
+ */
+function TestMoney({ request }: { request: Request }) {
+  const [ethBalance, setEthBalance] = useState<string | undefined>();
+  const refresh = useCallback(async () => {
+    // The assets route wraps each reading as { ok, value }; a failed read stays unknown, not zero.
+    const { robinhood } = await request<{ robinhood: { ok: boolean; value?: { ethBalance?: string } } | null }>('/api/assets?area=holdings');
+    setEthBalance(robinhood?.ok ? robinhood.value?.ethBalance : undefined);
+  }, [request]);
+  useEffect(() => {
+    // Same shape as the market view's read(): state is set only after the request resolves.
+    const read = () => { void refresh().catch(() => setEthBalance(undefined)); };
+    read();
+  }, [refresh]);
+  return <section className="card test-money" id="test-money" tabIndex={-1} aria-labelledby="test-money-title">
+    <h2 id="test-money-title">Test money</h2>
+    <p>Nothing here has monetary value. Each chain&apos;s test tokens work only on that chain.</p>
+    <ul className="test-money-list">
+      <li><strong>For the Home deposit (Solana devnet):</strong> test USDC from <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle&apos;s faucet</a>, sent to your Solana wallet (address in Me).</li>
+      <li><strong>For loans, lending, local stakes and paid AI answers (Robinhood Chain testnet):</strong> test ETH for fees and test dollars (tUSDG), below. Test TSLA for collateral comes from the <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet</a>.</li>
+    </ul>
+    <TestDollars request={request} ethBalance={ethBalance} refresh={refresh} />
+  </section>;
 }
 
 type RecordedOperation = { id: string; action: { kind: string; amountAtomic?: string }; role: string; state: string; createdAt: string; signature: string | null };
@@ -247,7 +275,7 @@ function Portfolio({ request }: { request: Request }) {
       <button className="button primary" disabled={busy || purchase === 'pending' || unavailable || view.referencePriceStale || BigInt(view.testUsdcAtomic) < 5_000_000n} onClick={invest}>
         {busy ? <Loader2 className="spin" size={16} /> : null} {purchase === 'pending' ? 'Purchase pending, checking' : 'Buy tSPYx with 5 test USDC'} <ArrowRight size={16} />
       </button>
-      {BigInt(view.testUsdcAtomic) < 5_000_000n && <p role="status">You need 5 test USDC in your Solana wallet to buy; current cash is {(Number(view.testUsdcAtomic) / 1e6).toFixed(2)} test USDC.</p>}
+      {BigInt(view.testUsdcAtomic) < 5_000_000n && <p role="status">You need 5 test USDC in your Solana devnet wallet to buy; current cash is {(Number(view.testUsdcAtomic) / 1e6).toFixed(2)} test USDC. Request test USDC from the <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle faucet (Solana Devnet)</a>. Robinhood tUSDG cannot fund this Solana action.</p>}
       <p className="small-copy">{TEST_EXIT_NOTICE}</p>
       {message && <p className="note" role="status">{message}</p>}
     </div>

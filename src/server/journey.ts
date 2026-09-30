@@ -9,11 +9,11 @@ import type { Store } from './store.ts';
 export type JourneyRole = 'tenant' | 'landlord' | 'arbitrator';
 export type JourneyStage = 'agreement' | 'space' | 'deposit' | 'living' | 'move-out' | 'paid';
 export const JOURNEY_STAGES: { id: JourneyStage; label: string }[] = [
-  { id: 'agreement', label: 'Agreement' },
-  { id: 'space', label: 'Prepared escrow' },
-  { id: 'deposit', label: 'Deposit secured' },
-  { id: 'living', label: 'Living here' },
-  { id: 'move-out', label: 'Move-out' },
+  { id: 'agreement', label: 'Agree' },
+  { id: 'space', label: 'Secure' },
+  { id: 'deposit', label: 'Secure' },
+  { id: 'living', label: 'Live' },
+  { id: 'move-out', label: 'Move out' },
   { id: 'paid', label: 'Paid out' },
 ];
 
@@ -68,7 +68,7 @@ export function agreementStep(agreement: Agreement, role: JourneyRole): NextActi
   if (role !== 'arbitrator' && !accepted(role))
     return {
       kind: 'accept_agreement',
-      label: 'Review and accept the agreement',
+      label: 'Review the deposit agreement',
       detail: `${agreement.property} · ${usd(agreement.requiredSecurity)} deposit · tenant keeps value above an approved deduction at settlement. ${agreement.releaseAllowed ? 'Tenant may claim surplus during the tenancy.' : 'Surplus remains locked until settlement.'} Devnet lending pays nothing, so earnings are simulated.`,
       digest,
     };
@@ -95,7 +95,7 @@ export function chainStep(
       return {
         stage: 'living',
         next: role === 'landlord'
-          ? { kind: 'propose_claim', label: 'Tenancy ended? Start the move-out', detail: 'Enter any deduction (0 if none) with a reason. The tenant must agree or the arbitrator decides.', maximumAtomic: t.requiredSecurityAtomic }
+          ? { kind: 'propose_claim', label: 'Propose a move-out deduction', detail: 'Enter any deduction (0 if none) with a reason. The tenant must agree or the arbitrator decides.', maximumAtomic: t.requiredSecurityAtomic }
           : role === 'tenant'
             ? waiting('Your deposit is secured in devnet lending', 'At move-out the landlord proposes a deduction (or none); you then agree or dispute. Devnet lending pays nothing, so earnings are simulated.')
             : waiting('Nothing to decide', 'You are only needed if tenant and landlord disagree.'),
@@ -165,7 +165,7 @@ export async function tenancyJourney(
       next: pending
         ? { kind: 'confirming', label: 'Preparing the escrow…', detail: 'Waiting for final confirmation on the network.', operationId: null }
         : role === 'landlord'
-          ? { kind: 'create_space', label: 'Prepare the escrow', detail: 'One approval creates the empty escrow. It holds no security until the tenant funds it.' }
+          ? { kind: 'create_space', label: 'Prepare the empty escrow', detail: 'One approval creates the empty escrow. It holds no security until the tenant funds it.' }
           : waiting('Waiting for the landlord', 'The landlord prepares the empty escrow for these terms.'),
     };
   }
@@ -188,7 +188,7 @@ export async function tenancyJourney(
   const result: TenancyJourney = {
     ...base,
     stage,
-    next: pending ? { kind: 'confirming', label: 'Confirming on the network…', detail: 'Your approval was sent. Check again if it takes longer than usual.', operationId: pending.id } : next,
+    next: pending ? { kind: 'confirming', label: 'Waiting for network confirmation', detail: 'Your approval was sent. Check again if it takes longer than usual.', operationId: pending.id } : next,
     chain: {
       phase: t.phase,
       escrowAtomic: t.accountedIdleAtomic,

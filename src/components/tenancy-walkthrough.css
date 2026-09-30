@@ -1,15 +1,18 @@
-.tenancy-walkthrough { padding: 18px 22px; }
-.tenancy-walkthrough > summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; cursor: pointer; font-size: 1.05rem; }
-.tenancy-walkthrough > summary > span { color: var(--muted); font-size: .85rem; }
+.tenancy-walkthrough { padding: 16px 20px; }
+.tenancy-walkthrough > summary { cursor: pointer; font-weight: 650; }
 .tenancy-walkthrough-body { display: grid; gap: 12px; margin-top: 12px; }
 .tenancy-walkthrough-body > p { margin: 0; color: #4b6352; line-height: 1.55; }
-.tenancy-walkthrough-body > ol { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; counter-reset: walkthrough; }
-.tenancy-walkthrough-body > ol > li { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 2px 16px; padding: 11px 0; border-top: 1px solid var(--line); counter-increment: walkthrough; }
-.tenancy-walkthrough-body > ol > li > strong::before { content: counter(walkthrough) '. '; color: var(--muted); font-weight: 600; }
-.tenancy-walkthrough-body > ol > li > small { grid-column: 1; color: var(--muted); font-size: 12px; line-height: 1.4; }
-.tenancy-walkthrough-body > ol > li > span { grid-column: 2; grid-row: 1 / span 2; font-size: 14px; line-height: 1.55; }
+.deposit-ideas { display: grid; gap: 10px; margin: 0; font-size: .85rem; }
+.deposit-ideas > div { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr); gap: 8px 18px; border-top: 1px solid var(--line); padding-top: 10px; }
+.deposit-ideas dt { font-weight: 650; color: var(--ink, #1b2a1f); }
+/* The global dd rule right-aligns values for fact lists; these are sentences. */
+.deposit-ideas dd { margin: 0; line-height: 1.5; color: var(--muted); text-align: left; font-weight: 400; }
+.deposit-ideas-card { display: grid; gap: 10px; padding: 16px 20px; }
+.deposit-ideas-card > h2 { margin: 0; font-size: 1.05rem; }
+.deposit-ideas dt { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.deposit-availability { padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.deposit-availability.available { border-color: var(--green); color: var(--green); background: #f3f8ee; }
 @media (max-width: 640px) {
-  .tenancy-walkthrough { padding: 16px; }
-  .tenancy-walkthrough-body > ol > li { grid-template-columns: minmax(0, 1fr); }
-  .tenancy-walkthrough-body > ol > li > span { grid-column: 1; grid-row: auto; }
+  .tenancy-walkthrough, .deposit-ideas-card { padding: 16px; }
+  .deposit-ideas > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 }

@@ -1,0 +1,10 @@
+/* Links in the signed-out navigation look like the area buttons they replace. */
+a.nav-item { text-decoration: none; }
+.sidebar-foot { line-height: 1.5; }
+.sidebar-roadmap { display: block; margin: 10px 12px 0; padding: 0; color: #59695a; font-size: 11px; text-align: left; }
+.sidebar-roadmap.selected { color: var(--green); font-weight: 650; }
+.mobile-nav a {
+  display: flex; flex-direction: column; align-items: center; flex: 1; gap: 4px;
+  min-height: 45px; min-width: 0; padding: 4px 2px; border-radius: 7px;
+  color: #59695a; font-size: 11px; text-decoration: none;
+}

@@ -1,4 +1,4 @@
-.net-position, .net-strip { --tone-free: var(--green); --tone-locked: #5f7f92; --tone-pledged: var(--amber); --tone-owed: #a34a3c; }
+.net-position, .net-strip { --tone-free: var(--green); --tone-locked: #5f7f92; --tone-pledged: var(--amber); --tone-lent: #776390; --tone-owed: #a34a3c; }
 .net-position { margin: 4px 0 18px; }
 .net-position > ul { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
 .net-position > ul > li { display: grid; grid-template-columns: minmax(150px, 1.1fr) minmax(80px, 2fr) minmax(90px, auto); align-items: center; gap: 3px 18px; padding: 12px 0; border-bottom: 1px solid var(--line); }
@@ -7,6 +7,7 @@
 .net-position-bar > span { display: block; height: 100%; min-width: 3px; border-radius: 0 4px 4px 0; background: var(--tone-free); }
 .tone-locked .net-position-bar > span { background: var(--tone-locked); }
 .tone-pledged .net-position-bar > span { background: var(--tone-pledged); }
+.tone-lent .net-position-bar > span { background: var(--tone-lent); }
 .tone-owed .net-position-bar > span { background: var(--tone-owed); }
 .net-position-amount { text-align: right; font-size: 15px; font-variant-numeric: tabular-nums; }
 .tone-owed .net-position-amount { color: var(--tone-owed); }
@@ -22,10 +23,12 @@
 .net-strip-bar > span { background: var(--tone-free); }
 .net-strip-bar > .tone-locked { background: var(--tone-locked); }
 .net-strip-bar > .tone-pledged { background: var(--tone-pledged); }
+.net-strip-bar > .tone-lent { background: var(--tone-lent); }
 .net-strip > ul { display: flex; flex-wrap: wrap; gap: 3px 14px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--muted); }
 .net-strip > ul > li::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--tone-free); }
 .net-strip > ul > .tone-locked::before { background: var(--tone-locked); }
 .net-strip > ul > .tone-pledged::before { background: var(--tone-pledged); }
+.net-strip > ul > .tone-lent::before { background: var(--tone-lent); }
 .net-strip > ul > .tone-owed::before { background: var(--tone-owed); }
 .net-strip > ul strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 

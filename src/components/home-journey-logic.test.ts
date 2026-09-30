@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { claimAmount, confirmationStalled, invitationKey, invitationPayload, invitationStatus, pollingPaused, settlementSplit } from './home-journey-logic.ts';
+import { claimAmount, confirmationStalled, HOME_STAGES, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, settlementSplit } from './home-journey-logic.ts';
 
 test('claim respects the full deposit and six-decimal atomic precision', () => {
   assert.equal(claimAmount('0,50', '1000001'), '500000');
@@ -31,4 +31,22 @@ test('waiting thresholds surface persistent failures and stalled confirmation', 
   assert.equal(pollingPaused(3), true);
   assert.equal(confirmationStalled(0, 89_999), false);
   assert.equal(confirmationStalled(0, 90_000), true);
+});
+
+test('Home progress keeps prepare and fund in Secure without skipping move-out or payout', () => {
+  assert.equal(homeStage('agreement'), 2);
+  assert.equal(homeStage('space'), 3);
+  assert.equal(homeStage('deposit'), 3);
+  assert.equal(homeStage('living'), 4);
+  assert.equal(homeStage('move-out'), 5);
+  assert.equal(homeStage('paid'), HOME_STAGES.length - 1);
+});
+
+test('listing progress distinguishes a pending application from a chosen or ended application', () => {
+  assert.equal(homeStage(undefined, { relation: null, status: 'open' }), 0);
+  assert.equal(homeStage(undefined, { relation: 'applicant', status: 'open' }), 1);
+  assert.equal(homeStage(undefined, { relation: 'landlord', status: 'open' }), 1);
+  assert.equal(homeStage(undefined, { relation: 'chosen', status: 'let' }), 2);
+  assert.equal(homeStage(undefined, { relation: 'applicant', status: 'closed' }), 0);
+  assert.equal(homeStage('living', { relation: 'applicant', status: 'open' }), 4);
 });

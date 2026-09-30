@@ -1,13 +1,23 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronRight, ShieldCheck } from 'lucide-react';
+import Link from 'next/link';
+import { BookOpen, ChevronRight, Cpu, ShieldCheck } from 'lucide-react';
 import { AREAS, areaLabel, type Area } from './areas';
 import { MyHome } from './home';
 import { DemoContext } from './demo-context';
 import { useRentalWallet } from '@/wallets';
 import { AreaErrorBoundary } from './area-error-boundary';
 import { areaFromSearch, withArea } from './workspace-location';
+import { THREAD } from '@/data/path';
+import './workspace.css';
+
+const PRIMARY = AREAS.filter((item) => !item.secondary);
+/** What works without an account; the six areas all need one. */
+const PUBLIC_LINKS = [
+  { href: '/welcome/strausberg', label: 'Welcome guide', icon: BookOpen },
+  { href: '/library', label: 'Public AI desk', icon: Cpu },
+] as const;
 
 export function Workspace() {
   const [area, setArea] = useState<Area>('overview');
@@ -40,6 +50,9 @@ export function Workspace() {
     document.getElementById('main')?.scrollIntoView({ block: 'start', behavior: 'instant' });
   }
 
+  // Signed-out visitors get the no-account paths instead of six destinations that all end at sign-in.
+  // While sign-in is still unknown the usual navigation stays, so signed-in people never see it flicker.
+  const signedOut = wallet.ready && !wallet.authenticated;
   return (
     <div className="app-shell wealth-app">
       <a className="skip-link" href="#main">Skip to workspace</a>
@@ -48,8 +61,10 @@ export function Workspace() {
           <span className="brand-mark" aria-hidden="true"><span /><span /><span /><span /></span>
           <span>Ledger<br /><strong>of Life</strong></span>
         </button>
-        <nav aria-label="Your account">
-          {AREAS.map((item) => (
+        <nav aria-label={signedOut ? 'Without an account' : 'Your account'}>
+          {signedOut ? PUBLIC_LINKS.map((item) => (
+            <Link key={item.href} className="nav-item" href={item.href}><item.icon size={18} />{item.label}</Link>
+          )) : PRIMARY.map((item) => (
             <button key={item.id} className={`nav-item ${area === item.id ? 'selected' : ''}`}
               aria-current={area === item.id ? 'page' : undefined} onClick={() => openArea(item.id)}>
               <item.icon size={18} />{item.label}
@@ -57,7 +72,9 @@ export function Workspace() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-foot">Everything that is yours,<span>in one place.</span></div>
+          <div className="sidebar-foot">{THREAD}</div>
+          {!signedOut && <button type="button" className={`text-button sidebar-roadmap ${area === 'ideas' ? 'selected' : ''}`}
+            aria-current={area === 'ideas' ? 'page' : undefined} onClick={() => openArea('ideas')}>Roadmap: what is built, what is next</button>}
         </div>
       </aside>
       <div className="main-shell">
@@ -73,8 +90,10 @@ export function Workspace() {
           <span className="sr-only" role="status" aria-live="polite">{announcement}</span>
           <AreaErrorBoundary key={area} area={area} goToday={() => openArea('overview')}><MyHome area={area} go={openArea} /></AreaErrorBoundary>
         </main>
-        <nav className="mobile-nav" aria-label="Account navigation">
-          {AREAS.map((item) => (
+        <nav className="mobile-nav" aria-label={signedOut ? 'Without an account' : 'Account navigation'}>
+          {signedOut ? PUBLIC_LINKS.map((item) => (
+            <Link key={item.href} href={item.href}><item.icon size={19} /><span>{item.label}</span></Link>
+          )) : PRIMARY.map((item) => (
             <button key={item.id} aria-current={area === item.id ? 'page' : undefined} onClick={() => openArea(item.id)}>
               <item.icon size={19} /><span>{item.label}</span>
             </button>

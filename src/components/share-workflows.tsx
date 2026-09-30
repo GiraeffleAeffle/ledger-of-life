@@ -6,6 +6,7 @@ import { useRentalWallet } from '@/wallets';
 import { SHARE_NAVIGATION_INTENT, type Area } from './areas';
 import { useSectionTabActive } from './section-tabs';
 import { settleShareAction } from './share-action';
+import { TestDollars } from './test-dollars';
 import './share-workflows.css';
 
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
@@ -40,6 +41,8 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
   const acting = useRef(false);
   const [view, setView] = useState<View | null>(null);
   const [tab, setTab] = useState('borrow');
+  const [operation, setOperation] = useState('deposit_collateral');
+  const [ethBalance, setEthBalance] = useState<string | undefined>();
   const [quantity, setQuantity] = useState('1');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -74,6 +77,10 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
       const { workflow } = await request<{ workflow: View }>('/api/share-workflows');
       if (current !== revision.current) return;
       setView(workflow); setReadError(''); setReview(null);
+      // The assets route wraps each reading as { ok, value } so a failed chain read stays distinguishable from zero.
+      void request<{ robinhood: { ok: boolean; value?: { ethBalance?: string } } | null }>('/api/assets?area=holdings')
+        .then(({ robinhood }) => { if (current === revision.current) setEthBalance(robinhood?.ok ? robinhood.value?.ethBalance : undefined); })
+        .catch(() => { if (current === revision.current) setEthBalance(undefined); });
     } catch (cause) {
       if (current === revision.current) { setReadError(cause instanceof Error ? cause.message : 'Market unavailable'); setReview(null); }
     }
@@ -87,7 +94,7 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
     return () => { clearInterval(timer); window.removeEventListener('ledger-balances-changed', read); document.removeEventListener('visibilitychange', read); };
   }, [refresh, activeTab, account]);
   useEffect(() => {
-    const consume = () => { const intent = sessionStorage.getItem(SHARE_NAVIGATION_INTENT); if (intent) { setTab(intent); sessionStorage.removeItem(SHARE_NAVIGATION_INTENT); } };
+    const consume = () => { const intent = sessionStorage.getItem(SHARE_NAVIGATION_INTENT); if (intent) { const choice = intent === 'lend' ? 'lend' : 'borrow'; setTab(choice); setOperation(choice === 'lend' ? 'lend' : 'deposit_collateral'); setReview(null); sessionStorage.removeItem(SHARE_NAVIGATION_INTENT); } };
     consume(); window.addEventListener(SHARE_NAVIGATION_INTENT, consume);
     return () => window.removeEventListener(SHARE_NAVIGATION_INTENT, consume);
   }, []);
@@ -125,6 +132,28 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
     const usesCollateral = ['deposit_collateral', 'withdraw_collateral', 'borrow', 'liquidate'].includes(operation);
     return busy || !ready || (usesCollateral && Boolean(view?.suspended)) || (needsPrice && !fresh) || (operation === 'liquidate' && (loansLoading || Boolean(loansError) || Boolean(loanPage?.suspended)));
   }
+  function blockedReason(selected: string) {
+    if (!actionBlocked(selected)) return '';
+    if (busy) return 'Waiting for the current wallet action and network confirmation.';
+    if (readError) return 'Market balances could not be checked. Refresh before reviewing an action.';
+    if (!ready) return 'A deployed market and confirmed wallet read are required.';
+    if (['deposit_collateral', 'withdraw_collateral', 'borrow', 'liquidate'].includes(selected) && view?.suspended) return 'Collateral operations are suspended by the issuer restrictions shown above.';
+    if (selected === 'liquidate' && (loansLoading || loansError || loanPage?.suspended)) return 'Wait for a successful, unsuspended liquidation assessment.';
+    return 'A fresh mirrored TSLA price is required for this action.';
+  }
+  const collateralAction = operation === 'deposit_collateral' || operation === 'withdraw_collateral';
+  const amountUnit = collateralAction ? 'TSLA' : 'tUSDG';
+  let amountAtomic: bigint | null = null;
+  const humanAmount = quantity.trim();
+  if (/^\d+(?:\.\d+)?$/.test(humanAmount) && (humanAmount.split('.')[1]?.length ?? 0) <= (collateralAction ? 18 : 6)) {
+    amountAtomic = parseUnits(humanAmount, collateralAction ? 18 : 6);
+  }
+  const cashNeeded = operation === 'repay' && view?.loan && amountAtomic !== null
+    ? amountAtomic < BigInt(view.loan.debtAtomic) ? amountAtomic : BigInt(view.loan.debtAtomic)
+    : amountAtomic;
+  const needsDollars = Boolean(ready && view?.testUsdAtomic !== null && cashNeeded !== null && ['lend', 'repay'].includes(operation) && cashNeeded > BigInt(view?.testUsdAtomic ?? '0'));
+  const needsShares = Boolean(ready && view?.sharesRaw !== null && amountAtomic !== null && operation === 'deposit_collateral' && amountAtomic > BigInt(view?.sharesRaw ?? '0'));
+  const operations = tab === 'lend' ? [['lend', 'Lend'], ['unlend', 'Withdraw lent dollars']] : [['deposit_collateral', '1. Add collateral'], ['borrow', '2. Borrow'], ['repay', 'Repay'], ['withdraw_collateral', 'Withdraw collateral']];
   function action(label: string, operation: string, needsPrice = false, borrower?: string) {
     return <button type="button" className="button secondary" disabled={actionBlocked(operation, needsPrice)} onClick={() => {
       setError(''); setReview(null);
@@ -145,9 +174,7 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
     }}>{label}</button>;
   }
   return <section className="card share-workflows" id="share-workflows">
-    <h2>Shared test TSLA loan market</h2>
-    {!view && <p>Official test TSLA · test dollars anyone can mint. tUSDG has no monetary value; these are not income or euro balances.</p>}
-    <p><a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Get 5 test TSLA and test ETH from Robinhood’s faucet</a></p>
+    <header className="share-market-head"><h2>Borrow against test TSLA, or lend test dollars.</h2><p>Robinhood Chain testnet; no real money.</p></header>
     {readError && <p role="alert">{readError}</p>}
     {!view && !readError && <p role="status">Reading shared market…</p>}
     {view && <>
@@ -155,12 +182,30 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
       {!view.deployment && <p role="status">Shared market is not deployed. No mirrored TSLA valuation or loan actions are available.</p>}
       {view.suspended && <p role="alert">Market operations suspended: {view.suspensionReasons.join('; ') || 'External issuer restrictions'}. Collateral is not currently usable for market operations.</p>}
       {view.deployment && !view.price && <p role="status">No mainnet round copied yet.</p>}
-      {view.price && <p>Robinhood TSLA token price from <a href={`https://robinhoodchain.blockscout.com/address/${view.price.sourceFeed}`} target="_blank" rel="noopener noreferrer">Chainlink RHTSLA/USD (mainnet)</a>, converted to the test token’s multiplier · source chain {view.price.sourceChainId} · round {view.price.sourceRoundId} at {time(view.price.sourceUpdatedAt)} · copied at {time(view.price.pushedAt)} · {age(view.price.ageSeconds)} old{view.price.weekendFreshnessWindow ? ' · weekend freshness window (74 h)' : ''}{view.price.stale ? ' · stale — valuation unavailable' : ''}. Mirror, not a Chainlink contract.</p>}
-      <p>Wallet: {view.sharesRaw === null ? 'unavailable' : shares(view.sharesRaw)} official test TSLA · {dollars(view.testUsdAtomic)}. {fresh ? `Mirrored token price: ${dollars(view.priceAtomic)}; wallet TSLA value: ${dollars(view.walletValueAtomic)}.` : 'Fresh mirrored token price unavailable.'}</p>
-      <nav aria-label="Share market panels">{([['borrow', 'Loan'], ['lend', 'Lend test dollars'], ['deposit', 'Rental deposit']] as const).map(([id, label]) => <button key={id} type="button" className={tab === id ? 'button' : 'button secondary'} aria-pressed={tab === id} onClick={() => setTab(id)}>{label}</button>)}</nav>
-      <label>Amount ({tab === 'borrow' ? 'TSLA for collateral actions; tUSDG for borrow/repay' : 'tUSDG'}) <input value={quantity} onChange={(event) => { setQuantity(event.target.value); setReview(null); }} inputMode="decimal" /></label>
-      {tab === 'deposit' ? <p>A rental deposit needs a real landlord and is not available on the hosted demo. Share-backed rental deposits are not offered here.</p> : tab === 'lend' ? <div><h3>Lend test dollars</h3><p>Net supplied: {dollars(view.lender?.netContributedAtomic ?? '0')} · current value: {dollars(view.lender?.valueAtomic ?? '0')} · earned (value minus net contributed, may be negative): {dollars(view.lender?.earnedAtomic ?? '0')} · cash withdrawable now: {dollars(view.lender?.maxWithdrawAtomic ?? '0')}</p>{action('Lend', 'lend')}{action('Withdraw lent dollars', 'unlend')}<p>Borrower interest increases lender share value. Cash becomes available when borrowers repay; losses and bad debt reduce lender value.</p></div> : <div><h3>Your loan</h3><p>Collateral: {shares(view.loan?.sharesRaw ?? '0')} TSLA · debt: {dollars(view.loan?.debtAtomic ?? '0')} · collateral value: {fresh ? dollars(view.loan?.valueAtomic ?? '0') : 'unavailable'} · LTV: {fresh ? `${(view.loan?.ltvBps ?? 0) / 100}%` : 'unavailable'} · available borrowing: {fresh ? dollars(view.loan?.availableAtomic ?? '0') : 'unavailable'}</p>{action('Add collateral', 'deposit_collateral')}{action('Withdraw collateral', 'withdraw_collateral', BigInt(view.loan?.debtAtomic ?? '0') > 0n)}{action('Borrow', 'borrow', true)}{action('Repay', 'repay')}<p>Borrowing is limited to 50% LTV and 90% pool utilization. Liquidation starts at 80% LTV. Repayment and adding collateral remain possible with a stale price. Interest accrues every second: to close the loan, enter a little more than the debt; Repay takes only what you owe.</p></div>}
-      {view.pool && <div><h3>Pool facts</h3><p>Cash: {dollars(view.pool.cashAtomic)} · total assets: {dollars(view.pool.totalAssetsAtomic)} · borrowed: {dollars(view.pool.borrowedAtomic)} · utilization: {view.pool.utilizationBps / 100}% · current borrower rate: {view.pool.borrowAprBps / 100}% a year, compounded continuously (≈{view.pool.effectiveBorrowApyBps / 100}% a year) · current lender rate: {view.pool.supplyAprBps / 100}% APR (not a projection).</p><p>10,000 tUSDG seeded at deploy to a burn address. Nobody can withdraw those seed shares; their interest stays locked in the pool.</p></div>}
+      <div className="share-market-overview" aria-label="Wallet, loan and lender status">
+        <p>Wallet: {view.sharesRaw === null ? 'unavailable' : shares(view.sharesRaw)} official test TSLA · {dollars(view.testUsdAtomic)} · {ethBalance === undefined ? 'fee balance unavailable' : `${ethBalance} test ETH for fees`}. {fresh ? `Mirrored token price: ${dollars(view.priceAtomic)}; wallet TSLA value: ${dollars(view.walletValueAtomic)}.` : 'Fresh mirrored token price unavailable.'}</p>
+        <p>Your loan · collateral: {view.loan ? shares(view.loan.sharesRaw) : 'unavailable'} TSLA · debt: {dollars(view.loan?.debtAtomic ?? null)} · collateral value: {fresh ? dollars(view.loan?.valueAtomic ?? null) : 'unavailable'} · LTV: {fresh && view.loan ? `${view.loan.ltvBps / 100}%` : 'unavailable'} · available borrowing: {fresh ? dollars(view.loan?.availableAtomic ?? null) : 'unavailable'}</p>
+        <p>Your lending · net supplied: {dollars(view.lender?.netContributedAtomic ?? null)} · current value: {dollars(view.lender?.valueAtomic ?? null)} · earned (value minus net contributed, may be negative): {dollars(view.lender?.earnedAtomic ?? null)} · cash withdrawable now: {dollars(view.lender?.maxWithdrawAtomic ?? null)}</p>
+        {view.price && <p>Price copied {age(view.price.ageSeconds)} ago{view.price.weekendFreshnessWindow ? ' · weekend freshness window (74 h)' : ''}{view.price.stale ? ' · stale — valuation unavailable' : ''}.</p>}
+      </div>
+      <nav className="share-market-choices" aria-label="Choose a test-money task">{([['borrow', 'Loan against shares'], ['lend', 'Lend test dollars']] as const).map(([id, label]) => <button key={id} type="button" className={tab === id ? 'button' : 'button secondary'} aria-pressed={tab === id} onClick={() => { setTab(id); setOperation(id === 'lend' ? 'lend' : 'deposit_collateral'); setReview(null); setError(''); }}>{label}</button>)}</nav>
+      <section className="share-market-task" aria-label={tab === 'lend' ? 'Lending task' : 'Borrowing task'}>
+        <h3>{tab === 'lend' ? 'Lend test dollars — no TSLA needed' : 'Add collateral, then review a loan'}</h3>
+        {tab === 'lend' ? <p>Borrower interest increases lender share value. Cash becomes available when borrowers repay; losses and bad debt reduce lender value.</p> : <p>Borrowing is limited to 50% LTV and 90% pool utilization. Liquidation starts at 80% LTV. Repayment and adding collateral remain possible with a stale price. Interest accrues every second: to close the loan, enter a little more than the debt; Repay takes only what you owe.</p>}
+        {tab === 'borrow' && <p className="share-market-risk">Liquidation can take your test TSLA collateral. Robinhood can pause, block, burn or upgrade its token; these issuer powers can affect collateral.</p>}
+        <nav className="share-market-operations" aria-label="Select an operation">{operations.map(([id, label]) => <button key={id} type="button" className={operation === id ? 'button' : 'button secondary'} aria-pressed={operation === id} onClick={() => { setOperation(id); setReview(null); setError(''); }}>{label}</button>)}</nav>
+        <label className="share-market-amount">Amount in {amountUnit}<input value={quantity} onChange={(event) => { setQuantity(event.target.value); setReview(null); }} inputMode="decimal" /></label>
+        {needsShares && <p role="status">This collateral amount needs more official test TSLA. Get test TSLA from the <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet</a> (no value).</p>}
+        {ready && (needsDollars || ethBalance !== undefined && Number(ethBalance) === 0) && <div className="share-market-funding"><p>For this {tab === 'lend' ? 'lending' : 'loan'} action: {needsDollars ? 'test dollars (tUSDG), plus test ETH for fees.' : 'test ETH for fees.'} These tokens cannot fund a Solana deposit.</p><TestDollars request={request} ethBalance={ethBalance} refresh={refresh} needDollars={needsDollars} /></div>}
+        {action(`Review ${operations.find(([id]) => id === operation)?.[1].replace(/^\d\. /, '').toLowerCase() ?? operation}`, operation, operation === 'borrow' || operation === 'withdraw_collateral' && BigInt(view.loan?.debtAtomic ?? '0') > 0n)}
+        {blockedReason(operation) && <p role="status">{blockedReason(operation)}</p>}
+      </section>
+      <details className="share-market-detail"><summary>Price source &amp; pool facts</summary>
+        {view.price && <p>Robinhood TSLA token price from <a href={`https://robinhoodchain.blockscout.com/address/${view.price.sourceFeed}`} target="_blank" rel="noopener noreferrer">Chainlink RHTSLA/USD (mainnet)</a>, converted to the test token’s multiplier · source chain {view.price.sourceChainId} · round {view.price.sourceRoundId} at {time(view.price.sourceUpdatedAt)} · copied at {time(view.price.pushedAt)}. Mirror, not a Chainlink contract.</p>}
+        {view.pool && <div><h3>Pool facts</h3><p>Cash: {dollars(view.pool.cashAtomic)} · total assets: {dollars(view.pool.totalAssetsAtomic)} · borrowed: {dollars(view.pool.borrowedAtomic)} · utilization: {view.pool.utilizationBps / 100}% · current borrower rate: {view.pool.borrowAprBps / 100}% a year, compounded continuously (≈{view.pool.effectiveBorrowApyBps / 100}% a year) · current lender rate: {view.pool.supplyAprBps / 100}% APR (not a projection).</p><p>10,000 tUSDG seeded at deploy to a burn address. Nobody can withdraw those seed shares; their interest stays locked in the pool.</p></div>}
+      </details>
+      <details className="share-market-detail"><summary>Advanced · loans that can be liquidated</summary>
+      <label className="share-market-amount">Liquidation repayment amount in tUSDG<input value={quantity} onChange={(event) => { setQuantity(event.target.value); setReview(null); }} inputMode="decimal" /></label>
       <h3>Loans that can be liquidated</h3>
       {!fresh && <p>Fresh price required to assess or liquidate loans.</p>}
       {!loanPage && <button type="button" className="button secondary" disabled={loansLoading || !ready || !fresh} onClick={() => void loadLoans()}>Show loans that can be liquidated</button>}
@@ -174,8 +219,9 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
         {loanPage.nextCursor !== null && <button type="button" className="button secondary" disabled={loansLoading || !ready || !fresh} onClick={() => void loadLoans()}>Load next 20 borrowers</button>}
       </>}
       <p>Anyone liquidates with their own test dollars and wallet signature. No operator can stage a price fall. Robinhood can pause, block, burn or upgrade its token; these issuer powers can affect collateral.</p>
+      </details>
     </>}
-    {review && <div role="region" aria-label="Review market action"><p>Review {review.operation}: {review.humanAmount} {review.unit}{review.borrower ? ` for ${review.borrower}` : ''}. You sign exact-amount approvals and the market transaction with your own wallet.</p><button type="button" disabled={actionBlocked(review.operation)} onClick={() => void execute()}>Confirm and sign</button><button type="button" onClick={() => setReview(null)}>Cancel</button></div>}
+    {review && <div className="share-market-review" role="region" aria-label="Review market action"><p>Review {review.operation}: {review.humanAmount} {review.unit}{review.borrower ? ` for ${review.borrower}` : ''}. You sign exact-amount approvals and the market transaction with your own wallet.</p><button type="button" className="button primary" disabled={actionBlocked(review.operation)} onClick={() => void execute()}>Confirm and sign</button><button type="button" className="button secondary" onClick={() => setReview(null)}>Cancel</button>{blockedReason(review.operation) && <p role="status">{blockedReason(review.operation)}</p>}</div>}
     {busy && <p role="status">{stepDescription || 'Waiting for wallet and transaction confirmation…'}</p>}{message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
     <LocalEarningsRehearsal key={account} request={request} account={account} />
   </section>;
@@ -221,11 +267,11 @@ function LocalEarningsRehearsal({ request, account }: { request: Request; accoun
   const starting = status.earnings?.status === 'starting';
   const earnings = status.earnings?.status === 'ready' ? status.earnings : null;
   const operations = !earnings ? ['setup'] : earnings.state === 0 ? ['accept'] : earnings.state === 1 ? ['mint', 'fund'] : !earnings.supplied ? ['supply'] : ['claim'];
-  return <div aria-label="Local earnings rehearsal"><h3>Localhost rental earnings rehearsal</h3><p>The operator acts as the test landlord only. You self-mint test dollars, sign funding and supply to the shared pool. Earnings are actual borrower interest, not operator credits; there may be none yet.</p>
+  return <details className="share-market-detail" aria-label="Local earnings rehearsal"><summary>Rental earnings rehearsal · needs a local setup</summary><h3>Rental earnings rehearsal in a local setup</h3><p>Not connected to a Home tenancy. The operator acts as the test landlord only. You self-mint test dollars, sign funding and supply to the shared pool. Earnings are actual borrower interest, not operator credits, and belong to the tenant; there may be none yet. Test dollars have no monetary value.</p>
     {starting && <p role="status">Rehearsal setup is incomplete. Resume setup to continue the saved steps.</p>}
     {earnings && <p>Escrow <code>{earnings.escrow}</code> · pool <code>{earnings.vault}</code> · state {earnings.state} · protected principal {dollars(earnings.securityAtomic)} · claimable {dollars(earnings.releasableAtomic)} · released {dollars(earnings.releasedAtomic)}. Claims require pool cash.</p>}
     {operations.map((operation) => <button type="button" key={operation} disabled={busy || (operation === 'claim' && BigInt(earnings?.releasableAtomic ?? '0') === 0n)} onClick={() => setReview(operation)}>{operation === 'setup' && starting ? 'Resume setup' : operation}</button>)}
     {review && <div><p>Review local rehearsal step: {review}. This uses test dollars with no monetary value.</p><button type="button" disabled={busy} onClick={() => void execute(review)}>Confirm {review}</button><button type="button" onClick={() => setReview(null)}>Cancel</button></div>}
     {busy && <p role="status">Waiting for rehearsal transaction…</p>}{error && <p role="alert">{error}</p>}
-  </div>;
+  </details>;
 }

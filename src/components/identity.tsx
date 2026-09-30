@@ -53,7 +53,7 @@ export function IdentityStrip({ request, status, loading, readError, onStatusCha
     <div id="identity-eudi" tabIndex={-1} className={`identity-strip${verified ? ' verified' : ''}`}>
       {verified ? <BadgeCheck size={20} /> : <Fingerprint size={18} />}
       <div className="identity-copy">
-        <strong>{verified ? `Verified adult${verified.city ? ` · city ${verified.city}` : ''} · EU Digital Identity Wallet` : 'Signed in with passkey'}</strong>
+        <strong>Optional EU test-wallet proof{verified ? ` · 18 or over${verified.city ? ` · city ${verified.city}` : ''}` : ''}</strong>
         <span>
           {verified
             ? `Test credential, checked ${new Date(verified.verifiedAt).toLocaleDateString()}. Kept: "18 or over"${verified.city ? ' and your city' : ''}. Not kept: name, birth date, street address.`
@@ -69,7 +69,7 @@ export function IdentityStrip({ request, status, loading, readError, onStatusCha
       {verified
         ? <button className="text-button" onClick={forget} disabled={busy || loading}>Forget</button>
         : <button className="secondary-button" onClick={start} disabled={busy || !!offer || loading || Boolean(readError)}>
-            {busy || loading ? <Loader2 className="spin" size={15} /> : <ShieldCheck size={15} />} Verify with EU wallet
+            {busy || loading ? <Loader2 className="spin" size={15} /> : <ShieldCheck size={15} />} Check EU test-wallet proof
           </button>}
       {offer && (
         <div className="identity-offer">

@@ -36,10 +36,10 @@ export function LedgerAdapters({ inputs, go }: { inputs: LedgerStateInputs; go: 
     consume();
     return () => window.removeEventListener(ADAPTER_NAVIGATION_INTENT, consume);
   }, []);
-  return <section className="card ledger-adapters" id="ledger-adapters" tabIndex={-1} aria-label="Ledger topics and adapters">
-    <div className="ledger-section-heading"><div><span className="eyebrow">ONE LEDGER · MANY SOURCES</span><h2>Your adapters</h2></div><span className="ledger-catalogue-count">{LEDGER_ADAPTERS.length} sources</span></div>
-    <p className="ledger-intro">An adapter is one way something enters your ledger. Each says what it brings, what it reads, who can see it, what you need and how to disconnect. Planned ones say they do nothing yet.</p>
-    <div className="ledger-topic-tabs" role="group" aria-label="Ledger adapter topics">
+  return <section className="card ledger-adapters" id="ledger-adapters" tabIndex={-1} aria-label="Ledger connections">
+    <div className="ledger-section-heading"><div><span className="eyebrow">ONE LEDGER · MANY SOURCES</span><h2>Your connections</h2></div><span className="ledger-catalogue-count">{LEDGER_ADAPTERS.length} sources</span></div>
+    <p className="ledger-intro">Connections use adapters to read or act on a source. Select one to see its purpose, status and data permissions. Planned sources do nothing yet; they are not unfinished account setup.</p>
+    <div className="ledger-topic-tabs" role="group" aria-label="Ledger connection topics">
       {LEDGER_TOPICS.map((topic) => { const Icon = TOPIC_ICONS[topic.id]; return <button type="button" key={topic.id} aria-pressed={selected.topic === topic.id} onClick={() => setSelectedId(LEDGER_ADAPTERS.find((adapter) => adapter.topic === topic.id)!.id)}><Icon size={18} />{topic.name}</button>; })}
     </div>
     <div className="ledger-adapter-browser">

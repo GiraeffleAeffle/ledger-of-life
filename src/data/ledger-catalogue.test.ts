@@ -47,9 +47,24 @@ test('only a roadmap adapter claims to be unavailable, and a live one never clai
   }
 });
 
-test('a getting-started step is a working adapter with a unique position', () => {
-  const steps = LEDGER_ADAPTERS.filter((adapter) => adapter.setup);
-  const orders = steps.map((adapter) => adapter.setup?.order);
-  assert.equal(new Set(orders).size, orders.length, 'setup order must be unique');
-  for (const adapter of steps) assert.notEqual(adapter.connection, 'future', `${adapter.id} is not built, so it cannot be a step`);
+test('deposit availability does not send a person into a different hosted money product', () => {
+  const deposit = IDEAS.find((idea) => idea.id === 'rental-deposit')!;
+  assert.equal(deposit.availability, 'Available on this site');
+  assert.equal(deposit.destination?.area, 'home');
+  const prototype = IDEAS.find((idea) => idea.id === 'stock-deposit')!;
+  assert.equal(prototype.availability, 'Contract prototype');
+  assert.equal(prototype.destination?.area, 'ideas', 'the only destination is its illustration, not a Money operation');
+  const rehearsal = IDEAS.find((idea) => idea.id === 'rental-earnings')!;
+  assert.equal(rehearsal.availability, 'Needs a local setup');
+  assert.equal(rehearsal.destination, undefined, 'local rehearsal must not open a hosted operation');
+  const loan = IDEAS.find((idea) => idea.id === 'borrow-against-shares')!;
+  assert.equal(loan.availability, 'Available on this site');
+  assert.equal(loan.status, 'prototype', 'testnet availability does not promote build maturity');
+});
+
+test('planned capabilities are information, not unfinished setup destinations', () => {
+  for (const idea of IDEAS.filter((item) => item.availability === 'Planned')) {
+    assert.equal(idea.status, 'planned');
+    assert.equal(idea.destination, undefined, `${idea.id} must not offer an operating destination`);
+  }
 });

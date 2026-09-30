@@ -7,6 +7,8 @@ export function areaFromSearch(search: string): Area {
 }
 export function withArea(url: string, area: Area) {
   const next = new URL(url);
+  // A tab belongs to the area that showed it; carried into another area it would reopen a stale view later.
+  if (areaFromSearch(next.search) !== area) next.searchParams.delete('tab');
   if (area === 'overview') next.searchParams.delete('area');
   else next.searchParams.set('area', area);
   return next.pathname + next.search + next.hash;

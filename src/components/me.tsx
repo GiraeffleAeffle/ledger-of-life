@@ -83,12 +83,12 @@ export function MeArea({ request, tenancies, listings, homeState, go }: {
 
   return (
     <div className="area-stack">
+      <section className="card account-settings" id="account-settings" tabIndex={-1}>
+        <h2>Account, wallets &amp; recovery</h2>
+        <AccountSettings request={request} />
+      </section>
       <IdentityStrip request={request} status={connections.identity} loading={connections.identityLoading}
         readError={connections.identityError} onStatusChange={connections.updateIdentity} onRefresh={connections.refreshIdentity} />
-      <details className="card account-settings">
-        <summary id="account-settings">Passkeys, wallets &amp; recovery</summary>
-        <AccountSettings request={request} />
-      </details>
       <LedgerAdapters inputs={inputs} go={go} />
       <AdapterSettings request={request} connection={connections.adapters} />
 
@@ -107,7 +107,7 @@ export function MeArea({ request, tenancies, listings, homeState, go }: {
 
       <section className="card" id="life-timeline" tabIndex={-1}>
         <h2><History size={18} /> Life timeline</h2>
-        <p className="small-copy">Private to your account. Sharing a derived tenancy history is planned; addresses are not shared here.</p>
+        <p className="small-copy">Private to your account. Tenancy records are recorded by this app; earlier places are your own statements. Choosing a city does not record a move or prove residence.</p>
         <ol className="life-timeline">
           {city?.cityId && (
             <li><strong>Now · {city.name}</strong><span>{city.source === 'identity' ? 'City from your EU wallet' : 'City you chose'}</span></li>
@@ -139,7 +139,6 @@ export function MeArea({ request, tenancies, listings, homeState, go }: {
               <button className="button primary" type="submit" disabled={savingPlace}>{savingPlace ? 'Adding…' : 'Add place'}</button>
               <button className="text-button" type="button" onClick={() => { setAddingPlace(false); setPlaceForm(emptyPlace); setPlaceError(''); }}>Cancel</button>
             </div>
-            <span className="small-copy">Later, an EU wallet residence attestation could prove a place you lived.</span>
           </form>
         )}
       </section>
@@ -153,9 +152,9 @@ function AccountSettings({ request }: { request: Request }) {
   const { recovery, view } = useRecoveryFlow(request as AuthorizedRequest, required === true);
   return <div className="area-stack">
     <WalletAccessPanel recoveryProof={recovery.identity?.recoveryProof ?? undefined} />
-    {required && <section className="card operation-section">
-      <h3>Same-wallet recovery check</h3>
+    {required && <details className="card operation-section">
+      <summary>Same-wallet recovery check · before your first tenancy wallet action</summary>
       <RecoveryStepView {...view} />
-    </section>}
+    </details>}
   </div>;
 }

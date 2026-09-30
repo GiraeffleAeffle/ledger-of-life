@@ -1,26 +1,20 @@
 .ledger-overview { display: grid; gap: 16px; min-width: 0; }
-.ledger-root { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
-.ledger-root h2 { margin: 0; font-size: 1.15rem; letter-spacing: -.025em; }
-.ledger-root > .text-button { display: inline-flex; align-items: center; gap: 7px; font-size: .8rem; }
 .ledger-topic-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.ledger-topic-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 9px; padding: 19px; min-width: 0; background: #fffef9; border: 1px solid var(--line); border-top: 3px solid #829c76; border-radius: 15px; }
+.ledger-topic-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px; min-width: 0; background: #fffef9; border: 1px solid var(--line); border-top: 3px solid #829c76; border-radius: 13px; }
 .ledger-topic-card header { display: flex; gap: 9px; align-items: center; color: #355a44; }
 .ledger-topic-card h3 { margin: 0; font-size: .98rem; letter-spacing: -.02em; }
 .ledger-topic-card > strong { font-size: 1.13rem; line-height: 1.3; letter-spacing: -.025em; }
 .ledger-topic-card > span { font-size: .84rem; color: #526959; line-height: 1.5; }
 .ledger-topic-card > small { font-size: .75rem; color: #647866; line-height: 1.5; }
-.ledger-topic-card > .text-button, .ledger-topic-card > .ledger-follow-entry { margin-top: auto; }
-.ledger-money { grid-column: 3; grid-row: 1 / span 2; background: #edf2e8; border-top-color: #28583e; }
-.ledger-money .today-money { width: 100%; gap: 12px; }
+.ledger-topic-card > .text-button { margin-top: auto; }
+.ledger-money { background: #edf2e8; border-top-color: #28583e; }
+.ledger-money .today-money { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 9px; }
 .ledger-money .overview-figure { font-size: clamp(1.7rem, 2.5vw, 2.3rem); letter-spacing: -.055em; }
 .ledger-money .overview-figure span { display: block; font-size: .74rem; font-weight: 500; letter-spacing: normal; margin-top: 5px; }
 .ledger-money .today-money > span { font-size: .76rem; line-height: 1.5; }
 .ledger-money .today-money details { font-size: .8rem; }
 .ledger-money .today-money > button { margin-top: auto; }
 .ledger-places { border-top-color: #a58550; }
-.ledger-follow-entry { display: inline-flex; align-items: center; gap: 7px; padding: 9px 12px; font-size: .8rem; }
-.ledger-overview-key { display: flex; flex-wrap: wrap; gap: 7px 20px; color: #657665; font-size: .73rem; }
-.ledger-overview-key span::before { content: ''; display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: #77946b; vertical-align: middle; }
 .ledger-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .ledger-section-heading h2 { margin: 5px 0 0; }
 .ledger-catalogue-count { color: #637461; font-size: .81rem; }
@@ -74,14 +68,9 @@
 .today-stack .today-news-list { margin-top: 12px; }
 .today-stack .today-news-list strong { font-size: .87rem; }
 @media (max-width: 1050px) {
-  .ledger-topic-cards { grid-template-columns: repeat(2, minmax(0,1fr)); }
-  .ledger-money { grid-column: 1 / -1; grid-row: 2; }
-  .ledger-money .today-money { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 10px 20px; }
-  .ledger-money .today-money .overview-figure { grid-row: 1 / span 2; }
+  .ledger-topic-cards { grid-template-columns: minmax(0,1fr); }
 }
 @media (max-width: 680px) {
-  .ledger-root { gap: 7px; }
-  .ledger-root > .text-button { flex-basis: 100%; justify-content: flex-start; }
   .ledger-topic-cards { gap: 8px; }
   .ledger-topic-card { padding: 13px; gap: 7px; border-radius: 11px; }
   .ledger-topic-card header { gap: 6px; align-items: flex-start; }
@@ -93,8 +82,6 @@
   .ledger-topic-card > .text-button { font-size: .74rem; text-align: left; }
   .ledger-money .today-money { display: flex; flex-direction: column; align-items: flex-start; }
   .ledger-money .overview-figure { font-size: 1.75rem; }
-  .ledger-follow-entry { font-size: .73rem; flex-wrap: wrap; line-height: 1.4; padding: 8px; }
-  .ledger-overview-key { font-size: .68rem; gap: 5px 12px; }
   .ledger-adapter-browser { grid-template-columns: minmax(0,1fr); }
   .ledger-topic-tabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
   .ledger-topic-tabs button { font-size: .75rem; padding: 9px; }
@@ -105,8 +92,3 @@
   #adapter-settings .inline-form { grid-template-columns: minmax(0,1fr); }
   .today-stack .today-news { padding: 17px; }
 }
-.ledger-money-paths { margin-top: auto; width: 100%; border-top: 1px solid #d1ddc8; padding-top: 13px; display: grid; gap: 8px; }
-.ledger-money-paths > span { font-size: .73rem; color: #647762; }
-.ledger-money-paths > div { display: grid; gap: 5px; }
-.ledger-money-paths > div button { border: 0; border-radius: 7px; background: #dde9d3; color: #28583e; font: inherit; font-size: .8rem; padding: 9px 11px; text-align: left; cursor: pointer; }
-.ledger-money-paths > .text-button { font-size: .75rem; justify-self: start; }

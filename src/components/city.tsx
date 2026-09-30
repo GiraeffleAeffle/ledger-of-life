@@ -11,7 +11,7 @@ import { CITY_CHANGED_EVENT } from './use-city-signals';
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 
 /** A person's covered city is distinct from a temporary map exploration. */
-export function CityCard({ request, onCityChange, fallbackSectionIds }: { request: Request; onCityChange?: () => void; fallbackSectionIds?: readonly string[] }) {
+export function CityCard({ request, onCityChange, onPreviewCity, previewCity, fallbackSectionIds }: { request: Request; onCityChange?: () => void; onPreviewCity?: (id: string) => void; previewCity?: string; fallbackSectionIds?: readonly string[] }) {
   const [city, setCity] = useState<CityResult | null>(null);
   const [cities, setCities] = useState<CityCoverage['cities']>([]);
   const [snapshot, setSnapshot] = useState('');
@@ -48,6 +48,9 @@ export function CityCard({ request, onCityChange, fallbackSectionIds }: { reques
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Your city could not be saved. Try again.'); }
     finally { setBusy(false); }
   }
+  const draftId = draft === 'another' ? cityIdFor(other) : draft;
+  const draftName = draftId ? coveredNames[draftId] : '';
+  const guideCity = previewCity || city?.cityId;
   const picker = <form className="city-picker" onSubmit={choose}>
     <label>City <select value={draft} onChange={(event) => setDraft(event.target.value)}>
       <option value="">Select a place…</option>
@@ -55,17 +58,25 @@ export function CityCard({ request, onCityChange, fallbackSectionIds }: { reques
       <option value="another">Another place · not covered yet</option>
     </select></label>
     {draft === 'another' && <label>Place name · not covered unless it matches one of the eight cities <input value={other} onChange={(event) => setOther(event.target.value)} placeholder="Enter your place" />{cityIdFor(other) && <span className="small-copy">We cover this spelling as {coveredNames[cityIdFor(other)!]}.</span>}</label>}
-    <button className="secondary-button" disabled={busy || !cities.length}>{busy ? <Loader2 className="spin" size={14} /> : null} Make this my city</button>
-    {cities.length > 0 && <p className="small-copy">Eight covered cities · published snapshot {formatCityDate(snapshot)}. Coverage is incomplete; a feed does not guarantee news or events.</p>}
+    <div className="city-picker-actions">
+      {onPreviewCity && <button type="button" className="secondary-button" disabled={busy || !draftId || !draftName} onClick={() => { if (draftId) onPreviewCity(draftId); }}>Preview {draftName || 'a city'} — don’t save</button>}
+      <button className="button primary" disabled={busy || !cities.length || !(draft === 'another' ? other.trim() : draft)}>{busy ? <Loader2 className="spin" size={14} /> : null} Make this my city</button>
+    </div>
+    {cities.length > 0 && <p className="small-copy">{cities.length} covered cities · published coverage {formatCityDate(snapshot)}. Refreshed only when the collector runs; coverage is incomplete.</p>}
   </form>;
   return <section className="card city-card" id="city-choice" tabIndex={-1}>
     {fallbackSectionIds?.map((id) => <span key={id} id={id} className="city-section-anchor" tabIndex={-1} aria-label="Choose your city" />)}
     <header><Building2 size={18} /> <strong>{city?.name ? `Your city · ${city.name}` : 'Choose your city'}</strong>
       {city?.name && <span className="city-source">{city.source === 'identity' ? 'From your EU wallet' : 'Chosen by you'}</span>}
     </header>
+    <p>Choose a city for published news, events, projects and ways to take part. Preview without saving, or keep it as your city. Neither choice is proof of residence.</p>
     {city?.name && <p className="small-copy" role="status">{city.cityId ? `Your city is ${city.name}. Published map and city feed are available below${!city.available && city.reason === 'atlas_unavailable' ? '; the separate project atlas is unavailable right now' : ''}.` : `${city.name} is not covered yet. You can choose a covered city instead.`}</p>}
-    {city?.cityId && arrivalGuideCityIds.includes(city.cityId) && arrivalGuideFor(city.cityId) && <p><Link href={`/welcome/${encodeURIComponent(city.cityId)}`}>New here? Welcome guide</Link></p>}
     {picker}
+    <div className="city-settled"><h3>Get settled</h3>
+      {guideCity && arrivalGuideCityIds.includes(guideCity) && arrivalGuideFor(guideCity)
+        ? <Link href={`/welcome/${encodeURIComponent(guideCity)}`}>Read the {coveredNames[guideCity]} welcome guide — no account needed</Link>
+        : <p className="small-copy">{guideCity || city?.name ? 'No welcome guide for this city yet.' : 'Choose or preview a city to see whether a welcome guide is available.'}</p>}
+    </div>
     {error && <p role="alert">{error} <button type="button" className="text-button" onClick={() => setRevision((value) => value + 1)}>Retry</button></p>}
   </section>;
 }
