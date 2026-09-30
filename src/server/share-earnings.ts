@@ -1,20 +1,17 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import {
-  createPublicClient, createWalletClient, defineChain, encodeFunctionData, encodePacked, getAddress, http,
-  keccak256, nonceManager, parseAbi, parseTransaction, recoverTransactionAddress, type Address, type Hex,
-} from 'viem';
+import { createWalletClient, decodeFunctionData, encodeDeployData, encodeFunctionData, encodePacked, getAddress, http, keccak256, nonceManager, parseAbi, parseTransaction, recoverTransactionAddress, TransactionReceiptNotFoundError, type Address, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import type { Store } from './store.ts';
-import { ROBINHOOD_TESTNET } from './robinhood-demo.ts';
 import { operatorTestCapability } from './test-capability.ts';
-import { readShareWorkflows, startShareMarket } from './share-workflows.ts';
+import { loadSharedMarketManifest, verifySharedMarket, sharedMarketRpc as rpc } from './shared-market.ts';
+import { executeFundingStep, type SignedFundingStep } from './local-investment-provisioning.ts';
+import { acquireOperatorNonceLane, releaseOperatorNonceLaneIfOwned } from './operator-nonce-lane.ts';
+import { reviewedOperatorFees, reviewedOperatorGas } from './ownership-gas.ts';
 
-const chain = defineChain({ id: 46630, name: 'Robinhood Chain Testnet', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://rpc.testnet.chain.robinhood.com'] } }, testnet: true });
-const rpc = createPublicClient({ chain, transport: http() });
-const erc20 = parseAbi(['function balanceOf(address) view returns (uint256)', 'function allowance(address,address) view returns (uint256)', 'function approve(address,uint256) returns (bool)', 'function mint(address,uint256)']);
-const vault = parseAbi(['function previewDeposit(uint256) view returns (uint256)', 'function accrue(uint256)']);
-const escrowAbi = parseAbi([
+const tokenAbi = parseAbi(['function allowance(address,address) view returns (uint256)', 'function approve(address,uint256) returns (bool)', 'function mint(address,uint256)']);
+const vaultAbi = parseAbi(['function previewDeposit(uint256) view returns (uint256)']);
+export const EARNINGS_ESCROW_ABI = parseAbi([
   'function state() view returns (uint8)', 'function nonce() view returns (uint256)', 'function trackedShares() view returns (uint256)',
   'function releasedEarnings() view returns (uint256)', 'function releasableEarnings() view returns (uint256)',
   'function acceptAgreement(uint256,uint256)', 'function fund(uint256,uint256)',
@@ -22,194 +19,203 @@ const escrowAbi = parseAbi([
 ]);
 const SECURITY = 1_500_000_000n;
 const RESERVE = 1_000_000n;
-const DEMO_PURCHASE_FAUCET = 3_540_000_000n;
-const YIELD = 60_500_000n;
-const MAX_YIELDS_PER_DAY = 3;
-const MAX = 2n ** 256n - 1n;
-type EarningsRecord = { status: 'ready'; escrow: Address; vault?: Address; securityAtomic?: string; previousEscrow?: Address; purchaseFaucetDone?: boolean; yieldDay?: string; yieldCount?: number; yieldDone?: boolean; yieldPending?: boolean; transactionHashes: Hex[] };
-type Starting = { status: 'starting' };
-const recordKey = (wallet: Address) => `share-earnings:${wallet.toLowerCase()}`;
-const today = () => new Date().toISOString().slice(0, 10);
-const yieldsToday = (entry: EarningsRecord) => entry.yieldDay === today() ? (entry.yieldCount ?? 0) : entry.yieldDone ? 1 : 0;
+const DEPOSIT = SECURITY + RESERVE;
+const key = (owner: Address) => `shared-pool-earnings:${owner.toLowerCase()}`;
+type Call = { chainId: 46630; to: Address; data: Hex; value: '0x0'; nonce: number; gas: Hex; maxFeePerGas: Hex; maxPriorityFeePerGas: Hex };
+type PreparedEarnings = { calls: Call[]; expiresAt: number; pendingHash?: Hex; pendingAt?: number; pendingNonce?: number };
+type ReadyEarnings = { status: 'ready'; escrow: Address; vault: Address; usd: Address; transactionHashes: Hex[] };
+type EarningsSetup = { status: 'starting'; vault: Address; usd: Address; landlord: Address; arbitrator: Address; deploy: SignedFundingStep; accept: SignedFundingStep; escrow?: Address };
+type EarningsRecord = ReadyEarnings | EarningsSetup;
+type PrepareClient = Pick<typeof rpc, 'readContract' | 'getBalance' | 'getTransactionReceipt' | 'request' | 'getTransactionCount' | 'estimateFeesPerGas'>;
+const PENDING_UNKNOWN_AGE_MS = 120_000;
 
-async function record(store: Store, owner: Address): Promise<EarningsRecord | null> {
-  const value = await store.get<EarningsRecord | Starting>(recordKey(owner));
-  if (value?.status === 'starting') throw new Error('Your earnings deposit is being prepared; wait for testnet confirmation.');
-  return value;
+/** Deployment configuration, never a request Host header, controls this local-only capability. */
+export function shareEarningsEnabled(environment: Record<string, string | undefined> = process.env) {
+  return environment.NODE_ENV !== 'production' && operatorTestCapability(environment);
 }
-async function actors() {
-  if (!operatorTestCapability()) throw new Error('Test earnings controls are disabled.');
-  const dir = resolve(/* turbopackIgnore: true */ process.env.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet');
-  const accounts = await Promise.all(['operator', 'landlord', 'arbitrator'].map(async (role) =>
-    privateKeyToAccount((await readFile(/* turbopackIgnore: true */ resolve(/* turbopackIgnore: true */ dir, `${role}.key`), 'utf8')).trim() as Hex, { nonceManager })));
-  return { operator: accounts[0], landlord: accounts[1], arbitrator: accounts[2] };
-}
-async function receipt(hash: Hex) {
-  const confirmed = await rpc.waitForTransactionReceipt({ hash });
-  if (confirmed.status !== 'success') throw new Error(`Robinhood testnet earnings transaction failed: ${hash}`);
-  return confirmed;
+function assertEnabled() {
+  if (!shareEarningsEnabled()) throw new Error('The earnings rehearsal is available only in local test mode.');
 }
 
-/** Fresh agreement: landlord operator accepts first; every tenant operation then requires their own wallet signature. */
+/** The operator is the disclosed test landlord; it never funds the tenant or manufactures yield. */
 export async function startShareEarnings(store: Store, wallet: string) {
+  assertEnabled();
   const owner = getAddress(wallet);
-  const prior = await record(store, owner);
-  if (prior?.vault) return prior;
-  const people = await actors();
-  if (prior) {
-    const released = await rpc.readContract({ address: prior.escrow, abi: escrowAbi, functionName: 'releasedEarnings' });
-    if (!released) throw new Error('Finish your earlier test earnings claim before preparing the new demo position.');
-    await store.create(`share-earnings:archive:${owner.toLowerCase()}:${prior.escrow.toLowerCase()}`, prior);
-    await store.update<EarningsRecord | Starting>(recordKey(owner), () => ({ status: 'starting' }));
-  } else await store.create(recordKey(owner), { status: 'starting' } satisfies Starting);
-  const op = createWalletClient({ chain, account: people.operator, transport: http() });
-  const landlord = createWalletClient({ chain, account: people.landlord, transport: http() });
-  const artifact = JSON.parse(await readFile(resolve('contracts/evm/out/RentalEscrow.sol/RentalEscrow.json'), 'utf8')) as { abi: unknown[]; bytecode: { object: Hex } };
-  const yieldVault = JSON.parse(await readFile(resolve('contracts/evm/out/TestnetMarket.sol/TestYieldVault.json'), 'utf8')) as { abi: unknown[]; bytecode: { object: Hex } };
-  const vaultHash = await op.deployContract({ abi: yieldVault.abi, bytecode: yieldVault.bytecode.object, args: [ROBINHOOD_TESTNET.usd] });
-  const vaultAddress = (await receipt(vaultHash)).contractAddress;
-  if (!vaultAddress) throw new Error('The dedicated test yield vault was not deployed.');
-  const hashes: Hex[] = [vaultHash];
-  const deployed = await op.deployContract({ abi: artifact.abi, bytecode: artifact.bytecode.object, args: [{
-    asset: ROBINHOOD_TESTNET.usd, vault: vaultAddress, tenant: owner,
-    landlord: people.landlord.address, arbitrator: people.arbitrator.address, personalWallet: owner,
-    securityRequirement: SECURITY, fundingReserve: RESERVE, earningsReleaseAllowed: true,
-    agreementHash: keccak256(encodePacked(['string', 'address'], ['Ledger of Life · signed test earnings tenancy', owner])),
-  }] });
-  const escrow = (await receipt(deployed)).contractAddress;
-  if (!escrow) throw new Error('Test earnings agreement was not deployed.');
-  hashes.push(deployed);
-  const mint = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'mint', args: [owner, SECURITY + RESERVE] });
-  await receipt(mint); hashes.push(mint);
-  if ((await rpc.getBalance({ address: owner })) < 100_000_000_000_000n) {
-    const gas = await op.sendTransaction({ to: owner, value: 300_000_000_000_000n });
-    await receipt(gas); hashes.push(gas);
+  const previous = await store.get<EarningsRecord>(key(owner));
+  if (previous?.status === 'ready') {
+    const journal = await store.get<EarningsSetup>(`${key(owner)}:setup`);
+    if (journal) await releaseOperatorNonceLaneIfOwned(store, journal.landlord, key(owner));
+    return previous;
   }
-  const accept = await landlord.writeContract({ address: escrow, abi: escrowAbi, functionName: 'acceptAgreement', args: [0n, MAX] });
-  await receipt(accept); hashes.push(accept);
-  const value: EarningsRecord = { status: 'ready', escrow, vault: vaultAddress, securityAtomic: SECURITY.toString(), previousEscrow: prior?.escrow,
-    yieldDay: today(), yieldCount: 0, purchaseFaucetDone: false, transactionHashes: hashes };
-  await store.update<EarningsRecord | Starting>(recordKey(owner), () => value);
-  return value;
+  const market = await loadSharedMarketManifest();
+  if (!market) throw new Error('The shared market has not been deployed.');
+  const dir = resolve(/* turbopackIgnore: true */ process.env.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet');
+  const load = async (role: string) => privateKeyToAccount((await readFile(/* turbopackIgnore: true */ resolve(/* turbopackIgnore: true */ dir, `${role}.key`), 'utf8')).trim() as Hex, { nonceManager });
+  const [landlord, arbitrator] = await Promise.all([load('operator'), load('arbitrator')]);
+  if (owner === landlord.address || owner === arbitrator.address) throw new Error('The tenant must use their own wallet, separate from the test parties.');
+  const artifact = JSON.parse(await readFile(/* turbopackIgnore: true */ resolve(/* turbopackIgnore: true */ 'contracts/evm/out/RentalEscrow.sol/RentalEscrow.json'), 'utf8')) as { abi: unknown[]; bytecode: { object: Hex } };
+  await verifySharedMarket(market);
+  const journal: EarningsSetup = previous ?? { status: 'starting', vault: market.pool, usd: market.usd, landlord: landlord.address, arbitrator: arbitrator.address, deploy: {}, accept: {} };
+  if (journal.vault.toLowerCase() !== market.pool.toLowerCase() || journal.usd.toLowerCase() !== market.usd.toLowerCase() ||
+      journal.landlord !== landlord.address || journal.arbitrator !== arbitrator.address)
+    throw new Error('The earnings setup configuration changed; reconcile the original journal first.');
+  const signer = createWalletClient({ chain: rpc.chain, account: landlord, transport: http() });
+  const sign = async (data: Hex, to?: Address) => {
+    const nonce = await rpc.getTransactionCount({ address: landlord.address, blockTag: 'pending' });
+    const [gas, fees] = await Promise.all([rpc.estimateGas({ account: landlord, data, to, value: 0n }), rpc.estimateFeesPerGas()]);
+    return signer.signTransaction({ type: 'eip1559', chainId: 46630, nonce, data, to, value: 0n,
+      gas: reviewedOperatorGas(gas, to ? 'transfer' : 'deploy'), ...reviewedOperatorFees(fees) });
+  };
+  await acquireOperatorNonceLane(store, landlord.address, key(owner));
+  if (!previous) await store.create<EarningsRecord>(key(owner), journal);
+  const persist = async () => { await store.update<EarningsRecord>(key(owner), () => journal); };
+  try {
+    const deployed = await executeFundingStep(journal.deploy, () => sign(encodeDeployData({ abi: artifact.abi, bytecode: artifact.bytecode.object, args: [{
+      asset: journal.usd, vault: journal.vault, tenant: owner, landlord: journal.landlord, arbitrator: journal.arbitrator,
+      personalWallet: owner, securityRequirement: SECURITY, fundingReserve: RESERVE, earningsReleaseAllowed: true,
+      agreementHash: keccak256(encodePacked(['string', 'address', 'address'], ['Local shared-pool earnings rehearsal', owner, journal.vault])),
+    }] })), persist, rpc);
+    journal.escrow = (await rpc.getTransactionReceipt({ hash: deployed })).contractAddress ?? undefined;
+    if (!journal.escrow) throw new Error('The earnings agreement was not deployed.');
+    await persist();
+    const accept = await executeFundingStep(journal.accept, () => sign(encodeFunctionData({
+      abi: EARNINGS_ESCROW_ABI, functionName: 'acceptAgreement', args: [0n, BigInt(Math.floor(Date.now() / 1000) + 3600)],
+    }), journal.escrow), persist, rpc);
+    const value: ReadyEarnings = { status: 'ready', escrow: journal.escrow, vault: journal.vault, usd: journal.usd, transactionHashes: [deployed, accept] };
+    const journalKey = `${key(owner)}:setup`;
+    if (await store.get(journalKey)) await store.update(journalKey, () => journal);
+    else await store.create(journalKey, journal);
+    await store.update<EarningsRecord>(key(owner), () => value);
+    await releaseOperatorNonceLaneIfOwned(store, landlord.address, key(owner));
+    return value;
+  } catch (error) {
+    // Unsigned failures consumed no nonce; signed/ambiguous steps retain the lane for exact replay.
+    if (!journal.deploy.signed && !journal.accept.signed) await releaseOperatorNonceLaneIfOwned(store, landlord.address, key(owner));
+    throw error;
+  }
 }
 
 export async function readShareEarnings(store: Store, wallet: string, readClient: Pick<typeof rpc, 'readContract'> = rpc) {
-  const owner = getAddress(wallet);
-  const item = await record(store, owner);
+  assertEnabled();
+  const item = await store.get<EarningsRecord>(key(getAddress(wallet)));
   if (!item) return null;
+  if (item.status === 'starting') return { status: 'starting' as const, vault: item.vault, usd: item.usd, escrow: item.escrow };
   const [state, nonce, tracked, releasable, released] = await Promise.all([
-    readClient.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'state' }),
-    readClient.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'nonce' }),
-    readClient.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'trackedShares' }),
-    readClient.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'releasableEarnings' }),
-    readClient.readContract({ address: item.escrow, abi: escrowAbi, functionName: 'releasedEarnings' }),
+    readClient.readContract({ address: item.escrow, abi: EARNINGS_ESCROW_ABI, functionName: 'state' }),
+    readClient.readContract({ address: item.escrow, abi: EARNINGS_ESCROW_ABI, functionName: 'nonce' }),
+    readClient.readContract({ address: item.escrow, abi: EARNINGS_ESCROW_ABI, functionName: 'trackedShares' }),
+    readClient.readContract({ address: item.escrow, abi: EARNINGS_ESCROW_ABI, functionName: 'releasableEarnings' }),
+    readClient.readContract({ address: item.escrow, abi: EARNINGS_ESCROW_ABI, functionName: 'releasedEarnings' }),
   ]);
-  const count = yieldsToday(item);
-  return { escrow: item.escrow, state: Number(state), nonce: nonce.toString(), supplied: tracked > 0n,
-    yieldsToday: count, yieldAvailable: count < MAX_YIELDS_PER_DAY && !item.yieldPending && releasable < 10_000n, purchaseFaucetDone: Boolean(item.purchaseFaucetDone),
-    previousEscrow: item.previousEscrow ?? null,
-    releasableAtomic: releasable.toString(), releasedAtomic: released.toString(), securityAtomic: item.securityAtomic ?? '10000000' };
+  return { status: 'ready' as const, escrow: item.escrow, vault: item.vault, state: Number(state), nonce: nonce.toString(), supplied: tracked > 0n,
+    releasableAtomic: releasable.toString(), releasedAtomic: released.toString(), securityAtomic: SECURITY.toString(), fundingAtomic: DEPOSIT.toString() };
 }
 
-/** An earnings read must never hide independent wallet, pledge and loan positions. */
-export async function readShareOverview(
-  store: Store, wallet: string,
-  workflowClient?: Parameters<typeof readShareWorkflows>[2],
-  earningsClient?: Parameters<typeof readShareEarnings>[2],
-) {
-  const [workflow, earnings] = await Promise.all([
-    readShareWorkflows(store, wallet, workflowClient),
-    readShareEarnings(store, wallet, earningsClient)
-      .then((value) => ({ value, error: null }))
-      .catch((error: unknown) => ({ value: null, error: error instanceof Error ? error.message : 'Earnings temporarily unavailable.' })),
-  ]);
-  return { ...workflow, earnings: earnings.value, earningsError: earnings.error };
-}
-
-/** Only the signed-in tenant's own wallet can sign these prepared on-chain calls. */
-export async function prepareShareEarnings(store: Store, wallet: string, action: string) {
+export async function prepareShareEarnings(store: Store, wallet: string, operation: string, client: PrepareClient = rpc, now = Date.now) {
+  assertEnabled();
   const owner = getAddress(wallet);
-  const entry = await record(store, owner);
-  if (!entry) throw new Error('Open your test earnings deposit first.');
-  const escrow = entry.escrow;
-  const status = await readShareEarnings(store, owner);
-  const nonce = BigInt(status!.nonce);
+  const bindingKey = `${key(owner)}:prepared`;
+  const previous = await store.get<PreparedEarnings>(bindingKey);
+  if (previous?.pendingHash) {
+    try { await client.getTransactionReceipt({ hash: previous.pendingHash }); }
+    catch (error) {
+      if (!(error instanceof TransactionReceiptNotFoundError)) throw error;
+      const [known, latestNonce] = await Promise.all([
+        client.request({ method: 'eth_getTransactionByHash', params: [previous.pendingHash] }),
+        client.getTransactionCount({ address: owner, blockTag: 'latest' }),
+      ]);
+      const consumed = previous.pendingNonce !== undefined && latestNonce > previous.pendingNonce;
+      const dropped = known === null && previous.pendingAt !== undefined && now() - previous.pendingAt >= PENDING_UNKNOWN_AGE_MS;
+      if (!consumed && !dropped) throw new Error(`Your earnings transaction is pending: ${previous.pendingHash}`);
+    }
+    await store.update<PreparedEarnings>(bindingKey, (value) => {
+      if (value.pendingHash !== previous.pendingHash) throw new Error('The pending earnings transaction changed.');
+      return { ...value, pendingHash: undefined, pendingAt: undefined, pendingNonce: undefined };
+    });
+  }
+  const entry = await store.get<EarningsRecord>(key(owner));
+  if (!entry) throw new Error('Set up the local earnings agreement first.');
+  if (entry.status === 'starting') throw new Error('The local earnings agreement is still being prepared. Resume setup first.');
+  if (await client.getBalance({ address: owner }) <= 0n)
+    throw new Error('No test ETH for network fees. Get test ETH from the Robinhood faucet first.');
+  const status = (await readShareEarnings(store, owner, client))!;
+  if (status.status !== 'ready') throw new Error('The local earnings agreement is still being prepared. Resume setup first.');
+  const nonce = BigInt(status.nonce);
+  const deadline = BigInt(Math.floor(now() / 1000) + 3600);
   const calls: { to: Address; data: Hex; description: string }[] = [];
-  if (action === 'accept' && status!.state === 0) calls.push({ to: escrow, data: encodeFunctionData({ abi: escrowAbi, functionName: 'acceptAgreement', args: [nonce, MAX] }), description: 'Accept your test earnings agreement' });
-  else if (action === 'fund' && status!.state === 1) {
-    const amount = BigInt(status!.securityAtomic) + (entry.vault ? RESERVE : 10_000n);
-    const allowance = await rpc.readContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'allowance', args: [owner, escrow] });
-    if (allowance < amount) calls.push({ to: ROBINHOOD_TESTNET.usd, data: encodeFunctionData({ abi: erc20, functionName: 'approve', args: [escrow, amount] }), description: 'Approve only your test deposit amount' });
-    calls.push({ to: escrow, data: encodeFunctionData({ abi: escrowAbi, functionName: 'fund', args: [nonce, MAX] }), description: 'Fund your own test earnings deposit' });
-  } else if (action === 'supply' && status!.state === 2 && !status!.supplied) {
-    const amount = BigInt(status!.securityAtomic) + (entry.vault ? RESERVE : 10_000n);
-    const minShares = await rpc.readContract({ address: entry.vault ?? ROBINHOOD_TESTNET.vault, abi: vault, functionName: 'previewDeposit', args: [amount] });
-    calls.push({ to: escrow, data: encodeFunctionData({ abi: escrowAbi, functionName: 'supply', args: [amount, minShares, nonce, MAX] }), description: 'Place your test deposit into the test yield vault' });
-  } else if (action === 'claim' && status!.state === 2 && status!.supplied) {
-    const upperBound = BigInt(status!.releasableAtomic);
-    const amount = upperBound > 1_000n ? upperBound - 1_000n : upperBound * 99n / 100n;
-    if (amount === 0n) throw new Error('Simulate test earnings before claiming.');
-    calls.push({ to: escrow, data: encodeFunctionData({ abi: escrowAbi, functionName: 'releaseEarnings', args: [amount, MAX, nonce, MAX] }), description: 'Claim simulated earnings to your own wallet' });
-  } else throw new Error('This earnings step is not ready yet.');
-  const fees = await rpc.estimateFeesPerGas();
-  let transactionNonce = await rpc.getTransactionCount({ address: owner, blockTag: 'pending' });
-  return calls.map((call) => ({ description: call.description, transaction: {
+  if (operation === 'mint') calls.push({ to: entry.usd, data: encodeFunctionData({ abi: tokenAbi, functionName: 'mint', args: [owner, DEPOSIT] }), description: 'Mint your own 1,501 test dollars (no monetary value)' });
+  else if (operation === 'accept' && status.state === 0) calls.push({ to: entry.escrow, data: encodeFunctionData({ abi: EARNINGS_ESCROW_ABI, functionName: 'acceptAgreement', args: [nonce, deadline] }), description: 'Accept the local test-landlord agreement' });
+  else if (operation === 'fund' && status.state === 1) {
+    const allowance = await client.readContract({ address: entry.usd, abi: tokenAbi, functionName: 'allowance', args: [owner, entry.escrow] });
+    if (allowance < DEPOSIT) calls.push({ to: entry.usd, data: encodeFunctionData({ abi: tokenAbi, functionName: 'approve', args: [entry.escrow, DEPOSIT] }), description: 'Approve only your test deposit' });
+    calls.push({ to: entry.escrow, data: encodeFunctionData({ abi: EARNINGS_ESCROW_ABI, functionName: 'fund', args: [nonce, deadline] }), description: 'Fund your RentalEscrow' });
+  } else if (operation === 'supply' && status.state === 2 && !status.supplied) {
+    const quoted = await client.readContract({ address: entry.vault, abi: vaultAbi, functionName: 'previewDeposit', args: [DEPOSIT] });
+    // Borrower interest advances between preparation and mining; allow one basis point.
+    const minimum = quoted * 9_999n / 10_000n;
+    calls.push({ to: entry.escrow, data: encodeFunctionData({ abi: EARNINGS_ESCROW_ABI, functionName: 'supply', args: [DEPOSIT, minimum, nonce, deadline] }), description: 'Supply the deposit to the shared lending pool' });
+  } else if (operation === 'claim' && status.state === 2 && status.supplied) {
+    const amount = BigInt(status.releasableAtomic);
+    if (amount <= 0n) throw new Error('No borrower interest is releasable yet. Interest is real, small, and withdrawals require pool cash.');
+    calls.push({ to: entry.escrow, data: encodeFunctionData({ abi: EARNINGS_ESCROW_ABI, functionName: 'releaseEarnings', args: [amount, 2n ** 256n - 1n, nonce, deadline] }), description: 'Claim actual borrower interest to your wallet' });
+  } else throw new Error('This earnings step is not ready.');
+  const fees = await client.estimateFeesPerGas();
+  let transactionNonce = await client.getTransactionCount({ address: owner, blockTag: 'pending' });
+  const steps = calls.map((call) => ({ description: call.description, transaction: {
     chainId: 46630 as const, to: call.to, data: call.data, value: '0x0' as const, nonce: transactionNonce++, gas: '0x927c0' as Hex,
     maxFeePerGas: `0x${(fees.maxFeePerGas! * 2n).toString(16)}` as Hex,
     maxPriorityFeePerGas: `0x${(fees.maxPriorityFeePerGas ?? 0n).toString(16)}` as Hex,
   } }));
+  const binding: PreparedEarnings = { calls: steps.map(({ transaction }) => transaction), expiresAt: Number(deadline) };
+  if (await store.get(bindingKey)) await store.update<PreparedEarnings>(bindingKey, (value) => {
+    if (value.pendingHash) throw new Error('Your earnings transaction is still pending.');
+    return binding;
+  });
+  else await store.create(bindingKey, binding);
+  return steps;
 }
 
-export async function submitShareEarnings(store: Store, wallet: string, signed: string) {
+export function assertPreparedEarningsCall(transaction: { chainId?: number; to?: Address | null; data?: Hex; value?: bigint; nonce?: number; gas?: bigint; maxFeePerGas?: bigint; maxPriorityFeePerGas?: bigint; accessList?: readonly unknown[] }, calls: Call[]) {
+  if (transaction.chainId !== 46630 || (transaction.value ?? 0n) !== 0n || !transaction.to || (transaction.accessList?.length ?? 0) !== 0 ||
+    !calls.some((call) => call.to.toLowerCase() === transaction.to!.toLowerCase() && call.data === transaction.data && call.nonce === (transaction.nonce ?? 0) &&
+      transaction.gas === BigInt(call.gas) && transaction.maxFeePerGas === BigInt(call.maxFeePerGas) && (transaction.maxPriorityFeePerGas ?? 0n) === BigInt(call.maxPriorityFeePerGas)))
+    throw new Error('Only the exact prepared earnings call can be submitted.');
+  decodeFunctionData({ abi: [...tokenAbi, ...EARNINGS_ESCROW_ABI], data: transaction.data! });
+}
+
+export async function submitShareEarnings(store: Store, wallet: string, signed: string, client: Pick<typeof rpc, 'sendRawTransaction' | 'waitForTransactionReceipt' | 'request'> = rpc, now = Date.now) {
+  assertEnabled();
   const owner = getAddress(wallet);
-  const item = await record(store, owner);
-  if (!item || !/^0x02[0-9a-fA-F]+$/.test(signed) || signed.length > 20_000) throw new Error('Invalid signed test earnings transaction.');
+  const bindingKey = `${key(owner)}:prepared`;
+  const binding = await store.get<PreparedEarnings>(bindingKey);
+  if (!binding || binding.expiresAt < now() / 1000 || !/^0x02[0-9a-fA-F]+$/.test(signed) || signed.length > 20_000)
+    throw new Error('Prepare your earnings transaction first.');
+  if (binding.pendingHash) throw new Error(`Your earnings transaction is pending: ${binding.pendingHash}`);
   const serialized = signed as `0x02${string}`;
   const transaction = parseTransaction(serialized);
-  if (transaction.chainId !== 46630 || (await recoverTransactionAddress({ serializedTransaction: serialized })).toLowerCase() !== owner.toLowerCase() || !transaction.to ||
-    ![item.escrow.toLowerCase(), ROBINHOOD_TESTNET.usd.toLowerCase()].includes(transaction.to.toLowerCase()))
-    throw new Error('Only your signed test earnings transaction can be submitted.');
-  const hash = await rpc.sendRawTransaction({ serializedTransaction: serialized });
-  await receipt(hash);
-  return { hash };
-}
-
-/** The operator contributes real test USD to the test vault; the tenant signs the later claim. */
-export async function addSimulatedShareYield(store: Store, wallet: string) {
-  const owner = getAddress(wallet);
-  const entry = await record(store, owner);
-  if (!entry) throw new Error('Open your test earnings deposit first.');
-  const status = await readShareEarnings(store, owner);
-  if (!status?.supplied || !status.yieldAvailable) throw new Error('Claim the current simulated yield first, or wait until tomorrow after three test runs.');
-  const people = await actors();
-  await store.update<EarningsRecord>(recordKey(owner), (state) => {
-    if (state.yieldPending || yieldsToday(state) >= MAX_YIELDS_PER_DAY) throw new Error('A test yield is pending, or all three daily runs are used.');
-    return { ...state, yieldDay: today(), yieldCount: yieldsToday(state) + 1, yieldPending: true };
+  if ((await recoverTransactionAddress({ serializedTransaction: serialized })).toLowerCase() !== owner.toLowerCase()) throw new Error('Sign with your own tenant wallet.');
+  assertPreparedEarningsCall(transaction, binding.calls);
+  const hash = keccak256(serialized);
+  await store.update<PreparedEarnings>(bindingKey, (value) => {
+    if (value.pendingHash || value.expiresAt < now() / 1000) throw new Error('The prepared earnings request is no longer available.');
+    assertPreparedEarningsCall(transaction, value.calls);
+    return { ...value, calls: value.calls.filter((call) => call.nonce !== (transaction.nonce ?? 0)), pendingHash: hash, pendingAt: now(), pendingNonce: transaction.nonce ?? 0 };
   });
-  const op = createWalletClient({ chain, account: people.operator, transport: http() });
-  const hashes: Hex[] = [];
-  const amount = entry.vault ? YIELD : 500_000n;
-  const targetVault = entry.vault ?? ROBINHOOD_TESTNET.vault;
-  const mint = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'mint', args: [people.operator.address, amount] });
-  await receipt(mint); hashes.push(mint);
-  const approve = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'approve', args: [targetVault, amount] });
-  await receipt(approve); hashes.push(approve);
-  const accrue = await op.writeContract({ address: targetVault, abi: vault, functionName: 'accrue', args: [amount] });
-  await receipt(accrue); hashes.push(accrue);
-  await store.update<EarningsRecord>(recordKey(owner), (state) => ({ ...state, yieldPending: false, yieldDone: true, transactionHashes: [...state.transactionHashes, ...hashes] }));
-  return { hashes };
-}
-
-/** One explicit test-mode setup: genuine signed earn/buy actions remain wallet-controlled. */
-export async function prepareDemoPosition(store: Store, wallet: string) {
-  const owner = getAddress(wallet);
-  const market = await startShareMarket(store, owner);
-  const earnings = await startShareEarnings(store, owner);
-  if (earnings.purchaseFaucetDone) return { escrow: earnings.escrow, vault: earnings.vault, stock: market.stock, faucet: null };
-  const people = await actors();
-  const op = createWalletClient({ chain, account: people.operator, transport: http() });
-  const faucet = await op.writeContract({ address: ROBINHOOD_TESTNET.usd, abi: erc20, functionName: 'mint', args: [owner, DEMO_PURCHASE_FAUCET] });
-  await receipt(faucet);
-  await store.update<EarningsRecord>(recordKey(owner), (state) => ({ ...state, purchaseFaucetDone: true, transactionHashes: [...state.transactionHashes, faucet] }));
-  return { escrow: earnings.escrow, vault: earnings.vault, stock: market.stock, faucet };
+  try { await client.sendRawTransaction({ serializedTransaction: serialized }); }
+  catch (error) {
+    // Only a successful null lookup proves this node refused the bytes.
+    // A known hash or failed lookup must retain the pending reservation.
+    const known = await client.request({ method: 'eth_getTransactionByHash', params: [hash] }).catch(() => undefined);
+    if (known === null) await store.update<PreparedEarnings>(bindingKey, (value) => value.pendingHash === hash
+      ? { ...binding, pendingHash: undefined, pendingAt: undefined, pendingNonce: undefined }
+      : value);
+    throw error;
+  }
+  const confirmed = await client.waitForTransactionReceipt({ hash });
+  await store.update<PreparedEarnings>(bindingKey, (value) => {
+    if (value.pendingHash !== hash) throw new Error('The pending earnings transaction changed.');
+    return { ...value, pendingHash: undefined, pendingAt: undefined, pendingNonce: undefined };
+  });
+  if (confirmed.status !== 'success') throw new Error(`Earnings transaction failed: ${hash}`);
+  return { hash };
 }

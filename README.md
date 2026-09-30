@@ -55,26 +55,34 @@ before broadcast; repeating a command verifies the same transactions rather than
 Normal viewing/signing/receipt reads do not need the operator key. Use the CLI `proof --wallet
 ADDRESS --tx HASH` for an independent read-only purchase check.
 
-For the complete borrowed-funds route, use a fresh real account with an empty share position.
-**Prepare example shares** creates only a new isolated market, two fake `tTSLA` shares and
-bounded fee gas—never test cash in the buyer's wallet. Review the editable loan amount,
-then buy the two stakes from that borrowed same-chain cash. Debt and locked collateral
-remain visible. Existing positions and legacy markets are preserved; interrupted preparation
-and operator controls expose their saved recovery actions.
+The borrowed-funds route now uses **official test TSLA from
+[Robinhood's faucet](https://faucet.testnet.chain.robinhood.com/)** and one shared lending
+pool, not project-minted example stock. The same wallet signs collateral, borrowing,
+repayment, lending and withdrawal. Borrowed same-chain test dollars may buy the two
+fictional stakes; buying does not repay debt.
 
-The preparation API uses a dedicated provisioner, not the shared legacy operator nonce lane.
-Stop the local preview and other operator activity for explicit setup funding, then restart:
+The shared market requires a verified `shared-market-46630.json` deployment manifest.
+Without it the app reports **undeployed**; this documentation does not claim a deployed
+pool or completed shared-market rehearsal. Wallet and collateral valuation use a
+mainnet Chainlink RHTSLA/USD **mirror, not a Chainlink testnet contract**. Jupiter is
+only a cross-check. Source round/time, copied time, age and stale/closed-market status
+are visible; stale pricing freezes price-sensitive actions.
 
-```sh
-node --env-file-if-exists=.env.local --experimental-strip-types scripts/ownership-provisioner.mjs prepare
-node --env-file-if-exists=.env.local --experimental-strip-types scripts/ownership-provisioner.mjs fund --send
-node --env-file-if-exists=.env.local --experimental-strip-types scripts/ownership-provisioner.mjs check
-```
+Borrowers accrue interest continuously at 5% nominal annually (approximately 5.13%
+effective annually, using the contract's effective rate), shared with lenders pro rata
+without projections. Wallet reads do not scan the borrower registry; unhealthy loans
+are fetched separately in on-demand bounded pages. Immutable collateral issuer and
+implementation pins protect against silent upgrades. TSLA pause, pool block,
+implementation change or collateral shortfall suspends the market. Withdrawals depend on pool cash;
+bad debt can reduce lender value. The **10,000 tUSDG burn-address seed** and its locked
+interest share are disclosed. tUSDG is **test dollars anyone can mint**, not income or
+money. No operator price/yield controls, stock desk or staged liquidation remain.
+Localhost reads the same market and needs no updater key. See
+[Shared workflows](docs/SHARE_WORKFLOWS.md) for rules and risks.
 
-This grants **0.001 test ETH** once, with estimated rollup gas and an immutable signed journal.
-Repeated funding commands reconcile that grant; they do not top it up. Keep the key and
-journals for recovery. The CLI and preview must use the same database configuration;
-if the preview deliberately overrides `DATABASE_URL=`, use that override for its operator commands too.
+The [borrow-to-local-AI evidence](docs/evidence/BORROW_TO_LOCAL_AI_ROBINHOOD_TESTNET.json)
+is historical **fake-stock/operator-priced** evidence, not proof of this shared-market
+cutover. Old per-wallet contracts and store records are left unused, without migration.
 
 ## Local AI and the public library desk
 
@@ -187,4 +195,4 @@ For a local preview use `DATABASE_URL= WATCHPACK_POLLING=true npm run dev` on po
 
 This work grows out of the earlier **Smart Rental Deposit** Gnosis prototype. Pre-existing product research and tenancy rules informed this implementation. The new public interface started on September 21, 2026; the parallel native implementation and selected architecture records were added on September 22. The prior private checkout reference was `07573bd3fa66f1af6c99b2d264af39ee767154a3`, with additional uncommitted work. This is a review reference, not a complete competition baseline. The submission must disclose prior work and distinguish competition-period changes. See the [official hackathon rules](https://colosseum.com/legal/Crypto%20World%27s%20Fair%20Hackathon%20Rules.pdf).
 
-This repository does not contain the private backend, tenant data, environment files, keys or old Git history. No hackathon submission, financial-provider approval, bank transfer or real-money deployment has been performed. RealT, insurance pooling, production borrowing, guaranteed returns and automatic recurring investment are outside this version; the share-backed loan is a separate test-network workflow with simulated pricing. Public visibility is not a project-wide license decision; that remains to be chosen.
+This repository does not contain the private backend, tenant data, environment files, keys or old Git history. No hackathon submission, financial-provider approval, bank transfer or real-money deployment has been performed. RealT, insurance pooling, production borrowing, guaranteed returns and automatic recurring investment are outside this version. The shared test-network loan/lender design uses official faucet TSLA, mirrored mainnet token pricing and freely mintable test dollars; deployment and new live proof remain prerequisites, not implied by historical fake-stock evidence. Public visibility is not a project-wide license decision; that remains to be chosen.

@@ -533,7 +533,7 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
       )}
       {journey.role === 'tenant' && chain && <div className="tenancy-money-links">
         <button className="text-button" onClick={() => goToSection(go, 'money', 'rental-deposit-holding')}>See this Solana test deposit in Money →</button>
-        <button className="text-button" onClick={() => openShareWorkflow(go, 'deposit')}>Explore a separate share-backed deposit →</button>
+        <button className="text-button" onClick={() => openShareWorkflow(go, 'borrow')}>Explore the shared TSLA test loan market →</button>
       </div>}
       {chain && (
         <dl className="journey-facts">
@@ -875,29 +875,14 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
   );
 }
 
-function TestTools({ tenancies, listings, request, helper, busy, log }: {
+function TestTools({ tenancies, listings, helper, busy, log }: {
   tenancies: TenancyJourney[]; listings: PublicListing[];
   request: Request; helper: Helper; busy: boolean; log: string;
 }) {
-  const [earning, setEarning] = useState(false);
-  const [earnLog, setEarnLog] = useState('');
-  async function robinhoodEarn() {
-    setEarning(true);
-    setEarnLog('');
-    try {
-      const { result } = await request<{ result: { releasedAtomic: string } }>('/api/assets', { action: 'robinhood_earn' });
-      setEarnLog(`A Robinhood testnet deposit earned ${money(result.releasedAtomic)} of simulated yield (test tokens), released to your wallet.`);
-    } catch (cause) {
-      setEarnLog(cause instanceof Error ? cause.message : 'The test earnings could not be released.');
-    } finally {
-      setEarning(false);
-    }
-  }
   function runHelper(body: Record<string, unknown>) {
-    setEarnLog('');
     void helper(body);
   }
-  const disabled = busy || earning;
+  const disabled = busy;
   return (
     <details className="card test-tools">
       <summary>Test tools · sample parties on devnet</summary>
@@ -928,11 +913,7 @@ function TestTools({ tenancies, listings, request, helper, busy, log }: {
             : <button className="button test-helper" disabled={disabled} onClick={() => runHelper({ action: 'act', listingId: listing.id })}>Let the test landlord choose</button>}
         </div>
       ))}
-      <div className="test-tool-row">
-        <span>Money · Robinhood testnet</span>
-        <button className="button test-helper" disabled={disabled} onClick={robinhoodEarn}>Earn on Robinhood (test)</button>
-      </div>
-      {(log || earnLog) && <p className="test-helper-note" role="status">{(busy || earning) && <Loader2 className="spin" size={14} />} {earnLog || log}</p>}
+      {log && <p className="test-helper-note" role="status">{busy && <Loader2 className="spin" size={14} />} {log}</p>}
     </details>
   );
 }

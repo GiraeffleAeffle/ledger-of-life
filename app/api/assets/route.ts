@@ -1,11 +1,9 @@
-import { parseAmount } from '@/domain/assets';
 import { authenticated } from '@/server/authenticated';
 import { homeAssistantPullAllowed, readAdapterConfig, readSolar, readValidator, type AdapterConfig } from '@/server/adapters';
-import { earnOnRobinhood, prepareRobinhoodBuy, robinhoodHoldings, robinhoodEnabled, submitRobinhoodTransaction } from '@/server/robinhood-demo';
+import { robinhoodHoldings } from '@/server/robinhood-demo';
 import { ReferencePriceUnavailable } from '@/server/reference-price';
 import { getStore } from '@/server/store';
 import { errorResponse, readBody, sameOrigin } from '@/server/http';
-import { operatorTestCapability } from '@/server/test-capability';
 import { prepareTestDollars, submitTestDollars } from '@/server/test-dollars';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };
@@ -60,17 +58,6 @@ export async function POST(request: Request) {
       if (typeof body.signed !== 'string') throw new Error('Invalid signed test transaction.');
       return Response.json(await submitTestDollars(store, evm.address, body.signed), noStore);
     }
-    if (!operatorTestCapability()) throw new Error('The Robinhood testnet demo is disabled.');
-    if (body.action === 'robinhood_earn') {
-      if (!(await robinhoodEnabled())) throw new Error('The Robinhood testnet demo is disabled.');
-      return Response.json({ result: await earnOnRobinhood(store, evm.address) }, noStore);
-    }
-    if (body.action === 'robinhood_prepare_buy') {
-      if (typeof body.amount !== 'string') throw new Error('Enter an amount in test USD.');
-      const prepared = await prepareRobinhoodBuy(evm.address, BigInt(parseAmount(body.amount, 6)));
-      return Response.json({ walletId: evm.id, ...prepared }, noStore);
-    }
-    if (body.action === 'robinhood_submit' && typeof body.signed === 'string') return Response.json(await submitRobinhoodTransaction(body.signed), noStore);
     throw new Error('Unknown action.');
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : 'Please try again.' }, { status: 409 });

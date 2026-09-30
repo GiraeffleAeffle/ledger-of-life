@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "chainId": 46630,
+  "deployer": "0x4efe17E8D8C475971d639ED1CaeEd84F57Fe68dD",
+  "usd": "0xA6e10E426A738aEF586dB5191177658D67C78A14",
+  "stock": "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E",
+  "oracle": "0x5196C8713A529bd676B875fB9Cea3F8a47ba48Be",
+  "pool": "0xA9c03045FD317230ab811419D13Fd4D0652DE069",
+  "updater": "0xfCE8e9D751545354A96743f7D7e6d6f9c8873Ec3",
+  "source": {
+    "chainId": 4663,
+    "feed": "0x4A1166a659A55625345e9515b32adECea5547C38"
+  },
+  "parameters": {
+    "borrowAprBps": 500,
+    "borrowApyBps": 513,
+    "maxBorrowLtvBps": 5000,
+    "liquidationLtvBps": 8000,
+    "liquidationBonusBps": 1000,
+    "liquidationCloseFactorBps": 5000,
+    "maxUtilizationBps": 9000,
+    "normalMaxPriceAgeSeconds": 93600,
+    "weekendMaxPriceAgeSeconds": 266400,
+    "shareVirtualOffset": "1000000000000",
+    "minBorrowAssets": 1000000,
+    "maxBorrowerPage": 100
+  },
+  "feedParameters": {
+    "initialAnswer": "35046300000",
+    "decimals": 8,
+    "MAX_STEP_BPS": 2000,
+    "MIN_PUSH_INTERVAL": 3600,
+    "WINDOW": 3600,
+    "initialBandMin": "28037040000",
+    "initialBandMax": "42055560000"
+  },
+  "bootstrap": {
+    "initialAnswer": "35046300000",
+    "sourceRoundId": "18446744073709553011",
+    "sourceUpdatedAt": "1790764465",
+    "rawMainnetAnswer": "35046300000",
+    "mainnetMultiplier": "1000000000000000000",
+    "testnetMultiplier": "1000000000000000000",
+    "stock": "0x322F0929c4625eD5bAd873c95208D54E1c003b2d",
+    "stockIdentity": {
+      "name": "Tesla • Robinhood Token",
+      "symbol": "TSLA",
+      "decimals": 18,
+      "paused": false,
+      "oraclePaused": false
+    }
+  },
+  "reviewedArtifacts": {
+    "MirroredPriceFeed": {
+      "creationHash": "0xeb0fe48933ffc373b3d37ca8be0b0a8a93a9b81a422592eb4a618acc8756dc13",
+      "runtimeTemplateHash": "0xe7a3ea1caa39dbb7e1da57a49fe1ea1ce60e6d4e792b97c99ffa81cd9cd3ef78",
+      "immutableRanges": [
+        {
+          "start": 238,
+          "length": 32
+        },
+        {
+          "start": 425,
+          "length": 32
+        },
+        {
+          "start": 538,
+          "length": 32
+        },
+        {
+          "start": 577,
+          "length": 32
+        },
+        {
+          "start": 616,
+          "length": 32
+        },
+        {
+          "start": 739,
+          "length": 32
+        },
+        {
+          "start": 952,
+          "length": 32
+        },
+        {
+          "start": 1202,
+          "length": 32
+        }
+      ]
+    },
+    "SharedLendingPool": {
+      "creationHash": "0xa883ef5e4899fa45124bd677ee5455a342335e1e7a1e821f24b06f834d965536",
+      "runtimeTemplateHash": "0x7ff694df7c8d4041397ff9ca2977faaac929b772265c743c4ce6d68faf01ef75",
+      "immutableRanges": [
+        {
+          "start": 984,
+          "length": 32
+        },
+        {
+          "start": 1221,
+          "length": 32
+        },
+        {
+          "start": 1610,
+          "length": 32
+        },
+        {
+          "start": 1687,
+          "length": 32
+        },
+        {
+          "start": 2488,
+          "length": 32
+        },
+        {
+          "start": 2744,
+          "length": 32
+        },
+        {
+          "start": 3982,
+          "length": 32
+        },
+        {
+          "start": 4595,
+          "length": 32
+        },
+        {
+          "start": 5323,
+          "length": 32
+        },
+        {
+          "start": 5502,
+          "length": 32
+        },
+        {
+          "start": 6476,
+          "length": 32
+        },
+        {
+          "start": 7805,
+          "length": 32
+        },
+        {
+          "start": 8257,
+          "length": 32
+        }
+      ]
+    }
+  },
+  "collateralIssuer": {
+    "beacon": "0x1dF3cA0fD30ED5eeb09eB01938f4E9c5196E6Ca5",
+    "implementation": "0xBd14156E05c6AF28ad39aA53a2AB8eB9CDf657DA",
+    "registry": "0x1dF3cA0fD30ED5eeb09eB01938f4E9c5196E6Ca5",
+    "codeHashes": {
+      "beacon": "0x404e8188c4b1d0c9804205e0da253d11570e9d48d03964962cb689072b1735d2",
+      "implementation": "0x137f26aacb7b1675d89017cebbf5018515c7bf4b87ae1848984494a56f3e1912",
+      "registry": "0x404e8188c4b1d0c9804205e0da253d11570e9d48d03964962cb689072b1735d2"
+    }
+  },
+  "codeHashes": {
+    "usd": "0x3e4adb6eab9d495c72d672fb619614979f38b422e49fcdb1b5e4c3b53744fe80",
+    "stock": "0x2f367e6a678e7b30ab613d5963e541e6f4d3ca586de76e2f441fbfeb1a27c440",
+    "oracle": "0xc193625756a94bd71da26d4fb607bd4e335cdb800669f9114caa047be951bfd4",
+    "pool": "0xfb9e7f9a2ce1afeb1195f3ac3d0a40a9ff247ffa42f40a7f7ee8dd4f2a195f5a"
+  },
+  "deploymentBlock": "126666126",
+  "deployment": {
+    "oracleTransactionHash": "0x67cc786010863bfbe2b69a74871a36beee43ec9431cf6128bb7078a03c879276",
+    "poolTransactionHash": "0xcc822eef563a2d2096e12fbaaff3fff38c4b7ca6da54a9070775e0a546c7fd95"
+  },
+  "seed": {
+    "receiver": "0x000000000000000000000000000000000000dEaD",
+    "assets": "10000000000",
+    "shares": "10000000000000000000000",
+    "deployerShares": "0",
+    "mintTransactionHash": "0x569bbb748c3967a54aa78a6612c061f2eef3910b284de7777aafa7183ea952c6",
+    "approveTransactionHash": "0x72b5ce5ac047eaa50d08c0269d5fc4f089eef5da7a39ba72bcf75d1bf5b65313",
+    "depositTransactionHash": "0x651c17386e6aa4e09c53adaa8ac97b8899fe8c6100be784f4daa4304afbe871b"
+  }
+}

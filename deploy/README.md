@@ -89,6 +89,16 @@ nothing about it, not claim an outage. `SOLANA_TEST_SIGNER_MODE`, `ALLOW_OPERATO
 `ALLOW_HOME_ASSISTANT_PULL`, `LOCAL_AI_OLLAMA_URL` and `DEMO_SKIP_RECOVERY` remain unset. ConfigMap changes alter the
 web pod template's `checksum/config`, so the next release replaces the pod instead of leaving stale environment values.
 
+## Dedicated testnet price updater
+
+Set `ROBINHOOD_PRICE_UPDATER_PRIVATE_KEY` in the private `ledger-env` file to a fresh key used **only** for the shared market's price mirror. It must match the immutable updater in `contracts/evm/deployments/shared-market-46630.json`. Its single power is the price push, bounded to 20% per hour on-chain; it cannot withdraw pool funds. Top up its address with **test ETH** at [Robinhood's faucet](https://faucet.testnet.chain.robinhood.com/).
+
+The minute reconcile job includes the `price` scope. A missing key or deployment manifest returns `unconfigured` without disturbing the other scopes. Chainlink RHTSLA/USD on mainnet is the primary source; a fresh Jupiter TSLAx quote must agree within 5%. Missing, stale or divergent Jupiter quotes skip the push. Source pause and RPC chain-identity checks fail closed. Before signing, the job checks the feed's constructor-bounded first push and, thereafter, its one-hour minimum interval and ±20% movement cap relative to the previous answer. A longer outage never removes the cap. Because only one push per hour can be accepted, the copied price may lag a source update by up to an hour. Localhost uses the same hosted mirror and needs no second updater. Rotating the immutable updater requires redeploying the feed and pool.
+
+Multiplier and pause reads use the mainnet **Tesla** token `0x322F0929c4625eD5bAd873c95208D54E1c003b2d`, not the SPY token in the older mainnet dependency manifest. The copied Chainlink token price is converted to the test token's multiplier: divide by the mainnet multiplier to get the share basis, then multiply by the testnet multiplier, rounding down at both steps. The journal and job result retain the raw answer, both multipliers and the converted answer. Jupiter checks the share basis. A test multiplier change during gas review skips the push; a later change makes the feed return price zero until the next source round is copied.
+
+The scheduler attempts every scope independently, collecting failures and exiting non-zero only after all scopes have run; a failed tenancy or local-AI reconciliation cannot prevent the price job.
+
 ## NetworkPolicy enforcement probe
 
 After releasing these hooks, `--network-test` prints `helm get hooks` for the deployed revision, asks for exactly

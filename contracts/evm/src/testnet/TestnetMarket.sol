@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IERC20Asset, IMorphoVault} from "../MorphoAdapter.sol";
+import {IERC20Asset} from "../MorphoAdapter.sol";
 
 /// @notice TESTNET ONLY. Freely mintable stand-in for USDG; it has no value.
 contract TestUSDG is IERC20Asset {
@@ -51,78 +51,6 @@ contract TestUSDG is IERC20Asset {
         balanceOf[from] -= amount;
         balanceOf[to] += amount;
         emit Transfer(from, to, amount);
-    }
-}
-
-/// @notice TESTNET ONLY. Minimal share vault standing in for a Morpho vault (none exists on testnet).
-/// Share price rises only when someone calls `accrue`, which transfers real test assets in.
-contract TestYieldVault is IMorphoVault {
-    address public immutable asset;
-    uint8 public constant decimals = 18;
-    uint256 public totalSupply;
-    mapping(address => uint256) public balanceOf;
-
-    event Deposit(address indexed caller, address indexed owner, uint256 assets, uint256 shares);
-    event Withdraw(address indexed caller, address indexed receiver, address indexed owner, uint256 assets, uint256 shares);
-    event Accrued(address indexed from, uint256 assets);
-
-    constructor(address token) {
-        if (block.chainid != 46630 && block.chainid != 31337) revert("TESTNET_ONLY");
-        asset = token;
-    }
-
-    function totalAssets() public view returns (uint256) {
-        return IERC20Asset(asset).balanceOf(address(this));
-    }
-
-    function previewDeposit(uint256 assets) public view returns (uint256) {
-        return totalSupply == 0 ? assets * 1e12 : assets * totalSupply / totalAssets();
-    }
-
-    function previewRedeem(uint256 shares) public view returns (uint256) {
-        return totalSupply == 0 ? shares / 1e12 : shares * totalAssets() / totalSupply;
-    }
-
-    function previewWithdraw(uint256 assets) public view returns (uint256) {
-        if (totalSupply == 0) return assets * 1e12;
-        uint256 available = totalAssets();
-        return (assets * totalSupply + available - 1) / available;
-    }
-
-    function deposit(uint256 assets, address receiver) external returns (uint256 shares) {
-        shares = previewDeposit(assets);
-        require(shares > 0, "ZERO_SHARES");
-        require(IERC20Asset(asset).transferFrom(msg.sender, address(this), assets), "TRANSFER");
-        totalSupply += shares;
-        balanceOf[receiver] += shares;
-        emit Deposit(msg.sender, receiver, assets, shares);
-    }
-
-    function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares) {
-        require(msg.sender == owner, "OWNER");
-        shares = previewWithdraw(assets);
-        _burn(owner, shares);
-        require(IERC20Asset(asset).transfer(receiver, assets), "TRANSFER");
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
-    }
-
-    function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets) {
-        require(msg.sender == owner, "OWNER");
-        assets = previewRedeem(shares);
-        _burn(owner, shares);
-        require(IERC20Asset(asset).transfer(receiver, assets), "TRANSFER");
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
-    }
-
-    /// @notice Test yield: moves real test assets into the vault, raising every share's value.
-    function accrue(uint256 assets) external {
-        require(IERC20Asset(asset).transferFrom(msg.sender, address(this), assets), "TRANSFER");
-        emit Accrued(msg.sender, assets);
-    }
-
-    function _burn(address owner, uint256 shares) private {
-        balanceOf[owner] -= shares;
-        totalSupply -= shares;
     }
 }
 

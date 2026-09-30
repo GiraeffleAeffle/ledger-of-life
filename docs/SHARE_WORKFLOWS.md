@@ -1,90 +1,67 @@
-# What your shares can do · test-network workflow
+# Shared shares, loans and lending · Robinhood testnet
 
-The signed-in tenant uses **their own Privy EVM wallet** on Robinhood Chain testnet. The landlord and a test lending-pool funder are operator-held **test** keys. The demo stock is **tTSLA · fake test stock**, deployed and mintable for each wallet's isolated test market; it is *not* Robinhood's separately displayed official test TSLA. Test USD is freely minted. All USD and stock valuations use an **operator-set simulated test price**; none is money or a live stock price. No Solana assets are bridged.
+## Deployment is a prerequisite, not a demo fallback
 
-```mermaid
-sequenceDiagram
-  actor T as Tenant (signed-in wallet)
-  actor O as Test operator (faucet and simulated yield)
-  participant E as Separate $1,500 test rental escrow
-  participant V as Dedicated test yield vault
-  participant D as Fake tTSLA test desk
-  participant C as New collateral tenancy
-  actor L as Landlord (test actor)
-  O->>T: Prepare demo position: mint $1,501 for deposit + $3,540 purchase faucet
-  O->>D: Deploy mintable fake tTSLA and fund desk/pool with test liquidity
-  L->>E: Accept signed-in tenant's $1,500 test agreement (3 × $500 rent)
-  T->>E: Sign acceptance and funding
-  T->>E: Sign vault supply into dedicated vault V
-  O->>V: Contribute $60.50 simulated test yield
-  T->>E: Sign claim of about $60
-  E-->>T: Release test USD earnings to own wallet
-  T->>D: Sign test USD approval and buy about $3,600 fake tTSLA
-  L->>C: Accept a new test tenancy backed by the tenant's fake tTSLA
-  T->>C: Sign fake tTSLA approval + pledge $1,800 shares (150% of ~$1,200 deposit)
-  Note over C,L: Test price falls 30%: flag shortfall; tenant can top up, or after grace sell only enough for cash security
-  L->>C: Propose move-out claim
-  T->>C: Accept claim
-  C->>D: Sell only fake shares needed to pay approved claim
-  C-->>L: Test USD claim
-  C-->>T: Unused fake tTSLA shares, in kind (plus surplus test USD)
-```
+The application uses one shared market on Robinhood Chain testnet **46630**, loaded from `contracts/evm/deployments/shared-market-46630.json`. A missing or unverifiable deployment is shown as **undeployed**: no invented address, price, liquidity, earnings or position replaces it. This cutover does not claim a live deployment or a completed shared-market wallet rehearsal.
 
-```mermaid
-sequenceDiagram
-  actor T as Tenant (signed-in wallet)
-  participant P as Test lending pool
-  actor F as Test funder (operator key)
-  F->>P: Supply test USD liquidity
-  T->>P: Approve and deposit fake tTSLA
-  T->>P: Borrow test USD at <=50% of simulated collateral value
-  P-->>T: Test USD; debt accrues simple interest by elapsed seconds
-  Note over T,P: Test price falls 30%: LTV/health update; add shares or repay
-  F->>P: Liquidate only if debt reaches 80% of collateral value
-  T->>P: Repay principal + accrued interest
-  P-->>T: Remaining shares returned when debt is zero
-```
+The person signs with their own Privy EVM wallet. Obtain **five official test TSLA and test ETH** from [Robinhood's official faucet](https://faucet.testnet.chain.robinhood.com/), subject to its daily limits. The stock is Robinhood's official test TSLA, not project-minted fake stock. Get test dollars through the existing wallet-signed tUSDG mint. **tUSDG is test dollars anyone can mint; unlimited repeated mint calls are possible. It has no monetary value and is not income, euros or redeemable cash.** Nothing bridges Solana assets.
 
-| What the person sees | On-chain execution | Test-only input/actor |
-| --- | --- | --- |
-| “Prepare a demo position”: operator deploys a dedicated vault and isolated fake tTSLA market, test landlord accepts a $1,500 (3 × $500) earnings deposit, test faucet supplies $1,501 for security/reserve and **$3,540 test USD to buy fake stock**. The tenant signs acceptance, funding, vault supply, and then claims about $60 of simulated earnings. | Separate `RentalEscrow`, `TestYieldVault`, fake tTSLA desk, test USD transfers and wallet-signed calls. Up to three operator-contributed test yields per wallet per UTC day, claiming each before the next. | $3,540 is explicitly a faucet purchase budget, **not earnings**; the $60.50 operator contribution creates about $60 claimable test yield in the dedicated vault. Earlier $10 test escrows remain at their recorded chain addresses. |
-| “Buy”: approve test USD and purchase around $3,600 of per-wallet tTSLA · fake test stock with the tenant wallet; the official test TSLA holding above is unchanged. | ERC-20 allowance and isolated test desk swap. | Fake stock supply, desk quote and liquidity are synthetic. |
-| “Secure a new deposit”: see required shares, sign approval and pledge; landlord accepts. | New `CollateralEscrow` per wallet, 150% opening / 125% maintenance, fake-stock custody. | Operator acts as landlord and arbitrator; per-wallet oracle + sale desk set the simulated price. This new tenancy is separate from the $1,500 earnings tenancy. |
-| Price falls: see new value, buffer and top-up request; choose to sign top-up, or let grace pass and trigger partial protective sale. | `flagShortfall`, `pledge`, `liquidate`. | Price and sale quote both change in the isolated test market. Grace period is real chain time. |
-| Move out: proposed claim, tenant signs acceptance; the claim is paid, unused shares returned. | `proposeClaim`, `acceptClaim`, `settle`; only approved amount is sold. | Landlord proposes a small sample test claim. |
-| “Borrow”: see max available, interest rate, debt, LTV, health and liquidation threshold; sign pledge and borrow; later add shares, repay and withdraw remaining fake shares. | Per-wallet `TestLendingPool`: collateral transfers, test USD debt/transfers and liquidation. | Operator supplies $8,000 test USD liquidity and, if unhealthy, calls liquidation. Test price is shared only with this wallet's collateral tenancy. |
+## One valuation path
 
-A non-test implementation would use the same consent and transaction boundaries with eligible assets and valuation rules specified in the tenancy, independent price sources and executable liquidity, an independently funded lending venue, and wallet-signed tenant actions. The fake tTSLA faucet, test USD, simulated yield and operator-set quote would be replaced by verifiable inputs and actual parties; none of these test tokens is redeemable.
+`MirroredPriceFeed` copies [Chainlink RHTSLA/USD on Robinhood mainnet 4663](https://robinhoodchain.blockscout.com/address/0x4A1166a659A55625345e9515b32adECea5547C38), **converted to the test token's multiplier**. This is a Robinhood token price, not a headline Tesla share quote. The testnet mirror is **not a Chainlink contract** and no native Chainlink testnet feed is claimed.
 
-## Connected ownership and local-service route
+The hosted price job reads the source round and timestamp, checks pauses and multipliers, and uses Jupiter TSLAx as an independent cross-check. It copies a new acceptable round; it does not choose a scenario price. The immutable updater key's sole contract power is to push a price: it cannot withdraw or move pool funds. The contract requires increasing rounds/timestamps, bounded future timestamps, at least 60 seconds between pushes and a per-push movement bound scaled by elapsed time, capped at 20% after one hour; the first push is bounded against the immutable deployment anchor. Nothing on-chain proves the copy matches mainnet: updater honesty and RPC availability remain risks.
 
-The **Build local ownership** path (Money → Holdings) is separate from the earnings/deposit
-fixture above. An approved test environment can prepare a **wholly empty** real account:
-an isolated market, at most two fake tTSLA shares, and at most 0.0003 test ETH for wallet fees.
-It does **not** mint cash into the buyer's wallet. Existing shares, collateral, loans, deposits
-and legacy markets are not reset or migrated.
+Mainnet and testnet multipliers need not match. The updater converts `mainnet_answer × testnetMultiplier / mainnetMultiplier`, rounding down, before pushing. It reads the official test token's `uiMultiplier()` (1e18 if absent), and journals the raw mainnet answer and both multipliers. The `push` parameter named `sourceMultiplier` records the **test-token multiplier used for conversion**; a later test-token multiplier mismatch makes `latestPrice()` return zero, freezing price-sensitive actions until an acceptable new round is copied.
 
-A dedicated provisioner signs this setup and retains authority over its own oracle/desk.
-Every setup/mint/gas/control envelope is journaled before broadcast. Preparation has a
-read-only status and explicit resume action; operator-control request IDs survive reload.
-A provably unsigned failed control is fenced before its nonce lane is released. Signed
-ambiguity retains the same-byte recovery path.
+Wallet TSLA, collateral and loan valuation use this same mirror. The interface exposes the source round, source time, copied time, age, source feed and chain, and stale state. It labels Saturday 00:00 UTC through Monday 12:00 UTC as the **weekend freshness window (74 hours)**, not as a claim that trading is closed. Normal freshness is 26 hours. Before the first push there is no price provenance: no mainnet round has been copied yet. Stale, unset or suspended prices are unavailable, never displayed as zero-dollar quotes. Longer holidays or a failed updater freeze price-sensitive actions rather than substituting Jupiter or an operator quote.
 
-The borrow amount is editable, defaults to 12 tUSDG, and stays within the authoritative
-available limit. The exercised real Privy wallet pledged two shares, borrowed 12 tUSDG,
-bought five units of each issuer for 5 tUSDG each, then paid 0.01 tUSDG for a completed
-local AI answer through x402. Cash ended at 1.99 tUSDG; collateral stayed locked and debt
-continued to accrue. The service milestone uses an owned settled receipt, never host-wide
-revenue or merely holding cash.
+## Wallet-signed actions
 
-[Public connected evidence](evidence/BORROW_TO_LOCAL_AI_ROBINHOOD_TESTNET.json) records
-the exact wallet, collateral/borrow events, purchase receipts and AI transfer. Follow
-[README operator setup](../README.md#test-local-investment--robinhood-chain) for explicit
-dedicated-account funding; funding commands run serially while the preview and other
-shared-operator activity are stopped.
+| Action | What actually happens |
+| --- | --- |
+| Deposit collateral | Approve the pool for the exact official test TSLA amount, then transfer collateral into the pool. No price is needed. |
+| Borrow | Receive tUSDG from pool cash; post-borrow loan-to-value must not exceed 50%, utilization must not exceed 90%, and the price must be fresh. |
+| Repay | Approve the exact tUSDG amount and repay debt plus accrued interest. Repayment remains possible when pricing is stale. |
+| Withdraw collateral | Return the person's collateral; with debt, freshness and the borrowing limit apply. With no debt, no price is needed. |
+| Lend test dollars | Approve an exact tUSDG amount and deposit for lender shares owned by the signer. |
+| Unlend | Withdraw/redeem the signer's lender position, limited by available pool cash. |
+| Liquidate | Any person can repay part of an unhealthy borrower's debt with their own tUSDG and receive seized official test TSLA. |
 
-## Executed testnet proof
+`GET /api/share-workflows` returns `{workflow}` with shared-market observations. POST supports only `prepare` (`operation`, `quantity`, optional `borrower`) and `submit` (`signed`); operations are `deposit_collateral`, `withdraw_collateral`, `borrow`, `repay`, `lend`, `unlend`, and `liquidate`. Preparation returns the wallet id and reviewed signing steps. Submission decodes calldata: only exact supported token approvals to the pool and supported pool methods, chain 46630, zero native value, and signer-owned receivers/owners are accepted. There is no start, demo preparation, price control or injected-yield operation on this route.
 
-The operator script `contracts/evm/script/share-workflows-cycle.mjs` executes the $1,500 test escrow and dedicated vault → ~$60 personally signed yield claim → $3,540 purchase faucet plus yield, signed ~$3,600 fake-stock buy → 150% share pledge for ~$1,200 deposit → 30% test-price drop and signed top-up → move-out claim and in-kind return → signed loan/collateral → 60% test-price drop, liquidation, repayment and fake-share withdrawal. It then signs two more yield claims and confirms a fourth simulated yield on the same UTC day is blocked. [Deployment addresses, transaction hashes and final balances](evidence/SHARE_WORKFLOWS_ROBINHOOD_TESTNET.json) come from an ephemeral scripted test wallet, **not** from a Privy session. Signed-in browser checks and responsive screenshots are local artifacts in `/tmp/share-shots/`.
+The editable amount is a human quantity: collateral actions accept up to 18 decimal places of official test TSLA; dollar actions accept up to 6 decimal places of tUSDG. Review and signing descriptions include that quantity and unit. Excess precision is rejected rather than rounded silently. Atomic values are sent to the server.
 
-To repeat locally: compile Foundry contracts with `cd contracts/evm && forge build`, then from the repository root run `SOLANA_TEST_SIGNER_MODE=1 node --no-warnings --experimental-strip-types --env-file-if-exists=.env.local contracts/evm/script/share-workflows-cycle.mjs`. The operator test capability and the ignored `.testnet-secrets/robinhood-testnet/` key files must already be configured; neither the script nor the evidence prints keys. This creates fresh isolated test contracts and replaces the evidence file with the new run.
+Wallet reads never scan the borrower registry and no longer return `unhealthyLoans`. They expose `suspended`, `suspensionReasons`, and pool `effectiveBorrowApyBps` alongside nominal `borrowAprBps` (500). Liquidation discovery is separate and on demand: `GET /api/share-workflows?view=unhealthy&cursor=0&pageSize=20` returns `{page:{loans:[{borrower,debtAtomic,sharesRaw,ltvBps}],nextCursor:string|null,scanned:number,observedAt:number,suspended:boolean,suspensionReasons:string[]}}`. Follow `nextCursor` to continue; each page reports how many registry entries were scanned, not a complete-market assertion.
+
+`observedAt` is a Unix timestamp in **seconds**. Wallet balances remain independent of deployment: undeployed reads query the official tokens and use `null` for an unreadable quantity, never a factual zero. Missing, stale, suspended or unpriced stock prevents a complete priced subtotal when stock is held or its quantity is unknown.
+
+## Borrower interest, lenders and seed
+
+Borrowings accrue continuously at a **5% nominal annual rate**, approximately **5.13% effective annually**. The UI reads `effectiveBorrowApyBps` from the contract instead of computing a projection or assuming simple interest. Lender share value increases by the same accrued interest; there is no yield injection, fee recipient or operator withdrawal lever. The displayed supply rate is a current utilization-based rate, not a projected or guaranteed return. Earned value is current lender value minus net contribution and can be negative after bad debt.
+
+Deployment seeds **10,000 tUSDG to shares owned by the burn address `0x000000000000000000000000000000000000dEaD`**. Nobody can redeem those shares. The seed's proportionate interest stays locked too; it is disclosed separately from independent lender participation. All subsequent borrowable cash comes from lenders, including compatible rental escrows. Interest becomes cash only when borrowers or liquidators repay. A lender may have a claim but insufficient cash to withdraw it.
+
+## Liquidation is not a scenario button
+
+The UI loads unhealthy loans only when requested, in bounded registry pages; normal wallet reads do not scan the registry. At **80% loan-to-value**, anyone may liquidate with a fresh price while the market is not suspended. Each liquidation repays at most 50% of debt and seizes collateral with a 10% bonus, bounded by available collateral. If collateral reaches zero, remaining debt is written off and lender value falls. There is no operator liquidation bot or price-drop lever. A loan opened at 50% needs about a 37.5% actual token-price decline to reach the threshold before interest accrual; a live liquidation cannot honestly be staged on demand. Contract tests, rather than fabricated market moves, demonstrate those boundaries.
+
+Stale pricing blocks borrowing, withdrawing collateral with debt, and liquidation. Lending, adding collateral, repayment, cash-limited lender withdrawal, and debt-free collateral withdrawal remain possible. Robinhood retains issuer powers to pause/block accounts, burn tokens held by a pool, or upgrade the stock implementation; those are external risks, not app controls.
+
+Issuer suspension is distinct from stale pricing: TSLA paused, the pool blocked by the issuer, an implementation change, or collateral custody below recorded collateral suspends the market. Suspension blocks collateral deposits and withdrawals, borrowing and liquidation, and withholds TSLA valuations. Dollar-only lending, repayment and cash-limited lender withdrawal remain available because tUSDG is separate from the suspended collateral token. Wallet and liquidation-page reads expose the suspension reasons. The collateral issuer identity and implementation are immutable deployment pins, not silently refreshed after an upgrade. Robinhood's issuer powers remain external risks; neither a fresh price nor an updater can override suspension.
+
+## Rental deposits and localhost
+
+The former share-backed `CollateralEscrow` app flow is removed. The contract remains a tested prototype, not a hosted tenancy offer. A real rental agreement needs distinct actual parties; the public deposit tab must not imply one account can create them.
+
+`RentalEscrow` and `MorphoAdapter` can use the shared pool as their vault. The separate **local-only `/api/share-earnings`** rehearsal discloses `operator.key` as the test landlord and `arbitrator.key` as the test arbitrator. The tenant obtains gas from Robinhood's official faucet, self-mints **1,501 tUSDG**, and signs acceptance, funding, pool supply and earnings claim. A verified pool manifest is required. Earnings are **borrower-funded interest**, never manufactured yield or operator funding. Principal remains protected by the escrow; release and settlement roll back if the pool lacks cash. Production disables this rehearsal **even when `ALLOW_OPERATOR_TEST_ACTIONS` is set**. It is not an operation on the prepare/submit-only share route; old per-wallet store keys stay untouched and unused.
+
+Incomplete local setup is returned as `starting`, so the setup control can resume the journal instead of hiding the rehearsal. Preparing tenant signatures requires test ETH. A refused broadcast restores its reviewed call only after the node proves it does not know the hash; unknown or known broadcasts remain reserved until a receipt, consumed nonce or aged-null lookup resolves them. Domain errors are shown with their actual message.
+
+Localhost reads the same manifest and chain market as hosted clients. The hosted job maintains the mirror; **localhost needs no updater key and must not run a second updater**.
+
+## Historical evidence is not shared-market proof
+
+[SHARE_WORKFLOWS_ROBINHOOD_TESTNET.json](evidence/SHARE_WORKFLOWS_ROBINHOOD_TESTNET.json) and [BORROW_TO_LOCAL_AI_ROBINHOOD_TESTNET.json](evidence/BORROW_TO_LOCAL_AI_ROBINHOOD_TESTNET.json) record the **historical per-wallet fake-stock/operator-priced implementation**. They do not prove official-stock shared-pool lending, mirror valuation, independent liquidity or borrower-funded earnings. Earlier official-stock collateral cycles likewise used a simulated oracle and operator desk. Preserve their transaction facts without promoting them to evidence of this cutover.
+
+Old per-wallet contracts and store keys (`share-workflows:*`, `share-control:*`, `share-earnings:*`, `ownership-example:*`) remain on-chain/in storage but are unused, not reset or migrated, and no longer surfaced as current positions. Shared-market live evidence must be recorded separately only after an actual rehearsal.

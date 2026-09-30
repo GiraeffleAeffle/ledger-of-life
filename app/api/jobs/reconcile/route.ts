@@ -5,6 +5,7 @@ import { createPublicClient, http } from 'viem';
 import { loadRobinhoodConfig, reconcileRobinhoodOperations } from '@/server/robinhood-service';
 import { reconcileSolanaOperations } from '@/server/solana-service';
 import { sweepAiText } from '@/server/local-ai';
+import { reconcileTslaPrice } from '@/server/tsla-price-mirror';
 export const runtime = 'nodejs';
 export async function POST(request: Request) {
   try {
@@ -13,8 +14,12 @@ export async function POST(request: Request) {
     const scope = url.searchParams.get('scope');
     const after = url.searchParams.get('after') || '';
     if (after.length > 160) throw new Error('Invalid cursor.');
-    if (!scope || !['robinhood', 'solana', 'local-ai'].includes(scope))
+    if (!scope || !['robinhood', 'solana', 'local-ai', 'price'].includes(scope))
       throw new WorkflowError('Unknown reconciliation scope.');
+    if (scope === 'price') {
+      const result = await reconcileTslaPrice(await getStore());
+      return Response.json({ scope, ...result }, { headers: { 'Cache-Control': 'no-store' } });
+    }
     if (scope === 'local-ai') {
       const { scrubbed, next } = await sweepAiText(await getStore(), after);
       return Response.json({ scope, status: 'checked', scrubbed, nextCursor: next }, { headers: { 'Cache-Control': 'no-store' } });

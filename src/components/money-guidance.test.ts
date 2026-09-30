@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { needsTestFunds, priceFallBeforeLiquidation, missingRepaymentCash, stakeDisabledReason } from './money-guidance.ts';
+import { needsTestFunds, stakeDisabledReason } from './money-guidance.ts';
 import { visibleDepositActivity } from './deposit-activity.ts';
 
 test('funding directions expand only after both wallet balances are known and empty', () => {
@@ -8,15 +8,6 @@ test('funding directions expand only after both wallet balances are known and em
   assert.equal(needsTestFunds(null, '0'), false);
   assert.equal(needsTestFunds('5000000', '0'), false);
   assert.equal(needsTestFunds('0', '1000000'), false);
-});
-
-test('loan liquidation distance uses the 80% threshold, not the 50% borrowing cap', () => {
-  assert.equal(priceFallBeforeLiquidation('100000000', '80000000'), 0);
-  assert.equal(priceFallBeforeLiquidation('100000000', '50000000'), 37);
-  assert.equal(priceFallBeforeLiquidation('100000000', '85000000'), 0);
-  assert.equal(priceFallBeforeLiquidation('0', '50000000'), null);
-  assert.equal(priceFallBeforeLiquidation('100000000', '0'), null);
-  assert.equal(missingRepaymentCash('9900000', '10000000'), 101000n);
 });
 
 test('stake funding blockers distinguish cash, gas and server cap', () => {
