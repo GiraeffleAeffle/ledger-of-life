@@ -49,7 +49,7 @@ layers:  # product architecture, bottom-up
   - id: ownership
     concepts: [Asset, Position, BorrowAgainstShares, Venue, Distribution, Adapter]
   - id: local_services
-    concepts: [LocalInferenceRequest, InferencePayment, HostEconomicsScenario]
+    concepts: [LocalInferenceRequest, InferencePayment, InferenceHost, HostEconomicsScenario]
   - id: civic_system
     concepts: [Organization, CityEvent, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence]
   - id: vision
@@ -428,13 +428,14 @@ concepts:
     code: [src/data/local-investments.ts, src/components/local-investments.tsx, src/components/city-flywheel.tsx, src/server/local-investments.ts, app/api/local-investments/route.ts, contracts/evm/src/testnet/FictionalCityUnit.sol]
 
   LocalInferenceRequest:
-    definition: An owned immutable question executed on the configured local Ollama model, with a persisted result and measured token/timing observations; never a canned or fallback model answer.
-    relations: {requested_by: Person or visitor session, served_by: Adapter, may_require: InferencePayment}
+    definition: An owned immutable question executed through an outbound paired Ollama connector or the configured direct local endpoint; complete results and reported token/timing observations are persisted, never replaced by canned answers.
+    relations: {requested_by: Person or visitor session, served_by: InferenceHost or Adapter, may_require: InferencePayment}
     lifecycle: [payment_required, approval_required, ready, running, settling, completed, failed, interrupted, expired]
     invariants:
-      - Server configuration fixes provider, model and options; request fingerprint and ownership cannot change on replay.
+      - Server configuration fixes model and options; the quote binds provider host, payout wallet, question privacy scope and ownership, which cannot change on replay.
       - A complete paid result is persisted before settlement and delivered only with a confirmed receipt.
       - Incomplete or interrupted inference never becomes paid revenue; an unresolved payment reuses its exact journal rather than recomputing the answer.
+      - A connector host reads questions in clear; city hosts receive only explicitly public questions, while own-host-only is the default. Signatures do not prove which model ran or prevent host retention.
       - Free access establishes a revocable HttpOnly visitor session before execution, permits three attempts per visitor and thirty per UTC day, and creates no paid receipt.
       - Clearing a visitor session revokes saved and in-flight access and removes that visitor's saved question and answer text at once; it does not revoke the person's independent paid receipts.
       - Question and answer text is retained only while the request is running, settling or has a payment in flight, then removed after a grace period (default 600 s, `LOCAL_AI_TEXT_GRACE_SECONDS`); fingerprint, usage, state and the payment receipt are kept. A removed request shows no text. On the SQLite store the removal also reaches the database file and its write-ahead log (`secure_delete` plus a truncating checkpoint, `Store.reclaim`); on Postgres, dead rows remain until autovacuum.
@@ -452,6 +453,22 @@ concepts:
       - Only settled transfers count as recorded receipts; signatures, quotes, failed jobs and free access do not.
     reality: testnet_real
     code: [src/server/local-ai-payment.ts, src/server/local-ai-operations.ts, src/wallets/inference-signing.ts, src/components/local-ai-payment.ts, scripts/setup-local-ai-facilitator.mjs]
+
+  InferenceHost:
+    definition: An operator-invited account's GPU reached exclusively through an outbound Ed25519-authenticated connector, with a verified EVM payout wallet and reported models and liveness.
+    relations: {owned_by: Person, serves: LocalInferenceRequest, receives: InferencePayment}
+    lifecycle: [pending, active, revoked]
+    invariants:
+      - A ten-minute single-use pairing code binds the host public key; approval requires a verified EVM wallet in LOCAL_AI_HOST_OWNER_WALLETS and payout is a verified wallet of that account.
+      - The private key and optional Home Assistant wake token stay on the connector; the app never dials a connector-supplied URL.
+      - Signed method, path, timestamp, nonce and body hash prevent tampering and replay within a sixty-second clock window.
+      - A recent heartbeat reports online or asleep; absent heartbeats report offline. Liveness and model names are host claims, not hardware or execution attestation.
+      - One lease per host; assigned hosts alone fetch and answer bounded text-only jobs. Pickup expires after thirty seconds and completion after ninety seconds, without charging failures.
+      - Queued question copies live only in bounded process memory and are discarded after completion, timeout, revocation or process exit; existing database retention rules still apply.
+      - One app replica is required; multi-replica queue and coordinated leases are not built.
+    reality: prototype
+    code: [src/server/local-ai-hosts.ts, host-connector/connector.mjs, app/api/local-ai/hosts, src/components/local-ai-host.tsx]
+
 
   HostEconomicsScenario:
     definition: Editable thirty-day euro planning from assumed hardware allocation, whole-host watts, online hours, electricity tariff, other costs, prices and paid/free demand.

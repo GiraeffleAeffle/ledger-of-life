@@ -175,14 +175,25 @@ sequenceDiagram
 
 In each tenancy phase exactly one person has an action; everyone else sees what they are waiting for (`src/server/journey.ts`).
 
-Local inference is a private, immutable **LocalInferenceRequest**, not a city fact or a
-financial recommendation. The configured Ollama model produces actual answers and usage.
+Local inference is an owned, immutable **LocalInferenceRequest**, not a city fact or a
+financial recommendation. A paired outbound **InferenceHost** (or the configured direct
+local Ollama endpoint) produces actual answers and reports usage. The quote binds the host
+and its verified payout wallet. Own-host-only is the default; routing to city hosts requires
+marking the question public. The host reads the question in clear, and neither a signature
+nor a model label proves which model ran or whether the host retained a copy.
 An **InferencePayment** uses official x402 v2 exact/Permit2 and existing tUSDG; a finite
 allowance is not a completed payment. The result is saved before settlement, failed/incomplete
 inference is not charged, and canonical token effects establish revenue. A free library
 visitor has a separate revocable session, bounded attempts and no fabricated sponsor receipt.
 The **HostEconomicsScenario** is an editable euro calculation, not actual profit or a conversion
 of test receipts.
+An **InferenceHost** is paired by a ten-minute single-use public-key-bound code, approved
+by an operator-allowlisted account, and authenticated by Ed25519 request signatures with
+clock and replay checks. Its private key and optional Home Assistant wake token stay on
+the LAN connector. The server never connects into that LAN. Heartbeats distinguish online,
+asleep and offline; one lease allows only the assigned host to answer a bounded text-only
+job. Failed or timed-out jobs are not charged. The single-replica queue holds question copies
+only in memory, erased on completion, timeout, revocation or process exit.
 
 
 ## Where concepts live in code
@@ -202,6 +213,7 @@ of test receipts.
 | Building/city scenario | `src/components/city-flywheel.tsx`; physical systems, supplier relationship, jobs and fiscal effects are illustrative |
 | LocalInferenceRequest and visitor access | `src/server/local-ai.ts`, `src/server/local-ai-runtime.ts`, `src/server/local-ai-session.ts`, `src/components/local-ai.tsx`, `app/(wallet)/library/page.tsx` |
 | InferencePayment | `src/server/local-ai-payment.ts`, `src/server/local-ai-operations.ts`, `src/wallets/inference-signing.ts`; explicit Permit2 review, owner/nonce binding and dedicated fee account |
+| InferenceHost | `src/server/local-ai-hosts.ts`, `app/api/local-ai/hosts/`, `host-connector/connector.mjs`, `src/components/local-ai-host.tsx`; outbound-only connector, invited pairing, signed jobs and heartbeat status |
 | HostEconomicsScenario | `src/components/local-ai-economics.ts`, `src/components/local-ai-host.tsx`; euro assumptions separate from measured usage and settled test-token receipts |
 | Adapter catalogue, state and settings | `src/data/ledger-catalogue.ts`, `src/components/ledger-adapter-state.ts`, `src/components/ledger-adapters.tsx`, `src/components/adapter-settings.tsx`, `app/api/adapters/route.ts` |
 | Adapter observations (home solar, validator) | `src/server/adapters.ts`, `src/components/device-readings.tsx`, `app/api/assets/route.ts` (`?area=devices`); existing financial and public-data readers retain their own contracts |

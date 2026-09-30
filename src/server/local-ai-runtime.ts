@@ -51,7 +51,7 @@ export async function assertInferenceAvailable(fetcher: typeof fetch = fetch) {
       !body.models.some((model: unknown) => model && typeof model === 'object' && 'name' in model && model.name === AI_MODEL))
     throw new ConflictError('Configured local Qwen model is not installed on the inference host.');
 }
-const instructions: Record<LocalAiContext, string> = {
+export const instructions: Record<LocalAiContext, string> = {
   general: 'Answer clearly and directly. Distinguish unknown facts from known facts. Do not invent local events, ownership rights or measured business returns.',
   housing: 'Explain housing and rental questions with practical next steps. Do not imply a demo token or a fictional share is a real tenancy or enforceable claim.',
   business: 'Explain company and local business questions plainly. Fictional demonstration units confer no legal ownership or membership; distinguish observed facts from scenarios.',

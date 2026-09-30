@@ -62,18 +62,29 @@ Supplied when the container runs, never built in.
 
 ## The GPU
 
-Ollama has no authentication, so it is never published. The app is the only public door and the payment gate; it runs the inference over a private link. `LOCAL_AI_OLLAMA_URL` is an ordinary `http://` address, so no code change is needed for a tunnel. The app supports **exactly one** GPU host this way: one URL, one model, one price and payee, and one lease that serialises inference.
+The hosted app uses the [outbound host connector](../host-connector/README.md), not a VPN or an inbound home-network connection ([ADR 0013](adr/0013-outbound-host-connector.md)). Ollama has no authentication and must stay private. The always-on Linux device initiates HTTPS to `https://ledger.stadtstack.eu`, signs polls/results/heartbeats with its locally generated Ed25519 key, and optionally invokes `script.desktop_ai_wake_gpu_host` through its configured Home Assistant REST endpoint. The Home Assistant token stays on that Linux device.
 
-That direct route suits the owner's own GPU, a Windows desktop. It sleeps and is woken by Wake-on-LAN through Home Assistant, so it should **not** join the tailnet (it would drop off whenever it sleeps). `pve-strausberg`, an always-on node, already advertises the home LAN as a subnet route, and the tailnet approves it (checked on 29 September). What remains is on the cluster and needs the owner's approval:
+Hosted release requirements (the connector implementation does not modify `deploy/`):
 
-1. On the cluster, run the [Tailscale Kubernetes operator](https://tailscale.com/docs/kubernetes-operator) with an egress `ProxyGroup`, and create an `ExternalName` Service annotated with `tailscale.com/tailnet-ip` set to the desktop's LAN address (see [Access a tailnet device from your cluster](https://tailscale.com/docs/kubernetes-operator/egress/access-tailnet-service); the annotation accepts an address exposed by a subnet router).
-2. Point `LOCAL_AI_OLLAMA_URL` at that Service, for example `http://gpu.<namespace>.svc.cluster.local:11434`.
-3. In the tailnet policy, allow only the app's tag to reach port 11434 of that one address. The subnet route otherwise exposes the whole home LAN to every permitted tailnet device.
-4. Provide a way to wake the desktop on demand, for example a small relay on the always-on node that only sends the magic packet. Do not hand the app the full-power Home Assistant token for this.
+| Setting/material | Required hosted value |
+|---|---|
+| `APP_ORIGIN` | `https://ledger.stadtstack.eu`; exact same-origin approval/revocation boundary. |
+| `LOCAL_AI_OLLAMA_URL` | Empty/unset. Setting a direct URL intentionally selects local mode instead of connectors. |
+| `LOCAL_AI_HOST_OWNER_WALLETS` | Comma-separated verified EVM addresses of accounts allowed to approve hosts for the contest; empty disables approval. |
+| `LOCAL_AI_MODEL` | Exact advertised model name, for the owner `qwen3.8:27b-ud-q3-k-xl`. Price remains fixed at 10000 atomic tUSDG. |
+| `LOCAL_AI_LIBRARY_ENABLED` | `0` on the public release. The isolated smoke enabled it only for synthetic, zero-cost requests. |
+| `LOCAL_AI_TEXT_GRACE_SECONDS` | `600` by default; keep the reconcile job's `local-ai` scope running. |
+| `LOCAL_AI_FACILITATOR_KEY_FILE` | Path of a dedicated funded Robinhood-testnet fee key, separate from payer and host payout. Copy the mounted Secret into a private volume using an init container, owner uid/gid 1000 and mode `0600`; mount that volume read-only into the app at this path. A group-readable Secret mount is rejected. Never put this key in the connector or image. |
+| App storage/replicas | Existing persistent SQLite volume (`ALLOW_LOCAL_STORE=1`, `LOCAL_DATABASE_PATH=/data/rental.sqlite`), exactly one app replica. Registry is durable; bounded jobs and leases are process-local and fail without charging after restart. |
+| Ingress timeout | At least 120 s. Connector polls are at most 25 s; pickup expires at 30 s and answer at 90 s, including wake time. |
 
-Not run: the Tailscale operator, the ACL and the wake relay. The desktop was asleep during this work, so the path was not exercised. The model host sees each question in clear while it runs; only the app's stored copy is bounded.
+No cluster egress change, Tailscale operator, home-LAN ACL, public Ollama port, Home Assistant credential or connector private key is needed on the cluster. Existing Privy server configuration and the dedicated facilitator's testnet gas remain required. `LOCAL_AI_PAY_TO` is only for the direct local path; connector quotes use each host's approved payout wallet.
 
-**Hosts other than the owner's are a different problem, and this route does not solve it.** Nobody else can join the owner's tailnet or have the cluster's operator and ACL edited for them, and an app that fetches addresses hosts supply has the same bypassable-address problem as Home Assistant pull. The proposed design (not built; [roadmap D3](ROADMAP.md)) reverses the direction: a small **host connector** next to Ollama (a relay program, not an AI agent) connects **out** to the app, proves itself with a key made on the host, and takes jobs from a queue. That needs no VPN, no open port and no cluster change, and it lets the cluster's network policy keep blocking private ranges. For the owner it would replace steps 1, 3 and 4 above: the connector runs on the always-on node and wakes the desktop itself.
+Local mode keeps `LOCAL_AI_OLLAMA_URL` and its existing direct inference lease. Connector onboarding lives in Money → Devices & income → Pair hosts & income: enter the eight-character code, approve with an eligible signed-in account, and optionally select another verified wallet belonging to that account. This is session-authenticated approval, not a new per-action passkey challenge. An owner may revoke there, stop the connector, and rotate its key as described in its README.
+
+Checked on 30 September in an isolated worktree dev server (`localhost:4185`), a fresh database under `~/.cache`, a synthetic Ollama HTTP server (`localhost:11487`) and the connector: pairing via the same approval function as the route, signed heartbeat, long-poll pickup, fixed-shape chat, signed result, `HTTP 200` completed answer and visitor text removal. The answer was **synthetic**, not owner-GPU inference; no test-token transfer was made. The owner's real Ollama, desktop and Home Assistant were not contacted. All smoke processes were stopped. Real wake, paid chain settlement through the hosted ingress, and security review remain unverified.
+
+Limits: a host reads every assigned question in clear; city routing requires explicitly public questions and own-host-only is the default. Ed25519 proves key possession, not which model ran or whether the host kept a copy. Recent asleep hosts can receive work only when they report wake capability; heartbeat/model/wake claims remain untrusted. One signed-in account's payer wallet cannot pay itself; choose a different verified payout wallet if using your own host.
 
 ## Public pages
 

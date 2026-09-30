@@ -140,9 +140,10 @@ export class PostgresStore implements Store {
   }
 }
 
-let instance: Promise<Store> | undefined;
+// Route bundles and development reloads must share leases and the process-local connector queue.
+const storeRuntime = globalThis as typeof globalThis & { __ledgerStore?: Promise<Store> };
 export function getStore(): Promise<Store> {
-  instance ??= (async () => {
+  storeRuntime.__ledgerStore ??= (async () => {
     if (process.env.DATABASE_URL) {
       const { Pool } = await import('pg');
       const store = new PostgresStore(
@@ -155,8 +156,8 @@ export function getStore(): Promise<Store> {
       throw new Error('DATABASE_URL is required for a hosted deployment.');
     return new LocalStore(resolve(process.env.LOCAL_DATABASE_PATH || '.data/rental.sqlite'));
   })().catch((error) => {
-    instance = undefined;
+    storeRuntime.__ledgerStore = undefined;
     throw error;
   });
-  return instance;
+  return storeRuntime.__ledgerStore;
 }

@@ -78,16 +78,25 @@ if the preview deliberately overrides `DATABASE_URL=`, use that override for its
 
 ## Local AI and the public library desk
 
-Set the server-only Ollama URL/model in `.env.local` using `.env.example`. The Next server
-must reach the LAN host; a public cloud deployment cannot reach a private LAN address
-without an explicitly configured network connection. Do not publish the Ollama port or keys.
-If the host sleeps, use its existing wake controls first. The app does not power on,
-reboot or reconfigure the PC, and it does not replace an unavailable local model.
+**Local mode:** set the server-only `LOCAL_AI_OLLAMA_URL` and model in `.env.local` using
+`.env.example`; the Next server must reach that endpoint. Never publish Ollama or keys.
+**Hosted mode:** leave the direct URL empty and run the zero-dependency [outbound host
+connector](host-connector/README.md) on an always-on Linux device beside Ollama. It creates
+an owner-only Ed25519 key and prints a ten-minute pairing code. An account whose verified
+EVM wallet is in `LOCAL_AI_HOST_OWNER_WALLETS` can approve it in Money → Devices & income
+→ Pair hosts & income, choose its verified payout wallet, and revoke it there. The connector
+dials the app over HTTPS; the cluster never dials the home LAN. Optional Home Assistant
+wake credentials stay only on that device. See [ADR 0013](docs/adr/0013-outbound-host-connector.md)
+and the exact [hosted release requirements](docs/DEPLOYMENT.md#the-gpu).
 
 - **Money → Devices & income → Local AI & GPU hosting** is the one home of this service; Me's GPU adapter, the project sketch's GPU option and the library profile link to it.
 - Personal access uses official **x402 v2 exact/Permit2**, the existing six-decimal `tUSDG`
   on `eip155:46630`, and **0.01 tUSDG per completed answer**. The reviewed Permit2 allowance
   is finite (**0.10 tUSDG**), and each answer needs its own bounded wallet authorization.
+  Connector quotes bind the selected host and its payout wallet; own hosts are preferred.
+  Own-host-only is the default. City routing requires an explicitly public question:
+  **the host reads the question in clear**, and nothing proves which model ran or whether
+  that operator retained it. No confidential question should go to a third-party host.
 - The model must produce a complete answer before settlement. Failed or length-capped
   inference is not charged; an already-sent allowance approval can still cost network gas.
   The saved output and exact settlement bytes survive an interrupted response, so recovery does not
@@ -98,7 +107,7 @@ reboot or reconfigure the PC, and it does not replace an unavailable local model
   (`secure_delete` plus a truncating checkpoint); Postgres keeps dead rows until autovacuum.
 - Set `LOCAL_AI_LIBRARY_ENABLED=1` to enable [the wallet-free desk](http://localhost:4175/library).
   It establishes an HttpOnly visitor session before inference, allows three attempts per
-  visitor and thirty shared attempts per UTC day, and runs one model request at a time.
+  visitor and thirty shared attempts per UTC day, with one model request at a time per host.
   **Finish & clear this desk** revokes the visitor session and removes that visitor's saved
   questions and answers now. No sponsor payment or paid receipt is fabricated for free access.
 - Recorded token usage, request duration, decode rate and settled receipts are observations.
