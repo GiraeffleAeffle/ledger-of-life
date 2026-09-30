@@ -1,4 +1,4 @@
 host: ledger.stadtstack.eu
 image:
-  # The image workflow's job summary prints the registry digest to paste here.
-  digest: ""
+  # From the image workflow run for tag image-20260930-92b952c (commit 92b952c), pushed 30 Sep 2026.
+  digest: "sha256:49ebff60b953323792d3df551236b6d8d2cb0a135db18e170469c04015af7559"

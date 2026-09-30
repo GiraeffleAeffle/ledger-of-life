@@ -1,9 +1,12 @@
-# KEY NAMES ONLY. Copy this file OUTSIDE the repository (for example to ~/ledger-env.local), fill in the real values there,
-# and never commit or paste the filled file.
+# KEY NAMES ONLY. Copy this file OUTSIDE every repository (for example to ~/ledger-env.local, chmod 600), fill in the real
+# values there, and never commit or paste the filled file.
 #
-# Create the Secret after deploy/namespace.yaml is applied (deploy/apply.sh does that before checking the Secret):
+# Store it as Secret ledger-env after the namespace exists (first run: --namespace), through the release wrapper:
 #
-#   kubectl create secret generic ledger-env --namespace ledger-of-life --from-env-file="$HOME/ledger-env.local"
+#   infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh --secret ~/ledger-env.local
+#
+# That runs deploy/apply.sh --secret, which refuses a file other users can read or one inside a git work tree, shows
+# only the key names and asks for a typed confirmation.
 #
 # Generate the reconcile secret locally, do not reuse another one:
 #
@@ -11,10 +14,12 @@
 #
 # The public Privy app id is NOT here: it is compiled into the browser bundle, so it is a build argument of the image.
 
-# The Privy app's secret and, optionally, the verification key of its access tokens.
-# The key is a PEM on one line with literal \n between the lines (the app converts them back).
+# The Privy app's secret.
 PRIVY_APP_SECRET=REPLACE_ME
-PRIVY_VERIFICATION_KEY=REPLACE_ME
+
+# Optional: the verification key of Privy access tokens, a PEM on one line with literal \n between the lines (the app
+# converts them back). Leave it commented out unless you have the key; a wrong value makes every sign-in fail.
+# PRIVY_VERIFICATION_KEY=
 
 # Bearer secret of the scheduled reconcile job (at least 32 random characters).
 RECONCILE_SECRET=REPLACE_ME

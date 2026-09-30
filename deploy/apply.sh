@@ -1,24 +1,34 @@
 #!/usr/bin/env bash
-# Bounded release of Ledger of Life to the reviewed Talos cluster. Run it in the owner's admin session.
+# Bounded release of Ledger of Life to the reviewed Talos cluster. On the owner's machine it runs inside
+# strausberg-zk-residency's infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh, which opens the session.
 #
-#   deploy/apply.sh --diff-only   read-only: what would change, and whether the Secret exists
-#   deploy/apply.sh --namespace   first run only: create the namespace (so the Secret can be created), nothing else
-#   deploy/apply.sh               the release: diff, typed confirmation, helmfile apply, rollout and status
+#   deploy/apply.sh --diff-only      read-only: what would change, and whether the Secret exists
+#   deploy/apply.sh --namespace      first run only: create the namespace (so the Secret can be stored), nothing else
+#   deploy/apply.sh --secret FILE    store Secret ledger-env from an owner-only KEY=VALUE file outside any repository
+#   deploy/apply.sh                  the release: diff, typed confirmation, helmfile apply, rollout and status
 #
 # Every mode refuses a render without a real image digest and any cluster but the reviewed one. One kube context is
 # resolved at the start and passed explicitly to every kubectl and helmfile call, so the cluster that was checked is
-# the cluster that is changed. Nothing here reads, decodes or prints a Secret value.
+# the cluster that is changed. Nothing here reads back, decodes or prints a Secret value.
 set -euo pipefail
 
-usage() { printf 'Usage: deploy/apply.sh [--diff-only | --namespace]\n' >&2; }
+usage() { printf 'Usage: deploy/apply.sh [--diff-only | --namespace | --secret FILE]\n' >&2; }
 mode='release'
+secret_file=''
 case "${1:-}" in
   "") ;;
   --diff-only) mode='diff' ;;
   --namespace) mode='namespace' ;;
+  --secret) mode='secret'; secret_file="${2:-}"; [[ -n "$secret_file" ]] || { usage; exit 2; } ;;
   *) usage; exit 2 ;;
 esac
-if (( $# > 1 )); then usage; exit 2; fi
+if [[ "$mode" == secret ]]; then (( $# == 2 )) || { usage; exit 2; }; elif (( $# > 1 )); then usage; exit 2; fi
+# Resolve the Secret file's directory before the script changes directory. The file itself is opened exactly once,
+# later, without following links.
+if [[ -n "$secret_file" ]]; then
+  secret_parent="$(cd -- "$(dirname -- "$secret_file")" 2>/dev/null && pwd -P)" || { printf 'Secret file directory not found: %s\n' "$secret_file" >&2; exit 1; }
+  secret_file="${secret_parent}/$(basename -- "$secret_file")"
+fi
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$script_dir"
@@ -65,14 +75,86 @@ confirm() {
   [[ "$answer" == "$1" ]] || { printf 'Confirmation did not match; nothing changed.\n' >&2; exit 1; }
 }
 
+# A preview must succeed: kubectl diff exits 0 (no change) or 1 (changes); anything else is an error, not a preview.
+preview_namespace() {
+  local status=0
+  kc diff --server-side --field-manager=ledger-apply -f namespace.yaml || status=$?
+  (( status <= 1 )) || { printf 'The namespace preview failed (kubectl diff exit %s); nothing changed.\n' "$status" >&2; exit 1; }
+}
+
 namespace_exists=false
 kc get namespace "$NAMESPACE" >/dev/null 2>&1 && namespace_exists=true
 
 if [[ "$mode" == namespace ]]; then
-  kc diff --server-side --field-manager=ledger-apply -f namespace.yaml || true
+  preview_namespace
   confirm "create namespace $NAMESPACE"
   kc apply --server-side --field-manager=ledger-apply -f namespace.yaml
-  printf 'Now create the Secret (see ledger-env.example), then run deploy/apply.sh --diff-only.\n'
+  printf 'Next: store the Secret with --secret FILE (see ledger-env.example), then run --diff-only.\n'
+  exit 0
+fi
+
+if [[ "$mode" == secret ]]; then
+  "$namespace_exists" || { printf 'Namespace %s does not exist yet. First run: --namespace\n' "$NAMESPACE" >&2; exit 1; }
+  if git -C "$secret_parent" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    printf 'Secret file is inside a git work tree; keep it outside every repository.\n' >&2; exit 1
+  fi
+  # Open the file once without following links, check the open file (regular, yours, one link, mode 0600 or
+  # stricter), validate those bytes and copy exactly them into a private snapshot. Only the snapshot reaches kubectl,
+  # so the file cannot be swapped between the checks, the confirmation and the upload.
+  snapshot_dir="$(mktemp -d "${TMPDIR:-/tmp}/ledger-secret.XXXXXX")"
+  chmod 700 "$snapshot_dir"
+  trap 'rm -rf -- "$snapshot_dir"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  status=0
+  keys="$(python3 - "$secret_file" "$snapshot_dir/env" <<'PY'
+import os, stat, sys
+source, target = sys.argv[1], sys.argv[2]
+try:
+    fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW)
+except OSError:
+    raise SystemExit(2)
+try:
+    details = os.fstat(fd)
+    if (not stat.S_ISREG(details.st_mode) or details.st_uid != os.getuid() or details.st_nlink != 1
+            or stat.S_IMODE(details.st_mode) & 0o077):
+        raise SystemExit(3)
+    data = b''
+    while chunk := os.read(fd, 65536):
+        data += chunk
+        if len(data) > 65536:
+            raise SystemExit(4)
+finally:
+    os.close(fd)
+values = {}
+for line in data.decode('utf-8').splitlines():
+    if not line.strip() or line.lstrip().startswith('#'):
+        continue
+    if '=' not in line:
+        raise SystemExit(4)
+    key, value = line.split('=', 1)
+    values[key] = value
+if not values.get('PRIVY_APP_SECRET') or not values.get('RECONCILE_SECRET'):
+    raise SystemExit(5)
+out = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+with os.fdopen(out, 'wb') as handle:
+    handle.write(data)
+print(' '.join(sorted(values)))
+PY
+)" || status=$?
+  case "$status" in
+    0) ;;
+    2) printf 'Secret file cannot be opened, or it is a link.\n' >&2; exit 1 ;;
+    3) printf 'Secret file must be a regular file with one link, owned by you and readable only by you (chmod 600).\n' >&2; exit 1 ;;
+    5) printf 'Secret file needs values for PRIVY_APP_SECRET and RECONCILE_SECRET.\n' >&2; exit 1 ;;
+    *) printf 'Secret file must hold KEY=VALUE lines (comments allowed) and stay under 64 KB.\n' >&2; exit 1 ;;
+  esac
+  printf 'Secret ledger-env will hold these keys: %s\n' "$keys"
+  confirm "store secret ledger-env"
+  # The rendered Secret goes through a pipe from kubectl to kubectl; it is never printed.
+  kc -n "$NAMESPACE" create secret generic ledger-env --from-env-file="$snapshot_dir/env" --dry-run=client -o yaml |
+    kc apply --server-side --field-manager=ledger-apply -f -
+  printf 'Next: --diff-only, then the release.\n'
   exit 0
 fi
 
@@ -88,15 +170,12 @@ secret_help() {
   if ! "$namespace_exists"; then
     printf 'Namespace %s does not exist yet. First run: deploy/apply.sh --namespace\n' "$NAMESPACE" >&2
   fi
-  printf '%s\n' 'Secret ledger-env must contain PRIVY_APP_SECRET and RECONCILE_SECRET. Fill a file outside the repository, then run:' >&2
-  # Printed literally, without expanding the operator's HOME.
-  # shellcheck disable=SC2016
-  printf '%s\n' '  kubectl create secret generic ledger-env --namespace ledger-of-life --from-env-file="$HOME/ledger-env.local"' >&2
+  printf '%s\n' 'Secret ledger-env must contain PRIVY_APP_SECRET and RECONCILE_SECRET. Fill an owner-only file outside every repository (see ledger-env.example), then run --secret FILE.' >&2
 }
 
 # 5. Show exactly what would change.
 if "$namespace_exists"; then
-  kc diff --server-side --field-manager=ledger-apply -f namespace.yaml || true
+  preview_namespace
 fi
 hf diff
 

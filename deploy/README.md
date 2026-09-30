@@ -1,6 +1,6 @@
 # Ledger of Life on the Talos cluster: Helm release for review
 
-**A proposal. Nothing here has been applied or server-side dry-run.** Applying needs the owner's explicit approval through the guarded operator script below. Test networks only; no real money. This is a bounded, digest-pinned release, not a claim of production readiness.
+**Nothing here has been applied yet.** Applying runs through `infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh` in `strausberg-zk-residency`, which opens the owner's rootless session and runs one mode of `deploy/apply.sh`; every change needs a typed confirmation. Test networks only; no real money. This is a bounded, digest-pinned release, not a claim of production readiness.
 
 ## Why helmfile
 
@@ -21,8 +21,8 @@ The app uses the same tool and defaults as the owner's platform: atomic, cleanup
 | `chart/templates/cronjob.yaml` | Reconcile every minute, Forbid concurrency and bounded deadlines, same hardening, in-cluster Service origin. |
 | `chart/templates/networkpolicy.yaml` | Four policies: default deny, HTTP-01 solver, web and reconcile. HAProxy sources and reconcile can reach the app; DNS and public HTTPS only, excluding private/link-local/CGNAT. |
 | `values/ledger.stadtstack.eu.yaml` | Public host and the **one** image digest used by both workloads. Rendering refuses an empty/invalid digest or empty host. |
-| `ledger-env.example` | Secret key names and creation command; no secret values. |
-| `apply.sh` | Three modes, all behind the offline render (digest refusal) and the cluster UID guard. `--diff-only` changes nothing. `--namespace` creates only the namespace after a typed confirmation (first run). The default mode requires the Secret, shows the diff, asks for a typed confirmation, applies, waits for the rollout and the certificate, then prints `storeAvailable` and `persistence`. Works from any cwd. |
+| `ledger-env.example` | Secret key names; no secret values. |
+| `apply.sh` | Four modes, all behind the offline render (digest refusal) and the cluster UID guard, with one kube context bound to every kubectl and helmfile call. `--diff-only` changes nothing. `--namespace` creates only the namespace (first run). `--secret FILE` stores Secret `ledger-env` from an owner-only file outside every repository, checking keys by name only. The default mode requires the Secret, shows the diff, asks for a typed confirmation, applies, waits for the rollout and the certificate, then prints `storeAvailable` and `persistence`. Works from any cwd. |
 
 Standard Helm labels are metadata only; selectors remain `app.kubernetes.io/name: ledger-of-life` and component `web` or `reconcile`.
 
@@ -55,12 +55,20 @@ Read on 29 Sep 2026 through the read-only Freelens viewer, plus the owner's repo
 
 Every external change requires the owner's approval. Nothing here was applied by the assistant.
 
-1. DNS is already complete. Create the Privy app client and set `NEXT_PUBLIC_PRIVY_CLIENT_ID`.
-2. Push a commit, run `.github/workflows/image.yml` on it, make the package public, and note the digest from the job summary.
-3. Paste the digest into `deploy/values/ledger.stadtstack.eu.yaml`.
-4. First run only: `deploy/apply.sh --namespace` (type `create namespace ledger-of-life`). Then copy `deploy/ledger-env.example` to `$HOME/ledger-env.local`, fill it privately (never commit or print it) and run the Secret command in the example.
-5. `deploy/apply.sh --diff-only`. Read-only: it renders, checks the cluster UID `7bc769bc-e860-4d54-a0d5-d426f3a52420`, reports whether the Secret has both keys and shows the namespace and release diffs.
-6. Review that diff, then run `deploy/apply.sh` and type exactly `apply ledger-of-life`. The script waits up to 180 seconds for the rollout and up to 2 minutes for the certificate; if the certificate is still pending it says so and exits successfully, because the release itself is up.
+1. DNS is done. Privy: `https://ledger.stadtstack.eu` is in the app's own Allowed Origins (30 Sep; the wallet iframe's `frame-ancestors` lists it), so no app client id is needed.
+2. The image comes from `.github/workflows/image.yml`, run by pushing a tag `image-*` on a commit whose CI passed. Make the package public once, then paste the digest from the job summary into `deploy/values/ledger.stadtstack.eu.yaml`, commit and push.
+3. In `strausberg-zk-residency`, stop the Freelens viewer (the session uses the same daily WireGuard identity), set the acknowledgement once, and run the wrapper. No sudo is needed:
+
+   ```bash
+   infra/hetzner-talos/scripts/open-freelens-filtered-viewer.sh stop
+   export LIVE_LEDGER_OF_LIFE_ACK=release-ledger-of-life-through-deploy-apply-only-v1
+   infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh --namespace          # first run only
+   infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh --secret ~/ledger-env.local
+   infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh --release            # shows the diff, then asks
+   infra/hetzner-talos/scripts/open-freelens-filtered-viewer.sh start --manual-stop
+   ```
+
+   The wrapper runs only the pushed commit's `deploy/` tree and refuses any cluster but the reviewed one (kube-system UID `7bc769bc-e860-4d54-a0d5-d426f3a52420`). It refuses to start while another rootless tunnel runs and checks again just before applying, but the Freelens viewer does not take its shared lock yet, so **do not start the viewer until the wrapper has finished**: two tunnels on the same identity make both unreliable. `--release` waits up to 180 seconds for the rollout and up to 2 minutes for the certificate; if the certificate is still pending it says so and exits successfully, because the release itself is up.
 
 Prerequisites: helmfile, Helm, the Helm diff plugin, kubectl, curl and Python 3. `KUBECTL` overrides the kubectl binary (for example `$HOME/.local/bin/kubectl-v1.36.0`). Secret checks fetch only `.data` key names, never values. Rendering happens before any cluster write, so missing digest stops safely.
 
