@@ -25,7 +25,14 @@ export function endpointOrigin(value, app = false) {
 }
 
 export function validateConfig(input, baseDirectory = process.cwd()) {
-  assert(keys(input, ['appOrigin', 'ollamaUrl', 'models', 'name', 'stateDirectory', 'pairingCode', 'wakeOnLan', 'homeAssistant']), 'Unknown connector configuration field');
+  assert(keys(input, ['appOrigin', 'ollamaUrl', 'models', 'name', 'stateDirectory', 'pairingCode', 'wakeOnLan', 'homeAssistant', 'DANGEROUS_ALLOW_PLAINTEXT_OLLAMA_ON_TRUSTED_LAN']), 'Unknown connector configuration field');
+  const ollamaOptIn = input.DANGEROUS_ALLOW_PLAINTEXT_OLLAMA_ON_TRUSTED_LAN;
+  assert(ollamaOptIn === undefined || typeof ollamaOptIn === 'boolean', 'Ollama plaintext opt-in must be boolean');
+  const ollamaUrl = endpointOrigin(input.ollamaUrl);
+  const ollamaHost = new URL(ollamaUrl).hostname;
+  // Plain HTTP beyond this device lets anyone on that network read questions and forge answers.
+  assert(ollamaUrl.startsWith('https:') || ['localhost', '127.0.0.1', '[::1]'].includes(ollamaHost) || ollamaOptIn === true,
+    'Ollama beyond this device requires HTTPS unless DANGEROUS_ALLOW_PLAINTEXT_OLLAMA_ON_TRUSTED_LAN is explicitly true');
   assert(text(input.name, 80) && input.name.trim(), 'Host name is required (max 80 characters)');
   assert(Array.isArray(input.models) && input.models.length > 0 && input.models.length <= 16 && input.models.every((model) => text(model, 128)) && new Set(input.models).size === input.models.length, 'Configure 1–16 unique model names, at most 128 characters each');
   assert(text(input.stateDirectory, 4096), 'stateDirectory is required');
@@ -50,7 +57,7 @@ export function validateConfig(input, baseDirectory = process.cwd()) {
     assert(url.startsWith('https:') || optIn === true, 'Home Assistant requires HTTPS unless DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN is explicitly true');
     homeAssistant = { url, tokenFile: resolve(baseDirectory, input.homeAssistant.tokenFile) };
   }
-  return { appOrigin: endpointOrigin(input.appOrigin, true), ollamaUrl: endpointOrigin(input.ollamaUrl), models: [...input.models], name: input.name.trim(), stateDirectory: resolve(baseDirectory, input.stateDirectory), pairingCode: input.pairingCode, wakeOnLan, homeAssistant };
+  return { appOrigin: endpointOrigin(input.appOrigin, true), ollamaUrl, models: [...input.models], name: input.name.trim(), stateDirectory: resolve(baseDirectory, input.stateDirectory), pairingCode: input.pairingCode, wakeOnLan, homeAssistant };
 }
 
 export function jobDeadline(job, now = Date.now()) {

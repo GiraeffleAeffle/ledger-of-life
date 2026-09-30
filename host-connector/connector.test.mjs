@@ -59,6 +59,15 @@ test('app origin cannot downgrade, redirect credentials through URL syntax, or e
   assert.throws(() => validateConfig({ ...configInput, homeAssistant: { url: 'http://localhost', token: 'must-not-be-inline' } }));
 });
 
+test('plain HTTP to an Ollama beyond this device needs the explicit trusted-LAN opt-in', () => {
+  const lan = { ...configInput, ollamaUrl: 'http://192.168.178.72:11434' };
+  assert.throws(() => validateConfig(lan), /DANGEROUS_ALLOW_PLAINTEXT_OLLAMA_ON_TRUSTED_LAN/);
+  assert.throws(() => validateConfig({ ...lan, DANGEROUS_ALLOW_PLAINTEXT_OLLAMA_ON_TRUSTED_LAN: 'yes' }));
+  assert.equal(validateConfig({ ...lan, DANGEROUS_ALLOW_PLAINTEXT_OLLAMA_ON_TRUSTED_LAN: true }).ollamaUrl, 'http://192.168.178.72:11434');
+  assert.equal(validateConfig({ ...configInput, ollamaUrl: 'https://gpu.lan.example' }).ollamaUrl, 'https://gpu.lan.example');
+  assert.equal(validateConfig({ ...configInput, ollamaUrl: 'http://127.0.0.1:11434' }).ollamaUrl, 'http://127.0.0.1:11434');
+});
+
 test('job validation rejects extra capabilities, unsafe options, oversized text and elapsed deadlines', () => {
   const valid = validateJob(job(), [model]);
   assert.equal(valid.stream, false);

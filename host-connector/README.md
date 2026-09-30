@@ -78,6 +78,7 @@ Use a dedicated unprivileged Linux service user on an always-on device in the ho
 {
   "appOrigin": "https://ledger.stadtstack.eu",
   "ollamaUrl": "http://192.168.178.72:11434",
+  "DANGEROUS_ALLOW_PLAINTEXT_OLLAMA_ON_TRUSTED_LAN": true,
   "name": "Owner desktop GPU",
   "models": ["qwen3.8:27b-ud-q3-k-xl"],
   "stateDirectory": "/home/ledger-host/.local/state/stadtstack-host",
