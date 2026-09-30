@@ -156,7 +156,8 @@ export async function listListings(store: Store, identity: VerifiedIdentity | nu
   const rows = await store.scan<Listing>('listing:', '', 200);
   return rows
     .map((row) => row.value)
-    .filter((value) => value.status === 'open' || (identity && publicListing(value, identity).relation))
+    .filter((value) => value.status === 'open' || (value.status === 'closed' && value.agreementId !== null) ||
+      (identity && publicListing(value, identity).relation))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .map((value) => publicListing(value, identity));
 }

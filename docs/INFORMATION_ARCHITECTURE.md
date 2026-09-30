@@ -57,7 +57,7 @@ Money is one page with four tabs (`SectionTabs`). Each has one job and states it
 
 | Feature | Home (area → section) | Configured in | Referenced from, and what the reference shows |
 |---|---|---|---|
-| Rented home: listing, agreement, deposit, move-out | Home | Me (wallet) | Today (next step), Money → Holdings (deposit entitlement tile), Me (timeline, roles) |
+| Rented home: listing, agreement, deposit, move-out (a landlord or tenant can cancel the tenancy until the deposit is locked) | Home | Me (wallet) | Today (next step), Money → Holdings (deposit entitlement tile), Me (timeline, roles) |
 | Service charges | Home (inside a living tenancy) | Me (Home Assistant, for consumption) | Ideas, Me directory |
 | Shared official-stock loan and lending; deposit prototype | Money → Shares & loans | Me (wallet); verified shared deployment and hosted mirror job | Today, Ideas, Me directory; no fake landlord/desk setup |
 | Stocks: tSPYx and official faucet test TSLA | Money → Holdings (wallet/lent positions) and Shares & loans (collateral) | Me (wallet) | Today (subtotal); wallet/collateral TSLA use one mirror, Jupiter only cross-checks |
@@ -180,6 +180,7 @@ Add or change an adapter by reading the code first, then editing the statements.
 - Money: holdings and the five categories first, test-money funding next to the action that needs it; Shares & loans offers two tasks (Loan against shares, Lend test dollars) with the protocol details behind one disclosure and no "Rental deposit" panel; the share-backed deposit calculator moved to the Roadmap as the prototype's illustration.
 - The "Test networks · no real money" chip opens the one explainer of what is real here.
 - The market's preflight checks refuse a shortfall before any signature (`src/domain/market-preflight.ts`).
+- Home: either the landlord or the tenant can cancel a tenancy before the deposit is locked, from the tenancy card. The tenancy and its listing close for everyone; the card keeps who cancelled and when, with no further step. Cancellation is refused while escrow initialization is confirming, while a funding operation is signed, broadcast or unknown, and once the deposit is funded. Accounts, wallets and balances stay. Cancelling sends nothing on chain; an initialized empty escrow stays on devnet. If someone funds it directly on chain despite cancellation, the normal settlement and payout steps return. Checked locally with scripted chain observations and a browser fixture, not on a funded devnet tenancy.
 - Deposits can be realistic: the site mints its own devnet test USDC (tUSDC, 10,000 per request, "Get test USDC" at the deposit step and in Money → Test money), and the listing form suggests three months' cold rent. A tUSDC deposit stays in the escrow as cash and earns nothing.
 - Ledger of Life takes the Stadtstack family look: the bound-pages mark (Stadtstack's four stacked tiles bound by an ink spine), "part of stadtstack." beside the name, the four stages in the Stadtstack level colours as accents only (1 green, 2 teal, 3 amber, 4 coral), ink text and ink pill buttons, and the self-hosted Fraunces, Public Sans and IBM Plex Mono. Three proposals (GPT-6.1, Claude Opus, Claude Sonnet) informed it.
 

@@ -228,6 +228,8 @@ export function createSolanaInitializationService(input: {
       fail('agreement_unavailable', 'A complete Solana agreement is required.', 403);
     const role = agreementRole(agreement, identity);
     const party = agreement.parties[role]!;
+    if (signing && agreement.cancelled)
+      fail('agreement_cancelled', 'This tenancy was cancelled before the deposit was secured.');
     if (identity.expiresAt * 1000 <= now() || party.wallet.chainType !== 'solana')
       fail('identity_expired', 'Sign in again before authorizing this tenancy.', 401);
     if (signing && !requiredRoles.includes(role as PartyRole))
@@ -352,6 +354,12 @@ export function createSolanaInitializationService(input: {
   }
   async function sendStored(record: SolanaInitialization) {
     if (!record.signedTxBase64 || !record.signature) throw new Error('Signed initialization missing');
+    // Persisted signed setup and this revision checkpoint serialize broadcast against cancel.
+    await store.update<Agreement>(`agreement:${config.agreementId}`, (agreement) => {
+      if (agreement.cancelled)
+        fail('agreement_cancelled', 'This tenancy was cancelled before the deposit was secured.');
+      return { ...agreement, revision: agreement.revision + 1 };
+    });
     try {
       const sent = await gateway.broadcast(new Uint8Array(Buffer.from(record.signedTxBase64, 'base64')));
       if (sent !== record.signature) throw new Error('RPC returned another signature');

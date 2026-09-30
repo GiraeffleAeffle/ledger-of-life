@@ -15,10 +15,15 @@ export interface Agreement {
   releaseAllowed: boolean;
   createdAt: string;
   revision: number;
+  cancelled?: { by: 'landlord' | 'tenant'; at: string };
   parties: Partial<Record<Role, { subject: string; wallet: VerifiedWallet }>>;
   invitations: Partial<Record<'tenant' | 'arbitrator', { digest: string; expiresAt: number }>>;
   accepted: Partial<Record<'tenant' | 'landlord', { digest: string; at: string }>>;
   records: { id: string; name: string; body: string; by: string; at: string }[];
+}
+
+export function requireOpenAgreement(value: Agreement) {
+  if (value.cancelled) throw new ConflictError('This tenancy was cancelled before the deposit was secured.');
 }
 function digest(value: string) {
   return createHash('sha256').update(value).digest('hex');
@@ -123,6 +128,7 @@ export async function inviteToAgreement(
   await store.update<Agreement>(`agreement:${id}`, (value) => {
     if (agreementRole(value, identity) !== 'landlord')
       throw new AccessError('Only the recorded landlord can create an invitation.');
+    requireOpenAgreement(value);
     if (value.parties[role]) throw new ConflictError('This role is already assigned.');
     return {
       ...value,
@@ -150,6 +156,7 @@ export async function joinAgreement(
   )
     throw new AccessError('The invitation is invalid.');
   const next = await store.update<Agreement>(`agreement:${id}`, (value) => {
+    requireOpenAgreement(value);
     const invite = value.invitations[role];
     if (!invite || invite.expiresAt < Date.now() || invite.digest !== digest(token))
       throw new AccessError('The invitation is invalid, expired or already used.');
@@ -184,6 +191,7 @@ export async function acceptAgreement(
   const next = await store.update<Agreement>(`agreement:${id}`, (value) => {
     const role = agreementRole(value, identity);
     if (role === 'arbitrator') throw new AccessError('The tenant and landlord accept the tenancy.');
+    requireOpenAgreement(value);
     const actual = agreementDigest(value);
     if (!actual || actual !== expectedDigest)
       throw new ConflictError(

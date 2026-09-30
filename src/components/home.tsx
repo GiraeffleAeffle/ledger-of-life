@@ -22,7 +22,7 @@ import type { PublicListing } from '@/server/listings';
 import { Today } from './today';
 import { Badge, money } from './workspace-panels';
 import './home-journey.css';
-import { claimAmount, confirmationStalled, HOME_STAGES, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, settlementSplit } from './home-journey-logic';
+import { claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, settlementSplit } from './home-journey-logic';
 import { operationLabels } from './deposit-activity';
 import { nextStep } from './next-step';
 import { NextStepCard } from './next-step-card';
@@ -151,14 +151,12 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
     return () => window.removeEventListener('hashchange', update);
   }, []);
   const ready = (tenancies ?? []).filter((t): t is TenancyJourney => !('unavailable' in t));
-  const current = ready.find((t) => t.next.kind === 'respond_claim' || t.next.kind === 'decide_claim')
-    ?? ready.find((t) => !AUTO[t.next.kind] && t.next.kind !== 'done' && t.next.kind !== 'propose_claim')
-    ?? ready.find((t) => t.next.kind !== 'done' && t.stage !== 'living')
-    ?? ready.find((t) => t.next.kind !== 'done');
+  const current = currentHomeTenancy(ready);
+  const otherTenancies = ready.filter((t) => t !== current && t.next.kind !== 'done' && t.next.kind !== 'cancelled');
   const unavailable = (tenancies ?? []).filter((t): t is Unavailable => 'unavailable' in t);
   const myOpenListing = listings.find((l) => l.relation === 'landlord' && l.status === 'open' && (l.applications?.length ?? 0) > 0);
   const focusListing = !current || AUTO[current.next.kind] || current.next.kind === 'propose_claim' ? myOpenListing : undefined;
-  const appliedListing = listings.find((l) => l.relation === 'chosen' && !ready.some((t) => t.agreementId === l.agreementId))
+  const appliedListing = listings.find((l) => l.relation === 'chosen' && l.status !== 'closed' && !ready.some((t) => t.agreementId === l.agreementId))
     ?? listings.find((l) => l.relation === 'applicant' && l.status === 'open');
   const finished = ready.find((t) => t.next.kind === 'done');
   const pathListing = focusListing ?? (!current || current.stage === 'living' ? appliedListing : undefined);
@@ -229,9 +227,9 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
             </section>)}
           </div>
           {current && unavailable.length > 0 && <p className="housing-unavailable" role="status">{unavailable.length} other tenancy reading{unavailable.length === 1 ? ' is' : 's are'} unavailable. See other tenancies below.</p>}
-          {current && (ready.some((t) => t !== current && t.next.kind !== 'done') || unavailable.length > 0) && <details className="card housing-other-tenancies" open={unavailable.length > 0 || ready.some((t) => t !== current && t.stage !== 'living' && !AUTO[t.next.kind] && t.next.kind !== 'done')}>
-            <summary>Other tenancies ({ready.filter((t) => t !== current && t.next.kind !== 'done').length + unavailable.length})</summary>
-            {ready.filter((t) => t !== current && t.next.kind !== 'done').map((t) => (
+          {current && (otherTenancies.length > 0 || unavailable.length > 0) && <details className="card housing-other-tenancies" open={unavailable.length > 0 || otherTenancies.some((t) => t.stage !== 'living' && !AUTO[t.next.kind])}>
+            <summary>Other tenancies ({otherTenancies.length + unavailable.length})</summary>
+            {otherTenancies.map((t) => (
               <TenancyCard key={t.agreementId} journey={t} request={request} reload={load} go={go} accountId={wallet.subject ?? ''} />
             ))}
             {unavailable.map((t) => <section className="card" key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}>
@@ -248,6 +246,13 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
               </div>
             ))}
           </details>}
+          {ready.filter((t) => t.next.kind === 'cancelled').map((t) => (
+            <section className="card cancelled-tenancy" key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}>
+              <strong>{t.property}</strong>
+              <p className="small-copy">Cancelled · {t.role}{t.cancelled && <> · by {t.cancelled.by} · {new Date(t.cancelled.at).toLocaleString('en-GB')}</>}</p>
+              <TenancyDetails journey={t} request={request} />
+            </section>
+          ))}
           <Homes listings={listings} request={request} reload={load} go={go} loaded={listingsLoaded} loadError={listingsError} testTools={helpers === true} tenancyIds={new Set(ready.map((t) => t.agreementId))} />
 
           {helpers && helper && <TestTools tenancies={ready} listings={listings} request={request} helper={helper} busy={helperBusy} log={helperLog} />}
@@ -533,6 +538,11 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
           </div>
         )}
       </div>}
+      {journey.cancellable && (journey.role === 'landlord' || journey.role === 'tenant') && <button type="button" className="button secondary" disabled={busy} onClick={() => {
+        if (window.confirm('No deposit is locked, so nothing moves. The tenancy and its listing close for all three of you. You can list the home again; a new tenancy uses test USDC (tUSDC).')) {
+          void run(async () => { await request(`/api/agreements/${encodeURIComponent(agreementId)}`, { action: 'cancel' }); });
+        }
+      }}>Cancel this tenancy</button>}
       {agreementError && <p className="note" role="alert">Agreement records are unavailable. Review the reasons before signing. <button className="button secondary" onClick={() => setAgreementRetry((count) => count + 1)}>Retry records</button></p>}
       {message && <p className="note" role="status">{message}</p>}
       {chain && !cashOnly && chain.phase === 'active' && journey.role === 'tenant' && (BigInt(chain.claimableAtomic) > 0n || BigInt(chain.releasedAtomic) > 0n) && (

@@ -3,6 +3,7 @@ import { Building2, Home, Wallet } from 'lucide-react';
 import type { TenancyJourney } from '@/server/journey';
 import type { PublicListing } from '@/server/listings';
 import type { AuthorizedRequest } from './use-city-signals';
+import { currentHomeTenancy } from './home-journey-logic';
 import { AssetsOverview } from './assets';
 import { goToSection, type Area } from './areas';
 import { RealityChips } from './reality-chip';
@@ -14,10 +15,10 @@ export function LedgerOverview({ request, tenancies, listings, homeError, cityId
   cityId: string; cityName: string; selectedCity: boolean; cityLoading: boolean; cityError: string; citySnapshot: string | null;
   go: (area: Area) => void;
 }) {
-  const relatedListings = listings.filter((item) => item.relation === 'landlord' || item.relation === 'applicant');
+  const relatedListings = listings.filter((item) => item.status !== 'closed' && (item.relation === 'landlord' || item.relation === 'applicant'));
   const ready = (tenancies ?? []).filter((item): item is TenancyJourney => !('unavailable' in item));
   const unreadableHomes = (tenancies ?? []).filter((item): item is UnavailableHome => 'unavailable' in item);
-  const home = ready[0];
+  const home = currentHomeTenancy(ready) ?? ready.find((item) => item.next.kind === 'done');
   const listing = relatedListings[0];
   const homeTarget = home ? `tenancy-${home.agreementId}` : listing ? `listing-${listing.id}` : 'home-options';
   return <section className="ledger-overview" aria-label="Your current status">

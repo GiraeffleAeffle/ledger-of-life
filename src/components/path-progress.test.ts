@@ -30,3 +30,12 @@ test('the deposit counts as secured only once it is locked', () => {
   assert.equal(pathProgress({ ...fresh, tenancies: [{ stage: 'living' }] }).deposit, 'done');
   assert.equal(pathProgress({ ...fresh, tenancies: [{ stage: 'paid' }] }).deposit, 'done');
 });
+
+test('cancelled records and closed listings leave no active home or deposit progress', () => {
+  const cancelled = { stage: 'agreement', next: { kind: 'cancelled' } };
+  const facts = { ...fresh, tenancies: [cancelled], listings: [{ relation: 'chosen' as const, status: 'closed' }] };
+  assert.deepEqual(pathProgress(facts), pathProgress(fresh));
+  assert.equal(pathProgress({ ...facts, homeError: true }).deposit, 'unknown');
+  assert.equal(pathProgress({ ...facts, tenancies: [cancelled, { stage: 'deposit', next: { kind: 'wait' } }] }).deposit, 'in-progress');
+  assert.equal(pathProgress({ ...facts, tenancies: [cancelled, { stage: 'living', next: { kind: 'wait' } }] }).deposit, 'done');
+});

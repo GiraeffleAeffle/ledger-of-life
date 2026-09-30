@@ -32,6 +32,7 @@ import type { Store } from './store.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import {
   RpcSolanaGateway,
+  EscrowAbsentError,
   solanaConfiguration,
   type SolanaConfiguration,
   type SolanaGateway,
@@ -355,6 +356,14 @@ export function createSolanaService(dependencies: Dependencies) {
     }
     return found!;
   }
+  async function requireFundingOpen(identity: VerifiedIdentity, action: { kind: string }) {
+    if (action.kind !== 'fund' && action.kind !== 'fund_and_supply') return;
+    const agreement = await store.get<Agreement>(`agreement:${config.agreementId}`);
+    if (agreement?.cancelled) {
+      agreementRole(agreement, identity);
+      fail('agreement_cancelled', 'This tenancy was cancelled before the deposit was secured.');
+    }
+  }
   async function access(identity: VerifiedIdentity) {
     const agreement = await store.get<Agreement>(`agreement:${config.agreementId}`);
     if (!agreement || agreement.network !== 'solana')
@@ -516,6 +525,15 @@ export function createSolanaService(dependencies: Dependencies) {
   }
   async function sendStored(op: SolanaOperation) {
     if (!op.signedTxBase64 || !op.signature) throw new Error('Signed operation was not persisted');
+    if (op.action.kind === 'fund' || op.action.kind === 'fund_and_supply') {
+      // The signed operation is already durable. Advancing the agreement revision makes a
+      // concurrent cancellation's earlier chain check stale, before any broadcast can start.
+      await store.update<Agreement>(`agreement:${config.agreementId}`, (agreement) => {
+        if (agreement.cancelled)
+          fail('agreement_cancelled', 'This tenancy was cancelled before the deposit was secured.');
+        return { ...agreement, revision: agreement.revision + 1 };
+      });
+    }
     try {
       const signature = await gateway.broadcast(
         new Uint8Array(Buffer.from(op.signedTxBase64, 'base64')),
@@ -594,6 +612,21 @@ export function createSolanaService(dependencies: Dependencies) {
     return sendStored(op);
   }
   return {
+    async cancellationState(identity: VerifiedIdentity) {
+      const agreement = await store.get<Agreement>(`agreement:${config.agreementId}`);
+      if (!agreement) fail('agreement_unavailable', 'This tenancy is unavailable.', 403);
+      agreementRole(agreement, identity);
+      let phase: SolanaSnapshot['tenancy']['phase'] | null = null;
+      try {
+        phase = (await gateway.snapshot()).tenancy.phase;
+      } catch (error) {
+        if (!(error instanceof EscrowAbsentError)) throw error;
+      }
+      const operations = (await lane()).operations;
+      return { phase, fundingPending: operations.some((op) =>
+        (op.action.kind === 'fund' || op.action.kind === 'fund_and_supply') &&
+        ['signed', 'broadcast', 'unknown'].includes(op.state)) };
+    },
     async snapshot(identity: VerifiedIdentity) {
       const verified = await access(identity);
       const records = await lane();
@@ -617,6 +650,8 @@ export function createSolanaService(dependencies: Dependencies) {
       return publicOperation(await operation(id));
     },
     async prepare(identity: VerifiedIdentity, requestId: string, input: unknown) {
+      if (input && typeof input === 'object' && 'kind' in input && typeof input.kind === 'string')
+        await requireFundingOpen(identity, { kind: input.kind });
       if (!/^[a-zA-Z0-9_-]{8,120}$/.test(requestId))
         fail('invalid_request_id', 'Use a stable request identifier.', 400);
       const verified = await access(identity),
@@ -743,6 +778,7 @@ export function createSolanaService(dependencies: Dependencies) {
       return publicOperation(next.operations.find((item) => item.id === id)!);
     },
     async authorize(identity: VerifiedIdentity, id: string, signedTxBase64: string) {
+      await requireFundingOpen(identity, (await operation(id)).action);
       const verified = await access(identity);
       let op = await operation(id);
       if (
@@ -836,6 +872,7 @@ export function createSolanaService(dependencies: Dependencies) {
       return publicOperation(await sendStored(op));
     },
     async retry(identity: VerifiedIdentity, id: string) {
+      await requireFundingOpen(identity, (await operation(id)).action);
       const verified = await access(identity);
       const op = await operation(id);
       if (

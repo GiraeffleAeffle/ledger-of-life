@@ -16,6 +16,7 @@ import { agreementDigest, type Agreement } from './agreements.ts';
 import { createSolanaService, decodeSolanaAction, type SolanaOperation } from './solana-service.ts';
 import {
   RpcSolanaGateway,
+  EscrowAbsentError,
   solanaConfiguration,
   verifyDeployedProgram,
   type SolanaConfiguration,
@@ -960,7 +961,7 @@ test('configuration rejects mainnet, wrong genesis, wrong mint and missing deplo
             : { context: { slot: 50 }, value: [null, null] },
       });
     }) as typeof fetch);
-    await assert.rejects(undeployed.snapshot(), /not deployed and initialized/);
+    await assert.rejects(undeployed.snapshot(), (error) => error instanceof Error && !(error instanceof EscrowAbsentError));
   } finally {
     await f.store.close();
   }
@@ -1077,3 +1078,82 @@ test('RPC simulation applies sponsor rent debit and fee together and refuses cha
     await f.store.close();
   }
 });
+
+for (const kind of ['fund', 'fund_and_supply'] as const) {
+  test(`cancellation blocks ${kind} preparation and authorization of an earlier review`, async () => {
+    const f = await fixture();
+    try {
+      const op = await f.service.prepare(f.identity, 'request_cancelled_1', { kind });
+      const signed = await f.sign(op);
+      await f.store.update<Agreement>(`agreement:${f.agreement.id}`, (row) => ({
+        ...row,
+        cancelled: { by: 'landlord', at: new Date(f.state.now).toISOString() },
+      }));
+      const cancelled = { code: 'agreement_cancelled' };
+      await assert.rejects(f.service.prepare(f.identity, 'request_cancelled_2', { kind }), cancelled);
+      await assert.rejects(f.service.prepare(f.identity, 'request_cancelled_1', { kind }), cancelled);
+      await assert.rejects(f.service.authorize(f.identity, op.id, signed), cancelled);
+      await assert.rejects(f.service.retry(f.identity, op.id), cancelled);
+      assert.equal(f.state.sponsorCalls, 0);
+      assert.deepEqual(f.state.broadcasts, []);
+    } finally {
+      await f.store.close();
+    }
+  });
+
+  test(`cancellation blocks ${kind} retry of persisted signed bytes without another send`, async () => {
+    const f = await fixture();
+    try {
+      f.state.ambiguous = true;
+      const op = await f.service.prepare(f.identity, 'request_cancelled_1', { kind });
+      const actorSigned = await f.sign(op);
+      const sent = await f.service.authorize(f.identity, op.id, actorSigned);
+      assert.equal(sent.state, 'unknown');
+      await f.store.update<Agreement>(`agreement:${f.agreement.id}`, (row) => ({
+        ...row,
+        cancelled: { by: 'tenant', at: new Date(f.state.now).toISOString() },
+      }));
+      const reloaded = createSolanaService(f.dependencies);
+      await assert.rejects(reloaded.retry(f.identity, op.id), { code: 'agreement_cancelled' });
+      await assert.rejects(reloaded.authorize(f.identity, op.id, actorSigned), { code: 'agreement_cancelled' });
+      assert.equal(f.state.sponsorCalls, 1);
+      assert.equal(f.state.broadcasts.length, 1);
+      f.state.receiptFinal = true;
+      f.snapshot.slot = '51';
+      f.snapshot.tenancy.nextNonce = kind === 'fund_and_supply' ? '2' : '1';
+      if (kind === 'fund_and_supply') {
+        f.snapshot.tenancy.phase = 'active';
+        f.snapshot.tenancy.accountedReceiptsAtomic = '3000000000';
+      }
+      assert.equal((await reloaded.reconcile(f.identity, op.id)).state, 'finalized');
+    } finally {
+      await f.store.close();
+    }
+  });
+
+  test(`cancellation during sponsor signing prevents ${kind} broadcast`, async () => {
+    const f = await fixture();
+    try {
+      const op = await f.service.prepare(f.identity, 'request_cancelled_1', { kind });
+      const sponsorSign = f.dependencies.sponsor.sign;
+      f.dependencies.sponsor.sign = async (bytes) => {
+        const signed = await sponsorSign(bytes);
+        await f.store.update<Agreement>(`agreement:${f.agreement.id}`, (row) => ({
+          ...row,
+          cancelled: { by: 'landlord', at: new Date(f.state.now).toISOString() },
+        }));
+        return signed;
+      };
+      await assert.rejects(
+        f.service.authorize(f.identity, op.id, await f.sign(op)),
+        { code: 'agreement_cancelled' },
+      );
+      assert.equal(f.state.sponsorCalls, 1);
+      assert.deepEqual(f.state.broadcasts, []);
+      await assert.rejects(f.service.retry(f.identity, op.id), { code: 'agreement_cancelled' });
+      assert.deepEqual(f.state.broadcasts, []);
+    } finally {
+      await f.store.close();
+    }
+  });
+}

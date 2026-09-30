@@ -95,7 +95,7 @@ export function nextStep(facts: NextStepFacts): NextStep {
     action: { label: 'View home status', target: tenancy(waiting) },
   };
   const hasTenancy = (l: Listing) => facts.tenancies.some((t) => t.agreementId === l.agreementId);
-  const chosen = facts.listings.find((l) => l.relation === 'chosen' && !hasTenancy(l));
+  const chosen = facts.listings.find((l) => l.relation === 'chosen' && l.status !== 'closed' && !hasTenancy(l));
   if (chosen) return {
     title: `The landlord chose you for ${chosen.title}.`,
     detail: 'Your deposit agreement is being prepared.',
@@ -112,13 +112,13 @@ export function nextStep(facts: NextStepFacts): NextStep {
     detail: 'Your progress has not been reset. Home shows what failed and lets you try again.',
     action: { label: 'Open Home', target: { area: 'home' } },
   };
-  const living = facts.tenancies.find((t) => t.next.kind !== 'done');
+  const living = facts.tenancies.find((t) => t.next.kind !== 'done' && t.next.kind !== 'cancelled');
   if (living) return {
     title: `The test deposit for ${living.property} is secured. Nothing needs you now.`,
     action: { label: 'View home status', target: tenancy(living) },
     choices: START,
   };
-  const finished = facts.tenancies[0];
+  const finished = facts.tenancies.find((t) => t.next.kind === 'done');
   if (finished) return {
     title: `${finished.property} is paid out. Your records stay in Home.`,
     action: { label: 'View payout summary', target: tenancy(finished) },

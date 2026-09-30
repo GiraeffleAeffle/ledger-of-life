@@ -22,6 +22,12 @@ import {
   type TenancyAccount,
 } from '../finance/solana/index.ts';
 
+export class EscrowAbsentError extends Error {
+  constructor() {
+    super('The escrow has not been initialized.');
+  }
+}
+
 export type SolanaConfiguration = DeploymentManifest & {
   setupMode: 'joint' | 'staged';
   rpcUrl: string;
@@ -256,7 +262,8 @@ export class RpcSolanaGateway implements SolanaGateway {
     const genesisHash = await this.checkedGenesis();
     const initial = await this.multiple([c.escrowProgram, c.tenancyAddress]);
     const program = initial.accounts[0];
-    if (!program || !initial.accounts[1]) throw new Error('Escrow is not deployed and initialized');
+    if (!program) throw new Error('Escrow program is not deployed');
+    if (!initial.accounts[1]) throw new EscrowAbsentError();
     let programData: AccountObservation | undefined;
     if (program.owner === loader && program.data.length === 36) {
       const key = getAddressDecoder().decode(program.data.subarray(4));

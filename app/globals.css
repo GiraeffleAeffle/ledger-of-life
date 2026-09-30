@@ -3181,3 +3181,5 @@ dd {
 .area-eyebrow--money::before { background: linear-gradient(to right, var(--stage-3) 50%, var(--stage-4) 50%); }
 .area-eyebrow--places::before { background: var(--stage-4); }
 code, kbd, samp, pre { font-family: var(--mono); }
+.card.cancelled-tenancy { padding: 16px 20px; color: var(--muted); background: var(--paper); box-shadow: none; }
+.cancelled-tenancy > p { margin: 6px 0; }

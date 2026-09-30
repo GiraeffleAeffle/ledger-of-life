@@ -6,6 +6,7 @@ import { RecoveryError } from './recovery.ts';
 import { SolanaServiceError, type SolanaOperation } from './solana-service.ts';
 import { solanaServicesFor } from './solana-tenancies.ts';
 import type { Store } from './store.ts';
+import { cancellationState } from './tenancy-cancellation.ts';
 
 export type JourneyRole = 'tenant' | 'landlord' | 'arbitrator';
 export type JourneyStage = 'agreement' | 'space' | 'deposit' | 'living' | 'move-out' | 'paid';
@@ -26,7 +27,7 @@ export type NextAction =
   | { kind: 'respond_claim'; label: string; detail: string; claimAtomic: string }
   | { kind: 'decide_claim'; label: string; detail: string; claimAtomic: string }
   | { kind: 'confirming'; label: string; detail: string; operationId: string | null }
-  | { kind: 'paying_out' | 'wait' | 'done'; label: string; detail: string };
+  | { kind: 'paying_out' | 'wait' | 'done' | 'cancelled'; label: string; detail: string };
 
 export interface TenancyJourney {
   agreementId: string;
@@ -34,6 +35,8 @@ export interface TenancyJourney {
   role: JourneyRole;
   requiredSecurity: string;
   sampleParties?: boolean;
+  cancellable?: boolean;
+  cancelled?: Agreement['cancelled'];
   stage: JourneyStage;
   next: NextAction;
   chain: null | {
@@ -58,9 +61,15 @@ export interface TenancyJourney {
 
 const usd = (atomic: string) => `${(Number(atomic) / 1e6).toLocaleString('en-US', { style: 'currency', currency: 'USD' })} test USDC`;
 const waiting = (label: string, detail: string): NextAction => ({ kind: 'wait', label, detail });
+const cancelledStep = (agreement: Agreement): NextAction => ({
+  kind: 'cancelled',
+  label: 'Cancelled before the deposit was secured',
+  detail: `Cancelled by the ${agreement.cancelled!.by} on ${agreement.cancelled!.at}. Nothing was locked.`,
+});
 
 /** Pure: agreement-level next step before any chain state exists. */
 export function agreementStep(agreement: Agreement, role: JourneyRole): NextAction | null {
+  if (agreement.cancelled) return cancelledStep(agreement);
   if (!agreement.parties.arbitrator)
     return role === 'landlord'
       ? { kind: 'invite_arbitrator', label: 'Invite a neutral arbitrator', detail: 'They only decide if you and the tenant disagree at move-out.' }
@@ -154,17 +163,24 @@ export async function tenancyJourney(
   const cached = finished.get(`${agreement.id}:${role}`);
   if (cached && resolveServices === solanaServicesFor) return cached;
   const base = { agreementId: agreement.id, property: agreement.property, role, requiredSecurity: agreement.requiredSecurity, chain: null,
+    cancelled: agreement.cancelled, cancellable: false,
     sampleParties: Object.values(agreement.parties).some((party) => party?.subject.startsWith('test-signer:')) };
-  const early = agreementStep(agreement, role);
-  if (early) return { ...base, stage: 'agreement', next: early };
+  const cancelledState = agreement.cancelled
+    ? await cancellationState(store, identity, agreement, resolveServices)
+    : null;
+  if (agreement.cancelled && (cancelledState!.phase === null || cancelledState!.phase === 'awaiting-funding'))
+    return { ...base, stage: 'agreement', next: cancelledStep(agreement) };
+  const early = agreementStep({ ...agreement, cancelled: undefined }, role);
+  if (early) return { ...base, cancellable: !agreement.cancelled && role !== 'arbitrator', stage: 'agreement', next: early };
   const services = await resolveServices(store, agreement.id);
   if (!services)
     return { ...base, stage: 'space', next: waiting('Deposit service not configured', 'The operator must configure the reviewed devnet deployment and fee sponsor.') };
   const setup = (await services.initialization.status(identity)).initialization;
-  if (setup?.state !== 'finalized') {
-    const pending = setup && setup.signature && ['signed', 'broadcast', 'unknown'].includes(setup.state);
+  if (setup?.state !== 'finalized' && !(agreement.cancelled && cancelledState?.phase && cancelledState.phase !== 'awaiting-funding')) {
+    const pending = setup && ['signed', 'broadcast', 'unknown'].includes(setup.state);
     return {
       ...base,
+      cancellable: !agreement.cancelled && role !== 'arbitrator' && !pending,
       stage: 'space',
       next: pending
         ? { kind: 'confirming', label: 'Preparing the escrow…', detail: 'Waiting for final confirmation on the network.', operationId: null }
@@ -191,6 +207,9 @@ export async function tenancyJourney(
       .toString();
   const result: TenancyJourney = {
     ...base,
+    cancellable: !agreement.cancelled && role !== 'arbitrator' && t.phase === 'awaiting-funding' &&
+      !snapshot.operations.some((op) => (op.action.kind === 'fund' || op.action.kind === 'fund_and_supply') &&
+        ['signed', 'broadcast', 'unknown'].includes(op.state)),
     stage,
     next: pending ? { kind: 'confirming', label: 'Waiting for network confirmation', detail: 'Your approval was sent. Check again if it takes longer than usual.', operationId: pending.id } : next,
     chain: {

@@ -6,8 +6,8 @@ export type PathFacts = {
   homeLoading: boolean;
   /** A home or listing read failed; known records still count. */
   homeError: boolean;
-  tenancies: readonly { stage: string }[];
-  listings: readonly { relation: 'landlord' | 'applicant' | 'chosen' | null }[];
+  tenancies: readonly { stage: string; next?: { kind: string } }[];
+  listings: readonly { relation: 'landlord' | 'applicant' | 'chosen' | null; status?: string }[];
   /** An explicit choice, including an explicitly chosen uncovered place; a bare slug is not a choice. */
   cityChosen: boolean;
   cityLoading: boolean;
@@ -23,11 +23,12 @@ const SECURED = new Set(['living', 'move-out', 'paid']);
  */
 export function pathProgress(facts: PathFacts): PathProgress {
   const homeUnknown = facts.homeLoading || facts.homeError;
-  const applied = facts.tenancies.length > 0 || facts.listings.some((listing) => listing.relation !== null);
+  const tenancies = facts.tenancies.filter((tenancy) => tenancy.next?.kind !== 'cancelled');
+  const applied = tenancies.length > 0 || facts.listings.some((listing) => listing.relation !== null && listing.status !== 'closed');
   return {
     home: applied ? 'done' : homeUnknown ? 'unknown' : 'todo',
-    deposit: facts.tenancies.some((tenancy) => SECURED.has(tenancy.stage)) ? 'done'
-      : facts.tenancies.length > 0 ? 'in-progress' : homeUnknown ? 'unknown' : 'todo',
+    deposit: tenancies.some((tenancy) => SECURED.has(tenancy.stage)) ? 'done'
+      : tenancies.length > 0 ? 'in-progress' : homeUnknown ? 'unknown' : 'todo',
     assets: 'status',
     city: facts.cityChosen ? 'done' : facts.cityLoading || facts.cityError ? 'unknown' : 'todo',
   };

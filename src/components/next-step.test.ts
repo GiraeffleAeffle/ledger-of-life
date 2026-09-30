@@ -55,3 +55,16 @@ test('a paid-out tenancy offers another home without erasing its record', () => 
   assert.equal(step.action?.label, 'View payout summary');
   assert.equal(step.choices?.[0].label, 'Find another home');
 });
+
+test('cancelled records are neither urgent, waiting, secured nor paid out', () => {
+  const cancelled = tenancy('cancelled', 'cancelled', 'agreement');
+  const empty = nextStep({ ...none, tenancies: [cancelled] });
+  assert.equal(empty.urgent, undefined);
+  assert.equal(empty.action?.label, 'Find a home');
+  const waiting = nextStep({ ...none, tenancies: [cancelled, tenancy('live', 'wait')] });
+  assert.equal(waiting.action?.target.section, 'tenancy-live');
+  const quiet = nextStep({ ...none, tenancies: [cancelled, tenancy('live', 'wait', 'living')] });
+  assert.equal(quiet.action?.target.section, 'tenancy-live');
+  const paid = nextStep({ ...none, tenancies: [cancelled, tenancy('paid', 'done', 'paid')] });
+  assert.equal(paid.action?.target.section, 'tenancy-paid');
+});

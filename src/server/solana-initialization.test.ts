@@ -133,7 +133,7 @@ async function fixture(setupMode: 'joint' | 'staged' = 'joint', depositMint?: st
       bump: derived.bump,
     },
   };
-  const state = { now: 100000, blockHeight: '100', lastValidBlockHeight: '300', blockhash: addressFor(30), sponsorCost: '8500000', final: false, accountExists: false, sent: [] as string[], preflights: 0 };
+  const state = { now: 100000, blockHeight: '100', lastValidBlockHeight: '300', blockhash: addressFor(30), sponsorCost: '8500000', sponsorCalls: 0, final: false, accountExists: false, sent: [] as string[], preflights: 0 };
   const gateway: InitializationGateway = {
     preflight: async (input) => {
       state.preflights++;
@@ -162,10 +162,12 @@ async function fixture(setupMode: 'joint' | 'staged' = 'joint', depositMint?: st
   };
   const feeSponsor = {
     address: sponsor.address,
-    sign: async (bytes: Uint8Array) =>
-      new Uint8Array(getTransactionEncoder().encode(
+    sign: async (bytes: Uint8Array) => {
+      state.sponsorCalls++;
+      return new Uint8Array(getTransactionEncoder().encode(
         await partiallySignTransaction([sponsor.keyPair], getTransactionDecoder().decode(bytes)),
-      )),
+      ));
+    },
   };
   const recoveryGate = async () => ({ wallet: identities.tenant.wallets[0], proof: null });
   const service = createSolanaInitializationService({
@@ -179,7 +181,7 @@ async function fixture(setupMode: 'joint' | 'staged' = 'joint', depositMint?: st
         getTransactionDecoder().decode(Buffer.from(encoded, 'base64')),
       ),
     )).toString('base64');
-  return { store, config, state, service, identities, tenant, landlord, arbitrator, sign, snapshot };
+  return { store, config, state, service, identities, tenant, landlord, arbitrator, sign, snapshot, feeSponsor };
 }
 
 test('new site-dollar initialization uses its own mint and canonical payout accounts', async () => {
@@ -341,4 +343,76 @@ test('expired unobserved setup can be replaced only after final block height and
   assert.equal(fresh.signature, null);
   assert.equal(f.state.preflights, initialPreflights + 2);
   await f.store.close();
+});
+
+test('cancellation blocks initialization prepared earlier before collecting signatures or sending', async () => {
+  const f = await fixture();
+  try {
+    const plan = await f.service.prepare(f.identities.tenant);
+    await f.service.sign(f.identities.tenant, await f.sign(plan.transactionBase64, f.tenant));
+    await f.store.update<Agreement>('agreement:one-accepted-demo', (row) => ({
+      ...row,
+      cancelled: { by: 'landlord', at: new Date(f.state.now).toISOString() },
+    }));
+    const cancelled = { code: 'agreement_cancelled' };
+    await assert.rejects(f.service.prepare(f.identities.landlord), cancelled);
+    await assert.rejects(
+      f.service.sign(f.identities.landlord, await f.sign(plan.transactionBase64, f.landlord)),
+      cancelled,
+    );
+    await assert.rejects(f.service.retry(f.identities.tenant), cancelled);
+    assert.equal(f.state.sponsorCalls, 0);
+    assert.deepEqual(f.state.sent, []);
+    const status = await f.service.status(f.identities.tenant);
+    assert.deepEqual(status.initialization?.signedRoles, ['tenant']);
+    assert.equal(status.initialization?.state, 'prepared');
+  } finally {
+    await f.store.close();
+  }
+});
+
+test('cancellation prevents resending already broadcast initialization but permits reconciliation', async () => {
+  const f = await fixture('staged');
+  try {
+    const plan = await f.service.prepare(f.identities.landlord);
+    const sent = await f.service.sign(f.identities.landlord, await f.sign(plan.transactionBase64, f.landlord));
+    await f.store.update<Agreement>('agreement:one-accepted-demo', (row) => ({
+      ...row,
+      cancelled: { by: 'tenant', at: new Date(f.state.now).toISOString() },
+    }));
+    await assert.rejects(f.service.retry(f.identities.landlord), { code: 'agreement_cancelled' });
+    assert.equal(f.state.sponsorCalls, 1);
+    assert.equal(f.state.sent.length, 1);
+    f.state.final = true;
+    assert.equal((await f.service.reconcile(f.identities.tenant)).signature, sent.signature);
+    assert.equal((await f.service.status(f.identities.tenant)).initialization?.state, 'finalized');
+  } finally {
+    await f.store.close();
+  }
+});
+
+test('cancellation during sponsor signing prevents initialization broadcast', async () => {
+  const f = await fixture('staged');
+  try {
+    const plan = await f.service.prepare(f.identities.landlord);
+    const sponsorSign = f.feeSponsor.sign;
+    f.feeSponsor.sign = async (bytes) => {
+      const signed = await sponsorSign(bytes);
+      await f.store.update<Agreement>('agreement:one-accepted-demo', (row) => ({
+        ...row,
+        cancelled: { by: 'tenant', at: new Date(f.state.now).toISOString() },
+      }));
+      return signed;
+    };
+    await assert.rejects(
+      f.service.sign(f.identities.landlord, await f.sign(plan.transactionBase64, f.landlord)),
+      { code: 'agreement_cancelled' },
+    );
+    assert.equal(f.state.sponsorCalls, 1);
+    assert.deepEqual(f.state.sent, []);
+    await assert.rejects(f.service.retry(f.identities.landlord), { code: 'agreement_cancelled' });
+    assert.deepEqual(f.state.sent, []);
+  } finally {
+    await f.store.close();
+  }
 });

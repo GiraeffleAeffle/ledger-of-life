@@ -3,6 +3,15 @@ import type { PublicListing } from '../server/listings.ts';
 
 export const HOME_STAGES = ['Find', 'Apply', 'Agree', 'Secure', 'Live', 'Move out', 'Paid out'] as const;
 
+/** Cancelled records stay available in Home, but never drive the active path. */
+export function currentHomeTenancy<T extends { stage: string; next: { kind: string } }>(tenancies: readonly T[]): T | undefined {
+  const live = tenancies.filter((tenancy) => tenancy.next.kind !== 'cancelled' && tenancy.next.kind !== 'done');
+  return live.find((tenancy) => tenancy.next.kind === 'respond_claim' || tenancy.next.kind === 'decide_claim')
+    ?? live.find((tenancy) => !['confirming', 'paying_out', 'wait', 'propose_claim'].includes(tenancy.next.kind))
+    ?? live.find((tenancy) => tenancy.stage !== 'living')
+    ?? live[0];
+}
+
 /** Person-facing progress only; never advances a pending chain operation. */
 export function homeStage(stage?: JourneyStage, listing?: Pick<PublicListing, 'relation' | 'status'>): number {
   if (stage) return { agreement: 2, space: 3, deposit: 3, living: 4, 'move-out': 5, paid: 6 }[stage];
