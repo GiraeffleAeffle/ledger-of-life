@@ -187,7 +187,7 @@ export async function readUnhealthyLoans(store: Store, wallet: string, cursor = 
 }
 
 type ReviewedTransaction = { chainId: 46630; to: Address; data: Hex; value: '0x0'; nonce: number; gas: Hex; maxFeePerGas: Hex; maxPriorityFeePerGas: Hex };
-type MarketRecord = { nextPrepareAt: number; submitWindowAt: number; submitAttempts: number; preparingUntil?: number; prepared?: { transaction: ReviewedTransaction; expiresAt: number; operation: string; quantity: string; borrower?: string; approval: boolean }; continuation?: { operation: string; quantity: string; borrower?: string; expiresAt: number }; pendingHash?: Hex; pendingAt?: number; pendingNonce?: number };
+type MarketRecord = { nextPrepareAt: number; submitWindowAt: number; submitAttempts: number; preparingUntil?: number; prepared?: { transaction: ReviewedTransaction; expiresAt: number; operation: string; quantity: string; borrower?: string; approval: boolean }; pendingHash?: Hex; pendingAt?: number; pendingNonce?: number };
 
 /** Semantic validation remains independent of persisted review binding. */
 export function validateMarketCall(transaction: { chainId?: number; to?: string | null; data?: Hex; value?: bigint }, owner: Address, config: SharedMarketManifest) {
@@ -226,9 +226,8 @@ export async function prepareMarketAction(store: Store, wallet: string, operatio
   try { await store.create<MarketRecord>(key, { nextPrepareAt: 0, submitWindowAt: 0, submitAttempts: 0 }); }
   catch { assert(await store.get(key), 'Could not reserve market request.'); }
   const record = await store.update<MarketRecord>(key, value => {
-    const continuation = value.continuation;
-    const continuing = continuation && now() < continuation.expiresAt && continuation.operation === operation && continuation.quantity === quantity && continuation.borrower === debtor;
-    assert(now() >= value.nextPrepareAt || continuing, 'Wait one minute between market requests.');
+    // Unsigned reviews wait a minute; a confirmed transaction reopens the window (see submit).
+    assert(now() >= value.nextPrepareAt, 'Wait one minute between market requests.');
     assert(!value.preparingUntil || now() >= value.preparingUntil, 'A market request is already being prepared.');
     assert(!value.prepared || now() >= value.prepared.expiresAt, 'Sign or wait for your market review to expire.');
     return { ...value, nextPrepareAt: now() + 60_000, preparingUntil: now() + 120_000, prepared: undefined };
@@ -256,7 +255,7 @@ export async function prepareMarketAction(store: Store, wallet: string, operatio
     const [fees, nonce, gas] = await Promise.all([client.estimateFeesPerGas(), client.getTransactionCount({ address: owner, blockTag: 'pending' }), client.estimateGas({ account: owner, to, data })]);
     assert(fees.maxFeePerGas !== undefined, 'Network did not return fees.');
     const transaction: ReviewedTransaction = { chainId: 46630, to, data, value: '0x0', nonce, gas: `0x${(gas * 120n / 100n).toString(16)}`, maxFeePerGas: `0x${(fees.maxFeePerGas * 2n).toString(16)}`, maxPriorityFeePerGas: `0x${(fees.maxPriorityFeePerGas ?? 0n).toString(16)}` };
-    await store.update<MarketRecord>(key, value => ({ ...value, preparingUntil: undefined, continuation: undefined, prepared: { transaction, expiresAt: now() + 120_000, operation, quantity, borrower: debtor, approval } }));
+    await store.update<MarketRecord>(key, value => ({ ...value, preparingUntil: undefined, prepared: { transaction, expiresAt: now() + 120_000, operation, quantity, borrower: debtor, approval } }));
     const collateralAmount = operation === 'deposit_collateral' || operation === 'withdraw_collateral';
     return { needsApproval: approval, steps: [{ description: `${approval ? 'Approve exact amount for' : 'Sign'} ${operation}: ${formatUnits(amount, collateralAmount ? 18 : 6)} ${collateralAmount ? 'official test TSLA' : 'tUSDG · test dollars anyone can mint'}`, transaction }] };
   } catch (error) {
@@ -299,7 +298,9 @@ export async function submitMarketTransaction(store: Store, wallet: string, sign
   let receipt;
   try { receipt = await client.waitForTransactionReceipt({ hash, timeout: 10_000, confirmations: 1 }); }
   catch { return { hash, status: 'pending' as const }; }
-  await store.update<MarketRecord>(key, value => ({ ...value, pendingHash: undefined, pendingAt: undefined, pendingNonce: undefined, continuation: receipt.status === 'success' && review.approval ? { operation: review.operation, quantity: review.quantity, borrower: review.borrower, expiresAt: now() + 120_000 } : undefined }));
+  // A confirmed transaction cost its signer gas and a signature, so the next step or action (the call after an
+  // approval, or borrowing right after adding collateral) need not wait; unsigned reviews and reverts still do.
+  await store.update<MarketRecord>(key, value => ({ ...value, pendingHash: undefined, pendingAt: undefined, pendingNonce: undefined, ...(receipt.status === 'success' ? { nextPrepareAt: now(), submitAttempts: 0 } : {}) }));
   assert(receipt.status === 'success', 'Market transaction reverted.');
   return { hash, status: 'confirmed' as const };
 }

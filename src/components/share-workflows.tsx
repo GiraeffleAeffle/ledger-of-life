@@ -94,6 +94,7 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
     if (!review || acting.current || actionBlocked(review.operation)) return;
     const action = review;
     acting.current = true; setBusy(true); setError(''); setMessage(''); setReview(null); setStepDescription('');
+    let submitted = false;
     try {
       const result = await settleShareAction(async () => {
         let hash = '';
@@ -104,13 +105,16 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
           for (const step of prepared.steps) {
             setStepDescription(step.description);
             const signed = await wallet.signEvmTransaction({ walletId: prepared.walletId, operationId: `market-${step.transaction.nonce}`, description: step.description, expiresAt: new Date(Date.now() + 120_000).toISOString(), transaction: step.transaction });
+            submitted = true;
             hash = (await request<{ hash: string }>('/api/share-workflows', { action: 'submit', signed })).hash;
           }
         } while (needsApproval);
         return hash;
       }, () => window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'evm' } })), refresh);
       if (result.confirmation) setMessage(`Confirmed · ${result.confirmation}`);
-      if (result.actionError) setError(`Action could not be confirmed; earlier steps may have changed balances. ${String(result.actionError)}`);
+      const reason = result.actionError instanceof Error ? result.actionError.message : String(result.actionError);
+      // Before the first submission nothing reached the chain, so there is no partial action to warn about.
+      if (result.actionError) setError(submitted ? `Action could not be confirmed; earlier steps may have changed balances. ${reason}` : reason);
       if (result.refreshError) setReadError('Transaction completed, but balances could not be refreshed.');
     } finally { acting.current = false; setBusy(false); setStepDescription(''); }
   }
@@ -149,7 +153,7 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
       <p>Wallet: {view.sharesRaw === null ? 'unavailable' : shares(view.sharesRaw)} official test TSLA · {dollars(view.testUsdAtomic)}. {fresh ? `Mirrored token price: ${dollars(view.priceAtomic)}; wallet TSLA value: ${dollars(view.walletValueAtomic)}.` : 'Fresh mirrored token price unavailable.'}</p>
       <nav aria-label="Share market panels">{([['borrow', 'Loan'], ['lend', 'Lend test dollars'], ['deposit', 'Rental deposit']] as const).map(([id, label]) => <button key={id} type="button" className={tab === id ? 'button' : 'button secondary'} aria-pressed={tab === id} onClick={() => setTab(id)}>{label}</button>)}</nav>
       <label>Amount ({tab === 'borrow' ? 'TSLA for collateral actions; tUSDG for borrow/repay' : 'tUSDG'}) <input value={quantity} onChange={(event) => { setQuantity(event.target.value); setReview(null); }} inputMode="decimal" /></label>
-      {tab === 'deposit' ? <p>A rental deposit needs a real landlord and is not available on the hosted demo. Share-backed rental deposits are not offered here.</p> : tab === 'lend' ? <div><h3>Lend test dollars</h3><p>Net supplied: {dollars(view.lender?.netContributedAtomic ?? '0')} · current value: {dollars(view.lender?.valueAtomic ?? '0')} · earned (value minus net contributed, may be negative): {dollars(view.lender?.earnedAtomic ?? '0')} · cash withdrawable now: {dollars(view.lender?.maxWithdrawAtomic ?? '0')}</p>{action('Lend', 'lend')}{action('Withdraw lent dollars', 'unlend')}<p>Borrower interest increases lender share value. Cash becomes available when borrowers repay; losses and bad debt reduce lender value.</p></div> : <div><h3>Your loan</h3><p>Collateral: {shares(view.loan?.sharesRaw ?? '0')} TSLA · debt: {dollars(view.loan?.debtAtomic ?? '0')} · collateral value: {fresh ? dollars(view.loan?.valueAtomic ?? '0') : 'unavailable'} · LTV: {fresh ? `${(view.loan?.ltvBps ?? 0) / 100}%` : 'unavailable'} · available borrowing: {fresh ? dollars(view.loan?.availableAtomic ?? '0') : 'unavailable'}</p>{action('Add collateral', 'deposit_collateral')}{action('Withdraw collateral', 'withdraw_collateral', BigInt(view.loan?.debtAtomic ?? '0') > 0n)}{action('Borrow', 'borrow', true)}{action('Repay', 'repay')}<p>Borrowing is limited to 50% LTV and 90% pool utilization. Liquidation starts at 80% LTV. Repayment and adding collateral remain possible with a stale price.</p></div>}
+      {tab === 'deposit' ? <p>A rental deposit needs a real landlord and is not available on the hosted demo. Share-backed rental deposits are not offered here.</p> : tab === 'lend' ? <div><h3>Lend test dollars</h3><p>Net supplied: {dollars(view.lender?.netContributedAtomic ?? '0')} · current value: {dollars(view.lender?.valueAtomic ?? '0')} · earned (value minus net contributed, may be negative): {dollars(view.lender?.earnedAtomic ?? '0')} · cash withdrawable now: {dollars(view.lender?.maxWithdrawAtomic ?? '0')}</p>{action('Lend', 'lend')}{action('Withdraw lent dollars', 'unlend')}<p>Borrower interest increases lender share value. Cash becomes available when borrowers repay; losses and bad debt reduce lender value.</p></div> : <div><h3>Your loan</h3><p>Collateral: {shares(view.loan?.sharesRaw ?? '0')} TSLA · debt: {dollars(view.loan?.debtAtomic ?? '0')} · collateral value: {fresh ? dollars(view.loan?.valueAtomic ?? '0') : 'unavailable'} · LTV: {fresh ? `${(view.loan?.ltvBps ?? 0) / 100}%` : 'unavailable'} · available borrowing: {fresh ? dollars(view.loan?.availableAtomic ?? '0') : 'unavailable'}</p>{action('Add collateral', 'deposit_collateral')}{action('Withdraw collateral', 'withdraw_collateral', BigInt(view.loan?.debtAtomic ?? '0') > 0n)}{action('Borrow', 'borrow', true)}{action('Repay', 'repay')}<p>Borrowing is limited to 50% LTV and 90% pool utilization. Liquidation starts at 80% LTV. Repayment and adding collateral remain possible with a stale price. Interest accrues every second: to close the loan, enter a little more than the debt; Repay takes only what you owe.</p></div>}
       {view.pool && <div><h3>Pool facts</h3><p>Cash: {dollars(view.pool.cashAtomic)} · total assets: {dollars(view.pool.totalAssetsAtomic)} · borrowed: {dollars(view.pool.borrowedAtomic)} · utilization: {view.pool.utilizationBps / 100}% · current borrower rate: {view.pool.borrowAprBps / 100}% a year, compounded continuously (≈{view.pool.effectiveBorrowApyBps / 100}% a year) · current lender rate: {view.pool.supplyAprBps / 100}% APR (not a projection).</p><p>10,000 tUSDG seeded at deploy to a burn address. Nobody can withdraw those seed shares; their interest stays locked in the pool.</p></div>}
       <h3>Loans that can be liquidated</h3>
       {!fresh && <p>Fresh price required to assess or liquidate loans.</p>}

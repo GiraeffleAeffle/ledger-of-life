@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { encodeFunctionData, keccak256, type TransactionSerializableEIP1559 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { LocalStore } from './store.ts';
-import { readSharedMarket, readUnhealthyLoans, readCollateralSafety, submitMarketTransaction, SHARED_POOL_ABI, SHARED_TOKEN_ABI, SHARED_STOCK, SHARED_USD, type SharedMarketManifest } from './shared-market.ts';
+import { prepareMarketAction, readSharedMarket, readUnhealthyLoans, readCollateralSafety, submitMarketTransaction, SHARED_POOL_ABI, SHARED_TOKEN_ABI, SHARED_STOCK, SHARED_USD, type SharedMarketManifest } from './shared-market.ts';
 
 const owner = privateKeyToAccount(`0x${'11'.repeat(32)}`);
 const other = privateKeyToAccount(`0x${'22'.repeat(32)}`);
@@ -122,6 +122,34 @@ test('the reviewed self deposit broadcasts once and cannot be replayed', async t
   assert.deepEqual(await submitMarketTransaction(store, owner.address, serialized, client, () => 100_000), { hash: keccak256(serialized), status: 'confirmed' });
   await assert.rejects(submitMarketTransaction(store, owner.address, serialized, client, () => 100_000), /expired/);
   assert.equal(broadcasts, 1);
+});
+
+test('a confirmed transaction lets the wallet prepare its next action at once; a failed unsigned review still waits a minute', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'market-window-'));
+  const old = process.env.SHARED_MARKET_MANIFEST_FILE;
+  process.env.SHARED_MARKET_MANIFEST_FILE = join(dir, 'manifest.json');
+  await writeFile(process.env.SHARED_MARKET_MANIFEST_FILE, JSON.stringify(config));
+  const store = new LocalStore(':memory:');
+  t.after(async () => { store.close(); if (old === undefined) delete process.env.SHARED_MARKET_MANIFEST_FILE; else process.env.SHARED_MARKET_MANIFEST_FILE = old; await rm(dir, { recursive: true, force: true }); });
+  let time = 100_000; let gas = 1n;
+  const client = { ...verification,
+    readContract: async (request: { functionName: string; address: string }) => request.functionName === 'allowance' ? 10n ** 30n : verification.readContract(request),
+    getBalance: async () => gas, getTransactionCount: async () => 0, estimateGas: async () => 100_000n,
+    estimateFeesPerGas: async () => ({ maxFeePerGas: 2n, maxPriorityFeePerGas: 1n }),
+    sendRawTransaction: async () => {}, waitForTransactionReceipt: async () => ({ status: 'success' }),
+  } as unknown as NonNullable<Parameters<typeof prepareMarketAction>[5]>;
+  const now = () => time;
+  const prepare = () => prepareMarketAction(store, owner.address, 'lend', '100', undefined, client, now);
+  assert.deepEqual((await prepare()).steps[0].transaction, reviewed);
+  assert.equal((await submitMarketTransaction(store, owner.address, await signed(), client, now)).status, 'confirmed');
+  time += 1_000;
+  assert.equal((await prepare()).steps.length, 1, 'the next action after a confirmed one must not wait a minute');
+  time += 120_001; gas = 0n;
+  await assert.rejects(prepare(), /test ETH/);
+  gas = 1n; time += 59_000;
+  await assert.rejects(prepare(), /Wait one minute between market requests/);
+  time += 1_000;
+  assert.equal((await prepare()).steps.length, 1);
 });
 
 for (const trigger of ['paused', 'isBlocked', 'collateralShortfall', 'implementation', 'ACCESS_CONTROLLED_REGISTRY', 'beacon storage', 'issuer code'] as const) {
