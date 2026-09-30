@@ -14,7 +14,7 @@ data:
   # The free desk stays off on a public host; see docs/DEPLOYMENT.md.
 
   # Deliberately NOT set here, so a shared host refuses them:
-  #   ALLOW_HOME_ASSISTANT_PULL, SOLANA_TEST_SIGNER_MODE, ALLOW_OPERATOR_TEST_ACTIONS, LOCAL_AI_OLLAMA_URL.
+  #   ALLOW_HOME_ASSISTANT_PULL, SOLANA_TEST_SIGNER_MODE, ALLOW_OPERATOR_TEST_ACTIONS, LOCAL_AI_OLLAMA_URL, DEMO_SKIP_RECOVERY.
 {{- range $key, $value := .Values.config }}
 {{- if ne $key "APP_ORIGIN" }}
   {{ $key }}: {{ $value | quote }}

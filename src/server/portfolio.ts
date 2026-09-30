@@ -106,9 +106,9 @@ function retryingTransport(url: string) {
 async function marketRead(environment: Record<string, string | undefined>) {
   const config = solanaConfiguration(environment);
   if (!config || config.cluster !== 'devnet') return null;
-  const dir = resolve(environment.SOLANA_TEST_SIGNER_DIR || '.testnet-secrets/test-signer');
+  const dir = resolve(/* turbopackIgnore: true */ environment.SOLANA_TEST_SIGNER_DIR || '.testnet-secrets/test-signer');
   try {
-    const { mint } = JSON.parse(await readFile(resolve(dir, 'market.json'), 'utf8')) as { mint: string };
+    const { mint } = JSON.parse(await readFile(/* turbopackIgnore: true */ resolve(/* turbopackIgnore: true */ dir, 'market.json'), 'utf8')) as { mint: string };
     return { rpc: createSolanaRpcFromTransport(retryingTransport(config.rpcUrl)), rpcUrl: config.rpcUrl, mint: address(mint) };
   } catch {
     return null;
@@ -119,9 +119,9 @@ async function market(environment: Record<string, string | undefined>) {
   if (!operatorTestCapability(environment)) return null;
   const observed = await marketRead(environment);
   if (!observed) return null;
-  const dir = resolve(environment.SOLANA_TEST_SIGNER_DIR || '.testnet-secrets/test-signer');
+  const dir = resolve(/* turbopackIgnore: true */ environment.SOLANA_TEST_SIGNER_DIR || '.testnet-secrets/test-signer');
   try {
-    const maker = await createKeyPairSignerFromBytes(new Uint8Array(JSON.parse(await readFile(resolve(dir, 'market-maker.json'), 'utf8'))));
+    const maker = await createKeyPairSignerFromBytes(new Uint8Array(JSON.parse(await readFile(/* turbopackIgnore: true */ resolve(/* turbopackIgnore: true */ dir, 'market-maker.json'), 'utf8'))));
     return { ...observed, maker };
   } catch {
     return null;

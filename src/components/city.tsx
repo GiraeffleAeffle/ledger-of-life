@@ -63,7 +63,7 @@ export function CityCard({ request, onCityChange, fallbackSectionIds }: { reques
     <header><Building2 size={18} /> <strong>{city?.name ? `Your city · ${city.name}` : 'Choose your city'}</strong>
       {city?.name && <span className="city-source">{city.source === 'identity' ? 'From your EU wallet' : 'Chosen by you'}</span>}
     </header>
-    {city?.name && <p className="small-copy" role="status">{city.cityId ? `Your city is ${city.name}. Published map and city feed are available below${!city.available ? '; the separate project atlas is unavailable right now' : ''}.` : `${city.name} is not covered yet. You can choose a covered city instead.`}</p>}
+    {city?.name && <p className="small-copy" role="status">{city.cityId ? `Your city is ${city.name}. Published map and city feed are available below${!city.available && city.reason === 'atlas_unavailable' ? '; the separate project atlas is unavailable right now' : ''}.` : `${city.name} is not covered yet. You can choose a covered city instead.`}</p>}
     {city?.cityId && arrivalGuideCityIds.includes(city.cityId) && arrivalGuideFor(city.cityId) && <p><Link href={`/welcome/${encodeURIComponent(city.cityId)}`}>New here? Welcome guide</Link></p>}
     {picker}
     {error && <p role="alert">{error} <button type="button" className="text-button" onClick={() => setRevision((value) => value + 1)}>Retry</button></p>}

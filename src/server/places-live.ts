@@ -96,14 +96,16 @@ function timestamp(value: unknown): string | null {
 }
 
 async function locate(city: string, id: string): Promise<Coordinates> {
-  try {
-    const url = `${ATLAS}/api/atlas/${encodeURIComponent(id)}/map`;
-    const map = await json(url) as { view?: { center?: unknown }; snapshot?: { asOf?: string } };
-    const center = map.view?.center;
-    if (Array.isArray(center) && validPoint(numeric(center[1]), numeric(center[0]))) {
-      return { lat: numeric(center[1])!, lon: numeric(center[0])!, source: 'Stadtstack atlas map centre (research preview, not municipal centroid)', url, observedAt: map.snapshot?.asOf ?? new Date().toISOString() };
-    }
-  } catch { /* Atlas may be down or have no map; use one cached geocode instead. */ }
+  if (ATLAS) {
+    try {
+      const url = `${ATLAS}/api/atlas/${encodeURIComponent(id)}/map`;
+      const map = await json(url) as { view?: { center?: unknown }; snapshot?: { asOf?: string } };
+      const center = map.view?.center;
+      if (Array.isArray(center) && validPoint(numeric(center[1]), numeric(center[0]))) {
+        return { lat: numeric(center[1])!, lon: numeric(center[0])!, source: 'Stadtstack atlas map centre (research preview, not municipal centroid)', url, observedAt: map.snapshot?.asOf ?? new Date().toISOString() };
+      }
+    } catch { /* Atlas may be down or have no map; use one cached geocode instead. */ }
+  }
   const url = `https://nominatim.openstreetmap.org/search?${new URLSearchParams({ city, country: 'Germany', format: 'jsonv2', limit: '1' })}`;
   const results = await json(url, { headers: { 'Accept-Language': 'de' } }) as { lat?: string; lon?: string }[];
   const lat = numeric(results?.[0]?.lat);

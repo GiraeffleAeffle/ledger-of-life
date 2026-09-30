@@ -109,7 +109,7 @@ export function MeArea({ request, tenancies, listings, homeState, go }: {
         <h2><History size={18} /> Life timeline</h2>
         <p className="small-copy">Private to your account. Sharing a derived tenancy history is planned; addresses are not shared here.</p>
         <ol className="life-timeline">
-          {city?.available && (
+          {city?.cityId && (
             <li><strong>Now · {city.name}</strong><span>{city.source === 'identity' ? 'City from your EU wallet' : 'City you chose'}</span></li>
           )}
           {tenancies.map((t) => (

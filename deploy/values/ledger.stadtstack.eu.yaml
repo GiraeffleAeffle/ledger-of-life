@@ -2,3 +2,10 @@ host: ledger.stadtstack.eu
 image:
   # From the image workflow run for tag image-20260930-92b952c (commit 92b952c), pushed 30 Sep 2026.
   digest: "sha256:49ebff60b953323792d3df551236b6d8d2cb0a135db18e170469c04015af7559"
+config:
+  # The hosted demo has no project atlas (a local research prototype). Empty means say nothing, not claim an outage.
+  STADTSTACK_ATLAS_URL: ""
+  # Public pull-v2 devnet evidence, with hosted placeholders for per-tenancy setup. Test tokens have no real value.
+  SOLANA_DEPLOYMENT_MANIFEST: '{"setupMode":"staged","escrowVersion":"pull-v2","cluster":"devnet","genesisHash":"EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG","escrowProgram":"DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb","programSha256":"094dbe9f54f66d7dbff4e9cbcd89046a043f42bcee70f3fc5c513c4e6db95e3c","programCodeLength":467936,"upgradeAuthority":"JCgJEV37VwWxzd2JqzFNaC847hrtPjQq9TU6c6HHxQao","depositMint":"4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU","reserve":"HRwMj8uuoGVWCanKzKvpTWN5ZvXjtjKGxcFbn2qTPKMW","market":"6aaNTBEmwdN19AAdTwbNrWyUo6iEyiLguxCTePEzSqoH","receiptMint":"6FY2rwh5wWrtSveAG9t9ANc2YsrChNasVSEpMQubJcXd","liquiditySupply":"6icVFmuKEsH5dzDwTSrxzrnJ14N27gDKRc2XAxPtB4ep","marketAuthority":"7Aoc3MHQkYSB5y3g3ipyFKWF2TBsYdvqNWHbQ2btWXJt","oracleAccounts":["Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX"],"maxObservationAgeMs":15000,"maximumSponsorLamports":"10000000","agreementId":"hosted-base","tenancyAddress":"DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb"}'
+  # Deliberately unset: SOLANA_TEST_SIGNER_MODE, ALLOW_OPERATOR_TEST_ACTIONS, ALLOW_HOME_ASSISTANT_PULL,
+  # LOCAL_AI_OLLAMA_URL, DEMO_SKIP_RECOVERY.

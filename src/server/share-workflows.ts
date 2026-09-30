@@ -53,17 +53,17 @@ const checked = (owner: string) => getAddress(owner);
 
 async function operator() {
   assertEnabled();
-  const dir = resolve(process.env.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet');
-  const read = async (role: string) => privateKeyToAccount((await readFile(resolve(dir, `${role}.key`), 'utf8')).trim() as Hex, { nonceManager });
+  const dir = resolve(/* turbopackIgnore: true */ process.env.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet');
+  const read = async (role: string) => privateKeyToAccount((await readFile(/* turbopackIgnore: true */ resolve(/* turbopackIgnore: true */ dir, `${role}.key`), 'utf8')).trim() as Hex, { nonceManager });
   const [signer, landlord, arbitrator] = await Promise.all(['operator', 'landlord', 'arbitrator'].map(read));
   return { signer, landlord, arbitrator };
 }
 /** A distinct, explicitly funded testnet signer owns newly created oracle and desk contracts. */
 export async function ownershipProvisioner() {
   assertEnabled();
-  const filename = resolve(process.env.ROBINHOOD_OWNERSHIP_PROVISIONER_KEY_FILE || '.testnet-secrets/robinhood-testnet/ownership-provisioner.key');
-  const shared = resolve(process.env.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet', 'operator.key');
-  const [dedicatedKey, operatorKey] = await Promise.all([readFile(filename, 'utf8'), readFile(shared, 'utf8')]);
+  const filename = resolve(/* turbopackIgnore: true */ process.env.ROBINHOOD_OWNERSHIP_PROVISIONER_KEY_FILE || '.testnet-secrets/robinhood-testnet/ownership-provisioner.key');
+  const shared = resolve(/* turbopackIgnore: true */ process.env.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet', 'operator.key');
+  const [dedicatedKey, operatorKey] = await Promise.all([readFile(/* turbopackIgnore: true */ filename, 'utf8'), readFile(/* turbopackIgnore: true */ shared, 'utf8')]);
   const signer = privateKeyToAccount(dedicatedKey.trim() as Hex, { nonceManager });
   if (signer.address.toLowerCase() === privateKeyToAccount(operatorKey.trim() as Hex).address.toLowerCase())
     throw new Error('Ownership provisioner must not reuse the shared test operator.');

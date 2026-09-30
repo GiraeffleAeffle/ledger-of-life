@@ -5,6 +5,7 @@
 #   deploy/apply.sh --diff-only      read-only: what would change, and whether the Secret exists
 #   deploy/apply.sh --namespace      first run only: create the namespace (so the Secret can be stored), nothing else
 #   deploy/apply.sh --secret FILE    store Secret ledger-env from an owner-only KEY=VALUE file outside any repository
+#   deploy/apply.sh --network-test   run the released NetworkPolicy probe Pods (helm test)
 #   deploy/apply.sh                  the release: diff, typed confirmation, helmfile apply, rollout and status
 #
 # Every mode refuses a render without a real image digest and any cluster but the reviewed one. One kube context is
@@ -12,13 +13,24 @@
 # the cluster that is changed. Nothing here reads back, decodes or prints a Secret value.
 set -euo pipefail
 
-usage() { printf 'Usage: deploy/apply.sh [--diff-only | --namespace | --secret FILE]\n' >&2; }
+# Connection overrides can redirect Helm away from the context kubectl verifies.
+# Refuse even empty exported values before invoking any external command.
+for override in HELM_KUBEAPISERVER HELM_KUBECAFILE HELM_KUBETOKEN \
+  HELM_KUBEASUSER HELM_KUBEASGROUPS HELM_KUBEINSECURE_SKIP_TLS_VERIFY HELM_KUBETLS_SERVER_NAME; do
+  if [[ "${!override+x}" == x ]]; then
+    printf 'Refusing connection override %s; unset it before running.\n' "$override" >&2
+    exit 1
+  fi
+done
+
+usage() { printf 'Usage: deploy/apply.sh [--diff-only | --namespace | --secret FILE | --network-test]\n' >&2; }
 mode='release'
 secret_file=''
 case "${1:-}" in
   "") ;;
   --diff-only) mode='diff' ;;
   --namespace) mode='namespace' ;;
+  --network-test) mode='network-test' ;;
   --secret) mode='secret'; secret_file="${2:-}"; [[ -n "$secret_file" ]] || { usage; exit 2; } ;;
   *) usage; exit 2 ;;
 esac
@@ -150,11 +162,30 @@ PY
     *) printf 'Secret file must hold KEY=VALUE lines (comments allowed) and stay under 64 KB.\n' >&2; exit 1 ;;
   esac
   printf 'Secret ledger-env will hold these keys: %s\n' "$keys"
+  printf 'This replaces the whole Secret. If Deployment ledger-of-life exists, it will restart and wait for readiness (up to 180 seconds).\n' >/dev/tty
   confirm "store secret ledger-env"
   # The rendered Secret goes through a pipe from kubectl to kubectl; it is never printed.
   kc -n "$NAMESPACE" create secret generic ledger-env --from-env-file="$snapshot_dir/env" --dry-run=client -o yaml |
     kc apply --server-side --field-manager=ledger-apply -f -
+  deployment="$(kc -n "$NAMESPACE" get deployment ledger-of-life --ignore-not-found -o name)"
+  if [[ -n "$deployment" ]]; then
+    kc -n "$NAMESPACE" rollout restart deployment/ledger-of-life
+    kc -n "$NAMESPACE" rollout status deployment/ledger-of-life --timeout=180s
+  fi
   printf 'Next: --diff-only, then the release.\n'
+  exit 0
+fi
+
+if [[ "$mode" == network-test ]]; then
+  "$namespace_exists" || { printf 'Namespace %s does not exist yet; release first.\n' "$NAMESPACE" >&2; exit 1; }
+  # Show the deployed hooks, not the checkout's render. They contain no Secret values.
+  hooks="$(helm --kube-context "$context" -n "$NAMESPACE" get hooks ledger-of-life)" ||
+    { printf 'Release ledger-of-life is not deployed; run the release first.\n' >&2; exit 1; }
+  grep -q 'name: ledger-of-life-netpol-2-isolated' <<<"$hooks" ||
+    { printf 'The deployed revision has no network probe; release this commit first.\n' >&2; exit 1; }
+  printf '%s\n' "$hooks"
+  confirm "test network policies in $NAMESPACE"
+  helm --kube-context "$context" -n "$NAMESPACE" test ledger-of-life --logs --timeout 3m
   exit 0
 fi
 
@@ -177,7 +208,7 @@ secret_help() {
 if "$namespace_exists"; then
   preview_namespace
 fi
-hf diff
+hf diff --include-tests
 
 if [[ "$mode" == diff ]]; then
   "$secret_ready" || secret_help
@@ -188,7 +219,7 @@ fi
 # 6. The release, after a typed confirmation.
 confirm "apply $NAMESPACE"
 kc apply --server-side --field-manager=ledger-apply -f namespace.yaml
-hf apply
+hf apply --include-tests
 kc -n "$NAMESPACE" rollout status deployment/ledger-of-life --timeout=180s
 
 # 7. The first certificate can take a minute or two. A release that is up but still waiting for it is not a failure.

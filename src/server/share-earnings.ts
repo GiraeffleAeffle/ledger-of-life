@@ -39,9 +39,9 @@ async function record(store: Store, owner: Address): Promise<EarningsRecord | nu
 }
 async function actors() {
   if (!operatorTestCapability()) throw new Error('Test earnings controls are disabled.');
-  const dir = resolve(process.env.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet');
+  const dir = resolve(/* turbopackIgnore: true */ process.env.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet');
   const accounts = await Promise.all(['operator', 'landlord', 'arbitrator'].map(async (role) =>
-    privateKeyToAccount((await readFile(resolve(dir, `${role}.key`), 'utf8')).trim() as Hex, { nonceManager })));
+    privateKeyToAccount((await readFile(/* turbopackIgnore: true */ resolve(/* turbopackIgnore: true */ dir, `${role}.key`), 'utf8')).trim() as Hex, { nonceManager })));
   return { operator: accounts[0], landlord: accounts[1], arbitrator: accounts[2] };
 }
 async function receipt(hash: Hex) {

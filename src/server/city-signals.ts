@@ -88,14 +88,14 @@ export type RegionalTopicResult =
 // mtime and file path are both part of the key: switching STADTSTACK_DATA_DIR never serves an old city.
 const files = new Map<string, { mtimeMs: number; size: number; value: unknown }>();
 async function jsonFile<T>(path: string): Promise<T> {
-  const info = await stat(path);
+  const info = await stat(/* turbopackIgnore: true */ path);
   const cached = files.get(path);
   if (cached && cached.mtimeMs === info.mtimeMs && cached.size === info.size) return cached.value as T;
-  const value = JSON.parse(await readFile(path, 'utf8')) as T;
+  const value = JSON.parse(await readFile(/* turbopackIgnore: true */ path, 'utf8')) as T;
   files.set(path, { mtimeMs: info.mtimeMs, size: info.size, value });
   return value;
 }
-const dataDirectory = () => resolve(process.env.STADTSTACK_DATA_DIR ?? join(process.cwd(), 'stadtstack-data/out'));
+const dataDirectory = () => resolve(/* turbopackIgnore: true */ process.env.STADTSTACK_DATA_DIR ?? join(process.cwd(), 'stadtstack-data/out'));
 export async function readSignalsCatalogue(): Promise<SignalCatalogue> {
   const catalogue = await jsonFile<SignalCatalogue>(join(dataDirectory(), 'catalogue.json'));
   if (catalogue.schemaVersion !== 'stadtstack-signals-v1' || !Array.isArray(catalogue.cities)) throw new Error('Unsupported city signals catalogue.');
@@ -173,7 +173,7 @@ const stageRank = (stage: string) => { const index = stageOrder.indexOf(stage); 
 export async function readRegionalTopics(cityId: string): Promise<RegionalTopicResult> {
   if (!/^[a-z0-9-]+$/.test(cityId)) return { state: 'not_available', cityId };
   const directory = join(dataDirectory(), 'regions');
-  const regions = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+  const regions = await readdir(/* turbopackIgnore: true */ directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
     if (error.code === 'ENOENT') return [];
     throw error;
   });

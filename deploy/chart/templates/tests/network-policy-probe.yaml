@@ -1,0 +1,110 @@
+{{- /*
+Helm test hooks, not release workloads. The reconcile identity must reach DNS and web but not public HTTPS;
+the isolated identity must reach neither DNS nor web. Only timeouts count as drops, not refusals or DNS errors.
+Neither identity is web, so neither becomes a Service endpoint. Keep Pods until the next test for --logs.
+*/ -}}
+{{- define "ledger.networkProbe" -}}
+const dns = require('node:dns');
+const net = require('node:net');
+const probe = process.env.PROBE;
+const service = process.env.SERVICE_FQDN;
+const results = [];
+const tcp = async (host, port) => {
+  if (!host) return 'no-address';
+  // DNS has its own deadline; only a resolved address can enter the drop timer.
+  let lookupTimer;
+  const address = net.isIP(host) ? host : await Promise.race([
+    dns.promises.lookup(host, { family: 4 }).then((entry) => entry.address, () => ''),
+    new Promise((resolve) => { lookupTimer = setTimeout(() => resolve(''), 4000); }),
+  ]);
+  clearTimeout(lookupTimer);
+  if (!address) return 'dns-error';
+  return new Promise((resolve) => {
+    const socket = net.connect({ host: address, port, family: 4, autoSelectFamily: false });
+    const finish = (outcome) => { socket.destroy(); resolve(outcome); };
+    socket.setTimeout(4000, () => finish('timeout'));
+    socket.once('connect', () => finish('connected'));
+    socket.once('error', (error) => finish(error.code === 'ETIMEDOUT' ? 'timeout' : error.code || 'error'));
+  });
+};
+const lookup = (name) => new dns.promises.Resolver({ timeout: 2000, tries: 1 }).resolve4(name)
+  .then(() => 'answered', (error) => (error.code === 'ETIMEOUT' ? 'timeout' : error.code));
+const check = (name, outcome, expected) => {
+  results.push(outcome === expected);
+  console.log(`${outcome === expected ? 'PASS' : 'FAIL'} ${probe} ${name}: ${outcome} (expected ${expected})`);
+};
+(async () => {
+  // Let the node's policy agent learn the new Pod address before sending packets.
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+  if (probe === 'reconcile') {
+    check('dns', await lookup(service), 'answered');
+    check('web :4175', await fetch(`http://${service}:4175/api/status`, { signal: AbortSignal.timeout(5000) })
+      .then((response) => `http ${response.status}`, (error) => error.name), 'http 200');
+    check('api.privy.io :443', await tcp('api.privy.io', 443), 'timeout');
+  } else {
+    check('dns', await lookup(service), 'timeout');
+    check('web :4175', await tcp(process.env.LEDGER_OF_LIFE_SERVICE_HOST, 4175), 'timeout');
+  }
+  const passed = results.every(Boolean);
+  console.log(`RESULT ${passed ? 'PASS' : 'FAIL'} ${probe} ${new Date().toISOString()}`);
+  process.exit(passed ? 0 : 1);
+})();
+{{- end }}
+{{- range $index, $probe := list "reconcile" "isolated" }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ledger-of-life-netpol-{{ add1 $index }}-{{ $probe }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "ledger.helmLabels" $ | nindent 4 }}
+    app.kubernetes.io/name: ledger-of-life
+    app.kubernetes.io/component: {{ ternary "reconcile" "netpol-probe" (eq $probe "reconcile") }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-weight: {{ add1 $index | quote }}
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  restartPolicy: Never
+  activeDeadlineSeconds: 120
+  automountServiceAccountToken: false
+  # The isolated Pod reads the web Service address from LEDGER_OF_LIFE_SERVICE_HOST without DNS.
+  enableServiceLinks: {{ eq $probe "isolated" }}
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: ledger-of-life
+              app.kubernetes.io/component: web
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: probe
+      image: {{ include "ledger.image" $ | quote }}
+      imagePullPolicy: IfNotPresent
+      command:
+        - node
+        - -e
+        - |
+          {{- include "ledger.networkProbe" $ | nindent 10 }}
+      env:
+        - name: PROBE
+          value: {{ $probe | quote }}
+        - name: SERVICE_FQDN
+          value: {{ printf "ledger-of-life.%s.svc.cluster.local" $.Release.Namespace | quote }}
+      resources:
+        {{- toYaml $.Values.reconcile.resources | nindent 8 }}
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+{{- end }}

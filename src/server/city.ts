@@ -7,6 +7,8 @@ import { cityIdFor, coveredNames } from '../components/city-coverage.ts';
  * "Your city" through the Stadtstack project atlas. The atlas owns collection, sources and review;
  * this app only reads its public read model (atlas-city-read-model-v1) and keeps the atlas's own
  * provenance labels (as-of date, review state, coverage) next to every figure.
+ * An empty STADTSTACK_ATLAS_URL means this deployment has no atlas (the hosted demo: the atlas is a local research
+ * prototype). That, and an atlas that does not cover the city, are not outages and are not reported as one.
  */
 const ATLAS = (process.env.STADTSTACK_ATLAS_URL ?? 'http://localhost:4317').replace(/\/$/, '');
 const SCHEMA = 'atlas-city-read-model-v1';
@@ -70,9 +72,10 @@ export async function readCity(store: Store, identity: VerifiedIdentity, verifie
   const source = chosen ? 'chosen' : 'identity';
   if (!cityId) return { available: false, reason: 'not_covered', name, source, explicitlyUncovered: Boolean(chosen && saved?.explicitlyUncovered) };
   const unavailable = (reason: string): CityResult => ({ available: false, reason, name: coveredNames[cityId], cityId, source });
+  if (!ATLAS) return unavailable('no_atlas');
   const response = await fetch(`${ATLAS}/api/atlas/${encodeURIComponent(cityId)}`, { signal: AbortSignal.timeout(8000) }).catch(() => null);
   if (!response) return unavailable('atlas_unavailable');
-  if (response.status === 404) return unavailable('atlas_unavailable');
+  if (response.status === 404) return unavailable('not_in_atlas');
   if (!response.ok) return unavailable('atlas_unavailable');
   const model = await response.json().catch(() => null) as AtlasReadModel | null;
   if (!model || model.schemaVersion !== SCHEMA) return unavailable('atlas_unavailable');

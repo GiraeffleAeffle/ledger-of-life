@@ -15,14 +15,15 @@ The app uses the same tool and defaults as the owner's platform: atomic, cleanup
 | `chart/Chart.yaml`, `chart/values.yaml` | Chart identity and defaults: host, digest, storage, resources, ingress and non-secret config. |
 | `chart/templates/configmap.yaml` | Derives `APP_ORIGIN=https://<host>`; `ALLOW_LOCAL_STORE=1`, `LOCAL_AI_LIBRARY_ENABLED=0`. No operator tools, Home Assistant pull or GPU address. |
 | `chart/templates/pvc.yaml` | 2 Gi ReadWriteOnce, `hcloud-volumes`, database at `/data`. `helm.sh/resource-policy: keep` preserves the claim on uninstall. |
-| `chart/templates/deployment.yaml` | One replica, Recreate for SQLite. Non-root uid/gid 1000, fsGroup 1000, RuntimeDefault, read-only root, drop ALL, no service-account token. Writable data, Next cache and tmp volumes; readiness checks the status JSON's store availability. |
+| `chart/templates/deployment.yaml` | One replica, Recreate for SQLite. A checksum of the rendered ConfigMap rolls the pod when config changes. Non-root uid/gid 1000, fsGroup 1000, RuntimeDefault, read-only root, drop ALL, no service-account token. Writable data, Next cache and tmp volumes; readiness checks the status JSON's store availability. |
 | `chart/templates/service.yaml` | ClusterIP 4175, unchanged immutable workload selectors. |
-| `chart/templates/ingress.yaml` | HAProxy, letsencrypt-prod, HTTPS redirect, `ledger-of-life-tls`. |
+| `chart/templates/ingress.yaml` | HAProxy, letsencrypt-prod, HTTPS redirect, `ledger-of-life-tls`, 120 s server timeout for payout account creation (which can wait about 60 s for Solana confirmations). |
 | `chart/templates/cronjob.yaml` | Reconcile every minute, Forbid concurrency and bounded deadlines, same hardening, in-cluster Service origin. |
 | `chart/templates/networkpolicy.yaml` | Four policies: default deny, HTTP-01 solver, web and reconcile. HAProxy sources and reconcile can reach the app; DNS and public HTTPS only, excluding private/link-local/CGNAT. |
-| `values/ledger.stadtstack.eu.yaml` | Public host and the **one** image digest used by both workloads. Rendering refuses an empty/invalid digest or empty host. |
-| `ledger-env.example` | Secret key names; no secret values. |
-| `apply.sh` | Four modes, all behind the offline render (digest refusal) and the cluster UID guard, with one kube context bound to every kubectl and helmfile call. `--diff-only` changes nothing. `--namespace` creates only the namespace (first run). `--secret FILE` stores Secret `ledger-env` from an owner-only file outside every repository, checking keys by name only. The default mode requires the Secret, shows the diff, asks for a typed confirmation, applies, waits for the rollout and the certificate, then prints `storeAvailable` and `persistence`. Works from any cwd. |
+| `chart/templates/tests/network-policy-probe.yaml` | Two digest-pinned, restricted Helm test Pods on the web pod's node; created only by `helm test`, not the release. |
+| `values/ledger.stadtstack.eu.yaml` | Public host, the **one** image digest used by workloads and probes, empty atlas URL and public pull-v2 devnet manifest. Rendering refuses an empty/invalid digest or empty host. |
+| `ledger-env.example` | Secret key names and the public devnet RPC fallback; no private values. |
+| `apply.sh` | Five modes, all behind the offline render (digest refusal) and cluster UID guard, with one kube context bound to every kubectl, Helm and helmfile call. `--diff-only` changes nothing. `--namespace` creates only the namespace. `--secret FILE` replaces `ledger-env` from an owner-only file outside every repository, checking keys by name only, then restarts the web Deployment if it exists and waits up to 180 s for readiness. `--network-test` prints deployed hooks, asks for typed confirmation and runs the enforcement probe. The default requires the Secret, shows the diff including test hooks, asks for typed confirmation, applies, waits for rollout and certificate, then prints `storeAvailable` and `persistence`. Works from any cwd. |
 
 Standard Helm labels are metadata only; selectors remain `app.kubernetes.io/name: ledger-of-life` and component `web` or `reconcile`.
 
@@ -65,12 +66,48 @@ Every external change requires the owner's approval. Nothing here was applied by
    infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh --namespace          # first run only
    infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh --secret ~/ledger-env.local
    infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh --release            # shows the diff, then asks
+   infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh --network-test       # after releasing the probe hooks
    infra/hetzner-talos/scripts/open-freelens-filtered-viewer.sh start --manual-stop
    ```
 
-   The wrapper runs only the pushed commit's `deploy/` tree and refuses any cluster but the reviewed one (kube-system UID `7bc769bc-e860-4d54-a0d5-d426f3a52420`). It refuses to start while another rootless tunnel runs and checks again just before applying, but the Freelens viewer does not take its shared lock yet, so **do not start the viewer until the wrapper has finished**: two tunnels on the same identity make both unreliable. `--release` waits up to 180 seconds for the rollout and up to 2 minutes for the certificate; if the certificate is still pending it says so and exits successfully, because the release itself is up.
+   The wrapper runs only the pushed commit's `deploy/` tree and refuses any cluster but the reviewed one (kube-system UID `7bc769bc-e860-4d54-a0d5-d426f3a52420`). It refuses to start while another rootless tunnel runs and checks again just before applying; the wrapper and Freelens supervisor now both atomically acquire the same per-user daily-identity lock, record their PID and hold it until their tunnel stops. The canonical path is `$(getconf DARWIN_USER_TEMP_DIR)stadtstack-wireguard-daily.${UID}.lock`, independent of the caller's `TMPDIR`; each launchd restart reacquires it, a live holder is named and refused, and only a recorded dead PID permits stale-lock reclamation. Offline smokes can redirect the lock with `STADTSTACK_WIREGUARD_DAILY_TEST_LOCK` only when `STADTSTACK_WIREGUARD_LOCK_TEST_MODE=1`; the former public `STADTSTACK_WIREGUARD_DAILY_LOCK` override is refused. `--release` waits up to 180 seconds for the rollout and up to 2 minutes for the certificate; if the certificate is still pending it says so and exits successfully, because the release itself is up.
 
 Prerequisites: helmfile, Helm, the Helm diff plugin, kubectl, curl and Python 3. `KUBECTL` overrides the kubectl binary (for example `$HOME/.local/bin/kubectl-v1.36.0`). Secret checks fetch only `.data` key names, never values. Rendering happens before any cluster write, so missing digest stops safely.
+Helm API-server, CA, token, impersonation and TLS connection environment overrides must be unset (even empty values are refused before any tool runs); context-name checks remain in place. Preview and apply both include test hooks in their change decision.
+
+The private env file must hold **every key to keep**: `--secret` replaces the whole Secret. In addition to Privy and
+reconcile credentials, set `SOLANA_RPC_URL` to a devnet HTTPS endpoint (a provider key embedded in its URL is secret;
+`https://api.devnet.solana.com` works but is rate limited) and `SOLANA_SPONSOR_KEYPAIR` to a one-line JSON array of
+64 integers, without surrounding quotes, from a fresh key used only by this host. Secret replacement restarts an
+existing web Deployment; first-run storage before a Deployment exists does not try to restart one.
+
+Hosted non-secret config supplies the public pull-v2 devnet manifest from
+`docs/evidence/SOLANA_PULL_DEVNET_DEPLOYMENT_2026-09-25.json`, with a 15 s observation limit, a 10,000,000-lamport sponsor
+ceiling and hosted base placeholders for per-tenancy setup. Test tokens have no real value. `STADTSTACK_ATLAS_URL`
+is explicitly empty: there is no hosted project atlas (it is a local research prototype), so the app should say
+nothing about it, not claim an outage. `SOLANA_TEST_SIGNER_MODE`, `ALLOW_OPERATOR_TEST_ACTIONS`,
+`ALLOW_HOME_ASSISTANT_PULL`, `LOCAL_AI_OLLAMA_URL` and `DEMO_SKIP_RECOVERY` remain unset. ConfigMap changes alter the
+web pod template's `checksum/config`, so the next release replaces the pod instead of leaving stale environment values.
+
+## NetworkPolicy enforcement probe
+
+After releasing these hooks, `--network-test` prints `helm get hooks` for the deployed revision, asks for exactly
+`test network policies in ledger-of-life`, and runs `helm test --logs --timeout 3m`. The wrapper still requires
+the acknowledgement. Both Pods wait 5 s for policy discovery and run on the web pod's node using its pinned image.
+The `reconcile` identity must receive DNS and HTTP 200 from the web Service, but time out connecting to
+`api.privy.io:443`. The `isolated` identity must time out on both DNS and the web Service. A refusal or answer is
+not a drop; a failed positive DNS/web check or public DNS error is inconclusive, not proof of enforcement.
+Public host resolution has a separate 4 s deadline before the 4 s TCP drop timer starts; failed or stalled resolution reports `dns-error` and cannot count as a drop.
+
+A PASS proves point-in-time enforcement for new connections on that node: default deny blocks DNS and same-node
+Service egress, reconcile allows DNS/web and denies public HTTPS, and web ingress admits reconcile. Combined with
+the site answering through HAProxy, it confirms a real ingress source is admitted there. It cannot prove web egress
+(443-only/private-range exclusions), web ingress denial independently, which HAProxy clause admits traffic or
+whether every configured source is needed, the other nodes, continuity during fail-open agent outages,
+Pod-to-own-node host traffic, HTTP-01 enforcement, non-DNS UDP or IPv6. Neither probe becomes a Service endpoint.
+The Pods have no Secret or service-account token; they stay completed until the next test so Helm can print logs.
+They are not removed by `helm uninstall`. Each result includes a timestamp: if the first hook fails, Helm may
+print the second hook's old logs from an earlier run.
 
 ## Check afterwards
 
@@ -89,11 +126,18 @@ Prerequisites: helmfile, Helm, the Helm diff plugin, kubectl, curl and Python 3.
 
 The old Kustomize render (11 objects) and Helm render (10 plus the external Namespace) were compared semantically using a test digest: every field matches after removing only standard Helm metadata and the PVC keep annotation. Strict kubeconform Kubernetes 1.36 validation, both Pod Security restricted pod-spec checks, Bash syntax and ShellCheck were run offline. Missing digest rendering refuses deployment. The prior readiness command smoke covered an available store (exit 0), unavailable store (exit 1) and closed port (exit 1); the command is unchanged.
 
+The updated chart renders 10 release objects plus two test Pods (the Namespace is still external). Offline checks
+cover all four rendered Pod specs' restricted hardening, hosted manifest parsing and `solanaConfiguration`
+acceptance without network calls, checksum changes when config changes, probe PASS/FAIL decisions with mock
+transport outcomes, actual `--secret` restart/no-Deployment flows with stub binaries, missing-digest refusal before
+kubectl, wrapper acknowledgement/argument refusal, Bash syntax and ShellCheck. These are not live network tests.
+Kubeconform was not available locally for revalidating the new hooks against Kubernetes 1.36.0.
+
 ## Not verified
 
 - **What the first release proved (30 September).** The wrapper's `--namespace`, `--secret` and `--release` modes against the live cluster; certificate issuance through the HTTP-01 solver policy; public readiness. The claim bound and the Hetzner volume attached (after one transient `FailedMount` while the device appeared), and the store opens on it as uid 1000, so `fsGroup` works: opening runs `CREATE TABLE`, and `/api/status` answers `storeAvailable: true`. A reconcile job completes every minute, and `scripts/reconcile.mjs` fails on any non-2xx answer, so the Secret, in-cluster DNS and the reconcile-to-web path work. Rollback was not exercised.
-- **NetworkPolicy enforcement.** The `kube-flannel` pods run a `kube-network-policies` container, which Talos documents as what makes Flannel enforce policy. Enforcement was not probed. Unenforced policies would be accepted and ignored.
-- **The HAProxy source addresses.** The site answers through the ingress, so there is no 504. That holds whether the addresses are right or policies are not enforced; probing enforcement tells the two apart.
-- **The project atlas.** `STADTSTACK_ATLAS_URL` is unset, so it defaults to `localhost:4317`, which does not exist in a pod. City choice and the bundled city snapshots still work, and Places says the atlas is unavailable. Deploying the atlas, or setting that variable, is separate work.
+- **NetworkPolicy enforcement.** The `kube-flannel` pods run a `kube-network-policies` container. The two-Pod Helm probe now exists but **has not been run on the cluster**. Until an owner runs `--network-test`, enforcement remains unverified: accepted policies could be ignored.
+- **The HAProxy source addresses.** The site answers through ingress, but this alone cannot distinguish correct sources from unenforced policies. A successful probe plus site reachability proves admission on the tested node, not which source clause or whether all addresses are needed.
+- **The project atlas.** No project atlas is deployed. Hosted values explicitly set `STADTSTACK_ATLAS_URL` empty; city choice and bundled snapshots remain separate from the local research prototype.
 - **Resource sizes** (request 192 Mi, limit 768 Mi) come from about 120 MB idle in Docker. They were not load tested.
 - **No GPU path.** `LOCAL_AI_OLLAMA_URL` is unset, so the paid AI desk reports itself unconfigured. See `docs/DEPLOYMENT.md`, "The GPU".

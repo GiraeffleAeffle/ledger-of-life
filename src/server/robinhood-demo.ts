@@ -59,7 +59,7 @@ const TSLAX_MAINNET = 'XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB';
 export async function robinhoodEnabled(environment = process.env) {
   if (!operatorTestCapability(environment)) return false;
   try {
-    await readFile(resolve(environment.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet', 'operator.key'));
+    await readFile(/* turbopackIgnore: true */ resolve(/* turbopackIgnore: true */ environment.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet', 'operator.key'));
     return true;
   } catch {
     return false;
@@ -67,9 +67,9 @@ export async function robinhoodEnabled(environment = process.env) {
 }
 
 async function keys(environment = process.env) {
-  const dir = resolve(environment.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet');
+  const dir = resolve(/* turbopackIgnore: true */ environment.ROBINHOOD_TEST_KEYS_DIR || '.testnet-secrets/robinhood-testnet');
   // Local nonce tracking: the load-balanced testnet RPC can report a stale count between quick sends.
-  const load = async (role: string) => privateKeyToAccount((await readFile(resolve(dir, `${role}.key`), 'utf8')).trim() as Hex, { nonceManager });
+  const load = async (role: string) => privateKeyToAccount((await readFile(/* turbopackIgnore: true */ resolve(/* turbopackIgnore: true */ dir, `${role}.key`), 'utf8')).trim() as Hex, { nonceManager });
   const [operator, tenant, landlord, arbitrator] = await Promise.all(['operator', 'tenant', 'landlord', 'arbitrator'].map(load));
   return { operator, tenant, landlord, arbitrator };
 }

@@ -13,6 +13,7 @@ import { TEST_CITY_INVESTMENTS } from '@/data/local-investments';
 import { useRentalWallet } from '@/wallets';
 import { RobinhoodBuy } from './robinhood-buy';
 import { useSectionTabActive } from './section-tabs';
+import { TestDollars } from './test-dollars';
 
 type AssetsResponse = { robinhood: RobinhoodRead };
 type SharePositions = {
@@ -205,11 +206,12 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
   return (
     <section className={`card assets ${show}`} id="money-overview" tabIndex={-1}>
       <p className="small-copy">{TEST_EXIT_NOTICE}</p>
+      <TestDollars request={request} ethBalance={rh?.ethBalance} refresh={refresh} />
       <details className="money-funds" key={noCash ? 'empty' : 'funded'} open={noCash}>
         <summary>{noCash ? 'Get test funds' : 'Need more test funds?'}</summary>
         <div className="money-funds-wallets">
           <div><strong>Solana devnet wallet · test USDC</strong><p>{solanaAddress ? <><code>{solanaAddress}</code> <button className="text-button" type="button" onClick={() => void copyAddress(solanaAddress, 'Solana')}>Copy</button></> : 'Connect your Solana wallet in Me.'}</p><p>Use the <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle faucet (Solana Devnet)</a> to request test USDC.</p></div>
-          <div><strong>Robinhood Chain wallet · test USD (tUSDG)</strong><p>{robinhoodAddress ? <><code>{robinhoodAddress}</code> <button className="text-button" type="button" onClick={() => void copyAddress(robinhoodAddress, 'Robinhood Chain')}>Copy</button></> : 'Connect your Robinhood Chain wallet in Me.'}</p><p>{positions === null ? 'Operator test tools could not be checked yet.' : positions.enabled ? 'Test USD comes from operator test tools when on, or by borrowing against example shares in Shares & loans; example shares and test ETH for network fees come from the operator test tools.' : 'This server has the operator test tools off, so test USD and example shares cannot be created here.'}</p></div>
+          <div><strong>Robinhood Chain wallet · test USD (tUSDG)</strong><p>{robinhoodAddress ? <><code>{robinhoodAddress}</code> <button className="text-button" type="button" onClick={() => void copyAddress(robinhoodAddress, 'Robinhood Chain')}>Copy</button></> : 'Connect your Robinhood Chain wallet in Me.'}</p><p>Use Get test dollars above; operator tools are not needed.</p></div>
         </div>
         {copied && <p role="status">{copied === 'Copy failed; select the address instead.' ? copied : `${copied} address copied.`}</p>}
       </details>
@@ -256,8 +258,10 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
           {hasLegacyPosition && <span>Contract-held official TSLA at simulated collateral price: {(Number(positions?.deposit?.sharesRaw ?? '0') / 1e18).toFixed(5)} TSLA pledged ({usd(pledged)}) · {(Number(positions?.loan?.sharesRaw ?? '0') / 1e18).toFixed(5)} TSLA loan collateral ({usd(collateral)}) · loan −{usd(debt)}</span>}
           {officialQuote?.referencePriceStale && <span>Reference price as of {new Date(officialQuote.referencePriceObservedAt).toLocaleString()} · live price unavailable</span>}
           {officialQuote && <span>Reference price {usd(officialQuote.referencePriceUsd)} per test TSLA · Jupiter price for mainnet TSLAx, not a resale quote for this test token</span>}
-          {officialQuote && (BigInt(officialQuote.testUsdAtomic) === 0n
-            ? <p className="small-copy">No test USD (tUSDG) in this Robinhood Chain wallet yet. It comes from borrowing against example shares in Shares &amp; loans, or from the operator test tools when they are on.</p>
+          {!positions?.enabled
+            ? <p className="small-copy">Buying test TSLA here is off on this site. The <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet</a> gives official test TSLA and test ETH for fees.</p>
+            : officialQuote && (BigInt(officialQuote.testUsdAtomic) === 0n
+            ? <p className="small-copy">No test USD (tUSDG) yet. Use Get test dollars above; get test ETH for fees from the Robinhood faucet.</p>
             : <RobinhoodBuy request={request} testUsdAtomic={officialQuote.testUsdAtomic}
                 pausedReason={!latestRead?.assets ? 'Robinhood Chain wallet read unavailable; buying is paused until its balance is checked.' : !latestRead?.workflow ? 'Share positions unavailable; buying is paused until they refresh.' : officialQuote.referencePriceStale ? 'The TSLA reference price is out of date, so buying is paused. Try again shortly.' : ''}
                 debtUsd={debt}

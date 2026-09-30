@@ -153,7 +153,7 @@ export function getStore(): Promise<Store> {
     }
     if (process.env.NODE_ENV === 'production' && process.env.ALLOW_LOCAL_STORE !== '1')
       throw new Error('DATABASE_URL is required for a hosted deployment.');
-    return new LocalStore(resolve(process.env.LOCAL_DATABASE_PATH || '.data/rental.sqlite'));
+    return new LocalStore(resolve(/* turbopackIgnore: true */ process.env.LOCAL_DATABASE_PATH || '.data/rental.sqlite'));
   })().catch((error) => {
     instance = undefined;
     throw error;

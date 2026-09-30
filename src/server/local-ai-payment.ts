@@ -21,12 +21,12 @@ export type AiPaidRecord = { id: string; owner: { payer: Address }; payee: Addre
 type FeeEnvelope = { chainId: 46630; to: Address; data: Hex; value: '0'; nonce: number; gas: '300000'; maxFeePerGas: string; maxPriorityFeePerGas: string };
 type FeeLane = { id: string; envelope: FeeEnvelope | null };
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
-const keyFile = () => resolve(process.env.LOCAL_AI_FACILITATOR_KEY_FILE || '.testnet-secrets/local-ai/facilitator.key');
+const keyFile = () => resolve(/* turbopackIgnore: true */ process.env.LOCAL_AI_FACILITATOR_KEY_FILE || '.testnet-secrets/local-ai/facilitator.key');
 export async function facilitatorAccount() {
   const filename = keyFile();
-  const metadata = await stat(filename);
+  const metadata = await stat(/* turbopackIgnore: true */ filename);
   if (metadata.mode & 0o077) throw new ConflictError('Dedicated fee signer key is not owner-only.');
-  const raw = (await readFile(filename, 'utf8')).trim();
+  const raw = (await readFile(/* turbopackIgnore: true */ filename, 'utf8')).trim();
   if (!/^0x[a-fA-F0-9]{64}$/.test(raw)) throw new ConflictError('Invalid dedicated facilitator key file.');
   return privateKeyToAccount(raw as Hex);
 }

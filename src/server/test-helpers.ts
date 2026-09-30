@@ -38,9 +38,9 @@ export function testHelpersEnabled(_request: Request, environment: Record<string
 }
 
 async function signers(environment: Record<string, string | undefined>) {
-  const dir = resolve(environment.SOLANA_TEST_SIGNER_DIR || '.testnet-secrets/test-signer');
+  const dir = resolve(/* turbopackIgnore: true */ environment.SOLANA_TEST_SIGNER_DIR || '.testnet-secrets/test-signer');
   const entries = await Promise.all((['tenant', 'landlord', 'arbitrator'] as const).map(async (role) => {
-    const bytes = new Uint8Array(JSON.parse(await readFile(resolve(dir, `${role}.json`), 'utf8')));
+    const bytes = new Uint8Array(JSON.parse(await readFile(/* turbopackIgnore: true */ resolve(/* turbopackIgnore: true */ dir, `${role}.json`), 'utf8')));
     const signer = await createKeyPairSignerFromBytes(bytes);
     return [role, { signer, identity: testIdentity(role, signer.address) }] as const;
   }));

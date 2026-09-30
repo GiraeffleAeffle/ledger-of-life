@@ -10,8 +10,8 @@ metadata:
     # Same issuer as the other sites (checked: the load balancer serves Let's Encrypt certificates).
     cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer | quote }}
     haproxy-ingress.github.io/ssl-redirect: "true"
-    # HAProxy's default server timeout is shorter than an AI answer. Add a longer `timeout-server` here only when
-    # a GPU path is switched on (see docs/DEPLOYMENT.md); nothing needs it in this first deployment.
+    # Payout account creation can wait about 60 seconds for Solana confirmations; leave room for the full request.
+    haproxy-ingress.github.io/timeout-server: "120s"
 spec:
   ingressClassName: haproxy
   rules:

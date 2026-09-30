@@ -6,7 +6,7 @@ import type { SignedFundingStep } from './local-investment-provisioning.ts';
 export type ProvisionerFundingJournal = { recipient: string; operator: string; amountWei: string; step: SignedFundingStep };
 
 export async function readProvisionerJournal(filename: string): Promise<ProvisionerFundingJournal | null> {
-  try { return JSON.parse(await readFile(filename, 'utf8')) as ProvisionerFundingJournal; }
+  try { return JSON.parse(await readFile(/* turbopackIgnore: true */ filename, 'utf8')) as ProvisionerFundingJournal; }
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }
 }
 

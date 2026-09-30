@@ -69,7 +69,7 @@ function publicOrder(order: PrivateOrder, now = Date.now()): LocalInvestmentOrde
 }
 async function manifest(): Promise<{ value: LocalInvestmentManifest; hash: Hex } | null> {
   let bytes: string;
-  try { bytes = await readFile(resolve(process.env.LOCAL_INVESTMENTS_MANIFEST_FILE || manifestFile), 'utf8'); }
+  try { bytes = await readFile(/* turbopackIgnore: true */ resolve(/* turbopackIgnore: true */ process.env.LOCAL_INVESTMENTS_MANIFEST_FILE || manifestFile), 'utf8'); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }
   const value = JSON.parse(bytes) as LocalInvestmentManifest;
   assert(value.version === 1 && value.chainId === 46630 && same(address(value.cashAddress), ROBINHOOD_TESTNET.usd), 'Invalid investment manifest.');

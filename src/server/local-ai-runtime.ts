@@ -23,7 +23,7 @@ export const AI_CONTRACT_HASHES = {
 const deployment = 'contracts/evm/deployments/local-investments-46630.json';
 export async function inferencePayee(): Promise<Address> {
   if (process.env.LOCAL_AI_PAY_TO) return getAddress(process.env.LOCAL_AI_PAY_TO);
-  const manifest = JSON.parse(await readFile(resolve(process.env.LOCAL_INVESTMENTS_MANIFEST_FILE || deployment), 'utf8')) as { chainId: number; operator: string };
+  const manifest = JSON.parse(await readFile(/* turbopackIgnore: true */ resolve(/* turbopackIgnore: true */ process.env.LOCAL_INVESTMENTS_MANIFEST_FILE || deployment), 'utf8')) as { chainId: number; operator: string };
   if (manifest.chainId !== 46630) throw new ConflictError('Wrong recipient manifest network.');
   return getAddress(manifest.operator);
 }

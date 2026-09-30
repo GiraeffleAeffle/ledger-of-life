@@ -7,6 +7,21 @@ const standalone = process.env.NEXT_OUTPUT === 'standalone';
 const config: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  // No page is meant to be shown inside another site. Framing would let a site trick a visitor into pressing the
+  // app's buttons (clickjacking); Privy's wallet frame already refuses foreign parents, the app's own pages did not.
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
+      },
+    ];
+  },
   ...(standalone && {
     output: 'standalone' as const,
     // Several server modules read files by a computed path, which makes the tracer include the whole project.

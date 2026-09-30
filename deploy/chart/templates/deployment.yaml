@@ -18,6 +18,8 @@ spec:
       app.kubernetes.io/component: web
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       labels:
         app.kubernetes.io/name: ledger-of-life
         app.kubernetes.io/component: web

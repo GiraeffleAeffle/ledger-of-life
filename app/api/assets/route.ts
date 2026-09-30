@@ -6,6 +6,7 @@ import { ReferencePriceUnavailable } from '@/server/reference-price';
 import { getStore } from '@/server/store';
 import { errorResponse, readBody, sameOrigin } from '@/server/http';
 import { operatorTestCapability } from '@/server/test-capability';
+import { prepareTestDollars, submitTestDollars } from '@/server/test-dollars';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };
 const settle = <T,>(work: Promise<T>) => work.then((value) => ({ ok: true as const, value })).catch((e: unknown) => ({
@@ -53,6 +54,12 @@ export async function POST(request: Request) {
     const store = await getStore();
     const evm = identity.wallets.find((w) => w.chainType === 'ethereum');
     if (!evm) throw new Error('Your account has no Robinhood Chain wallet yet.');
+    if (body.action === 'test_dollars_prepare')
+      return Response.json({ walletId: evm.id, ...await prepareTestDollars(store, evm.address) }, noStore);
+    if (body.action === 'test_dollars_submit') {
+      if (typeof body.signed !== 'string') throw new Error('Invalid signed test transaction.');
+      return Response.json(await submitTestDollars(store, evm.address, body.signed), noStore);
+    }
     if (!operatorTestCapability()) throw new Error('The Robinhood testnet demo is disabled.');
     if (body.action === 'robinhood_earn') {
       if (!(await robinhoodEnabled())) throw new Error('The Robinhood testnet demo is disabled.');

@@ -20,7 +20,7 @@ The machine-readable source of truth is [`ontology.yaml`](ontology.yaml). This p
 | 2. Homes | Which home, terms and parties? | Home, Listing, Application, Agreement, Role |
 | 3. Custody | Who may move a deposit? | Escrow, Operation, Claim, Settlement, Payout, CollateralDeposit |
 | 4. Earnings | What does it earn? | YieldSource, Earnings, Release |
-| 5. Ownership | What do I own, owe and earn? | Asset, Position, BorrowAgainstShares, Venue, Distribution, Adapter |
+| 5. Ownership | What do I own, owe and earn? | Asset, Position, TestFunds, BorrowAgainstShares, Venue, Distribution, Adapter |
 | 6. Civic system | What was proposed, done or measured in this same place? | Organization, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence |
 | 7. Vision | What could follow, subject to verification? | ServiceChargeAccount, HomeEquityPath, DeviceTokenization, LocalInvestment, LifeTimeline |
 
@@ -198,6 +198,7 @@ of test receipts.
 | Operation, Release, Payout | `src/server/solana-service.ts`, `src/server/solana-initialization.ts` |
 | Journey (next step per person) | `src/server/journey.ts`, `src/components/home.tsx` |
 | Position, Venue, Distribution | `src/server/portfolio.ts`, `src/server/robinhood-demo.ts` |
+| TestFunds | `src/server/test-dollars.ts`, `src/components/test-dollars.tsx`: the person's own wallet mints tUSDG; test ETH and the official test TSLA come from Robinhood's public faucet, devnet USDC from Circle's |
 | LocalInvestment (test units) | `src/data/local-investments.ts`, `src/server/local-investments.ts`, `src/components/local-investments.tsx`, `contracts/evm/src/testnet/FictionalCityUnit.sol`, `contracts/evm/script/local-investments.mjs` |
 | Building/city scenario | `src/components/city-flywheel.tsx`; physical systems, supplier relationship, jobs and fiscal effects are illustrative |
 | LocalInferenceRequest and visitor access | `src/server/local-ai.ts`, `src/server/local-ai-runtime.ts`, `src/server/local-ai-session.ts`, `src/components/local-ai.tsx`, `app/(wallet)/library/page.tsx` |
