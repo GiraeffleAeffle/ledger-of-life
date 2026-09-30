@@ -8,7 +8,8 @@ type PartKey = keyof NetPositionParts;
 const PARTS: { key: PartKey; label: string; short: string; meaning: string }[] = [
   { key: 'free', label: 'Free to use', short: 'Free', meaning: 'Test cash and shares in your own wallets. They can be used for supported test actions here, but not sold or withdrawn.' },
   { key: 'locked', label: 'Held in a tenancy', short: 'Held', meaning: 'For a tenant: deposit entitlement held for the tenancy. For a landlord: only an approved claim or unpaid settlement amount, never the tenant’s entire deposit. An arbitrator owns neither.' },
-  { key: 'pledged', label: 'Pledged as collateral', short: 'Pledged', meaning: 'Test shares a separate share-backed deposit or loan contract holds. Repay debt or end that test deposit to return remaining shares; liquidation can take some.' },
+  { key: 'pledged', label: 'Pledged as collateral', short: 'Pledged', meaning: 'Official test TSLA held in the shared loan pool, valued at the same mirrored token price as wallet TSLA. Repayment unlocks collateral; liquidation can take some.' },
+  { key: 'lent', label: 'Lent to the shared pool', short: 'Lent', meaning: 'Your pool claim includes borrower interest and losses. Withdrawals are limited by available cash; test dollars anyone can mint have no monetary value.' },
   { key: 'owed', label: 'Owed on your loan', short: 'Owed', meaning: 'Test USD (tUSDG) borrowed against shares, subtracted here. Borrowed test cash appears once in Free to use.' },
 ];
 /** A part that is zero says nothing, except "Free to use", which anchors the list. */
@@ -19,10 +20,11 @@ const signed = (key: PartKey, amount: number) => `${key === 'owed' ? '−' : ''}
 export function NetPosition({ parts, go, depositSection }: { parts: NetPositionParts; go: (area: Area) => void; depositSection: string }) {
   const rows = shown(parts);
   // One scale for every bar: the whole held (free + locked + pledged), or the debt if that is larger.
-  const scale = Math.max(parts.free + parts.locked + parts.pledged, parts.owed, 0.01);
+  const scale = Math.max(parts.free + parts.locked + parts.pledged + parts.lent, parts.owed, 0.01);
   const opens: Partial<Record<PartKey, () => void>> = {
     locked: () => goToSection(go, 'home', depositSection),
     pledged: () => goToSection(go, 'money', 'share-workflows'),
+    lent: () => goToSection(go, 'money', 'share-workflows'),
     owed: () => goToSection(go, 'money', 'share-workflows'),
   };
   return (
@@ -38,7 +40,7 @@ export function NetPosition({ parts, go, depositSection }: { parts: NetPositionP
         ))}
         <li className="net-position-total">
           <span className="net-position-label">Adds up to</span>
-          <span className="net-position-sum">{rows.length > 1 ? 'Free + locked + pledged − owed' : 'Nothing locked, pledged or owed'}</span>
+          <span className="net-position-sum">{rows.length > 1 ? 'Free + locked + pledged + lent − owed' : 'Nothing locked, pledged, lent or owed'}</span>
           <strong className="net-position-amount">{usd(netPositionTotal(parts))} test value</strong>
         </li>
       </ul>

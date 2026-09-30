@@ -6,9 +6,9 @@
 #     --build-arg NEXT_PUBLIC_PRIVY_APP_ID=<public Privy app id> \
 #     --build-arg NEXT_PUBLIC_PRIVY_CLIENT_ID=<public Privy app client id, optional> .
 #
-# The image holds code, the published city data and one public deployment manifest (Local stakes on Robinhood Chain
-# testnet: addresses and code hashes). Keys, the database and operator material are supplied at run time (see
-# docs/DEPLOYMENT.md); nothing private is copied in, and `.dockerignore` is deny-by-default.
+# The image holds code, the published city data and two public deployment manifests (Local stakes and the shared loan
+# market on Robinhood Chain testnet: addresses, code hashes, parameters). Keys, the database and operator material are
+# supplied at run time (see docs/DEPLOYMENT.md); nothing private is copied in, and `.dockerignore` is deny-by-default.
 
 # Pinned by digest so a moved tag cannot change what builds and runs this image: node:24-bookworm-slim, Node 24.21.0,
 # resolved on 30 Sep 2026. Update deliberately: `docker buildx imagetools inspect node:24-bookworm-slim`, then rebuild.
@@ -54,9 +54,11 @@ RUN mkdir /data /app/.next /app/.next/cache && chown -R node:node /data /app/.ne
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --chown=node:node stadtstack-data/out ./stadtstack-data/out
-# Read by Local stakes and the AI desk's payee at their default path (src/server/local-investments.ts); rebuild the
-# image when that deployment changes.
+# Public testnet deployments read at their default paths: Local stakes and the AI desk's payee
+# (src/server/local-investments.ts), and the shared loan market and its price mirror (src/server/shared-market.ts,
+# src/server/tsla-price-mirror.ts). Rebuild the image when a deployment changes.
 COPY --chown=node:node contracts/evm/deployments/local-investments-46630.json ./contracts/evm/deployments/local-investments-46630.json
+COPY --chown=node:node contracts/evm/deployments/shared-market-46630.json ./contracts/evm/deployments/shared-market-46630.json
 COPY --chown=node:node scripts/reconcile.mjs ./scripts/reconcile.mjs
 USER node
 VOLUME /data

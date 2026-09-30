@@ -1,4 +1,6 @@
 {
+  "evidenceStatus": "historical_fake_stock_operator_priced",
+  "evidenceScope": "Preserved historical per-wallet fake-tTSLA execution with operator oracle/desk and simulated yield. Not evidence of the official-stock SharedLendingPool, converted mainnet price mirror or borrower-funded earnings.",
   "network": "Robinhood Chain testnet",
   "chainId": 46630,
   "mode": "ephemeral signed test wallet and operator-held test actors; not a Privy/signed-in wallet proof",

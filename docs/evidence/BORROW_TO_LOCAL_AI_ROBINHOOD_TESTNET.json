@@ -1,4 +1,6 @@
 {
+  "evidenceStatus": "historical_fake_stock_operator_priced",
+  "evidenceScope": "Preserved historical Privy wallet transfers and purchases funded through a per-wallet fake-stock/operator-price loan. Not evidence of the official-stock SharedLendingPool, converted mainnet price mirror or borrower-funded earnings.",
   "verifiedAt": "2026-09-28T20:43:12.600Z",
   "network": "eip155:46630",
   "chainId": 46630,

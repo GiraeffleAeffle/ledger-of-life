@@ -2,14 +2,13 @@
 import { NetPosition, NetPositionStrip } from './net-position';
 import { netPositionTotal, usd, type NetPositionParts } from './money-valuation';
 import { RecoveryCard, RecoveryStepView, type RecoveryView } from './recovery-step';
-import { RobinhoodBuy } from './robinhood-buy';
 import { TenancyWalkthrough } from './tenancy-walkthrough';
 import './design-lab.css';
 
 const HOLDINGS: { name: string; note: string; parts: NetPositionParts }[] = [
-  { name: 'A new account', note: 'Signed in, nothing funded yet.', parts: { free: 0, locked: 0, pledged: 0, owed: 0 } },
-  { name: 'A living tenancy', note: 'A 1 test-USDC deposit is locked and a little test cash is free.', parts: { free: 7.31, locked: 1, pledged: 0, owed: 0 } },
-  { name: 'Shares, a pledge and a loan', note: 'Everything at once: a deposit, shares pledged to a contract, and test USD borrowed against them.', parts: { free: 812.34, locked: 10, pledged: 2200, owed: 300 } },
+  { name: 'A new account', note: 'Signed in, nothing funded yet.', parts: { free: 0, locked: 0, pledged: 0, lent: 0, owed: 0 } },
+  { name: 'A living tenancy', note: 'A 1 test-USDC deposit is locked and a little test cash is free.', parts: { free: 7.31, locked: 1, pledged: 0, lent: 0, owed: 0 } },
+  { name: 'Collateral, a loan and lending', note: 'Everything at once: a deposit, test TSLA posted as collateral in the shared pool, test dollars borrowed against it, and test dollars lent to the pool.', parts: { free: 812.34, locked: 10, pledged: 2200, lent: 500, owed: 300 } },
 ];
 
 const noop = () => {};
@@ -26,11 +25,6 @@ const recoveryView = (status: RecoveryView['status']): RecoveryView => ({
   status, email: 'maria@example.org', origin: 'https://ledger.example', busy: false, error: '', copied: false,
   onEnroll: noop, onVerify: noop, onCopy: noop, onSignInAgain: noop,
 });
-
-/** Stands in for the server so the purchase review can be opened without an account or a chain. */
-const quotedRequest = (async () => ({
-  walletId: 'lab', quote: { spendAtomic: '5000000', tslaRaw: '21300000000000000' }, steps: [],
-})) as unknown as Parameters<typeof RobinhoodBuy>[0]['request'];
 
 /**
  * Real components with invented numbers, so a layout can be judged without funds or an account.
@@ -68,22 +62,6 @@ export function DesignLab() {
             <RecoveryStepView {...recoveryView(status)} />
           </article>
         ))}
-      </section>
-      <section aria-labelledby="lab-buy">
-        <h2 id="lab-buy">Money → Holdings: buying test TSLA</h2>
-        <p>The button no longer spends everything. A person picks an amount, reviews what it does, then signs. The first card has both cautions on; the second is a wallet with a share market and no loan.</p>
-        <article className="card">
-          <span className="eyebrow">NO SHARE MARKET YET · A LOAN IS OPEN</span>
-          <RobinhoodBuy request={quotedRequest} testUsdAtomic="12000000" pausedReason="" debtUsd={12} blocksExampleShares onPrepareExamples={noop} />
-        </article>
-        <article className="card">
-          <span className="eyebrow">A SHARE MARKET EXISTS · NO LOAN</span>
-          <RobinhoodBuy request={quotedRequest} testUsdAtomic="500000" pausedReason="" debtUsd={0} blocksExampleShares={false} onPrepareExamples={noop} />
-        </article>
-        <article className="card">
-          <span className="eyebrow">BUYING IS PAUSED</span>
-          <RobinhoodBuy request={quotedRequest} testUsdAtomic="12000000" pausedReason="The TSLA reference price is out of date, so buying is paused. Try again shortly." debtUsd={0} blocksExampleShares={false} onPrepareExamples={noop} />
-        </article>
       </section>
       <section aria-labelledby="lab-walkthrough">
         <h2 id="lab-walkthrough">Home: a person with no tenancy yet</h2>

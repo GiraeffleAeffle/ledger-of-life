@@ -4,8 +4,8 @@ import { ownershipFacts, type SharePosition } from './ownership-facts.ts';
 import type { LocalInvestmentView } from '../server/local-investments.ts';
 
 const share: SharePosition = {
-  enabled: true, fakeStock: { symbol: 'tTSLA' }, deployment: { pool: 'test-pool' },
-  sharesRaw: '2000000000000000000', testUsdAtomic: '12000000', deposit: null, loan: null,
+  enabled: true, deployment: { pool: 'test-pool' },
+  sharesRaw: '2000000000000000000', testUsdAtomic: '12000000', loan: null,
 };
 const market = {
   state: 'ready', cashAtomic: '2000000', assets: [
@@ -33,10 +33,9 @@ test('investing borrowed cash keeps debt and locked collateral visible even when
   assert.equal(facts.company, true);
 });
 
-test('deposit-locked shares cannot count as loan collateral or wallet-available shares', () => {
-  const facts = ownershipFacts({ ...share, sharesRaw: '0', deposit: { state: 1, sharesRaw: '2000000000000000000' } }, market);
-  assert.equal(facts.depositLocked, true);
-  assert.equal(facts.lockedShares, false);
+test('unknown wallet quantities do not prove ownership or become a factual zero cash balance', () => {
+  const facts = ownershipFacts({ ...share, sharesRaw: null, testUsdAtomic: null }, { ...market, cashAtomic: null });
   assert.equal(facts.walletShares, false);
+  assert.equal(facts.cashAtomic, null);
   assert.equal(facts.borrowed, false);
 });

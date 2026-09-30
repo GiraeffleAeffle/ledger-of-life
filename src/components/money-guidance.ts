@@ -4,20 +4,6 @@ export function needsTestFunds(solanaCash: string | null, robinhoodCash: string 
   return solanaCash !== null && robinhoodCash !== null && BigInt(solanaCash) === 0n && BigInt(robinhoodCash) === 0n;
 }
 
-/** Current collateral price drop before debt reaches the 80% liquidation threshold. */
-export function priceFallBeforeLiquidation(valueAtomic: string, debtAtomic: string): number | null {
-  const value = BigInt(valueAtomic);
-  const debt = BigInt(debtAtomic);
-  if (value <= 0n || debt <= 0n) return null;
-  const room = (value * 80n - debt * 100n) * 100n / (value * 80n);
-  return Number(room > 0n ? room : 0n);
-}
-
-export function missingRepaymentCash(cashAtomic: string, debtAtomic: string): bigint {
-  const shortfall = BigInt(debtAtomic) + 1000n - BigInt(cashAtomic);
-  return shortfall > 0n ? shortfall : 0n;
-}
-
 export function stakeDisabledReason(input: { amountAtomic: string | null; cashAtomic: string | null; nativeAtomic: string | null; hasWallet: boolean }): string {
   if (!input.hasWallet) return 'Connect your Robinhood Chain wallet in Me first.';
   if (!input.amountAtomic || BigInt(input.amountAtomic) <= 0n) return 'Enter a stake amount greater than zero.';

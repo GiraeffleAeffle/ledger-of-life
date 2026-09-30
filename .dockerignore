@@ -17,8 +17,9 @@ scripts/*
 stadtstack-data/*
 !stadtstack-data/out
 
-# The public Local-stakes deployment on Robinhood Chain testnet (addresses and code hashes only). Local stakes and the
-# AI desk's payee read it at the path the code expects; artifacts, other manifests and keys stay out.
+# The public Robinhood Chain testnet deployments the app reads at fixed paths (addresses, code hashes, parameters
+# only): Local stakes and the AI desk's payee, and the shared loan market with its price mirror. Artifacts, other
+# manifests and keys stay out.
 !contracts
 contracts/*
 !contracts/evm
@@ -26,3 +27,4 @@ contracts/evm/*
 !contracts/evm/deployments
 contracts/evm/deployments/*
 !contracts/evm/deployments/local-investments-46630.json
+!contracts/evm/deployments/shared-market-46630.json

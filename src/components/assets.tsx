@@ -6,29 +6,22 @@ import type { PortfolioPartial, PortfolioView } from '@/server/portfolio';
 import { goToSection, type Area } from './areas';
 import { NetPosition, NetPositionStrip } from './net-position';
 import { RealityChips } from './reality-chip';
-import { confirmedRobinhood, netPositionParts, netPositionTotal, netSharePositionsAtomic, usd, type RobinhoodRead } from './money-valuation';
+import { confirmedRobinhood, netPositionParts, netPositionTotal, shareValuationAvailable, usd, type RobinhoodRead, type SharePositionAmounts } from './money-valuation';
 import { needsTestFunds, TEST_EXIT_NOTICE } from './money-guidance';
 import type { LocalInvestmentView } from '@/server/local-investments';
 import { TEST_CITY_INVESTMENTS } from '@/data/local-investments';
 import { useRentalWallet } from '@/wallets';
-import { RobinhoodBuy } from './robinhood-buy';
 import { useSectionTabActive } from './section-tabs';
 import { TestDollars } from './test-dollars';
 
 type AssetsResponse = { robinhood: RobinhoodRead };
-type SharePositions = {
-  enabled: boolean;
-  testUsdAtomic: string;
-  fakeStock: null | { symbol: 'tTSLA'; walletRaw: string; walletValueAtomic: string; priceAtomic: string };
-  deposit: { sharesRaw: string; valueAtomic: string } | null;
-  loan: { sharesRaw: string; valueAtomic: string; debtAtomic: string } | null;
-};
+type SharePositions = SharePositionAmounts & { enabled: boolean; testUsdAtomic: string | null };
 type PricedPortfolio = PortfolioView | PortfolioPartial;
 type MoneySnapshot = { assets: AssetsResponse; portfolio: PricedPortfolio; workflow: SharePositions; lockedUsd: number; officialCashUsd: number; officialStockUsd: number; solanaStockUsd: number; checkedAt: number };
 type LatestRead = { assets: AssetsResponse | null; portfolio: PricedPortfolio | null; workflow: SharePositions | null; checkedAt: number };
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 
-const atomicUsd = (atomic: string | undefined) => Number(atomic ?? '0') / 1e6;
+const atomicUsd = (atomic: string | null | undefined) => Number(atomic ?? '0') / 1e6;
 type Chain = NonNullable<TenancyJourney['chain']>;
 /** What of one tenancy belongs to the viewer, in USD. Before settlement the tenant owns the deposit and
  * earnings minus approved claims; after settlement each side owns what is owed and not yet paid. */
@@ -81,16 +74,16 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
     const workflow = workflowResult.status === 'fulfilled' ? workflowResult.value.workflow : null;
     setLatestRead({ assets, portfolio: solana, workflow, checkedAt: Date.now() });
     const issues = [
-      !official ? 'Robinhood wallet balances' : 'status' in official && BigInt(official.tslaRaw) > 0n ? 'official TSLA price' : null,
+      !official ? 'Robinhood wallet balances' : null,
       !solana ? 'Solana wallet balances' : 'status' in solana && BigInt(solana.rawAtomic) > 0n ? 'tSPYx price' : null,
-      !workflow ? 'share-backed positions' : null,
+      !workflow || !shareValuationAvailable(workflow) ? 'fresh shared-market TSLA valuation' : null,
     ].filter((issue): issue is string => issue !== null);
     if (issues.length) {
       setReadError(`Live valuation incomplete: ${issues.join(', ')} unavailable.`);
     } else if (assets && official && solana && workflow) {
       setSnapshot({ assets, portfolio: solana, workflow, lockedUsd: lockedAtRead,
         officialCashUsd: atomicUsd(official.testUsdAtomic),
-        officialStockUsd: 'status' in official ? 0 : official.tslaValueUsd,
+        officialStockUsd: 0,
         solanaStockUsd: 'status' in solana ? 0 : solana.valueUsd,
         checkedAt: Date.now() });
       setReadError('');
@@ -145,21 +138,13 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
   const onChain = tenancies.find((t) => t.chain);
   const depositSection = onChain ? `tenancy-${onChain.agreementId}` : 'home-tenancies';
   const rh = confirmedRobinhood(assets?.robinhood ?? null);
-  const officialQuote = rh && !('status' in rh) ? rh : null;
   const positions = workflow;
-  // Workflow walletValueAtomic overlaps wallet stock value. Official TSLA held by
-  // the older share market belongs to the official tile, not the new fake tile.
+  const hasFreshTokenPrice = Boolean(positions && !positions.suspended && positions.price && !positions.price.stale
+    && positions.priceAtomic !== null && BigInt(positions.priceAtomic) > 0n);
   const walletTestUsd = rh ? atomicUsd(rh.testUsdAtomic) : 0;
-  const shareNetUsd = Number(netSharePositionsAtomic(positions)) / 1e6;
-  const officialContractNet = positions && !positions.fakeStock ? shareNetUsd : 0;
-  const fakeStockWalletValue = atomicUsd(positions?.fakeStock?.walletValueAtomic);
-  const pledged = atomicUsd(positions?.deposit?.valueAtomic);
   const collateral = atomicUsd(positions?.loan?.valueAtomic);
   const debt = atomicUsd(positions?.loan?.debtAtomic);
-  const fakeStockValue = positions?.fakeStock ? shareNetUsd : 0;
-  const hasLegacyPosition = Boolean(positions && !positions.fakeStock &&
-    (BigInt(positions.deposit?.sharesRaw ?? '0') > 0n || BigInt(positions.loan?.sharesRaw ?? '0') > 0n ||
-      BigInt(positions.loan?.debtAtomic ?? '0') > 0n || BigInt(positions.deposit?.valueAtomic ?? '0') > 0n));
+  const lent = atomicUsd(positions?.lender?.valueAtomic);
   const parts = snapshot ? netPositionParts({
     lockedUsd: snapshot.lockedUsd,
     walletCashUsd: atomicUsd(snapshot.portfolio.testUsdcAtomic) + snapshot.officialCashUsd,
@@ -168,8 +153,8 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
   }) : null;
   const total = parts ? netPositionTotal(parts) : 0;
   const solanaShareValue = !portfolio ? null : 'status' in portfolio ? BigInt(portfolio.rawAtomic) === 0n ? 0 : null : portfolio.valueUsd;
-  const officialSharesInWallet = !rh ? null : 'status' in rh ? BigInt(rh.tslaRaw) === 0n ? 0 : null : rh.tslaValueUsd;
-  const officialTileValue = officialSharesInWallet === null ? null : officialSharesInWallet + officialContractNet;
+  const officialTileValue = !readError && positions && shareValuationAvailable(positions)
+    ? atomicUsd(positions.walletValueAtomic) + collateral - debt : null;
   const checkedAt = snapshot ? new Date(snapshot.checkedAt).toLocaleString() : null;
   const entitlementChanged = Boolean(snapshot && snapshot.lockedUsd !== locked);
   const balanceStatus = readError
@@ -180,17 +165,15 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
   if (show === 'summary')
     return (
       <div className="today-money">
-        <strong className="overview-figure">{snapshot ? `${usd(total)} test value` : '—'} <span>priced test-asset subtotal</span></strong>
+        <strong className="overview-figure">{snapshot && !readError ? `${usd(total)} test value` : '—'} <span>priced test-asset subtotal</span></strong>
         <RealityChips levels={['testnet_simulated']} />
         <span role="status">{balanceStatus}</span>
         {portfolio && !('status' in portfolio) && portfolio.referencePriceStale && <span>Solana reference price as of {new Date(portfolio.referencePriceObservedAt).toLocaleString()}</span>}
-        {officialQuote?.referencePriceStale && <span>Robinhood reference price as of {new Date(officialQuote.referencePriceObservedAt).toLocaleString()}</span>}
-        {parts && <NetPositionStrip parts={parts} />}
+        {parts && !readError && <NetPositionStrip parts={parts} />}
         <details><summary>What is included</summary>
           <p>{snapshot ? 'The parts above add up to the subtotal. Robinhood Chain test USD (tUSDG) is counted once.' : 'No complete subtotal yet.'}
             {' Validator stake (Money → Devices & income) is public mainnet data and is not part of this subtotal. Local project units are excluded: their test issue price is not a resale or market quote.'}</p>
-          {positions?.fakeStock && <p>tTSLA · fake test stock at simulated price: {usd(fakeStockWalletValue)} wallet · {usd(pledged)} pledged · {usd(collateral)} loan collateral · debt −{usd(debt)}</p>}
-          {hasLegacyPosition && <p>Official TSLA test positions: {usd(pledged)} pledged · {usd(collateral)} loan collateral · debt −{usd(debt)} (simulated collateral price)</p>}
+          {positions && !readError && shareValuationAvailable(positions) && <p>Shared market: {usd(collateral)} loan collateral · {usd(lent)} lent · debt −{usd(debt)}. {hasFreshTokenPrice ? 'Wallet and collateral use the same fresh mirrored token price.' : 'No fresh mirrored token price is available; confirmed zero-stock positions do not need a stock quote.'}</p>}
         </details>
         <button className="text-button" onClick={() => go('money')}>See priced test assets →</button>
       </div>
@@ -221,11 +204,9 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
           <h2>What you hold, what is locked</h2>
           <p className="small-copy">See your home deposit, shares and cash in one place.</p>
         </div>
-        <div className="assets-total"><span>Priced test-asset subtotal</span><strong>{snapshot ? `${usd(total)} test value` : '—'}</strong><small role="status">{balanceStatus}</small><details><summary>What this counts</summary><p>{snapshot ? 'The parts listed below add up to this figure.' : 'No complete subtotal yet.'} Robinhood Chain and Solana are separate test networks. Robinhood Chain test USD (tUSDG) is counted once. Local project units are excluded: their test issue price is not a resale or market quote.</p></details></div>
-        {positions?.fakeStock && <p className="small-copy assets-valuation-note">tTSLA wallet and contract positions use a simulated test price; loan debt is subtracted once.</p>}
-        {((portfolio && !('status' in portfolio) && portfolio.referencePriceStale) || officialQuote?.referencePriceStale) && <p className="small-copy assets-valuation-note">Last known stock reference prices; observation times below.</p>}
+        <div className="assets-total"><span>Priced test-asset subtotal</span><strong>{snapshot && !readError ? `${usd(total)} test value` : '—'}</strong><small role="status">{balanceStatus}</small><p>Test dollars anyone can mint have no monetary value. Local fictional units are outside this subtotal.</p></div>
       </div>
-      {parts && <NetPosition parts={parts} go={go} depositSection={depositSection} />}
+      {parts && !readError && <NetPosition parts={parts} go={go} depositSection={depositSection} />}
       <div className="asset-grid">
         <button type="button" className="asset-tile clickable" id="rental-deposit-holding" onClick={() => goToSection(go, 'home', depositSection)} aria-label="Open rental home and deposit">
           <header><KeyRound size={18} /> Rental home &amp; deposit · Solana devnet</header>
@@ -254,26 +235,10 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
           <header><LineChart size={18} /> TSLA · official Robinhood test token</header>
           <strong>{officialTileValue === null ? '—' : `${usd(officialTileValue)} test value`}</strong>
           <span>{rh ? `${rh.tslaShares.toFixed(5)} TSLA in wallet · ${usd(walletTestUsd)} test USD (tUSDG) in Robinhood Chain wallet` : 'Balance not yet available'}</span>
-          {rh && 'status' in rh && <span role="status">Official TSLA reference price unavailable; wallet quantity and cash were read.</span>}
-          {hasLegacyPosition && <span>Contract-held official TSLA at simulated collateral price: {(Number(positions?.deposit?.sharesRaw ?? '0') / 1e18).toFixed(5)} TSLA pledged ({usd(pledged)}) · {(Number(positions?.loan?.sharesRaw ?? '0') / 1e18).toFixed(5)} TSLA loan collateral ({usd(collateral)}) · loan −{usd(debt)}</span>}
-          {officialQuote?.referencePriceStale && <span>Reference price as of {new Date(officialQuote.referencePriceObservedAt).toLocaleString()} · live price unavailable</span>}
-          {officialQuote && <span>Reference price {usd(officialQuote.referencePriceUsd)} per test TSLA · Jupiter price for mainnet TSLAx, not a resale quote for this test token</span>}
-          {!positions?.enabled
-            ? <p className="small-copy">Buying test TSLA here is off on this site. The <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet</a> gives official test TSLA and test ETH for fees.</p>
-            : officialQuote && (BigInt(officialQuote.testUsdAtomic) === 0n
-            ? <p className="small-copy">No test USD (tUSDG) yet. Use Get test dollars above; get test ETH for fees from the Robinhood faucet.</p>
-            : <RobinhoodBuy request={request} testUsdAtomic={officialQuote.testUsdAtomic}
-                pausedReason={!latestRead?.assets ? 'Robinhood Chain wallet read unavailable; buying is paused until its balance is checked.' : !latestRead?.workflow ? 'Share positions unavailable; buying is paused until they refresh.' : officialQuote.referencePriceStale ? 'The TSLA reference price is out of date, so buying is paused. Try again shortly.' : ''}
-                debtUsd={debt}
-                blocksExampleShares={Boolean(positions?.enabled && !positions.fakeStock && !positions.deposit && !positions.loan && BigInt(officialQuote.tslaRaw) === 0n)}
-                onPrepareExamples={() => goToSection(go, 'money', 'ownership-journey')} />)}
+          {positions && <span>Loan collateral: {(Number(positions.loan?.sharesRaw ?? '0') / 1e18).toFixed(5)} TSLA · debt {usd(debt)} test value. {hasFreshTokenPrice ? `Mirrored Robinhood TSLA token price: ${usd(atomicUsd(positions.priceAtomic))}.` : 'Fresh mirrored token price unavailable; no stock valuation shown.'}</span>}
+          <p className="small-copy"><a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Get 5 test TSLA and test ETH from Robinhood’s faucet</a>. No operator-priced stock desk.</p>
         </article>
-        {positions?.fakeStock && <article className="asset-tile" id="fake-shares" tabIndex={-1}>
-          <header><LineChart size={18} /> tTSLA · fake test stock (test market price)</header>
-          <strong>{usd(fakeStockValue)} simulated test value</strong>
-          <span>{(Number(positions.fakeStock.walletRaw) / 1e18).toFixed(5)} tTSLA in wallet · simulated price {usd(atomicUsd(positions.fakeStock.priceAtomic))} per share</span>
-          <span>In wallet {usd(fakeStockWalletValue)} · pledged for a deposit {usd(pledged)} · loan collateral {usd(collateral)} · loan −{usd(debt)}</span>
-        </article>}
+        <article className="asset-tile"><header>Lent test dollars · shared pool</header><strong>{positions ? `${usd(lent)} test value` : '—'}</strong><span>Pool share value includes borrower interest and losses. Withdrawals depend on available pool cash.</span><button className="text-button" type="button" onClick={() => goToSection(go, 'money', 'share-workflows')}>Open shared market →</button></article>
         <article className="asset-tile"><header>tHOME and tWORK · fictional test units</header><strong>Outside subtotal</strong>{stakes?.state === 'ready' ? stakes.assets.map((asset) => <span key={asset.projectId}>{TEST_CITY_INVESTMENTS.find((project) => project.id === asset.projectId)?.symbol ?? 'Test units'}: {asset.holdingRaw === null ? 'unavailable' : (Number(BigInt(asset.holdingRaw)) / 1e18).toFixed(4)} units · fictional test issuer</span>) : <span>{stakes ? 'Local stake balances unavailable.' : 'Checking wallet units…'}</span>}<span>Test issue prices are not resale prices, and these units grant no property or company rights.</span><button className="text-button" type="button" onClick={() => goToSection(go, 'money', 'local-investments')}>See your local stakes →</button></article>
       </div>
     </section>

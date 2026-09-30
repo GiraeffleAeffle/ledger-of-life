@@ -45,7 +45,7 @@ layers:  # product architecture, bottom-up
   - id: custody
     concepts: [Escrow, Operation, Claim, Settlement, Payout, CollateralDeposit]
   - id: earnings
-    concepts: [YieldSource, Earnings, Release]
+    concepts: [YieldSource, Earnings, Release, PriceSource]
   - id: ownership
     concepts: [Asset, Position, TestFunds, BorrowAgainstShares, Venue, Distribution, Adapter]
   - id: local_services
@@ -306,7 +306,7 @@ concepts:
     implementations:
       kamino_devnet: {reality: testnet_real, note: "No borrowers on devnet, so 0 % yield."}
       solana_test_credit_yield: {reality: testnet_simulated, note: "Test-only program instruction standing in for interest."}
-      robinhood_test_vault: {reality: testnet_simulated, code: contracts/evm/src/testnet/TestnetMarket.sol}
+      robinhood_shared_pool: {reality: testnet_real, code: contracts/evm/src/testnet/SharedLendingPool.sol, note: "Borrower-funded continuous 5% nominal annual interest (about 5.13% effective, read from contract), shared pro rata without projections; deployment required, withdrawals limited by cash. Freely mintable tUSDG has no monetary value."}
       morpho_mainnet_vault: {reality: prototype, note: "Mainnet-fork tests only."}
 
   Earnings:
@@ -314,11 +314,16 @@ concepts:
     invariants:
       - claimable = min(idle cash, total value - required security), only while active and if permitted.
     relations: {released_by: Release, to: Asset(CashBalance of tenant)}
+    implementations:
+      robinhood_shared_pool: {reality: testnet_real, note: "Actual accrued borrower interest, not operator-contributed yield; may fall with bad debt."}
+      solana_test_credit_yield: {reality: testnet_simulated, note: "Test credit remains simulated."}
 
   Release:
     definition: The tenant claims Earnings during the tenancy to their own fixed account.
     code: [programs/rental_escrow/src/lib.rs#release_earnings, contracts/evm/src/RentalEscrow.sol#releaseEarnings]
-    reality: testnet_simulated   # real execution; yield input simulated
+    implementations:
+      robinhood_shared_pool: {reality: testnet_real, note: "Cash-limited; escrow release rolls back if liquidity is insufficient."}
+      solana_test_credit_yield: {reality: testnet_simulated}
 
   Claim:
     definition: The landlord's proposed deduction at move-out (0 allowed), with evidence.
@@ -344,13 +349,13 @@ concepts:
 
   Position:
     definition: A quantity of an Asset held in a Person's wallet or in a test contract as their deposit/loan collateral, valued at a stated price.
-    code: [src/server/portfolio.ts, src/server/robinhood-demo.ts#robinhoodHoldings, src/server/share-workflows.ts, src/components/assets.tsx]
+    code: [src/server/portfolio.ts, src/server/robinhood-demo.ts#robinhoodHoldings, src/server/shared-market.ts, src/components/assets.tsx]
 
   Venue:
     definition: Where a Person exchanges cash for an Asset.
     implementations:
       tspyx_test_market: {reality: testnet_real, note: "Atomic co-signed swap at the live SPYx price."}
-      robinhood_test_desk: {reality: testnet_real, note: "TestStockDesk at the live TSLAx price."}
+      robinhood_official_faucet: {reality: testnet_real, note: "Official test TSLA is obtained externally; no operator-priced buying desk in the app."}
       jupiter_xstocks: {reality: read_only_live, note: "Price quotes only."}
 
   TestFunds:
@@ -402,7 +407,7 @@ concepts:
     implementations:
       home_assistant_solar: {reality: read_only_live, code: src/server/adapters.ts#readSolar}
       validator: {chains: [gnosis, ethereum, solana], reality: read_only_live, code: src/server/adapters.ts#readValidator}
-      signed_financial_flows: {reality: testnet_real, code: src/server/share-workflows.ts, note: "User-approved signed testnet actions; not passive read adapters."}
+      signed_financial_flows: {reality: testnet_real, code: src/server/shared-market.ts, note: "User-approved signed testnet actions; not passive read adapters."}
       electric_car: {reality: roadmap}
       bank_account: {reality: roadmap}
 
@@ -484,21 +489,41 @@ concepts:
     implementation: Partial; tenancy and earlier-place entries built, verified residence and broader milestones planned.
     code: [src/server/timeline.ts, src/components/me.tsx]
 
+  PriceSource:
+    definition: Provenance and freshness of a token valuation, distinct from the asset and from an executable sale quote.
+    implementations:
+      chainlink_rhtsla_mirror: {reality: read_only_live, note: "Chainlink RHTSLA/USD on Robinhood mainnet 4663 copied to 46630. The mirror is not a Chainlink contract; an immutable key can only push bounded prices, not move funds."}
+      jupiter_tslax: {reality: read_only_live, note: "Cross-check only for Robinhood TSLA; not a wallet or collateral fallback."}
+    invariants:
+      - Wallet and collateral use the same mirrored Robinhood token price, converted from the mainnet multiplier to the test-token multiplier with rounding down; the multipliers need not match.
+      - Expose source round, source time, copied time, age, stale status and the weekend freshness window (74 h), not an inferred trading-session closure.
+      - Missing deployment has no fabricated price; stale pricing freezes price-sensitive actions.
+    code: [contracts/evm/src/testnet/MirroredPriceFeed.sol, src/server/tsla-price-mirror.ts]
+
   CollateralDeposit:
-    definition: A working Robinhood Chain testnet flow secures a separate illustrated deposit with fake tTSLA at a simulated per-wallet price; existing legacy positions may use official test TSLA. It is not a cash deposit in a production rental agreement.
-    lifecycle: [test_landlord_accepts, tenant_pledges_shares, simulated_price_drop, tenant_tops_up_or_operator_protectively_sells, test_move_out_claim, tenant_accepts_claim, settlement_returns_remaining_shares]
-    invariant: Share and cash collateral remains in the contract until its test claim and settlement rules release it.
-    code: [contracts/evm/src/CollateralEscrow.sol, contracts/evm/src/testnet/TestnetMarket.sol, src/server/share-workflows.ts, src/components/share-workflows.tsx, src/components/stock-collateral.tsx]
-    reality: testnet_simulated
+    definition: Retained stock-collateral contract prototype; the former per-wallet fake-stock/operator-desk application flow is removed, not a hosted rental offer.
+    invariant: Share and cash collateral remain in the contract until its claim and settlement rules release them.
+    code: [contracts/evm/src/CollateralEscrow.sol, src/components/stock-collateral.tsx]
+    reality: prototype
+    historical_evidence: "Earlier official-stock and fake-stock cycles used simulated oracle/desk prices; not evidence of the shared market."
 
   BorrowAgainstShares:
-    definition: A separate Robinhood Chain testnet TestLendingPool accepts fake tTSLA as collateral and lends operator-funded test USD at a simulated per-wallet oracle price; existing legacy positions may use official test TSLA.
+    definition: One shared Robinhood Chain testnet pool accepts official faucet test TSLA and lends freely mintable tUSDG supplied by lenders, valued at the mainnet Chainlink RHTSLA/USD mirror.
     rules:
-      - Borrowing is limited to 50 % of the current test-price collateral value.
-      - Liquidation is available at 80 % loan-to-value.
-      - Repayment includes accrued test interest; remaining collateral can be withdrawn.
-    code: [contracts/evm/src/testnet/TestLendingPool.sol, contracts/evm/src/testnet/TestnetMarket.sol, src/server/share-workflows.ts, src/components/share-workflows.tsx]
-    reality: testnet_simulated
+      - Requires a verified shared-market deployment; otherwise honestly undeployed.
+      - Borrowing is limited to 50 % loan-to-value and 90 % utilization at a fresh price.
+      - Borrowers accrue continuous 5 % nominal annual interest (approximately 5.13 % effective annually, read from the contract); lenders receive it pro rata, without projections.
+      - Anyone may liquidate at 80 % loan-to-value with a fresh price, repaying at most 50 % of debt with a 10 % collateral bonus.
+      - Bad debt reduces lender value; lender withdrawal is limited by pool cash.
+      - Freshness is 26 hours normally and 74 hours Saturday 00:00 UTC through Monday 12:00 UTC.
+      - Stale prices do not block adding collateral, repayment or debt-free collateral withdrawal.
+      - Disclose 10,000 tUSDG seed shares at the burn address, including their locked share of interest.
+      - No operator price/yield/liquidity withdrawal lever or staged liquidation.
+      - Wallet reads never scan the borrower registry; unhealthy loans are a separate on-demand paginated read with a continuation cursor.
+      - Immutable collateral issuer and implementation pins are not refreshed silently after upgrades.
+      - TSLA paused, pool blocked, implementation changed or collateral shortfall suspends the market; reads expose suspension reasons.
+    code: [contracts/evm/src/testnet/SharedLendingPool.sol, src/server/shared-market.ts, src/components/share-workflows.tsx]
+    reality: testnet_real
 
   HomeEquityPath:
     definition: Future legally defined housing interests or down-payment credit toward acquiring a home; the current fictional test-unit purchase does not grant those rights.
@@ -519,7 +544,8 @@ journeys:
 
 networks:
   solana_devnet: {used_for: [Escrow, Operation, tSPYx market], rpc: "Helius (SOLANA_RPC_URL)"}
-  robinhood_testnet: {chain_id: 46630, used_for: [RentalEscrow earnings demo, official test TSLA, CollateralDeposit with simulated per-wallet TestPriceOracle, BorrowAgainstShares in operator-funded TestLendingPool]}
+  robinhood_testnet: {chain_id: 46630, used_for: [official faucet test TSLA, BorrowAgainstShares in SharedLendingPool, lender shares, RentalEscrow shared-pool rehearsal], note: "Verified manifest required; no fake-stock fallback. Localhost shares the hosted market and needs no updater key."}
+  robinhood_mainnet_read: {chain_id: 4663, used_for: [Chainlink RHTSLA/USD mirror source], note: "Read-only source, not mainnet financial execution."}
   gnosis_beacon: {used_for: [validator adapter]}
   solana_mainnet_read: {used_for: [validator adapter, SPYx/TSLAx reference prices via Jupiter]}
 

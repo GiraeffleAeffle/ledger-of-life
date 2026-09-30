@@ -39,10 +39,10 @@ flowchart LR
   EA -- Release --> C[Cash in own wallet]
   C -- buys at Venue --> S[Security token]
   S -- pays --> D[Distribution]
-  S -- pledges --> CD[Share-backed test deposit]
-  CD -- test move-out settlement --> C
-  S -- secures --> BL[TestLendingPool loan]
-  BL -- operator-funded test USD --> C
+  S -- historical prototype only --> CD[CollateralDeposit]
+  S -- secures --> BL[SharedLendingPool loan]
+  BL -- lender-supplied test dollars --> C
+  BL -- borrower interest --> Y
   C -- wallet-signed test buy --> TU[Fictional housing / workshop units]
   E -- move-out Claim --> ST[Settlement] --> PO[Payouts]
   P -- configures --> AD[Adapter]
@@ -154,14 +154,18 @@ sequenceDiagram
 | Level | Meaning | What is at this level |
 | --- | --- | --- |
 | Live mainnet | Real assets | Nothing yet |
-| Testnet, real | Real execution with test tokens or test verifier | Accounts and wallets; EU OpenID4VP adult/optional city presentation with confirmed iOS phone flow; listings and agreements; Solana and Robinhood test escrows; tSPYx and test TSLA purchases |
-| Testnet, simulated input | Real testnet execution with an intentionally simulated price or yield | Deposit yield/earnings; tSPYx distributions; fake tTSLA pledge and share-backed test-USD loan; fictional `tHOME`/`tWORK` purchases at test issue prices. Real rights/returns are not implied. Legacy official test TSLA and Solana tSPYx remain separate assets. |
-| Read-only live | Real third-party data, with source and review caveats | CitySignals from Stadtstack public files (candidate items not yet reviewed); Home Assistant solar/savings and optional daily consumption reading; Gnosis, Ethereum and Solana validators; SPYx and TSLA reference prices |
+| Testnet, real | Real execution with test tokens or test verifier | Accounts and wallets; EU OpenID4VP adult/optional city presentation with confirmed iOS phone flow; listings and agreements; Solana and Robinhood test escrows; tSPYx; official faucet TSLA; shared-pool collateral, borrowing and lending when deployed. Robinhood earnings are actual borrower-funded interest in freely mintable test dollars, not income. |
+| Testnet, simulated input | Real testnet execution with an intentionally simulated price or yield | Solana test-credit yield; tSPYx distributions; fictional `tHOME`/`tWORK` purchases at test issue prices. Historical fake-tTSLA/operator-price evidence is not shared-market proof. |
+| Read-only live | Real third-party data, with source and review caveats | CitySignals; Home Assistant; validators; SPYx reference prices; mainnet Chainlink RHTSLA/USD copied to a testnet mirror (not a Chainlink contract), with Jupiter TSLAx as cross-check only. |
 | Self-declared local | Unverified information a person places on their device | MyPlaces home/work map pins, removable from localStorage; not a verified address |
 | Self-declared private | Unverified information stored under the person's authenticated account | Earlier places in the partly built life timeline; no residence verification or disclosure to other contexts |
 | Prototype | A working test/counterpart exists but this is not a money-moving app flow | Standalone stock-collateral calculator; service-charge example statement with server-stored test prepayment; Morpho on a mainnet fork |
 | Illustration | Fictional physical/economic model or researched lead; not a measured outcome | Building technology switches, hypothetical workshop→housing relationship and city flywheel; municipal scenarios and unverified real cooperative leads |
 | Roadmap | Idea only | Home tokens toward owning a home; production EUDI issuance/integration; bank-account adapter; EV adapter; tokenizing device income |
+
+**Shared-market boundary.** Official test TSLA comes from Robinhood's faucet. Wallet and collateral valuation use one mirrored token price, converted from the mainnet multiplier to the test token's multiplier, with source round/time, copied time, age, stale status and weekend freshness-window labels. The multipliers need not match. The updater can only push bounded prices, never move funds; its honesty is not proven on-chain. Freshness is 26 h normally and 74 h during Saturday 00:00 UTC–Monday 12:00 UTC; that policy window is not a trading-session status. Stale pricing freezes price-sensitive actions. A missing verified manifest is undeployed, not simulated.
+
+Borrowers accrue interest continuously at 5% nominal annually (approximately 5.13% effective annually, read from the contract, not projected); lenders share it pro rata and may lose value to bad debt. Withdrawals, including escrow earnings/settlement, need available cash. Disclose the 10,000 tUSDG seed deposited for burn-address shares and its permanently locked interest share. Anyone may liquidate an 80%-LTV loan at a fresh price while unsuspended; no operator stages liquidation. Wallet reads never scan the borrower registry: unhealthy loans are a separate on-demand paginated read. Immutable issuer/implementation pins and suspension reasons expose TSLA pause, pool block, implementation change and collateral shortfall. Robinhood issuer pause/block/burn/upgrade powers remain external risks. Localhost uses the same market and hosted updater without its own updater key.
 
 ## Journeys
 
@@ -193,8 +197,9 @@ of test receipts.
 | Listing, Application | `src/server/listings.ts` |
 | Agreement, Role | `src/server/agreements.ts` |
 | Escrow (Solana) | `programs/rental_escrow/src/` |
-| CollateralDeposit | `contracts/evm/src/CollateralEscrow.sol`, `src/server/share-workflows.ts`, `src/components/share-workflows.tsx` |
-| BorrowAgainstShares | `contracts/evm/src/testnet/TestLendingPool.sol`, `src/server/share-workflows.ts`, `src/components/share-workflows.tsx` |
+| CollateralDeposit | `contracts/evm/src/CollateralEscrow.sol`: retained prototype, removed from app; historical simulated-price evidence only |
+| BorrowAgainstShares, lender Position | `contracts/evm/src/testnet/SharedLendingPool.sol`, `src/server/shared-market.ts`, `src/components/share-workflows.tsx` |
+| PriceSource | `contracts/evm/src/testnet/MirroredPriceFeed.sol`, `src/server/tsla-price-mirror.ts`: mainnet source and testnet copy provenance |
 | Operation, Release, Payout | `src/server/solana-service.ts`, `src/server/solana-initialization.ts` |
 | Journey (next step per person) | `src/server/journey.ts`, `src/components/home.tsx` |
 | Position, Venue, Distribution | `src/server/portfolio.ts`, `src/server/robinhood-demo.ts` |

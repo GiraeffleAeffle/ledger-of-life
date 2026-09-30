@@ -21,7 +21,7 @@ export function StockCollateral({ initialDeposit = 1200 }: { initialDeposit?: nu
     <details className="stock-collateral">
       <summary>Calculator: how much would a share-backed deposit pledge? · illustration</summary>
       <div className="prototype-content">
-        <p className="small-copy">This calculator is an illustration, not a quote or transaction. The wallet-signed Robinhood testnet share-deposit and loan workflows above are the real test flows; neither replaces the cash deposit of a Solana tenancy in Home.</p>
+        <p className="small-copy">This calculator is an illustration, not a quote or transaction. Shared Robinhood testnet loans and direct lending use wallet signatures; share-backed rental deposits are not offered in the app. These do not replace the cash deposit of a Solana tenancy in Home.</p>
         <div className="collateral-inputs">
           <label>Illustrative test deposit to secure ($)<input type="number" min="1" max="100000" step="1" value={deposit} onChange={(event) => setDeposit(event.target.value)} /></label>
           <label>Example stock price drop (%)<input type="number" min="0" max="80" step="1" value={drop} onChange={(event) => setDrop(event.target.value)} /></label>

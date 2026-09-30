@@ -21,24 +21,24 @@ Status 2026-09-25. These are **product explorations**, not implemented features 
 - **Eligibility:** xStocks and Robinhood Stock Tokens are not available to US persons and have issuer terms.
 
 **Feasibility here.**
-- **Robinhood Chain testnet:** high. The official testnet TSLA/AMZN tokens exist, and our `TestStockDesk` can act as the sale route. A Chainlink feed would need to be confirmed on testnet, or mocked with a clearly labelled test oracle.
+- **Robinhood Chain testnet:** official test TSLA comes from Robinhood's faucet. The shared lending design uses a bounded mirror of mainnet Chainlink RHTSLA/USD, not a native Chainlink testnet feed; Jupiter TSLAx only cross-checks it. The operator sale desk is removed from the app, so this collateral-deposit contract is not a hosted rental offer.
 - **Solana devnet:** medium. `tSPYx` exists, but it needs an oracle integration in the Anchor program.
 
-**Prototype (done, unreviewed):** [`CollateralEscrow.sol`](../contracts/evm/src/CollateralEscrow.sol) implements pledge at an initial ratio, excess withdrawal, permissionless shortfall flag, grace period, forced sale of only what is needed with an oracle-bounded slippage limit, the claim/dispute/arbitrator flow, and settlement that pays the landlord in cash and returns the rest in kind. There are 7 forge tests in `test/CollateralEscrow.t.sol`.
+**Retained contract prototype (not a current app flow):** [`CollateralEscrow.sol`](../contracts/evm/src/CollateralEscrow.sol) implements pledge, excess withdrawal, shortfall/grace-period sale, claim/dispute/arbitrator handling and in-kind return. Its historical test and live-cycle evidence concerns the operator-oracle/operator-desk design, not the shared lending cutover.
 
-It also ran live on Robinhood Chain testnet (`script/CollateralTestnetCycle.s.sol`, 14 transactions, all succeeded, escrow `0xb04bCbA7D89631E5Ca33B8152B8b346Cc8F08229`):
+Historical official-stock evidence (not shared-market proof): Robinhood testnet `script/CollateralTestnetCycle.s.sol`, 14 successful transactions, escrow `0xb04bCbA7D89631E5Ca33B8152B8b346Cc8F08229`:
 - A $10 deposit was secured by 0.0403 **official test TSLA** (150%).
 - A test 25% price drop triggered a shortfall, which the tenant cured with 0.0081 TSLA.
 - A $2 claim was paid to the landlord by selling 0.0072 TSLA.
 - 0.0412 TSLA returned to the tenant.
 
-The price oracle and sale desk are our test contracts (`TestPriceOracle`, `TestStockDesk`), not Chainlink or a real venue.
+That historical cycle used our `TestPriceOracle` and `TestStockDesk`, not Chainlink or an independent venue. Later per-wallet fake-tTSLA evidence is likewise historical simulated-price evidence. The new shared market instead has wallet-signed official-stock loans and tUSDG lending, borrower-funded continuous interest at 5% nominal annually (about 5.13% effective, read from the contract), cash-limited withdrawals, bad-debt losses and a disclosed 10,000 tUSDG burn-address seed. It requires a verified deployment and fresh mirrored token pricing; no live deployment or shared-market rehearsal is claimed here.
 
 ## 2. Borrowing against stocks to pay the deposit
 
 **Idea.** A tenant with investments borrows stablecoin against them (Morpho, Kamino) and uses the loan as a normal cash deposit.
 
-**Assessment.** It works with existing protocols today, and the deposit escrow does not change, because the landlord just sees cash. It does add borrowing interest (usually higher than the deposit's lending yield, so the net is negative) and liquidation risk exactly when moving house is expensive. Idea 1 is strictly simpler for the tenant. **Verdict:** mention it as an option; don't build it first.
+**Assessment.** The landlord would see cash, but borrowing adds interest and liquidation risk. The current testnet design implements a separate official-stock shared loan/lender market, not a production rental-finance recommendation. Continuous borrower interest at 5% nominal annually (about 5.13% effective, read from the contract) is not offset by a guaranteed escrow return: the current supply rate depends on utilization, cash may be unavailable, and bad debt affects lenders. These rates are not projections. A hosted rental still needs actual parties; no testnet execution establishes real-money suitability.
 
 ## 3. Collect home tokens monthly, swap them for a whole home
 

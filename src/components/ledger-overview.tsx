@@ -58,7 +58,6 @@ export function LedgerOverview({ request, accountId, tenancies, listings, homeEr
       <article className="ledger-topic-card ledger-money"><header><Wallet size={20} /><h3>{topicName('money')}</h3></header>
         {tenancies !== null && !unreadableHomes ? <AssetsOverview request={request} tenancies={ready} show="summary" go={go} /> : <><RealityChips levels={['testnet_simulated']} /><strong>—</strong><span>{homeError || unreadableHomes ? 'Home context is incomplete; no combined balance inferred.' : 'Checking Home before the combined balance…'}</span><button type="button" className="text-button" onClick={() => go('money')}>Open Money →</button></>}
         <div className="ledger-money-paths"><span>Working test workflows</span><div>
-          <button type="button" onClick={() => openShareWorkflow(go, 'deposit')}>Share-backed deposit →</button>
           <button type="button" onClick={() => openShareWorkflow(go, 'borrow')}>Loan against shares →</button>
         </div><button className="text-button" type="button" onClick={() => openLedgerIdea(go, 'home-tokens')}>Home ownership · planned →</button></div>
       </article>

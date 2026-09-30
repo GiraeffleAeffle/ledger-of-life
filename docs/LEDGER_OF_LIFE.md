@@ -38,8 +38,8 @@ flowchart TB
 | Domain / detail area | Question it answers | Concepts (status) |
 |---|---|---|
 | **1 · Identity & life / Me** | Who am I here, and what may others learn? | Passkey sign-in and own wallets (built) · optional adult/city proof (EU test wallet) · tenancy/listing/city contexts (built; general memberships planned) · private timeline (partly built: app tenancies and self-declared earlier places) |
-| **2 · Home & living / Home** | Where do I live, and what is locked or owed there? | Listing → application → agreement, earning escrow and move-out payouts (built, Solana devnet with simulated yield) · service-charge example/test prepayment with optional daily Home Assistant consumption (prototype, not a bill) · separate stock-backed test deposit in Money · home ownership (roadmap) |
-| **3 · Money & ownership / Money** | What do I own, owe and earn? | Priced-test-assets subtotal · separate Solana tSPYx, official Robinhood test TSLA and fake tTSLA · signed test-share pledge and loan · distinct wallet-held fictional housing/workshop units (`tHOME`/`tWORK`) and checked purchase receipts · real bank accounts and legally defined home interests (roadmap) |
+| **2 · Home & living / Home** | Where do I live, and what is locked or owed there? | Listing → application → agreement, earning escrow and move-out payouts (built, Solana devnet with simulated test credit) · service-charge example/test prepayment (prototype, not a bill) · stock-backed deposit retained only as a contract prototype · home ownership (roadmap) |
+| **3 · Money & ownership / Money** | What do I own, owe and earn? | Priced-test-assets subtotal · Solana tSPYx and official faucet Robinhood test TSLA · shared-pool collateral, loans and lending when deployed · fictional housing/workshop units (`tHOME`/`tWORK`) and checked purchase receipts · real bank accounts and housing rights (roadmap) |
 | **4 · Energy & devices / Money** | What can I observe from things I run? | Home Assistant energy/solar, public Gnosis/Ethereum/Solana validator readings and the local AI node are operated in Money → Devices & income (readings built, read-only). Me owns their configuration; Home's service charges read the same Home Assistant consumption. A validator identifier does not prove ownership of its stake. EV feeds and income tokenization remain planned. |
 | **5 · Places & participation / Places** | What is changing around me, and where can I participate? | Published city map/signals, projects, source-linked outcomes, device-local following, news/events, regional topics, consultations, council papers where covered, DWD/citizen readings and OSM discovery. Strausberg ALLRIS remains outbound links; budget figures are headline plans, not actual spending. Wider-scale feeds, verified memberships, vouchers and offering expertise remain planned. |
 
@@ -98,11 +98,12 @@ Canonical receipts and matching cash/unit effects establish completion; approval
 
 The shared test USD can already be held in the wallet or come from the separate share-backed
 test loan. Borrowing and buying are distinct approvals; buying units does not repay debt.
-The original faucet-funded proof remains recorded separately. A new real Privy passkey
-account completed two-share collateral → 12 tUSDG borrowing → 5 tHOME and 5 tWORK →
-0.01 tUSDG paid local inference, leaving 1.99 tUSDG and outstanding loan debt.
-See [connected evidence](evidence/BORROW_TO_LOCAL_AI_ROBINHOOD_TESTNET.json) and
-[the earlier purchase proof](evidence/LOCAL_CITY_INVESTMENTS_ROBINHOOD_TESTNET.json).
+The original faucet-funded purchase proof remains separate. The historical Privy route
+completed two-share collateral → 12 tUSDG borrowing → 5 tHOME and 5 tWORK →
+0.01 tUSDG local inference payment. Its [connected evidence](evidence/BORROW_TO_LOCAL_AI_ROBINHOOD_TESTNET.json)
+used **per-wallet fake stock and an operator-set price**, not the new official-stock shared pool.
+It proves those historical transfers, not mirror pricing or borrower-funded earnings.
+See also [the earlier purchase proof](evidence/LOCAL_CITY_INVESTMENTS_ROBINHOOD_TESTNET.json).
 
 The building, workshop supply relationship, solar/heat-pump choices and city flywheel remain
 project ideas, shown as a labelled sketch inside Money → Local stakes. Local Qwen GPU inference is a
@@ -285,8 +286,8 @@ No push/email service or invented action deadline.
 |---|---|---|
 | **Today** | Actionable Home prompt when needed; five-domain ledger overview with one coherent Money summary and working share-flow links; compact official press, followed developments, chosen-city visit differences and conditional civic preview below | Restores the household-first entry point |
 | **Me** | Identity, contextual roles, private timeline and a shared source/capability directory (19 sources, 18 capabilities); Home Assistant and validator save/remove controls; on-demand passkey, backup, wallet creation and same-wallet recovery settings | One catalogue and one configuration owner |
-| **Home** | Visual find → apply/agree → deposit → live journey; photo-led listings and one actual role-specific next step; other/past tenancies, service charges and test controls on demand. Nothing from Money or devices: one link to the share-backed deposit sits at the deposit step | Reuses real listing/agreement/tenancy handlers |
-| **Money** | Four tabs, one job each: **Holdings** (deposit entitlement, shares, cash, the priced subtotal, the ownership path, deposit activity), **Shares & loans** (share-backed deposit, loan, collateral calculator), **Local stakes** (fictional project units, receipts, project sketch), **Devices & income** (home solar, validator, local AI & GPU hosting); collateral/debt/cash counted once | Working financial actions, concise review and secondary technical controls; the promotional hero and duplicate goal cards were removed |
+| **Home** | Visual find → apply/agree → deposit → live journey; role-specific next steps, service charges and test controls on demand. A hosted tenancy needs actual distinct parties; no fake-stock deposit setup | Reuses listing/agreement/tenancy handlers |
+| **Money** | **Holdings** (wallets, deposit entitlement, lent value and subtotal), **Shares & loans** (official-stock shared loan and lender actions; deposit unavailable without actual parties), **Local stakes** (fictional units and receipts), **Devices & income** (solar, validators, local AI); collateral/debt/cash counted once | Deployment-dependent wallet-signed actions, honest provenance and liquidity limits |
 | **Places** | Persistent OSM 2D/3D context, public planning areas/local places, prominent selected-project Follow and one detail sheet; distinct opt-in fictional issuer markers, unlocated events and source details | One map and one selection, not a stack of prose dashboards |
 | **Ideas** | All 18 capability IDs/statuses, including the bank-account roadmap item; five topic groups built from `Idea.topic`, one selected detail, exact working destinations (`Idea.destination`) and links back to the related adapters | One capability definition in `src/data/ledger-catalogue.ts` |
 
@@ -304,13 +305,13 @@ until read and reports source outages rather than inferring project closure. Det
 on request without hiding publisher, date, review state or stale/test labels. Home earnings
 and deposits link to their exact Money holding/workflow, and Money's deposit and operation
 trail links back to the actual tenancy. One tSPYx holding owns its purchase control; the
-fake Robinhood tTSLA rail, official Robinhood test TSLA and Solana tSPYx remain separate.
+official Robinhood test TSLA uses one mirror valuation in wallet and collateral; Solana tSPYx remains separate.
 Today's share-deposit/loan shortcuts select the corresponding Money workflow without starting
 an operation. The actual Borrow action is visible in its main panel when eligible; the existing
 wallet-signing and readiness gates are unchanged.
-Share-backed positions distinguish available shares, pledged shares, loan collateral, debt and shares returned
-after closure; their API has no dated personal share-event history. Deployment addresses
-are setup evidence, not user transactions. The deposit activity trail reads authenticated
+Shared-market positions distinguish wallet shares, loan collateral, debt and lender value.
+Old fake-stock contracts and store records are unused without migration, not current holdings.
+Deployment addresses are setup evidence, not user transactions. The deposit activity trail reads authenticated
 agreement operations and labels the stored creation time as such, not as settlement time.
 
 Regional comparison previews put a chosen town's own source item and another named
@@ -346,21 +347,20 @@ is never called consumption. Nothing moves on-chain. A separate stock-collateral
 an on-demand illustration, not a change to the selected Solana tenancy. Money's local investment
 surface now executes fictional test-unit purchases; real cooperative leads still are not offers.
 
-Money's Solana tSPYx and official Robinhood TSLA use read-only Jupiter reference prices.
-Quotes share one in-flight request per mint, cache for 60 seconds and retain an observed,
-dated last-good quote during an upstream throttle. Without a quote, wallet share quantities
-and test cash remain visible as confirmed balances; a nonzero unpriced holding has no
-invented dollar valuation. Known zero shares do not prevent known cash from contributing
-to the total. A stale quote is dated and pauses test buying. Solana token-account RPC errors
-do not become zero balances; a genuinely absent associated token account still means zero.
-Robinhood's quote-missing response explicitly carries confirmed quantities alongside
-`ok: false` and `code: price_unavailable`; only this typed partial is used for cash and share
-counts. Other failed reads do not supply zero balances.
+Solana tSPYx retains read-only Jupiter reference pricing. Official Robinhood test TSLA
+uses the same mainnet Chainlink RHTSLA/USD mirror as shared-pool collateral; Jupiter
+TSLAx is a cross-check only, never a fallback quote. The mirror is not a Chainlink contract.
+Show source round/time, copied time, age and stale/closed-market status. Missing deployment
+is undeployed, with no invented price or pool. Failed reads never become zero balances.
+Freshness is 26 hours normally, 74 hours Saturday 00:00 UTC–Monday 12:00 UTC.
+Closed markets retain dated last prices; stale pricing freezes price-sensitive actions.
 
 Money and Today publish a **priced-test-assets subtotal** only after Solana, official TSLA
-and share-position reads settle successfully together. On a failed or unpriced nonzero
-holding within that scope, the last complete subtotal stays dated; before the first successful
-read it is “—”. Project units remain separate: an issue price is not a resale/market quote.
+and shared loan/lender reads settle successfully together. A nonzero official TSLA holding
+with stale pricing or an undeployed mirror blocks the numeric subtotal. The prior snapshot
+is retained internally; only its dated last-complete timestamp is shown, not its prior numeric value. Wallet TSLA is counted
+once at the mainnet token price converted to the test token's multiplier, plus collateral
+and lender claims, minus debt. Project issue prices are not market/resale quotes.
 Independent share-earnings read failure leaves healthy wallet, pledge and loan balances available, but
 pauses earnings-dependent actions rather than offering a new demo faucet. Requests belong
 to one signed-in account and wallet; older responses cannot replace another account's
@@ -373,17 +373,26 @@ the entitlement change starts a coordinated recheck instead of mixing new deposi
 with older wallet holdings. Validator and Home solar cards report their own adapter status,
 not an unrelated share-position or quote error.
 
-Holdings shows the subtotal as four parts that add up to it, each with its amount and a bar drawn in proportion: **free to use** (cash and shares in the person's own wallets), **locked in the rental deposit** (the tenancy entitlement, never spendable), **pledged as collateral** (shares a contract holds for a share-backed deposit or a loan) and **owed** (borrowed test USD, subtracted once; the borrowed cash is already in free to use). A part that is zero is not listed. Today shows the same parts as one line. The parts are rounded to whole cents first and the total is their sum, so the figures shown always add up. Decided 29 September 2026; [ADR 0001](adr/0001-separate-rental-security-and-personal-portfolio.md) still governs who controls each part.
+Holdings separates **free to use** (wallet cash/shares), **locked in the rental deposit**
+(escrow entitlement), **pledged as collateral** (loan shares), **lent** (lender share value),
+and **owed** (debt subtracted once). Borrowed wallet cash is already free to use; supplied
+cash is not counted again outside its lender claim. Official wallet TSLA and collateral
+use one mirror token price. Project issue prices are not resale valuations.
 
-The share-backed test market values tTSLA fake shares at its simulated per-wallet oracle,
-separate from official TSLA's Jupiter wallet quote. Existing older markets holding official
-TSLA collateral remain visible on the official tile at their simulated collateral price;
-they do not become fake tTSLA and require no redeployment. Wallet, deposit pledge and loan
-collateral move between places without disappearing from net worth; open debt is subtracted
-once, and workflow wallet aggregates are not added again to separately counted test cash
-or wallet shares. Money groups one status and the contextual next action; completed setup
-and settled deposits stay quiet, loan zero-debt/return states are explicit, technical
-transaction details and test scenario controls open on request.
+The shared pool accrues borrower interest continuously at 5% nominal annually
+(approximately 5.13% effective annually, read from the contract), shared pro rata.
+Earned value is current value minus net contribution and can become negative with
+bad debt. Current supply rate reflects utilization, not projected income. Withdrawal
+and escrow earnings/settlement need available cash. Disclose 10,000 tUSDG seeded into
+burn-address shares and their locked interest. Anyone can liquidate at 80% LTV with
+a fresh price while unsuspended, but no operator can stage it. Wallet reads never
+scan the borrower registry; unhealthy loans load separately on demand in bounded
+pages. Immutable issuer/implementation pins and suspension reasons expose TSLA
+pause, pool block, implementation change and collateral shortfall. The updater only
+pushes bounded prices; Robinhood issuer pause/block/burn/upgrade powers
+remain external risks. Localhost uses the hosted market and needs no updater key.
+All tUSDG is freely mintable test dollars, never income or euros. No operator price,
+desk, yield or liquidity-withdrawal lever substitutes for actual deployment and borrowers.
 
 The published city press feeds live at `cities/<cityId>/feed.json` for eight covered cities.
 Today shows only official press news with publisher, date and source link; Places also lists
@@ -455,8 +464,8 @@ Home/Money link to these settings and retain the existing `/api/assets` observat
 | Local investments | Money (Local stakes) | Wallet-signed test-USD purchases of separate fictional `tHOME`/`tWORK` units, checked receipts and actual holdings; building/city effects remain illustrative | Real issuers, defined rights, legal arrangements and verified projects before actual local investment offers |
 | Local AI & GPU hosting | Money (Devices & income); public `/library` | Actual configured Ollama answers, measured usage and official x402 test-token settlement; wallet-free bounded visitor access | Reliable host operations, sustained demand and metered costs before any real-income claim |
 | Newcomer welcome | Places | Partly built: live OSM clubs and official directories; no matching, registration or voucher | **Next**: clearly simulated vouchers; partners only for real redemption |
-| Shares as a test deposit | Money (Shares & loans) | Working Robinhood Chain testnet pledge, simulated price drop, top-up or protective sale, move-out claim and return of remaining shares; separate from the Solana tenancy | Keep simulated test market price and test-only custody explicit |
-| Borrow against test shares | Money (Shares & loans) | Working TestLendingPool with operator-funded test USD, per-wallet simulated test oracle, 50 % max LTV and liquidation at 80 % | Count loan collateral and open debt in wallet totals without double-counting |
+| Shares as a test deposit | Contract prototype only | Former per-wallet fake-stock/operator-desk app flow removed; historical evidence remains labelled | Needs actual parties and an independent sale venue before any hosted rental offer |
+| Borrow/lend against official test shares | Money (Shares & loans), deployment required | SharedLendingPool: official faucet TSLA, mirrored token price, 50% borrow LTV, 80% liquidation, 90% utilization, continuous 5% nominal annual interest (about 5.13% effective, read from contract) | Cash-limited withdrawal, bad-debt losses, issuer suspension, burned seed disclosure; no projections or live deployment/rehearsal claim |
 | Home tokens towards owning | Money (Local stakes) | Fictional test-unit demonstration; real housing rights/down-payment credit remain planned | A real issuer/legal wrapper and property transaction, not a claim that these units buy an apartment |
 | EV and device tokenization | Money | Planned | **Later**: read-only device adapter if a dependable user source appears |
 | Bank account | Money | Planned; no connection, statement import or payment implemented | Add a permissioned provider only when a real integration is chosen |

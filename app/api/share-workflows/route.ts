@@ -1,11 +1,7 @@
 import { authenticated } from '@/server/authenticated';
 import { getStore } from '@/server/store';
 import { errorResponse, readBody, sameOrigin } from '@/server/http';
-import {
-  controlShareMarket, prepareShareAction, startShareMarket, submitShareTransaction,
-} from '@/server/share-workflows';
-import { addSimulatedShareYield, prepareDemoPosition, prepareShareEarnings, readShareOverview, startShareEarnings, submitShareEarnings } from '@/server/share-earnings';
-import { operatorTestCapability } from '@/server/test-capability';
+import { prepareMarketAction, readSharedMarket, readUnhealthyLoans, submitMarketTransaction } from '@/server/shared-market';
 
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };
@@ -24,10 +20,17 @@ export async function GET(request: Request) {
   const wallet = identity.wallets.find((item) => item.chainType === 'ethereum');
   if (!wallet) return Response.json({ error: 'Your account has no Robinhood Chain wallet yet.' }, { status: 400 });
   try {
+    const query = new URL(request.url).searchParams;
+    if (query.get('view') === 'unhealthy') {
+      const pageSize = query.get('pageSize') ?? '20';
+      if (!/^[1-9][0-9]?$/.test(pageSize)) throw new Error('Invalid liquidation page size.');
+      const page = await readUnhealthyLoans(await getStore(), wallet.address, query.get('cursor') ?? '0', Number(pageSize));
+      return Response.json({ page }, noStore);
+    }
     const key = wallet.address.toLowerCase();
     let pending = pendingReads.get(key);
     if (!pending) {
-      pending = getStore().then((store) => readShareOverview(store, wallet.address));
+      pending = readSharedMarket(wallet.address);
       pendingReads.set(key, pending);
       const clear = () => { if (pendingReads.get(key) === pending) pendingReads.delete(key); };
       void pending.then(clear, clear);
@@ -50,20 +53,9 @@ export async function POST(request: Request) {
     const body = await readBody(request);
     const store = await getStore();
     if (body.action === 'prepare' && typeof body.operation === 'string')
-      return Response.json({ walletId: wallet.id, steps: await prepareShareAction(store, wallet.address, body.operation, typeof body.quantity === 'string' ? body.quantity : undefined) }, noStore);
+      return Response.json({ walletId: wallet.id, ...await prepareMarketAction(store, wallet.address, body.operation, typeof body.quantity === 'string' ? body.quantity : undefined, typeof body.borrower === 'string' ? body.borrower : undefined) }, noStore);
     if (body.action === 'submit' && typeof body.signed === 'string')
-      return Response.json(await submitShareTransaction(store, wallet.address, body.signed), noStore);
-    if (body.action === 'earn_prepare' && typeof body.operation === 'string')
-      return Response.json({ walletId: wallet.id, steps: await prepareShareEarnings(store, wallet.address, body.operation) }, noStore);
-    if (body.action === 'earn_submit' && typeof body.signed === 'string')
-      return Response.json(await submitShareEarnings(store, wallet.address, body.signed), noStore);
-    if (!operatorTestCapability()) throw new Error('Test market controls are disabled.');
-    if (body.action === 'prepare_demo') return Response.json({ result: await prepareDemoPosition(store, wallet.address) }, noStore);
-    if (body.action === 'earn_start') return Response.json({ result: await startShareEarnings(store, wallet.address) }, noStore);
-    if (body.action === 'earn_yield') return Response.json({ result: await addSimulatedShareYield(store, wallet.address) }, noStore);
-    if (body.action === 'start') return Response.json({ deployment: await startShareMarket(store, wallet.address) }, noStore);
-    if (body.action === 'control' && typeof body.operation === 'string')
-      return Response.json(await controlShareMarket(store, wallet.address, body.operation, typeof body.requestId === 'string' ? body.requestId : undefined), noStore);
+      return Response.json(await submitMarketTransaction(store, wallet.address, body.signed), noStore);
     throw new Error('Unknown share workflow action.');
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : 'Please try again.' }, { status: 409 });

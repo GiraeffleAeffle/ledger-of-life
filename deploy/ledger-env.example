@@ -32,3 +32,9 @@ SOLANA_RPC_URL=https://api.devnet.solana.com
 # Sponsor keypair: a JSON array of 64 integers on ONE line, without surrounding quotes.
 # Generate a fresh key used ONLY by this host; never reuse a personal wallet or commit the filled file.
 SOLANA_SPONSOR_KEYPAIR=REPLACE_ME
+
+# Optional dedicated Robinhood testnet price updater key (0x-prefixed 32-byte hex).
+# Its only contract power is pushing the mirror, bounded 20% per hour on-chain.
+# Fund only with test ETH from https://faucet.testnet.chain.robinhood.com/.
+# Without it or the shared-market manifest, price reconciliation is unconfigured.
+# ROBINHOOD_PRICE_UPDATER_PRIVATE_KEY=
