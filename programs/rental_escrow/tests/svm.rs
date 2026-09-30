@@ -589,7 +589,7 @@ fn ledger_cash_dispute_and_payout_work_but_circle_supply_is_rejected() {
                 account.pubkey = LEDGER_TEST_USDC;
             }
         }
-        f.send(payout, "tenant").unwrap();
+        f.send(payout, "payer").unwrap();
     }
     assert_eq!(f.balance(f.landlord_token), CLAIM);
     assert_eq!(f.balance(f.tenant_token), PRINCIPAL - CLAIM);
