@@ -33,6 +33,13 @@ const verification = {
     throw new Error(`Unexpected read ${functionName}`);
   },
 };
+/** Reads the preflight makes, for a wallet with plenty of both tokens and an empty position. */
+const marketReads = (request: { functionName: string; address: string }) => {
+  if (['allowance', 'balanceOf'].includes(request.functionName)) return 10n ** 30n;
+  if (request.functionName === 'position') return [0n, 0n, 0n, 0n, 0n, true];
+  if (request.functionName === 'maxWithdraw') return 0n;
+  return verification.readContract(request);
+};
 const rejectionReasons: Record<string, RegExp> = {
   target: /Target is not the shared market/,
   selector: /Encoded function signature "0x12345678" not found on ABI/,
@@ -133,7 +140,7 @@ test('a confirmed transaction lets the wallet prepare its next action at once; a
   t.after(async () => { store.close(); if (old === undefined) delete process.env.SHARED_MARKET_MANIFEST_FILE; else process.env.SHARED_MARKET_MANIFEST_FILE = old; await rm(dir, { recursive: true, force: true }); });
   let time = 100_000; let gas = 1n; let replacement: string | null = null;
   const client = { ...verification,
-    readContract: async (request: { functionName: string; address: string }) => request.functionName === 'allowance' ? 10n ** 30n : verification.readContract(request),
+    readContract: async (request: { functionName: string; address: string }) => marketReads(request),
     getBalance: async () => gas, getTransactionCount: async () => 0, estimateGas: async () => 100_000n,
     estimateFeesPerGas: async () => ({ maxFeePerGas: 2n, maxPriorityFeePerGas: 1n }),
     sendRawTransaction: async () => {}, waitForTransactionReceipt: async ({ hash }: { hash: string }) => ({ status: 'success', transactionHash: replacement ?? hash }),
@@ -155,6 +162,33 @@ test('a confirmed transaction lets the wallet prepare its next action at once; a
   await assert.rejects(submitMarketTransaction(store, owner.address, await signed(), client, now), /replaced/);
   time += 1_000;
   await assert.rejects(prepare(), /Wait one minute between market requests/);
+});
+
+test('a shortfall is refused before any approval is offered, and a pool revert reads as a plain refusal', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'market-preflight-'));
+  const old = process.env.SHARED_MARKET_MANIFEST_FILE;
+  process.env.SHARED_MARKET_MANIFEST_FILE = join(dir, 'manifest.json');
+  await writeFile(process.env.SHARED_MARKET_MANIFEST_FILE, JSON.stringify(config));
+  const store = new LocalStore(':memory:');
+  t.after(async () => { store.close(); if (old === undefined) delete process.env.SHARED_MARKET_MANIFEST_FILE; else process.env.SHARED_MARKET_MANIFEST_FILE = old; await rm(dir, { recursive: true, force: true }); });
+  let time = 100_000; let allowanceReads = 0; let estimates = 0;
+  const client = { ...verification,
+    // The owner's live case: 1,000 tUSDG, no test TSLA; after that, 1 TSLA of collateral and 175 tUSDG of room.
+    readContract: async (request: { functionName: string; address: string }) => {
+      if (request.functionName === 'allowance') allowanceReads++;
+      if (request.functionName === 'balanceOf') return request.address === SHARED_STOCK ? 0n : 1_000_000_000n;
+      if (request.functionName === 'position') return [10n ** 18n, 0n, 350_000_000n, 0n, 175_000_000n, true];
+      return marketReads(request);
+    },
+    getBalance: async () => 1n, getTransactionCount: async () => 0, estimateFeesPerGas: async () => ({ maxFeePerGas: 2n, maxPriorityFeePerGas: 1n }),
+    estimateGas: async () => { estimates++; throw new Error('Execution reverted for an unknown reason. Estimate Gas Arguments: …'); },
+  } as unknown as NonNullable<Parameters<typeof prepareMarketAction>[5]>;
+  await assert.rejects(prepareMarketAction(store, owner.address, 'deposit_collateral', String(10n ** 18n), undefined, client, () => time),
+    /You hold 0 official test TSLA, less than 1\. Get test TSLA from Robinhood’s faucet first\./);
+  assert.equal(allowanceReads + estimates, 0, 'no approval may be prepared for collateral the wallet does not hold');
+  time += 60_000;
+  await assert.rejects(prepareMarketAction(store, owner.address, 'borrow', '100000000', undefined, client, () => time),
+    (error: Error) => /^The market would refuse this borrow now\. Borrowing is limited to 50%/.test(error.message) && !/Estimate Gas/.test(error.message));
 });
 
 for (const trigger of ['paused', 'isBlocked', 'collateralShortfall', 'implementation', 'ACCESS_CONTROLLED_REGISTRY', 'beacon storage', 'issuer code'] as const) {

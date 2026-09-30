@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseUnits } from 'viem';
+import { marketShortfall } from '@/domain/market-preflight';
 import { useRentalWallet } from '@/wallets';
 import { SHARE_NAVIGATION_INTENT, type Area } from './areas';
 import { useSectionTabActive } from './section-tabs';
@@ -135,6 +136,11 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
       if ((humanAmount.split('.')[1]?.length ?? 0) > decimals) { setError(`${unit} amounts support at most ${decimals} decimal places; no rounding is applied.`); return; }
       const atomic = parseUnits(humanAmount, decimals);
       if (atomic <= 0n || atomic.toString().length > 78) { setError(`Enter a positive ${unit} amount within the supported range.`); return; }
+      // The server checks again with fresh chain reads; this answers at once, before any review or signature.
+      const shortfall = view && view.sharesRaw !== null && view.testUsdAtomic !== null && view.loan && view.lender && marketShortfall(operation, atomic, {
+        walletTsla: BigInt(view.sharesRaw), walletUsd: BigInt(view.testUsdAtomic), collateral: BigInt(view.loan.sharesRaw), debt: BigInt(view.loan.debtAtomic),
+        available: BigInt(view.loan.availableAtomic), withdrawable: BigInt(view.lender.maxWithdrawAtomic) });
+      if (shortfall) { setError(shortfall); return; }
       setReview({ operation, quantity: atomic.toString(), humanAmount, unit, ...(borrower ? { borrower } : {}) });
     }}>{label}</button>;
   }

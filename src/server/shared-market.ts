@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createPublicClient, decodeFunctionData, defineChain, encodeFunctionData, formatUnits, getAddress, http, keccak256, parseAbi, parseTransaction, recoverTransactionAddress, toHex, TransactionReceiptNotFoundError, type Address, type Hex } from 'viem';
 import type { Store } from './store.ts';
+import { marketShortfall } from '../domain/market-preflight.ts';
 
 export const SHARED_STOCK = getAddress('0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E');
 export const SHARED_USD = getAddress('0xA6e10E426A738aEF586dB5191177658D67C78A14');
@@ -188,6 +189,13 @@ export async function readUnhealthyLoans(store: Store, wallet: string, cursor = 
 
 type ReviewedTransaction = { chainId: 46630; to: Address; data: Hex; value: '0x0'; nonce: number; gas: Hex; maxFeePerGas: Hex; maxPriorityFeePerGas: Hex };
 type MarketRecord = { nextPrepareAt: number; submitWindowAt: number; submitAttempts: number; preparingUntil?: number; prepared?: { transaction: ReviewedTransaction; expiresAt: number; operation: string; quantity: string; borrower?: string; approval: boolean }; pendingHash?: Hex; pendingAt?: number; pendingNonce?: number };
+/** Said when the pool would revert an action that passed the balance checks; the rules are the pool's. */
+const REFUSAL_HINTS: Record<string, string> = {
+  borrow: 'Borrowing is limited to 50% of your collateral’s value and 90% pool utilization, and needs a fresh price.',
+  withdraw_collateral: 'While you owe dollars, the collateral left must keep the loan within 50% of its value.',
+  unlend: 'Dollars that borrowers are using come back as they repay.',
+  liquidate: 'Only loans above 80% of their collateral’s value can be liquidated.',
+};
 
 /** Semantic validation remains independent of persisted review binding. */
 export function validateMarketCall(transaction: { chainId?: number; to?: string | null; data?: Hex; value?: bigint }, owner: Address, config: SharedMarketManifest) {
@@ -243,6 +251,15 @@ export async function prepareMarketAction(store: Store, wallet: string, operatio
       await store.update<MarketRecord>(key, value => value.pendingHash === record.pendingHash ? { ...value, pendingHash: undefined, pendingAt: undefined, pendingNonce: undefined } : value);
     }
     assert(await client.getBalance({ address: owner }) > 0n, 'Get test ETH from Robinhood’s faucet for network fees.');
+    // Before any approval: a person must never sign an approval for an action the pool will refuse.
+    const [walletTsla, walletUsd, position, withdrawable] = await Promise.all([
+      client.readContract({ address: config.stock, abi: SHARED_TOKEN_ABI, functionName: 'balanceOf', args: [owner] }),
+      client.readContract({ address: config.usd, abi: SHARED_TOKEN_ABI, functionName: 'balanceOf', args: [owner] }),
+      client.readContract({ address: config.pool, abi: SHARED_POOL_ABI, functionName: 'position', args: [owner] }),
+      client.readContract({ address: config.pool, abi: SHARED_POOL_ABI, functionName: 'maxWithdraw', args: [owner] }),
+    ]);
+    const shortfall = marketShortfall(operation, amount, { walletTsla, walletUsd, collateral: position[0], debt: position[1], available: safety.suspended ? 0n : position[4], withdrawable });
+    if (shortfall) throw new Error(shortfall);
     let to = config.pool; let data: Hex; let approval = false;
     const token = operation === 'deposit_collateral' ? config.stock : ['lend','repay','liquidate'].includes(operation) ? config.usd : null;
     if (token && await client.readContract({ address: token, abi: SHARED_TOKEN_ABI, functionName: 'allowance', args: [owner, config.pool] }) < amount) {
@@ -252,7 +269,8 @@ export async function prepareMarketAction(store: Store, wallet: string, operatio
       const args = operation === 'lend' ? [amount, owner] : operation === 'unlend' ? [amount, owner, owner] : operation === 'liquidate' ? [debtor, amount] : [amount];
       data = encodeFunctionData({ abi: SHARED_POOL_ABI, functionName: method, args } as Parameters<typeof encodeFunctionData>[0]);
     }
-    const [fees, nonce, gas] = await Promise.all([client.estimateFeesPerGas(), client.getTransactionCount({ address: owner, blockTag: 'pending' }), client.estimateGas({ account: owner, to, data })]);
+    const refused = () => { throw new Error(`The market would refuse this ${operation.replace('_', ' ')} now. ${REFUSAL_HINTS[operation] ?? 'Check your balances and try again.'}`); };
+    const [fees, nonce, gas] = await Promise.all([client.estimateFeesPerGas(), client.getTransactionCount({ address: owner, blockTag: 'pending' }), client.estimateGas({ account: owner, to, data }).catch(refused)]);
     assert(fees.maxFeePerGas !== undefined, 'Network did not return fees.');
     const transaction: ReviewedTransaction = { chainId: 46630, to, data, value: '0x0', nonce, gas: `0x${(gas * 120n / 100n).toString(16)}`, maxFeePerGas: `0x${(fees.maxFeePerGas * 2n).toString(16)}`, maxPriorityFeePerGas: `0x${(fees.maxPriorityFeePerGas ?? 0n).toString(16)}` };
     await store.update<MarketRecord>(key, value => ({ ...value, preparingUntil: undefined, prepared: { transaction, expiresAt: now() + 120_000, operation, quantity, borrower: debtor, approval } }));
