@@ -26,6 +26,7 @@ import { StyleSheetManager } from 'styled-components';
 import { defineChain } from 'viem';
 import {
   assertUnchangedSolanaMessage,
+  privyTransaction,
   validateEvmSigningRequest,
   validateSolanaSigningRequest,
 } from './signing-policy.ts';
@@ -316,7 +317,7 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
     signEvmTransaction: (request) =>
       runAction(async () => {
         requireSession();
-        const transaction = structuredClone(request.transaction);
+        const transaction = privyTransaction(structuredClone(request.transaction));
         const wallet = validateEvmSigningRequest(
           { ...request, transaction },
           wallets.find((item) => item.id === request.walletId),

@@ -5,6 +5,7 @@ import { ReferencePriceUnavailable } from '@/server/reference-price';
 import { getStore } from '@/server/store';
 import { errorResponse, readBody, sameOrigin } from '@/server/http';
 import { prepareTestDollars, submitTestDollars } from '@/server/test-dollars';
+import { dripTestGas, gasDripConfigured } from '@/server/gas-drip';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };
 const settle = <T,>(work: Promise<T>) => work.then((value) => ({ ok: true as const, value })).catch((e: unknown) => ({
@@ -52,6 +53,10 @@ export async function POST(request: Request) {
     const store = await getStore();
     const evm = identity.wallets.find((w) => w.chainType === 'ethereum');
     if (!evm) throw new Error('Your account has no Robinhood Chain wallet yet.');
+    if (body.action === 'gas_drip_status')
+      return Response.json({ configured: gasDripConfigured() }, noStore);
+    if (body.action === 'gas_drip')
+      return Response.json(await dripTestGas(store, identity.subject, evm.address), noStore);
     if (body.action === 'test_dollars_prepare')
       return Response.json({ walletId: evm.id, ...await prepareTestDollars(store, evm.address) }, noStore);
     if (body.action === 'test_dollars_submit') {

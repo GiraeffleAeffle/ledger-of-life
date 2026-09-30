@@ -39,6 +39,12 @@ SOLANA_SPONSOR_KEYPAIR=REPLACE_ME
 # Without it the price scope is unconfigured and the market pauses borrowing once the last price is 26 h old.
 ROBINHOOD_PRICE_UPDATER_PRIVATE_KEY=REPLACE_ME
 
+# Optional dedicated host-only Robinhood testnet faucet key (0x-prefixed 32-byte hex). Its ONLY use is sending
+# 0.00005 test ETH to a signed-in person's verified wallet below 0.00001 ETH: once per 24 h per account/wallet,
+# at most 200 drips per UTC day. Fund with a little test ETH from https://faucet.testnet.chain.robinhood.com/.
+# Never use a personal/mainnet key. Without it people keep using the public faucet.
+# ROBINHOOD_GAS_DRIP_PRIVATE_KEY=
+
 # Dedicated Robinhood testnet fee key for paid AI answers (0x-prefixed 32-byte hex), used only by this host. It settles
 # only Permit2 authorizations people already signed, to the payee and amount in them. Fund it with a little test ETH.
 LOCAL_AI_FACILITATOR_PRIVATE_KEY=REPLACE_ME

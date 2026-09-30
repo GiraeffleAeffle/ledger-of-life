@@ -17,6 +17,7 @@ import { verifyTypedData, zeroHash } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import {
   assertUnchangedSolanaMessage,
+  privyTransaction,
   validateEvmSigningRequest,
   validateSolanaSigningRequest,
 } from './signing-policy.ts';
@@ -215,4 +216,15 @@ test('the bounded escrow signature binds action, chain and contract', async () =
       ),
     /Refresh/,
   );
+});
+
+test('a prepared gas limit reaches Privy as gasLimit, so the signed transaction keeps the reviewed limit', () => {
+  const prepared = { chainId: 46630 as const, to: '0xA6e10E426A738aEF586dB5191177658D67C78A14', data: '0x40c10f19' as const, nonce: 3, gas: '0x1d4c0', maxFeePerGas: '0x989680' };
+  const forPrivy = privyTransaction(prepared);
+  assert.equal(forPrivy.gasLimit, '0x1d4c0');
+  assert.equal('gas' in forPrivy, false);
+  assert.equal(forPrivy.nonce, 3);
+  assert.deepEqual(privyTransaction({ ...prepared, gasLimit: '120000' }).gasLimit, '120000');
+  assert.throws(() => privyTransaction({ ...prepared, gasLimit: '0x1' }), /two different gas limits/);
+  assert.equal(privyTransaction({ ...prepared, gas: undefined }).gasLimit, undefined);
 });

@@ -225,7 +225,7 @@ memory, erased on completion, timeout, revocation, clear or process exit.
 | Operation, Release, Payout | `src/server/solana-service.ts`, `src/server/solana-initialization.ts` |
 | Journey (next step per person) | `src/server/journey.ts`, `src/components/home.tsx` |
 | Position, Venue, Distribution | `src/server/portfolio.ts`, `src/server/robinhood-demo.ts` |
-| TestFunds | `src/server/test-dollars.ts`, `src/components/test-dollars.tsx`: the person's own wallet mints tUSDG; test ETH and the official test TSLA come from Robinhood's public faucet, devnet USDC from Circle's |
+| TestFunds | `src/server/test-dollars.ts`, `src/server/gas-drip.ts`, `src/components/test-dollars.tsx`: the person's own wallet mints tUSDG. `robinhood_gas_drip` is an optional host-only infrastructure faucet: exactly 0.00005 test ETH to a verified wallet below 0.00001 ETH, once per 24 h per account and wallet, capped at 200 per UTC day, with durable exact-transfer recovery. Robinhood's public faucet remains the alternative for test ETH and official test TSLA; Circle supplies devnet USDC. No paymaster or operator action for the person. |
 | LocalInvestment (test units) | `src/data/local-investments.ts`, `src/server/local-investments.ts`, `src/components/local-investments.tsx`, `contracts/evm/src/testnet/FictionalCityUnit.sol`, `contracts/evm/script/local-investments.mjs` |
 | Building/city scenario | `src/components/city-flywheel.tsx`; physical systems, supplier relationship, jobs and fiscal effects are illustrative |
 | LocalInferenceRequest and visitor access | `src/server/local-ai.ts`, `src/server/local-ai-runtime.ts`, `src/server/local-ai-session.ts`, `src/components/local-ai.tsx`, `app/(wallet)/library/page.tsx` |

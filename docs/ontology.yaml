@@ -362,9 +362,10 @@ concepts:
     definition: How a Person gets test money with no value without an operator acting for them.
     implementations:
       tusdg_self_mint: {reality: testnet_real, note: "The person's own wallet calls the open tUSDG mint on Robinhood Chain testnet (the token caps a call at 10,000; the app asks for 1,000). The server only checks and broadcasts that signed transaction."}
+      robinhood_gas_drip: {reality: testnet_real, note: "Host-only infrastructure faucet sends exactly 0.00005 test ETH to the signed-in person's verified wallet below 0.00001 ETH: once per 24 hours per account and wallet, at most 200 per UTC day. Journaled transfers recover exact signed bytes; no operator acts for the person and no paymaster is used."}
       robinhood_faucet: {reality: testnet_real, note: "Robinhood's public faucet: test ETH for gas and the official test TSLA. External."}
       circle_usdc_faucet: {reality: testnet_real, note: "Circle's public faucet: Solana devnet test USDC for a deposit. External."}
-    code: [src/server/test-dollars.ts, src/components/test-dollars.tsx]
+    code: [src/server/test-dollars.ts, src/server/gas-drip.ts, src/components/test-dollars.tsx]
 
   Distribution:
     definition: Value an Asset pays its holder (dividends, rent, staking rewards, energy savings).

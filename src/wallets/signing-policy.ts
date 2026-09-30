@@ -34,6 +34,20 @@ function assertWallet(
   return wallet;
 }
 
+/**
+ * Privy reads a transaction's gas limit from `gasLimit`. A server that prepares `gas` (viem's name) would have that
+ * field ignored: Privy estimates its own limit, and the server then rejects the signature as a different transaction.
+ */
+export function privyTransaction(
+  transaction: EvmSigningRequest['transaction'] & { gas?: string | number | bigint },
+): EvmSigningRequest['transaction'] {
+  const { gas, ...rest } = transaction;
+  if (gas === undefined) return rest;
+  if (rest.gasLimit !== undefined && BigInt(rest.gasLimit) !== BigInt(gas))
+    throw new Error('The prepared transaction names two different gas limits.');
+  return { ...rest, gasLimit: rest.gasLimit ?? `0x${BigInt(gas).toString(16)}` };
+}
+
 export function validateEvmSigningRequest(
   request: EvmSigningRequest,
   wallet: RentalWallet | undefined,

@@ -108,7 +108,8 @@ export async function submitTestDollars(store: Store, wallet: string, signed: st
   const prepared = record.prepared.transaction;
   if (transaction.nonce !== prepared.nonce || transaction.gas !== BigInt(prepared.gas)
     || transaction.maxFeePerGas !== BigInt(prepared.maxFeePerGas)
-    || transaction.maxPriorityFeePerGas !== BigInt(prepared.maxPriorityFeePerGas)
+    // viem parses a zero priority fee (RLP 0x) as absent; Robinhood testnet often has a zero priority fee.
+    || (transaction.maxPriorityFeePerGas ?? 0n) !== BigInt(prepared.maxPriorityFeePerGas)
     || transaction.data?.toLowerCase() !== prepared.data.toLowerCase()
     || (transaction.accessList?.length ?? 0) !== 0)
     throw new Error('Signed transaction does not match your prepared test dollar request.');

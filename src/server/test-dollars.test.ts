@@ -13,11 +13,11 @@ async function signed(overrides: Partial<TransactionSerializableEIP1559> = {}, s
 }
 function fixture() {
   const store = new LocalStore(':memory:');
-  const state = { time: 1_000_000, broadcasts: 0, balanceReads: 0, mined: false, known: true, lookupFails: false, latestNonce: 0 };
+  const state = { time: 1_000_000, broadcasts: 0, balanceReads: 0, mined: false, known: true, lookupFails: false, latestNonce: 0, priorityFee: 1n };
   const clock = () => state.time;
   const prepareClient = {
     getBalance: async () => { state.balanceReads++; return 1n; },
-    estimateFeesPerGas: async () => ({ maxFeePerGas: 2n, maxPriorityFeePerGas: 1n }),
+    estimateFeesPerGas: async () => ({ maxFeePerGas: 2n, maxPriorityFeePerGas: state.priorityFee }),
     getTransactionCount: async () => state.latestNonce,
     estimateGas: async () => 100_000n,
     getTransactionReceipt: async ({ hash }: { hash: Hex }) => {
@@ -63,6 +63,17 @@ test('accepts the prepared self-mint and returns confirmed balance', async (t) =
   const serialized = await signed();
   assert.deepEqual(await submitTestDollars(f.store, owner.address, serialized, f.client, f.clock),
     { hash: keccak256(serialized), status: 'confirmed', testUsdAtomic: '2000000000' });
+  assert.equal(f.state.broadcasts, 1);
+});
+
+test('accepts a prepared mint whose priority fee is zero, which parses back as absent', async (t) => {
+  const f = fixture();
+  t.after(() => f.store.close());
+  // Robinhood testnet often quotes a zero priority fee; the live mint failed on exactly this.
+  f.state.priorityFee = 0n;
+  await prepareTestDollars(f.store, owner.address, f.prepareClient, f.clock);
+  const serialized = await signed({ maxPriorityFeePerGas: 0n });
+  assert.equal((await submitTestDollars(f.store, owner.address, serialized, f.client, f.clock)).status, 'confirmed');
   assert.equal(f.state.broadcasts, 1);
 });
 

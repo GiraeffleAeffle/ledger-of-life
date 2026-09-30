@@ -283,7 +283,8 @@ export async function submitMarketTransaction(store: Store, wallet: string, sign
   validateMarketCall(transaction, owner, config);
   assert(same(await recoverTransactionAddress({ serializedTransaction: serialized }), owner), 'Transaction was not signed by your verified wallet.');
   const prepared = review.transaction;
-  assert(same(transaction.to!, prepared.to) && transaction.data?.toLowerCase() === prepared.data.toLowerCase() && transaction.nonce === prepared.nonce && transaction.gas === BigInt(prepared.gas) && transaction.maxFeePerGas === BigInt(prepared.maxFeePerGas) && transaction.maxPriorityFeePerGas === BigInt(prepared.maxPriorityFeePerGas) && (transaction.accessList?.length ?? 0) === 0, 'Signed transaction does not match the prepared market review.');
+  // viem parses a zero priority fee (RLP 0x) as absent; Robinhood testnet often has a zero priority fee.
+  assert(same(transaction.to!, prepared.to) && transaction.data?.toLowerCase() === prepared.data.toLowerCase() && transaction.nonce === prepared.nonce && transaction.gas === BigInt(prepared.gas) && transaction.maxFeePerGas === BigInt(prepared.maxFeePerGas) && (transaction.maxPriorityFeePerGas ?? 0n) === BigInt(prepared.maxPriorityFeePerGas) && (transaction.accessList?.length ?? 0) === 0, 'Signed transaction does not match the prepared market review.');
   const hash = keccak256(serialized);
   await store.update<MarketRecord>(key, value => {
     assert(!value.pendingHash && value.prepared && now() < value.prepared.expiresAt && JSON.stringify(value.prepared) === JSON.stringify(review), 'Market review is no longer available.');
