@@ -34,6 +34,7 @@ Verified with `docker run --read-only --tmpfs /tmp --cap-drop ALL --security-opt
 | `RECONCILE_SECRET` | Bearer secret for `/api/jobs/reconcile`. |
 | Chains, AI | The rest of `.env.example`. |
 | Solana on the hosted demo | `SOLANA_RPC_URL` (a keyed devnet URL is secret, because the key sits in the URL) and `SOLANA_SPONSOR_KEYPAIR` (a key used only by this host; it pays network fees and rent and can never act as a party) go in the Secret; `SOLANA_DEPLOYMENT_MANIFEST` (the public pull-v2 devnet deployment, one line of JSON) is a chart value. The sponsor needs devnet SOL: top it up at https://faucet.solana.com. |
+| Shared loan market | `ROBINHOOD_PRICE_UPDATER_PRIVATE_KEY` goes in the Secret: a key used only to copy the TSLA price into the testnet feed (its single power is at most one push per hour within 20% of the previous price; it touches no funds). It needs a little test ETH from Robinhood's faucet. Without it the market still works until the last copied price is older than 26 hours (74 over the weekend window), then borrowing and liquidation pause. The public manifest `contracts/evm/deployments/shared-market-46630.json` is in the image. |
 | `STADTSTACK_ATLAS_URL` | Optional. The separate project atlas that `/api/city` and the map centre read. Unset it is `http://localhost:4317`. Empty means this deployment has no atlas: the hosted demo sets it so, because the atlas is a local research prototype; the city, the bundled snapshots and the map still work, and nothing claims an outage. |
 
 - The server writes only to `/data`. `/app/.next/cache` exists so a read-only root filesystem starts cleanly; nothing needs to write there.
@@ -44,14 +45,15 @@ Verified with `docker run --read-only --tmpfs /tmp --cap-drop ALL --security-opt
 
 ## The scheduler
 
-Run `node scripts/reconcile.mjs` about once a minute (for example a Kubernetes `CronJob` from the same image) with `APP_ORIGIN` and `RECONCILE_SECRET`. The route checks the secret, not the origin, so `APP_ORIGIN` for the job may be the in-cluster address. It walks three scopes:
+Run `node scripts/reconcile.mjs` about once a minute (for example a Kubernetes `CronJob` from the same image) with `APP_ORIGIN` and `RECONCILE_SECRET`. The route checks the secret, not the origin, so `APP_ORIGIN` for the job may be the in-cluster address. It tries every scope, even when an earlier one fails, and exits non-zero only after all of them ran:
 
 - `robinhood` and `solana`: reconcile pending operations against the chain; they answer `unconfigured` until the chain settings exist.
+- `price`: copies a new Chainlink RHTSLA/USD round from Robinhood Chain mainnet into the testnet feed when every check passes (the Tesla token is not paused, the round is fresh, Jupiter's TSLAx price agrees within 5%, at least an hour since the last copy, within 20% of it); otherwise it skips and says why.
 - `local-ai`: removes stored questions and answers after `LOCAL_AI_TEXT_GRACE_SECONDS` (600 by default) and truncates the SQLite write-ahead log. Both are needed: without them the removed text stays in the database file and the log (checked: 20 copies remained; with the fix, none). Postgres keeps dead rows until autovacuum, which this job does not force.
 
 ## Secrets and operator material
 
-Supplied when the container runs, never built in, with one exception: the image contains the public Local-stakes manifest `contracts/evm/deployments/local-investments-46630.json` (addresses and code hashes on Robinhood Chain testnet), because Local stakes and the AI desk's payee read it at that path. Rebuild the image when that deployment changes.
+Supplied when the container runs, never built in, with two exceptions: the image contains the public manifests `contracts/evm/deployments/local-investments-46630.json` (Local stakes; the AI desk's payee) and `contracts/evm/deployments/shared-market-46630.json` (the shared loan market and its price feed), addresses, code hashes and parameters on Robinhood Chain testnet, because the app reads them at those paths. Rebuild the image when a deployment changes.
 
 - Key files (`LOCAL_AI_FACILITATOR_KEY_FILE`, `ROBINHOOD_TEST_KEYS_DIR`, `SOLANA_TEST_SIGNER_DIR`). The fee-signer key must be owner-only (the code rejects any group or other permission bit) and readable by uid 1000. A plain Kubernetes Secret volume may not satisfy both; copying the file in an init container with mode 0600 is the likely answer. Not tried on a cluster.
 - `contracts/evm/out` and the other deployment manifests, mounted under `/app/contracts/evm/`. Only the operator test tools need them; the hosted demo keeps those off.
@@ -59,7 +61,7 @@ Supplied when the container runs, never built in, with one exception: the image 
 ## What a production build refuses by default
 
 - **Home Assistant.** A production build never fetches an address a person entered unless `ALLOW_HOME_ASSISTANT_PULL=1`. Local setup sets it. On a shared host, leave it off: the address check cannot be relied on, because DNS is resolved again when the request is made.
-- **Operator test tools.** Off unless `SOLANA_TEST_SIGNER_MODE=1` and `ALLOW_OPERATOR_TEST_ACTIONS=1`, and only without `DATABASE_URL`. They let server-held keys act for someone else: a private market per wallet with a fake test stock, the landlord and arbitrator in Home, price and yield levers. **The owner decided on 30 September that the public site runs real flows only**, so they stay off there and remain for rehearsals on localhost. Visitors get test money themselves instead: their own wallet mints test dollars (tUSDG, no value), and Robinhood's and Circle's public faucets give test ETH, the official test TSLA and devnet USDC.
+- **Operator test tools.** Off unless `SOLANA_TEST_SIGNER_MODE=1` and `ALLOW_OPERATOR_TEST_ACTIONS=1`, and only without `DATABASE_URL`. They let server-held keys act for someone else: the landlord and arbitrator in Home, and the localhost earnings rehearsal's landlord. **The owner decided on 30 September that the public site runs real flows only**, so they stay off there and remain for rehearsals on localhost. The per-wallet market with a fake test stock and its price and yield levers no longer exists anywhere: loans and lending run on one shared market with a copied real price. Visitors get test money themselves: their own wallet mints test dollars (tUSDG, no value), and Robinhood's and Circle's public faucets give test ETH, the official test TSLA and devnet USDC.
 - **The free library desk.** Off unless `LOCAL_AI_LIBRARY_ENABLED=1`. Switched on, anyone who can reach the site can use it until its shared 30 answers a day are gone.
 
 ## The GPU
