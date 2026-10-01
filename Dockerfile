@@ -46,6 +46,8 @@ COPY public ./public
 COPY contracts/evm/deployments/share-deposit-46630.json ./contracts/evm/deployments/share-deposit-46630.json
 COPY contracts/evm/deployments/building-revenue-46630.json ./contracts/evm/deployments/building-revenue-46630.json
 COPY contracts/evm/deployments/local-investments-46630.json ./contracts/evm/deployments/local-investments-46630.json
+# The public /replay page bundles the 1 October hosted evidence (public transaction hashes and amounts).
+COPY docs/evidence/HOSTED_SHARE_DEPOSIT_ROBINHOOD_TESTNET_2026-10-01.json docs/evidence/HOSTED_LOAN_STAKES_ROBINHOOD_TESTNET_2026-10-01.json docs/evidence/HOSTED_PER_TOKEN_AI_ANSWER_ROBINHOOD_TESTNET_2026-10-01.json ./docs/evidence/
 RUN npm run build
 
 FROM base AS runtime
