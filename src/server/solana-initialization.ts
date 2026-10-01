@@ -28,7 +28,7 @@ import {
   type AccountObservation,
 } from '../finance/solana/index.ts';
 import { agreementDigest, agreementRole, type Agreement } from './agreements.ts';
-import { requireWalletRecovery, type RecoveryGate } from './recovery.ts';
+import { requireWalletAccess, type WalletAccessGate } from './wallet-access.ts';
 import {
   RpcSolanaGateway,
   solanaConfiguration,
@@ -215,11 +215,11 @@ export function createSolanaInitializationService(input: {
   gateway: InitializationGateway;
   sponsor: FeeSponsor;
   now?: () => number;
-  recoveryGate?: RecoveryGate;
+  accessGate?: WalletAccessGate;
 }) {
   const { store, config, gateway, sponsor } = input;
   const now = input.now ?? Date.now;
-  const recovery = input.recoveryGate ?? requireWalletRecovery;
+  const walletAccess = input.accessGate ?? requireWalletAccess;
   const requiredRoles: PartyRole[] = config.setupMode === 'staged' ? ['landlord'] : ['tenant', 'landlord'];
   const recordKey = `solana-initialization:${hash(`${config.genesisHash}:${config.tenancyAddress}`)}`;
   async function access(identity: VerifiedIdentity, signing = false) {
@@ -236,7 +236,7 @@ export function createSolanaInitializationService(input: {
       fail('signer_required', config.setupMode === 'staged'
         ? 'Only the landlord creates this empty escrow; the tenant signs funding later.'
         : 'The tenant and landlord initialize this tenancy.', 403);
-    if (signing) await recovery(store, identity, party.wallet.id);
+    if (signing) await walletAccess(store, identity, party.wallet.id);
     const digest = agreementDigest(agreement);
     if (
       !digest ||

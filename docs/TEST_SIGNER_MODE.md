@@ -20,7 +20,7 @@ Without `--send`, nothing is signed or broadcast.
 - `SOLANA_TEST_SIGNER_MODE=1` is required (the npm script sets it). The flag has no effect on the web app.
 - Only the local SQLite database. Only devnet or localnet, and never the mainnet genesis hash.
 - Only agreements whose three parties all use `test-signer:` subjects. Real Privy tenancies, including the closed staged and active joint devnet tenancies, cannot be driven.
-- The Privy recovery gate is replaced only inside this CLI's service instances. The production service factories are unchanged.
+- The Privy wallet-access gate is replaced only inside this CLI's service instances. The production service factories are unchanged.
 - The test tenancy uses its own manifest from `.testnet-secrets/test-signer/state.json`. The app's `SOLANA_DEPLOYMENT_MANIFEST` is not modified.
 
 ## Funding

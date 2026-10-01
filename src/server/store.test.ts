@@ -34,3 +34,30 @@ test('text that an update removed cannot be recovered from the database files on
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('restart removes legacy recovery identifiers and source hashes, preserving invitations and tenancy data', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ledger-privacy-cutover-'));
+  const filename = join(directory, 'records.sqlite');
+  let store = new LocalStore(filename);
+  const source = 'LEGACY-IP-HASH-SENTINEL-a842cf';
+  try {
+    await store.create('identity-browser:legacy-browser', { hash: source });
+    await store.create('identity-recovery:legacy-account', { browserHash: source });
+    await store.create('local-ai:connector-registry', {
+      hosts: [{ id: 'existing-host' }], invitations: [{ codeHash: 'valid-invitation' }],
+      rate: [{ source, started: 1, count: 5 }],
+    });
+    await store.create('agreement:retained', { property: 'Test flat', parties: {} });
+    await store.close();
+    store = new LocalStore(filename);
+    assert.deepEqual(await store.scan('identity-'), []);
+    assert.deepEqual(await store.get('local-ai:connector-registry'), {
+      hosts: [{ id: 'existing-host' }], invitations: [{ codeHash: 'valid-invitation' }],
+    });
+    assert.deepEqual(await store.get('agreement:retained'), { property: 'Test flat', parties: {} });
+    assert.equal((await diskBytes(directory)).includes(source), false);
+  } finally {
+    await store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});

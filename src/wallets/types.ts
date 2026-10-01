@@ -1,6 +1,5 @@
 import type { UnsignedTransactionRequest } from '@privy-io/react-auth';
 import type { WalletChainType } from './identity-policy.ts';
-import type { RecoverySignature } from './recovery.ts';
 import type { EscrowSigningRequest } from './escrow-signing.ts';
 import type { InferencePaymentSigningRequest } from '../server/local-ai-types.ts';
 
@@ -36,24 +35,18 @@ export interface RentalWalletAccess {
   subject: string | null;
   wallets: RentalWallet[];
   passkeyCount: number;
-  backupLoginLinked: boolean;
-  backupEmail: string | null;
+  hasLinkedEmail: boolean;
   busy: boolean;
   error: string | null;
   loginWithPasskey: () => Promise<void>;
   signupWithPasskey: () => Promise<void>;
-  loginWithBackup: () => void;
   addPasskey: () => Promise<void>;
-  addBackupEmail: () => void;
+  removeEmail: () => Promise<void>;
   createMissingWallets: () => Promise<void>;
   logout: () => Promise<void>;
   getAccessToken: () => Promise<string | null>;
   signEvmTransaction: (request: EvmSigningRequest) => Promise<`0x${string}`>;
   signSolanaTransaction: (request: SolanaSigningRequest) => Promise<Uint8Array>;
-  signRecoveryChallenge: (
-    chainType: WalletChainType,
-    message: string,
-  ) => Promise<RecoverySignature>;
   signEvmTypedData: (request: EscrowSigningRequest) => Promise<string>;
   signInferencePayment: (request: InferencePaymentSigningRequest) => Promise<`0x${string}`>;
 }

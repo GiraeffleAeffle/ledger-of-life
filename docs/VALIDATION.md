@@ -2,6 +2,8 @@
 
 Updated through 28 September 2026. Current application/native-investment checks are recorded below. Earlier Solana, fork and phone evidence retains its original dates and actors; those historical runs were not repeated merely to confirm prior observations.
 
+On 1 October the email-backup/recovery path below was removed by [ADR 0014](adr/0014-passkey-only-test-accounts.md). Its historical device observations do not verify the new passkey-only signup, second-device passkey or old-email unlink flow.
+
 | Check                            | Evidence                                                                                                                                                                                                                                                                                                                           |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `npm test` | **228 tests pass.** Includes existing native/account/investment boundaries plus fresh-position protection, durable provisioning/control recovery, request ownership/replay, incomplete inference, visitor revocation/quota, exact receipt effects, JSON-safe uint256 signing, terminal-response reload and host-economics boundaries. |

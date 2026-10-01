@@ -5,6 +5,7 @@ import { WorkflowError } from '../domain/errors.ts';
 import { requireReady, walletFor, type Agreement } from './agreements.ts';
 import { AccessError, ConflictError } from './errors.ts';
 import type { Store } from './store.ts';
+import { roundedLocation, type HomeLocation } from '../domain/home-location.ts';
 
 /**
  * Pre-tenancy workflow: a landlord publishes a home, verified people apply, the landlord chooses
@@ -26,6 +27,7 @@ export interface Listing {
   title: string;
   description: string;
   details: HomeDetails;
+  location?: HomeLocation;
   rentMonthly: string;
   requiredSecurity: string;
   releaseAllowed: boolean;
@@ -40,10 +42,10 @@ export interface HomeDetails {
   rooms: number;
   sizeSqm: number;
   availableFrom: string;
-  /** Preset stock photos or small uploaded JPEG/PNG/WebP data URLs. */
+  /** Self-hosted sample photos; no uploaded personal files. */
   photos: string[];
 }
-/** Curated stock photos landlords can pick instead of uploading. */
+/** Curated, self-hosted stock photos landlords can pick. */
 export const PRESET_PHOTOS = [
   'photo-1502672260266-1c1ef2d93688',
   'photo-1522708323590-d24dbb6b0267',
@@ -51,13 +53,14 @@ export const PRESET_PHOTOS = [
   'photo-1493809842364-78817add7ffb',
   'photo-1484154218962-a197022b5858',
   'photo-1505691938895-1758d7feb511',
-].map((id) => `https://images.unsplash.com/${id}?w=1200&q=70&auto=format&fit=crop`);
+].map((id) => `/samples/${id}.jpg`);
 
 export interface PublicListing {
   id: string;
   title: string;
   description: string;
   details: HomeDetails;
+  location?: HomeLocation;
   rentMonthly: string;
   requiredSecurity: string;
   releaseAllowed: boolean;
@@ -93,7 +96,12 @@ export function publicListing(value: Listing, identity: VerifiedIdentity | null)
     id: value.id,
     title: value.title,
     description: value.description,
-    details: value.details ?? { city: '', rooms: 0, sizeSqm: 0, availableFrom: '', photos: [] },
+    details: { ...(value.details ?? { city: '', rooms: 0, sizeSqm: 0, availableFrom: '', photos: [] }),
+      photos: (value.details?.photos ?? []).flatMap((photo) => {
+        const sample = PRESET_PHOTOS.find((path) => path === photo || photo.startsWith(`https://images.unsplash.com/${path.slice('/samples/'.length, -4)}?`));
+        return sample ? [sample] : [];
+      }) },
+    location: value.location,
     rentMonthly: value.rentMonthly,
     requiredSecurity: value.requiredSecurity,
     releaseAllowed: value.releaseAllowed,
@@ -117,8 +125,8 @@ function details(input: Record<string, unknown>): HomeDetails {
   const photos = Array.isArray(input.photos) ? input.photos : [];
   if (photos.length > 4) throw new WorkflowError('Add up to four photos.');
   for (const photo of photos)
-    if (typeof photo !== 'string' || !(PRESET_PHOTOS.includes(photo) || (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(photo) && photo.length <= 700_000)))
-      throw new WorkflowError('Use one of the sample photos or a JPEG, PNG or WebP under 500 KB.');
+    if (typeof photo !== 'string' || !PRESET_PHOTOS.includes(photo))
+      throw new WorkflowError('Use one of the self-hosted sample photos.');
   const availableFrom = typeof input.availableFrom === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.availableFrom) ? input.availableFrom : '';
   return {
     city: text(input.city ?? '', 0, 80, 'The city'),
@@ -139,6 +147,7 @@ export async function createListing(store: Store, identity: VerifiedIdentity, in
     title: text(input.title, 3, 120, 'The title'),
     description: text(input.description ?? '', 0, 2000, 'The description'),
     details: details(input),
+    location: roundedLocation(input.location),
     rentMonthly: amount(input.rentMonthly, 'The monthly rent'),
     requiredSecurity: amount(input.requiredSecurity, 'The deposit'),
     releaseAllowed: input.releaseAllowed,
@@ -224,6 +233,7 @@ export async function chooseApplicant(store: Store, identity: VerifiedIdentity, 
     id: chosen.agreementId!,
     network: 'solana',
     property: chosen.title,
+    home: { city: chosen.details.city, location: chosen.location },
     requiredSecurity: chosen.requiredSecurity,
     releaseAllowed: chosen.releaseAllowed,
     createdAt: new Date().toISOString(),

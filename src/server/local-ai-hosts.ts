@@ -31,7 +31,6 @@ interface HostInvitation {
 interface Registry {
   hosts: StoredHost[];
   invitations: HostInvitation[];
-  rate: { source: string; started: number; count: number }[];
 }
 const KEY = 'local-ai:connector-registry';
 const PAIR_TTL = 600000;
@@ -49,14 +48,16 @@ async function ready(store: Store) {
     promise = (async () => {
       const existing = await store.get<Registry>(KEY);
       if (!existing) {
-        try { await store.create<Registry>(KEY, { hosts: [], invitations: [], rate: [] }); }
+        try { await store.create<Registry>(KEY, { hosts: [], invitations: [] }); }
         catch (error) { if (!await store.get(KEY)) throw error; }
-      } else if (!Array.isArray(existing.invitations) || !Array.isArray(existing.rate)) {
+      } else {
+        // Strip legacy unsalted IP hashes, including when the rest of the registry is valid.
         await store.update<Registry>(KEY, (registry) => ({
           hosts: registry.hosts.filter((host) => host.state === 'active' || host.state === 'revoked')
             .map((host) => ({ ...rawHost(host), publicKey: host.publicKey, nonces: host.nonces })),
-          invitations: [], rate: [],
+          invitations: Array.isArray(registry.invitations) ? registry.invitations : [],
         }));
+        await store.reclaim?.();
       }
     })();
     registries.set(store, promise);
@@ -121,7 +122,7 @@ export async function createHostInvitation(store: Store, identity: VerifiedIdent
   return { code, expiresAt: new Date(now + PAIR_TTL).toISOString() };
 }
 
-export async function createHostPairing(store: Store, input: unknown, rateKey: string, now = Date.now()) {
+export async function createHostPairing(store: Store, input: unknown, now = Date.now()) {
   const body = object(input);
   only(body, ['code', 'publicKey', 'name']);
   if (typeof body.code !== 'string' || !/^[A-HJ-NP-Z2-9]{12}$/.test(body.code)) throw new WorkflowError('Use the twelve-character host invitation code.');
@@ -135,20 +136,6 @@ export async function createHostPairing(store: Store, input: unknown, rateKey: s
     if (key.asymmetricKeyType !== 'ed25519' || publicKey !== body.publicKey) throw new Error('Noncanonical key');
   } catch { throw new WorkflowError('Use a base64 DER SPKI Ed25519 public key.'); }
   await ready(store);
-  const source = createHash('sha256').update(rateKey.slice(0, 512)).digest('hex');
-  let rateAllowed = false;
-  await store.update<Registry>(KEY, (registry) => {
-    registry.rate = registry.rate.filter((bucket) => bucket.started <= now && now - bucket.started < PAIR_TTL);
-    let bucket = registry.rate.find((entry) => entry.source === source);
-    if (!bucket) {
-      if (registry.rate.length >= 1024) registry.rate.shift();
-      bucket = { source, started: now, count: 0 };
-      registry.rate.push(bucket);
-    }
-    if (bucket.count < 5) { bucket.count++; rateAllowed = true; }
-    return registry;
-  });
-  if (!rateAllowed) throw new ConflictError('Too many pairing requests from this source; retry after ten minutes.');
   const codeHash = createHash('sha256').update(body.code).digest('hex');
   let hostId!: string;
   await store.update<Registry>(KEY, (registry) => {

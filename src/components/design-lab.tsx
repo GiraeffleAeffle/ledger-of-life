@@ -1,7 +1,6 @@
 'use client';
 import { NetPosition, NetPositionStrip } from './net-position';
 import { netPositionTotal, usd, type NetPositionParts } from './money-valuation';
-import { RecoveryCard, RecoveryStepView, type RecoveryView } from './recovery-step';
 import { DepositIdeas, TenancyWalkthrough } from './tenancy-walkthrough';
 import './design-lab.css';
 
@@ -11,20 +10,6 @@ const HOLDINGS: { name: string; note: string; parts: NetPositionParts }[] = [
   { name: 'Collateral, a loan and lending', note: 'Everything at once: a deposit, test TSLA posted as collateral in the shared pool, test dollars borrowed against it, and test dollars lent to the pool.', parts: { free: 812.34, locked: 10, pledged: 2200, lent: 500, owed: 300 } },
 ];
 
-const noop = () => {};
-const RECOVERY: { status: RecoveryView['status']; note: string }[] = [
-  { status: 'needs_baseline', note: 'Nothing done yet' },
-  { status: 'use_another_browser', note: 'Waiting for the other browser' },
-  { status: 'sign_in_again', note: 'This browser still holds the setup session' },
-  { status: 'ready', note: 'Signed in with the backup email in the other browser' },
-  { status: 'verified', note: 'Done' },
-  { status: 'wallet_changed', note: 'The wallets differ from the recorded ones' },
-  { status: 'needs_setup', note: 'Account setup is incomplete' },
-];
-const recoveryView = (status: RecoveryView['status']): RecoveryView => ({
-  status, email: 'maria@example.org', origin: 'https://ledger.example', busy: false, error: '', copied: false,
-  onEnroll: noop, onVerify: noop, onCopy: noop, onSignInAgain: noop,
-});
 
 /**
  * Real components with invented numbers, so a layout can be judged without funds or an account.
@@ -49,17 +34,6 @@ export function DesignLab() {
             <NetPosition parts={parts} go={() => {}} depositSection="home-tenancies" />
             <h3>On Today</h3>
             <NetPositionStrip parts={parts} />
-          </article>
-        ))}
-      </section>
-      <section aria-labelledby="lab-recovery">
-        <h2 id="lab-recovery">First run: setup ends after the wallets, recovery comes later</h2>
-        <p>The card sits on Today until the proof is done, and the same steps appear inside a tenancy the first time a wallet acts. Each state below is one thing the server can report.</p>
-        <RecoveryCard><RecoveryStepView {...recoveryView('needs_baseline')} /></RecoveryCard>
-        {RECOVERY.map(({ status, note }) => (
-          <article className="card" key={status}>
-            <span className="eyebrow">{status!.toUpperCase()} · {note}</span>
-            <RecoveryStepView {...recoveryView(status)} />
           </article>
         ))}
       </section>

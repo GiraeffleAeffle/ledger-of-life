@@ -13,7 +13,7 @@ import {
 } from '@solana/kit';
 import { decodeClassicTokenAccount, decodeTenancy, deriveEscrowAddresses, derivePayoutAddress, ledgerDepositMint, SOLANA_IDS } from '../finance/solana/index.ts';
 import type { Agreement } from './agreements.ts';
-import type { RecoveryGate } from './recovery.ts';
+import type { WalletAccessGate } from './wallet-access.ts';
 import {
   createSolanaInitializationService,
   leaseIdForAgreement,
@@ -51,8 +51,8 @@ export async function solanaServicesFor(
   store: Store,
   agreementId: string | null,
   environment: Record<string, string | undefined> = process.env,
-  /** Test-signer seam only; production uses the Privy recovery gate. */
-  recoveryGate?: RecoveryGate,
+  /** Test-signer seam only; production verifies passkey and wallet ownership. */
+  accessGate?: WalletAccessGate,
 ) {
   const [config, sponsor] = await Promise.all([
     solanaConfigurationFor(store, agreementId, environment),
@@ -61,13 +61,13 @@ export async function solanaServicesFor(
   if (!config || !sponsor) return null;
   return {
     config,
-    service: createSolanaService({ store, config, gateway: new RpcSolanaGateway(config), sponsor, recoveryGate }),
+    service: createSolanaService({ store, config, gateway: new RpcSolanaGateway(config), sponsor, accessGate }),
     initialization: createSolanaInitializationService({
       store,
       config,
       gateway: new RpcInitializationGateway(config),
       sponsor,
-      recoveryGate,
+      accessGate,
     }),
   };
 }

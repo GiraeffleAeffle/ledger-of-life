@@ -27,7 +27,7 @@ import {
   type ExpectedTokenDelta,
 } from '../finance/solana/index.ts';
 import { agreementDigest, agreementRole, type Agreement } from './agreements.ts';
-import { requireWalletRecovery, type RecoveryGate } from './recovery.ts';
+import { requireWalletAccess, type WalletAccessGate } from './wallet-access.ts';
 import type { Store } from './store.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import {
@@ -115,7 +115,7 @@ type Dependencies = {
   gateway: SolanaGateway;
   sponsor: FeeSponsor;
   now?: () => number;
-  recoveryGate?: RecoveryGate;
+  accessGate?: WalletAccessGate;
 };
 function publicOperation(op: SolanaOperation) {
   const { signedTxBase64: _, subject: __, fingerprint: ___, ...visible } = op;
@@ -332,7 +332,7 @@ async function bundleDeltas(
 export function createSolanaService(dependencies: Dependencies) {
   const { store, config, gateway, sponsor } = dependencies;
   const now = dependencies.now ?? Date.now;
-  const recovery = dependencies.recoveryGate ?? requireWalletRecovery;
+  const walletAccess = dependencies.accessGate ?? requireWalletAccess;
   if (
     !['devnet', 'localnet'].includes(config.cluster) ||
     config.genesisHash === SOLANA_MAINNET_MANIFEST.genesisHash
@@ -372,7 +372,7 @@ export function createSolanaService(dependencies: Dependencies) {
       party = agreement.parties[role]!;
     if (party.wallet.chainType !== 'solana' || identity.expiresAt * 1000 <= now())
       fail('identity_expired', 'Sign in again before authorizing test funds.', 401);
-    await recovery(store, identity, party.wallet.id);
+    await walletAccess(store, identity, party.wallet.id);
     const digest = agreementDigest(agreement);
     if (
       !digest ||

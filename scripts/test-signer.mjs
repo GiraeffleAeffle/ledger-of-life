@@ -145,10 +145,10 @@ assertTestAgreement(agreement);
 const { config } = configure(state.manifest);
 const sponsor = await configuredFeeSponsor();
 if (!sponsor) throw new Error('SOLANA_SPONSOR_KEYPAIR is required');
-// Test identities have no Privy recovery proof; this gate override exists only in this CLI.
-const recoveryGate = async (_store, identity) => ({ wallet: identity.wallets[0], proof: null });
-const init = createSolanaInitializationService({ store, config, gateway: new RpcInitializationGateway(config), sponsor, recoveryGate });
-const service = createSolanaService({ store, config, gateway: new RpcSolanaGateway(config), sponsor, recoveryGate });
+// Operator-held fixture wallets bypass Privy ownership checks only in this gated CLI.
+const accessGate = async (_store, identity) => ({ wallet: identity.wallets[0] });
+const init = createSolanaInitializationService({ store, config, gateway: new RpcInitializationGateway(config), sponsor, accessGate });
+const service = createSolanaService({ store, config, gateway: new RpcSolanaGateway(config), sponsor, accessGate });
 const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
 async function observe() {

@@ -17,8 +17,8 @@ export async function GET(request: Request) {
     return Response.json({ error: 'Only a public city ID is accepted. Home and work stay on your device.' }, { status: 400, headers });
   try {
     return Response.json(await readCityFeed(params.get('city')!), { headers });
-  } catch (error) {
-    console.error('City feed unavailable:', error);
+  } catch {
+    console.error('City feed unavailable.');
     return Response.json({ error: 'City feed is temporarily unavailable.' }, { status: 503, headers });
   }
 }

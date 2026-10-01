@@ -12,7 +12,7 @@ import type { LocalAiRequest } from './local-ai-types.ts';
 
 const payout = '0x1111111111111111111111111111111111111111';
 const identity: VerifiedIdentity = { subject: 'did:privy:connector-owner', sessionId: 'session', expiresAt: Date.now() + 600_000,
-  wallets: [{ id: 'wallet', address: payout, chainType: 'ethereum' }], passkeyCount: 1, backupLoginLinked: true };
+  wallets: [{ id: 'wallet', address: payout, chainType: 'ethereum' }], passkeyCount: 1 };
 const visitor = libraryOwner('c'.repeat(64));
 const input = { mode: 'library', prompt: 'Explain why the stub is not real inference.', maxOutputTokens: 64, context: 'general', hostScope: 'city', publicQuestion: true };
 const url = (id: string) => `http://localhost/api/local-ai/requests/${id}`;
@@ -27,7 +27,7 @@ async function fixture(run: (store: LocalStore, hostId: string) => Promise<void>
   try {
     const invitation = await createHostInvitation(store, identity, {});
     const { publicKey } = generateKeyPairSync('ed25519');
-    const pair = await createHostPairing(store, { code: invitation.code, publicKey: publicKey.export({ format: 'der', type: 'spki' }).toString('base64'), name: 'Test connector' }, 'consumer-test');
+    const pair = await createHostPairing(store, { code: invitation.code, publicKey: publicKey.export({ format: 'der', type: 'spki' }).toString('base64'), name: 'Test connector' });
     await recordHostHeartbeat(store, pair.hostId, { models: [AI_MODEL], ollamaReachable: true, awake: true });
     await setConnectorFreePublicAnswers(store, identity, pair.hostId, true);
     await run(store, pair.hostId);
@@ -217,7 +217,7 @@ test('free routing requires owner opt-in while paid routing remains available wi
     await assert.rejects(setConnectorFreePublicAnswers(store, { ...identity, subject: 'other-account' }, hostId, true), /Only the host owner/);
     const invitation = await createHostInvitation(store, identity, {});
     const { publicKey } = generateKeyPairSync('ed25519');
-    const other = await createHostPairing(store, { code: invitation.code, publicKey: publicKey.export({ format: 'der', type: 'spki' }).toString('base64'), name: 'Free opted-in host' }, 'free-routing');
+    const other = await createHostPairing(store, { code: invitation.code, publicKey: publicKey.export({ format: 'der', type: 'spki' }).toString('base64'), name: 'Free opted-in host' });
     await recordHostHeartbeat(store, other.hostId, { models: [AI_MODEL], ollamaReachable: true, awake: true });
     await setConnectorFreePublicAnswers(store, identity, other.hostId, true);
     const pending = executeAiRequest(store, id, visitor, input, url(id), null);

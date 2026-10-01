@@ -50,7 +50,6 @@ const tenancy = (t: Tenancy): NextStepTarget => ({ area: 'home', section: `tenan
 const YOUR_TURN: Record<string, (property: string) => { title: string; label: string }> = {
   invite_arbitrator: (p) => ({ title: `Invite a neutral arbitrator for ${p}.`, label: 'Open invitation step' }),
   accept_agreement: (p) => ({ title: `Review the deposit terms for ${p}.`, label: 'Review agreement' }),
-  finish_setup: (p) => ({ title: `Check your backup access, then continue ${p}.`, label: 'Open recovery check' }),
   create_space: (p) => ({ title: `Your landlord step: prepare the empty deposit escrow for ${p}.`, label: 'Review escrow step' }),
   secure_deposit: (p) => ({ title: `Your tenant step: secure the test deposit for ${p}.`, label: 'Review deposit' }),
   respond_claim: (p) => ({ title: `Review the landlord’s proposed deduction for ${p}.`, label: 'Review deduction' }),

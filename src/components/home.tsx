@@ -11,8 +11,6 @@ import { MoneyArea, TestUsdc } from './money-area';
 import { SOLANA_TEST_USDC_MINT } from '@/finance/solana/manifest';
 import { accountSetupStep } from './account-setup-state';
 import { AccountSetup, SigningIn } from './onboarding';
-import { RecoveryGate, RecoveryStep } from './recovery-step';
-import { useRecoveryRequired } from './use-recovery';
 import { PlacesArea } from './places';
 import { ServiceCharges } from './service-charges';
 import { DepositIdeas, TenancyWalkthrough } from './tenancy-walkthrough';
@@ -27,6 +25,10 @@ import { operationLabels } from './deposit-activity';
 import { nextStep } from './next-step';
 import { NextStepCard } from './next-step-card';
 import { STAGES } from '@/data/path';
+import { FlatMap } from './flat-map';
+import { Neighbourhood } from './neighbourhood';
+import { MoveInHandover } from './move-in-handover';
+import { moveInAvailable, type HomeLocation } from '@/domain/home-location';
 
 const BUTTON_LABEL: Record<string, string> = {
   invite_arbitrator: 'Make invitation link',
@@ -71,13 +73,12 @@ function useAuthorizedRequest(): Request {
 
 export function MyHome({ area, go }: { area: Area; go: (area: Area) => void }) {
   const wallet = useRentalWallet();
-  const recoveryRequired = useRecoveryRequired();
   const step = accountSetupStep({
     ready: wallet.ready, authenticated: wallet.authenticated, subject: wallet.subject, passkeyCount: wallet.passkeyCount,
-    backupLoginLinked: wallet.backupLoginLinked, wallets: wallet.wallets, recoveryRequired,
+    wallets: wallet.wallets,
   });
   if (step === 'loading') return <SigningIn />;
-  if (step !== 'done') return <AccountSetup key={wallet.subject ?? 'signed-out'} step={step} recoveryRequired={recoveryRequired ?? true} />;
+  if (step !== 'done') return <AccountSetup key={wallet.subject ?? 'signed-out'} step={step} />;
   return <SignedInHome key={walletRequestIdentity(wallet)} area={area} go={go} />;
 }
 
@@ -455,6 +456,9 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
         <Badge tone="neutral">{journey.role} · Solana devnet test USDC{journey.sampleParties ? ' · sample fixture party' : ''}</Badge>
       </div>
       <p className="small-copy">{HOME_STAGES[homeStage(journey.stage)]} · step {homeStage(journey.stage) + 1} of {HOME_STAGES.length}</p>
+      {journey.home?.location && <FlatMap location={journey.home.location} />}
+      {(journey.home || (journey.role === 'tenant' && moveInAvailable(journey.stage, chain?.phase))) && <Neighbourhood city={journey.home?.city ?? ''} location={journey.home?.location} request={request} movingIn={journey.role === 'tenant' && moveInAvailable(journey.stage, chain?.phase)} />}
+      {journey.role !== 'arbitrator' && moveInAvailable(journey.stage, chain?.phase) && <MoveInHandover agreementId={agreementId} role={journey.role} initial={journey.handover} request={request} />}
       {(journey.stage === 'space' || journey.stage === 'deposit') && <div className="secure-substeps">
         <p><strong>Landlord prepares</strong> · {journey.stage === 'deposit' ? 'Empty escrow ready.' : 'Create the empty escrow. No deposit is locked yet.'}</p>
         <p><strong>Tenant funds</strong> · Secure {money(journey.requiredSecurity)} test USDC after the escrow is ready.</p>
@@ -479,9 +483,8 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
           {agreement && <p>Tenant: {agreement.parties.tenant?.wallet?.address ? `${agreement.parties.tenant.wallet.address.slice(0, 5)}…${agreement.parties.tenant.wallet.address.slice(-5)}` : 'not available'} · Landlord: {agreement.parties.landlord?.wallet?.address ? `${agreement.parties.landlord.wallet.address.slice(0, 5)}…${agreement.parties.landlord.wallet.address.slice(-5)}` : 'not available'} · Arbitrator: {agreement.parties.arbitrator?.wallet?.address ? `${agreement.parties.arbitrator.wallet.address.slice(0, 5)}…${agreement.parties.arbitrator.wallet.address.slice(-5)}` : 'not available'}</p>}
           {agreement && <p>Tenant acceptance: {agreement.accepted.tenant?.digest === agreement.digest ? 'accepted' : 'waiting'} · Landlord acceptance: {agreement.accepted.landlord?.digest === agreement.digest ? 'accepted' : 'waiting'}. Surplus: {agreement.releaseAllowed ? 'tenant may claim during the tenancy' : 'locked until settlement'}.</p>}
         </div>}
-        {next.kind === 'finish_setup' && <RecoveryStep request={request} onVerified={() => void reload()} />}
         {next.kind === 'accept_agreement' && recordBlocker && <p className="action-blocker" role="status">{recordBlocker}</p>}
-        {oneButton && (next.kind === 'create_space' ? <RecoveryGate request={request}>{actionButton}</RecoveryGate> : actionButton)}
+        {oneButton && actionButton}
         {next.kind === 'secure_deposit' && <div className="small-copy faucet-note">
           {cashOnly ? <TestUsdc request={request} /> : <p>This existing tenancy uses Circle devnet test USDC, not the site&apos;s tUSDC. Use <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle&apos;s faucet</a> on Solana devnet, sent to your wallet {wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? 'address in Me'}.</p>}
         </div>}
@@ -726,25 +729,9 @@ const PRESETS = [
   'photo-1493809842364-78817add7ffb',
   'photo-1484154218962-a197022b5858',
   'photo-1505691938895-1758d7feb511',
-].map((id) => `https://images.unsplash.com/${id}?w=1200&q=70&auto=format&fit=crop`);
-const thumb = (url: string) => (url.startsWith('https://') ? url.replace('w=1200', 'w=360') : url);
+].map((id) => `/samples/${id}.jpg`);
 
-/** Downscale an uploaded photo in the browser so it stays small enough to store with the listing. */
-async function compressPhoto(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1280 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  for (const quality of [0.8, 0.65, 0.5]) {
-    const url = canvas.toDataURL('image/jpeg', quality);
-    if (url.length <= 700_000) return url;
-  }
-  throw new Error('This photo is too large even after compression.');
-}
-
-function ListingCard({ listing, children }: { listing: PublicListing; children?: React.ReactNode }) {
+function ListingCard({ listing, request, children }: { listing: PublicListing; request: Request; children?: React.ReactNode }) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const d = listing.details;
   const facts = [d.city || 'City not specified', d.rooms ? `${d.rooms} room${d.rooms > 1 ? 's' : ''}` : 'Rooms not specified', d.sizeSqm ? `${d.sizeSqm} m²` : '',
@@ -752,23 +739,26 @@ function ListingCard({ listing, children }: { listing: PublicListing; children?:
   return (
     <article className="listing-card">
       <div className="listing-photo">
-        {/* eslint-disable-next-line @next/next/no-img-element -- uploaded photos are data URLs */}
-        {d.photos[photoIndex] ? <img src={d.photos[photoIndex]} alt={`Photo ${photoIndex + 1} of ${listing.title}`} loading="lazy" /> : <HomeIcon size={42} aria-label="No listing photo" />}
+        {/* eslint-disable-next-line @next/next/no-img-element -- self-hosted illustrative samples */}
+        {d.photos[photoIndex] ? <img src={d.photos[photoIndex]} alt={`Illustrative sample interior ${photoIndex + 1}, not a photograph of this dwelling`} loading="lazy" /> : <HomeIcon size={42} aria-label="No listing photo" />}
         {d.photos.length > 1 && <span className="photo-count">{photoIndex + 1}/{d.photos.length}</span>}
       </div>
       <div className="listing-body">
         <header><strong>{listing.title}{listing.sample && !listing.title.toLowerCase().includes('sample') ? ' · sample home' : ''}</strong><span className="listing-rent">{money(listing.rentMonthly)}<small>/month · test USDC</small></span></header>
         {facts.length > 0 && <p className="listing-facts">{facts.join(' · ')}</p>}
+        {d.photos.length > 0 && <p className="small-copy">Illustrative sample interiors, not photographs of this dwelling.</p>}
         <p className="listing-deposit"><span>Required deposit · Solana devnet</span><strong>{money(listing.requiredSecurity)} test USDC</strong></p>
         <p className="small-copy">{listing.sample ? 'Sample home · local rehearsal. ' : ''}{listing.releaseAllowed ? 'Tenant may claim surplus during the tenancy.' : 'Surplus stays locked until settlement.'} Site-minted tUSDC stays in cash escrow, is not lent and earns nothing. Any deposit earnings belong to the tenant.</p>
+        {listing.location && <FlatMap location={listing.location} />}
+        <Neighbourhood city={d.city} location={listing.location} request={request} />
         {children}
         {(listing.description || d.photos.length > 1) && <details className="listing-details">
-          <summary>Description & photos</summary>
+          <summary>Description &amp; sample photos</summary>
           {listing.description && <p className="listing-description">{listing.description}</p>}
           {d.photos.length > 1 && <div className="listing-gallery" aria-label={`Photos of ${listing.title}`}>
             {d.photos.map((photo, index) => <button type="button" key={index} aria-label={`Show photo ${index + 1} of ${listing.title}`} aria-pressed={photoIndex === index} onClick={() => setPhotoIndex(index)}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- uploaded photos are data URLs */}
-              <img src={thumb(photo)} alt="" loading="lazy" />
+              {/* eslint-disable-next-line @next/next/no-img-element -- self-hosted illustrative samples */}
+              <img src={photo} alt="" loading="lazy" />
             </button>)}
           </div>}
         </details>}
@@ -783,6 +773,7 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
   const [posting, setPosting] = useState(false);
   const [form, setForm] = useState({ title: '', city: '', rooms: '2', sizeSqm: '55', availableFrom: '', description: '', rent: '900', deposit: '2700', releaseAllowed: true });
   const [photos, setPhotos] = useState<string[]>([]);
+  const [location, setLocation] = useState<HomeLocation | undefined>();
   const [applyTo, setApplyTo] = useState<string | null>(null);
   const [application, setApplication] = useState({ name: '', message: '' });
   const [feedback, setFeedback] = useState<{ target: string | null; message: string }>({ target: null, message: '' });
@@ -821,13 +812,13 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
       {posting && (
         <form className="listing-form" onSubmit={(e) => { e.preventDefault(); void act(async () => {
           await request('/api/listings', {
-            title: form.title, city: form.city, rooms: Number(form.rooms), sizeSqm: Number(form.sizeSqm), availableFrom: form.availableFrom,
+            title: form.title, city: form.city, location, rooms: Number(form.rooms), sizeSqm: Number(form.sizeSqm), availableFrom: form.availableFrom,
             description: form.description, photos, rentMonthly: parseAmount(form.rent.replace(',', '.')), requiredSecurity: parseAmount(form.deposit.replace(',', '.')), releaseAllowed: form.releaseAllowed,
           });
           setPosting(false);
         }, 'post'); }}>
           <label className="wide">Title<input required placeholder="Bright 2-room flat near the park" {...field('title')} /></label>
-          <label>City / district<input placeholder="Berlin-Friedrichshain" {...field('city')} /></label>
+          <label>City<input placeholder="Strausberg" {...field('city')} /></label>
           <label>Rooms<input type="number" min={1} max={20} {...field('rooms')} /></label>
           <label>Size (m²)<input type="number" min={10} max={1000} {...field('sizeSqm')} /></label>
           <label>Available from<input type="date" {...field('availableFrom')} /></label>
@@ -835,23 +826,17 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
           <label>Deposit (test USDC)<input inputMode="decimal" {...field('deposit')} /></label>
           <p className="wide small-copy">The suggested deposit is three months&apos; cold rent (900 → 2,700 test USDC). For German residential tenancies, §551 BGB generally limits security to at most three months&apos; rent excluding separately stated operating costs. This test setup is not legal advice or a statement that token escrow meets legal requirements.</p>
           <label className="wide">Description<textarea rows={3} placeholder="Balcony, fitted kitchen, 5 minutes to the U-Bahn…" {...field('description')} /></label>
+          <div className="wide"><span className="field-label">Place the flat on the map (optional)</span><FlatMap location={location} onChange={setLocation} />{location && <Neighbourhood city={form.city} location={location} request={request} />}</div>
           <div className="wide">
-            <span className="field-label">Photos (up to 4): pick samples or upload your own</span>
+            <span className="field-label">Photos (up to 4): self-hosted samples only · no uploads</span>
             <div className="photo-picker">
-              {[...PRESETS, ...photos.filter((p) => !PRESETS.includes(p))].map((url) => (
+              {PRESETS.map((url) => (
                 <button type="button" key={url.slice(-40)} className={photos.includes(url) ? 'selected' : ''} onClick={() => togglePhoto(url)}>
-                  {/* eslint-disable-next-line @next/next/no-img-element -- uploaded photos are data URLs */}
-                  <img src={thumb(url)} alt="" />
+                  {/* eslint-disable-next-line @next/next/no-img-element -- self-hosted illustrative samples */}
+                  <img src={url} alt="" />
                   {photos.includes(url) && <span><Check size={14} /></span>}
                 </button>
               ))}
-              <label className="photo-upload">
-                <Plus size={18} /> Upload
-                <input type="file" accept="image/*" hidden onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void compressPhoto(file).then((url) => setPhotos((c) => (c.length >= 4 ? c : [...c, url]))).catch((err) => setFeedback({ target: 'post', message: err.message }));
-                }} />
-              </label>
             </div>
           </div>
           <label className="policy-check wide"><input type="checkbox" checked={form.releaseAllowed} onChange={(e) => setForm({ ...form, releaseAllowed: e.target.checked })} /> Let the tenant claim surplus during the tenancy. Site tUSDC stays in cash escrow and earns nothing; this policy does not create earnings. Any deposit earnings belong to the tenant, who keeps deposit value above an approved deduction at settlement either way.</label>
@@ -864,7 +849,7 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
           <h3>My listings</h3>
           {mine.map((l) => (
             <div key={l.id} id={`listing-${l.id}`} tabIndex={-1}>
-              <ListingCard listing={l}>
+              <ListingCard listing={l} request={request}>
                 <p className="small-copy">{l.status === 'open' ? `Review applications (${l.applicants})` : l.status === 'closed' ? 'Listing closed' : 'Tenant chosen'}</p>
                 {l.status === 'open' && (l.applications?.length ?? 0) > 0 && <p className="small-copy">Choosing creates the agreement and cannot be undone here.</p>}
                 {l.status === 'open' && l.applications?.map((a) => (
@@ -884,7 +869,7 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
       <div className="listing-grid">
         {others.map((l) => (
           <div key={l.id} id={`listing-${l.id}`} tabIndex={-1}>
-            <ListingCard listing={l}>
+            <ListingCard listing={l} request={request}>
             {l.relation !== null && <Badge tone={l.relation === 'chosen' ? 'green' : 'neutral'}>
               {l.relation === 'chosen' ? l.agreementId && tenancyIds.has(l.agreementId) ? 'Tenancy recorded' : 'Chosen · agreement next' : l.status === 'let' ? 'Not chosen' : l.status === 'closed' ? 'Listing closed' : 'Application sent'}
             </Badge>}

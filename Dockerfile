@@ -25,11 +25,9 @@ FROM base AS build
 ARG NEXT_PUBLIC_PRIVY_APP_ID
 ARG NEXT_PUBLIC_PRIVY_CLIENT_ID
 ARG NEXT_PUBLIC_SOLANA_DEVNET_RPC_URL
-ARG NEXT_PUBLIC_DEMO_SKIP_RECOVERY
 ENV NEXT_PUBLIC_PRIVY_APP_ID=$NEXT_PUBLIC_PRIVY_APP_ID \
     NEXT_PUBLIC_PRIVY_CLIENT_ID=$NEXT_PUBLIC_PRIVY_CLIENT_ID \
     NEXT_PUBLIC_SOLANA_DEVNET_RPC_URL=$NEXT_PUBLIC_SOLANA_DEVNET_RPC_URL \
-    NEXT_PUBLIC_DEMO_SKIP_RECOVERY=$NEXT_PUBLIC_DEMO_SKIP_RECOVERY \
     NEXT_OUTPUT=standalone \
     NEXT_TELEMETRY_DISABLED=1
 # The public origin, needed at build time only because prerendered pages carry absolute link-preview URLs
@@ -41,6 +39,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json next.config.ts tsconfig.json ./
 COPY app ./app
 COPY src ./src
+COPY scripts/copy-maplibre-worker.mjs ./scripts/copy-maplibre-worker.mjs
+COPY public ./public
 RUN npm run build
 
 FROM base AS runtime
@@ -53,8 +53,8 @@ ENV NODE_ENV=production \
 RUN mkdir /data /app/.next /app/.next/cache && chown -R node:node /data /app/.next
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
-# Standalone output does not include public/; the server serves it from ./public (the self-hosted fonts).
-COPY --chown=node:node public ./public
+# Serve fonts, sample photos and the generated matching MapLibre worker modules.
+COPY --from=build --chown=node:node /app/public ./public
 COPY --chown=node:node stadtstack-data/out ./stadtstack-data/out
 # Public testnet deployments read at their default paths: Local stakes and the AI desk's payee
 # (src/server/local-investments.ts), and the shared loan market and its price mirror (src/server/shared-market.ts,

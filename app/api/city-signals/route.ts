@@ -23,8 +23,8 @@ export async function GET(request: Request) {
     }
     const result = await readCitySignals(params.get('city') ?? '');
     return Response.json(result, { headers });
-  } catch (error) {
-    console.error('City signals files unavailable:', error);
+  } catch {
+    console.error('City signals files unavailable.');
     return Response.json({ error: 'City signals are temporarily unavailable.' }, { status: 503, headers });
   }
 }

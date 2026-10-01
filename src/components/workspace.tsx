@@ -90,7 +90,7 @@ export function Workspace() {
         <header className="topbar">
           <div className="breadcrumb"><ShieldCheck size={16} /><span>Account</span><ChevronRight size={14} /><strong>{areaLabel(area)}</strong></div>
           <div className="topbar-actions">
-            {wallet.ready && wallet.authenticated && <><span className="account-label" title={wallet.backupEmail ?? undefined}>{wallet.backupEmail || `Account ${wallet.subject?.slice(-8) ?? ''}`}</span>
+            {wallet.ready && wallet.authenticated && <><span className="account-label">{`Account ${wallet.subject?.slice(-8) ?? ''}`}</span>
               <button className="topbar-signout" onClick={() => void wallet.logout()}>Sign out</button></>}
             <DemoContext />
           </div>

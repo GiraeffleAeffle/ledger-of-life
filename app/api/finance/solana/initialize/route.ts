@@ -2,14 +2,13 @@ import { authenticated } from '@/server/authenticated';
 import { getStore } from '@/server/store';
 import { solanaServicesFor } from '@/server/solana-tenancies';
 import { SolanaServiceError } from '@/server/solana-service';
-import { RecoveryError } from '@/server/recovery';
 import { errorResponse, readBody, sameOrigin } from '@/server/http';
 
 export const runtime = 'nodejs';
 const response = (value: unknown) =>
   Response.json(value, { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } });
 function failure(error: unknown) {
-  if (error instanceof SolanaServiceError || error instanceof RecoveryError)
+  if (error instanceof SolanaServiceError)
     return Response.json(
       { error: error.message, code: error.code },
       { status: error.status, headers: { 'Cache-Control': 'no-store' } },

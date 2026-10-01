@@ -26,7 +26,7 @@ Keep deposit yield disabled. A separate personal savings adapter can follow only
 
 ### 2. Connect the interface to verified state
 
-Bind every workspace area to authenticated identities and server-enforced tenancy membership. Handle email verification, wallet ownership, enrollment, recovery, and assigned arbitrators. Model submitted, confirmed, failed, and reconciled transactions separately. Reject client-supplied balances or claims of authority.
+Bind every workspace area to authenticated identities and server-enforced tenancy membership. Handle passkey access, wallet ownership and assigned arbitrators. Model submitted, confirmed, failed, and reconciled transactions separately. Reject client-supplied balances or claims of authority.
 
 Keep test-network and sample states clearly labeled and separate from actual account balances. Keep network, token, recipients, and amounts visible before a signature.
 

@@ -12,7 +12,6 @@ export interface VerifiedIdentity {
   expiresAt: number;
   wallets: VerifiedWallet[];
   passkeyCount: number;
-  backupLoginLinked: boolean;
 }
 
 export class IdentityError extends Error {
@@ -68,7 +67,6 @@ export interface IdentityVerificationDependencies {
   isValidAddress: (address: string, chainType: WalletChainType) => boolean;
 }
 
-const backupAccountTypes = new Set(['email', 'google_oauth', 'apple_oauth']);
 
 /** Only provider-verified identity enters here; application roles stay in our database. */
 export function createIdentityVerifier(dependencies: IdentityVerificationDependencies) {
@@ -199,9 +197,6 @@ export function createIdentityVerifier(dependencies: IdentityVerificationDepende
       expiresAt: claims.expiresAt,
       wallets,
       passkeyCount: user.linked_accounts.filter((account) => account.type === 'passkey').length,
-      backupLoginLinked: user.linked_accounts.some((account) =>
-        backupAccountTypes.has(account.type),
-      ),
     };
   };
   // One provider read for simultaneous area requests. A short, positive-only

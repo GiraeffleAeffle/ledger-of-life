@@ -4,13 +4,12 @@
 
 ## Onboarding
 
-Account setup starts directly, without picking a global role. A person can **Find a home** to apply, **Rent out a home** to post a listing, or join a tenancy through a private invitation; roles in tenancies come from recorded agreement parties, not account setup. Setup walks through three steps with live status, and ends there:
+Account setup starts directly, without picking a global role. A person can **Find a home** to apply, **Rent out a home** to post a listing, or join a tenancy through a private invitation; roles in tenancies come from recorded agreement parties, not account setup. Setup walks through two steps with live status:
 
 1. Create an account with a passkey.
-2. Add a backup email.
-3. Create the two wallets (automatic).
+2. Create the two wallets (automatic).
 
-The second-browser recovery proof is **not** part of setup. It is asked the first time a wallet acts on a tenancy. The landlord meets it at the deposit-space step. The tenant and the arbitrator meet it as a "Prove you can recover your wallets" step in the tenancy card once the space exists, because the server refuses their wallet reads until it is done. Today also carries a reminder card until it is done. The person remembers their two wallets, opens the app in a different browser with **Continue with email**, and approves two signatures there; the first browser notices by itself. Local demo builds that skip the proof (`DEMO_SKIP_RECOVERY=1`, never in a production build) skip the backup email too.
+Tenancy actions need a verified passkey and the appropriate owned wallet, not an email or a second-browser recovery proof. A second passkey on another device is recommended in Me, not required. Losing every passkey means losing the test account; nothing here has monetary value ([ADR 0014](adr/0014-passkey-only-test-accounts.md)).
 
 After setup, Home shows a short walkthrough of the journey until the person has a tenancy (open when no test tools can play the other people), then the person's own tenancies and the listings. A tenant who needs test USDC for a deposit can use the Circle devnet faucet.
 
@@ -47,7 +46,7 @@ level and an approved claim sale with illustrative slippage). `CollateralEscrow`
 ## Requirements before the passkey run
 
 - `SOLANA_DEPLOYMENT_MANIFEST` must point at the pull-v2 deployment ([evidence](evidence/SOLANA_PULL_DEVNET_DEPLOYMENT_2026-09-25.json)); settlement bundles require it.
-- Each person needs a passkey, backup email and a Solana wallet, plus the one-time recovery check in Me → Account settings. The Home setup action opens those controls directly when needed.
+- Each person needs a passkey and a Solana wallet. No email or recovery ceremony is required.
 - The tenant needs test USDC in their wallet (Circle faucet). Payout token accounts are created automatically by the sponsor right before the landlord creates the deposit space.
 - The public devnet RPC rate-limits. The gateway backs off on HTTP 429, but a keyed devnet RPC is recommended for a smoother test-network rehearsal.
 
@@ -65,7 +64,7 @@ Home has a collapsible **Test tools** panel only where operator test actions are
 - **Let the test party do their step** while waiting.
 - **Test landlord starts move-out** explicitly while the tenant is living in an active test tenancy; this lets a single test account advance the devnet workflow. Do not click it until ready to advance the devnet tenancy.
 
-The test tools use operator-held test keys through the same services. You need **one** real account (passkey, backup email; the recovery proof before the first wallet action) whose signatures are the ones that matter. Helper steps are fixtures, not wallet proof.
+The test tools use operator-held test keys through the same services. You need **one** real passkey account whose signatures are the ones that matter. Helper steps are fixtures, not wallet proof.
 
 ## Verified
 

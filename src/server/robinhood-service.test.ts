@@ -20,6 +20,7 @@ import { prepareSignedOperation } from '../finance/robinhood/relay.ts';
 import type { EscrowSnapshot } from '../finance/robinhood/read.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { LocalStore, type Store } from './store.ts';
+import { requireWalletAccess } from './wallet-access.ts';
 import { agreementDigest, type Agreement } from './agreements.ts';
 import {
   assertSponsoredTransaction,
@@ -53,7 +54,6 @@ const identity: VerifiedIdentity = {
   expiresAt: Number(now + 1000n),
   wallets: [{ id: 'wallet_tenant_1', address: tenant.address, chainType: 'ethereum' }],
   passkeyCount: 1,
-  backupLoginLinked: true,
 };
 function profile(address: Address, subject: string): VerifiedIdentity {
   return {
@@ -117,7 +117,6 @@ function fixture(store: Store = new LocalStore(':memory:'), config = configurati
     broadcasts: [] as Hex[],
     nonceReads: 0,
     simulations: 0,
-    recoveryChecks: 0,
     observations: 0,
   };
   const controls = {
@@ -137,7 +136,6 @@ function fixture(store: Store = new LocalStore(':memory:'), config = configurati
     depositPreview: 3000000000000000000000n,
     redeemPreview: 3000000000n,
     redeemLoss: 0n,
-    recovery: true,
   };
   let latestRaw: Hex | undefined;
   const client = {
@@ -239,11 +237,7 @@ function fixture(store: Store = new LocalStore(':memory:'), config = configurati
       effects.observations++;
       return { ...observed };
     },
-    requireRecovery: async () => {
-      effects.recoveryChecks++;
-      if (!controls.recovery)
-        throw new RobinhoodServiceError('recovery_required', 'Complete the saved recovery check.');
-    },
+    requireAccess: requireWalletAccess,
   };
   const service = createRobinhoodService(dependencies);
   async function plan(n = 1) {
@@ -370,19 +364,6 @@ test('reads and plans bind current provider wallets to actual immutable parties 
   await f.store.close();
 });
 
-test('persisted recovery is required for planning and rechecked immediately before authorization', async () => {
-  const f = fixture();
-  f.controls.recovery = false;
-  await assert.rejects(() => f.plan(), /recovery check/);
-  assert.equal(await f.store.get(operationKey(id(1))), null);
-  f.controls.recovery = true;
-  await f.plan();
-  const signature = await f.sign();
-  f.controls.recovery = false;
-  await assert.rejects(() => f.service.authorize(identity, id(1), { signature }), /recovery check/);
-  assert.equal(f.effects.broadcasts.length, 0);
-  await f.store.close();
-});
 
 test('funding requires existing exact allowance and never submits an approval on behalf of a user', async () => {
   const f = fixture();
@@ -659,7 +640,7 @@ test('retry requires a saved envelope and rejects client signatures, hashes and 
   await f.store.close();
 });
 
-test('retry rechecks account, recovery, current party, deployment and explicit send enablement', async () => {
+test('retry rechecks account access, current party, deployment and explicit send enablement', async () => {
   const f = fixture();
   await f.plan();
   f.controls.failBroadcast = true;
@@ -668,9 +649,7 @@ test('retry rechecks account, recovery, current party, deployment and explicit s
     () => f.service.retry({ ...identity, subject: 'did:privy:other' }, id(1), {}),
     /another verified account/,
   );
-  f.controls.recovery = false;
-  await assert.rejects(() => f.service.retry(identity, id(1), {}), /recovery check/);
-  f.controls.recovery = true;
+  await assert.rejects(() => f.service.retry({ ...identity, passkeyCount: 0 }, id(1), {}), /passkey/);
   f.config.sendEnabled = false;
   await assert.rejects(() => f.service.retry(identity, id(1), {}), /disabled/);
   f.config.sendEnabled = true;

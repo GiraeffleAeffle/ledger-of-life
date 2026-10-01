@@ -6,7 +6,7 @@ import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 
 const person = (subject: string): VerifiedIdentity => ({
   subject, sessionId: `session-${subject}`, expiresAt: Date.now() / 1000 + 3600,
-  passkeyCount: 1, backupLoginLinked: true,
+  passkeyCount: 1,
   wallets: [{ id: `wallet-${subject}`, address: `address-${subject}`, chainType: 'solana' }],
 });
 

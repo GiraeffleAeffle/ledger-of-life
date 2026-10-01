@@ -50,7 +50,6 @@ async function fixture() {
     expiresAt: 9999999999,
     wallets: [{ id: 'tenant-wallet', address: tenant.address, chainType: 'solana' }],
     passkeyCount: 1,
-    backupLoginLinked: true,
   };
   const agreement: Agreement = {
     id: 'agreement_fixture',
@@ -145,8 +144,6 @@ async function fixture() {
   };
   const state = {
     now: 100000,
-    recoveryCalls: 0,
-    recoveryAllowed: true,
     sponsorCalls: 0,
     simulations: 0,
     sponsorCost: '20000',
@@ -203,18 +200,6 @@ async function fixture() {
     gateway,
     sponsor: feeSponsor,
     now: () => state.now,
-    recoveryGate: async () => {
-      state.recoveryCalls++;
-      if (!state.recoveryAllowed) throw new Error('recovery required');
-      return {
-        wallet: identity.wallets[0],
-        proof: {
-          subject: identity.subject,
-          walletIds: ['tenant-wallet'],
-          checkedAt: new Date(0).toISOString(),
-        },
-      };
-    },
   };
   const service = createSolanaService(dependencies);
   const sign = async (op: { transactionBase64: string }) =>
@@ -577,7 +562,6 @@ test('prepare is idempotent, reserves one nonce and persists exact bytes before 
     assert.equal(result.state, 'broadcast');
     assert.equal(f.state.sponsorCalls, 1);
     assert.equal(f.state.broadcasts.length, 1);
-    assert.equal(f.state.recoveryCalls, 4);
   } finally {
     await f.store.close();
   }
@@ -680,7 +664,7 @@ test('authenticated retry after a reload sends only persisted bytes without anot
     await f.store.close();
   }
 });
-test('retry rechecks the original actor, current recovery, accepted agreement and deployment', async () => {
+test('retry rechecks the original actor, current passkey, accepted agreement and deployment', async () => {
   const f = await fixture();
   try {
     const op = await f.service.prepare(f.identity, 'request_0001', { kind: 'fund' });
@@ -689,9 +673,7 @@ test('retry rechecks the original actor, current recovery, accepted agreement an
     const landlord = f.agreement.parties.landlord!;
     const other = { ...f.identity, subject: landlord.subject, wallets: [landlord.wallet] };
     await assert.rejects(f.service.retry(other, op.id), /recorded actor/);
-    f.state.recoveryAllowed = false;
-    await assert.rejects(f.service.retry(f.identity, op.id), /recovery/);
-    f.state.recoveryAllowed = true;
+    await assert.rejects(f.service.retry({ ...f.identity, passkeyCount: 0 }, op.id), /passkey/);
     await f.store.update<Agreement>(`agreement:${f.agreement.id}`, (row) => ({
       ...row,
       accepted: {},
@@ -790,18 +772,14 @@ test('retry returns a finalized recorded receipt without another broadcast', asy
     await f.store.close();
   }
 });
-test('recovery, accepted policy and original wallet bindings are checked before every authorization', async () => {
+test('passkey and accepted policy are checked before every authorization', async () => {
   const f = await fixture();
   try {
     const op = await f.service.prepare(f.identity, 'request_0001', { kind: 'fund' });
-    f.state.recoveryAllowed = false;
-    await assert.rejects(f.service.authorize(f.identity, op.id, await f.sign(op)), /recovery/);
+    await assert.rejects(f.service.authorize({ ...f.identity, passkeyCount: 0 }, op.id, await f.sign(op)), /passkey/);
     assert.equal(f.state.sponsorCalls, 0);
-    f.state.recoveryAllowed = true;
     f.snapshot.tenancy.policyHash = new Uint8Array(32);
     await assert.rejects(f.service.snapshot(f.identity), /accepted parties and policy/);
-    const withoutRecovery = createSolanaService({ ...f.dependencies, recoveryGate: undefined });
-    await assert.rejects(withoutRecovery.snapshot(f.identity), /existing wallets/);
   } finally {
     await f.store.close();
   }

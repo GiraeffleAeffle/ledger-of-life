@@ -140,10 +140,9 @@ contract but is not represented as a working consumer wallet integration.
 
 ## Funding gates
 
-Planning and authorization both call `requireWalletRecovery`. This reads the
-durable recovery proof, requires the same provider-confirmed wallet baseline,
-and checks that passkey and backup access remain configured. No client-provided
-recovery checkbox or proof flag can substitute for that record.
+Planning, authorization and retries call `requireWalletAccess`, which requires
+a provider-verified passkey and the selected sole-owned wallet. No email or
+second-session recovery proof is required ([ADR 0014](adr/0014-passkey-only-test-accounts.md)).
 
 Funding additionally requires the recorded agreement to match the escrow's
 agreement hash, parties, USDG network, required security and release policy. The

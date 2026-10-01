@@ -8,8 +8,6 @@ import type { PublicListing } from '@/server/listings';
 import { citySlug, type CityResult } from '@/server/city';
 import { IdentityStrip } from './identity';
 import type { Area } from './areas';
-import { RecoveryStepView, useRecoveryFlow } from './recovery-step';
-import { useRecoveryRequired, type AuthorizedRequest } from './use-recovery';
 import { useLedgerConnections } from './use-ledger-connections';
 import { LedgerAdapters } from './ledger-adapters';
 import { AdapterSettings } from './adapter-settings';
@@ -84,8 +82,8 @@ export function MeArea({ request, tenancies, listings, homeState, go }: {
   return (
     <div className="area-stack">
       <section className="card account-settings" id="account-settings" tabIndex={-1}>
-        <h2>Account, wallets &amp; recovery</h2>
-        <AccountSettings request={request} />
+        <h2>Account &amp; wallets</h2>
+        <WalletAccessPanel />
       </section>
       <IdentityStrip request={request} status={connections.identity} loading={connections.identityLoading}
         readError={connections.identityError} onStatusChange={connections.updateIdentity} onRefresh={connections.refreshIdentity} />
@@ -142,19 +140,6 @@ export function MeArea({ request, tenancies, listings, homeState, go }: {
           </form>
         )}
       </section>
-
     </div>
   );
-}
-
-function AccountSettings({ request }: { request: Request }) {
-  const required = useRecoveryRequired();
-  const { recovery, view } = useRecoveryFlow(request as AuthorizedRequest, required === true);
-  return <div className="area-stack">
-    <WalletAccessPanel recoveryProof={recovery.identity?.recoveryProof ?? undefined} />
-    {required && <details className="card operation-section">
-      <summary>Same-wallet recovery check · before your first tenancy wallet action</summary>
-      <RecoveryStepView {...view} />
-    </details>}
-  </div>;
 }

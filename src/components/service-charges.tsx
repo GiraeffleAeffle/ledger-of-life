@@ -65,6 +65,10 @@ export function ServiceCharges({ agreementId, request }: { agreementId: string; 
           )}
           <div>
             <h3>Consumption share</h3>
+            {account.handover && <div className="handover-baseline"><h4>Move-in meter baseline · entered by the parties</h4>
+              <p className="small-copy">{account.handover.confirmed.tenant && account.handover.confirmed.landlord ? 'Confirmed by both parties.' : 'Not yet confirmed by both parties.'} A single cumulative reading is a starting point, not consumption; no usage or charge is inferred from it.</p>
+              <ul>{account.handover.readings.map((row) => <li key={row.meter}>{row.meter}: {row.value} {row.unit} · {row.date}</li>)}</ul>
+            </div>}
             {account.consumption.source === 'home_assistant' ? (
               <p>Today: {account.consumption.dailyKwh.toFixed(2)} kWh from your Home Assistant sensor <code>{account.consumption.sensor}</code> (live reading). One day is extrapolated into a simulated monthly cost; it is not a meter statement.</p>
             ) : (

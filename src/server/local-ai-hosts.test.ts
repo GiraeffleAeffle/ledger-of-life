@@ -23,7 +23,7 @@ after(() => {
   else process.env.LOCAL_AI_HOST_OWNER_WALLETS = originalAllowlist;
 });
 const owner: VerifiedIdentity = { subject: 'did:privy:owner', sessionId: 'session', expiresAt: 2000000000,
-  wallets: [{ id: 'one', chainType: 'ethereum', address: wallet }, { id: 'two', chainType: 'ethereum', address: alternateWallet }], passkeyCount: 0, backupLoginLinked: true };
+  wallets: [{ id: 'one', chainType: 'ethereum', address: wallet }, { id: 'two', chainType: 'ethereum', address: alternateWallet }], passkeyCount: 0 };
 const other: VerifiedIdentity = { ...owner, subject: 'did:privy:other', wallets: [{ id: 'third', chainType: 'ethereum', address: thirdWallet }] };
 const input: ConnectorInferenceInput = { model: 'test-model', messages: [{ role: 'system', content: 'Answer briefly.' }, { role: 'user', content: 'Private question' }],
   options: { num_ctx: 8192, num_predict: 64, temperature: 0.35 } };
@@ -35,14 +35,14 @@ function signed(hostId: string, key: KeyObject, body = '{}', timestamp = Date.no
     'x-host-signature': sign(null, connectorSigningBytes(method, pathname, String(timestamp), nonce, raw), key).toString('base64') };
   return { raw, request: new Request(`https://app.example${pathname}`, { method, headers, ...(method === 'POST' ? { body: raw } : {}) }) };
 }
-async function pairing(store: LocalStore, now = Date.now(), address = 'address', identity = owner) {
+async function pairing(store: LocalStore, now = Date.now(), identity = owner) {
   const keys = generateKeyPairSync('ed25519');
   const invitation = await createHostInvitation(store, identity, { payoutWallet: identity.wallets[0].address }, now);
-  const pair = await createHostPairing(store, { code: invitation.code, name: 'Home GPU', publicKey: keys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') }, address, now);
+  const pair = await createHostPairing(store, { code: invitation.code, name: 'Home GPU', publicKey: keys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') }, now);
   return { ...pair, keys };
 }
 async function connected(store: LocalStore, identity = owner) {
-  const pair = await pairing(store, Date.now(), identity.subject, identity);
+  const pair = await pairing(store, Date.now(), identity);
   await recordHostHeartbeat(store, pair.hostId, { models: [input.model], ollamaReachable: true, awake: true });
   return pair;
 }
@@ -65,7 +65,7 @@ test('owner invitations are hashed, single use, account/payout bound and activat
     assert.deepEqual(await publicConnectorHosts(store, 1000001, owner.subject), []);
     const keys = generateKeyPairSync('ed25519');
     const body = { code: invitation.code, name: 'Home GPU', publicKey: keys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') };
-    const results = await Promise.allSettled([createHostPairing(store, body, 'one', 1000001), createHostPairing(store, body, 'two', 1000001)]);
+    const results = await Promise.allSettled([createHostPairing(store, body, 1000001), createHostPairing(store, body, 1000001)]);
     const paired = results.find((result) => result.status === 'fulfilled') as PromiseFulfilledResult<{ hostId: string }>;
     assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
     const host = (await publicConnectorHosts(store, 1000001, owner.subject))[0];
@@ -99,14 +99,14 @@ test('invitations expire at ten minutes and require allowlisted EVM ownership wi
     await assert.rejects(createHostInvitation(store, owner, {}, 1000000), /Choose a verified/);
     const invitation = await createHostInvitation(store, other, {}, 1000000);
     const publicKey = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
-    await assert.rejects(createHostPairing(store, { code: invitation.code, name: 'Home GPU', publicKey }, 'expiry', 1600000), /expired/);
+    await assert.rejects(createHostPairing(store, { code: invitation.code, name: 'Home GPU', publicKey }, 1600000), /expired/);
     const fresh = await createHostInvitation(store, other, {}, 1600000);
-    const pair = await createHostPairing(store, { code: fresh.code, name: 'Home GPU', publicKey }, 'fresh', 1600001);
+    const pair = await createHostPairing(store, { code: fresh.code, name: 'Home GPU', publicKey }, 1600001);
     assert.equal((await publicConnectorHosts(store, 1600001, other.subject)).find((host) => host.id === pair.hostId)!.payoutWallet, thirdWallet);
   } finally { await store.close(); }
 });
 
-test('malformed pairing cannot spend source limits or consume invitations and unknown codes cannot fill shared capacity', async () => {
+test('malformed pairing cannot consume invitations and unknown codes cannot fill shared capacity', async () => {
   const store = new LocalStore(':memory:');
   try {
     const invitation = await createHostInvitation(store, other, {}, 1000000);
@@ -117,47 +117,42 @@ test('malformed pairing cannot spend source limits or consume invitations and un
     for (const body of [{ ...valid, code: 'BAD' }, { ...valid, name: 'x'.repeat(81) }, { ...valid, name: String.fromCharCode(0) },
       { ...valid, publicKey: 'not-base64' }, { ...valid, publicKey: rsa.publicKey.export({ type: 'spki', format: 'der' }).toString('base64') },
       { ...valid, publicKey: publicKey + String.fromCharCode(10) }, { ...valid, payoutWallet: wallet }]) {
-      await assert.rejects(createHostPairing(store, body, 'invalid', 1000000), /Unsupported|invitation code|name|Ed25519/);
+      await assert.rejects(createHostPairing(store, body, 1000000), /Unsupported|invitation code|name|Ed25519/);
     }
-    const before = await store.get<{ hosts: unknown[]; invitations: unknown[]; rate: unknown[] }>('local-ai:connector-registry');
-    assert.deepEqual(before!.rate, []);
+    const before = await store.get<{ hosts: unknown[]; invitations: unknown[] }>('local-ai:connector-registry');
     assert.deepEqual(before!.hosts, []);
     assert.equal(before!.invitations.length, 1);
     for (let index = 0; index < 1030; index++) {
-      await assert.rejects(createHostPairing(store, { ...valid, code: 'AAAAAAAAAAAA' }, `source-${index}`, 1000000), /expired, used, or unknown/);
+      await assert.rejects(createHostPairing(store, { ...valid, code: 'AAAAAAAAAAAA' }, 1000000), /expired, used, or unknown/);
     }
     const after = await store.get<typeof before>('local-ai:connector-registry');
     assert.deepEqual(after!.hosts, before!.hosts);
     assert.deepEqual(after!.invitations, before!.invitations);
-    assert.equal(after!.rate.length, 1024);
-    const pair = await createHostPairing(store, valid, 'invalid', 1000000);
+    const pair = await createHostPairing(store, valid, 1000000);
     assert.equal((await publicConnectorHosts(store, 1000000))[0].id, pair.hostId);
     const next = await createHostInvitation(store, other, {}, 1000000);
-    await assert.rejects(createHostPairing(store, { ...valid, code: next.code }, 'duplicate', 1000000), /already has an active/);
+    await assert.rejects(createHostPairing(store, { ...valid, code: next.code }, 1000000), /already has an active/);
     const newKey = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
-    await createHostPairing(store, { ...valid, code: next.code, publicKey: newKey }, 'replacement', 1000000);
+    await createHostPairing(store, { ...valid, code: next.code, publicKey: newKey }, 1000000);
   } finally { await store.close(); }
 });
 
-test('pairing source limits are durable and expire without imposing a shared global pairing cap', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'connector-rate-'));
-  const filename = join(directory, 'test.sqlite');
-  let store = new LocalStore(filename);
+test('legacy persisted source hashes are removed without invalidating host invitations', async () => {
+  const store = new LocalStore(':memory:');
   try {
+    const code = 'AAAAAAAAAAAA';
+    await store.create('local-ai:connector-registry', {
+      hosts: [],
+      invitations: [{ codeHash: createHash('sha256').update(code).digest('hex'), ownerSubject: other.subject, payoutWallet: thirdWallet, expiresAt: 1600000 }],
+      rate: [{ source: createHash('sha256').update('192.0.2.1').digest('hex'), started: 1000000, count: 5 }],
+    });
     const publicKey = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
-    const body = { code: 'AAAAAAAAAAAA', name: 'Host', publicKey };
-    for (let index = 0; index < 5; index++) await assert.rejects(createHostPairing(store, body, 'one-source', 1000000), /expired, used, or unknown/);
-    await store.close();
-    store = new LocalStore(filename);
-    await assert.rejects(createHostPairing(store, body, 'one-source', 1000000), /Too many pairing/);
-    for (let index = 0; index < 35; index++) {
-      const identity = { ...other, subject: `operator-${index}` };
-      await pairing(store, 1000000, `source-${index}`, identity);
-    }
-    const invitation = await createHostInvitation(store, other, {}, 1600000);
-    const pair = await createHostPairing(store, { ...body, code: invitation.code }, 'one-source', 1600000);
-    assert.equal((await publicConnectorHosts(store, 1600000)).some((host) => host.id === pair.hostId), true);
-  } finally { await store.close(); await rm(directory, { recursive: true, force: true }); }
+    const pair = await createHostPairing(store, { code, name: 'Host', publicKey }, 1000000);
+    const registry = await store.get<{ rate?: unknown; hosts: { id: string }[] }>('local-ai:connector-registry');
+    assert.equal('rate' in registry!, false);
+    assert.equal(registry!.hosts[0].id, pair.hostId);
+    assert.equal((await publicConnectorHosts(store, 1000000, other.subject))[0].payoutWallet, thirdWallet);
+  } finally { await store.close(); }
 });
 
 test('signed requests bind exact bytes, method, path, timestamp, nonce and host ID; replay is atomic', async () => {
@@ -588,7 +583,7 @@ test('registry cutover preserves active paired keys and durable replay while dis
     const picked = await pollConnectorJob(store, host.id, 0);
     await completeConnectorJob(store, host.id, { jobId: picked.job!.id, response: answer });
     assert.equal((await outcome).value!.answer, 'Complete answer.');
-    const newHost = await pairing(store, now, 'new-source', other);
+    const newHost = await pairing(store, now, other);
     assert.equal((await publicConnectorHosts(store, now)).some((entry) => entry.id === newHost.hostId), true);
   } finally { await store.close(); }
 });

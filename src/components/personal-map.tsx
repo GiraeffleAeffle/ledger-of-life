@@ -189,10 +189,11 @@ export function PersonalMap({ request, accountId, explorationCity = '', onExplor
     const routes = features.filter((feature) => feature.geometry?.type === 'LineString');
     const collection = (items: CityFeature[]) => ({ type: 'FeatureCollection', features: items }) as GeoJSONSourceSpecification['data'];
     performance.mark(`personal-map-data-${city.id}`);
-    import('maplibre-gl').then(({ default: maplibre }) => {
+    import('maplibre-gl').then((maplibre) => {
       if (disposed || !container.current) return;
+      maplibre.setWorkerUrl('/maplibre/maplibre-gl-worker.mjs');
       const closeCity = city.id === 'strausberg';
-      const instance = new maplibre.Map({ container: container.current, style: 'https://tiles.openfreemap.org/styles/liberty',
+      const instance = new maplibre.Map({ container: container.current, style: '/api/map/styles/liberty',
         center: closeCity ? [13.883, 52.581] : city.center, zoom: closeCity ? 15.8 : 12, pitch: closeCity ? 52 : 0,
         bearing: closeCity ? -17 : 0, attributionControl: false, cooperativeGestures: true });
       map.current = instance;
@@ -350,7 +351,7 @@ export function PersonalMap({ request, accountId, explorationCity = '', onExplor
     if (!instance) return;
     markerInstances.current.forEach((marker) => marker.remove());
     markerInstances.current = [];
-    import('maplibre-gl').then(({ default: maplibre }) => {
+    import('maplibre-gl').then((maplibre) => {
       if (map.current !== instance) return;
       for (const [which, color] of [['home', '#76a753'], ['work', '#315d9c']] as const) {
         const point = pins[which];
@@ -427,7 +428,7 @@ export function PersonalMap({ request, accountId, explorationCity = '', onExplor
       {placing && <p role="status">Click anywhere on the map to mark your {placing} (no address search).</p>}
       {positionError && <p role="alert">{positionError}</p>}
       <div className="personal-map-layout"><div><div className="personal-map-canvas" ref={container} aria-label={`Map of ${result.data.catalogue.name}`} />
-        <p className="personal-tile-note">Map tile requests reveal the viewed map area to OpenFreeMap; they never contain saved pin coordinates. © OpenStreetMap contributors / OpenMapTiles / OpenFreeMap.</p>
+        <p className="personal-tile-note">Map assets pass through Ledger: OpenFreeMap sees the server’s IP and requested map area, not your IP or saved pin coordinates. © OpenStreetMap contributors / OpenMapTiles / OpenFreeMap.</p>
         <details className="personal-map-options"><summary>Map filters, private pins &amp; citywide records</summary>
           <p>Exploring {result.data.catalogue.name} · catalogue generated {date(result.data.generatedAt)} · {signals.length} published items (not a complete city inventory). Since the previous publication: {result.data.changes.added.length} added, {result.data.changes.changed.length} changed, {result.data.changes.removed.length} removed. Changes do not indicate construction progress.</p>
           <fieldset className="personal-interests"><legend>Interests · stored on this device</legend>

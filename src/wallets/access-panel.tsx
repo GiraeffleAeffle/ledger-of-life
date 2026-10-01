@@ -27,13 +27,8 @@ const supportsPasskeys = () =>
   window.isSecureContext &&
   typeof PublicKeyCredential !== 'undefined';
 
-export interface WalletRecoveryProof {
-  subject: string;
-  walletIds: string[];
-  checkedAt: string;
-}
 
-export function WalletAccessPanel({ recoveryProof }: { recoveryProof?: WalletRecoveryProof }) {
+export function WalletAccessPanel() {
   const access = useRentalWallet();
   const passkeysAvailable = useSyncExternalStore(subscribe, supportsPasskeys, () => false);
   const localPasskeyUrl = useSyncExternalStore(subscribe, localhostPasskeyUrl, () => '');
@@ -42,11 +37,6 @@ export function WalletAccessPanel({ recoveryProof }: { recoveryProof?: WalletRec
   const hasBothWallets =
     access.wallets.some((wallet) => wallet.chainType === 'ethereum') &&
     access.wallets.some((wallet) => wallet.chainType === 'solana');
-  const recoveryVerified =
-    hasBothWallets &&
-    recoveryProof?.subject === access.subject &&
-    Number.isFinite(Date.parse(recoveryProof.checkedAt)) &&
-    access.wallets.every((wallet) => recoveryProof.walletIds.includes(wallet.id));
   const run = (action: () => Promise<void>) => void action().catch(() => undefined);
 
   if (!access.configured) {
@@ -65,22 +55,21 @@ export function WalletAccessPanel({ recoveryProof }: { recoveryProof?: WalletRec
       <div className={styles.eyebrow}>Account access</div>
       <h3 id="wallet-access-title">Keep your assets with you</h3>
       <p>
-        Use a passkey to access your personal wallet. Add backup access before you fund a deposit.
+        Sign in with a passkey. We recommend a second passkey on another device as an optional backup. If you lose every passkey, you lose this test account. Nothing here has monetary value.
       </p>
       {!access.ready && <p role="status">Connecting account access…</p>}
       {!access.authenticated ? (
         <>
           {invitationRole && (
             <p className={styles.note}>
-              This invitation is for the {invitationRole}. Use a different email in this browser
-              profile, then add a passkey while signed in. Passkey-first sign-ups can look identical
-              in your device&apos;s account chooser.
+              This invitation is for the {invitationRole}. Create a separate passkey account if this
+              account already belongs to another tenancy role.
             </p>
           )}
           <div className={styles.actions}>
           <button
             type="button"
-            className={invitationRole ? undefined : styles.primary}
+            className={styles.primary}
               disabled={disabled || !passkeysAvailable}
               onClick={() => run(access.signupWithPasskey)}
             >
@@ -93,22 +82,14 @@ export function WalletAccessPanel({ recoveryProof }: { recoveryProof?: WalletRec
             >
               Sign in with passkey
             </button>
-          <button
-            type="button"
-            className={invitationRole ? styles.primary : styles.textButton}
-            disabled={disabled}
-            onClick={access.loginWithBackup}
-          >
-            {invitationRole ? 'Continue with email' : 'Use email access'}
-            </button>
           </div>
         </>
       ) : (
         <>
           {invitationRole && (
             <p className={styles.note}>
-              This invitation is for the {invitationRole}. Check the linked email below before
-              joining; an account already assigned to another role cannot join again.
+              This invitation is for the {invitationRole}. An account already assigned to another
+              role cannot join again.
             </p>
           )}
           <ol className={styles.steps}>
@@ -131,21 +112,6 @@ export function WalletAccessPanel({ recoveryProof }: { recoveryProof?: WalletRec
             </li>
             <li>
               <div>
-                <strong>Backup access</strong>
-                <span>
-                  {access.backupLoginLinked
-                    ? `Email linked and verified: ${access.backupEmail}`
-                    : 'Add an email you can access elsewhere'}
-                </span>
-              </div>
-              {!access.backupLoginLinked && (
-                <button type="button" disabled={disabled} onClick={access.addBackupEmail}>
-                  Add backup email
-                </button>
-              )}
-            </li>
-            <li>
-              <div>
                 <strong>Personal wallets</strong>
                 <span>
                   {hasBothWallets
@@ -156,32 +122,19 @@ export function WalletAccessPanel({ recoveryProof }: { recoveryProof?: WalletRec
               {!hasBothWallets && (
                 <button
                   type="button"
-                  disabled={disabled || access.passkeyCount === 0 || !access.backupLoginLinked}
+                  disabled={disabled || access.passkeyCount === 0}
                   onClick={() => run(access.createMissingWallets)}
                 >
                   Create wallets
                 </button>
               )}
             </li>
-            <li>
-              <div>
-                <strong>Recovery check</strong>
-                <span>
-                  {recoveryVerified
-                    ? 'Same-wallet access verified in another browser'
-                    : 'Second-browser check pending'}
-                </span>
-              </div>
-              <span className={recoveryVerified ? styles.complete : styles.pending}>
-                {recoveryVerified ? 'Verified' : 'Before funding'}
-              </span>
-            </li>
           </ol>
-          {hasBothWallets && !recoveryVerified && (
-            <p className={styles.note}>
-              On another device, sign in to this same account with your backup access and verify the
-              same wallet addresses. Linked login methods alone do not prove recovery.
-            </p>
+          {access.hasLinkedEmail && access.passkeyCount > 0 && (
+            <div className={styles.note}>
+              <p>An email is still linked to this older Privy account. Remove it to keep passkey-only access; keep your passkeys safe.</p>
+              <button type="button" disabled={disabled} onClick={() => run(access.removeEmail)}>Remove my email</button>
+            </div>
           )}
           {access.wallets.length > 0 && (
             <details className={styles.details}>
@@ -223,8 +176,7 @@ export function WalletAccessPanel({ recoveryProof }: { recoveryProof?: WalletRec
             </>
           ) : (
             <>
-              Passkeys need a supported browser on HTTPS or localhost. Email access remains
-              available; add your passkey from a supported device before funding.
+              Passkeys need a supported browser on HTTPS or localhost. Open this app on a supported device.
             </>
           )}
         </p>

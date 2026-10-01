@@ -2,7 +2,7 @@ import './thread-public.css';
 
 export function DemoContext() {
   return <details className="demo-context">
-    <summary>Test networks · no real money{process.env.NEXT_PUBLIC_DEMO_SKIP_RECOVERY === '1' ? ' · demo' : ''}</summary>
+    <summary>Test networks · no real money</summary>
     <div className="demo-context-popover">
       <strong>What is real here</strong>
       <p>Money features run on test networks with test tokens. Nothing you hold here has monetary value, and test tokens cannot be sold or withdrawn for real money.</p>

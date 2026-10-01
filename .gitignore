@@ -18,3 +18,4 @@ target/
 contracts/evm/out/
 contracts/evm/cache/
 contracts/evm/broadcast/
+public/maplibre/

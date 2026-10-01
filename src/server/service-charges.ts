@@ -5,6 +5,7 @@ import { HOME_ASSISTANT_UNAVAILABLE_MESSAGE, homeAssistantPullAllowed, readHomeE
 import type { Store } from './store.ts';
 import { AccessError } from './errors.ts';
 
+import type { HandoverRecord } from './move-in.ts';
 const EXAMPLE_WEEK_KWH = [5.8, 6.2, 6.4, 6.1, 5.9, 6.6, 6.4];
 const DEFAULT_PREPAYMENT_CENTS = 15000;
 const key = (agreementId: string) => `service-charges:${agreementId}`;
@@ -14,6 +15,7 @@ export interface ServiceChargeView {
   property: string;
   role: 'tenant' | 'landlord' | 'arbitrator';
   prepaymentCents: number;
+  handover?: HandoverRecord;
   consumption: {
     dailyKwh: number;
     source: 'home_assistant' | 'example';
@@ -53,6 +55,7 @@ export async function readServiceCharges(
   const balanceCents = prepaymentCents - estimatedMonthlyCostCents;
   return {
     agreementId, property: agreement.property, role: agreement.role, prepaymentCents,
+    handover: agreement.handover,
     consumption: {
       dailyKwh, source: realConsumption ? 'home_assistant' : 'example',
       sensor: realConsumption ? reading!.consumptionEntity : null,

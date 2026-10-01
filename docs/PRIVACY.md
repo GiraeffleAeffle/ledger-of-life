@@ -1,0 +1,71 @@
+# Data inventory and open privacy decisions
+
+Checked against the source on 1 October 2026. This is an engineering inventory, **not** a legal privacy policy, legal notice or assertion of compliance. Changes described here remain local until deployed. All money paths are test networks; nothing here has monetary value.
+
+## Ledger of Life (`ledger.stadtstack.eu`)
+
+### Sign-in and wallets
+
+- The wallet route group loads Privy for passkey sign-up/sign-in and user-owned embedded Ethereum/Solana wallets. The application requests passkey-only login and offers optional additional passkeys on another device. Losing every passkey means losing the test account.
+- Privy processes account, passkey credential, authentication-session and wallet records. The server verifies a Privy access token, then reads current provider account/wallet ownership; it returns only the account id, session id, expiry, verified wallet ids/addresses and passkey count. Positive verification results are cached in memory for at most 30 seconds, within token expiry.
+- Passkeys and embedded wallets do not make Privy invisible to the visitor: browser requests go to Privy, which necessarily receives network connection information. Its SDK contains provider analytics/session machinery; this application does not install a separate analytics service. Provider retention, telemetry and cookies need an owner/provider review; no claim is made that Privy never processes an IP address.
+- The application does not ask for an email. Older accounts may still have one in Privy. Me offers **Remove my email** only when at least one passkey exists. The client passes the existing address directly to Privy's unlink hook; the application does not display it elsewhere or store it. A source search of the server and store-write paths found no application email-address field.
+- There is no email login/recovery or second-browser wallet-recovery ceremony. Old recovery/browser records are deleted when the store initializes. Passkey linking preserves existing wallets.
+
+### Application storage
+
+The hosted ledger uses SQLite on the cluster's persistent volume. The code also supports PostgreSQL. There is no general account-deletion or record-retention sweep, except the AI text rules below. Data is linked by the Privy account id and/or wallet address; those are identifiers, not anonymous data.
+
+| Data | Why it is kept |
+| --- | --- |
+| Listings, applications and short notes; landlord/applicant account ids and wallet identities | Home applications and the recorded choice of a tenant |
+| Agreements, party roles/wallets, terms acceptance, invitation digests/expiry, notes and cancellation records | Enforce membership, consent and tenancy state; invitation bearer tokens are hashed |
+| Optional move-in/handover statements | Coordinate the test tenancy; no SCHUFA, IDs or document uploads are requested |
+| Signed operation bytes, nonces, transaction hashes/receipts, fee and token amounts, prepared quotes/authorization journals | Prevent replay/double submission and reconcile ambiguous network responses |
+| Chosen city; optional earlier cities, periods and timeline note | User-requested local information and private life timeline; earlier places can be removed |
+| Optional EUDI test-wallet adult predicate, verification time and optional city; pending verifier transaction id/nonce | Label the optional test proof; the birth date is processed for the adult predicate and discarded, not persisted. Name and street address are not requested |
+| Optional adapter configuration | Explicitly connected devices/services. Hosted Home Assistant token writes are disabled; old locally opted-in configuration can contain a device token |
+| Connector host name/key, owner account/payout wallet, model/heartbeat state, replay nonces, invitation digests | Authenticate an owner-invited GPU host, route requests and bound replay/capacity; not a client IP history |
+| AI request owner (account/wallet or random visitor token), scope, model, usage, state and payment receipt/journal | Isolate answers, bound free usage and settle/reconcile test-token payments |
+
+Browser-local navigation, selected city/interests/map pins, followed projects, invitation links and request drafts/history may be saved on the device for continuity. They are not an analytics feed. Do not enter names, contact details or sensitive information in free-text fields; text is not made non-personal by being optional.
+
+### Public city AI desk text and cookies
+
+- A random 32-byte first-party `local_ai_visitor` cookie isolates an account-free visitor's answers and enforces three free attempts. It is `HttpOnly`, `SameSite=Strict`, API-path scoped, expires after 24 hours and is `Secure` in production. Its token is not derived from an IP address or a device fingerprint. Visitor quota/revocation records and a shared 30-attempt daily counter persist; their metadata currently has no deletion schedule.
+- This is a functional session cookie, not an analytics/tracking cookie. Privy's sign-in/session storage is separate. The public welcome guide does not mount the wallet SDK or set this AI cookie.
+- The prompt and answer are temporarily stored for delivery and recovery of a pending request. By default text becomes eligible for purge ten minutes after completion/failure/interruption or unsigned request expiry. `LOCAL_AI_TEXT_GRACE_SECONDS` can change this, bounded to zero–24 hours. Reads and the reconcile sweep perform the purge; scheduling/outages can delay it. Running/settling requests and unresolved payment journals can retain text longer until they resolve. Metadata, text-derived request fingerprints and payment records remain after text purge.
+- **Clear this desk** revokes the visitor session, cancels queued/in-flight work and clears that visitor's stored text. It cannot make a host forget text already received. SQLite uses secure deletion and a truncated WAL checkpoint for reclaiming removed live text.
+- The selected local GPU host/Ollama receives cleartext prompt and answer. City-host routing requires explicit public-question consent; it is not end-to-end encrypted or confidential compute. Connector job queues are process-local, but the application request record is durable. Host operators' retention must be reviewed separately.
+- The new backup command scrubs prompts/answers from every AI request, including running/settling requests, before publishing a snapshot; secure deletion and `VACUUM` remove those bytes from the copy. Snapshots on the separate `ledger-backups` PVC retain the remaining identifiers, tenancy data and usage/payment journals for seven days by default. Earlier/manual backups may still contain text or legacy identifiers; initialization and the AI text sweep must run after restoring those. The job has not been deployed. See [DEPLOYMENT.md](DEPLOYMENT.md).
+- An interrupted backup can leave a private `.partial` copy before text scrubbing. Never distribute or restore it; the next backup run removes leftover partial files. Published snapshots are the scrubbed `.sqlite` files only.
+
+### Network and hosting
+
+- Hetzner hosts the Talos cluster and public load balancer. They process network connections to serve the sites. Access to cluster/database volumes and backups is an operator concern.
+- The application no longer reads `x-forwarded-for` or `x-real-ip`, persists IP-derived pairing-rate hashes, or fingerprints visitors. Host admission is bounded by authenticated owner invitations, single use/expiry, 128 invitation/active-host caps and key checks instead of a per-source limit. Store initialization and connector-registry reads remove the legacy source-rate field.
+- Application-authored error logs contain fixed diagnostics, not request headers, email addresses, prompts or raw error objects. Infrastructure/provider logs are separate.
+- Public-chain RPCs receive wallet addresses, read requests and signed transactions. Server-origin requests expose the server connection, not a forwarded visitor IP; configured browser wallet/RPC connections can expose the browser connection to their provider. Test-chain addresses, transactions and receipts are public and cannot be erased by deleting application records. Privy-managed wallet operations also depend on Privy.
+- Current map assets and tiles are proxied through the application without forwarding browser headers, cookies or IPs; tile/style providers see the server's connection and requested assets. City lookup can send the selected city to Nominatim. Public information links navigate to the external source when chosen; that site's processing is outside this application.
+- No application analytics, advertising pixels or tracking-cookie integration was found in either repository. This does not assert that third-party authentication/RPC/hosting providers have no logs or telemetry.
+
+## Stadtstack (`stadtstack.eu`)
+
+- Static exported site: interactive diagrams/language/view state run in the browser, with no account, email form, application database or analytics/tracking-cookie integration. Fonts/assets are served by the site; outbound links are user navigation, not embedded tracking requests.
+- Nginx's configured access log is off; only critical error severity is enabled (`error_log /dev/stderr crit`). The generated CSP config preserves these settings. The site still necessarily processes an incoming connection to deliver static files. This is not a statement about upstream Hetzner or HAProxy logging, nor evidence that local config changes are live.
+
+## HAProxy ingress: evidence and limit
+
+Read-only inspection of `strausberg-zk-residency/infra/hetzner-talos/platform/haproxy-ingress-values.yaml` and its Helmfile shows HAProxy Ingress 0.16.1, PROXY-protocol source reception (`accept-proxy`) and `forwardfor: add`. The related values contain **no `syslog-endpoint` or access-log override**. [HAProxy Ingress documents](https://haproxy-ingress.github.io/docs/configuration/keys/#syslog) that access logging defaults to disabled without a syslog endpoint; [log formats](https://haproxy-ingress.github.io/docs/configuration/keys/#log-format) apply only when that endpoint is configured. **Inference:** the checked-in configuration does not enable client-IP access logs, although it processes/forwards the source address.
+
+The requested read-only live command (`kubectl-v1.36.0` with the filtered kubeconfig, `get configmap -A`) returned `Forbidden (get configmaps)`. A narrower `get configmap -n ingress-system` subsequently failed because the local API tunnel at `127.0.0.1:16443` was no longer accepting connections. Therefore the actual live ConfigMap, controller logging and any upstream retention remain **unverified**. No cluster, DNS or infrastructure change was made.
+
+## Decisions the owner still needs to make
+
+1. Which optional personal-data features (timeline, application/handover notes, chosen city, EUDI proof) to offer, and the retention/deletion schedule for account, transaction and visitor metadata. Email-free is not personal-data-free.
+2. Privy app-level login settings for legacy accounts; provider cookie/telemetry/retention and contractual information, and acceptable loss-of-all-passkeys support. Client controls cannot erase earlier provider records/backups.
+3. Hosting/load-balancer/ingress log policy and retention; obtain read-only live evidence with authorized access before claiming neither site logs client IPs end to end.
+4. Who may run city AI hosts, what they retain, the acceptable AI-text grace period and treatment of unresolved payments; how to explain that public questions still reach a host in cleartext.
+5. Backup access controls, actual retention and restoration/purge procedure; whether to add an independently secured copy outside the current Hetzner volume/cluster failure domain. The separate backup PVC is not a tested cross-provider disaster-recovery plan.
+6. Public-chain permanence, RPC/provider selection and whether existing records can be deleted without breaking replay/receipt evidence.
+7. The factual operator/contact/provider disclosures and any legally required notice. Those are owner decisions; this inventory does not draft them.

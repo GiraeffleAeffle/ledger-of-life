@@ -4,20 +4,17 @@ import { createContext, useContext, useRef, useState, type ReactNode } from 'rea
 import {
   PrivyProvider,
   useCreateWallet,
-  useLinkAccount,
   useLinkWithPasskey,
-  useLogin,
   useLoginWithPasskey,
   usePrivy,
-  useSignMessage,
   useSignTransaction,
   useSignTypedData,
   useSignupWithPasskey,
+  useUnlinkEmail,
   useWallets,
 } from '@privy-io/react-auth';
 import {
   useCreateWallet as useCreateSolanaWallet,
-  useSignMessage as useSignSolanaMessage,
   useSignTransaction as useSignSolanaTransaction,
   useWallets as useSolanaWallets,
 } from '@privy-io/react-auth/solana';
@@ -31,13 +28,11 @@ import {
   validateSolanaSigningRequest,
 } from './signing-policy.ts';
 import type { RentalWallet, RentalWalletAccess } from './types.ts';
-import { validateRecoveryRequest } from './recovery.ts';
 import { prepareEscrowTypedData } from './escrow-signing.ts';
 import { prepareInferencePayment } from './inference-signing.ts';
 
-/** Local demo builds let the app's own step card be the approval instead of Privy's review modals. */
 const DEVNET_RPC = process.env.NEXT_PUBLIC_SOLANA_DEVNET_RPC_URL || 'https://api.devnet.solana.com';
-const SHOW_WALLET_UIS = process.env.NEXT_PUBLIC_DEMO_SKIP_RECOVERY !== '1';
+const SHOW_WALLET_UIS = true;
 
 const unavailable = async (): Promise<never> => {
   throw new Error('Account access is not configured yet.');
@@ -82,7 +77,7 @@ function walletActionError(cause: unknown, action: 'passkey' | 'wallet') {
     typeof rawCode === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(rawCode) ? rawCode : undefined;
   if (name === 'NotAllowedError' || code === 'passkey_not_allowed')
     return action === 'passkey'
-      ? 'Request cancelled. You can try again, or continue with email.'
+      ? 'Request cancelled. You can try again.'
       : 'Request cancelled. You can try again.';
   if (action === 'passkey') {
     if (code === 'disallowed_login_method')
@@ -103,21 +98,18 @@ const inactiveAccess: RentalWalletAccess = {
   subject: null,
   wallets: [],
   passkeyCount: 0,
-  backupLoginLinked: false,
-  backupEmail: null,
+  hasLinkedEmail: false,
   busy: false,
   error: null,
   loginWithPasskey: unavailable,
   signupWithPasskey: unavailable,
-  loginWithBackup: () => undefined,
   addPasskey: unavailable,
-  addBackupEmail: () => undefined,
+  removeEmail: unavailable,
   createMissingWallets: unavailable,
   logout: async () => undefined,
   getAccessToken: async () => null,
   signEvmTransaction: unavailable,
   signSolanaTransaction: unavailable,
-  signRecoveryChallenge: unavailable,
   signEvmTypedData: unavailable,
   signInferencePayment: unavailable,
 };
@@ -148,14 +140,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   return (
     <StyleSheetManager
-      // Privy 3.45.0 passes its email modal's `stacked` layout prop to a styled label.
       shouldForwardProp={(prop, target) => !(prop === 'stacked' && typeof target === 'string')}
     >
       <PrivyProvider
         appId={appId}
         clientId={clientId}
         config={{
-          loginMethods: ['email', 'passkey'],
+          loginMethods: ['passkey'],
           appearance: {
             theme: 'light',
             accentColor: '#245B4A',
@@ -196,23 +187,18 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
   const { createWallet: createSolanaWallet } = useCreateSolanaWallet();
   const { signTransaction } = useSignTransaction();
   const { signTransaction: signSolanaTransaction } = useSignSolanaTransaction();
-  const { signMessage } = useSignMessage();
-  const { signMessage: signSolanaMessage } = useSignSolanaMessage();
   const { signTypedData } = useSignTypedData();
   const { loginWithPasskey } = useLoginWithPasskey();
   const { signupWithPasskey } = useSignupWithPasskey();
+  const { unlink: unlinkEmail } = useUnlinkEmail();
   const { linkWithPasskey } = useLinkWithPasskey();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
-  const onModalError = () => setError('Account access was not completed. You can try again.');
-  const { login } = useLogin({ onError: onModalError });
-  const { linkEmail } = useLinkAccount({ onError: onModalError });
 
   const linkedAccounts = authenticated ? (user?.linkedAccounts ?? []) : [];
   const passkeyCount = linkedAccounts.filter((account) => account.type === 'passkey').length;
-  const backupEmail = linkedAccounts.find((account) => account.type === 'email')?.address ?? null;
-  const backupLoginLinked = backupEmail !== null;
+  const linkedEmail = linkedAccounts.find((account) => account.type === 'email')?.address ?? null;
   const wallets: RentalWallet[] = [];
   for (const account of linkedAccounts) {
     if (
@@ -272,34 +258,26 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
     subject: authenticated ? (user?.id ?? null) : null,
     wallets,
     passkeyCount,
-    backupLoginLinked,
-    backupEmail,
+    hasLinkedEmail: linkedEmail !== null,
     busy,
     error,
     loginWithPasskey: () => runAction(() => loginWithPasskey(), 'passkey'),
     signupWithPasskey: () => runAction(() => withPasskeyLabel(passkeyLabel(), () => signupWithPasskey()), 'passkey'),
-    loginWithBackup: () => {
-      setError(null);
-      login({ loginMethods: ['email'] });
-    },
     addPasskey: () =>
       runAction(async () => {
         requireSession();
         const label = passkeyLabel();
         await withPasskeyLabel(label, () => linkWithPasskey({ name: label }));
       }, 'passkey'),
-    addBackupEmail: () => {
+    removeEmail: () => runAction(async () => {
       requireSession();
-      setError(null);
-      linkEmail();
-    },
+      if (passkeyCount < 1) throw new Error('Keep at least one passkey before removing your email.');
+      if (linkedEmail) await unlinkEmail({ address: linkedEmail });
+    }),
     createMissingWallets: () =>
       runAction(async () => {
         requireSession();
-        // Local demo builds may skip the backup email (NEXT_PUBLIC_DEMO_SKIP_RECOVERY=1).
-        if (passkeyCount === 0 || (!backupLoginLinked && process.env.NEXT_PUBLIC_DEMO_SKIP_RECOVERY !== '1')) {
-          throw new Error('Add a passkey and a backup email before creating wallets.');
-        }
+        if (passkeyCount === 0) throw new Error('Add a passkey before creating wallets.');
         // Direct passkey hooks do not run Privy's automatic wallet creation.
         // Existing linked wallets, including unsupported legacy ones, are never replaced.
         const hasWallet = (chain: string) =>
@@ -327,8 +305,6 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
           {
             address: wallet.address,
             uiOptions: {
-              // Local demo: the app's own step card is the approval; Privy's preview cannot
-              // simulate sponsor-paid transactions and would block the button.
               showWalletUIs: SHOW_WALLET_UIS,
               isCancellable: true,
               description: request.description,
@@ -364,36 +340,6 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
         });
         assertUnchangedSolanaMessage(reviewedMessage, signedTransaction);
         return signedTransaction;
-      }),
-    signRecoveryChallenge: (chainType, message) =>
-      runAction(async () => {
-        requireSession();
-        const { wallet } = validateRecoveryRequest(chainType, message, user!.id, wallets);
-        const uiOptions = {
-          showWalletUIs: SHOW_WALLET_UIS,
-          title: 'Verify access to your existing wallet',
-          description: 'Sign this recovery check. It does not authorize a transfer.',
-          buttonText: 'Verify wallet access',
-        };
-        if (chainType === 'ethereum') {
-          const { signature } = await signMessage(
-            { message },
-            { address: wallet.address, uiOptions },
-          );
-          return { address: wallet.address, signature, message };
-        }
-        const connected = solana.wallets.find((item) => item.address === wallet.address);
-        if (!connected) throw new Error('Your Solana wallet is not available.');
-        const { signature } = await signSolanaMessage({
-          message: new TextEncoder().encode(message),
-          wallet: connected,
-          options: { uiOptions },
-        });
-        return {
-          address: wallet.address,
-          signature: btoa(String.fromCharCode(...signature)),
-          message,
-        };
       }),
     signEvmTypedData: (request) =>
       runAction(async () => {

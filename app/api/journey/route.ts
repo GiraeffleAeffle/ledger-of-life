@@ -5,9 +5,8 @@ import { SolanaServiceError } from '@/server/solana-service';
 import { getStore } from '@/server/store';
 import { errorResponse, readBody, sameOrigin } from '@/server/http';
 import type { Agreement } from '@/server/agreements';
-import { RecoveryError } from '@/server/recovery';
 function failure(error: unknown) {
-  if (error instanceof SolanaServiceError || error instanceof RecoveryError)
+  if (error instanceof SolanaServiceError)
     return Response.json({ error: error.message, code: error.code }, { status: error.status, headers: { 'Cache-Control': 'no-store' } });
   return errorResponse(error);
 }

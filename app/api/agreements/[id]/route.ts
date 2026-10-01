@@ -11,6 +11,8 @@ import { getStore } from '@/server/store';
 import { readBody, sameOrigin, errorResponse } from '@/server/http';
 import { WorkflowError } from '@/domain/errors';
 import { cancelAgreement } from '@/server/tenancy-cancellation';
+import { updateHandover } from '@/server/move-in';
+import { tenancyJourney } from '@/server/journey';
 export const runtime = 'nodejs';
 type Context = { params: Promise<{ id: string }> };
 export async function GET(request: Request, context: Context) {
@@ -36,6 +38,8 @@ export async function POST(request: Request, context: Context) {
     const body = await readBody(request);
     const store = await getStore();
     const { id } = await context.params;
+    if (body.action === 'handover_save' || body.action === 'handover_confirm')
+      return Response.json({ agreement: await updateHandover(store, id, identity, body, tenancyJourney) }, { headers: { 'Cache-Control': 'no-store' } });
     if (body.action === 'cancel')
       return Response.json(
         { agreement: await cancelAgreement(store, id, identity) },

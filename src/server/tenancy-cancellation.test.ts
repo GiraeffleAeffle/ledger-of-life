@@ -16,7 +16,7 @@ import { cancelAgreement } from './tenancy-cancellation.ts';
 
 const addressFor = (byte: number) => getAddressDecoder().decode(new Uint8Array(32).fill(byte));
 const person = (role: string, byte: number): VerifiedIdentity => ({
-  subject: role, sessionId: role, expiresAt: 9999999999, passkeyCount: 1, backupLoginLinked: true,
+  subject: role, sessionId: role, expiresAt: 9999999999, passkeyCount: 1,
   wallets: [{ id: `wallet-${role}`, address: addressFor(byte), chainType: 'solana' }],
 });
 async function fixture(accepted = true) {
@@ -70,10 +70,10 @@ async function fixture(accepted = true) {
     async reconcile() { throw new Error('Cancellation must not reconcile'); },
   };
   const sponsor = { address: addressFor(4), async sign(): Promise<Uint8Array> { throw new Error('Cancellation must not sign'); } };
-  const service = createSolanaService({ store, config, gateway, recoveryGate: async () => {}, sponsor });
+  const service = createSolanaService({ store, config, gateway, sponsor });
   const initialization = createSolanaInitializationService({
     store, config, gateway: { ...gateway, async preflight() { throw new Error('Cancellation must not initialize'); } },
-    recoveryGate: async () => {}, sponsor,
+    sponsor,
   });
   const recordKey = initialization.recordKey;
   const resolve: typeof solanaServicesFor = async () => ({ config, service, initialization });

@@ -26,6 +26,10 @@ export class LocalStore implements Store {
     this.database.exec(
       'PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA secure_delete=ON; CREATE TABLE IF NOT EXISTS rental_records (key TEXT PRIMARY KEY, body TEXT NOT NULL) STRICT;',
     );
+    // Clean cutover: remove obsolete recovery/browser records and durable network-source buckets.
+    const removed = this.database.prepare("DELETE FROM rental_records WHERE key LIKE 'identity-recovery:%' OR key LIKE 'identity-browser:%'").run();
+    const scrubbed = this.database.prepare("UPDATE rental_records SET body = json_remove(body, '$.rate') WHERE key = 'local-ai:connector-registry' AND json_type(body, '$.rate') IS NOT NULL").run();
+    if (removed.changes || scrubbed.changes) this.database.exec('PRAGMA wal_checkpoint(TRUNCATE)');
   }
   async reclaim() {
     this.database.exec('PRAGMA wal_checkpoint(TRUNCATE)');
@@ -92,6 +96,8 @@ export class PostgresStore implements Store {
     await this.pool.query(
       'CREATE TABLE IF NOT EXISTS rental_records (key text PRIMARY KEY, body jsonb NOT NULL)',
     );
+    await this.pool.query("DELETE FROM rental_records WHERE starts_with(key, 'identity-recovery:') OR starts_with(key, 'identity-browser:')");
+    await this.pool.query("UPDATE rental_records SET body = body - 'rate' WHERE key = 'local-ai:connector-registry' AND body ? 'rate'");
   }
   async get<T>(key: string): Promise<T | null> {
     const result = await this.pool.query('SELECT body FROM rental_records WHERE key = $1', [key]);

@@ -12,7 +12,6 @@ const person = (name: string): VerifiedIdentity => ({
   expiresAt: Math.floor(Date.now() / 1000) + 3600,
   wallets: [{ id: `w-${name}`, address: `${name.padEnd(32, '1').slice(0, 32)}Wallet1111`, chainType: 'solana' }],
   passkeyCount: 1,
-  backupLoginLinked: true,
 });
 
 test('choosing an applicant creates an agreement binding landlord and that applicant only', async () => {

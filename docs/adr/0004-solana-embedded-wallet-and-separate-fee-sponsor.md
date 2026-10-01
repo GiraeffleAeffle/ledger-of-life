@@ -4,6 +4,8 @@ status: accepted
 
 # Start with a user-owned embedded Solana wallet and separate fee sponsorship
 
+The mandatory backup-access recovery ceremony below was superseded on 1 October 2026 by [ADR 0014](0014-passkey-only-test-accounts.md). Custody and sponsor separation remain unchanged.
+
 The connected demo needs passkey access, recovery and transactions without requiring the tenant to hold SOL. We use Privy for a user-owned embedded Solana wallet and a separate app-funded fee payer. ADR 0008 records the implemented sponsor service; Kora remains an alternative provider, not an active dependency. This preserves ordinary Solana wallet signing for the lending and investment integrations, at the cost of a wallet-provider dependency and sponsor operating costs.
 
 ## Considered options

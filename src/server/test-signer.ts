@@ -46,9 +46,8 @@ export function testIdentity(role: TestRole, address: string, now = Date.now()):
     sessionId: `${TEST_SUBJECT_PREFIX}session`,
     expiresAt: Math.floor(now / 1000) + 3600,
     wallets: [{ id: `${TEST_SUBJECT_PREFIX}wallet-${role}`, address, chainType: 'solana' }],
-    // Fixture flags: satisfy the agreement readiness rule; no real passkey or backup exists.
+    // Fixture passkey count satisfies readiness; test signers are not real Privy accounts.
     passkeyCount: 1,
-    backupLoginLinked: true,
   };
 }
 

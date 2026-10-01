@@ -1,8 +1,10 @@
 ---
-status: accepted
+status: superseded by 0014
 ---
 
 # Ask for the recovery proof at the first wallet action, not at sign-up
+
+Superseded on 1 October 2026 by [ADR 0014](0014-passkey-only-test-accounts.md). The following records the historical decision, not the current account-access contract.
 
 [ADR 0004](0004-solana-embedded-wallet-and-separate-fee-sponsor.md) requires that backup access is proved to recover the same wallets before funds are used. The setup wizard also put that proof, which needs a second browser, in front of every area of the app, and a production build cannot skip it. A judge with one browser, a phone visiting a local run, or an arbitrator following an invitation could see nothing, not even public city data, until it was done.
 

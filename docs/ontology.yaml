@@ -75,7 +75,7 @@ concepts:
     definition: How strongly a Person is verified.
     levels:
       passkey: testnet_real
-      backup_email_and_recovery_proof: testnet_real   # skipped in local demo mode (DEMO_SKIP_RECOVERY=1)
+      second_passkey: optional  # recommended on another device, never required for tenancy actions (ADR 0014)
       eu_digital_identity_wallet: testnet_real # OpenID4VP PID adult check and opt-in locality built; phone-wallet iOS flow confirmed in test environment, not production issuance.
     session_verification:
       - Privy access JWT must verify against the app's ES256 public key/JWKS with exact issuer, audience and expiry; then current provider user and embedded-wallet sole ownership are checked.
@@ -600,7 +600,6 @@ networks:
 test_tooling:   # never presented as wallet or user evidence
   test_signers: {code: [src/server/test-signer.ts, scripts/test-signer.mjs], purpose: "Operator keys play people end to end."}
   test_helpers: {code: src/server/test-helpers.ts, gate: "SOLANA_TEST_SIGNER_MODE=1, local store, loopback", purpose: "One real account walks the whole journey."}
-  demo_mode: {env: [DEMO_SKIP_RECOVERY, NEXT_PUBLIC_DEMO_SKIP_RECOVERY], effect: "No recovery proof, optional backup email, no Privy confirmation modals."}
 
 # ---------------------------------------------------------------------------
 # Vision recorded 2026-09-26 (not built unless marked). Grounding for later work.

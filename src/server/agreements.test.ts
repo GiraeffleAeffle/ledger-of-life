@@ -15,7 +15,6 @@ const person = (subject: string): VerifiedIdentity => ({
   sessionId: `session-${subject}`,
   expiresAt: Date.now() / 1000 + 3600,
   passkeyCount: 1,
-  backupLoginLinked: true,
   wallets: [{ id: `wallet-${subject}`, address: `address-${subject}`, chainType: 'solana' }],
 });
 test('verified tenancy invitations bind independent people and an immutable accepted agreement', async () => {

@@ -35,7 +35,6 @@ async function fixture(setupMode: 'joint' | 'staged' = 'joint', depositMint?: st
     expiresAt: 9999999999,
     wallets: [{ id: `${role}-wallet`, address: signer.address, chainType: 'solana' }],
     passkeyCount: 1,
-    backupLoginLinked: true,
   });
   const identities = {
     tenant: identity('tenant', tenant),
@@ -169,10 +168,8 @@ async function fixture(setupMode: 'joint' | 'staged' = 'joint', depositMint?: st
       ));
     },
   };
-  const recoveryGate = async () => ({ wallet: identities.tenant.wallets[0], proof: null });
   const service = createSolanaInitializationService({
     store, config, gateway, sponsor: feeSponsor, now: () => state.now,
-    recoveryGate: recoveryGate as never,
   });
   const sign = async (encoded: string, actor: typeof tenant) =>
     Buffer.from(getTransactionEncoder().encode(

@@ -19,7 +19,7 @@ import { LocalStore, type Store } from './store.ts';
 
 const buyer = privateKeyToAccount(`0x${'12'.repeat(32)}`);
 const other = privateKeyToAccount(`0x${'34'.repeat(32)}`);
-const identity: VerifiedIdentity = { subject: 'test-owned-person', sessionId: 'test-session', expiresAt: Date.now() + 3600_000, wallets: [{ id: 'personal-wallet', chainType: 'ethereum', address: buyer.address }], passkeyCount: 1, backupLoginLinked: true };
+const identity: VerifiedIdentity = { subject: 'test-owned-person', sessionId: 'test-session', expiresAt: Date.now() + 3600_000, wallets: [{ id: 'personal-wallet', chainType: 'ethereum', address: buyer.address }], passkeyCount: 1 };
 const unitAddresses = ['0x1111111111111111111111111111111111111111', '0x2222222222222222222222222222222222222222'].map(getAddress);
 const marketAddresses = ['0x3333333333333333333333333333333333333333', '0x4444444444444444444444444444444444444444'].map(getAddress);
 const code = '0x6001600055' as Hex;

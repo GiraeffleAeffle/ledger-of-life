@@ -1,10 +1,10 @@
 # Passkeys and personal wallet setup
 
-Updated 23 September 2026. The SDK integration and development-dashboard configuration exist. A real passkey, linked backup email, user-owned EVM/Solana wallets and same-wallet recovery in another browser have been observed locally. The user also completed a phone recovery rehearsal through a temporary HTTPS preview; sponsored transactions remain unproved.
+Updated 1 October 2026. Account access is passkey-only ([ADR 0014](adr/0014-passkey-only-test-accounts.md)). No email login, backup-email enrollment or second-session recovery proof remains in the application. Nothing here has monetary value.
 
 ## What is implemented
 
-`WalletProvider` and `useRentalWallet()` in `src/wallets/` expose passkey signup/login, additional passkey enrollment, verified email backup linking, explicit creation of EVM and Solana embedded wallets, and user-visible signature requests. With no `NEXT_PUBLIC_PRIVY_APP_ID`, the app shows an honest setup-pending state. It does not create an anonymous wallet or simulate a successful login.
+`WalletProvider` and `useRentalWallet()` in `src/wallets/` expose passkey signup/login, additional passkey enrollment through Privy's `useLinkWithPasskey`, removal of an old linked email through `useUnlinkEmail`, explicit creation of EVM and Solana embedded wallets, and user-visible signature requests. Email removal is offered only when the account already has a passkey. With no `NEXT_PUBLIC_PRIVY_APP_ID`, the app shows an honest setup-pending state. It does not create an anonymous wallet or simulate a successful login.
 
 Wallet creation follows account security setup. Privy's automatic wallet creation does not run for direct passkey hooks, so the onboarding button explicitly creates missing wallets. It never replaces an existing linked wallet. Both wallets must use Privy's current user-owned embedded-wallet model; imported or delegated wallets are excluded from this first flow.
 
@@ -15,23 +15,22 @@ Signing is separated from submission:
 - EVM transaction signing accepts only Robinhood mainnet/testnet requests for the selected wallet. This is a signature primitive, not Safe/ERC-4337 sponsorship.
 - `signEvmTypedData()` reconstructs only the `RentalEscrow` version `1` / `EscrowAction` schema used by the bounded escrow relay. It binds the operation to the signer, chain, escrow, exact action, nonce and deadline. The sponsor can submit that signature to `executeSigned`; it receives no general portfolio signing authority.
 - Solana signing requires the tenant to be a required signer and the declared fee payer to be a separate sponsor. The transaction's message must remain unchanged after signing. Sponsorship must already be included before quoting/signing; this helper does not rewrite Jupiter or sponsor signatures.
-- Recovery signing accepts only our canonical nonce-and-expiry challenge for the currently authenticated subject and existing wallet. The result is a proof to verify server-side, not permission to move money.
 
 The module never calls server wallet-signing endpoints, attaches session signers, requests offline delegation, or submits financial transactions. Do not enable those controls as a setup shortcut.
 
 ## Provider activation
 
-The user signed in and created the `hackathon` development app. Email and passkey login are enabled. Passkeys for sign-up, a separate dashboard setting, was initially off and caused a `disallowed_login_method` error even after switching to `localhost`; it is now on. The client login-method list includes both email and passkey. `http://localhost:4175` is the local passkey origin. The wallet environment reports TEE enabled; smart wallets and additional authorization keys remain off. The public app ID and a new server secret are set in the user's ignored local `.env.local`. A read-only `client.users().list({limit: 1})` request authenticated and returned zero users before the signup retry. An initial signup attempt on `http://127.0.0.1:4175` failed before a device prompt. The app and local configuration now use `localhost`, which [WebAuthn permits on HTTP](https://www.w3.org/TR/webauthn/#rp-id). The user completed passkey signup on `localhost`, added and verified a backup email, and created EVM and Solana embedded wallets. Account readiness had incorrectly depended on both wallet-connector hooks, leaving setup buttons disabled before wallets existed; it now follows Privy's account readiness. The email modal emitted a non-fatal React warning because Privy 3.45.0 forwarded its internal `stacked` prop to an HTML label; a scoped styled-components prop filter now omits that prop from DOM elements.
+The existing development app has passkey login and the separate **Enable passkeys for sign up** setting enabled. The client requests only `passkey`; additional passkeys are linked to the same account, not used to create replacement wallets. Historical accounts may still have emails in Privy; Me offers their removal without displaying the address elsewhere.
 
-The signed-in browser called `GET /api/identity`, which passed the server's token, current-user and sole-owner wallet checks and showed the original-wallet enrollment step. `POST /api/identity/baseline` recorded both originals and returned the instruction to continue in a different browser. Addresses and secrets are omitted from public documentation. The user completed backup-email sign-in in Chrome; the server required a different browser cookie and Privy session before offering the recovery challenge. The user approved the EVM and Solana recovery messages, and a fresh `GET /api/identity` in the enrollment browser displayed "Same-wallet access verified in another browser." On 23 September, the user repeated recovery on a physical phone through a temporary HTTPS preview. The isolated server record showed two original wallets, two wallet IDs in the proof, and recovery receipts from a different browser cookie and Privy session. The computer browser fetched the persisted proof. Physical device use is based on the user's report; the server does not attest device hardware. The tunnel and Privy allowed origin were removed after the test. No secret is in the repository; a clean checkout needs its own secure configuration.
+We recommend linking a second passkey on another device, but it does not gate any tenancy action. Losing every passkey means losing this test account. There is no email-based recovery path.
 
 Remaining setup:
 
 1. Use the existing development app and preserve the technical repository name while the brand is undecided. In Authentication → Login methods → Passkeys, enable both passkeys and the separate **Enable passkeys for sign up** option. A production plan has not been activated.
-2. For the hosted origin, add an **app client** (App settings → Clients → Add app client, web) whose allowed origins list only `https://ledger.stadtstack.eu`, and build with its id as `NEXT_PUBLIC_PRIVY_CLIENT_ID`. A client shares the app's users; its own origin list keeps the hosted build restricted to its domain. Confirm relying-party/domain behavior on a real device; a credential enrolled at the local origin may not work on a different hostname.
-3. Keep user-owned embedded Ethereum and Solana wallets with TEE, without server/session/additional signers or wallet automations. The application explicitly requests each missing wallet after passkey and backup-email setup.
+2. Ensure the published origin is in the Privy app or app client's allowed origins. The current hosted app uses the app-level `https://ledger.stadtstack.eu` origin without a separate app client. Confirm relying-party/domain behavior on a real device; a credential enrolled at the local origin may not work on a different hostname.
+3. Keep user-owned embedded Ethereum and Solana wallets with TEE, without server/session/additional signers or wallet automations. The application explicitly requests each missing wallet after passkey setup.
 4. Set `PRIVY_APP_SECRET` in each additional development or deployment environment. Never put a server secret in a `NEXT_PUBLIC_` variable, public repository, URL or screenshot.
-5. Restart local development or rebuild a deployment after configuration changes. Prove real passkey access and original-wallet recovery before connected finance.
+5. Restart local development or rebuild a deployment after configuration changes. Prove real passkey access and an optional second-device passkey before relying on the account.
 
 ```dotenv
 NEXT_PUBLIC_PRIVY_APP_ID=
@@ -67,38 +66,22 @@ Wrap the interactive application with `WalletProvider`; show `WalletAccessPanel`
   expiresAt: number; // Unix seconds
   wallets: Array<{ id: string; address: string; chainType: 'ethereum' | 'solana' }>;
   passkeyCount: number;
-  backupLoginLinked: boolean;
 }
 ```
 
 It throws `IdentityError` with `unauthenticated`, `identity_unavailable` or `wallet_not_user_owned`. Handle unavailable identity as unavailable; do not silently fall back to demo or anonymous authorization.
 
-For recovery, import `formatRecoveryMessage()` from `src/wallets/recovery.ts` directly in server code. Its challenge has `id`, `subject`, `walletId`, `chainType`, `address`, `nonce` and ISO `expiresAt`. Use a cryptographically random hex nonce, bind it to the original verified wallet, persist its expiry and consume it exactly once after successful verification. The client calls `signRecoveryChallenge(chainType, message)`; the result contains the same message/address and a hex EVM signature or base64 Solana signature.
+`requireWalletAccess(store, verifiedIdentity, walletId)` in `src/server/wallet-access.ts` requires a provider-verified passkey and the selected sole-owned wallet. It writes no recovery record and issues no browser cookie. Agreement readiness also needs only a verified passkey; existing party, wallet, amount, signature and deployment checks remain unchanged.
 
-Verify EVM signatures against that wallet with EIP-191 message verification; verify Solana's Ed25519 signature over the exact UTF-8 message. Require a separate server-issued browser identity from enrollment and validate current Privy subject/session. A client-provided device label or header is not evidence. Another browser is not physical-device attestation: record a separate observed new-device rehearsal where that claim matters. Only pass a server-verified `{subject, walletIds, checkedAt}` recovery proof to the panel; the panel never marks recovery complete from login methods alone.
-
-These checks are implemented in `src/server/recovery.ts`. The HTTP endpoints are:
-
-| Endpoint                       | Request                    | Result                                                                                                                                                                                       |
-| ------------------------------ | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/identity`            | Bearer access token        | Verified `profile`, original `baseline`, optional `recoveryProof`, and recovery status. Issues a server-backed browser cookie if needed.                                                     |
-| `POST /api/identity/baseline`  | `{}`                       | Records the current provider-verified EVM and Solana wallets once. Requires a passkey and verified backup login. Existing originals cannot be replaced by this endpoint.                     |
-| `POST /api/identity/challenge` | `{walletId}`               | Returns `{challenge, message}` for one original wallet. Requires another issued browser cookie and a different Privy session from enrollment.                                                |
-| `POST /api/identity/verify`    | `{challengeId, signature}` | Verifies the exact stored message, atomically consumes the challenge and returns refreshed profile/status. Completes the proof after both wallets sign in the same recovery browser/session. |
-
-Every write requires the same `Origin` as `APP_ORIGIN` (or the request origin for local development), an authenticated bearer token, JSON, and the cookie issued by `GET`. The HTTPS cookie uses the `__Host-` prefix, `Secure`, `HttpOnly`, `SameSite=Strict` and `Path=/`. Only its hash is stored; supplying an arbitrary hex cookie does not establish a browser. Responses are not cached. Set `APP_ORIGIN` to the published application's exact origin in a hosted environment.
-
-Challenges expire after five minutes. A failed signature leaves the challenge available for a correct retry; a verified or expired challenge cannot be reused. Concurrent verification and proof completion are serialized by `Store.update`, so a server restart or duplicate HTTP request does not verify a nonce twice. Both signatures must belong to the same recovery browser/session; the recorded originals and checked-at time are server values. The read-only `requireWalletRecovery(store, verifiedIdentity, walletId)` gate rejects missing proof or any change to the current wallet inventory before connected finance can proceed.
-
-The seven server tests exercise actual EIP-191 and Ed25519 verification, persisted proof, replay after restart, racing duplicates, expiry, invalid signatures, wrong account/wallet/browser/session, baseline replacement, forged browser cookies and cross-origin requests. These are local cryptographic and HTTP-handler tests; they do not substitute for a real Privy login and device rehearsal.
+The obsolete `/api/identity` recovery endpoints and signing challenges have been removed. Store initialization removes old `identity-recovery:*` and `identity-browser:*` records and legacy connector source-rate fields. SQLite secure deletion plus a WAL checkpoint reclaims their old bytes.
 
 The client signing methods do not replace server validation of operation membership, immutable tenancy network/asset, quote expiry, amounts, allowed recipients, nonce or signatures. A complete connected money flow still requires finance adapter simulation, sponsored submission and durable reconciliation.
 
 ## Acceptance still to run with provider access
 
-1. Create an account using a passkey, link and verify the backup email, then create both wallets. Confirm server-fetched wallet ownership and record the initial IDs/addresses.
-2. Repeat the same-wallet recovery rehearsal for each funded test account and on the stable deployment origin. Never create replacement wallets to make this test pass.
-3. Cancel signup, email verification, wallet creation and a signing request. Verify useful recovery UI and no financial submission. Retry partial wallet creation without duplicating the existing wallet.
+1. Create an account using only a passkey, then create both wallets and run the tenancy journey. Confirm server-fetched wallet ownership.
+2. Link another passkey from a second device and sign in to the same account. This is optional backup access, not a tenancy requirement.
+3. Cancel signup, wallet creation and a signing request. Verify useful retry UI and no financial submission. Retry partial wallet creation without duplicating the existing wallet.
 4. Inspect a real Robinhood escrow action and a Solana sponsored transaction. Confirm visible wallet approval, signature binding and rejection of changed amount, chain, escrow, signer, sponsor or expired request.
 5. Run the whole declared flow with zero native user gas balance, including account creation, and show actual sponsor costs. These wallet hooks alone do not prove the fee budget or complete deposit/investment path.
 

@@ -17,8 +17,8 @@ export async function GET(request: Request) {
     return Response.json({ error: 'Only a public city ID is accepted. Home and work stay on your device.' }, { status: 400, headers });
   try {
     return Response.json(await readRegionalTopics(params.get('city')!), { headers });
-  } catch (error) {
-    console.error('Regional topics unavailable:', error);
+  } catch {
+    console.error('Regional topics unavailable.');
     return Response.json({ error: 'Regional topics are temporarily unavailable.' }, { status: 503, headers });
   }
 }

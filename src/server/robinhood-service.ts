@@ -481,7 +481,7 @@ interface Dependencies {
   store: Store;
   client: PublicClient;
   config: RobinhoodServerConfig;
-  requireRecovery: (store: Store, identity: VerifiedIdentity, walletId: string) => Promise<unknown>;
+  requireAccess: (store: Store, identity: VerifiedIdentity, walletId: string) => Promise<unknown>;
   now?: () => bigint;
   // Deterministic tests replace only the RPC observation boundary, never the signing/durable-send path.
   observe?: (client: PublicClient, config: RobinhoodServerConfig) => Promise<EscrowSnapshot>;
@@ -693,7 +693,7 @@ async function signSponsoredTransaction(
 }
 
 export function createRobinhoodService(dependencies: Dependencies) {
-  const { store, client, config, requireRecovery } = dependencies;
+  const { store, client, config, requireAccess } = dependencies;
   const now = dependencies.now ?? seconds;
   const observe = () => (dependencies.observe ?? observeConfiguredEscrow)(client, config);
 
@@ -780,7 +780,7 @@ export function createRobinhoodService(dependencies: Dependencies) {
         agreementBinding: config.agreementId
           ? 'requires-matching-accepted-agreement'
           : 'unconfigured',
-        recovery: 'verified-record-required',
+        accountAccess: 'verified-passkey-and-owned-wallet-required',
         stockTrading: 'separate-provider-access-required',
       },
     };
@@ -812,7 +812,7 @@ export function createRobinhoodService(dependencies: Dependencies) {
     }
     const snapshot = await observe();
     const wallet = partyWallet(identity, snapshot, item.walletId);
-    await requireRecovery(store, identity, wallet.id);
+    await requireAccess(store, identity, wallet.id);
     if (intent.kind === 'fund') await fundingGate(snapshot, wallet, identity);
     const time = now();
     let prepared: Prepared;
@@ -871,7 +871,7 @@ export function createRobinhoodService(dependencies: Dependencies) {
     exactKeys(item, ['signature']);
     let record = await owned(identity, id);
     const signature = await assertSignature(record.digest, item.signature, record.walletAddress);
-    await requireRecovery(store, identity, record.walletId);
+    await requireAccess(store, identity, record.walletId);
     if (
       record.state === 'completed' ||
       record.state === 'reverted' ||
@@ -1043,7 +1043,7 @@ export function createRobinhoodService(dependencies: Dependencies) {
   async function retry(identity: VerifiedIdentity, id: string, input: unknown) {
     exactKeys(object(input), []);
     let record = await owned(identity, id);
-    await requireRecovery(store, identity, record.walletId);
+    await requireAccess(store, identity, record.walletId);
     if (!config.sendEnabled || !config.sponsor)
       throw new RobinhoodServiceError(
         'unconfigured',
@@ -1238,9 +1238,9 @@ export async function reconcileRobinhoodOperations(
 }
 
 export async function getRobinhoodService() {
-  const [{ getStore }, { requireWalletRecovery }] = await Promise.all([
+  const [{ getStore }, { requireWalletAccess }] = await Promise.all([
     import('./store.ts'),
-    import('./recovery.ts'),
+    import('./wallet-access.ts'),
   ]);
   const config = loadRobinhoodConfig();
   return createRobinhoodService({
@@ -1249,7 +1249,7 @@ export async function getRobinhoodService() {
       transport: http(config.manifest.rpcUrl, { timeout: 15_000, retryCount: 0 }),
     }),
     config,
-    requireRecovery: requireWalletRecovery,
+    requireAccess: requireWalletAccess,
   });
 }
 
@@ -1269,8 +1269,7 @@ export function robinhoodErrorResponse(error: unknown) {
     details?: unknown;
   } | null;
   const known =
-    error instanceof RobinhoodServiceError ||
-    (error instanceof Error && error.name === 'RecoveryError');
+    error instanceof RobinhoodServiceError;
   if (!known && !candidate?.code) return errorResponse(error);
   const status = known
     ? candidate!.status!

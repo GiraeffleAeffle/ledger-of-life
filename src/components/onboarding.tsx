@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Check, KeyRound, Loader2, Mail } from 'lucide-react';
+import { Check, KeyRound, Loader2 } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
 import type { SetupStep } from './account-setup-state';
 import { invitationPayload } from './home-journey-logic';
@@ -39,15 +39,11 @@ export function SigningIn() {
   );
 }
 
-/**
- * Account setup: passkey, backup email, then both wallets. It ends there. The second-browser recovery
- * proof is asked later, the first time a wallet acts on a tenancy (recovery-step.tsx).
- */
-export function AccountSetup({ step, recoveryRequired }: { step: Exclude<SetupStep, 'loading' | 'done'>; recoveryRequired: boolean }) {
+/** Passkey-only access, followed by both embedded test-network wallets. */
+export function AccountSetup({ step }: { step: Exclude<SetupStep, 'loading' | 'done'> }) {
   const wallet = useRentalWallet();
   const creating = useRef(false);
   const accountDone = step !== 'account';
-  const backupDone = step === 'wallets';
   const [deskStatus, setDeskStatus] = useState('Checking availability…');
   useEffect(() => {
     if (step !== 'account') return;
@@ -64,7 +60,7 @@ export function AccountSetup({ step, recoveryRequired }: { step: Exclude<SetupSt
 
   const invitation = typeof window === 'undefined' ? null : new URLSearchParams(window.location.hash.slice(1)).get('invitation');
   const invitedRole = invitation ? invitationPayload(invitation)?.role : null;
-  // Wallets are created automatically once passkey and backup exist.
+  // Wallets are created automatically once a passkey exists.
   useEffect(() => {
     if (step !== 'wallets' || creating.current || wallet.busy) return;
     creating.current = true;
@@ -89,7 +85,7 @@ export function AccountSetup({ step, recoveryRequired }: { step: Exclude<SetupSt
         <Link href="/welcome/strausberg">Read the Strausberg welcome guide — no account needed</Link>
         <div><Link href="/library">Public AI desk — no account needed</Link><p className="small-copy" role="status">{deskStatus}</p></div>
       </nav>}
-      {recoveryRequired && <p className="small-copy">After these steps you can look around. Before your first deposit you will also prove you can recover your wallets from a second browser (about two minutes).</p>}
+      <p className="small-copy">Add a second passkey on another device in Me as an optional backup. If you lose every passkey, you lose this test account. Nothing here has monetary value.</p>
       {!wallet.configured && <p className="note" role="alert">Sign-in is not set up on this server yet. The operator needs to add a Privy app id (see docs/WALLET_SETUP.md).</p>}
       {invitation && <p className="note" role="status">{invitedRole ? `You were invited to a tenancy as ${invitedRole === 'arbitrator' ? 'a neutral arbitrator' : 'a tenant'}. Finish these steps, then you can join.` : 'This invitation link is malformed. You can still finish setup and ask for a new link.'}</p>}
       <h2 className="onboarding-access-heading" id="access-steps">Before you start: create your account</h2>
@@ -103,33 +99,17 @@ export function AccountSetup({ step, recoveryRequired }: { step: Exclude<SetupSt
             <div className="onboarding-signin"><span>Already have an account?</span>
               <button className="button secondary large" disabled={!wallet.configured || !wallet.ready || wallet.busy} onClick={() => void wallet.loginWithPasskey().catch(() => {})}>Sign in</button>
             </div>
-            <div className="onboarding-email"><span>Email alternative</span>
-              <button className="button secondary" disabled={!wallet.configured || !wallet.ready || wallet.busy} onClick={wallet.loginWithBackup}>Continue with email</button>
-            </div>
           </div>
           {wallet.authenticated && wallet.passkeyCount === 0 && (
             <button className="button primary" onClick={() => void wallet.addPasskey().catch(() => {})}>Add a passkey to this account</button>
           )}
           {wallet.error && <p className="note" role="alert">{wallet.error}</p>}
         </Step>
-        {recoveryRequired && (
-          <Step n={2} state={state(backupDone, accountDone)} title="Add a backup email">
-            <p>So you never lose access if this device is gone. You’ll get a one-time code.</p>
-            <button className="button primary large" disabled={wallet.busy} onClick={wallet.addBackupEmail}><Mail size={18} /> Add email</button>
-            {wallet.error && <p className="note" role="alert">{wallet.error}</p>}
-          </Step>
-        )}
-        <Step n={recoveryRequired ? 3 : 2} state={state(false, backupDone)} title="Create your two wallets" description="After sign-in, your Solana wallet holds the Home test-USDC deposit; your Robinhood Chain wallet is for separate test shares and loans. Creating wallets does not fund them.">
+        <Step n={2} state={state(false, accountDone)} title="Create your two wallets" description="After sign-in, your Solana wallet holds the Home test-USDC deposit; your Robinhood Chain wallet is for separate test shares and loans. Creating wallets does not fund them.">
           <p><Loader2 className="spin" size={14} /> Creating your Solana and Robinhood Chain wallets. Only you can sign with them.</p>
           {wallet.error && <p className="note" role="alert">{wallet.error}</p>}
         </Step>
       </ol>
-      {!recoveryRequired && (
-        <p className="small-copy">
-          <Mail size={13} /> In a real launch you’d also add a backup email and prove recovery from a second device, so
-          losing this phone never means losing your deposit. Skipped in this demo.
-        </p>
-      )}
       {wallet.authenticated && <button type="button" className="text-button" disabled={wallet.busy} onClick={() => void wallet.logout().catch(() => {})}>Use a different account</button>}
     </section>
   );

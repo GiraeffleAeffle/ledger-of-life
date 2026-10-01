@@ -41,7 +41,6 @@ function accessToken(overrides: Record<string, unknown> = {}) {
 function fixture(overrides: Partial<IdentityVerificationDependencies> = {}) {
   const linked = [
     { type: 'passkey' },
-    { type: 'email' },
     {
       type: 'wallet',
       id: 'wallet-solana',
@@ -115,7 +114,6 @@ test('verified JWT plus provider user and sole-owner quorum yields network-aware
     { id: 'wallet-ethereum', address: ethereumAddress, chainType: 'ethereum' },
   ]);
   assert.equal(identity.passkeyCount, 1);
-  assert.equal(identity.backupLoginLinked, true);
   assert.equal('roles' in identity, false);
 });
 

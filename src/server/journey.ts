@@ -2,7 +2,6 @@ import type { TenancyAccount } from '../finance/solana/program.ts';
 import { SOLANA_TEST_USDC_MINT } from '../finance/solana/manifest.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { agreementDigest, agreementRole, type Agreement } from './agreements.ts';
-import { RecoveryError } from './recovery.ts';
 import { SolanaServiceError, type SolanaOperation } from './solana-service.ts';
 import { solanaServicesFor } from './solana-tenancies.ts';
 import type { Store } from './store.ts';
@@ -21,7 +20,7 @@ export const JOURNEY_STAGES: { id: JourneyStage; label: string }[] = [
 
 /** Exactly one thing this person can do now, or what they are waiting for. */
 export type NextAction =
-  | { kind: 'invite_arbitrator' | 'create_space' | 'secure_deposit' | 'settle' | 'finish_setup'; label: string; detail: string }
+  | { kind: 'invite_arbitrator' | 'create_space' | 'secure_deposit' | 'settle'; label: string; detail: string }
   | { kind: 'accept_agreement'; label: string; detail: string; digest: string }
   | { kind: 'propose_claim'; label: string; detail: string; maximumAtomic: string }
   | { kind: 'respond_claim'; label: string; detail: string; claimAtomic: string }
@@ -32,6 +31,8 @@ export type NextAction =
 export interface TenancyJourney {
   agreementId: string;
   property: string;
+  home?: Agreement['home'];
+  handover?: Agreement['handover'];
   role: JourneyRole;
   requiredSecurity: string;
   sampleParties?: boolean;
@@ -163,7 +164,7 @@ export async function tenancyJourney(
   const cached = finished.get(`${agreement.id}:${role}`);
   if (cached && resolveServices === solanaServicesFor) return cached;
   const base = { agreementId: agreement.id, property: agreement.property, role, requiredSecurity: agreement.requiredSecurity, chain: null,
-    cancelled: agreement.cancelled, cancellable: false,
+    home: agreement.home, handover: agreement.handover, cancelled: agreement.cancelled, cancellable: false,
     sampleParties: Object.values(agreement.parties).some((party) => party?.subject.startsWith('test-signer:')) };
   const cancelledState = agreement.cancelled
     ? await cancellationState(store, identity, agreement, resolveServices)
@@ -193,8 +194,8 @@ export async function tenancyJourney(
   try {
     snapshot = await services.service.snapshot(identity);
   } catch (error) {
-    if (error instanceof RecoveryError || (error instanceof SolanaServiceError && error.code === 'identity_expired'))
-      return { ...base, stage: 'space', next: { kind: 'finish_setup', label: 'Prove you can recover your wallets', detail: 'A one-time check that your backup email leads to the same two wallets. Do it below, then carry on.' } };
+    if (error instanceof SolanaServiceError && error.code === 'identity_expired')
+      return { ...base, stage: 'space', next: waiting('Sign in again', 'Your session expired. Sign in with your passkey to continue.') };
     throw error;
   }
   const t = snapshot.tenancy;

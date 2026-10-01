@@ -170,9 +170,14 @@ for geometric tests only, not app data; real published files are the runtime sou
 
 The resident clicks to place home and work pins (or separately requests browser geolocation).
 They are stored only in per-city `localStorage` and can be removed. The map does not recenter on
-private pins, and no geocoding, routing or private-coordinate request is made. MapLibre uses
-OpenFreeMap tiles: **tile requests disclose the viewed map area to the tile provider**, even though
-saved pin coordinates are never transmitted; self-hosted tiles could reduce this later.
+private pins, and no geocoding, routing or private-coordinate request is made. MapLibre 6.11.2
+uses OpenFreeMap assets through the same-origin `/api/map/` proxy. The provider sees the
+server's IP and requested map area, not the visitor's IP, cookies or saved pin coordinates.
+The proxy allows only the Liberty style, its tile manifest, vector/raster tiles, glyphs and
+sprites, rejects redirects and query parameters, limits responses to 8 MiB and 10 seconds,
+and keeps at most 128 entries / 24 MiB in memory for one hour. Attribution is preserved.
+MapLibre 6 requires WebGL2 and ESM namespace imports; `predev` and `prebuild` copy its
+matching worker and shared module into `public/maplibre/` for Next's asset pipeline.
 
 The browser matches published public geometries to a 1 km straight-line neighbourhood
 radius and a 400 m approximate corridor around the straight line from home to work—not

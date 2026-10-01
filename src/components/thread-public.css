@@ -8,9 +8,8 @@
 .onboarding-public a { display: inline-block; color: var(--ink-2); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; }
 .onboarding-access { display: grid; justify-items: start; gap: 22px; margin: 18px 0; }
 .onboarding-access .button { min-height: 48px; white-space: normal; }
-.onboarding-signin, .onboarding-email { display: grid; justify-items: start; gap: 10px; }
-.onboarding-email { padding-top: 18px; border-top: 1px solid var(--line); }
-.onboarding-signin > span, .onboarding-email > span { color: var(--muted); font-size: .9rem; }
+.onboarding-signin { display: grid; justify-items: start; gap: 10px; }
+.onboarding-signin > span { color: var(--muted); font-size: .9rem; }
 .ideas-catalogue { min-width: 0; }
 .ideas-group { margin-top: 24px; }
 .ideas-group > h3 { border-bottom: 1px solid var(--line); padding-bottom: 10px; }
