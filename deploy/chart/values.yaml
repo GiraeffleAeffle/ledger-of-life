@@ -22,9 +22,6 @@ reconcile:
       cpu: 500m
       memory: 192Mi
 backup:
-  storage:
-    className: hcloud-volumes
-    size: 2Gi
   resources:
     requests:
       cpu: 20m

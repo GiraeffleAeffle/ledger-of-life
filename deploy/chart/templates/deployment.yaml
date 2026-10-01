@@ -90,11 +90,6 @@ spec:
               mountPath: /app/.next/cache
             - name: tmp
               mountPath: /tmp
-            # The app never reads this. Mounting the backup claim binds it on this Pod's node during a release:
-            # hcloud-volumes binds on first consumer, and the release (helm --wait) waits until every claim is Bound.
-            - name: backups
-              mountPath: /backups
-              readOnly: true
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -103,7 +98,3 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
-        - name: backups
-          persistentVolumeClaim:
-            claimName: ledger-backups
-            readOnly: true

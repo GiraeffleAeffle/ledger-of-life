@@ -90,17 +90,17 @@ confirm() {
 }
 
 # A preview must succeed: kubectl diff exits 0 (no change) or 1 (changes); anything else is an error, not a preview.
-preview_namespace() {
+preview() {
   local status=0
-  kc diff --server-side --field-manager=ledger-apply -f namespace.yaml || status=$?
-  (( status <= 1 )) || { printf 'The namespace preview failed (kubectl diff exit %s); nothing changed.\n' "$status" >&2; exit 1; }
+  kc diff --server-side --field-manager=ledger-apply -f "$1" || status=$?
+  (( status <= 1 )) || { printf 'The preview of %s failed (kubectl diff exit %s); nothing changed.\n' "$1" "$status" >&2; exit 1; }
 }
 
 namespace_exists=false
 kc get namespace "$NAMESPACE" >/dev/null 2>&1 && namespace_exists=true
 
 if [[ "$mode" == namespace ]]; then
-  preview_namespace
+  preview namespace.yaml
   confirm "create namespace $NAMESPACE"
   kc apply --server-side --field-manager=ledger-apply -f namespace.yaml
   printf 'Next: store the Secret with --secret FILE (see ledger-env.example), then run --diff-only.\n'
@@ -248,8 +248,10 @@ if [[ -n "$release_state" ]]; then
 fi
 
 # 5. Show exactly what would change.
+# The snapshot claim is applied outside the chart (see backups-pvc.yaml); it needs the namespace.
 if "$namespace_exists"; then
-  preview_namespace
+  preview namespace.yaml
+  preview backups-pvc.yaml
 fi
 hf diff --include-tests
 
@@ -262,6 +264,7 @@ fi
 # 6. The release, after a typed confirmation.
 confirm "apply $NAMESPACE"
 kc apply --server-side --field-manager=ledger-apply -f namespace.yaml
+kc apply --server-side --field-manager=ledger-apply -f backups-pvc.yaml
 hf apply --include-tests
 kc -n "$NAMESPACE" rollout status deployment/ledger-of-life --timeout=180s
 
