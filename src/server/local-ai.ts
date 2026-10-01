@@ -12,7 +12,7 @@ import { AI_MAX_OUTPUT } from '../domain/ai-pricing.ts';
 import { AI_BUDGET, AI_CONTEXT_TOKENS, AI_MODEL, inferenceMaximum, inferenceCharge, aiRpc, aiTokenAbi, assertInferenceAvailable, assertInferenceContracts, inferencePayee, instructions, releaseHost, reserveHost, runLocalInference } from './local-ai-runtime.ts';
 import { TEST_USDG_ADDRESS } from '../wallets/inference-token.ts';
 import { PERMIT2_ADDRESS } from '@x402/evm';
-import { createAiResource, facilitatorAccount, inspectAiReceipt, recoverExpiredUnsignedSettlement, validatePaymentPayload, type AiPayment } from './local-ai-payment.ts';
+import { assertAiPaymentVerified, createAiResource, facilitatorAccount, inspectAiReceipt, recoverExpiredUnsignedSettlement, validatePaymentPayload, type AiPayment } from './local-ai-payment.ts';
 import { acquireVisitorLease, assertVisitorActive, type VisitorLease } from './local-ai-session.ts';
 import type { LocalAiApproval, LocalAiContext, LocalAiMode, LocalAiRequest } from './local-ai-types.ts';
 import { purged, textDue, textGraceMs } from './local-ai-retention.ts';
@@ -335,7 +335,7 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
       if (!matching) throw new ConflictError('Payment differs from the immutable quote.');
       await validatePaymentPayload(payload, matching, id, (owner as Extract<AiOwner, { payer: Address }>).payer, payee!, resourceUrl, inferenceMaximum(record.request.maxOutputTokens), (await facilitatorAccount()).address);
       const result = await resource.verifyPayment(payload, matching, required.extensions);
-      if (!result.isValid || result.payer?.toLowerCase() !== (owner as Extract<AiOwner, { payer: Address }>).payer.toLowerCase()) throw new ConflictError('Signed payment could not be verified. Check balance and finite Permit2 allowance.');
+      assertAiPaymentVerified(result, (owner as Extract<AiOwner, { payer: Address }>).payer);
       record = await reserveNonce(store, record, payload);
     } else if (paymentHeader && JSON.stringify(decodePaymentSignatureHeader(paymentHeader)) !== JSON.stringify(record.paymentJournal.payload))
       throw new ConflictError('A different authorization cannot replace this operation.');

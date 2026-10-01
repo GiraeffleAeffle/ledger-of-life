@@ -6,6 +6,10 @@ A standalone Node.js **22 or newer**, ESM, zero-dependency connector. It opens n
 
 The app pays the host’s payout wallet in test tUSDG through x402 `upto`: 0.0001 tUSDG (100 atomic) per output token, at most 192 tokens (0.0192 tUSDG) per answer, and only when the model finishes a complete answer. Own-host and free public answers earn nothing. This is test money; the connector itself never touches payments.
 
+Before dispatching a paid question, the app verifies the signed Permit2 authorization and read-only simulates the maximum charge with the dedicated facilitator wallet as the call sender. The proxy requires that sender to match the signed facilitator witness; an omitted sender reverts with `UnauthorizedFacilitator` even when balance and allowance are sufficient. Settlement's preflight uses the same sender-bound reads; the connector does not sign or send either operation.
+
+Payment refusals include the SDK's safe reason code and returned payer address (or `unavailable`), not signatures, keys or question text. `permit2_allowance_required` means the payer needs the reviewed finite token approval; `permit2_simulation_failed` is not evidence of an allowance problem and requires checking the proxy simulation. `payer_missing` / `payer_mismatch` indicate that verification did not identify the reviewed payer.
+
 ## Owner setup on Linux
 
 Run as a dedicated unprivileged user on the GPU device, or on an always-on device that can reach the GPU's configured Ollama endpoint. Install/copy this directory somewhere that user can read, such as `/opt/stadtstack/host-connector`. Node must be on the device already.

@@ -2,7 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { x402Facilitator } from '@x402/core/facilitator';
 import { x402ResourceServer } from '@x402/core/server';
-import type { PaymentPayload, PaymentRequirements, SettleResponse } from '@x402/core/types';
+import type { PaymentPayload, PaymentRequirements, SettleResponse, VerifyResponse } from '@x402/core/types';
 import type { FacilitatorClient } from '@x402/core/server';
 import { UptoEvmScheme as UptoServer } from '@x402/evm/upto/server';
 import { UptoEvmScheme as UptoFacilitator } from '@x402/evm/upto/facilitator';
@@ -36,6 +36,18 @@ export async function facilitatorAccount() {
   const raw = (await readFile(/* turbopackIgnore: true */ filename, 'utf8')).trim();
   if (!/^0x[a-fA-F0-9]{64}$/.test(raw)) throw new ConflictError('Invalid dedicated facilitator key file.');
   return privateKeyToAccount(raw as Hex);
+}
+/** Proxy simulations must use the same msg.sender as the eventual fee transaction. */
+export function facilitatorReadContract(facilitator: Address, rpc: typeof aiRpc = aiRpc): FacilitatorEvmSigner['readContract'] {
+  return (args) => rpc.readContract({ ...args, account: facilitator } as Parameters<typeof aiRpc.readContract>[0]);
+}
+export function assertAiPaymentVerified(result: VerifyResponse, payer: Address) {
+  if (result.isValid && result.payer?.toLowerCase() === payer.toLowerCase()) return;
+  const reason = !result.isValid
+    ? typeof result.invalidReason === 'string' && /^[a-zA-Z0-9_:-]{1,160}$/.test(result.invalidReason) ? result.invalidReason : 'verification_failed'
+    : result.payer ? 'payer_mismatch' : 'payer_missing';
+  const verifiedPayer = typeof result.payer === 'string' && /^0x[a-fA-F0-9]{40}$/.test(result.payer) ? result.payer : 'unavailable';
+  throw new ConflictError(`Signed payment could not be verified: ${reason} (payer: ${verifiedPayer}).`);
 }
 export function validatePaymentPayload(payload: PaymentPayload, requirements: PaymentRequirements, id: string, payer: Address, payee: Address, url: string, maximum: bigint, facilitator: Address) {
   const identifier = payload.extensions?.['payment-identifier'];
@@ -197,7 +209,7 @@ export async function createAiResource(store: Store, recordKey: string, payer: A
   };
   const signer: FacilitatorEvmSigner = {
     getAddresses: () => [account.address],
-    readContract: (args) => aiRpc.readContract(args as Parameters<typeof aiRpc.readContract>[0]),
+    readContract: facilitatorReadContract(account.address),
     verifyTypedData: (args) => {
       // Official SDK types admit broad objects; only this chain's canonical witness is verified.
       if (!same(args.address, payer) || args.domain.name !== 'Permit2' || args.domain.chainId !== 46630 ||
