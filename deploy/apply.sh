@@ -6,7 +6,9 @@
 #   deploy/apply.sh --namespace      first run only: create the namespace (so the Secret can be stored), nothing else
 #   deploy/apply.sh --secret FILE    store Secret ledger-env from an owner-only KEY=VALUE file outside any repository
 #   deploy/apply.sh --network-test   run the released NetworkPolicy probe Pods (helm test)
-#   deploy/apply.sh                  the release: diff, typed confirmation, helmfile apply, rollout and status
+#   deploy/apply.sh                  the release: diff, typed confirmation, helmfile apply, rollout and status;
+#                                    first, after its own typed confirmation, it recovers a release that an
+#                                    interrupted helm process left pending
 #
 # Every mode refuses a render without a real image digest and any cluster but the reviewed one. One kube context is
 # resolved at the start and passed explicitly to every kubectl and helmfile call, so the cluster that was checked is
@@ -203,6 +205,47 @@ secret_help() {
   fi
   printf '%s\n' 'Secret ledger-env must contain PRIVY_APP_SECRET and RECONCILE_SECRET. Fill an owner-only file outside every repository (see ledger-env.example), then run --secret FILE.' >&2
 }
+
+# Helm's own record. A pending-* status means a helm process stopped mid-operation (for example, its terminal closed).
+# Helm then refuses every upgrade ("another operation is in progress") until the release is rolled back.
+release_state=''
+if "$namespace_exists"; then
+  # Prints: latest revision, its status, the last deployed or superseded revision (0 if none), seconds since update.
+  release_state="$(helm --kube-context "$context" -n "$NAMESPACE" history ledger-of-life --max 20 -o json 2>/dev/null |
+    python3 -c '
+import json, re, sys
+from datetime import datetime, timezone
+rows = json.load(sys.stdin)
+if rows:
+    last = rows[-1]
+    good = [row["revision"] for row in rows if row["status"] in ("deployed", "superseded")]
+    updated = datetime.fromisoformat(re.sub(r"\.[0-9]+", "", last["updated"]).replace("Z", "+00:00"))
+    print(last["revision"], last["status"], good[-1] if good else 0, int((datetime.now(timezone.utc) - updated).total_seconds()))
+' 2>/dev/null)" || release_state=''
+fi
+if [[ -n "$release_state" ]]; then
+  read -r revision status last_good age <<<"$release_state"
+  printf 'Helm release ledger-of-life: revision %s, %s.\n' "$revision" "$status"
+  case "$status" in
+    pending-install | pending-upgrade | pending-rollback)
+      if [[ "$mode" != release ]]; then
+        printf 'Revision %s is stuck in %s; the release recovers it first, after its own confirmation.\n' "$revision" "$status"
+      elif (( last_good == 0 )); then
+        printf 'Revision %s is stuck in %s and no earlier revision was ever deployed; nothing to roll back to.\n' "$revision" "$status" >&2
+        exit 1
+      elif (( age < 900 )); then
+        printf 'Revision %s changed %s seconds ago; a helm process may still be running (its timeout is 600 seconds). Retry after 15 minutes.\n' "$revision" "$age" >&2
+        exit 1
+      else
+        helm --kube-context "$context" -n "$NAMESPACE" history ledger-of-life --max 5
+        printf 'Revision %s is stuck in %s: a helm process was interrupted, and Helm refuses every upgrade until the release is rolled back.\n' "$revision" "$status"
+        printf 'Recovery rolls back to revision %s, the last good one, and waits for it. The release then continues with its own diff and confirmation.\n' "$last_good"
+        confirm "recover $NAMESPACE"
+        helm --kube-context "$context" -n "$NAMESPACE" rollback ledger-of-life "$last_good" --wait --timeout 10m
+      fi
+      ;;
+  esac
+fi
 
 # 5. Show exactly what would change.
 if "$namespace_exists"; then
