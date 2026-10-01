@@ -27,7 +27,7 @@ const mainnetRpc = createPublicClient({ transport: http(robinhoodMainnet.rpcUrl,
 const testnetRpc = createPublicClient({ transport: http('https://rpc.testnet.chain.robinhood.com', { timeout: 15000, retryCount: 0 }) });
 export type PriceMirrorManifest = { chainId: number; feed: Address };
 type Rpc = Pick<typeof testnetRpc, 'readContract' | 'getChainId' | 'getBlock' | 'getTransactionCount' | 'estimateFeesPerGas' | 'estimateGas' | 'getTransactionReceipt' | 'sendRawTransaction' | 'waitForTransactionReceipt'>;
-type Journal = { signer: Address; feed: Address; round: string; rawMainnetAnswer: string; mainnetMultiplier: string; testnetMultiplier: string; convertedAnswer: string; state: 'pending' | 'done'; crossCheck: 'passed'; step: SignedFundingStep };
+type Journal = { signer: Address; feed: Address; round: string; sourceUpdatedAt?: number; rawMainnetAnswer: string; mainnetMultiplier: string; testnetMultiplier: string; convertedAnswer: string; state: 'pending' | 'done'; crossCheck: 'passed'; step: SignedFundingStep };
 type Options = { environment?: Record<string, string | undefined>; loadManifest?: () => Promise<PriceMirrorManifest | null>; mainnet?: Pick<Rpc, 'readContract' | 'getChainId'>; testnet?: Rpc; reference?: () => Promise<ReferencePrice>; now?: () => number };
 
 async function readTestMultiplier(rpc: Pick<Rpc, 'readContract'>) {
@@ -66,7 +66,9 @@ export function reconcileTslaPrice(store: Store, options: Options = {}) {
 }
 
 async function reconcile(store: Store, options: Options) {
-  const skip = (reason: string) => ({ status: 'skipped', reason, nextCursor: null });
+  // Once the source round is read, a skip reports which round it judged so the job record can show its age.
+  const observed: { sourceRoundId?: string; sourceUpdatedAt?: number } = {};
+  const skip = (reason: string) => ({ status: 'skipped' as const, reason, ...observed, nextCursor: null });
   const raw = (options.environment ?? process.env).ROBINHOOD_PRICE_UPDATER_PRIVATE_KEY;
   if (!raw) return { status: 'unconfigured', reason: 'Missing dedicated price updater key.', nextCursor: null };
   let signer;
@@ -94,7 +96,7 @@ async function reconcile(store: Store, options: Options) {
     }, rpc);
     await store.update<Journal>(key, (value) => ({ ...value, state: 'done' }));
     await releaseOperatorNonceLaneIfOwned(store, signer.address, key);
-    return { status: 'pushed', sourceRoundId: journal.round, rawMainnetAnswer: journal.rawMainnetAnswer,
+    return { status: 'pushed' as const, sourceRoundId: journal.round, sourceUpdatedAt: journal.sourceUpdatedAt, rawMainnetAnswer: journal.rawMainnetAnswer,
       mainnetMultiplier: journal.mainnetMultiplier, testnetMultiplier: journal.testnetMultiplier,
       convertedAnswer: journal.convertedAnswer, crossCheck: journal.crossCheck, transactionHash: hash, nextCursor: null };
   };
@@ -118,6 +120,7 @@ async function reconcile(store: Store, options: Options) {
   if (!snapshot) return skip('source_read_unavailable');
   const [round, mirrored, multiplier, testMultiplier, paused, oraclePaused, initialAnswer, maxStepBps, minPushInterval, block] = snapshot;
   const [roundId, answer, , updatedAt, answeredInRound] = round;
+  Object.assign(observed, { sourceRoundId: roundId.toString(), sourceUpdatedAt: Number(updatedAt) });
   if (roundId <= mirrored[0]) return skip('same_or_older_round');
   if (paused || oraclePaused) return skip('source_paused');
   if (multiplier <= 0n || testMultiplier <= 0n) return skip('invalid_multiplier');
@@ -141,7 +144,7 @@ async function reconcile(store: Store, options: Options) {
   const crossCheck = 'passed' as const;
   const data = encodeFunctionData({ abi: feedAbi, functionName: 'push', args: [roundId, convertedAnswer, updatedAt, testMultiplier] });
   await acquireOperatorNonceLane(store, signer.address, key);
-  const journal: Journal = { signer: signer.address, feed, round: roundId.toString(), rawMainnetAnswer: answer.toString(),
+  const journal: Journal = { signer: signer.address, feed, round: roundId.toString(), sourceUpdatedAt: Number(updatedAt), rawMainnetAnswer: answer.toString(),
     mainnetMultiplier: multiplier.toString(), testnetMultiplier: testMultiplier.toString(),
     convertedAnswer: convertedAnswer.toString(), state: 'pending', crossCheck, step: {} };
   if (previous) await store.update<Journal>(key, () => journal);

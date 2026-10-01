@@ -31,7 +31,7 @@ export const TEST_CITY_INVESTMENTS: readonly TestCityInvestment[] = [
     issuerReality: 'fictional-test-issuer',
     rights: 'Test tokens only; no company shares, cooperative membership or property title.',
     priceAtomicPerUnit: '1000000', totalUnitsRaw: '10000000000000000000000',
-    location: { coordinates: [13.8822, 52.5801], basis: 'illustrative', label: 'Illustrative city placement — not this property or an offer of land.' },
+    location: { coordinates: [13.898, 52.568], basis: 'illustrative', label: 'Illustrative city placement — not this property or an offer of land. Fictional test units, no value, no rights.' },
   },
   {
     id: 'demo-retrofit-workshop', name: 'Neighbourhood Works · test issuer', symbol: 'tWORK',

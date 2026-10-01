@@ -24,6 +24,7 @@ import { claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, home
 import { operationLabels } from './deposit-activity';
 import { nextStep } from './next-step';
 import { NextStepCard } from './next-step-card';
+import { DepositYield } from './deposit-yield';
 import { STAGES } from '@/data/path';
 import { FlatMap } from './flat-map';
 import { Neighbourhood } from './neighbourhood';
@@ -464,6 +465,7 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
         <p><strong>Tenant funds</strong> · Secure {money(journey.requiredSecurity)} test USDC after the escrow is ready.</p>
         <p className="small-copy">Only the test-USDC deposit can be used here; see &ldquo;Ways to hold the deposit&rdquo; above.</p>
       </div>}
+      {cashOnly && chain?.simulatedYield && <DepositYield view={chain.simulatedYield} requiredAtomic={journey.requiredSecurity} tenant={journey.role === 'tenant'} request={request} agreementId={agreementId} reload={reload} />}
       {living && <div className="housing-living-note">
         <strong>Deposit secured</strong>
         <p>{next.kind === 'confirming' ? 'Approval sent. Waiting for network confirmation.' : 'Nothing needs your approval right now.'}</p>
@@ -478,7 +480,7 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
         {next.kind === 'confirming' && confirmationSince !== null && confirmationStalled(confirmationSince, clock) && <p role="status">This is taking longer than usual. <button className="button secondary" onClick={() => void run(reconcile)} disabled={busy}>Check again</button></p>}
         {next.kind === 'paying_out' && <p className="small-copy">Payouts run while Home is open. A failed attempt retries here.</p>}
         {next.kind === 'accept_agreement' && <div className="small-copy">
-          <p>These terms cover {journey.property}, the {money(journey.requiredSecurity)} test USDC required deposit, and whether the tenant may claim surplus while the tenancy is active. The tenant keeps deposit assets above an approved deduction at settlement, whatever the release setting. Site-minted tUSDC stays in cash escrow: it is not lent and earns nothing. Any deposit earnings belong to the tenant; separately credited test earnings are simulated, not income.</p>
+          <p>These terms cover {journey.property}, the {money(journey.requiredSecurity)} test USDC required deposit, and whether the tenant may claim surplus while the tenancy is active. The tenant keeps deposit assets above an approved deduction at settlement, whatever the release setting. Site-minted tUSDC stays in cash escrow: it is not lent. This site pays labelled simulated yield to the tenant in tUSDC, separate from the escrow. Test tokens have no value.</p>
           <p><strong>These terms cover the deposit and its parties, not monthly rent or tenancy dates.</strong> The landlord chooses the arbitrator before acceptance.</p>
           {agreement && <p>Tenant: {agreement.parties.tenant?.wallet?.address ? `${agreement.parties.tenant.wallet.address.slice(0, 5)}…${agreement.parties.tenant.wallet.address.slice(-5)}` : 'not available'} · Landlord: {agreement.parties.landlord?.wallet?.address ? `${agreement.parties.landlord.wallet.address.slice(0, 5)}…${agreement.parties.landlord.wallet.address.slice(-5)}` : 'not available'} · Arbitrator: {agreement.parties.arbitrator?.wallet?.address ? `${agreement.parties.arbitrator.wallet.address.slice(0, 5)}…${agreement.parties.arbitrator.wallet.address.slice(-5)}` : 'not available'}</p>}
           {agreement && <p>Tenant acceptance: {agreement.accepted.tenant?.digest === agreement.digest ? 'accepted' : 'waiting'} · Landlord acceptance: {agreement.accepted.landlord?.digest === agreement.digest ? 'accepted' : 'waiting'}. Surplus: {agreement.releaseAllowed ? 'tenant may claim during the tenancy' : 'locked until settlement'}.</p>}
@@ -657,7 +659,7 @@ function TenancyDetails({ journey, request }: { journey: TenancyJourney; request
           <dl className="journey-facts">
             <div><dt>Agreement</dt><dd>{agreement.digest && agreement.accepted.tenant?.digest === agreement.digest && agreement.accepted.landlord?.digest === agreement.digest ? 'Accepted by both parties' : 'Awaiting acceptance'}</dd></div>
             <div><dt>Required deposit · test USDC</dt><dd>{money(agreement.requiredSecurity)} test USDC</dd></div>
-            <div><dt>Earnings release policy</dt><dd>{agreement.releaseAllowed ? 'Tenant may claim surplus during tenancy' : 'Surplus remains locked until settlement'} · {!chain ? 'test tokens only; any deposit earnings belong to the tenant.' : chain.depositMint === SOLANA_TEST_USDC_MINT ? 'the deposit is held as cash in the escrow and earns nothing.' : 'devnet lending pays nothing; earnings are simulated.'}</dd></div>
+            <div><dt>Earnings release policy</dt><dd>{agreement.releaseAllowed ? 'Tenant may claim surplus during tenancy' : 'Surplus remains locked until settlement'} · {!chain ? 'test tokens only; any deposit earnings belong to the tenant.' : chain.depositMint === SOLANA_TEST_USDC_MINT ? 'the deposit stays in cash escrow; this site pays labelled simulated yield to the tenant.' : 'devnet lending pays nothing; earnings are simulated.'}</dd></div>
             {chain && <div><dt>Claim status</dt><dd>{chain.phase === 'claim-proposed' ? 'Awaiting tenant answer' : chain.phase === 'disputed' ? 'Disputed' : chain.phase === 'settling' ? 'Settling' : chain.phase === 'closed' ? 'Closed' : BigInt(chain.claimAtomic) > 0n ? 'Claim recorded' : 'No deduction proposed'}</dd></div>}
             {chain && BigInt(chain.claimAtomic) > 0n && <div><dt>Requested deduction</dt><dd>{money(chain.claimAtomic)} test USDC</dd></div>}
             {chain && (chain.phase === 'settling' || chain.phase === 'closed') && <div><dt>Approved deduction</dt><dd>{money(chain.approvedClaimAtomic)} test USDC</dd></div>}
@@ -748,7 +750,7 @@ function ListingCard({ listing, request, children }: { listing: PublicListing; r
         {facts.length > 0 && <p className="listing-facts">{facts.join(' · ')}</p>}
         {d.photos.length > 0 && <p className="small-copy">Illustrative sample interiors, not photographs of this dwelling.</p>}
         <p className="listing-deposit"><span>Required deposit · Solana devnet</span><strong>{money(listing.requiredSecurity)} test USDC</strong></p>
-        <p className="small-copy">{listing.sample ? 'Sample home · local rehearsal. ' : ''}{listing.releaseAllowed ? 'Tenant may claim surplus during the tenancy.' : 'Surplus stays locked until settlement.'} Site-minted tUSDC stays in cash escrow, is not lent and earns nothing. Any deposit earnings belong to the tenant.</p>
+        <p className="small-copy">{listing.sample ? 'Sample home · local rehearsal. ' : ''}{listing.releaseAllowed ? 'Tenant may claim simulated yield during the tenancy.' : 'Simulated yield may be claimed after settlement.'} Site-minted tUSDC stays in cash escrow, not lent. This site pays labelled simulated yield at 5 % a year by default; earnings belong to the tenant. Test tokens have no value.</p>
         {listing.location && <FlatMap location={listing.location} />}
         <Neighbourhood city={d.city} location={listing.location} request={request} />
         {children}
@@ -839,7 +841,7 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
               ))}
             </div>
           </div>
-          <label className="policy-check wide"><input type="checkbox" checked={form.releaseAllowed} onChange={(e) => setForm({ ...form, releaseAllowed: e.target.checked })} /> Let the tenant claim surplus during the tenancy. Site tUSDC stays in cash escrow and earns nothing; this policy does not create earnings. Any deposit earnings belong to the tenant, who keeps deposit value above an approved deduction at settlement either way.</label>
+          <label className="policy-check wide"><input type="checkbox" checked={form.releaseAllowed} onChange={(e) => setForm({ ...form, releaseAllowed: e.target.checked })} /> Let the tenant claim surplus and simulated yield during the tenancy. Site tUSDC stays in cash escrow; this site separately pays labelled simulated yield (5 % a year by default). Otherwise it is claimable after settlement. Any deposit earnings belong to the tenant, who keeps deposit value above an approved deduction at settlement either way.</label>
           {feedback.target === 'post' && feedback.message && <p className="note wide" role="alert">{feedback.message}</p>}
           <button className="button primary large">Publish home</button>
         </form>

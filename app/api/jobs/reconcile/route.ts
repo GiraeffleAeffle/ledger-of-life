@@ -6,6 +6,7 @@ import { loadRobinhoodConfig, reconcileRobinhoodOperations } from '@/server/robi
 import { reconcileSolanaOperations } from '@/server/solana-service';
 import { sweepAiText } from '@/server/local-ai';
 import { reconcileTslaPrice } from '@/server/tsla-price-mirror';
+import { recordPriceJob } from '@/server/price-job-health';
 export const runtime = 'nodejs';
 export async function POST(request: Request) {
   try {
@@ -17,7 +18,15 @@ export async function POST(request: Request) {
     if (!scope || !['robinhood', 'solana', 'local-ai', 'price'].includes(scope))
       throw new WorkflowError('Unknown reconciliation scope.');
     if (scope === 'price') {
-      const result = await reconcileTslaPrice(await getStore());
+      const store = await getStore();
+      let result;
+      try { result = await reconcileTslaPrice(store); }
+      catch (error) {
+        // A failed run must be visible in /api/status, not only in the scheduler's log.
+        await recordPriceJob(store, { status: 'failed', reason: error instanceof Error ? error.message.slice(0, 200) : 'Price job failed.' }, Math.floor(Date.now() / 1000)).catch(() => {});
+        throw error;
+      }
+      await recordPriceJob(store, result as Parameters<typeof recordPriceJob>[1], Math.floor(Date.now() / 1000)).catch(() => {});
       return Response.json({ scope, ...result }, { headers: { 'Cache-Control': 'no-store' } });
     }
     if (scope === 'local-ai') {

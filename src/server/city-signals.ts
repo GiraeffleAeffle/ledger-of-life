@@ -60,7 +60,7 @@ export interface CityFeed {
 }
 export type CityFeedResult =
   | { state: 'available'; cityId: string; cityName: string; feed: CityFeed }
-  | { state: 'not_available'; cityId: string; cityName: string };
+  | { state: 'not_available'; cityId: string; cityName: string; generatedAt: string };
 export interface RegionalTopicItem {
   title: string; url: string; date: string | null; sourceType: 'planningProcedure' | 'cityWebsite' | 'councilAgenda';
   locator: string; stage: string;
@@ -148,7 +148,7 @@ export async function readCitySignal(cityId: string, signalId: string): Promise<
 export async function readCityFeed(cityId: string): Promise<CityFeedResult> {
   const catalogue = await readSignalsCatalogue();
   const city = catalogue.cities.find((entry) => entry.id === cityId && /^[a-z0-9-]+$/.test(entry.id));
-  if (!city || !city.feedUrl) return { state: 'not_available', cityId, cityName: city?.name ?? cityId };
+  if (!city || !city.feedUrl) return { state: 'not_available', cityId, cityName: city?.name ?? cityId, generatedAt: catalogue.generatedAt };
   // A catalogue entry, never request input, selects the only allowed feed path.
   if (city.feedUrl !== `cities/${city.id}/feed.json`) throw new Error('Invalid city feed path.');
   const feed = await jsonFile<CityFeed>(join(dataDirectory(), city.feedUrl));

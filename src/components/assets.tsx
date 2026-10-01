@@ -20,6 +20,7 @@ type PricedPortfolio = PortfolioView | PortfolioPartial;
 type MoneySnapshot = { assets: AssetsResponse; portfolio: PricedPortfolio; workflow: SharePositions; lockedUsd: number; officialCashUsd: number; officialStockUsd: number; solanaStockUsd: number; checkedAt: number };
 type LatestRead = { assets: AssetsResponse | null; portfolio: PricedPortfolio | null; workflow: SharePositions | null; checkedAt: number };
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
+import { DepositYield } from './deposit-yield';
 
 const atomicUsd = (atomic: string | null | undefined) => Number(atomic ?? '0') / 1e6;
 type Chain = NonNullable<TenancyJourney['chain']>;
@@ -212,10 +213,11 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
           <span>{entitled.length === 0 && !tenancies.some((t) => t.chain) ? 'No active deposit' : asTenant > 0
             ? tenancies.some((t) => t.role === 'tenant' && t.chain && t.chain.depositMint !== SOLANA_TEST_USDC_MINT)
               ? `Your deposit for ${asTenant} home${asTenant > 1 ? 's' : ''} is supplied to lending. Devnet lending pays nothing; deposit earnings here are simulated.`
-              : `Your deposit for ${asTenant} home${asTenant > 1 ? 's' : ''} is locked in the escrow as cash and earns nothing.`
+              : `Your deposit for ${asTenant} home${asTenant > 1 ? 's' : ''} stays in cash escrow. This site pays labelled simulated yield in tUSDC; earnings belong to you.`
             : 'Deposit assets are held for a tenancy where you are landlord or arbitrator; they are not yours. Only an approved claim or settlement payout may be owed to you.'}</span>
           {tenancies.some((t) => t.chain && t.role !== 'tenant') && <span>Held for your tenancy: {usd(tenancies.reduce((sum, t) => sum + (t.role !== 'tenant' && t.chain ? atomicUsd(t.chain.lendingValueAtomic) + atomicUsd(t.chain.escrowAtomic) : 0), 0))} test value · not yours</span>}
           {claimed > 0 && <span className="asset-gain"><TrendingUp size={13} /> {usd(claimed)} test deposit earnings claimed (simulated)</span>}
+          {tenancies.filter((t) => t.role === 'tenant' && t.chain?.depositMint === SOLANA_TEST_USDC_MINT && t.chain.simulatedYield).map((t) => <DepositYield key={t.agreementId} view={t.chain!.simulatedYield!} requiredAtomic={t.requiredSecurity} tenant compact />)}
           {tenancies.some((t) => t.chain) && <span className="text-button">Open in Home →</span>}
         </button>
 

@@ -59,6 +59,7 @@ test('new primary round is journaled before broadcast with exact bounded testnet
     const result = await reconcileTslaPrice(store, f.options);
     assert.equal(result.status, 'pushed');
     assert.equal('crossCheck' in result && result.crossCheck, 'passed');
+    assert.equal('sourceUpdatedAt' in result && result.sourceUpdatedAt, now - 60, 'the push reports the source round time for the job record');
     const tx = parseTransaction(f.state.sends[0]);
     assert.equal(tx.chainId, 46630);
     assert.equal(tx.to?.toLowerCase(), feed);
@@ -86,6 +87,7 @@ for (const [name, modify, reason] of [
     const result = await reconcileTslaPrice(store, f.options);
     assert.equal(result.status, 'skipped');
     assert.equal('reason' in result && result.reason, reason);
+    assert.equal('sourceUpdatedAt' in result && result.sourceUpdatedAt, Number(f.state.updatedAt), 'a skip after reading the round reports which round it judged');
     assert.deepEqual(f.state.sends, []);
     assert.equal(await store.get(`tsla-price-mirror:46630:${feed}`), null);
   } finally { await store.close(); }

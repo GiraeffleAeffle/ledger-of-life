@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseUnits } from 'viem';
 import { marketShortfall } from '@/domain/market-preflight';
+import { belowGasDripThreshold } from '@/domain/gas-threshold';
 import { useRentalWallet } from '@/wallets';
 import { SHARE_NAVIGATION_INTENT, type Area } from './areas';
 import { useSectionTabActive } from './section-tabs';
@@ -15,6 +16,8 @@ type View = {
   enabled: boolean; deployment: null | { pool: string; oracle: string; stock: string; usd: string }; disclaimer: string; stockSymbol: string;
   sharesRaw: string | null; testUsdAtomic: string | null; priceAtomic: string | null; walletValueAtomic: string | null;
   price: null | { sourceRoundId: string; sourceUpdatedAt: number; pushedAt: number; ageSeconds: number; stale: boolean; weekendFreshnessWindow: boolean; sourceFeed: string; sourceChainId: number };
+  /** Last hourly price-job run, shaped by the server; null when the job record could not be read. */
+  priceJob?: null | { health: 'ok' | 'waiting' | 'attention'; message: string; lastRun: null | { at: number; status: string; reason: string | null; sourceUpdatedAt: number | null }; lastPush: null | { at: number; sourceRoundId: string; sourceUpdatedAt: number | null; transactionHash: string | null } };
   loan: null | { sharesRaw: string; debtAtomic: string; valueAtomic: string | null; ltvBps: number; availableAtomic: string; priceFresh: boolean };
   lender: null | { sharesRaw: string; netContributedAtomic: string; valueAtomic: string; earnedAtomic: string; maxWithdrawAtomic: string };
   pool: null | { cashAtomic: string; totalAssetsAtomic: string; borrowedAtomic: string; utilizationBps: number; borrowAprBps: number; effectiveBorrowApyBps: number; supplyAprBps: number };
@@ -26,6 +29,9 @@ const shares = (value: string) => (Number(value) / 1e18).toLocaleString('en-US',
 const time = (value: number) => new Date(value * 1000).toLocaleString();
 /** How old the copied price is, in the unit a person reads at a glance. */
 const age = (seconds: number) => seconds < 60 ? 'under a minute' : seconds < 3600 ? `${Math.round(seconds / 60)} min` : `${(seconds / 3600).toFixed(1)} h`;
+const EXPLORER_TX = 'https://explorer.testnet.chain.robinhood.com/tx/';
+/** Age of a Unix-seconds time against the browser clock. */
+const since = (unixSeconds: number) => age(Math.max(0, Math.floor(Date.now() / 1000) - unixSeconds));
 
 export function ShareWorkflows({ request, go }: { request: Request; go: (area: Area) => void }) {
   const wallet = useRentalWallet();
@@ -48,6 +54,7 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
   const [error, setError] = useState('');
   const [readError, setReadError] = useState('');
   const [message, setMessage] = useState('');
+  const [confirmedHashes, setConfirmedHashes] = useState<string[]>([]);
   const [review, setReview] = useState<{ operation: string; borrower?: string; quantity: string; humanAmount: string; unit: string } | null>(null);
   const [stepDescription, setStepDescription] = useState('');
   const [loanPage, setLoanPage] = useState<LiquidationPage | null>(null);
@@ -101,7 +108,8 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
   async function execute() {
     if (!review || acting.current || actionBlocked(review.operation)) return;
     const action = review;
-    acting.current = true; setBusy(true); setError(''); setMessage(''); setReview(null); setStepDescription('');
+    acting.current = true; setBusy(true); setError(''); setMessage(''); setConfirmedHashes([]); setReview(null); setStepDescription('');
+    const hashes: string[] = [];
     let submitted = false;
     try {
       const result = await settleShareAction(async () => {
@@ -115,11 +123,14 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
             const signed = await wallet.signEvmTransaction({ walletId: prepared.walletId, operationId: `market-${step.transaction.nonce}`, description: step.description, expiresAt: new Date(Date.now() + 120_000).toISOString(), transaction: step.transaction });
             submitted = true;
             hash = (await request<{ hash: string }>('/api/share-workflows', { action: 'submit', signed })).hash;
+            hashes.push(hash);
           }
         } while (needsApproval);
         return hash;
       }, () => window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'evm' } })), refresh);
-      if (result.confirmation) setMessage(`Confirmed · ${result.confirmation}`);
+      if (result.confirmation) setMessage('Confirmed');
+      // Every submitted step (approvals and the market call) gets its explorer link, even when a later step failed.
+      setConfirmedHashes(hashes);
       const reason = result.actionError instanceof Error ? result.actionError.message : String(result.actionError);
       // Before the first submission nothing reached the chain, so there is no partial action to warn about.
       if (result.actionError) setError(submitted ? `Action could not be confirmed; earlier steps may have changed balances. ${reason}` : reason);
@@ -186,7 +197,8 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
         <p>Wallet: {view.sharesRaw === null ? 'unavailable' : shares(view.sharesRaw)} official test TSLA · {dollars(view.testUsdAtomic)} · {ethBalance === undefined ? 'fee balance unavailable' : `${ethBalance} test ETH for fees`}. {fresh ? `Mirrored token price: ${dollars(view.priceAtomic)}; wallet TSLA value: ${dollars(view.walletValueAtomic)}.` : 'Fresh mirrored token price unavailable.'}</p>
         <p>Your loan · collateral: {view.loan ? shares(view.loan.sharesRaw) : 'unavailable'} TSLA · debt: {dollars(view.loan?.debtAtomic ?? null)} · collateral value: {fresh ? dollars(view.loan?.valueAtomic ?? null) : 'unavailable'} · LTV: {fresh && view.loan ? `${view.loan.ltvBps / 100}%` : 'unavailable'} · available borrowing: {fresh ? dollars(view.loan?.availableAtomic ?? null) : 'unavailable'}</p>
         <p>Your lending · net supplied: {dollars(view.lender?.netContributedAtomic ?? null)} · current value: {dollars(view.lender?.valueAtomic ?? null)} · earned (value minus net contributed, may be negative): {dollars(view.lender?.earnedAtomic ?? null)} · cash withdrawable now: {dollars(view.lender?.maxWithdrawAtomic ?? null)}</p>
-        {view.price && <p>Price copied {age(view.price.ageSeconds)} ago{view.price.weekendFreshnessWindow ? ' · weekend freshness window (74 h)' : ''}{view.price.stale ? ' · stale — valuation unavailable' : ''}.</p>}
+        {view.price && <p>Price source round: {since(view.price.sourceUpdatedAt)} old (published {time(view.price.sourceUpdatedAt)}) · copied to this chain {since(view.price.pushedAt)} ago ({time(view.price.pushedAt)}){view.price.weekendFreshnessWindow ? ' · weekend freshness window (74 h)' : ''}{view.price.stale ? ' · stale — valuation unavailable' : ''}.</p>}
+        {view.deployment && view.priceJob && <p role={view.priceJob.health === 'attention' ? 'alert' : 'status'}>Price job: {view.priceJob.health === 'ok' ? 'healthy' : view.priceJob.health === 'waiting' ? 'waiting for a newer round' : 'needs attention'} — {view.priceJob.message}{view.priceJob.lastRun ? ` Last run ${since(view.priceJob.lastRun.at)} ago.` : ''}</p>}
       </div>
       <nav className="share-market-choices" aria-label="Choose a test-money task">{([['borrow', 'Loan against shares'], ['lend', 'Lend test dollars']] as const).map(([id, label]) => <button key={id} type="button" className={tab === id ? 'button' : 'button secondary'} aria-pressed={tab === id} onClick={() => { setTab(id); setOperation(id === 'lend' ? 'lend' : 'deposit_collateral'); setReview(null); setError(''); }}>{label}</button>)}</nav>
       <section className="share-market-task" aria-label={tab === 'lend' ? 'Lending task' : 'Borrowing task'}>
@@ -196,12 +208,14 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
         <nav className="share-market-operations" aria-label="Select an operation">{operations.map(([id, label]) => <button key={id} type="button" className={operation === id ? 'button' : 'button secondary'} aria-pressed={operation === id} onClick={() => { setOperation(id); setReview(null); setError(''); }}>{label}</button>)}</nav>
         <label className="share-market-amount">Amount in {amountUnit}<input value={quantity} onChange={(event) => { setQuantity(event.target.value); setReview(null); }} inputMode="decimal" /></label>
         {needsShares && <p role="status">This collateral amount needs more official test TSLA. Get test TSLA from the <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet</a> (no value).</p>}
-        {ready && (needsDollars || ethBalance !== undefined && Number(ethBalance) === 0) && <div className="share-market-funding"><p>For this {tab === 'lend' ? 'lending' : 'loan'} action: {needsDollars ? 'test dollars (tUSDG), plus test ETH for fees.' : 'test ETH for fees.'} These tokens cannot fund a Solana deposit.</p><TestDollars request={request} ethBalance={ethBalance} refresh={refresh} needDollars={needsDollars} /></div>}
+        {ready && (needsDollars || belowGasDripThreshold(ethBalance)) && <div className="share-market-funding"><p>For this {tab === 'lend' ? 'lending' : 'loan'} action: {needsDollars ? 'test dollars (tUSDG), plus test ETH for fees.' : 'test ETH for fees.'} These tokens cannot fund a Solana deposit.</p><TestDollars request={request} ethBalance={ethBalance} refresh={refresh} needDollars={needsDollars} /></div>}
+        {tab === 'borrow' && operation === 'borrow' && view.pool && <p className="share-market-borrow-facts" role="status">Pool cash available to borrow: {dollars(view.pool.cashAtomic)} (borrowing also stops at 90% utilization; your limit now: {fresh ? dollars(view.loan?.availableAtomic ?? null) : 'unavailable without a fresh price'}). Price age: {view.price ? `${since(view.price.sourceUpdatedAt)} old${view.price.stale ? ', stale' : ''}, copied ${since(view.price.pushedAt)} ago` : 'no price copied yet'}.</p>}
         {action(`Review ${operations.find(([id]) => id === operation)?.[1].replace(/^\d\. /, '').toLowerCase() ?? operation}`, operation, operation === 'borrow' || operation === 'withdraw_collateral' && BigInt(view.loan?.debtAtomic ?? '0') > 0n)}
         {blockedReason(operation) && <p role="status">{blockedReason(operation)}</p>}
       </section>
       <details className="share-market-detail"><summary>Price source &amp; pool facts</summary>
         {view.price && <p>Robinhood TSLA token price from <a href={`https://robinhoodchain.blockscout.com/address/${view.price.sourceFeed}`} target="_blank" rel="noopener noreferrer">Chainlink RHTSLA/USD (mainnet)</a>, converted to the test token’s multiplier · source chain {view.price.sourceChainId} · round {view.price.sourceRoundId} at {time(view.price.sourceUpdatedAt)} · copied at {time(view.price.pushedAt)}. Mirror, not a Chainlink contract.</p>}
+        {view.deployment && view.priceJob && <p>Hourly price job · {view.priceJob.message} {view.priceJob.lastRun ? `Last run: ${time(view.priceJob.lastRun.at)}, ${view.priceJob.lastRun.status}${view.priceJob.lastRun.reason ? ` (${view.priceJob.lastRun.reason.replaceAll('_', ' ')})` : ''}. ` : ''}{view.priceJob.lastPush ? <>Last round copied: {view.priceJob.lastPush.sourceRoundId}, source time {view.priceJob.lastPush.sourceUpdatedAt ? time(view.priceJob.lastPush.sourceUpdatedAt) : 'unknown'}, copied {time(view.priceJob.lastPush.at)}{view.priceJob.lastPush.transactionHash && <> (<a href={`${EXPLORER_TX}${view.priceJob.lastPush.transactionHash}`} target="_blank" rel="noopener noreferrer">transaction</a>)</>}.</> : 'No copy recorded by the job yet.'}</p>}
         {view.pool && <div><h3>Pool facts</h3><p>Cash: {dollars(view.pool.cashAtomic)} · total assets: {dollars(view.pool.totalAssetsAtomic)} · borrowed: {dollars(view.pool.borrowedAtomic)} · utilization: {view.pool.utilizationBps / 100}% · current borrower rate: {view.pool.borrowAprBps / 100}% a year, compounded continuously (≈{view.pool.effectiveBorrowApyBps / 100}% a year) · current lender rate: {view.pool.supplyAprBps / 100}% APR (not a projection).</p><p>10,000 tUSDG seeded at deploy to a burn address. Nobody can withdraw those seed shares; their interest stays locked in the pool.</p></div>}
       </details>
       <details className="share-market-detail"><summary>Advanced · loans that can be liquidated</summary>
@@ -222,7 +236,7 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
       </details>
     </>}
     {review && <div className="share-market-review" role="region" aria-label="Review market action"><p>Review {review.operation}: {review.humanAmount} {review.unit}{review.borrower ? ` for ${review.borrower}` : ''}. You sign exact-amount approvals and the market transaction with your own wallet.</p><button type="button" className="button primary" disabled={actionBlocked(review.operation)} onClick={() => void execute()}>Confirm and sign</button><button type="button" className="button secondary" onClick={() => setReview(null)}>Cancel</button>{blockedReason(review.operation) && <p role="status">{blockedReason(review.operation)}</p>}</div>}
-    {busy && <p role="status">{stepDescription || 'Waiting for wallet and transaction confirmation…'}</p>}{message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
+    {busy && <p role="status">{stepDescription || 'Waiting for wallet and transaction confirmation…'}</p>}{message && <p role="status">{message}{confirmedHashes.length > 0 && <> · {confirmedHashes.map((hash, index) => <span key={hash}>{index > 0 && ', '}<a href={`${EXPLORER_TX}${hash}`} target="_blank" rel="noopener noreferrer">{confirmedHashes.length > 1 ? `step ${index + 1}` : 'view transaction'}</a></span>)}</>}</p>}{!message && confirmedHashes.length > 0 && <p role="status">Submitted: {confirmedHashes.map((hash, index) => <span key={hash}>{index > 0 && ', '}<a href={`${EXPLORER_TX}${hash}`} target="_blank" rel="noopener noreferrer">step {index + 1}</a></span>)}</p>}{error && <p role="alert">{error}</p>}
     <LocalEarningsRehearsal key={account} request={request} account={account} />
   </section>;
 }

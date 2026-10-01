@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { createPublicClient, defineChain, getAddress, http, keccak256, parseTransaction, recoverTransactionAddress, type Hex, type TransactionSerializedEIP1559 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
+import { GAS_DRIP_THRESHOLD } from '../domain/gas-threshold.ts';
 import { acquireOperatorNonceLane, releaseOperatorNonceLaneIfOwned } from './operator-nonce-lane.ts';
 import type { Store } from './store.ts';
 
 export const GAS_DRIP_AMOUNT = 50_000_000_000_000n;
-export const GAS_DRIP_THRESHOLD = 10_000_000_000_000n;
+export { GAS_DRIP_THRESHOLD } from '../domain/gas-threshold.ts';
 export const GAS_DRIP_DAILY_CAP = 200;
 const DAY = 86_400_000;
 const KEY = 'robinhood-gas-drip:46630';

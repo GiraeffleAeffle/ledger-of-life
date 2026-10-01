@@ -16,6 +16,22 @@ Mainnet and testnet multipliers need not match. The updater converts `mainnet_an
 
 Wallet TSLA, collateral and loan valuation use this same mirror. The interface exposes the source round, source time, copied time, age, source feed and chain, and stale state. It labels Saturday 00:00 UTC through Monday 12:00 UTC as the **weekend freshness window (74 hours)**, not as a claim that trading is closed. Normal freshness is 26 hours. Before the first push there is no price provenance: no mainnet round has been copied yet. Stale, unset or suspended prices are unavailable, never displayed as zero-dollar quotes. Longer holidays or a failed updater freeze price-sensitive actions rather than substituting Jupiter or an operator quote.
 
+## The hourly price job and its health
+
+An operator job (`scripts/reconcile.mjs`, scope `price`, hourly) runs `reconcileTslaPrice`. After every run the route `POST /api/jobs/reconcile?scope=price` stores the outcome under `tsla-price-job:last`: status (`pushed`, `skipped`, `unconfigured`, `failed`), the skip reason, the source round id and its time, the time of the run, and the last successful copy (time, round, transaction). `GET /api/status` returns it as `market.priceJob`, and the loan panel shows it under the price lines and in "Price source & pool facts".
+
+`health` is `ok` when the last run copied a round, `waiting` when it skipped only because nothing newer exists (`same_or_older_round`, `push_interval`, `nonincreasing_source_time`), and `attention` for every other skip (stale or paused source, Jupiter cross-check unavailable or divergent, movement bound, RPC trouble), for an unconfigured or failed run, for a job that never reported, and for no run in over three hours. A skipped run is therefore never reported as healthy. The job state does not change what the contract accepts: the pool still decides freshness (26 h, 74 h in the weekend window) from the copied source time.
+
+The panel keeps two times apart: the **source round** (when Chainlink published the price on mainnet, which is what freshness is measured from) and the **copy** (when the job wrote it to this chain). The line above the Borrow form states the pool's cash, your limit and the price age.
+
+## Leaving in kind
+
+There is no sale and no exchange. To exit, repay the debt (enter a little more than owed; Repay takes only what is owed because interest accrues every second) and withdraw the collateral: the same test TSLA returns to the wallet. With no debt, withdrawing needs no price. Only liquidation seizes collateral. Every confirmed action shows an explorer link for each transaction it sent (approval and market call).
+
+## Evidence for a hosted run
+
+`node scripts/prove-loan-cycle.mjs <wallet> <txHash>...` reads the public RPC only (no key, no transaction) and prints JSON: each receipt (status, block, target, decoded pool or token call), the wallet's position, balances and pool market, and the mirrored price with its source time and age. It records what the chain says; it does not decide whether a run counts as evidence.
+
 ## Wallet-signed actions
 
 | Action | What actually happens |

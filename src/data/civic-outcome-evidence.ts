@@ -22,6 +22,7 @@ export type CivicOutcomeEvidence = {
   /** Source-reported relationships and spend do not establish the funding source or causal effects. */
   relations?: CivicSourceFact[];
   spending?: { planned: Omit<CivicOutputEvidence, 'id'>; recorded: Omit<CivicOutputEvidence, 'id'>; caveat: string };
+  budgetPlan?: readonly { year: number; administrative: number; investment: number; financing: number; total: number }[];
   indicator?: CivicIndicator;
   metrics: {
     id: string;
@@ -202,17 +203,21 @@ export const civicOutcomeEvidence: readonly CivicOutcomeEvidence[] = [
   {
     id: 'strausberg-investment-budget-2025-2026',
     cityId: 'strausberg',
-    signalIds: ['budget:investment-outlays-2025', 'budget:investment-outlays-2026'],
-    title: 'Planned investment disbursements · 2025 and 2026',
+    signalIds: [],
+    title: 'Planned city cash outlays · 2025 and 2026',
     topic: 'municipal-budget',
     outputs: [],
+    budgetPlan: [
+      { year: 2025, administrative: 64036804, investment: 17941270, financing: 1730000, total: 83708074 },
+      { year: 2026, administrative: 64173869, investment: 12609320, financing: 1757000, total: 78540189 },
+    ],
     metrics: [
       { id: 'budget-investment-2025', label: 'Budgeted investment disbursements', value: 17941270, unit: 'EUR', basis: 'planned', period: '2025 fiscal year', sourceUrl: budgetSource, locator: 'PDF page 1, § 1, row “Auszahlungen aus Investitionstätigkeit”, 2025 column' },
       { id: 'budget-investment-2026', label: 'Budgeted investment disbursements', value: 12609320, unit: 'EUR', basis: 'planned', period: '2026 fiscal year', sourceUrl: budgetSource, locator: 'PDF page 1, § 1, row “Auszahlungen aus Investitionstätigkeit”, 2026 column' },
     ],
     benefitIndicatorMissing: 'Actual disbursement and public-service results · no measured values in reviewed sources',
     missingEvidence: ['Actual disbursements and year-end accounts', 'Project-level allocation and delivery', 'Resulting public-service or asset outcomes'],
-    comparisonCaveat: 'These are budget ordinance plans for investment disbursements, not actual spending, unrestricted cash, revenue/tax gains, or outcomes; annual plan values are not a like-for-like impact measure.',
+    comparisonCaveat: 'These are the 2025/26 ordinance’s planned cash outlays, not actual or project-level spending, expense-by-service allocations, unrestricted cash, revenue/tax gains, or outcomes. Subsequent amendments are not tracked in this snapshot.',
     geometryNote: 'City-wide budget amounts have no project location; do not map them as neighbourhood expenditure.',
     checkedAt,
   },

@@ -16,6 +16,7 @@ import { readCurrentProjectSnapshot, readPublicSignal, useProjectFollowing } fro
 import { ProjectFollowButton } from './project-follow-button';
 import { projectDisplayName } from './project-display-name';
 import { strausbergOrganizations } from '@/data/cities/strausberg-organizations';
+import { strausbergSources } from '@/data/cities/strausberg';
 import { OrganizationDetail, OrganizationShelf } from './organization-profile';
 import { consultationGroups, displayCityText, formatCityDate, formatCityEventDate, shortlistFeatures } from './city-coverage';
 
@@ -57,8 +58,21 @@ function Outcomes({ caseStudy, feature }: { caseStudy?: CivicOutcomeEvidence; fe
     metric.value === output.value && metric.unit === output.unit && metric.basis === output.basis)) ?? [];
   return <div className="civic-outcomes" aria-label="Project outputs and outcomes">
     <div className="civic-lifecycle" aria-label="Lifecycle stages; only the published stage below is evidenced"><span className="civic-state">① Plan</span><span className="civic-state">② Decision</span><span className="civic-state">③ Delivery</span><span className={`civic-state${caseStudy?.indicator ? ' is-observed' : ' is-unknown'}`}>{caseStudy?.indicator ? '④ Before/during' : '④ Outcome?'}</span></div>
-    <p className="civic-stage">Published stage: <strong>{feature ? displayStatus(feature) : outputs.length ? `${outputs[0].basis === 'planned' ? 'Planned' : 'Reported'} · ${outputs[0].label}` : 'not established'}</strong> <span>≠ measured success</span></p>
+    <p className="civic-stage">Published stage: <strong>{feature ? displayStatus(feature) : caseStudy?.budgetPlan ? 'Planned · 2025/26 budget ordinance' : outputs.length ? `${outputs[0].basis === 'planned' ? 'Planned' : 'Reported'} · ${outputs[0].label}` : 'not established'}</strong> <span>≠ measured success</span></p>
     {outputs.map((output) => <div className={`civic-output civic-${output.basis}`} key={`${output.label}:${output.locator}`}><span>{output.basis === 'planned' ? '◌ Plan' : '■ Reported physical output'}</span><strong>{quantity(output.value, output.unit)}</strong><small>{output.label}</small></div>)}
+    {caseStudy?.budgetPlan && <section className="civic-spending" aria-label="Planned city cash outlays">
+      <span className="eyebrow">2025/26 ORDINANCE · PLAN, NOT ACTUAL SPENDING</span>
+      <div>{caseStudy.budgetPlan.map((plan) => <div key={plan.year}>
+        <h4>{plan.year} planned · {quantity(plan.total, 'EUR')}</h4>
+        <p>Administrative · {quantity(plan.administrative, 'EUR')}</p>
+        <p>Investment · {quantity(plan.investment, 'EUR')}</p>
+        <p>Financing · {quantity(plan.financing, 'EUR')}</p>
+        <div className="civic-meter" aria-hidden="true"><i style={{ width: `${plan.total / 83708074 * 100}%` }} /></div>
+        <p><strong>Actual: not published</strong> in the reviewed snapshot</p>
+      </div>)}</div>
+      <p>Cash disbursements, not expenses by service or project. Subsequent amendments are not tracked.</p>
+      <p><a href={caseStudy.metrics[0].sourceUrl} target="_blank" rel="noopener noreferrer">Official ordinance · page 1, §1 ↗</a> · <a href={strausbergSources.gazette} target="_blank" rel="noopener noreferrer">Publication &amp; inspection notice ↗</a> · <a href={strausbergSources.inspectionLaw} target="_blank" rel="noopener noreferrer">Budget inspection law ↗</a> · <a href={strausbergSources.informationAccessLaw} target="_blank" rel="noopener noreferrer">Information access (AIG) ↗</a></p>
+    </section>}
     {caseStudy?.spending && <section className="civic-spending" aria-label="Planned and provisional trial expenditure"><span className="eyebrow">COST · NOT A FUNDING LINEAGE</span><div><p><strong>{quantity(caseStudy.spending.planned.value, caseStudy.spending.planned.unit)}</strong> forecast</p><p><strong>{caseStudy.spending.recorded.value}</strong> recorded through 2021</p></div><small>{caseStudy.spending.caveat}</small></section>}
     {caseStudy?.indicator && <ObservedIndicator indicator={caseStudy.indicator} />}
     <div className="civic-metrics">{metrics.map((metric) => {

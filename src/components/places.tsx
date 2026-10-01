@@ -1,9 +1,11 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
+import NextLink from 'next/link';
 import { CityCard } from './city';
 import { CivicPlaceLenses } from './civic-place-lenses';
 import { CityRegionTopics } from './region-topics';
+import { CivicDecisionsPanel } from './civic-decisions-panel';
 import { CITY_CHANGED_EVENT } from './use-city-signals';
 import { useCitySignals } from './use-city-signals';
 import type { PlacesResult } from '@/server/places-live';
@@ -51,12 +53,14 @@ export function PlacesArea({ request, accountId, go }: { request: Request; accou
       <p className="places-meta">Local observations are context, not measured outcomes of a project.</p>
     </details>
     <section className="card places-section civic-support"><h2 id="community-discovery">Community in {currentCity} · sport places &amp; official directories</h2>
+      {(exploredCity || cityId) === 'strausberg' && <p><NextLink href="/welcome/strausberg">Get settled in Strausberg · public welcome guide →</NextLink> · sourced steps, groups and contacts; English-only, unofficial community guidance.</p>}
       {!places ? <p>{reason === 'choose' ? 'Choose your city to discover local activities.' : reason || 'Checking local directories…'}</p>
         : <>{places.clubs.state === 'available' ? <div className="places-groups"><p>{places.clubs.value.caveat} <Link url={places.clubs.value.source.licenceUrl}>© OpenStreetMap contributors · ODbL 1.0</Link>.</p>{places.clubs.value.groups.map((group) => <details key={group.type}><summary>{group.type.split(';')[0].replaceAll('_', ' ')} · {group.count}</summary><ul>{group.items.map((item) => <li key={item.id}><Link url={item.url}>{item.name}</Link></li>)}</ul></details>)}</div> : <p>No verified directory reading available.</p>}{places.cityId === 'strausberg' && <div className="places-links">{strausberg.directories.map((item) => <Link key={item.url} url={item.url}>{item.label}</Link>)}</div>}</>}
     </section>
     <section className="card places-section civic-support"><h2 id="public-decisions">Council in {currentCity} · papers, participation &amp; wider portals</h2>
-      {places?.cityId === 'strausberg' ? <div className="places-links"><Link url={strausberg.calendar}>Council calendar</Link><Link url={strausberg.documents}>Document search</Link>{strausberg.hierarchy.map((item) => item.url && <Link key={item.level} url={item.url}>{item.level}</Link>)}</div> : <p>{places ? 'No researched official links for this city.' : reason === 'choose' ? 'Choose a city to see its researched public links.' : reason || 'Checking city sources…'}</p>}
-      <p className="places-meta">Official links checked {checked}; no live meetings or complete district/state/world feed claimed.</p>
+      <CivicDecisionsPanel request={request} cityId={exploredCity || cityId} />
+      {(exploredCity || cityId) === 'strausberg' && <div className="places-links"><Link url={strausberg.calendar}>Council calendar</Link><Link url={strausberg.documents}>Document search</Link>{strausberg.hierarchy.map((item) => item.url && <Link key={item.level} url={item.url}>{item.level} · wider portal link</Link>)}</div>}
+      {(exploredCity || cityId) === 'strausberg' && <p className="places-meta">Strausberg official links checked {checked}; district, state, Germany and EU are links, not live feeds.</p>}
     </section>
     </>}
   </div>;

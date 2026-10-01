@@ -1,5 +1,6 @@
 import { authenticated } from '@/server/authenticated';
 import { getStore } from '@/server/store';
+import { readPriceJob, shapePriceJob } from '@/server/price-job-health';
 import { errorResponse, readBody, sameOrigin } from '@/server/http';
 import { prepareMarketAction, readSharedMarket, readUnhealthyLoans, submitMarketTransaction } from '@/server/shared-market';
 
@@ -35,8 +36,10 @@ export async function GET(request: Request) {
       const clear = () => { if (pendingReads.get(key) === pending) pendingReads.delete(key); };
       void pending.then(clear, clear);
     }
-    const workflow = await pending;
-    return Response.json({ workflow }, noStore);
+    const workflow = await pending as Record<string, unknown>;
+    // The job record is a store read; a store failure hides the job line but must not hide the market.
+    const priceJob = await getStore().then(readPriceJob).then((record) => shapePriceJob(record, Math.floor(Date.now() / 1000))).catch(() => null);
+    return Response.json({ workflow: { ...workflow, priceJob } }, noStore);
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : 'Workflow positions unavailable.' }, { status: 503, ...noStore });
   }

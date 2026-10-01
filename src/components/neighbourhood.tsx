@@ -45,7 +45,7 @@ export function Neighbourhood({ city, location, request, movingIn = false }: { c
       <p>Public snapshot for {nearby.city.name} · {formatCityDate(nearby.generatedAt)}. Nearby means within 2 km of the approximate pin, not walking distance. Coverage is incomplete.</p>
       {movingIn && <button type="button" className="button secondary" disabled={busy || chosenCity === cityId} onClick={() => void choose()}>{chosenCity === cityId ? `${nearby.city.name} is now your city` : `Make ${nearby.city.name} my city`}</button>}
       {arrivalGuideCityIds.includes(cityId) && <p><Link href={`/welcome/${cityId}`} prefetch={false}>Open the welcome guide for {nearby.city.name}</Link></p>}
-      {movingIn && <p><Link href="/library" prefetch={false}>Ask the city AI desk about the area</Link> · public compute, free when a host offers it. Name the city in your question; this link sends no listing details.</p>}
+      {movingIn && <p><Link href={`/library?city=${cityId}`} prefetch={false}>Ask the city AI desk about the area</Link> · public compute, free when a host offers it. The link carries only the city name; no listing details.</p>}
       {(['projects', 'places'] as const).map((kind) => <div key={kind}><h4>Nearby public {kind}</h4>{nearby[kind].length ? <ul>{nearby[kind].map(({ feature, distance }) => {
         const source = 'sources' in feature.properties ? feature.properties.sources[0] : feature.properties.primarySource;
         return <li key={feature.properties.id}><strong>{displayCityText(feature.properties.title)}</strong> · {(distance / 1000).toFixed(1)} km

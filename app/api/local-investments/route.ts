@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const body = await readBody(request);
     const store = await getStore();
     if (body.action === 'prepare')
-      return Response.json({ order: await prepareLocalInvestment(store, identity, { requestId: body.requestId, projectId: body.projectId, cashAtomic: body.cashAtomic }) }, noStore);
+      return Response.json({ order: await prepareLocalInvestment(store, identity, { requestId: body.requestId, projectId: body.projectId, direction: body.direction, cashAtomic: body.cashAtomic, unitsRaw: body.unitsRaw }) }, noStore);
     if (body.action === 'submit')
       return Response.json({ order: await submitLocalInvestment(store, identity, body.orderId, body.stepId, body.signedTransaction) }, noStore);
     if (body.action === 'reconcile')

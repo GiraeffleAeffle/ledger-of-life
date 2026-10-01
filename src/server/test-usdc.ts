@@ -1,19 +1,9 @@
-import { createHash, randomUUID } from 'node:crypto';
-import {
-  address, appendTransactionMessageInstructions, blockhash, compileTransaction, createKeyPairSignerFromBytes,
-  createNoopSigner, createTransactionMessage, getBase58Decoder, getTransactionDecoder, getTransactionEncoder,
-  isSome, partiallySignTransaction, pipe, setTransactionMessageFeePayer,
-  setTransactionMessageLifetimeUsingBlockhash, type ReadonlyUint8Array,
-} from '@solana/kit';
-import { findAssociatedTokenPda, getCreateAssociatedTokenIdempotentInstruction, getMintDecoder, getMintToCheckedInstruction } from '@solana-program/token-2022';
-import { SOLANA_IDS, SOLANA_TEST_USDC_MINT, type SignatureReconciliation } from '../finance/solana/index.ts';
+import { randomUUID } from 'node:crypto';
 import { ConflictError } from './errors.ts';
-import { RpcSolanaGateway, solanaConfiguration } from './solana-rpc.ts';
-import { configuredFeeSponsor } from './solana-service.ts';
 import type { Store } from './store.ts';
+import { executeTestUsdcPayout, testUsdcPayoutContext, type TestUsdcClient } from './test-usdc-payout.ts';
 const DAY = 86_400_000;
 const KEY = 'solana-test-usdc:devnet';
-const digest = (bytes: ReadonlyUint8Array) => createHash('sha256').update(bytes as Uint8Array).digest('hex');
 type Journal = {
   subject: string; at: number; lease: string; busyUntil: number;
   authority: string; sponsor: string; amountAtomic: string; ata: string;
@@ -21,7 +11,7 @@ type Journal = {
   done?: boolean;
 };
 type Ledger = { accounts: Record<string, number>; wallets: Record<string, Journal>; day: string; count: number };
-type Client = Pick<RpcSolanaGateway, 'checkedGenesis' | 'multiple' | 'lifetime' | 'simulate' | 'broadcast' | 'reconcile' | 'rpc'>;
+type Client = TestUsdcClient;
 type Options = { environment?: Record<string, string | undefined>; client?: Client; now?: () => number };
 
 function positiveInteger(value: string | undefined, fallback: number) {
@@ -34,26 +24,14 @@ function positiveInteger(value: string | undefined, fallback: number) {
 /** Only the server's verified identity may select the recipient; no request amount or wallet is accepted. */
 export async function mintTestUsdc(store: Store, subject: string, verifiedWallet: string, options: Options = {}) {
   const environment = options.environment ?? process.env;
-  if (!environment.SOLANA_TEST_USDC_MINT_AUTHORITY?.trim() || !environment.SOLANA_SPONSOR_KEYPAIR?.trim())
-    return { status: 'unconfigured' as const };
-  const config = solanaConfiguration(environment);
-  if (!config || config.cluster !== 'devnet' || config.ledgerDepositMint !== SOLANA_TEST_USDC_MINT)
-    return { status: 'unconfigured' as const };
-  const raw: unknown = JSON.parse(environment.SOLANA_TEST_USDC_MINT_AUTHORITY);
-  if (!Array.isArray(raw) || raw.length !== 64 || raw.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255))
-    throw new Error('Invalid test USDC mint authority configuration.');
-  const authority = await createKeyPairSignerFromBytes(new Uint8Array(raw));
-  const sponsor = (await configuredFeeSponsor(environment))!;
-  const owner = address(verifiedWallet);
-  if (owner === authority.address || owner === sponsor.address || authority.address === sponsor.address)
-    throw new ConflictError('The faucet needs separate mint authority, fee sponsor and personal wallet.');
+  const context = await testUsdcPayoutContext(verifiedWallet, environment, options.client);
+  if (!context) return { status: 'unconfigured' as const };
+  const { authority, sponsor, owner, ata } = context;
   const amount = BigInt(positiveInteger(environment.SOLANA_TEST_USDC_AMOUNT, 10_000)) * 1_000_000n;
   if (amount > 18_446_744_073_709_551_615n) throw new Error('Test USDC amount exceeds the token limit.');
   const cap = positiveInteger(environment.SOLANA_TEST_USDC_DAILY_CAP, 200);
-  const client = options.client ?? new RpcSolanaGateway(config);
   const at = (options.now ?? Date.now)();
   const lease = randomUUID();
-  const [ata] = await findAssociatedTokenPda({ owner, mint: address(SOLANA_TEST_USDC_MINT), tokenProgram: address(SOLANA_IDS.token) });
   try { await store.create<Ledger>(KEY, { accounts: {}, wallets: {}, day: '', count: 0 }); }
   catch (error) { if (!await store.get(KEY)) throw error; }
   const ledger = await store.update<Ledger>(KEY, (value) => {
@@ -98,71 +76,15 @@ export async function mintTestUsdc(store: Store, subject: string, verifiedWallet
     });
     journal = saved.wallets[owner];
   };
-  const observe = () => client.reconcile(journal.signature!, journal.messageSha256!, [{
-    account: journal.ata, mint: SOLANA_TEST_USDC_MINT, owner, direction: 'credit',
-    minimumAtomic: journal.amountAtomic, maximumAtomic: journal.amountAtomic, allowCreated: true,
-  }]);
-  const finish = async (result: SignatureReconciliation) => {
-    if (result.status === 'finalized') {
-      await persist((value) => ({ ...value, done: true }));
-      return { status: 'confirmed' as const, signature: journal.signature!, amountAtomic: journal.amountAtomic };
-    }
-    if (result.status === 'failed') {
-      await persist((value) => ({ ...value, done: true }));
-      throw new ConflictError('The test USDC mint failed. No replacement transaction was sent.');
-    }
-    return null;
-  };
   try {
-    await client.checkedGenesis();
-    if (!journal.signed) {
-      const row = (await client.multiple([SOLANA_TEST_USDC_MINT])).accounts[0];
-      if (!row || row.owner !== SOLANA_IDS.token || row.executable || row.data.length !== 82)
-        throw new Error('The test USDC mint is unavailable.');
-      const mint = getMintDecoder().decode(row.data);
-      if (!mint.isInitialized || mint.decimals !== 6 || !isSome(mint.mintAuthority)
-        || mint.mintAuthority.value !== authority.address || isSome(mint.freezeAuthority))
-        throw new Error('The test USDC mint does not match the configured authority and reviewed token.');
-      const lifetime = await client.lifetime();
-      const transaction = compileTransaction(pipe(
-        createTransactionMessage({ version: 0 }),
-        (message) => setTransactionMessageFeePayer(address(sponsor.address), message),
-        (message) => setTransactionMessageLifetimeUsingBlockhash({ blockhash: blockhash(lifetime.blockhash), lastValidBlockHeight: BigInt(lifetime.lastValidBlockHeight) }, message),
-        (message) => appendTransactionMessageInstructions([
-          getCreateAssociatedTokenIdempotentInstruction({ payer: createNoopSigner(address(sponsor.address)), ata, owner, mint: address(SOLANA_TEST_USDC_MINT), tokenProgram: address(SOLANA_IDS.token) }),
-          getMintToCheckedInstruction({ mint: address(SOLANA_TEST_USDC_MINT), token: ata, mintAuthority: authority, amount: BigInt(journal.amountAtomic), decimals: 6 }, { programAddress: address(SOLANA_IDS.token) }),
-        ], message),
-      ));
-      const authoritySigned = getTransactionEncoder().encode(await partiallySignTransaction([authority.keyPair], transaction));
-      const signed = await sponsor.sign(authoritySigned as Uint8Array);
-      // Simulation includes the sponsor's fee and ATA rent ceiling. Nothing is broadcast before durable storage.
-      await client.simulate(signed, sponsor.address, owner);
-      const decoded = getTransactionDecoder().decode(signed);
-      const signature = getBase58Decoder().decode(decoded.signatures[address(sponsor.address)]!);
-      await persist((value) => ({ ...value, signed: Buffer.from(signed).toString('base64'), signature, messageSha256: digest(decoded.messageBytes), lastValidBlockHeight: lifetime.lastValidBlockHeight }));
-    }
-    const signed = Buffer.from(journal.signed!, 'base64');
-    const transaction = getTransactionDecoder().decode(signed);
-    if (journal.ata !== ata || digest(transaction.messageBytes) !== journal.messageSha256
-      || getBase58Decoder().decode(transaction.signatures[address(sponsor.address)]!) !== journal.signature)
-      throw new Error('The test USDC journal does not match the verified wallet and transaction.');
-    const observed = await observe();
-    const completed = await finish(observed);
-    if (completed) return completed;
-    // Only a successful absence observation permits rebroadcast. Unknown RPC evidence is never absence.
-    if (observed.status === 'unknown' && observed.reason === 'signature-not-observed-do-not-resubmit-new-intent') {
-      const height = await client.rpc('getBlockHeight', [{ commitment: 'finalized' }]);
-      if (!Number.isSafeInteger(height) || Number(height) < 0) throw new Error('Block height unavailable.');
-      if (BigInt(Number(height)) > BigInt(journal.lastValidBlockHeight!)) {
-        await persist((value) => ({ ...value, done: true }));
-        throw new ConflictError('The test USDC mint expired without confirmation. No replacement transaction was sent.');
-      }
-      try { await client.broadcast(signed); }
-      catch { /* Ambiguous send retains the exact bytes; a retry observes them before any rebroadcast. */ }
-      const confirmed = await finish(await observe());
-      if (confirmed) return confirmed;
-    }
-    return { status: 'pending' as const, signature: journal.signature! };
+    const result = await executeTestUsdcPayout(context, journal, async (saved) => {
+      await persist((value) => ({ ...value, ...saved }));
+    });
+    if (result.status === 'confirmed' || result.status === 'failed' || result.status === 'expired')
+      await persist((value) => ({ ...value, done: true }));
+    if (result.status === 'failed' || result.status === 'expired')
+      throw new ConflictError(`The test USDC mint ${result.status === 'failed' ? 'failed' : 'expired without confirmation'}. No replacement transaction was sent.`);
+    return result;
   } finally {
     await store.update<Ledger>(KEY, (value) => {
       const current = value.wallets[owner];

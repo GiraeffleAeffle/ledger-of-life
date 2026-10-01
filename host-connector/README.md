@@ -2,6 +2,10 @@
 
 A standalone Node.js **22 or newer**, ESM, zero-dependency connector. It opens no listening service. The public app receives signed outbound requests; Ollama and optional Home Assistant remain reachable only from this device. Tokenless direct Wake-on-LAN uses an ephemeral outbound UDP socket. No npm install, app build, browser, shell execution, tools or model downloads are involved.
 
+## What a paid answer earns
+
+The app pays the host’s payout wallet in test tUSDG through x402 `upto`: 0.0001 tUSDG (100 atomic) per output token, at most 192 tokens (0.0192 tUSDG) per answer, and only when the model finishes a complete answer. Own-host and free public answers earn nothing. This is test money; the connector itself never touches payments.
+
 ## Owner setup on Linux
 
 Run as a dedicated unprivileged user on the GPU device, or on an always-on device that can reach the GPU's configured Ollama endpoint. Install/copy this directory somewhere that user can read, such as `/opt/stadtstack/host-connector`. Node must be on the device already.

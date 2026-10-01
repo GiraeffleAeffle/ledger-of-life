@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { belowGasDripThreshold } from '@/domain/gas-threshold';
 import { useRentalWallet } from '@/wallets';
 
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
@@ -12,7 +13,8 @@ export function TestDollars({ request, ethBalance, refresh, needDollars = true }
   const [success, setSuccess] = useState('');
   const [dripConfigured, setDripConfigured] = useState(false);
   const [gettingGas, setGettingGas] = useState(false);
-  const noGas = ethBalance !== undefined && Number(ethBalance) === 0;
+  // The server drips below 0.00001 ETH, so the button appears for the same balances (not only at exactly zero).
+  const noGas = belowGasDripThreshold(ethBalance);
   useEffect(() => {
     let active = true;
     void request<{ configured: boolean }>('/api/assets', { action: 'gas_drip_status' })
@@ -54,7 +56,7 @@ export function TestDollars({ request, ethBalance, refresh, needDollars = true }
   }
   return <div>
     <p>Robinhood Chain testnet · no real money.{needDollars && ' 1,000 tUSDG per request · no value. You sign with your own wallet. Wait one minute between requests; sign within two minutes.'}</p>
-    {noGas && <p role="status">{dripConfigured ? 'No test ETH for network fees. This site can send 0.00005 test ETH to your verified wallet, once per 24 hours per account and wallet (200 transfers per UTC day).' : 'No test ETH for network fees. Use the faucet first.'}</p>}
+    {noGas && <p role="status">{dripConfigured ? 'Too little test ETH for network fees. This site can send 0.00005 test ETH to your verified wallet, once per 24 hours per account and wallet (200 transfers per UTC day).' : 'Too little test ETH for network fees. Use the faucet first.'}</p>}
     {noGas && dripConfigured && <button type="button" className="button primary" disabled={pending || !hasWallet} onClick={() => { void getGas(); }}>{gettingGas ? 'Getting test ETH…' : 'Get test ETH for fees from this site'}</button>}
     {noGas && <p>The <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet</a> gives test ETH for fees (no value).</p>}
     {needDollars && <button type="button" className="button primary" disabled={pending || !hasWallet || noGas} onClick={() => { void mint(); }}>{pending && !gettingGas ? 'Getting test dollars…' : 'Get test dollars (tUSDG, no value)'}</button>}

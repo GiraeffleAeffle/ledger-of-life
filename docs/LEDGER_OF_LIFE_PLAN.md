@@ -24,7 +24,7 @@ demonstration is stronger than many disconnected dashboards or speculative reven
    open this working service. Record usage and settled receipts; keep euro cost scenarios separate.
 
 The connected rehearsal now uses a fresh real Privy passkey wallet: two tTSLA shares →
-collateral → 12 tUSDG borrowed → 5 tHOME + 5 tWORK → a 0.01-tUSDG local AI answer.
+collateral → 12 tUSDG borrowed → 5 tHOME + 5 tWORK → a 0.01-tUSDG local AI answer (the former flat price; now 0.0001 tUSDG per output token, at most 0.0192).
 The final cash is 1.99 tUSDG and the loan remains owed. The dedicated preparation signer
 never puts test cash directly in this buyer's wallet. See [executed evidence](evidence/BORROW_TO_LOCAL_AI_ROBINHOOD_TESTNET.json)
 and `VALIDATION.md`; existing funded tenancies and earlier investment positions are not reused.

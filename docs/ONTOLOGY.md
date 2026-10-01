@@ -181,7 +181,7 @@ Borrowers accrue interest continuously at 5% nominal annually (approximately 5.1
 | Landlord | Account → rent out a home → choose applicant → invite arbitrator → accept → create deposit space → propose deduction at move-out → payout |
 | Arbitrator | Account → join by invitation → decide a dispute |
 | Any owner | Connect adapters → see everything owned |
-| Local owner/customer | Available shares → separately signed collateral and loan → housing/company units → an owned AI answer; own-host compute has no payment, paid city-host complete-stop answers have checked x402 `upto` receipts at 100 atomic test tUSDG per output token within a signed maximum; free public city AI is an independent visitor service with no residence check |
+| Local owner/customer | Available shares → separately signed collateral and loan → housing/company units → an owned AI answer; own-host compute has no payment, paid city-host complete-stop answers are priced by x402 `upto` at 100 atomic test tUSDG (0.0001) per output token, at most 192 tokens (0.0192 tUSDG) per answer; the per-token path is implemented and covered by tests, but no `upto` receipt has settled on the hosted site yet; free public city AI is an independent visitor service with no residence check |
 
 In each tenancy phase exactly one person has an action; everyone else sees what they are waiting for (`src/server/journey.ts`).
 

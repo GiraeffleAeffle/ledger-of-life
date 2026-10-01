@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  encodeAbiParameters, encodeEventTopics, getAddress, keccak256, parseAbi, parseAbiParameters, parseTransaction,
+  decodeFunctionData, encodeAbiParameters, encodeEventTopics, getAddress, keccak256, parseAbi, parseAbiParameters, parseTransaction,
   type Address, type Hex,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -24,20 +24,22 @@ const unitAddresses = ['0x1111111111111111111111111111111111111111', '0x22222222
 const marketAddresses = ['0x3333333333333333333333333333333333333333', '0x4444444444444444444444444444444444444444'].map(getAddress);
 const code = '0x6001600055' as Hex;
 const codeHash = keccak256(code);
-const eventAbi = parseAbi(['event Transfer(address indexed from,address indexed to,uint256 value)', 'event Bought(address indexed buyer,uint256 usdIn,uint256 stockOut)']);
+const eventAbi = parseAbi(['event Transfer(address indexed from,address indexed to,uint256 value)', 'event Bought(address indexed buyer,uint256 usdIn,uint256 stockOut)', 'event Sold(address indexed seller,uint256 stockIn,uint256 usdOut)']);
 const blockHash = `0x${'aa'.repeat(32)}` as Hex;
 const cash = 30_000_000n;
 
-type MockState = { sent: Hex[]; receipt: 'missing' | 'reverted' | 'success' | 'unknown'; correctLogs: boolean; nonce: number; pendingNonce: number | null; currentCash: bigint; allowance: bigint; bought: bigint; native: bigint };
+type MockState = { sent: Hex[]; receipt: 'missing' | 'reverted' | 'success' | 'unknown'; correctLogs: boolean; wrongSellEvent: boolean; wrongCashRecipient: boolean; nonce: number; pendingNonce: number | null; currentCash: bigint; deskCash: bigint; allowance: bigint; unitAllowance: bigint; bought: bigint; native: bigint };
 function fixtureRpc(): { rpc: InvestmentRpc; state: MockState } {
-  const state: MockState = { sent: [], receipt: 'missing', correctLogs: true, nonce: 0, pendingNonce: null, currentCash: cash, allowance: 0n, bought: 0n, native: 3_000_000_000_000_000n };
+  const state: MockState = { sent: [], receipt: 'missing', correctLogs: true, wrongSellEvent: false, wrongCashRecipient: false, nonce: 0, pendingNonce: null, currentCash: cash, deskCash: cash, allowance: 0n, unitAllowance: 0n, bought: 0n, native: 3_000_000_000_000_000n };
   const entryFor = (address: string) => {
     const index = unitAddresses.findIndex((unit) => unit.toLowerCase() === address.toLowerCase());
     return index >= 0 ? index : marketAddresses.findIndex((market) => market.toLowerCase() === address.toLowerCase());
   };
-  const makeLog = (contract: Address, name: 'Bought' | 'Transfer', indexed: Address[], value: bigint[]) => name === 'Bought' ? {
+  const makeLog = (contract: Address, name: 'Bought' | 'Sold' | 'Transfer', indexed: Address[], value: bigint[]) => name !== 'Transfer' ? {
     address: contract,
-    topics: encodeEventTopics({ abi: eventAbi, eventName: 'Bought', args: { buyer: indexed[0] } }),
+    topics: name === 'Bought'
+      ? encodeEventTopics({ abi: eventAbi, eventName: 'Bought', args: { buyer: indexed[0] } })
+      : encodeEventTopics({ abi: eventAbi, eventName: 'Sold', args: { seller: indexed[0] } }),
     data: encodeAbiParameters(parseAbiParameters('uint256,uint256'), [value[0], value[1]]),
   } : {
     address: contract,
@@ -62,7 +64,12 @@ function fixtureRpc(): { rpc: InvestmentRpc; state: MockState } {
       const parsed = parseTransaction(state.sent.find((raw) => keccak256(raw) === hash)!);
       const marketIndex = marketAddresses.findIndex((market) => market.toLowerCase() === parsed.to?.toLowerCase());
       const units = state.correctLogs ? 2n * 10n ** 18n : 3n * 10n ** 18n;
-      const logs = marketIndex < 0 ? [] : [
+      const selling = parsed.data?.startsWith('0x' + keccak256(new TextEncoder().encode('sell(uint256,uint256)')).slice(2, 10));
+      const logs = marketIndex < 0 ? [] : selling ? [
+        makeLog(marketAddresses[marketIndex], state.wrongSellEvent ? 'Bought' : 'Sold', [buyer.address], state.wrongSellEvent ? [2_000_000n, 2n * 10n ** 18n] : [2n * 10n ** 18n, 2_000_000n]),
+        makeLog(ROBINHOOD_TESTNET.usd, 'Transfer', [marketAddresses[marketIndex], state.wrongCashRecipient ? other.address : buyer.address], [2_000_000n]),
+        makeLog(unitAddresses[marketIndex], 'Transfer', [buyer.address, marketAddresses[marketIndex]], [units]),
+      ] : [
         makeLog(marketAddresses[marketIndex], 'Bought', [buyer.address], [2_000_000n, 2n * 10n ** 18n]),
         makeLog(ROBINHOOD_TESTNET.usd, 'Transfer', [buyer.address, marketAddresses[marketIndex]], [2_000_000n]),
         makeLog(unitAddresses[marketIndex], 'Transfer', [marketAddresses[marketIndex], buyer.address], [units]),
@@ -80,7 +87,7 @@ function fixtureRpc(): { rpc: InvestmentRpc; state: MockState } {
       const project = TEST_CITY_INVESTMENTS[index];
       if (address.toLowerCase() === ROBINHOOD_TESTNET.usd.toLowerCase()) {
         if (functionName === 'decimals') return 6;
-        if (functionName === 'balanceOf') return state.currentCash;
+        if (functionName === 'balanceOf') return (args?.[0] as string).toLowerCase() === buyer.address.toLowerCase() ? state.currentCash : state.deskCash;
         if (functionName === 'allowance') return state.allowance;
       }
       if (index < 0 || !project) throw new Error('Unexpected contract');
@@ -91,12 +98,14 @@ function fixtureRpc(): { rpc: InvestmentRpc; state: MockState } {
         if (functionName === 'decimals') return 18;
         if (functionName === 'totalSupply') return BigInt(project.totalUnitsRaw);
         if (functionName === 'balanceOf') return (args?.[0] as string).toLowerCase() === buyer.address.toLowerCase() ? state.bought : BigInt(project.totalUnitsRaw) - state.bought;
+        if (functionName === 'allowance') return state.unitAllowance;
       } else {
         if (functionName === 'owner') return other.address;
         if (functionName === 'usd') return ROBINHOOD_TESTNET.usd;
         if (functionName === 'stock') return unitAddresses[index];
         if (functionName === 'price') return 1_000_000n;
         if (functionName === 'quoteBuy') return BigInt(args![0] as bigint) * 10n ** 18n / 1_000_000n;
+        if (functionName === 'quoteSell') return BigInt(args![0] as bigint) * 1_000_000n / 10n ** 18n;
       }
       throw new Error('Unexpected contract call');
     },
@@ -385,5 +394,100 @@ test('a canonically encoded zero-tip wallet transaction is accepted without allo
     assert.equal((await submitLocalInvestment(testbed.store, identity, order.id, signed.step.id, signed.serialized, zeroTip)).state, 'pending');
     testbed.state.receipt = 'success';
     assert.equal((await reconcileLocalInvestment(testbed.store, identity, order.id, zeroTip)).state, 'completed');
+  } finally { await testbed.cleanup(); }
+});
+
+test('sell-back reviews approve exact units, persist signed bytes, and verify Sold plus both transfers after reload', async () => {
+  const testbed = await setup();
+  try {
+    testbed.state.bought = 5n * 10n ** 18n;
+    const input = { requestId: 'sell-roundtrip-request', projectId: TEST_CITY_INVESTMENTS[1].id, direction: 'sell', unitsRaw: (2n * 10n ** 18n).toString() };
+    const order = await prepareLocalInvestment(testbed.store, identity, input, testbed.rpc);
+    assert.equal(order.direction, 'sell');
+    assert.equal(order.cashAtomic, '2000000');
+    assert.equal(order.minimumUnitsRaw, input.unitsRaw);
+    assert.equal(order.steps[1].request, null);
+    const approval = await sign(order);
+    assert.equal(approval.step.request!.transaction.to, unitAddresses[1]);
+    assert.deepEqual(decodeFunctionData({ abi: parseAbi(['function approve(address,uint256) returns (bool)']), data: approval.step.request!.transaction.data as Hex }).args, [marketAddresses[1], 2n * 10n ** 18n]);
+    const unsafeStore: Store = { ...testbed.store, get: testbed.store.get.bind(testbed.store), create: testbed.store.create.bind(testbed.store), scan: testbed.store.scan.bind(testbed.store), close: testbed.store.close.bind(testbed.store), update: async () => { throw new Error('durable write failed'); } };
+    await assert.rejects(submitLocalInvestment(unsafeStore, identity, order.id, approval.step.id, approval.serialized, testbed.rpc), /durable write/);
+    assert.equal(testbed.state.sent.length, 0);
+    await submitLocalInvestment(testbed.store, identity, order.id, approval.step.id, approval.serialized, testbed.rpc);
+    assert.equal((await readLocalInvestments(testbed.store, identity, testbed.rpc)).order!.state, 'pending');
+    testbed.state.receipt = 'success';
+    testbed.state.nonce = 1;
+    testbed.state.unitAllowance = 2n * 10n ** 18n;
+    const ready = await reconcileLocalInvestment(testbed.store, identity, order.id, testbed.rpc);
+    const sale = await sign(ready);
+    assert.deepEqual(decodeFunctionData({ abi: parseAbi(['function sell(uint256,uint256) returns (uint256)']), data: sale.step.request!.transaction.data as Hex }).args, [2n * 10n ** 18n, 2_000_000n]);
+    testbed.state.receipt = 'missing';
+    await submitLocalInvestment(testbed.store, identity, order.id, sale.step.id, sale.serialized, testbed.rpc);
+    testbed.state.receipt = 'success';
+    for (const flaw of ['correctLogs', 'wrongSellEvent', 'wrongCashRecipient'] as const) {
+      testbed.state[flaw] = flaw !== 'correctLogs';
+      assert.equal((await reconcileLocalInvestment(testbed.store, identity, order.id, testbed.rpc)).state, 'pending');
+      testbed.state[flaw] = flaw === 'correctLogs';
+    }
+    const completed = await reconcileLocalInvestment(testbed.store, identity, order.id, testbed.rpc);
+    assert.equal(completed.state, 'completed');
+    assert.equal(completed.steps[1].hash, keccak256(sale.serialized));
+    assert.equal((await prepareLocalInvestment(testbed.store, identity, input, testbed.rpc)).id, order.id);
+  } finally { await testbed.cleanup(); }
+});
+
+test('sell-back refuses missing holdings, empty desk cash, dust, changed quote and orders above 100 units', async () => {
+  const testbed = await setup();
+  try {
+    const input = { requestId: 'sell-refusal-request', projectId: TEST_CITY_INVESTMENTS[0].id, direction: 'sell', unitsRaw: (2n * 10n ** 18n).toString() };
+    await assert.rejects(prepareLocalInvestment(testbed.store, identity, input, testbed.rpc), /Not enough fictional/);
+    testbed.state.bought = 101n * 10n ** 18n;
+    testbed.state.deskCash = 0n;
+    await assert.rejects(prepareLocalInvestment(testbed.store, identity, input, testbed.rpc), /desk lacks tUSDG/);
+    await assert.rejects(prepareLocalInvestment(testbed.store, identity, { ...input, unitsRaw: '1' }, testbed.rpc), /too small/);
+    await assert.rejects(prepareLocalInvestment(testbed.store, identity, { ...input, unitsRaw: '02000000000000000000' }, testbed.rpc), /canonical/);
+    await assert.rejects(prepareLocalInvestment(testbed.store, identity, { ...input, unitsRaw: (100n * 10n ** 18n + 1n).toString() }, testbed.rpc), /limit/);
+    testbed.state.deskCash = 200_000_000n;
+    const changedQuote = { ...testbed.rpc, readContract: async (args: Parameters<InvestmentRpc['readContract']>[0]) => args.functionName === 'quoteSell' ? 1n : testbed.rpc.readContract(args) } as InvestmentRpc;
+    await assert.rejects(prepareLocalInvestment(testbed.store, identity, input, changedQuote), /quote changed/);
+    const boundary = await prepareLocalInvestment(testbed.store, identity, { ...input, unitsRaw: (100n * 10n ** 18n).toString() }, testbed.rpc);
+    assert.equal(boundary.cashAtomic, '100000000');
+    await cancelLocalInvestment(testbed.store, identity, boundary.id);
+    const order = await prepareLocalInvestment(testbed.store, identity, { ...input, requestId: 'sell-preflight-request' }, testbed.rpc);
+    const approval = await sign(order);
+    testbed.state.deskCash = 0n;
+    await assert.rejects(submitLocalInvestment(testbed.store, identity, order.id, approval.step.id, approval.serialized, testbed.rpc), /desk lacks tUSDG/);
+    assert.equal(testbed.state.sent.length, 0);
+  } finally { await testbed.cleanup(); }
+});
+
+test('a reviewed sell-back rechecks unit approval, wallet holdings and desk cash before sending, and chain failure stays terminal', async () => {
+  const testbed = await setup();
+  try {
+    testbed.state.bought = 2n * 10n ** 18n;
+    testbed.state.unitAllowance = testbed.state.bought;
+    const order = await prepareLocalInvestment(testbed.store, identity, {
+      requestId: 'sell-send-refusal-request', projectId: TEST_CITY_INVESTMENTS[0].id, direction: 'sell', unitsRaw: testbed.state.bought.toString(),
+    }, testbed.rpc);
+    const sale = await sign(order);
+    const foreign = await sign(order, other);
+    await assert.rejects(submitLocalInvestment(testbed.store, identity, order.id, sale.step.id, foreign.serialized, testbed.rpc), /different wallet/);
+    testbed.state.unitAllowance = 0n;
+    await assert.rejects(submitLocalInvestment(testbed.store, identity, order.id, sale.step.id, sale.serialized, testbed.rpc), /unit approval/);
+    testbed.state.unitAllowance = testbed.state.bought;
+    testbed.state.bought = 0n;
+    await assert.rejects(submitLocalInvestment(testbed.store, identity, order.id, sale.step.id, sale.serialized, testbed.rpc), /units remain/);
+    testbed.state.bought = 2n * 10n ** 18n;
+    testbed.state.deskCash = 1_999_999n;
+    await assert.rejects(submitLocalInvestment(testbed.store, identity, order.id, sale.step.id, sale.serialized, testbed.rpc), /desk lacks tUSDG/);
+    assert.equal(testbed.state.sent.length, 0);
+    testbed.state.deskCash = 2_000_000n;
+    await submitLocalInvestment(testbed.store, identity, order.id, sale.step.id, sale.serialized, testbed.rpc);
+    testbed.state.receipt = 'reverted';
+    const failed = await reconcileLocalInvestment(testbed.store, identity, order.id, testbed.rpc);
+    assert.equal(failed.state, 'failed');
+    assert.equal(failed.error, 'sell failed on chain.');
+    testbed.state.receipt = 'success';
+    assert.equal((await reconcileLocalInvestment(testbed.store, identity, order.id, testbed.rpc)).state, 'failed');
   } finally { await testbed.cleanup(); }
 });

@@ -1,8 +1,18 @@
 import { strict as assert } from 'node:assert';
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import type { CityFeature, Signal } from '../server/city-signals.ts';
 import { acknowledgeFollow, changesBetween, emptyFollowStore, follow, followKey, parseFollowStore, projectSnapshot, refreshFollow, targetForSignal, targetKey, unfollow, type FollowTarget } from './project-following.ts';
 import { readCurrentProjectSnapshot } from './use-project-following.ts';
+import { civicOutcomeEvidence } from '../data/civic-outcome-evidence.ts';
+
+/** Keep multi-record invariants exercised even when published research uses one signal per case. */
+function linkedCaseFixture(t: TestContext) {
+  const item = civicOutcomeEvidence.find((entry) => entry.id === 'strausberg-kulturpark-phase-2')!;
+  const original = item.signalIds;
+  item.signalIds = ['atlas:kulturpark', 'fixture:kulturpark-phase-2'];
+  t.after(() => { item.signalIds = original; });
+  return { kind: 'case', cityId: item.cityId, id: item.id } satisfies FollowTarget;
+}
 
 const target: FollowTarget = { kind: 'signal', cityId: 'dresden', id: 'council:42' };
 function signal(overrides: Partial<CityFeature['properties']> = {}): CityFeature {
@@ -52,15 +62,16 @@ test('unseen updates survive other refreshes and older acknowledgments do not co
   assert.equal(olderReadLast.entries[targetKey(target)].acknowledged.facts.find((fact) => fact.key.endsWith(':status'))?.value, 'adopted');
 });
 
-test('canonical case follows merge linked signals while other cases and cities remain isolated on unfollow', () => {
-  const a = targetForSignal('strausberg', 'budget:investment-outlays-2025');
-  const b = targetForSignal('strausberg', 'budget:investment-outlays-2026');
+test('canonical case follows merge linked signals while other cases and cities remain isolated on unfollow', (t) => {
+  linkedCaseFixture(t);
+  const a = targetForSignal('strausberg', 'atlas:kulturpark');
+  const b = targetForSignal('strausberg', 'fixture:kulturpark-phase-2');
   assert.equal(targetKey(a), targetKey(b));
   assert.notEqual(targetKey(a), targetKey({ ...a, cityId: 'dresden' }));
   const first = follow(emptyFollowStore(), target, snapshot());
   const withOther = follow(first, a, projectSnapshot(a, 'Strausberg', [
-    signal({ id: 'budget:investment-outlays-2025', cityId: 'strausberg' }),
-    signal({ id: 'budget:investment-outlays-2026', cityId: 'strausberg' }),
+    signal({ id: 'atlas:kulturpark', cityId: 'strausberg' }),
+    signal({ id: 'fixture:kulturpark-phase-2', cityId: 'strausberg' }),
   ])!);
   assert.equal(Object.keys(withOther.entries).length, 2);
   const removed = unfollow(withOther, target);
@@ -147,24 +158,24 @@ test('removing a published measurement records lost evidence without implying ca
   assert.equal(revised.pending.length, 1);
 });
 
-test('reordered structured outputs retain identity and equal labels from two signal records do not collide', () => {
-  const caseTarget: FollowTarget = { kind: 'case', cityId: 'strausberg', id: 'strausberg-kulturpark-phase-2' };
+test('reordered structured outputs retain identity and equal labels from two signal records do not collide', (t) => {
+  const caseTarget = linkedCaseFixture(t);
   const caseSnapshot = projectSnapshot(caseTarget, 'Strausberg', [
     signal({ cityId: 'strausberg', id: 'atlas:kulturpark' }),
+    signal({ cityId: 'strausberg', id: 'fixture:kulturpark-phase-2' }),
   ])!;
   assert.equal(changesBetween(caseSnapshot, { ...caseSnapshot, facts: caseSnapshot.facts.toReversed() }).length, 0);
-  const budget = targetForSignal('strausberg', 'budget:investment-outlays-2025');
-  const before = projectSnapshot(budget, 'Strausberg', [
-    signal({ cityId: 'strausberg', id: 'budget:investment-outlays-2025', title: 'Investment budget 2025', status: 'planned' }),
-    signal({ cityId: 'strausberg', id: 'budget:investment-outlays-2026', title: 'Investment budget 2026', status: 'planned' }),
+  const before = projectSnapshot(caseTarget, 'Strausberg', [
+    signal({ cityId: 'strausberg', id: 'atlas:kulturpark', title: 'Kulturpark', status: 'planned' }),
+    signal({ cityId: 'strausberg', id: 'fixture:kulturpark-phase-2', title: 'Kulturpark', status: 'planned' }),
   ])!;
-  const changed = projectSnapshot(budget, 'Strausberg', [
-    signal({ cityId: 'strausberg', id: 'budget:investment-outlays-2025', title: 'Investment budget 2025', status: 'revised 2025' }),
-    signal({ cityId: 'strausberg', id: 'budget:investment-outlays-2026', title: 'Investment budget 2026', status: 'revised 2026' }),
+  const changed = projectSnapshot(caseTarget, 'Strausberg', [
+    signal({ cityId: 'strausberg', id: 'atlas:kulturpark', title: 'Kulturpark', status: 'revised phase one' }),
+    signal({ cityId: 'strausberg', id: 'fixture:kulturpark-phase-2', title: 'Kulturpark', status: 'revised phase two' }),
   ])!;
   const updates = changesBetween(before, changed);
   assert.deepEqual(new Set(updates.map((change) => change.key)),
-    new Set(['signal:budget:investment-outlays-2025:status', 'signal:budget:investment-outlays-2026:status']));
+    new Set(['signal:atlas:kulturpark:status', 'signal:fixture:kulturpark-phase-2:status']));
 });
 
 test('invalid saved data is reported rather than treated as an empty follow list', () => {
@@ -177,8 +188,8 @@ test('invalid saved data is reported rather than treated as an empty follow list
   assert.equal(Object.keys(parseFollowStore(null).entries).length, 0);
 });
 
-test('first follow reads every current linked full record before baselining; partial read cannot follow', async () => {
-  const budget = targetForSignal('strausberg', 'budget:investment-outlays-2025');
+test('first follow reads every current linked full record before baselining; partial read cannot follow', async (t) => {
+  const project = linkedCaseFixture(t);
   const record = (id: string, status: string): Signal => ({
     ...signal({ id, cityId: 'strausberg', kind: 'budget', status }),
     properties: {
@@ -189,22 +200,33 @@ test('first follow reads every current linked full record before baselining; par
     },
   } as Signal);
   const source = new Map([
-    ['budget:investment-outlays-2025', record('budget:investment-outlays-2025', 'source-era plan')],
-    ['budget:investment-outlays-2026', record('budget:investment-outlays-2026', 'current 2026 decision')],
+    ['atlas:kulturpark', record('atlas:kulturpark', 'source-era plan')],
+    ['fixture:kulturpark-phase-2', record('fixture:kulturpark-phase-2', 'current phase two decision')],
   ]);
   const request = async <T>(path: string): Promise<T> => ({ feature: source.get(new URL(path, 'https://example.test').searchParams.get('id')!) } as T);
-  const olderCompact = projectSnapshot(budget, 'Strausberg', [
-    record('budget:investment-outlays-2025', 'source-era plan'),
-    record('budget:investment-outlays-2026', 'source-era plan'),
+  const olderCompact = projectSnapshot(project, 'Strausberg', [
+    record('atlas:kulturpark', 'source-era plan'),
+    record('fixture:kulturpark-phase-2', 'source-era plan'),
   ])!;
-  const { snapshot: current } = await readCurrentProjectSnapshot(request, budget, 'Strausberg');
+  const { snapshot: current } = await readCurrentProjectSnapshot(request, project, 'Strausberg');
   assert.equal(changesBetween(olderCompact, current).length, 1);
+  const saved = follow(emptyFollowStore(), project, current);
+  assert.equal(refreshFollow(saved, project, (await readCurrentProjectSnapshot(request, project, 'Strausberg')).snapshot).entries[targetKey(project)].pending.length, 0);
+  source.set('fixture:kulturpark-phase-2', record('fixture:kulturpark-phase-2', 'later phase two delivery report'));
+  const later = refreshFollow(saved, project, (await readCurrentProjectSnapshot(request, project, 'Strausberg')).snapshot);
+  assert.equal(later.entries[targetKey(project)].pending.length, 1);
+  source.delete('atlas:kulturpark');
+  await assert.rejects(readCurrentProjectSnapshot(request, project, 'Strausberg'), /linked public record/);
+  assert.equal(later.entries[targetKey(project)].pending.length, 1);
+});
+
+test('citywide budget establishes an evidence baseline without requesting removed signals', async () => {
+  const budget: FollowTarget = { kind: 'case', cityId: 'strausberg', id: 'strausberg-investment-budget-2025-2026' };
+  const request = async <T>(): Promise<T> => { throw new Error('Citywide research must not fetch a linked signal.'); };
+  const { snapshot: current, records } = await readCurrentProjectSnapshot(request, budget, 'Strausberg');
+  assert.deepEqual(records, []);
+  assert.equal(current.facts.find((fact) => fact.key === 'metric:budget-investment-2025')?.value, 'planned: 17941270 EUR · 2025 fiscal year');
+  assert.equal(current.facts.find((fact) => fact.key === 'metric:budget-investment-2026')?.value, 'planned: 12609320 EUR · 2026 fiscal year');
   const saved = follow(emptyFollowStore(), budget, current);
   assert.equal(refreshFollow(saved, budget, (await readCurrentProjectSnapshot(request, budget, 'Strausberg')).snapshot).entries[targetKey(budget)].pending.length, 0);
-  source.set('budget:investment-outlays-2026', record('budget:investment-outlays-2026', 'later 2026 delivery report'));
-  const later = refreshFollow(saved, budget, (await readCurrentProjectSnapshot(request, budget, 'Strausberg')).snapshot);
-  assert.equal(later.entries[targetKey(budget)].pending.length, 1);
-  source.delete('budget:investment-outlays-2025');
-  await assert.rejects(readCurrentProjectSnapshot(request, budget, 'Strausberg'), /linked public record/);
-  assert.equal(later.entries[targetKey(budget)].pending.length, 1);
 });

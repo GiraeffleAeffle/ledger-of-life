@@ -1,4 +1,4 @@
-export const TEST_EXIT_NOTICE = 'Test units cannot be sold or withdrawn in this prototype. Test cash has no monetary value; supported shared-pool withdrawals return only test dollars.';
+export const TEST_EXIT_NOTICE = 'Fictional test units, no value, no rights. Local tHOME and tWORK units can be sold back for tUSDG at the fixed test price only when the desk has enough test cash. Other test units have no app sell lane. Test cash and shared-pool withdrawals have no monetary value.';
 
 export function stakeDisabledReason(input: { amountAtomic: string | null; cashAtomic: string | null; nativeAtomic: string | null; hasWallet: boolean }): string {
   if (!input.hasWallet) return 'Connect your Robinhood Chain wallet in Me first.';

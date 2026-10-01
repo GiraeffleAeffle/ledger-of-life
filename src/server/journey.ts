@@ -6,6 +6,8 @@ import { SolanaServiceError, type SolanaOperation } from './solana-service.ts';
 import { solanaServicesFor } from './solana-tenancies.ts';
 import type { Store } from './store.ts';
 import { cancellationState } from './tenancy-cancellation.ts';
+import { readDepositYield, type DepositYieldView } from './deposit-yield.ts';
+import { RpcSolanaGateway } from './solana-rpc.ts';
 
 export type JourneyRole = 'tenant' | 'landlord' | 'arbitrator';
 export type JourneyStage = 'agreement' | 'space' | 'deposit' | 'living' | 'move-out' | 'paid';
@@ -43,6 +45,7 @@ export interface TenancyJourney {
   chain: null | {
     phase: TenancyAccount['phase'];
     depositMint: string;
+    simulatedYield?: DepositYieldView;
     escrowAtomic: string;
     lendingValueAtomic: string;
     claimAtomic: string;
@@ -81,7 +84,7 @@ export function agreementStep(agreement: Agreement, role: JourneyRole): NextActi
     return {
       kind: 'accept_agreement',
       label: 'Review the deposit agreement',
-      detail: `${agreement.property} · ${usd(agreement.requiredSecurity)} deposit · tenant keeps value above an approved deduction at settlement. ${agreement.releaseAllowed ? 'Tenant may claim surplus during the tenancy.' : 'Surplus remains locked until settlement.'} Test tokens only; a deposit here earns nothing.`,
+      detail: `${agreement.property} · ${usd(agreement.requiredSecurity)} deposit · tenant keeps value above an approved deduction at settlement. ${agreement.releaseAllowed ? 'Tenant may claim surplus during the tenancy.' : 'Surplus remains locked until settlement.'} Test tokens only; site-minted tUSDC receives labelled simulated yield paid by this site.`,
       digest,
     };
   if (!accepted('tenant') || !accepted('landlord'))
@@ -102,7 +105,7 @@ export function chainStep(
       return {
         stage: 'deposit',
         next: role === 'tenant'
-          ? { kind: 'secure_deposit', label: `Secure your ${usd(t.requiredSecurityAtomic)} deposit`, detail: cashOnly ? 'One approval locks the deposit for this home in the escrow, where it stays as cash until move-out. Test tokens only; it earns nothing.' : 'One approval locks the deposit for this home and supplies it to devnet lending. Devnet lending pays nothing, so earnings are simulated.' }
+          ? { kind: 'secure_deposit', label: `Secure your ${usd(t.requiredSecurityAtomic)} deposit`, detail: cashOnly ? 'One approval locks the deposit in cash escrow until move-out. The site pays the tenant labelled simulated yield in test USDC.' : 'One approval locks the deposit for this home and supplies it to devnet lending. Devnet lending pays nothing, so earnings are simulated.' }
           : waiting('Waiting for the tenant’s deposit', 'The empty escrow is ready; the tenant approves the deposit.'),
       };
     case 'active':
@@ -111,7 +114,7 @@ export function chainStep(
         next: role === 'landlord'
           ? { kind: 'propose_claim', label: 'Propose a move-out deduction', detail: 'Enter any deduction (0 if none) with a reason. The tenant must agree or the arbitrator decides.', maximumAtomic: t.requiredSecurityAtomic }
           : role === 'tenant'
-            ? waiting(cashOnly ? 'Your deposit is locked in the escrow' : 'Your deposit is secured in devnet lending', `At move-out the landlord proposes a deduction (or none); you then agree or dispute. ${cashOnly ? 'The deposit is held as cash and earns nothing.' : 'Devnet lending pays nothing, so earnings are simulated.'}`)
+            ? waiting(cashOnly ? 'Your deposit is locked in the escrow' : 'Your deposit is secured in devnet lending', `At move-out the landlord proposes a deduction (or none); you then agree or dispute. ${cashOnly ? 'The deposit stays as cash; this site pays the tenant labelled simulated yield.' : 'Devnet lending pays nothing, so earnings are simulated.'}`)
             : waiting('Nothing to decide', 'You are only needed if tenant and landlord disagree.'),
       };
     case 'claim-proposed':
@@ -151,9 +154,6 @@ function pendingFor(operations: Omit<SolanaOperation, 'signedTxBase64' | 'subjec
   return operations.find((op) => op.walletId === walletId && op.signature && ['signed', 'broadcast', 'unknown'].includes(op.state));
 }
 
-/** Closed and fully paid tenancies never change again; skip chain reads for them. */
-const finished = new Map<string, TenancyJourney>();
-
 export async function tenancyJourney(
   store: Store,
   identity: VerifiedIdentity,
@@ -161,8 +161,6 @@ export async function tenancyJourney(
   resolveServices: typeof solanaServicesFor = solanaServicesFor,
 ): Promise<TenancyJourney> {
   const role = agreementRole(agreement, identity);
-  const cached = finished.get(`${agreement.id}:${role}`);
-  if (cached && resolveServices === solanaServicesFor) return cached;
   const base = { agreementId: agreement.id, property: agreement.property, role, requiredSecurity: agreement.requiredSecurity, chain: null,
     home: agreement.home, handover: agreement.handover, cancelled: agreement.cancelled, cancellable: false,
     sampleParties: Object.values(agreement.parties).some((party) => party?.subject.startsWith('test-signer:')) };
@@ -206,6 +204,8 @@ export async function tenancyJourney(
       .filter((op) => op.state === 'finalized' && op.action.kind === 'payout' && op.action.landlord === landlord)
       .reduce((sum, op) => sum + BigInt(op.expectedDeltas.find((delta) => delta.direction === 'credit')?.minimumAtomic ?? '0'), 0n)
       .toString();
+  const yieldGateway = new RpcSolanaGateway(services.config);
+  const simulatedYield = await readDepositYield(store, agreement, t, snapshot.operations, yieldGateway.rpc.bind(yieldGateway));
   const result: TenancyJourney = {
     ...base,
     cancellable: !agreement.cancelled && role !== 'arbitrator' && t.phase === 'awaiting-funding' &&
@@ -216,6 +216,7 @@ export async function tenancyJourney(
     chain: {
       phase: t.phase,
       depositMint: t.depositMint,
+      simulatedYield,
       escrowAtomic: t.accountedIdleAtomic,
       lendingValueAtomic: snapshot.receiptValueAtomic,
       claimAtomic: t.claimAtomic,
@@ -236,7 +237,6 @@ export async function tenancyJourney(
       walletChain: snapshot.walletChain === 'solana:devnet' ? 'solana:devnet' : null,
     },
   };
-  if (result.next.kind === 'done' && resolveServices === solanaServicesFor) finished.set(`${agreement.id}:${role}`, result);
   return result;
 }
 

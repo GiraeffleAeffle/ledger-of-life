@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight, Building2, Check, ExternalLink, Loader2, MapPin, Wallet, Wrench } from 'lucide-react';
+import { formatUnits } from 'viem';
 import { useRentalWallet } from '@/wallets';
 import { parseAmount } from '@/domain/assets';
 import { STRAUSBERG_INVESTMENT_LEADS, TEST_CITY_INVESTMENTS, type TestCityInvestmentId } from '@/data/local-investments';
@@ -11,12 +12,13 @@ import { projectDisplayName } from './project-display-name';
 import { stakeDisabledReason, TEST_EXIT_NOTICE } from './money-guidance';
 import { useSectionTabActive } from './section-tabs';
 import { CityFlywheel, ProjectBlueprint } from './city-flywheel';
+import { TestDollars } from './test-dollars';
 import './local-investments.css';
 
 const cash = (raw: string) => new Intl.NumberFormat('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 6 }).format(Number(BigInt(raw)) / 1e6);
 const units = (raw: string) => new Intl.NumberFormat('en-GB', { maximumFractionDigits: 4 }).format(Number(BigInt(raw)) / 1e18);
 const percent = (raw: string, total: string) => BigInt(total) > 0n ? `${Number(BigInt(raw) * 100_000n / BigInt(total)) / 1000}%` : '—';
-const message = (cause: unknown) => cause instanceof Error ? cause.message : 'The stake purchase could not be checked.';
+const message = (cause: unknown) => cause instanceof Error ? cause.message : 'The test-unit order could not be checked.';
 
 /** Real signed test-unit purchases; project rights, physical plans and local effects remain fictional. */
 export function LocalInvestments({ request, go }: { request: AuthorizedRequest; go: (area: Area) => void }) {
@@ -27,6 +29,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
   const [market, setMarket] = useState<LocalInvestmentView | null>(null);
   const [order, setOrder] = useState<LocalInvestmentOrder | null>(null);
   const [amount, setAmount] = useState('5');
+  const [direction, setDirection] = useState<'buy' | 'sell'>('buy');
   const [readError, setReadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState('');
@@ -35,14 +38,14 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
   const readRevision = useRef(0);
   const actionRevision = useRef(0);
   const mutating = useRef(false);
-  const preparation = useRef<{ id: string; projectId: TestCityInvestmentId; cashAtomic: string } | null>(null);
+  const preparation = useRef<{ id: string; projectId: TestCityInvestmentId; direction: 'buy' | 'sell'; amountRaw: string } | null>(null);
   const refresh = useCallback((afterMutation = false) => {
     if (mutating.current && !afterMutation) return Promise.resolve();
     const revision = ++readRevision.current;
     return request<{ market: LocalInvestmentView }>('/api/local-investments').then(({ market: next }) => {
       if (!mounted.current || (mutating.current && !afterMutation) || revision !== readRevision.current) return;
       if (next.order && (next.order.state === 'review' || next.order.state === 'pending') &&
-        preparation.current?.projectId === next.order.projectId && preparation.current.cashAtomic === next.order.cashAtomic) {
+        preparation.current?.projectId === next.order.projectId && preparation.current.direction === next.order.direction && preparation.current.amountRaw === (next.order.direction === 'sell' ? next.order.minimumUnitsRaw : next.order.cashAtomic)) {
         preparation.current = null;
         if (afterMutation) setActionError('');
       }
@@ -90,7 +93,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
         ++readRevision.current; setOrder(next); setActionError('');
         if (next.state === 'completed' || next.state === 'failed') window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'evm' } }));
       }, () => {
-        if (active) setActionError('Confirmation is unavailable. The submitted transaction remains unresolved; no replacement purchase has been started.');
+        if (active) setActionError('Confirmation is unavailable. The submitted transaction remains unresolved; no replacement order has been started.');
       }).finally(() => { checking = false; });
     };
     check(); const timer = window.setInterval(check, 4000);
@@ -102,14 +105,21 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
   const currentOrder = order?.projectId === selectedId ? order : null;
   const openOrder = Boolean(order && (order.state === 'review' || order.state === 'pending'));
   const nextStep = currentOrder?.steps.find((step) => step.state === 'ready' && step.request);
-  const purchaseHash = currentOrder?.state === 'completed' ? currentOrder.steps.find((step) => step.kind === 'buy')?.hash : null;
+  const tradeHash = currentOrder?.state === 'completed' ? currentOrder.steps.find((step) => step.kind !== 'approve')?.hash : null;
   const healthy = market?.state === 'ready' && !readError && asset && !asset.error;
   const hasWallet = wallet.wallets.some((item) => item.chainType === 'ethereum' && item.connected);
-  let requestedCash: string | null = null;
-  try { requestedCash = parseAmount(amount); } catch { /* Invalid input is kept editable, never treated as zero. */ }
-  const disabledReason = stakeDisabledReason({ amountAtomic: requestedCash, cashAtomic: market?.cashAtomic ?? null, nativeAtomic: market?.nativeAtomic ?? null, hasWallet });
-  const affordable = !disabledReason;
+  let requestedAmount: string | null = null;
+  try { requestedAmount = parseAmount(amount, direction === 'sell' ? 18 : 6); } catch { /* Invalid input is kept editable, never treated as zero. */ }
   const hasGas = market?.nativeAtomic !== null && market?.nativeAtomic !== undefined && BigInt(market.nativeAtomic) > 0n;
+  const disabledReason = direction === 'buy'
+    ? stakeDisabledReason({ amountAtomic: requestedAmount, cashAtomic: market?.cashAtomic ?? null, nativeAtomic: market?.nativeAtomic ?? null, hasWallet })
+    : !hasWallet ? 'Connect your Robinhood Chain wallet in Me first.'
+      : !requestedAmount || BigInt(requestedAmount) <= 0n ? 'Choose a positive fictional-unit amount.'
+        : BigInt(requestedAmount) > 100n * 10n ** 18n ? 'Sell-back orders are capped at 100 fictional test units.'
+          : asset?.holdingRaw === null || !asset ? 'Wait for a verified unit balance.'
+            : BigInt(requestedAmount) > BigInt(asset.holdingRaw) ? 'Not enough fictional test units to sell back.'
+              : !hasGas ? 'Get network-fee test ETH first.' : '';
+  const affordable = !disabledReason;
 
   async function finishAction(generation: number) {
     if (!mounted.current || generation !== actionRevision.current) return;
@@ -122,15 +132,16 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
     }
   }
   async function prepare() {
-    if (!healthy || !hasWallet || !affordable || !hasGas || !requestedCash || openOrder || busy) return;
+    if (!healthy || !hasWallet || !affordable || !hasGas || !requestedAmount || openOrder || busy) return;
     const generation = ++actionRevision.current; ++readRevision.current; mutating.current = true;
-    if (!preparation.current || preparation.current.projectId !== selectedId || preparation.current.cashAtomic !== requestedCash)
-      preparation.current = { id: crypto.randomUUID(), projectId: selectedId, cashAtomic: requestedCash };
+    if (!preparation.current || preparation.current.projectId !== selectedId || preparation.current.direction !== direction || preparation.current.amountRaw !== requestedAmount)
+      preparation.current = { id: crypto.randomUUID(), projectId: selectedId, direction, amountRaw: requestedAmount };
     const intent = preparation.current;
     setBusy('Preparing review'); setActionError('');
     try {
       const { order: prepared } = await request<{ order: LocalInvestmentOrder }>('/api/local-investments', {
-        action: 'prepare', requestId: intent.id, projectId: intent.projectId, cashAtomic: intent.cashAtomic,
+        action: 'prepare', requestId: intent.id, projectId: intent.projectId, direction: intent.direction,
+        ...(intent.direction === 'sell' ? { unitsRaw: intent.amountRaw } : { cashAtomic: intent.amountRaw }),
       });
       if (mounted.current && generation === actionRevision.current) {
         ++readRevision.current; preparation.current = null; setOrder(prepared);
@@ -178,27 +189,27 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
   }
 
   return <section className="local-capital" id="local-investments" tabIndex={-1} aria-label="Local stakes">
-    <header className="local-capital-heading"><div><span className="eyebrow">LOCAL STAKES · FICTIONAL TEST ISSUERS</span><h2>Buy a stake in a fictional local project.</h2><p>Explore a fictional housing project or workshop. {TEST_EXIT_NOTICE}</p></div></header>
+    <header className="local-capital-heading"><div><span className="eyebrow">LOCAL STAKES · FICTIONAL TEST ISSUERS</span><h2>Explore fictional local test units.</h2><p>A test-token demonstration, not a funding offer. {TEST_EXIT_NOTICE}</p></div></header>
     <div className="local-project-picker" role="group" aria-label="Choose a fictional test issuer">{TEST_CITY_INVESTMENTS.map((item) => {
       const holding = market?.assets.find((entry) => entry.projectId === item.id);
       const Icon = item.kind === 'housing' ? Building2 : Wrench;
-      return <button type="button" key={item.id} data-project-id={item.id} disabled={Boolean(busy)} aria-pressed={selectedId === item.id} onClick={() => { setSelectedId(item.id); setActionError(''); }}>
-        <span className={`local-project-icon ${item.kind}`}><Icon size={25} /></span><span><strong>{item.kind === 'housing' ? 'Homes we build together' : 'Tools, skills, local work'}</strong><small>{projectDisplayName(item.name)}</small></span>
+      return <div key={item.id} className="local-project-choice"><button type="button" data-project-id={item.id} disabled={Boolean(busy)} aria-pressed={selectedId === item.id} onClick={() => { setSelectedId(item.id); setActionError(''); }}>
+        <span className={`local-project-icon ${item.kind}`}><Icon size={25} /></span><span><strong>{item.kind === 'housing' ? 'Fictional housing example' : 'Fictional workshop example'}</strong><small>{projectDisplayName(item.name)} · no value, no rights</small></span>
         <span className="local-project-owned">{holding?.holdingRaw === null || !holding ? '— units' : `${units(holding.holdingRaw)} ${item.symbol}`}{readError && <small>Last checked</small>}</span>
-      </button>;
+      </button><button type="button" className="text-button" aria-label={`Sell back ${item.symbol} fictional test units`} disabled={Boolean(busy) || openOrder || !holding?.holdingRaw || BigInt(holding.holdingRaw) === 0n} onClick={() => { setSelectedId(item.id); setDirection('sell'); setAmount('1'); setPanel('invest'); setActionError(''); }}>Sell back {item.symbol}</button></div>;
     })}</div>
-    <div className="local-project-toolbar"><div><MapPin size={15} />{project.cityName} · fictional test issuer</div><button type="button" className="text-button" onClick={() => openInvestmentOnMap(go, project.id)}>See on the map <ArrowUpRight size={15} /></button></div>
+    <div className="local-project-toolbar"><div><MapPin size={15} />{project.cityName} · illustrative pin, not a real project · fictional test units, no value, no rights</div><button type="button" className="text-button" onClick={() => openInvestmentOnMap(go, project.id)}>See on the map <ArrowUpRight size={15} /></button></div>
     <div className="local-project-tabs" role="group" aria-label="Stake and project views">
       <button type="button" aria-pressed={panel === 'invest'} onClick={() => setPanel('invest')}>Your stake</button>
       <button type="button" aria-pressed={panel === 'idea'} onClick={() => setPanel('idea')}>{project.kind === 'housing' ? 'The building idea' : 'The workshop idea'}</button>
       <button type="button" aria-pressed={panel === 'city'} onClick={() => setPanel('city')}>The city flywheel</button>
     </div>
     {readError && <p className="local-market-alert" role="alert">Stake reads unavailable: {readError} <button type="button" className="text-button" onClick={() => void refresh()}>Retry reading</button></p>}
-    {openOrder && order?.projectId !== selectedId && <p className="local-market-alert">Another project purchase is still open. <button type="button" className="text-button" onClick={() => { setSelectedId(order!.projectId as TestCityInvestmentId); setPanel('invest'); }}>Open that review →</button></p>}
+    {openOrder && order?.projectId !== selectedId && <p className="local-market-alert">Another fictional test-unit order is still open. <button type="button" className="text-button" onClick={() => { setSelectedId(order!.projectId as TestCityInvestmentId); setPanel('invest'); }}>Open that review →</button></p>}
     {panel === 'idea' && <ProjectBlueprint key={project.id} kind={project.kind} go={go} />}
     {panel === 'city' && <CityFlywheel />}
     {panel === 'invest' && <div className="local-investment-body">
-      <div className="local-project-story"><span className="eyebrow">{project.symbol} · FICTIONAL TEST ISSUER · PROJECT UNITS</span><h3>{project.kind === 'housing' ? 'A small stake in a fictional place.' : 'A fictional stake in local work.'}</h3><p>{project.description}</p>
+      <div className="local-project-story"><span className="eyebrow">{project.symbol} · FICTIONAL TEST UNITS · NO VALUE, NO RIGHTS</span><h3>{project.kind === 'housing' ? 'A fictional housing example.' : 'A fictional workshop example.'}</h3><p>{project.description}</p>
         <div className="local-use-tags">{project.uses.map((use) => <span key={use}>{use}</span>)}</div>
         <div className="local-stake-display"><Building2 size={26} /><div><strong>{asset?.holdingRaw === null || !asset ? '—' : units(asset.holdingRaw)} <span>{project.symbol}</span></strong><small>Fictional test issuer · {asset?.holdingRaw !== null && asset ? `${percent(asset.holdingRaw, asset.totalSupplyRaw)} of the unit supply` : 'Wallet units appear after a successful network read'}</small></div></div>
         {asset && market && <div className="local-contract-links"><a href={`${market.network.explorerUrl.replace(/\/$/, '')}/address/${asset.unitAddress}`} target="_blank" rel="noopener noreferrer">{project.symbol} contract <ExternalLink size={12} /></a><a href={`${market.network.explorerUrl.replace(/\/$/, '')}/address/${asset.marketAddress}`} target="_blank" rel="noopener noreferrer">Market contract <ExternalLink size={12} /></a></div>}
@@ -209,22 +220,24 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
         {market?.state !== 'ready' && market && <p className="local-market-alert">{market.state === 'not_configured' ? 'The test-issuer contracts have not been provisioned in this environment.' : market.error || 'The test market is unavailable; no balance or purchase is inferred.'} <button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => void refresh()}>Check again</button></p>}
         {asset?.error && <p role="alert">{asset.error}</p>}
         {currentOrder && (currentOrder.state === 'review' || currentOrder.state === 'pending') ? <div className="local-order-review">
-          <span className="eyebrow">REVIEW STAKE · FICTIONAL TEST ISSUER</span><h4>{cash(currentOrder.cashAtomic)} test USD (tUSDG) <ArrowRight size={18} /> at least {units(currentOrder.minimumUnitsRaw)} {project.symbol}</h4>
+          <span className="eyebrow">REVIEW {currentOrder.direction === 'sell' ? 'SELL-BACK' : 'PURCHASE'} · FICTIONAL TEST UNITS</span><h4>{currentOrder.direction === 'sell' ? <>{formatUnits(BigInt(currentOrder.minimumUnitsRaw), 18)} {project.symbol} in <ArrowRight size={18} /> {cash(currentOrder.cashAtomic)} tUSDG out</> : <>{cash(currentOrder.cashAtomic)} tUSDG in <ArrowRight size={18} /> {formatUnits(BigInt(currentOrder.minimumUnitsRaw), 18)} {project.symbol} out</>}</h4>
           <p>Robinhood Chain testnet · network fees use test ETH. Units convey no property or company rights. {TEST_EXIT_NOTICE}</p>
-          <ol className="local-order-steps">{currentOrder.steps.map((step) => <li key={step.id} className={`is-${step.state}`}><span>{step.state === 'confirmed' ? <Check size={14} /> : step.kind === 'approve' ? '1' : '2'}</span><div><strong>{step.kind === 'approve' ? 'Approve only this test USD (tUSDG) amount' : 'Buy fictional test units'}</strong><small>{step.state === 'confirmed' ? 'Confirmed on the network' : step.state === 'pending' ? 'Submitted · awaiting verified receipt' : step.state === 'failed' ? 'Failed; no success inferred' : 'Your wallet approval is required'}</small></div></li>)}</ol>
-          {currentOrder.state === 'pending' ? <p role="status"><Loader2 className="spin" size={16} /> Checking the signed transaction. Do not start a replacement purchase.</p> : nextStep && <button type="button" className="button primary" disabled={Boolean(busy) || !healthy || !hasWallet} onClick={() => void signStep()}>{busy ? <><Loader2 className="spin" size={16} />{busy}</> : nextStep.kind === 'approve' ? 'Approve test USD (tUSDG) in my wallet' : 'Buy fictional test units with my wallet'}</button>}
+          <ol className="local-order-steps">{currentOrder.steps.map((step) => <li key={step.id} className={`is-${step.state}`}><span>{step.state === 'confirmed' ? <Check size={14} /> : step.kind === 'approve' ? '1' : '2'}</span><div><strong>{step.kind === 'approve' ? `Approve only this ${currentOrder.direction === 'sell' ? project.symbol : 'tUSDG'} amount` : step.kind === 'sell' ? 'Sell back fictional test units' : 'Buy fictional test units'}</strong><small>{step.state === 'confirmed' ? 'Confirmed on the network' : step.state === 'pending' ? 'Submitted · awaiting verified receipt' : step.state === 'failed' ? 'Failed; no success inferred' : 'Your wallet signature is required'}</small>{step.hash && market && <a href={`${market.network.explorerUrl}/tx/${step.hash}`} target="_blank" rel="noopener noreferrer">View {step.kind} transaction <ExternalLink size={12} /></a>}</div></li>)}</ol>
+          {currentOrder.state === 'pending' ? <p role="status"><Loader2 className="spin" size={16} /> Checking the signed transaction. Do not start a replacement order.</p> : nextStep && <button type="button" className="button primary" disabled={Boolean(busy) || !healthy || !hasWallet} onClick={() => void signStep()}>{busy ? <><Loader2 className="spin" size={16} />{busy}</> : nextStep.kind === 'approve' ? `Approve ${currentOrder.direction === 'sell' ? project.symbol : 'tUSDG'} in my wallet` : nextStep.kind === 'sell' ? 'Sell back fictional test units with my wallet' : 'Buy fictional test units with my wallet'}</button>}
           {currentOrder.state === 'review' && <button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => void cancelReview()}>Cancel this review</button>}
         </div> : <>
-          {currentOrder?.state === 'completed' && <div className="local-order-success" role="status"><Check size={18} /><div><strong>Stake purchase confirmed.</strong><span>The purchase receipt was checked; fictional test units are shown separately from priced assets.</span>{purchaseHash && market && <a href={`${market.network.explorerUrl.replace(/\/$/, '')}/tx/${purchaseHash}`} target="_blank" rel="noopener noreferrer">View purchase transaction <ExternalLink size={13} /></a>}</div></div>}
+          {currentOrder?.state === 'completed' && <div className="local-order-success" role="status"><Check size={18} /><div><strong>{currentOrder.direction === 'sell' ? 'Sell-back' : 'Purchase'} confirmed.</strong><span>{formatUnits(BigInt(currentOrder.minimumUnitsRaw), 18)} {project.symbol} {currentOrder.direction === 'sell' ? 'in' : 'out'} · {cash(currentOrder.cashAtomic)} tUSDG {currentOrder.direction === 'sell' ? 'out' : 'in'} at the fixed test price. Fictional test units, no value, no rights. Receipt and both transfers verified.</span>{tradeHash && market && <a href={`${market.network.explorerUrl.replace(/\/$/, '')}/tx/${tradeHash}`} target="_blank" rel="noopener noreferrer">View {currentOrder.direction === 'sell' ? 'sell-back' : 'purchase'} transaction <ExternalLink size={13} /></a>}</div></div>}
           {currentOrder?.error && <p className="local-market-alert">{currentOrder.error}</p>}
+          <div className="local-test-actions" role="group" aria-label="Choose test-unit action"><button type="button" className="text-button" disabled={Boolean(busy) || openOrder} aria-pressed={direction === 'buy'} onClick={() => setDirection('buy')}>Buy test units</button><button type="button" className="text-button" disabled={Boolean(busy) || openOrder} aria-pressed={direction === 'sell'} onClick={() => setDirection('sell')}>Sell back</button></div>
           <form onSubmit={(event) => { event.preventDefault(); void prepare(); }}>
-            <label>Amount for your stake <span>test USD (tUSDG)</span><input aria-label="Stake amount in test USD (tUSDG)" inputMode="decimal" value={amount} disabled={Boolean(busy) || openOrder} onChange={(event) => setAmount(event.target.value)} /></label>
+            <label>{direction === 'sell' ? 'Units to sell back' : 'Test dollars to spend'} <span>{direction === 'sell' ? project.symbol : 'tUSDG'}</span><input aria-label={direction === 'sell' ? `Sell-back amount in ${project.symbol}` : 'Stake amount in test USD (tUSDG)'} inputMode="decimal" value={amount} disabled={Boolean(busy) || openOrder} onChange={(event) => setAmount(event.target.value)} /></label>
             <div className="local-amount-presets">{['5', '10', '25'].map((value) => <button type="button" key={value} disabled={Boolean(busy) || openOrder} aria-pressed={amount === value} onClick={() => setAmount(value)}>{value}</button>)}</div>
-            <p className="local-price">{asset ? `${cash(asset.priceAtomic)} test USD (tUSDG) per whole ${project.symbol}` : 'Issue price is unavailable until the deployed market is checked.'}<small>Issue price, not a resale quote or market valuation.</small></p>
-            <p className="small-copy">Maximum 100 test USD (tUSDG) per stake purchase · No sell · no rights.</p>
-            <button className="button primary" disabled={!healthy || !affordable || openOrder || Boolean(busy)}>{busy ? <><Loader2 className="spin" size={16} />{busy}</> : <>Review stake <ArrowRight size={16} /></>}</button>
+            <p className="local-price">{asset ? `${cash(asset.priceAtomic)} tUSDG per whole ${project.symbol}` : 'Fixed test price is unavailable until the deployed desk is checked.'}<small>Fixed test issue and sell-back price, not a market valuation. Sell-back requires enough tUSDG in the desk.</small></p>
+            <p className="small-copy">Maximum 100 fictional test units per order; buys also capped at 100 tUSDG · no value, no rights.</p>
+            <button className="button primary" disabled={!healthy || !affordable || openOrder || Boolean(busy)}>{busy ? <><Loader2 className="spin" size={16} />{busy}</> : <>Review {direction === 'sell' ? 'sell-back' : 'purchase'} <ArrowRight size={16} /></>}</button>
           </form>
           {disabledReason && <p className="local-funding-note" role="status">{disabledReason}</p>}
+          {hasWallet && direction === 'buy' && !openOrder && <TestDollars request={request} ethBalance={market?.nativeAtomic ?? undefined} refresh={refresh} />}
         </>}
         {actionError && <p className="local-market-alert" role="alert">{actionError}</p>}
         {checkedAt && <span className="local-checked">Wallet/market last checked {checkedAt}{readError ? ' · refresh unavailable' : ''}</span>}

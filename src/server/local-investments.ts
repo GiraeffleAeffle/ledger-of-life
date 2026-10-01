@@ -17,20 +17,21 @@ import { WorkflowError } from '../domain/errors.ts';
 const chain = defineChain({ id: 46630, name: 'Robinhood Chain Testnet', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://rpc.testnet.chain.robinhood.com'] } }, testnet: true });
 const rpc = createPublicClient({ chain, transport: http() });
 const tokenAbi = parseAbi(['function name() view returns (string)', 'function symbol() view returns (string)', 'function decimals() view returns (uint8)', 'function totalSupply() view returns (uint256)', 'function balanceOf(address) view returns (uint256)', 'function allowance(address,address) view returns (uint256)', 'function approve(address,uint256) returns (bool)', 'event Transfer(address indexed from,address indexed to,uint256 value)']);
-const deskAbi = parseAbi(['function usd() view returns (address)', 'function stock() view returns (address)', 'function price() view returns (uint256)', 'function owner() view returns (address)', 'function quoteBuy(uint256) view returns (uint256)', 'function buy(uint256,uint256) returns (uint256)', 'event Bought(address indexed buyer,uint256 usdIn,uint256 stockOut)']);
+const deskAbi = parseAbi(['function usd() view returns (address)', 'function stock() view returns (address)', 'function price() view returns (uint256)', 'function owner() view returns (address)', 'function quoteBuy(uint256) view returns (uint256)', 'function quoteSell(uint256) view returns (uint256)', 'function buy(uint256,uint256) returns (uint256)', 'function sell(uint256,uint256) returns (uint256)', 'event Bought(address indexed buyer,uint256 usdIn,uint256 stockOut)', 'event Sold(address indexed seller,uint256 stockIn,uint256 usdOut)']);
 const network = { chainId: 46630 as const, name: 'Robinhood Chain Testnet', explorerUrl: 'https://explorer.testnet.chain.robinhood.com' };
 const scale = 10n ** 18n;
 const manifestFile = 'contracts/evm/deployments/local-investments-46630.json';
 const timeoutMs = 10 * 60_000;
 const maxSpend = 100_000_000n; // At most 100 test USD per order.
+const maxUnits = 100n * scale;
 
 export type LocalInvestmentAsset = { projectId: TestCityInvestmentId; unitAddress: string; marketAddress: string; unitDecimals: 18; priceAtomic: string; holdingRaw: string | null; totalSupplyRaw: string; availableUnitsRaw: string | null; error: string | null };
-export type LocalInvestmentStep = { id: string; kind: 'approve' | 'buy'; state: 'ready' | 'pending' | 'confirmed' | 'failed'; request: EvmSigningRequest | null; hash: `0x${string}` | null };
-export type LocalInvestmentOrder = { id: string; projectId: TestCityInvestmentId; state: 'review' | 'pending' | 'completed' | 'failed' | 'expired' | 'cancelled'; cashAtomic: string; minimumUnitsRaw: string; expiresAt: string; steps: LocalInvestmentStep[]; error: string | null };
+export type LocalInvestmentStep = { id: string; kind: 'approve' | 'buy' | 'sell'; state: 'ready' | 'pending' | 'confirmed' | 'failed'; request: EvmSigningRequest | null; hash: `0x${string}` | null };
+export type LocalInvestmentOrder = { id: string; projectId: TestCityInvestmentId; direction: 'buy' | 'sell'; state: 'review' | 'pending' | 'completed' | 'failed' | 'expired' | 'cancelled'; cashAtomic: string; minimumUnitsRaw: string; expiresAt: string; steps: LocalInvestmentStep[]; error: string | null };
 export type LocalInvestmentView = { state: 'ready' | 'not_configured' | 'unavailable'; network: typeof network; owner: string; cashAddress: string; cashAtomic: string | null; nativeAtomic: string | null; assets: LocalInvestmentAsset[]; order: LocalInvestmentOrder | null; error: string | null };
 export type LocalInvestmentManifest = { version: 1; chainId: 46630; cashAddress: Address; cashCodeHash: Hex; operator: Address; assets: Record<TestCityInvestmentId, { unitAddress: Address; marketAddress: Address; unitCodeHash: Hex; marketCodeHash: Hex; priceAtomic: string; totalSupplyRaw: string; name: string; symbol: string; deployment?: { unitHash: Hex | null; deskHash: Hex | null; seedHash: Hex | null } }> };
 type ReviewedTx = { chainId: 46630; to: Address; data: Hex; value: '0x0'; nonce: number; gas: Hex; maxFeePerGas: Hex; maxPriorityFeePerGas: Hex };
-type PrivateStep = { id: string; kind: 'approve' | 'buy'; state: LocalInvestmentStep['state']; transaction: ReviewedTx; signed: Hex | null; hash: Hex | null; nonceConflict?: { hash: Hex; blockHash: Hex; blockNumber: string } };
+type PrivateStep = { id: string; kind: LocalInvestmentStep['kind']; state: LocalInvestmentStep['state']; transaction: ReviewedTx; signed: Hex | null; hash: Hex | null; nonceConflict?: { hash: Hex; blockHash: Hex; blockNumber: string } };
 type PrivateOrder = { id: string; projectId: TestCityInvestmentId; owner: string; walletId: string; subject: string; manifestHash: Hex; cashAtomic: string; minimumUnitsRaw: string; preparedBlock: string; expiresAt: string; steps: PrivateStep[]; state: LocalInvestmentOrder['state']; error: string | null };
 type Lane = { active: string | null; lastOrderId?: string; requests: Record<string, { digest: string; orderId: string }>; orders: Record<string, PrivateOrder> };
 export type InvestmentRpc = typeof rpc;
@@ -45,19 +46,26 @@ function amount(value: unknown): bigint {
   if (parsed > maxSpend) throw new WorkflowError('The per-order test spend limit is 100 test USD.');
   return parsed;
 }
+function unitAmount(value: unknown): bigint {
+  if (typeof value !== 'string' || !/^[1-9][0-9]{0,20}$/.test(value)) throw new WorkflowError('Choose a canonical positive fictional-unit atomic amount.');
+  const parsed = BigInt(value);
+  if (parsed > maxUnits) throw new WorkflowError('The per-order limit is 100 fictional test units.');
+  return parsed;
+}
+const isSell = (order: PrivateOrder) => order.steps.some((step) => step.kind === 'sell');
 function selected(identity: VerifiedIdentity) {
   const wallet = walletFor(identity, 'robinhood');
   return { ...wallet, address: address(wallet.address) };
 }
 function publicOrder(order: PrivateOrder, now = Date.now()): LocalInvestmentOrder {
   return {
-    id: order.id, projectId: order.projectId, state: order.state, cashAtomic: order.cashAtomic,
+    id: order.id, projectId: order.projectId, direction: isSell(order) ? 'sell' : 'buy', state: order.state, cashAtomic: order.cashAtomic,
     minimumUnitsRaw: order.minimumUnitsRaw, expiresAt: order.expiresAt, error: order.error,
     steps: order.steps.map((step, index) => ({
       id: step.id, kind: step.kind, state: step.state, hash: step.hash,
       request: order.state === 'review' && step.state === 'ready' && order.steps.slice(0, index).every((prior) => prior.state === 'confirmed') && now < Date.parse(order.expiresAt) ? {
         walletId: order.walletId, operationId: step.id,
-        description: `${step.kind === 'approve' ? 'Approve exact test USD for' : 'Buy fictional test units in'} ${order.projectId} · no ownership or membership rights`,
+        description: `${step.kind === 'approve' ? `Approve exact ${isSell(order) ? 'fictional test units' : 'tUSDG'} for` : step.kind === 'sell' ? 'Sell back fictional test units in' : 'Buy fictional test units in'} ${order.projectId} · no value, no rights`,
         expiresAt: order.expiresAt, transaction: {
           chainId: step.transaction.chainId, to: step.transaction.to, data: step.transaction.data,
           value: step.transaction.value, nonce: step.transaction.nonce, gasLimit: step.transaction.gas,
@@ -156,16 +164,18 @@ export async function readLocalInvestments(store: Store, identity: VerifiedIdent
     return { ...base, state: 'unavailable', error: 'Unable to verify this testnet deployment or current balances. No zero balance is implied.' };
   }
 }
-export async function prepareLocalInvestment(store: Store, identity: VerifiedIdentity, input: { requestId: unknown; projectId: unknown; cashAtomic: unknown }, client: InvestmentRpc = rpc): Promise<LocalInvestmentOrder> {
+export async function prepareLocalInvestment(store: Store, identity: VerifiedIdentity, input: { requestId: unknown; projectId: unknown; direction?: unknown; cashAtomic?: unknown; unitsRaw?: unknown }, client: InvestmentRpc = rpc): Promise<LocalInvestmentOrder> {
   const wallet = selected(identity);
   const requestId = input.requestId;
   assert(typeof requestId === 'string' && /^[a-zA-Z0-9_-]{8,80}$/.test(requestId), 'Invalid request ID.');
   const project = TEST_CITY_INVESTMENTS.find((item) => item.id === input.projectId);
   assert(project, 'Unknown fictional test issuer.');
-  const spend = amount(input.cashAtomic);
+  assert(input.direction === undefined || input.direction === 'buy' || input.direction === 'sell', 'Unknown test-unit order direction.');
+  const selling = input.direction === 'sell';
+  const quantity = selling ? unitAmount(input.unitsRaw) : amount(input.cashAtomic);
   const deployment = await manifest();
   assert(deployment, 'Test units have not been provisioned yet.');
-  const digest = createHash('sha256').update(JSON.stringify([project.id, spend.toString(), wallet.id, wallet.address, deployment.hash])).digest('hex');
+  const digest = createHash('sha256').update(JSON.stringify([project.id, selling ? 'sell' : 'buy', quantity.toString(), wallet.id, wallet.address, deployment.hash])).digest('hex');
   const previous = (await laneGet(store, identity)).requests[requestId];
   if (previous) {
     assert(previous.digest === digest, 'Request ID already belongs to a different review.');
@@ -176,24 +186,36 @@ export async function prepareLocalInvestment(store: Store, identity: VerifiedIde
   await verified(deployment.value, client);
   const preparedBlock = await client.getBlockNumber();
   const asset = deployment.value.assets[project.id];
-  const expected = spend * scale / BigInt(asset.priceAtomic);
-  assert(expected > 0n, 'Spend is too small for a unit.');
+  const expected = selling ? quantity : quantity * scale / BigInt(asset.priceAtomic);
+  const spend = selling ? quantity * BigInt(asset.priceAtomic) / scale : quantity;
+  assert(expected > 0n && spend > 0n, 'Amount is too small for a test-unit trade.');
+  assert(expected <= maxUnits, 'The per-order limit is 100 fictional test units.');
+  const inputToken = selling ? asset.unitAddress : ROBINHOOD_TESTNET.usd;
+  const inputAmount = selling ? expected : spend;
   const [quoted, inventory, balance, allowance, fees, nonce, latestNonce] = await Promise.all([
-    client.readContract({ address: asset.marketAddress, abi: deskAbi, functionName: 'quoteBuy', args: [spend] }),
-    client.readContract({ address: asset.unitAddress, abi: tokenAbi, functionName: 'balanceOf', args: [asset.marketAddress] }),
-    client.readContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'balanceOf', args: [wallet.address] }),
-    client.readContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'allowance', args: [wallet.address, asset.marketAddress] }),
+    client.readContract({ address: asset.marketAddress, abi: deskAbi, functionName: selling ? 'quoteSell' : 'quoteBuy', args: [inputAmount] }),
+    client.readContract({ address: selling ? ROBINHOOD_TESTNET.usd : asset.unitAddress, abi: tokenAbi, functionName: 'balanceOf', args: [asset.marketAddress] }),
+    client.readContract({ address: inputToken, abi: tokenAbi, functionName: 'balanceOf', args: [wallet.address] }),
+    client.readContract({ address: inputToken, abi: tokenAbi, functionName: 'allowance', args: [wallet.address, asset.marketAddress] }),
     client.estimateFeesPerGas(), client.getTransactionCount({ address: wallet.address, blockTag: 'pending' }),
     client.getTransactionCount({ address: wallet.address, blockTag: 'latest' }),
   ]);
-  assert(quoted === expected && inventory >= expected && balance >= spend, 'Quote, available units or available test cash changed.');
+  if (selling) {
+    assert(balance >= expected, 'Not enough fictional test units in your wallet to sell back.');
+    assert(inventory >= spend, 'The test desk lacks tUSDG for this sell-back. No approval or sale was prepared.');
+    assert(quoted === spend, 'The fixed test sell-back quote changed.');
+  } else {
+    assert(quoted === expected && inventory >= expected && balance >= spend, 'Quote, available units or available test cash changed.');
+  }
   assert(nonce === latestNonce, 'Another wallet transaction is pending; wait before preparing an investment.');
   assert(fees.maxFeePerGas && fees.maxFeePerGas > 0n, 'Network fees unavailable.');
   const expiryAt = new Date(Date.now() + timeoutMs).toISOString();
   const id = randomUUID();
   const calls = [
-    ...(allowance < spend ? [{ kind: 'approve' as const, to: ROBINHOOD_TESTNET.usd, data: encodeFunctionData({ abi: tokenAbi, functionName: 'approve', args: [asset.marketAddress, spend] }) }] : []),
-    { kind: 'buy' as const, to: asset.marketAddress, data: encodeFunctionData({ abi: deskAbi, functionName: 'buy', args: [spend, expected] }) },
+    ...(allowance < inputAmount ? [{ kind: 'approve' as const, to: inputToken, data: encodeFunctionData({ abi: tokenAbi, functionName: 'approve', args: [asset.marketAddress, inputAmount] }) }] : []),
+    selling
+      ? { kind: 'sell' as const, to: asset.marketAddress, data: encodeFunctionData({ abi: deskAbi, functionName: 'sell', args: [expected, spend] }) }
+      : { kind: 'buy' as const, to: asset.marketAddress, data: encodeFunctionData({ abi: deskAbi, functionName: 'buy', args: [spend, expected] }) },
   ];
   const steps: PrivateStep[] = calls.map((call, index) => ({ id: randomUUID(), kind: call.kind, state: 'ready', signed: null, hash: null, transaction: {
     chainId: 46630, to: call.to, data: call.data, value: '0x0', nonce: nonce + index,
@@ -230,7 +252,7 @@ export async function submitLocalInvestment(store: Store, identity: VerifiedIden
   const order = lane.orders[orderId]; assert(order && lane.active === orderId, 'No active review for this order.');
   bound(order, identity, deployment.hash);
   const index = order.steps.findIndex((step) => step.id === stepId);
-  assert(index >= 0 && order.steps.slice(0, index).every((step) => step.state === 'confirmed'), 'Approve the exact test spend before buying.');
+  assert(index >= 0 && order.steps.slice(0, index).every((step) => step.state === 'confirmed'), 'Confirm the exact token approval before trading fictional test units.');
   const step = order.steps[index];
   await inspectSigned(step, signed, order.owner);
   const hash = keccak256(signed as Hex);
@@ -252,6 +274,19 @@ export async function submitLocalInvestment(store: Store, identity: VerifiedIden
     ]);
     assert(allowance >= BigInt(order.cashAtomic) && balance >= BigInt(order.cashAtomic) && inventory >= BigInt(order.minimumUnitsRaw) && quote === BigInt(order.minimumUnitsRaw), 'Cash, approval, quote or inventory changed before signing the buy.');
   }
+  if (isSell(order)) {
+    const asset = deployment.value.assets[order.projectId];
+    const [holding, deskCash, quote, allowance] = await Promise.all([
+      client.readContract({ address: asset.unitAddress, abi: tokenAbi, functionName: 'balanceOf', args: [address(order.owner)] }),
+      client.readContract({ address: ROBINHOOD_TESTNET.usd, abi: tokenAbi, functionName: 'balanceOf', args: [asset.marketAddress] }),
+      client.readContract({ address: asset.marketAddress, abi: deskAbi, functionName: 'quoteSell', args: [BigInt(order.minimumUnitsRaw)] }),
+      client.readContract({ address: asset.unitAddress, abi: tokenAbi, functionName: 'allowance', args: [address(order.owner), asset.marketAddress] }),
+    ]);
+    assert(holding >= BigInt(order.minimumUnitsRaw), 'Not enough fictional test units remain to sell back.');
+    assert(deskCash >= BigInt(order.cashAtomic), 'The test desk lacks tUSDG for this sell-back. This signed step was not sent.');
+    assert(quote === BigInt(order.cashAtomic), 'The fixed test sell-back quote changed.');
+    assert(step.kind !== 'sell' || allowance >= BigInt(order.minimumUnitsRaw), 'Confirm the exact unit approval before selling back.');
+  }
   // One atomic record contains reservation, reviewed call and exact signed bytes before any send.
   await laneUpdate(store, identity, (current) => {
     const target = current.orders[orderId]; assert(target && current.active === orderId, 'Order reservation changed.');
@@ -270,31 +305,37 @@ export async function submitLocalInvestment(store: Store, identity: VerifiedIden
 
 function matchingLogs(order: PrivateOrder, receipt: TransactionReceipt, asset: LocalInvestmentManifest['assets'][TestCityInvestmentId]): boolean {
   const buyer = address(order.owner);
-  let bought = 0, cash = 0, units = 0;
+  const selling = isSell(order);
+  const cashFrom = selling ? asset.marketAddress : buyer, cashTo = selling ? buyer : asset.marketAddress;
+  const unitsFrom = cashTo, unitsTo = cashFrom;
+  let trades = 0, cash = 0, units = 0;
   for (const log of receipt.logs) {
     try {
       if (same(log.address, asset.marketAddress)) {
         const event = decodeEventLog({ abi: deskAbi, data: log.data, topics: log.topics, strict: true });
         if (event.eventName === 'Bought') {
-          if (!same(event.args.buyer, buyer) || event.args.usdIn !== BigInt(order.cashAtomic) || event.args.stockOut !== BigInt(order.minimumUnitsRaw)) return false;
-          bought++;
+          if (selling || !same(event.args.buyer, buyer) || event.args.usdIn !== BigInt(order.cashAtomic) || event.args.stockOut !== BigInt(order.minimumUnitsRaw)) return false;
+          trades++;
+        } else if (event.eventName === 'Sold') {
+          if (!selling || !same(event.args.seller, buyer) || event.args.stockIn !== BigInt(order.minimumUnitsRaw) || event.args.usdOut !== BigInt(order.cashAtomic)) return false;
+          trades++;
         }
       }
       if (same(log.address, ROBINHOOD_TESTNET.usd) || same(log.address, asset.unitAddress)) {
         const event = decodeEventLog({ abi: tokenAbi, data: log.data, topics: log.topics, strict: true });
         if (event.eventName !== 'Transfer') continue;
         if (same(log.address, ROBINHOOD_TESTNET.usd) && [event.args.from, event.args.to].some((party) => same(party, buyer) || same(party, asset.marketAddress))) {
-          if (!same(event.args.from, buyer) || !same(event.args.to, asset.marketAddress) || event.args.value !== BigInt(order.cashAtomic)) return false;
+          if (!same(event.args.from, cashFrom) || !same(event.args.to, cashTo) || event.args.value !== BigInt(order.cashAtomic)) return false;
           cash++;
         }
         if (same(log.address, asset.unitAddress) && [event.args.from, event.args.to].some((party) => same(party, buyer) || same(party, asset.marketAddress))) {
-          if (!same(event.args.from, asset.marketAddress) || !same(event.args.to, buyer) || event.args.value !== BigInt(order.minimumUnitsRaw)) return false;
+          if (!same(event.args.from, unitsFrom) || !same(event.args.to, unitsTo) || event.args.value !== BigInt(order.minimumUnitsRaw)) return false;
           units++;
         }
       }
     } catch { return false; }
   }
-  return bought === 1 && cash === 1 && units === 1;
+  return trades === 1 && cash === 1 && units === 1;
 }
 /** A higher account nonce alone is not evidence that this particular transaction failed. */
 async function confirmedNonceReplacement(order: PrivateOrder, step: PrivateStep, client: InvestmentRpc) {
@@ -361,7 +402,7 @@ export async function reconcileLocalInvestment(store: Store, identity: VerifiedI
             entry.hash !== step.hash || entry.signed !== step.signed) return current;
           entry.state = 'failed'; entry.nonceConflict = conflict;
           target.state = 'failed';
-          target.error = 'This nonce was used by another confirmed wallet transaction. The reviewed transaction did not execute; inspect your wallet before another purchase.';
+          target.error = 'This nonce was used by another confirmed wallet transaction. The reviewed transaction did not execute; inspect your wallet before another trade.';
           current.active = null;
           return current;
         });
@@ -381,8 +422,8 @@ export async function reconcileLocalInvestment(store: Store, identity: VerifiedI
       transaction.input !== step.transaction.data || transaction.value !== 0n || transaction.chainId !== 46630 || transaction.gas !== BigInt(step.transaction.gas) ||
       transaction.maxFeePerGas !== BigInt(step.transaction.maxFeePerGas) || (transaction.maxPriorityFeePerGas ?? 0n) !== BigInt(step.transaction.maxPriorityFeePerGas)) return latest();
     if (receipt.status !== 'success' && receipt.status !== 'reverted') return latest();
-    if (receipt.status === 'success' && step.kind === 'buy' && !matchingLogs(order, receipt, deployment.value.assets[order.projectId])) {
-      return latest(); // A successful unrelated or incomplete receipt is not a purchase.
+    if (receipt.status === 'success' && step.kind !== 'approve' && !matchingLogs(order, receipt, deployment.value.assets[order.projectId])) {
+      return latest(); // A successful unrelated or incomplete receipt is not a trade.
     }
     const result = await laneUpdate(store, identity, (current) => {
       const target = current.orders[orderId];
