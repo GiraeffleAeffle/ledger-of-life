@@ -180,7 +180,7 @@ The original research block 69,695,660 was unavailable from the public RPC's his
 
 Primary references: [Robinhood network](https://docs.robinhood.com/chain/connecting/), [stock integration](https://docs.robinhood.com/chain/building-with-stock-tokens/), [Morpho integration](https://docs.morpho.org/developers/earn/tutorials/assets-flow/), [Morpho V2 source](https://github.com/morpho-org/vault-v2), and [0x RWA access](https://help.0x.org/articles/5420296643-xstocks-support-on-0x).
 
-## Building GPU revenue streaming (testnet; not deployed)
+## Building GPU revenue streaming (testnet; deployed and source-verified)
 
 `BuildingRevenueDistributor` is a trustless staking-rewards stream. It receives ERC20 tUSDG directly, including a potential future x402 host payee transfer. **Income streams to stakers over 7 days**, not as an immediate payout to whoever stakes around a revenue transfer. Constructor arguments `(payoutToken, unitToken, rewardDuration)` are immutable; duration is bounded to 1 hour–30 days and pinned to 7 days for this deployment. Chains 46630 and local 31337 are allowed. No operator, owner, admin, roots, epochs, upgrades or rescue exists.
 
@@ -202,21 +202,23 @@ Per-account checkpoints accrue `stakedOf(account)*(rewardPerUnit-rewardPerUnitPa
 
 Views expose `rewardDuration`, `rewardScale`, `rewardRate`, `periodFinish`, `lastUpdateTime`, `totalStaked`, `stakedOf(account)`, `rewardPerUnit`, account checkpoints/rewards/fractions, `accounted`, `streamRemainingScaled`, `undistributedScaled`, `rewardRemainderScaled`, `pendingRevenue()` and `earned(account)`. Earned rewards grow with elapsed scheduled time; unsynced new receipts do not instantly become earned. `Staked`, `Unstaked`, `Claimed`, `RevenueSynced`, `StreamScheduled` and `FractionRecycled` expose mutations; direct tUSDG receipts use token `Transfer` logs. The pinned dependencies must remain ordinary non-rebasing test ERC20 assets; unexpected payout custody loss fails closed rather than silently reallocating rewards.
 
-### Reviewed build and dry-run
+### Reviewed deployment and public verification
 
-`deployments/building-revenue-46630.json` is **version 3**, `rewardsSpec.scheme = staking_stream_v1`, **status `not_deployed`**, with null distributor/runtime/deployment evidence. It pins test tUSDG/tHOME, their code hashes, `rewardDuration = 604800`, scale `1e36`, and reviewed creation/runtime-template hashes with complete token/duration immutable anchors. `script/check-runtime.mjs` rejects obsolete operator/instant-reward manifests and validates build/dependency/runtime bindings offline. Explicit `--live` additionally checks a deployed distributor's receipt, exact configured runtime, token/duration/scale readbacks, or reports deployment unavailable.
+`deployments/building-revenue-46630.json` is **version 3**, `rewardsSpec.scheme = staking_stream_v1`, **status `deployed`**. The distributor is [`0xF397621304C0c4c2745fa0e9cA31A120E02BB4b3`](https://explorer.testnet.chain.robinhood.com/address/0xF397621304C0c4c2745fa0e9cA31A120E02BB4b3), fully source-verified on Blockscout with Solidity 0.8.28, optimizer 200 runs and Cancun EVM. Owner-authorized deployment [transaction `0x39c528236812c1e298ec7a5c42c6450a08caee2a6d18288ad75b80de86ab1934`](https://explorer.testnet.chain.robinhood.com/tx/0x39c528236812c1e298ec7a5c42c6450a08caee2a6d18288ad75b80de86ab1934) succeeded at block **127305053**, using **1,281,914 gas**, from `0x4efe17E8D8C475971d639ED1CaeEd84F57Fe68dD`.
+
+Public-RPC reads independently confirmed chain 46630, receipt, deployer/gas, exact reviewed creation bytecode plus constructor arguments, and payout token/unit token/duration/scale readbacks. The exact deployed runtime hash is `0x94fba1cd1a051656d3fae1f0ce573f3f36a7dd448f44ccc70dde71927d29faf3`; zeroing all compiler-recorded immutable slots normalizes it to reviewed template hash `0x11ee7aad6361111af9e8d4e04393e58524f5f063cd5acf65004f7594ca561aa0`. Every configured slot matches the manifest's token addresses and seven-day duration. Initial observed `totalStaked` and `accounted` were both zero, not evidence of a completed income flow.
+
+The manifest pins tUSDG/tHOME, their code hashes, `rewardDuration = 604800`, scale `1e36`, reviewed creation/runtime-template hashes and all three immutable anchors. `script/check-runtime.mjs` rejects obsolete manifests and checks exact configured build bindings offline. Explicit `--live` checks public receipt/creation/normalized and exact runtime, token/duration/scale/dependency readbacks and the explorer's fully verified source against this repository.
 
 ```sh
 forge build --root contracts/evm
 forge test --root contracts/evm -vv
 node contracts/evm/script/check-runtime.mjs
-forge script --root contracts/evm \
-  contracts/evm/script/BuildingRevenueDistributor.s.sol:DeployBuildingRevenueDistributor \
-  --rpc-url https://rpc.testnet.chain.robinhood.com -vv
+node contracts/evm/script/check-runtime.mjs --live
 ```
 
-The deployment script checks token addresses, chain/version/stream scheme, seven-day duration, scale, live dependency code hashes and reviewed creation hash before starting a broadcast context. The command above **does not broadcast**: the public-RPC dry-run succeeded on chain 46630 with an estimated 1,540,455 gas and only simulated deployment.
+The deployment script checks token addresses, chain/version/stream scheme, seven-day duration, scale, live dependency code hashes and reviewed creation hash before starting a broadcast context. Before the authorized deployment, a public-RPC dry-run succeeded with an estimated 1,540,455 gas and no broadcast. The script now intentionally refuses another deployment because the manifest is already deployed; use the read-only checker above for verification, not a simulated address.
 
 A separate throwaway local-EVM smoke received 10,400 atomic tUSDG while nobody staked, waited through the idle window, then staked 1 tHOME. The immediate claim paid **0**, the half-window claim paid **5,199**, and at the end total payout was exactly **10,400** with zero held payout and all 1 tHOME principal returned. Foundry time-warp tests cover one-second front-run participation, zero-staker streaming, staggered stakers, repeated receipts extending only future revenue, unchanged finish on zero-incoming sync, exact rate/dust accounting, recycled exit fractions, transfer rollback, reentrancy, duration/chain guards and 256-run exact-conservation sequences. Default network-fork skips are not integration evidence.
 
-No deployment, chain transaction or host payout reroute was performed. A simulated address is not usable deployment evidence. All units and payouts are fictional testnet data with no monetary value or legal rights; this is not legal advice.
+Deployment and source verification do **not** prove GPU host revenue routing, hosted staking, seven-day live accrual or wallet claims. The verification follow-up used public-RPC reads and explorer verification only; it submitted no additional chain transactions and performed no host payout reroute. All units and payouts are fictional testnet data with no monetary value or legal rights; this is not legal advice.

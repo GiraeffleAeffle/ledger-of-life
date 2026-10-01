@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { createPublicClient, http, keccak256, parseAbi, toHex } from 'viem';
+import { concat, createPublicClient, encodeAbiParameters, http, keccak256, parseAbi, toHex } from 'viem';
 import {
   assertRentalEscrowRuntime,
   rentalEscrowRuntime,
@@ -153,6 +153,14 @@ if (buildingManifest.status === 'not_deployed') {
   assert.equal(buildingManifest.status, 'deployed');
   assert.match(buildingManifest.distributor, /^0x[0-9a-fA-F]{40}$/);
   assert.match(buildingManifest.deploymentTransaction, /^0x[0-9a-fA-F]{64}$/);
+  assert.equal(buildingManifest.deploymentStatus, 1);
+  assert.match(buildingManifest.deploymentGasUsed, /^[1-9][0-9]*$/);
+  assert.match(buildingManifest.deployer, /^0x[0-9a-fA-F]{40}$/);
+  assert.equal(buildingManifest.verification.status, 'verified');
+  assert.equal(buildingManifest.verification.provider, 'blockscout');
+  assert.equal(buildingManifest.verification.compilerVersion, 'v0.8.28+commit.7893614a');
+  assert.equal(buildingManifest.verification.optimizerRuns, 200);
+  assert.equal(buildingManifest.verification.evmVersion, 'cancun');
   assert.ok(Number.isSafeInteger(buildingManifest.deploymentBlock) && buildingManifest.deploymentBlock > 0);
   assert.equal(keccak256(buildingConfiguredRuntime), buildingManifest.runtimeCodeHash, 'building exact deployed immutable binding');
 }
@@ -200,8 +208,29 @@ if (process.argv.includes('--live')) {
     assert.equal(buildingReceipt.status, 'success');
     assert.equal(buildingReceipt.blockNumber, BigInt(buildingManifest.deploymentBlock));
     assert.equal(buildingReceipt.contractAddress.toLowerCase(), buildingManifest.distributor.toLowerCase());
+    assert.equal(buildingReceipt.gasUsed, BigInt(buildingManifest.deploymentGasUsed));
+    assert.equal(buildingReceipt.from.toLowerCase(), buildingManifest.deployer.toLowerCase());
+    const buildingTransaction = await client.getTransaction({ hash: buildingManifest.deploymentTransaction });
+    assert.equal(buildingTransaction.to, null, 'building direct creation transaction');
+    const buildingConstructor = encodeAbiParameters(
+      [{ type: 'address' }, { type: 'address' }, { type: 'uint256' }],
+      [buildingManifest.payoutToken, buildingManifest.unitToken, BigInt(buildingManifest.rewardDuration)],
+    );
+    assert.equal(buildingTransaction.input.toLowerCase(), concat([
+      buildingCompiled.bytecode.object, buildingConstructor,
+    ]).toLowerCase(), 'building exact creation and constructor arguments');
     const deployed = await client.getCode({ address: buildingManifest.distributor });
     assert.equal(deployed?.toLowerCase(), buildingConfiguredRuntime.toLowerCase(), 'building live exact runtime');
+    let buildingNormalizedRuntime = deployed;
+    for (const group of buildingGroups) {
+      for (const ref of group) {
+        const start = ref.start * 2 + 2;
+        buildingNormalizedRuntime = buildingNormalizedRuntime.slice(0, start)
+          + '0'.repeat(ref.length * 2) + buildingNormalizedRuntime.slice(start + ref.length * 2);
+      }
+    }
+    assert.equal(keccak256(buildingNormalizedRuntime), buildingPins.runtimeTemplateHash, 'building live normalized reviewed template');
+    assert.equal(keccak256(deployed), buildingManifest.runtimeCodeHash, 'building live configured code hash');
     const buildingAbi = parseAbi([
       'function payoutToken() view returns (address)', 'function unitToken() view returns (address)',
       'function rewardDuration() view returns (uint256)', 'function rewardScale() view returns (uint256)',
@@ -221,7 +250,18 @@ if (process.argv.includes('--live')) {
       const dependency = await client.getCode({ address: buildingManifest[field] });
       assert.equal(keccak256(dependency), buildingManifest.dependencyCodeHashes[field], `building live ${field} code`);
     }
-    console.log('Building distributor live receipt, exact runtime and immutable readbacks passed.');
+    const explorerResponse = await fetch(`https://explorer.testnet.chain.robinhood.com/api/v2/smart-contracts/${buildingManifest.distributor}`);
+    assert.ok(explorerResponse.ok, 'building explorer verification response');
+    const explorer = await explorerResponse.json();
+    assert.equal(explorer.is_verified, true, 'building verified source');
+    assert.equal(explorer.is_fully_verified, true, 'building fully verified source');
+    assert.equal(explorer.compiler_version, buildingManifest.verification.compilerVersion);
+    assert.equal(explorer.optimization_runs, buildingManifest.verification.optimizerRuns);
+    assert.equal(explorer.evm_version, buildingManifest.verification.evmVersion);
+    assert.equal(explorer.source_code, readFileSync(fileURLToPath(
+      new URL('../src/BuildingRevenueDistributor.sol', import.meta.url),
+    ), 'utf8'), 'building exact explorer source');
+    console.log('Building distributor live receipt, creation, normalized/exact runtimes, immutable readbacks and verified source passed.');
   } else {
     console.log('Building distributor is not deployed; live verification is unavailable.');
   }

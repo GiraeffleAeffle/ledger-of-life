@@ -1,14 +1,26 @@
 {
   "version": 3,
   "chainId": 46630,
-  "status": "not_deployed",
-  "distributor": null,
+  "status": "deployed",
+  "distributor": "0xF397621304C0c4c2745fa0e9cA31A120E02BB4b3",
   "payoutToken": "0xA6e10E426A738aEF586dB5191177658D67C78A14",
   "unitToken": "0x2b95D13BDFEB4202281Cea72494263fdC7b0cbFb",
   "rewardDuration": 604800,
-  "runtimeCodeHash": null,
-  "deploymentTransaction": null,
-  "deploymentBlock": null,
+  "runtimeCodeHash": "0x94fba1cd1a051656d3fae1f0ce573f3f36a7dd448f44ccc70dde71927d29faf3",
+  "deploymentTransaction": "0x39c528236812c1e298ec7a5c42c6450a08caee2a6d18288ad75b80de86ab1934",
+  "deploymentBlock": 127305053,
+  "deploymentStatus": 1,
+  "deploymentGasUsed": "1281914",
+  "deployer": "0x4efe17E8D8C475971d639ED1CaeEd84F57Fe68dD",
+  "verification": {
+    "status": "verified",
+    "provider": "blockscout",
+    "url": "https://explorer.testnet.chain.robinhood.com/address/0xF397621304C0c4c2745fa0e9cA31A120E02BB4b3",
+    "verifiedAt": "2026-10-01T21:49:33.692435Z",
+    "compilerVersion": "v0.8.28+commit.7893614a",
+    "optimizerRuns": 200,
+    "evmVersion": "cancun"
+  },
   "dependencyCodeHashes": {
     "payoutToken": "0x3e4adb6eab9d495c72d672fb619614979f38b422e49fcdb1b5e4c3b53744fe80",
     "unitToken": "0xb5fb5c637f95b99fd213060f58555cd2cdb380c0a0665a773ec9476fe8a287bd"
@@ -36,6 +48,6 @@
     "Any positive receipt restarts the outstanding stream; repeated freely mintable dust receipts can delay its tail. Already-earned rewards and unit principal remain withdrawable.",
     "No owner, operator, admin, upgrade or rescue exists. Use stake(); direct tHOME transfers earn nothing and cannot be recovered.",
     "Whole rewards remain claimable after unstake; sub-atomic fractions on full exit are recycled to the stream.",
-    "Not deployed and not configured as any host payout address; build pins are not live deployment evidence."
+    "Deployment and source verification do not prove GPU revenue routing, hosted staking, time accrual or wallet payout flows."
   ]
 }

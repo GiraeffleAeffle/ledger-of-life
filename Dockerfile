@@ -41,8 +41,11 @@ COPY app ./app
 COPY src ./src
 COPY scripts/copy-maplibre-worker.mjs ./scripts/copy-maplibre-worker.mjs
 COPY public ./public
-# Home and the wallet signing policy statically bundle these reviewed factory/implementation pins.
+# Statically bundled reviewed pins: the share-deposit factory/implementation (Home and the wallet signing policy),
+# the building revenue distributor (wallet signing policy) and the Local stakes units (building revenue reads).
 COPY contracts/evm/deployments/share-deposit-46630.json ./contracts/evm/deployments/share-deposit-46630.json
+COPY contracts/evm/deployments/building-revenue-46630.json ./contracts/evm/deployments/building-revenue-46630.json
+COPY contracts/evm/deployments/local-investments-46630.json ./contracts/evm/deployments/local-investments-46630.json
 RUN npm run build
 
 FROM base AS runtime
@@ -59,12 +62,14 @@ COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
 COPY --chown=node:node stadtstack-data/out ./stadtstack-data/out
 # Public testnet deployments read at their default paths: Local stakes and the AI desk's payee
-# (src/server/local-investments.ts), and the shared loan market and its price mirror (src/server/shared-market.ts,
-# src/server/tsla-price-mirror.ts), and share deposits (src/server/share-deposit-chain.ts). The share manifest also
-# enters the build stage for Home and the wallet signing policy. Rebuild the image when a deployment changes.
+# (src/server/local-investments.ts), the shared loan market and its price mirror (src/server/shared-market.ts,
+# src/server/tsla-price-mirror.ts), share deposits (src/server/share-deposit-chain.ts) and the building revenue
+# distributor (src/server/building-revenue.ts). The share, building and Local stakes manifests also enter the build
+# stage, which bundles them statically. Rebuild the image when a deployment changes.
 COPY --chown=node:node contracts/evm/deployments/local-investments-46630.json ./contracts/evm/deployments/local-investments-46630.json
 COPY --chown=node:node contracts/evm/deployments/shared-market-46630.json ./contracts/evm/deployments/shared-market-46630.json
 COPY --chown=node:node contracts/evm/deployments/share-deposit-46630.json ./contracts/evm/deployments/share-deposit-46630.json
+COPY --chown=node:node contracts/evm/deployments/building-revenue-46630.json ./contracts/evm/deployments/building-revenue-46630.json
 COPY --chown=node:node scripts/reconcile.mjs ./scripts/reconcile.mjs
 USER node
 VOLUME /data
