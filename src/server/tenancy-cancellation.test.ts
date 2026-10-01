@@ -23,7 +23,7 @@ async function fixture(accepted = true) {
   const store = new LocalStore(':memory:');
   const landlord = person('landlord', 1), tenant = person('tenant', 2), arbitrator = person('arbitrator', 3);
   const listing = await createListing(store, landlord, {
-    title: 'A test home', rentMonthly: '1000000', requiredSecurity: '10000000', releaseAllowed: false,
+    title: 'A test home', rentMonthly: '4000000', requiredSecurity: '10000000', releaseAllowed: false,
   });
   await applyToListing(store, tenant, listing.id, { name: 'Tenant', message: 'I would like to rent this home.' });
   const applications = (await listListings(store, landlord))[0].applications!;

@@ -6,7 +6,7 @@ import { requireReady, walletFor, type Agreement } from './agreements.ts';
 import { AccessError, ConflictError } from './errors.ts';
 import type { Store } from './store.ts';
 import { roundedLocation, type HomeLocation } from '../domain/home-location.ts';
-import { cashDepositForm, shareDepositForm, type DepositForm } from '../domain/deposit-form.ts';
+import { cashDepositForm, shareDepositForm, validateDepositSecurity, type DepositForm } from '../domain/deposit-form.ts';
 import { loadShareDepositManifest, requireDeposit } from './share-deposit-chain.ts';
 
 /**
@@ -148,6 +148,8 @@ export async function createListing(store: Store, identity: VerifiedIdentity, in
   if (input.depositForm !== undefined && input.depositForm !== 'cash' && input.depositForm !== 'shares')
     throw new WorkflowError('Choose cash or shares for the deposit.');
   const security = amount(input.requiredSecurity, 'The deposit');
+  const rent = amount(input.rentMonthly, 'The monthly cold rent');
+  validateDepositSecurity(rent, security, input.depositForm === 'shares' ? 'shares' : 'cash');
   const deployment = input.depositForm === 'shares' ? await loadShareDepositManifest() : null;
   if (input.depositForm === 'shares') requireDeposit(deployment?.factory, 'Share deposit not deployed yet');
   const form = input.depositForm === 'shares'
@@ -163,7 +165,7 @@ export async function createListing(store: Store, identity: VerifiedIdentity, in
     description: text(input.description ?? '', 0, 2000, 'The description'),
     details: details(input),
     location: roundedLocation(input.location),
-    rentMonthly: amount(input.rentMonthly, 'The monthly rent'),
+    rentMonthly: rent,
     requiredSecurity: security,
     releaseAllowed: form.kind === 'shares' ? false : input.releaseAllowed,
     status: 'open',

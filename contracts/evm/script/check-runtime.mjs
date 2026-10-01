@@ -100,6 +100,64 @@ if (shareManifest.status === 'not_deployed') {
 }
 console.log('Share-deposit reviewed creation/runtime pins and manifest shape passed.');
 
+// Build pins remain distinct from deployment evidence for the building distributor.
+const buildingManifest = JSON.parse(readFileSync(fileURLToPath(
+  new URL('../deployments/building-revenue-46630.json', import.meta.url),
+), 'utf8'));
+const investmentsManifest = JSON.parse(readFileSync(fileURLToPath(
+  new URL('../deployments/local-investments-46630.json', import.meta.url),
+), 'utf8'));
+assert.equal(buildingManifest.version, 3);
+assert.equal(buildingManifest.rewardsSpec.scheme, 'staking_stream_v1');
+assert.equal(buildingManifest.rewardsSpec.scale, '1000000000000000000000000000000000000');
+assert.equal(buildingManifest.rewardDuration, 604_800);
+assert.ok(!Object.hasOwn(buildingManifest, 'operator') && !Object.hasOwn(buildingManifest, 'merkleSpec'), 'no obsolete epoch/operator manifest');
+assert.equal(buildingManifest.chainId, 46630);
+assert.equal(buildingManifest.payoutToken, investmentsManifest.cashAddress);
+assert.equal(buildingManifest.unitToken, investmentsManifest.assets['demo-neighbourhood-homes'].unitAddress);
+assert.deepEqual(buildingManifest.dependencyCodeHashes, {
+  payoutToken: investmentsManifest.cashCodeHash,
+  unitToken: investmentsManifest.assets['demo-neighbourhood-homes'].unitCodeHash,
+});
+const buildingCompiled = JSON.parse(readFileSync(fileURLToPath(
+  new URL('../out/BuildingRevenueDistributor.sol/BuildingRevenueDistributor.json', import.meta.url),
+), 'utf8'));
+const buildingPins = buildingManifest.reviewedArtifacts.BuildingRevenueDistributor;
+assert.equal(keccak256(buildingCompiled.bytecode.object), buildingPins.creationHash, 'building creation pin');
+assert.equal(keccak256(buildingCompiled.deployedBytecode.object), buildingPins.runtimeTemplateHash, 'building runtime pin');
+assert.ok((buildingCompiled.deployedBytecode.object.length - 2) / 2 <= 24_576, 'building EIP-170 limit');
+const buildingGroups = Object.values(buildingCompiled.deployedBytecode.immutableReferences);
+const buildingAnchors = Object.entries(buildingPins.immutableAnchors);
+assert.equal(buildingAnchors.length, buildingGroups.length, 'building complete immutable bindings');
+assert.deepEqual(buildingAnchors.map(([, field]) => field).sort(), ['payoutToken', 'rewardDuration', 'unitToken']);
+let buildingConfiguredRuntime = buildingCompiled.deployedBytecode.object;
+const boundBuildingGroups = new Set();
+for (const [anchor, field] of buildingAnchors) {
+  const matching = buildingGroups.filter(group => group.some(ref => ref.start === Number(anchor)));
+  assert.equal(matching.length, 1, `building reviewed immutable anchor ${anchor}`);
+  assert.ok(!boundBuildingGroups.has(matching[0]), 'building unique immutable group');
+  boundBuildingGroups.add(matching[0]);
+  const value = toHex(BigInt(buildingManifest[field]), { size: 32 }).slice(2);
+  for (const ref of matching[0]) {
+    assert.equal(ref.length, 32);
+    const start = ref.start * 2 + 2;
+    assert.equal(buildingConfiguredRuntime.slice(start, start + 64), '0'.repeat(64), 'building template slot');
+    buildingConfiguredRuntime = buildingConfiguredRuntime.slice(0, start) + value + buildingConfiguredRuntime.slice(start + 64);
+  }
+}
+if (buildingManifest.status === 'not_deployed') {
+  for (const key of ['distributor', 'runtimeCodeHash', 'deploymentTransaction', 'deploymentBlock']) {
+    assert.equal(buildingManifest[key], null, `building unavailable ${key}`);
+  }
+} else {
+  assert.equal(buildingManifest.status, 'deployed');
+  assert.match(buildingManifest.distributor, /^0x[0-9a-fA-F]{40}$/);
+  assert.match(buildingManifest.deploymentTransaction, /^0x[0-9a-fA-F]{64}$/);
+  assert.ok(Number.isSafeInteger(buildingManifest.deploymentBlock) && buildingManifest.deploymentBlock > 0);
+  assert.equal(keccak256(buildingConfiguredRuntime), buildingManifest.runtimeCodeHash, 'building exact deployed immutable binding');
+}
+console.log('Building distributor reviewed creation/runtime pins, dependencies and manifest shape passed.');
+
 // CI remains offline. Explicit --live verifies receipt, code and readbacks using public reads only.
 if (process.argv.includes('--live')) {
   assert.equal(shareManifest.status, 'deployed');
@@ -137,4 +195,34 @@ if (process.argv.includes('--live')) {
     address: shareManifest.implementation, abi: implementationAbi, functionName: 'state',
   }), 4);
   console.log('Share-deposit live receipt, exact configured runtimes and locked implementation readbacks passed.');
+  if (buildingManifest.status === 'deployed') {
+    const buildingReceipt = await client.getTransactionReceipt({ hash: buildingManifest.deploymentTransaction });
+    assert.equal(buildingReceipt.status, 'success');
+    assert.equal(buildingReceipt.blockNumber, BigInt(buildingManifest.deploymentBlock));
+    assert.equal(buildingReceipt.contractAddress.toLowerCase(), buildingManifest.distributor.toLowerCase());
+    const deployed = await client.getCode({ address: buildingManifest.distributor });
+    assert.equal(deployed?.toLowerCase(), buildingConfiguredRuntime.toLowerCase(), 'building live exact runtime');
+    const buildingAbi = parseAbi([
+      'function payoutToken() view returns (address)', 'function unitToken() view returns (address)',
+      'function rewardDuration() view returns (uint256)', 'function rewardScale() view returns (uint256)',
+    ]);
+    for (const field of ['payoutToken', 'unitToken']) {
+      assert.equal((await client.readContract({
+        address: buildingManifest.distributor, abi: buildingAbi, functionName: field,
+      })).toLowerCase(), buildingManifest[field].toLowerCase());
+    }
+    assert.equal(await client.readContract({
+      address: buildingManifest.distributor, abi: buildingAbi, functionName: 'rewardDuration',
+    }), BigInt(buildingManifest.rewardDuration));
+    assert.equal(await client.readContract({
+      address: buildingManifest.distributor, abi: buildingAbi, functionName: 'rewardScale',
+    }), BigInt(buildingManifest.rewardsSpec.scale));
+    for (const field of ['payoutToken', 'unitToken']) {
+      const dependency = await client.getCode({ address: buildingManifest[field] });
+      assert.equal(keccak256(dependency), buildingManifest.dependencyCodeHashes[field], `building live ${field} code`);
+    }
+    console.log('Building distributor live receipt, exact runtime and immutable readbacks passed.');
+  } else {
+    console.log('Building distributor is not deployed; live verification is unavailable.');
+  }
 }

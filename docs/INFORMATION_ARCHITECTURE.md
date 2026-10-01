@@ -71,6 +71,7 @@ Money is one page with four tabs (`SectionTabs`). Each has one job and states it
 | **GPU**: local AI node, per-answer payment, host income scenario | Money → Devices & income | — (node is configured on the host) | Places (library profile), Ideas, the ownership path, Me directory |
 | Free public AI desk for visitors | `/library` (no account, separate route) | — | Money → Devices & income offers it as the library access mode |
 | Newcomer welcome guide | `/welcome/<city>` (no account; a separate route, outside the wallet route group) | — | Places (a "New here? Welcome guide" link in the city card); its interests are Places' interests |
+| Recorded hosted run (the 1 Oct three-account share-deposit tenancy as the seven Home steps with receipts, plus loan, stake and paid-answer receipts) | `/replay` (no account, no cookies; a separate route, outside the wallet route group) | — | The door and Home's deposit options link to it |
 | Electric car and other devices | Ideas (roadmap) | — | Today (says feeds remain planned) |
 
 ## Deciding where something new goes
@@ -127,6 +128,7 @@ After deposit security, either tenancy party can record electricity/gas/water re
 
 ## What changed on 2026-10-01
 
+- Added the public `/replay` page: no account and no cookies, outside the wallet group. It replays the recorded 1 October share-deposit tenancy as the seven Home steps with all receipts, plus the loan, stake and paid-answer receipts; linked from the door and Home's deposit options.
 - Home now connects a flat’s approximate map pin to sourced public neighbourhood context and, after deposit security, optional city/guide/public-compute links. It keeps the tenancy path non-blocking.
 - Added a revision-bound handover confirmed separately by tenant and landlord, with meter baselines visible in service charges. Registration particulars stay in a browser-only print form.
 - Removed Home’s remote Unsplash image requests and photo-upload controls; six attributed samples are self-hosted.

@@ -1,0 +1,41 @@
+{
+  "version": 3,
+  "chainId": 46630,
+  "status": "not_deployed",
+  "distributor": null,
+  "payoutToken": "0xA6e10E426A738aEF586dB5191177658D67C78A14",
+  "unitToken": "0x2b95D13BDFEB4202281Cea72494263fdC7b0cbFb",
+  "rewardDuration": 604800,
+  "runtimeCodeHash": null,
+  "deploymentTransaction": null,
+  "deploymentBlock": null,
+  "dependencyCodeHashes": {
+    "payoutToken": "0x3e4adb6eab9d495c72d672fb619614979f38b422e49fcdb1b5e4c3b53744fe80",
+    "unitToken": "0xb5fb5c637f95b99fd213060f58555cd2cdb380c0a0665a773ec9476fe8a287bd"
+  },
+  "reviewedArtifacts": {
+    "BuildingRevenueDistributor": {
+      "creationHash": "0x54a245a04716dfb233b5712c67796c06555fef0e2233afa2041e426e02fe622c",
+      "runtimeTemplateHash": "0x11ee7aad6361111af9e8d4e04393e58524f5f063cd5acf65004f7594ca561aa0",
+      "immutableAnchors": { "463": "payoutToken", "602": "unitToken", "760": "rewardDuration" }
+    }
+  },
+  "rewardsSpec": {
+    "scheme": "staking_stream_v1",
+    "scale": "1000000000000000000000000000000000000",
+    "rateUnits": "scaled_atomic_tUSDG_per_second",
+    "weight": "raw_tHOME_staked_during_elapsed_stream_time",
+    "zeroStakeRevenue": "carry_then_stream_over_fresh_window_never_lump_sum",
+    "newRevenue": "reschedule_only_unstreamed_budget_plus_new_receipts",
+    "dust": "exact_scaled_rate_and_accumulator_remainders",
+    "fullExitFraction": "recycle_into_stream_without_extending_active_finish"
+  },
+  "limitations": [
+    "Testnet only; fictional units and payouts have no value or legal rights.",
+    "Income streams to stakers over 7 days; new revenue extends the stream. No historical unit ownership rights are inferred.",
+    "Any positive receipt restarts the outstanding stream; repeated freely mintable dust receipts can delay its tail. Already-earned rewards and unit principal remain withdrawable.",
+    "No owner, operator, admin, upgrade or rescue exists. Use stake(); direct tHOME transfers earn nothing and cannot be recovered.",
+    "Whole rewards remain claimable after unstake; sub-atomic fractions on full exit are recycled to the stream.",
+    "Not deployed and not configured as any host payout address; build pins are not live deployment evidence."
+  ]
+}

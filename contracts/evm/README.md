@@ -179,3 +179,44 @@ The original research block 69,695,660 was unavailable from the public RPC's his
 - No production wallet/provider account, stock purchase, fiat transfer, or production deployment was created here. Provider access, wallet recovery, complete fee sponsorship, actual stock execution/exit and production review remain integration gates.
 
 Primary references: [Robinhood network](https://docs.robinhood.com/chain/connecting/), [stock integration](https://docs.robinhood.com/chain/building-with-stock-tokens/), [Morpho integration](https://docs.morpho.org/developers/earn/tutorials/assets-flow/), [Morpho V2 source](https://github.com/morpho-org/vault-v2), and [0x RWA access](https://help.0x.org/articles/5420296643-xstocks-support-on-0x).
+
+## Building GPU revenue streaming (testnet; not deployed)
+
+`BuildingRevenueDistributor` is a trustless staking-rewards stream. It receives ERC20 tUSDG directly, including a potential future x402 host payee transfer. **Income streams to stakers over 7 days**, not as an immediate payout to whoever stakes around a revenue transfer. Constructor arguments `(payoutToken, unitToken, rewardDuration)` are immutable; duration is bounded to 1 hour–30 days and pinned to 7 days for this deployment. Chains 46630 and local 31337 are allowed. No operator, owner, admin, roots, epochs, upgrades or rescue exists.
+
+`stake(amount)` transfers the caller's approved raw tHOME into custody; `unstake(amount)` returns only that caller's units. `claim()` pays only the caller's accrued atomic tUSDG (6 decimals). `exit()` unstakes all and claims atomically. All mutations, including permissionless `sync()`, enforce a reentrancy guard and synchronize incoming revenue first. Account checkpoints precede stake-weight changes; effects precede transfers, and exact sender/recipient balance deltas reject fee-on-transfer tokens. Transfer failures revert the full action, so a failed exit keeps units and rewards intact.
+
+**Do not transfer tHOME directly to the distributor.** Only `stake()` credits the caller's stake ledger. Direct unit transfers earn no rewards and cannot be recovered or unstaked because no rescue authority exists. Plain transfers are intended for **tUSDG revenue only**.
+
+**Timing is part of the model:** only elapsed stream time earns rewards at the actual stake weights during that time, not historical unit ownership. A large stake immediately before a receipt and an immediate exit earns zero at the same timestamp; after one second it earns only its share of that second. New incoming receipts plus the unstreamed remainder start a fresh seven-day window; already-earned rewards are never rescheduled. Revenue emitted while nobody stakes is retained, and when the first staker arrives that carry plus the unstreamed budget starts a fresh full-window stream, **never an instant lump-sum payout**. Repeated zero-incoming syncs cannot extend the window. These time-weighted fictional test rewards do not create ownership or legal rights.
+
+**Streaming liveness limitation:** any positive tUSDG receipt restarts the outstanding unstreamed budget over a new window. Because test tUSDG is freely mintable, repeated dust receipts can keep extending the remaining tail at negligible cost. Already-accrued rewards remain claimable and unit principal remains withdrawable, but **seven days is not a guaranteed completion deadline when new receipts keep arriving**. This is a known tradeoff of the permissionless reschedule-on-receipt model, not a claim of production-grade economic fairness.
+
+### Accounting and precision
+
+With high internal precision `S = 1e36`, `rewardRate` is **scaled atomic tUSDG per second**; divide by `S` and by `1e6` to express test dollars/second. `accounted` tracks all synced payouts still held and decreases only on successful whole-token claims. Each mutation accrues the current stream first, then computes new `incoming = payoutToken.balanceOf(distributor) - accounted`. Newly received revenue, idle carry and the still-unstreamed budget are scheduled over `rewardDuration`, with `rewardRate = floor(budgetScaled / rewardDuration)`.
+
+Elapsed emission is `rewardRate * elapsedSeconds` up to `periodFinish`; the final accrual includes the exact remaining budget, so sub-atomic rate-division dust is not lost. With stakers, emission plus `rewardRemainderScaled` increments `rewardPerUnit` by floor division over raw `totalStaked`; its modulo remainder stays tracked. Without stakers, emissions enter `undistributedScaled` (idle carry). `streamRemainingScaled` is the exact unstreamed budget. Synced payout custody equals whole owed rewards, uncheckpointed accrual, per-account fractions, future/idle budgets and global remainders combined.
+
+Per-account checkpoints accrue `stakedOf(account)*(rewardPerUnit-rewardPerUnitPaid(account)) + rewardFraction(account)`; whole atomic units enter `rewards`, and the sub-atomic fraction remains tracked across ordinary claims/partial unstaking. Full unstake/exit retains whole rewards for a later claim but clears and recycles its fractional remainder into the stream, emitting `FractionRecycled`. Recycling keeps an active period's existing finish; if the stream ended with stakers remaining, the fraction streams over a fresh window. With no remaining stakers, fractions and global accumulator dust join idle carry. No per-account fraction is permanently orphaned by a full exit.
+
+Views expose `rewardDuration`, `rewardScale`, `rewardRate`, `periodFinish`, `lastUpdateTime`, `totalStaked`, `stakedOf(account)`, `rewardPerUnit`, account checkpoints/rewards/fractions, `accounted`, `streamRemainingScaled`, `undistributedScaled`, `rewardRemainderScaled`, `pendingRevenue()` and `earned(account)`. Earned rewards grow with elapsed scheduled time; unsynced new receipts do not instantly become earned. `Staked`, `Unstaked`, `Claimed`, `RevenueSynced`, `StreamScheduled` and `FractionRecycled` expose mutations; direct tUSDG receipts use token `Transfer` logs. The pinned dependencies must remain ordinary non-rebasing test ERC20 assets; unexpected payout custody loss fails closed rather than silently reallocating rewards.
+
+### Reviewed build and dry-run
+
+`deployments/building-revenue-46630.json` is **version 3**, `rewardsSpec.scheme = staking_stream_v1`, **status `not_deployed`**, with null distributor/runtime/deployment evidence. It pins test tUSDG/tHOME, their code hashes, `rewardDuration = 604800`, scale `1e36`, and reviewed creation/runtime-template hashes with complete token/duration immutable anchors. `script/check-runtime.mjs` rejects obsolete operator/instant-reward manifests and validates build/dependency/runtime bindings offline. Explicit `--live` additionally checks a deployed distributor's receipt, exact configured runtime, token/duration/scale readbacks, or reports deployment unavailable.
+
+```sh
+forge build --root contracts/evm
+forge test --root contracts/evm -vv
+node contracts/evm/script/check-runtime.mjs
+forge script --root contracts/evm \
+  contracts/evm/script/BuildingRevenueDistributor.s.sol:DeployBuildingRevenueDistributor \
+  --rpc-url https://rpc.testnet.chain.robinhood.com -vv
+```
+
+The deployment script checks token addresses, chain/version/stream scheme, seven-day duration, scale, live dependency code hashes and reviewed creation hash before starting a broadcast context. The command above **does not broadcast**: the public-RPC dry-run succeeded on chain 46630 with an estimated 1,540,455 gas and only simulated deployment.
+
+A separate throwaway local-EVM smoke received 10,400 atomic tUSDG while nobody staked, waited through the idle window, then staked 1 tHOME. The immediate claim paid **0**, the half-window claim paid **5,199**, and at the end total payout was exactly **10,400** with zero held payout and all 1 tHOME principal returned. Foundry time-warp tests cover one-second front-run participation, zero-staker streaming, staggered stakers, repeated receipts extending only future revenue, unchanged finish on zero-incoming sync, exact rate/dust accounting, recycled exit fractions, transfer rollback, reentrancy, duration/chain guards and 256-run exact-conservation sequences. Default network-fork skips are not integration evidence.
+
+No deployment, chain transaction or host payout reroute was performed. A simulated address is not usable deployment evidence. All units and payouts are fictional testnet data with no monetary value or legal rights; this is not legal advice.

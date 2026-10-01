@@ -1,4 +1,5 @@
 import type { Network } from './assets.ts';
+import { atomic } from './assets.ts';
 import { WorkflowError } from './errors.ts';
 
 export const SHARE_STOCK = '0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E';
@@ -7,6 +8,20 @@ export const CASH_MINT = 'BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE';
 export type CashDepositForm = { kind: 'cash'; network: Network; mint: string; decimals: number };
 export type ShareDepositForm = { kind: 'shares'; chainId: 46630; stock: string; oracle: string; factory: string | null; securityUsd6: string; initialRatioBps: 15000; topUpRatioBps: 12500; responseWindow: number; returnWindow: number; arbitrationWindow: number };
 export type DepositForm = CashDepositForm | ShareDepositForm;
+
+/** Rent and security use the same six-decimal test-dollar units, never share quantities. */
+export function maximumDepositSecurity(rentMonthly: string, kind: DepositForm['kind']): string {
+  return (atomic(rentMonthly) * (kind === 'shares' ? 2n : 3n)).toString();
+}
+
+/** Publication-only rule: existing listings and accepted agreements are not revalidated. */
+export function validateDepositSecurity(rentMonthly: string, security: string, kind: DepositForm['kind']): void {
+  if (atomic(security) > atomic(maximumDepositSecurity(rentMonthly, kind))) {
+    throw new WorkflowError(kind === 'shares'
+      ? 'The share-backed security must not exceed two months’ net cold rent: 150% share cover reaches the three-month cap under §551(1) BGB.'
+      : 'The cash deposit must not exceed three months’ net cold rent under §551(1) BGB.');
+  }
+}
 export const cashDepositForm = (network: Network = 'solana'): CashDepositForm => ({ kind: 'cash', network, mint: network === 'solana' ? CASH_MINT : '0xA6e10E426A738aEF586dB5191177658D67C78A14', decimals: 6 });
 export function shareDepositForm(securityUsd6: string, factory: string | null, input: Record<string, unknown> = {}): ShareDepositForm {
   if (!/^[1-9][0-9]{0,10}$/.test(securityUsd6) || BigInt(securityUsd6) < 1_000_000n || BigInt(securityUsd6) > 10_000_000_000n)

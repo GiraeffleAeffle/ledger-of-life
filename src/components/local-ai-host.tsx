@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BarChart3, Cpu, Library, Loader2, Wallet } from 'lucide-react';
 import type { LocalAiServiceStatus, LocalAiUsageSummary } from '../server/local-ai-types';
 import { DEFAULT_HOST_SCENARIO, hostEconomics, type HostScenario } from './local-ai-economics';
+import { useRentalWallet } from '@/wallets';
 
 const euros = (value: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format(value);
 const fields: { key: keyof HostScenario; label: string; min: number; max?: number; step: number }[] = [
@@ -23,6 +24,9 @@ export function LocalAiHost({ usage, error, service, request, refresh }: {
   usage: LocalAiUsageSummary | null; error: string; service: LocalAiServiceStatus | null;
   request: HostRequest; refresh: () => Promise<void>;
 }) {
+  const wallet = useRentalWallet();
+  const [distributor, setDistributor] = useState<string | null>(null);
+  const ownAddress = wallet.wallets.find((item) => item.chainType === 'ethereum' && item.connected)?.address;
   const [inputs, setInputs] = useState<HostScenario>(DEFAULT_HOST_SCENARIO);
   const [invitation, setInvitation] = useState<{ code: string; expiresAt: string } | null>(null);
   const [payoutWallet, setPayoutWallet] = useState('');
@@ -35,6 +39,15 @@ export function LocalAiHost({ usage, error, service, request, refresh }: {
     mounted.current = true;
     const active = mounted;
     return () => { active.current = false; };
+  }, []);
+  useEffect(() => {
+    let live = true;
+    void fetch('/api/building', { cache: 'no-store' }).then(async (response) => {
+      if (!response.ok) return;
+      const value = await response.json() as { building: { configured: boolean; distributor: string | null } };
+      if (live) setDistributor(value.building.configured ? value.building.distributor : null);
+    }).catch(() => { /* Unavailable configuration never enables payout changes. */ });
+    return () => { live = false; };
   }, []);
   const hosts = service?.hosts?.filter((host) => host.own && host.state === 'active') ?? [];
   async function manageHost(operation: () => Promise<void>) {
@@ -69,6 +82,14 @@ export function LocalAiHost({ usage, error, service, request, refresh }: {
       if (mounted.current) setNotice(enabled ? 'This host now offers free public answers within the shared allowance. No payment or payout.' : 'Free public answers disabled. Paid and own-compute access are unchanged.');
     });
   }
+  function setBuildingPayout(hostId: string, enabled: boolean) {
+    const address = enabled ? distributor : ownAddress;
+    if (!address) return;
+    void manageHost(async () => {
+      await request('/api/local-ai/hosts/settings', { hostId, payoutWallet: address });
+      if (mounted.current) setNotice(enabled ? 'Future paid GPU answers pay the building distributor, for staked fictional tHOME units. No value, no rights. Existing receipts are unchanged.' : 'Future paid GPU answers pay your own verified wallet again. Existing building earnings are unchanged.');
+    });
+  }
   const plan = hostEconomics(inputs, usage?.meanWallMs ?? null);
   return <div className="local-ai-host">
     <div className="local-ai-pairing">
@@ -84,7 +105,7 @@ export function LocalAiHost({ usage, error, service, request, refresh }: {
         <p className="local-ai-meta">Invitations expire after 10 minutes and bind your account and payout wallet to one connector. Only share the code with a device you control.</p>
         <button type="submit" className="primary-btn" disabled={busy}>{busy ? <Loader2 size={16} className="spin" /> : <Cpu size={16} />}Create private host invitation</button>
       </form> : <p className="local-ai-meta">{service ? 'Host pairing is not enabled for this account. Existing hosts are shown below.' : 'Checking whether this account can pair a host…'}</p>}
-      <div className="local-ai-host-directory"><h4>Your connector hosts</h4>{hosts.length ? <ul>{hosts.map((host) => <li key={host.id}><div><strong>{host.name}</strong><small>{host.models.join(', ') || 'No models reported'}</small><small>Payout: {host.payoutWallet ? <code>{host.payoutWallet}</code> : 'Not configured'}</small><small>Last heartbeat: {host.lastHeartbeat ? new Date(host.lastHeartbeat).toLocaleString() : 'Not yet received'}</small><label className="local-ai-consent"><input type="checkbox" checked={host.freePublicAnswers === true} disabled={busy} onChange={(event) => setFreePublicAnswers(host.id, event.target.checked)} /><span>Offer free public answers · no payout</span></label><small>Off by default. Anyone may use the shared allowance: 30 attempts per day, up to 3 per visitor. You cover the compute; residence is not checked.</small></div><span className={`local-ai-node-state ${host.availability}`}><span />{host.availability}{host.availability === 'asleep' && host.canWake ? ' · wakes on request' : ''}</span><button type="button" className="text-button" disabled={busy} onClick={() => revokeHost(host.id)}>Revoke host</button></li>)}</ul> : <p className="local-ai-meta">No connector hosts belong to this account yet.</p>}</div>
+      <div className="local-ai-host-directory"><h4>Your connector hosts</h4>{hosts.length ? <ul>{hosts.map((host) => <li key={host.id}><div><strong>{host.name}</strong><small>{host.models.join(', ') || 'No models reported'}</small><small>Payout: {host.payoutWallet ? <code>{host.payoutWallet}</code> : 'Not configured'}</small><small>Last heartbeat: {host.lastHeartbeat ? new Date(host.lastHeartbeat).toLocaleString() : 'Not yet received'}</small><label className="local-ai-consent"><input type="checkbox" checked={host.freePublicAnswers === true} disabled={busy} onChange={(event) => setFreePublicAnswers(host.id, event.target.checked)} /><span>Offer free public answers · no payout</span></label><small>Off by default. Anyone may use the shared allowance: 30 attempts per day, up to 3 per visitor. You cover the compute; residence is not checked.</small><label className="local-ai-consent"><input type="checkbox" checked={Boolean(distributor && host.payoutWallet?.toLowerCase() === distributor.toLowerCase())} disabled={busy || !distributor || !ownAddress} onChange={(event) => setBuildingPayout(host.id, event.target.checked)} /><span>Opt in: pay future GPU revenue to the tHOME building</span></label><small>Explicit testnet opt-in only. Paid answers send tUSDG to the pinned building distributor; income streams to stakers over 7 days, not as an instant payout. Only staked fictional tHOME units earn. Fictional test units, no value, no rights. Uncheck to restore your verified wallet. {distributor ? `Distributor: ${distributor}` : 'Building distributor not configured.'}</small></div><span className={`local-ai-node-state ${host.availability}`}><span />{host.availability}{host.availability === 'asleep' && host.canWake ? ' · wakes on request' : ''}</span><button type="button" className="text-button" disabled={busy} onClick={() => revokeHost(host.id)}>Revoke host</button></li>)}</ul> : <p className="local-ai-meta">No connector hosts belong to this account yet.</p>}</div>
       {notice && <p className="local-ai-meta" role="status">{notice}</p>}
       {hostError && <p className="local-ai-alert" role="alert">{hostError}</p>}
     </div>

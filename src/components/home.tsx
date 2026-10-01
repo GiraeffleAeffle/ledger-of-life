@@ -33,7 +33,7 @@ import { moveInAvailable, type HomeLocation } from '@/domain/home-location';
 import { ShareDeposit, ShareDepositRules, depositUsd } from './share-deposit';
 import { ShareDepositApplication } from './share-deposit-application';
 import shareDepositManifest from '../../contracts/evm/deployments/share-deposit-46630.json';
-import type { DepositForm } from '@/domain/deposit-form';
+import { maximumDepositSecurity, validateDepositSecurity, type DepositForm } from '@/domain/deposit-form';
 
 const BUTTON_LABEL: Record<string, string> = {
   invite_arbitrator: 'Make invitation link',
@@ -778,6 +778,7 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
 }) {
   const [posting, setPosting] = useState(false);
   const [depositForm, setDepositForm] = useState<'cash' | 'shares'>('cash');
+  const [depositTracksRent, setDepositTracksRent] = useState(true);
   const [form, setForm] = useState({ title: '', city: '', rooms: '2', sizeSqm: '55', availableFrom: '', description: '', rent: '900', deposit: '2700', releaseAllowed: true });
   const [photos, setPhotos] = useState<string[]>([]);
   const [location, setLocation] = useState<HomeLocation | undefined>();
@@ -793,18 +794,26 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
       setFeedback({ target, message: e instanceof Error ? e.message : 'Please try again.' });
     }
   }
+  const suggestedDeposit = (rent: string, kind = depositForm) => {
+    try {
+      const maximum = BigInt(maximumDepositSecurity(parseAmount(rent.replace(',', '.')), kind));
+      const fraction = (maximum % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
+      return `${maximum / 1_000_000n}${fraction ? `.${fraction}` : ''}`;
+    } catch { return null; }
+  };
   const togglePhoto = (url: string) =>
     setPhotos((current) => (current.includes(url) ? current.filter((p) => p !== url) : current.length >= 4 ? current : [...current, url]));
-  const field = (key: keyof typeof form) => ({ value: String(form[key]), onChange: (e: { target: { value: string } }) => setForm((current) => {
+  const field = (key: keyof typeof form) => ({ value: String(form[key]), onChange: (e: { target: { value: string } }) => {
     const value = e.target.value;
-    if (key === 'rent') {
-      const previousRent = Number(current.rent.replace(',', '.'));
-      const nextRent = Number(value.replace(',', '.'));
-      const tracksRent = Number(current.deposit.replace(',', '.')) === previousRent * 3;
-      return { ...current, rent: value, ...(tracksRent && value.trim() && Number.isFinite(nextRent) && nextRent >= 0 ? { deposit: String(Math.round(nextRent * 300) / 100) } : {}) };
-    }
-    return { ...current, [key]: value };
-  }) });
+    if (key === 'deposit') setDepositTracksRent(value.replace(',', '.') === suggestedDeposit(form.rent));
+    setForm((current) => {
+      if (key === 'rent') {
+        const suggestion = suggestedDeposit(value);
+        return { ...current, rent: value, ...(depositTracksRent && suggestion !== null ? { deposit: suggestion } : {}) };
+      }
+      return { ...current, [key]: value };
+    });
+  } });
   const mine = listings.filter((l) => l.relation === 'landlord');
   const others = listings.filter((l) => l.relation !== 'landlord');
   return (
@@ -818,9 +827,12 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
       {feedback.target === null && feedback.message && <p className="note" role="alert">{feedback.message}</p>}
       {posting && (
         <form className="listing-form" onSubmit={(e) => { e.preventDefault(); void act(async () => {
+          const rentMonthly = parseAmount(form.rent.replace(',', '.'));
+          const requiredSecurity = parseAmount(form.deposit.replace(',', '.'));
+          validateDepositSecurity(rentMonthly, requiredSecurity, depositForm);
           await request('/api/listings', {
             title: form.title, city: form.city, location, rooms: Number(form.rooms), sizeSqm: Number(form.sizeSqm), availableFrom: form.availableFrom,
-            description: form.description, photos, rentMonthly: parseAmount(form.rent.replace(',', '.')), requiredSecurity: parseAmount(form.deposit.replace(',', '.')), releaseAllowed: form.releaseAllowed,
+            description: form.description, photos, rentMonthly, requiredSecurity, releaseAllowed: form.releaseAllowed,
             depositForm,
           });
           setPosting(false);
@@ -832,9 +844,17 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
           <label>Available from<input type="date" {...field('availableFrom')} /></label>
           <label>Monthly cold rent (test USDC)<input inputMode="decimal" {...field('rent')} /></label>
           <label>Deposit ({depositForm === 'shares' ? 'USD' : 'test USDC'})<input inputMode="decimal" {...field('deposit')} /></label>
-          <label>Deposit form<select value={depositForm} onChange={e => setDepositForm(e.target.value as 'cash' | 'shares')}><option value="cash">Cash · site tUSDC</option><option value="shares">Shares · test TSLA</option></select></label>
+          <label>Deposit form<select value={depositForm} onChange={e => {
+            const kind = e.target.value as 'cash' | 'shares';
+            setDepositForm(kind);
+            setDepositTracksRent(true);
+            const suggestion = suggestedDeposit(form.rent, kind);
+            if (suggestion !== null) setForm(current => ({ ...current, deposit: suggestion }));
+          }}><option value="cash">Cash · site tUSDC</option><option value="shares">Shares · test TSLA</option></select></label>
           {depositForm === 'shares' && <div className="wide"><ShareDepositRules />{!shareDepositManifest.factory && <p role="status">Share deposit not deployed yet. Publication and funding are disabled.</p>}</div>}
-          <p className="wide small-copy">The suggested deposit is three months&apos; cold rent (900 → 2,700 test USDC). For German residential tenancies, §551 BGB generally limits security to at most three months&apos; rent excluding separately stated operating costs. This test setup is not legal advice or a statement that token escrow meets legal requirements.</p>
+          <p className="wide small-copy">{depositForm === 'shares'
+            ? 'Share-backed security is capped at two months’ net cold rent because 150% share cover reaches the three-month cap under §551(1) BGB; not legal advice; test networks.'
+            : 'Cash security is capped at three months’ net cold rent under §551(1) BGB; not legal advice; test networks.'} {suggestedDeposit(form.rent) !== null && `Suggested maximum: ${suggestedDeposit(form.rent)} ${depositForm === 'shares' ? 'test USD security' : 'test USDC'}.`} Token escrow is not a statement of legal compliance.</p>
           <label className="wide">Description<textarea rows={3} placeholder="Balcony, fitted kitchen, 5 minutes to the U-Bahn…" {...field('description')} /></label>
           <div className="wide"><span className="field-label">Place the flat on the map (optional)</span><FlatMap location={location} onChange={setLocation} />{location && <Neighbourhood city={form.city} location={location} request={request} />}</div>
           <div className="wide">

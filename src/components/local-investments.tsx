@@ -13,6 +13,7 @@ import { stakeDisabledReason, TEST_EXIT_NOTICE } from './money-guidance';
 import { useSectionTabActive } from './section-tabs';
 import { CityFlywheel, ProjectBlueprint } from './city-flywheel';
 import { TestDollars } from './test-dollars';
+import { BuildingPanel } from './building-panel';
 import './local-investments.css';
 
 const cash = (raw: string) => new Intl.NumberFormat('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 6 }).format(Number(BigInt(raw)) / 1e6);
@@ -201,17 +202,18 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
     <div className="local-project-toolbar"><div><MapPin size={15} />{project.cityName} · illustrative pin, not a real project · fictional test units, no value, no rights</div><button type="button" className="text-button" onClick={() => openInvestmentOnMap(go, project.id)}>See on the map <ArrowUpRight size={15} /></button></div>
     <div className="local-project-tabs" role="group" aria-label="Stake and project views">
       <button type="button" aria-pressed={panel === 'invest'} onClick={() => setPanel('invest')}>Your stake</button>
-      <button type="button" aria-pressed={panel === 'idea'} onClick={() => setPanel('idea')}>{project.kind === 'housing' ? 'The building idea' : 'The workshop idea'}</button>
+      <button type="button" aria-pressed={panel === 'idea'} onClick={() => setPanel('idea')}>{project.kind === 'housing' ? 'Live building' : 'The workshop idea'}</button>
       <button type="button" aria-pressed={panel === 'city'} onClick={() => setPanel('city')}>The city flywheel</button>
     </div>
     {readError && <p className="local-market-alert" role="alert">Stake reads unavailable: {readError} <button type="button" className="text-button" onClick={() => void refresh()}>Retry reading</button></p>}
     {openOrder && order?.projectId !== selectedId && <p className="local-market-alert">Another fictional test-unit order is still open. <button type="button" className="text-button" onClick={() => { setSelectedId(order!.projectId as TestCityInvestmentId); setPanel('invest'); }}>Open that review →</button></p>}
-    {panel === 'idea' && <ProjectBlueprint key={project.id} kind={project.kind} go={go} />}
+    {panel === 'idea' && (project.kind === 'housing' ? <BuildingPanel request={request} /> : <ProjectBlueprint key={project.id} kind={project.kind} go={go} />)}
     {panel === 'city' && <CityFlywheel />}
     {panel === 'invest' && <div className="local-investment-body">
       <div className="local-project-story"><span className="eyebrow">{project.symbol} · FICTIONAL TEST UNITS · NO VALUE, NO RIGHTS</span><h3>{project.kind === 'housing' ? 'A fictional housing example.' : 'A fictional workshop example.'}</h3><p>{project.description}</p>
         <div className="local-use-tags">{project.uses.map((use) => <span key={use}>{use}</span>)}</div>
         <div className="local-stake-display"><Building2 size={26} /><div><strong>{asset?.holdingRaw === null || !asset ? '—' : units(asset.holdingRaw)} <span>{project.symbol}</span></strong><small>Fictional test issuer · {asset?.holdingRaw !== null && asset ? `${percent(asset.holdingRaw, asset.totalSupplyRaw)} of the unit supply` : 'Wallet units appear after a successful network read'}</small></div></div>
+        {project.kind === 'housing' && <p className="small-copy">This balance shows wallet units only. Staked tHOME units earn building GPU test dollars and must be unstaked before sell-back. <button type="button" className="text-button" onClick={() => setPanel('idea')}>View staked units in Live building</button> · fictional test units, no value, no rights.</p>}
         {asset && market && <div className="local-contract-links"><a href={`${market.network.explorerUrl.replace(/\/$/, '')}/address/${asset.unitAddress}`} target="_blank" rel="noopener noreferrer">{project.symbol} contract <ExternalLink size={12} /></a><a href={`${market.network.explorerUrl.replace(/\/$/, '')}/address/${asset.marketAddress}`} target="_blank" rel="noopener noreferrer">Market contract <ExternalLink size={12} /></a></div>}
       </div>
       <div className="local-investment-review">

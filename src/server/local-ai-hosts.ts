@@ -4,6 +4,8 @@ import { WorkflowError } from '../domain/errors.ts';
 import { AccessError, ConflictError } from './errors.ts';
 import type { LocalAiRequestUsage } from './local-ai-types.ts';
 import type { Store } from './store.ts';
+import { getAddress } from 'viem';
+import { loadBuildingManifest, verifyBuildingDeployment } from './building-revenue.ts';
 
 export interface ConnectorHost {
   id: string;
@@ -97,6 +99,26 @@ function allowedWallets(identity: VerifiedIdentity) {
 }
 export function hostPairingAllowed(identity: VerifiedIdentity) { return allowedWallets(identity).length > 0; }
 
+/** Explicit owner opt-in only. Changing the registry never reroutes an already reviewed payment. */
+export async function setConnectorPayoutWallet(store: Store, identity: VerifiedIdentity, hostId: string, payoutWallet: string) {
+  let payout: string;
+  try { payout = getAddress(payoutWallet); } catch { throw new WorkflowError('Choose a valid testnet payout wallet.'); }
+  const own = evmWallets(identity).some(wallet => wallet.address.toLowerCase() === payout.toLowerCase());
+  if (!own) {
+    const manifest = await loadBuildingManifest();
+    if (!manifest?.distributor || payout.toLowerCase() !== manifest.distributor.toLowerCase())
+      throw new AccessError('Payout must be your verified wallet or the deployed building distributor.');
+    await verifyBuildingDeployment(manifest);
+  }
+  await ready(store);
+  await store.update<Registry>(KEY, registry => {
+    const host = active(registry, hostId);
+    if (host.ownerSubject !== identity.subject) throw new AccessError('Only the host owner may change its payout wallet.');
+    host.payoutWallet = payout;
+    return registry;
+  });
+  return { hostId, payoutWallet: payout };
+}
 export async function createHostInvitation(store: Store, identity: VerifiedIdentity, input: unknown, now = Date.now()) {
   const body = object(input);
   only(body, ['payoutWallet']);

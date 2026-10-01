@@ -38,6 +38,7 @@ export function ProjectBlueprint({ kind, go }: { kind: 'housing' | 'business'; g
     <div className="city-blueprint-options">
       <span className="eyebrow">EXPLORE THE BUILDING IDEA</span>
       <h3>What could the building do?</h3>
+      <p>Illustrative sketch only. Fictional test units, no value, no rights. The tHOME Live building panel separately shows recorded GPU receipts and staking earnings; these switches never change payouts.</p>
       <div className="city-tech-toggles">{technologies.map(({ id, label, Icon }) => <button type="button" key={id} aria-pressed={enabled[id]} onClick={() => setEnabled((value) => ({ ...value, [id]: !value[id] }))}><Icon size={17} />{label}<span>{enabled[id] ? 'On' : 'Off'}</span></button>)}</div>
       <ul className="city-blueprint-benefits">
         {enabled.solar && <li><Sun size={16} /><span><strong>Use more power where it is generated.</strong> Explore a roof designed for local energy use.</span></li>}

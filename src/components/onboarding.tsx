@@ -83,6 +83,7 @@ export function AccountSetup({ step }: { step: Exclude<SetupStep, 'loading' | 'd
       <p className="onboarding-reality"><strong>Test networks only. Nothing here has monetary value.</strong></p>
       {step === 'account' && <nav className="onboarding-public" aria-label="Explore without an account">
         <Link href="/welcome/strausberg">Read the Strausberg welcome guide — no account needed</Link>
+        <Link href="/replay">See a recorded tenancy — no account needed</Link>
         <div><Link href="/library">Public AI desk — no account needed</Link><p className="small-copy" role="status">{deskStatus}</p></div>
       </nav>}
       <p className="small-copy">Add a second passkey on another device in Me as an optional backup. If you lose every passkey, you lose this test account. Nothing here has monetary value.</p>

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { goToSection, type Area } from './areas';
 import './tenancy-walkthrough.css';
 
@@ -16,6 +17,7 @@ export function DepositIdeas({ go }: { go?: (area: Area) => void }) {
           <dd>Earning on a deposit runs only in a local rehearsal, where it is lent to the shared loan pool for test dollars. Older tenancies here that use Circle&apos;s devnet USDC are lent on Solana devnet, which pays nothing. Earnings on a rental deposit belong to the tenant.</dd></div>
         <div><dt>Share-backed deposit <span className="deposit-availability available">Available on this site</span></dt>
           <dd>Choose &ldquo;Shares · test TSLA&rdquo; when publishing a home. The tenant locks official test TSLA worth 150 % of the USD deposit in an escrow on Robinhood Chain testnet. Settlement is in TSLA, with no forced sale. It was proven on this site on 1 October with three fresh accounts.
+            {' '}<Link href="/replay">See the recorded tenancy — no account needed →</Link>
             {go && <> <button type="button" className="text-button" onClick={() => goToSection(go, 'home', 'home-options')}>Choose the deposit when publishing →</button></>}</dd></div>
       </dl>
     </section>

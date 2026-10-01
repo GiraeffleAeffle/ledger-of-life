@@ -2,6 +2,10 @@
 
 _Formerly "Deposit workspace". Package names, repository name and environment keys are unchanged._
 
+**Live:** <https://ledger.stadtstack.eu> · **Repository:** <https://github.com/GiraeffleAeffle/ledger-of-life> (default branch `main`, work on `develop`) · **Licence:** MIT ([LICENSE](LICENSE)).
+
+**No account needed:** [`/replay`](https://ledger.stadtstack.eu/replay) shows the recorded 1 October 2026 three-account share-deposit tenancy as the seven Home steps with every receipt, plus the loan, stake and paid-answer receipts. Evidence files from that day: [share deposit](docs/evidence/HOSTED_SHARE_DEPOSIT_ROBINHOOD_TESTNET_2026-10-01.json), [loan and local stakes](docs/evidence/HOSTED_LOAN_STAKES_ROBINHOOD_TESTNET_2026-10-01.json), [per-token AI answer](docs/evidence/HOSTED_PER_TOKEN_AI_ANSWER_ROBINHOOD_TESTNET_2026-10-01.json).
+
 Start with [docs/LEDGER_OF_LIFE.md](docs/LEDGER_OF_LIFE.md) for the idea, structure and adapter overview.
 
 **Ledger of Life** keeps a person’s home, deposit, money and places in one real-account workspace. A tenant's eligible deposit earnings can become contributions to a separate personal portfolio. Landlords retain a bounded rental-security workflow; assigned human arbitrators can resolve disputed claims.
@@ -65,9 +69,10 @@ pool, not project-minted example stock. The same wallet signs collateral, borrow
 repayment, lending and withdrawal. Borrowed same-chain test dollars may buy the two
 fictional stakes; buying does not repay debt.
 
-The shared market requires a verified `shared-market-46630.json` deployment manifest.
-Without it the app reports **undeployed**; this documentation does not claim a deployed
-pool or completed shared-market rehearsal. Wallet and collateral valuation use a
+The shared market is deployed ([manifest](contracts/evm/deployments/shared-market-46630.json)); without a verified
+manifest the app reports **undeployed**. On 1 October 2026 a fresh passkey account completed borrow, repay and
+withdraw on the live site ([evidence](docs/evidence/HOSTED_LOAN_STAKES_ROBINHOOD_TESTNET_2026-10-01.json)).
+Lender deposit/withdraw and a liquidation-boundary case have not been run hosted. Wallet and collateral valuation use a
 mainnet Chainlink RHTSLA/USD **mirror, not a Chainlink testnet contract**. Jupiter is
 only a cross-check. Source round/time, copied time, age and stale/closed-market status
 are visible; stale pricing freezes price-sensitive actions.
@@ -106,7 +111,7 @@ and the exact [hosted release requirements](docs/DEPLOYMENT.md#the-gpu).
 
 - **Money → Devices & income → Local AI & GPU hosting** is the one home of this service; Me's GPU adapter, the project sketch's GPU option and the library profile link to it.
 - Other people's hosts use official **x402 v2 exact/Permit2**, the existing six-decimal `tUSDG`
-  on `eip155:46630`, and **0.01 tUSDG per completed answer**. Your own paired host is your
+  on `eip155:46630`, and **0.0001 tUSDG per generated output token** (x402 `upto`; at most the chosen limit, 192 tokens = 0.0192 tUSDG; charged only for complete answers; first hosted per-token settlement on 1 October: 104 tokens, 0.0104 tUSDG). Your own paired host is your
   own compute: no authorization, payout, balance prerequisite or payment receipt. The reviewed Permit2 allowance
   is finite (**0.10 tUSDG**), and each paid answer needs its own bounded wallet authorization.
   Connector quotes bind the selected host and its payout wallet; own hosts are preferred.
@@ -215,4 +220,4 @@ For a local preview use `DATABASE_URL= WATCHPACK_POLLING=true npm run dev` on po
 
 This work grows out of the earlier **Smart Rental Deposit** Gnosis prototype. Pre-existing product research and tenancy rules informed this implementation. The new public interface started on September 21, 2026; the parallel native implementation and selected architecture records were added on September 22. The prior private checkout reference was `07573bd3fa66f1af6c99b2d264af39ee767154a3`, with additional uncommitted work. This is a review reference, not a complete competition baseline. The submission must disclose prior work and distinguish competition-period changes. See the [official hackathon rules](https://colosseum.com/legal/Crypto%20World%27s%20Fair%20Hackathon%20Rules.pdf).
 
-This repository does not contain the private backend, tenant data, environment files, keys or old Git history. No hackathon submission, financial-provider approval, bank transfer or real-money deployment has been performed. RealT, insurance pooling, production borrowing, guaranteed returns and automatic recurring investment are outside this version. The shared test-network loan/lender design uses official faucet TSLA, mirrored mainnet token pricing and freely mintable test dollars; deployment and new live proof remain prerequisites, not implied by historical fake-stock evidence. Public visibility is not a project-wide license decision; that remains to be chosen.
+The repository is released under the MIT licence. It does not contain the private backend, tenant data, environment files, keys or old Git history. No hackathon submission, financial-provider approval, bank transfer or real-money deployment has been performed. RealT, insurance pooling, production borrowing, guaranteed returns and automatic recurring investment are outside this version. The shared test-network loan/lender design uses official faucet TSLA, mirrored mainnet token pricing and freely mintable test dollars; the shared market is deployed and a fresh account used it on the live site on 1 October 2026 (see above).
