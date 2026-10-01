@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
+import { THREAD } from '../src/data/path.ts';
 
-export const alt = 'Ledger of Life · Everything that is yours, in one place · Test networks · no real money';
+export const alt = `Ledger of Life · ${THREAD} · Test networks · no real money`;
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -18,7 +19,7 @@ export default function OpenGraphImage() {
         </svg>
         <div style={{ fontSize: 56, fontWeight: 700 }}>Ledger of Life</div>
       </div>
-      <div style={{ display: 'flex', maxWidth: 960, fontSize: 72, fontWeight: 700, lineHeight: 1.12, letterSpacing: -2 }}>Everything that is yours, in one place</div>
+      <div style={{ display: 'flex', maxWidth: 1000, fontSize: 60, fontWeight: 700, lineHeight: 1.12, letterSpacing: -1.5 }}>{THREAD}</div>
       <div style={{ display: 'flex', fontSize: 26, color: '#56677a' }}>Test networks · no real money</div>
     </div>,
     size,

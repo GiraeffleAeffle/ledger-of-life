@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { THREAD } from '../src/data/path.ts';
 import './globals.css';
 
 function metadataBaseFromOrigin(): URL | undefined {
@@ -14,9 +15,9 @@ const metadataBase = metadataBaseFromOrigin();
 
 export const metadata: Metadata = {
   ...(metadataBase ? { metadataBase } : {}),
-  title: 'Ledger of Life · Everything that is yours, in one place',
+  title: `Ledger of Life · ${THREAD}`,
   description:
-    'Your verified identity, your home and deposit, what you own and earn, and what is changing in your city. A test-network prototype.',
+    'Rent a flat with a deposit held in a test-network escrow, see what you own, and follow what your city decides. No real money moves.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
