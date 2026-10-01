@@ -547,11 +547,11 @@ concepts:
     code: [contracts/evm/src/testnet/MirroredPriceFeed.sol, src/server/tsla-price-mirror.ts]
 
   CollateralDeposit:
-    definition: Retained stock-collateral contract prototype; the former per-wallet fake-stock/operator-desk application flow is removed, not a hosted rental offer.
-    invariant: Share and cash collateral remain in the contract until its claim and settlement rules release them.
-    code: [contracts/evm/src/CollateralEscrow.sol, src/components/stock-collateral.tsx]
-    reality: prototype
-    historical_evidence: "Earlier official-stock and fake-stock cycles used simulated oracle/desk prices; not evidence of the shared market."
+    definition: Available Home rental deposit backed by official test TSLA on Robinhood Chain testnet; prototype maturity until the first hosted three-party proof.
+    invariant: Shares stay in the bound escrow until consent, arbitration or the agreed tenant-return timeout permits in-kind payouts; there is no forced sale.
+    code: [contracts/evm/src/ShareDeposit.sol, contracts/evm/src/ShareDepositFactory.sol, src/components/share-deposit.tsx]
+    reality: testnet_real
+    historical_evidence: "Earlier sale-based official-stock and fake-stock cycles do not prove this in-kind share-deposit flow. First hosted three-party proof pending."
 
   BorrowAgainstShares:
     definition: One shared Robinhood Chain testnet pool accepts official faucet test TSLA and lends freely mintable tUSDG supplied by lenders, valued at the mainnet Chainlink RHTSLA/USD mirror.

@@ -9,7 +9,6 @@ export function DemoContext() {
       <dl className="demo-availability">
         <div><dt>Available on this site</dt><dd>You can do it here with test tokens. Check current deployment and service status before acting.</dd></div>
         <div><dt>Needs a local setup</dt><dd>Runs only when you run the app yourself, where test tools can play the other people.</dd></div>
-        <div><dt>Contract prototype</dt><dd>A contract or calculation exists; nothing is offered here.</dd></div>
         <div><dt>Planned</dt><dd>An idea on the Roadmap.</dd></div>
       </dl>
       <p>Public city records and connected services keep their own sources; check each record and transaction review for details.</p>

@@ -6,10 +6,12 @@ import { WorkflowError } from '../domain/errors.ts';
 import { AccessError, ConflictError } from './errors.ts';
 import type { Store } from './store.ts';
 import type { HandoverRecord } from './move-in.ts';
+import { cashDepositForm, canonicalDeposit, type DepositForm } from '../domain/deposit-form.ts';
 
 export interface Agreement {
   id: string;
   network: Network;
+  depositForm?: DepositForm;
   property: string;
   home?: { city: string; location?: { lat: number; lon: number } };
   handover?: HandoverRecord;
@@ -61,6 +63,7 @@ export function agreementRole(value: Agreement, identity: VerifiedIdentity): Rol
 export function agreementDigest(value: Agreement): string | null {
   if (!value.parties.tenant || !value.parties.landlord || !value.parties.arbitrator) return null;
   // Domain separation and canonical field order make exactly what is accepted reproducible.
+  if (value.depositForm) return `0x${digest(JSON.stringify({ domain: 'rental-agreement-v2', id: value.id, network: value.network, property: value.property, deposit: canonicalDeposit(value.depositForm), requiredSecurity: value.requiredSecurity, releaseAllowed: value.releaseAllowed, tenant: value.parties.tenant.wallet.address, landlord: value.parties.landlord.wallet.address, arbitrator: value.parties.arbitrator.wallet.address }))}`;
   return `0x${digest(JSON.stringify({ domain: 'rental-agreement-v1', id: value.id, network: value.network, property: value.property, asset: value.network === 'solana' ? 'USDC' : 'USDG', requiredSecurity: value.requiredSecurity, releaseAllowed: value.releaseAllowed, tenant: value.parties.tenant.wallet.address, landlord: value.parties.landlord.wallet.address, arbitrator: value.parties.arbitrator.wallet.address }))}`;
 }
 export function publicAgreement(value: Agreement, identity: VerifiedIdentity) {
@@ -89,6 +92,7 @@ export async function createAgreement(
   const value: Agreement = {
     id: randomUUID(),
     network: input.network,
+    depositForm: cashDepositForm(input.network),
     property: input.property.trim(),
     requiredSecurity: amount.toString(),
     releaseAllowed: input.releaseAllowed,
@@ -116,7 +120,7 @@ export async function previewAgreementInvitation(store: Store, id: string, role:
   if (!value || !/^[a-f0-9]{64}$/.test(token) || !value.invitations[role] ||
     value.invitations[role].expiresAt < Date.now() || value.invitations[role].digest !== digest(token))
     throw new AccessError('The invitation is invalid, expired or already used.');
-  return { property: value.property, requiredSecurity: value.requiredSecurity };
+  return { property: value.property, requiredSecurity: value.requiredSecurity, ...(value.depositForm ? { depositForm: value.depositForm } : {}) };
 }
 export async function inviteToAgreement(
   store: Store,

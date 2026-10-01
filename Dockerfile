@@ -41,6 +41,8 @@ COPY app ./app
 COPY src ./src
 COPY scripts/copy-maplibre-worker.mjs ./scripts/copy-maplibre-worker.mjs
 COPY public ./public
+# Home and the wallet signing policy statically bundle these reviewed factory/implementation pins.
+COPY contracts/evm/deployments/share-deposit-46630.json ./contracts/evm/deployments/share-deposit-46630.json
 RUN npm run build
 
 FROM base AS runtime
@@ -58,9 +60,11 @@ COPY --from=build --chown=node:node /app/public ./public
 COPY --chown=node:node stadtstack-data/out ./stadtstack-data/out
 # Public testnet deployments read at their default paths: Local stakes and the AI desk's payee
 # (src/server/local-investments.ts), and the shared loan market and its price mirror (src/server/shared-market.ts,
-# src/server/tsla-price-mirror.ts). Rebuild the image when a deployment changes.
+# src/server/tsla-price-mirror.ts), and share deposits (src/server/share-deposit-chain.ts). The share manifest also
+# enters the build stage for Home and the wallet signing policy. Rebuild the image when a deployment changes.
 COPY --chown=node:node contracts/evm/deployments/local-investments-46630.json ./contracts/evm/deployments/local-investments-46630.json
 COPY --chown=node:node contracts/evm/deployments/shared-market-46630.json ./contracts/evm/deployments/shared-market-46630.json
+COPY --chown=node:node contracts/evm/deployments/share-deposit-46630.json ./contracts/evm/deployments/share-deposit-46630.json
 COPY --chown=node:node scripts/reconcile.mjs ./scripts/reconcile.mjs
 USER node
 VOLUME /data

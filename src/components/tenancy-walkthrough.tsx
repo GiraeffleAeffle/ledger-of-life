@@ -3,7 +3,7 @@ import './tenancy-walkthrough.css';
 
 /**
  * The answer to "can I hold the deposit with shares, or lend it?", visible without opening anything.
- * Only the first way can be used on this site; the others say plainly where they exist. Nothing here signs.
+ * Cash and shares are available here; lending requires a local rehearsal. Nothing here signs.
  */
 export function DepositIdeas({ go }: { go?: (area: Area) => void }) {
   return (
@@ -14,9 +14,9 @@ export function DepositIdeas({ go }: { go?: (area: Area) => void }) {
           <dd>The tenant locks the home&apos;s deposit in test USDC (tUSDC, minted by this site for tests, no value) in a Solana devnet escrow. It stays as cash, not lent. This site pays labelled simulated yield at 5 % a year by default; earnings belong to the tenant. At move-out the deposit comes back, minus any agreed or decided deduction.</dd></div>
         <div><dt>Deposit lent out to earn <span className="deposit-availability">Needs a local setup</span></dt>
           <dd>Earning on a deposit runs only in a local rehearsal, where it is lent to the shared loan pool for test dollars. Older tenancies here that use Circle&apos;s devnet USDC are lent on Solana devnet, which pays nothing. Earnings on a rental deposit belong to the tenant.</dd></div>
-        <div><dt>Share-backed deposit <span className="deposit-availability">Contract prototype</span></dt>
-          <dd>A contract and a calculator exist; nothing is offered or signed here, and buying or borrowing against shares does not replace the deposit.
-            {go && <> <button type="button" className="text-button" onClick={() => goToSection(go, 'ideas', 'stock-deposit-illustration')}>See the illustration →</button></>}</dd></div>
+        <div><dt>Share-backed deposit <span className="deposit-availability available">Available on this site</span></dt>
+          <dd>Choose &ldquo;Shares · test TSLA&rdquo; when publishing a home. The tenant locks official test TSLA worth 150 % of the USD deposit in an escrow on Robinhood Chain testnet. Settlement is in TSLA, with no forced sale. The first three-party run on this site is pending.
+            {go && <> <button type="button" className="text-button" onClick={() => goToSection(go, 'home', 'home-options')}>Choose the deposit when publishing →</button></>}</dd></div>
       </dl>
     </section>
   );

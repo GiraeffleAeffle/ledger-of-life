@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import { AREAS, IDEA_NAVIGATION_INTENT, goToSection, openLocalInvestment, openCivicMap, openLedgerAdapter, openShareWorkflow, type Area } from './areas';
 import { AVAILABILITY_LABELS, IDEAS, LEDGER_ADAPTERS, STATUS_LABEL } from '@/data/ledger-catalogue';
 import { RealityChips } from './reality-chip';
-import { StockCollateral } from './stock-collateral';
 import { DepositIdeas } from './tenancy-walkthrough';
 import './capability-map.css';
 import './thread-public.css';
@@ -55,13 +54,12 @@ export function IdeasArea({ go }: { go: (area: Area) => void }) {
           </button>
           {selected.id === idea.id && <article ref={detailRef} className="capability-detail" id="selected-capability" tabIndex={-1} aria-live="polite" aria-label="Selected capability">
             <h2>{selected.title}</h2><p><strong>{selected.availability}</strong> · {STATUS_LABEL[selected.status]}</p>
-            <RealityChips levels={selected.availability === 'Planned' ? ['roadmap'] : selected.availability === 'Contract prototype' || selected.availability === 'Needs a local setup' ? ['prototype'] : [...new Set(adapters.map((adapter) => adapter.explain.reality))]} />
+            <RealityChips levels={selected.availability === 'Planned' ? ['roadmap'] : selected.availability === 'Needs a local setup' ? ['prototype'] : [...new Set(adapters.map((adapter) => adapter.explain.reality))]} />
             <p>{selected.enables}</p><p>{selected.how}</p>
             {['rental-deposit', 'stock-deposit', 'rental-earnings'].includes(selected.id) && <DepositIdeas />}
-            {selected.illustration === 'stock-collateral' && <div id="stock-deposit-illustration" tabIndex={-1}><StockCollateral /></div>}
             {selected.needs && <details><summary>What remains</summary><p>{selected.needs}</p></details>}
             <div className="capability-links">
-              {destination && selected.availability !== 'Planned' && selected.availability !== 'Needs a local setup' && <button type="button" className="secondary-button" onClick={openCapability}>{selected.illustration ? 'View illustration' : `Open ${AREAS.find((area) => area.id === destination.area)?.label}`}</button>}
+              {destination && selected.availability !== 'Planned' && selected.availability !== 'Needs a local setup' && <button type="button" className="secondary-button" onClick={openCapability}>{`Open ${AREAS.find((area) => area.id === destination.area)?.label}`}</button>}
               {adapters[0] && <button type="button" className="text-button" onClick={() => openLedgerAdapter(go, adapters[0].id)}>Connection and data permissions</button>}
             </div>
           </article>}

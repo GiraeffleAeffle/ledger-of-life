@@ -2931,8 +2931,8 @@ dd {
 .journey-facts div { display: grid; gap: 2px; }
 .journey-facts dt { font-size: 0.8rem; opacity: 0.65; }
 .journey-facts dd { margin: 0; font-weight: 700; }
-.service-charge-card, .stock-collateral { border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
-.service-charge-card summary, .stock-collateral summary, .local-investments summary { cursor: pointer; font-weight: 700; }
+.service-charge-card { border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.service-charge-card summary, .local-investments summary { cursor: pointer; font-weight: 700; }
 .prototype-content { display: grid; gap: 16px; padding-top: 16px; }
 .prototype-content p, .prototype-content h3 { margin: 0; }
 .prototype-content h3 { margin-bottom: 8px; font-size: 1rem; }
@@ -2940,9 +2940,6 @@ dd {
 .service-items { list-style: none; margin: 0; padding: 0; display: grid; }
 .service-items li { display: grid; gap: 3px; padding: 9px 0; border-top: 1px solid var(--line); }
 .service-items li span { font-size: 0.85rem; }
-.collateral-inputs { display: flex; flex-wrap: wrap; gap: 12px; }
-.collateral-inputs label { display: grid; gap: 4px; font-size: 0.85rem; }
-.collateral-inputs input { width: min(100%, 180px); padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
 .homes { display: grid; gap: 14px; }
 .listing { display: grid; gap: 8px; padding: 14px; border-radius: 14px; border: 1px solid rgba(0, 0, 0, 0.08); }
 .listing header { display: flex; justify-content: space-between; gap: 8px; align-items: center; }

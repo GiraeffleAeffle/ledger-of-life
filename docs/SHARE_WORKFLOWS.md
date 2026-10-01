@@ -68,13 +68,23 @@ Issuer suspension is distinct from stale pricing: TSLA paused, the pool blocked 
 
 ## Rental deposits and localhost
 
-The former share-backed `CollateralEscrow` app flow is removed. The contract remains a tested prototype, not a hosted tenancy offer. A real rental agreement needs distinct actual parties; the public deposit tab must not imply one account can create them.
+The former `CollateralEscrow` app flow is removed. The current share-backed tenancy uses `ShareDeposit` and `ShareDepositFactory`, operated in **Home**, not the loan panel. The catalogue keeps its existing prototype status until hosted three-account proof is recorded; the app implementation is built and that proof is pending. Distinct landlord, tenant and invited arbitrator accounts each use verified EVM wallets. The public manifest `contracts/evm/deployments/share-deposit-46630.json` pins the deployment; missing/null addresses disable the feature without a demo fallback.
 
 `RentalEscrow` and `MorphoAdapter` can use the shared pool as their vault. The separate **local-only `/api/share-earnings`** rehearsal discloses `operator.key` as the test landlord and `arbitrator.key` as the test arbitrator. The tenant obtains gas from Robinhood's official faucet, self-mints **1,501 tUSDG**, and signs acceptance, funding, pool supply and earnings claim. A verified pool manifest is required. Earnings are **borrower-funded interest**, never manufactured yield or operator funding. Principal remains protected by the escrow; release and settlement roll back if the pool lacks cash. Production disables this rehearsal **even when `ALLOW_OPERATOR_TEST_ACTIONS` is set**. It is not an operation on the prepare/submit-only share route; old per-wallet store keys stay untouched and unused.
 
 Incomplete local setup is returned as `starting`, so the setup control can resume the journal instead of hiding the rehearsal. Preparing tenant signatures requires test ETH. A refused broadcast restores its reviewed call only after the node proves it does not know the hash; unknown or known broadcasts remain reserved until a receipt, consumed nonce or aged-null lookup resolves them. Domain errors are shown with their actual message.
 
 Localhost reads the same manifest and chain market as hosted clients. The hosted job maintains the mirror; **localhost needs no updater key and must not run a second updater**.
+
+### Share-deposit prepare, sign and reconcile
+
+`GET /api/share-deposit?rentalId=...` returns `{view}` with accepted terms, role-derived actions, actual custody, wallet shares, quote source/copy times, price-job health and fixed deadlines. `GET /api/share-deposit?listingId=...` quotes 150% required versus the verified applicant’s held shares before Apply. `POST` prepares an exact durable plan, then accepts only its exact wallet-signed raw transaction; the server broadcasts but never signs. Chain, value, calldata, signer, nonce, gas and fee fields must match. Repeated submit with the bound transaction hash reconciles its receipt and expected events; merely sending a transaction never advances Home.
+An unknown rejected broadcast leaves no pending binding; a mined revert is a terminal failed receipt, allowing another valid action. Quotes are null on read failure/zero observations, not a $0 price. Active withdrawal reviews show the exact maximum shares that preserve 150%; malformed zero withdrawal and under-bound acceptance are rejected before estimation. Every review includes the accepted Terms and predicted CREATE2 target for independent wallet-side binding.
+
+The landlord creates and proposes/lowers claims. The tenant approves exactly, pledges, withdraws extra, requests return and accepts/contests. The arbitrator resolves only after contested/escalated authority. Agreement parties can activate, escalate an expired response, close an expired unclaimed return, close an expired unresolved arbitration and trigger either fixed payout side. Evidence records are bound into the proposal hash and persist only after the matching confirmed receipt. Every quote-dependent review shows human shares, USD-at-quote and timestamps; proposal shares are an estimate until the transaction’s quote fixes the conversion.
+
+No shares are sold, lent or used as loan collateral by this rental escrow. 150% activates and permits extra withdrawals; below 125% asks for a top-up without enforcement. Silence never awards the landlord. Claims convert once; subsequent decisions and exits are price-free. After the arbitration window anyone can return the deposit to the tenant. Outstanding landlord awards have priority, with independent fixed-recipient payouts and actual custody verification. Issuer pause/block/burn/upgrade remains disclosed; factory and full term read-back plus issuer safety checks refuse unsafe inflows, without an app safety gate over exits. Test tokens have no monetary value and no legal advice is given.
+
 
 ## Historical evidence is not shared-market proof
 

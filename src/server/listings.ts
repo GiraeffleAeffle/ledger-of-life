@@ -6,6 +6,8 @@ import { requireReady, walletFor, type Agreement } from './agreements.ts';
 import { AccessError, ConflictError } from './errors.ts';
 import type { Store } from './store.ts';
 import { roundedLocation, type HomeLocation } from '../domain/home-location.ts';
+import { cashDepositForm, shareDepositForm, type DepositForm } from '../domain/deposit-form.ts';
+import { loadShareDepositManifest, requireDeposit } from './share-deposit-chain.ts';
 
 /**
  * Pre-tenancy workflow: a landlord publishes a home, verified people apply, the landlord chooses
@@ -22,7 +24,8 @@ export interface Application {
 }
 export interface Listing {
   id: string;
-  network: 'solana';
+  network: 'solana' | 'robinhood';
+  depositForm?: DepositForm;
   landlord: { subject: string; wallet: VerifiedWallet };
   title: string;
   description: string;
@@ -63,6 +66,7 @@ export interface PublicListing {
   location?: HomeLocation;
   rentMonthly: string;
   requiredSecurity: string;
+  depositForm?: DepositForm;
   releaseAllowed: boolean;
   status: Listing['status'];
   createdAt: string;
@@ -104,6 +108,7 @@ export function publicListing(value: Listing, identity: VerifiedIdentity | null)
     location: value.location,
     rentMonthly: value.rentMonthly,
     requiredSecurity: value.requiredSecurity,
+    depositForm: value.depositForm ?? cashDepositForm(),
     releaseAllowed: value.releaseAllowed,
     status: value.status,
     createdAt: value.createdAt,
@@ -140,17 +145,27 @@ function details(input: Record<string, unknown>): HomeDetails {
 export async function createListing(store: Store, identity: VerifiedIdentity, input: Record<string, unknown>) {
   requireReady(identity);
   if (typeof input.releaseAllowed !== 'boolean') throw new WorkflowError('Choose the earnings policy.');
+  if (input.depositForm !== undefined && input.depositForm !== 'cash' && input.depositForm !== 'shares')
+    throw new WorkflowError('Choose cash or shares for the deposit.');
+  const security = amount(input.requiredSecurity, 'The deposit');
+  const deployment = input.depositForm === 'shares' ? await loadShareDepositManifest() : null;
+  if (input.depositForm === 'shares') requireDeposit(deployment?.factory, 'Share deposit not deployed yet');
+  const form = input.depositForm === 'shares'
+    ? shareDepositForm(security, deployment!.factory, input)
+    : cashDepositForm();
+  const network = form.kind === 'shares' ? 'robinhood' : 'solana';
   const value: Listing = {
     id: randomUUID(),
-    network: 'solana',
-    landlord: { subject: identity.subject, wallet: walletFor(identity, 'solana') },
+    network,
+    depositForm: form,
+    landlord: { subject: identity.subject, wallet: walletFor(identity, network) },
     title: text(input.title, 3, 120, 'The title'),
     description: text(input.description ?? '', 0, 2000, 'The description'),
     details: details(input),
     location: roundedLocation(input.location),
     rentMonthly: amount(input.rentMonthly, 'The monthly rent'),
-    requiredSecurity: amount(input.requiredSecurity, 'The deposit'),
-    releaseAllowed: input.releaseAllowed,
+    requiredSecurity: security,
+    releaseAllowed: form.kind === 'shares' ? false : input.releaseAllowed,
     status: 'open',
     createdAt: new Date().toISOString(),
     applications: [],
@@ -173,8 +188,8 @@ export async function listListings(store: Store, identity: VerifiedIdentity | nu
 
 export async function applyToListing(store: Store, identity: VerifiedIdentity, id: string, input: Record<string, unknown>) {
   requireReady(identity);
-  const wallet = walletFor(identity, 'solana');
   const next = await store.update<Listing>(key(id), (value) => {
+    const wallet = walletFor(identity, value.depositForm?.kind === 'shares' ? 'robinhood' : 'solana');
     if (value.status !== 'open') throw new ConflictError('This home is no longer available.');
     if (value.landlord.subject === identity.subject || value.landlord.wallet.address === wallet.address)
       throw new AccessError('Landlords cannot apply to their own listing.');
@@ -231,7 +246,8 @@ export async function chooseApplicant(store: Store, identity: VerifiedIdentity, 
   const application = chosen.applications.find((item) => item.id === chosen.chosenApplicationId)!;
   const agreement: Agreement = {
     id: chosen.agreementId!,
-    network: 'solana',
+    network: chosen.network,
+    depositForm: chosen.depositForm,
     property: chosen.title,
     home: { city: chosen.details.city, location: chosen.location },
     requiredSecurity: chosen.requiredSecurity,
@@ -262,6 +278,7 @@ export async function chooseApplicant(store: Store, identity: VerifiedIdentity, 
     existing.property !== agreement.property ||
     existing.requiredSecurity !== agreement.requiredSecurity ||
     existing.releaseAllowed !== agreement.releaseAllowed ||
+    JSON.stringify(existing.depositForm) !== JSON.stringify(agreement.depositForm) ||
     existing.parties.landlord?.subject !== agreement.parties.landlord?.subject ||
     existing.parties.landlord?.wallet.id !== agreement.parties.landlord?.wallet.id ||
     existing.parties.landlord?.wallet.address !== agreement.parties.landlord?.wallet.address ||

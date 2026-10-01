@@ -13,6 +13,8 @@ import type { LocalInvestmentView } from '@/server/local-investments';
 import { TEST_CITY_INVESTMENTS } from '@/data/local-investments';
 import { useRentalWallet } from '@/wallets';
 import { useSectionTabActive } from './section-tabs';
+import { depositShares, depositUsd } from './share-deposit';
+import { depositHoldings } from './deposit-holdings';
 
 type AssetsResponse = { robinhood: RobinhoodRead };
 type SharePositions = SharePositionAmounts & { enabled: boolean; testUsdAtomic: string | null };
@@ -23,19 +25,6 @@ type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Pr
 import { DepositYield } from './deposit-yield';
 
 const atomicUsd = (atomic: string | null | undefined) => Number(atomic ?? '0') / 1e6;
-type Chain = NonNullable<TenancyJourney['chain']>;
-/** What of one tenancy belongs to the viewer, in USD. Before settlement the tenant owns the deposit and
- * earnings minus approved claims; after settlement each side owns what is owed and not yet paid. */
-function entitlementUsd(role: TenancyJourney['role'], c: Chain): number {
-  const settled = c.phase === 'settling' || c.phase === 'closed';
-  if (role === 'tenant')
-    return settled
-      ? atomicUsd(c.tenantOwedAtomic) - atomicUsd(c.tenantPaidAtomic)
-      : Math.max(0, atomicUsd(c.lendingValueAtomic) + atomicUsd(c.escrowAtomic) - atomicUsd(c.approvedClaimAtomic));
-  if (role === 'landlord')
-    return settled ? atomicUsd(c.landlordOwedAtomic) - atomicUsd(c.landlordPaidAtomic) : atomicUsd(c.approvedClaimAtomic);
-  return 0;
-}
 
 /**
  * Holdings and the Today summary; device readings live in DeviceReadings.
@@ -58,8 +47,7 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
   const refresh = useCallback(async () => {
     const current = ++revision.current;
     setRefreshing(true);
-    const lockedAtRead = tenanciesRef.current.reduce((sum, tenancy) =>
-      sum + (tenancy.chain ? entitlementUsd(tenancy.role, tenancy.chain) : 0), 0);
+    const lockedAtRead = depositHoldings(tenanciesRef.current).locked;
     // Commit a net worth only after every source settles. A wallet transfer and its
     // collateral read must never appear as two different points in time.
     const [assetResult, portfolioResult, workflowResult] = await Promise.allSettled([
@@ -78,6 +66,7 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
       !official ? 'Robinhood wallet balances' : null,
       !solana ? 'Solana wallet balances' : 'status' in solana && BigInt(solana.rawAtomic) > 0n ? 'tSPYx price' : null,
       !workflow || !shareValuationAvailable(workflow) ? 'fresh shared-market TSLA valuation' : null,
+      tenanciesRef.current.some(t => t.shareDeposit && BigInt(t.shareDeposit.lockedShares) > 0n && !t.shareDeposit.quote?.fresh) ? 'fresh locked-deposit TSLA valuation' : null,
     ].filter((issue): issue is string => issue !== null);
     if (issues.length) {
       setReadError(`Live valuation incomplete: ${issues.join(', ')} unavailable.`);
@@ -123,10 +112,7 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
   const workflow = latestRead?.workflow ?? snapshot?.workflow ?? null;
   // Count only what belongs to the viewer: a landlord must not see the tenant's deposit as their own,
   // and unpaid payouts stay visible after the tenancy closes.
-  const entitled = tenancies
-    .map((t) => ({ t, value: t.chain ? entitlementUsd(t.role, t.chain) : 0 }))
-    .filter(({ value }) => value > 0);
-  const locked = entitled.reduce((sum, { value }) => sum + value, 0);
+  const { cashEntitled, locked, cashLocked, cashTenantCount } = depositHoldings(tenancies);
   const lastLockedRef = useRef(locked);
   useEffect(() => {
     if (lastLockedRef.current === locked) return;
@@ -135,7 +121,7 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
     return () => clearTimeout(timer);
   }, [locked, refresh]);
   const claimed = tenancies.filter((t) => t.role === 'tenant').reduce((sum, t) => sum + atomicUsd(t.chain?.releasedAtomic), 0);
-  const asTenant = entitled.filter(({ t }) => t.role === 'tenant').length;
+  const asTenant = cashTenantCount;
   const onChain = tenancies.find((t) => t.chain);
   const depositSection = onChain ? `tenancy-${onChain.agreementId}` : 'home-tenancies';
   const rh = confirmedRobinhood(assets?.robinhood ?? null);
@@ -207,10 +193,11 @@ export function AssetsOverview({ request, tenancies, show, go, solanaAction }: {
       </dl>
       {parts && !readError && <details className="holdings-breakdown"><summary>How this subtotal is counted</summary><NetPosition parts={parts} go={go} depositSection={depositSection} /></details>}
       <div className="asset-grid">
+        {tenancies.filter(t => t.shareDeposit && BigInt(t.shareDeposit.lockedShares) > 0n).map(t => <button key={t.agreementId} type="button" className="asset-tile clickable" onClick={() => goToSection(go, 'home', `tenancy-${t.agreementId}`)}><header><KeyRound size={18} /> TSLA locked in your deposit · Robinhood testnet</header><strong>{depositShares(t.shareDeposit!.lockedShares)} test TSLA</strong><span>{t.shareDeposit!.quote?.fresh ? `${depositUsd((BigInt(t.shareDeposit!.lockedShares) * BigInt(t.shareDeposit!.quote!.priceUsd6) / 10n ** 18n).toString())} USD at the quote` : 'USD valuation unavailable — fresh quote required'}</span><span>{t.role === 'tenant' ? 'Locked in your deposit, not spendable wallet balance and never loan collateral.' : 'Held for this tenancy, not your wallet balance. Only your decided award is your entitlement.'}</span><span>Settlement in TSLA; no yield. Open in Home →</span></button>)}
         <button type="button" className="asset-tile clickable" id="rental-deposit-holding" onClick={() => goToSection(go, 'home', depositSection)} aria-label="Open rental home and deposit">
           <header><KeyRound size={18} /> Rental home &amp; deposit · Solana devnet</header>
-          <strong>{usd(locked)} test value</strong>
-          <span>{entitled.length === 0 && !tenancies.some((t) => t.chain) ? 'No active deposit' : asTenant > 0
+          <strong>{usd(cashLocked)} test value</strong>
+          <span>{cashEntitled.length === 0 && !tenancies.some((t) => t.chain) ? 'No active deposit' : asTenant > 0
             ? tenancies.some((t) => t.role === 'tenant' && t.chain && t.chain.depositMint !== SOLANA_TEST_USDC_MINT)
               ? `Your deposit for ${asTenant} home${asTenant > 1 ? 's' : ''} is supplied to lending. Devnet lending pays nothing; deposit earnings here are simulated.`
               : `Your deposit for ${asTenant} home${asTenant > 1 ? 's' : ''} stays in cash escrow. This site pays labelled simulated yield in tUSDC; earnings belong to you.`

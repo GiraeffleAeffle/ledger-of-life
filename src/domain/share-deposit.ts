@@ -1,0 +1,20 @@
+import type { ShareDepositForm } from './deposit-form.ts';
+import type { PriceJobStatus } from '../server/price-job-health.ts';
+export type ShareDepositAction = 'create' | 'approve' | 'pledge' | 'activate' | 'withdraw' | 'proposeClaim' | 'acceptClaim' | 'contestClaim' | 'lowerClaim' | 'escalateClaim' | 'resolveClaim' | 'requestReturn' | 'closeUnclaimed' | 'closeUnresolved' | 'payout';
+export type ShareDepositView = {
+  kind: 'shares'; rentalId: string; deployment: 'not_deployed' | 'deployed'; chainId: 46630;
+  escrow: string | null; state: 'AwaitingLock' | 'Active' | 'ClaimPending' | 'ClaimContested' | 'Closed' | null;
+  agreementHash: string | null; form: ShareDepositForm; role: 'tenant' | 'landlord' | 'arbitrator';
+  quote: { priceUsd6: string; sourceTime: number; copiedAt: number | null; fresh: boolean } | null;
+  priceJob: PriceJobStatus; walletShares: string; lockedShares: string; requiredShares: string | null; coverBps: number | null; needsTopUp: boolean;
+  maximumWithdrawShares: string | null;
+  claim: { usd6: string; shares: string; evidenceHash: string; price6: string; sourceTime: number } | null;
+  responseDeadline: number; returnDeadline: number; arbitrationDeadline: number; landlordOwed: string; custodyShortfall: boolean;
+  paidOut: boolean;
+  actions: ShareDepositAction[]; warnings: string[]; explorerUrl: string | null;
+  receipts: { planId: string; walletId: string; transactionHash: string; action: ShareDepositAction; status: 'pending' | 'confirmed' | 'failed' }[];
+};
+export type ShareDepositTerms = { tenant: string; landlord: string; arbitrator: string; depositValue: string; agreementHash: string; responseWindow: string; returnWindow: string; arbitrationWindow: string };
+export type ShareDepositReview = { title: string; lines: string[]; factory: string; escrow: string; stock: string; functionName: string; args: unknown[]; terms: ShareDepositTerms; role: ShareDepositView['role']; approvalShares: string | null; priceUsd6: string | null };
+export type ShareDepositTransaction = { chainId: 46630; to: string; data: string; value: '0x0'; nonce: number; gas: string; maxFeePerGas: string; maxPriorityFeePerGas: string };
+export type ShareDepositPlan = { id: string; rentalId: string; action: ShareDepositAction; walletId: string; chainId: 46630; from: string; to: string; data: string; value: '0x0'; transaction: ShareDepositTransaction; review: ShareDepositReview; expiresAt: string };

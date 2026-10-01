@@ -21,10 +21,10 @@ Status 2026-09-25. These are **product explorations**, not implemented features 
 - **Eligibility:** xStocks and Robinhood Stock Tokens are not available to US persons and have issuer terms.
 
 **Feasibility here.**
-- **Robinhood Chain testnet:** official test TSLA comes from Robinhood's faucet. The shared lending design uses a bounded mirror of mainnet Chainlink RHTSLA/USD, not a native Chainlink testnet feed; Jupiter TSLAx only cross-checks it. The operator sale desk is removed from the app, so this collateral-deposit contract is not a hosted rental offer.
+- **Robinhood Chain testnet:** official test TSLA comes from Robinhood's faucet. The deployed in-kind `ShareDeposit` path is available in Home at 150 % activation cover, with no forced sale and the first hosted three-party proof pending. Its quote uses the bounded mainnet Chainlink RHTSLA/USD mirror, not a native Chainlink testnet feed. The older operator-sale design below is historical, not evidence for this flow.
 - **Solana devnet:** medium. `tSPYx` exists, but it needs an oracle integration in the Anchor program.
 
-**Retained contract prototype (not a current app flow):** [`CollateralEscrow.sol`](../contracts/evm/src/CollateralEscrow.sol) implements pledge, excess withdrawal, shortfall/grace-period sale, claim/dispute/arbitrator handling and in-kind return. Its historical test and live-cycle evidence concerns the operator-oracle/operator-desk design, not the shared lending cutover.
+**Retained legacy sale-based contract (not the current in-kind path):** [`CollateralEscrow.sol`](../contracts/evm/src/CollateralEscrow.sol) implements pledge, excess withdrawal, shortfall/grace-period sale, claim/dispute/arbitrator handling and in-kind return. Its historical test and live-cycle evidence concerns the operator-oracle/operator-desk design, not `ShareDeposit` or the shared lending cutover.
 
 Historical official-stock evidence (not shared-market proof): Robinhood testnet `script/CollateralTestnetCycle.s.sol`, 14 successful transactions, escrow `0xb04bCbA7D89631E5Ca33B8152B8b346Cc8F08229`:
 - A $10 deposit was secured by 0.0403 **official test TSLA** (150%).

@@ -14,6 +14,8 @@ Tenancy actions need a verified passkey and the appropriate owned wallet, not an
 After setup, Home shows a short walkthrough of the journey until the person has a tenancy (open when no test tools can play the other people), then the person's own tenancies and the listings. A tenant who needs test USDC for a deposit can use the Circle devnet faucet.
 
 ## Flow
+The path remains **Find → Apply → Agree → Secure → Live → Move out → Paid out**. At publish the landlord chooses **cash** (site tUSDC, Solana) or **shares** (official test TSLA, Robinhood Chain testnet 46630). Applicants and the distinct invited arbitrator need the matching verified wallet. The following legacy cash flow stays unchanged; share settlement is described below.
+
 
 1. **Homes.** A landlord posts a home: title, monthly rent, deposit amount and earnings policy (no photo is preselected). Signed-in people apply with a short note; applicants never see each other. An applicant may withdraw while the listing is open, and the landlord may close a listing before choosing. Choosing one applicant cannot be undone: it creates the agreement with landlord and tenant already bound, and Home asks for confirmation first. Once a tenant is chosen there is no cancel.
 2. **Agreement.** The landlord invites a neutral arbitrator with a one-time private link, valid once for 24 hours. Making a new link stops the old one, and Home says so before it does. The link is kept on the landlord's device (`ledger-of-life:invite:v1:<account>:<agreement>`) so a reload does not lose it. The invited person sees the home's name and the deposit at stake before joining (`preview`, gated by the one-time token), and "Not now" records nothing. Tenant and landlord then accept the same terms: the home, the deposit and who keeps earnings. The terms do not cover rent or dates.
@@ -32,9 +34,16 @@ and a daily Home Assistant consumption sensor is read when present. Without a co
 example week is used. The balance and projected monthly surplus are calculations only: no escrow prepayment
 or release exists. In a future implementation, those prepayments would share the deposit escrow.
 
-Home keeps one link at the deposit step to the share-backed deposit, which is operated in **Money → Shares & loans**.
-That section also holds the collapsed collateral calculator (150% initial collateral, a 125% example maintenance
-level and an approved claim sale with illustrative slippage). `CollateralEscrow` runs on Robinhood Chain testnet as a separate workflow, not as a way to pay this tenancy's Solana deposit.
+## Share-backed tenancy
+
+`ShareDepositFactory` creates an escrow for the accepted `rental-agreement-v2` terms; previous agreements retain their byte-identical v1 digest. The USD deposit, official stock/feed/factory, 150% activation ratio, 125% app-only warning, and response/return/arbitration windows are committed to acceptance. Defaults are 7/7/30 days; each window is fixed at creation. Before Apply the quote says how many test TSLA are needed and how many the verified tenant wallet holds; Robinhood’s faucet gives five per claim. Gas comes from the existing drip or the official faucet.
+
+The landlord signs creation; the tenant signs an exact finite approval then pledge. At least 150% fresh-price cover activates the deposit. Extra withdrawals preserve 150%; below 125% Home requests a top-up, with no on-chain enforcement, forced sale or DEX. Shares locked here are never spendable wallet shares or loan collateral. Cash simulated yield is unchanged; shares pay no yield.
+
+A landlord proposal commits the move-out evidence hash and USD amount and converts it once (rounded up, capped at custody) to shares. Acceptance, contest, lowering, arbitration and payout are price-free. Silence is never consent: expired response permits escalation, not an award. The tenant may request return; after the return window anyone can close unclaimed. After the fixed arbitration window anyone can close unresolved and return the deposit to the tenant. Each payout side has a fixed recipient, landlord priority up to its award and tenant the remainder; an issuer-blocked recipient need not block the other side. Closed is not Paid out until actual custody is empty.
+
+The server verifies factory/implementation/dependency pins and complete escrow read-back before preparing calls, and issuer beacon, implementation, registry, code hashes, pause and party/escrow blocks before creation or inflow. Issuer powers to pause, block, burn or upgrade remain external risks, including on exits. Missing/null deployment means “Share deposit not deployed yet”, without signing actions. Quotes show source and copy times and the existing price-job health. Stale prices suppress coverage/valuation, not price-free exits. Test tokens have no monetary value; no legal advice. Hosted three-account proof remains pending.
+
 
 ## Architecture
 

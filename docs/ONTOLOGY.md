@@ -159,7 +159,7 @@ sequenceDiagram
 | Read-only live | Real third-party data, with source and review caveats | CitySignals; Home Assistant; validators; SPYx reference prices; mainnet Chainlink RHTSLA/USD copied to a testnet mirror (not a Chainlink contract), with Jupiter TSLAx as cross-check only. |
 | Self-declared local | Unverified information a person places on their device | MyPlaces home/work map pins, removable from localStorage; not a verified address |
 | Self-declared private | Unverified information stored under the person's authenticated account | Earlier places in the partly built life timeline; no residence verification or disclosure to other contexts |
-| Prototype | A working test/counterpart exists but this is not a money-moving app flow | Standalone stock-collateral calculator; service-charge example statement with server-stored test prepayment; Morpho on a mainnet fork |
+| Prototype | A working test/counterpart exists; product maturity is separate from availability | Share-backed rental deposit available in Home, with the first hosted three-party proof pending; service-charge example statement with server-stored test prepayment; Morpho on a mainnet fork |
 | Illustration | Fictional physical/economic model or researched lead; not a measured outcome | Building technology switches, hypothetical workshop→housing relationship and city flywheel; municipal scenarios and unverified real cooperative leads |
 | Roadmap | Idea only | Home tokens toward owning a home; production EUDI issuance/integration; bank-account adapter; EV adapter; tokenizing device income |
 

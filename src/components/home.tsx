@@ -30,6 +30,10 @@ import { FlatMap } from './flat-map';
 import { Neighbourhood } from './neighbourhood';
 import { MoveInHandover } from './move-in-handover';
 import { moveInAvailable, type HomeLocation } from '@/domain/home-location';
+import { ShareDeposit, ShareDepositRules, depositUsd } from './share-deposit';
+import { ShareDepositApplication } from './share-deposit-application';
+import shareDepositManifest from '../../contracts/evm/deployments/share-deposit-46630.json';
+import type { DepositForm } from '@/domain/deposit-form';
 
 const BUTTON_LABEL: Record<string, string> = {
   invite_arbitrator: 'Make invitation link',
@@ -243,8 +247,7 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
             {ready.filter((t) => t.next.kind === 'done').map((t) => (
               <div className="past-tenancy" key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}>
                 <strong>{t.property}</strong><span className="small-copy">Paid out · {t.role}</span>
-                <p>Tenant received {money(t.chain?.tenantPaidAtomic ?? '0')} test USDC · landlord received {money(t.chain?.landlordPaidAtomic ?? '0')} test USDC.</p>
-                <TenancyDetails journey={t} request={request} />
+                {t.depositForm?.kind === 'shares' ? <><p>Paid out in test TSLA.</p>{t.shareDeposit?.receipts.filter(receipt => receipt.action === 'payout' && receipt.status === 'confirmed').map(receipt => <p key={receipt.planId}><a href={`https://explorer.testnet.chain.robinhood.com/tx/${receipt.transactionHash}`} target="_blank" rel="noopener noreferrer">Confirmed TSLA payout receipt</a></p>)}{t.shareDeposit?.explorerUrl && <a href={t.shareDeposit.explorerUrl} target="_blank" rel="noopener noreferrer">Read share escrow on explorer</a>}</> : <><p>Tenant received {money(t.chain?.tenantPaidAtomic ?? '0')} test USDC · landlord received {money(t.chain?.landlordPaidAtomic ?? '0')} test USDC.</p><TenancyDetails journey={t} request={request} /></>}
               </div>
             ))}
           </details>}
@@ -300,6 +303,7 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
   const recordedOperations = useRef(new Set<string>());
   const advancing = useRef(false);
   const { next, chain, agreementId } = journey;
+  const shareForm = journey.depositForm?.kind === 'shares' ? journey.depositForm : null;
   const cashOnly = chain?.depositMint === SOLANA_TEST_USDC_MINT;
   const living = journey.stage === 'living' && chain?.phase === 'active';
   const q = `?agreement=${encodeURIComponent(agreementId)}`;
@@ -320,7 +324,7 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
 
   // Payouts run only while a browser has Home open; retry transient failures.
   useEffect(() => {
-    if (next.kind !== 'paying_out') return;
+    if (shareForm || next.kind !== 'paying_out') return;
     let active = true;
     const advance = async () => {
       if (advancing.current || !active) return;
@@ -332,13 +336,13 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
     void advance();
     const timer = setInterval(() => void advance(), 15000);
     return () => { active = false; clearInterval(timer); };
-  }, [next.kind, agreementId, request, reload]);
+  }, [next.kind, agreementId, request, reload, shareForm]);
   const reconcile = useCallback(async () => {
-    if (next.kind !== 'confirming') return;
+    if (shareForm || next.kind !== 'confirming') return;
     const path = next.operationId ? `/api/finance/solana/operations/${next.operationId}/reconcile${q}` : `/api/finance/solana/initialize${q}`;
     await request(path, next.operationId ? {} : { action: 'reconcile' });
     await reload();
-  }, [next, q, request, reload]);
+  }, [next, q, request, reload, shareForm]);
   const confirmingId = next.kind === 'confirming' ? next.operationId ?? 'escrow-setup' : null;
   const confirmationSince = confirmation?.id === confirmingId ? confirmation.since : null;
   useEffect(() => {
@@ -450,11 +454,12 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
       <ArrowRight size={17} />
     </button>
   );
+  if (shareForm && journey.stage !== 'agreement') return <section className="card tenancy-card" id={`tenancy-${agreementId}`}><h2>{journey.property}</h2><p>{journey.role} · {HOME_STAGES[homeStage(journey.stage)]} · step {homeStage(journey.stage) + 1} of 7</p><ShareDeposit rentalId={agreementId} request={request} reload={reload} /></section>;
   return (
     <section className="card tenancy-card" id={`tenancy-${agreementId}`} tabIndex={-1}>
       <div className="section-heading">
         <h2><HomeIcon size={18} /> {journey.property}</h2>
-        <Badge tone="neutral">{journey.role} · Solana devnet test USDC{journey.sampleParties ? ' · sample fixture party' : ''}</Badge>
+        <Badge tone="neutral">{journey.role} · {shareForm ? 'Robinhood testnet TSLA' : 'Solana devnet test USDC'}{journey.sampleParties ? ' · sample fixture party' : ''}</Badge>
       </div>
       <p className="small-copy">{HOME_STAGES[homeStage(journey.stage)]} · step {homeStage(journey.stage) + 1} of {HOME_STAGES.length}</p>
       {journey.home?.location && <FlatMap location={journey.home.location} />}
@@ -480,10 +485,10 @@ function TenancyCard({ journey, request, reload, go, accountId }: {
         {next.kind === 'confirming' && confirmationSince !== null && confirmationStalled(confirmationSince, clock) && <p role="status">This is taking longer than usual. <button className="button secondary" onClick={() => void run(reconcile)} disabled={busy}>Check again</button></p>}
         {next.kind === 'paying_out' && <p className="small-copy">Payouts run while Home is open. A failed attempt retries here.</p>}
         {next.kind === 'accept_agreement' && <div className="small-copy">
-          <p>These terms cover {journey.property}, the {money(journey.requiredSecurity)} test USDC required deposit, and whether the tenant may claim surplus while the tenancy is active. The tenant keeps deposit assets above an approved deduction at settlement, whatever the release setting. Site-minted tUSDC stays in cash escrow: it is not lent. This site pays labelled simulated yield to the tenant in tUSDC, separate from the escrow. Test tokens have no value.</p>
+          {shareForm ? <><p>Security: {depositUsd(shareForm.securityUsd6)} USD, backed by test TSLA; factory {shareForm.factory ?? 'not deployed yet'}, oracle {shareForm.oracle}. Response: {shareForm.responseWindow / 86400} days; return: {shareForm.returnWindow / 86400} days; arbitration: {shareForm.arbitrationWindow / 86400} days.</p><ShareDepositRules /></> : <p>These terms cover {journey.property}, the {money(journey.requiredSecurity)} test USDC required deposit, and whether the tenant may claim surplus while the tenancy is active. The tenant keeps deposit assets above an approved deduction at settlement, whatever the release setting. Site-minted tUSDC stays in cash escrow: it is not lent. This site pays labelled simulated yield to the tenant in tUSDC, separate from the escrow. Test tokens have no value.</p>}
           <p><strong>These terms cover the deposit and its parties, not monthly rent or tenancy dates.</strong> The landlord chooses the arbitrator before acceptance.</p>
           {agreement && <p>Tenant: {agreement.parties.tenant?.wallet?.address ? `${agreement.parties.tenant.wallet.address.slice(0, 5)}…${agreement.parties.tenant.wallet.address.slice(-5)}` : 'not available'} · Landlord: {agreement.parties.landlord?.wallet?.address ? `${agreement.parties.landlord.wallet.address.slice(0, 5)}…${agreement.parties.landlord.wallet.address.slice(-5)}` : 'not available'} · Arbitrator: {agreement.parties.arbitrator?.wallet?.address ? `${agreement.parties.arbitrator.wallet.address.slice(0, 5)}…${agreement.parties.arbitrator.wallet.address.slice(-5)}` : 'not available'}</p>}
-          {agreement && <p>Tenant acceptance: {agreement.accepted.tenant?.digest === agreement.digest ? 'accepted' : 'waiting'} · Landlord acceptance: {agreement.accepted.landlord?.digest === agreement.digest ? 'accepted' : 'waiting'}. Surplus: {agreement.releaseAllowed ? 'tenant may claim during the tenancy' : 'locked until settlement'}.</p>}
+          {agreement && <p>Tenant acceptance: {agreement.accepted.tenant?.digest === agreement.digest ? 'accepted' : 'waiting'} · Landlord acceptance: {agreement.accepted.landlord?.digest === agreement.digest ? 'accepted' : 'waiting'}.{!shareForm && <> Surplus: {agreement.releaseAllowed ? 'tenant may claim during the tenancy' : 'locked until settlement'}.</>}</p>}
         </div>}
         {next.kind === 'accept_agreement' && recordBlocker && <p className="action-blocker" role="status">{recordBlocker}</p>}
         {oneButton && actionButton}
@@ -686,14 +691,14 @@ function TenancyDetails({ journey, request }: { journey: TenancyJourney; request
 function JoinInvitation({ request, encoded, onDone }: { request: Request; encoded: string; onDone: () => Promise<void> }) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const [home, setHome] = useState<{ property: string; requiredSecurity: string } | null>(null);
+  const [home, setHome] = useState<{ property: string; requiredSecurity: string; depositForm?: DepositForm } | null>(null);
   const [previewFailed, setPreviewFailed] = useState(false);
   const [previewRetry, setPreviewRetry] = useState(0);
   const value = useMemo(() => invitationPayload(encoded), [encoded]);
   useEffect(() => {
     if (!value) return;
     let active = true;
-    request<{ invitation: { property: string; requiredSecurity: string } }>(`/api/agreements/${encodeURIComponent(value.id)}`, { action: 'preview', role: value.role, token: value.token })
+    request<{ invitation: { property: string; requiredSecurity: string; depositForm?: DepositForm } }>(`/api/agreements/${encodeURIComponent(value.id)}`, { action: 'preview', role: value.role, token: value.token })
       .then(({ invitation }) => { if (active) { setHome(invitation); setPreviewFailed(false); } })
       .catch(() => { if (active) setPreviewFailed(true); });
     return () => { active = false; };
@@ -714,7 +719,7 @@ function JoinInvitation({ request, encoded, onDone }: { request: Request; encode
       <span className="eyebrow">INVITATION</span>
       {!value ? <p>This invitation link is malformed. Ask the landlord for a new one.</p> : <>
         <h3>Join as {value.role}</h3>
-        {home ? <p>{home.property} · {money(home.requiredSecurity)} test USDC deposit at stake.</p> : previewFailed ? <p>This invitation cannot be previewed. It may have expired or been replaced. <button className="button secondary" onClick={() => setPreviewRetry((count) => count + 1)}>Try again</button></p> : <p>Checking this tenancy invitation…</p>}
+        {home ? <p>{home.property} · {home.depositForm?.kind === 'shares' ? `${depositUsd(home.depositForm.securityUsd6)} USD security in test TSLA. A verified EVM wallet is required.` : `${money(home.requiredSecurity)} test USDC deposit at stake.`}</p> : previewFailed ? <p>This invitation cannot be previewed. It may have expired or been replaced. <button className="button secondary" onClick={() => setPreviewRetry((count) => count + 1)}>Try again</button></p> : <p>Checking this tenancy invitation…</p>}
         <p>{value.role === 'arbitrator' ? 'You decide a disputed deduction only, up to the landlord’s claim. You cannot take the deposit or start a claim.' : 'You join as the tenant. The landlord may propose a deduction at move-out; you may agree or dispute it.'} Joining records your account and wallet as the {value.role} on this tenancy; it does not sign or fund the deposit.</p>
         <button className="button primary large" disabled={!home || busy} onClick={() => void join()}>{busy ? <Loader2 className="spin" size={16} /> : null} Join this tenancy <ArrowRight size={17} /></button>
       </>}
@@ -749,8 +754,7 @@ function ListingCard({ listing, request, children }: { listing: PublicListing; r
         <header><strong>{listing.title}{listing.sample && !listing.title.toLowerCase().includes('sample') ? ' · sample home' : ''}</strong><span className="listing-rent">{money(listing.rentMonthly)}<small>/month · test USDC</small></span></header>
         {facts.length > 0 && <p className="listing-facts">{facts.join(' · ')}</p>}
         {d.photos.length > 0 && <p className="small-copy">Illustrative sample interiors, not photographs of this dwelling.</p>}
-        <p className="listing-deposit"><span>Required deposit · Solana devnet</span><strong>{money(listing.requiredSecurity)} test USDC</strong></p>
-        <p className="small-copy">{listing.sample ? 'Sample home · local rehearsal. ' : ''}{listing.releaseAllowed ? 'Tenant may claim simulated yield during the tenancy.' : 'Simulated yield may be claimed after settlement.'} Site-minted tUSDC stays in cash escrow, not lent. This site pays labelled simulated yield at 5 % a year by default; earnings belong to the tenant. Test tokens have no value.</p>
+        {listing.depositForm?.kind === 'shares' ? <><p className="listing-deposit"><span>Required deposit · Robinhood Chain testnet</span><strong>{depositUsd(listing.depositForm.securityUsd6)} USD · test TSLA</strong></p><ShareDepositRules />{!shareDepositManifest.factory && <p role="status">Share deposit not deployed yet.</p>}</> : <><p className="listing-deposit"><span>Required deposit · Solana devnet</span><strong>{money(listing.requiredSecurity)} test USDC</strong></p><p className="small-copy">{listing.sample ? 'Sample home · local rehearsal. ' : ''}{listing.releaseAllowed ? 'Tenant may claim simulated yield during the tenancy.' : 'Simulated yield may be claimed after settlement.'} Site-minted tUSDC stays in cash escrow, not lent. This site pays labelled simulated yield at 5 % a year by default; earnings belong to the tenant. Test tokens have no value.</p></>}
         {listing.location && <FlatMap location={listing.location} />}
         <Neighbourhood city={d.city} location={listing.location} request={request} />
         {children}
@@ -773,6 +777,7 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
   listings: PublicListing[]; request: Request; reload: () => Promise<void>; go: (area: Area) => void; loaded: boolean; loadError: string; testTools: boolean; tenancyIds: Set<string>;
 }) {
   const [posting, setPosting] = useState(false);
+  const [depositForm, setDepositForm] = useState<'cash' | 'shares'>('cash');
   const [form, setForm] = useState({ title: '', city: '', rooms: '2', sizeSqm: '55', availableFrom: '', description: '', rent: '900', deposit: '2700', releaseAllowed: true });
   const [photos, setPhotos] = useState<string[]>([]);
   const [location, setLocation] = useState<HomeLocation | undefined>();
@@ -816,6 +821,7 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
           await request('/api/listings', {
             title: form.title, city: form.city, location, rooms: Number(form.rooms), sizeSqm: Number(form.sizeSqm), availableFrom: form.availableFrom,
             description: form.description, photos, rentMonthly: parseAmount(form.rent.replace(',', '.')), requiredSecurity: parseAmount(form.deposit.replace(',', '.')), releaseAllowed: form.releaseAllowed,
+            depositForm,
           });
           setPosting(false);
         }, 'post'); }}>
@@ -825,7 +831,9 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
           <label>Size (m²)<input type="number" min={10} max={1000} {...field('sizeSqm')} /></label>
           <label>Available from<input type="date" {...field('availableFrom')} /></label>
           <label>Monthly cold rent (test USDC)<input inputMode="decimal" {...field('rent')} /></label>
-          <label>Deposit (test USDC)<input inputMode="decimal" {...field('deposit')} /></label>
+          <label>Deposit ({depositForm === 'shares' ? 'USD' : 'test USDC'})<input inputMode="decimal" {...field('deposit')} /></label>
+          <label>Deposit form<select value={depositForm} onChange={e => setDepositForm(e.target.value as 'cash' | 'shares')}><option value="cash">Cash · site tUSDC</option><option value="shares">Shares · test TSLA</option></select></label>
+          {depositForm === 'shares' && <div className="wide"><ShareDepositRules />{!shareDepositManifest.factory && <p role="status">Share deposit not deployed yet. Publication and funding are disabled.</p>}</div>}
           <p className="wide small-copy">The suggested deposit is three months&apos; cold rent (900 → 2,700 test USDC). For German residential tenancies, §551 BGB generally limits security to at most three months&apos; rent excluding separately stated operating costs. This test setup is not legal advice or a statement that token escrow meets legal requirements.</p>
           <label className="wide">Description<textarea rows={3} placeholder="Balcony, fitted kitchen, 5 minutes to the U-Bahn…" {...field('description')} /></label>
           <div className="wide"><span className="field-label">Place the flat on the map (optional)</span><FlatMap location={location} onChange={setLocation} />{location && <Neighbourhood city={form.city} location={location} request={request} />}</div>
@@ -841,9 +849,9 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
               ))}
             </div>
           </div>
-          <label className="policy-check wide"><input type="checkbox" checked={form.releaseAllowed} onChange={(e) => setForm({ ...form, releaseAllowed: e.target.checked })} /> Let the tenant claim surplus and simulated yield during the tenancy. Site tUSDC stays in cash escrow; this site separately pays labelled simulated yield (5 % a year by default). Otherwise it is claimable after settlement. Any deposit earnings belong to the tenant, who keeps deposit value above an approved deduction at settlement either way.</label>
+          {depositForm === 'cash' && <label className="policy-check wide"><input type="checkbox" checked={form.releaseAllowed} onChange={(e) => setForm({ ...form, releaseAllowed: e.target.checked })} /> Let the tenant claim surplus and simulated yield during the tenancy. Site tUSDC stays in cash escrow; this site separately pays labelled simulated yield (5 % a year by default). Otherwise it is claimable after settlement. Any deposit earnings belong to the tenant, who keeps deposit value above an approved deduction at settlement either way.</label>}
           {feedback.target === 'post' && feedback.message && <p className="note wide" role="alert">{feedback.message}</p>}
-          <button className="button primary large">Publish home</button>
+          <button className="button primary large" disabled={depositForm === 'shares' && !shareDepositManifest.factory}>Publish home</button>
         </form>
       )}
       {mine.length > 0 && (
@@ -887,7 +895,7 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
                 <label>A few words about you<input required value={application.message} onChange={(e) => setApplication({ ...application, message: e.target.value })} /></label>
                 {feedback.target === l.id && feedback.message && <p className="note" role="alert">{feedback.message}</p>}
                 <p className="small-copy">This sends your application. It does not reserve the home or lock a deposit.</p>
-                <button className="button primary">Send application</button>
+                {l.depositForm?.kind === 'shares' ? <ShareDepositApplication listingId={l.id} request={request} /> : <button className="button primary">Send application</button>}
               </form>
             ) : (
               <button className="button primary" onClick={() => setApplyTo(l.id)}>Apply for this home</button>

@@ -6,6 +6,7 @@ import {
 import { decodeFunctionData, isAddress as isEthereumAddress, parseAbi } from 'viem';
 import { PERMIT2_ADDRESS } from '@x402/evm';
 import { TEST_USDG_ADDRESS } from './inference-token.ts';
+import { validateShareDepositTransaction } from './share-deposit-signing.ts';
 import type {
   EvmSigningRequest,
   RentalWallet,
@@ -63,6 +64,12 @@ export function validateEvmSigningRequest(
     throw new Error('The transaction destination is invalid.');
   if (transaction.from && transaction.from.toLowerCase() !== selected.address.toLowerCase()) {
     throw new Error('The transaction was prepared for another wallet.');
+  }
+  if (request.operationId.startsWith('share-deposit:')) {
+    if (!request.shareDeposit) throw new Error('Review the bound share deposit call before signing.');
+    validateShareDepositTransaction(transaction, request.shareDeposit, selected.address);
+  } else if (request.shareDeposit) {
+    throw new Error('Share deposit reviews require a share deposit operation.');
   }
   if (request.operationId.startsWith('local-ai-approval:')) {
     const tx = transaction;

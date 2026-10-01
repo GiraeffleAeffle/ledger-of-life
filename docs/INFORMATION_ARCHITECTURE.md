@@ -26,8 +26,9 @@ One sentence, the owner's destination line with the deposit as its hinge: **Find
 - **One next step** (`src/components/next-step.ts`, `next-step-card.tsx`). Precedence: an opened invitation, a home step waiting for this person, applicants to review, a step waiting on someone else or the network, an application in progress, a failed read, a secured or paid-out home, then a fresh account's "Start with a home" with two equal alternatives. It is a full card on Today. On Money, Places and Me it appears only when something waits for this person (an invitation, their own home step, applicants to review); Home never repeats it, because its own path already shows the step. A read that failed or is still running is never offered as done or empty.
 - **Today shows where you are** (`path-strip.tsx`, pure `path-progress.ts`): the four stages as done, in progress, to do, or not known yet, then three status tiles titled by stage.
 - **Navigation follows the path:** Today, Home, Money, Places, then Me (the toolbox for every stage). The Roadmap (area id `ideas`) is secondary: the sidebar foot, Today's stage links and the explainer lead there. Signed-out visitors see only what works without an account (the welcome guide and the public AI desk).
-- **What is real here** lives in one place: the "Test networks · no real money" chip opens the explainer with four availability labels (Available on this site, Needs a local setup, Contract prototype, Planned). Reality chips still say how real the data is; availability says whether you can do it on this site.
-- **Ways to hold the deposit** (Home, `deposit-options`) is the one answer to "a deposit with shares, or lent out?": the test-USDC deposit (available on this site; new tenancies use site-minted tUSDC held as cash in escrow, with labelled simulated yield paid by this site at 5 % simple annual interest by default), the deposit lent out to earn (needs a local setup: borrower-funded earnings in test dollars belong to the tenant; older Circle-USDC tenancies are lent on devnet, which pays nothing), and a share-backed deposit (contract prototype). Nothing in it signs.
+- **What is real here** lives in one place: the "Test networks · no real money" chip opens the explainer with three availability labels (Available on this site, Needs a local setup, Planned). Reality chips still say how real the data is; availability says whether you can do it on this site.
+- **Ways to hold the deposit** (Home, `deposit-options`) answers the deposit choice: cash tUSDC on Solana retains labelled site-paid simulated yield; share-backed deposits use official test TSLA on Robinhood testnet with no yield. The landlord selects one form at publish; applicants and arbitrator need the matching verified wallet. The share deposit is deployed and available on this site; catalogue maturity stays prototype until the first hosted three-party proof. Missing reviewed deployment disables signing. Loan collateral is a separate Money workflow, never a replacement custody bucket.
+- **Share signing boundary:** every review includes the eight accepted escrow terms. The wallet derives the CREATE2 address from those terms and the bundled factory/implementation pins, checks the signing party, and permits only enumerated escrow calls or exact, capped TSLA approval to that derived address. Failed receipts are terminal, not permanent pending blockers. Cash holdings/yield copy excludes share custody; past share tenancies show TSLA payout receipts.
 
 ## The six areas
 
@@ -49,7 +50,7 @@ Money is one page with four tabs (`SectionTabs`). Each has one job and states it
 | Section | Jump target | What it is for | Reality |
 |---|---|---|---|
 | **Holdings** | `money-holdings` | Deposit entitlement, wallet shares/cash, lent value, debt and priced subtotal | Test network · mirrored live token price with provenance |
-| **Shares & loans** | `money-shares` | Official-stock collateral, loans, lending, on-demand paginated unhealthy loans; wallet reads do not scan the registry; deposit needs actual parties and is unavailable on the hosted demo | Test network · deployment required · borrower-funded interest |
+| **Shares & loans** | `money-shares` | Official-stock collateral, loans, lending, on-demand paginated unhealthy loans; wallet reads do not scan the registry. Share rental deposits are operated in Home, not here | Test network · deployment required · borrower-funded interest |
 | **Local stakes** | `money-stakes` | Fictional local-project units (`tHOME` housing, `tWORK` workshop) and the project sketch | Test network · simulated input |
 | **Devices & income** | `money-devices` | Things you run that produce value: home solar, a validator, the local AI node on a GPU | Live read-only · test network |
 
@@ -59,8 +60,9 @@ Money is one page with four tabs (`SectionTabs`). Each has one job and states it
 |---|---|---|---|
 | Rented home: listing, agreement, deposit, move-out (a landlord or tenant can cancel the tenancy until the deposit is locked) | Home | Me (wallet) | Today (next step), Money → Holdings (deposit entitlement tile), Me (timeline, roles) |
 | Service charges | Home (inside a living tenancy) | Me (Home Assistant, for consumption) | Ideas, Me directory |
-| Shared official-stock loan and lending; deposit prototype | Money → Shares & loans | Me (wallet); verified shared deployment and hosted mirror job | Today, Ideas, Me directory; no fake landlord/desk setup |
-| Stocks: tSPYx and official faucet test TSLA | Money → Holdings (wallet/lent positions) and Shares & loans (collateral) | Me (wallet) | Today (subtotal); wallet/collateral TSLA use one mirror, Jupiter only cross-checks |
+| Shared official-stock loan and lending | Money → Shares & loans | Me (wallet); verified shared deployment and hosted mirror job | Today, Ideas, Me directory; no fake landlord/desk setup |
+| Share-backed rental deposit | Home (same seven steps as cash) | Me (verified EVM wallet); pinned share-deposit manifest | Money → Holdings (“locked in your deposit”), never spendable wallet balance or loan collateral; Today next step |
+| Stocks: tSPYx and official faucet test TSLA | Money → Holdings (wallet/lent positions) and Shares & loans (loan collateral) | Me (wallet) | Today (subtotal); wallet/collateral/deposit TSLA use one mirror with source/copy times and price-job health; stale price makes a complete priced total unavailable |
 | **Tokenized local companies and housing** (`tHOME`, `tWORK` test units) | Money → Local stakes | Me (wallet) | Places (issuer markers, an illustration with a link to buy), Ideas, Today, Me directory |
 | Home ownership path (home shares) | Ideas (roadmap). Its nearest working surface is Money → Local stakes | — | Today (link), Me directory |
 | **Solar**: your own Home Assistant reading | Money → Devices & income | Me → Home Assistant | Home (service charges read the same sensor), Today, Me directory |
@@ -105,7 +107,7 @@ Worked examples: your own solar panel reads a sensor and produces savings → qu
 | Your next step | What to do next lists, setup checklists, Next on your path |
 | Ways to hold the deposit | Deposit options panel, Rental deposit tab |
 | Roadmap (the area; its id stays `ideas`) | Ideas (as the area name) |
-| Available on this site, Needs a local setup, Contract prototype, Planned (availability) | Hosted-only, demo-only, coming soon, Localhost only |
+| Available on this site, Needs a local setup, Planned (availability) | Hosted-only, demo-only, coming soon, Localhost only |
 
 ## First run
 
@@ -164,7 +166,7 @@ Add or change an adapter by reading the code first, then editing the statements.
 
 - Money became one page with four tabs. The promotional hero, the two goal cards and the duplicated "Build local ownership" and "Secure a rental deposit" entry points are gone; the ownership path now sits under the holdings.
 - Home solar moved from a collapsed Home card to Money → Devices & income beside the validator and the local AI node. Both readings share one card (`DeviceReadings`) and one endpoint scope (`/api/assets?area=devices`).
-- Home no longer hosts Money content: the share-backed promo card, both collateral calculators and the connected-readings card are removed. The calculator now lives in Money → Shares & loans, and the tenancy card keeps one link to it.
+- Home no longer hosts personal-Money promotional cards, collateral calculators or connected-readings cards. Rental share custody is operated in Home; personal loan collateral remains in Money → Shares & loans.
 - The catalogue is the single source for capability topic, status label and destination. `IDEAS[].area`, the Ideas routing table and the Ideas topic groups were replaced by `Idea.topic` and `Idea.destination`; "Energy & devices" is now owned by Money.
 - Status chips distinguish Built from Partly built and Planned; the duplicate label maps and scattered chip rules were consolidated.
 - A duplicate DOM id (`regional-topics`) was removed.
@@ -190,7 +192,7 @@ Add or change an adapter by reading the code first, then editing the statements.
 - One next step replaces Today's six-step getting-started guide (deleted with `setup-steps.ts`), the four "Choose my city" prompts and the Home hero's own button. Money's six-step "shares to stakes" funnel became three optional choices.
 - Navigation follows the path; Ideas became the Roadmap, grouped by availability, reached from the sidebar foot. Signed-out visitors see only what works without an account.
 - Home: one seven-step path (Find, Apply, Agree, Secure, Live, Move out, Paid out) replaces the four-step hero, the six-step walkthrough and the per-tenancy six-stage bar; listing cards show rent, deposit and "Apply for this home" without opening anything; the tenant sees "Agree and settle" and "Dispute deduction" as equal choices; "Ways to hold the deposit" answers the stocks and lending questions with availability labels.
-- Money: holdings and the five categories first, test-money funding next to the action that needs it; Shares & loans offers two tasks (Loan against shares, Lend test dollars) with the protocol details behind one disclosure and no "Rental deposit" panel; the share-backed deposit calculator moved to the Roadmap as the prototype's illustration.
+- Money: holdings and the five categories first, test-money funding next to the action that needs it; Shares & loans offers two tasks (Loan against shares, Lend test dollars) with the protocol details behind one disclosure and no "Rental deposit" panel. The obsolete share-deposit illustration was deleted when the real in-kind rental path became available in Home.
 - The "Test networks · no real money" chip opens the one explainer of what is real here.
 - The market's preflight checks refuse a shortfall before any signature (`src/domain/market-preflight.ts`).
 - Home: either the landlord or the tenant can cancel a tenancy before the deposit is locked, from the tenancy card. The tenancy and its listing close for everyone; the card keeps who cancelled and when, with no further step. Cancellation is refused while escrow initialization is confirming, while a funding operation is signed, broadcast or unknown, and once the deposit is funded. Accounts, wallets and balances stay. Cancelling sends nothing on chain; an initialized empty escrow stays on devnet. If someone funds it directly on chain despite cancellation, the normal settlement and payout steps return. Checked locally with scripted chain observations and a browser fixture, not on a funded devnet tenancy.

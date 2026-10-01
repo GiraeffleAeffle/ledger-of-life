@@ -85,7 +85,7 @@ The privacy follow-up used the updated rendered command with four synthetic desk
 
 ## Secrets and operator material
 
-Supplied when the container runs, never built in, with two exceptions: the image contains the public manifests `contracts/evm/deployments/local-investments-46630.json` (Local stakes; the AI desk's payee) and `contracts/evm/deployments/shared-market-46630.json` (the shared loan market and its price feed), addresses, code hashes and parameters on Robinhood Chain testnet, because the app reads them at those paths. Rebuild the image when a deployment changes.
+Supplied when the container runs, never built in, with three exceptions: the image contains the public manifests `contracts/evm/deployments/local-investments-46630.json` (Local stakes; the AI desk's payee), `contracts/evm/deployments/shared-market-46630.json` (the shared loan market and its price feed), and `contracts/evm/deployments/share-deposit-46630.json` (share-backed rental deposits), addresses, code hashes and parameters on Robinhood Chain testnet, because the app reads them at those paths. Rebuild the image when a deployment changes.
 
 - Key files (`LOCAL_AI_FACILITATOR_KEY_FILE`, `ROBINHOOD_TEST_KEYS_DIR`, `SOLANA_TEST_SIGNER_DIR`). The fee-signer key must be owner-only (the code rejects any group or other permission bit) and readable by uid 1000. A plain Kubernetes Secret volume may not satisfy both; copying the file in an init container with mode 0600 is the likely answer. Not tried on a cluster.
 - `contracts/evm/out` and the other deployment manifests, mounted under `/app/contracts/evm/`. Only the operator test tools need them; the hosted demo keeps those off.

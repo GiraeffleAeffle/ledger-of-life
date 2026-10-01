@@ -3,11 +3,14 @@ import { SOLANA_TEST_USDC_MINT } from '../finance/solana/manifest.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { agreementDigest, agreementRole, type Agreement } from './agreements.ts';
 import { SolanaServiceError, type SolanaOperation } from './solana-service.ts';
-import { solanaServicesFor } from './solana-tenancies.ts';
+import { ensurePayoutAccounts, solanaServicesFor } from './solana-tenancies.ts';
 import type { Store } from './store.ts';
 import { cancellationState } from './tenancy-cancellation.ts';
 import { readDepositYield, type DepositYieldView } from './deposit-yield.ts';
 import { RpcSolanaGateway } from './solana-rpc.ts';
+import type { DepositForm } from '../domain/deposit-form.ts';
+import type { ShareDepositView } from '../domain/share-deposit.ts';
+import { readShareDeposit } from './share-deposit.ts';
 
 export type JourneyRole = 'tenant' | 'landlord' | 'arbitrator';
 export type JourneyStage = 'agreement' | 'space' | 'deposit' | 'living' | 'move-out' | 'paid';
@@ -33,6 +36,8 @@ export type NextAction =
 export interface TenancyJourney {
   agreementId: string;
   property: string;
+  depositForm?: DepositForm;
+  shareDeposit?: ShareDepositView;
   home?: Agreement['home'];
   handover?: Agreement['handover'];
   role: JourneyRole;
@@ -84,7 +89,9 @@ export function agreementStep(agreement: Agreement, role: JourneyRole): NextActi
     return {
       kind: 'accept_agreement',
       label: 'Review the deposit agreement',
-      detail: `${agreement.property} · ${usd(agreement.requiredSecurity)} deposit · tenant keeps value above an approved deduction at settlement. ${agreement.releaseAllowed ? 'Tenant may claim surplus during the tenancy.' : 'Surplus remains locked until settlement.'} Test tokens only; site-minted tUSDC receives labelled simulated yield paid by this site.`,
+      detail: agreement.depositForm?.kind === 'shares'
+        ? `${agreement.property} · USD deposit covered at 150% by test TSLA. Below 125% asks for top-up, without forced sale. Settlement in shares; silence never awards the landlord. Arbitration timeout returns shares to the tenant. Issuer can pause, block, burn or upgrade. Test tokens only; no yield or legal advice.`
+        : `${agreement.property} · ${usd(agreement.requiredSecurity)} deposit · tenant keeps value above an approved deduction at settlement. ${agreement.releaseAllowed ? 'Tenant may claim surplus during the tenancy.' : 'Surplus remains locked until settlement.'} Test tokens only; site-minted tUSDC receives labelled simulated yield paid by this site.`,
       digest,
     };
   if (!accepted('tenant') || !accepted('landlord'))
@@ -159,11 +166,25 @@ export async function tenancyJourney(
   identity: VerifiedIdentity,
   agreement: Agreement,
   resolveServices: typeof solanaServicesFor = solanaServicesFor,
+  readShares: typeof readShareDeposit = readShareDeposit,
 ): Promise<TenancyJourney> {
   const role = agreementRole(agreement, identity);
-  const base = { agreementId: agreement.id, property: agreement.property, role, requiredSecurity: agreement.requiredSecurity, chain: null,
+  const base = { agreementId: agreement.id, property: agreement.property, role, depositForm: agreement.depositForm, requiredSecurity: agreement.requiredSecurity, chain: null,
     home: agreement.home, handover: agreement.handover, cancelled: agreement.cancelled, cancellable: false,
     sampleParties: Object.values(agreement.parties).some((party) => party?.subject.startsWith('test-signer:')) };
+  if (agreement.depositForm?.kind === 'shares') {
+    const shareDeposit = await readShares(store, identity, agreement.id);
+    const shareBase = { ...base, depositForm: agreement.depositForm, shareDeposit };
+    const early = agreementStep(agreement, role);
+    if (early) return { ...shareBase, stage: 'agreement', next: early };
+    if (shareDeposit.deployment === 'not_deployed') return { ...shareBase, stage: 'space', next: waiting('Share deposit not deployed yet', 'The reviewed factory is not deployed. No transaction is available.') };
+    if (!shareDeposit.escrow) return { ...shareBase, stage: 'space', next: role === 'landlord' ? { kind: 'create_space', label: 'Prepare the share escrow', detail: 'Create the empty escrow bound to these accepted terms.' } : waiting('Waiting for the landlord', 'The landlord creates the accepted share escrow.') };
+    if (shareDeposit.state === 'AwaitingLock') return { ...shareBase, stage: 'deposit', next: role === 'tenant' ? { kind: 'secure_deposit', label: 'Lock test TSLA for your deposit', detail: 'Approve exactly the reviewed shares, then pledge. Activation needs 150% cover.' } : waiting('Waiting for the tenant', 'The tenant locks test TSLA at 150% cover.') };
+    if (shareDeposit.state === 'Closed') return { ...shareBase, stage: shareDeposit.paidOut ? 'paid' : 'move-out', next: shareDeposit.paidOut ? { kind: 'done', label: 'Deposit paid out', detail: 'The payout receipt is confirmed, the escrow is closed and actual custody is empty.' } : { kind: 'settle', label: 'Collect the share payout', detail: 'Landlord award has priority; tenant collects the remainder. Payout sides are independent.' } };
+    if (shareDeposit.state === 'ClaimPending' || shareDeposit.state === 'ClaimContested' || shareDeposit.returnDeadline)
+      return { ...shareBase, stage: 'move-out', next: waiting('Move-out share settlement', 'Review the available claim, arbitration and timeout actions below. Silence is not consent.') };
+    return { ...shareBase, stage: 'living', next: role === 'landlord' ? { kind: 'propose_claim', label: 'Prepare the move-out deduction', detail: 'Record the move-out inspection first. The USD claim is converted once to shares.', maximumAtomic: agreement.requiredSecurity } : waiting(shareDeposit.needsTopUp ? 'Please top up your share deposit' : 'Your share deposit is locked', 'Test TSLA is locked in the deposit, not spendable or loan collateral. The tenant may request its return at move-out.') };
+  }
   const cancelledState = agreement.cancelled
     ? await cancellationState(store, identity, agreement, resolveServices)
     : null;
@@ -240,10 +261,34 @@ export async function tenancyJourney(
   return result;
 }
 
+/** Only cash tenancies authorize operator-sponsored Solana account creation or payouts. */
+export async function advanceTenancyJourney(
+  store: Store,
+  identity: VerifiedIdentity,
+  agreement: Agreement,
+  dependencies: {
+    read?: typeof tenancyJourney;
+    accounts?: typeof ensurePayoutAccounts;
+    services?: typeof solanaServicesFor;
+  } = {},
+) {
+  const read = dependencies.read ?? tenancyJourney;
+  const before = await read(store, identity, agreement);
+  if (agreement.depositForm?.kind === 'shares') return { payout: null, journey: before };
+  let payout = null;
+  if (before.next.kind === 'create_space') await (dependencies.accounts ?? ensurePayoutAccounts)(store, agreement.id);
+  if (before.next.kind === 'paying_out') {
+    const services = await (dependencies.services ?? solanaServicesFor)(store, agreement.id);
+    if (!services) throw new SolanaServiceError(503, 'solana_unavailable', 'The deposit service is not configured.');
+    payout = await services.service.payout(identity);
+  }
+  return { payout, journey: await read(store, identity, agreement) };
+}
+
 export async function myTenancies(store: Store, identity: VerifiedIdentity) {
   const rows = await store.scan<Agreement>('agreement:', '', 200);
   return rows
     .map((row) => row.value)
-    .filter((agreement) => agreement.network === 'solana' && Object.values(agreement.parties).some((party) => party?.subject === identity.subject))
+    .filter((agreement) => (agreement.network === 'solana' || agreement.depositForm?.kind === 'shares') && Object.values(agreement.parties).some((party) => party?.subject === identity.subject))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

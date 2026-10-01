@@ -35,3 +35,4 @@ contracts/evm/*
 contracts/evm/deployments/*
 !contracts/evm/deployments/local-investments-46630.json
 !contracts/evm/deployments/shared-market-46630.json
+!contracts/evm/deployments/share-deposit-46630.json

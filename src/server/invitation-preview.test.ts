@@ -16,7 +16,12 @@ test('only current bearer token reveals home and deposit, and it stops after rep
     const landlord = person('landlord');
     const agreement = await createAgreement(store, landlord, { network: 'solana', property: 'Example home', requiredSecurity: '1000000', releaseAllowed: true });
     const old = await inviteToAgreement(store, agreement.id, landlord, 'arbitrator');
-    assert.deepEqual(await previewAgreementInvitation(store, agreement.id, 'arbitrator', old.token), { property: 'Example home', requiredSecurity: '1000000' });
+    const preview = await previewAgreementInvitation(store, agreement.id, 'arbitrator', old.token);
+    assert.equal(preview.property, 'Example home');
+    assert.equal(preview.requiredSecurity, '1000000');
+    assert.equal(preview.depositForm?.kind, 'cash');
+    if (preview.depositForm?.kind === 'cash') assert.equal(preview.depositForm.network, 'solana');
+    assert.deepEqual(Object.keys(preview).sort(), ['depositForm', 'property', 'requiredSecurity'], 'A bearer preview exposes deposit terms, never wallets, records or invitations.');
     await assert.rejects(() => previewAgreementInvitation(store, agreement.id, 'arbitrator', 'f'.repeat(64)), /invalid/);
     const replacement = await inviteToAgreement(store, agreement.id, landlord, 'arbitrator');
     await assert.rejects(() => previewAgreementInvitation(store, agreement.id, 'arbitrator', old.token), /invalid/);

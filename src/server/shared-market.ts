@@ -62,7 +62,7 @@ export async function verifySharedMarket(config: SharedMarketManifest, client: R
 }
 
 /** Proxy runtime alone does not pin issuer implementation or transfer permissions. */
-export async function readCollateralSafety(config: SharedMarketManifest, client: Rpc = sharedMarketRpc) {
+export async function readCollateralSafety(config: SharedMarketManifest, client: Rpc = sharedMarketRpc, scope?: { custody: Address; participants: Address[]; shortfall: boolean }) {
   const suspensionReasons: string[] = [];
   const pins = config.collateralIssuer;
   try {
@@ -71,8 +71,10 @@ export async function readCollateralSafety(config: SharedMarketManifest, client:
       client.readContract({ address: pins.beacon, abi: issuerAbi, functionName: 'implementation' }),
       client.readContract({ address: config.stock, abi: issuerAbi, functionName: 'ACCESS_CONTROLLED_REGISTRY' }),
       client.readContract({ address: config.stock, abi: issuerAbi, functionName: 'paused' }),
-      client.readContract({ address: pins.registry, abi: issuerAbi, functionName: 'isBlocked', args: [config.pool] }),
-      client.readContract({ address: config.pool, abi: SHARED_POOL_ABI, functionName: 'collateralShortfall' }),
+      scope
+        ? Promise.all([scope.custody, ...scope.participants].map(address => client.readContract({ address: pins.registry, abi: issuerAbi, functionName: 'isBlocked', args: [address] }))).then(values => values.some(Boolean))
+        : client.readContract({ address: pins.registry, abi: issuerAbi, functionName: 'isBlocked', args: [config.pool] }),
+      scope ? scope.shortfall : client.readContract({ address: config.pool, abi: SHARED_POOL_ABI, functionName: 'collateralShortfall' }),
       Promise.all((['beacon','implementation','registry'] as const).map(async field => {
         const code = await client.getCode({ address: pins[field] });
         return Boolean(code && code !== '0x' && same(keccak256(code), pins.codeHashes[field]));
@@ -83,8 +85,8 @@ export async function readCollateralSafety(config: SharedMarketManifest, client:
     if (!same(registry, pins.registry)) suspensionReasons.push('TSLA access registry changed from the pinned deployment.');
     if (hashes.some(matched => !matched)) suspensionReasons.push('TSLA issuer contract code changed from the pinned deployment.');
     if (paused) suspensionReasons.push('Robinhood has paused test TSLA transfers.');
-    if (blocked) suspensionReasons.push('Robinhood has blocked the shared pool.');
-    if (shortfall) suspensionReasons.push('Pool TSLA collateral is below the recorded collateral (issuer burn or other shortfall).');
+    if (blocked) suspensionReasons.push(scope ? 'Robinhood has blocked a deposit party or escrow.' : 'Robinhood has blocked the shared pool.');
+    if (shortfall) suspensionReasons.push(scope ? 'Deposit TSLA custody is below recorded custody (issuer burn or other shortfall).' : 'Pool TSLA collateral is below the recorded collateral (issuer burn or other shortfall).');
   } catch {
     suspensionReasons.push('TSLA issuer safety could not be verified.');
   }

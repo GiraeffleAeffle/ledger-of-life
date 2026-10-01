@@ -51,9 +51,6 @@ test('deposit availability does not send a person into a different hosted money 
   const deposit = IDEAS.find((idea) => idea.id === 'rental-deposit')!;
   assert.equal(deposit.availability, 'Available on this site');
   assert.equal(deposit.destination?.area, 'home');
-  const prototype = IDEAS.find((idea) => idea.id === 'stock-deposit')!;
-  assert.equal(prototype.availability, 'Contract prototype');
-  assert.equal(prototype.destination?.area, 'ideas', 'the only destination is its illustration, not a Money operation');
   const rehearsal = IDEAS.find((idea) => idea.id === 'rental-earnings')!;
   assert.equal(rehearsal.availability, 'Needs a local setup');
   assert.equal(rehearsal.destination, undefined, 'local rehearsal must not open a hosted operation');

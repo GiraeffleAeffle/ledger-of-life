@@ -4,7 +4,7 @@ import type { SectionId } from './sections';
 
 export type CapabilityStatus = 'planned' | 'prototype' | 'partly built' | 'illustration' | 'built';
 export const STATUS_LABEL: Record<CapabilityStatus, string> = { planned: 'Planned', prototype: 'Prototype', 'partly built': 'Partly built', illustration: 'Illustration', built: 'Built' };
-export const AVAILABILITY_LABELS = ['Available on this site', 'Needs a local setup', 'Contract prototype', 'Planned'] as const;
+export const AVAILABILITY_LABELS = ['Available on this site', 'Needs a local setup', 'Planned'] as const;
 export type CapabilityAvailability = typeof AVAILABILITY_LABELS[number];
 export interface Idea {
   id: string;
@@ -15,7 +15,6 @@ export interface Idea {
   enables: string;
   status: CapabilityStatus;
   availability: CapabilityAvailability;
-  illustration?: 'stock-collateral';
   needs?: string;
 }
 
@@ -45,9 +44,9 @@ export const IDEAS: Idea[] = [
     how: 'Example service-charge statement with a landlord-set test prepayment and optional live daily Home Assistant consumption; no escrow funding or payouts.',
     enables: 'See an illustrative running balance. It is not a legal annual statement or money movement.',
     needs: 'Real meter and invoice data before an actual service-charge balance can be calculated.' },
-  { id: 'stock-deposit', availability: 'Contract prototype', topic: 'home', destination: { area: 'ideas', section: 'stock-deposit-illustration' }, illustration: 'stock-collateral', status: 'prototype', title: 'Share-backed deposit',
-    how: 'Retained stock-collateral contract prototype and illustrative calculator only. Not offered on the hosted site and not selectable for a Home tenancy. Buying test shares, borrowing against them or lending test dollars does not replace the Solana test-USDC deposit.',
-    enables: 'Contract prototype — not available for Home deposits.' },
+  { id: 'stock-deposit', availability: 'Available on this site', topic: 'home', destination: { area: 'home', section: 'deposit-options' }, status: 'prototype', title: 'Share-backed deposit',
+    how: 'Built share-backed rental deposit with official test TSLA on Robinhood Chain testnet: 150 % cover, app-only top-up warning below 125 %, fixed-window consent or arbitration, and share payouts without a forced sale. Hosted three-account proof pending; test tokens have no monetary value and issuer pause, block, burn and upgrade powers remain.',
+    enables: 'Built; hosted three-account proof pending. Cash tUSDC and its simulated yield remain separate.' },
   { id: 'borrow-against-shares', availability: 'Available on this site', topic: 'money', destination: { area: 'money', section: 'share-workflows' }, status: 'prototype', title: 'Loan against shares, or lend test dollars',
     how: 'With a verified shared Robinhood testnet deployment, pledge official faucet test TSLA and borrow freely mintable test dollars up to 50 % of mirrored token value. The price is copied hourly from Robinhood mainnet by an operator price job (its last run is shown, and a skipped run is flagged); borrowing and withdrawing collateral with debt need a fresh copy (26 h, 74 h at weekends). Interest accrues continuously at 5 % nominal annually (about 5.13 % effective, read from the contract); anyone can liquidate at 80 % LTV with a fresh price while unsuspended.',
     enables: 'Review loan debt and collateral, or lend test dollars for borrower-funded interest, with cash-limited withdrawals and possible bad-debt losses. You leave in kind: repay the debt and the same test TSLA returns to your wallet. Nothing is sold; a liquidation, not an exit, is the only way collateral is seized.' },
