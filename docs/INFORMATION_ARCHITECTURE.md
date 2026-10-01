@@ -208,4 +208,4 @@ Add or change an adapter by reading the code first, then editing the statements.
 - Dead code found while mapping: `src/components/neighborhood.tsx`, `openCityEvent` and the `capabilityIds` of `SYSTEM_NODES` in `civic-system.ts` have no consumer.
 - The Me directory's state chips for the four city adapters still all read "City selected" whatever their coverage.
 - The welcome guide exists only in English and only for Strausberg; it has no registration-desk handout or QR code yet, and Places and Today still need an account, so a visitor without one cannot preview them.
-- The repository and `package.json` are still named `rental-deposit-hackathon`; the product name is Ledger of Life.
+- The repository and package are `ledger-of-life`, renamed on 1 Oct 2026 from `rental-deposit-hackathon`. The local checkout folder, image name `ghcr.io/giraeffleaeffle/ledger-of-life` and environment keys are unchanged.

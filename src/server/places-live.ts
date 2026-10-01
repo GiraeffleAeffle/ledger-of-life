@@ -2,7 +2,7 @@ import { citySlug } from './city.ts';
 import { strausbergSources } from '../data/cities/strausberg.ts';
 
 const ATLAS = (process.env.STADTSTACK_ATLAS_URL ?? 'http://localhost:4317').replace(/\/$/, '');
-const AGENT = 'LedgerOfLifePlaces/1.0 (https://github.com/GiraeffleAeffle/rental-deposit-hackathon; public read-only research)';
+const AGENT = 'LedgerOfLifePlaces/1.0 (https://github.com/GiraeffleAeffle/ledger-of-life; public read-only research)';
 const WEATHER_TTL = 10 * 60_000;
 const CLUB_TTL = 24 * 60 * 60_000;
 const LOCATION_TTL = 24 * 60 * 60_000;

@@ -25,7 +25,7 @@ they are not automatically partners or test-token issuers.
 
 ## Scope and current baseline
 
-The build target is the existing public `rental-deposit-hackathon` project. Selected architecture documents are now maintained in this public implementation. Read [implementation status](IMPLEMENTATION_STATUS.md) for completed code and remaining proof gates. Public implementation should reuse reviewed workflows and business rules without copying private operational material or secrets.
+The build target is the existing public `ledger-of-life` project. Selected architecture documents are now maintained in this public implementation. Read [implementation status](IMPLEMENTATION_STATUS.md) for completed code and remaining proof gates. Public implementation should reuse reviewed workflows and business rules without copying private operational material or secrets.
 
 The original public baseline was an interactive simulation. Its integer-cent rental fixture and actor-switch UI are now retired; they are not part of the signed-in workspace or an API path. The former fictional $800 claim-settlement example did not represent connected custody, authorization or investing. Verified account and agreement services and independent native finance proofs remain separate, account-bound workflows.
 
