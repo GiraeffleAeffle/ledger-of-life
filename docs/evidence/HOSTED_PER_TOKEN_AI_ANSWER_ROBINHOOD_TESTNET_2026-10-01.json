@@ -1,0 +1,59 @@
+{
+  "evidenceStatus": "hosted_first_per_token_upto_ai_answer_settled",
+  "evidenceScope": "One paid public question answered by the city host and settled per output token through x402 v2 upto/Permit2 on the hosted site. One answer only: not sustained capacity, electricity cost or fiat profit. Answer text is not included. Test tokens only.",
+  "date": "2026-10-01",
+  "answerSavedAtUtc": "2026-10-01T19:14:53Z",
+  "site": "https://ledger.stadtstack.eu",
+  "network": "Robinhood Chain testnet",
+  "chainId": 46630,
+  "explorerBase": "https://explorer.testnet.chain.robinhood.com",
+  "release": {
+    "helmRevision": 17,
+    "image": "sha256:df4ae2d8…",
+    "commit": "b3cbf17",
+    "includes": "725e24f (facilitator simulation of the Permit2 proxy now runs with the facilitator as caller)"
+  },
+  "earlierFailure": "Earlier the same day the hosted verification failed with 'Signed payment could not be verified': the facilitator's proxy simulation ran without a caller and the proxy reverted UnauthorizedFacilitator. Fixed in 725e24f.",
+  "mode": "Fresh tenant account asked a public question to the city host through the live site. The host woke from sleep; the answer was saved after about 68 s.",
+  "payer": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+  "host": {
+    "name": "Owner desktop GPU",
+    "model": "qwen3.8:27b-ud-q3-k-xl",
+    "payoutWallet": "0x159f73874ad373156897FB84E9C982541115682f"
+  },
+  "answer": {
+    "summary": "A public question answered by the owner's desktop GPU host and saved as a complete answer.",
+    "inputTokens": 66,
+    "outputTokens": 104,
+    "inferenceSeconds": 57.12,
+    "outputTokensPerSecond": 52.8,
+    "secondsToSavedAnswer": 68
+  },
+  "approval": {
+    "action": "Permit2 budget approval",
+    "amount": "0.1 tUSDG",
+    "hash": "0x2a849c4432d26ed258cdb9b9e971ef297ac77d978344fba7544b2e5ac80cf17c",
+    "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x2a849c4432d26ed258cdb9b9e971ef297ac77d978344fba7544b2e5ac80cf17c"
+  },
+  "settlement": {
+    "scheme": "x402 v2 upto via Permit2 proxy",
+    "permit2Proxy": "0x4020A4f3b7b90ccA423B9fabCc0CE57C6C240002",
+    "hash": "0x5576861a41a327b1bad13cafda3d4e7e4ea6e18af2b97302bbf93088a069a5a0",
+    "block": 127267299,
+    "status": "success",
+    "pricePerOutputTokenAtomic": 100,
+    "signedMaximumTokens": 128,
+    "signedMaximum": "0.0128 tUSDG",
+    "transferred": "0.0104 tUSDG",
+    "transferredAtomic": 10400,
+    "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+    "to": "0x159f73874ad373156897FB84E9C982541115682f",
+    "check": "104 output tokens × 0.0001 tUSDG = 0.0104 tUSDG",
+    "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x5576861a41a327b1bad13cafda3d4e7e4ea6e18af2b97302bbf93088a069a5a0"
+  },
+  "verification": {
+    "command": "node scripts/prove-ai-answer.mjs 0x5576861a41a327b1bad13cafda3d4e7e4ea6e18af2b97302bbf93088a069a5a0",
+    "result": "Matches a per-token upto answer",
+    "access": "read-only, public RPC"
+  }
+}

@@ -60,7 +60,7 @@ export const IDEAS: Idea[] = [
   { id: 'devices', availability: 'Planned', topic: 'devices', status: 'planned', title: 'Electric car and other devices',
     how: 'Charging and vehicle-to-grid income read like the solar and validator adapters.',
     enables: 'Everything your hardware earns in one total.' },
-  { id: 'local-ai', availability: 'Available on this site', topic: 'devices', destination: { area: 'money', section: 'local-ai' }, status: 'prototype', title: 'Local AI & GPU hosting',
+  { id: 'local-ai', availability: 'Available on this site', topic: 'devices', destination: { area: 'money', section: 'local-ai' }, status: 'built', title: 'Local AI & GPU hosting',
     how: 'An available configured host answers real questions. Your own host runs without payment; eligible public hosts offer free answers within a shared allowance; a paid city-host answer uses x402 and test tUSDG at 0.0001 per generated token, at most 192 tokens (0.0192 tUSDG), charged only for a complete answer. The public AI desk needs no account. Check current service availability in the desk; availability is not guaranteed.',
     enables: 'Ask a local model or manage a host you run. Host receipts and hypothetical euro cost scenarios remain separate.',
     needs: 'Reliable operating capacity and real customer demand before treating an earnings scenario as a business forecast.' },
