@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "chainId": 46630,
+  "status": "deployed",
+  "factory": "0x525b9bA7d083d2a63417239B7e384C5e0E570aCe",
+  "implementation": "0x84f3bDEcF0Ca0F561fe865A7Ae412CdE8DC81427",
+  "factoryCodeHash": "0xea1e2bbfbfdda9f1b152630c7d4a2db67972a84cb0988656fb1ab5dbd1f05ab6",
+  "implementationCodeHash": "0x42ea9945d624db747982db0f51d46167b178cb8de6f40c8bfa91009eb466c48e",
+  "deploymentTransaction": "0x90a2211b75b89bce07de5744a5bfc96779e6090b3a2cf116d6f2c9f0d9aeb027",
+  "deploymentBlock": 127079150,
+  "deploymentStatus": 1,
+  "deploymentGasUsed": "3306759",
+  "deployer": "0x4efe17E8D8C475971d639ED1CaeEd84F57Fe68dD",
+  "verification": {
+    "factory": {
+      "status": "verified",
+      "url": "https://explorer.testnet.chain.robinhood.com/address/0x525b9bA7d083d2a63417239B7e384C5e0E570aCe"
+    },
+    "implementation": {
+      "status": "verified",
+      "url": "https://explorer.testnet.chain.robinhood.com/address/0x84f3bDEcF0Ca0F561fe865A7Ae412CdE8DC81427"
+    }
+  },
+  "stock": "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E",
+  "oracle": "0x5196C8713A529bd676B875fB9Cea3F8a47ba48Be",
+  "dependencyCodeHashes": {
+    "stock": "0x2f367e6a678e7b30ab613d5963e541e6f4d3ca586de76e2f441fbfeb1a27c440",
+    "oracle": "0xc193625756a94bd71da26d4fb607bd4e335cdb800669f9114caa047be951bfd4"
+  },
+  "collateralIssuer": {
+    "beacon": "0x1dF3cA0fD30ED5eeb09eB01938f4E9c5196E6Ca5",
+    "implementation": "0xBd14156E05c6AF28ad39aA53a2AB8eB9CDf657DA",
+    "registry": "0x1dF3cA0fD30ED5eeb09eB01938f4E9c5196E6Ca5",
+    "codeHashes": {
+      "beacon": "0x404e8188c4b1d0c9804205e0da253d11570e9d48d03964962cb689072b1735d2",
+      "implementation": "0x137f26aacb7b1675d89017cebbf5018515c7bf4b87ae1848984494a56f3e1912",
+      "registry": "0x404e8188c4b1d0c9804205e0da253d11570e9d48d03964962cb689072b1735d2"
+    }
+  },
+  "tokenIdentity": {
+    "decimals": 18,
+    "multiplier": "1000000000000000000",
+    "permitName": "Tesla",
+    "permitVersion": "1",
+    "permitChainId": 46630,
+    "paused": false
+  },
+  "reviewedArtifacts": {
+    "ShareDeposit": {
+      "creationHash": "0xc34df0f1a825cfcfce87d0fae7c9221c30a9311e3218e5f49f79cd65910ff9ad",
+      "runtimeTemplateHash": "0x217f72186b9175377005ca8799150fb6301c3507f718efdfc328d94ebb9b2f29",
+      "immutableAnchors": { "935": "oracle", "1096": "chainId", "1144": "stock", "1214": "factory" }
+    },
+    "ShareDepositFactory": {
+      "creationHash": "0x20566d0b3c2eed2e80e732befdbbbd0fa3a39ed9f615aff1d2ff7136626eeeb1",
+      "runtimeTemplateHash": "0xb1847e8961de8a3c59a36e8cf64da4d5de255b564a4c5813516daf94cf97bec4",
+      "immutableAnchors": { "225": "implementation" }
+    }
+  },
+  "parameters": {
+    "initialRatioBps": 15000,
+    "topUpRatioBps": 12500,
+    "minimumDepositUsd6": "1000000",
+    "maximumDepositUsd6": "10000000000",
+    "minimumWindowSeconds": 3600,
+    "maximumWindowSeconds": 34560000,
+    "normalMaxPriceAgeSeconds": 93600,
+    "weekendMaxPriceAgeSeconds": 266400,
+    "settlement": "in_kind",
+    "claimConversion": "ceil_at_proposal_capped_at_balance",
+    "relay": false
+  }
+}
