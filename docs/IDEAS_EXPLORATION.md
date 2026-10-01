@@ -21,7 +21,7 @@ Status 2026-09-25. These are **product explorations**, not implemented features 
 - **Eligibility:** xStocks and Robinhood Stock Tokens are not available to US persons and have issuer terms.
 
 **Feasibility here.**
-- **Robinhood Chain testnet:** official test TSLA comes from Robinhood's faucet. The deployed in-kind `ShareDeposit` path is available in Home at 150 % activation cover, with no forced sale and the first hosted three-party proof pending. Its quote uses the bounded mainnet Chainlink RHTSLA/USD mirror, not a native Chainlink testnet feed. The older operator-sale design below is historical, not evidence for this flow.
+- **Robinhood Chain testnet:** official test TSLA comes from Robinhood's faucet. The deployed in-kind `ShareDeposit` path is available in Home at 150 % activation cover, with no forced sale and a hosted three-party run proven on 1 October 2026 with three fresh accounts ([evidence](evidence/HOSTED_SHARE_DEPOSIT_ROBINHOOD_TESTNET_2026-10-01.json)); timeout exits are contract-tested only. Its quote uses the bounded mainnet Chainlink RHTSLA/USD mirror, not a native Chainlink testnet feed. The older operator-sale design below is historical, not evidence for this flow.
 - **Solana devnet:** medium. `tSPYx` exists, but it needs an oracle integration in the Anchor program.
 
 **Retained legacy sale-based contract (not the current in-kind path):** [`CollateralEscrow.sol`](../contracts/evm/src/CollateralEscrow.sol) implements pledge, excess withdrawal, shortfall/grace-period sale, claim/dispute/arbitrator handling and in-kind return. Its historical test and live-cycle evidence concerns the operator-oracle/operator-desk design, not `ShareDeposit` or the shared lending cutover.

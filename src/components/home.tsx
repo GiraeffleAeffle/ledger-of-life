@@ -891,8 +891,8 @@ function Homes({ listings, request, reload, go, loaded, loadError, testTools, te
                 await request(`/api/listings/${l.id}`, { action: 'apply', ...application });
                 setApplyTo(null);
               }, l.id); }}>
-                <label>Your name<input required value={application.name} onChange={(e) => setApplication({ ...application, name: e.target.value })} /></label>
-                <label>A few words about you<input required value={application.message} onChange={(e) => setApplication({ ...application, message: e.target.value })} /></label>
+                <label>Nickname shown to the landlord<input required minLength={2} maxLength={40} value={application.name} onChange={(e) => setApplication({ ...application, name: e.target.value })} /><span className="small-copy">No real name needed; this test site does not verify identity</span></label>
+                <label>Message to the landlord (optional)<input maxLength={500} value={application.message} onChange={(e) => setApplication({ ...application, message: e.target.value })} /></label>
                 {feedback.target === l.id && feedback.message && <p className="note" role="alert">{feedback.message}</p>}
                 <p className="small-copy">This sends your application. It does not reserve the home or lock a deposit.</p>
                 {l.depositForm?.kind === 'shares' ? <ShareDepositApplication listingId={l.id} request={request} /> : <button className="button primary">Send application</button>}

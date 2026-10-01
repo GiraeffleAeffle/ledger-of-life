@@ -200,8 +200,8 @@ export async function applyToListing(store: Store, identity: VerifiedIdentity, i
       id: randomUUID(),
       subject: identity.subject,
       wallet,
-      name: text(input.name, 2, 80, 'Your name'),
-      message: text(input.message, 10, 2000, 'Your message'),
+      name: text(input.name, 2, 40, 'Nickname'),
+      message: text(input.message ?? '', 0, 500, 'Optional message'),
       at: new Date().toISOString(),
     };
     return { ...value, applications: [...value.applications, application] };

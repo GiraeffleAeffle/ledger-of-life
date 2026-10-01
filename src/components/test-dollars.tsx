@@ -14,7 +14,7 @@ export function TestDollars({ request, ethBalance, refresh, needDollars = true }
   const [dripConfigured, setDripConfigured] = useState(false);
   const [gettingGas, setGettingGas] = useState(false);
   // The server drips below 0.00001 ETH, so the button appears for the same balances (not only at exactly zero).
-  const noGas = belowGasDripThreshold(ethBalance);
+  const noGas = ethBalance === undefined || belowGasDripThreshold(ethBalance);
   useEffect(() => {
     let active = true;
     void request<{ configured: boolean }>('/api/assets', { action: 'gas_drip_status' })

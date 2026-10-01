@@ -1,0 +1,387 @@
+{
+  "evidenceStatus": "hosted_fresh_account_loan_cycle_and_local_stakes",
+  "evidenceScope": "Fresh passkey tenant account on the hosted site (revision 15 image): mint test dollars, pledge test TSLA, borrow, buy and sell back a local-city stake, repay in full, withdraw collateral. Test tokens only; issuer powers unchanged. Local AI per-token settlement is NOT covered here.",
+  "date": "2026-10-01",
+  "site": "https://ledger.stadtstack.eu",
+  "explorerBase": "https://explorer.testnet.chain.robinhood.com",
+  "mode": "Passkey account created via live sign-up (virtual WebAuthn authenticator); Privy embedded wallet signed after passkey authorization. Chain reads below come from scripts/prove-loan-cycle.mjs (public chain data only: addresses, hashes, balances).",
+  "steps": [
+    {
+      "step": 1,
+      "action": "faucet gas top-up (bounded fee gas)",
+      "amount": "0.00005 ETH",
+      "hash": "0xceed1abffb842dfe5b3f2b7ec99da1366bd4d06077166c694fe9f6218f83bdc2",
+      "status": "success",
+      "from": "0x18ba3C3C96A7cF7dE367d672616d8AD49a3A5f63"
+    },
+    {
+      "step": 2,
+      "action": "mint tUSDG",
+      "amount": "1,000 tUSDG",
+      "hash": "0x8aaa4d2e6725d7465c9d65fa2d9be5b20f08e445f15a657037916acb59213657",
+      "status": "success",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C"
+    },
+    {
+      "step": 3,
+      "action": "approve test TSLA to pool",
+      "amount": "0.5 TSLA",
+      "hash": "0x2210a75acc0d491a9576769b413f078078fd2935564ec59da7f851bc069b78e2",
+      "status": "success",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C"
+    },
+    {
+      "step": 4,
+      "action": "depositCollateral",
+      "amount": "0.5 TSLA",
+      "hash": "0xe324ced7d4f7b195eb47fb96ab6a02b309a08da6c90e0a54b2534096a5ee0016",
+      "status": "success",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C"
+    },
+    {
+      "step": 5,
+      "action": "borrow",
+      "amount": "20 tUSDG (LTV 11.25 %)",
+      "hash": "0x1eba9d60df1db7360d83d3e599444ce7183d0b38135cfd11d670cd2ad22c9c99",
+      "status": "success",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C"
+    },
+    {
+      "step": 6,
+      "action": "approve tUSDG for local market",
+      "amount": "5 tUSDG",
+      "hash": "0x23d541d55b76cf1acd7f28f5d77905179501c8e5723ecc93dee78d397223e6d6",
+      "status": "success",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C"
+    },
+    {
+      "step": 7,
+      "action": "buy tHOME",
+      "amount": "5 tHOME for 5 tUSDG",
+      "hash": "0x644a93fcbacbea21eebb8a24c8ef7534b9d6e8676d3d91000738e7dc9c2c0be6",
+      "status": "success",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C"
+    },
+    {
+      "step": 8,
+      "action": "approve tHOME for sell-back",
+      "amount": "5 tHOME",
+      "hash": "0x2810ec4e4071a5deb2189f157dc76c6fa5c19d29485afc16357593b42018834f",
+      "status": "success",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C"
+    },
+    {
+      "step": 9,
+      "action": "sell back tHOME",
+      "amount": "5 tHOME for 5 tUSDG",
+      "hash": "0x1e45d6eea54eaf056919877802c88dc0ae899664b357d9b73645eacb50eb9ad1",
+      "status": "success",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C"
+    },
+    {
+      "step": 10,
+      "action": "approve tUSDG for repay",
+      "amount": "20.01 tUSDG",
+      "hash": "0x64b09eefa885c3f78af5331ba3169a6fbefe7d91edb46bd47ecc293209d92104",
+      "status": "success",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C"
+    },
+    {
+      "step": 11,
+      "action": "repay (took 20.000005)",
+      "amount": "20.000005 tUSDG",
+      "hash": "0x662442b3024df88a5e62616704d13a53469afe7c8c80656da9dca1a03607e873",
+      "status": "success",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C"
+    },
+    {
+      "step": 12,
+      "action": "withdrawCollateral",
+      "amount": "0.5 TSLA",
+      "hash": "0xb71076d158437bf3b4e8581244d42ed6ea9710e23f12d8af2221d760a3a6d9ba",
+      "status": "success",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C"
+    }
+  ],
+  "finalSummary": "collateral 0, debt 0, 1 TSLA back in the wallet; all 12 receipts success",
+  "rpc": "https://rpc.testnet.chain.robinhood.com",
+  "chainId": 46630,
+  "observedAtBlock": "127103539",
+  "observedAt": "2026-10-01T10:51:32.000Z",
+  "wallet": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+  "deployment": {
+    "pool": "0xA9c03045FD317230ab811419D13Fd4D0652DE069",
+    "oracle": "0x5196C8713A529bd676B875fB9Cea3F8a47ba48Be",
+    "stock": "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E",
+    "usd": "0xA6e10E426A738aEF586dB5191177658D67C78A14"
+  },
+  "allTransactionsConfirmed": true,
+  "walletBalances": {
+    "testTslaRaw": "1000000000000000000",
+    "tUsdgAtomic": "999999995",
+    "ethWei": "40469370000000"
+  },
+  "position": {
+    "collateralSharesRaw": "0",
+    "debtAtomic": "0",
+    "collateralValueAtomic": "0",
+    "ltvBps": 0,
+    "availableToBorrowAtomic": "0",
+    "priceFresh": true
+  },
+  "pool": {
+    "cashAtomic": "10000000007",
+    "totalAssetsAtomic": "10000000007",
+    "borrowedAtomic": "0",
+    "utilizationBps": 0,
+    "priceAtomic": "355810800",
+    "priceFresh": true
+  },
+  "mirroredPrice": {
+    "sourceRoundId": "18446744073709553029",
+    "sourceUpdatedAt": "2026-10-01T08:11:48.000Z",
+    "sourceAgeSeconds": 9584,
+    "copiedAt": "2026-10-01T08:12:03.000Z",
+    "copyAgeSeconds": 9569
+  },
+  "note": "Chain reads at the latest block. This script does not judge whether a run qualifies as evidence.",
+  "chainReadScript": "scripts/prove-loan-cycle.mjs",
+  "transactions": [
+    {
+      "hash": "0xceed1abffb842dfe5b3f2b7ec99da1366bd4d06077166c694fe9f6218f83bdc2",
+      "found": true,
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0xceed1abffb842dfe5b3f2b7ec99da1366bd4d06077166c694fe9f6218f83bdc2",
+      "status": "success",
+      "blockNumber": "127101787",
+      "blockTime": "2026-10-01T10:46:16.000Z",
+      "from": "0x18ba3C3C96A7cF7dE367d672616d8AD49a3A5f63",
+      "fromIsWallet": false,
+      "to": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "target": "other contract",
+      "nativeValue": "50000000000000",
+      "call": null,
+      "gasUsed": "25554",
+      "logCount": 0
+    },
+    {
+      "hash": "0x8aaa4d2e6725d7465c9d65fa2d9be5b20f08e445f15a657037916acb59213657",
+      "found": true,
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x8aaa4d2e6725d7465c9d65fa2d9be5b20f08e445f15a657037916acb59213657",
+      "status": "success",
+      "blockNumber": "127101896",
+      "blockTime": "2026-10-01T10:46:40.000Z",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "fromIsWallet": true,
+      "to": "0xA6e10E426A738aEF586dB5191177658D67C78A14",
+      "target": "tUSDG",
+      "nativeValue": "0",
+      "call": null,
+      "gasUsed": "58275",
+      "logCount": 1
+    },
+    {
+      "hash": "0x2210a75acc0d491a9576769b413f078078fd2935564ec59da7f851bc069b78e2",
+      "found": true,
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x2210a75acc0d491a9576769b413f078078fd2935564ec59da7f851bc069b78e2",
+      "status": "success",
+      "blockNumber": "127102122",
+      "blockTime": "2026-10-01T10:47:26.000Z",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "fromIsWallet": true,
+      "to": "0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E",
+      "target": "test TSLA",
+      "nativeValue": "0",
+      "call": {
+        "function": "approve",
+        "args": [
+          "0xA9c03045FD317230ab811419D13Fd4D0652DE069",
+          "500000000000000000"
+        ]
+      },
+      "gasUsed": "67694",
+      "logCount": 1
+    },
+    {
+      "hash": "0xe324ced7d4f7b195eb47fb96ab6a02b309a08da6c90e0a54b2534096a5ee0016",
+      "found": true,
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0xe324ced7d4f7b195eb47fb96ab6a02b309a08da6c90e0a54b2534096a5ee0016",
+      "status": "success",
+      "blockNumber": "127102179",
+      "blockTime": "2026-10-01T10:47:38.000Z",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "fromIsWallet": true,
+      "to": "0xA9c03045FD317230ab811419D13Fd4D0652DE069",
+      "target": "pool",
+      "nativeValue": "0",
+      "call": {
+        "function": "depositCollateral",
+        "args": [
+          "500000000000000000"
+        ]
+      },
+      "gasUsed": "141458",
+      "logCount": 3
+    },
+    {
+      "hash": "0x1eba9d60df1db7360d83d3e599444ce7183d0b38135cfd11d670cd2ad22c9c99",
+      "found": true,
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x1eba9d60df1db7360d83d3e599444ce7183d0b38135cfd11d670cd2ad22c9c99",
+      "status": "success",
+      "blockNumber": "127102505",
+      "blockTime": "2026-10-01T10:48:17.000Z",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "fromIsWallet": true,
+      "to": "0xA9c03045FD317230ab811419D13Fd4D0652DE069",
+      "target": "pool",
+      "nativeValue": "0",
+      "call": {
+        "function": "borrow",
+        "args": [
+          "20000000"
+        ]
+      },
+      "gasUsed": "208792",
+      "logCount": 2
+    },
+    {
+      "hash": "0x23d541d55b76cf1acd7f28f5d77905179501c8e5723ecc93dee78d397223e6d6",
+      "found": true,
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x23d541d55b76cf1acd7f28f5d77905179501c8e5723ecc93dee78d397223e6d6",
+      "status": "success",
+      "blockNumber": "127102759",
+      "blockTime": "2026-10-01T10:49:02.000Z",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "fromIsWallet": true,
+      "to": "0xA6e10E426A738aEF586dB5191177658D67C78A14",
+      "target": "tUSDG",
+      "nativeValue": "0",
+      "call": {
+        "function": "approve",
+        "args": [
+          "0xD9B44B63fd4A195A4a92531d4b0F8BE6583A3Dde",
+          "5000000"
+        ]
+      },
+      "gasUsed": "53629",
+      "logCount": 1
+    },
+    {
+      "hash": "0x644a93fcbacbea21eebb8a24c8ef7534b9d6e8676d3d91000738e7dc9c2c0be6",
+      "found": true,
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x644a93fcbacbea21eebb8a24c8ef7534b9d6e8676d3d91000738e7dc9c2c0be6",
+      "status": "success",
+      "blockNumber": "127102915",
+      "blockTime": "2026-10-01T10:49:31.000Z",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "fromIsWallet": true,
+      "to": "0xD9B44B63fd4A195A4a92531d4b0F8BE6583A3Dde",
+      "target": "other contract",
+      "nativeValue": "0",
+      "call": null,
+      "gasUsed": "82587",
+      "logCount": 3
+    },
+    {
+      "hash": "0x2810ec4e4071a5deb2189f157dc76c6fa5c19d29485afc16357593b42018834f",
+      "found": true,
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x2810ec4e4071a5deb2189f157dc76c6fa5c19d29485afc16357593b42018834f",
+      "status": "success",
+      "blockNumber": "127103091",
+      "blockTime": "2026-10-01T10:50:04.000Z",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "fromIsWallet": true,
+      "to": "0x2b95D13BDFEB4202281Cea72494263fdC7b0cbFb",
+      "target": "other contract",
+      "nativeValue": "0",
+      "call": {
+        "function": "approve",
+        "args": [
+          "0xD9B44B63fd4A195A4a92531d4b0F8BE6583A3Dde",
+          "5000000000000000000"
+        ]
+      },
+      "gasUsed": "53665",
+      "logCount": 1
+    },
+    {
+      "hash": "0x1e45d6eea54eaf056919877802c88dc0ae899664b357d9b73645eacb50eb9ad1",
+      "found": true,
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x1e45d6eea54eaf056919877802c88dc0ae899664b357d9b73645eacb50eb9ad1",
+      "status": "success",
+      "blockNumber": "127103166",
+      "blockTime": "2026-10-01T10:50:18.000Z",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "fromIsWallet": true,
+      "to": "0xD9B44B63fd4A195A4a92531d4b0F8BE6583A3Dde",
+      "target": "other contract",
+      "nativeValue": "0",
+      "call": null,
+      "gasUsed": "60747",
+      "logCount": 3
+    },
+    {
+      "hash": "0x64b09eefa885c3f78af5331ba3169a6fbefe7d91edb46bd47ecc293209d92104",
+      "found": true,
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x64b09eefa885c3f78af5331ba3169a6fbefe7d91edb46bd47ecc293209d92104",
+      "status": "success",
+      "blockNumber": "127103302",
+      "blockTime": "2026-10-01T10:50:48.000Z",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "fromIsWallet": true,
+      "to": "0xA6e10E426A738aEF586dB5191177658D67C78A14",
+      "target": "tUSDG",
+      "nativeValue": "0",
+      "call": {
+        "function": "approve",
+        "args": [
+          "0xA9c03045FD317230ab811419D13Fd4D0652DE069",
+          "20010000"
+        ]
+      },
+      "gasUsed": "53641",
+      "logCount": 1
+    },
+    {
+      "hash": "0x662442b3024df88a5e62616704d13a53469afe7c8c80656da9dca1a03607e873",
+      "found": true,
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x662442b3024df88a5e62616704d13a53469afe7c8c80656da9dca1a03607e873",
+      "status": "success",
+      "blockNumber": "127103345",
+      "blockTime": "2026-10-01T10:50:55.000Z",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "fromIsWallet": true,
+      "to": "0xA9c03045FD317230ab811419D13Fd4D0652DE069",
+      "target": "pool",
+      "nativeValue": "0",
+      "call": {
+        "function": "repay",
+        "args": [
+          "20010000"
+        ]
+      },
+      "gasUsed": "91029",
+      "logCount": 2
+    },
+    {
+      "hash": "0xb71076d158437bf3b4e8581244d42ed6ea9710e23f12d8af2221d760a3a6d9ba",
+      "found": true,
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0xb71076d158437bf3b4e8581244d42ed6ea9710e23f12d8af2221d760a3a6d9ba",
+      "status": "success",
+      "blockNumber": "127103451",
+      "blockTime": "2026-10-01T10:51:14.000Z",
+      "from": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "fromIsWallet": true,
+      "to": "0xA9c03045FD317230ab811419D13Fd4D0652DE069",
+      "target": "pool",
+      "nativeValue": "0",
+      "call": {
+        "function": "withdrawCollateral",
+        "args": [
+          "500000000000000000"
+        ]
+      },
+      "gasUsed": "81546",
+      "logCount": 3
+    }
+  ]
+}

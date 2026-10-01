@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextShareDepositAction, pendingShareDepositReceipt, requireBoundShareReview, shareDepositAmount } from './share-deposit-logic.ts';
+import { nextShareDepositAction, pendingShareDepositReceipt, requireBoundShareReview, shareDepositAmount, shareRefreshIsCurrent, showShareClaim, showTenantFunding, shareFeeBalance, shareReceiptPollDelay } from './share-deposit-logic.ts';
 import type { ShareDepositPlan, ShareDepositView } from '../domain/share-deposit.ts';
 
 test('next action respects server role permissions and timeout priority', () => {
-  const view = {deployment:'deployed' as const,state:'AwaitingLock' as const,needsTopUp:false,actions:['create' as const]};
+  const view = {deployment:'deployed' as const,state:'AwaitingLock' as const,role:'tenant' as const,needsTopUp:false,actions:['create' as const]};
   assert.equal(nextShareDepositAction(view),'create');
   assert.equal(nextShareDepositAction({...view,actions:['approve','pledge','withdraw']}),'approve');
   assert.equal(nextShareDepositAction({...view,state:'ClaimPending',actions:['acceptClaim','contestClaim']}),'acceptClaim');
@@ -43,4 +43,72 @@ test('failed and foreign pending receipts never block the current wallet after r
   assert.equal(pendingShareDepositReceipt([failed,foreign,active],['mine'])?.planId,'active-plan');
   assert.equal(pendingShareDepositReceipt([{...active,status:'failed'}],['mine']),null);
   assert.equal(pendingShareDepositReceipt([{...active,status:'confirmed'}],['mine']),null);
+});
+
+test('a delayed refresh cannot replace a prepared review or preparation error', async () => {
+  for (const outcome of ['review', 'error']) {
+    let revision = 1;
+    const started = revision;
+    let finish!: () => void;
+    const response = new Promise<void>(resolve => { finish = resolve; });
+    let displayed = 'loading';
+    const refresh = response.then(() => {
+      if (shareRefreshIsCurrent(started, revision)) displayed = 'refreshed';
+    });
+    revision++;
+    displayed = outcome;
+    finish();
+    await refresh;
+    assert.equal(displayed, outcome);
+  }
+});
+
+test('next actions follow each tenancy state and party without prescribing active approval', () => {
+  const base = { deployment: 'deployed' as const, needsTopUp: false };
+  const cases: { state: ShareDepositView['state']; role: ShareDepositView['role']; actions: ShareDepositView['actions']; expected: string | null }[] = [
+    { state: 'AwaitingLock', role: 'tenant', actions: ['approve', 'pledge'], expected: 'approve' },
+    { state: 'AwaitingLock', role: 'landlord', actions: ['create', 'activate'], expected: 'create' },
+    { state: 'AwaitingLock', role: 'arbitrator', actions: [], expected: null },
+    { state: 'Active', role: 'tenant', actions: ['approve', 'pledge', 'withdraw', 'requestReturn'], expected: null },
+    { state: 'Active', role: 'landlord', actions: ['proposeClaim'], expected: 'proposeClaim' },
+    { state: 'Active', role: 'arbitrator', actions: [], expected: null },
+    { state: 'ClaimPending', role: 'tenant', actions: ['acceptClaim', 'contestClaim'], expected: 'acceptClaim' },
+    { state: 'ClaimPending', role: 'landlord', actions: ['lowerClaim'], expected: 'lowerClaim' },
+    { state: 'ClaimPending', role: 'arbitrator', actions: [], expected: null },
+    { state: 'ClaimContested', role: 'tenant', actions: ['escalateClaim'], expected: 'escalateClaim' },
+    { state: 'ClaimContested', role: 'landlord', actions: ['lowerClaim', 'escalateClaim'], expected: 'escalateClaim' },
+    { state: 'ClaimContested', role: 'arbitrator', actions: ['resolveClaim'], expected: 'resolveClaim' },
+    { state: 'Closed', role: 'tenant', actions: ['payout'], expected: 'payout' },
+    { state: 'Closed', role: 'landlord', actions: ['payout'], expected: 'payout' },
+    { state: 'Closed', role: 'arbitrator', actions: ['payout'], expected: 'payout' },
+  ];
+  for (const { expected, ...view } of cases) assert.equal(nextShareDepositAction({ ...base, ...view }), expected, `${view.state}/${view.role}`);
+  assert.equal(nextShareDepositAction({ ...base, state: 'Active', role: 'tenant', needsTopUp: true, actions: ['approve', 'pledge'] }), 'approve');
+});
+
+test('claim visibility requires a dispute or a closed award, never an empty initial claim', () => {
+  const claim = { usd6: '0', shares: '0', evidenceHash: '0x00', price6: '0', sourceTime: 0 };
+  for (const state of ['AwaitingLock', 'Active', 'Closed'] as const) assert.equal(showShareClaim({ state, claim, landlordOwed: '0' }), false);
+  for (const state of ['ClaimPending', 'ClaimContested'] as const) assert.equal(showShareClaim({ state, claim, landlordOwed: '0' }), true);
+  assert.equal(showShareClaim({ state: 'Closed', claim, landlordOwed: '1' }), true);
+  assert.equal(showShareClaim({ state: 'ClaimPending', claim: null, landlordOwed: '0' }), false);
+});
+
+test('tenant funding advice is not shown to either reviewing party', () => {
+  assert.equal(showTenantFunding({ role: 'tenant' }), true);
+  assert.equal(showTenantFunding({ role: 'landlord' }), false);
+  assert.equal(showTenantFunding({ role: 'arbitrator' }), false);
+});
+
+test('fee balance remains usable when token valuation is unavailable', () => {
+  const staleValuation = { robinhood: { ok: false, code: 'price_unavailable', value: { ethBalance: '0.00005' } } };
+  assert.equal(shareFeeBalance(staleValuation), '0.00005');
+  assert.equal(shareFeeBalance({ robinhood: null }), undefined);
+});
+
+test('pending receipt retries use five seconds normally and capped error backoff', () => {
+  assert.equal(shareReceiptPollDelay(0), 5000);
+  assert.equal(shareReceiptPollDelay(1), 10000);
+  assert.equal(shareReceiptPollDelay(2), 20000);
+  assert.equal(shareReceiptPollDelay(10), 60000);
 });

@@ -105,7 +105,7 @@ This covers all 13 [Ideas entries](../../src/components/ideas.tsx), plus the thr
 | Life timeline | Tenancies/self-declared history exist. Keep compact; attestations and disclosure predicates later. |
 | Roles everywhere | Tenancy roles exist. Generic memberships later; chosen city is not verified residence. |
 | Service charges | Example statement/test prepayment; optional live consumption. Keep collapsed; invoices, allocation and payments later. |
-| Stocks as deposit | At this historical review: illustrative calculator and legacy sale-based contract. Current implementation: in-kind test-TSLA deposit available in Home; first hosted three-party proof pending. |
+| Stocks as deposit | At this historical review: illustrative calculator and legacy sale-based contract. Current implementation: in-kind test-TSLA deposit available in Home; hosted three-party run proven on 1 October 2026 with three fresh accounts ([evidence](../evidence/HOSTED_SHARE_DEPOSIT_ROBINHOOD_TESTNET_2026-10-01.json)). |
 | Local investments | Illustrated forms/unverified leads. Later with verified terms and licensed scope. |
 | Home shares | Planned. Park until enforceable ownership/acquisition structure exists. |
 | EV/devices | Solar/validator observation exists; EV planned. Read-only EV later; income tokenization parked. |

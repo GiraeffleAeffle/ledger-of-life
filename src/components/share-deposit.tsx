@@ -4,7 +4,7 @@ import { useRentalWallet } from '@/wallets';
 import { belowGasDripThreshold } from '@/domain/gas-threshold';
 import type { ShareDepositPlan, ShareDepositView, ShareDepositAction } from '@/domain/share-deposit';
 import { TestDollars } from './test-dollars';
-import { nextShareDepositAction, pendingShareDepositReceipt, requireBoundShareReview, shareDepositAmount } from './share-deposit-logic';
+import { nextShareDepositAction, pendingShareDepositReceipt, requireBoundShareReview, shareDepositAmount, shareRefreshIsCurrent, showShareClaim, showTenantFunding, shareFeeBalance, shareReceiptPollDelay } from './share-deposit-logic';
 
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 type Receipt = { planId: string; transactionHash: string };
@@ -42,17 +42,17 @@ export function ShareDeposit({ rentalId, request, reload }: { rentalId: string; 
     const current = ++revision.current;
     try {
       const result = await request<{ view: ShareDepositView }>(`/api/share-deposit?rentalId=${encodeURIComponent(rentalId)}`);
-      if (current !== revision.current) return;
-      setView(result.view); setError(''); setPlan(null);
+      if (!shareRefreshIsCurrent(current, revision.current)) return;
+      setView(result.view);
       const unfinished = pendingShareDepositReceipt(result.view.receipts, walletIds.split(','));
       setPending(unfinished ? { planId: unfinished.planId, transactionHash: unfinished.transactionHash } : null);
       const assets = await request<{ robinhood: { ok: boolean; value?: { ethBalance?: string } } | null }>('/api/assets?area=holdings');
-      if (current === revision.current) setEthBalance(assets.robinhood?.ok ? assets.robinhood.value?.ethBalance : undefined);
+      if (shareRefreshIsCurrent(current, revision.current)) setEthBalance(shareFeeBalance(assets));
       const agreement = await request<{ agreement: { records: { name: string; body: string }[] } }>(`/api/agreements/${encodeURIComponent(rentalId)}`);
       if (current === revision.current) setRecords(agreement.agreement.records);
     } catch (cause) {
-      if (current !== revision.current) return;
-      setError(cause instanceof Error ? cause.message : 'Deposit unavailable'); setPlan(null); setEthBalance(undefined);
+      if (!shareRefreshIsCurrent(current, revision.current)) return;
+      setError(cause instanceof Error ? cause.message : 'Deposit unavailable'); setEthBalance(undefined);
     }
   }, [request, rentalId, walletIds]);
   useEffect(() => {
@@ -71,7 +71,8 @@ export function ShareDeposit({ rentalId, request, reload }: { rentalId: string; 
       document.removeEventListener('visibilitychange', read);
     };
   }, [refresh, busy, plan, pending]);
-  async function prepare(operation: ShareDepositAction, side?: 'tenant' | 'landlord') {
+  const prepare = useCallback(async (operation: ShareDepositAction, side?: 'tenant' | 'landlord') => {
+    revision.current++;
     setBusy(true); setError(''); setPlan(null);
     try {
       const body: Record<string, unknown> = { action: 'prepare', rentalId, operation };
@@ -95,20 +96,48 @@ export function ShareDeposit({ rentalId, request, reload }: { rentalId: string; 
       setPlan(result.plan);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Cannot prepare'); }
     finally { setBusy(false); }
-  }
-  async function confirmed() {
+  }, [request, rentalId, amount, evidence, view]);
+  const confirmed = useCallback(async () => {
     await reload(); await refresh();
     window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'evm' } }));
-  }
-  async function reconcile(input: Receipt) {
+  }, [reload, refresh]);
+  const reconcile = useCallback(async (input: Receipt) => {
     const result = await request<{ status: 'pending' | 'confirmed' | 'failed'; view: ShareDepositView }>('/api/share-deposit', { action: 'submit', ...input });
     setView(result.view);
     if (result.status === 'confirmed') { setPending(null); await confirmed(); }
-    else if (result.status === 'pending') setPending(input);
-    else { setPending(null); await reload(); setError('Transaction failed on chain. Review the refreshed deposit before trying another action.'); }
-  }
+    else if (result.status === 'failed') { setPending(null); await reload(); setError('Transaction failed on chain. Review the refreshed deposit before trying another action.'); }
+    return result.status;
+  }, [request, confirmed, reload]);
+  useEffect(() => {
+    if (!pending) return;
+    let stopped = false;
+    let running = false;
+    let failures = 0;
+    let timer: number;
+    const poll = async () => {
+      if (stopped || running || document.visibilityState !== 'visible') return;
+      running = true;
+      try {
+        const status = await reconcile(pending);
+        failures = 0;
+        if (status !== 'pending') return;
+      } catch (cause) {
+        failures++;
+        if (!stopped) setError(cause instanceof Error ? cause.message : 'Receipt unavailable; retrying.');
+      } finally { running = false; }
+      if (!stopped) timer = window.setTimeout(() => { void poll(); }, shareReceiptPollDelay(failures));
+    };
+    const visible = () => {
+      clearTimeout(timer);
+      if (document.visibilityState === 'visible') void poll();
+    };
+    timer = window.setTimeout(() => { void poll(); }, shareReceiptPollDelay(0));
+    document.addEventListener('visibilitychange', visible);
+    return () => { stopped = true; clearTimeout(timer); document.removeEventListener('visibilitychange', visible); };
+  }, [pending, reconcile]);
   async function sign() {
     if (!plan || !view || busy) return;
+    revision.current++;
     setBusy(true); setError('');
     try {
       if (ethBalance === undefined || belowGasDripThreshold(ethBalance)) throw new Error('Check your test ETH fee balance and use the gas drip before signing.');
@@ -139,24 +168,27 @@ export function ShareDeposit({ rentalId, request, reload }: { rentalId: string; 
       <p>Locked in your deposit: {depositShares(view.lockedShares)} TSLA. Not spendable and not loan collateral.</p>
       {view.quote ? <p>Token quote: {depositUsd(view.quote.priceUsd6)} USD per TSLA · source {time(view.quote.sourceTime)} · copied {view.quote.copiedAt ? time(view.quote.copiedAt) : 'unavailable'} · {view.quote.fresh ? 'fresh' : 'stale — cover unavailable'}. Cover: {view.quote.fresh && view.coverBps !== null ? `${view.coverBps / 100} %` : 'unavailable'}.</p> : <p>Price and cover unavailable.</p>}
       {view.priceJob && <p role={view.priceJob.health === 'attention' ? 'alert' : 'status'}>Price copy job: {view.priceJob.message}</p>}
-      {view.needsTopUp && <p role="alert">Below 125 % cover: please top up. No forced sale or on-chain top-up enforcement.</p>}
-      <p>You need {view.requiredShares === null ? 'a fresh price to calculate' : depositShares(view.requiredShares)} test TSLA at 150 %; you hold {depositShares(view.walletShares)}. <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet</a> gives 5 test TSLA per claim.</p>
-      {view.claim && <p>Deduction proposed: {depositUsd(view.claim.usd6)} USD = {depositShares(view.claim.shares)} TSLA, fixed at proposal price {depositUsd(view.claim.price6)}. Acceptance is capped at these shares; no later price is used. Move-out evidence: {view.claim.evidenceHash}.</p>}
+      {showTenantFunding(view) && view.needsTopUp && <p role="alert">Below 125 % cover: please top up. No forced sale or on-chain top-up enforcement.</p>}
+      {showTenantFunding(view) && <p>You need {view.requiredShares === null ? 'a fresh price to calculate' : depositShares(view.requiredShares)} test TSLA at 150 %; you hold {depositShares(view.walletShares)}. <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet</a> gives 5 test TSLA per claim.</p>}
+      {showShareClaim(view) && view.claim && <p>Deduction proposed: {depositUsd(view.claim.usd6)} USD = {depositShares(view.claim.shares)} TSLA, fixed at proposal price {depositUsd(view.claim.price6)}. Acceptance is capped at these shares; no later price is used. Move-out evidence: {view.claim.evidenceHash}.</p>}
       {view.responseDeadline > 0 && <p>Response deadline: {time(view.responseDeadline)}</p>}
       {view.returnDeadline > 0 && <p>Return deadline: {time(view.returnDeadline)}</p>}
       {view.arbitrationDeadline > 0 && <p>Arbitration deadline: {time(view.arbitrationDeadline)}</p>}
       {view.warnings.map(warning => <p key={warning} role="status">{warning}</p>)}
       {records.map((record, index) => <details key={index}><summary>{record.name}</summary><p style={{ whiteSpace: 'pre-wrap' }}>{record.body}</p></details>)}
       {view.actions.length > 0 && view.deployment === 'deployed' && <>
-        <p>Next: {next ? labels[next] : 'wait for another party'}. Parties send their own transactions.</p>
+        <p>Next: {next ? labels[next] : view.state === 'Active' && view.role === 'tenant' ? 'no action needed. Top up below 125 %, withdraw extra above 150 %, or request return' : 'wait for another party'}. Parties send their own transactions.</p>
         {view.actions.includes('withdraw') && <p>Withdraw extra: maximum {view.maximumWithdrawShares === null ? 'unavailable without a fresh quote' : `${depositShares(view.maximumWithdrawShares)} test TSLA (${view.maximumWithdrawShares} raw units)`}. Active withdrawals must leave 150 % cover.</p>}
         <label>Amount (TSLA for pledge / withdrawal / arbitration; USD for deduction)<input inputMode="decimal" value={amount} onChange={e => { setAmount(e.target.value); setPlan(null); }} /></label>
         <label>Move-out record / dispute / arbitration reason<textarea value={evidence} onChange={e => { setEvidence(e.target.value); setPlan(null); }} /></label>
         {ethBalance === undefined && <p role="status">Test ETH balance unavailable. Refresh before signing.</p>}
-        {belowGasDripThreshold(ethBalance) && <TestDollars request={request} ethBalance={ethBalance} refresh={refresh} needDollars={false} />}
+        {(ethBalance === undefined || belowGasDripThreshold(ethBalance)) && <TestDollars request={request} ethBalance={ethBalance} refresh={refresh} needDollars={false} />}
         <div className="deduction-choices">
           {view.actions.filter(action => action !== 'payout').map(action => <button key={action} className="button secondary" disabled={busy || !!pending} onClick={() => void prepare(action)}>{labels[action]}</button>)}
-          {view.actions.includes('payout') && (['landlord', 'tenant'] as const).map(side => <button className="button secondary" key={side} disabled={busy || !!pending} onClick={() => void prepare('payout', side)}>Pay {side} in TSLA</button>)}
+          {view.actions.includes('payout') && <>
+            <button className="button secondary" disabled={busy || !!pending} onClick={() => void prepare('payout', 'landlord')}>Pay landlord in TSLA</button>
+            <button className="button secondary" disabled={busy || !!pending} onClick={() => void prepare('payout', 'tenant')}>Pay tenant in TSLA</button>
+          </>}
         </div>
       </>}
       {view.explorerUrl && <a href={view.explorerUrl} target="_blank" rel="noopener noreferrer">Read escrow on explorer</a>}

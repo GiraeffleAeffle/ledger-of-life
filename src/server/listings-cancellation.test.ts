@@ -45,3 +45,32 @@ test('landlord can close only an unchosen listing; chosen tenancy remains intact
     await assert.rejects(() => withdrawApplication(store, tenant, second.id), /chosen or closed/);
   } finally { await store.close(); }
 });
+
+test('applications accept nicknames and optional short messages with bounded lengths', async () => {
+  const store = new LocalStore(':memory:');
+  try {
+    const landlord = person('landlord');
+    const home = await listing(store, landlord);
+    await applyToListing(store, person('minimal'), home.id, { name: 'AB' });
+    await applyToListing(store, person('maximal'), home.id, { name: 'N'.repeat(40), message: 'M'.repeat(500) });
+    await applyToListing(store, person('short-message'), home.id, { name: 'Alias', message: 'Hi' });
+    for (const [subject, input] of [
+      ['short', { name: 'A' }],
+      ['long', { name: 'N'.repeat(41) }],
+      ['long-message', { name: 'Alias', message: 'M'.repeat(501) }],
+    ] as const) await assert.rejects(() => applyToListing(store, person(subject), home.id, input));
+    const applications = (await listListings(store, landlord))[0].applications!;
+    assert.equal(applications.find(application => application.name === 'AB')?.message, '');
+    assert.equal(applications.find(application => application.name === 'Alias')?.message, 'Hi');
+    assert.equal(applications.find(application => application.name.length === 40)?.message.length, 500);
+    await store.update<{ applications: { name: string; message: string }[] }>(`listing:${home.id}`, value => ({
+      ...value,
+      applications: value.applications.map((application, index) => index === 0
+        ? { ...application, name: 'Legacy '.repeat(10), message: 'Earlier message '.repeat(100) }
+        : application),
+    }));
+    const legacy = (await listListings(store, landlord))[0].applications![0];
+    assert.equal(legacy.name, 'Legacy '.repeat(10));
+    assert.equal(legacy.message, 'Earlier message '.repeat(100));
+  } finally { await store.close(); }
+});

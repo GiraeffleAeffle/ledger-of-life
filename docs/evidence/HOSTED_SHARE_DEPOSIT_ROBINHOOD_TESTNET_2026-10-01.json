@@ -1,0 +1,109 @@
+{
+  "evidenceStatus": "hosted_three_fresh_passkey_accounts_share_backed_deposit",
+  "evidenceScope": "Share-backed deposit run end to end on the hosted site with three fresh passkey accounts (tenant, landlord, arbitrator). Test TSLA only, issuer powers unchanged. Timeout exits (request return, escalation, arbitration window) were NOT run on the hosted site; contract tests cover them.",
+  "date": "2026-10-01",
+  "site": "https://ledger.stadtstack.eu",
+  "network": "Robinhood Chain testnet",
+  "chainId": 46630,
+  "explorerBase": "https://explorer.testnet.chain.robinhood.com",
+  "mode": "Fresh passkey accounts created through the live sign-up (virtual WebAuthn authenticator in a headless browser); Privy embedded wallets signed after passkey authorization. Revision 16 image.",
+  "accounts": {
+    "tenant": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+    "landlord": "0xDEAE86b4F44a54A217DA98B70A7c9fAB8Ea851fb",
+    "arbitrator": "0xe65E48553B296B5df3d5eaD68A36F3F384189A83"
+  },
+  "factory": "0x525b9bA7d083d2a63417239B7e384C5e0E570aCe",
+  "escrow": "0x088C5a0b9fC17EA9C746c5BBcE4c131EBf1b6CAF",
+  "steps": [
+    {
+      "step": 1,
+      "actor": "landlord",
+      "address": "0xDEAE86b4F44a54A217DA98B70A7c9fAB8Ea851fb",
+      "action": "create listing 'Evidence run · share deposit · sample' ($100 security)",
+      "amount": "$100 security",
+      "hash": "0xae255320bc1c2903fdd965a8cb8bb02ebfa281e04d1b05bc7bc5d8c5745d3584",
+      "status": "success",
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0xae255320bc1c2903fdd965a8cb8bb02ebfa281e04d1b05bc7bc5d8c5745d3584"
+    },
+    {
+      "step": 2,
+      "actor": "tenant",
+      "address": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "action": "approve exact allowance",
+      "amount": "0.5 TSLA",
+      "hash": "0x264ad215a27b9ae4e85decc8c68cd6105d9f890b0bdc36baeee997cfcd763d2e",
+      "status": "success",
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x264ad215a27b9ae4e85decc8c68cd6105d9f890b0bdc36baeee997cfcd763d2e"
+    },
+    {
+      "step": 3,
+      "actor": "tenant",
+      "address": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "action": "pledge shares (auto-activated, cover 178.13 %)",
+      "amount": "0.5 TSLA",
+      "hash": "0x61bd9c4ef88c1028c6cf4ecf09ae7dfa0edca54a0090f6d3b251fd204dca620f",
+      "status": "success",
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x61bd9c4ef88c1028c6cf4ecf09ae7dfa0edca54a0090f6d3b251fd204dca620f"
+    },
+    {
+      "step": 4,
+      "actor": "landlord",
+      "address": "0xDEAE86b4F44a54A217DA98B70A7c9fAB8Ea851fb",
+      "action": "proposeClaim",
+      "amount": "$10 = 0.02806907 TSLA at $356.264",
+      "hash": "0x5836fcdf2987f131263639bad1b95db1c4195996039d6443c9e081be4d313845",
+      "status": "success",
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x5836fcdf2987f131263639bad1b95db1c4195996039d6443c9e081be4d313845"
+    },
+    {
+      "step": 5,
+      "actor": "tenant",
+      "address": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "action": "contestClaim",
+      "amount": null,
+      "hash": "0xb15d17915cd0ba60456a1ff8746dff875f7bec62dc1094a2228f0e3f1673fa42",
+      "status": "success",
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0xb15d17915cd0ba60456a1ff8746dff875f7bec62dc1094a2228f0e3f1673fa42"
+    },
+    {
+      "step": 6,
+      "actor": "arbitrator",
+      "address": "0xe65E48553B296B5df3d5eaD68A36F3F384189A83",
+      "action": "resolveClaim",
+      "amount": "0.014 TSLA",
+      "hash": "0x822d27d47b3f6aab2e4329f590679431bf3b0ceef017119771fa002073d77867",
+      "status": "success",
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x822d27d47b3f6aab2e4329f590679431bf3b0ceef017119771fa002073d77867"
+    },
+    {
+      "step": 7,
+      "actor": "landlord",
+      "address": "0xDEAE86b4F44a54A217DA98B70A7c9fAB8Ea851fb",
+      "action": "payout(true)",
+      "amount": "0.014 TSLA",
+      "hash": "0x1fa4a6e7daae72d24f6f00548eae49493fef3b83fd760e481e602ac409462972",
+      "status": "success",
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x1fa4a6e7daae72d24f6f00548eae49493fef3b83fd760e481e602ac409462972"
+    },
+    {
+      "step": 8,
+      "actor": "tenant",
+      "address": "0x0D2d628E470b65eF7E20E42D47Bc8dAcE4696F3C",
+      "action": "payout(false)",
+      "amount": "remaining 0.486 TSLA",
+      "hash": "0x81efab01c9957a74e21c966e0eba0847c9148798ccedf7c60212de1fe3d6fb38",
+      "status": "success",
+      "explorer": "https://explorer.testnet.chain.robinhood.com/tx/0x81efab01c9957a74e21c966e0eba0847c9148798ccedf7c60212de1fe3d6fb38"
+    }
+  ],
+  "allStepsStatus": "success from the expected sender",
+  "finalReads": {
+    "escrowTsla": "0",
+    "state": "Closed (4)",
+    "custodyShortfall": false,
+    "cloneBytecodeBytes": 45,
+    "tenantTsla": "0.986 (from 1)",
+    "landlordTsla": "0.014",
+    "homeJourney": "step 7 of 7 'Paid out in test TSLA'"
+  }
+}

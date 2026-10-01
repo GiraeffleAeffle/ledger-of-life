@@ -16,6 +16,8 @@ Checked against the source on 1 October 2026. This is an engineering inventory, 
 
 The hosted ledger uses SQLite on the cluster's persistent volume. The code also supports PostgreSQL. There is no general account-deletion or record-retention sweep, except the AI text rules below. Data is linked by the Privy account id and/or wallet address; those are identifiers, not anonymous data.
 
+Home applications require only a nickname (2–40 characters), shown to the landlord to distinguish applicants; no real name or identity verification is requested. The optional message is limited to 500 characters. Existing stored application names/messages remain readable rather than being rewritten; avoid personal or sensitive information in either field.
+
 | Data | Why it is kept |
 | --- | --- |
 | Listings, applications and short notes; landlord/applicant account ids and wallet identities | Home applications and the recorded choice of a tenant |

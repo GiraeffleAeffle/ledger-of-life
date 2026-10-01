@@ -2,10 +2,34 @@ import type { ShareDepositAction, ShareDepositView, ShareDepositPlan } from '../
 import { parseUnits } from 'viem';
 
 /** Never invent permission from a local clock; the server's readable actions are authoritative. */
-export function nextShareDepositAction(view: Pick<ShareDepositView, 'deployment' | 'actions' | 'needsTopUp' | 'state'>): ShareDepositAction | null {
+export function nextShareDepositAction(view: Pick<ShareDepositView, 'deployment' | 'actions' | 'needsTopUp' | 'state' | 'role'>): ShareDepositAction | null {
   if (view.deployment !== 'deployed') return null;
-  const priority: ShareDepositAction[] = ['closeUnresolved', 'closeUnclaimed', 'acceptClaim', 'contestClaim', 'resolveClaim', 'escalateClaim', 'create', 'approve', 'pledge', 'activate', 'payout', 'requestReturn', 'proposeClaim', 'lowerClaim', 'withdraw'];
+  const priority: ShareDepositAction[] = view.state === 'Active'
+    ? view.role === 'tenant' ? view.needsTopUp ? ['approve', 'pledge', 'requestReturn', 'withdraw'] : ['closeUnclaimed', 'closeUnresolved'] : ['proposeClaim']
+    : ['closeUnresolved', 'closeUnclaimed', 'acceptClaim', 'contestClaim', 'resolveClaim', 'escalateClaim', 'create', 'approve', 'pledge', 'activate', 'payout', 'lowerClaim'];
   return priority.find(action => view.actions.includes(action)) ?? null;
+}
+
+export function shareRefreshIsCurrent(started: number, current: number) {
+  return started === current;
+}
+
+export function showShareClaim(view: Pick<ShareDepositView, 'state' | 'claim' | 'landlordOwed'>) {
+  return !!view.claim && (view.state === 'ClaimPending' || view.state === 'ClaimContested' ||
+    view.state === 'Closed' && BigInt(view.landlordOwed) > 0n);
+}
+
+export function showTenantFunding(view: Pick<ShareDepositView, 'role'>) {
+  return view.role === 'tenant';
+}
+
+export function shareFeeBalance(assets: { robinhood: { value?: { ethBalance?: string } } | null }) {
+  // A stale valuation still carries authoritative wallet balances.
+  return assets.robinhood?.value?.ethBalance;
+}
+
+export function shareReceiptPollDelay(errors: number) {
+  return Math.min(5_000 * 2 ** Math.min(errors, 4), 60_000);
 }
 
 /** Only the current wallet's genuinely pending receipt may block its next signature. */

@@ -56,7 +56,6 @@ test('deposit availability does not send a person into a different hosted money 
   assert.equal(rehearsal.destination, undefined, 'local rehearsal must not open a hosted operation');
   const loan = IDEAS.find((idea) => idea.id === 'borrow-against-shares')!;
   assert.equal(loan.availability, 'Available on this site');
-  assert.equal(loan.status, 'prototype', 'testnet availability does not promote build maturity');
 });
 
 test('planned capabilities are information, not unfinished setup destinations', () => {
