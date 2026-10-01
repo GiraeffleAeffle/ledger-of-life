@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: ledger-of-life
     app.kubernetes.io/component: web
 spec:
-  # One replica and Recreate: SQLite lives on a ReadWriteOnce volume, so two pods must never run at once.
+  # One app replica and Recreate: SQLite has one web writer on a ReadWriteOnce volume.
   replicas: 1
   strategy:
     type: Recreate
@@ -37,7 +37,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          # Both workloads use the same digest; rendering refuses an empty or invalid digest.
+          # All workloads use the same digest; rendering refuses an empty or invalid digest.
           image: {{ include "ledger.image" . | quote }}
           imagePullPolicy: IfNotPresent
           ports:

@@ -18,3 +18,22 @@ spec:
   resources:
     requests:
       storage: {{ .Values.storage.size | quote }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ledger-backups
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ledger.helmLabels" . | nindent 4 }}
+    app.kubernetes.io/name: ledger-of-life
+    app.kubernetes.io/component: backup
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.backup.storage.className | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.storage.size | quote }}

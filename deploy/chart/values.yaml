@@ -21,6 +21,17 @@ reconcile:
     limits:
       cpu: 500m
       memory: 192Mi
+backup:
+  storage:
+    className: hcloud-volumes
+    size: 2Gi
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
 ingress:
   clusterIssuer: letsencrypt-prod
   haproxySources:

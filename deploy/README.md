@@ -14,18 +14,19 @@ The app uses the same tool and defaults as the owner's platform: atomic, cleanup
 | `namespace.yaml` | Outside Helm: `restricted` enforce/audit/warn at v1.36. Created before the release and never deleted by uninstall. |
 | `chart/Chart.yaml`, `chart/values.yaml` | Chart identity and defaults: host, digest, storage, resources, ingress and non-secret config. |
 | `chart/templates/configmap.yaml` | Derives `APP_ORIGIN=https://<host>`; `ALLOW_LOCAL_STORE=1`, `LOCAL_AI_LIBRARY_ENABLED=0`. No operator tools, Home Assistant pull or GPU address. |
-| `chart/templates/pvc.yaml` | 2 Gi ReadWriteOnce, `hcloud-volumes`, database at `/data`. `helm.sh/resource-policy: keep` preserves the claim on uninstall. |
+| `chart/templates/pvc.yaml` | Two 2 Gi ReadWriteOnce claims, `hcloud-volumes`: `ledger-data` for `/data` and `ledger-backups` for `/backups`. Both have `helm.sh/resource-policy: keep` for uninstall. |
 | `chart/templates/deployment.yaml` | One replica, Recreate for SQLite. A checksum of the rendered ConfigMap rolls the pod when config changes. Non-root uid/gid 1000, fsGroup 1000, RuntimeDefault, read-only root, drop ALL, no service-account token. Writable data, Next cache and tmp volumes; readiness checks the status JSON's store availability. |
 | `chart/templates/service.yaml` | ClusterIP 4175, unchanged immutable workload selectors. |
 | `chart/templates/ingress.yaml` | HAProxy, letsencrypt-prod, HTTPS redirect, `ledger-of-life-tls`, 120 s server timeout for payout account creation (which can wait about 60 s for Solana confirmations). |
 | `chart/templates/cronjob.yaml` | Reconcile every minute, Forbid concurrency and bounded deadlines, same hardening, in-cluster Service origin. |
+| `chart/templates/backup-cronjob.yaml`, `backup-configmap.yaml`, `chart/files/backup.mjs` | Online SQLite backup every six hours using the app image and a ConfigMap-mounted Node command, verifies integrity before publishing, retains the newest 28 snapshots. Required affinity puts it on the web pod's node for ReadWriteOnce; same restricted hardening, no Secret or network allowances. |
 | `chart/templates/networkpolicy.yaml` | Four policies: default deny, HTTP-01 solver, web and reconcile. HAProxy sources and reconcile can reach the app; DNS and public HTTPS only, excluding private/link-local/CGNAT. |
 | `chart/templates/tests/network-policy-probe.yaml` | Two digest-pinned, restricted Helm test Pods on the web pod's node; created only by `helm test`, not the release. |
 | `values/ledger.stadtstack.eu.yaml` | Public host, the **one** image digest used by workloads and probes, empty atlas URL and public pull-v2 devnet manifest. Rendering refuses an empty/invalid digest or empty host. |
 | `ledger-env.example` | Secret key names and the public devnet RPC fallback; no private values. |
 | `apply.sh` | Five modes, all behind the offline render (digest refusal) and cluster UID guard, with one kube context bound to every kubectl, Helm and helmfile call. `--diff-only` changes nothing. `--namespace` creates only the namespace. `--secret FILE` replaces `ledger-env` from an owner-only file outside every repository, checking keys by name only, then restarts the web Deployment if it exists and waits up to 180 s for readiness. `--network-test` prints deployed hooks, asks for typed confirmation and runs the enforcement probe. The default requires the Secret, shows the diff including test hooks, asks for typed confirmation, applies, waits for rollout and certificate, then prints `storeAvailable` and `persistence`. Works from any cwd. |
 
-Standard Helm labels are metadata only; selectors remain `app.kubernetes.io/name: ledger-of-life` and component `web` or `reconcile`.
+Standard Helm labels are metadata only; workload components are `web`, `reconcile` and `backup`. The backup component matches only the namespace-wide default-deny policy.
 
 ## Conventions copied, and where they were read
 
@@ -50,7 +51,7 @@ Read on 29 Sep 2026 through the read-only Freelens viewer, plus the owner's repo
 2. **Digest.** Paste that digest into `values/ledger.stadtstack.eu.yaml`. The empty default is intentional: neither rendering nor the script can proceed without `sha256:` plus 64 lowercase hex characters.
 3. **Privy.** Not needed any more: the owner added `https://ledger.stadtstack.eu` to the app's own Allowed Origins on 30 Sep, so no app client id is set. Fill the private Secret file outside this repository.
 4. **DNS is DONE.** `ledger` A → `77.42.11.9` was created 30 Sep 2026 and resolves to the public ingress load balancer. No AAAA; the apex address must not be copied. No CAA blocks Let's Encrypt.
-5. **SQLite acceptance.** There is no backup or restore test, and this volume holds account identifiers, selected cities and test tenancy records. The owner's production model is PostgreSQL with backups. Keep this small; do not call it production.
+5. **SQLite acceptance.** Six-hourly snapshots on a second cluster volume protect against database corruption and mistakes, not loss of the whole cluster. There is no off-site copy yet. These include account identifiers, wallet addresses, selected cities and test tenancy records; keep this small and do not call it production.
 
 ## Order
 
@@ -86,7 +87,7 @@ Hosted non-secret config supplies the public pull-v2 devnet manifest from
 ceiling and hosted base placeholders for per-tenancy setup. Test tokens have no real value. `STADTSTACK_ATLAS_URL`
 is explicitly empty: there is no hosted project atlas (it is a local research prototype), so the app should say
 nothing about it, not claim an outage. `SOLANA_TEST_SIGNER_MODE`, `ALLOW_OPERATOR_TEST_ACTIONS`,
-`ALLOW_HOME_ASSISTANT_PULL`, `LOCAL_AI_OLLAMA_URL` and `DEMO_SKIP_RECOVERY` remain unset. ConfigMap changes alter the
+`ALLOW_HOME_ASSISTANT_PULL` and `LOCAL_AI_OLLAMA_URL` remain unset. ConfigMap changes alter the
 web pod template's `checksum/config`, so the next release replaces the pod instead of leaving stale environment values.
 
 ## Dedicated testnet price updater
@@ -125,23 +126,145 @@ print the second hook's old logs from an earlier run.
 - Public `/api/status` reports `storeAvailable: true`, `persistence: local-sqlite`.
 - `/welcome/strausberg` loads without third-party requests. `/` contacts Privy and WalletConnect by design (ADR 0012).
 - `kubectl -n ledger-of-life get jobs` shows completed reconcile jobs about every minute.
+- `kubectl -n ledger-of-life get cronjob ledger-of-life-backup` shows `0 */6 * * *` UTC; inspect backup Job logs after the first scheduled run for `Verified snapshot`. This checkout has only been verified offline, not released.
 - Localhost passkeys cannot be used on this domain (WebAuthn domain scoping).
 
 ## Roll back
 
 - `helm history ledger-of-life -n ledger-of-life`, then `helm rollback ledger-of-life <revision> -n ledger-of-life`. Recreate means a short outage. Also restore the desired digest in the values file before the next helmfile apply. A failed atomic release rolls back automatically; database schema/data changes are not reversed by Helm.
-- `helm uninstall ledger-of-life -n ledger-of-life` removes release resources but **keeps the namespace and PVC**. Inspect retained data and ownership before reinstalling. Namespace/PVC deletion is a separate, explicit decision; the example StorageClass says Retain, so the underlying Hetzner volume may remain billed until removed manually. Remove DNS separately if decommissioning.
+- `helm uninstall ledger-of-life -n ledger-of-life` removes release resources but **keeps the namespace and both PVCs**. Inspect retained data and ownership before reinstalling. Namespace/PVC deletion is a separate, explicit decision; the example StorageClass says Retain, so the underlying Hetzner volumes may remain billed until removed manually. Remove DNS separately if decommissioning.
+
+## SQLite snapshots and restore
+
+`ledger-of-life-backup` runs at 00:00, 06:00, 12:00 and 18:00 UTC. It uses the pinned app image's `node:sqlite` online backup API against `/data/rental.sqlite`, including committed WAL pages while the app writes. A read-only SQLite connection still needs a writable data mount for WAL shared-memory bookkeeping. Required pod affinity schedules the Job on the web pod's node, so both can mount `ledger-data` (ReadWriteOnce). If the web pod is absent or volumes cannot attach, the Job cannot run and its 300-second deadline bounds the attempt. `Forbid`, no retries, one successful and two failed Job histories keep work bounded.
+
+Snapshots live on the separate 2 Gi `hcloud-volumes` claim **`ledger-backups`**, mounted at `/backups`. The chart mounts `chart/files/backup.mjs` through `ledger-backup-script`; no new image or app secrets are needed. Files are `rental-<UTC timestamp>-<uuid>.sqlite`, mode 0600. Before verification/publication, every `local-ai:request:*` record is scrubbed using exactly the app retention fields: `request.prompt = ''`, `request.answer = null`, and `request.purgedAt = <UTC time>`. This applies regardless of age or state, including running/settling requests. The snapshot alone enables `secure_delete`, uses DELETE journal mode and is rebuilt with `VACUUM` so removed text cannot remain in free pages. It then must return `ok` from `PRAGMA integrity_check`; only then is its `.partial` file renamed and older snapshots pruned. The newest **28 successful snapshots** are kept (about seven days at four successes/day; failed runs can make the oldest older). Interrupted partials are removed on the next run; never restore or distribute a partial because it may be incomplete or not yet scrubbed. Size is not compressed or quota-managed: ensure 2 Gi accommodates 28 databases plus one in-progress copy and temporary space for VACUUM, and inspect failed Job logs for capacity or integrity errors. Both PVCs survive Helm uninstall.
+
+Snapshots are sensitive database copies **excluding desk questions and answers**, not anonymised exports. Reviewing `src/server` found account identifiers, public wallet addresses, city and tenancy/listing records, the AI host registry (public keys and invitation hashes), usage counters and signed transaction/payment journals. API credentials, signing private keys and connector private keys are not written by those hosted flows; they stay in runtime secrets or on the connector. **Do not assume every possible database is secret-free:** `src/server/adapters.ts` can store a Home Assistant bearer token when local/explicit opt-in is enabled. The hosted configuration forbids new Home Assistant connections, but restoring old/local records can bring a token back. Published snapshots do not extend AI question/answer retention: the scrub affects the backup copy only, leaving the live desk's existing grace-period behavior unchanged. Usage, ownership, state and payment journals remain recoverable, but a restored desk cannot recover its former question/answer text. Treat both volumes as private and never print record bodies while inspecting them.
+
+This protects against corruption and accidental changes **after a successful snapshot**, not losing the whole cluster or all its volumes. There is **no off-site copy yet**. A restore loses database changes since that snapshot and does not roll back test-chain transactions, Privy accounts or connector state; review pending operations and host pairings after recovery.
+
+### List snapshots (owner's admin session)
+
+The release wrapper only accepts the existing `deploy/apply.sh` modes. It cannot run arbitrary `kubectl exec`, scale, patch or maintenance Pods. **All commands in this section require the owner's separately authorised admin session** on the reviewed cluster, not the release wrapper or the filtered read-only viewer. No cluster changes were made while writing this runbook.
+
+1. Record the ready web pod's node and the deployed image (public values), then create a hardened, network-isolated maintenance Pod on that node. Use it to list the backup PVC; no database content is printed.
+
+   ```bash
+   NS=ledger-of-life
+   NODE=$(kubectl -n "$NS" get pods -l app.kubernetes.io/name=ledger-of-life,app.kubernetes.io/component=web --field-selector=status.phase=Running -o jsonpath='{.items[0].spec.nodeName}')
+   IMAGE=$(kubectl -n "$NS" get deployment ledger-of-life -o jsonpath='{.spec.template.spec.containers[0].image}')
+   test -n "$NODE" && test -n "$IMAGE" || exit 1
+   kubectl -n "$NS" apply -f - <<EOF
+   apiVersion: v1
+   kind: Pod
+   metadata:
+     name: ledger-restore
+     labels:
+       app.kubernetes.io/name: ledger-of-life
+       app.kubernetes.io/component: maintenance
+   spec:
+     nodeName: $NODE
+     restartPolicy: Never
+     automountServiceAccountToken: false
+     enableServiceLinks: false
+     securityContext:
+       runAsNonRoot: true
+       runAsUser: 1000
+       runAsGroup: 1000
+       fsGroup: 1000
+       fsGroupChangePolicy: OnRootMismatch
+       seccompProfile:
+         type: RuntimeDefault
+     containers:
+       - name: restore
+         image: $IMAGE
+         command: ["node", "-e", "setInterval(() => {}, 60000)"]
+         securityContext:
+           allowPrivilegeEscalation: false
+           readOnlyRootFilesystem: true
+           capabilities:
+             drop: ["ALL"]
+         resources:
+           requests: {cpu: 20m, memory: 64Mi}
+           limits: {cpu: 500m, memory: 256Mi}
+         volumeMounts:
+           - {name: data, mountPath: /data}
+           - {name: backups, mountPath: /backups, readOnly: true}
+     volumes:
+       - name: data
+         persistentVolumeClaim: {claimName: ledger-data}
+       - name: backups
+         persistentVolumeClaim: {claimName: ledger-backups}
+   EOF
+   kubectl -n "$NS" wait --for=condition=Ready pod/ledger-restore --timeout=180s
+   kubectl -n "$NS" exec ledger-restore -- node -e 'console.log(require("node:fs").readdirSync("/backups").filter(n => n.endsWith(".sqlite")).sort().join("\n"))'
+   ```
+
+   If only listing, delete `pod/ledger-restore` afterwards. If the web pod is already unavailable, recover its volume attachment node from the owner's storage inventory and deliberately set `NODE` instead; do not start a helper on a second node while a claim is still attached elsewhere.
+
+### Restore (owner's admin session; outage required)
+
+2. Keep the helper from step 1 running. Suspend scheduled backups, inspect active Jobs and wait for any running backup to finish before proceeding. Suspension does not stop an already-started Job; if a failed/stuck Job must be removed, review it and delete that specific Job in the admin session first. Ensure no backup Pod remains Running or Pending.
+
+   ```bash
+   kubectl -n "$NS" patch cronjob ledger-of-life-backup --type=merge -p '{"spec":{"suspend":true}}'
+   kubectl -n "$NS" get jobs,pods -l app.kubernetes.io/component=backup
+   # For each active Job: kubectl -n "$NS" wait --for=condition=complete job/<name> --timeout=330s
+   ```
+
+3. Scale the web Deployment to zero and wait until **all** its Pods terminate. Do not run a release or Secret replacement during this maintenance window.
+
+   ```bash
+   kubectl -n "$NS" scale deployment ledger-of-life --replicas=0
+   kubectl -n "$NS" wait --for=delete pod -l app.kubernetes.io/name=ledger-of-life,app.kubernetes.io/component=web --timeout=180s
+   ```
+
+4. Choose one listed, verified `.sqlite` snapshot (never `.partial`). With the app and backup writers stopped, check it again, copy it over `/data/rental.sqlite`, set 0600 and remove old WAL/shared-memory sidecars. **Do not remove sidecars while the app is running.**
+
+   ```bash
+   SNAPSHOT='rental-<timestamp>-<uuid>.sqlite' # replace with an exact listed name
+   kubectl -n "$NS" exec ledger-restore -- node -e '
+     const fs = require("node:fs"), { DatabaseSync } = require("node:sqlite");
+     const name = process.argv[1];
+     if (!/^rental-[a-zA-Z0-9-]+\.sqlite$/.test(name)) throw Error("Invalid snapshot name");
+     const path = "/backups/" + name, db = new DatabaseSync(path, {readOnly: true});
+     const rows = db.prepare("PRAGMA integrity_check").all();
+     db.close();
+     if (rows.length !== 1 || rows[0].integrity_check !== "ok") throw Error("Invalid snapshot");
+     fs.copyFileSync(path, "/data/rental.sqlite");
+     fs.chmodSync("/data/rental.sqlite", 0o600);
+     for (const suffix of ["-wal", "-shm"]) fs.rmSync("/data/rental.sqlite" + suffix, {force: true});
+     console.log("Snapshot restored; stale WAL and SHM removed");
+   ' "$SNAPSHOT"
+   ```
+
+   If the copy/check fails, leave the web scaled down, inspect the failure and retry with a known-good snapshot; never resume with a partly copied database.
+
+5. Delete the helper before scaling back to one, check store readiness, review restored pending operations/pairings, and resume backups only after recovery is satisfactory.
+
+   ```bash
+   kubectl -n "$NS" delete pod ledger-restore --wait=true
+   kubectl -n "$NS" scale deployment ledger-of-life --replicas=1
+   kubectl -n "$NS" rollout status deployment/ledger-of-life --timeout=180s
+   curl --fail --silent --show-error https://ledger.stadtstack.eu/api/status
+   kubectl -n "$NS" patch cronjob ledger-of-life-backup --type=merge -p '{"spec":{"suspend":false}}'
+   ```
 
 ## Offline verification and limits
 
 The old Kustomize render (11 objects) and Helm render (10 plus the external Namespace) were compared semantically using a test digest: every field matches after removing only standard Helm metadata and the PVC keep annotation. Strict kubeconform Kubernetes 1.36 validation, both Pod Security restricted pod-spec checks, Bash syntax and ShellCheck were run offline. Missing digest rendering refuses deployment. The prior readiness command smoke covered an available store (exit 0), unavailable store (exit 1) and closed port (exit 1); the command is unchanged.
 
-The updated chart renders 10 release objects plus two test Pods (the Namespace is still external). Offline checks
-cover all four rendered Pod specs' restricted hardening, hosted manifest parsing and `solanaConfiguration`
+The current chart renders 13 release objects plus two test Pods (the Namespace is still external). Prior offline checks
+cover the original four rendered Pod specs' restricted hardening, hosted manifest parsing and `solanaConfiguration`
 acceptance without network calls, checksum changes when config changes, probe PASS/FAIL decisions with mock
 transport outcomes, actual `--secret` restart/no-Deployment flows with stub binaries, missing-digest refusal before
 kubectl, wrapper acknowledgement/argument refusal, Bash syntax and ShellCheck. These are not live network tests.
 Kubeconform was not available locally for revalidating the new hooks against Kubernetes 1.36.0.
+
+On 1 October, `helm template` with current hosted values passed; all five rendered workload Pod specs satisfy restricted hardening and the backup matches only default deny. The pinned amd64 app image ran read-only as uid 1000 with capabilities dropped and no network: a real app `LocalStore` WAL database was written continuously while a second container ran the exact rendered backup command. Integrity was `ok`, mode 0600, committed counter 1056 was captured while the writer advanced to 1168. Further smoke checks kept the newest 28 snapshots, cleaned an interrupted partial, preserved an unrelated file, rejected a corrupt source without publishing/pruning and restored the exact snapshot counter after stopping writes. Temporary containers, volume, newly pulled app image and smoke files were removed. Kubeconform is not installed, so this addition was not strictly schema-validated. Actual CronJob scheduling/affinity, Hetzner attachment, live backup and cluster restore remain unverified; nothing was applied to the cluster.
+
+The privacy follow-up ran the updated rendered command against four real `LocalStore` desk records (`completed`, `ready`, `running`, `settling`) while another record was being written. All four snapshot records had empty prompts, null answers and a purge timestamp; their states, usage, ownership and payment journals survived, and integrity remained `ok`. Full-file byte checks found neither synthetic question nor answer marker in the published snapshot, while both markers remained in the live SQLite file and live queries returned unchanged text. The grep tool reported no snapshot matches but also missed known binary live-file matches, so the decisive byte evidence used Node `Buffer.includes` over the entire files. The follow-up container, pulled image and temporary files were removed.
 
 ## Not verified
 
