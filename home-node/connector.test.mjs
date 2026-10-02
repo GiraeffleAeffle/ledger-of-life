@@ -24,7 +24,7 @@ async function temporary(t) {
 }
 async function server(t, handler) {
   const instance = createServer((request, response) => Promise.resolve(handler(request, response)).catch((error) => { response.destroy(error); }));
-  instance.listen(0, 'localhost');
+  instance.listen(0, '127.0.0.1');
   await once(instance, 'listening');
   t.after(() => { instance.closeAllConnections(); return new Promise((done) => instance.close(done)); });
   return `http://localhost:${instance.address().port}`;
