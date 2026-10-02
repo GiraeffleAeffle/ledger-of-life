@@ -6,6 +6,8 @@ _Formerly "Deposit workspace". Package names, repository name and environment ke
 
 **No account needed:** [`/replay`](https://ledger.stadtstack.eu/replay) shows the recorded 1 October 2026 three-account share-deposit tenancy as the seven Home steps with every receipt, plus the loan, stake and paid-answer receipts. Evidence files from that day: [share deposit](docs/evidence/HOSTED_SHARE_DEPOSIT_ROBINHOOD_TESTNET_2026-10-01.json), [loan and local stakes](docs/evidence/HOSTED_LOAN_STAKES_ROBINHOOD_TESTNET_2026-10-01.json), [per-token AI answer](docs/evidence/HOSTED_PER_TOKEN_AI_ANSWER_ROBINHOOD_TESTNET_2026-10-01.json).
 
+**A city story:** [`/story`](https://ledger.stadtstack.eu/story) follows fictional Mara and Jonas in Strausberg through the [growing 2 October evidence](docs/evidence/HOSTED_CITY_STORY_ROBINHOOD_TESTNET_2026-10-02.json), with test-network receipts, app records, fiction, public data and illustrative calculations labelled separately; no account, cookies or wallet SDK, and no real-world value or rights.
+
 Start with [docs/LEDGER_OF_LIFE.md](docs/LEDGER_OF_LIFE.md) for the idea, structure and adapter overview.
 
 **Ledger of Life** keeps a person’s home, deposit, money and places in one real-account workspace. A tenant's eligible deposit earnings can become contributions to a separate personal portfolio. Landlords retain a bounded rental-security workflow; assigned human arbitrators can resolve disputed claims.
@@ -45,9 +47,10 @@ examples have separate markers on the OSM 3D map; real public projects retain so
 example shows its building sketch and a 3D OpenStreetMap view of the fictional house at an illustrative spot; the live
 building panel starts with what a holder can claim, then where the income comes from. On 2 October a paid answer on the
 owner's GPU (payout set to the building) settled 0.0082 tUSDG into the distributor and the sole staker claimed 0.000019
-tUSDG ([evidence](docs/evidence/HOSTED_BUILDING_INCOME_CLAIM_ROBINHOOD_TESTNET_2026-10-02.json)); reinvesting, monthly
-test rent shared with the building (80 % landlord, 20 % building, built, not run live) and solar income are not proven
-live. A third, illustrative Agri-PV calculator (no token, no purchase) uses unverified developer figures and editable
+tUSDG ([evidence](docs/evidence/HOSTED_BUILDING_INCOME_CLAIM_ROBINHOOD_TESTNET_2026-10-02.json)). The same evening a
+recorded two-person story paid a month of test rent with its fixed 20 % building share and an early investor claimed and
+reinvested her share ([/story](https://ledger.stadtstack.eu/story)); solar income is built but not switched on. A third,
+illustrative Agri-PV calculator (no token, no purchase) uses unverified developer figures and editable
 assumptions. All fictional test units: no value, no rights.
 
 The [public deployment manifest](contracts/evm/deployments/local-investments-46630.json) pins the

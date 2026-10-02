@@ -22,7 +22,7 @@ import type { PublicListing } from '@/server/listings';
 import { Today } from './today';
 import { Badge, money } from './workspace-panels';
 import './home-journey.css';
-import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, settlementSplit } from './home-journey-logic';
+import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, recoverExpiredRentReview, settlementSplit } from './home-journey-logic';
 import { operationLabels } from './deposit-activity';
 import { nextStep } from './next-step';
 import { NextStepCard } from './next-step-card';
@@ -600,7 +600,7 @@ function RentTerms({ terms }: { terms: BuildingRentTerms }) {
 type RentStepView = {
   id: string; kind: 'landlord' | 'building'; recipient: string; amountRaw: string;
   state: 'prepared' | 'signed' | 'submitted' | 'confirmed' | 'stopped';
-  request: EvmSigningRequest | null; hash?: `0x${string}`; error: string | null;
+  request: EvmSigningRequest | null; hash?: `0x${string}`; error: string | null; retryable?: boolean;
 };
 type RentPaymentView = {
   id: string; month: string; rentMonthly: string; landlordRaw: string; buildingRaw: string;
@@ -623,6 +623,8 @@ function RentPayments({ agreementId, role, request }: { agreementId: string; rol
   // Keep exact approved bytes through ambiguous submission failures; never approve replacements.
   const [signed, setSigned] = useState<Record<string, `0x${string}`>>({});
   const [review, setReview] = useState<string | null>(null);
+  const acting = useRef(false);
+  const automaticReview = useRef<string | null>(null);
   const path = `/api/rent?agreement=${encodeURIComponent(agreementId)}`;
   const load = useCallback(async () => {
     const result = await request<{ rent: RentView | null }>(path);
@@ -643,72 +645,89 @@ function RentPayments({ agreementId, role, request }: { agreementId: string; rol
     return () => { active = false; clearInterval(timer); };
   }, [path, request, role]);
   async function run(work: () => Promise<void>) {
+    if (acting.current) return;
+    acting.current = true;
     setBusy(true); setError('');
     try { await work(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Rent action failed. Check status before retrying.'); }
-    finally { setBusy(false); }
+    catch (reason) {
+      try {
+        if (await recoverExpiredRentReview(reason, () => { setSigned({}); setReview(null); }, prepareReview)) {
+          setError('Review refreshed. Check it before signing again.');
+        } else setError(reason instanceof Error ? reason.message : 'Rent action failed. Check status before retrying.');
+      } catch (refreshError) { setError(refreshError instanceof Error ? refreshError.message : 'Could not refresh rent review.'); }
+    } finally { acting.current = false; setBusy(false); }
   }
   async function action(action: 'prepare' | 'reconcile' | 'submit', stepId?: string, signedTransaction?: `0x${string}`) {
-    await request('/api/rent', { agreementId, action, stepId, signedTransaction });
-    const updated = await load();
-    if (action === 'prepare') {
-      const previous = rentWorkflow(rent);
-      const resumed = rentWorkflow(updated)?.steps.filter(step => step.state === 'prepared' && !step.hash && previous?.steps.some(old => old.id === step.id && old.state === 'stopped'));
-      if (resumed?.length) setSigned(bytes => {
-        const retained = { ...bytes };
-        for (const step of resumed) delete retained[step.id];
-        return retained;
-      });
-    }
-    return updated;
+    const result = await request<{ rent: RentView | null }>('/api/rent', { agreementId, action, stepId, signedTransaction });
+    setRent(result.rent);
+    return result.rent;
   }
-  if (role === 'arbitrator') return null;
+  async function prepareReview() {
+    const updated = await action('prepare');
+    const step = rentWorkflow(updated)?.steps.find(item => item.state !== 'confirmed');
+    if (step?.state === 'prepared' && !step.hash && step.request) {
+      setSigned(bytes => { const retained = { ...bytes }; delete retained[step.id]; return retained; });
+      setReview(step.id);
+    } else setReview(null);
+  }
   const payment = rentWorkflow(rent);
-  const month = payment?.month ?? rent?.month;
   const currentTransfer = payment?.steps.find(step => step.state !== 'confirmed');
+  const nextReviewId = rent?.role === 'tenant' && rent.active && currentTransfer?.state === 'prepared'
+    && payment?.steps[0]?.state === 'confirmed' && !currentTransfer.hash ? currentTransfer.id : null;
+  useEffect(() => {
+    if (!nextReviewId || automaticReview.current === nextReviewId || review === nextReviewId || acting.current) return;
+    const timer = setTimeout(() => {
+      automaticReview.current = nextReviewId;
+      void run(prepareReview);
+    }, 0);
+    return () => clearTimeout(timer);
+    // Advance only on a newly confirmed first transfer, not every polling refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextReviewId, busy, review]);
+  if (role === 'arbitrator') return null;
+  const month = payment?.month ?? rent?.month;
   return <div className="tenancy-action">
     <span className="eyebrow">MONTHLY RENT · SEPARATE FROM DEPOSIT</span>
     <h3>{role === 'landlord' ? 'Rent received' : 'Pay monthly test rent'}</h3>
     {error && <p className="note" role="alert">{error}</p>}
     {!rent && !error && <p role="status">Loading rent status…</p>}
-    <button type="button" className="button secondary" disabled={busy} onClick={() => void run(async () => { await action('reconcile'); })}>Check rent status / retry</button>
+    <button type="button" className="button secondary" disabled={busy} onClick={() => void run(async () => { if (role === 'landlord') await load(); else await action('reconcile'); })}>Check rent status</button>
     {rent && <>
       <p>{month} · {money(payment?.rentMonthly ?? rent.rentMonthly)} test dollars · Robinhood Chain testnet</p>
       {month !== rent.month && <p role="status">Finish this saved {month} payment before starting rent for {rent.month}. Confirmed transfers will not be paid again.</p>}
-      <p>Landlord: {money(payment?.landlordRaw ?? rent.landlordRaw)} · fictional building&apos;s tHOME stakers: {money(payment?.buildingRaw ?? rent.buildingRaw)} (fixed 20 %, rounded down). Two separate transfers; one confirmed transfer does not mean the month is fully paid.</p>
+      <p>Landlord: {money(payment?.landlordRaw ?? rent.landlordRaw)} · building stakers: {money(payment?.buildingRaw ?? rent.buildingRaw)} (fixed 20 %, rounded down). Both transfers must confirm.</p>
       <p role="status">Month status: {payment?.state ?? 'not paid'}. {!rent.active && 'This tenancy is not active for rent payment.'}</p>
-      <p className="small-copy">This simulates a share of net rental income. In a real building rent goes to the property owner under the lease. Not legal advice. The deposit remains separate and its earnings belong to the tenant; test units have no value or legal rights.</p>
-      {rent.role === 'tenant' && rent.active && (!payment || payment.state === 'stopped') && <button className="button primary" disabled={busy} onClick={() => void run(async () => { await action('prepare'); })}>{payment ? 'Resume rent for' : 'Pay rent for'} {month}</button>}
-      {rent.role === 'tenant' && rent.active && payment?.state !== 'stopped' && currentTransfer?.state === 'prepared' && !currentTransfer.hash && !signed[currentTransfer.id] && <button className="button secondary" disabled={busy} onClick={() => void run(async () => { await action('prepare'); setReview(null); })}>{currentTransfer.request ? 'Refresh unsigned transfer review' : 'Prepare next rent transfer'}</button>}
+      <p className="small-copy">Fictional test rent, no value or legal rights. Real rent goes to the property owner. The deposit and its earnings stay separate. Not legal advice.</p>
+      {rent.role === 'tenant' && rent.active && !payment && <button className="button primary" disabled={busy} onClick={() => void run(prepareReview)}>Pay transfer 1</button>}
       {payment?.error && <p className="note" role="alert">{payment.error}</p>}
       {payment?.steps.map((step, index) => <div key={step.id} style={{ marginTop: 16, overflowWrap: 'anywhere' }}>
         <strong>Transfer {index + 1}: {step.kind === 'landlord' ? 'Landlord' : 'Building distributor'} · {money(step.amountRaw)} test dollars</strong>
         <p className="small-copy">Exact amount: {step.amountRaw} token units · recipient: {step.recipient} · {step.state}</p>
         {step.hash && <a href={`https://explorer.testnet.chain.robinhood.com/tx/${step.hash}`} target="_blank" rel="noopener noreferrer">{step.state === 'confirmed' ? 'Confirmed transfer receipt' : 'Submitted transaction (not yet confirmed)'}</a>}
         {step.error && <p className="note" role="alert">{step.error}</p>}
-        {rent.role === 'tenant' && rent.active && step.state === 'prepared' && step.request && !step.hash && !signed[step.id] && <>
-          <button className="button secondary" disabled={busy} onClick={() => setReview(review === step.id ? null : step.id)}>Review exact transfer {index + 1}</button>
-          {review === step.id && <div className="small-copy">
+        {rent.role === 'tenant' && rent.active && currentTransfer?.id === step.id && ((!step.hash && !signed[step.id] && step.state === 'prepared') || (step.state === 'stopped' && (step.retryable || (!step.hash && !signed[step.id])))) && <>
+          {review !== step.id || !step.request ? <button className="button primary" disabled={busy} onClick={() => void run(prepareReview)}>Pay transfer {index + 1}</button> : <div className="small-copy">
             <p>{step.request.description}</p>
             <p>Chain ID: {step.request.transaction.chainId} · token contract: {step.request.transaction.to} · expires: {step.request.expiresAt}</p>
             <p>Transaction data: {String(step.request.transaction.data ?? '')}</p>
             <button className="button primary" disabled={busy} onClick={() => void run(async () => {
               const current = await load();
               const fresh = rentWorkflow(current)?.steps.find(item => item.id === step.id);
-              if (!current?.active || fresh?.state !== 'prepared' || fresh.hash || !fresh.request) throw new Error('Transfer status changed. Review the current transfer before signing.');
-              if (JSON.stringify(fresh.request) !== JSON.stringify(step.request)) { setReview(null); throw new Error('Transfer request changed. Review the updated exact transfer before signing.'); }
+              if (!current?.active || fresh?.state !== 'prepared' || fresh.hash || !fresh.request) { setReview(null); throw new Error('Transfer status changed. Check rent status.'); }
+              if (JSON.stringify(fresh.request) !== JSON.stringify(step.request)) { setReview(null); throw new Error('Transfer changed. Review it again.'); }
+              if (Date.parse(fresh.request.expiresAt) <= Date.now()) { await prepareReview(); setError('Review refreshed. Check it before signing.'); return; }
               const bytes = await wallet.signEvmTransaction(fresh.request);
               setSigned(previous => ({ ...previous, [step.id]: bytes }));
               setReview(null);
-            })}>Sign transfer {index + 1} (does not submit)</button>
+              await action('submit', step.id, bytes);
+            })}>Sign and send transfer {index + 1}</button>
           </div>}
         </>}
-        {rent.role === 'tenant' && signed[step.id] && (step.state === 'prepared' || step.state === 'signed' || step.state === 'stopped') && <button className="button primary" disabled={busy} onClick={() => void run(async () => {
+        {rent.role === 'tenant' && !step.retryable && (signed[step.id] || step.state === 'signed' || step.state === 'submitted') && step.state !== 'confirmed' && <button className="button primary" disabled={busy} onClick={() => void run(async () => {
           const current = await action('reconcile');
           const fresh = rentWorkflow(current)?.steps.find(item => item.id === step.id);
-          if (fresh && !fresh.hash && fresh.state !== 'confirmed' && fresh.state !== 'submitted') await action('submit', step.id, signed[step.id]);
-        })}>Submit approved transfer {index + 1} / retry same bytes</button>}
-        {rent.role === 'tenant' && step.state === 'signed' && !signed[step.id] && <button className="button secondary" disabled={busy} onClick={() => void run(async () => { await action('reconcile'); })}>Recover stored approval / check submission</button>}
+          if (signed[step.id] && fresh && !fresh.hash && fresh.state !== 'confirmed') await action('submit', step.id, signed[step.id]);
+        })}>Retry the same signed transfer</button>}
       </div>)}
       <details className="tenancy-details"><summary>Rent payment history</summary>
         {rent.history.length === 0 && <p>No rent payment records yet.</p>}

@@ -54,6 +54,7 @@ export function ShareDepositReplay() {
       <h2>Evidence, not a promise</h2><p>{replayFacts.scope}</p>
       <nav aria-label="Recorded evidence sources">{replaySources.map((source) => <a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer">{source.label} ↗</a>)}</nav>
       <p className="small-copy">This is a technical demonstration, not an offer of investments or legal advice. Fictional tHOME units grant no property, income or other legal rights.</p>
+      <p><Link href="/story" prefetch={false}>Two people, one city — a story with receipts</Link></p>
       <Link href="/" prefetch={false}>Back to Ledger of Life</Link>
     </footer>
   </main>;

@@ -3,6 +3,16 @@ import type { PublicListing } from '../server/listings.ts';
 
 export const HOME_STAGES = ['Find', 'Apply', 'Agree', 'Secure', 'Live', 'Move out', 'Paid out'] as const;
 
+/** Expiry rejected before persistence: discard local approval before obtaining a fresh review. */
+export async function recoverExpiredRentReview(
+  reason: unknown, clearApproval: () => void, prepare: () => Promise<void>,
+): Promise<boolean> {
+  if (!(reason instanceof Error) || !('status' in reason) || reason.status !== 409 || !/rent review expired/i.test(reason.message)) return false;
+  clearApproval();
+  await prepare();
+  return true;
+}
+
 /** Cancelled records stay available in Home, but never drive the active path. */
 export function currentHomeTenancy<T extends { stage: string; next: { kind: string } }>(tenancies: readonly T[]): T | undefined {
   const live = tenancies.filter((tenancy) => tenancy.next.kind !== 'cancelled' && tenancy.next.kind !== 'done');

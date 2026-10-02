@@ -35,6 +35,7 @@ docs/evidence/*
 !docs/evidence/HOSTED_SHARE_DEPOSIT_ROBINHOOD_TESTNET_2026-10-01.json
 !docs/evidence/HOSTED_LOAN_STAKES_ROBINHOOD_TESTNET_2026-10-01.json
 !docs/evidence/HOSTED_PER_TOKEN_AI_ANSWER_ROBINHOOD_TESTNET_2026-10-01.json
+!docs/evidence/HOSTED_CITY_STORY_ROBINHOOD_TESTNET_2026-10-02.json
 
 # The public Robinhood Chain testnet deployments the app reads at fixed paths (addresses, code hashes, parameters
 # only): Local stakes and the AI desk's payee, the shared loan market with its price mirror, share deposits and the

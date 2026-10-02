@@ -130,6 +130,6 @@ export function ArrivalGuideView({ guide, feed, now }: { guide: ArrivalGuide; fe
         <p><a href={contact.url} target="_blank" rel="noopener noreferrer">Contact information</a></p><Source source={contact.source} />
       </li>)}</ul> : <p>No verified contacts are listed yet.</p>}
     </section>
-    <footer className="welcome-footer"><button type="button" className="button primary" onClick={() => window.print()}>Print plan and contacts</button><Link href="/">Back to Ledger of Life</Link></footer>
+    <footer className="welcome-footer"><button type="button" className="button primary" onClick={() => window.print()}>Print plan and contacts</button><Link href="/story" prefetch={false}>A city story with receipts</Link><Link href="/">Back to Ledger of Life</Link></footer>
   </main>;
 }

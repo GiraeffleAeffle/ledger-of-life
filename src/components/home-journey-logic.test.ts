@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, settlementSplit } from './home-journey-logic.ts';
+import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, recoverExpiredRentReview, settlementSplit } from './home-journey-logic.ts';
 import type { PublicListing } from '../server/listings.ts';
 
 test('claim respects the full deposit and six-decimal atomic precision', () => {
@@ -96,4 +96,24 @@ test('rejected and closed applications are not presented as waiting for a decisi
   assert.equal(applicationStatusLabel(listing('selected', 'chosen', 'let')), 'Chosen · agreement next');
   const listings = [listing('rejected', 'applicant', 'let'), listing('pending', 'applicant'), listing('recorded', 'chosen', 'let', 'tenancy')];
   assert.deepEqual(homeSituation({ ...homeState, listings, tenancyIds: ['tenancy'] }).applicationListings.map(l => l.id), ['rejected', 'pending']);
+});
+
+test('rent expiry discards stale signed state before preparing a fresh review; ambiguous failures retain bytes', async () => {
+  let signed: string | null = '0x02abcd';
+  let review: string | null = null;
+  const expired = Object.assign(new Error('The rent review expired before signing.'), { status: 409 });
+  assert.equal(await recoverExpiredRentReview(expired, () => { signed = null; }, async () => {
+    assert.equal(signed, null);
+    review = 'fresh exact transfer';
+  }), true);
+  assert.equal(signed, null);
+  assert.equal(review, 'fresh exact transfer');
+  signed = '0x02abcd';
+  for (const reason of [new Error('Network response lost'), Object.assign(new Error('Only identical bytes may be retried.'), { status: 409 })]) {
+    assert.equal(await recoverExpiredRentReview(reason, () => { signed = null; }, async () => { review = 'unexpected'; }), false);
+    assert.equal(signed, '0x02abcd');
+    assert.equal(review, 'fresh exact transfer');
+  }
+  await assert.rejects(recoverExpiredRentReview(expired, () => { signed = null; }, async () => { throw new Error('Refresh unavailable'); }), /Refresh unavailable/);
+  assert.equal(signed, null);
 });

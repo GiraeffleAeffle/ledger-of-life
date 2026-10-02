@@ -22,6 +22,6 @@ export async function authorizedRequest<T>(
   });
   const data = await response.json();
   if (!isCurrent()) throw new Error('Account changed while loading. Please try again.');
-  if (!response.ok) throw Object.assign(new Error(data.error || 'Please try again.'), { code: data.code });
+  if (!response.ok) throw Object.assign(new Error(data.error || 'Please try again.'), { code: data.code, status: response.status });
   return data as T;
 }

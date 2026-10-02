@@ -129,6 +129,28 @@ test('preparation failures stop clearly, reverted transfers refresh only after r
     await assert.rejects(submitRent(store,tenant,value.id,step.id,signed,h.options),/exact wallet, nonce/);
   } finally {await store.close();}
 });
+test('rent review lasts two minutes, rejects exact-boundary expiry before persistence, and refreshes the same step', async () => {
+  const store = new LocalStore(':memory:'), h = harness(), value = agreement();
+  try {
+    await store.create(`agreement:${value.id}`, value);
+    const prepared = (await prepareRent(store, tenant, value.id, h.options))!;
+    const step = prepared.payment!.steps[0], request = step.request!;
+    const start = h.options.now();
+    assert.equal(Date.parse(request.expiresAt) - start, 120_000);
+    const before = { ...h.options, now: () => start + 119_999 };
+    assert.deepEqual((await prepareRent(store, tenant, value.id, before))!.payment!.steps[0].request, request);
+    const expired = { ...h.options, now: () => start + 120_000 };
+    await assert.rejects(submitRent(store, tenant, value.id, step.id, await sign(request), expired), /rent review expired/);
+    assert.equal((await store.get<RentPayment>(`rent-payment:${value.id}:2026-10`))!.steps[0].signed, undefined);
+    assert.equal(h.count(), 0);
+    const refreshed = (await prepareRent(store, tenant, value.id, expired))!.payment!.steps[0];
+    assert.equal(refreshed.id, step.id);
+    assert.equal(Date.parse(refreshed.request!.expiresAt), start + 240_000);
+    const signed = await sign(refreshed.request!);
+    await submitRent(store, tenant, value.id, step.id, signed, expired);
+    assert.equal((await store.get<RentPayment>(`rent-payment:${value.id}:2026-10`))!.steps[0].signed, signed);
+  } finally { await store.close(); }
+});
 test('receipt proof rejects wrong token, recipient, sender, amount, hash and reverted transfers',()=>{
   const payment={tenantWallet:tenantAccount.address,token:manifestJson.payoutToken,steps:[{recipient:landlordAddress,amountRaw:'8000000',hash:`0x${'aa'.repeat(32)}`}]} as RentPayment;
   const step=payment.steps[0],receipt=receiptFor(payment,0);verifyRentReceipt(receipt,payment,step);

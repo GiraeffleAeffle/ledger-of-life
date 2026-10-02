@@ -1,0 +1,241 @@
+{
+  "evidenceStatus": "hosted_city_story_recorded",
+  "evidenceScope": "A two-person city story recorded on https://ledger.stadtstack.eu with fresh passkey test accounts playing fictional people. Recorded steps link real test-network receipts; narrative steps are labelled as fiction; illustrative steps are calculations, not results. Test tokens only; fictional tHOME and tWORK units have no value and no rights. Not an offer, forecast or investment advice.",
+  "site": "https://ledger.stadtstack.eu",
+  "networks": {
+    "robinhood-testnet": { "name": "Robinhood Chain testnet", "chainId": 46630, "explorerTx": "https://explorer.testnet.chain.robinhood.com/tx/" },
+    "solana-devnet": { "name": "Solana devnet", "explorerTx": "https://explorer.solana.com/tx/", "explorerSuffix": "?cluster=devnet" }
+  },
+  "personas": [
+    {
+      "id": "resident",
+      "name": "Mara",
+      "role": "Has lived in Strausberg for years and invested early in the fictional house and workshop",
+      "fictional": true,
+      "account": "0x01f5F627533F2fdE8B199d2bc20C3547E2Ef128a",
+      "note": "A fresh passkey test account created on 2 Oct 2026 to play this fictional person."
+    },
+    {
+      "id": "workshop",
+      "name": "Neighbourhood Works",
+      "role": "A fictional local workshop that installs and repairs building-energy equipment; Mara holds some of its tWORK test units",
+      "fictional": true,
+      "note": "A fictional test issuer, not a real company or employer."
+    },
+    {
+      "id": "newcomer",
+      "name": "Jonas",
+      "role": "Moves to Strausberg for a job at Neighbourhood Works",
+      "fictional": true,
+      "account": "0x2f909013353fC5bc767531bd71CC98BC3826316E",
+      "note": "A fresh passkey test account created on 2 Oct 2026 to play this fictional person."
+    },
+    {
+      "id": "operator",
+      "name": "Neighbourhood Homes",
+      "role": "Operates the fictional house and rents out its flats",
+      "fictional": true,
+      "account": "0xDEAE86b4F44a54A217DA98B70A7c9fAB8Ea851fb",
+      "note": "The landlord test account from the 1 Oct hosted evidence plays this fictional house operator."
+    }
+  ],
+  "steps": [
+    {
+      "id": "resident-invests",
+      "actor": "resident",
+      "kind": "recorded",
+      "title": "Mara invests early in the house and the workshop",
+      "summary": "Mara gets test dollars, buys 50 fictional tHOME units of the Neighbourhood Homes house and stakes them, so they share the building's income. She also buys 20 fictional tWORK units of the Neighbourhood Works workshop.",
+      "startedAtUtc": "2026-10-02T15:25:08Z",
+      "finishedAtUtc": "2026-10-02T16:00:00Z",
+      "facts": [
+        { "label": "Staked in the building", "value": "50 tHOME" },
+        { "label": "Held in the workshop", "value": "20 tWORK" },
+        { "label": "Spent", "value": "70 tUSDG at the fixed test price of 1 tUSDG per unit" }
+      ],
+      "receipts": [
+        { "network": "robinhood-testnet", "hash": "0xdeba521f775c761931947b8d652b84180066554541a993abebe55d42f5572243", "label": "Site sends 0.00005 test ETH for fees" },
+        { "network": "robinhood-testnet", "hash": "0xe1cc5d9ea251d5ae5dbae035a4a2d84d9eb74785d3a7dc33f85596f70b56cf64", "label": "Mara mints 1,000 test dollars (tUSDG)" },
+        { "network": "robinhood-testnet", "hash": "0xe7a4b73b147632586a955d510fe5f90a5730f04813dea10b122753fb60db38e3", "label": "Approve exactly 50 tUSDG for the tHOME desk" },
+        { "network": "robinhood-testnet", "hash": "0xaa17955f4165720e2c4255ba233afe8dff2ae8b63ad7cd0f79fbb7f95c26dd80", "label": "Buy 50 tHOME for 50 tUSDG" },
+        { "network": "robinhood-testnet", "hash": "0xbbe1687cbf46847c1a4d1c45ac229b05b758a76f1383c0f72adc59182a6d640f", "label": "Approve exactly 50 tHOME for the building" },
+        { "network": "robinhood-testnet", "hash": "0xffcc7d6651aedb74c1c3400f2505c74c96d2b0981359272d016d408da7696035", "label": "Stake 50 tHOME in the building" },
+        { "network": "robinhood-testnet", "hash": "0x613dbd4e2b77194b98bb72239e426844f1fccf599a5380a2ffeb6638bad6dac0", "label": "Approve exactly 20 tUSDG for the tWORK desk" },
+        { "network": "robinhood-testnet", "hash": "0x2ed676183b125bd597db0a1a05fd677a585ffc76200dac8b38a4fa510ac76eaf", "label": "Buy 20 tWORK for 20 tUSDG" }
+      ]
+    },
+    {
+      "id": "workshop-hires",
+      "actor": "workshop",
+      "kind": "narrative",
+      "title": "Neighbourhood Works hires Jonas",
+      "summary": "The workshop Mara invested in grows and offers Jonas a job installing heat pumps and solar roofs. This is fiction: no employer, contract or wage exists on any network."
+    },
+    {
+      "id": "newcomer-arrives",
+      "actor": "newcomer",
+      "kind": "recorded",
+      "title": "Jonas creates his account and gets test money",
+      "summary": "Jonas signs up with a passkey. The site sends a little test ETH for network fees, he mints 1,000 test dollars on Robinhood Chain testnet and receives 10,000 site-minted test USDC on Solana devnet for a deposit.",
+      "startedAtUtc": "2026-10-02T16:15:23Z",
+      "finishedAtUtc": "2026-10-02T16:15:40Z",
+      "receipts": [
+        { "network": "robinhood-testnet", "hash": "0xfc343ce6eea2996759dbf4ab037476198aae0ce52473f05c741a6e8de0b13a58", "label": "Site sends 0.00005 test ETH for fees" },
+        { "network": "robinhood-testnet", "hash": "0xc04a757303231153283a00de1833d4b760c5bb369da61ea66800e28e93fe9dae", "label": "Jonas mints 1,000 test dollars (tUSDG)" },
+        { "network": "solana-devnet", "hash": "VA3KVmwBFDAP9wb9Dj5J6ho11VVC9ZhWdPRCQUtjSjG7jNoRWVakQNJ4wDWWp1tXw48cy1jJPRqEwAd38mP3x2X", "label": "Site mints 10,000 test USDC (tUSDC) to Jonas" }
+      ]
+    },
+    {
+      "id": "newcomer-reads-city",
+      "actor": "newcomer",
+      "kind": "public-data",
+      "title": "Jonas reads what is going on in Strausberg",
+      "summary": "Before choosing a flat, Jonas reads the public welcome guide: the first weeks' errands, events and local groups, each linked to its source. Signed in, Places adds council papers and planning projects, what is being built now.",
+      "links": [
+        { "label": "Welcome to Strausberg (no account needed)", "href": "/welcome/strausberg" }
+      ]
+    },
+    {
+      "id": "operator-lists-flat",
+      "actor": "operator",
+      "kind": "app-record",
+      "title": "A flat in the tHOME house is listed",
+      "summary": "Neighbourhood Homes lists a two-room flat in the fictional house. The listing fixes the rent split before anyone applies: 20 % of each month's test rent goes to the house's tHOME stakers, 80 % to the operator.",
+      "facts": [
+        { "label": "Monthly test rent", "value": "650 test dollars (tUSDG): 130 to tHOME stakers, 520 to the operator" },
+        { "label": "Deposit", "value": "1,300 test USDC in a Solana devnet escrow, with simulated 5 % yield paid to the tenant" }
+      ]
+    },
+    {
+      "id": "newcomer-rents",
+      "actor": "newcomer",
+      "kind": "app-record",
+      "title": "Jonas applies and both sides agree the terms",
+      "summary": "Jonas applies under a nickname with a message about his new job. The operator chooses him, a neutral test arbitrator joins for move-out disputes, and both accept the same terms, which bind the deposit and the rent split. The operator then prepares the empty deposit escrow.",
+      "receipts": [
+        { "network": "solana-devnet", "hash": "ipBnUpzbWcSCR7ZQhfykQGbPaZBXemgEe4yj9jQGKXqq589VTL3afjH4v2uwLou4LtE19QoBNcYoqTPSXN68bCs", "label": "Operator prepares the empty deposit escrow" }
+      ]
+    },
+    {
+      "id": "newcomer-joins-stakes",
+      "actor": "newcomer",
+      "kind": "recorded",
+      "title": "Jonas buys into the house he lives in",
+      "summary": "Jonas buys 5 fictional tHOME units and stakes them, so part of the house's income now also reaches him.",
+      "startedAtUtc": "2026-10-02T18:06:34Z",
+      "finishedAtUtc": "2026-10-02T18:13:22Z",
+      "receipts": [
+        { "network": "robinhood-testnet", "hash": "0xe402c47e903ae25c9694528feae21f41cbd6d9ab4c867a9e541ab5eb2e82a49a", "label": "Approve exactly 5 tUSDG for the tHOME desk" },
+        { "network": "robinhood-testnet", "hash": "0x2dff539de8981dc499ffaffa4550c77a72f980277d33e5f7dc0feddc076765e7", "label": "Buy 5 tHOME for 5 tUSDG" },
+        { "network": "robinhood-testnet", "hash": "0x4c5e263c9c58041fa9557ce7dcb2fe130f2567309db764b9339ed328e337d2a9", "label": "Approve exactly 5 tHOME for the building" },
+        { "network": "robinhood-testnet", "hash": "0x994d18ab9d35f92fe5a2b03ce6d379533e335e9c4671dc1fc26c93e4592cf074", "label": "Stake 5 tHOME in the building" }
+      ]
+    },
+    {
+      "id": "newcomer-asks-ai",
+      "actor": "newcomer",
+      "kind": "recorded",
+      "title": "Jonas asks the city's own AI, and the house earns",
+      "summary": "Jonas asks the local AI what a newcomer should do in the first two weeks. A resident's GPU, which pays its earnings to the house, wakes and answers; he pays only for the 65 tokens generated, 0.0065 test dollars, straight into the building.",
+      "startedAtUtc": "2026-10-02T18:17:18Z",
+      "finishedAtUtc": "2026-10-02T18:18:10Z",
+      "facts": [
+        { "label": "Answer", "value": "65 output tokens on the Owner desktop GPU (qwen3.8 27B), about 36 s after queueing" },
+        { "label": "Paid into the building", "value": "0.0065 tUSDG = 65 × 0.0001" }
+      ],
+      "receipts": [
+        { "network": "robinhood-testnet", "hash": "0x0d84f5314ebd3b83ad48301467f9b473eebcac31b01087725be8bbe59fc3790b", "label": "Approve a finite 0.1 tUSDG Permit2 budget" },
+        { "network": "robinhood-testnet", "hash": "0x5f3753940dab45f10de29959db2c0432ed403cbbbd3fa78ea34bdb9e01f7d23b", "label": "x402 per-token settlement: 0.0065 tUSDG to the building" }
+      ]
+    },
+    {
+      "id": "deposit-secured",
+      "actor": "newcomer",
+      "kind": "recorded",
+      "title": "Jonas locks his deposit in the escrow",
+      "summary": "Jonas moves 1,300 test USDC into the Solana devnet escrow with one approval. The deposit stays separate from the rent; the site pays him labelled simulated yield, because deposit earnings belong to the tenant. His first approval did not reach the network; after the 2 Oct fix it expired safely and this second approval landed.",
+      "startedAtUtc": "2026-10-02T18:54:17Z",
+      "facts": [
+        { "label": "Locked", "value": "1,300 tUSDC from Jonas into the escrow" }
+      ],
+      "receipts": [
+        { "network": "solana-devnet", "hash": "5divT1fxYUa5rSEGLMNHvjeESYTwStuRUAhVsgwgBQEBHP1rWSb95aaA797V6HpqjAQYURmjFFGteYJpAyqefbRD", "label": "Jonas funds the deposit escrow" }
+      ]
+    },
+    {
+      "id": "newcomer-pays-rent",
+      "actor": "newcomer",
+      "kind": "recorded",
+      "title": "Jonas pays October's rent, and a fifth goes to the house's owners",
+      "summary": "Jonas pays 650 test dollars of rent as two exact transfers he reviews himself: 520 to the operator and the fixed 20 %, 130, to the house's distributor, where it becomes income for everyone who staked tHOME.",
+      "startedAtUtc": "2026-10-02T19:19:49Z",
+      "finishedAtUtc": "2026-10-02T19:21:05Z",
+      "facts": [
+        { "label": "To the operator", "value": "520 tUSDG" },
+        { "label": "To tHOME stakers", "value": "130 tUSDG (20 %, fixed in the signed terms)" }
+      ],
+      "receipts": [
+        { "network": "robinhood-testnet", "hash": "0x714c1156315c9228d3216da66ef2cbd63113eacb73329f67905c42793d29bdd8", "label": "520 tUSDG rent to the operator" },
+        { "network": "robinhood-testnet", "hash": "0x92ae68b39d5e586c2a37aae5386885d1c41a993446f761c5c0aeaf3fc6770de0", "label": "130 tUSDG rent share to the building" }
+      ]
+    },
+    {
+      "id": "stream-starts",
+      "actor": "newcomer",
+      "kind": "recorded",
+      "title": "The house's new income starts streaming to its owners",
+      "summary": "The building now holds 130.0065 test dollars of new income: the rent share and Jonas's AI answer. Anyone may start the stream; Jonas does. Over the next seven days it flows to the 60 staked tHOME units in proportion: 50 are Mara's, 5 are Jonas's, 5 belong to an earlier evidence account.",
+      "startedAtUtc": "2026-10-02T19:22:11Z",
+      "facts": [
+        { "label": "Streamed over 7 days", "value": "130.0065 tUSDG" },
+        { "label": "Mara's share", "value": "50 of 60 staked tHOME" }
+      ],
+      "receipts": [
+        { "network": "robinhood-testnet", "hash": "0x0e96b9fa837d65082a603e3ab5e88a8ae7f5d9811f58ed776ad6be6a14c4c390", "label": "sync(): start streaming the new income" }
+      ]
+    },
+    {
+      "id": "resident-reinvests",
+      "actor": "resident",
+      "kind": "recorded",
+      "title": "Mara claims her share and puts it back into the house",
+      "summary": "Ten minutes into the stream, Mara's 50 staked units have earned 0.108885 test dollars from Jonas's rent and the GPU's answers. She claims them and reinvests them in one guided workflow, reviewing each of the five transactions herself: claim, approve exactly that cash, buy 0.108885 tHOME at the fixed test price, approve exactly those units, stake them.",
+      "startedAtUtc": "2026-10-02T19:32:18Z",
+      "finishedAtUtc": "2026-10-02T19:34:52Z",
+      "facts": [
+        { "label": "Claimed", "value": "0.108885 tUSDG after about 10 minutes of a 7-day stream" },
+        { "label": "Reinvested", "value": "0.108885 tHOME bought and staked; Mara now stakes 50.108885 tHOME" }
+      ],
+      "receipts": [
+        { "network": "robinhood-testnet", "hash": "0x7fcf907332badfc85699c54547869766a285ed8f407d2b04e06b6df6bc51f1f3", "label": "Claim 0.108885 tUSDG from the building" },
+        { "network": "robinhood-testnet", "hash": "0xfebfc8d72e08ad876e82efb847c576c87661afac1d43e1e6290bd8c957b98f18", "label": "Approve exactly the claimed tUSDG for the desk" },
+        { "network": "robinhood-testnet", "hash": "0xdd25960fb4172a2fb149491812fd823f0a7feb0570d6dc17fe104bc25d159828", "label": "Buy 0.108885 tHOME" },
+        { "network": "robinhood-testnet", "hash": "0x297a485f611e46a1a98c63d02bbb268bcdd73510daec0056081f02014fd57a63", "label": "Approve exactly the bought tHOME for the building" },
+        { "network": "robinhood-testnet", "hash": "0x354c7ca8af2c083417c21a12e09a8e3da35f1dfbd20052e6e7d05c256546bdfd", "label": "Stake the reinvested tHOME" }
+      ]
+    },
+    {
+      "id": "next-project-agri-pv",
+      "actor": "resident",
+      "kind": "illustrative",
+      "title": "What the town could build next: an Agri-PV field",
+      "summary": "The same pattern could reach further. In Röbel/Müritz a developer proposed a 6 MWp Agri-PV field with citizen tickets from €250 (developer's figures, not verified; a proposal, not a decision). The app's calculator shows how a ticket holder's share would combine electricity sold and crops grown under the panels, with every assumption editable. It is a calculation, not a forecast, offer or investment advice, and no token exists.",
+      "facts": [
+        { "label": "Default ticket", "value": "€250" },
+        { "label": "Illustrative net share", "value": "about €15 a year with the calculator's defaults: the developer's production figure, the 1 July 2026 Bundesnetzagentur solar award benchmark (4.79 ct/kWh), an assumed €2,000/ha crop revenue and an assumed 20 % operating cost" }
+      ],
+      "links": [
+        { "label": "Research note on the Röbel/Müritz proposal", "href": "https://github.com/GiraeffleAeffle/ledger-of-life/blob/develop/docs/research/ROEBEL_AGRI_PV_2026-01.md" }
+      ]
+    }
+  ],
+  "outcome": {
+    "title": "What the early investment brought back, in test money",
+    "summary": "Within one evening on test networks, the house Mara invested in housed the newcomer the workshop hired. His rent share and his question to a resident's GPU became the building's income, and Mara claimed her part and put it back into the house. Jonas's deposit stayed separate, earning simulated yield for him. Simulated solar feed-in is built but not yet switched on. Test tokens only: no value, no property or company rights.",
+    "facts": [
+      { "label": "Building income", "value": "130.0147 tUSDG: 130 rent share + 0.0147 from two paid GPU answers" },
+      { "label": "Stakers", "value": "60 tHOME at the start of the stream: Mara 50, Jonas 5, an earlier evidence account 5" },
+      { "label": "Mara's first claim", "value": "0.108885 tUSDG, reinvested as tHOME; the rest streams over seven days" }
+    ]
+  }
+}

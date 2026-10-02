@@ -30,6 +30,8 @@ Each person sees the progress through their current phase and exactly **one** ne
 
 If Journey or Listings cannot be read, Home keeps whatever loaded, names what failed and offers **Retry**; it never says "Find a place to call home" when the tenancy reading failed. After three failed background polls it says updates are paused.
 
+Monthly fictional-building rent is separate from the deposit. The tenant selects **Pay transfer N** to show the exact amount, recipient, token, chain and transaction inline, then **Sign and send transfer N** to approve and submit. Reviews last two minutes. The landlord remainder goes first; once it confirms, the fixed 20% building-share review appears automatically. An expired review rejected with 409 clears unpersisted client approval and prepares a fresh review; it never signs again automatically. Ambiguous submissions retain approved bytes and offer **Retry the same signed transfer**, including persisted approvals after reload. The server persists signed bytes before sending and refuses a second payment for the same Berlin calendar month. Landlords only read rent status and receipts.
+
 While living, tenants and landlords see a visible **Service charges · prototype · simulated figures** summary with prepayment, costs and balance. It is hidden for arbitrators. Its landlord can edit
 the server-stored monthly test prepayment; example annual building costs use m², units and consumption keys,
 and a daily Home Assistant consumption sensor is read when present. Without a consumption sensor, a labeled
