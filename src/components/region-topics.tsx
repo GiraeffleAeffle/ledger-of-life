@@ -68,15 +68,17 @@ export function RegionalComparison({ topic, cityName, compact = false }: {
 
 export function CityRegionTopics({ request, cityId, cityName }: { request: AuthorizedRequest; cityId: string; cityName: string }) {
   const { result, error } = useRegionalTopics(request, cityId);
+  const [showAll, setShowAll] = useState(false);
   if (result?.state !== 'available') return null;
   const topics = result.topics.filter((topic) => externalTopicUrl(topic.furthest.source.url));
   if (!topics.length) return null;
-  return <section className="card places-section city-region-topics" aria-label="In your region" id="regional-comparison" tabIndex={-1}>
+  return <section className="card places-section city-region-topics civic-support" aria-label="In your region" id="regional-topics" tabIndex={-1}>
     <div className="places-heading"><div><span className="eyebrow">REGIONAL PUBLISHED SOURCES · {result.regionName.toUpperCase()}</span><h2>What nearby towns are planning</h2></div></div>
     {error && <p className="small-copy" role="status">{error} Showing last checked topics.</p>}
     <p>Compare each town&apos;s source and stage separately. An agenda does not mean adoption.</p>
-    <div className="regional-topics-list">{topics.map((topic) =>
+    <div className="regional-topics-list">{(showAll ? topics : topics.slice(0, 1)).map((topic) =>
       <RegionalComparison key={topic.id} topic={topic} cityName={cityName} />)}</div>
+    {topics.length > 1 && <button className="text-button" onClick={() => setShowAll(!showAll)}>{showAll ? 'Show fewer topics' : `Show all ${topics.length} topics`}</button>}
     <a href="#personal-map">Explore published locations on the map ↓</a>
   </section>;
 }

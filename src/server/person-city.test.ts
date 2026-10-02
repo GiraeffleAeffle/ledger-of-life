@@ -59,6 +59,29 @@ test('tenant home wins over EU city, explicit choice overrides it, and clearing 
     assert.equal((await personCity(store, identity)).cityId, 'dresden');
     values.set('listing:applied', { ...applied, status: 'closed' });
     assert.equal((await personCity(store, identity)).source, 'identity');
+    // Newer legacy candidates must not mask a usable chosen or applied home.
+    values.set('listing:legacy-chosen', { ...chosen, createdAt: '2026-10-04', details: null });
+    const legacyApplied = { ...applied, details: undefined };
+    values.set('listing:legacy-applied', { ...legacyApplied, createdAt: '2026-10-03' });
+    assert.equal((await personCity(store, identity)).source, 'identity');
+    assert.equal((await personCity(store, identity)).cityId, 'koeln');
+    values.set('listing:applied', applied);
+    assert.equal((await personCity(store, identity)).home?.title, 'Applied home');
+    values.set('listing:chosen', chosen);
+    assert.equal((await personCity(store, identity)).home?.title, 'Chosen home');
+
+    agreement.cancelled = undefined;
+    agreement.parties = { tenant: { subject: identity.subject, wallet: { ...wallet, id: 'stale-wallet' } } };
+    assert.equal((await personCity(store, identity)).home?.title, 'Chosen home');
+    values.set('agreement:missing-wallet', { ...agreement, createdAt: '2026-10-04', parties: { tenant: { subject: identity.subject } } });
+    values.set('agreement:missing-parties', { ...agreement, createdAt: '2026-10-05', parties: null });
+    values.set('agreement:valid', { ...agreement, createdAt: '2026-09-30', property: 'Verified home', home: { city: 'Strausberg' }, parties: { tenant: { subject: identity.subject, wallet } } });
+    assert.equal((await personCity(store, identity)).home?.title, 'Verified home');
+    values.delete('agreement:valid');
+    values.set('listing:chosen', { ...chosen, status: 'closed' });
+    values.set('listing:applied', { ...applied, status: 'closed' });
+    assert.equal((await personCity(store, identity)).cityId, 'koeln');
+    assert.equal((await personCity(store, identity)).source, 'identity');
   } finally {
     globalThis.fetch = original;
     if (originalData === undefined) delete process.env.STADTSTACK_DATA_DIR;

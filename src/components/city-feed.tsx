@@ -55,6 +55,7 @@ export function CityFeedList({ cityId, result, error, onSelectEvent }: {
     : [];
   const now = useEventClock();
   const [showMore, setShowMore] = useState(false);
+  const [showNews, setShowNews] = useState(false);
   const events = items.filter((item) => item.kind === 'event').toSorted((a, b) => {
     const stateA = eventTimeState(a, now);
     const stateB = eventTimeState(b, now);
@@ -77,7 +78,7 @@ export function CityFeedList({ cityId, result, error, onSelectEvent }: {
           : result.state === 'not_available' ? <p>No published press feed for {result.cityName} yet.</p>
             : items.length === 0 ? <p>{unavailablePress ? `No published feed for ${result.cityName}.` : `No dated news or event items in the published feed for ${result.cityName}.`} {unavailablePress?.pageUrl && (unavailablePress.pageUrl.startsWith('https://') || unavailablePress.pageUrl.startsWith('http://')) && <a href={unavailablePress.pageUrl} target="_blank" rel="noopener noreferrer">Open the city&apos;s news page <ArrowUpRight size={14} aria-hidden /></a>}</p>
               : <><div className="city-event-shelf"><strong>{events.length ? `Published events · ${events.length}` : 'No events in this published feed'}</strong>
-                {events.length > 0 && <><FeedItems items={showMore ? events : events.slice(0, 3)} cityId={cityId} now={now} onSelectEvent={onSelectEvent} />{events.length > 3 && <button className="text-button" onClick={() => setShowMore(!showMore)}>{showMore ? 'Show fewer events' : `Show ${events.length - 3} more events`}</button>}</>}
-              </div>{news.length > 0 && <section className="city-feed-more"><h3>City news · {news.length}</h3><FeedItems items={news} cityId={cityId} now={now} /></section>}</>}
+                {events.length > 0 && <><FeedItems items={showMore ? events : events.slice(0, 2)} cityId={cityId} now={now} onSelectEvent={onSelectEvent} />{events.length > 2 && <button type="button" className="text-button" aria-expanded={showMore} onClick={() => setShowMore(!showMore)}>{showMore ? 'Show fewer events' : `Show all ${events.length} events`}</button>}</>}
+              </div>{news.length > 0 && <section className="city-feed-more"><h3>City news · {news.length}</h3><FeedItems items={showNews ? news : news.slice(0, 2)} cityId={cityId} now={now} />{news.length > 2 && <button type="button" className="text-button" aria-expanded={showNews} onClick={() => setShowNews(!showNews)}>{showNews ? 'Show fewer news items' : `Show all ${news.length} news items`}</button>}</section>}</>}
   </section>;
 }

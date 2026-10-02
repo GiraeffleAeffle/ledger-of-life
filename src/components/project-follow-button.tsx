@@ -42,7 +42,6 @@ export function ProjectFollowButton({ request, target, title, cityName, entry, s
       <svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill={entry ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8"><path d="M6 3.5h12v17l-6-4-6 4z" /></svg>
       {pending ? 'Checking sources…' : entry ? 'Following · Unfollow' : 'Follow'}
     </button>
-    <small>Saved in this browser for this account. Nobody is notified; check again after a new published snapshot.</small>
     {error && <small role="alert">{error}</small>}
   </div>;
 }

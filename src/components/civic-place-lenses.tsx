@@ -107,6 +107,10 @@ export function CivicPlaceLenses({ request, accountId, previewRequest, onExplora
     return () => window.removeEventListener(CITY_CHANGED_EVENT, reset);
   }, []);
   const [showInvestments, setShowInvestments] = useState(false);
+  const [showShortlist, setShowShortlist] = useState(false);
+  const [showFollowed, setShowFollowed] = useState(false);
+  const [expandedUpdates, setExpandedUpdates] = useState<string[]>([]);
+  const [showParticipation, setShowParticipation] = useState(false);
   const [lens, setLens] = useState<'map' | 'outcomes' | 'connections'>('map');
   const [mode, setMode] = useState<'observed' | 'scenario'>('observed');
   const [node, setNode] = useState<SystemNodeId>('public');
@@ -230,9 +234,8 @@ export function CivicPlaceLenses({ request, accountId, previewRequest, onExplora
         item.metrics.some((metric) => metric.basis === 'planned' || metric.basis === 'estimate');
       shortlist.push({ target, title: item.title, selectionId: item.id,
         context: `Published research · ${reported ? planned ? 'reported outputs and plans' : 'reported outputs' : 'plans, not measured outcomes'} · sources checked ${formatCityDate(item.checkedAt)}` });
-      if (shortlist.length === 4) break;
     }
-    if (shortlist.length < 4) for (const item of eligibleFeatures) {
+    for (const item of eligibleFeatures) {
       const target = targetForSignal(cityId, item.properties.id);
       const key = targetKey(target);
       if (shown.has(key)) continue;
@@ -241,7 +244,6 @@ export function CivicPlaceLenses({ request, accountId, previewRequest, onExplora
       shortlist.push({ target, title: target.kind === 'case' ? caseForTarget(target)!.title : item.properties.title,
         selectionId: target.id,
         context: `${item.properties.kind.replaceAll('_', ' ')} · ${displayCityText(displayStatus(item))} · source as of ${formatCityDate(item.properties.asOf)} · ${REVIEW_LABELS[item.properties.reviewState]}` });
-      if (shortlist.length === 4) break;
     }
   }
   const selectedTarget: FollowTarget | null = investmentId ? null : selected && caseStudy ? { kind: 'case', cityId, id: caseStudy.id }
@@ -334,22 +336,18 @@ export function CivicPlaceLenses({ request, accountId, previewRequest, onExplora
   }
   const cityName = (result?.state === 'covered' ? result.data.catalogue.name : cityDisplayName) || undefined;
   const consultations = useMemo(() => result?.state === 'covered' ? consultationGroups(eligibleFeatures, cityId, result.data.generatedAt) : null, [result, eligibleFeatures, cityId]);
-  const snapshotDate = result?.state === 'covered' ? result.data.generatedAt.slice(0, 10) : '';
   if (!city && !error) return <section className="card civic-place" aria-busy="true" style={{ minHeight: 410 }}><p>Checking your city…</p></section>;
   if (!cityId && !cityDisplayName) return <section className="civic-look-around" id="city-system" tabIndex={-1} aria-label="Explore a covered city">
     <p>After you choose or preview a city, its council papers, events, projects and map appear here.</p>
   </section>;
-  if (!cityId && cityDisplayName) return <section className="card civic-place" id="city-system" tabIndex={-1}>
-    <h2>{cityDisplayName} is not covered yet</h2>
-    <p>No published city data for your home yet. Preview the nearest covered city without changing yours.</p>
-  </section>;
+  if (!cityId && cityDisplayName) return <section className="civic-look-around" id="city-system" tabIndex={-1}><p>No published map or city feed for {cityDisplayName} yet.</p></section>;
   return <section className="card civic-place" id="city-system" aria-label="City place, outcomes and connections" tabIndex={-1}>
     <div className="civic-heading"><div><span className="eyebrow">PUBLISHED CITY INFORMATION</span><h2>What is changing in {cityName ?? 'your city'}</h2>{explorationCity && <p>Previewing {cityName ?? explorationCity} · your city has not changed.</p>}</div></div>
     {consultations && <section className="civic-open-windows" aria-label="Participation as published">
       <h3>Where can I have a say?</h3><p>Published dates describe the source record, not a guaranteed deadline. Check the source before taking part.</p>
-      {consultations.open.length ? <><strong>Open now · as published</strong><ul>{consultations.open.map((item) => <li key={item.properties.id}><button type="button" className="text-button" onClick={() => choose(item.properties.id)}>{item.properties.title}</button> · end date as published {item.properties.endDate ? formatCityDate(item.properties.endDate) : 'not supplied'}</li>)}</ul></> : <p>Nothing open as of {formatCityDate(result?.state === 'covered' ? result.data.generatedAt : '')}.</p>}
-      {consultations.closed.length > 0 && <><strong>Closed recently · as published</strong><ul>{consultations.closed.map((item) => <li key={item.properties.id}><button type="button" className="text-button" onClick={() => choose(item.properties.id)}>{item.properties.title}</button> · closed {formatCityDate(item.properties.endDate!)}</li>)}</ul></>}
-      {feedResult?.state === 'available' && <><strong>From the published city feed · not comment windows</strong><ul>{feedResult.feed.items.filter((item) => item.kind === 'news' || item.kind === 'event' && item.eventStart && item.eventStart >= snapshotDate).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, 3).map((item) => <li key={item.id}><a href={item.url} target="_blank" rel="noopener noreferrer">{item.title} ↗</a> · {formatCityDate(item.kind === 'event' && item.eventStart ? item.eventStart : item.publishedAt)} · {item.publisher}</li>)}</ul></>}
+      {consultations.open.length ? <><strong>Open now · as published</strong><ul>{(showParticipation ? consultations.open : consultations.open.slice(0, 3)).map((item) => <li key={item.properties.id}><button type="button" className="text-button" onClick={() => choose(item.properties.id)}>{item.properties.title}</button> · end date as published {item.properties.endDate ? formatCityDate(item.properties.endDate) : 'not supplied'}</li>)}</ul></> : <p>Nothing open as of {formatCityDate(result?.state === 'covered' ? result.data.generatedAt : '')}.</p>}
+      {consultations.closed.length > 0 && <><strong>Closed recently · as published</strong><ul>{(showParticipation ? consultations.closed : consultations.closed.slice(0, 3)).map((item) => <li key={item.properties.id}><button type="button" className="text-button" onClick={() => choose(item.properties.id)}>{item.properties.title}</button> · closed {formatCityDate(item.properties.endDate!)}</li>)}</ul></>}
+      {(consultations.open.length > 3 || consultations.closed.length > 3) && <button type="button" className="text-button" aria-expanded={showParticipation} onClick={() => setShowParticipation(!showParticipation)}>{showParticipation ? 'Show fewer participation records' : `Show all ${consultations.open.length + consultations.closed.length} participation records`}</button>}
     </section>}
     <section className="civic-selected-project" id="selected-project" tabIndex={-1} aria-label="Selected project">
     {cityId === 'strausberg' && <div className="civic-story" aria-label="Explore three city stories">
@@ -366,7 +364,7 @@ export function CivicPlaceLenses({ request, accountId, previewRequest, onExplora
         if (profile) selectOrganization(profile.id); else choose(item.properties.id);
       }} events={events} selectedEventId={eventSelection?.cityId === cityId ? eventSelection.id : null} onSelectEvent={(id) => selectEvent(cityId, id)}
       showInvestments={showInvestments && cityId === 'strausberg'} selectedInvestmentId={investmentId} onSelectInvestment={selectInvestment} />
-    <div ref={detailRef} className={`civic-detail${issuer ? ' civic-detail-demo' : ''}`}>
+    {(issuer || organization || eventSelection?.cityId === cityId || selected) && <div ref={detailRef} className={`civic-detail${issuer ? ' civic-detail-demo' : ''}`}>
       {organization ? <OrganizationDetail profile={organization} matchedSignal={Boolean(organizationSignal)} go={go} /> : eventSelection?.cityId === cityId ? selectedEvent ? <>
         <header className="civic-detail-header"><div><span className="eyebrow">PUBLISHED EVENT · {eventTimeState(selectedEvent, eventClock).toUpperCase()}</span><h3>{selectedEvent.title}</h3>
           <p>{selectedEvent.eventStart && !Number.isNaN(Date.parse(selectedEvent.eventStart)) ? formatCityEventDate(selectedEvent.eventStart) : 'Event date unknown'} · {selectedEvent.venue ?? 'Venue not supplied'}</p></div></header>
@@ -403,18 +401,20 @@ export function CivicPlaceLenses({ request, accountId, previewRequest, onExplora
       {following.storageError && <p role="alert">{following.storageError}</p>}
       {!issuer && <Evidence caseStudy={caseStudy} feature={evidenceFeature} />}
       </>}
-    </div>
+    </div>}
     </div>
     {available.length > 0 && <div className="civic-selector"><label>Other published projects &amp; topics <select aria-label="Project or topic" value={selected ?? ''} onChange={(event) => choose(event.target.value)}><option value="">Select a published item</option>{available.map((item) => <option value={item.id} key={item.id}>{item.title}</option>)}{selected && selected !== caseStudy?.id && <option value={selected}>{feature?.properties.title ?? 'Selected public item'}</option>}</select></label><span>{cityName}</span></div>}
     {Object.values(following.store.entries).length > 0 && <section className="civic-followed-list"><h2 id="followed-projects">Followed projects · {Object.values(following.store.entries).length}</h2>
       <p>Saved only in this browser for this account; public city records are fetched to check changes. Research cases without a linked public item track published app evidence, not live document monitoring.</p>
-      <ul>{Object.values(following.store.entries).map((entry) => <li key={targetKey(entry.target)}>
+      <ul>{(showFollowed ? Object.values(following.store.entries) : Object.values(following.store.entries).slice(0, 3)).map((entry) => <li key={targetKey(entry.target)}>
         <button type="button" className="text-button" onClick={() => reviewFollowed(entry.target, entry.pending[0]?.changes)}>{entry.latest.title} · {entry.latest.cityName} {entry.pending.length ? `(${entry.pending.length} unread)` : ''} →</button>
         {following.sources[targetKey(entry.target)] && <small role="status">{following.sources[targetKey(entry.target)]}</small>}
-        {entry.pending.map((update) => <div key={update.sequence}>{update.changes.map((change) => <p key={change.key}><strong>{change.label}</strong>: {change.value} · {change.context} {change.sourceUrl && <a href={change.sourceUrl} target="_blank" rel="noopener noreferrer">Source ↗</a>}</p>)}
+        {(expandedUpdates.includes(targetKey(entry.target)) ? entry.pending : entry.pending.slice(0, 1)).map((update) => <div key={update.sequence}>{update.changes.map((change) => <p key={change.key}><strong>{change.label}</strong>: {change.value} · {change.context} {change.sourceUrl && <a href={change.sourceUrl} target="_blank" rel="noopener noreferrer">Source ↗</a>}</p>)}
           <button type="button" className="text-button" onClick={() => reviewFollowed(entry.target, update.changes)}>Review this update →</button>
           <button type="button" className="text-button" onClick={() => following.acknowledge(entry.target, update.sequence, entry.instance)}>Mark this update read</button></div>)}
+        {entry.pending.length > 1 && <button type="button" className="text-button" aria-expanded={expandedUpdates.includes(targetKey(entry.target))} onClick={() => setExpandedUpdates((keys) => keys.includes(targetKey(entry.target)) ? keys.filter((key) => key !== targetKey(entry.target)) : [...keys, targetKey(entry.target)])}>{expandedUpdates.includes(targetKey(entry.target)) ? 'Show fewer updates' : `Show all ${entry.pending.length} updates`}</button>}
       </li>)}</ul>
+      {Object.values(following.store.entries).length > 3 && <button type="button" className="text-button" aria-expanded={showFollowed} onClick={() => setShowFollowed(!showFollowed)}>{showFollowed ? 'Show fewer followed projects' : `Show all ${Object.values(following.store.entries).length} followed projects`}</button>}
     </section>}
     <div className="civic-tabs" role="group" aria-label="City lenses">{(['map', 'outcomes', 'connections'] as const).map((item) => <button type="button" key={item} aria-pressed={lens === item} onClick={() => { advanceReview(); setLens(item); }}>{item === 'map' ? '⌖ Map context' : item === 'outcomes' ? '▥ Outcomes' : '↝ Connections'}</button>)}</div>
     {lens === 'outcomes' && !issuer && !organization && !eventSelection && <Outcomes caseStudy={caseStudy} feature={evidenceFeature} />}
@@ -425,9 +425,9 @@ export function CivicPlaceLenses({ request, accountId, previewRequest, onExplora
     <CityFeedList cityId={cityId} result={feedResult} error={feedError} onSelectEvent={selectEvent} />
     <section className="civic-project-browser" id="project-browser" tabIndex={-1} aria-labelledby="project-browser-title">
       <h2 id="project-browser-title">Browse more public projects to follow</h2>
-      <p>Exploring {cityName ?? 'a covered city'} · published projects and council papers. Following is a bookmark on this device; nobody is notified.</p>
+      <p className="small-copy">Following saves a bookmark for this account on this device; nobody is notified. Check again after a new published snapshot.</p>
       {following.storageError && <p role="alert">{following.storageError}</p>}
-      {shortlist.length > 0 ? <ul className="civic-project-shortlist">{shortlist.map((item) => <li key={targetKey(item.target)}>
+      {shortlist.length > 0 ? <ul className="civic-project-shortlist">{(showShortlist ? shortlist : shortlist.slice(0, 2)).map((item) => <li key={targetKey(item.target)}>
         <div className="civic-project-description"><strong>{item.title}</strong><small>{item.context}</small></div>
         <div className="civic-project-actions">
           <button type="button" className="civic-view-button" aria-pressed={selectedKey === targetKey(item.target)}
@@ -437,6 +437,7 @@ export function CivicPlaceLenses({ request, accountId, previewRequest, onExplora
             entry={following.store.entries[targetKey(item.target)]} storageError={following.storageError} add={following.add} remove={following.remove} />
         </div>
       </li>)}</ul> : <p className="civic-browser-empty">{result?.state === 'covered' ? <>No public projects are published for {cityName ?? 'this city'} yet.</> : error ? 'Public projects could not be read.' : 'Reading published projects…'}</p>}
+      {shortlist.length > 2 && <button type="button" className="text-button" aria-expanded={showShortlist} onClick={() => setShowShortlist(!showShortlist)}>{showShortlist ? 'Show fewer projects' : `Show all ${shortlist.length} projects`}</button>}
       {cityId !== 'muenster' && <button type="button" className="text-button" onClick={() => { advanceReview(); setExplorationCity('muenster'); setInvestmentId(null); setSelection({ cityId: 'muenster', id: MUNSTER_BUS_TRIAL_ID }); setLens('outcomes'); setMode('observed'); }}>Historical measured example · Münster 2021 →</button>}
       {explorationCity && <button type="button" className="text-button" onClick={() => { advanceReview(); setExplorationCity(''); setInvestmentId(null); setSelection(null); }}>{!selectedCity && !cityDisplayName ? 'Back to choosing a city' : 'Back to my chosen city →'}</button>}
     </section>

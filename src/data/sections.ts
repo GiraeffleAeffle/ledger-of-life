@@ -9,7 +9,7 @@ import type { Area } from '../components/areas';
 export const SECTIONS = {
   'account-settings': 'me', 'identity-eudi': 'me', 'life-timeline': 'me', 'ledger-adapters': 'me',
   'adapter-home-assistant': 'me', 'adapter-validator': 'me',
-  'home-tenancies': 'home', 'home-options': 'home', 'past-tenancies': 'home', 'deposit-options': 'home',
+  'home-tenancies': 'home', 'home-options': 'home', 'past-tenancies': 'home', 'deposit-options': 'home', 'publish-home': 'home',
   'money-holdings': 'money', 'money-shares': 'money', 'money-stakes': 'money', 'money-devices': 'money',
   'money-overview': 'money', 'solana-holding': 'money', 'rental-deposit-holding': 'money', 'official-shares': 'money', 'fake-shares': 'money',
   'share-workflows': 'money', 'local-investments': 'money', 'test-money': 'money',

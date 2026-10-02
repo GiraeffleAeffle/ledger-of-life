@@ -3121,10 +3121,7 @@ dd {
 .today-things { display: grid; grid-template-columns: minmax(150px, .7fr) minmax(0, 1.5fr); gap: 12px 24px; align-items: start; padding: 8px 0 30px; }
 .today-things p { margin: 5px 0; }
 .today-things > .text-button { justify-self: start; }
-.today-money { display: grid; gap: 6px; align-content: start; min-width: 0; color: var(--muted); }
-.today-money .overview-figure { font-size: 1.85rem; line-height: 1.2; color: var(--ink); }
-.today-money .overview-figure span { font-size: .85rem; font-weight: 500; white-space: nowrap; }
-.today-money details p { margin: 8px 0; line-height: 1.5; }
+.today-money { display: inline; color: var(--muted); }
 .home-tenancy-anchor { display: grid; gap: 16px; scroll-margin-top: 20px; }
 .tenancy-card, .past-tenancy, .asset-tile, .share-flow, .city-region-topics, .personal-map-section { scroll-margin-top: 24px; }
 .tenancy-money-links { display: flex; flex-wrap: wrap; gap: 8px 20px; }

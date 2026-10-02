@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GeoJSONSource, GeoJSONSourceSpecification, Map as LibreMap, Marker } from 'maplibre-gl';
 import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
 import type { Coordinate, CityFeature, CityFeedItem, SignalKind } from '../server/city-signals';
-import { interestOptions, matchPersonalRings, PRECISION_LABELS, REVIEW_LABELS, type MatchedSignal } from './personal-map-relevance';
+import { displayStatus, interestOptions, matchPersonalRings, PRECISION_LABELS, REVIEW_LABELS, type MatchedSignal } from './personal-map-relevance';
 import { CITY_CHANGED_EVENT, PINS_CHANGED_EVENT, pinsKey, useCitySignals, type AuthorizedRequest } from './use-city-signals';
 import { parsePins, saveInterests, useInterests, usePersonalPins } from './personal-map-preferences';
 import { TEST_CITY_INVESTMENTS, type TestCityInvestmentId } from '@/data/local-investments';
@@ -41,12 +41,12 @@ function SignalMeta({ feature }: { feature: CityFeature }) {
 }
 
 function Ring({ title, items, empty, open }: { title: string; items: MatchedSignal[]; empty: string; open: (item: MatchedSignal) => void }) {
-  const [shown, setShown] = useState(10);
+  const [showAll, setShowAll] = useState(false);
   return <section className="personal-ring"><h3>{title} <span>{items.length}</span></h3>
-    {items.length ? <><ul>{items.slice(0, shown).map((item) => <li key={item.feature.properties.id}>
-      <button type="button" onClick={() => open(item)}><strong>{displayCityText(item.feature.properties.title)}</strong><span>{displayCityText(item.explanation)}</span></button>
+    {items.length ? <><ul>{(showAll ? items : items.slice(0, 2)).map((item) => <li key={item.feature.properties.id}>
+      <button type="button" onClick={() => open(item)}><strong>{displayCityText(item.feature.properties.title)}</strong><span>{item.distanceMetres === null ? 'Citywide record' : `${Math.round(item.distanceMetres)} m away`} · {displayCityText(displayStatus(item.feature))}</span></button>
       <SignalMeta feature={item.feature} />
-    </li>)}</ul>{items.length > shown && <button type="button" className="secondary-button personal-show-more" onClick={() => setShown((value) => value + 10)}>Show more ({items.length - shown} remaining)</button>}</> : <p>{empty}</p>}
+    </li>)}</ul>{items.length > 2 && <button type="button" className="secondary-button personal-show-more" aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>{showAll ? 'Show fewer' : `Show all ${items.length}`}</button>}</> : <p>{empty}</p>}
   </section>;
 }
 
@@ -356,9 +356,9 @@ export function PersonalMap({ request, accountId, explorationCity = '', selected
       <div className="personal-map-layout"><div><div className="personal-map-canvas" ref={container} aria-label={`Map of ${result.data.catalogue.name}`} />
         <p className="personal-tile-note">Map assets pass through Ledger: OpenFreeMap sees the server’s IP and requested map area, not your IP or saved pin coordinates. © OpenStreetMap contributors / OpenMapTiles / OpenFreeMap.</p>
         <section className="personal-map-options"><h3>Map filters and device pins</h3>
-          <p>Exploring {result.data.catalogue.name} · catalogue generated {date(result.data.generatedAt)} · {signals.length} published items (not a complete city inventory). Since the previous publication: {result.data.changes.added.length} added, {result.data.changes.changed.length} changed, {result.data.changes.removed.length} removed. Changes do not indicate construction progress.</p>
+          <p>{result.data.catalogue.name} · snapshot {date(result.data.generatedAt)} · {signals.length} items, not a complete inventory. Publication changes: +{result.data.changes.added.length} / {result.data.changes.changed.length} changed / −{result.data.changes.removed.length}; not construction progress.</p>
           <fieldset className="personal-interests"><legend>Interests · stored on this device</legend>
-            <p>Used to rank the city lists, never sent to our server.</p>
+            <p>Ranks city lists; never sent to our server.</p>
             <div className="personal-legend">{interestOptions.map((interest) => <label key={interest}><input type="checkbox" checked={interests.includes(interest)} onChange={() => saveInterests(interests.includes(interest) ? interests.filter((item) => item !== interest) : [...interests, interest])} />{interest}</label>)}</div>
           </fieldset>
           <div className="personal-pin-controls">{(['home', 'work'] as const).map((which) => <div key={which}>
@@ -367,7 +367,7 @@ export function PersonalMap({ request, accountId, explorationCity = '', selected
             <button type="button" className="secondary-button" onClick={() => geolocate(which)}>Use browser location for {which}</button>
             {pins[which] && <button type="button" className="secondary-button" onClick={() => savePin(which)}>Remove {which}</button>}
           </div>)}</div>
-          <p className="personal-privacy">Your home defaults to the approximate pin in your tenancy. Device pins override it only on this device; work pins stay on this device.</p>
+          <p className="personal-privacy">Home defaults to your approximate tenancy pin; overrides and work pins stay on this device.</p>
           <div className="personal-legend" aria-label="Map layer filters">{kinds.map(({ id, label, color }) => <label key={id}><input type="checkbox" checked={enabled.includes(id)} onChange={() => setEnabled((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} /><i style={{ background: color }} />{label}</label>)}</div>
         </section>
         {availableCategories.length > 0 && <div className="personal-category-picker" aria-label="Place categories">
@@ -386,7 +386,7 @@ export function PersonalMap({ request, accountId, explorationCity = '', selected
         {pinConfirmation && <p role="status">{pinConfirmation} {pins.home && 'Nearby public items appear in Near my home.'}</p>}
         <p className="personal-corridor">Near home: within 1 km straight-line, not a walking route. Way to work: approximate 400 m corridor around a straight line; no routing or travel-time prediction. Unlocated city items stay in these lists, never invented pins.</p>
         <div className={`personal-rings${pins.home ? '' : ' city-only'}`}>{pins.home && <Ring title="Near my home" items={rings.home} empty="No mapped public items within 1 km." open={openFeature} />}
-          {pins.home && <Ring title="On my way to work" items={rings.commute} empty={pins.work ? 'No mapped public items in the approximate corridor.' : 'Set my work to see the approximate corridor.'} open={openFeature} />}
+          {pins.home && pins.work && <Ring title="On my way to work" items={rings.commute} empty="No mapped public items in the approximate corridor." open={openFeature} />}
           <Ring title="In my city" items={rings.city} empty="No citywide public items or selected place categories here yet." open={openFeature} /></div>
       </section>
     </>}

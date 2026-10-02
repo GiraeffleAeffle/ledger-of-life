@@ -1,7 +1,7 @@
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import type { Store } from './store.ts';
 import type { Listing } from './listings.ts';
-import { agreementRole, type Agreement } from './agreements.ts';
+import type { Agreement } from './agreements.ts';
 import { identityStatus } from './eudi.ts';
 import { readCity, type CityResult } from './city.ts';
 import { homeCityId } from '../components/city-coverage.ts';
@@ -14,15 +14,20 @@ export async function personCity(store: Store, identity: VerifiedIdentity): Prom
   ]);
   // City inference is a record read, not a chain journey: no escrow services are needed.
   const agreement = agreementRows.map((row) => row.value)
-    .filter((item) => !item.cancelled && item.parties.tenant?.subject === identity.subject &&
-      (item.network === 'solana' || item.depositForm?.kind === 'shares') && item.home?.city && agreementRole(item, identity) === 'tenant')
+    .filter((item) => {
+      const tenant = item.parties?.tenant;
+      return !item.cancelled && tenant?.subject === identity.subject && tenant.wallet &&
+        (item.network === 'solana' || item.depositForm?.kind === 'shares') && item.home?.city &&
+        identity.wallets.some((wallet) => wallet.id === tenant.wallet.id &&
+          wallet.address === tenant.wallet.address && wallet.chainType === tenant.wallet.chainType);
+    })
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-  const listings = rows.map((row) => row.value).filter((item) => item.landlord.subject !== identity.subject && item.status !== 'closed')
+  const listings = rows.map((row) => row.value).filter((item) => item.details?.city && item.landlord.subject !== identity.subject && item.status !== 'closed')
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const listing = listings.find((item) => item.applications.some((application) => application.subject === identity.subject && application.id === item.chosenApplicationId))
     ?? listings.find((item) => item.status === 'open' && item.applications.some((application) => application.subject === identity.subject));
   const home = agreement?.home ? { ...agreement.home, title: agreement.property }
-    : listing?.details.city ? { city: listing.details.city, title: listing.title, location: listing.location } : undefined;
+    : listing?.details?.city ? { city: listing.details.city, title: listing.title, location: listing.location } : undefined;
   if (home) {
     let cityId = homeCityId(home.city);
     if (!cityId && home.location) {

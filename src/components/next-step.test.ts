@@ -75,3 +75,11 @@ test('an open landlord listing without applicants links to its existing listing'
   assert.equal(step.action?.target.section, 'listing-published');
   assert.equal(step.choices, undefined);
 });
+
+test('a chosen home with an unreadable linked tenancy remains an unavailable record, not a new agreement', () => {
+  const step = nextStep({ ...none, unavailable: 1, unavailableAgreementIds: ['known-home'], listings: [listing('chosen', 'chosen', 0, 'known-home')] });
+  assert.equal(step.action?.target.area, 'home');
+  assert.equal(step.action?.target.section, undefined);
+  const otherApplication = nextStep({ ...none, unavailable: 1, unavailableAgreementIds: ['known-home'], listings: [listing('chosen', 'chosen', 0, 'known-home'), listing('other', 'applicant')] });
+  assert.equal(otherApplication.action?.target.section, 'listing-other');
+});

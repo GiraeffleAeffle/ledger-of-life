@@ -36,7 +36,7 @@ In navigation order; the Roadmap is reached from the sidebar foot rather than th
 
 | Area | The one question | Operated here | Not operated here (link instead) |
 |---|---|---|---|
-| **Today** | Your next step, and where you are on the path | Nothing. The next step, the stage strip and three status tiles | Every control. Tiles link to the area that owns them |
+| **Today** | Your next step, and where you are on the path | Nothing. The next step, one four-row reference strip and an unread city-update count | Every control. References link to the area that owns them |
 | **Home** | Find a home, agree the deposit, and see what is owed | Listings with approximate OSM pins and public neighbourhood context, application, agreement, deposit, document-free move-in handover, browser-only registration confirmation, service charges, move-out, payouts | Shares, loans, stakes, device readings (Money); full public project exploration (Places), welcome guide and public AI desk (separate public routes) |
 | **Money** | Your test holdings, collateral, loans and recorded activity | Holdings, shared official-stock loans and lender positions, local stakes, devices that earn | The rental itself (Home), connection settings (Me), public projects (Places) |
 | **Places** | Get settled, see what's changing, and find the published ways to take part | Public map, projects, city feed, evidence, following, city choice | Anything with a personal balance. Fictional project markers are illustrations; buying is in Money |
@@ -49,7 +49,7 @@ Money is one page with four tabs (`SectionTabs`). Each has one job and states it
 
 Holdings owns one visible priced breakdown; Today references it with one subtotal line. Only positions the person holds get tiles, and rental operations stay in Home. Funding and purchase controls reuse the holdings reads, which start before tenancy loading finishes. A successful wallet read enables its actions without waiting for other sources; the complete subtotal still waits for the full coherent read. Locked deposits wait for tenancy records, and an unfunded tenant deposit says so instead of showing a landlord explanation. The global test-network explainer is the single no-value notice; transaction reviews retain their specific token, network and rights disclosures.
 
-Me keeps wallet addresses visible with copy buttons, one private timeline including the resolved city and its source, and inline connection setup actions. Device readings stay in Money; GPU hosting follows the ask panel rather than hiding behind another view. Local stakes show the project and, for holders, its building readings without nested tabs.
+Me keeps wallet addresses visible with copy buttons, one private timeline including the resolved city and its source, and inline connection setup actions. Device readings stay in Money; GPU pairing follows the ask panel even before the first host is connected, while operating metrics and the scenario appear only for active hosts. Local stakes show the project and its building readings without nested tabs for holders, including people with remaining earnings or action receipts after unstaking. Roadmap offers the deposit-options link only when Home renders that target; other people open their existing Home instead.
 
 | Section | Jump target | What it is for | Reality |
 |---|---|---|---|
@@ -116,11 +116,11 @@ Worked examples: your own solar panel reads a sensor and produces savings → qu
 
 ## First run
 
-The server renders the requested area's heading and metadata immediately. An area-shaped skeleton reserves the first screen while sign-in and the first home reads settle. Wallet connector readiness and area clicks do not remount the signed-in workspace.
+The server renders area metadata immediately. With a session hint, it also renders the requested area's heading and shaped skeleton while sign-in and first home reads settle. Without a hint, a neutral skeleton has no area heading until sign-in is known, so first-time visitors never see an account page before the door. Wallet connector readiness and area clicks do not remount the signed-in workspace. In-app navigation updates the title and focuses the heading unless a section jump has already focused its destination.
 
 A new person meets these in order, and each says what it is:
 
-1. **The door** (`onboarding.tsx`, progress from `account-setup-state.ts`). Its heading is the thread, followed by public access and passkey/wallet setup. No email or document upload is requested. Until the wallet SDK answers, the URL's area heading and shaped skeleton stay stable; navigation is neutral without a session hint.
+1. **The door** (`onboarding.tsx`, progress from `account-setup-state.ts`). Its heading is the thread, followed by public access and passkey/wallet setup. No email or document upload is requested. Until the wallet SDK answers, a session hint allows the URL's area heading and shaped skeleton; without it, loading stays neutral without an account-area heading.
 2. **Your next step** under Today's heading. A new account starts with a home; a published listing with no applicants links to that listing, not to finding a home.
 3. **One four-row status strip** on Today. Home and Money own their facts and controls; Today keeps short references.
 
@@ -225,4 +225,4 @@ Add or change an adapter by reading the code first, then editing the statements.
 
 - Shell and loading: URL-derived areas/tabs and server metadata, stable account identity across wallet connections and navigation, area-shaped skeletons, neutral signed-out navigation, and one global test-network/reality explainer. Changes to active home or application records invalidate the inferred city for mounted consumers; unchanged polls do not.
 
-- Places and Today share the server-resolved city, source labels and home pin. City feed and signals load in parallel without an empty-city request. One change/preview control lives in the city card; Today is a four-row reference strip and one civic-update link. Primary Places content and scenario controls are visible; source fine print remains a disclosure.
+- Places and Today share the server-resolved city, source labels and home pin. City feed and signals load in parallel without an empty-city request. One change/preview control lives in the city card; Today is a four-row reference strip and one civic-update link. Places owns the since-last-visit list, and only "Mark changes seen" acknowledges it. Primary sections show relevant samples with "Show all" controls, not duplicate blocks or hidden disclosures. Legacy home records are skipped when they cannot supply a verified city; home-change cache invalidation works even while Home is the only mounted area. Source fine print remains a disclosure.

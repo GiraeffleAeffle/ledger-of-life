@@ -177,9 +177,9 @@ export function AssetsOverview({ request, tenancies, tenanciesLoaded = true, sho
   const read: HoldingsRead = { portfolio: portfolioSnapshot, ethBalance: rh?.ethBalance, refresh };
   const localHoldings = stakes?.state === 'ready' ? stakes.assets.filter(asset => asset.holdingRaw !== null && BigInt(asset.holdingRaw) > 0n) : [];
 
-  if (show === 'summary') return <div className="today-money">
-    <span>{complete ? `${usd(total)} test value` : '— test value'} · <button type="button" className="text-button" onClick={() => goToSection(go, 'money', 'money-overview')}>Holdings →</button></span>
-  </div>;
+  if (show === 'summary') return <span className="today-money">
+    {complete ? `${usd(total)} test value` : '— test value'} · <button type="button" className="text-button" onClick={() => goToSection(go, 'money', 'money-overview')}>Holdings →</button>
+  </span>;
   return (
     <HoldingsContext value={read}>
     <section className={`card assets ${show}`} id="money-overview" tabIndex={-1} aria-busy={refreshing}>

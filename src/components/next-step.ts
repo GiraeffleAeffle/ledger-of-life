@@ -38,6 +38,7 @@ export type NextStepFacts = {
   tenancies: readonly Tenancy[];
   /** Tenancies whose reading failed. */
   unavailable: number;
+  unavailableAgreementIds?: readonly string[];
   listings: readonly Listing[];
 };
 
@@ -93,7 +94,8 @@ export function nextStep(facts: NextStepFacts): NextStep {
     detail: waiting.next.detail,
     action: { label: 'View home status', target: tenancy(waiting) },
   };
-  const hasTenancy = (l: Listing) => facts.tenancies.some((t) => t.agreementId === l.agreementId);
+  const hasTenancy = (l: Listing) => facts.tenancies.some((t) => t.agreementId === l.agreementId) ||
+    Boolean(l.agreementId && facts.unavailableAgreementIds?.includes(l.agreementId));
   const chosen = facts.listings.find((l) => l.relation === 'chosen' && l.status !== 'closed' && !hasTenancy(l));
   if (chosen) return {
     title: `The landlord chose you for ${chosen.title}.`,

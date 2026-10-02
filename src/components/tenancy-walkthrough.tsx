@@ -18,7 +18,7 @@ export function DepositIdeas({ go }: { go?: (area: Area) => void }) {
         <div><dt>Share-backed deposit <span className="deposit-availability available">Available on this site</span></dt>
           <dd>The tenant locks official test TSLA worth 150 % of the USD deposit on Robinhood Chain testnet. Settlement is in shares, without a forced sale. Proven here on 1 October with three fresh accounts.
             {' '}<Link href="/replay">See the recorded tenancy — no account needed →</Link>
-            {go && <> <button type="button" className="text-button" onClick={() => goToSection(go, 'home', 'home-options')}>Choose the deposit when publishing →</button></>}</dd></div>
+            {go && <> <button type="button" className="text-button" onClick={() => goToSection(go, 'home', 'publish-home')}>Choose the deposit when publishing →</button></>}</dd></div>
       </dl>
     </section>
   );

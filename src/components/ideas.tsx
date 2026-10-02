@@ -7,7 +7,7 @@ import './capability-map.css';
 import './thread-public.css';
 
 /** Availability is distinct from build maturity and the current health of a service. */
-export function IdeasArea({ go }: { go: (area: Area) => void }) {
+export function IdeasArea({ go, showDepositOptions = false }: { go: (area: Area) => void; showDepositOptions?: boolean }) {
   const [selectedId, setSelectedId] = useState(IDEAS[0].id);
   const detailRef = useRef<HTMLElement>(null);
   const reveal = useRef(false);
@@ -38,6 +38,7 @@ export function IdeasArea({ go }: { go: (area: Area) => void }) {
     if (selected.id === 'local-investments') openLocalInvestment(go, 'demo-neighbourhood-homes');
     else if (selected.id === 'scales') openCivicMap(go);
     else if (selected.id === 'borrow-against-shares') openShareWorkflow(go, 'borrow');
+    else if (destination?.section === 'deposit-options' && !showDepositOptions) go(destination.area);
     else if (destination?.section) goToSection(go, destination.area, destination.section);
     else if (destination) go(destination.area);
   }
@@ -45,16 +46,16 @@ export function IdeasArea({ go }: { go: (area: Area) => void }) {
     <section className="card ideas-catalogue" aria-label="Capabilities by availability">
       <p>Available here means there is a working area, not that every deployment or service is online. Check its current status before acting.</p>
       {AVAILABILITY_LABELS.map((availability) => <section className="ideas-group" key={availability} aria-label={availability}>
-        <h3>{availability}</h3>
+        <h2>{availability}</h2>
         {IDEAS.filter((idea) => idea.availability === availability).map((idea) => <div className={`ideas-row${selected.id === idea.id ? ' selected' : ''}`} key={idea.id}>
           <button className="ideas-choice" type="button" aria-pressed={selected.id === idea.id} aria-controls={selected.id === idea.id ? 'selected-capability' : undefined} onClick={() => select(idea.id)}>
             <strong>{idea.title}</strong><span className={`idea-status ${idea.status.replace(' ', '-')}`}>{STATUS_LABEL[idea.status]}</span>
           </button>
           {selected.id === idea.id && <article ref={detailRef} className="capability-detail" id="selected-capability" tabIndex={-1} aria-live="polite" aria-label="Selected capability">
-            <h2>{selected.title}</h2><p><strong>{selected.availability}</strong> · {STATUS_LABEL[selected.status]}</p>
+            <h3>{selected.title}</h3><p><strong>{selected.availability}</strong> · {STATUS_LABEL[selected.status]}</p>
             <RealityChips levels={selected.availability === 'Planned' ? ['roadmap'] : selected.availability === 'Needs a local setup' ? ['prototype'] : [...new Set(adapters.map((adapter) => adapter.explain.reality))]} />
             <p>{selected.enables}</p><p>{selected.how}</p>
-            {['rental-deposit', 'stock-deposit', 'rental-earnings'].includes(selected.id) && <button type="button" className="text-button" onClick={() => goToSection(go, 'home', 'deposit-options')}>Ways to hold the deposit → Home</button>}
+            {showDepositOptions && ['rental-deposit', 'stock-deposit', 'rental-earnings'].includes(selected.id) && <button type="button" className="text-button" onClick={() => goToSection(go, 'home', 'deposit-options')}>Ways to hold the deposit → Home</button>}
             {selected.needs && <p><strong>What remains:</strong> {selected.needs}</p>}
             <div className="capability-links">
               {destination && selected.availability !== 'Planned' && selected.availability !== 'Needs a local setup' && <button type="button" className="secondary-button" onClick={openCapability}>{`Open ${AREAS.find((area) => area.id === destination.area)?.label}`}</button>}

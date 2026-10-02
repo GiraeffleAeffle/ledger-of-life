@@ -27,7 +27,8 @@
 .housing-listing-heading .button { white-space: nowrap; }
 .housing-page .homes { gap: 20px; padding: clamp(18px, 3vw, 30px); }
 .housing-page .listing-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 18px; }
-.housing-page .listing-card { grid-template-rows: auto 1fr; height: 100%; box-shadow: 0 8px 22px #15263b0a; }
+.housing-page .listing-card { grid-template-rows: auto 1fr; box-shadow: 0 8px 22px #15263b0a; }
+.housing-page .listing-grid .listing-card { height: 100%; }
 .housing-page .listing-photo { aspect-ratio: 16 / 9; }
 .housing-page .listing-photo > svg { color: var(--muted); }
 .housing-page .listing-body { padding: 16px; gap: 12px; }

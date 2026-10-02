@@ -22,10 +22,13 @@ export function Workspace({ initialArea = 'overview', initialTab, sessionHint = 
   const wallet = useRentalWallet();
   const areaRef = useRef(area);
   useEffect(() => {
+    document.title = `${areaLabel(area)} · Ledger of Life`;
     if (areaRef.current !== area) {
       areaRef.current = area;
       setAnnouncement(`${areaLabel(area)} area`);
       requestAnimationFrame(() => {
+        // Section jumps already put focus on the destination in this commit.
+        if (document.getElementById('main')?.contains(document.activeElement)) return;
         const heading = document.querySelector<HTMLElement>('#main .page-heading h1, #main .area-error h1, #main h1');
         if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
       });
@@ -55,14 +58,14 @@ export function Workspace({ initialArea = 'overview', initialTab, sessionHint = 
           <span className="ledger-wordmark">Ledger<br /><strong>of Life</strong></span>
         </button>
         <BrandEndorsement />
-        <nav aria-label="Your account">
-          {!wallet.ready && !sessionHint ? <div className="skeleton-block nav-skeleton" aria-label="Loading navigation" /> : showAccount && PRIMARY.map((item) => (
+        {!signedOut && <nav aria-label="Your account">
+          {!wallet.ready && !sessionHint ? <div className="skeleton-block nav-skeleton" aria-hidden="true" /> : showAccount && PRIMARY.map((item) => (
             <button key={item.id} className={`nav-item ${area === item.id ? 'selected' : ''}`}
               aria-current={area === item.id ? 'page' : undefined} onClick={() => openArea(item.id)}>
               <item.icon size={18} />{item.label}
             </button>
           ))}
-        </nav>
+        </nav>}
         <div className="sidebar-bottom">
           {showAccount && <button type="button" className={`text-button sidebar-roadmap ${area === 'ideas' ? 'selected' : ''}`}
             aria-current={area === 'ideas' ? 'page' : undefined} onClick={() => openArea('ideas')}>Roadmap: what is built, what is next</button>}
@@ -79,15 +82,15 @@ export function Workspace({ initialArea = 'overview', initialTab, sessionHint = 
         </header>
         <main id="main" className="main-content">
           <span className="sr-only" role="status" aria-live="polite">{announcement}</span>
-          <AreaErrorBoundary area={area} goToday={() => openArea('overview')}><InitialTabContext.Provider value={initialTab}><MyHome area={area} go={openArea} /></InitialTabContext.Provider></AreaErrorBoundary>
+          <AreaErrorBoundary area={area} goToday={() => openArea('overview')}><InitialTabContext.Provider value={initialTab}><MyHome area={area} go={openArea} sessionHint={sessionHint} /></InitialTabContext.Provider></AreaErrorBoundary>
         </main>
-        <nav className="mobile-nav" aria-label="Account navigation">
-          {!wallet.ready && !sessionHint ? <div className="skeleton-block nav-skeleton" aria-label="Loading navigation" /> : showAccount && PRIMARY.map((item) => (
+        {!signedOut && <nav className="mobile-nav" aria-label="Account navigation">
+          {!wallet.ready && !sessionHint ? <div className="skeleton-block nav-skeleton" aria-hidden="true" /> : showAccount && PRIMARY.map((item) => (
             <button key={item.id} aria-current={area === item.id ? 'page' : undefined} onClick={() => openArea(item.id)}>
               <item.icon size={19} /><span>{item.label}</span>
             </button>
           ))}
-        </nav>
+        </nav>}
       </div>
     </div>
   );

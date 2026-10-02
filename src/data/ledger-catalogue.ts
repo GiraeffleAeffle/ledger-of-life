@@ -261,7 +261,7 @@ export const LEDGER_ADAPTERS: LedgerAdapter[] = [
   { id: 'robinhood', topic: 'money', name: 'Robinhood Chain shares',
     source: 'Your Robinhood Chain testnet wallet and mirrored mainnet token-price observations', environment: 'Test network · deployment-dependent valuation', maturity: 'built',
     connection: 'robinhood', direction: 'signed', capabilities: ['today-cockpit'],
-    action: { kind: 'area', area: 'money', section: 'official-shares', label: 'Open Robinhood holdings' },
+    action: { kind: 'area', area: 'money', section: 'money-overview', label: 'Open Robinhood holdings' },
     explain: {
       brings: 'See test USD, Robinhood’s official faucet test TSLA and test ETH for fees. No fake stock or operator-priced buying desk.',
       reads: 'Confirmed Robinhood testnet balances and the same Robinhood TSLA token price from Chainlink RHTSLA/USD (mainnet), converted to the test token’s multiplier, used for collateral. Source round/time, copied time, stale status and weekend freshness-window labels are shown; Jupiter TSLAx only cross-checks it.',

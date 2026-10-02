@@ -109,6 +109,7 @@ export function LocalAiHost({ usage, error, service, request, refresh }: {
       {notice && <p className="local-ai-meta" role="status">{notice}</p>}
       {hostError && <p className="local-ai-alert" role="alert">{hostError}</p>}
     </div>
+    {hosts.length > 0 && <>
     <div className="local-ai-section-title"><span className="eyebrow">RECORDED ON THIS APP</span><h3>Useful work, recorded payments.</h3><p>Completed answers and confirmed x402 transfers across all hosts on this app, not your personal earnings or a forecast. Connector usage is reported by the host.</p></div>
     {error && <p className="local-ai-alert" role="alert">Usage unavailable: {error}</p>}
     <div className="local-ai-metrics" aria-label="Recorded app inference usage">
@@ -133,5 +134,6 @@ export function LocalAiHost({ usage, error, service, request, refresh }: {
       </div>
       <details className="local-ai-method"><summary>What the calculation includes</summary><p>Power is a whole-host assumption, not a GPU power measurement. Electricity covers all online hours, including idle time. Hardware is allocated over the entered months. Add hosting, financing, maintenance and transaction costs to other monthly costs; tax is not calculated.</p><p>Observed request time depends on model, prompt length, output and cold starts. The capacity check excludes wallet review, payment settlement and queue overhead. It is an upper-bound compute check, not a prediction of customers or continuous throughput. Free answers use the same node without a payment.</p></details>
     </div>
+    </>}
   </div>;
 }

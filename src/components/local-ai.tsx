@@ -356,6 +356,6 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
       {current && !current.purgedAt && <div className="local-ai-request-id"><span>Request <code>{current.id}</code></span><button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => void run('Reading the saved request', () => readSaved(current.id))}>Refresh saved result</button></div>}
       <p className="local-ai-meta">Only the selected host runs this request. If it is unavailable, this service does not substitute a cloud model or a prepared answer.</p>
     </div>
-    {!publicAccess && connectorMode && service?.hosts?.some((host) => host.own && host.state === 'active') && <section aria-label="Your GPU host"><LocalAiHost usage={usage} error={usageError} service={service} request={(path, body) => api(path, body, undefined, true)} refresh={refresh} /></section>}
+    {!publicAccess && connectorMode && <section aria-label="Your GPU host"><LocalAiHost usage={usage} error={usageError} service={service} request={(path, body) => api(path, body, undefined, true)} refresh={refresh} /></section>}
   </section>;
 }

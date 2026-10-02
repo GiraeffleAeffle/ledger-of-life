@@ -4,9 +4,9 @@ import { selectCouncilRecords, type CouncilRecord } from './civic-decisions';
 import { useEventClock } from './city-feed';
 import { formatCityDate } from './city-coverage';
 
-export function CivicDecisionsPanel({ cityId, result }: { cityId: string; result: SignalResult | null }) {
+export function CivicDecisionsPanel({ cityId, cityName, result }: { cityId: string; cityName: string; result: SignalResult | null }) {
   const now = useEventClock();
-  if (!cityId) return <p>Choose a city to read its published council records.</p>;
+  if (!cityId) return <p>No published council snapshot for {cityName} yet.</p>;
   if (cityId === 'strausberg') return <p>Links only: no working public Strausberg OParl endpoint was confirmed. The district endpoint requires permission; its records are not imported.</p>;
   if (!result) return <p role="status">Reading published council records…</p>;
   if (result.state !== 'covered') return <p>No council snapshot published for this city.</p>;

@@ -152,3 +152,35 @@
 .ledger-overview > li { padding: 14px 18px; border-bottom: 1px solid var(--line); }
 .ledger-overview > li:last-child { border-bottom: 0; }
 .ledger-overview .assets-summary { display: inline; }
+.places-area p { margin-block: 8px; }
+.places-area .city-settled { margin-top: 8px; padding-top: 10px; }
+.places-area .civic-support { padding: 16px; }
+.places-area .regional-topics-list { gap: 10px; margin: 12px 0; }
+.places-area .regional-comparison { padding: 12px; }
+.places-area .regional-comparison h3 { margin-bottom: 8px; }
+.places-area .personal-map-options > h3 { margin: 0; font-size: 1rem; }
+.places-area .personal-map-options > p { font-size: .82rem; }
+.places-area .city-feed-list li { padding: 8px 0; gap: 2px; }
+.places-area .places-groups > p, .places-area .places-groups > button { grid-column: 1 / -1; }
+.places-area .places-groups > section { padding: 10px; border: 1px solid var(--line); border-radius: 9px; }
+.places-area .civic-map-row:not(:has(.civic-detail)) { grid-template-columns: minmax(0, 1fr); }
+.places-area .civic-project-shortlist li { padding-block: 10px; }
+.places-area .civic-project-description { gap: 4px; }
+@media (min-width: 901px) {
+  .places-area .city-feed-card { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .places-area .city-feed-card > .section-heading, .places-area .city-feed-card > p { grid-column: 1 / -1; }
+  .places-area .city-feed-more { border-top: 0; padding-top: 0; }
+  .places-area .regional-topics-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
+  .places-area { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .places-area > * { grid-column: 1 / -1; }
+  .places-area > .places-local-readings, .places-area > .places-community { grid-column: span 1; align-self: start; }
+  .places-area .places-local-readings .places-measures { grid-template-columns: minmax(0, 1fr); }
+}
+.places-area .today-changes { padding: 16px; }
+.places-area .personal-rings { grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); align-items: start; }
+.places-area .personal-ring h3 { font-size: 1rem; margin: 0 0 8px; }
+.places-area .personal-source-meta { margin: 4px 0 0; }
+.places-area .personal-map-canvas { height: min(50vh, 480px); min-height: 410px; }
+@media (max-width: 680px) {
+  .places-area .personal-map-canvas { height: 50vh; min-height: 365px; }
+}

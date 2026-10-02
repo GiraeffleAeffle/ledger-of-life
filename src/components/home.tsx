@@ -22,7 +22,7 @@ import type { PublicListing } from '@/server/listings';
 import { Today } from './today';
 import { Badge, money } from './workspace-panels';
 import './home-journey.css';
-import { claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, settlementSplit } from './home-journey-logic';
+import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, settlementSplit } from './home-journey-logic';
 import { operationLabels } from './deposit-activity';
 import { nextStep } from './next-step';
 import { NextStepCard } from './next-step-card';
@@ -77,14 +77,16 @@ function useAuthorizedRequest(): Request {
     authorizedRequest<T>(path, body, identity, () => latest.current), [identity]);
 }
 
-export function MyHome({ area, go }: { area: Area; go: (area: Area) => void }) {
+export function MyHome({ area, go, sessionHint = false }: { area: Area; go: (area: Area) => void; sessionHint?: boolean }) {
   const wallet = useRentalWallet();
   const step = accountSetupStep({
     ready: wallet.ready, authenticated: wallet.authenticated, subject: wallet.subject, passkeyCount: wallet.passkeyCount,
     wallets: wallet.wallets,
   });
   return <div className={area === 'home' ? 'home housing-page' : 'home'}>
-    {step === 'loading' ? <><AreaSkeleton area={area} /><SigningIn /></>
+    {step === 'loading' ? <>{!wallet.ready && !sessionHint
+      ? <div className="area-skeleton" aria-busy="true"><div className="skeleton-block skeleton-card" /><span className="sr-only" role="status">Loading your workspace…</span></div>
+      : <AreaSkeleton area={area} />}<SigningIn /></>
       : step !== 'done' ? <AccountSetup key={wallet.subject ?? 'signed-out'} step={step} />
       : <SignedInHome key={walletRequestIdentity(wallet)} area={area} go={go} />}
   </div>;
@@ -186,14 +188,17 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
   const current = currentHomeTenancy(ready);
   const otherTenancies = ready.filter((t) => t !== current && t.next.kind !== 'done' && t.next.kind !== 'cancelled');
   const unavailable = (tenancies ?? []).filter((t): t is Unavailable => 'unavailable' in t);
-  const myOpenListing = listings.find((l) => l.relation === 'landlord' && l.status === 'open' && (l.applications?.length ?? 0) > 0);
-  const appliedListing = listings.find((l) => (l.relation === 'chosen' || l.relation === 'applicant') && l.status !== 'closed' && !ready.some((t) => t.agreementId === l.agreementId));
   const [browsing, setBrowsing] = useState(false);
+  if (area !== 'home' && browsing) setBrowsing(false);
   const [showPast, setShowPast] = useState(false);
-  const showBrowser = browsing || (!current && !listings.some((l) => l.relation === 'landlord'));
+  const { reviewListings, applicationListings, showBrowser } = homeSituation({
+    listings, tenancyIds: (tenancies ?? []).map(t => t.agreementId), hasCurrent: Boolean(current),
+    homeKnown: tenancies !== null && !journeyError && unavailable.length === 0, browsing,
+  });
   const step = nextStep({
     loading: (tenancies === null && !journeyError) || (!listingsLoaded && !listingsError),
     invitation: Boolean(invitation), homeError: error, tenancies: ready, unavailable: unavailable.length, listings,
+    unavailableAgreementIds: unavailable.map((item) => item.agreementId),
   });
   const meta = AREAS.find((a) => a.id === area)!;
   const firstReadsPending = (tenancies === null && !journeyError) || (!listingsLoaded && !listingsError);
@@ -222,19 +227,26 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
         <div className="housing-journey">
           {invitation && <JoinInvitation key={invitation} request={request} encoded={invitation} onDone={load} />}
           {(!invitation || current) && <>
-            {myOpenListing && <ApplicantsReview listing={myOpenListing} request={request} reload={load} />}
+            {reviewListings.map(listing => <ApplicantsReview key={listing.id} listing={listing} request={request} reload={load} />)}
             <div id="home-tenancies" tabIndex={-1} className="home-tenancy-anchor" aria-label="Your tenancies">
               {current && <TenancyCard key={current.agreementId} journey={current} request={request} reload={load} go={go} accountId={wallet.subject ?? ''} />}
             </div>
-            {appliedListing && <ApplicationStatus listing={appliedListing} request={request} reload={load} />}
-            {otherTenancies.map((t) => <TenancyCard compact key={t.agreementId} journey={t} request={request} reload={load} go={go} accountId={wallet.subject ?? ''} />)}
+            {applicationListings.map(listing => <ApplicationStatus key={listing.id} listing={listing} request={request} reload={load} />)}
+            {otherTenancies.map((t) => <TenancyCard compact={t.role !== 'tenant'} key={t.agreementId} journey={t} request={request} reload={load} go={go} accountId={wallet.subject ?? ''} />)}
             {unavailable.map((t) => <section className="card" key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}><h2>{t.property}</h2><p className="note">{t.unavailable}</p></section>)}
             {current && !showPast && ready.some(t => t.next.kind === 'done' || t.next.kind === 'cancelled') && <button className="text-button" onClick={() => setShowPast(true)}>Past homes →</button>}
             {(!current || showPast) && ready.some((t) => t.next.kind === 'done' || t.next.kind === 'cancelled') && <section className="card" id="past-tenancies"><h2>Past homes</h2>
-              {ready.filter((t) => t.next.kind === 'done' || t.next.kind === 'cancelled').map((t) => <div key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}><strong>{t.property}</strong><p>{t.next.kind === 'done' ? 'Paid out' : 'Cancelled'} · {t.role}</p>{t.depositForm?.kind === 'shares' ? <><p>Paid out in test TSLA.</p>{t.shareDeposit?.receipts.filter(receipt => receipt.action === 'payout' && receipt.status === 'confirmed').map(receipt => <p key={receipt.planId}><a href={`https://explorer.testnet.chain.robinhood.com/tx/${receipt.transactionHash}`} target="_blank" rel="noopener noreferrer">Confirmed TSLA payout receipt</a></p>)}{t.shareDeposit?.explorerUrl && <a href={t.shareDeposit.explorerUrl} target="_blank" rel="noopener noreferrer">Read share escrow on explorer</a>}</> : <TenancyDetails journey={t} request={request} />}</div>)}
+              {ready.filter((t) => t.next.kind === 'done' || t.next.kind === 'cancelled').map((t) => <div key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}>
+                <strong>{t.property}</strong><p>{t.next.kind === 'done' ? 'Paid out' : 'Cancelled'} · {t.role}{t.cancelled && <> · by {t.cancelled.by} · {new Date(t.cancelled.at).toLocaleString('en-GB')}</>}</p>
+                {t.depositForm?.kind === 'shares' ? <>{t.next.kind === 'done' && <p>Paid out in test TSLA.</p>}{t.shareDeposit?.receipts.filter(receipt => receipt.action === 'payout' && receipt.status === 'confirmed').map(receipt => <p key={receipt.planId}><a href={`https://explorer.testnet.chain.robinhood.com/tx/${receipt.transactionHash}`} target="_blank" rel="noopener noreferrer">Confirmed TSLA payout receipt</a></p>)}{t.shareDeposit?.explorerUrl && <a href={t.shareDeposit.explorerUrl} target="_blank" rel="noopener noreferrer">Read share escrow on explorer</a>}</> : <>
+                  {t.next.kind === 'done' && <p>Tenant received {money(t.chain?.tenantPaidAtomic ?? '0')} test USDC · landlord received {money(t.chain?.landlordPaidAtomic ?? '0')} test USDC.</p>}
+                  {t.role !== 'arbitrator' && t.chain?.depositMint === SOLANA_TEST_USDC_MINT && t.chain.simulatedYield?.since && <DepositYield view={t.chain.simulatedYield} requiredAtomic={t.requiredSecurity} tenant={t.role === 'tenant'} request={request} agreementId={t.agreementId} reload={load} />}
+                  <TenancyDetails journey={t} request={request} />
+                </>}
+              </div>)}
             </section>}
             {showBrowser ? <><ListingBrowser listings={listings} request={request} reload={load} loaded={listingsLoaded} loadError={listingsError} testTools={helpers === true} /><DepositIdeas go={go} /></> : <button id="home-options" className="text-button" onClick={() => setBrowsing(true)}>Looking for another home? Browse homes →</button>}
-            <PublishHome listings={listings} request={request} reload={load} go={go} tenancyIds={new Set(ready.map((t) => t.agreementId))} />
+            <PublishHome listings={listings} request={request} reload={load} go={go} tenancyIds={new Set((tenancies ?? []).map((t) => t.agreementId))} />
             {helpers && helper && <TestTools tenancies={ready} listings={listings} request={request} helper={helper} busy={helperBusy} log={helperLog} />}
           </>}
         </div>
@@ -244,7 +256,7 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
 
       {area === 'places' && <PlacesArea request={request} accountId={wallet.subject ?? ''} go={go} />}
 
-      {area === 'ideas' && <IdeasArea go={go} />}
+      {area === 'ideas' && <IdeasArea go={go} showDepositOptions={showBrowser} />}
       </div>
     </>
   );
@@ -522,7 +534,7 @@ function TenancyCard({ journey, request, reload, go, accountId, compact = false 
         <p><strong>Landlord prepares</strong> · {journey.stage === 'deposit' ? 'Empty escrow ready.' : 'Create the empty escrow. No deposit is locked yet.'}</p>
         <p><strong>Tenant funds</strong> · Secure {money(journey.requiredSecurity)} test USDC after the escrow is ready.</p>
       </div>}
-      {journey.role !== 'arbitrator' && living && cashOnly && chain?.simulatedYield && <DepositYield view={chain.simulatedYield} requiredAtomic={journey.requiredSecurity} tenant={journey.role === 'tenant'} request={request} agreementId={agreementId} reload={reload} />}
+      {journey.role !== 'arbitrator' && cashOnly && chain?.simulatedYield?.since && <DepositYield view={chain.simulatedYield} requiredAtomic={journey.requiredSecurity} tenant={journey.role === 'tenant'} request={request} agreementId={agreementId} reload={reload} />}
       {journey.cancellable && (journey.role === 'landlord' || journey.role === 'tenant') && <button type="button" className="button secondary" disabled={busy} onClick={() => {
         if (window.confirm('No deposit is locked, so nothing moves. The tenancy and its listing close for all three of you. You can list the home again; a new tenancy uses test USDC (tUSDC).')) {
           void run(async () => { await request(`/api/agreements/${encodeURIComponent(agreementId)}`, { action: 'cancel' }); });
@@ -776,7 +788,7 @@ function ApplicationStatus({ listing, request, reload }: { listing: PublicListin
     finally { setBusy(false); }
   }
   return <section className="card" id={`listing-${listing.id}`} tabIndex={-1}><h2>{listing.title}</h2>
-    <p>{listing.relation === 'chosen' ? 'Chosen · agreement next' : 'Application sent · the landlord decides. The app sends no notification; tell them yourself.'}</p>
+    <p>{applicationStatusLabel(listing)}</p>
     {listing.relation === 'applicant' && listing.status === 'open' && <button className="button secondary" disabled={busy} onClick={() => void withdraw()}>Withdraw application</button>}
     {error && <p className="note" role="alert">{error}</p>}
   </section>;
@@ -832,7 +844,7 @@ function PublishHome({ listings, request, reload, go, tenancyIds }: {
   } });
   const mine = listings.filter((l) => l.relation === 'landlord' && !(l.agreementId && tenancyIds.has(l.agreementId)) && !(l.status === 'open' && (l.applications?.length ?? 0) > 0));
   return (
-    <section className="card homes">
+    <section className="card homes" id="publish-home" tabIndex={-1} onFocus={event => { if (event.target === event.currentTarget) setPosting(true); }}>
       <div className="housing-listing-heading">
         <button type="button" className="button secondary" aria-expanded={posting} onClick={() => setPosting(!posting)}><Plus size={15} /> {listings.some(l => l.relation === 'landlord') ? 'Rent out another home' : 'Rent out a home'}</button>
       </div>

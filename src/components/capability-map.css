@@ -13,7 +13,7 @@
 .capability-stage button { display: grid; justify-items: start; gap: 5px; min-width: 0; width: 100%; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: white; color: inherit; text-align: left; cursor: pointer; font-size: .8rem; }
 .capability-stage button[aria-pressed=true] { border-color: var(--ink); outline: 2px solid var(--focus); outline-offset: 1px; }
 .capability-stage .idea-status { font-size: .63rem; }
-.capability-detail h2 { margin: 0; font-size: 1.25rem; }
+.capability-detail h3 { margin: 0; font-size: 1.25rem; }
 .capability-detail > p { margin: 8px 0; }
 .capability-detail details { border-top: 1px solid var(--line); padding: 9px 0; font-size: .89rem; }
 .capability-detail summary { cursor: pointer; font-weight: 600; }

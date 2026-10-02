@@ -2,14 +2,21 @@
 import { useEffect, useState } from 'react';
 import type { CityResult } from '../server/city';
 import type { SignalResult } from '../server/city-signals';
-export { pinsKey } from './personal-map-storage';
+export { pinsKey } from './personal-map-storage.ts';
 
 export type AuthorizedRequest = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 export const CITY_CHANGED_EVENT = 'ledger-personal-map-city-changed';
 export const PINS_CHANGED_EVENT = 'ledger-personal-map-pins-changed';
 let cityReads = new WeakMap<AuthorizedRequest, Promise<CityResult>>();
 let signalReads = new WeakMap<AuthorizedRequest, Map<string, Promise<SignalResult>>>();
-let lastChange: Event | undefined;
+// Home can change the city while no city hook is mounted. Invalidation belongs
+// to the client session; hook listeners only request a rerender.
+if (typeof window !== 'undefined') {
+  window.addEventListener(CITY_CHANGED_EVENT, () => {
+    cityReads = new WeakMap();
+    signalReads = new WeakMap();
+  });
+}
 export function readPersonCity(request: AuthorizedRequest): Promise<CityResult> {
   let pending = cityReads.get(request);
   if (!pending) {
@@ -29,10 +36,7 @@ export function useCitySignals(request: AuthorizedRequest, explorationCity?: str
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   useEffect(() => {
-    const update = (event: Event) => {
-      if (lastChange !== event) { lastChange = event; cityReads = new WeakMap(); signalReads = new WeakMap(); }
-      setRevision((value) => value + 1);
-    };
+    const update = () => setRevision((value) => value + 1);
     window.addEventListener(CITY_CHANGED_EVENT, update);
     return () => window.removeEventListener(CITY_CHANGED_EVENT, update);
   }, []);

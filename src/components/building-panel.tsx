@@ -92,7 +92,7 @@ export function BuildingPanel({ request, walletHolder = false }: { request: Auth
     });
   }
   const heat = building ? estimateBuildingHeat({ tokens: building.gpuTokensServed, measuredWhPerToken: building.heat?.measuredWhPerToken, runtimeMs: building.heat?.runtimeSeconds == null ? null : building.heat.runtimeSeconds * 1000, nominalWatts: building.heat?.nominalPowerWatts }) : null;
-  const holder = walletHolder || Boolean(position?.stakedRaw && BigInt(position.stakedRaw) > 0n);
+  const holder = walletHolder || Boolean(position && [position.stakedRaw, position.earnedRaw].some(raw => raw != null && BigInt(raw) > 0n)) || receipts.length > 0 || Boolean(submitted || plan);
   if (!holder) return null;
   return <div className="city-flywheel building-panel" style={{ overflowWrap: 'anywhere' }}>
     <span className="eyebrow">tHOME</span><h3>Live building</h3>

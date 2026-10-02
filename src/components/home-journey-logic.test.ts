@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, settlementSplit } from './home-journey-logic.ts';
+import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, settlementSplit } from './home-journey-logic.ts';
+import type { PublicListing } from '../server/listings.ts';
 
 test('claim respects the full deposit and six-decimal atomic precision', () => {
   assert.equal(claimAmount('0,50', '1000001'), '500000');
@@ -59,4 +60,40 @@ test('cancelled tenancies never drive Home or Today while another tenancy is liv
   assert.equal(currentHomeTenancy([cancelled, living]), living);
   assert.equal(currentHomeTenancy([cancelled, living, accepting]), accepting);
   assert.equal(currentHomeTenancy([{ stage: 'paid', next: { kind: 'done' } }, cancelled]), undefined);
+});
+
+const listing = (id: string, relation: PublicListing['relation'], status: PublicListing['status'] = 'open', agreementId: string | null = null) => ({
+  id, relation, status, agreementId, applications: [{ id: `${id}-application`, name: 'Applicant', message: '', at: '2026-10-02T00:00:00Z' }],
+});
+const homeState = { tenancyIds: [], hasCurrent: false, homeKnown: true, browsing: false };
+
+test('each open application and landlord review remains reachable alongside other listings', () => {
+  const listings = [listing('offer', null), listing('application-1', 'applicant'), listing('application-2', 'applicant'), listing('review-1', 'landlord'), listing('review-2', 'landlord')];
+  const result = homeSituation({ ...homeState, listings });
+  assert.deepEqual(result.applicationListings.map(l => l.id), ['application-1', 'application-2']);
+  assert.deepEqual(result.reviewListings.map(l => l.id), ['review-1', 'review-2']);
+  assert.equal(result.showBrowser, false);
+});
+
+test('unreadable home state never becomes a newcomer or duplicates its chosen listing', () => {
+  const listings = [listing('own-home', 'chosen', 'let', 'unavailable-home'), listing('other-home', null)];
+  const unknown = homeSituation({ ...homeState, listings, tenancyIds: ['unavailable-home'], homeKnown: false, browsing: true });
+  assert.equal(unknown.showBrowser, false);
+  assert.deepEqual(unknown.applicationListings, []);
+  assert.equal(homeSituation({ ...homeState, listings: [], homeKnown: false }).showBrowser, false);
+  assert.equal(homeSituation({ ...homeState, listings: [listing('offer', null)] }).showBrowser, true);
+});
+
+test('a current home hides offers until an explicit browser request', () => {
+  const state = { ...homeState, listings: [listing('offer', null)], hasCurrent: true };
+  assert.equal(homeSituation(state).showBrowser, false);
+  assert.equal(homeSituation({ ...state, browsing: true }).showBrowser, true);
+});
+
+test('rejected and closed applications are not presented as waiting for a decision', () => {
+  assert.equal(applicationStatusLabel(listing('rejected', 'applicant', 'let')), 'Not chosen');
+  assert.equal(applicationStatusLabel(listing('closed', 'applicant', 'closed')), 'Listing closed');
+  assert.equal(applicationStatusLabel(listing('selected', 'chosen', 'let')), 'Chosen · agreement next');
+  const listings = [listing('rejected', 'applicant', 'let'), listing('pending', 'applicant'), listing('recorded', 'chosen', 'let', 'tenancy')];
+  assert.deepEqual(homeSituation({ ...homeState, listings, tenancyIds: ['tenancy'] }).applicationListings.map(l => l.id), ['rejected', 'pending']);
 });

@@ -12,6 +12,24 @@ export function currentHomeTenancy<T extends { stage: string; next: { kind: stri
     ?? live[0];
 }
 
+/** A failed home read is unknown, never evidence that someone needs to find a home. */
+export function homeSituation<L extends Pick<PublicListing, 'relation' | 'status' | 'agreementId' | 'applications'>>({
+  listings, tenancyIds, hasCurrent, homeKnown, browsing,
+}: { listings: readonly L[]; tenancyIds: readonly string[]; hasCurrent: boolean; homeKnown: boolean; browsing: boolean }) {
+  return {
+    reviewListings: listings.filter(l => l.relation === 'landlord' && l.status === 'open' && (l.applications?.length ?? 0) > 0),
+    applicationListings: listings.filter(l => (l.relation === 'chosen' || l.relation === 'applicant') && !(l.agreementId && tenancyIds.includes(l.agreementId))),
+    showBrowser: homeKnown && (browsing || (!hasCurrent && !listings.some(l => l.relation === 'landlord'))),
+  };
+}
+
+export function applicationStatusLabel(listing: Pick<PublicListing, 'relation' | 'status'>): string {
+  if (listing.status === 'closed') return 'Listing closed';
+  if (listing.relation === 'chosen') return 'Chosen · agreement next';
+  if (listing.status === 'let') return 'Not chosen';
+  return 'Application sent · the landlord decides. The app sends no notification; tell them yourself.';
+}
+
 /** Person-facing progress only; never advances a pending chain operation. */
 export function homeStage(stage?: JourneyStage, listing?: Pick<PublicListing, 'relation' | 'status'>): number {
   if (stage) return { agreement: 2, space: 3, deposit: 3, living: 4, 'move-out': 5, paid: 6 }[stage];

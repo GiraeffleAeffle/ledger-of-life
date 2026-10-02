@@ -77,7 +77,7 @@ export function CityCard({ request, onCityChange, onPreviewCity, previewCity, fa
     {cities.length > 0 && <p className="small-copy">{cities.length} covered cities · published coverage {formatCityDate(snapshot)}. Refreshed only when the collector runs; coverage is incomplete.</p>}
   </form>;
   return <section className="card city-card" id="city-choice" tabIndex={-1}>
-    {fallbackSectionIds?.map((id) => <span key={id} id={id} className="city-section-anchor" tabIndex={-1} aria-label="Choose your city" />)}
+    {fallbackSectionIds?.map((id) => <span key={id} id={id} className="city-section-anchor" tabIndex={-1} aria-label="Your city" />)}
     <header><Building2 size={18} /> <strong>{city?.name ? `Your city · ${city.name}` : city ? 'Choose your city' : 'Your city'}</strong>
       {city?.name && <span className="city-source">{citySourceLabel(city.source)}</span>}
     </header>
@@ -92,12 +92,12 @@ export function CityCard({ request, onCityChange, onPreviewCity, previewCity, fa
       catch (cause) { setError(cause instanceof Error ? cause.message : 'Your home city could not be restored.'); }
       finally { setBusy(false); }
     }}>Use my home city</button>}
-    {(changing || (city && !city.name)) && picker}
+    {(changing || (city && !city.name) || (!city && error)) && picker}
     <div className="city-settled"><h3>Get settled</h3>
       {guideCity && arrivalGuideCityIds.includes(guideCity) && arrivalGuideFor(guideCity)
         ? <Link href={`/welcome/${encodeURIComponent(guideCity)}`}>Read the {coveredNames[guideCity]} welcome guide — no account needed</Link>
         : <p className="small-copy">{guideCity || city?.name ? 'No welcome guide for this city yet.' : 'Choose or preview a city to see whether a welcome guide is available.'}</p>}
     </div>
-    {error && <p role="alert">{error} <button type="button" className="text-button" onClick={() => setRevision((value) => value + 1)}>Retry</button></p>}
+    {error && <p role="alert">{error} <button type="button" className="text-button" onClick={() => window.dispatchEvent(new Event(CITY_CHANGED_EVENT))}>Retry</button></p>}
   </section>;
 }
