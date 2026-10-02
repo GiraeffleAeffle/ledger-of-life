@@ -692,31 +692,97 @@ test('retry rechecks the original actor, current passkey, accepted agreement and
     await f.store.close();
   }
 });
-test('expired retry reviews, expired blockhashes and unknown heights never free the nonce or resend', async () => {
+test('reconcile rebroadcasts immutable bytes even after review timeout, and any party can check', async () => {
   const f = await fixture();
   try {
     const op = await f.service.prepare(f.identity, 'request_0001', { kind: 'fund' });
-    f.state.ambiguous = true;
     await f.service.authorize(f.identity, op.id, await f.sign(op));
     f.state.now += 60_000;
-    let result = await f.service.retry(f.identity, op.id);
-    assert.equal(result.state, 'unknown');
-    assert.match(result.lastError!, /review expired/);
-    f.state.now = 100000;
+    const landlord = f.agreement.parties.landlord!;
+    const result = await f.service.reconcile({ ...f.identity, subject: landlord.subject, wallets: [landlord.wallet] }, op.id);
+    assert.equal(result.state, 'broadcast');
+    assert.deepEqual(f.state.broadcasts, [f.state.broadcasts[0], f.state.broadcasts[0]]);
+    await assert.rejects(f.service.prepare(f.identity, 'request_0002', { kind: 'fund' }), /reserves/);
+    assert.equal(f.state.sponsorCalls, 1);
+    f.state.receiptFinal = true;
+    f.snapshot.slot = '51';
+    f.snapshot.tenancy.nextNonce = '1';
+    assert.equal((await f.service.reconcile(f.identity, op.id)).state, 'finalized');
+    assert.equal(f.state.broadcasts.length, 2);
+    assert.equal(f.state.sponsorCalls, 1);
+  } finally {
+    await f.store.close();
+  }
+});
+
+test('finalized blockhash expiry releases an absent signature nonce for a fresh approval', async () => {
+  const f = await fixture();
+  try {
+    const op = await f.service.prepare(f.identity, 'request_0001', { kind: 'fund' });
+    await f.service.authorize(f.identity, op.id, await f.sign(op));
+    f.state.blockHeight = '150';
+    assert.equal((await f.service.reconcile(f.identity, op.id)).state, 'unknown', 'the last valid height itself is not past the lifetime');
+    assert.equal(f.state.broadcasts.length, 1);
     f.state.blockHeight = '151';
-    result = await f.service.retry(f.identity, op.id);
-    assert.equal(result.state, 'unknown');
-    assert.match(result.lastError!, /blockhash lifetime ended/);
-    f.state.blockHeight = '100';
+    assert.equal((await f.service.reconcile(f.identity, op.id)).state, 'expired');
+    f.gateway.lifetime = async () => ({ blockhash: key(31), lastValidBlockHeight: '300', blockHeight: '151' });
+    const fresh = await f.service.prepare(f.identity, 'request_0002', { kind: 'fund' });
+    assert.equal(fresh.nonce, op.nonce);
+    assert.notEqual(fresh.id, op.id);
+    assert.notEqual(fresh.transactionBase64, op.transactionBase64);
+    assert.equal(f.state.sponsorCalls, 1);
+    assert.equal(f.state.broadcasts.length, 1);
+    assert.equal((await f.service.reconcile(f.identity, op.id)).state, 'expired');
+  } finally {
+    await f.store.close();
+  }
+});
+
+test('a signature that lands between the absence lookup and the height read is never expired', async () => {
+  const f = await fixture();
+  try {
+    const op = await f.service.prepare(f.identity, 'request_0001', { kind: 'fund' });
+    await f.service.authorize(f.identity, op.id, await f.sign(op));
+    f.state.blockHeight = '151';
+    const lookup = f.gateway.reconcile;
+    let lookups = 0;
+    f.gateway.reconcile = async (...args) => {
+      lookups++;
+      if (lookups === 2) f.state.receiptFinal = true;
+      return lookup(...args);
+    };
+    assert.equal((await f.service.reconcile(f.identity, op.id)).state, 'unknown');
+    assert.equal(lookups, 2, 'expiry needs a fresh lookup after the finalized height read');
+    f.gateway.lifetime = async () => ({ blockhash: key(31), lastValidBlockHeight: '300', blockHeight: '151' });
+    await assert.rejects(f.service.prepare(f.identity, 'request_0002', { kind: 'fund' }), /reserves/);
+    f.snapshot.slot = '51';
+    f.snapshot.tenancy.nextNonce = '1';
+    assert.equal((await f.service.reconcile(f.identity, op.id)).state, 'finalized');
+    assert.equal(f.state.sponsorCalls, 1);
+    assert.equal(f.state.broadcasts.length, 1);
+  } finally {
+    await f.store.close();
+  }
+});
+
+test('failed or ambiguous lookup and unavailable finalized heights keep the nonce reserved', async () => {
+  const f = await fixture();
+  try {
+    const op = await f.service.prepare(f.identity, 'request_0001', { kind: 'fund' });
+    await f.service.authorize(f.identity, op.id, await f.sign(op));
+    f.state.blockHeight = '151';
+    const lookup = f.gateway.reconcile;
+    f.gateway.reconcile = async () => { throw new Error('RPC disconnected'); };
+    assert.equal((await f.service.reconcile(f.identity, op.id)).state, 'unknown');
+    f.gateway.reconcile = lookup;
+    f.state.receiptReason = 'receipt-unavailable';
+    assert.equal((await f.service.reconcile(f.identity, op.id)).state, 'unknown');
+    f.state.receiptReason = 'signature-not-observed-do-not-resubmit-new-intent';
     f.state.lifetimeUnavailable = true;
-    result = await f.service.retry(f.identity, op.id);
-    assert.equal(result.state, 'unknown');
-    assert.match(result.lastError!, /Block-height evidence is unavailable/);
+    assert.equal((await f.service.reconcile(f.identity, op.id)).state, 'unknown');
     f.state.lifetimeUnavailable = false;
-    await assert.rejects(
-      f.service.prepare(f.identity, 'request_0002', { kind: 'fund' }),
-      /reserves/,
-    );
+    f.gateway.lifetime = async () => ({ blockhash: key(31), lastValidBlockHeight: '300', blockHeight: '151' });
+    await assert.rejects(f.service.prepare(f.identity, 'request_0002', { kind: 'fund' }), /reserves/);
     assert.equal(f.state.broadcasts.length, 1);
     assert.equal(f.state.sponsorCalls, 1);
   } finally {

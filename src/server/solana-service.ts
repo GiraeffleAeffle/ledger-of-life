@@ -467,7 +467,12 @@ export function createSolanaService(dependencies: Dependencies) {
       return op;
     // Reverify the deployed program and network before interpreting a native receipt.
     const snapshot = await gateway.snapshot();
-    let receipt = await gateway.reconcile(op.signature, op.messageSha256, op.expectedDeltas);
+    let receipt;
+    try {
+      receipt = await gateway.reconcile(op.signature, op.messageSha256, op.expectedDeltas);
+    } catch {
+      return retainUnknown(id, 'Receipt evidence is unavailable. The original nonce remains reserved.');
+    }
     if (receipt.status === 'finalized') {
       const nextNonce = atomic(snapshot.tenancy.nextNonce);
       const finalNonce = atomic(op.nonce) + BigInt(op.steps ?? 1);
@@ -507,8 +512,8 @@ export function createSolanaService(dependencies: Dependencies) {
         if (!matches) receipt = { status: 'unknown', reason: 'tenancy-transition-not-observed' };
       }
     }
-    return update(id, (current) =>
-      ['finalized', 'failed'].includes(current.state)
+    const observed = await update(id, (current) =>
+      ['finalized', 'failed', 'expired'].includes(current.state)
         ? current
         : {
             ...current,
@@ -519,9 +524,43 @@ export function createSolanaService(dependencies: Dependencies) {
                   ? 'failed'
                   : 'unknown',
             receipt,
-            lastError: receipt.status === 'finalized' ? null : receipt.reason,
+            lastError: receipt.status === 'finalized' || !('reason' in receipt) ? null : receipt.reason,
           },
     );
+    if (observed.state !== 'unknown' ||
+      receipt.status !== 'unknown' ||
+      receipt.reason !== 'signature-not-observed-do-not-resubmit-new-intent')
+      return observed;
+    // Height is finalized; expiry additionally needs a fresh absence lookup after this read.
+    let height: bigint;
+    try {
+      height = atomic((await gateway.lifetime()).blockHeight);
+    } catch {
+      return retainUnknown(id, 'Block-height evidence is unavailable. The original nonce remains reserved.');
+    }
+    if (height > atomic(observed.lastValidBlockHeight)) {
+      let afterExpiry;
+      try {
+        afterExpiry = await gateway.reconcile(op.signature, op.messageSha256, op.expectedDeltas);
+      } catch {
+        return retainUnknown(id, 'Receipt evidence is unavailable. The original nonce remains reserved.');
+      }
+      if (afterExpiry.status !== 'unknown' ||
+        afterExpiry.reason !== 'signature-not-observed-do-not-resubmit-new-intent')
+        return update(id, (current) =>
+          ['finalized', 'failed', 'expired'].includes(current.state)
+            ? current
+            : { ...current, state: 'unknown', receipt: afterExpiry, lastError: 'Fresh receipt evidence needs reconciliation. The original nonce remains reserved.' });
+      return update(id, (current) =>
+        ['finalized', 'failed', 'expired'].includes(current.state)
+          ? current
+          : { ...current, state: 'expired', receipt: afterExpiry, lastError: 'The network did not include this approval before it expired, so it can no longer take effect. Approve again.' });
+    }
+    if (height === atomic(observed.lastValidBlockHeight)) return observed;
+    if (observed.nonce !== snapshot.tenancy.nextNonce)
+      return retainUnknown(id, 'The tenancy nonce changed without a complete receipt. Reconcile the original signature.');
+    // The review deadline applies to new signatures, never to these immutable signed bytes.
+    return sendStored(observed);
   }
   async function sendStored(op: SolanaOperation) {
     if (!op.signedTxBase64 || !op.signature) throw new Error('Signed operation was not persisted');
@@ -540,13 +579,13 @@ export function createSolanaService(dependencies: Dependencies) {
       );
       if (signature !== op.signature) throw new Error('RPC returned another signature');
       return update(op.id, (current) =>
-        ['finalized', 'failed'].includes(current.state)
+        ['finalized', 'failed', 'expired'].includes(current.state)
           ? current
           : { ...current, state: 'broadcast', lastError: null },
       );
     } catch {
       return update(op.id, (current) =>
-        ['finalized', 'failed'].includes(current.state)
+        ['finalized', 'failed', 'expired'].includes(current.state)
           ? current
           : {
               ...current,
@@ -558,58 +597,15 @@ export function createSolanaService(dependencies: Dependencies) {
   }
   const retainUnknown = (id: string, reason: string) =>
     update(id, (current) =>
-      ['finalized', 'failed'].includes(current.state)
+      ['finalized', 'failed', 'expired'].includes(current.state)
         ? current
         : { ...current, state: 'unknown', lastError: reason },
     );
-  async function retryStored(id: string, snapshot: SolanaSnapshot) {
-    let op = await operation(id);
+  async function retryStored(id: string) {
+    const op = await operation(id);
     if (!op.signedTxBase64 || !op.signature || op.state === 'expired')
       fail('operation_not_signed', 'Only an already signed operation can be retried.');
-    if (op.state === 'finalized' || op.state === 'failed') return op;
-    try {
-      op = await reconcileStored(id);
-    } catch {
-      return retainUnknown(
-        id,
-        'Receipt evidence is unavailable. The original nonce remains reserved.',
-      );
-    }
-    if (op.state === 'finalized' || op.state === 'failed') return op;
-    // Rebroadcast only after a successful RPC lookup reports this signature absent.
-    // Missing receipt details or transport errors do not establish absence.
-    const receipt = op.receipt as { status?: unknown; reason?: unknown } | null;
-    if (
-      receipt?.status !== 'unknown' ||
-      receipt.reason !== 'signature-not-observed-do-not-resubmit-new-intent'
-    )
-      return op;
-    const expiresAt = Date.parse(op.expiresAt);
-    let height: bigint;
-    try {
-      height = atomic((await gateway.lifetime()).blockHeight);
-    } catch {
-      return retainUnknown(
-        id,
-        'Block-height evidence is unavailable. The original nonce remains reserved.',
-      );
-    }
-    if (!Number.isFinite(expiresAt) || expiresAt <= now())
-      return retainUnknown(
-        id,
-        'The authorization review expired. Reconcile the original signature; its nonce remains reserved.',
-      );
-    if (height >= atomic(op.lastValidBlockHeight))
-      return retainUnknown(
-        id,
-        'The original blockhash lifetime ended. Reconcile the original signature; its nonce remains reserved.',
-      );
-    if (op.nonce !== snapshot.tenancy.nextNonce)
-      return retainUnknown(
-        id,
-        'The tenancy nonce changed without a complete receipt. Reconcile the original signature.',
-      );
-    return sendStored(op);
+    return reconcileStored(id);
   }
   return {
     async cancellationState(identity: VerifiedIdentity) {
@@ -813,7 +809,7 @@ export function createSolanaService(dependencies: Dependencies) {
           400,
         );
       if (op.signedTxBase64) {
-        return publicOperation(await retryStored(id, verified.snapshot));
+        return publicOperation(await retryStored(id));
       }
       if (tx.signatures[address(sponsor.address)])
         fail(
@@ -881,7 +877,7 @@ export function createSolanaService(dependencies: Dependencies) {
         op.actor !== verified.wallet.address
       )
         fail('operation_owner', 'Only the recorded actor can retry this operation.', 403);
-      return publicOperation(await retryStored(id, verified.snapshot));
+      return publicOperation(await retryStored(id));
     },
     async reconcile(identity: VerifiedIdentity, id: string) {
       await access(identity);
@@ -901,18 +897,8 @@ export function createSolanaService(dependencies: Dependencies) {
         op.action.kind === 'payout' && op.signature && !['finalized', 'failed', 'expired'].includes(op.state));
       if (pending) {
         const settled = await reconcileStored(pending.id);
-        if (settled.state !== 'failed') {
-          // An unobserved signature is not a failed payout until its blockhash
-          // has expired on the finalized chain.
-          const receipt = settled.receipt as { status?: string; reason?: string } | null;
-          if (settled.state !== 'unknown' ||
-            receipt?.reason !== 'signature-not-observed-do-not-resubmit-new-intent' ||
-            atomic((await gateway.lifetime()).blockHeight) < atomic(settled.lastValidBlockHeight))
-            return publicOperation(settled);
-          const expired = await update(settled.id, (current) =>
-            current.state === 'unknown' ? { ...current, state: 'expired' } : current);
-          if (expired.state !== 'expired' && expired.state !== 'failed') return publicOperation(expired);
-        }
+        if (settled.state !== 'failed' && settled.state !== 'expired')
+          return publicOperation(settled);
       }
       const owed = (['tenant', 'landlord'] as const).filter((side) =>
         atomic(side === 'landlord' ? t.landlordOwedAtomic : t.tenantOwedAtomic) > 0n);

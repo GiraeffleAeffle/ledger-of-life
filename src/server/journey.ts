@@ -158,8 +158,20 @@ export function chainStep(
   }
 }
 
-function pendingFor(operations: Omit<SolanaOperation, 'signedTxBase64' | 'subject' | 'fingerprint'>[], walletId: string) {
-  return operations.find((op) => op.walletId === walletId && op.signature && ['signed', 'broadcast', 'unknown'].includes(op.state));
+export function operationStep(
+  next: NextAction,
+  operations: Pick<SolanaOperation, 'id' | 'walletId' | 'signature' | 'state' | 'nonce'>[],
+  walletId: string,
+  nonce: string,
+): NextAction {
+  const own = operations.filter((op) => op.walletId === walletId);
+  const pending = own.find((op) => op.signature && ['signed', 'broadcast', 'unknown'].includes(op.state));
+  if (pending)
+    return { kind: 'confirming', label: 'Waiting for network confirmation', detail: 'Your approval was sent. Check again if it takes longer than usual.', operationId: pending.id };
+  const latest = own.findLast((op) => op.nonce === nonce);
+  return latest?.state === 'expired' && latest.signature
+    ? { ...next, detail: 'The network did not include this approval before it expired, so it can no longer take effect. Approve again.' }
+    : next;
 }
 
 export async function tenancyJourney(
@@ -220,7 +232,6 @@ export async function tenancyJourney(
   }
   const t = snapshot.tenancy;
   const { stage, next } = chainStep(role, t, services.config.escrowVersion === 'pull-v2');
-  const pending = pendingFor(snapshot.operations, snapshot.walletId);
   const paid = (landlord: boolean) =>
     snapshot.operations
       .filter((op) => op.state === 'finalized' && op.action.kind === 'payout' && op.action.landlord === landlord)
@@ -234,7 +245,7 @@ export async function tenancyJourney(
       !snapshot.operations.some((op) => (op.action.kind === 'fund' || op.action.kind === 'fund_and_supply') &&
         ['signed', 'broadcast', 'unknown'].includes(op.state)),
     stage,
-    next: pending ? { kind: 'confirming', label: 'Waiting for network confirmation', detail: 'Your approval was sent. Check again if it takes longer than usual.', operationId: pending.id } : next,
+    next: operationStep(next, snapshot.operations, snapshot.walletId, t.nextNonce),
     chain: {
       phase: t.phase,
       depositMint: t.depositMint,

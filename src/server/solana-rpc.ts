@@ -476,7 +476,7 @@ export class RpcSolanaGateway implements SolanaGateway {
     await this.checkedGenesis();
     const result = await this.rpc('sendTransaction', [
       Buffer.from(transactionBytes).toString('base64'),
-      { encoding: 'base64', skipPreflight: false, preflightCommitment: 'finalized', maxRetries: 0 },
+      { encoding: 'base64', skipPreflight: false, preflightCommitment: 'finalized' },
     ]);
     if (typeof result !== 'string') throw new Error('Broadcast response ambiguous');
     return result;

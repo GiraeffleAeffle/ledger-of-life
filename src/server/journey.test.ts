@@ -3,7 +3,7 @@ import test from 'node:test';
 import { LocalStore } from './store.ts';
 import { agreementDigest, type Agreement } from './agreements.ts';
 import { applyToListing, chooseApplicant, createListing, listListings } from './listings.ts';
-import { agreementStep, chainStep } from './journey.ts';
+import { agreementStep, chainStep, operationStep } from './journey.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 
 const person = (name: string): VerifiedIdentity => ({
@@ -102,4 +102,21 @@ test('chain steps give exactly one actor the move each phase', () => {
   assert.deepEqual(actors('closed', '5'), []);
   assert.equal(chainStep('tenant', t('closed', '5'), true).next.kind, 'paying_out');
   assert.equal(chainStep('tenant', t('closed'), true).next.kind, 'done');
+});
+
+test('expired approvals restore the chain action while unresolved signatures take precedence', () => {
+  const op = { id: 'fund-1', walletId: 'tenant', signature: 'signature', state: 'expired' as const, nonce: '0' };
+  for (const kind of ['secure_deposit', 'settle', 'respond_claim'] as const) {
+    const action = kind === 'respond_claim'
+      ? { kind, label: 'Respond', detail: 'Review claim', claimAtomic: '20' }
+      : { kind, label: 'Approve', detail: 'Review action' };
+    const recovered = operationStep(action, [op], 'tenant', '0');
+    assert.equal(recovered.kind, kind);
+    assert.match(recovered.detail, /can no longer take effect\. Approve again/);
+    assert.deepEqual(operationStep(action, [op], 'tenant', '1'), action);
+    assert.deepEqual(operationStep(action, [op], 'landlord', '0'), action);
+    const unresolved = operationStep(action, [op, { ...op, id: 'fund-2', state: 'unknown' }], 'tenant', '0');
+    assert.equal(unresolved.kind, 'confirming');
+    if (unresolved.kind === 'confirming') assert.equal(unresolved.operationId, 'fund-2');
+  }
 });
