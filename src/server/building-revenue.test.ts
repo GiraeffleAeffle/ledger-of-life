@@ -99,6 +99,60 @@ function chainFixture() {
   } as unknown as BuildingRpc;
   return { rpc, sends: () => sends, setWaitFailure: (value: boolean) => { failWait = value; } };
 }
+test('building exposes only active distributor-paying device names, kind and availability', async () => {
+  const store = new LocalStore(':memory:'), chain = chainFixture();
+  const host = { ownerSubject: 'private-owner', models: [], lastHeartbeat: Date.now(), ollamaReachable: true, awake: true, publicKey: 'unused', nonces: [], kind: 'operator' };
+  try {
+    await store.create('local-ai:connector-registry', { hosts: [
+      { ...host, id: 'paying', name: 'Building GPU', payoutWallet: distributor.toLowerCase(), state: 'active' },
+      { ...host, id: 'asleep', name: 'Sleeping GPU', payoutWallet: distributor, state: 'active', ollamaReachable: false, kind: 'community' },
+      { ...host, id: 'offline', name: 'Offline GPU', payoutWallet: distributor, state: 'active', lastHeartbeat: null },
+      { ...host, id: 'own', name: 'Private GPU', payoutWallet: holder.address, state: 'active' },
+      { ...host, id: 'suspended', name: 'Suspended GPU', payoutWallet: distributor, state: 'suspended' },
+      { ...host, id: 'removed', name: 'Removed GPU', payoutWallet: distributor, state: 'revoked' },
+    ], invitations: [] });
+    const view = await readBuildingView(store, { rpc: chain.rpc, loadManifest: async () => manifest });
+    assert.deepEqual(view.payingDevices, [
+      { name: 'Building GPU', kind: 'operator', availability: 'online' },
+      { name: 'Sleeping GPU', kind: 'community', availability: 'asleep' },
+      { name: 'Offline GPU', kind: 'operator', availability: 'offline' },
+    ]);
+    assert.deepEqual((await readBuildingView(store, { loadManifest: async () => null })).payingDevices, []);
+  } finally { await store.close(); }
+});
+
+test('public building view aggregates rent without flat labels, tenant wallets or rent-associated transaction hashes', async () => {
+  const store = new LocalStore(':memory:'), chain = chainFixture();
+  const rentHashes = [keccak256(toHex('rent-private-a')), keccak256(toHex('rent-private-b'))];
+  const unrelatedHash = keccak256(toHex('unrelated-income'));
+  const flatLabels = ['Private Flat A', 'Private Flat B'];
+  const rpc = { ...chain.rpc, getLogs: async (input: { event: { name: string } }) => input.event.name === 'Transfer'
+    ? [...rentHashes.map((transactionHash, index) => ({ args: { from: holder.address, value: BigInt((index + 1) * 101) },
+      logIndex: 0, blockNumber: 10n, transactionHash, removed: false })),
+      { args: { from: foreign, value: 77n }, logIndex: 0, blockNumber: 10n, transactionHash: unrelatedHash, removed: false }]
+    : [] } as unknown as BuildingRpc;
+  try {
+    for (let index = 0; index < rentHashes.length; index++) {
+      const amountRaw = String((index + 1) * 101);
+      await store.create(`rent-payment:private-${index}:2026-10`, {
+        flatLabel: flatLabels[index], tenantWallet: holder.address, tenantName: 'Private Tenant',
+        distributor, token: payoutToken, buildingRaw: amountRaw, state: 'pending',
+        steps: [{ kind: 'building', state: 'confirmed', recipient: distributor, amountRaw, hash: rentHashes[index] }],
+      });
+    }
+    const view = await readBuildingView(store, { rpc, loadManifest: async () => manifest });
+    const rent = view.incomeSources.find(source => source.kind === 'rent')!;
+    assert.equal(rent.name, 'Rent shares');
+    assert.equal(rent.amountRaw, '303');
+    assert.equal(rent.receipts, 2);
+    assert.equal(view.revenueRaw, '380');
+    assert.deepEqual(view.revenueTransactions.map(row => row.transactionHash), [unrelatedHash]);
+    assert.equal(view.revenueTransactions.some(row => row.kind === 'rent'), false);
+    const publicBody = JSON.stringify(view).toLowerCase();
+    for (const privateValue of [...flatLabels, ...rentHashes, holder.address, 'Private Tenant'])
+      assert.equal(publicBody.includes(privateValue.toLowerCase()), false);
+  } finally { await store.close(); }
+});
 
 async function signPrepared(request: EvmSigningRequest) {
   const tx = request.transaction;

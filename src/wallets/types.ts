@@ -4,6 +4,7 @@ import type { EscrowSigningRequest } from './escrow-signing.ts';
 import type { InferencePaymentSigningRequest } from '../server/local-ai-types.ts';
 import type { ShareDepositSigningReview } from './share-deposit-signing.ts';
 import type { BuildingActionReview } from '../server/building-revenue-signing.ts';
+import type { RentTransferReview } from './rent-signing.ts';
 
 export interface RentalWallet {
   id: string;
@@ -22,6 +23,7 @@ export interface EvmSigningRequest extends SigningReview {
   walletId: string;
   shareDeposit?: ShareDepositSigningReview;
   buildingAction?: BuildingActionReview;
+  rentTransfer?: RentTransferReview;
   transaction: UnsignedTransactionRequest & { chainId: 4663 | 46630; to: string };
 }
 

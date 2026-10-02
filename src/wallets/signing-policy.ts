@@ -9,6 +9,7 @@ import { TEST_USDG_ADDRESS } from './inference-token.ts';
 import { validateShareDepositTransaction } from './share-deposit-signing.ts';
 import buildingManifest from '../../contracts/evm/deployments/building-revenue-46630.json' with { type: 'json' };
 import { validateBuildingActionTransaction } from '../server/building-revenue-signing.ts';
+import { validateRentTransfer } from './rent-signing.ts';
 import type {
   EvmSigningRequest,
   RentalWallet,
@@ -78,6 +79,12 @@ export function validateEvmSigningRequest(
     validateBuildingActionTransaction(transaction, request.buildingAction, selected.address, buildingManifest);
   } else if (request.buildingAction) {
     throw new Error('Building action reviews require a building staking operation.');
+  }
+  if (request.operationId.startsWith('rent-payment:')) {
+    if (!request.rentTransfer) throw new Error('Review the fixed building rent transfer before signing.');
+    validateRentTransfer(transaction, request.rentTransfer, selected.address);
+  } else if (request.rentTransfer) {
+    throw new Error('Rent reviews require a rent payment operation.');
   }
   if (request.operationId.startsWith('local-ai-approval:')) {
     const tx = transaction;

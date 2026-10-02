@@ -1,27 +1,24 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRentalWallet } from '@/wallets';
 import { useSectionTabActive } from './section-tabs';
-import { atomicDollars, installCommand, mcpConfig, pairingStatus, readingFresh, solarSummary, solarAssignmentPayload, solarApprovalAllowed, operatorSolarApprovalAllowed, type HomeDevicesResponse, type OperatorSolarAssignmentFields } from './home-node-logic';
+import { atomicDollars, gpuPayoutSummary, installCommand, mcpConfig, pairingStatus, readingFresh, solarSummary, solarAssignmentPayload, solarApprovalAllowed, operatorSolarApprovalAllowed, type HomeDevicesResponse, type OperatorSolarAssignmentFields } from './home-node-logic';
 import './home-node.css';
 import { HostKindBadge } from './home-node-host-badge';
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 type OperatorDevice = OperatorSolarAssignmentFields & { hostId: string; name: string; state: string; kind: 'operator' | 'community'; availability: string; canSuspend: boolean; assignSolarToBuilding: boolean };
 export function HomeNode({ request }: { request: Request }) {
   const active = useSectionTabActive();
-  const wallet = useRentalWallet();
-  const ownWallet = wallet.wallets.find((item) => item.chainType === 'ethereum' && item.connected)?.address;
   const [data, setData] = useState<HomeDevicesResponse | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
   const [invitation, setInvitation] = useState<{ code: string; expiresAt: string } | null>(null);
+  const [pairPayout, setPairPayout] = useState<'own' | 'building'>('own');
   const [pairBaseline, setPairBaseline] = useState<string[]>([]);
   const [operatorDevices, setOperatorDevices] = useState<OperatorDevice[]>([]);
   const [capacities, setCapacities] = useState<Record<string, string>>({});
   const [checksum, setChecksum] = useState('');
   const [origin, setOrigin] = useState('');
-  const [distributor, setDistributor] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const revision = useRef(0);
   const action = useRef(false);
@@ -49,11 +46,6 @@ export function HomeNode({ request }: { request: Request }) {
     let live = true;
     const initial = setTimeout(() => { if (live) setOrigin(window.location.origin); }, 0);
     void fetch('/api/home-node/download', { method: 'HEAD' }).then((response) => { if (live && response.ok) setChecksum(response.headers.get('x-content-sha256') ?? ''); }).catch(() => {});
-    void fetch('/api/building', { cache: 'no-store' }).then(async (response) => {
-      if (!response.ok) return;
-      const value = await response.json() as { building: { configured: boolean; distributor: string | null } };
-      if (live) setDistributor(value.building.configured ? value.building.distributor : null);
-    }).catch(() => {});
     return () => { live = false; clearTimeout(initial); };
   }, []);
   async function manage(operation: () => Promise<void>) {
@@ -82,7 +74,17 @@ export function HomeNode({ request }: { request: Request }) {
       <h4>1 · Install and verify</h4><p>On your own computer with Node.js 22 or newer, run this command. It checks the downloaded file before you run it.</p>
       {command ? <><pre><code>{command}</code></pre><button className="text-button" type="button" onClick={() => void copy(command, 'Install command')}>Copy install command</button><details><summary>SHA-256 checksum</summary><code className="home-node-hash">{checksum}</code></details></> : <p role="status">Verified download is not available yet. Setup commands will appear when its checksum is available.</p>}
       <h4>2 · Create a private pairing code</h4>
-      {invitation ? <><p>One use only · expires {new Date(invitation.expiresAt).toLocaleTimeString()}. Keep this code private; it lets your device receive assigned work, not spend from your wallet.</p><pre><code>{invitation.code}</code></pre><button type="button" className="text-button" onClick={() => void copy(invitation.code, 'Pairing code')}>Copy pairing code</button><button type="button" className="text-button" onClick={() => setInvitation(null)}>Hide code</button></> : <><p>A signed-in account with a verified EVM wallet can pair a device. Earnings go to that verified wallet unless you opt into the building below.</p><button type="button" className="button primary" disabled={busy || !data?.canPair} onClick={() => void manage(async () => { setPairBaseline(data?.devices.map((device) => device.hostId) ?? []); setInvitation(await request('/api/local-ai/hosts/invitations', {})); })}>Create pairing code</button>{data && !data.canPair && <p>Pairing unavailable: verify your EVM wallet in Me, or remove a device if your account has reached its host limit.</p>}</>}
+      {invitation ? <><p>One use only · expires {new Date(invitation.expiresAt).toLocaleTimeString()}. Keep this code private; it lets your device receive assigned work, not spend from your wallet.</p><pre><code>{invitation.code}</code></pre><button type="button" className="text-button" onClick={() => void copy(invitation.code, 'Pairing code')}>Copy pairing code</button><button type="button" className="text-button" onClick={() => setInvitation(null)}>Hide code</button></> : <>
+        <p>Choose where this device&apos;s future paid GPU answers go before creating its code.</p>
+        <fieldset className="home-node-payout-choice" disabled={busy}><legend>GPU income goes to</legend>
+          <label><input type="radio" name="pair-payout" value="own" checked={pairPayout === 'own'} disabled={!data?.ownPayoutAvailable} onChange={() => setPairPayout('own')} />My wallet</label>
+          <label><input type="radio" name="pair-payout" value="building" checked={pairPayout === 'building'} disabled={!data?.buildingPayoutAvailable} onChange={() => setPairPayout('building')} />The building (tHOME stakers)</label>
+        </fieldset>
+        {data && !data.ownPayoutAvailable && <p>My wallet requires one verified EVM wallet on your account.</p>}
+        {data && !data.buildingPayoutAvailable && <p>The building payout is unavailable until its test-network distributor is deployed.</p>}
+        <button type="button" className="button primary" disabled={busy || !data?.canPair || !(pairPayout === 'own' ? data.ownPayoutAvailable : data.buildingPayoutAvailable)} onClick={() => void manage(async () => { setPairBaseline(data?.devices.map((device) => device.hostId) ?? []); setInvitation(await request('/api/local-ai/hosts/invitations', { payoutTarget: pairPayout })); })}>Create pairing code</button>
+        {data && !data.canPair && <p>Pairing unavailable: verify your EVM wallet in Me.</p>}
+      </>}
       <h4>3 · Connect by CLI or your AI assistant</h4><pre><code>node home-node.mjs setup</code></pre><p>The setup wizard asks for this site ({origin}), your private pairing code and local connections. Then run <code>node home-node.mjs run</code>.</p>
       <p className="small-copy">For solar, choose a daily energy sensor that resets at local midnight. Set the Home Node computer&apos;s timezone to match Home Assistant so daily production and simulated feed-in use the same local day.</p>
       <details><summary>Connect your AI assistant · MCP stdio configuration</summary><p>Replace the absolute path with your downloaded file. Add this to your assistant&apos;s MCP configuration; do not put tokens or keys in it.</p><pre><code>{mcpConfig()}</code></pre><button type="button" className="text-button" onClick={() => void copy(mcpConfig(), 'MCP configuration')}>Copy MCP configuration</button><p>Ask: “Set up my Ledger Home Node for {origin}. Pair my device, then help me configure local Ollama, solar sensors or public validator IDs.” Supply the private pairing code only to a trusted assistant.</p></details>
@@ -93,7 +95,8 @@ export function HomeNode({ request }: { request: Request }) {
       <header><h3>{device.name}</h3><HostKindBadge kind={device.kind} /><span>{device.state === 'active' ? device.availability : device.state}</span></header>
       <p><strong>GPU</strong> · {(device.capabilities?.gpuModels.length ? device.capabilities.gpuModels : device.models).join(', ') || 'No GPU models reported'}</p>
       <p><strong>{atomicDollars(device.earnings.amountAtomic)}</strong> · {device.earnings.settledAnswers} settled paid answers for this host</p>
-      <p className="small-copy home-node-hash">Payout wallet: {device.payoutWallet ?? 'Not configured'}</p>
+      <p className="home-node-hash">{gpuPayoutSummary(device)}</p>
+      <p className="small-copy">This choice is saved on the server until you change it or remove the device. Restarting the node or the site does not change it. Payments already reviewed keep their original payee.</p>
       {!!device.earnings.receipts?.length && <details><summary>Paid-answer receipts</summary><ul>{device.earnings.receipts.map((receipt) => <li key={receipt.txHash}><HostKindBadge kind={device.kind} /><a href={`https://explorer.testnet.chain.robinhood.com/tx/${receipt.txHash}`} target="_blank" rel="noreferrer">{atomicDollars(receipt.amountAtomic)} · {receipt.settledAt ? new Date(receipt.settledAt).toLocaleString() : 'Settlement time unavailable'}</a></li>)}</ul></details>}
       {device.latestReading ? <p><strong>Solar · {solarSummary(device.latestReading)}</strong><br /><span className="small-copy">{readingFresh(device.latestReading.timestamp) ? 'Recent signed reading' : 'Stale reading — not live'} · {new Date(device.latestReading.timestamp).toLocaleString()}</span></p> : <p className="small-copy">Solar: {device.capabilities?.solarSensors.length ? 'Waiting for a signed sensor reading' : 'No solar sensors reported'}</p>}
       <p><strong>Solar assignment · {device.solarAssignmentState}</strong>{device.peakCapacityKwp !== null && <> · declared {device.peakCapacityKwp} kWp</>}{device.dailyProductionCeilingKwh !== null && <> · ceiling {device.dailyProductionCeilingKwh} kWh/day</>}</p>
@@ -102,7 +105,7 @@ export function HomeNode({ request }: { request: Request }) {
       {device.solarAnomaly && <p role="status">Production anomaly: {device.solarAnomaly.energyKwh} kWh on {device.solarAnomaly.day}, above the recorded {device.solarAnomaly.ceilingKwh} kWh ceiling. Simulated feed-in is paused; revise the capacity for operator review. Days above 100 kWh cannot be approved.</p>}
       {!!device.capabilities?.validatorIds.length && <p className="home-node-hash"><strong>Validator IDs</strong> · {device.capabilities.validatorIds.join(', ')}<br /><span className="small-copy">Public identifiers, not proof of stake ownership or verified rewards.</span></p>}
       {device.state !== 'revoked' && <div className="home-node-controls">
-        <label><input type="checkbox" checked={!!distributor && device.payoutWallet?.toLowerCase() === distributor.toLowerCase()} disabled={busy || !distributor || !ownWallet} onChange={(event) => void manage(async () => { await request('/api/local-ai/hosts/settings', { hostId: device.hostId, payoutWallet: event.target.checked ? distributor : ownWallet }); })} />GPU payouts to the building</label>
+        <label><input type="checkbox" checked={device.payoutTarget === 'building'} disabled={busy || (device.payoutTarget === 'building' ? !data.ownPayoutAvailable : !data.buildingPayoutAvailable)} onChange={(event) => { const payoutTarget = event.target.checked ? 'building' : 'own'; void manage(async () => { await request('/api/local-ai/hosts/settings', { hostId: device.hostId, payoutTarget }); }); }} />GPU payouts to the building</label>
         <label>Declared solar peak capacity (kWp)<input type="number" inputMode="decimal" min="0.001" max="1000" step="any" value={capacities[device.hostId] ?? device.peakCapacityKwp?.toString() ?? ''} disabled={busy} onChange={(event) => setCapacities((previous) => ({ ...previous, [device.hostId]: event.target.value }))} /></label>
         <label><input type="checkbox" checked={device.assignSolarToBuilding} disabled={busy} onChange={(event) => assignSolar(device.hostId, event.target.checked, capacities[device.hostId] ?? device.peakCapacityKwp?.toString() ?? '')} />Solar income to the building · simulated feed-in</label>
         {device.assignSolarToBuilding && <button type="button" className="text-button" disabled={busy} onClick={() => assignSolar(device.hostId, true, capacities[device.hostId] ?? device.peakCapacityKwp?.toString() ?? '')}>Submit revised capacity for approval</button>}

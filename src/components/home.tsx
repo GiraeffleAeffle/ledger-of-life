@@ -35,6 +35,7 @@ import { ShareDeposit, ShareDepositRules, depositUsd } from './share-deposit';
 import { ShareDepositApplication } from './share-deposit-application';
 import shareDepositManifest from '../../contracts/evm/deployments/share-deposit-46630.json';
 import { maximumDepositSecurity, validateDepositSecurity, type DepositForm } from '@/domain/deposit-form';
+import type { EvmSigningRequest } from '@/wallets/types';
 
 const BUTTON_LABEL: Record<string, string> = {
   invite_arbitrator: 'Make invitation link',
@@ -442,8 +443,8 @@ function TenancyCard({ journey, request, reload, go, accountId, compact = false 
       <ArrowRight size={17} />
     </button>
   );
-  if (compact && !shareForm && living && next.kind === 'wait') return <section className="card" id={`tenancy-${agreementId}`} tabIndex={-1}><h2>{journey.property}</h2><p>{journey.role} · Deposit secured</p><p>{next.detail}</p><TenancyDetails journey={journey} request={request} /></section>;
-  if (shareForm && journey.stage !== 'agreement') return <section className="card tenancy-card" id={`tenancy-${agreementId}`} tabIndex={-1}><h2>{journey.property}</h2><p>{journey.role} · {HOME_STAGES[homeStage(journey.stage)]}</p><ShareDeposit rentalId={agreementId} request={request} reload={reload} /></section>;
+  if (compact && !shareForm && living && next.kind === 'wait') return <section className="card" id={`tenancy-${agreementId}`} tabIndex={-1}><h2>{journey.property}</h2><p>{journey.role} · Deposit secured</p><p>{next.detail}</p>{journey.rentTerms && <RentPayments agreementId={agreementId} role={journey.role} request={request} />}<TenancyDetails journey={journey} request={request} /></section>;
+  if (shareForm && journey.stage !== 'agreement') return <section className="card tenancy-card" id={`tenancy-${agreementId}`} tabIndex={-1}><h2>{journey.property}</h2><p>{journey.role} · {HOME_STAGES[homeStage(journey.stage)]}</p><ShareDeposit rentalId={agreementId} request={request} reload={reload} />{journey.rentTerms && <RentPayments agreementId={agreementId} role={journey.role} request={request} />}</section>;
   return (
     <section className="card tenancy-card" id={`tenancy-${agreementId}`} tabIndex={-1}>
       <div className="section-heading">
@@ -460,7 +461,7 @@ function TenancyCard({ journey, request, reload, go, accountId, compact = false 
         {next.kind === 'paying_out' && <p className="small-copy">Payouts run while Home is open. A failed attempt retries here.</p>}
         {next.kind === 'accept_agreement' && <div className="small-copy">
           {shareForm ? <><p>Security: {depositUsd(shareForm.securityUsd6)} USD, backed by test TSLA; factory {shareForm.factory ?? 'not deployed yet'}, oracle {shareForm.oracle}. Response: {shareForm.responseWindow / 86400} days; return: {shareForm.returnWindow / 86400} days; arbitration: {shareForm.arbitrationWindow / 86400} days.</p><ShareDepositRules /></> : <p>These terms cover {journey.property}, the {money(journey.requiredSecurity)} test USDC required deposit, and whether the tenant may claim surplus while the tenancy is active. The tenant keeps deposit assets above an approved deduction at settlement, whatever the release setting. Site-minted tUSDC stays in cash escrow: it is not lent. This site pays labelled simulated yield to the tenant in tUSDC, separate from the escrow. Test tokens have no value.</p>}
-          <p><strong>These terms cover the deposit and its parties, not monthly rent or tenancy dates.</strong> The landlord chooses the arbitrator before acceptance.</p>
+          {agreement?.rentTerms ? <RentTerms terms={agreement.rentTerms} /> : <p><strong>These terms cover the deposit and its parties, not monthly rent or tenancy dates.</strong> The landlord chooses the arbitrator before acceptance.</p>}
           {agreement && <p>Tenant: {agreement.parties.tenant?.wallet?.address ? `${agreement.parties.tenant.wallet.address.slice(0, 5)}…${agreement.parties.tenant.wallet.address.slice(-5)}` : 'not available'} · Landlord: {agreement.parties.landlord?.wallet?.address ? `${agreement.parties.landlord.wallet.address.slice(0, 5)}…${agreement.parties.landlord.wallet.address.slice(-5)}` : 'not available'} · Arbitrator: {agreement.parties.arbitrator?.wallet?.address ? `${agreement.parties.arbitrator.wallet.address.slice(0, 5)}…${agreement.parties.arbitrator.wallet.address.slice(-5)}` : 'not available'}</p>}
           {agreement && <p>Tenant acceptance: {agreement.accepted.tenant?.digest === agreement.digest ? 'accepted' : 'waiting'} · Landlord acceptance: {agreement.accepted.landlord?.digest === agreement.digest ? 'accepted' : 'waiting'}.{!shareForm && <> Surplus: {agreement.releaseAllowed ? 'tenant may claim during the tenancy' : 'locked until settlement'}.</>}</p>}
         </div>}
@@ -579,15 +580,152 @@ function TenancyCard({ journey, request, reload, go, accountId, compact = false 
         </dl>
       )}
       {journey.role !== 'arbitrator' && living && <ServiceCharges agreementId={agreementId} request={request} />}
+      {journey.rentTerms && journey.stage !== 'agreement' && <RentPayments agreementId={agreementId} role={journey.role} request={request} />}
       <TenancyDetails journey={journey} request={request} />
     </section>
   );
+}
+
+type BuildingRentTerms = { buildingId: string; shareBps: number; rentMonthly: string; landlordWallet: string };
+
+function RentTerms({ terms }: { terms: BuildingRentTerms }) {
+  const buildingRaw = (BigInt(terms.rentMonthly) * 2000n / 10000n).toString();
+  return <div className="small-copy">
+    <p><strong>Monthly rent: {money(terms.rentMonthly)} test dollars · Robinhood Chain testnet.</strong> Fixed 20 % building share: {money(buildingRaw)}; landlord receives {money((BigInt(terms.rentMonthly) - BigInt(buildingRaw)).toString())}. Building share rounds down to the token unit; landlord receives the remainder.</p>
+    <p>A fixed 20 % of this test rent goes to the fictional building&apos;s tHOME stakers; the rest goes to the landlord. This simulates how a tokenized building could share net rental income; in a real building rent goes to the property owner under the lease. Not legal advice.</p>
+    <p>Building: {terms.buildingId}. Landlord recipient: <span style={{ overflowWrap: 'anywhere' }}>{terms.landlordWallet}</span>. These accepted terms bind the rent split as well as the separate deposit terms. Deposit earnings belong to the tenant; fictional units have no value or legal rights.</p>
+  </div>;
+}
+
+type RentStepView = {
+  id: string; kind: 'landlord' | 'building'; recipient: string; amountRaw: string;
+  state: 'prepared' | 'signed' | 'submitted' | 'confirmed' | 'stopped';
+  request: EvmSigningRequest | null; hash?: `0x${string}`; error: string | null;
+};
+type RentPaymentView = {
+  id: string; month: string; rentMonthly: string; landlordRaw: string; buildingRaw: string;
+  state: 'prepared' | 'pending' | 'confirmed' | 'stopped'; steps: RentStepView[]; error: string | null;
+};
+type RentView = {
+  agreementId: string; month: string; rentMonthly: string; landlordRaw: string; buildingRaw: string;
+  role: 'tenant' | 'landlord'; active: boolean; payment: RentPaymentView | null; history: RentPaymentView[];
+};
+
+function rentWorkflow(view: RentView | null) {
+  return view?.payment ?? view?.history.find(payment => payment.state !== 'confirmed') ?? null;
+}
+
+function RentPayments({ agreementId, role, request }: { agreementId: string; role: TenancyJourney['role']; request: Request }) {
+  const wallet = useRentalWallet();
+  const [rent, setRent] = useState<RentView | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  // Keep exact approved bytes through ambiguous submission failures; never approve replacements.
+  const [signed, setSigned] = useState<Record<string, `0x${string}`>>({});
+  const [review, setReview] = useState<string | null>(null);
+  const path = `/api/rent?agreement=${encodeURIComponent(agreementId)}`;
+  const load = useCallback(async () => {
+    const result = await request<{ rent: RentView | null }>(path);
+    setRent(result.rent);
+    return result.rent;
+  }, [path, request]);
+  useEffect(() => {
+    if (role === 'arbitrator') return;
+    let active = true;
+    const update = async () => {
+      try {
+        const result = await request<{ rent: RentView | null }>(path);
+        if (active) setRent(result.rent);
+      } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : 'Could not read rent.'); }
+    };
+    void update();
+    const timer = setInterval(() => void update(), 15000);
+    return () => { active = false; clearInterval(timer); };
+  }, [path, request, role]);
+  async function run(work: () => Promise<void>) {
+    setBusy(true); setError('');
+    try { await work(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Rent action failed. Check status before retrying.'); }
+    finally { setBusy(false); }
+  }
+  async function action(action: 'prepare' | 'reconcile' | 'submit', stepId?: string, signedTransaction?: `0x${string}`) {
+    await request('/api/rent', { agreementId, action, stepId, signedTransaction });
+    const updated = await load();
+    if (action === 'prepare') {
+      const previous = rentWorkflow(rent);
+      const resumed = rentWorkflow(updated)?.steps.filter(step => step.state === 'prepared' && !step.hash && previous?.steps.some(old => old.id === step.id && old.state === 'stopped'));
+      if (resumed?.length) setSigned(bytes => {
+        const retained = { ...bytes };
+        for (const step of resumed) delete retained[step.id];
+        return retained;
+      });
+    }
+    return updated;
+  }
+  if (role === 'arbitrator') return null;
+  const payment = rentWorkflow(rent);
+  const month = payment?.month ?? rent?.month;
+  const currentTransfer = payment?.steps.find(step => step.state !== 'confirmed');
+  return <div className="tenancy-action">
+    <span className="eyebrow">MONTHLY RENT · SEPARATE FROM DEPOSIT</span>
+    <h3>{role === 'landlord' ? 'Rent received' : 'Pay monthly test rent'}</h3>
+    {error && <p className="note" role="alert">{error}</p>}
+    {!rent && !error && <p role="status">Loading rent status…</p>}
+    <button type="button" className="button secondary" disabled={busy} onClick={() => void run(async () => { await action('reconcile'); })}>Check rent status / retry</button>
+    {rent && <>
+      <p>{month} · {money(payment?.rentMonthly ?? rent.rentMonthly)} test dollars · Robinhood Chain testnet</p>
+      {month !== rent.month && <p role="status">Finish this saved {month} payment before starting rent for {rent.month}. Confirmed transfers will not be paid again.</p>}
+      <p>Landlord: {money(payment?.landlordRaw ?? rent.landlordRaw)} · fictional building&apos;s tHOME stakers: {money(payment?.buildingRaw ?? rent.buildingRaw)} (fixed 20 %, rounded down). Two separate transfers; one confirmed transfer does not mean the month is fully paid.</p>
+      <p role="status">Month status: {payment?.state ?? 'not paid'}. {!rent.active && 'This tenancy is not active for rent payment.'}</p>
+      <p className="small-copy">This simulates a share of net rental income. In a real building rent goes to the property owner under the lease. Not legal advice. The deposit remains separate and its earnings belong to the tenant; test units have no value or legal rights.</p>
+      {rent.role === 'tenant' && rent.active && (!payment || payment.state === 'stopped') && <button className="button primary" disabled={busy} onClick={() => void run(async () => { await action('prepare'); })}>{payment ? 'Resume rent for' : 'Pay rent for'} {month}</button>}
+      {rent.role === 'tenant' && rent.active && payment?.state !== 'stopped' && currentTransfer?.state === 'prepared' && !currentTransfer.hash && !signed[currentTransfer.id] && <button className="button secondary" disabled={busy} onClick={() => void run(async () => { await action('prepare'); setReview(null); })}>{currentTransfer.request ? 'Refresh unsigned transfer review' : 'Prepare next rent transfer'}</button>}
+      {payment?.error && <p className="note" role="alert">{payment.error}</p>}
+      {payment?.steps.map((step, index) => <div key={step.id} style={{ marginTop: 16, overflowWrap: 'anywhere' }}>
+        <strong>Transfer {index + 1}: {step.kind === 'landlord' ? 'Landlord' : 'Building distributor'} · {money(step.amountRaw)} test dollars</strong>
+        <p className="small-copy">Exact amount: {step.amountRaw} token units · recipient: {step.recipient} · {step.state}</p>
+        {step.hash && <a href={`https://explorer.testnet.chain.robinhood.com/tx/${step.hash}`} target="_blank" rel="noopener noreferrer">{step.state === 'confirmed' ? 'Confirmed transfer receipt' : 'Submitted transaction (not yet confirmed)'}</a>}
+        {step.error && <p className="note" role="alert">{step.error}</p>}
+        {rent.role === 'tenant' && rent.active && step.state === 'prepared' && step.request && !step.hash && !signed[step.id] && <>
+          <button className="button secondary" disabled={busy} onClick={() => setReview(review === step.id ? null : step.id)}>Review exact transfer {index + 1}</button>
+          {review === step.id && <div className="small-copy">
+            <p>{step.request.description}</p>
+            <p>Chain ID: {step.request.transaction.chainId} · token contract: {step.request.transaction.to} · expires: {step.request.expiresAt}</p>
+            <p>Transaction data: {String(step.request.transaction.data ?? '')}</p>
+            <button className="button primary" disabled={busy} onClick={() => void run(async () => {
+              const current = await load();
+              const fresh = rentWorkflow(current)?.steps.find(item => item.id === step.id);
+              if (!current?.active || fresh?.state !== 'prepared' || fresh.hash || !fresh.request) throw new Error('Transfer status changed. Review the current transfer before signing.');
+              if (JSON.stringify(fresh.request) !== JSON.stringify(step.request)) { setReview(null); throw new Error('Transfer request changed. Review the updated exact transfer before signing.'); }
+              const bytes = await wallet.signEvmTransaction(fresh.request);
+              setSigned(previous => ({ ...previous, [step.id]: bytes }));
+              setReview(null);
+            })}>Sign transfer {index + 1} (does not submit)</button>
+          </div>}
+        </>}
+        {rent.role === 'tenant' && signed[step.id] && (step.state === 'prepared' || step.state === 'signed' || step.state === 'stopped') && <button className="button primary" disabled={busy} onClick={() => void run(async () => {
+          const current = await action('reconcile');
+          const fresh = rentWorkflow(current)?.steps.find(item => item.id === step.id);
+          if (fresh && !fresh.hash && fresh.state !== 'confirmed' && fresh.state !== 'submitted') await action('submit', step.id, signed[step.id]);
+        })}>Submit approved transfer {index + 1} / retry same bytes</button>}
+        {rent.role === 'tenant' && step.state === 'signed' && !signed[step.id] && <button className="button secondary" disabled={busy} onClick={() => void run(async () => { await action('reconcile'); })}>Recover stored approval / check submission</button>}
+      </div>)}
+      <details className="tenancy-details"><summary>Rent payment history</summary>
+        {rent.history.length === 0 && <p>No rent payment records yet.</p>}
+        {rent.history.map(payment => <div key={payment.id} style={{ overflowWrap: 'anywhere' }}>
+          <p><strong>{payment.month}</strong> · {payment.state} · landlord {money(payment.landlordRaw)} / building {money(payment.buildingRaw)} test dollars</p>
+          {payment.steps.map(step => <p key={step.id}>{step.kind}: {step.state} · {money(step.amountRaw)}{step.hash && <> · <a href={`https://explorer.testnet.chain.robinhood.com/tx/${step.hash}`} target="_blank" rel="noopener noreferrer">Transaction receipt</a></>}</p>)}
+        </div>)}
+      </details>
+    </>}
+  </div>;
 }
 
 type TenancyAgreement = {
   createdAt: string;
   requiredSecurity: string;
   releaseAllowed: boolean;
+  rentTerms?: BuildingRentTerms;
   digest: string | null;
   accepted: Partial<Record<'tenant' | 'landlord', { digest: string; at: string }>>;
   parties: Partial<Record<'tenant' | 'landlord' | 'arbitrator', { subject: string; wallet?: { address: string } }>>;
@@ -648,6 +786,7 @@ function TenancyDetails({ journey, request }: { journey: TenancyJourney; request
       {!agreement && !error && <p className="small-copy">Loading tenancy records…</p>}
       {agreement && (
         <>
+          {agreement.rentTerms && <RentTerms terms={agreement.rentTerms} />}
           <dl className="journey-facts">
             <div><dt>Agreement</dt><dd>{agreement.digest && agreement.accepted.tenant?.digest === agreement.digest && agreement.accepted.landlord?.digest === agreement.digest ? 'Accepted by both parties' : 'Awaiting acceptance'}</dd></div>
             <div><dt>Required deposit · test USDC</dt><dd>{money(agreement.requiredSecurity)} test USDC</dd></div>
@@ -738,7 +877,8 @@ function ListingCard({ listing, children, photoNotice = true }: { listing: Publi
         {d.photos.length > 1 && <span className="photo-count">{photoIndex + 1}/{d.photos.length}</span>}
       </div>
       <div className="listing-body">
-        <header><strong>{listing.title}{listing.sample && !listing.title.toLowerCase().includes('sample') ? ' · sample home' : ''}</strong><span className="listing-rent">{money(listing.rentMonthly)}<small>/month · test USDC</small></span></header>
+        <header><strong>{listing.title}{listing.sample && !listing.title.toLowerCase().includes('sample') ? ' · sample home' : ''}</strong><span className="listing-rent">{money(listing.rentMonthly)}<small>/month · {listing.buildingRent ? 'test dollars · Robinhood testnet' : 'test USDC'}</small></span></header>
+        {listing.buildingRent && <p className="small-copy">Fictional tHOME building · fixed 20 % rent share to stakers; 80 % to the landlord. Deposit and its earnings stay separate; test units have no value or legal rights.</p>}
         {facts.length > 0 && <p className="listing-facts">{facts.join(' · ')}</p>}
         {photoNotice && d.photos.length > 0 && <p className="small-copy">Illustrative sample interiors, not photographs of this dwelling.</p>}
         <p className="listing-deposit"><span>Required deposit · {listing.depositForm?.kind === 'shares' ? 'Robinhood Chain testnet' : 'Solana devnet'}</span><strong>{listing.depositForm?.kind === 'shares' ? `${depositUsd(listing.depositForm.securityUsd6)} USD · test TSLA` : `${money(listing.requiredSecurity)} test USDC`}</strong></p>
@@ -800,6 +940,7 @@ function PublishHome({ listings, request, reload, go, tenancyIds }: {
   const [posting, setPosting] = useState(false);
   const [depositForm, setDepositForm] = useState<'cash' | 'shares'>('cash');
   const [depositTracksRent, setDepositTracksRent] = useState(true);
+  const [buildingHome, setBuildingHome] = useState(false);
   const [form, setForm] = useState({ title: '', city: '', rooms: '2', sizeSqm: '55', availableFrom: '', description: '', rent: '900', deposit: '2700', releaseAllowed: true });
   const [photos, setPhotos] = useState<string[]>([]);
   const [location, setLocation] = useState<HomeLocation | undefined>();
@@ -857,7 +998,7 @@ function PublishHome({ listings, request, reload, go, tenancyIds }: {
           await request('/api/listings', {
             title: form.title, city: form.city, location, rooms: Number(form.rooms), sizeSqm: Number(form.sizeSqm), availableFrom: form.availableFrom,
             description: form.description, photos, rentMonthly, requiredSecurity, releaseAllowed: form.releaseAllowed,
-            depositForm,
+            depositForm, buildingHome,
           });
           setPosting(false);
         }, 'post'); }}>
@@ -866,7 +1007,7 @@ function PublishHome({ listings, request, reload, go, tenancyIds }: {
           <label>Rooms<input type="number" min={1} max={20} {...field('rooms')} /></label>
           <label>Size (m²)<input type="number" min={10} max={1000} {...field('sizeSqm')} /></label>
           <label>Available from<input type="date" {...field('availableFrom')} /></label>
-          <label>Monthly cold rent (test USDC)<input inputMode="decimal" {...field('rent')} /></label>
+          <label>Monthly cold rent ({buildingHome ? 'test dollars · Robinhood testnet' : 'test USDC'})<input inputMode="decimal" {...field('rent')} /></label>
           <label>Deposit ({depositForm === 'shares' ? 'USD' : 'test USDC'})<input inputMode="decimal" {...field('deposit')} /></label>
           <label>Deposit form<select value={depositForm} onChange={e => {
             const kind = e.target.value as 'cash' | 'shares';
@@ -876,6 +1017,8 @@ function PublishHome({ listings, request, reload, go, tenancyIds }: {
             if (suggestion !== null) setForm(current => ({ ...current, deposit: suggestion }));
           }}><option value="cash">Cash · site tUSDC</option><option value="shares">Shares · test TSLA</option></select></label>
           {depositForm === 'shares' && <div className="wide"><ShareDepositRules />{!shareDepositManifest.factory && <p role="status">Share deposit not deployed yet. Publication and funding are disabled.</p>}</div>}
+          <label className="policy-check wide"><input type="checkbox" checked={buildingHome} onChange={event => setBuildingHome(event.target.checked)} /> Fictional tHOME building home · fixed 20 % of test rent to building stakers, 80 % to landlord.</label>
+          {buildingHome && <div className="wide small-copy"><p>A fixed 20 % of this test rent goes to the fictional building&apos;s tHOME stakers; the rest goes to the landlord. This simulates how a tokenized building could share net rental income; in a real building rent goes to the property owner under the lease. Not legal advice.</p><p>Monthly rent uses test dollars on Robinhood Chain testnet in two separate transfers. The deposit remains separate; deposit earnings belong to the tenant. Fictional units have no value and confer no ownership or tenancy rights.</p></div>}
           <p className="wide small-copy">{depositForm === 'shares'
             ? 'Share-backed security is capped at two months’ net cold rent because 150% share cover reaches the three-month cap under §551(1) BGB; not legal advice; test networks.'
             : 'Cash security is capped at three months’ net cold rent under §551(1) BGB; not legal advice; test networks.'} {suggestedDeposit(form.rent) !== null && `Suggested maximum: ${suggestedDeposit(form.rent)} ${depositForm === 'shares' ? 'test USD security' : 'test USDC'}.`} Token escrow is not a statement of legal compliance.</p>

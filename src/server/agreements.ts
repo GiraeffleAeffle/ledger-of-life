@@ -7,11 +7,13 @@ import { AccessError, ConflictError } from './errors.ts';
 import type { Store } from './store.ts';
 import type { HandoverRecord } from './move-in.ts';
 import { cashDepositForm, canonicalDeposit, type DepositForm } from '../domain/deposit-form.ts';
+import type { RentTerms } from '../domain/rent.ts';
 
 export interface Agreement {
   id: string;
   network: Network;
   depositForm?: DepositForm;
+  rentTerms?: RentTerms;
   property: string;
   home?: { city: string; location?: { lat: number; lon: number } };
   handover?: HandoverRecord;
@@ -63,6 +65,7 @@ export function agreementRole(value: Agreement, identity: VerifiedIdentity): Rol
 export function agreementDigest(value: Agreement): string | null {
   if (!value.parties.tenant || !value.parties.landlord || !value.parties.arbitrator) return null;
   // Domain separation and canonical field order make exactly what is accepted reproducible.
+  if (value.rentTerms) return `0x${digest(JSON.stringify({ domain: 'rental-agreement-v3', id: value.id, network: value.network, property: value.property, deposit: canonicalDeposit(value.depositForm ?? cashDepositForm(value.network)), rent: { buildingId: value.rentTerms.buildingId, shareBps: value.rentTerms.shareBps, rentMonthly: value.rentTerms.rentMonthly, landlordWallet: value.rentTerms.landlordWallet }, requiredSecurity: value.requiredSecurity, releaseAllowed: value.releaseAllowed, tenant: value.parties.tenant.wallet.address, landlord: value.parties.landlord.wallet.address, arbitrator: value.parties.arbitrator.wallet.address }))}`;
   if (value.depositForm) return `0x${digest(JSON.stringify({ domain: 'rental-agreement-v2', id: value.id, network: value.network, property: value.property, deposit: canonicalDeposit(value.depositForm), requiredSecurity: value.requiredSecurity, releaseAllowed: value.releaseAllowed, tenant: value.parties.tenant.wallet.address, landlord: value.parties.landlord.wallet.address, arbitrator: value.parties.arbitrator.wallet.address }))}`;
   return `0x${digest(JSON.stringify({ domain: 'rental-agreement-v1', id: value.id, network: value.network, property: value.property, asset: value.network === 'solana' ? 'USDC' : 'USDG', requiredSecurity: value.requiredSecurity, releaseAllowed: value.releaseAllowed, tenant: value.parties.tenant.wallet.address, landlord: value.parties.landlord.wallet.address, arbitrator: value.parties.arbitrator.wallet.address }))}`;
 }

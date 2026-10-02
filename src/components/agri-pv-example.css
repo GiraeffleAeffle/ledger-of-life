@@ -1,0 +1,34 @@
+.agri-pv-example { min-width: 0; margin-top: 22px; border-top: 1px solid var(--line); }
+.agri-pv-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.agri-pv-story, .agri-pv-calculator { padding: 28px; min-width: 0; }
+.agri-pv-story h3 { margin: 10px 0 16px; font-size: clamp(1.4rem, 2.1vw, 1.9rem); line-height: 1.2; letter-spacing: -.035em; }
+.agri-pv-story p, .agri-pv-calculator > p { font-size: .85rem; color: var(--muted); line-height: 1.65; }
+.agri-pv-caveat { border-left: 3px solid var(--line-strong); padding-left: 13px; }
+.agri-pv-calculator { border-top: 1px solid var(--line); }
+.agri-pv-calculator h4 { font-size: 1.1rem; margin: 0 0 12px; }
+.agri-pv-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 22px 0; }
+.agri-pv-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.agri-pv-field label { font-size: .84rem; font-weight: 600; }
+.agri-pv-field input { box-sizing: border-box; width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--panel); font: inherit; font-variant-numeric: tabular-nums; }
+.agri-pv-field input[aria-invalid=true] { border-color: #a24d30; }
+.agri-pv-field small { font-size: .72rem; line-height: 1.5; color: var(--muted); }
+.agri-pv-error { padding: 12px; background: #f8efdc; border-radius: 8px; }
+.agri-pv-results { padding: 20px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--soft); min-width: 0; }
+.agri-pv-results table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: .8rem; }
+.agri-pv-results th, .agri-pv-results td { padding: 12px 5px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.agri-pv-results th { text-align: left; font-weight: 500; }
+.agri-pv-results td { text-align: right; font-variant-numeric: tabular-nums; }
+.agri-pv-results thead th:not(:first-child) { text-align: right; }
+.agri-pv-results tbody tr:last-child { font-weight: 650; }
+.agri-pv-results tbody tr:last-child th { font-weight: 650; }
+.agri-pv-ratio { color: var(--muted); font-size: .8rem; line-height: 1.6; }
+.agri-pv-ratio strong { display: block; color: var(--ink); font-size: 1.8rem; letter-spacing: -.04em; }
+.agri-pv-results .small-copy { margin-bottom: 0; }
+.agri-pv-calculator > details { margin-top: 20px; overflow-wrap: anywhere; }
+@media (max-width: 680px) {
+  .agri-pv-intro, .agri-pv-fields { grid-template-columns: minmax(0, 1fr); }
+  .agri-pv-story, .agri-pv-calculator { padding: 20px 17px; }
+  .agri-pv-results { padding: 16px 10px; }
+  .agri-pv-results table { font-size: .7rem; }
+  .agri-pv-results th, .agri-pv-results td { padding: 12px 3px; }
+}

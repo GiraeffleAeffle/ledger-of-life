@@ -41,7 +41,7 @@ layers:  # product architecture, bottom-up
   - id: identity
     concepts: [Person, Wallet, IdentityAssurance, Credential, DisclosurePolicy, Context, Membership, CitySignal, MyPlaces, ArrivalGuide, ProjectFollow]
   - id: homes
-    concepts: [Home, Listing, Application, Agreement, Role]
+    concepts: [Home, Listing, Application, Agreement, RentPayment, Role]
   - id: custody
     concepts: [Escrow, Operation, Claim, Settlement, Payout, CollateralDeposit]
   - id: earnings
@@ -260,6 +260,7 @@ concepts:
     relations: {offered_by: Person(landlord), receives: Application, results_in: Agreement}
     code: [src/server/listings.ts]
     guidance: "Listing UI suggests three months' cold rent (900 → 2700 test USDC), follows rent edits until overridden, and explains §551 BGB's at-most-three-months security rule excluding separately stated operating costs; no legal advice or claim that token escrow meets legal requirements."
+    building_rent: "New listings may explicitly join demo-neighbourhood-homes; the share is fixed at 2000 basis points (20%), never a landlord-editable rate. Unmarked and existing listings are unchanged."
     reality: testnet_real   # off-chain record
 
   Application:
@@ -274,7 +275,26 @@ concepts:
     invariants:
       - The on-chain Escrow's policy hash equals the accepted agreement digest.
       - Changing terms or parties changes the digest and requires new acceptance.
+      - Only new marked building-home agreements bind building ID, fixed 2000-bps share, monthly rent and landlord wallet in the accepted v3 digest; existing agreements retain their original digest and have no retroactive rent obligation.
     code: [src/server/agreements.ts]
+    reality: testnet_real
+
+  RentPayment:
+    definition: A durable monthly journal for two tenant-wallet-signed test tUSDG transfers, separately paying the landlord and the fictional building's tHOME staking distributor.
+    fields: [agreementId, month, flatLabel, tenantWallet, landlordWallet, distributor, token, rentMonthly, landlordRaw, buildingRaw, state, steps]
+    lifecycle: [prepared, pending, confirmed | stopped]
+    relations: {bound_to: Agreement, pays: Person(landlord), shares_with: Distribution(home_rent_share)}
+    invariants:
+      - Applies only to accepted new building-home agreements; rent terms are bound into their accepted digest.
+      - The month is YYYY-MM in Europe/Berlin; one journal per agreement and month prevents a confirmed month from being paid twice. Recovery resumes the same signed transfers, not a replacement payment.
+      - Building amount is floor(monthly rent atomic units * 2000 / 10000); the landlord receives the exact remainder, conserving the rent.
+      - Each transfer is separately reviewed, signed and receipt-confirmed; a confirmed building step can be attributed even while the landlord step is unfinished.
+      - Rent is paid from the tenant's own wallet, not the deposit escrow; deposit protection and all deposit earnings remain the tenant's.
+      - Internal attribution accepts only confirmed building steps with an exact transaction hash, amount, token and distributor match and consumes each receipt once; publicly it emits one aggregated Rent shares source with total and receipt count, never flat labels.
+      - Public building income never exposes tenant identity, name, wallet, flat label or private agreement/payment IDs. Rent-associated hashes and explorer links are omitted from the public receipt list; exact rent receipts and labels stay in authenticated tenant/landlord views. Other income sender wallets are also omitted. Blockchain transactions themselves are not anonymous.
+      - These real test-token transfers simulate a fictional rental share, not full property rent, monetary value or legal/property rights. In real buildings rent goes to the property owner under the lease; not legal advice.
+    journal_prefix: "rent-payment:"
+    code: [src/domain/rent.ts, src/server/rent-payments.ts, app/api/rent/route.ts, src/server/building-revenue-attribution.ts]
     reality: testnet_real
 
   Escrow:
@@ -379,7 +399,7 @@ concepts:
       token_multiplier: {reality: testnet_simulated, note: "tSPYx scaled-UI multiplier, as xStocks do."}
       validator_rewards: {reality: read_only_live}
       solar_savings: {reality: read_only_live}
-      home_rent_share: {reality: roadmap}
+      home_rent_share: {reality: testnet_real, note: "Fixed 20% of fictional monthly test rent reaches the tHOME distributor through a confirmed RentPayment building step; actual test tUSDG execution, no real rent or property rights."}
 
   Adapter:
     definition: A connector between the person's assets and an external system; observation adapters and signed financial flows have different authority.

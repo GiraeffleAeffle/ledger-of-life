@@ -18,6 +18,9 @@
 .home-node-controls label { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; font-size: 14px; }
 .home-node-controls input[type="checkbox"] { flex: 0 0 auto; width: 18px; height: 18px; margin-top: 2px; }
 .home-node-controls input[type="number"] { width: 110px; max-width: 100%; padding: 5px; }
+.home-node-payout-choice { margin: 12px 0; padding: 12px; border: 1px solid var(--line, #ddd); border-radius: 8px; }
+.home-node-payout-choice label { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+.home-node-payout-choice input { flex: 0 0 auto; }
 .home-node a { overflow-wrap: anywhere; }
 .home-node-host-kind { display: inline-block; border: 1px solid currentColor; border-radius: 6px; padding: 2px 7px; margin: 3px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .home-node-host-kind.operator { color: #145c45; background: #eaf5ee; }

@@ -41,7 +41,14 @@ Every financial action has a review, an explicit authorization and a separate re
 **Money** has four sections: **Holdings**, **Shares & loans**, **Local stakes** and **Devices & income**. Its **Holdings** tab
 carries the ownership path (available shares, an explicitly reviewed loan, and wallet-signed housing/workshop
 stakes `tHOME`, `tWORK` in **Local stakes**). The separate rental-deposit route remains available in Home. Issuer
-examples have separate markers on the OSM 3D map; real public projects retain source-based Follow actions.
+examples have separate markers on the OSM 3D map; real public projects retain source-based Follow actions. The housing
+example shows its building sketch and a 3D OpenStreetMap view of the fictional house at an illustrative spot; the live
+building panel starts with what a holder can claim, then where the income comes from. On 2 October a paid answer on the
+owner's GPU (payout set to the building) settled 0.0082 tUSDG into the distributor and the sole staker claimed 0.000019
+tUSDG ([evidence](docs/evidence/HOSTED_BUILDING_INCOME_CLAIM_ROBINHOOD_TESTNET_2026-10-02.json)); reinvesting, monthly
+test rent shared with the building (80 % landlord, 20 % building, built, not run live) and solar income are not proven
+live. A third, illustrative Agri-PV calculator (no token, no purchase) uses unverified developer figures and editable
+assumptions. All fictional test units: no value, no rights.
 
 The [public deployment manifest](contracts/evm/deployments/local-investments-46630.json) pins the
 contracts. [Actual Privy purchase evidence](docs/evidence/LOCAL_CITY_INVESTMENTS_ROBINHOOD_TESTNET.json)
@@ -170,7 +177,8 @@ Home Assistant locally and pushes selected readings signed, adds public validato
 Wake-on-LAN. Tokens and keys stay on the device and the hosted site never calls into your network.
 Any signed-in account with a verified EVM wallet may pair up to two community hosts. Solar income to
 the building is simulated (test dollars once per completed local day, lower bound of measured kWh ×
-tariff) and needs a funding key that is not configured yet. Nothing here is proven live on real devices.
+tariff) and needs a funding key that is not configured yet. Nothing here is proven live on real devices, except one
+paid GPU answer whose income reached the building and was claimed on 2 October (see Local stakes).
 
 ## Architecture
 

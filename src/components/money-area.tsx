@@ -39,7 +39,7 @@ export function MoneyArea({ request, tenancies, loaded, homeError, retryHome, go
           summary: 'Borrowing and lending are separate optional tasks, not rental-deposit products.',
           content: <ShareWorkflows request={request} go={go} /> },
         { id: 'money-stakes', label: 'Local stakes', reality: ['testnet_simulated'],
-          summary: 'Buy fictional test units in a housing project or a workshop. They grant no company, cooperative or property rights.',
+          summary: 'Buy fictional test units in a housing project or a workshop, or explore an illustrative Agri-PV income calculation with no token. Units grant no company, cooperative or property rights.',
           content: <LocalInvestments request={request} go={go} /> },
         { id: 'money-devices', label: 'Devices & income', reality: ['read_only_live', 'testnet_real'],
           summary: 'Connect your own GPU, solar sensors or validator IDs. Paid GPU receipts and simulated solar feed-in can support the building; readings stay outside your priced subtotal.',

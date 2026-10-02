@@ -1,0 +1,12 @@
+.project-map-wrap { padding: 28px; border-top: 1px solid var(--line); min-width: 0; }
+.project-map-wrap > header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.project-map-wrap h3 { margin: 7px 0 0; font-size: 1.35rem; letter-spacing: -.025em; }
+.project-map { width: 100%; height: 420px; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
+.project-map-wrap .small-copy { line-height: 1.6; overflow-wrap: anywhere; }
+.project-map-label { display: block; max-width: 210px; padding: 6px 9px; border-radius: 7px; border: 1px solid #b16c3e; background: #fffaf1; color: #4b3625; font: 600 11px/1.4 system-ui, sans-serif; white-space: normal; text-align: center; box-shadow: 0 2px 8px #15263b22; }
+@media (max-width: 680px) {
+  .project-map-wrap { padding: 20px 16px; }
+  .project-map { height: 320px; }
+  .project-map-wrap h3 { font-size: 1.2rem; }
+  .project-map-label { max-width: 170px; font-size: 10px; }
+}

@@ -14,6 +14,28 @@ export const ROEBEL_AGRI_PV = {
   noteUrl: 'https://github.com/GiraeffleAeffle/ledger-of-life/blob/develop/docs/research/ROEBEL_AGRI_PV_2026-01.md',
 } as const;
 
+/** Illustration only: deliberately outside the test issuers that drive contracts and markets. */
+export const AGRI_PV_EXAMPLE = {
+  id: 'illustrative-agri-pv',
+  name: 'Fictional Agri-PV example · illustrative',
+  defaults: {
+    plantSizeMWp: 6,
+    annualProductionKWh: 6_000_000,
+    investmentEuro: 4_000_000,
+    electricityPriceEuroPerKWh: 0.0479,
+    areaHectares: 8,
+    cropRevenueEuroPerHectare: 2_000,
+    operatingCostPercent: 20,
+    ticketEuro: 250,
+  },
+  electricitySource: {
+    url: 'https://www.bundesnetzagentur.de/DE/Fachthemen/ElektrizitaetundGas/Ausschreibungen/Solaranlagen1/01072026/artikel.html',
+    date: '18 August 2026',
+    label: 'Bundesnetzagentur · 1 July 2026 first-segment solar tender',
+    description: '4.79 ct/kWh volume-weighted award value, published 18 August 2026. An EEG support benchmark, not a sales-price quote or a Röbel award; used here only as an editable price assumption. No Agri-PV premium is assumed.',
+  },
+} as const;
+
 export type TestCityInvestmentId = 'demo-neighbourhood-homes' | 'demo-retrofit-workshop';
 export type TestCityInvestment = {
   id: TestCityInvestmentId;
@@ -29,6 +51,7 @@ export type TestCityInvestment = {
   priceAtomicPerUnit: string;
   totalUnitsRaw: string;
   location: { coordinates: readonly [number, number]; basis: 'illustrative'; label: string };
+  model: { footprintMetres: readonly [number, number]; rotationDegrees: number; storeys: number; storeyHeightMetres: number };
 };
 
 /** Separate fictional issuers. Neither is any real provider or mapped property's owner. */
@@ -41,7 +64,8 @@ export const TEST_CITY_INVESTMENTS: readonly TestCityInvestment[] = [
     issuerReality: 'fictional-test-issuer',
     rights: 'Test tokens only; no company shares, cooperative membership or property title.',
     priceAtomicPerUnit: '1000000', totalUnitsRaw: '10000000000000000000000',
-    location: { coordinates: [13.898, 52.568], basis: 'illustrative', label: 'Illustrative city placement — not this property or an offer of land.' },
+    location: { coordinates: [13.896978, 52.570030], basis: 'illustrative', label: 'Illustrative city placement — not this property or an offer of land.' },
+    model: { footprintMetres: [24, 12], rotationDegrees: 18, storeys: 4, storeyHeightMetres: 3 },
   },
   {
     id: 'demo-retrofit-workshop', name: 'Neighbourhood Works · test issuer', symbol: 'tWORK',
@@ -51,6 +75,7 @@ export const TEST_CITY_INVESTMENTS: readonly TestCityInvestment[] = [
     issuerReality: 'fictional-test-issuer',
     rights: 'Test tokens only; no company shares, cooperative membership or property title.',
     priceAtomicPerUnit: '1000000', totalUnitsRaw: '10000000000000000000000',
-    location: { coordinates: [13.8858, 52.5786], basis: 'illustrative', label: 'Illustrative city placement — not a real business site or investment offer.' },
+    location: { coordinates: [13.888570, 52.581897], basis: 'illustrative', label: 'Illustrative city placement — not a real business site or investment offer.' },
+    model: { footprintMetres: [30, 16], rotationDegrees: -12, storeys: 1, storeyHeightMetres: 6 },
   },
 ];

@@ -6,6 +6,7 @@ import { LocalStore } from './store.ts';
 import { createHostInvitation, createHostPairing, ownedConnectorHosts } from './local-ai-hosts.ts';
 import { assignNodeSolar, HOME_NODE_PREFIX, myHomeNodes, nodeLocalDay, operatorHomeNodes, recordNodeCapabilities, recordNodeReading, reviewNodeSolar, type NodeRecord } from './home-node.ts';
 import { reconcileBuildingIncome } from './building-income.ts';
+import type { BuildingManifest } from './building-revenue.ts';
 const owner: VerifiedIdentity = { subject: 'node-owner', sessionId: 'session', expiresAt: 2000000000, wallets: [{ id: 'wallet', chainType: 'ethereum', address: '0x1111111111111111111111111111111111111111' }], passkeyCount: 0 };
 const originalAllowlist = process.env.LOCAL_AI_HOST_OWNER_WALLETS;
 const operator: VerifiedIdentity = { ...owner, subject: 'operator', wallets: [{ id: 'operator', chainType: 'ethereum', address: '0x3333333333333333333333333333333333333333' }] };
@@ -17,6 +18,27 @@ async function paired(store: LocalStore, now: number) {
   const { hostId } = await createHostPairing(store, { code: invite.code, publicKey: keys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64'), name: 'Solar node' }, now);
   return (await ownedConnectorHosts(store, owner, now)).find(host => host.id === hostId)!;
 }
+test('device destination resolves from the manifest without chain reads and keeps legacy dates unknown', async () => {
+  const store = new LocalStore(':memory:');
+  try {
+    const host = await paired(store, 1000000);
+    const options = { loadManifest: async () => ({ distributor: host.payoutWallet } as BuildingManifest) };
+    const building = await myHomeNodes(store, owner, 1000001, options);
+    assert.equal(building.devices[0].payoutTarget, 'building');
+    assert.equal(building.devices[0].payoutChangedAt, new Date(1000000).toISOString());
+    assert.equal(building.buildingPayoutAvailable, true);
+    assert.equal((await myHomeNodes(store, owner, 1000001, { loadManifest: async () => null })).devices[0].payoutTarget, 'own');
+    await store.update<{ hosts: { payoutWallet: string; payoutChangedAt?: string }[] }>('local-ai:connector-registry', registry => {
+      registry.hosts[0].payoutWallet = '0x9999999999999999999999999999999999999999';
+      delete registry.hosts[0].payoutChangedAt;
+      return registry;
+    });
+    const other = await myHomeNodes(store, owner, 1000001, { loadManifest: async () => null });
+    assert.equal(other.devices[0].payoutTarget, 'other');
+    assert.equal(other.devices[0].payoutChangedAt, null);
+    assert.equal(other.buildingPayoutAvailable, false);
+  } finally { await store.close(); }
+});
 test('private node readings enforce time, monotonic daily energy, rate bounds, day rollover and owner isolation', async () => {
   const store = new LocalStore(':memory:');
   try {

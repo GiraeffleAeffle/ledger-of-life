@@ -37,6 +37,7 @@ export interface TenancyJourney {
   agreementId: string;
   property: string;
   depositForm?: DepositForm;
+  rentTerms?: Agreement['rentTerms'];
   shareDeposit?: ShareDepositView;
   home?: Agreement['home'];
   handover?: Agreement['handover'];
@@ -169,7 +170,7 @@ export async function tenancyJourney(
   readShares: typeof readShareDeposit = readShareDeposit,
 ): Promise<TenancyJourney> {
   const role = agreementRole(agreement, identity);
-  const base = { agreementId: agreement.id, property: agreement.property, role, depositForm: agreement.depositForm, requiredSecurity: agreement.requiredSecurity, chain: null,
+  const base = { agreementId: agreement.id, property: agreement.property, role, depositForm: agreement.depositForm, rentTerms: agreement.rentTerms, requiredSecurity: agreement.requiredSecurity, chain: null,
     home: agreement.home, handover: agreement.handover, cancelled: agreement.cancelled, cancellable: false,
     sampleParties: Object.values(agreement.parties).some((party) => party?.subject.startsWith('test-signer:')) };
   if (agreement.depositForm?.kind === 'shares') {

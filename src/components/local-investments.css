@@ -2,7 +2,7 @@
 .local-capital-heading { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; padding: 28px 28px 18px; }
 .local-capital-heading h2 { margin: 6px 0 8px; font-size: clamp(1.45rem, 2.4vw, 2rem); letter-spacing: -.04em; }
 .local-capital-heading p { margin: 0; color: var(--muted); max-width: 570px; line-height: 1.5; }
-.local-project-picker { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; padding: 0 28px; }
+.local-project-picker { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; padding: 0 28px; }
 .local-project-choice { min-width: 0; display: grid; gap: 6px; }
 .local-project-choice > button:first-child { display: grid; grid-template-columns: 48px minmax(0,1fr) auto; align-items: center; gap: 12px; min-width: 0; border: 1px solid var(--line-strong); border-radius: 13px; background: var(--soft); padding: 16px; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
 .local-project-choice > button[aria-pressed=true] { background: var(--soft); border-color: var(--ink); box-shadow: inset 0 0 0 1px #15263b12; }
@@ -80,6 +80,16 @@
 .city-blueprint-evidence summary { cursor: pointer; font-weight: 600; }
 .city-flywheel { padding: 30px; }
 .city-flywheel h3 { margin: 9px 0 25px; font-size: 1.55rem; letter-spacing: -.035em; }
+.building-panel > section { margin: 22px 0; min-width: 0; }
+.building-panel h4 { margin: 0 0 16px; font-size: 1.05rem; }
+.building-panel .building-rewards { padding: 22px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--soft); }
+.building-rewards .local-test-actions > div { flex: 1 1 180px; min-width: 0; }
+.building-rewards .button { width: 100%; justify-content: center; }
+.building-income, .building-how { padding-top: 22px; border-top: 1px solid var(--line); }
+.building-how summary { font-weight: 600; cursor: pointer; }
+.building-panel label { display: grid; gap: 8px; max-width: 420px; margin: 16px 0; }
+.building-panel input { width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font: inherit; color: var(--ink); }
+.local-housing-precedent { padding: 0 30px 24px; }
 @media (max-width: 1000px) {
   .local-project-choice > button:first-child { grid-template-columns: 42px minmax(0,1fr); }
   .local-project-owned { grid-column: 2; }
@@ -111,6 +121,8 @@
   .city-blueprint-art > svg { max-width: 340px; }
   .city-flywheel { padding: 23px 19px; }
   .city-flywheel h3 { font-size: 1.3rem; }
+  .building-panel .building-rewards { padding: 16px; }
+  .local-housing-precedent { padding: 0 19px 20px; }
 }
 .local-contract-links { display: flex; flex-wrap: wrap; gap: 12px; margin: -7px 0 15px; color: var(--muted); font-size: .72rem; }
 .local-contract-links a { display: inline-flex; align-items: center; gap: 5px; color: inherit; }

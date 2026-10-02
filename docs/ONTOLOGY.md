@@ -17,7 +17,7 @@ The machine-readable source of truth is [`ontology.yaml`](ontology.yaml). This p
 | Layer | Question it answers | Concepts |
 | --- | --- | --- |
 | 1. Identity and contexts | Who is acting, in which context, and what may others learn? | Person, Wallet, IdentityAssurance, Credential, DisclosurePolicy, Context, Membership, CitySignal, MyPlaces, ArrivalGuide, ProjectFollow |
-| 2. Homes | Which home, terms and parties? | Home, Listing, Application, Agreement, Role |
+| 2. Homes | Which home, terms and parties? | Home, Listing, Application, Agreement, RentPayment, Role |
 | 3. Custody | Who may move a deposit? | Escrow, Operation, Claim, Settlement, Payout, CollateralDeposit |
 | 4. Earnings | What does it earn? | YieldSource, Earnings, Release |
 | 5. Ownership | What do I own, owe and earn? | Asset, Position, TestFunds, BorrowAgainstShares, Venue, Distribution, Adapter |
@@ -133,6 +133,35 @@ sequenceDiagram
   E->>T: Payout: deposit minus deduction
   E->>L: Payout: deduction
 ```
+
+**Monthly rent is separate from the deposit.** A new listing can explicitly join the fictional
+`demo-neighbourhood-homes` building. Its share is fixed at **20% (2000 basis points)**, not an
+editable rate. Only the resulting new agreement binds the building ID, monthly rent, fixed share
+and landlord wallet into its accepted v3 digest; legacy/unmarked agreements remain unchanged.
+
+A **RentPayment** journal (`rent-payment:`) records the agreement's **Europe/Berlin calendar month**
+(`YYYY-MM`) and two separately reviewed, tenant-wallet-signed real test **tUSDG** transfers:
+`floor(rent atomic units × 2000 / 10000)` to the tHOME staking distributor and the exact remainder
+to the landlord. One journal per agreement/month prevents paying a confirmed month twice.
+Prepared, pending and stopped payments recover the same signed transfers rather than silently
+creating replacement spends; both steps must confirm before the whole payment is confirmed.
+Rent never draws from deposit escrow, and deposit earnings remain the tenant's.
+
+Public building income emits one aggregated **“Rent shares”** source: a total and receipt count,
+never flat labels, tenant identity, names, wallets or private agreement/payment IDs. Internal
+matching requires a confirmed **building** step and an exact inflow transaction hash, amount,
+token and distributor match, attributing each receipt once. Rent-associated hashes and explorer
+links are omitted from public receipt rows; exact rent receipts and flat labels stay in the
+authenticated tenant/landlord rent view. The building step can count while the independent
+landlord transfer is unfinished; landlord transfers, pending steps and unrelated inflows cannot
+borrow its evidence. Other public income receipts also omit sender wallets. This disclosure
+policy does not make blockchain transactions anonymous.
+GPU and simulated-solar income retain their own evidence and meanings.
+
+A fixed 20% of this test rent goes to the fictional building's tHOME stakers; the rest goes to the
+landlord. This simulates how a tokenized building could share net rental income; in a real building
+rent goes to the property owner under the lease. Fictional units confer no value or property rights.
+Not legal advice.
 
 ## Rules that must always hold
 

@@ -4,6 +4,7 @@ import { AccessError, ConflictError } from './errors.ts';
 import { hostOperatorAllowed, hostPairingAllowed, operatorConnectorHosts, ownedConnectorHosts, type ConnectorHost } from './local-ai-hosts.ts';
 import type { Store } from './store.ts';
 import type { LocalAiRequest } from './local-ai-types.ts';
+import { loadBuildingManifest, type BuildingReadOptions } from './building-revenue.ts';
 
 export type NodeCapabilities = { gpuModels: string[]; solarSensors: string[]; validatorIds: string[] };
 export type NodeReading = { powerW: number | null; energyTodayKwh: number; timestamp: string; localDate?: string; timezone?: string };
@@ -139,8 +140,8 @@ export async function operatorHomeNodes(store: Store, identity: VerifiedIdentity
     return { ...host, ...operatorSolarSummary(row) };
   })) };
 }
-export async function myHomeNodes(store: Store, identity: VerifiedIdentity, now = Date.now()) {
-  const hosts = await ownedConnectorHosts(store, identity, now);
+export async function myHomeNodes(store: Store, identity: VerifiedIdentity, now = Date.now(), options: BuildingReadOptions = {}) {
+  const [hosts, manifest] = await Promise.all([ownedConnectorHosts(store, identity, now), (options.loadManifest ?? loadBuildingManifest)()]);
   const earnings = new Map(hosts.map(host => [host.id, { settledAnswers: 0, amountAtomic: '0', asset: null as string | null, receipts: [] as { txHash: string; amountAtomic: string; settledAt: string | null }[] }]));
   let after = '';
   for (;;) {
@@ -158,7 +159,10 @@ export async function myHomeNodes(store: Store, identity: VerifiedIdentity, now 
     after = rows[rows.length - 1].key;
   }
   const devices = await Promise.all(hosts.map(async host => {
+    // Resolve the saved destination from deployment pins, without reading chain history.
     const row = await store.get<NodeRecord>(HOME_NODE_PREFIX + host.id);
+    const payoutTarget = host.payoutWallet && manifest?.distributor && host.payoutWallet.toLowerCase() === manifest.distributor.toLowerCase() ? 'building'
+      : host.payoutWallet && identity.wallets.some(wallet => wallet.chainType === 'ethereum' && wallet.address.toLowerCase() === host.payoutWallet!.toLowerCase()) ? 'own' : 'other';
     const cutoff = now - 30 * 86400000;
     const solarIncome: { day: string; energyKwh: number; amountAtomic: string; state: string; txHash: string | null }[] = [];
     let cursor = '';
@@ -168,7 +172,8 @@ export async function myHomeNodes(store: Store, identity: VerifiedIdentity, now 
       if (page.length < 100) break;
       cursor = page[page.length - 1].key;
     }
-    return { hostId: host.id, name: host.name, state: host.state, kind: host.kind, availability: host.availability, payoutWallet: host.payoutWallet, models: host.models, freePublicAnswers: host.freePublicAnswers === true, canSuspend: hostOperatorAllowed(identity) && host.kind === 'community', capabilities: row?.capabilities ?? null, latestReading: row?.latestReading && Date.parse(row.latestReading.timestamp) >= cutoff ? row.latestReading : null, dailyTotals: row?.dailyTotals.filter(entry => Date.parse(entry.updatedAt) >= cutoff) ?? [], assignSolarToBuilding: row?.assignSolarToBuilding ?? false, solarAssignmentState: row?.solarAssignmentState ?? (row?.assignSolarToBuilding ? 'pending' : 'unassigned'), peakCapacityKwp: row?.peakCapacityKwp ?? null, dailyProductionCeilingKwh: row?.peakCapacityKwp ? Math.min(row.peakCapacityKwp * 8, 100) : null, solarAnomaly: row?.solarAnomaly ?? null, earnings: earnings.get(host.id)!, solarIncome };
+    const payout = { payoutTarget, payoutChangedAt: host.payoutChangedAt ?? null };
+    return { ...payout, hostId: host.id, name: host.name, state: host.state, kind: host.kind, availability: host.availability, payoutWallet: host.payoutWallet, models: host.models, freePublicAnswers: host.freePublicAnswers === true, canSuspend: hostOperatorAllowed(identity) && host.kind === 'community', capabilities: row?.capabilities ?? null, latestReading: row?.latestReading && Date.parse(row.latestReading.timestamp) >= cutoff ? row.latestReading : null, dailyTotals: row?.dailyTotals.filter(entry => Date.parse(entry.updatedAt) >= cutoff) ?? [], assignSolarToBuilding: row?.assignSolarToBuilding ?? false, solarAssignmentState: row?.solarAssignmentState ?? (row?.assignSolarToBuilding ? 'pending' : 'unassigned'), peakCapacityKwp: row?.peakCapacityKwp ?? null, dailyProductionCeilingKwh: row?.peakCapacityKwp ? Math.min(row.peakCapacityKwp * 8, 100) : null, solarAnomaly: row?.solarAnomaly ?? null, earnings: earnings.get(host.id)!, solarIncome };
   }));
-  return { devices, canPair: hostPairingAllowed(identity), isOperator: hostOperatorAllowed(identity) };
+  return { devices, canPair: hostPairingAllowed(identity), isOperator: hostOperatorAllowed(identity), buildingPayoutAvailable: Boolean(manifest?.distributor), ownPayoutAvailable: identity.wallets.filter(wallet => wallet.chainType === 'ethereum' && /^0x[0-9a-fA-F]{40}$/.test(wallet.address)).length === 1 };
 }

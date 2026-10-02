@@ -1,10 +1,10 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowRight, ArrowUpRight, Building2, Check, ExternalLink, Loader2, MapPin, Wallet, Wrench } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Building2, Check, ExternalLink, Leaf, Loader2, MapPin, Wallet, Wrench } from 'lucide-react';
 import { formatUnits } from 'viem';
 import { useRentalWallet } from '@/wallets';
 import { parseAmount } from '@/domain/assets';
-import { STRAUSBERG_INVESTMENT_LEADS, TEST_CITY_INVESTMENTS, type TestCityInvestmentId } from '@/data/local-investments';
+import { AGRI_PV_EXAMPLE, STRAUSBERG_INVESTMENT_LEADS, TEST_CITY_INVESTMENTS, type TestCityInvestmentId } from '@/data/local-investments';
 import type { LocalInvestmentOrder, LocalInvestmentView } from '@/server/local-investments';
 import { LOCAL_INVESTMENT_NAVIGATION_INTENT, openInvestmentOnMap, type Area } from './areas';
 import { CITY_CHANGED_EVENT, readPersonCity, type AuthorizedRequest } from './use-city-signals';
@@ -13,6 +13,9 @@ import { projectDisplayName } from './project-display-name';
 import { stakeDisabledReason, TEST_EXIT_NOTICE } from './money-guidance';
 import { useSectionTabActive } from './section-tabs';
 import { ProjectBlueprint } from './city-flywheel';
+import { AgriPvExample } from './agri-pv-example';
+import { ProjectMap } from './project-map';
+import { DEFAULT_PROJECT_SYSTEMS, type ProjectSystems } from './project-map-model';
 import { TestDollars } from './test-dollars';
 import { BuildingPanel } from './building-panel';
 import './local-investments.css';
@@ -27,6 +30,11 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
   const wallet = useRentalWallet();
   const activeTab = useSectionTabActive();
   const [selectedId, setSelectedId] = useState<TestCityInvestmentId>(TEST_CITY_INVESTMENTS[0].id);
+  const [showAgriPv, setShowAgriPv] = useState(false);
+  const [systemsByProject, setSystemsByProject] = useState<Record<TestCityInvestmentId, ProjectSystems>>({
+    'demo-neighbourhood-homes': { ...DEFAULT_PROJECT_SYSTEMS },
+    'demo-retrofit-workshop': { ...DEFAULT_PROJECT_SYSTEMS },
+  });
   const [city, setCity] = useState<CityResult | null>(null);
   const [market, setMarket] = useState<LocalInvestmentView | null>(null);
   const [order, setOrder] = useState<LocalInvestmentOrder | null>(null);
@@ -85,7 +93,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
       if (!id) return;
       sessionStorage.removeItem(LOCAL_INVESTMENT_NAVIGATION_INTENT);
       const project = TEST_CITY_INVESTMENTS.find((item) => item.id === id);
-      if (project) queueMicrotask(() => { setSelectedId(project.id); });
+      if (project) queueMicrotask(() => { setSelectedId(project.id); setShowAgriPv(false); });
     }
     window.addEventListener(LOCAL_INVESTMENT_NAVIGATION_INTENT, consume); consume();
     return () => window.removeEventListener(LOCAL_INVESTMENT_NAVIGATION_INTENT, consume);
@@ -111,6 +119,10 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
   }, [pendingOrderId, request, activeTab]);
 
   const project = TEST_CITY_INVESTMENTS.find((item) => item.id === selectedId)!;
+  const systems = systemsByProject[selectedId];
+  const setSystems = (update: React.SetStateAction<ProjectSystems>) => setSystemsByProject((current) => ({
+    ...current, [selectedId]: typeof update === 'function' ? update(current[selectedId]) : update,
+  }));
   const asset = market?.assets.find((item) => item.projectId === selectedId);
   const currentOrder = order?.projectId === selectedId ? order : null;
   const openOrder = Boolean(order && (order.state === 'review' || order.state === 'pending'));
@@ -199,15 +211,16 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
   }
 
   return <section className="local-capital" id="local-investments" tabIndex={-1} aria-label="Local stakes">
-    <header className="local-capital-heading"><div><span className="eyebrow">LOCAL STAKES · FICTIONAL TEST ISSUERS</span><h2>Explore fictional local test units.</h2></div></header>
-    <div className="local-project-picker" role="group" aria-label="Choose a fictional test issuer">{TEST_CITY_INVESTMENTS.map((item) => {
+    <header className="local-capital-heading"><div><span className="eyebrow">LOCAL STAKES · FICTIONAL EXAMPLES</span><h2>Explore fictional local projects.</h2></div></header>
+    <div className="local-project-picker" role="group" aria-label="Choose a fictional local project">{TEST_CITY_INVESTMENTS.map((item) => {
       const holding = market?.assets.find((entry) => entry.projectId === item.id);
       const Icon = item.kind === 'housing' ? Building2 : Wrench;
-      return <div key={item.id} className="local-project-choice"><button type="button" data-project-id={item.id} disabled={Boolean(busy)} aria-pressed={selectedId === item.id} onClick={() => { setSelectedId(item.id); setActionError(''); }}>
+      return <div key={item.id} className="local-project-choice"><button type="button" data-project-id={item.id} disabled={Boolean(busy)} aria-pressed={!showAgriPv && selectedId === item.id} onClick={() => { setSelectedId(item.id); setShowAgriPv(false); setActionError(''); }}>
         <span className={`local-project-icon ${item.kind}`}><Icon size={25} /></span><span><strong>{item.kind === 'housing' ? 'Fictional housing example' : 'Fictional workshop example'}</strong><small>{projectDisplayName(item.name)}</small></span>
         <span className="local-project-owned">{holding?.holdingRaw === null || !holding ? '— units' : `${units(holding.holdingRaw)} ${item.symbol}`}{readError && <small>Last checked</small>}</span>
-      </button><button type="button" className="text-button" aria-label={`Sell back ${item.symbol} fictional test units`} disabled={Boolean(busy) || openOrder || !holding?.holdingRaw || BigInt(holding.holdingRaw) === 0n} onClick={() => { setSelectedId(item.id); setDirection('sell'); setAmount('1'); setActionError(''); }}>Sell back {item.symbol}</button></div>;
-    })}</div>
+      </button>{!showAgriPv && <button type="button" className="text-button" aria-label={`Sell back ${item.symbol} fictional test units`} disabled={Boolean(busy) || openOrder || !holding?.holdingRaw || BigInt(holding.holdingRaw) === 0n} onClick={() => { setSelectedId(item.id); setShowAgriPv(false); setDirection('sell'); setAmount('1'); setActionError(''); }}>Sell back {item.symbol}</button>}</div>;
+    })}<div className="local-project-choice"><button type="button" data-project-id={AGRI_PV_EXAMPLE.id} disabled={Boolean(busy)} aria-pressed={showAgriPv} onClick={() => { setShowAgriPv(true); setActionError(''); }}><span className="local-project-icon"><Leaf size={25} /></span><span><strong>{AGRI_PV_EXAMPLE.name}</strong><small>Electricity + crops · editable income model, no token or purchase</small></span></button></div></div>
+    {showAgriPv ? <AgriPvExample /> : <>
     {city?.name && city.cityId !== 'strausberg' && <p>No local stakes in {city.name} yet; these fictional examples are set in Strausberg.</p>}
     <div className="local-project-toolbar"><div><MapPin size={15} />{project.cityName} · illustrative pin, not a real project</div><button type="button" className="text-button" onClick={() => openInvestmentOnMap(go, project.id)}>See on the map <ArrowUpRight size={15} /></button></div>
     {readError && <p className="local-market-alert" role="alert">Stake reads unavailable: {readError} <button type="button" className="text-button" onClick={() => void refresh()}>Retry reading</button></p>}
@@ -248,7 +261,10 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
         {checkedAt && <span className="local-checked">Wallet/market last checked {checkedAt}{readError ? ' · refresh unavailable' : ''}</span>}
       </div>
     </div>
-    {project.kind === 'housing' ? <BuildingPanel request={request} /> : <ProjectBlueprint key={project.id} kind={project.kind} go={go} />}
+    <ProjectBlueprint kind={project.kind} go={go} enabled={systems} setEnabled={setSystems} />
+    <ProjectMap key={project.id} project={project} systems={systems} />
+    {project.kind === 'housing' && <><BuildingPanel request={request} /><div className="local-housing-precedent"><button type="button" className="text-button" onClick={() => setShowAgriPv(true)}>Explore the Agri-PV income example and its Röbel/Müritz source →</button></div></>}
     <details className="local-investment-details"><summary>Sources, project context &amp; token rights</summary><p>Purchases move test tokens on Robinhood Chain testnet after your wallet signs. These issuers and projects are fictional; they are not the real buildings, owners or companies shown in public city records. They establish no construction, funding, dividend, employment or tax outcome. Test USD (tUSDG) can come from your existing Robinhood Chain wallet or a separate share-backed test loan; Solana assets do not bridge here. Borrowing and buying a stake require separate approvals; buying units does not repay a loan, and collateral can still be liquidated.</p><p>{project.rights} Fictional test units are displayed separately from priced assets: an issue price is not a resale quote, guaranteed exit or legal interest in a building. Shared test USD (tUSDG) is counted once.</p><h4>Real Strausberg research leads</h4><ul>{STRAUSBERG_INVESTMENT_LEADS.map((lead) => <li key={lead.url}><a href={lead.url} target="_blank" rel="noopener noreferrer">{lead.name}</a> · {lead.kind}. Research lead only; check eligibility and terms directly.</li>)}</ul></details>
+    </>}
   </section>;
 }

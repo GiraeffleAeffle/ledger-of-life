@@ -3,10 +3,11 @@ import { resolve } from 'node:path';
 import { createPublicClient, formatUnits, getAddress, http, keccak256, parseAbi, parseAbiItem, type Address, type Hex } from 'viem';
 import investments from '../../contracts/evm/deployments/local-investments-46630.json' with { type: 'json' };
 import type { Store } from './store.ts';
-import { attributeBuildingIncome, type BuildingInflow, type IncomeEvidence } from './building-revenue-attribution.ts';
+import { attributeBuildingIncome, rentPaymentEvidence, type BuildingInflow, type IncomeEvidence } from './building-revenue-attribution.ts';
 import type { LocalAiRequest } from './local-ai-types.ts';
 import { buildingIncomeJournals } from './building-income.ts';
 import { connectorHosts } from './local-ai-hosts.ts';
+import type { RentPayment } from './rent-payments.ts';
 
 export const BUILDING_ABI = parseAbi([
   'function payoutToken() view returns (address)',
@@ -89,6 +90,7 @@ export async function readBuildingView(store: Store, options: BuildingReadOption
   const incomeEvidence: IncomeEvidence[] = [];
   let totalStaked = 0n, rewardPerUnit = 0n, pendingRevenue = 0n, undistributedScaled = 0n;
   let rewardRate = 0n, periodFinish = 0n, lastUpdateTime = 0n, streamRemainingScaled = 0n, rewardRemainderScaled = 0n;
+  let payingDevices: { name: string; kind: 'operator' | 'community'; availability: 'online' | 'asleep' | 'offline' }[] = [];
   const balances = new Map<Address, bigint>();
   if (manifest?.distributor) {
     await verifyBuildingDeployment(manifest, rpc);
@@ -153,7 +155,16 @@ export async function readBuildingView(store: Store, options: BuildingReadOption
     } while (true);
   }
   if (manifest?.distributor) {
+    let rentCursor = '';
+    do {
+      const rows = await store.scan<RentPayment>('rent-payment:', rentCursor, 500);
+      incomeEvidence.push(...rentPaymentEvidence(rows.map(row => row.value), { distributor: manifest.distributor, payoutToken: manifest.payoutToken }));
+      if (rows.length < 500) break;
+      rentCursor = rows[rows.length - 1].key;
+    } while (true);
     const [journals, hosts] = await Promise.all([buildingIncomeJournals(store), connectorHosts(store)]);
+    payingDevices = hosts.filter(host => host.payoutWallet?.toLowerCase() === manifest.distributor!.toLowerCase())
+      .map(host => ({ name: host.name, kind: host.kind ?? 'community', availability: host.availability }));
     for (const journal of journals) {
       if (journal.state !== 'done' || !journal.step.hash ||
           journal.distributor.toLowerCase() !== manifest.distributor.toLowerCase() ||
@@ -168,6 +179,7 @@ export async function readBuildingView(store: Store, options: BuildingReadOption
     configured: Boolean(manifest), status: manifest ? 'configured' : 'unconfigured',
     reason: manifest ? null : 'Building staking distributor is not deployed.', chainId: 46630,
     distributor: manifest?.distributor ?? null, explorerUrl,
+    payingDevices,
     shareToken: manifest?.unitToken ?? investments.assets['demo-neighbourhood-homes'].unitAddress,
     assetToken: manifest?.payoutToken ?? investments.cashAddress, revenueRaw, revenue: formatUnits(BigInt(revenueRaw), 6),
     totalStakedRaw: totalStaked.toString(), totalStaked: formatUnits(totalStaked, 18), rewardPerUnitRaw: rewardPerUnit.toString(),

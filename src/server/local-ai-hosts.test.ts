@@ -8,6 +8,9 @@ import { setImmediate } from 'node:timers/promises';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { LocalStore } from './store.ts';
 import { AccessError } from './errors.ts';
+import { keccak256 } from 'viem';
+import type { BuildingManifest, BuildingRpc } from './building-revenue.ts';
+import { resolveConnectorPayout, setConnectorPayoutWallet } from './local-ai-hosts.ts';
 import { authenticateConnector, cancelConnectorInference, checkConnectorHeaders, chooseConnectorHost, completeConnectorJob, connectorSigningBytes,
   createHostInvitation, createHostPairing, enqueueConnectorInference, hostPairingAllowed, parseConnectorBody, pollConnectorJob, publicConnectorHosts,
   readConnectorBody, recordHostHeartbeat, releaseConnectorHost, reserveConnectorHost, revokeConnectorHost, sanitizeConnectorAnswer, suspendConnectorHost, ownedConnectorHosts, type ConnectorInferenceInput } from './local-ai-hosts.ts';
@@ -52,6 +55,58 @@ async function startJob(store: LocalStore, hostId: string, requestId = 'request'
   await setImmediate();
   return { outcome };
 }
+test('saved payout survives heartbeats and a store reopen; a node cannot override its owner setting', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'host-payout-'));
+  const path = join(directory, 'store.sqlite');
+  let store = new LocalStore(path);
+  try {
+    const { hostId } = await pairing(store, 1000000);
+    await setConnectorPayoutWallet(store, owner, hostId, alternateWallet, 1001000);
+    await setConnectorPayoutWallet(store, owner, hostId, alternateWallet, 1002000);
+    await recordHostHeartbeat(store, hostId, { models: ['model'], ollamaReachable: true, awake: true }, 1003000);
+    for (const field of ['payoutWallet', 'payoutTarget', 'payoutChangedAt'])
+      await assert.rejects(recordHostHeartbeat(store, hostId, { models: [], ollamaReachable: true, awake: true, [field]: wallet }, 1004000));
+    await assert.rejects(setConnectorPayoutWallet(store, owner, hostId, thirdWallet, 1004000), AccessError);
+    await store.close();
+    store = new LocalStore(path);
+    const host = (await ownedConnectorHosts(store, owner, 1005000))[0];
+    assert.equal(host.payoutWallet, alternateWallet);
+    assert.equal(host.payoutChangedAt, new Date(1001000).toISOString());
+    assert.deepEqual(host.models, ['model']);
+  } finally { await store.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('building invitation verifies deployment, preserves identity kind and pairs with its saved payee', async () => {
+  const distributor = '0x4444444444444444444444444444444444444444';
+  const payoutToken = '0x5555555555555555555555555555555555555555';
+  const unitToken = '0x6666666666666666666666666666666666666666';
+  const hash = keccak256('0x1234');
+  const manifest: BuildingManifest = { version: 3, chainId: 46630, status: 'deployed', distributor, payoutToken, unitToken, deploymentBlock: 1,
+    runtimeCodeHash: hash, dependencyCodeHashes: { payoutToken: hash, unitToken: hash }, rewardDuration: 604800,
+    rewardsSpec: { scheme: 'staking_stream_v1', scale: (10n ** 36n).toString() } };
+  const rpc = { getChainId: async () => 46630, getCode: async () => '0x1234',
+    readContract: async ({ functionName }: { functionName: string }) => ({ payoutToken, unitToken, rewardDuration: 604800n, rewardScale: 10n ** 36n })[functionName as 'payoutToken'] } as unknown as BuildingRpc;
+  const options = { loadManifest: async () => manifest, rpc };
+  const store = new LocalStore(':memory:');
+  const community = { ...owner, wallets: [{ id: 'community', chainType: 'ethereum' as const, address: alternateWallet }] };
+  try {
+    await assert.rejects(resolveConnectorPayout(owner, 'own'), /single verified/);
+    assert.equal(await resolveConnectorPayout(community, 'own'), alternateWallet);
+    await assert.rejects(createHostInvitation(store, community, { payoutTarget: 'building' }, 1000000, { ...options, rpc: { ...rpc, getCode: async () => '0x5678' } }), /runtime/);
+    const invitation = await createHostInvitation(store, community, { payoutTarget: 'building' }, 1000000, options);
+    const { hostId } = await createHostPairing(store, { code: invitation.code, name: 'Community GPU',
+      publicKey: generateKeyPairSync('ed25519').publicKey.export({ format: 'der', type: 'spki' }).toString('base64') }, 1001000);
+    await recordHostHeartbeat(store, hostId, { models: [], ollamaReachable: false, awake: true }, 1002000);
+    const host = (await ownedConnectorHosts(store, community, 1002000))[0];
+    assert.equal(host.payoutWallet, distributor);
+    assert.equal(host.payoutChangedAt, new Date(1000000).toISOString());
+    assert.equal(host.kind, 'community');
+    await setConnectorPayoutWallet(store, community, hostId, alternateWallet, 1003000);
+    await setConnectorPayoutWallet(store, community, hostId, distributor, 1004000, options);
+    assert.equal((await ownedConnectorHosts(store, community))[0].payoutChangedAt, new Date(1004000).toISOString());
+    assert.equal((await ownedConnectorHosts(store, community))[0].kind, 'community');
+  } finally { await store.close(); }
+});
 
 test('owner invitations are hashed, single use, account/payout bound and activate only their canonical Ed25519 key', async () => {
   const store = new LocalStore(':memory:');
@@ -95,7 +150,7 @@ test('invitations expire at ten minutes and accept verified EVM ownership with a
     assert.equal(hostPairingAllowed(notEvm), false);
     await createHostInvitation(store, notAllowed, {}, 1000000);
     await assert.rejects(createHostInvitation(store, notEvm, {}, 1000000), /verified EVM/);
-    await assert.rejects(createHostInvitation(store, owner, { payoutWallet: thirdWallet }, 1000000), /own verified EVM/);
+    await assert.rejects(createHostInvitation(store, owner, { payoutWallet: thirdWallet }, 1000000), AccessError);
     await assert.rejects(createHostInvitation(store, owner, {}, 1000000), /Choose a verified/);
     const invitation = await createHostInvitation(store, other, {}, 1000000);
     const publicKey = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'der' }).toString('base64');

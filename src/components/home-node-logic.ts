@@ -6,7 +6,7 @@ export type SolarAssignmentFields = {
 export type OperatorSolarAssignmentFields = Omit<SolarAssignmentFields, 'solarAnomaly'> & { aboveCeiling: boolean; pausedForReview: boolean };
 export type HomeDevice = SolarAssignmentFields & {
   hostId: string; name: string; state: string; kind: 'operator' | 'community'; availability: string;
-  payoutWallet: string | null; models: string[]; canSuspend?: boolean;
+  payoutWallet: string | null; payoutTarget: 'building' | 'own' | 'other'; payoutChangedAt: string | null; models: string[]; canSuspend?: boolean;
   freePublicAnswers?: boolean;
   capabilities: { gpuModels: string[]; solarSensors: string[]; validatorIds: string[] } | null;
   latestReading: { powerW: number | null; energyTodayKwh: number; timestamp: string; localDate?: string; timezone?: string } | null;
@@ -15,7 +15,13 @@ export type HomeDevice = SolarAssignmentFields & {
   earnings: { settledAnswers: number; amountAtomic: string; asset: string | null; receipts?: { txHash: string; amountAtomic: string; settledAt: string | null }[] };
   solarIncome: { day: string; energyKwh: number; amountAtomic: string; state: string; txHash: string | null }[];
 };
-export type HomeDevicesResponse = { devices: HomeDevice[]; canPair: boolean; isOperator: boolean };
+export type HomeDevicesResponse = { devices: HomeDevice[]; canPair: boolean; isOperator: boolean; buildingPayoutAvailable: boolean; ownPayoutAvailable: boolean };
+export function gpuPayoutSummary(device: Pick<HomeDevice, 'payoutTarget' | 'payoutWallet' | 'payoutChangedAt'>): string {
+  const address = device.payoutWallet ? `${device.payoutWallet.slice(0, 6)}…${device.payoutWallet.slice(-4)}` : 'not configured';
+  const destination = device.payoutTarget === 'building' ? 'the building (tHOME stakers)'
+    : device.payoutTarget === 'own' ? `your wallet ${address}` : `another wallet ${address}`;
+  return `GPU income goes to: ${destination}${device.payoutChangedAt ? ` since ${new Date(device.payoutChangedAt).toLocaleString()}` : ' · start date unavailable (legacy setting)'}`;
+}
 export function atomicDollars(atomic: string): string {
   if (!/^\d+$/.test(atomic)) return 'Unavailable';
   const value = BigInt(atomic);

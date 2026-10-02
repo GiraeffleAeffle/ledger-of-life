@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import type { ProjectSystems } from './project-map-model';
 import { ArrowRight, Building2, Cpu, Leaf, Sun } from 'lucide-react';
 import { openLocalAi, type Area } from './areas';
 import { ROEBEL_AGRI_PV } from '../data/local-investments';
@@ -19,8 +20,7 @@ const technologies = [
   { id: 'gpu', label: 'GPU hosting', Icon: Cpu },
 ] as const;
 
-export function ProjectBlueprint({ kind, go }: { kind: 'housing' | 'business'; go: (area: Area) => void }) {
-  const [enabled, setEnabled] = useState({ solar: true, heat: true, validator: false, gpu: false });
+export function ProjectBlueprint({ kind, go, enabled, setEnabled }: { kind: 'housing' | 'business'; go: (area: Area) => void; enabled: ProjectSystems; setEnabled: Dispatch<SetStateAction<ProjectSystems>> }) {
   const computing = enabled.validator || enabled.gpu;
   return <div className="city-blueprint">
     <div className="city-blueprint-art">
@@ -57,7 +57,6 @@ export function ProjectBlueprint({ kind, go }: { kind: 'housing' | 'business'; g
       </ul>
       {enabled.gpu && <button type="button" className="button primary" onClick={() => openLocalAi(go)}>Try the connected GPU node <ArrowRight size={16} /></button>}
       <details className="city-blueprint-evidence"><summary>Costs, evidence &amp; realism</summary><p>These switches change a schematic, not a building, holding, bill or return. Capital cost, finance, servicing, grid charges and actual demand need a project-specific assessment.</p><p><a href="https://www.ise.fraunhofer.de/en/press-media/press-releases/2025/fraunhofer-ise-research-project-completed-heat-pumps-provide-climate-friendly-heating-in-existing-buildings.html" target="_blank" rel="noopener noreferrer">Fraunhofer ISE’s field study</a> found substantial variation in heat-pump efficiency and partial—not universal—solar autonomy. It is not a forecast for this fictional building.</p><p><a href="https://www.iea.org/commentaries/opportunities-for-district-heating-in-the-changing-energy-landscape" target="_blank" rel="noopener noreferrer">IEA on heat recovery</a>: location, temperature, timing, infrastructure and a viable business model all matter. A validator is not a substitute for a heating design.</p></details>
-      <RoebelPrecedent />
     </div>
   </div>;
 }

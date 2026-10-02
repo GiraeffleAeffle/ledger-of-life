@@ -5,7 +5,7 @@ import { AccessError, ConflictError } from './errors.ts';
 import type { LocalAiRequestUsage } from './local-ai-types.ts';
 import type { Store } from './store.ts';
 import { getAddress } from 'viem';
-import { loadBuildingManifest, verifyBuildingDeployment } from './building-revenue.ts';
+import { loadBuildingManifest, verifyBuildingDeployment, type BuildingReadOptions } from './building-revenue.ts';
 
 import type { AiProgressEvents } from '../components/local-ai-progress-state.ts';
 
@@ -26,6 +26,7 @@ export interface ConnectorHost {
   name: string;
   ownerSubject: string | null;
   payoutWallet: string | null;
+  payoutChangedAt?: string | null;
   models: string[];
   lastHeartbeat: number | null;
   state: 'active' | 'revoked' | 'suspended';
@@ -43,6 +44,7 @@ interface HostInvitation {
   codeHash: string;
   ownerSubject: string;
   payoutWallet: string;
+  payoutChangedAt?: string | null;
   expiresAt: number;
   kind?: 'operator' | 'community';
 }
@@ -84,8 +86,8 @@ async function ready(store: Store) {
   }
   await promise;
 }
-const rawHost = ({ id, name, ownerSubject, payoutWallet, models, lastHeartbeat, state, ollamaReachable, awake, canWake, freePublicAnswers, kind }: StoredHost): ConnectorHost =>
-  ({ id, name, ownerSubject, payoutWallet, models, lastHeartbeat, state, kind: kind ?? (operatorWallet(payoutWallet) ? 'operator' : 'community'), ollamaReachable, awake, canWake: canWake === true, freePublicAnswers: freePublicAnswers === true });
+const rawHost = ({ id, name, ownerSubject, payoutWallet, payoutChangedAt, models, lastHeartbeat, state, ollamaReachable, awake, canWake, freePublicAnswers, kind }: StoredHost): ConnectorHost =>
+  ({ id, name, ownerSubject, payoutWallet, payoutChangedAt: payoutChangedAt ?? null, models, lastHeartbeat, state, kind: kind ?? (operatorWallet(payoutWallet) ? 'operator' : 'community'), ollamaReachable, awake, canWake: canWake === true, freePublicAnswers: freePublicAnswers === true });
 const availability = (host: ConnectorHost, now: number): 'online' | 'asleep' | 'offline' =>
   host.state !== 'active' || host.lastHeartbeat === null || now - host.lastHeartbeat > 75000 || now < host.lastHeartbeat
     ? 'offline' : host.ollamaReachable ? 'online' : 'asleep';
@@ -138,36 +140,58 @@ function checkCapacity(registry: Registry, subject: string) {
     throw new ConflictError('An account may register at most two hosts; revoke an unused host.');
 }
 
-/** Explicit owner opt-in only. Changing the registry never reroutes an already reviewed payment. */
-export async function setConnectorPayoutWallet(store: Store, identity: VerifiedIdentity, hostId: string, payoutWallet: string) {
+export async function resolveConnectorPayout(identity: VerifiedIdentity, payoutTarget: unknown, options: BuildingReadOptions = {}) {
+  if (payoutTarget === 'own') {
+    const wallets = evmWallets(identity);
+    if (wallets.length !== 1) throw new WorkflowError('Choose a single verified EVM wallet for your payout.');
+    return getAddress(wallets[0].address);
+  }
+  if (payoutTarget !== 'building') throw new WorkflowError('Choose your wallet or the building for GPU income.');
+  const manifest = await (options.loadManifest ?? loadBuildingManifest)();
+  if (!manifest?.distributor) throw new WorkflowError('Building staking distributor is not deployed.');
+  return manifest.distributor;
+}
+
+async function validateConnectorPayout(identity: VerifiedIdentity, payoutWallet: string, options: BuildingReadOptions) {
   let payout: string;
   try { payout = getAddress(payoutWallet); } catch { throw new WorkflowError('Choose a valid testnet payout wallet.'); }
-  const own = evmWallets(identity).some(wallet => wallet.address.toLowerCase() === payout.toLowerCase());
-  if (!own) {
-    const manifest = await loadBuildingManifest();
+  if (!evmWallets(identity).some(wallet => wallet.address.toLowerCase() === payout.toLowerCase())) {
+    const manifest = await (options.loadManifest ?? loadBuildingManifest)();
     if (!manifest?.distributor || payout.toLowerCase() !== manifest.distributor.toLowerCase())
       throw new AccessError('Payout must be your verified wallet or the deployed building distributor.');
-    await verifyBuildingDeployment(manifest);
+    await verifyBuildingDeployment(manifest, options.rpc);
   }
+  return payout;
+}
+
+/** Explicit owner opt-in only. Changing the registry never reroutes an already reviewed payment. */
+export async function setConnectorPayoutWallet(store: Store, identity: VerifiedIdentity, hostId: string, payoutWallet: string, now = Date.now(), options: BuildingReadOptions = {}) {
+  const payout = await validateConnectorPayout(identity, payoutWallet, options);
   await ready(store);
   await store.update<Registry>(KEY, registry => {
     const host = active(registry, hostId);
     if (host.ownerSubject !== identity.subject) throw new AccessError('Only the host owner may change its payout wallet.');
     host.kind ??= rawHost(host).kind;
-    host.payoutWallet = payout;
+    if (host.payoutWallet?.toLowerCase() !== payout.toLowerCase()) {
+      host.payoutWallet = payout;
+      host.payoutChangedAt = new Date(now).toISOString();
+    }
     return registry;
   });
   return { hostId, payoutWallet: payout };
 }
-export async function createHostInvitation(store: Store, identity: VerifiedIdentity, input: unknown, now = Date.now()) {
+export async function createHostInvitation(store: Store, identity: VerifiedIdentity, input: unknown, now = Date.now(), options: BuildingReadOptions = {}) {
   const body = object(input);
-  only(body, ['payoutWallet']);
+  only(body, ['payoutWallet', 'payoutTarget']);
   if (!hostPairingAllowed(identity)) throw new AccessError('A verified EVM account is required to invite hosts.');
+  if (body.payoutWallet !== undefined && body.payoutTarget !== undefined) throw new WorkflowError('Choose one payout setting.');
   const wallets = evmWallets(identity);
-  const payout = body.payoutWallet === undefined && wallets.length === 1 ? wallets[0].address : body.payoutWallet;
-  if (payout === undefined) throw new WorkflowError('Choose a verified EVM payout wallet.');
-  if (typeof payout !== 'string' || !wallets.some((wallet) => wallet.address.toLowerCase() === payout.toLowerCase()))
-    throw new AccessError('Payout must use your own verified EVM wallet.');
+  const address = body.payoutWallet === undefined && body.payoutTarget === undefined && wallets.length === 1 ? wallets[0].address : body.payoutWallet;
+  if (body.payoutTarget === undefined && address === undefined) throw new WorkflowError('Choose a verified EVM payout wallet.');
+  if (body.payoutTarget === undefined && typeof address !== 'string') throw new WorkflowError('Choose a valid testnet payout wallet.');
+  const payout = await validateConnectorPayout(identity, body.payoutTarget !== undefined
+    ? await resolveConnectorPayout(identity, body.payoutTarget, options)
+    : address as string, options);
   await ready(store);
   let code!: string;
   await store.update<Registry>(KEY, (registry) => {
@@ -185,7 +209,7 @@ export async function createHostInvitation(store: Store, identity: VerifiedIdent
       code = Array.from({ length: 12 }, () => alphabet[randomInt(alphabet.length)]).join('');
       codeHash = createHash('sha256').update(code).digest('hex');
     } while (registry.invitations.some((invitation) => invitation.codeHash === codeHash));
-    registry.invitations.push({ codeHash, ownerSubject: identity.subject, payoutWallet: payout, expiresAt: now + PAIR_TTL, kind: hostOperatorAllowed(identity) ? 'operator' : 'community' });
+    registry.invitations.push({ codeHash, ownerSubject: identity.subject, payoutWallet: payout, payoutChangedAt: new Date(now).toISOString(), expiresAt: now + PAIR_TTL, kind: hostOperatorAllowed(identity) ? 'operator' : 'community' });
     return registry;
   });
   return { code, expiresAt: new Date(now + PAIR_TTL).toISOString() };
@@ -219,7 +243,7 @@ export async function createHostPairing(store: Store, input: unknown, now = Date
       throw new ConflictError('This key already has an active host.');
     hostId = randomUUID();
     registry.hosts.push({ id: hostId, name: body.name as string, publicKey, ownerSubject: invitation.ownerSubject,
-      payoutWallet: invitation.payoutWallet, kind, models: [], lastHeartbeat: null, state: 'active', ollamaReachable: false, awake: false, canWake: false, nonces: [] });
+      payoutWallet: invitation.payoutWallet, payoutChangedAt: invitation.payoutChangedAt ?? null, kind, models: [], lastHeartbeat: null, state: 'active', ollamaReachable: false, awake: false, canWake: false, nonces: [] });
     registry.invitations = registry.invitations.filter((entry) => entry !== invitation);
     return registry;
   });

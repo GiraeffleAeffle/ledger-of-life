@@ -8,6 +8,7 @@ import type { Store } from './store.ts';
 import { roundedLocation, type HomeLocation } from '../domain/home-location.ts';
 import { cashDepositForm, shareDepositForm, validateDepositSecurity, type DepositForm } from '../domain/deposit-form.ts';
 import { loadShareDepositManifest, requireDeposit } from './share-deposit-chain.ts';
+import { BUILDING_RENT_SHARE_BPS, RENT_BUILDING_ID, type BuildingRent } from '../domain/rent.ts';
 
 /**
  * Pre-tenancy workflow: a landlord publishes a home, verified people apply, the landlord chooses
@@ -26,6 +27,7 @@ export interface Listing {
   id: string;
   network: 'solana' | 'robinhood';
   depositForm?: DepositForm;
+  buildingRent?: BuildingRent;
   landlord: { subject: string; wallet: VerifiedWallet };
   title: string;
   description: string;
@@ -67,6 +69,7 @@ export interface PublicListing {
   rentMonthly: string;
   requiredSecurity: string;
   depositForm?: DepositForm;
+  buildingRent?: BuildingRent;
   releaseAllowed: boolean;
   status: Listing['status'];
   createdAt: string;
@@ -109,6 +112,7 @@ export function publicListing(value: Listing, identity: VerifiedIdentity | null)
     rentMonthly: value.rentMonthly,
     requiredSecurity: value.requiredSecurity,
     depositForm: value.depositForm ?? cashDepositForm(),
+    buildingRent: value.buildingRent,
     releaseAllowed: value.releaseAllowed,
     status: value.status,
     createdAt: value.createdAt,
@@ -144,6 +148,13 @@ function details(input: Record<string, unknown>): HomeDetails {
 
 export async function createListing(store: Store, identity: VerifiedIdentity, input: Record<string, unknown>) {
   requireReady(identity);
+  if (input.buildingHome !== undefined && typeof input.buildingHome !== 'boolean')
+    throw new WorkflowError('Choose whether this flat is in the fictional Neighbourhood Homes building.');
+  if (input.shareBps !== undefined || input.buildingRent !== undefined)
+    throw new WorkflowError('The building rent share is fixed at 20%, not editable.');
+  const buildingRent: BuildingRent | undefined = input.buildingHome
+    ? { buildingId: RENT_BUILDING_ID, shareBps: BUILDING_RENT_SHARE_BPS, landlordWallet: walletFor(identity, 'robinhood').address }
+    : undefined;
   if (typeof input.releaseAllowed !== 'boolean') throw new WorkflowError('Choose the earnings policy.');
   if (input.depositForm !== undefined && input.depositForm !== 'cash' && input.depositForm !== 'shares')
     throw new WorkflowError('Choose cash or shares for the deposit.');
@@ -160,6 +171,7 @@ export async function createListing(store: Store, identity: VerifiedIdentity, in
     id: randomUUID(),
     network,
     depositForm: form,
+    buildingRent,
     landlord: { subject: identity.subject, wallet: walletFor(identity, network) },
     title: text(input.title, 3, 120, 'The title'),
     description: text(input.description ?? '', 0, 2000, 'The description'),
@@ -250,6 +262,7 @@ export async function chooseApplicant(store: Store, identity: VerifiedIdentity, 
     id: chosen.agreementId!,
     network: chosen.network,
     depositForm: chosen.depositForm,
+    ...(chosen.buildingRent ? { rentTerms: { ...chosen.buildingRent, rentMonthly: chosen.rentMonthly } } : {}),
     property: chosen.title,
     home: { city: chosen.details.city, location: chosen.location },
     requiredSecurity: chosen.requiredSecurity,
@@ -281,6 +294,7 @@ export async function chooseApplicant(store: Store, identity: VerifiedIdentity, 
     existing.requiredSecurity !== agreement.requiredSecurity ||
     existing.releaseAllowed !== agreement.releaseAllowed ||
     JSON.stringify(existing.depositForm) !== JSON.stringify(agreement.depositForm) ||
+    JSON.stringify(existing.rentTerms) !== JSON.stringify(agreement.rentTerms) ||
     existing.parties.landlord?.subject !== agreement.parties.landlord?.subject ||
     existing.parties.landlord?.wallet.id !== agreement.parties.landlord?.wallet.id ||
     existing.parties.landlord?.wallet.address !== agreement.parties.landlord?.wallet.address ||
