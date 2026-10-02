@@ -10,7 +10,8 @@ export function accountSetupStep(input: {
   wallets: { chainType: string }[];
 }): SetupStep {
   if (!input.ready) return 'loading';
-  if (!input.authenticated || !input.subject || input.passkeyCount === 0) return 'account';
+  if (input.authenticated && !input.subject) return 'loading';
+  if (!input.authenticated || input.passkeyCount === 0) return 'account';
   const has = (chainType: string) => input.wallets.some((wallet) => wallet.chainType === chainType);
   return has('solana') && has('ethereum') ? 'done' : 'wallets';
 }

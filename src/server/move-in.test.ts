@@ -81,7 +81,8 @@ test('neighbourhood requires covered city bounds and located nearby data; past o
   assert.equal(listingNeighbourhood(unavailable, { lat: 52.581, lon: 13.883 }, []), null);
   const snapshot = { state: 'covered', data: { catalogue: { id: 'strausberg', bbox: [13.8, 52.5, 14, 52.7] }, generatedAt: '2026-10-01', signals: { features: [
     { geometry: { type: 'Point', coordinates: [13.883, 52.581] }, properties: { id: 'library', kind: 'place', asOf: '2026-10-01' } },
-    { geometry: { type: 'Point', coordinates: [13.9, 52.581] }, properties: { id: 'works', kind: 'construction', asOf: '2026-10-01' } },
+    { geometry: { type: 'Point', coordinates: [13.897, 52.581] }, properties: { id: 'works', kind: 'construction', asOf: '2026-10-01' } },
+    { geometry: { type: 'Point', coordinates: [13.9, 52.581] }, properties: { id: 'outside-one-km', kind: 'construction', asOf: '2026-10-01' } },
     { geometry: { type: 'Point', coordinates: [13.98, 52.581] }, properties: { id: 'far', kind: 'place', asOf: '2026-10-01' } },
     { geometry: null, properties: { id: 'unlocated', kind: 'place', asOf: '2026-10-01' } },
   ] } } } as SignalResult;

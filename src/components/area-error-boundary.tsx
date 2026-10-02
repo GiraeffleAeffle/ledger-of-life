@@ -7,6 +7,9 @@ type State = { failed: boolean };
 export class AreaErrorBoundary extends Component<Props, State> {
   state: State = { failed: false };
   static getDerivedStateFromError(): State { return { failed: true }; }
+  componentDidUpdate(previous: Props) {
+    if (previous.area !== this.props.area && this.state.failed) this.setState({ failed: false });
+  }
   render() {
     if (this.state.failed) return <section role="alert" className="area-error">
       <h1>{areaLabel(this.props.area)}</h1>

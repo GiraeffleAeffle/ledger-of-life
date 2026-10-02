@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { CityFeature, SignalCity } from '../server/city-signals.ts';
-import { cityIdFor, consultationGroups, displayCityText, formatCityDate, nearestCoveredCity, shortlistFeatures } from './city-coverage.ts';
+import { cityIdFor, homeCityId, consultationGroups, displayCityText, formatCityDate, nearestCoveredCity, shortlistFeatures } from './city-coverage.ts';
 import { oldPinsKey, pinsKey, readAccountPins } from './personal-map-storage.ts';
 
 test('covered spellings resolve without treating arbitrary names as covered', () => {
@@ -10,6 +10,14 @@ test('covered spellings resolve without treating arbitrary names as covered', ()
   for (const spelling of ['Dusseldorf', 'Düsseldorf', 'Duesseldorf']) assert.equal(cityIdFor(spelling), 'duesseldorf');
   assert.equal(cityIdFor('asdf'), null);
   assert.equal(cityIdFor('Hamburg'), null);
+});
+
+test('home city inference accepts postcodes and districts without inventing coverage', () => {
+  assert.equal(homeCityId('15344 Strausberg'), 'strausberg');
+  assert.equal(homeCityId('Strausberg-Vorstadt'), 'strausberg');
+  assert.equal(homeCityId('Strausberg, Vorstadt'), 'strausberg');
+  assert.equal(homeCityId('Castrop-Rauxel'), 'castrop-rauxel');
+  assert.equal(homeCityId('Munich-Sendling'), null);
 });
 
 const sample = (id: string, cityId: string, kind: CityFeature['properties']['kind'], startDate: string | null = null, endDate: string | null = null, longitude = 13.88): CityFeature => ({

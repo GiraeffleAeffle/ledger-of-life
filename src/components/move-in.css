@@ -3,13 +3,16 @@
 .flat-map .maplibregl-canvas { position: absolute; inset: 0; }
 .flat-map .maplibregl-ctrl-attrib { font-size: 10px; }
 .neighbourhood, .move-in-handover, .registration-confirmation { margin-block: 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); overflow-wrap: anywhere; }
-.neighbourhood summary, .move-in-handover summary, .registration-confirmation summary { cursor: pointer; font-weight: 650; }
-.neighbourhood h3, .neighbourhood h4 { margin-block: 1rem .5rem; }
+.neighbourhood h3, .move-in-handover h3, .registration-confirmation h3 { margin-block: 0 .75rem; }
+.neighbourhood h4 { margin-block: 1rem .5rem; }
 .neighbourhood li { margin-block: .6rem; }
 .move-in-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-block: 1rem; }
 .handover-room { display: grid; gap: .5rem; }
 .handover-room textarea { width: 100%; }
 .registration-confirmation input { width: 100%; }
+.handover-status { margin-block: 1rem; }
+.service-charge-card { margin-block: 1rem; min-height: 190px; }
+.service-charge-card > h3 { margin-block: 0 .75rem; }
 @media (max-width: 600px) {
   .flat-map { height: 220px; }
   .neighbourhood, .move-in-handover, .registration-confirmation { padding: .8rem; }

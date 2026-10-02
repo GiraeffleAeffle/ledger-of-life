@@ -18,6 +18,7 @@ type Tenancy = {
   agreementId: string;
   property: string;
   stage: string;
+  role?: string;
   next: { kind: string; label: string; detail: string };
 };
 type Listing = {
@@ -41,7 +42,6 @@ export type NextStepFacts = {
 };
 
 const START: NextStepLink[] = [
-  { label: 'Choose your city', target: { area: 'places', section: 'city-choice' } },
   { label: 'Get test money', target: { area: 'money', section: 'test-money' } },
 ];
 const tenancy = (t: Tenancy): NextStepTarget => ({ area: 'home', section: `tenancy-${t.agreementId}` });
@@ -113,15 +113,19 @@ export function nextStep(facts: NextStepFacts): NextStep {
   };
   const living = facts.tenancies.find((t) => t.next.kind !== 'done' && t.next.kind !== 'cancelled');
   if (living) return {
-    title: `The test deposit for ${living.property} is secured. Nothing needs you now.`,
+    title: living.role === 'arbitrator' ? `You are the neutral arbitrator for ${living.property}. Nothing to decide.` : `The test deposit for ${living.property} is secured. Nothing needs you now.`,
     action: { label: 'View home status', target: tenancy(living) },
-    choices: START,
   };
   const finished = facts.tenancies.find((t) => t.next.kind === 'done');
   if (finished) return {
     title: `${finished.property} is paid out. Your records stay in Home.`,
     action: { label: 'View payout summary', target: tenancy(finished) },
-    choices: [{ label: 'Find another home', target: { area: 'home', section: 'home-options' } }, ...START],
+    choices: [{ label: 'Find another home', target: { area: 'home', section: 'home-options' } }],
+  };
+  const published = facts.listings.find((item) => item.relation === 'landlord' && item.status === 'open');
+  if (published) return {
+    title: `${published.title} is listed. No applications yet.`,
+    action: { label: 'View listing', target: { area: 'home', section: `listing-${published.id}` } },
   };
   return {
     title: 'Your account is ready. Start with a home.',

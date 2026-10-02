@@ -30,7 +30,12 @@ export function MoveInHandover({ agreementId, role, initial, request }: { agreem
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Handover could not be read.'); }
     finally { setBusy(false); }
   }
-  return <details className="move-in-handover"><summary>Move-in handover · readings &amp; room notes</summary>
+  if (record?.confirmed.tenant && record.confirmed.landlord) return <>
+    <p className="handover-status" role="status">Move-in handover · confirmed by both parties</p>
+    {role === 'landlord' && <RegistrationConfirmation />}
+  </>;
+  return <section className="move-in-handover" aria-label="Move-in handover">
+    <h3>Move-in handover · readings &amp; room notes</h3>
     <p>Shared with this agreement’s parties. Record only meter numbers, units, dates and short room notes. No names, addresses, photos or documents. These are entered by the parties, not verified sensor readings.</p>
     <button className="button secondary" type="button" disabled={busy} onClick={() => { if (!editing || window.confirm('Discard your unsaved edits and read the latest shared handover?')) void refresh(); }}>Read latest shared handover</button>
     {record && <>
@@ -48,5 +53,5 @@ export function MoveInHandover({ agreementId, role, initial, request }: { agreem
     </form>}
     {error && <p className="note" role="alert">{error}</p>}
     {role === 'landlord' && <RegistrationConfirmation />}
-  </details>;
+  </section>;
 }

@@ -32,10 +32,10 @@ export function SigningIn() {
     return () => clearTimeout(timer);
   }, []);
   return (
-    <section className="onboarding" aria-busy="true">
-      <p role="status"><Loader2 className="spin" size={16} /> Checking your sign-in…</p>
+    <div aria-busy="true">
+      <p className="sr-only" role="status">Checking your sign-in…</p>
       {slow && <p className="note">This is taking longer than usual. Sign-in needs a connection to privy.io: check that a content blocker or firewall is not stopping it, then reload.</p>}
-    </section>
+    </div>
   );
 }
 
@@ -72,7 +72,7 @@ export function AccountSetup({ step }: { step: Exclude<SetupStep, 'loading' | 'd
     <section className="onboarding">
       <span className="eyebrow">WELCOME TO LEDGER OF LIFE</span>
       <h1>{step === 'account' ? THREAD : 'Finish setting up your access.'}</h1>
-      <p className="lede">Rent a flat with a deposit held in a test-network escrow, see what you own, and follow what your city decides. No real money moves.</p>
+      <p className="lede">Rent a flat with a deposit held in a test-network escrow, see what you own, and follow what your city decides.</p>
       <BrandEndorsement />
       <ol className="onboarding-stages" aria-label="The Ledger of Life path">{STAGES.map((stage) => <li key={stage.id}><span>{stage.number}</span><strong>{stage.name}</strong></li>)}</ol>
       <ul className="onboarding-purposes">
@@ -80,13 +80,12 @@ export function AccountSetup({ step }: { step: Exclude<SetupStep, 'loading' | 'd
         <li>Try borrowing or lending with test tokens</li>
         <li>Find sourced information for your city</li>
       </ul>
-      <p className="onboarding-reality"><strong>Test networks only. Nothing here has monetary value.</strong></p>
       {step === 'account' && <nav className="onboarding-public" aria-label="Explore without an account">
         <Link href="/welcome/strausberg">Read the Strausberg welcome guide — no account needed</Link>
         <Link href="/replay">See a recorded tenancy — no account needed</Link>
         <div><Link href="/library">Public AI desk — no account needed</Link><p className="small-copy" role="status">{deskStatus}</p></div>
       </nav>}
-      <p className="small-copy">Add a second passkey on another device in Me as an optional backup. If you lose every passkey, you lose this test account. Nothing here has monetary value.</p>
+      <p className="small-copy">Add a second passkey on another device in Me as an optional backup. If you lose every passkey, you lose this test account.</p>
       {!wallet.configured && <p className="note" role="alert">Sign-in is not set up on this server yet. The operator needs to add a Privy app id (see docs/WALLET_SETUP.md).</p>}
       {invitation && <p className="note" role="status">{invitedRole ? `You were invited to a tenancy as ${invitedRole === 'arbitrator' ? 'a neutral arbitrator' : 'a tenant'}. Finish these steps, then you can join.` : 'This invitation link is malformed. You can still finish setup and ask for a new link.'}</p>}
       <h2 className="onboarding-access-heading" id="access-steps">Before you start: create your account</h2>

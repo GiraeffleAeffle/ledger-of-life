@@ -1,5 +1,6 @@
 'use client';
-import { createContext, useContext, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { createContext, useContext, type KeyboardEvent, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { tabFromSearch, withTab } from './workspace-location';
 import { RealityChips } from './reality-chip';
 import type { RealityLevel } from '@/data/reality';
@@ -16,6 +17,7 @@ export interface SectionTab {
 }
 
 const ActiveTabContext = createContext(true);
+export const InitialTabContext = createContext<string | undefined>(undefined);
 export function useSectionTabActive() { return useContext(ActiveTabContext); }
 
 /**
@@ -23,19 +25,13 @@ export function useSectionTabActive() { return useContext(ActiveTabContext); }
  * half-finished workflow keeps its state when the person looks at another section, and
  * `goToSection` can find a target in any panel and select the tab that contains it.
  */
-export function SectionTabs({ label, tabs }: { label: string; tabs: SectionTab[] }) {
-  const ids = tabs.map((tab) => tab.id).join('|');
-  const [active, setActive] = useState(tabs[0].id);
-  useEffect(() => {
-    const sync = () => setActive(tabFromSearch(window.location.search, ids.split('|')));
-    sync();
-    window.addEventListener('popstate', sync);
-    return () => window.removeEventListener('popstate', sync);
-  }, [ids]);
+export function SectionTabs({ label, tabs, initialTab }: { label: string; tabs: SectionTab[]; initialTab?: string }) {
+  const params = useSearchParams();
+  const serverTab = useContext(InitialTabContext);
+  const active = tabFromSearch(params?.toString() ?? new URLSearchParams({ tab: initialTab ?? serverTab ?? '' }).toString(), tabs.map((tab) => tab.id));
   function select(id: string) {
     if (active === id) return;
     window.history.pushState(null, '', withTab(window.location.href, id));
-    setActive(id);
   }
   function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     const direction = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;

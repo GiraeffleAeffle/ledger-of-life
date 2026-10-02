@@ -60,7 +60,7 @@ export const IDEAS: Idea[] = [
     needs: 'A legally assessed custody model, tenant protection, withdrawal liquidity and an independently reviewed validator integration. No legal advice.' },
   { id: 'ethereum-realtime-proving', availability: 'Planned', topic: 'devices', status: 'planned', title: 'GPUs for Ethereum real-time proving',
     how: 'Explore GPU workloads for Ethereum real-time proving separately from the current paid local AI answers. No proving customer, integration or receipts are connected today.',
-    enables: 'Assess whether useful proving workloads and recoverable heat fit a local building without forecasting revenue. Fictional test units, no value, no rights.',
+    enables: 'Assess whether useful proving workloads and recoverable heat fit a local building without forecasting revenue. Fictional units grant no company or property rights.',
     needs: 'A supported proving stack, measured workloads, real demand and operational evidence before any earnings claim.' },
   { id: 'home-tokens', availability: 'Planned', topic: 'home', status: 'planned', title: 'Home shares towards owning a home',
     how: 'A future issuer could define a legal housing interest or down-payment credit. The separate test-investment example only transfers fictional issuer units; it does not grant those rights.',

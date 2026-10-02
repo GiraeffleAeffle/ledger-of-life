@@ -70,7 +70,7 @@ export function adapterState(adapter: LedgerAdapter, input: LedgerStateInputs): 
     return { label, tone: progress ? 'ready' : 'setup', configured: progress };
   }
   if (adapter.connection === 'city') {
-    if (input.selectedCity) return { label: `City selected · ${input.cityName || input.cityId}`, tone: 'ready', configured: true };
+    if (input.selectedCity || input.cityName) return { label: 'City known', tone: 'ready', configured: true };
     if (input.cityLoading) return { label: 'Checking city…', tone: 'unknown', configured: false, checking: true };
     if (input.cityError) return { label: 'City/source check unavailable', tone: 'unknown', configured: false, checkFailed: true };
     return { label: 'Choose a city', tone: 'setup', configured: false };
@@ -93,7 +93,7 @@ export function adapterAction(adapter: LedgerAdapter, inputs: LedgerStateInputs)
     ? { kind: 'area', area: 'home', section: inputs.serviceChargeTarget, label: 'Open this home’s service charges' }
     : { kind: 'area', area: 'home', section: 'home-tenancies', label: 'Open tenancy details' };
   // While the city could not be read, "choose my city" would ask for something the person may already have done.
-  if (adapter.connection === 'city' && !inputs.selectedCity && !inputs.cityError)
+  if (adapter.connection === 'city' && !inputs.selectedCity && !inputs.cityName && !inputs.cityLoading && !inputs.cityError)
     return { kind: 'area', area: 'places', section: 'city-choice', label: 'Choose my city' };
   return adapter.action;
 }

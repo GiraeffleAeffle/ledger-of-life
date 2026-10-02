@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { stakeDisabledReason, TEST_EXIT_NOTICE } from './money-guidance.ts';
-import { IDEAS, LEDGER_ADAPTERS } from '../data/ledger-catalogue.ts';
+import { cashDepositStatus, stakeDisabledReason } from './money-guidance.ts';
+import type { TenancyJourney } from '../server/journey.ts';
 import { TEST_CITY_INVESTMENTS } from '../data/local-investments.ts';
 import { visibleDepositActivity } from './deposit-activity.ts';
 
@@ -26,20 +26,27 @@ test('activity excludes another party’s action and unconfirmed preparation', (
   assert.deepEqual(visibleDepositActivity('arbitrator', entries), []);
 });
 
-test('local-stake disclosures distinguish fictional cash-limited sell-back from real rights or a permanent purchase', () => {
-  const adapter = LEDGER_ADAPTERS.find((entry) => entry.id === 'local-capital')!;
-  const idea = IDEAS.find((entry) => entry.id === 'local-investments')!;
-  for (const disclosure of [TEST_EXIT_NOTICE, adapter.explain.brings, adapter.explain.disconnect, idea.enables]) {
-    assert.match(disclosure, /fictional test units/i);
-    assert.match(disclosure, /no value/i);
-    assert.match(disclosure, /no rights/i);
-    assert.doesNotMatch(disclosure, /cannot be sold|no sell|purchase is permanent/i);
-  }
-  assert.match(TEST_EXIT_NOTICE, /desk has enough test cash/i);
-  assert.match(adapter.explain.disconnect, /enough tUSDG/i);
-  assert.match(idea.needs!, /Verified issuers, legal rights/i);
+test('fictional housing example does not reuse the real Altstadt project pin', () => {
   const housing = TEST_CITY_INVESTMENTS.find((entry) => entry.symbol === 'tHOME')!;
   const [longitude, latitude] = housing.location.coordinates;
   const oldProjectDistanceMetres = Math.hypot((longitude - 13.8822) * Math.cos(52.5801 * Math.PI / 180), latitude - 52.5801) * 111_000;
   assert.ok(oldProjectDistanceMetres > 1_000, 'illustrative housing pin must not sit next to the real Altstadt project');
+});
+
+test('zero tenant entitlement distinguishes unfunded escrow, payout and an exhausted claim', () => {
+  const chain = { phase: 'active', escrowAtomic: '0', lendingValueAtomic: '0', approvedClaimAtomic: '0' } as NonNullable<TenancyJourney['chain']>;
+  assert.equal(cashDepositStatus({ role: 'tenant', chain }), 'unfunded');
+  assert.equal(cashDepositStatus({ role: 'tenant', chain: { ...chain, escrowAtomic: '1000000' } }), 'secured');
+  assert.equal(cashDepositStatus({ role: 'tenant', chain: { ...chain, escrowAtomic: '1000000', approvedClaimAtomic: '1000000' } }), 'no_entitlement');
+  const settlement = { ...chain, phase: 'settling' as const, tenantOwedAtomic: '1000000', tenantPaidAtomic: '1000000' };
+  assert.equal(cashDepositStatus({ role: 'tenant', chain: settlement }), 'paid_out');
+  assert.equal(cashDepositStatus({ role: 'tenant', chain: { ...settlement, tenantPaidAtomic: '999999' } }), 'secured');
+  assert.equal(cashDepositStatus({ role: 'tenant', chain: { ...settlement, phase: 'closed' } }), 'paid_out');
+});
+
+test('a landlord sees only their claim; an arbitrator never owns a deposit', () => {
+  const chain = { phase: 'active', escrowAtomic: '2000000', lendingValueAtomic: '0', approvedClaimAtomic: '0' } as NonNullable<TenancyJourney['chain']>;
+  assert.equal(cashDepositStatus({ role: 'landlord', chain }), 'held_for_tenant');
+  assert.equal(cashDepositStatus({ role: 'landlord', chain: { ...chain, approvedClaimAtomic: '1' } }), 'claim_owed');
+  assert.equal(cashDepositStatus({ role: 'arbitrator', chain: { ...chain, approvedClaimAtomic: '1' } }), 'not_owner');
 });

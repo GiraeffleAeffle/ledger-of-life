@@ -41,6 +41,9 @@ export function DeviceReadings({ request, go }: { request: Request; go: (area: A
   const solar = assets?.solar?.ok ? assets.solar.value : null;
   const validator = assets?.validator?.ok ? assets.validator.value : null;
 
+  if (assets && !assets.adapters.homeAssistant && !assets.adapters.validator) {
+    return <p id="device-readings" tabIndex={-1}>No devices connected · <button type="button" className="text-button" onClick={() => goToSection(go, 'me', 'ledger-adapters')}>Connect home solar or a validator in Me →</button>{readError && <span role="status"> Device refresh unavailable: {readError}</span>}</p>;
+  }
   return (
     <section className="card assets devices" id="device-readings" tabIndex={-1}>
       <div className="assets-head"><div><span className="eyebrow">THINGS YOU RUN · READ-ONLY</span><h2>Home solar and validator</h2><p className="small-copy">Live public or sensor readings. Not counted in the priced subtotal. Connections are configured in Me.</p></div></div>

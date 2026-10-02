@@ -20,4 +20,5 @@ test('sign-in and a passkey precede wallet creation', () => {
 
 test('setup waits until the wallet SDK has answered', () => {
   assert.equal(accountSetupStep({ ...signedIn, ready: false, authenticated: false, subject: null }), 'loading');
+  assert.equal(accountSetupStep({ ...signedIn, subject: null }), 'loading');
 });

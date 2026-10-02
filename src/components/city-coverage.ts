@@ -13,6 +13,11 @@ export function cityIdFor(name: string): string | null {
   return aliases[key] ?? Object.keys(coveredNames).find((id) => id.replace(/[^a-z0-9]/g, '') === key ||
     coveredNames[id].toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '') === key) ?? null;
 }
+/** Preserve complete city names before removing an optional postcode or district. */
+export function homeCityId(name: string): string | null {
+  const city = name.trim().replace(/^\d{5}\s+/, '');
+  return cityIdFor(city) ?? cityIdFor(city.split(/[-,]/)[0]);
+}
 export function formatCityDate(value: string): string {
   const parsed = new Date(value.length === 10 ? `${value}T12:00:00Z` : value);
   return Number.isNaN(parsed.getTime()) ? value : new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(parsed).replace('Sept', 'Sep');

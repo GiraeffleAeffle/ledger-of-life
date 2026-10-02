@@ -1,7 +1,7 @@
 'use client';
 import { NetPosition, NetPositionStrip } from './net-position';
 import { netPositionTotal, usd, type NetPositionParts } from './money-valuation';
-import { DepositIdeas, TenancyWalkthrough } from './tenancy-walkthrough';
+import { DepositIdeas } from './tenancy-walkthrough';
 import './design-lab.css';
 
 const HOLDINGS: { name: string; note: string; parts: NetPositionParts }[] = [
@@ -37,12 +37,10 @@ export function DesignLab() {
           </article>
         ))}
       </section>
-      <section aria-labelledby="lab-walkthrough">
-        <h2 id="lab-walkthrough">Home: ways to hold the deposit, and how it works</h2>
-        <p>Under the Home path: the four ways to hold the deposit, always visible, then the optional &ldquo;How it works&rdquo;. The second explainer is the local build, where rehearsal tools exist.</p>
+      <section aria-labelledby="lab-deposits">
+        <h2 id="lab-deposits">Home: ways to hold the deposit</h2>
+        <p>One compact deposit comparison follows the listing browser for people looking for a home.</p>
         <DepositIdeas />
-        <TenancyWalkthrough testTools={false} />
-        <TenancyWalkthrough testTools />
       </section>
     </main>
   );

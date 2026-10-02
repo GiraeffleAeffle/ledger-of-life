@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { REALITY } from '@/data/reality';
 import './thread-public.css';
 
 export function DemoContext() {
@@ -11,10 +13,9 @@ export function DemoContext() {
         <div><dt>Needs a local setup</dt><dd>Runs only when you run the app yourself, where test tools can play the other people.</dd></div>
         <div><dt>Planned</dt><dd>An idea on the Roadmap.</dd></div>
       </dl>
+      <dl className="demo-availability">{Object.entries(REALITY).map(([id, level]) => <div key={id}><dt>{level.label}</dt><dd>{level.meaning}</dd></div>)}</dl>
       <p>Public city records and connected services keep their own sources; check each record and transaction review for details.</p>
-      {/* A full navigation on purpose: the workspace reads ?area= when the page loads, and this link also appears on /library. */}
-      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-      <a href="/?area=ideas">What is built and what is planned → Roadmap</a>
+      <Link href="/?area=ideas">What is built and what is planned → Roadmap</Link>
     </div>
   </details>;
 }

@@ -3180,3 +3180,20 @@ dd {
 code, kbd, samp, pre { font-family: var(--mono); }
 .card.cancelled-tenancy { padding: 16px 20px; color: var(--muted); background: var(--paper); box-shadow: none; }
 .cancelled-tenancy > p { margin: 6px 0; }
+
+.skeleton-block { border-radius: 16px; background: linear-gradient(110deg, var(--paper, #f3f4ef), var(--line, #e1e5de), var(--paper, #f3f4ef)); background-size: 200% 100%; animation: skeleton-pulse 2s ease-in-out infinite; }
+.area-skeleton { display: grid; gap: 20px; }
+.skeleton-card { min-height: 300px; }
+.area-skeleton--money .skeleton-card { min-height: 600px; }
+.area-skeleton--places .skeleton-card { min-height: 150px; }
+.skeleton-tabs { height: 52px; }
+.skeleton-strip { height: 160px; }
+.skeleton-map { height: 410px; }
+.skeleton-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.skeleton-tiles > div { height: 150px; }
+.nav-skeleton { width: 100%; min-height: 210px; }
+@keyframes skeleton-pulse { 50% { background-position: 100% 0; } }
+@media (max-width: 760px) { .skeleton-tiles { grid-template-columns: 1fr; } .mobile-nav .nav-skeleton { min-height: 48px; } }
+@media (prefers-reduced-motion: reduce) { .skeleton-block { animation: none; } }
+.area-content { display: contents; }
+.area-content[hidden] { display: none; }

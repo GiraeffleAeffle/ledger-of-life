@@ -26,7 +26,8 @@ export interface CityView {
   available: true;
   cityId: string;
   name: string;
-  source: 'identity' | 'chosen';
+  source: 'identity' | 'chosen' | 'home';
+  home?: { title: string; location?: { lat: number; lon: number } };
   asOf: string;
   reviewState: string;
   fullInventory: boolean;
@@ -35,7 +36,7 @@ export interface CityView {
   recent: { id: string; title: string; status: string; stage: string; latest: string }[];
   portalUrl: string;
 }
-export type CityResult = CityView | { available: false; reason: string; name?: string; cityId?: string; source?: 'identity' | 'chosen'; explicitlyUncovered?: boolean };
+export type CityResult = CityView | { available: false; reason: string; name?: string; cityId?: string; source?: 'identity' | 'chosen' | 'home'; home?: { title: string; location?: { lat: number; lon: number } }; explicitlyUncovered?: boolean };
 
 const key = (subject: string) => `city:${subject}`;
 
@@ -47,7 +48,11 @@ export function citySlug(name: string): string {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
-export async function chooseCity(store: Store, identity: VerifiedIdentity, name: string) {
+export async function chooseCity(store: Store, identity: VerifiedIdentity, name: string | null) {
+  if (name === null) {
+    await store.update(key(identity.subject), () => ({})).catch(() => store.create(key(identity.subject), {}));
+    return;
+  }
   const city = name.trim().slice(0, 80);
   if (!citySlug(city)) throw new WorkflowError('Enter a city name.');
   if (!cityIdFor(city)) {
@@ -63,15 +68,16 @@ export async function chooseCity(store: Store, identity: VerifiedIdentity, name:
   await store.update(key(identity.subject), () => value).catch(() => store.create(key(identity.subject), value));
 }
 
-export async function readCity(store: Store, identity: VerifiedIdentity, verifiedCity?: string): Promise<CityResult> {
+export async function readCity(store: Store, identity: VerifiedIdentity, verifiedCity?: string, home?: { title: string; city: string; cityId?: string | null; location?: { lat: number; lon: number } }): Promise<CityResult> {
   const saved = await store.get<{ name: string; explicitlyUncovered?: boolean }>(key(identity.subject));
   const chosen = saved?.name;
-  const name = chosen ?? verifiedCity;
+  const name = chosen ?? home?.city ?? verifiedCity;
   if (!name) return { available: false, reason: 'choose' };
-  const cityId = cityIdFor(name);
-  const source = chosen ? 'chosen' : 'identity';
-  if (!cityId) return { available: false, reason: 'not_covered', name, source, explicitlyUncovered: Boolean(chosen && saved?.explicitlyUncovered) };
-  const unavailable = (reason: string): CityResult => ({ available: false, reason, name: coveredNames[cityId], cityId, source });
+  const cityId = chosen ? cityIdFor(chosen) : home ? home.cityId ?? cityIdFor(home.city) : cityIdFor(name);
+  const source = chosen ? 'chosen' : home ? 'home' : 'identity';
+  const homeInfo = home ? { title: home.title, location: home.location } : undefined;
+  if (!cityId) return { available: false, reason: 'not_covered', name, source, home: homeInfo, explicitlyUncovered: Boolean(chosen && saved?.explicitlyUncovered) };
+  const unavailable = (reason: string): CityResult => ({ available: false, reason, name: coveredNames[cityId], cityId, source, home: homeInfo });
   if (!ATLAS) return unavailable('no_atlas');
   const response = await fetch(`${ATLAS}/api/atlas/${encodeURIComponent(cityId)}`, { signal: AbortSignal.timeout(8000) }).catch(() => null);
   if (!response) return unavailable('atlas_unavailable');
@@ -85,6 +91,7 @@ export async function readCity(store: Store, identity: VerifiedIdentity, verifie
     cityId,
     name: coveredNames[cityId],
     source,
+    home: homeInfo,
     asOf: model.asOf,
     reviewState: model.reviewState,
     fullInventory: model.fullMunicipalInventory,

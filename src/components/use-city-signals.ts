@@ -2,52 +2,61 @@
 import { useEffect, useState } from 'react';
 import type { CityResult } from '../server/city';
 import type { SignalResult } from '../server/city-signals';
-import { sharedReads } from './shared-reads';
 export { pinsKey } from './personal-map-storage';
 
 export type AuthorizedRequest = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 export const CITY_CHANGED_EVENT = 'ledger-personal-map-city-changed';
 export const PINS_CHANGED_EVENT = 'ledger-personal-map-pins-changed';
-// Keyed by the request function as well, so a read started before sign-up finished is never reused afterwards.
-const cityReads = sharedReads<AuthorizedRequest, CityResult>();
-const signalReads = sharedReads<AuthorizedRequest, SignalResult>();
+let cityReads = new WeakMap<AuthorizedRequest, Promise<CityResult>>();
+let signalReads = new WeakMap<AuthorizedRequest, Map<string, Promise<SignalResult>>>();
 let lastChange: Event | undefined;
-function readCity(request: AuthorizedRequest): Promise<CityResult> {
-  return cityReads.read(request, 'city', () => request<{ city: CityResult }>('/api/city').then(({ city }) => city));
+export function readPersonCity(request: AuthorizedRequest): Promise<CityResult> {
+  let pending = cityReads.get(request);
+  if (!pending) {
+    pending = request<{ city: CityResult }>('/api/city').then(({ city }) => city);
+    cityReads.set(request, pending);
+    void pending.catch(() => { if (cityReads.get(request) === pending) cityReads.delete(request); });
+  }
+  return pending;
 }
-function readSignals(request: AuthorizedRequest, id: string): Promise<SignalResult> {
-  return signalReads.read(request, id, () => request<SignalResult>(`/api/city-signals?city=${encodeURIComponent(id)}`));
+export function citySourceLabel(source?: CityResult['source']): string {
+  return source === 'home' ? 'From your home' : source === 'chosen' ? 'Chosen by you' : source === 'identity' ? 'From your EU wallet' : '';
 }
-
 export function useCitySignals(request: AuthorizedRequest, explorationCity?: string) {
-  const [view, setView] = useState<{ cityId: string; result: SignalResult | null; error: string; revision: number; explorationCity?: string; selectedCity: boolean; cityDisplayName: string }>({
-    cityId: '', result: null, error: '', revision: -1, selectedCity: false, cityDisplayName: '',
-  });
+  const [city, setCity] = useState<CityResult | null>(null);
+  const [result, setResult] = useState<SignalResult | null>(null);
+  const [cityId, setCityId] = useState('');
+  const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   useEffect(() => {
-    const update = (event: Event) => { if (lastChange !== event) { lastChange = event; cityReads.clear(); signalReads.clear(); } setRevision((value) => value + 1); };
+    const update = (event: Event) => {
+      if (lastChange !== event) { lastChange = event; cityReads = new WeakMap(); signalReads = new WeakMap(); }
+      setRevision((value) => value + 1);
+    };
     window.addEventListener(CITY_CHANGED_EVENT, update);
     return () => window.removeEventListener(CITY_CHANGED_EVENT, update);
   }, []);
   useEffect(() => {
     let current = true;
-    let id = '';
-    let selectedCity = false;
-    let cityDisplayName = '';
-    readCity(request)
-      .then((city) => {
-        if (!current) return;
-        id = explorationCity ?? city.cityId ?? '';
-        selectedCity = Boolean(city.cityId || (!city.available && city.explicitlyUncovered));
-        cityDisplayName = city.name ?? '';
-        return readSignals(request, id);
-      })
-      .then((result) => { if (current && result) setView({ cityId: id, result, error: '', revision, explorationCity, selectedCity, cityDisplayName }); })
-      .catch((cause) => { if (current) setView((previous) => ({
-        cityId: id, result: previous.cityId === id ? previous.result : null,
-        error: cause instanceof Error ? cause.message : 'City information unavailable.', revision, explorationCity, selectedCity, cityDisplayName,
-      })); });
+    readPersonCity(request).then(async (next) => {
+      if (!current) return;
+      const id = explorationCity ?? next.cityId ?? '';
+      setCity(next); setCityId(id); setError('');
+      setResult((previous) => previous?.state === 'covered' && previous.data.catalogue.id === id ? previous : null);
+      if (!id) return;
+      let reads = signalReads.get(request);
+      if (!reads) { reads = new Map(); signalReads.set(request, reads); }
+      let pending = reads.get(id);
+      if (!pending) {
+        pending = request<SignalResult>(`/api/city-signals?city=${encodeURIComponent(id)}`);
+        reads.set(id, pending);
+        void pending.catch(() => { if (reads.get(id) === pending) reads.delete(id); });
+      }
+      const signals = await pending;
+      if (current) setResult(signals);
+    }).catch((cause) => { if (current) setError(cause instanceof Error ? cause.message : 'City information unavailable.'); });
     return () => { current = false; };
   }, [request, explorationCity, revision]);
-  return view.revision === revision && view.explorationCity === explorationCity ? view : { cityId: '', result: null, error: '', selectedCity: false, cityDisplayName: '' };
+  return { cityId, result, error, city, source: city?.source, homePin: city?.home?.location,
+    selectedCity: Boolean(city?.name), cityDisplayName: city?.name ?? '' };
 }

@@ -8,7 +8,7 @@ export type PathFacts = {
   homeError: boolean;
   tenancies: readonly { stage: string; next?: { kind: string } }[];
   listings: readonly { relation: 'landlord' | 'applicant' | 'chosen' | null; status?: string }[];
-  /** An explicit choice, including an explicitly chosen uncovered place; a bare slug is not a choice. */
+  /** City known from home, explicit choice or EU proof, including an uncovered home. */
   cityChosen: boolean;
   cityLoading: boolean;
   cityError: boolean;
@@ -18,7 +18,7 @@ const SECURED = new Set(['living', 'move-out', 'paid']);
 
 /**
  * Stage 1 is done once a listing, application or tenancy exists; stage 2 once a deposit is locked (living or
- * later); stage 3 is a status, never "done"; stage 4 once a city is chosen. Known progress always counts,
+ * later); stage 3 is a status, never "done"; stage 4 once a city is known. Known progress always counts,
  * but a stage that could not be read, or is still being read, is "unknown", never "to do".
  */
 export function pathProgress(facts: PathFacts): PathProgress {

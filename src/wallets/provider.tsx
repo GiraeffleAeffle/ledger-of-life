@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   PrivyProvider,
   useCreateWallet,
@@ -195,6 +195,13 @@ function ActiveWalletAccess({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
+  // A non-secret rendering hint only; every API still requires authorization.
+  useEffect(() => {
+    if (!ready) return;
+    document.cookie = authenticated
+      ? 'ledger-session=1; Path=/; SameSite=Lax; Max-Age=31536000'
+      : 'ledger-session=; Path=/; SameSite=Lax; Max-Age=0';
+  }, [ready, authenticated]);
 
   const linkedAccounts = authenticated ? (user?.linkedAccounts ?? []) : [];
   const passkeyCount = linkedAccounts.filter((account) => account.type === 'passkey').length;

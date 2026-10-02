@@ -4,7 +4,7 @@ import { interestOptions, type Interest } from '../data/interests.ts';
 
 export { interestOptions, type Interest };
 
-export const HOME_RADIUS_METRES = 1000;
+export const NEIGHBOURHOOD_RADIUS_METRES = 1000;
 export const COMMUTE_CORRIDOR_METRES = 400;
 export type PersonalPins = { home?: Coordinate; work?: Coordinate };
 export type MatchedSignal = { feature: CityFeature; distanceMetres: number | null; explanation: string };
@@ -146,7 +146,7 @@ export function matchPersonalRings(features: CityFeature[], pins: PersonalPins, 
     const distance = pins.home ? distanceToGeometry(pins.home, feature.geometry) : null;
     const onWay = pins.home && pins.work ? distanceToCorridor(feature.geometry, pins.home, pins.work) : null;
     const citywide = !feature.geometry || scale === 'city';
-    if (!citywide && distance !== null && distance <= HOME_RADIUS_METRES) result.home.push({ feature, distanceMetres: distance, explanation: means(feature, 'home', distance, today) });
+    if (!citywide && distance !== null && distance <= NEIGHBOURHOOD_RADIUS_METRES) result.home.push({ feature, distanceMetres: distance, explanation: means(feature, 'home', distance, today) });
     if (!citywide && onWay !== null && onWay <= COMMUTE_CORRIDOR_METRES) result.commute.push({ feature, distanceMetres: onWay, explanation: means(feature, 'commute', onWay, today) });
     // The city ring is for civic citywide matters, not an unbounded dump of every street/place.
     if ((kind === 'place' && cityPlaceCategories.includes(category)) ||

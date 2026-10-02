@@ -81,13 +81,15 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
   const refresh = useCallback(async () => {
     const current = ++revision.current;
     try {
-      const { workflow } = await request<{ workflow: View }>('/api/share-workflows');
+      const [{ workflow }, robinhood] = await Promise.all([
+        request<{ workflow: View }>('/api/share-workflows'),
+        // A failed fee reading must not discard a successful market reading.
+        request<{ robinhood: { ok: boolean; value?: { ethBalance?: string } } | null }>('/api/assets?area=holdings')
+          .then(({ robinhood }) => robinhood).catch(() => null),
+      ]);
       if (current !== revision.current) return;
       setView(workflow); setReadError(''); setReview(null);
-      // The assets route wraps each reading as { ok, value } so a failed chain read stays distinguishable from zero.
-      void request<{ robinhood: { ok: boolean; value?: { ethBalance?: string } } | null }>('/api/assets?area=holdings')
-        .then(({ robinhood }) => { if (current === revision.current) setEthBalance(robinhood?.ok ? robinhood.value?.ethBalance : undefined); })
-        .catch(() => { if (current === revision.current) setEthBalance(undefined); });
+      setEthBalance(robinhood?.ok ? robinhood.value?.ethBalance : undefined);
     } catch (cause) {
       if (current === revision.current) { setReadError(cause instanceof Error ? cause.message : 'Market unavailable'); setReview(null); }
     }
@@ -185,9 +187,9 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
     }}>{label}</button>;
   }
   return <section className="card share-workflows" id="share-workflows">
-    <header className="share-market-head"><h2>Borrow against test TSLA, or lend test dollars.</h2><p>Robinhood Chain testnet; no real money.</p></header>
+    <header className="share-market-head"><h2>Borrow against test TSLA, or lend test dollars.</h2></header>
     {readError && <p role="alert">{readError}</p>}
-    {!view && !readError && <p role="status">Reading shared market…</p>}
+    {!view && !readError && <p role="status" style={{ minHeight: 240 }}>Reading shared market…</p>}
     {view && <>
       <p>{view.disclaimer}</p>
       {!view.deployment && <p role="status">Shared market is not deployed. No mirrored TSLA valuation or loan actions are available.</p>}
@@ -200,8 +202,8 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
         {view.price && <p>Price source round: {since(view.price.sourceUpdatedAt)} old (published {time(view.price.sourceUpdatedAt)}) · copied to this chain {since(view.price.pushedAt)} ago ({time(view.price.pushedAt)}){view.price.weekendFreshnessWindow ? ' · weekend freshness window (74 h)' : ''}{view.price.stale ? ' · stale — valuation unavailable' : ''}.</p>}
         {view.deployment && view.priceJob && <p role={view.priceJob.health === 'attention' ? 'alert' : 'status'}>Price job: {view.priceJob.health === 'ok' ? 'healthy' : view.priceJob.health === 'waiting' ? 'waiting for a newer round' : 'needs attention'} — {view.priceJob.message}{view.priceJob.lastRun ? ` Last run ${since(view.priceJob.lastRun.at)} ago.` : ''}</p>}
       </div>
-      <nav className="share-market-choices" aria-label="Choose a test-money task">{([['borrow', 'Loan against shares'], ['lend', 'Lend test dollars']] as const).map(([id, label]) => <button key={id} type="button" className={tab === id ? 'button' : 'button secondary'} aria-pressed={tab === id} onClick={() => { setTab(id); setOperation(id === 'lend' ? 'lend' : 'deposit_collateral'); setReview(null); setError(''); }}>{label}</button>)}</nav>
-      <section className="share-market-task" aria-label={tab === 'lend' ? 'Lending task' : 'Borrowing task'}>
+      <nav className="share-market-choices" aria-label="Choose a test-money task">{([['borrow', 'Loan against shares'], ['lend', 'Lend test dollars'], ['liquidate', 'Liquidate a loan']] as const).map(([id, label]) => <button key={id} type="button" className={tab === id ? 'button' : 'button secondary'} aria-pressed={tab === id} onClick={() => { setTab(id); setOperation(id === 'lend' ? 'lend' : id === 'liquidate' ? 'liquidate' : 'deposit_collateral'); setReview(null); setError(''); }}>{label}</button>)}</nav>
+      {tab !== 'liquidate' && <section className="share-market-task" aria-label={tab === 'lend' ? 'Lending task' : 'Borrowing task'}>
         <h3>{tab === 'lend' ? 'Lend test dollars — no TSLA needed' : 'Add collateral, then review a loan'}</h3>
         {tab === 'lend' ? <p>Borrower interest increases lender share value. Cash becomes available when borrowers repay; losses and bad debt reduce lender value.</p> : <p>Borrowing is limited to 50% LTV and 90% pool utilization. Liquidation starts at 80% LTV. Repayment and adding collateral remain possible with a stale price. Interest accrues every second: to close the loan, enter a little more than the debt; Repay takes only what you owe.</p>}
         {tab === 'borrow' && <p className="share-market-risk">Liquidation can take your test TSLA collateral. Robinhood can pause, block, burn or upgrade its token; these issuer powers can affect collateral.</p>}
@@ -212,13 +214,13 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
         {tab === 'borrow' && operation === 'borrow' && view.pool && <p className="share-market-borrow-facts" role="status">Pool cash available to borrow: {dollars(view.pool.cashAtomic)} (borrowing also stops at 90% utilization; your limit now: {fresh ? dollars(view.loan?.availableAtomic ?? null) : 'unavailable without a fresh price'}). Price age: {view.price ? `${since(view.price.sourceUpdatedAt)} old${view.price.stale ? ', stale' : ''}, copied ${since(view.price.pushedAt)} ago` : 'no price copied yet'}.</p>}
         {action(`Review ${operations.find(([id]) => id === operation)?.[1].replace(/^\d\. /, '').toLowerCase() ?? operation}`, operation, operation === 'borrow' || operation === 'withdraw_collateral' && BigInt(view.loan?.debtAtomic ?? '0') > 0n)}
         {blockedReason(operation) && <p role="status">{blockedReason(operation)}</p>}
-      </section>
+      </section>}
       <details className="share-market-detail"><summary>Price source &amp; pool facts</summary>
         {view.price && <p>Robinhood TSLA token price from <a href={`https://robinhoodchain.blockscout.com/address/${view.price.sourceFeed}`} target="_blank" rel="noopener noreferrer">Chainlink RHTSLA/USD (mainnet)</a>, converted to the test token’s multiplier · source chain {view.price.sourceChainId} · round {view.price.sourceRoundId} at {time(view.price.sourceUpdatedAt)} · copied at {time(view.price.pushedAt)}. Mirror, not a Chainlink contract.</p>}
         {view.deployment && view.priceJob && <p>Hourly price job · {view.priceJob.message} {view.priceJob.lastRun ? `Last run: ${time(view.priceJob.lastRun.at)}, ${view.priceJob.lastRun.status}${view.priceJob.lastRun.reason ? ` (${view.priceJob.lastRun.reason.replaceAll('_', ' ')})` : ''}. ` : ''}{view.priceJob.lastPush ? <>Last round copied: {view.priceJob.lastPush.sourceRoundId}, source time {view.priceJob.lastPush.sourceUpdatedAt ? time(view.priceJob.lastPush.sourceUpdatedAt) : 'unknown'}, copied {time(view.priceJob.lastPush.at)}{view.priceJob.lastPush.transactionHash && <> (<a href={`${EXPLORER_TX}${view.priceJob.lastPush.transactionHash}`} target="_blank" rel="noopener noreferrer">transaction</a>)</>}.</> : 'No copy recorded by the job yet.'}</p>}
         {view.pool && <div><h3>Pool facts</h3><p>Cash: {dollars(view.pool.cashAtomic)} · total assets: {dollars(view.pool.totalAssetsAtomic)} · borrowed: {dollars(view.pool.borrowedAtomic)} · utilization: {view.pool.utilizationBps / 100}% · current borrower rate: {view.pool.borrowAprBps / 100}% a year, compounded continuously (≈{view.pool.effectiveBorrowApyBps / 100}% a year) · current lender rate: {view.pool.supplyAprBps / 100}% APR (not a projection).</p><p>10,000 tUSDG seeded at deploy to a burn address. Nobody can withdraw those seed shares; their interest stays locked in the pool.</p></div>}
       </details>
-      <details className="share-market-detail"><summary>Advanced · loans that can be liquidated</summary>
+      {tab === 'liquidate' && <section className="share-market-task" aria-label="Liquidation task">
       <label className="share-market-amount">Liquidation repayment amount in tUSDG<input value={quantity} onChange={(event) => { setQuantity(event.target.value); setReview(null); }} inputMode="decimal" /></label>
       <h3>Loans that can be liquidated</h3>
       {!fresh && <p>Fresh price required to assess or liquidate loans.</p>}
@@ -233,7 +235,7 @@ function SharedMarketView({ request, account }: { request: Request; go: (area: A
         {loanPage.nextCursor !== null && <button type="button" className="button secondary" disabled={loansLoading || !ready || !fresh} onClick={() => void loadLoans()}>Load next 20 borrowers</button>}
       </>}
       <p>Anyone liquidates with their own test dollars and wallet signature. No operator can stage a price fall. Robinhood can pause, block, burn or upgrade its token; these issuer powers can affect collateral.</p>
-      </details>
+      </section>}
     </>}
     {review && <div className="share-market-review" role="region" aria-label="Review market action"><p>Review {operations.find(([id]) => id === review.operation)?.[1].replace(/^\d\. /, '').toLowerCase() ?? (review.operation === 'liquidate' ? 'repay part and receive TSLA' : review.operation)}: {review.humanAmount} {review.unit}{review.borrower ? ` for ${review.borrower}` : ''}. You sign exact-amount approvals and the market transaction with your own wallet.</p><button type="button" className="button primary" disabled={actionBlocked(review.operation)} onClick={() => void execute()}>Confirm and sign</button><button type="button" className="button secondary" onClick={() => setReview(null)}>Cancel</button>{blockedReason(review.operation) && <p role="status">{blockedReason(review.operation)}</p>}</div>}
     {busy && <p role="status">{stepDescription || 'Waiting for wallet and transaction confirmation…'}</p>}{message && <p role="status">{message}{confirmedHashes.length > 0 && <> · {confirmedHashes.map((hash, index) => <span key={hash}>{index > 0 && ', '}<a href={`${EXPLORER_TX}${hash}`} target="_blank" rel="noopener noreferrer">{confirmedHashes.length > 1 ? `step ${index + 1}` : 'view transaction'}</a></span>)}</>}</p>}{!message && confirmedHashes.length > 0 && <p role="status">Submitted: {confirmedHashes.map((hash, index) => <span key={hash}>{index > 0 && ', '}<a href={`${EXPLORER_TX}${hash}`} target="_blank" rel="noopener noreferrer">step {index + 1}</a></span>)}</p>}{error && <p role="alert">{error}</p>}

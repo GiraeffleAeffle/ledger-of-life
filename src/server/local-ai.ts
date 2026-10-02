@@ -17,6 +17,7 @@ import { acquireVisitorLease, assertVisitorActive, type VisitorLease } from './l
 import type { LocalAiApproval, LocalAiContext, LocalAiMode, LocalAiRequest } from './local-ai-types.ts';
 import { purged, textDue, textGraceMs } from './local-ai-retention.ts';
 import { CONNECTOR_JOB_TIMEOUT_MS, cancelConnectorInference, chooseConnectorHost, enqueueConnectorInference, reserveConnectorHost, releaseConnectorHost } from './local-ai-hosts.ts';
+import { deriveAiProgress, type AiProgressEvents, type ProgressRequest } from '../components/local-ai-progress-state.ts';
 
 export type AiInput = { mode: LocalAiMode; prompt: string; maxOutputTokens: number; context: LocalAiContext; hostScope: 'own' | 'city'; publicQuestion: boolean };
 export type PaidAiOwner = { subject: string; walletId: string; payer: Address };
@@ -25,6 +26,7 @@ export type AiOwner = PaidAiOwner | VisitorAiOwner;
 type AiRecord = {
   id: string; mode: LocalAiMode; owner: AiOwner; request: LocalAiRequest; context: LocalAiContext;
   payee: Address | null; resourceUrl: string; paymentJournal: AiPayment | null; runningAt?: number; completedAt?: string;
+  progressEvents?: AiProgressEvents;
   approvalJournal: { signed: Hex | null; hash: Hex | null; transaction: NonNullable<LocalAiApproval['request']>['transaction'] } | null;
 };
 const prefix = 'local-ai:request:';
@@ -51,14 +53,15 @@ export function libraryOwner(visitor: string): VisitorAiOwner {
   if (!/^[a-f0-9]{64}$/.test(visitor)) throw new AccessError('A private visitor session is required.');
   return { visitor };
 }
-function publicRequest(record: AiRecord): LocalAiRequest {
+function publicRequest(record: AiRecord): ProgressRequest {
   const stored = record.request;
   // Explicit public host fields also protect reads of records written by an older release.
   const request = stored.host ? { ...stored, host: {
     id: stored.host.id, name: stored.host.name, own: stored.host.own === true, payoutWallet: stored.host.payoutWallet,
-  } } : stored;
-  if (record.mode === 'paid' && request.payment.state !== 'none' && request.payment.state !== 'settled') return { ...request, answer: null, usage: null };
-  return request;
+  } } : { ...stored };
+  const progress = deriveAiProgress(record);
+  if (record.mode === 'paid' && request.payment.state !== 'none' && request.payment.state !== 'settled') return { ...request, progress, answer: null, usage: null };
+  return { ...request, progress };
 }
 async function purgeDueText(store: Store, id: string, now: number, graceMs = textGraceMs()) {
   return store.update<AiRecord>(prefix + id, (current) =>
@@ -152,6 +155,7 @@ export async function readAiRequest(store: Store, id: string, owner: AiOwner) {
     const interrupted = await store.update<AiRecord>(prefix + id, (current) => {
       if (current.request.state === 'running') {
         current.request.state = 'interrupted'; current.request.error = 'Inference was interrupted. No inference tokens were charged.';
+        (current.progressEvents ??= {}).finishedAt = new Date().toISOString();
         if (current.request.host && current.runningAt) current.completedAt = new Date(current.runningAt + connectorRequestTimeoutMs).toISOString();
       }
       return current;
@@ -240,6 +244,7 @@ async function reserveNonce(store: Store, record: AiRecord, payload: PaymentPayl
     if (current.request.state !== 'payment_required' && current.request.state !== 'approval_required') throw new ConflictError('Inference state changed before authorization.');
     current.paymentJournal = { payload, requirements: current.request.paymentRequired!.accepts[0], signed: null, hash: null, nonce: null };
     current.request.payment.state = 'authorized'; current.request.state = 'ready';
+    (current.progressEvents ??= {}).authorizedAt = new Date().toISOString();
     return current;
   });
   return latest;
@@ -270,6 +275,7 @@ async function settleStored(store: Store, record: AiRecord): Promise<AiRecord> {
       if (receipt.amount !== '0' && value.paymentJournal?.hash !== receipt.transaction) throw new ConflictError('Settlement journal changed.');
       value.request.payment.state = 'settled'; value.request.payment.receipt = receipt;
       value.request.state = 'completed'; value.request.error = null; value.completedAt = new Date().toISOString();
+      (value.progressEvents ??= {}).finishedAt = value.completedAt;
       return value;
     });
   }
@@ -278,6 +284,7 @@ async function settleStored(store: Store, record: AiRecord): Promise<AiRecord> {
     if (outcome === 'failed') {
       value.request.payment.state = 'failed'; value.request.state = 'failed';
       value.request.error = 'The saved fee transaction was canonically reverted. No inference-token revenue was received.';
+      (value.progressEvents ??= {}).finishedAt = new Date().toISOString();
     } else {
       value.request.payment.state = 'pending'; value.request.state = 'settling';
       value.request.error = 'Payment confirmation is pending. The saved answer remains private.';
@@ -395,6 +402,7 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
           value.paymentJournal!.amount = value.request.payment.amountAtomic;
         }
         value.request.answer = inference.answer; value.request.usage = inference.usage;
+        (value.progressEvents ??= {}).answerReceivedAt = new Date().toISOString();
         value.request.state = value.request.payment.state !== 'none' ? 'settling' : 'completed';
         if (value.request.state === 'completed') value.completedAt = new Date().toISOString();
         return value;
@@ -404,6 +412,7 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
         if (value.request.state === 'running') {
           value.request.state = 'failed'; value.request.error = error instanceof Error ? error.message : 'Local inference failed. No inference payment was sent.';
           value.request.payment.amountAtomic = '0';
+          (value.progressEvents ??= {}).finishedAt = new Date().toISOString();
         }
         return value;
       });

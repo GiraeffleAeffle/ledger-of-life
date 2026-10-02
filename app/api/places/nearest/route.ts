@@ -1,7 +1,6 @@
 import { authenticated } from '@/server/authenticated';
-import { identityStatus } from '@/server/eudi';
 import { getStore } from '@/server/store';
-import { readCity } from '@/server/city';
+import { personCity } from '@/server/person-city';
 import { readSignalsCatalogue } from '@/server/city-signals';
 import { locateCity } from '@/server/places-live';
 import { errorResponse } from '@/server/http';
@@ -14,13 +13,15 @@ export async function GET(request: Request) {
   try {
     const identity = await authenticated(request);
     const store = await getStore();
-    const status = await identityStatus(store, identity);
-    const city = await readCity(store, identity, status.state === 'verified' ? status.statement.city : undefined);
+    const city = await personCity(store, identity);
     if (!city.name || city.cityId) return Response.json({ nearest: null }, { headers });
-    const location = await locateCity(city.name);
-    if (location.state !== 'available') return Response.json({ nearest: null }, { headers });
+    const pin = city.home?.location;
+    const location = pin ? null : await locateCity(city.name);
+    if (!pin && location?.state !== 'available') return Response.json({ nearest: null }, { headers });
+    const point = pin ?? (location?.state === 'available' ? location.value : null);
+    if (!point) return Response.json({ nearest: null }, { headers });
     const { cities } = await readSignalsCatalogue();
-    const nearest = nearestCoveredCity(cities, [location.value.lon, location.value.lat]);
+    const nearest = nearestCoveredCity(cities, [point.lon, point.lat]);
     return Response.json({ nearest: nearest ? { id: nearest.id, name: nearest.name } : null }, { headers });
   } catch (error) {
     return errorResponse(error);

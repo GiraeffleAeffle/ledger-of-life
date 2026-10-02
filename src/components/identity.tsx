@@ -2,12 +2,13 @@
 import { useEffect, useState } from 'react';
 import { BadgeCheck, Fingerprint, Loader2, ShieldCheck, X } from 'lucide-react';
 import type { IdentityStatus } from '@/server/eudi';
+import { CITY_CHANGED_EVENT } from './use-city-signals';
 
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 
 /** Passkey sign-in and optional EU Digital Identity Wallet check in Me. */
-export function IdentityStrip({ request, status, loading, readError, onStatusChange, onRefresh }: {
-  request: Request; status: IdentityStatus | null; loading: boolean; readError: string;
+export function IdentityStrip({ request, status, loading, readError, onStatusChange, onRefresh, homeCity = false }: {
+  request: Request; status: IdentityStatus | null; loading: boolean; readError: string; homeCity?: boolean;
   onStatusChange: (status: IdentityStatus) => void; onRefresh: () => Promise<void>;
 }) {
   const [offer, setOffer] = useState<{ walletLink: string; qr: string } | null>(null);
@@ -21,7 +22,7 @@ export function IdentityStrip({ request, status, loading, readError, onStatusCha
     const timer = setInterval(async () => {
       try {
         const r = await request<{ identity: IdentityStatus }>('/api/eudi', { action: 'poll' });
-        if (r.identity.state === 'verified') { onStatusChange(r.identity); setOffer(null); }
+        if (r.identity.state === 'verified') { onStatusChange(r.identity); window.dispatchEvent(new Event(CITY_CHANGED_EVENT)); setOffer(null); }
         if (r.identity.state === 'none') { onStatusChange(r.identity); setOffer(null); setError('The request expired. Please start again.'); }
       } catch (e) {
         setOffer(null);
@@ -35,7 +36,7 @@ export function IdentityStrip({ request, status, loading, readError, onStatusCha
     setBusy(true);
     setError('');
     try {
-      setOffer(await request<{ walletLink: string; qr: string }>('/api/eudi', { action: 'start', shareCity }));
+      setOffer(await request<{ walletLink: string; qr: string }>('/api/eudi', { action: 'start', shareCity: shareCity && !homeCity }));
       void onRefresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Please try again.');
@@ -46,6 +47,7 @@ export function IdentityStrip({ request, status, loading, readError, onStatusCha
   async function forget() {
     const r = await request<{ identity: IdentityStatus }>('/api/eudi', { action: 'forget' });
     onStatusChange(r.identity);
+    window.dispatchEvent(new Event(CITY_CHANGED_EVENT));
   }
 
   const verified = status?.state === 'verified' ? status.statement : null;
@@ -53,13 +55,13 @@ export function IdentityStrip({ request, status, loading, readError, onStatusCha
     <div id="identity-eudi" tabIndex={-1} className={`identity-strip${verified ? ' verified' : ''}`}>
       {verified ? <BadgeCheck size={20} /> : <Fingerprint size={18} />}
       <div className="identity-copy">
-        <strong>Optional EU test-wallet proof{verified ? ` · 18 or over${verified.city ? ` · city ${verified.city}` : ''}` : ''}</strong>
+        <strong>Optional EU test-wallet proof{verified ? ' · 18 or over' : ''}</strong>
         <span>
           {verified
             ? `Test credential, checked ${new Date(verified.verifiedAt).toLocaleDateString()}. Kept: "18 or over"${verified.city ? ' and your city' : ''}. Not kept: name, birth date, street address.`
             : loading ? 'Checking the saved identity proof…' : readError ? 'The saved identity proof could not be checked.' : 'Optional adult predicate and city from the EU test wallet. No birth date is retained.'}
         </span>
-        {!verified && !offer && !loading && !readError && (
+        {!homeCity && !verified && !offer && !loading && !readError && (
           <label className="identity-option">
             <input type="checkbox" checked={shareCity} onChange={(e) => setShareCity(e.target.checked)} />
             Also share my city (not the street) for local news and decisions
@@ -80,7 +82,7 @@ export function IdentityStrip({ request, status, loading, readError, onStatusCha
             <strong>Scan with the EU reference wallet</strong>
             <ol>
               <li>Open the EUDI reference wallet app with a test PID.</li>
-              <li>Scan this code and review the request: your birth date{shareCity ? ' and city' : ''}, nothing else.</li>
+              <li>Scan this code and review the request: your birth date{shareCity && !homeCity ? ' and city' : ''}, nothing else.</li>
               <li>Approve. This page updates by itself.</li>
             </ol>
             <a className="text-button" href={offer.walletLink}>On this phone? Open the wallet</a>

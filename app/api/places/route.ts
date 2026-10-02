@@ -1,7 +1,6 @@
 import { authenticated } from '@/server/authenticated';
-import { identityStatus } from '@/server/eudi';
 import { getStore } from '@/server/store';
-import { readCity } from '@/server/city';
+import { personCity } from '@/server/person-city';
 import { readSignalsCatalogue } from '@/server/city-signals';
 import { readPlaces } from '@/server/places-live';
 import { errorResponse } from '@/server/http';
@@ -14,8 +13,7 @@ export async function GET(request: Request) {
   try {
     const identity = await authenticated(request);
     const store = await getStore();
-    const status = await identityStatus(store, identity);
-    const city = await readCity(store, identity, status.state === 'verified' ? status.statement.city : undefined);
+    const city = await personCity(store, identity);
     const explored = new URL(request.url).searchParams.get('city');
     const covered = explored ? (await readSignalsCatalogue()).cities.find((item) => item.id === explored) : undefined;
     if (explored && !covered) return Response.json({ error: 'Choose a covered city.' }, { status: 400, ...noStore });

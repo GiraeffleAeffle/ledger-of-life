@@ -13,9 +13,6 @@
 .local-project-owned { font-size: .81rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .local-project-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 14px 28px; color: var(--muted); font-size: .75rem; }
 .local-project-toolbar > div, .local-project-toolbar button { display: inline-flex; align-items: center; gap: 6px; }
-.local-project-tabs { display: flex; gap: 4px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 7px 28px; background: var(--soft); }
-.local-project-tabs button { border: 0; border-radius: 7px; padding: 10px 14px; font: inherit; font-size: .82rem; color: var(--muted); background: transparent; cursor: pointer; }
-.local-project-tabs button[aria-pressed=true] { background: var(--soft); box-shadow: 0 1px 5px #15263b12; color: var(--ink); font-weight: 650; }
 .local-investment-body { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
 .local-project-story { padding: 30px; background: radial-gradient(ellipse at bottom left, var(--soft), transparent 70%), var(--soft); }
 .local-project-story h3 { font-size: clamp(1.4rem, 2.1vw, 1.9rem); line-height: 1.2; letter-spacing: -.035em; margin: 9px 0 14px; max-width: 390px; }
@@ -83,16 +80,6 @@
 .city-blueprint-evidence summary { cursor: pointer; font-weight: 600; }
 .city-flywheel { padding: 30px; }
 .city-flywheel h3 { margin: 9px 0 25px; font-size: 1.55rem; letter-spacing: -.035em; }
-.city-flywheel-nodes { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 20px; padding: 20px 0 28px; }
-.city-flywheel-nodes > div { display: flex; flex-direction: column; align-items: center; position: relative; gap: 9px; text-align: center; }
-.city-flywheel-icon { display: grid; place-items: center; width: 62px; height: 62px; border-radius: 50%; background: var(--soft); border: 1px solid var(--line); color: var(--muted); }
-.city-flywheel-nodes strong { font-size: .87rem; }
-.city-flywheel-nodes small { color: var(--muted); font-size: .72rem; line-height: 1.5; max-width: 155px; }
-.city-flywheel-arrow { position: absolute; right: -19px; top: 22px; color: var(--muted); }
-.city-supplier-example { display: flex; gap: 12px; padding: 18px; border: 1px dashed var(--line); border-radius: 12px; background: var(--soft); }
-.city-supplier-example > svg { flex-shrink: 0; color: var(--muted); margin-top: 3px; }
-.city-supplier-example strong { font-size: .87rem; }
-.city-supplier-example p { margin: 6px 0 0; font-size: .79rem; color: var(--muted); line-height: 1.6; }
 @media (max-width: 1000px) {
   .local-project-choice > button:first-child { grid-template-columns: 42px minmax(0,1fr); }
   .local-project-owned { grid-column: 2; }
@@ -109,8 +96,6 @@
   .local-project-picker strong { font-size: .86rem; }
   .local-project-owned { font-size: .76rem; }
   .local-project-toolbar { padding: 13px 17px; font-size: .7rem; }
-  .local-project-tabs { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); padding: 6px 10px; }
-  .local-project-tabs button { padding: 9px 6px; font-size: .75rem; line-height: 1.4; }
   .local-investment-body, .city-blueprint { grid-template-columns: minmax(0,1fr); }
   .local-project-story, .local-investment-review, .city-blueprint-options { padding: 20px; }
   .local-stake-display { margin: 18px 0; padding: 15px; }
@@ -126,10 +111,6 @@
   .city-blueprint-art > svg { max-width: 340px; }
   .city-flywheel { padding: 23px 19px; }
   .city-flywheel h3 { font-size: 1.3rem; }
-  .city-flywheel-nodes { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 25px; }
-  .city-flywheel-nodes > div:last-child { grid-column: 1 / -1; }
-  .city-flywheel-arrow { display: none; }
-  .city-supplier-example { padding: 14px; }
 }
 .local-contract-links { display: flex; flex-wrap: wrap; gap: 12px; margin: -7px 0 15px; color: var(--muted); font-size: .72rem; }
 .local-contract-links a { display: inline-flex; align-items: center; gap: 5px; color: inherit; }

@@ -158,7 +158,7 @@ export async function localAiUsage(store: Store): Promise<LocalAiUsageSummary> {
   if (speedCount) result.meanTokensPerSecond = Math.round(speed / speedCount * 100) / 100;
   return result;
 }
-export async function localAiStatus(store: Store, owner?: AiOwner): Promise<LocalAiServiceStatus> {
+export async function localAiStatus(store: Store, owner?: AiOwner): Promise<LocalAiServiceStatus & { progressEvidence: { connectorPickup: boolean; wakeSignalReported: false } }> {
   const hosts = await publicConnectorHosts(store, Date.now(), owner && 'subject' in owner ? owner.subject : undefined);
   const connectorHosts = hosts.filter((host) => host.models.includes(AI_MODEL) && host.payoutWallet);
   connectorHosts.sort((a, b) => Number(b.own) - Number(a.own) || Number(b.availability === 'online') - Number(a.availability === 'online'));
@@ -210,7 +210,7 @@ export async function localAiStatus(store: Store, owner?: AiOwner): Promise<Loca
     remainingRequests = Math.min(remainingRequests, Math.max(0, 3 - (quota?.count ?? 0)));
   } else remainingRequests = Math.min(remainingRequests, 3);
   const usage = await localAiUsage(store);
-  return { configured, reachable, model: AI_MODEL, contextTokens: AI_CONTEXT_TOKENS, maxOutputTokens: AI_MAX_OUTPUT, hosts: direct ? [] : hosts,
+  return { progressEvidence: { connectorPickup: !direct, wakeSignalReported: false }, configured, reachable, model: AI_MODEL, contextTokens: AI_CONTEXT_TOKENS, maxOutputTokens: AI_MAX_OUTPUT, hosts: direct ? [] : hosts,
     mode: direct ? 'direct' : 'connector', availability: direct ? reachable ? 'online' : 'offline' : selected?.availability ?? 'offline', ownHostAvailable,
     lastSuccessAt: usage.lastSuccessAt, modelResident, vramBytes,
     hardwareLabel: direct ? process.env.LOCAL_AI_HARDWARE_LABEL || 'Local inference host' : selected?.name || 'Outbound connector hosts',

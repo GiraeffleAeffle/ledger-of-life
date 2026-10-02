@@ -11,7 +11,7 @@ Account setup starts directly, without picking a global role. A person can **Fin
 
 Tenancy actions need a verified passkey and the appropriate owned wallet, not an email or a second-browser recovery proof. A second passkey on another device is recommended in Me, not required. Losing every passkey means losing the test account; nothing here has monetary value ([ADR 0014](adr/0014-passkey-only-test-accounts.md)).
 
-After setup, Home shows a short walkthrough of the journey until the person has a tenancy (open when no test tools can play the other people), then the person's own tenancies and the listings. A tenant who needs test USDC for a deposit can use the Circle devnet faucet.
+After setup, Home starts with the person's situation: a private invitation, applicants needing a landlord's decision, the current tenancy, or an application status. Newcomers see open listings directly below the page heading, followed by a compact **Ways to hold the deposit** comparison and the secondary **Rent out a home** action. People with a current home see **Browse homes** instead of another offers grid. Other live tenancies are compact visible cards; past homes are listed when there is no current home. There is no generic walkthrough or seven-step header. A tenant who needs test USDC can use the Circle devnet faucet for older Circle-USDC agreements.
 
 ## Flow
 The path remains **Find → Apply → Agree → Secure → Live → Move out → Paid out**. At publish the landlord chooses **cash** (site tUSDC, Solana) or **shares** (official test TSLA, Robinhood Chain testnet 46630). Applicants and the distinct invited arbitrator need the matching verified wallet. The following legacy cash flow stays unchanged; share settlement is described below.
@@ -22,15 +22,15 @@ New publications enforce the §551(1) BGB three-month net cold rent cap on the s
 1. **Homes.** A landlord posts a home: title, monthly rent, deposit amount and earnings policy (no photo is preselected). Signed-in people apply with a short note; applicants never see each other. An applicant may withdraw while the listing is open, and the landlord may close a listing before choosing. Choosing one applicant cannot be undone: it creates the agreement with landlord and tenant already bound, and Home asks for confirmation first. Once a tenant is chosen there is no cancel.
 2. **Agreement.** The landlord invites a neutral arbitrator with a one-time private link, valid once for 24 hours. Making a new link stops the old one, and Home says so before it does. The link is kept on the landlord's device (`ledger-of-life:invite:v1:<account>:<agreement>`) so a reload does not lose it. The invited person sees the home's name and the deposit at stake before joining (`preview`, gated by the one-time token), and "Not now" records nothing. Tenant and landlord then accept the same terms: the home, the deposit and who keeps earnings. The terms do not cover rent or dates.
 3. **Deposit space.** The landlord approves once to create the empty escrow for those terms.
-4. **Deposit.** The tenant approves once. The deposit is locked for this home and supplied to Kamino lending in the same transaction (`fund_and_supply`).
-5. **Living here / move-out.** While active, the journey stops at "Living here". **Moving out?** explains the next steps; the landlord may then propose a deduction (0 if none) with a reason. Once proposed, the full six-step journey appears automatically. The tenant either agrees and settles in one approval (`accept_and_settle`: accept, redeem from lending, settle), or disputes. On a dispute, the arbitrator decides and settles in one approval (`resolve_and_settle`).
-6. **Paid out.** No approval is needed. The fee sponsor sends each side's payout to its own account, one transaction per side. Completed tenancies appear under **Past tenancies**.
+4. **Deposit.** The tenant approves once. Site-minted tUSDC stays as cash in the home's escrow, with separately labelled simulated yield. Older Circle devnet USDC agreements lock and supply the deposit to Kamino lending in the same transaction (`fund_and_supply`).
+5. **Living here / move-out.** The current tenancy leads with its status and required action. The tenant sees the move-out explanation inline; the landlord sees a visible **Move-out · propose a deduction** form (0 if none) with a reason, without opening a toggle. The tenant either agrees and settles in one approval (`accept_and_settle`: accept, redeem where lent, settle), or disputes. On a dispute, the arbitrator decides and settles in one approval (`resolve_and_settle`). Arbitrators see the decision path without maps, neighbourhood, yield or service-charge content.
+6. **Paid out.** No approval is needed. The fee sponsor sends each side's payout to its own account, one transaction per side. Completed tenancies appear under **Past homes**.
 
 Each person sees the progress through their current phase and exactly **one** next step when action is required. A tenant deciding on a deduction sees the landlord's reason and the split before agreeing; an arbitrator sees both reasons, the range from 0 to the claim and the split. Waiting states, network confirmations and payouts refresh automatically; nothing notifies the other person, and Home says so. A confirmation that takes more than 90 seconds offers **Check again**, the reconcile call the card already makes. Payouts are retried every 15 seconds while Home is open and do not run otherwise. Across the whole tenancy the three people approve 4 transactions without a dispute and 5 with one, instead of the previous 7–8.
 
 If Journey or Listings cannot be read, Home keeps whatever loaded, names what failed and offers **Retry**; it never says "Find a place to call home" when the tenancy reading failed. After three failed background polls it says updates are paused.
 
-While living, each tenancy has a collapsed **Service charges · prototype** statement. Its landlord can edit
+While living, tenants and landlords see a visible **Service charges · prototype · simulated figures** summary with prepayment, costs and balance. It is hidden for arbitrators. Its landlord can edit
 the server-stored monthly test prepayment; example annual building costs use m², units and consumption keys,
 and a daily Home Assistant consumption sensor is read when present. Without a consumption sensor, a labeled
 example week is used. The balance and projected monthly surplus are calculations only: no escrow prepayment
@@ -67,7 +67,7 @@ Money shows **Your portfolio**: the person's `tSPYx` holding (the devnet Token-2
 
 ## Test helpers: one real account is enough, where they exist
 
-Home has a collapsible **Test tools** panel only where operator test actions are allowed: `SOLANA_TEST_SIGNER_MODE=1`, the local store (no `DATABASE_URL`) and devnet or localnet, never on Vercel. The gate is the environment, not the request hostname. On a hosted build the panel is absent, and one account can post a home or apply to one but cannot complete a tenancy: it needs a landlord, a tenant and an arbitrator, each with their own account. Home says so, and shows the walkthrough. Where the panel exists it offers:
+Home has a collapsible **Local rehearsal tools · needs a local setup** panel only where operator test actions are allowed: `SOLANA_TEST_SIGNER_MODE=1`, the local store (no `DATABASE_URL`) and devnet or localnet, never on Vercel. The gate is the environment, not the request hostname. On a hosted build the panel is absent, and completing a tenancy needs a landlord, a tenant and an arbitrator, each with their own account. Required actions and waiting states explain the next step in the relevant card; there is no separate walkthrough. Where the panel exists it offers:
 
 - **Add sample homes**, then **Let the test landlord choose** after you apply.
 - **Add a test applicant** to your own listing.
@@ -80,3 +80,7 @@ The test tools use operator-held test keys through the same services. You need *
 ## Verified
 
 A test-key run on devnet went through the real services: listing → application → choice → arbitrator invite → acceptance → setup → deposit → claim → dispute → arbitrator decision → two sponsor payouts (tenant 4.5, landlord 0.5, escrow empty). At every phase exactly one person had an action. This is not passkey evidence; the passkey run is still open.
+
+## What changed on 2026-10-02
+
+- Home now puts the person's invitation, applicants, tenancy or application first instead of a generic journey scaffold. Listings are for people browsing homes; housing actions, handover and simulated service-charge figures are visible where relevant, with agreement records as fine print. The repeated walkthrough was removed, deposit options are compact, and flat maps initialize only when visible, using the supplied catalogue city centre or the home's approximate pin.

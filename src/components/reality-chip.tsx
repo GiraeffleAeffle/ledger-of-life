@@ -7,8 +7,5 @@ export function RealityChips({ levels }: { levels: RealityLevel[] }) {
     <ul className="reality-chips" aria-label="How real this is">
       {levels.map((level) => <li key={level} className={`reality-chip ${level}`} aria-label={`${REALITY[level].label}: ${REALITY[level].meaning}`}>{REALITY[level].label}</li>)}
     </ul>
-    <details className="reality-meaning"><summary aria-label="What the labels mean"><span aria-hidden="true">i</span></summary>
-      <dl>{levels.map((level) => <div key={level}><dt>{REALITY[level].label}</dt><dd>{REALITY[level].meaning}</dd></div>)}</dl>
-    </details>
   </div>;
 }

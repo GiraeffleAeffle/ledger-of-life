@@ -1,20 +1,15 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
 import type { TenancyJourney } from '@/server/journey';
-import type { PortfolioView, PortfolioPartial } from '@/server/portfolio';
-import { AssetsOverview } from './assets';
-import { goToSection, type Area } from './areas';
+import { AssetsOverview, useHoldingsRead } from './assets';
+import type { Area } from './areas';
 import { DeviceReadings } from './device-readings';
 import { ShareWorkflows } from './share-workflows';
 import { LocalInvestments } from './local-investments';
-import { OwnershipJourney } from './ownership-journey';
 import { LocalAiWorkspace } from './local-ai';
 import { SectionTabs, useSectionTabActive } from './section-tabs';
-import { createPortfolioRefresh, type PortfolioSnapshot } from './portfolio-refresh';
-import { operationLabels, visibleDepositActivity } from './deposit-activity';
-import { TEST_EXIT_NOTICE } from './money-guidance';
 import { TestDollars } from './test-dollars';
 import './money-area.css';
 
@@ -34,16 +29,13 @@ export function MoneyArea({ request, tenancies, loaded, homeError, retryHome, go
     <div className="money-journey">
       <SectionTabs label="Money sections" tabs={[
         { id: 'money-holdings', label: 'Holdings', reality: ['testnet_real', 'read_only_live'],
-          summary: 'Your test holdings, collateral, loans and recorded activity. The priced subtotal separates free, locked, pledged, lent and owed positions. Local stakes and devices are outside it.',
-          content: <>
-            {loaded ? <AssetsOverview request={request} tenancies={tenancies} show="money" go={go} solanaAction={<Portfolio request={request} />} />
-              : homeError ? <p className="note" role="alert">{homeError} <button className="button secondary" type="button" onClick={() => void retryHome()}>Retry Home read</button></p> : <p className="money-activity-pending" role="status">Reading your tenancies before the holdings subtotal…</p>}
+          summary: 'The priced subtotal separates free, locked, pledged, lent and owed positions. Local stakes and devices are outside it.',
+          content: <AssetsOverview request={request} tenancies={tenancies} tenanciesLoaded={loaded && !homeError} show="money" go={go} solanaAction={<Portfolio request={request} />}>
+            {homeError && <p className="note" role="alert">{homeError} <button className="button secondary" type="button" onClick={() => void retryHome()}>Retry Home read</button></p>}
             <TestMoney request={request} />
-            <div id="ownership-journey" tabIndex={-1}><OwnershipJourney go={go} /></div>
-            {loaded && <MoneyActivity request={request} tenancies={tenancies} go={go} />}
-          </> },
+          </AssetsOverview> },
         { id: 'money-shares', label: 'Shares & loans', reality: ['testnet_real', 'read_only_live'],
-          summary: 'Robinhood Chain testnet; no real money. Borrowing and lending are separate optional tasks, not rental-deposit products.',
+          summary: 'Borrowing and lending are separate optional tasks, not rental-deposit products.',
           content: <ShareWorkflows request={request} go={go} /> },
         { id: 'money-stakes', label: 'Local stakes', reality: ['testnet_simulated'],
           summary: 'Buy fictional test units in a housing project or a workshop. They grant no company, cooperative or property rights.',
@@ -56,32 +48,27 @@ export function MoneyArea({ request, tenancies, loaded, homeError, retryHome, go
   );
 }
 
-/**
- * Where "Get test money" leads: every test token a person needs, in the order the path uses them.
- * Nothing here has monetary value; each chain's tokens pay for that chain only.
- */
+/** Funding help lives beside the tokens' different uses; balances come from Holdings. */
 function TestMoney({ request }: { request: Request }) {
-  const [ethBalance, setEthBalance] = useState<string | undefined>();
-  const refresh = useCallback(async () => {
-    // The assets route wraps each reading as { ok, value }; a failed read stays unknown, not zero.
-    const { robinhood } = await request<{ robinhood: { ok: boolean; value?: { ethBalance?: string } } | null }>('/api/assets?area=holdings');
-    setEthBalance(robinhood?.ok ? robinhood.value?.ethBalance : undefined);
-  }, [request]);
-  useEffect(() => {
-    // Same shape as the market view's read(): state is set only after the request resolves.
-    const read = () => { void refresh().catch(() => setEthBalance(undefined)); };
-    read();
-  }, [refresh]);
+  const read = useHoldingsRead();
+  const wallet = useRentalWallet();
+  const [copied, setCopied] = useState('');
+  const solanaAddress = wallet.wallets.find(item => item.chainType === 'solana')?.address;
+  const robinhoodAddress = wallet.wallets.find(item => item.chainType === 'ethereum')?.address;
+  async function copyAddress(address: string, chain: string) {
+    try { await navigator.clipboard.writeText(address); setCopied(`${chain} address copied.`); }
+    catch { setCopied(`Copy failed. Copy your ${chain} address from Me.`); }
+  }
   return <section className="card test-money" id="test-money" tabIndex={-1} aria-labelledby="test-money-title">
     <h2 id="test-money-title">Test money</h2>
-    <p>Nothing here has monetary value. Each chain&apos;s test tokens work only on that chain.</p>
     <ul className="test-money-list">
-      <li><strong>For site-tUSDC Home deposits (Solana devnet):</strong> site-minted test USDC (tUSDC), below. These test tokens have no monetary value and are not Circle USDC.</li>
-      <li><strong>For existing Circle-USDC deposits and Solana portfolio trades only:</strong> <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle&apos;s devnet faucet</a> supplies their different legacy token. It cannot fund a site-tUSDC cash deposit.</li>
-      <li><strong>For loans, lending, local stakes and paid AI answers (Robinhood Chain testnet):</strong> test ETH for fees and test dollars (tUSDG), below. Test TSLA for collateral comes from the <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet</a>.</li>
+      <li><strong>For site-tUSDC Home deposits (Solana devnet):</strong> site-minted test USDC (tUSDC), below. It is not Circle USDC.</li>
+      <li><strong>For existing Circle-USDC deposits and Solana portfolio trades only:</strong> <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle&apos;s devnet faucet</a> supplies their different legacy token. It cannot fund a site-tUSDC cash deposit. {solanaAddress && <button className="text-button" type="button" onClick={() => void copyAddress(solanaAddress, 'Solana')}>Copy Solana address</button>}</li>
+      <li><strong>For loans, lending, local stakes and paid AI answers (Robinhood Chain testnet):</strong> test ETH for fees and test dollars (tUSDG), below. Test TSLA for collateral comes from the <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet</a>. {robinhoodAddress && <button className="text-button" type="button" onClick={() => void copyAddress(robinhoodAddress, 'Robinhood Chain')}>Copy Robinhood address</button>}</li>
     </ul>
     <TestUsdc request={request} />
-    <TestDollars request={request} ethBalance={ethBalance} refresh={refresh} />
+    <TestDollars request={request} ethBalance={read.ethBalance} refresh={read.refresh} />
+    {copied && <p role="status">{copied}</p>}
   </section>;
 }
 
@@ -105,108 +92,36 @@ export function TestUsdc({ request }: { request: Request }) {
     finally { setBusy(false); }
   }
   return <div className="test-usdc">
-    <p>Site-minted test USDC (tUSDC) · Solana devnet · tests only, no monetary value. Sent to your verified Solana wallet. Default allowance: 10,000 tUSDC once per 24 hours per account and wallet, subject to the site&apos;s daily cap.</p>
+    <p>Site-minted test USDC (tUSDC) · Solana devnet. Sent to your verified Solana wallet. Default allowance: 10,000 tUSDC once per 24 hours per account and wallet, subject to the site&apos;s daily cap.</p>
     <button type="button" className="button primary" disabled={busy || !hasWallet} onClick={() => { void getTestUsdc(); }}>
       {busy ? 'Checking test USDC…' : result?.status === 'pending' ? 'Check pending test USDC request' : 'Get test USDC (tUSDC)'}
     </button>
     {!hasWallet && <p>Connect your Solana wallet in Me first.</p>}
     {result?.status === 'unconfigured' && <p className="note" role="status">The site test-USDC faucet is not configured. Circle&apos;s faucet supplies a different token and cannot fund a tUSDC deposit.</p>}
     {result?.status === 'pending' && <p className="note" role="status">Test USDC mint pending. Check this request again to recover its result; do not start a separate mint. <a href={`https://explorer.solana.com/tx/${encodeURIComponent(result.signature)}?cluster=devnet`} target="_blank" rel="noopener noreferrer">View devnet transaction</a>.</p>}
-    {result?.status === 'confirmed' && <p className="note" role="status">{(Number(result.amountAtomic) / 1e6).toLocaleString('en-US', { maximumFractionDigits: 6 })} tUSDC received (no value). <a href={`https://explorer.solana.com/tx/${encodeURIComponent(result.signature)}?cluster=devnet`} target="_blank" rel="noopener noreferrer">View devnet transaction</a>.</p>}
+    {result?.status === 'confirmed' && <p className="note" role="status">{(Number(result.amountAtomic) / 1e6).toLocaleString('en-US', { maximumFractionDigits: 6 })} tUSDC received. <a href={`https://explorer.solana.com/tx/${encodeURIComponent(result.signature)}?cluster=devnet`} target="_blank" rel="noopener noreferrer">View devnet transaction</a>.</p>}
     {error && <p className="note" role="alert">{error}</p>}
   </div>;
 }
 
-type RecordedOperation = { id: string; action: { kind: string; amountAtomic?: string }; role: string; state: string; createdAt: string; signature: string | null };
-function MoneyActivity({ request, tenancies, go }: { request: Request; tenancies: TenancyJourney[]; go: (area: Area) => void }) {
-  const [activity, setActivity] = useState<{ entries: { agreementId: string; property: string; operation: RecordedOperation }[]; error: boolean } | null>(null);
-  const agreementKey = JSON.stringify(tenancies.filter((tenancy) => tenancy.chain).map(({ agreementId, property, role }) => ({ agreementId, property, role })));
-  const agreements = useMemo(() => JSON.parse(agreementKey) as { agreementId: string; property: string; role: TenancyJourney['role'] }[], [agreementKey]);
-  const activeTab = useSectionTabActive();
-  useEffect(() => {
-    if (!activeTab || document.visibilityState === 'hidden') return;
-    let active = true;
-    if (!agreements.length) return;
-    Promise.allSettled(agreements.map(async ({ agreementId, property, role }) => {
-      const result = await request<{ operations: RecordedOperation[] }>(`/api/finance/solana?agreement=${encodeURIComponent(agreementId)}`);
-      return visibleDepositActivity(role, result.operations).map((operation) => ({ agreementId, property, operation }));
-    })).then((results) => {
-      if (!active) return;
-      setActivity({
-        entries: results.flatMap((result) => result.status === 'fulfilled' ? result.value : [])
-          .sort((a, b) => b.operation.createdAt.localeCompare(a.operation.createdAt)).slice(0, 5),
-        error: results.some((result) => result.status === 'rejected'),
-      });
-    });
-    return () => { active = false; };
-  }, [request, agreements, activeTab]);
-  if (!agreements.length) return null;
-  if (!activity) return <p className="money-activity-pending" role="status">Reading tenancy activity…</p>;
-  if (!activity.entries.length) return <details className="money-activity-empty">
-    <summary>{activity.error ? 'Deposit activity unavailable' : 'Deposit activity · no recorded operations yet'}</summary>
-    <p>{activity.error ? 'Some tenancy operations could not be checked. Open the tenancy in Home for its other records.' : 'There are no recorded deposit operations for these tenancies yet.'}</p>
-  </details>;
-  return <section className="card money-activity" aria-label="Deposit activity for your role">
-    <span className="eyebrow">DEPOSIT ACTIVITY · SOLANA DEVNET</span><h2>Deposit activity</h2>
-    {activity.error && <p role="status">Some tenancy operations are unavailable; this activity may be incomplete.</p>}
-    <ol>{activity.entries.map(({ agreementId, property, operation }) => <li key={operation.id}>
-      <strong>{operationLabels[operation.action.kind] ?? 'Tenancy operation'} · {property}</strong>
-      <span>{operation.state === 'finalized' ? 'Confirmed' : operation.state === 'failed' ? 'Failed' : 'Not yet confirmed'} · recorded {new Date(operation.createdAt).toLocaleString('en-GB')}</span>
-      {operation.action.amountAtomic && <span>{(Number(operation.action.amountAtomic) / 1e6).toFixed(2)} test USDC · Solana devnet</span>}
-      {operation.signature && <span>Transaction reference: <code>{operation.signature}</code></span>}
-      <button className="text-button" onClick={() => goToSection(go, 'home', `tenancy-${agreementId}`)}>Tenancy & full records →</button>
-    </li>)}</ol>
-    <details><summary>About these records</summary>
-      <p>Only operations performed in your role are shown. A recorded time marks creation, not completion; pending or expired preparation is not shown. Other tenancy records remain in Home.</p>
-    </details>
-  </section>;
-}
 
 function Portfolio({ request }: { request: Request }) {
+  const read = useHoldingsRead();
   const wallet = useRentalWallet();
   const activeTab = useSectionTabActive();
-  const [snapshot, setSnapshot] = useState<PortfolioSnapshot<PortfolioView | PortfolioPartial>>({
-    view: null, checkedAt: null, unavailable: false,
-  });
-  const { view, checkedAt, unavailable } = snapshot;
+  const { view, checkedAt, unavailable } = read.portfolio;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [purchase, setPurchase] = useState<'none' | 'pending'>('none');
   const [signedAttempt, setSignedAttempt] = useState<{ id: string; signedTxBase64: string } | null>(null);
-  const reader = useMemo(() => createPortfolioRefresh(
-    async () => (await request<{ portfolio: PortfolioView | PortfolioPartial | { available: false } }>('/api/portfolio')).portfolio,
-    setSnapshot,
-  ), [request]);
-  const refresh = useCallback(() => reader.refresh(), [reader]);
   useEffect(() => {
     if (!activeTab) return;
     let active = true;
     request<{ result: { state: string } }>('/api/portfolio', { action: 'purchase_status' })
       .then(({ result }) => { if (active && result.state === 'pending') setPurchase('pending'); })
       .catch(() => {});
-    let retry: ReturnType<typeof setTimeout> | undefined;
-    async function loadPortfolio() {
-      let delay = 60_000;
-      try {
-        await refresh();
-      } catch {
-        // The existing transient-error retry leaves the last checked balances visible.
-        delay = 8000;
-      }
-      if (active) retry = setTimeout(loadPortfolio, delay);
-    }
-    if (document.visibilityState === 'visible') void loadPortfolio();
-    const onVisibility = () => { if (document.visibilityState === 'visible') void loadPortfolio(); else clearTimeout(retry); };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => { active = false; clearTimeout(retry); document.removeEventListener('visibilitychange', onVisibility); reader.dispose(); };
-  }, [request, refresh, reader, activeTab]);
-  useEffect(() => {
-    const onBalancesChanged = (event: Event) => {
-      if (activeTab && document.visibilityState === 'visible' && event instanceof CustomEvent && event.detail?.chain === 'solana') void refresh().catch(() => {});
-    };
-    window.addEventListener('ledger-balances-changed', onBalancesChanged);
-    return () => window.removeEventListener('ledger-balances-changed', onBalancesChanged);
-  }, [refresh, activeTab]);
+    return () => { active = false; };
+  }, [request, activeTab]);
   useEffect(() => {
     if (purchase !== 'pending') return;
     let active = true;
@@ -248,7 +163,7 @@ function Portfolio({ request }: { request: Request }) {
         .finally(() => { checking = false; });
     }, 4000);
     return () => { active = false; clearInterval(timer); };
-  }, [purchase, request, refresh, signedAttempt, activeTab]);
+  }, [purchase, request, signedAttempt, activeTab]);
   if (!view) return unavailable ? (
     <div className="solana-buy-row" role="status">
       <span>Solana test portfolio temporarily unavailable; checking again…</span>
@@ -309,8 +224,7 @@ function Portfolio({ request }: { request: Request }) {
       <button className="button primary" disabled={busy || purchase === 'pending' || unavailable || view.referencePriceStale || BigInt(view.testUsdcAtomic) < 5_000_000n} onClick={invest}>
         {busy ? <Loader2 className="spin" size={16} /> : null} {purchase === 'pending' ? 'Purchase pending, checking' : 'Buy tSPYx with 5 test USDC'} <ArrowRight size={16} />
       </button>
-      {BigInt(view.testUsdcAtomic) < 5_000_000n && <p role="status">You need 5 test USDC in your Solana devnet wallet to buy; current cash is {(Number(view.testUsdcAtomic) / 1e6).toFixed(2)} test USDC. Request test USDC from the <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle faucet (Solana Devnet)</a>. Robinhood tUSDG cannot fund this Solana action.</p>}
-      <p className="small-copy">{TEST_EXIT_NOTICE}</p>
+      {BigInt(view.testUsdcAtomic) < 5_000_000n && <p role="status">You need 5 Circle devnet USDC in your Solana wallet to buy; current cash is {(Number(view.testUsdcAtomic) / 1e6).toFixed(2)} test USDC. Funding help is in Test money below.</p>}
       {message && <p className="note" role="status">{message}</p>}
     </div>
   );

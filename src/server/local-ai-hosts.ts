@@ -7,6 +7,20 @@ import type { Store } from './store.ts';
 import { getAddress } from 'viem';
 import { loadBuildingManifest, verifyBuildingDeployment } from './building-revenue.ts';
 
+import type { AiProgressEvents } from '../components/local-ai-progress-state.ts';
+
+async function recordProgress(store: Store, requestId: string, events: AiProgressEvents) {
+  const key = `local-ai:request:${requestId}`;
+  if (!await store.get(key)) return;
+  await store.update<{ progressEvents?: AiProgressEvents }>(key, (row) => {
+    const saved = row.progressEvents ??= {};
+    for (const [name, at] of Object.entries(events)) {
+      const event = name as keyof AiProgressEvents;
+      if (at && !saved[event]) saved[event] = at;
+    }
+    return row;
+  });
+}
 export interface ConnectorHost {
   id: string;
   name: string;
@@ -243,6 +257,11 @@ export async function recordHostHeartbeat(store: Store, hostId: string, input: u
     return registry;
   });
   expireJobs(store, now);
+  const job = state(store).jobs.get(hostId);
+  if (job) await recordProgress(store, job.requestId, {
+    hostAwakeAt: body.awake ? new Date(now).toISOString() : undefined,
+    modelReachableAt: body.ollamaReachable ? new Date(now).toISOString() : undefined,
+  });
   return { ok: true };
 }
 export interface ConnectorInferenceInput {
@@ -373,6 +392,12 @@ export async function enqueueConnectorInference(store: Store, hostId: string, re
     releaseConnectorHost(store, hostId, requestId);
     throw error;
   }
+  const host = (await connectorHosts(store, now)).find((entry) => entry.id === hostId);
+  await recordProgress(store, requestId, {
+    queuedAt: new Date(now).toISOString(),
+    hostAwakeAt: host?.awake && host.lastHeartbeat !== null ? new Date(host.lastHeartbeat).toISOString() : undefined,
+    modelReachableAt: host?.ollamaReachable && host.lastHeartbeat !== null ? new Date(host.lastHeartbeat).toISOString() : undefined,
+  });
   runtime.wake.get(hostId)?.();
   return promise;
 }
@@ -398,18 +423,21 @@ export async function pollConnectorJob(store: Store, hostId: string, waitMs = 25
       const current = now ?? Date.now();
       expireJobs(store, current);
       let result: ConnectorPolledJob | null = null;
+      let pickedUpRequest: string | null = null;
       await store.update<Registry>(KEY, (registry) => {
         if (signal?.aborted) return registry;
         active(registry, hostId);
         const job = runtime.jobs.get(hostId);
         if (job && !job.pickedUp) {
           job.pickedUp = true;
+          pickedUpRequest = job.requestId;
           clearTimeout(job.timer);
           job.timer = setTimeout(() => expireJobs(store, Date.now()), Math.max(0, job.expiresAt - Date.now()));
           result = { id: job.id, model: job.model, messages: job.messages.map((message) => ({ ...message })), options: { ...job.options }, expiresAt: new Date(job.expiresAt).toISOString() };
         }
         return registry;
       });
+      if (pickedUpRequest) await recordProgress(store, pickedUpRequest, { pickedUpAt: new Date(current).toISOString() });
       if (result || Date.now() >= deadline || signal?.aborted) return { job: result };
       await new Promise<void>((resolve) => {
         const wake = () => {

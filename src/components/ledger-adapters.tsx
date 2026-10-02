@@ -21,8 +21,10 @@ export function activateAdapterAction(action: AdapterAction | DynamicHomeAction,
 
 /** One topic list, one selected source: not another full proof dashboard on every page. */
 export function LedgerAdapters({ inputs, go }: { inputs: LedgerStateInputs; go: (area: Area) => void }) {
-  const [selectedId, setSelectedId] = useState('account');
-  const selected = LEDGER_ADAPTERS.find((adapter) => adapter.id === selectedId) ?? LEDGER_ADAPTERS[0];
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = LEDGER_ADAPTERS.find((adapter) => adapter.id === selectedId)
+    ?? LEDGER_ADAPTERS.find((adapter) => adapterState(adapter, inputs).tone === 'setup')
+    ?? LEDGER_ADAPTERS[0];
   const state = adapterState(selected, inputs);
   const action = adapterAction(selected, inputs);
   useEffect(() => {

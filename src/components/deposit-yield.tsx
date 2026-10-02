@@ -43,7 +43,6 @@ export function DepositYield({ view, requiredAtomic, tenant, request, agreementI
     <strong>Earned so far: {amount} tUSDC</strong>
     <p className="small-copy">Accrued at {rate} % a year (simple interest){view.since ? ` from confirmed funding on ${new Date(view.since).toLocaleDateString()}` : ' after confirmed funding'}{view.until ? '; stopped at settlement' : ''}.</p>
     <p>Simulated yield, paid by this site in test USDC. Earnings belong to the tenant.</p>
-    <p className="small-copy">Under §551 BGB a real deposit must be invested at the usual savings rate; its earnings belong to the tenant and add to the deposit. On this site, earnings on a real-money deposit would come from lending it out. This is not legal advice; these test tokens have no value.</p>
     {BigInt(view.claimedAtomic) > 0n && <p className="small-copy">Already claimed: {(Number(view.claimedAtomic) / 1e6).toFixed(6)} tUSDC; later claims pay only the remainder.</p>}
     {tenant && request && <>
       <button className="button secondary" type="button" disabled={busy || (!view.pendingRequestId && (!view.claimAllowed || due <= 0n))} onClick={() => void claim()}>{busy ? 'Checking yield payment…' : view.pendingRequestId ? 'Check pending yield payment' : 'Claim simulated yield'}</button>

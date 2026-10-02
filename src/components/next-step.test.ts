@@ -44,11 +44,6 @@ test('a failed read is never shown as an empty account', () => {
   assert.equal(step.action?.label, 'Open Home');
 });
 
-test('a fresh account starts with a home and offers city and test money as equal choices', () => {
-  const step = nextStep(none);
-  assert.equal(step.action?.label, 'Find a home');
-  assert.deepEqual(step.choices?.map((choice) => choice.target.area), ['places', 'money']);
-});
 
 test('a paid-out tenancy offers another home without erasing its record', () => {
   const step = nextStep({ ...none, tenancies: [tenancy('p', 'done', 'paid')] });
@@ -67,4 +62,16 @@ test('cancelled records are neither urgent, waiting, secured nor paid out', () =
   assert.equal(quiet.action?.target.section, 'tenancy-live');
   const paid = nextStep({ ...none, tenancies: [cancelled, tenancy('paid', 'done', 'paid')] });
   assert.equal(paid.action?.target.section, 'tenancy-paid');
+});
+
+test('quiet housed people are linked to their tenancy without setup alternatives', () => {
+  const step = nextStep({ ...none, tenancies: [tenancy('living', 'wait', 'living')] });
+  assert.equal(step.action?.target.section, 'tenancy-living');
+  assert.equal(step.choices, undefined);
+});
+
+test('an open landlord listing without applicants links to its existing listing', () => {
+  const step = nextStep({ ...none, listings: [listing('published', 'landlord')] });
+  assert.equal(step.action?.target.section, 'listing-published');
+  assert.equal(step.choices, undefined);
 });

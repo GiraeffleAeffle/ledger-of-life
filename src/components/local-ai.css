@@ -14,9 +14,6 @@
 .local-ai-node strong, .local-ai-node > div > span { display: block; overflow-wrap: anywhere; }
 .local-ai-node strong { font-size: .86rem; }
 .local-ai-node > div > span { margin-top: 5px; font-size: .73rem; color: var(--muted); }
-.local-ai-tabs { display: flex; gap: 4px; padding: 7px 28px; border-block: 1px solid var(--line); background: var(--soft); }
-.local-ai-tabs button { border: 0; border-radius: 7px; padding: 11px 14px; background: transparent; color: var(--muted); font: inherit; font-size: .82rem; cursor: pointer; }
-.local-ai-tabs button[aria-pressed=true] { background: var(--soft); color: var(--ink); box-shadow: 0 1px 5px #15263b12; font-weight: 650; }
 .local-ai-ask, .local-ai-host { padding: 26px 28px; }
 .local-ai-access { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 20px; }
 .local-ai-access button { display: flex; align-items: center; gap: 11px; padding: 15px; border: 1px solid var(--line-strong); border-radius: 11px; background: var(--soft); font: inherit; text-align: left; color: var(--muted); cursor: pointer; }
@@ -125,7 +122,6 @@
 @media (max-width: 760px) {
   .local-ai-heading, .local-ai-ask, .local-ai-host { padding: 21px 18px; }
   .local-ai-node { margin: 0 18px 20px; }
-  .local-ai-tabs { padding-inline: 14px; }
   .local-ai-plan-layout { grid-template-columns: 1fr; }
   .local-ai-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .local-ai-payment-review { padding: 18px; }

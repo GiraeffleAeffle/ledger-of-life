@@ -5,6 +5,7 @@ import { useRentalWallet } from '@/wallets';
 import type { EvmSigningRequest } from '../wallets/types';
 import type { AuthorizedRequest } from './use-city-signals';
 import { buildingActionState, estimateBuildingHeat } from './building-panel-logic';
+import { useSectionTabActive } from './section-tabs';
 
 type Operation = 'approve' | 'stake' | 'unstake' | 'claim' | 'sync';
 type Receipt = { operation: string; quantityRaw: string | null; hash: string; status: 'pending' | 'confirmed' | 'failed' };
@@ -19,8 +20,9 @@ type Position = { configured: boolean; account: string; walletUnitsRaw: string |
 type Plan = { id: string; request: EvmSigningRequest; review: { operation: string; amount: string; asset: string; distributor: string } };
 const dollars = (raw: string) => formatUnits(BigInt(raw), 6);
 
-export function BuildingPanel({ request }: { request: AuthorizedRequest }) {
+export function BuildingPanel({ request, walletHolder = false }: { request: AuthorizedRequest; walletHolder?: boolean }) {
   const wallet = useRentalWallet();
+  const activeTab = useSectionTabActive();
   const [building, setBuilding] = useState<Building | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -48,6 +50,7 @@ export function BuildingPanel({ request }: { request: AuthorizedRequest }) {
     }
   }, [account, request]);
   useEffect(() => {
+    if (!activeTab) return;
     active.current = true;
     const live = active;
     const revisions = revision;
@@ -59,7 +62,7 @@ export function BuildingPanel({ request }: { request: AuthorizedRequest }) {
     });
     const timer = setInterval(() => { if (!lock.current) void refresh(); }, 30_000);
     return () => { cancelled = true; live.current = false; ++revisions.current; clearInterval(timer); };
-  }, [refresh]);
+  }, [refresh, activeTab]);
   async function act(operation: () => Promise<void>) {
     if (lock.current) return;
     lock.current = true; setBusy(true); setError('');
@@ -89,8 +92,10 @@ export function BuildingPanel({ request }: { request: AuthorizedRequest }) {
     });
   }
   const heat = building ? estimateBuildingHeat({ tokens: building.gpuTokensServed, measuredWhPerToken: building.heat?.measuredWhPerToken, runtimeMs: building.heat?.runtimeSeconds == null ? null : building.heat.runtimeSeconds * 1000, nominalWatts: building.heat?.nominalPowerWatts }) : null;
+  const holder = walletHolder || Boolean(position?.stakedRaw && BigInt(position.stakedRaw) > 0n);
+  if (!holder) return null;
   return <div className="city-flywheel building-panel" style={{ overflowWrap: 'anywhere' }}>
-    <span className="eyebrow">tHOME · FICTIONAL TEST UNITS · NO VALUE, NO RIGHTS</span><h3>Live building</h3>
+    <span className="eyebrow">tHOME</span><h3>Live building</h3>
     <p>Only staked tHOME units earn: income streams to stakers over 7 days, not as an instant payout. Seven days is a scheduling window, not a guaranteed finish: every positive new receipt extends the outstanding stream, even a tiny test-dollar transfer. Revenue during an idle period restarts streaming when staking resumes, never as a lump sum.</p>
     <p>Stake, claim accrued earnings or unstake any time with your own wallet. Unstake units before selling them back at the desk. This is fictional testnet accounting, not property rights or real investment returns.</p>
     <button type="button" className="text-button" disabled={busy} onClick={() => void refresh()}>Refresh building</button>
@@ -124,7 +129,7 @@ export function BuildingPanel({ request }: { request: AuthorizedRequest }) {
         })}
       </div>
       {position?.configured && position.pendingRevenueRaw != null && BigInt(position.pendingRevenueRaw) > 0n && <div><p>{dollars(position.pendingRevenueRaw)} tUSDG of new income awaits a stream update. This does not claim earnings or pay you a lump sum.</p><button type="button" className="button primary" disabled={Boolean(buildingActionState({ ...common, operation: 'sync' })) || Boolean(error)} onClick={() => void prepare('sync')}>Start streaming new income to stakers (anyone can do this)</button></div>}
-      <p className="small-copy">Staking needs two separate exact reviews when allowance is insufficient: approve only the entered units, then stake after the approval receipt is confirmed. No unlimited approval. Fictional test units, no value, no rights.</p>
+      <p className="small-copy">Staking needs two separate exact reviews when allowance is insufficient: approve only the entered units, then stake after the approval receipt is confirmed. No unlimited approval.</p>
       <p className="small-copy">Use the Stake action, never transfer tHOME directly to the distributor: direct unit transfers do not earn rewards and cannot be recovered. Plain tUSDG transfers are revenue, not unit stakes.</p>
       {plan && <div className="local-order-review"><h4>Exact {plan.review.operation} review</h4><p>{plan.review.amount} {plan.review.asset} · Robinhood Chain testnet (46630).</p><p>Distributor: <code>{plan.review.distributor}</code><br />Own wallet: <code>{wallet.wallets.find((item) => item.id === plan.request.walletId)?.address || position?.account}</code></p><p>{plan.request.description} Network fees use test ETH. Fictional test units, no value, no rights.</p><button type="button" className="button primary" disabled={busy || !account} onClick={() => void submit()}>{hasSigned ? 'Retry submitting the same signed transaction' : `${plan.review.operation === 'approve' ? 'Approve exact units' : plan.review.operation === 'stake' ? 'Stake' : plan.review.operation === 'unstake' ? 'Unstake' : plan.review.operation === 'sync' ? 'Start streaming new income' : 'Claim'} with my wallet`}</button>{!hasSigned && <button type="button" className="text-button" disabled={busy} onClick={() => setPlan(null)}>Close unsigned review</button>}</div>}
       {pending && <p role="status">A signed building transaction is pending. Wait for its verified receipt before another action.</p>}

@@ -157,7 +157,7 @@ export function ShareDeposit({ rentalId, request, reload }: { rentalId: string; 
   }
   const next = view ? nextShareDepositAction(view) : null;
   return <section className="card share-workflows" aria-label="Share-backed rental deposit">
-    <h3>Test TSLA rental deposit</h3><ShareDepositRules />
+    <h3>Test TSLA rental deposit</h3>
     {error && <p role="alert">{error}</p>}
     {!view && !error && <p role="status">Reading escrow and agreement…</p>}
     {view && <>
@@ -175,9 +175,10 @@ export function ShareDeposit({ rentalId, request, reload }: { rentalId: string; 
       {view.returnDeadline > 0 && <p>Return deadline: {time(view.returnDeadline)}</p>}
       {view.arbitrationDeadline > 0 && <p>Arbitration deadline: {time(view.arbitrationDeadline)}</p>}
       {view.warnings.map(warning => <p key={warning} role="status">{warning}</p>)}
-      {records.map((record, index) => <details key={index}><summary>{record.name}</summary><p style={{ whiteSpace: 'pre-wrap' }}>{record.body}</p></details>)}
+      {records.length > 0 && <details><summary>Agreement records</summary>{records.map((record, index) => <section key={index}><h4>{record.name}</h4><p style={{ whiteSpace: 'pre-wrap' }}>{record.body}</p></section>)}</details>}
       {view.actions.length > 0 && view.deployment === 'deployed' && <>
         <p>Next: {next ? labels[next] : view.state === 'Active' && view.role === 'tenant' ? 'no action needed. Top up below 125 %, withdraw extra above 150 %, or request return' : 'wait for another party'}. Parties send their own transactions.</p>
+        {showShareClaim(view) && records.filter(record => ['Move-out inspection', 'Dispute the deduction', 'Arbitration decision'].includes(record.name)).map((record, index) => <section key={index}><h4>{record.name}</h4><p style={{ whiteSpace: 'pre-wrap' }}>{record.body}</p></section>)}
         {view.actions.includes('withdraw') && <p>Withdraw extra: maximum {view.maximumWithdrawShares === null ? 'unavailable without a fresh quote' : `${depositShares(view.maximumWithdrawShares)} test TSLA (${view.maximumWithdrawShares} raw units)`}. Active withdrawals must leave 150 % cover.</p>}
         <label>Amount (TSLA for pledge / withdrawal / arbitration; USD for deduction)<input inputMode="decimal" value={amount} onChange={e => { setAmount(e.target.value); setPlan(null); }} /></label>
         <label>Move-out record / dispute / arbitration reason<textarea value={evidence} onChange={e => { setEvidence(e.target.value); setPlan(null); }} /></label>
@@ -195,6 +196,7 @@ export function ShareDeposit({ rentalId, request, reload }: { rentalId: string; 
     </>}
     {plan && <section className="card" aria-label="Exact transaction review">
       <h4>{plan.review.title}</h4>{plan.review.lines.map((line, index) => <p key={index}>{line}</p>)}
+      <ShareDepositRules />
       <p>Contract: {plan.to} · function: {plan.review.functionName} · chain 46630 · native value 0.</p>
       <button className="button primary" disabled={busy || ethBalance === undefined || belowGasDripThreshold(ethBalance)} onClick={() => void sign()}>Sign this exact transaction</button>
       <button className="button secondary" disabled={busy} onClick={() => setPlan(null)}>Cancel review</button>

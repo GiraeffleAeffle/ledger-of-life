@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { ArrowRight, Building2, Cpu, Landmark, Leaf, Sun, Users, Wrench } from 'lucide-react';
+import { ArrowRight, Building2, Cpu, Leaf, Sun } from 'lucide-react';
 import { openLocalAi, type Area } from './areas';
 
 const windows = [[112, 137], [155, 137], [198, 137], [241, 137], [112, 174], [155, 174], [198, 174], [241, 174]] as const;
@@ -38,7 +38,7 @@ export function ProjectBlueprint({ kind, go }: { kind: 'housing' | 'business'; g
     <div className="city-blueprint-options">
       <span className="eyebrow">EXPLORE THE BUILDING IDEA</span>
       <h3>What could the building do?</h3>
-      <p>Illustrative sketch only. Fictional test units, no value, no rights. The tHOME Live building panel separately shows recorded GPU receipts and staking earnings; these switches never change payouts.</p>
+      <p>Illustrative sketch only. These switches never change holdings or payouts.</p>
       <div className="city-tech-toggles">{technologies.map(({ id, label, Icon }) => <button type="button" key={id} aria-pressed={enabled[id]} onClick={() => setEnabled((value) => ({ ...value, [id]: !value[id] }))}><Icon size={17} />{label}<span>{enabled[id] ? 'On' : 'Off'}</span></button>)}</div>
       <ul className="city-blueprint-benefits">
         {enabled.solar && <li><Sun size={16} /><span><strong>Use more power where it is generated.</strong> Explore a roof designed for local energy use.</span></li>}
@@ -50,21 +50,5 @@ export function ProjectBlueprint({ kind, go }: { kind: 'housing' | 'business'; g
       {enabled.gpu && <button type="button" className="button primary" onClick={() => openLocalAi(go)}>Try the connected GPU node <ArrowRight size={16} /></button>}
       <details className="city-blueprint-evidence"><summary>Costs, evidence &amp; realism</summary><p>These switches change a schematic, not a building, holding, bill or return. Capital cost, finance, servicing, grid charges and actual demand need a project-specific assessment.</p><p><a href="https://www.ise.fraunhofer.de/en/press-media/press-releases/2025/fraunhofer-ise-research-project-completed-heat-pumps-provide-climate-friendly-heating-in-existing-buildings.html" target="_blank" rel="noopener noreferrer">Fraunhofer ISE’s field study</a> found substantial variation in heat-pump efficiency and partial—not universal—solar autonomy. It is not a forecast for this fictional building.</p><p><a href="https://www.iea.org/commentaries/opportunities-for-district-heating-in-the-changing-energy-landscape" target="_blank" rel="noopener noreferrer">IEA on heat recovery</a>: location, temperature, timing, infrastructure and a viable business model all matter. A validator is not a substitute for a heating design.</p></details>
     </div>
-  </div>;
-}
-
-const flywheel = [
-  { Icon: Users, title: 'Shared capital', detail: 'People choose what to support' },
-  { Icon: Building2, title: 'Homes & firms', detail: 'More useful local capacity' },
-  { Icon: Wrench, title: 'Work & services', detail: 'Potential jobs and local purchases' },
-  { Icon: Leaf, title: 'A better place', detail: 'Reasons to stay or move here' },
-  { Icon: Landmark, title: 'Public investment', detail: 'A possible tax base for shared services' },
-];
-export function CityFlywheel() {
-  return <div className="city-flywheel">
-    <span className="eyebrow">THE BIGGER IDEA</span><h3>Local ownership can reinforce local life.</h3>
-    <div className="city-flywheel-nodes">{flywheel.map(({ Icon, title, detail }, index) => <div key={title}><span className="city-flywheel-icon"><Icon size={23} /></span><strong>{title}</strong><small>{detail}</small>{index < flywheel.length - 1 && <ArrowRight className="city-flywheel-arrow" size={18} />}</div>)}</div>
-    <div className="city-supplier-example"><Wrench size={22} /><div><strong>Workshop → housing project</strong><p>Local installation, maintenance and repair could keep skills nearby.</p></div></div>
-    <details className="city-blueprint-evidence"><summary>What this example assumes</summary><p>This is a proposed supplier relationship, not a signed contract. Affordability, costs, demand, planning and fiscal rules determine what can happen; buying test units creates no tax receipt, job or energy saving.</p></details>
   </div>;
 }

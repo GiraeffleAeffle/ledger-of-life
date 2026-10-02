@@ -1,6 +1,6 @@
 import type { HomeLocation } from '../domain/home-location.ts';
 import type { SignalResult, CityFeedItem } from '../server/city-signals.ts';
-import { distanceToGeometry } from './personal-map-relevance.ts';
+import { distanceToGeometry, NEIGHBOURHOOD_RADIUS_METRES } from './personal-map-relevance.ts';
 import { shortlistFeatures } from './city-coverage.ts';
 
 /** Covered city AND pin inside its published bounding box; a city label alone is insufficient. */
@@ -11,11 +11,11 @@ export function listingNeighbourhood(result: SignalResult, location: HomeLocatio
   const point: [number, number] = [location.lon, location.lat];
   const near = result.data.signals.features.flatMap((feature) => {
     const distance = distanceToGeometry(point, feature.geometry);
-    return feature.properties.reviewState !== 'rejected' && distance !== null && distance <= 2000 ? [{ feature, distance }] : [];
+    return feature.properties.reviewState !== 'rejected' && distance !== null && distance <= NEIGHBOURHOOD_RADIUS_METRES ? [{ feature, distance }] : [];
   }).sort((a, b) => a.distance - b.distance);
   const nearbyEvents = events.flatMap((item) => {
     const distance = distanceToGeometry(point, item.geometry);
-    return item.kind === 'event' && item.eventStart && Date.parse(item.eventStart) >= now.getTime() && distance !== null && distance <= 2000 ? [{ item, distance }] : [];
+    return item.kind === 'event' && item.eventStart && Date.parse(item.eventStart) >= now.getTime() && distance !== null && distance <= NEIGHBOURHOOD_RADIUS_METRES ? [{ item, distance }] : [];
   }).sort((a, b) => a.distance - b.distance).slice(0, 4);
   return { city: result.data.catalogue, generatedAt: result.data.generatedAt,
     places: near.filter((row) => row.feature.properties.kind === 'place').slice(0, 4),

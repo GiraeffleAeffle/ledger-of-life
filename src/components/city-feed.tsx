@@ -54,6 +54,7 @@ export function CityFeedList({ cityId, result, error, onSelectEvent }: {
     ? result.feed.items.filter((item) => item.url.startsWith('https://') || item.url.startsWith('http://'))
     : [];
   const now = useEventClock();
+  const [showMore, setShowMore] = useState(false);
   const events = items.filter((item) => item.kind === 'event').toSorted((a, b) => {
     const stateA = eventTimeState(a, now);
     const stateB = eventTimeState(b, now);
@@ -73,10 +74,10 @@ export function CityFeedList({ cityId, result, error, onSelectEvent }: {
     {!cityId ? <p>Choose your city to see its published news and events.</p>
       : !result && !error ? <p role="status">Reading city feed…</p>
         : !result ? <p>City feed is temporarily unavailable.</p>
-          : result.state === 'not_available' ? <p>No published feed for {result.cityName}. Choose a covered city or check its official website directly.</p>
+          : result.state === 'not_available' ? <p>No published press feed for {result.cityName} yet.</p>
             : items.length === 0 ? <p>{unavailablePress ? `No published feed for ${result.cityName}.` : `No dated news or event items in the published feed for ${result.cityName}.`} {unavailablePress?.pageUrl && (unavailablePress.pageUrl.startsWith('https://') || unavailablePress.pageUrl.startsWith('http://')) && <a href={unavailablePress.pageUrl} target="_blank" rel="noopener noreferrer">Open the city&apos;s news page <ArrowUpRight size={14} aria-hidden /></a>}</p>
               : <><div className="city-event-shelf"><strong>{events.length ? `Published events · ${events.length}` : 'No events in this published feed'}</strong>
-                {events.length > 0 && <><FeedItems items={events.slice(0, 3)} cityId={cityId} now={now} onSelectEvent={onSelectEvent} />{events.length > 3 && <details className="city-feed-more"><summary>More events ({events.length - 3})</summary><FeedItems items={events.slice(3)} cityId={cityId} now={now} onSelectEvent={onSelectEvent} /></details>}</>}
-              </div>{news.length > 0 && <details className="city-feed-more"><summary>City news · {news.length}</summary><FeedItems items={news} cityId={cityId} now={now} /></details>}</>}
+                {events.length > 0 && <><FeedItems items={showMore ? events : events.slice(0, 3)} cityId={cityId} now={now} onSelectEvent={onSelectEvent} />{events.length > 3 && <button className="text-button" onClick={() => setShowMore(!showMore)}>{showMore ? 'Show fewer events' : `Show ${events.length - 3} more events`}</button>}</>}
+              </div>{news.length > 0 && <section className="city-feed-more"><h3>City news · {news.length}</h3><FeedItems items={news} cityId={cityId} now={now} /></section>}</>}
   </section>;
 }

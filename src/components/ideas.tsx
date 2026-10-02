@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import { AREAS, IDEA_NAVIGATION_INTENT, goToSection, openLocalInvestment, openCivicMap, openLedgerAdapter, openShareWorkflow, type Area } from './areas';
 import { AVAILABILITY_LABELS, IDEAS, LEDGER_ADAPTERS, STATUS_LABEL } from '@/data/ledger-catalogue';
 import { RealityChips } from './reality-chip';
-import { DepositIdeas } from './tenancy-walkthrough';
 import './capability-map.css';
 import './thread-public.css';
 
@@ -44,8 +43,7 @@ export function IdeasArea({ go }: { go: (area: Area) => void }) {
   }
   return <div className="ideas-area capability-area">
     <section className="card ideas-catalogue" aria-label="Capabilities by availability">
-      <span className="eyebrow">ROADMAP</span><h2>What is built, and what comes next</h2>
-      <p>Available here means there is a working area, not that every deployment or service is online. Check its current status before acting. Money features use test networks only; no real money.</p>
+      <p>Available here means there is a working area, not that every deployment or service is online. Check its current status before acting.</p>
       {AVAILABILITY_LABELS.map((availability) => <section className="ideas-group" key={availability} aria-label={availability}>
         <h3>{availability}</h3>
         {IDEAS.filter((idea) => idea.availability === availability).map((idea) => <div className={`ideas-row${selected.id === idea.id ? ' selected' : ''}`} key={idea.id}>
@@ -56,8 +54,8 @@ export function IdeasArea({ go }: { go: (area: Area) => void }) {
             <h2>{selected.title}</h2><p><strong>{selected.availability}</strong> · {STATUS_LABEL[selected.status]}</p>
             <RealityChips levels={selected.availability === 'Planned' ? ['roadmap'] : selected.availability === 'Needs a local setup' ? ['prototype'] : [...new Set(adapters.map((adapter) => adapter.explain.reality))]} />
             <p>{selected.enables}</p><p>{selected.how}</p>
-            {['rental-deposit', 'stock-deposit', 'rental-earnings'].includes(selected.id) && <DepositIdeas />}
-            {selected.needs && <details><summary>What remains</summary><p>{selected.needs}</p></details>}
+            {['rental-deposit', 'stock-deposit', 'rental-earnings'].includes(selected.id) && <button type="button" className="text-button" onClick={() => goToSection(go, 'home', 'deposit-options')}>Ways to hold the deposit → Home</button>}
+            {selected.needs && <p><strong>What remains:</strong> {selected.needs}</p>}
             <div className="capability-links">
               {destination && selected.availability !== 'Planned' && selected.availability !== 'Needs a local setup' && <button type="button" className="secondary-button" onClick={openCapability}>{`Open ${AREAS.find((area) => area.id === destination.area)?.label}`}</button>}
               {adapters[0] && <button type="button" className="text-button" onClick={() => openLedgerAdapter(go, adapters[0].id)}>Connection and data permissions</button>}

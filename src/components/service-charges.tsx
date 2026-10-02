@@ -8,13 +8,11 @@ const euro = (cents: number) => euroFormat.format(cents / 100);
 
 /** Read-only estimate; only the landlord's example prepayment is editable. */
 export function ServiceCharges({ agreementId, request }: { agreementId: string; request: Request }) {
-  const [open, setOpen] = useState(false);
   const [account, setAccount] = useState<ServiceChargeView | null>(null);
   const [prepayment, setPrepayment] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   useEffect(() => {
-    if (!open) return;
     let active = true;
     request<{ account: ServiceChargeView }>(`/api/service-charges?agreement=${encodeURIComponent(agreementId)}`)
       .then(({ account: next }) => {
@@ -25,7 +23,7 @@ export function ServiceCharges({ agreementId, request }: { agreementId: string; 
       })
       .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Statement unavailable.'); });
     return () => { active = false; };
-  }, [open, agreementId, request]);
+  }, [agreementId, request]);
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,8 +43,8 @@ export function ServiceCharges({ agreementId, request }: { agreementId: string; 
   }
 
   return (
-    <details className="service-charge-card" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary id={`service-charges-${agreementId}`}>Service charges · prototype · simulated figures</summary>
+    <section className="service-charge-card" aria-labelledby={`service-charges-${agreementId}`}>
+      <h3 id={`service-charges-${agreementId}`}>Service charges · prototype · simulated figures</h3>
       {error && <p role="alert" className="note">{error}</p>}
       {!account && !error && <p className="small-copy">Loading this tenancy’s example account…</p>}
       {account && (
@@ -86,6 +84,6 @@ export function ServiceCharges({ agreementId, request }: { agreementId: string; 
           <p><strong>Projected monthly surplus release: {euro(account.projectedReleaseCents)}</strong> (illustration only; no transfer or on-chain action). In a future version, prepayments would sit in the same escrow as the deposit.</p>
         </div>
       )}
-    </details>
+    </section>
   );
 }

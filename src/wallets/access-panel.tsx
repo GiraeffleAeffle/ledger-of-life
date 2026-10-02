@@ -1,6 +1,6 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { useRentalWallet } from './provider.tsx';
 import { pendingInvitationRole } from './pending-invitation.ts';
 import styles from './access-panel.module.css';
@@ -30,6 +30,15 @@ const supportsPasskeys = () =>
 
 export function WalletAccessPanel() {
   const access = useRentalWallet();
+  const [copyStatus, setCopyStatus] = useState('');
+  async function copyAddress(address: string) {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopyStatus('Address copied.');
+    } catch {
+      setCopyStatus('Could not copy the address. Select and copy it manually.');
+    }
+  }
   const passkeysAvailable = useSyncExternalStore(subscribe, supportsPasskeys, () => false);
   const localPasskeyUrl = useSyncExternalStore(subscribe, localhostPasskeyUrl, () => '');
   const invitationRole = useSyncExternalStore(subscribeHash, pendingInvitationRole, () => null);
@@ -51,11 +60,9 @@ export function WalletAccessPanel() {
   }
 
   return (
-    <section className={styles.panel} aria-labelledby="wallet-access-title" aria-busy={access.busy}>
-      <div className={styles.eyebrow}>Account access</div>
-      <h3 id="wallet-access-title">Keep your assets with you</h3>
+    <section className={styles.panel} aria-label="Passkeys and wallets" aria-busy={access.busy}>
       <p>
-        Sign in with a passkey. We recommend a second passkey on another device as an optional backup. If you lose every passkey, you lose this test account. Nothing here has monetary value.
+        We recommend a second passkey on another device as an optional backup. If you lose every passkey, you lose this account.
       </p>
       {!access.ready && <p role="status">Connecting account access…</p>}
       {!access.authenticated ? (
@@ -137,12 +144,12 @@ export function WalletAccessPanel() {
             </div>
           )}
           {access.wallets.length > 0 && (
-            <details className={styles.details}>
-              <summary>Wallet and control details</summary>
+            <div className={styles.details}>
               {access.wallets.map((wallet) => (
                 <div className={styles.wallet} key={wallet.id}>
                   <strong>{wallet.chainType === 'solana' ? 'Solana' : 'Robinhood Chain'}</strong>
                   <code>{wallet.address}</code>
+                  <button type="button" onClick={() => void copyAddress(wallet.address)}>Copy {wallet.chainType === 'solana' ? 'Solana' : 'Robinhood'} address</button>
                   <span>
                     {wallet.connected
                       ? 'Ready to request your signature'
@@ -155,16 +162,9 @@ export function WalletAccessPanel() {
                 app does not add a server signer or give landlords or arbitrators access to your
                 personal wallet.
               </p>
-            </details>
+              {copyStatus && <p role="status">{copyStatus}</p>}
+            </div>
           )}
-          <button
-            type="button"
-            className={styles.textButton}
-            disabled={disabled}
-            onClick={() => run(access.logout)}
-          >
-            Sign out
-          </button>
         </>
       )}
       {!passkeysAvailable && access.ready && (

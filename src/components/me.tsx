@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { History, KeyRound } from 'lucide-react';
+import { History } from 'lucide-react';
 import type { PlaceEntry } from '@/server/timeline';
 import { WalletAccessPanel } from '@/wallets';
 import type { TenancyJourney } from '@/server/journey';
@@ -20,7 +20,7 @@ const STAGE_LABEL: Record<string, string> = {
 };
 
 /** One source catalogue and one settings owner, alongside identity and private life history. */
-export function MeArea({ request, tenancies, listings, homeState, go }: {
+export function MeArea({ request, tenancies, homeState, go }: {
   request: Request; tenancies: TenancyJourney[]; listings: PublicListing[];
   homeState: Pick<LedgerStateInputs, 'homeLoading' | 'homeError' | 'tenancyCount' | 'listingCount'>; go: (area: Area) => void;
 }) {
@@ -45,14 +45,9 @@ export function MeArea({ request, tenancies, listings, homeState, go }: {
     ...connections.facts, ...homeState,
     serviceChargeTarget: livingTenancy ? `service-charges-${livingTenancy.agreementId}` : undefined,
     cityId: city?.cityId ?? (city?.name ? citySlug(city.name) : ''),
-    selectedCity: Boolean(city?.cityId || (city?.source === 'chosen' && city?.name)),
+    selectedCity: Boolean(city?.name),
     cityName: city?.name ?? '', cityLoading: !city && !cityError, cityError,
   };
-  const memberships = [
-    ...tenancies.map((t) => ({ key: t.agreementId, role: t.role, context: t.property })),
-    ...listings.filter((l) => l.relation === 'landlord').map((l) => ({ key: l.id, role: 'landlord', context: l.title })),
-    ...(city?.name && (city.available || city.cityId || city.source === 'chosen') ? [{ key: 'city', role: city.source === 'identity' ? 'city on identity' : 'chosen city', context: city.name }] : []),
-  ];
 
   async function submitPlace(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -82,33 +77,20 @@ export function MeArea({ request, tenancies, listings, homeState, go }: {
   return (
     <div className="area-stack">
       <section className="card account-settings" id="account-settings" tabIndex={-1}>
-        <h2>Account &amp; wallets</h2>
         <WalletAccessPanel />
       </section>
       <IdentityStrip request={request} status={connections.identity} loading={connections.identityLoading}
-        readError={connections.identityError} onStatusChange={connections.updateIdentity} onRefresh={connections.refreshIdentity} />
+        readError={connections.identityError} onStatusChange={connections.updateIdentity} onRefresh={connections.refreshIdentity} homeCity={city?.source === 'home'} />
       <LedgerAdapters inputs={inputs} go={go} />
       <AdapterSettings request={request} connection={connections.adapters} />
 
-      {memberships.length > 0 && (
-        <section className="card">
-          <h2><KeyRound size={18} /> Your roles</h2>
-          <ul className="membership-list">
-            {memberships.map((membership) => (
-              <li key={membership.key}>
-                <strong>{membership.role[0].toUpperCase() + membership.role.slice(1)}</strong> · {membership.context}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       <section className="card" id="life-timeline" tabIndex={-1}>
         <h2><History size={18} /> Life timeline</h2>
         <p className="small-copy">Private to your account. Tenancy records are recorded by this app; earlier places are your own statements. Choosing a city does not record a move or prove residence.</p>
         <ol className="life-timeline">
-          {city?.cityId && (
-            <li><strong>Now · {city.name}</strong><span>{city.source === 'identity' ? 'City from your EU wallet' : 'City you chose'}</span></li>
+          {city?.name && (
+            <li><strong>Now · {city.name}</strong><span>{city.source === 'home' ? `From your home${city.home?.title ? ` · ${city.home.title}` : ''}` : city.source === 'identity' ? 'From your EU wallet' : 'Chosen by you'}</span></li>
           )}
           {tenancies.map((t) => (
             <li key={t.agreementId}>

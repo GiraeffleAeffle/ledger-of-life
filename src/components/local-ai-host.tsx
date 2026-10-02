@@ -93,7 +93,7 @@ export function LocalAiHost({ usage, error, service, request, refresh }: {
   const plan = hostEconomics(inputs, usage?.meanWallMs ?? null);
   return <div className="local-ai-host">
     <div className="local-ai-pairing">
-      <div className="local-ai-section-title"><span className="eyebrow">YOUR DEVICES</span><h3>Connect a host you run.</h3><p>The outbound connector runs beside Ollama on your device. No public Ollama port is needed. Create a private invitation here, then put it in your connector configuration as pairingCode.</p></div>
+      <div className="local-ai-section-title"><span className="eyebrow">YOUR DEVICES</span><h3>Your GPU host</h3><p>The outbound connector runs beside Ollama on your device. No public Ollama port is needed. Create a private invitation here, then put it in your connector configuration as pairingCode.</p></div>
       {service?.mode !== 'direct' && service?.hostPairingAllowed ? invitation ? <div className="local-ai-invitation" role="status">
         <strong>Keep this invitation private. It is shown only once.</strong>
         <code>{invitation.code}</code>

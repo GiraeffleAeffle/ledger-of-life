@@ -12,7 +12,7 @@ export const SECTIONS = {
   'home-tenancies': 'home', 'home-options': 'home', 'past-tenancies': 'home', 'deposit-options': 'home',
   'money-holdings': 'money', 'money-shares': 'money', 'money-stakes': 'money', 'money-devices': 'money',
   'money-overview': 'money', 'solana-holding': 'money', 'rental-deposit-holding': 'money', 'official-shares': 'money', 'fake-shares': 'money',
-  'ownership-journey': 'money', 'share-workflows': 'money', 'local-investments': 'money', 'test-money': 'money',
+  'share-workflows': 'money', 'local-investments': 'money', 'test-money': 'money',
   'device-readings': 'money', 'solar-reading': 'money', 'validator-reading': 'money', 'local-ai': 'money',
   'personal-map': 'places', 'selected-project': 'places', 'project-browser': 'places', 'followed-projects': 'places',
   'city-choice': 'places', 'city-system': 'places', 'city-news': 'places', 'regional-topics': 'places',

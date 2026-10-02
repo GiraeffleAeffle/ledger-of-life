@@ -1,6 +1,6 @@
 import { authenticated } from '@/server/authenticated';
-import { chooseCity, readCity } from '@/server/city';
-import { identityStatus } from '@/server/eudi';
+import { chooseCity } from '@/server/city';
+import { personCity } from '@/server/person-city';
 import { getStore } from '@/server/store';
 import { errorResponse, readBody, sameOrigin } from '@/server/http';
 export const runtime = 'nodejs';
@@ -9,11 +9,10 @@ const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Author
 async function view(request: Request) {
   const identity = await authenticated(request);
   const store = await getStore();
-  const status = await identityStatus(store, identity);
-  return readCity(store, identity, status.state === 'verified' ? status.statement.city : undefined);
+  return personCity(store, identity);
 }
 
-/** The person's city through the Stadtstack project atlas: EU-wallet city first, else a chosen one. */
+/** Resolve the person's home city, explicit override or EU-wallet city. */
 export async function GET(request: Request) {
   try {
     return Response.json({ city: await view(request) }, noStore);
@@ -27,7 +26,7 @@ export async function POST(request: Request) {
     sameOrigin(request);
     const identity = await authenticated(request);
     const body = await readBody(request);
-    await chooseCity(await getStore(), identity, String(body.city ?? ''));
+    await chooseCity(await getStore(), identity, body.city === null ? null : String(body.city ?? ''));
     return Response.json({ city: await view(request) }, noStore);
   } catch (error) {
     return errorResponse(error);

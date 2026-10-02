@@ -6,7 +6,7 @@ import type { CityResult } from '@/server/city';
 import { arrivalGuideCityIds, arrivalGuideFor } from '@/data/arrival';
 import type { CityCoverage } from '@/server/city-signals';
 import { cityIdFor, coveredNames, formatCityDate } from './city-coverage';
-import { CITY_CHANGED_EVENT } from './use-city-signals';
+import { CITY_CHANGED_EVENT, readPersonCity, citySourceLabel } from './use-city-signals';
 
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 
@@ -16,10 +16,12 @@ export function CityCard({ request, onCityChange, onPreviewCity, previewCity, fa
   const [cities, setCities] = useState<CityCoverage['cities']>([]);
   const [snapshot, setSnapshot] = useState('');
   const [draft, setDraft] = useState('');
+  const [changing, setChanging] = useState(false);
   const [other, setOther] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
+  const [nearest, setNearest] = useState<{ id: string; name: string } | null>(null);
   useEffect(() => {
     const changed = () => setRevision((value) => value + 1);
     window.addEventListener(CITY_CHANGED_EVENT, changed);
@@ -27,14 +29,22 @@ export function CityCard({ request, onCityChange, onPreviewCity, previewCity, fa
   }, []);
   useEffect(() => {
     let active = true;
-    request<{ city: CityResult }>('/api/city')
-      .then(({ city }) => { if (active) { setCity(city); setError(''); } })
+    readPersonCity(request)
+      .then((city) => { if (active) { setCity(city); setDraft(city.cityId ?? ''); setError(''); } })
       .catch(() => { if (active) setError('Your city could not be checked. You can still choose a covered city.'); });
     request<CityCoverage>('/api/city-signals/coverage')
       .then((coverage) => { if (active) { setCities(coverage.cities); setSnapshot(coverage.generatedAt); } })
       .catch(() => { if (active) setError('Published city coverage is temporarily unavailable. Try again.'); });
     return () => { active = false; };
   }, [request, revision]);
+  useEffect(() => {
+    if (!city?.name || city.cityId) return;
+    let active = true;
+    request<{ nearest: { id: string; name: string } | null }>('/api/places/nearest')
+      .then(({ nearest }) => { if (active) setNearest(nearest); })
+      .catch(() => { if (active) setNearest(null); });
+    return () => { active = false; };
+  }, [request, city]);
   async function choose(event: React.FormEvent) {
     event.preventDefault();
     const name = draft === 'another' ? other.trim() : coveredNames[draft];
@@ -44,6 +54,8 @@ export function CityCard({ request, onCityChange, onPreviewCity, previewCity, fa
     try {
       const response = await request<{ city: CityResult }>('/api/city', { city: name });
       setCity(response.city);
+      setChanging(false);
+      window.dispatchEvent(new Event(CITY_CHANGED_EVENT));
       onCityChange?.();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Your city could not be saved. Try again.'); }
     finally { setBusy(false); }
@@ -66,12 +78,21 @@ export function CityCard({ request, onCityChange, onPreviewCity, previewCity, fa
   </form>;
   return <section className="card city-card" id="city-choice" tabIndex={-1}>
     {fallbackSectionIds?.map((id) => <span key={id} id={id} className="city-section-anchor" tabIndex={-1} aria-label="Choose your city" />)}
-    <header><Building2 size={18} /> <strong>{city?.name ? `Your city · ${city.name}` : 'Choose your city'}</strong>
-      {city?.name && <span className="city-source">{city.source === 'identity' ? 'From your EU wallet' : 'Chosen by you'}</span>}
+    <header><Building2 size={18} /> <strong>{city?.name ? `Your city · ${city.name}` : city ? 'Choose your city' : 'Your city'}</strong>
+      {city?.name && <span className="city-source">{citySourceLabel(city.source)}</span>}
     </header>
-    <p>Choose a city for published news, events, projects and ways to take part. Preview without saving, or keep it as your city. Neither choice is proof of residence.</p>
-    {city?.name && <p className="small-copy" role="status">{city.cityId ? `Your city is ${city.name}. Published map and city feed are available below${!city.available && city.reason === 'atlas_unavailable' ? '; the separate project atlas is unavailable right now' : ''}.` : `${city.name} is not covered yet. You can choose a covered city instead.`}</p>}
-    {picker}
+    {!city && !error ? <p aria-busy="true" style={{ minHeight: 80 }}>Checking your city…</p> : null}
+    {city?.name && <p className="small-copy">{city.source === 'home' && city.home?.title ? `${city.home.title}${!city.cityId ? ' · ' : ''}` : null}{!city.cityId ? `${city.name} · not covered yet.` : null}</p>}
+    {!city?.cityId && city?.name && nearest && onPreviewCity && <button type="button" className="secondary-button" onClick={() => onPreviewCity(nearest.id)}>Preview the nearest covered city · {nearest.name}</button>}
+    {previewCity && onPreviewCity && <button type="button" className="text-button" onClick={() => onPreviewCity('')}>Back to my city</button>}
+    {city?.name && <button type="button" className="text-button" onClick={() => setChanging(!changing)}>{changing ? 'Cancel' : 'Change city'}</button>}
+    {city?.source === 'chosen' && city.home && <button type="button" className="text-button" disabled={busy} onClick={async () => {
+      setBusy(true);
+      try { await request('/api/city', { city: null }); window.dispatchEvent(new Event(CITY_CHANGED_EVENT)); onCityChange?.(); }
+      catch (cause) { setError(cause instanceof Error ? cause.message : 'Your home city could not be restored.'); }
+      finally { setBusy(false); }
+    }}>Use my home city</button>}
+    {(changing || (city && !city.name)) && picker}
     <div className="city-settled"><h3>Get settled</h3>
       {guideCity && arrivalGuideCityIds.includes(guideCity) && arrivalGuideFor(guideCity)
         ? <Link href={`/welcome/${encodeURIComponent(guideCity)}`}>Read the {coveredNames[guideCity]} welcome guide — no account needed</Link>
