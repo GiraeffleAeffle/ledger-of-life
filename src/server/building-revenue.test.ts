@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decodeFunctionData, encodeFunctionData, getAddress, keccak256, parseTransaction, toHex, type Hex } from 'viem';
+import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, encodeFunctionData, getAddress, keccak256, parseAbi, parseTransaction, toHex, type Hex, type TransactionReceipt } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import investments from '../../contracts/evm/deployments/local-investments-46630.json' with { type: 'json' };
 import { LocalStore } from './store.ts';
@@ -48,7 +48,7 @@ test('staking signing scope refuses foreign accounts, wrong targets, changed amo
 
 function chainFixture() {
   let allowance = 0n, staked = 0n, units = 1000n, earned = 50n, sends = 0, failWait = false;
-  const receipts = new Map<Hex, { status: 'success'; transactionHash: Hex; blockNumber: bigint }>();
+  const receipts = new Map<Hex, { status: 'success'; transactionHash: Hex; blockNumber: bigint; logs: TransactionReceipt['logs'] }>();
   const rpc = {
     getChainId: async () => 46630, getCode: async () => '0x1234', getBlockNumber: async () => 20n,
     getTransactionCount: async () => 0, estimateFeesPerGas: async () => ({ maxFeePerGas: 1n, maxPriorityFeePerGas: 0n }),
@@ -74,6 +74,7 @@ function chainFixture() {
     sendRawTransaction: async ({ serializedTransaction }: { serializedTransaction: Hex }) => {
       sends++;
       const tx = parseTransaction(serializedTransaction), hash = keccak256(serializedTransaction);
+      const logs: TransactionReceipt['logs'] = [];
       assert.equal(tx.to?.toLowerCase(), tx.data!.slice(0, 10) === '0x095ea7b3' ? unitToken.toLowerCase() : distributor.toLowerCase());
       if (tx.to?.toLowerCase() === unitToken.toLowerCase()) {
         const call = decodeFunctionData({ abi: BUILDING_TOKEN_ABI, data: tx.data! });
@@ -82,14 +83,17 @@ function chainFixture() {
         const call = decodeFunctionData({ abi: BUILDING_ACTION_ABI, data: tx.data! });
         if (call.functionName === 'stake') { units -= call.args[0]; staked += call.args[0]; allowance -= call.args[0]; }
         if (call.functionName === 'unstake') { units += call.args[0]; staked -= call.args[0]; }
-        if (call.functionName === 'claim') earned = 0n;
-        if (call.functionName === 'exit') { units += staked; staked = 0n; earned = 0n; }
+        if (call.functionName === 'claim' || call.functionName === 'exit') {
+          logs.push({ address: distributor, topics: encodeEventTopics({ abi: parseAbi(['event Claimed(address indexed account,uint256 amount)']), eventName: 'Claimed', args: { account: holder.address } }), data: encodeAbiParameters([{ type: 'uint256' }], [earned]) } as TransactionReceipt['logs'][number]);
+          earned = 0n;
+        }
+        if (call.functionName === 'exit') { units += staked; staked = 0n; }
       }
-      receipts.set(hash, { status: 'success', transactionHash: hash, blockNumber: 10n }); return hash;
+      receipts.set(hash, { status: 'success', transactionHash: hash, blockNumber: 10n, logs }); return hash;
     },
     waitForTransactionReceipt: async ({ hash }: { hash: Hex }) => { if (failWait) throw new Error('Timeout'); return receipts.get(hash)!; },
     getLogs: async (input: { event: { name: string } }) => {
-      if (input.event.name === 'Transfer') return [{ args: { value: 101n }, blockNumber: 10n, transactionHash: keccak256(toHex('revenue')), removed: false }];
+      if (input.event.name === 'Transfer') return [{ args: { from: foreign, value: 101n }, logIndex: 0, blockNumber: 10n, transactionHash: keccak256(toHex('revenue')), removed: false }];
       return input.event.name === 'Staked' && staked > 0n ? [{ args: { account: holder.address, amount: staked }, removed: false }] : [];
     },
   } as unknown as BuildingRpc;

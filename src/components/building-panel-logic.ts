@@ -26,3 +26,14 @@ export function buildingActionState(input: {
   if (BigInt(input.quantityRaw) > BigInt(balance)) return input.operation === 'stake' ? 'Not enough wallet tHOME units' : 'Not enough staked tHOME units';
   return null;
 }
+
+/** The tick is a projection between verified reads, never an amount used to prepare a claim. */
+export function projectedBuildingEarnings(input: {
+  earnedRaw: string; stakedRaw: string; totalStakedRaw: string; rewardRateRaw: string;
+  rewardScaleRaw: string; periodFinish: number; observedAt: number; now: number;
+}) {
+  const total = BigInt(input.totalStakedRaw), scale = BigInt(input.rewardScaleRaw);
+  const elapsed = Math.max(0, Math.min(input.now, input.periodFinish) - input.observedAt);
+  if (total <= 0n || scale <= 0n || elapsed === 0) return input.earnedRaw;
+  return (BigInt(input.earnedRaw) + BigInt(Math.floor(elapsed)) * BigInt(input.rewardRateRaw) * BigInt(input.stakedRaw) / total / scale).toString();
+}

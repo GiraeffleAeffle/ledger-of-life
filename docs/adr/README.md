@@ -18,8 +18,9 @@ These records cover the separate rental asset-building hackathon project. They d
 | [0010](0010-one-home-per-feature.md)                            | Accepted                             | Give every feature one home area where it is operated; every other area shows a one-line reference that links there.   |
 | [0011](0011-ask-for-recovery-at-the-first-wallet-action.md)     | Superseded by 0014                   | Historical: defer the second-browser recovery proof to the first wallet action. |
 | [0012](0012-public-pages-outside-the-wallet-group.md)           | Accepted                             | Mount the wallet SDK only in the `(wallet)` route group, so public pages such as the welcome guide load nothing from a third party. |
-| [0013](0013-outbound-host-connector.md)                       | Accepted                             | Pair outbound Ed25519 GPU connectors; keep the home LAN private, bind payment to the host, and disclose cleartext questions and absent model attestation. |
+| [0013](0013-outbound-home-node.md)                            | Accepted                             | Pair outbound Ed25519 GPU workers; keep the home LAN private, bind payment to the host, and disclose cleartext questions and absent model attestation. |
 | [0014](0014-passkey-only-test-accounts.md)                     | Accepted                             | Use passkey-only test accounts, optional second-device passkeys, no email recovery or network-source persistence. |
+| [0015](0015-home-node.md)                                    | Accepted                             | Evolve the outbound worker into a local Home Node with community pairing, selected signed readings, public validator ids and an MCP stdio setup interface; keep device secrets local. |
 
 ## Coverage of the three implementation plans
 

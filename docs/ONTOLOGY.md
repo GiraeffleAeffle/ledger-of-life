@@ -257,7 +257,7 @@ memory, erased on completion, timeout, revocation, clear or process exit.
 | Building/city scenario | `src/components/city-flywheel.tsx`; physical systems, supplier relationship, jobs and fiscal effects are illustrative |
 | LocalInferenceRequest and visitor access | `src/server/local-ai.ts`, `src/server/local-ai-runtime.ts`, `src/server/local-ai-session.ts`, `src/components/local-ai.tsx`, `app/(wallet)/library/page.tsx` |
 | InferencePayment | `src/server/local-ai-payment.ts`, `src/server/local-ai-operations.ts`, `src/wallets/inference-signing.ts`; explicit Permit2 review, owner/nonce binding and dedicated fee account |
-| InferenceHost | `src/server/local-ai-hosts.ts`, `app/api/local-ai/hosts/`, `host-connector/connector.mjs`, `src/components/local-ai-host.tsx`; outbound-only connector, invited pairing, signed jobs and heartbeat status |
+| InferenceHost | `src/server/local-ai-hosts.ts`, `app/api/local-ai/hosts/`, `home-node/home-node.mjs`, `src/components/local-ai-host.tsx`; outbound-only Home Node, community/operator pairing, signed jobs and heartbeat status |
 | HostPairingInvitation | `src/server/local-ai-hosts.ts`, `app/api/local-ai/hosts/invitations/route.ts`, `src/components/local-ai-host.tsx`; private, owner-created, hashed, ten-minute and single-use |
 | HostEconomicsScenario | `src/components/local-ai-economics.ts`, `src/components/local-ai-host.tsx`; euro assumptions separate from measured usage and settled test-token receipts |
 | Adapter catalogue, state and settings | `src/data/ledger-catalogue.ts`, `src/components/ledger-adapter-state.ts`, `src/components/ledger-adapters.tsx`, `src/components/adapter-settings.tsx`, `app/api/adapters/route.ts` |

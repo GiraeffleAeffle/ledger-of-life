@@ -2,6 +2,14 @@
 import { useState } from 'react';
 import { ArrowRight, Building2, Cpu, Leaf, Sun } from 'lucide-react';
 import { openLocalAi, type Area } from './areas';
+import { ROEBEL_AGRI_PV } from '../data/local-investments';
+
+export function RoebelPrecedent() {
+  return <details className="city-blueprint-evidence"><summary>{ROEBEL_AGRI_PV.title}</summary>
+    <p>{ROEBEL_AGRI_PV.summary}</p><p><strong>{ROEBEL_AGRI_PV.caveat}</strong></p>
+    <p>{ROEBEL_AGRI_PV.tokenization}</p><p className="small-copy">Source: {ROEBEL_AGRI_PV.source} Privately shared presentation; no public online record located. <a href={ROEBEL_AGRI_PV.noteUrl} target="_blank" rel="noopener noreferrer">Read the attributed research note</a></p>
+  </details>;
+}
 
 const windows = [[112, 137], [155, 137], [198, 137], [241, 137], [112, 174], [155, 174], [198, 174], [241, 174]] as const;
 const technologies = [
@@ -49,6 +57,7 @@ export function ProjectBlueprint({ kind, go }: { kind: 'housing' | 'business'; g
       </ul>
       {enabled.gpu && <button type="button" className="button primary" onClick={() => openLocalAi(go)}>Try the connected GPU node <ArrowRight size={16} /></button>}
       <details className="city-blueprint-evidence"><summary>Costs, evidence &amp; realism</summary><p>These switches change a schematic, not a building, holding, bill or return. Capital cost, finance, servicing, grid charges and actual demand need a project-specific assessment.</p><p><a href="https://www.ise.fraunhofer.de/en/press-media/press-releases/2025/fraunhofer-ise-research-project-completed-heat-pumps-provide-climate-friendly-heating-in-existing-buildings.html" target="_blank" rel="noopener noreferrer">Fraunhofer ISE’s field study</a> found substantial variation in heat-pump efficiency and partial—not universal—solar autonomy. It is not a forecast for this fictional building.</p><p><a href="https://www.iea.org/commentaries/opportunities-for-district-heating-in-the-changing-energy-landscape" target="_blank" rel="noopener noreferrer">IEA on heat recovery</a>: location, temperature, timing, infrastructure and a viable business model all matter. A validator is not a substitute for a heating design.</p></details>
+      <RoebelPrecedent />
     </div>
   </div>;
 }

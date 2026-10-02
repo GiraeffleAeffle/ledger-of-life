@@ -22,7 +22,8 @@ export interface LocalAiApproval {
 }
 export interface ConnectorHostStatus {
   id: string; name: string; own: boolean; payoutWallet: string | null; models: string[];
-  lastHeartbeat: number | null; state: 'pending' | 'active' | 'revoked';
+  lastHeartbeat: number | null; state: 'pending' | 'active' | 'revoked' | 'suspended';
+  kind?: 'operator' | 'community';
   ollamaReachable: boolean; awake: boolean; availability: 'online' | 'asleep' | 'offline';
   canWake?: boolean;
   freePublicAnswers?: boolean;
@@ -34,7 +35,7 @@ export interface LocalAiRequest {
   createdAt: string; expiresAt: string; answer: string | null; purgedAt?: string | null; usage: LocalAiRequestUsage | null; error: string | null;
   payment: { state: 'none' | 'quoted' | 'authorized' | 'pending' | 'settled' | 'failed'; amountAtomic: string; receipt: SettleResponse | null };
   review: InferencePaymentReview | null; paymentRequired: PaymentRequired | null; approval: LocalAiApproval | null;
-  host?: { id: string; name: string; own: boolean; payoutWallet: string | null };
+  host?: { id: string; name: string; own: boolean; payoutWallet: string | null; kind?: 'operator' | 'community' };
   hostScope?: 'own' | 'city'; publicQuestion?: boolean;
 }
 export interface LocalAiServiceStatus {

@@ -10,7 +10,7 @@ import { LocalStore } from './store.ts';
 import { AccessError } from './errors.ts';
 import { authenticateConnector, cancelConnectorInference, checkConnectorHeaders, chooseConnectorHost, completeConnectorJob, connectorSigningBytes,
   createHostInvitation, createHostPairing, enqueueConnectorInference, hostPairingAllowed, parseConnectorBody, pollConnectorJob, publicConnectorHosts,
-  readConnectorBody, recordHostHeartbeat, releaseConnectorHost, reserveConnectorHost, revokeConnectorHost, sanitizeConnectorAnswer, type ConnectorInferenceInput } from './local-ai-hosts.ts';
+  readConnectorBody, recordHostHeartbeat, releaseConnectorHost, reserveConnectorHost, revokeConnectorHost, sanitizeConnectorAnswer, suspendConnectorHost, ownedConnectorHosts, type ConnectorInferenceInput } from './local-ai-hosts.ts';
 import { signedHostRoute } from '../../app/api/local-ai/hosts/_http.ts';
 
 const wallet = '0x1111111111111111111111111111111111111111';
@@ -86,15 +86,15 @@ test('owner invitations are hashed, single use, account/payout bound and activat
   } finally { await store.close(); }
 });
 
-test('invitations expire at ten minutes and require allowlisted EVM ownership with an unambiguous verified payout', async () => {
+test('invitations expire at ten minutes and accept verified EVM ownership with an unambiguous verified payout', async () => {
   const store = new LocalStore(':memory:');
   try {
     const notAllowed = { ...owner, wallets: [{ id: 'foreign', address: alternateWallet, chainType: 'ethereum' as const }], passkeyCount: 10 };
     const notEvm = { ...owner, wallets: [{ id: 'solana', address: wallet, chainType: 'solana' as const }] };
-    assert.equal(hostPairingAllowed(notAllowed), false);
+    assert.equal(hostPairingAllowed(notAllowed), true);
     assert.equal(hostPairingAllowed(notEvm), false);
-    await assert.rejects(createHostInvitation(store, notAllowed, {}, 1000000), /allowlisted EVM/);
-    await assert.rejects(createHostInvitation(store, notEvm, {}, 1000000), /allowlisted EVM/);
+    await createHostInvitation(store, notAllowed, {}, 1000000);
+    await assert.rejects(createHostInvitation(store, notEvm, {}, 1000000), /verified EVM/);
     await assert.rejects(createHostInvitation(store, owner, { payoutWallet: thirdWallet }, 1000000), /own verified EVM/);
     await assert.rejects(createHostInvitation(store, owner, {}, 1000000), /Choose a verified/);
     const invitation = await createHostInvitation(store, other, {}, 1000000);
@@ -103,6 +103,53 @@ test('invitations expire at ten minutes and require allowlisted EVM ownership wi
     const fresh = await createHostInvitation(store, other, {}, 1600000);
     const pair = await createHostPairing(store, { code: fresh.code, name: 'Home GPU', publicKey }, 1600001);
     assert.equal((await publicConnectorHosts(store, 1600001, other.subject)).find((host) => host.id === pair.hostId)!.payoutWallet, thirdWallet);
+  } finally { await store.close(); }
+});
+
+test('community host limits are atomic; suspension blocks signatures and cannot bypass account/global capacity', async () => {
+  const store = new LocalStore(':memory:');
+  try {
+    const community = { ...owner, subject: 'community', wallets: [{ id: 'community', chainType: 'ethereum' as const, address: alternateWallet }] };
+    const first = await pairing(store, 1000000, community);
+    const second = await pairing(store, 1000000, community);
+    assert.equal((await ownedConnectorHosts(store, community, 1000000))[0].kind, 'community');
+    assert.equal((await pairing(store, 1000000, other)).hostId.length, 36);
+    assert.equal((await ownedConnectorHosts(store, other, 1000000))[0].kind, 'operator');
+    await assert.rejects(createHostInvitation(store, community, {}, 1000000), /at most two/);
+    await assert.rejects(suspendConnectorHost(store, community, first.hostId, true), /Only an operator/);
+    await suspendConnectorHost(store, owner, first.hostId, true);
+    const signedRequest = signed(first.hostId, first.keys.privateKey, '{}', 1000001);
+    await assert.rejects(authenticateConnector(store, signedRequest.request, signedRequest.raw, 1000001), /unknown or revoked/);
+    await assert.rejects(createHostInvitation(store, community, {}, 1000000), /at most two/);
+    assert.equal((await ownedConnectorHosts(store, community, 1000000))[0].state, 'suspended');
+    await suspendConnectorHost(store, owner, first.hostId, false);
+    await authenticateConnector(store, signedRequest.request, signedRequest.raw, 1000001);
+    await revokeConnectorHost(store, community, second.hostId);
+    await pairing(store, 1000000, community);
+    for (let index = 0; index < 46; index++) await pairing(store, 1000000, { ...community, subject: `account-${index}` });
+    const overflowOwner = { ...community, subject: 'capacity-overflow' };
+    const overflowInvite = await createHostInvitation(store, overflowOwner, {}, 1000000);
+    await pairing(store, 1000000, { ...community, subject: 'account-46' });
+    await assert.rejects(createHostPairing(store, { code: overflowInvite.code, name: 'GPU', publicKey: generateKeyPairSync('ed25519').publicKey.export({ format: 'der', type: 'spki' }).toString('base64') }, 1000000), /50 hosts/);
+    await assert.rejects(createHostInvitation(store, overflowOwner, {}, 1000000), /50 hosts/);
+  } finally { await store.close(); }
+});
+
+test('legacy invitation floods are reduced to the latest unused code per subject before concurrent redemption', async () => {
+  const store = new LocalStore(':memory:');
+  try {
+    const invitations = ['AAAAAAAAAAAA', 'BBBBBBBBBBBB', 'CCCCCCCCCCCC'].map(code => ({ code }));
+    await store.create('local-ai:connector-registry', { hosts: [], invitations: invitations.map(({ code }) => ({
+      codeHash: createHash('sha256').update(code).digest('hex'), ownerSubject: other.subject, payoutWallet: thirdWallet, expiresAt: 1600000,
+    })) });
+    const results = await Promise.allSettled(invitations.map(invitation => createHostPairing(store, {
+      code: invitation.code, name: 'Community device', publicKey: generateKeyPairSync('ed25519').publicKey.export({ format: 'der', type: 'spki' }).toString('base64'),
+    }, 1000001)));
+    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+    assert.match((results.find(result => result.status === 'rejected') as PromiseRejectedResult).reason.message, /expired, used, or unknown/);
+    await pairing(store, 1000001, other);
+    assert.equal((await ownedConnectorHosts(store, other, 1000001)).length, 2);
+    await assert.rejects(createHostInvitation(store, other, {}, 1000001), /at most two/);
   } finally { await store.close(); }
 });
 
@@ -585,5 +632,35 @@ test('registry cutover preserves active paired keys and durable replay while dis
     assert.equal((await outcome).value!.answer, 'Complete answer.');
     const newHost = await pairing(store, now, other);
     assert.equal((await publicConnectorHosts(store, now)).some((entry) => entry.id === newHost.hostId), true);
+  } finally { await store.close(); }
+});
+test('one subject retains only its latest unused invitation and cannot exhaust shared slots or bypass its hourly creation rate', async () => {
+  const store = new LocalStore(':memory:');
+  try {
+    const first = await createHostInvitation(store, other, {}, 1000000);
+    let latest = first;
+    for (let index = 1; index < 5; index++) latest = await createHostInvitation(store, other, {}, 1000000 + index);
+    const saved = await store.get<{ invitations: { ownerSubject: string; codeHash: string }[] }>('local-ai:connector-registry');
+    assert.equal(saved!.invitations.filter(row => row.ownerSubject === other.subject).length, 1);
+    assert.equal(saved!.invitations[0].codeHash, createHash('sha256').update(latest.code).digest('hex'));
+    await assert.rejects(createHostInvitation(store, other, {}, 1000010), /five host invitations/);
+    await createHostInvitation(store, owner, { payoutWallet: wallet }, 1000010);
+    const key = generateKeyPairSync('ed25519').publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
+    await assert.rejects(createHostPairing(store, { code: first.code, name: 'GPU', publicKey: key }, 1000010), /expired, used, or unknown/);
+    await createHostPairing(store, { code: latest.code, name: 'GPU', publicKey: key }, 1000010);
+    await createHostInvitation(store, other, {}, 4600000);
+  } finally { await store.close(); }
+});
+test('community aliases cannot use trusted branding or invisible formatting, and refused names do not consume the invitation', async () => {
+  const store = new LocalStore(':memory:');
+  try {
+    const community = { ...other, wallets: [{ id: 'community', chainType: 'ethereum' as const, address: alternateWallet }] };
+    const invitation = await createHostInvitation(store, community, {}, 1000000);
+    const publicKey = generateKeyPairSync('ed25519').publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
+    for (const name of ['Official GPU', 'OPERATOR GPU', 'Ledger of Life desktop', 'Ｏｆｆｉｃｉａｌ GPU', ...[0x202e, 0x200b, 0x034f].map(code => `GPU${String.fromCodePoint(code)}`)]) {
+      await assert.rejects(createHostPairing(store, { code: invitation.code, name, publicKey }, 1000000), /host name|must not claim/);
+    }
+    const pair = await createHostPairing(store, { code: invitation.code, name: 'Neighbour GPU', publicKey }, 1000000);
+    assert.equal((await ownedConnectorHosts(store, community, 1000000)).find(host => host.id === pair.hostId)!.kind, 'community');
   } finally { await store.close(); }
 });

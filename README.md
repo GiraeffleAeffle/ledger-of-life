@@ -97,17 +97,17 @@ cutover. Old per-wallet contracts and store records are left unused, without mig
 
 **Local mode:** set the server-only `LOCAL_AI_OLLAMA_URL` and model in `.env.local` using
 `.env.example`; the Next server must reach that endpoint. Never publish Ollama or keys.
-**Hosted mode:** leave the direct URL empty and run the zero-dependency [outbound host
-connector](host-connector/README.md) on an always-on Linux device beside Ollama. It creates
-an owner-only Ed25519 key. An account whose verified EVM wallet is in
-`LOCAL_AI_HOST_OWNER_WALLETS` creates a private, single-use twelve-character invitation in
-Money → Devices & income → Pair hosts & income, chooses its verified payout, and puts the
-invitation in the connector's private configuration. The app shows it once, stores only its
-hash and expires it after ten minutes. Revoke the registered host in the same view.
-The connector dials the app over HTTPS; the cluster never dials the home LAN. Tokenless
-UDP Wake-on-LAN is the owner's default; optional Home Assistant requires HTTPS unless a
-loud trusted-LAN plaintext opt-in is configured. See [ADR 0013](docs/adr/0013-outbound-host-connector.md)
-and the exact [hosted release requirements](docs/DEPLOYMENT.md#the-gpu).
+**Hosted mode:** leave the direct URL empty and run the zero-dependency [Home Node](home-node/README.md)
+on a device beside Ollama. Any signed-in account with a verified EVM wallet can pair its
+own community hosts (two per account, fifty globally); allowlisted wallets retain operator hosts.
+Create a private, single-use twelve-character invitation in Money → Devices & income,
+choose a verified payout or explicitly assign GPU income to the building, and enter the
+code in Home Node's interactive setup. The app shows it once, stores only its hash and expires
+it after ten minutes. Revoke the registered host in the same view; operators may suspend community hosts.
+The node dials the app over HTTPS; the cluster never dials the home LAN. Home Node also
+pushes only selected Home Assistant readings and public validator ids, with an MCP stdio
+setup interface; tokens and keys stay local. Optional plaintext LAN access needs explicit opt-in.
+See [ADR 0015](docs/adr/0015-home-node.md) and the [hosted release requirements](docs/DEPLOYMENT.md#the-gpu).
 
 - **Money → Devices & income → Local AI & GPU hosting** is the one home of this service; Me's GPU adapter, the project sketch's GPU option and the library profile link to it.
 - Other people's hosts use official **x402 v2 exact/Permit2**, the existing six-decimal `tUSDG`
@@ -157,6 +157,20 @@ Protocol: [x402 exact EVM](https://github.com/x402-foundation/x402/blob/main/spe
 and [Robinhood rollup gas accounting](https://docs.robinhood.com/chain/gas-and-fees/).
 
 
+
+## Home Node: add your GPU, solar and validator
+
+`home-node/home-node.mjs` is one dependency-free file (Node ≥ 22). In Money → Devices & income,
+"Add a device" offers its download with a SHA-256 checksum (`/api/home-node/download`) and a
+one-time pairing code. Run `setup` and `pair`, or let an AI assistant do it: `node home-node.mjs mcp`
+is a stdio MCP server with nine guided tools (status, detect devices, pair, configure GPU, list and
+connect Home Assistant sensors, add a validator, test the GPU, push readings); see the
+[MCP section](home-node/README.md#mcp-with-an-llm-client). The node answers GPU questions, reads
+Home Assistant locally and pushes selected readings signed, adds public validator ids and can send
+Wake-on-LAN. Tokens and keys stay on the device and the hosted site never calls into your network.
+Any signed-in account with a verified EVM wallet may pair up to two community hosts. Solar income to
+the building is simulated (test dollars once per completed local day, lower bound of measured kWh ×
+tariff) and needs a funding key that is not configured yet. Nothing here is proven live on real devices.
 
 ## Architecture
 

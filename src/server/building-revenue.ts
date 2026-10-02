@@ -3,6 +3,10 @@ import { resolve } from 'node:path';
 import { createPublicClient, formatUnits, getAddress, http, keccak256, parseAbi, parseAbiItem, type Address, type Hex } from 'viem';
 import investments from '../../contracts/evm/deployments/local-investments-46630.json' with { type: 'json' };
 import type { Store } from './store.ts';
+import { attributeBuildingIncome, type BuildingInflow, type IncomeEvidence } from './building-revenue-attribution.ts';
+import type { LocalAiRequest } from './local-ai-types.ts';
+import { buildingIncomeJournals } from './building-income.ts';
+import { connectorHosts } from './local-ai-hosts.ts';
 
 export const BUILDING_ABI = parseAbi([
   'function payoutToken() view returns (address)',
@@ -81,7 +85,8 @@ export async function verifyBuildingDeployment(manifest: BuildingManifest, rpc: 
 export async function readBuildingView(store: Store, options: BuildingReadOptions = {}) {
   const manifest = await (options.loadManifest ?? loadBuildingManifest)();
   const rpc = options.rpc ?? buildingRpc;
-  const revenueTransactions: { transactionHash: Hex; blockNumber: string; amountRaw: string; explorerUrl: string }[] = [];
+  const revenueTransactions: BuildingInflow[] = [];
+  const incomeEvidence: IncomeEvidence[] = [];
   let totalStaked = 0n, rewardPerUnit = 0n, pendingRevenue = 0n, undistributedScaled = 0n;
   let rewardRate = 0n, periodFinish = 0n, lastUpdateTime = 0n, streamRemainingScaled = 0n, rewardRemainderScaled = 0n;
   const balances = new Map<Address, bigint>();
@@ -99,8 +104,8 @@ export async function readBuildingView(store: Store, options: BuildingReadOption
       rpc.readContract({ address: manifest.distributor, abi: BUILDING_ABI, functionName: 'streamRemainingScaled', blockNumber: snapshot }),
       rpc.readContract({ address: manifest.distributor, abi: BUILDING_ABI, functionName: 'rewardRemainderScaled', blockNumber: snapshot }),
     ]);
-    for (let start = BigInt(manifest.deploymentBlock!); start <= snapshot; start += 2000n) {
-      const toBlock = start + 1999n < snapshot ? start + 1999n : snapshot;
+    for (let start = BigInt(manifest.deploymentBlock!); start <= snapshot; start += 10000n) {
+      const toBlock = start + 9999n < snapshot ? start + 9999n : snapshot;
       const [receipts, stakes, withdrawals] = await Promise.all([
         rpc.getLogs({ address: manifest.payoutToken, event: transfer, args: { to: manifest.distributor }, fromBlock: start, toBlock, strict: true }),
         rpc.getLogs({ address: manifest.distributor, event: staked, fromBlock: start, toBlock, strict: true }),
@@ -108,8 +113,8 @@ export async function readBuildingView(store: Store, options: BuildingReadOption
       ]);
       for (const receipt of receipts) {
         if (receipt.removed) throw new Error('Removed building revenue transfer.');
-        revenueTransactions.push({ transactionHash: receipt.transactionHash, blockNumber: receipt.blockNumber.toString(),
-          amountRaw: receipt.args.value.toString(), explorerUrl: `${explorerUrl}/tx/${receipt.transactionHash}` });
+        revenueTransactions.push({ transactionHash: receipt.transactionHash, logIndex: receipt.logIndex, from: receipt.args.from,
+          blockNumber: receipt.blockNumber.toString(), amountRaw: receipt.args.value.toString(), explorerUrl: `${explorerUrl}/tx/${receipt.transactionHash}` });
       }
       for (const event of stakes) {
         if (event.removed) throw new Error('Removed building staking event.');
@@ -130,21 +135,35 @@ export async function readBuildingView(store: Store, options: BuildingReadOption
   let cursor = '', gpuTokensServed = 0, paidAnswers = 0, runtimeMs = 0, knownRuntime = false;
   if (manifest?.distributor) {
     do {
-      const rows = await store.scan<{ request: { state: string; payment: { state: string }; review?: { payTo: string } | null;
-        usage?: { outputTokens: number | null; wallMs: number } | null } }>('local-ai:request:', cursor, 500);
+      const rows = await store.scan<{ request: LocalAiRequest }>('local-ai:request:', cursor, 500);
       for (const row of rows) {
         cursor = row.key;
         const request = row.value.request;
         if (request.state !== 'completed' || request.payment.state !== 'settled' ||
             request.review?.payTo.toLowerCase() !== manifest.distributor.toLowerCase()) continue;
         paidAnswers++;
+        if (request.payment.receipt?.transaction) incomeEvidence.push({
+          transactionHash: request.payment.receipt.transaction, amountRaw: request.payment.amountAtomic, kind: 'gpu',
+          hostId: request.host?.id ?? 'direct', hostName: request.host?.name ?? 'Operator direct host',
+        });
         gpuTokensServed += request.usage?.outputTokens ?? 0;
         if (request.usage) { runtimeMs += request.usage.wallMs; knownRuntime = true; }
       }
       if (rows.length < 500) break;
     } while (true);
   }
+  if (manifest?.distributor) {
+    const [journals, hosts] = await Promise.all([buildingIncomeJournals(store), connectorHosts(store)]);
+    for (const journal of journals) {
+      if (journal.state !== 'done' || !journal.step.hash ||
+          journal.distributor.toLowerCase() !== manifest.distributor.toLowerCase() ||
+          journal.token.toLowerCase() !== manifest.payoutToken.toLowerCase()) continue;
+      incomeEvidence.push({ transactionHash: journal.step.hash, amountRaw: journal.amountAtomic, kind: 'solar',
+        hostId: journal.hostId, hostName: hosts.find(host => host.id === journal.hostId)?.name ?? journal.hostId });
+    }
+  }
   const revenueRaw = revenueTransactions.reduce((sum, row) => sum + BigInt(row.amountRaw), 0n).toString();
+  const attributed = attributeBuildingIncome(revenueTransactions, incomeEvidence);
   return {
     configured: Boolean(manifest), status: manifest ? 'configured' : 'unconfigured',
     reason: manifest ? null : 'Building staking distributor is not deployed.', chainId: 46630,
@@ -156,7 +175,8 @@ export async function readBuildingView(store: Store, options: BuildingReadOption
     rewardDuration: manifest?.rewardDuration ?? 604800, rewardScaleRaw: manifest?.rewardsSpec.scale ?? '1000000000000000000000000000000000000',
     rewardRateRaw: rewardRate.toString(), periodFinish: Number(periodFinish), lastUpdateTime: Number(lastUpdateTime),
     streamRemainingScaledRaw: streamRemainingScaled.toString(), rewardRemainderScaledRaw: rewardRemainderScaled.toString(),
-    stakerCount: [...balances.values()].filter(balance => balance > 0n).length, gpuTokensServed, paidAnswers, revenueTransactions,
+    stakerCount: [...balances.values()].filter(balance => balance > 0n).length, gpuTokensServed, paidAnswers,
+    revenueTransactions: attributed.transactions, incomeSources: attributed.sources,
     validator: null, heat: { runtimeSeconds: knownRuntime ? runtimeMs / 1000 : null, nominalPowerWatts: null, measuredWhPerToken: null },
   };
 }

@@ -1,0 +1,9 @@
+{
+  "name": "ledger-home-node",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "bin": { "ledger-home-node": "./home-node.mjs" },
+  "scripts": { "start": "node home-node.mjs run", "test": "node --test connector.test.mjs home-node.test.mjs" }
+}

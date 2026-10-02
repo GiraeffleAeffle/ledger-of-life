@@ -5,6 +5,7 @@ import type { AuthorizedRequest } from './use-city-signals';
 
 export const ADAPTER_CONFIG_CHANGED = 'ledger-of-life:adapter-config-changed';
 type ConfigView = { request: AuthorizedRequest; config: PublicAdapterConfig | null; homeAssistantPull: boolean; loading: boolean; error: string };
+export type AdapterConfigConnection = Omit<ConfigView, 'request'> & { refresh: () => Promise<void> };
 
 /** Reads configuration without triggering Home Assistant, validator, prices or wallet reads. */
 export function useAdapterConfig(request: AuthorizedRequest) {

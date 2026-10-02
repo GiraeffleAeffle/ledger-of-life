@@ -52,6 +52,17 @@ test('public consent gates city routing and immutable scope survives connector c
     assert.equal(completed.host?.id, hostId);
     assert.equal(completed.host?.own, false);
     assert.equal(completed.answer, 'A synthetic connector answer.');
+    assert.equal(completed.host?.kind, 'operator');
+    await store.update<{ hosts: { id: string; name: string; kind: string }[] }>('local-ai:connector-registry', row => {
+      const host = row.hosts.find(host => host.id === hostId)!;
+      host.name = 'Renamed neighbour';
+      host.kind = 'community';
+      return row;
+    });
+    assert.equal((await publicConnectorHosts(store)).find(host => host.id === hostId)!.kind, 'community');
+    const historical = await readAiRequest(store, id, visitor);
+    assert.equal(historical.host?.kind, 'operator');
+    assert.equal(historical.host?.name, 'Test connector');
     await assert.rejects(executeAiRequest(store, id, visitor, { ...input, prompt: 'A different public question.' }, url(id), null), /different inference inputs/);
     assert.equal((await readAiRequest(store, id, visitor)).answer, completed.answer);
     assert.ok(!JSON.stringify(completed).includes(identity.subject));

@@ -73,6 +73,7 @@ COPY --chown=node:node contracts/evm/deployments/shared-market-46630.json ./cont
 COPY --chown=node:node contracts/evm/deployments/share-deposit-46630.json ./contracts/evm/deployments/share-deposit-46630.json
 COPY --chown=node:node contracts/evm/deployments/building-revenue-46630.json ./contracts/evm/deployments/building-revenue-46630.json
 COPY --chown=node:node scripts/reconcile.mjs ./scripts/reconcile.mjs
+COPY --chown=node:node home-node/home-node.mjs ./home-node/home-node.mjs
 USER node
 VOLUME /data
 EXPOSE 4175

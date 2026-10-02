@@ -56,7 +56,7 @@ Me keeps wallet addresses visible with copy buttons, one private timeline includ
 | **Holdings** | `money-holdings` | Deposit entitlement, wallet shares/cash, lent value, debt and priced subtotal | Test network · mirrored live token price with provenance |
 | **Shares & loans** | `money-shares` | Official-stock collateral, loans, lending, on-demand paginated unhealthy loans; wallet reads do not scan the registry. Share rental deposits are operated in Home, not here | Test network · deployment required · borrower-funded interest |
 | **Local stakes** | `money-stakes` | Fictional local-project units (`tHOME` housing, `tWORK` workshop) and the project sketch | Test network · simulated input |
-| **Devices & income** | `money-devices` | Things you run that produce value: home solar, a validator, the local AI node on a GPU | Live read-only · test network |
+| **Devices & income** | `money-devices` | Things you run that produce value: add a device (Home Node download with checksum, pairing code, CLI or AI-assistant setup), then see each host's GPU state, earnings and receipts, solar power and local-day kWh pushed by the node, validator ids, and the toggles sending GPU payouts and solar income to the building | Live · test network; solar income simulated |
 
 ## Where the ambiguous features live
 
@@ -69,10 +69,10 @@ Me keeps wallet addresses visible with copy buttons, one private timeline includ
 | Stocks: tSPYx and official faucet test TSLA | Money → Holdings (wallet/lent positions) and Shares & loans (loan collateral) | Me (wallet) | Today (subtotal); wallet/collateral/deposit TSLA use one mirror with source/copy times and price-job health; stale price makes a complete priced total unavailable |
 | **Tokenized local companies and housing** (`tHOME`, `tWORK` test units) | Money → Local stakes | Me (wallet) | Places (issuer markers, an illustration with a link to buy), Ideas, Today, Me directory |
 | Home ownership path (home shares) | Ideas (roadmap). Its nearest working surface is Money → Local stakes | — | Today (link), Me directory |
-| **Solar**: your own Home Assistant reading | Money → Devices & income | Me → Home Assistant | Home (service charges read the same sensor), Today, Me directory |
+| **Solar**: readings your Home Node pushes (local setups may read Home Assistant directly) | Money → Devices & income | Me → Home Assistant (local only) | Home (service charges read the same sensor), Today, Me directory |
 | Solar and heat plans of a city (public evidence, for example Solarpark) | Places → project evidence | Me (chosen city) | Today (compact preview) |
 | Validator stake and rewards | Money → Devices & income | Me → validator | Today, Me directory |
-| **GPU**: local AI node, per-answer payment, host income scenario | Money → Devices & income | Money → Your GPU host (paired connector hosts) | Places (library profile), Ideas, Me directory |
+| **GPU**: local AI node, per-answer payment, host income scenario | Money → Devices & income | Money → Devices & income → your paired hosts (any signed-in account with a verified EVM wallet, up to two; operators keep allowlisted hosts) | Places (library profile), Ideas, Me directory |
 | Free public AI desk for visitors | `/library` (no account, separate route) | — | Money → Devices & income offers it as the library access mode |
 | Newcomer welcome guide | `/welcome/<city>` (no account; a separate route, outside the wallet route group) | — | Places (a "New here? Welcome guide" link in the city card); its interests are Places' interests |
 | Recorded hosted run (the 1 Oct three-account share-deposit tenancy as the seven Home steps with receipts, plus loan, stake and paid-answer receipts) | `/replay` (no account, no cookies; a separate route, outside the wallet route group) | — | The door and Home's deposit options link to it |
@@ -135,6 +135,7 @@ After deposit security, either tenancy party can record electricity/gas/water re
 ## What changed on 2026-10-02
 
 - Money and Me remove repeated notices and navigation, expose their primary holdings, wallet and connection controls, and keep only sources/fine print in disclosures. The city timeline records its resolved source; paid-answer progress uses plain words without inventing host activity. The public library has one introduction.
+- Devices & income becomes the single place to add a device. "Add a device" offers the Home Node download with its SHA-256, the pairing code and two setup routes (the CLI or an AI assistant through the node's MCP configuration). Each device row shows GPU state, earnings and receipts per host, solar power and local-day kWh from pushed readings, validator ids and two toggles: GPU payouts to the building and solar income to the building. Any signed-in account with a verified EVM wallet may pair up to two community hosts; operators can suspend them. Solar income is simulated and stays off until its funding key is configured. The building panel attributes income per source and lets tHOME holders claim and reinvest (claim, buy tHOME, approve, stake), each step an exact own-wallet review. Nothing here is proven live yet.
 
 ## What changed on 2026-10-01
 

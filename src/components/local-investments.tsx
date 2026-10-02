@@ -122,7 +122,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
   try { requestedAmount = parseAmount(amount, direction === 'sell' ? 18 : 6); } catch { /* Invalid input is kept editable, never treated as zero. */ }
   const hasGas = market?.nativeAtomic !== null && market?.nativeAtomic !== undefined && BigInt(market.nativeAtomic) > 0n;
   const disabledReason = direction === 'buy'
-    ? stakeDisabledReason({ amountAtomic: requestedAmount, cashAtomic: market?.cashAtomic ?? null, nativeAtomic: market?.nativeAtomic ?? null, hasWallet })
+    ? requestedAmount && BigInt(requestedAmount) > 0n && BigInt(requestedAmount) < 1000n ? 'Buy at least 0.001 fictional tUSDG; fractional units are supported.' : stakeDisabledReason({ amountAtomic: requestedAmount, cashAtomic: market?.cashAtomic ?? null, nativeAtomic: market?.nativeAtomic ?? null, hasWallet })
     : !hasWallet ? 'Connect your Robinhood Chain wallet in Me first.'
       : !requestedAmount || BigInt(requestedAmount) <= 0n ? 'Choose a positive fictional-unit amount.'
         : BigInt(requestedAmount) > 100n * 10n ** 18n ? 'Sell-back orders are capped at 100 fictional test units.'
@@ -216,7 +216,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
       <div className="local-project-story"><span className="eyebrow">{project.symbol}</span><h3>{project.kind === 'housing' ? 'A fictional housing example.' : 'A fictional workshop example.'}</h3><p>{project.description}</p>
         <div className="local-use-tags">{project.uses.map((use) => <span key={use}>{use}</span>)}</div>
         <div className="local-stake-display"><Building2 size={26} /><div><strong>{asset?.holdingRaw === null || !asset ? '—' : units(asset.holdingRaw)} <span>{project.symbol}</span></strong><small>Fictional test issuer · {asset?.holdingRaw !== null && asset ? `${percent(asset.holdingRaw, asset.totalSupplyRaw)} of the unit supply` : 'Wallet units appear after a successful network read'}</small></div></div>
-        {project.kind === 'housing' && <p className="small-copy">This balance shows wallet units only. Staked tHOME units earn building GPU test dollars and must be unstaked before sell-back.</p>}
+        {project.kind === 'housing' && <p className="small-copy">This balance shows wallet units only. Staked tHOME units earn attributed GPU and simulated solar test dollars. Claim and reinvest earnings below; unstake before sell-back.</p>}
         {asset && market && <div className="local-contract-links"><a href={`${market.network.explorerUrl.replace(/\/$/, '')}/address/${asset.unitAddress}`} target="_blank" rel="noopener noreferrer">{project.symbol} contract <ExternalLink size={12} /></a><a href={`${market.network.explorerUrl.replace(/\/$/, '')}/address/${asset.marketAddress}`} target="_blank" rel="noopener noreferrer">Market contract <ExternalLink size={12} /></a></div>}
       </div>
       <div className="local-investment-review">
@@ -238,7 +238,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
             <label>{direction === 'sell' ? 'Units to sell back' : 'Test dollars to spend'} <span>{direction === 'sell' ? project.symbol : 'tUSDG'}</span><input aria-label={direction === 'sell' ? `Sell-back amount in ${project.symbol}` : 'Stake amount in test USD (tUSDG)'} inputMode="decimal" value={amount} disabled={Boolean(busy) || openOrder} onChange={(event) => setAmount(event.target.value)} /></label>
             <div className="local-amount-presets">{['5', '10', '25'].map((value) => <button type="button" key={value} disabled={Boolean(busy) || openOrder} aria-pressed={amount === value} onClick={() => setAmount(value)}>{value}</button>)}</div>
             <p className="local-price">{asset ? `${cash(asset.priceAtomic)} tUSDG per whole ${project.symbol}` : 'Fixed test price is unavailable until the deployed desk is checked.'}<small>Fixed test issue and sell-back price, not a market valuation. Sell-back requires enough tUSDG in the desk.</small></p>
-            <p className="small-copy">Maximum 100 fictional test units per order; buys also capped at 100 tUSDG.</p>
+            <p className="small-copy">Fractional buys from 0.001 tUSDG; maximum 100 fictional test units per order, buys also capped at 100 tUSDG.</p>
             <button className="button primary" disabled={!healthy || !affordable || openOrder || Boolean(busy)}>{busy ? <><Loader2 className="spin" size={16} />{busy}</> : <>Review {direction === 'sell' ? 'sell-back' : 'purchase'} <ArrowRight size={16} /></>}</button>
           </form>
           {disabledReason && <p className="local-funding-note" role="status">{disabledReason}</p>}
@@ -248,7 +248,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
         {checkedAt && <span className="local-checked">Wallet/market last checked {checkedAt}{readError ? ' · refresh unavailable' : ''}</span>}
       </div>
     </div>
-    {project.kind === 'housing' ? <BuildingPanel request={request} walletHolder={Boolean(asset?.holdingRaw && BigInt(asset.holdingRaw) > 0n)} /> : <ProjectBlueprint key={project.id} kind={project.kind} go={go} />}
+    {project.kind === 'housing' ? <BuildingPanel request={request} /> : <ProjectBlueprint key={project.id} kind={project.kind} go={go} />}
     <details className="local-investment-details"><summary>Sources, project context &amp; token rights</summary><p>Purchases move test tokens on Robinhood Chain testnet after your wallet signs. These issuers and projects are fictional; they are not the real buildings, owners or companies shown in public city records. They establish no construction, funding, dividend, employment or tax outcome. Test USD (tUSDG) can come from your existing Robinhood Chain wallet or a separate share-backed test loan; Solana assets do not bridge here. Borrowing and buying a stake require separate approvals; buying units does not repay a loan, and collateral can still be liquidated.</p><p>{project.rights} Fictional test units are displayed separately from priced assets: an issue price is not a resale quote, guaranteed exit or legal interest in a building. Shared test USD (tUSDG) is counted once.</p><h4>Real Strausberg research leads</h4><ul>{STRAUSBERG_INVESTMENT_LEADS.map((lead) => <li key={lead.url}><a href={lead.url} target="_blank" rel="noopener noreferrer">{lead.name}</a> · {lead.kind}. Research lead only; check eligibility and terms directly.</li>)}</ul></details>
   </section>;
 }

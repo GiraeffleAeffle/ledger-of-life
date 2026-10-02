@@ -290,6 +290,7 @@ test('unsupported chain, absent deployed code, unknown issuer and noncanonical s
     await assert.rejects(prepareLocalInvestment(testbed.store, identity, { ...input, projectId: 'real-strausberg-provider' }, testbed.rpc), /Unknown fictional/);
     await assert.rejects(prepareLocalInvestment(testbed.store, identity, { ...input, cashAtomic: '02000000' }, testbed.rpc), /canonical/);
     await assert.rejects(prepareLocalInvestment(testbed.store, identity, { ...input, cashAtomic: '100000001' }, testbed.rpc), /limit/);
+    await assert.rejects(prepareLocalInvestment(testbed.store, identity, { ...input, cashAtomic: '999' }, testbed.rpc), /at least 0.001/);
     const foreignChain = { ...testbed.rpc, getChainId: async () => 1 } as InvestmentRpc;
     await assert.rejects(prepareLocalInvestment(testbed.store, identity, input, foreignChain), /Wrong test network/);
     const missingCode = { ...testbed.rpc, getCode: async () => '0x' } as InvestmentRpc;

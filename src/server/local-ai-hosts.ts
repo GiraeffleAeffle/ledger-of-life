@@ -28,7 +28,8 @@ export interface ConnectorHost {
   payoutWallet: string | null;
   models: string[];
   lastHeartbeat: number | null;
-  state: 'active' | 'revoked';
+  state: 'active' | 'revoked' | 'suspended';
+  kind?: 'operator' | 'community';
   ollamaReachable: boolean;
   awake: boolean;
   canWake?: boolean;
@@ -43,10 +44,12 @@ interface HostInvitation {
   ownerSubject: string;
   payoutWallet: string;
   expiresAt: number;
+  kind?: 'operator' | 'community';
 }
 interface Registry {
   hosts: StoredHost[];
   invitations: HostInvitation[];
+  invitationRates?: { subject: string; windowStarted: number; count: number }[];
 }
 const KEY = 'local-ai:connector-registry';
 const PAIR_TTL = 600000;
@@ -69,9 +72,10 @@ async function ready(store: Store) {
       } else {
         // Strip legacy unsalted IP hashes, including when the rest of the registry is valid.
         await store.update<Registry>(KEY, (registry) => ({
-          hosts: registry.hosts.filter((host) => host.state === 'active' || host.state === 'revoked')
+          hosts: registry.hosts.filter((host) => ['active', 'revoked', 'suspended'].includes(host.state))
             .map((host) => ({ ...rawHost(host), publicKey: host.publicKey, nonces: host.nonces })),
           invitations: Array.isArray(registry.invitations) ? registry.invitations : [],
+          invitationRates: Array.isArray(registry.invitationRates) ? registry.invitationRates : [],
         }));
         await store.reclaim?.();
       }
@@ -80,13 +84,24 @@ async function ready(store: Store) {
   }
   await promise;
 }
-const rawHost = ({ id, name, ownerSubject, payoutWallet, models, lastHeartbeat, state, ollamaReachable, awake, canWake, freePublicAnswers }: StoredHost): ConnectorHost =>
-  ({ id, name, ownerSubject, payoutWallet, models, lastHeartbeat, state, ollamaReachable, awake, canWake: canWake === true, freePublicAnswers: freePublicAnswers === true });
+const rawHost = ({ id, name, ownerSubject, payoutWallet, models, lastHeartbeat, state, ollamaReachable, awake, canWake, freePublicAnswers, kind }: StoredHost): ConnectorHost =>
+  ({ id, name, ownerSubject, payoutWallet, models, lastHeartbeat, state, kind: kind ?? (operatorWallet(payoutWallet) ? 'operator' : 'community'), ollamaReachable, awake, canWake: canWake === true, freePublicAnswers: freePublicAnswers === true });
 const availability = (host: ConnectorHost, now: number): 'online' | 'asleep' | 'offline' =>
   host.state !== 'active' || host.lastHeartbeat === null || now - host.lastHeartbeat > 75000 || now < host.lastHeartbeat
     ? 'offline' : host.ollamaReachable ? 'online' : 'asleep';
 function cleanRegistry(registry: Registry, now: number) {
-  registry.invitations = registry.invitations.filter((invitation) => invitation.expiresAt > now);
+  const registeredBySubject = new Map<string | null, number>();
+  for (const host of registry.hosts) if (host.state !== 'revoked') registeredBySubject.set(host.ownerSubject, (registeredBySubject.get(host.ownerSubject) ?? 0) + 1);
+  const subjects = new Set<string>();
+  const invitations: HostInvitation[] = [];
+  for (let index = registry.invitations.length - 1; index >= 0; index--) {
+    const invitation = registry.invitations[index];
+    if (invitation.expiresAt <= now || subjects.has(invitation.ownerSubject) || (registeredBySubject.get(invitation.ownerSubject) ?? 0) >= 2) continue;
+    subjects.add(invitation.ownerSubject);
+    invitations.push(invitation);
+  }
+  registry.invitations = invitations.reverse();
+  registry.invitationRates = (registry.invitationRates ?? []).filter(rate => now - rate.windowStarted < 3600000);
   const revoked = registry.hosts.filter((host) => host.state === 'revoked').slice(-32);
   registry.hosts = registry.hosts.filter((host) => host.state !== 'revoked' || revoked.includes(host));
   for (const host of registry.hosts) host.nonces = host.nonces.filter((entry) => entry.timestamp >= now - SKEW);
@@ -111,7 +126,17 @@ function allowedWallets(identity: VerifiedIdentity) {
   const allowed = new Set((process.env.LOCAL_AI_HOST_OWNER_WALLETS || '').split(/[\s,]+/).filter(Boolean).map((value) => value.toLowerCase()));
   return evmWallets(identity).filter((wallet) => allowed.has(wallet.address.toLowerCase()));
 }
-export function hostPairingAllowed(identity: VerifiedIdentity) { return allowedWallets(identity).length > 0; }
+function operatorWallet(wallet: string | null) {
+  return Boolean(wallet && (process.env.LOCAL_AI_HOST_OWNER_WALLETS || '').split(/[\s,]+/).some(value => value.toLowerCase() === wallet.toLowerCase()));
+}
+export function hostOperatorAllowed(identity: VerifiedIdentity) { return allowedWallets(identity).length > 0; }
+export function hostPairingAllowed(identity: VerifiedIdentity) { return evmWallets(identity).length > 0; }
+function checkCapacity(registry: Registry, subject: string) {
+  const registered = registry.hosts.filter(host => host.state !== 'revoked');
+  if (registered.length >= 50) throw new ConflictError('Host registry is full (50 hosts); revoke an unused host.');
+  if (registered.filter(host => host.ownerSubject === subject).length >= 2)
+    throw new ConflictError('An account may register at most two hosts; revoke an unused host.');
+}
 
 /** Explicit owner opt-in only. Changing the registry never reroutes an already reviewed payment. */
 export async function setConnectorPayoutWallet(store: Store, identity: VerifiedIdentity, hostId: string, payoutWallet: string) {
@@ -128,6 +153,7 @@ export async function setConnectorPayoutWallet(store: Store, identity: VerifiedI
   await store.update<Registry>(KEY, registry => {
     const host = active(registry, hostId);
     if (host.ownerSubject !== identity.subject) throw new AccessError('Only the host owner may change its payout wallet.');
+    host.kind ??= rawHost(host).kind;
     host.payoutWallet = payout;
     return registry;
   });
@@ -136,7 +162,7 @@ export async function setConnectorPayoutWallet(store: Store, identity: VerifiedI
 export async function createHostInvitation(store: Store, identity: VerifiedIdentity, input: unknown, now = Date.now()) {
   const body = object(input);
   only(body, ['payoutWallet']);
-  if (!hostPairingAllowed(identity)) throw new AccessError('A verified allowlisted EVM account is required to invite hosts.');
+  if (!hostPairingAllowed(identity)) throw new AccessError('A verified EVM account is required to invite hosts.');
   const wallets = evmWallets(identity);
   const payout = body.payoutWallet === undefined && wallets.length === 1 ? wallets[0].address : body.payoutWallet;
   if (payout === undefined) throw new WorkflowError('Choose a verified EVM payout wallet.');
@@ -146,13 +172,20 @@ export async function createHostInvitation(store: Store, identity: VerifiedIdent
   let code!: string;
   await store.update<Registry>(KEY, (registry) => {
     cleanRegistry(registry, now);
+    checkCapacity(registry, identity.subject);
+    registry.invitations = registry.invitations.filter(invitation => invitation.ownerSubject !== identity.subject);
+    const rates = registry.invitationRates ??= [];
+    const rate = rates.find(entry => entry.subject === identity.subject);
+    if (rate && rate.count >= 5) throw new ConflictError('At most five host invitations per account per hour; reuse the current code or wait.');
+    if (rate) rate.count++;
+    else rates.push({ subject: identity.subject, windowStarted: now, count: 1 });
     if (registry.invitations.length >= 128) throw new ConflictError('Host invitation registry is full; wait for an invitation to expire.');
     let codeHash: string;
     do {
       code = Array.from({ length: 12 }, () => alphabet[randomInt(alphabet.length)]).join('');
       codeHash = createHash('sha256').update(code).digest('hex');
     } while (registry.invitations.some((invitation) => invitation.codeHash === codeHash));
-    registry.invitations.push({ codeHash, ownerSubject: identity.subject, payoutWallet: payout, expiresAt: now + PAIR_TTL });
+    registry.invitations.push({ codeHash, ownerSubject: identity.subject, payoutWallet: payout, expiresAt: now + PAIR_TTL, kind: hostOperatorAllowed(identity) ? 'operator' : 'community' });
     return registry;
   });
   return { code, expiresAt: new Date(now + PAIR_TTL).toISOString() };
@@ -162,7 +195,7 @@ export async function createHostPairing(store: Store, input: unknown, now = Date
   const body = object(input);
   only(body, ['code', 'publicKey', 'name']);
   if (typeof body.code !== 'string' || !/^[A-HJ-NP-Z2-9]{12}$/.test(body.code)) throw new WorkflowError('Use the twelve-character host invitation code.');
-  if (!text(body.name, 80) || !body.name.trim() || /[\u0000-\u001f\u007f]/.test(body.name) || !text(body.publicKey, 128))
+  if (!text(body.name, 80) || !body.name.trim() || /[\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}]/u.test(body.name) || !text(body.publicKey, 128))
     throw new WorkflowError('A host name and Ed25519 public key are required.');
   let publicKey: string;
   try {
@@ -178,12 +211,15 @@ export async function createHostPairing(store: Store, input: unknown, now = Date
     cleanRegistry(registry, now);
     const invitation = registry.invitations.find((entry) => entry.codeHash === codeHash);
     if (!invitation) throw new ConflictError('Host invitation is expired, used, or unknown.');
-    if (registry.hosts.filter((host) => host.state === 'active').length >= 128) throw new ConflictError('Host registry is full; revoke an unused host.');
-    if (registry.hosts.some((host) => host.publicKey === publicKey && host.state === 'active'))
+    const kind = invitation.kind ?? (operatorWallet(invitation.payoutWallet) ? 'operator' : 'community');
+    if (kind === 'community' && /\b(?:operator|official)\b|ledger\s+of\s+life/i.test((body.name as string).normalize('NFKC')))
+      throw new WorkflowError('Community host names must not claim operator, official, or Ledger of Life status.');
+    checkCapacity(registry, invitation.ownerSubject);
+    if (registry.hosts.some((host) => host.publicKey === publicKey && host.state !== 'revoked'))
       throw new ConflictError('This key already has an active host.');
     hostId = randomUUID();
     registry.hosts.push({ id: hostId, name: body.name as string, publicKey, ownerSubject: invitation.ownerSubject,
-      payoutWallet: invitation.payoutWallet, models: [], lastHeartbeat: null, state: 'active', ollamaReachable: false, awake: false, canWake: false, nonces: [] });
+      payoutWallet: invitation.payoutWallet, kind, models: [], lastHeartbeat: null, state: 'active', ollamaReachable: false, awake: false, canWake: false, nonces: [] });
     registry.invitations = registry.invitations.filter((entry) => entry !== invitation);
     return registry;
   });
@@ -197,6 +233,36 @@ export async function connectorHosts(store: Store, now = Date.now()) {
 }
 export async function publicConnectorHosts(store: Store, now = Date.now(), subject?: string) {
   return (await connectorHosts(store, now)).map(({ ownerSubject, ...host }) => ({ ...host, own: Boolean(subject && ownerSubject === subject) }));
+}
+export async function ownedConnectorHosts(store: Store, identity: VerifiedIdentity, now = Date.now()) {
+  await ready(store);
+  const registry = await store.get<Registry>(KEY);
+  return registry!.hosts.filter(host => host.ownerSubject === identity.subject && host.state !== 'revoked')
+    .map(host => ({ ...rawHost(host), availability: availability(host, now) }));
+}
+export async function operatorConnectorHosts(store: Store, identity: VerifiedIdentity, now = Date.now()) {
+  if (!hostOperatorAllowed(identity)) throw new AccessError('Only an operator may moderate nodes.');
+  await ready(store);
+  const registry = await store.get<Registry>(KEY);
+  return registry!.hosts.filter(host => host.state !== 'revoked')
+    .map(host => ({ hostId: host.id, name: host.name, state: host.state, kind: rawHost(host).kind, availability: availability(host, now), canSuspend: rawHost(host).kind === 'community' }));
+}
+export async function suspendConnectorHost(store: Store, identity: VerifiedIdentity, hostId: string, suspended: boolean) {
+  if (!hostOperatorAllowed(identity)) throw new AccessError('Only an operator may suspend community hosts.');
+  await ready(store);
+  await store.update<Registry>(KEY, registry => {
+    const host = registry.hosts.find(entry => entry.id === hostId && entry.state !== 'revoked');
+    if (!host || rawHost(host).kind !== 'community') throw new AccessError('Choose a community host.');
+    host.state = suspended ? 'suspended' : 'active';
+    return registry;
+  });
+  if (suspended) {
+    const reservation = state(store).reservations.get(hostId);
+    if (reservation) releaseConnectorHost(store, hostId, reservation.requestId);
+    finish(store, hostId, new AccessError('Host suspended by an operator.'));
+    state(store).wake.get(hostId)?.();
+  }
+  return { hostId, suspended };
 }
 export async function chooseConnectorHost(store: Store, owner: { subject?: string; payer?: string }, model: string, scope: 'own' | 'city', now = Date.now(), freePublic = false) {
   if (scope !== 'own' && scope !== 'city') throw new WorkflowError('Choose own or city host scope.');

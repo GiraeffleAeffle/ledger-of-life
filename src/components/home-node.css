@@ -1,0 +1,28 @@
+.home-node { min-width: 0; scroll-margin-top: 24px; }
+.home-node-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.home-node-heading h2 { margin: 6px 0; }
+.home-node-heading p { margin: 8px 0 0; }
+.home-node-heading > button { flex-shrink: 0; }
+.home-node-setup { margin-top: 24px; padding: 20px; border: 1px solid var(--line, #ddd); border-radius: 12px; }
+.home-node pre { max-width: 100%; overflow-x: auto; padding: 14px; background: var(--paper, #f4f3ee); border: 1px solid var(--line, #ddd); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.home-node h4 { margin: 24px 0 8px; }
+.home-node details { margin: 14px 0; }
+.home-node summary { cursor: pointer; font-weight: 600; }
+.home-node .text-button { margin: 6px 12px 6px 0; }
+.home-node-hash { overflow-wrap: anywhere; }
+.home-node-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; margin-top: 20px; }
+.home-node-device { min-width: 0; padding: 20px; border: 1px solid var(--line, #ddd); border-radius: 12px; }
+.home-node-device h3 { margin: 0 0 6px; }
+.home-node-device header > span { font-size: 13px; }
+.home-node-controls { border-top: 1px solid var(--line, #ddd); margin-top: 16px; padding-top: 16px; }
+.home-node-controls label { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; font-size: 14px; }
+.home-node-controls input[type="checkbox"] { flex: 0 0 auto; width: 18px; height: 18px; margin-top: 2px; }
+.home-node-controls input[type="number"] { width: 110px; max-width: 100%; padding: 5px; }
+.home-node a { overflow-wrap: anywhere; }
+.home-node-host-kind { display: inline-block; border: 1px solid currentColor; border-radius: 6px; padding: 2px 7px; margin: 3px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.home-node-host-kind.operator { color: #145c45; background: #eaf5ee; }
+.home-node-host-kind.community { color: #725100; background: #fff4d8; }
+@media (max-width: 600px) {
+  .home-node-heading { flex-direction: column; gap: 12px; }
+  .home-node-setup, .home-node-device { padding: 14px; }
+}

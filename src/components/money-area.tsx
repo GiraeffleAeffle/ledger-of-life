@@ -6,6 +6,7 @@ import type { TenancyJourney } from '@/server/journey';
 import { AssetsOverview, useHoldingsRead } from './assets';
 import type { Area } from './areas';
 import { DeviceReadings } from './device-readings';
+import { HomeNode } from './home-node';
 import { ShareWorkflows } from './share-workflows';
 import { LocalInvestments } from './local-investments';
 import { LocalAiWorkspace } from './local-ai';
@@ -41,8 +42,8 @@ export function MoneyArea({ request, tenancies, loaded, homeError, retryHome, go
           summary: 'Buy fictional test units in a housing project or a workshop. They grant no company, cooperative or property rights.',
           content: <LocalInvestments request={request} go={go} /> },
         { id: 'money-devices', label: 'Devices & income', reality: ['read_only_live', 'testnet_real'],
-          summary: 'Things you run that produce value: home solar, a validator and a local AI node on a GPU. Readings are read-only and outside the priced subtotal; connections are set up in Me.',
-          content: <><DeviceReadings request={request} go={go} /><LocalAiWorkspace /></> },
+          summary: 'Connect your own GPU, solar sensors or validator IDs. Paid GPU receipts and simulated solar feed-in can support the building; readings stay outside your priced subtotal.',
+          content: <><HomeNode request={request} /><DeviceReadings request={request} go={go} /><LocalAiWorkspace /></> },
       ]} />
     </div>
   );

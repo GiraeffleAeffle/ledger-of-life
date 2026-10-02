@@ -2,7 +2,8 @@
 import { useState, type FormEvent } from 'react';
 import type { PublicAdapterConfig } from '@/server/adapters';
 import type { AuthorizedRequest } from './use-city-signals';
-import { ADAPTER_CONFIG_CHANGED, type useAdapterConfig } from './use-adapter-config';
+import { ADAPTER_CONFIG_CHANGED, type AdapterConfigConnection } from './use-adapter-config';
+import { goToSection, type Area } from './areas';
 
 type AdapterKind = 'homeAssistant' | 'validator';
 type Change = (kind: AdapterKind, body: Record<string, unknown>) => Promise<PublicAdapterConfig>;
@@ -77,7 +78,7 @@ function ValidatorForm({ saved, disabled, change }: {
   </form>;
 }
 
-export function AdapterSettings({ request, connection }: { request: AuthorizedRequest; connection: ReturnType<typeof useAdapterConfig> }) {
+export function AdapterSettings({ request, connection, go }: { request: AuthorizedRequest; connection: AdapterConfigConnection; go: (area: Area) => void }) {
   const { config, homeAssistantPull, loading, error, refresh } = connection;
   const [pending, setPending] = useState(false);
   const [messages, setMessages] = useState({ homeAssistant: '', validator: '' });
@@ -103,21 +104,22 @@ export function AdapterSettings({ request, connection }: { request: AuthorizedRe
   return <section id="adapter-settings" tabIndex={-1} aria-label="Adapter settings">
     {error && <p role="alert">Could not load adapter settings: {error} <button type="button" className="text-button" onClick={() => void refresh()}>Retry</button></p>}
     <div className="asset-tile">
-      <h3 id="adapter-home-assistant" tabIndex={-1}>Home Assistant · {status || (!homeAssistantPull ? 'Unavailable on this host' : config?.homeAssistant ? 'Configured' : 'Not configured')}</h3>
+      <h3 id="adapter-home-assistant" tabIndex={-1}>Home Assistant · {status || (!homeAssistantPull ? 'Connect through Home Node' : config?.homeAssistant ? 'Configured' : 'Not configured')}</h3>
       {canEdit && homeAssistantPull && <button type="button" className="text-button" aria-expanded={editing.homeAssistant} onClick={() => setEditing((previous) => ({ ...previous, homeAssistant: !previous.homeAssistant }))}>{editing.homeAssistant ? 'Cancel' : config?.homeAssistant ? 'Edit Home Assistant' : 'Connect Home Assistant'}</button>}
       {homeAssistantPull && <p className="small-copy">This app only reads your solar and consumption sensors. The access token you paste is <em>not limited to reading</em>: it can do whatever the Home Assistant user who created it can do. It is kept on the server as plain data, so the host of this app can read and use it. Create a dedicated low-privilege Home Assistant user for it, and delete the token in Home Assistant (Profile → Security) when you remove it here. Tariff-derived amounts are estimates, not bills.</p>}
+      {!homeAssistantPull && <p className="small-copy">This hosted site never pulls from your home network. <button type="button" className="text-button" onClick={() => goToSection(go, 'money', 'money-devices')}>Connect through Home Node in Money → Devices &amp; income</button>. It reads locally and pushes signed readings; your Home Assistant token stays on your device.</p>}
       {canEdit && (homeAssistantPull
         ? editing.homeAssistant && <HomeAssistantForm key={JSON.stringify(config!.homeAssistant) ?? 'none'} saved={config!.homeAssistant} disabled={loading || pending || Boolean(error)} change={change} />
         : config!.homeAssistant
           ? <div><p className="small-copy">Saved address: {config!.homeAssistant.url}. This host does not connect to Home Assistant. The saved connection cannot be used here.</p>
             <button type="button" className="text-button" disabled={loading || pending || Boolean(error)} onClick={() => void change('homeAssistant', { remove: true }).catch((cause) => setMessages((previous) => ({ ...previous, homeAssistant: cause instanceof Error ? cause.message : 'Could not remove Home Assistant.' })))}>Remove Home Assistant</button></div>
-          : <p className="small-copy">This host does not connect to Home Assistant, because that would let this server reach into a home network. Run Ledger of Life on your own network to connect it.</p>)}
+          : null)}
       {messages.homeAssistant && <p role="status">{messages.homeAssistant}</p>}
     </div>
     <div className="asset-tile">
       <h3 id="adapter-validator" tabIndex={-1}>Validator · {status || (config?.validator ? 'Configured' : 'Not configured')}</h3>
       {canEdit && <button type="button" className="text-button" aria-expanded={editing.validator} onClick={() => setEditing((previous) => ({ ...previous, validator: !previous.validator }))}>{editing.validator ? 'Cancel' : config?.validator ? 'Edit validator' : 'Connect validator'}</button>}
-      <p className="small-copy">Read-only public validator information. A supplied identifier is not proof of ownership; saving it does not verify current status or rewards.</p>
+      <p className="small-copy">Read-only public validator information. You can also report public validator IDs through the Home Node in Money → Devices &amp; income. An identifier is not proof of ownership; saving it does not verify status or rewards.</p>
       {canEdit && editing.validator && <ValidatorForm key={JSON.stringify(config!.validator) ?? 'none'} saved={config!.validator} disabled={loading || pending || Boolean(error)} change={change} />}
       {messages.validator && <p role="status">{messages.validator}</p>}
     </div>

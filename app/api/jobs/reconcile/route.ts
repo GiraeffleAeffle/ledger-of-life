@@ -7,6 +7,7 @@ import { reconcileSolanaOperations } from '@/server/solana-service';
 import { sweepAiText } from '@/server/local-ai';
 import { reconcileTslaPrice } from '@/server/tsla-price-mirror';
 import { recordPriceJob } from '@/server/price-job-health';
+import { reconcileBuildingIncome } from '@/server/building-income';
 export const runtime = 'nodejs';
 export async function POST(request: Request) {
   try {
@@ -15,8 +16,11 @@ export async function POST(request: Request) {
     const scope = url.searchParams.get('scope');
     const after = url.searchParams.get('after') || '';
     if (after.length > 160) throw new Error('Invalid cursor.');
-    if (!scope || !['robinhood', 'solana', 'local-ai', 'price'].includes(scope))
+    if (!scope || !['robinhood', 'solana', 'local-ai', 'price', 'building-income'].includes(scope))
       throw new WorkflowError('Unknown reconciliation scope.');
+    if (scope === 'building-income') {
+      return Response.json({ scope, ...await reconcileBuildingIncome(await getStore()) }, { headers: { 'Cache-Control': 'no-store' } });
+    }
     if (scope === 'price') {
       const store = await getStore();
       let result;

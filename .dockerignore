@@ -12,6 +12,9 @@
 scripts/*
 !scripts/reconcile.mjs
 !scripts/copy-maplibre-worker.mjs
+!home-node
+home-node/*
+!home-node/home-node.mjs
 
 # Self-hosted fonts (SIL OFL files and their licence), served from /fonts by the standalone server.
 !public

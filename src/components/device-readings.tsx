@@ -41,15 +41,14 @@ export function DeviceReadings({ request, go }: { request: Request; go: (area: A
   const solar = assets?.solar?.ok ? assets.solar.value : null;
   const validator = assets?.validator?.ok ? assets.validator.value : null;
 
-  if (assets && !assets.adapters.homeAssistant && !assets.adapters.validator) {
-    return <p id="device-readings" tabIndex={-1}>No devices connected · <button type="button" className="text-button" onClick={() => goToSection(go, 'me', 'ledger-adapters')}>Connect home solar or a validator in Me →</button>{readError && <span role="status"> Device refresh unavailable: {readError}</span>}</p>;
-  }
+  if (!assets || (!assets.adapters.homeAssistant && !assets.adapters.validator)) return null;
   return (
     <section className="card assets devices" id="device-readings" tabIndex={-1}>
-      <div className="assets-head"><div><span className="eyebrow">THINGS YOU RUN · READ-ONLY</span><h2>Home solar and validator</h2><p className="small-copy">Live public or sensor readings. Not counted in the priced subtotal. Connections are configured in Me.</p></div></div>
+      <div className="assets-head"><div><span className="eyebrow">EXISTING READ-ONLY CONNECTIONS</span><h2>Connected sensor and validator readings</h2><p className="small-copy">These older adapter connections are outside the priced subtotal. New home devices connect through the Home Node above.</p></div></div>
       {readError && <p className="note" role="status">Device refresh unavailable; {assets ? 'showing the last checked readings' : 'no reading confirmed yet'}. {readError} <button className="text-button" type="button" onClick={() => void refresh()}>Retry device readings</button></p>}
       {refreshing && <p className="small-copy" role="status">Checking device readings…</p>}
       <div className="asset-grid">
+        {assets.adapters.homeAssistant && <>
         <article className="asset-tile" id="solar-reading" tabIndex={-1}>
           <header><Sun size={18} /> Home solar</header>
           {solar ? (
@@ -64,11 +63,13 @@ export function DeviceReadings({ request, go }: { request: Request; go: (area: A
           ) : (
             <>
               <strong>{assets?.adapters.homeAssistant || assets?.homeAssistantPull === false ? '—' : assets ? 'Connect' : '—'}</strong>
-              <span>{assets?.solar && !assets.solar.ok ? assets.solar.error : assets?.homeAssistantPull === false ? 'This host does not connect to Home Assistant. Run Ledger of Life on your own network to use it.' : assets?.adapters.homeAssistant ? 'Home Assistant reading unavailable.' : assets ? 'Read your solar production from Home Assistant.' : readError ? 'Home energy connection could not be checked.' : 'Checking Home Assistant…'}</span>
+              <span>{assets?.solar && !assets.solar.ok ? assets.solar.error : assets?.homeAssistantPull === false ? 'Connect through the Home Node above; this hosted site cannot pull from your home network.' : assets?.adapters.homeAssistant ? 'Home Assistant reading unavailable.' : 'Read your solar production through the Home Node above.'}</span>
             </>
           )}
           <button className="text-button" onClick={() => goToSection(go, 'me', 'adapter-home-assistant')}>{assets?.adapters.homeAssistant ? 'Manage Home Assistant in Me' : assets?.homeAssistantPull === false ? 'About Home Assistant in Me' : 'Connect Home Assistant in Me'} →</button>
         </article>
+        </>}
+        {assets.adapters.validator && <>
         <article className="asset-tile" id="validator-reading" tabIndex={-1}>
           <header><Cpu size={18} /> Validator · public mainnet data · not your test money</header>
           <span className="small-copy">A public validator identifier does not prove you own this stake. This reading is outside your priced test-asset subtotal.</span>
@@ -86,6 +87,7 @@ export function DeviceReadings({ request, go }: { request: Request; go: (area: A
           )}
           <button className="text-button" onClick={() => goToSection(go, 'me', 'adapter-validator')}>{assets?.adapters.validator ? 'Manage validator in Me' : 'Connect validator in Me'} →</button>
         </article>
+        </>}
       </div>
     </section>
   );

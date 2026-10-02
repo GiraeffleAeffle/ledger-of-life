@@ -3,7 +3,7 @@ const origin = process.env.APP_ORIGIN;
 const secret = process.env.RECONCILE_SECRET;
 if (!origin || !secret) throw new Error('APP_ORIGIN and RECONCILE_SECRET are required.');
 const failures = [];
-for (const scope of ['robinhood', 'solana', 'local-ai', 'price']) {
+for (const scope of ['robinhood', 'solana', 'local-ai', 'price', 'building-income']) {
   try {
     let after = '';
     do {

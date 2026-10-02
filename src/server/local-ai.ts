@@ -58,6 +58,7 @@ function publicRequest(record: AiRecord): ProgressRequest {
   // Explicit public host fields also protect reads of records written by an older release.
   const request = stored.host ? { ...stored, host: {
     id: stored.host.id, name: stored.host.name, own: stored.host.own === true, payoutWallet: stored.host.payoutWallet,
+    kind: stored.host.kind === 'operator' ? 'operator' as const : 'community' as const,
   } } : { ...stored };
   const progress = deriveAiProgress(record);
   if (record.mode === 'paid' && request.payment.state !== 'none' && request.payment.state !== 'settled') return { ...request, progress, answer: null, usage: null };
@@ -219,7 +220,7 @@ async function prepareQuote(store: Store, id: string, owner: AiOwner, input: AiI
       maxOutputTokens: input.maxOutputTokens, facilitatorAddress: (await facilitatorAccount()).address } : null,
     paymentRequired: required, approval: null,
   };
-  if (connector) request.host = { id: connector.id, name: connector.name, own: ownCompute, payoutWallet: charge ? connector.payoutWallet! : null };
+  if (connector) request.host = { id: connector.id, name: connector.name, own: ownCompute, kind: connector.kind ?? 'community', payoutWallet: charge ? connector.payoutWallet! : null };
   request.hostScope = input.hostScope; request.publicQuestion = input.publicQuestion;
   const record: AiRecord = { id, mode: input.mode, owner, request, context: input.context, payee, resourceUrl,
     paymentJournal: null, approvalJournal: null };

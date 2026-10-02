@@ -1,21 +1,35 @@
 import { randomUUID } from 'node:crypto';
-import { encodeFunctionData, formatUnits, getAddress, keccak256, parseTransaction, recoverTransactionAddress, type Hex } from 'viem';
+import { decodeEventLog, encodeFunctionData, formatUnits, getAddress, keccak256, parseAbi, parseTransaction, recoverTransactionAddress, type Hex, type TransactionReceipt } from 'viem';
 import type { EvmSigningRequest } from '../wallets/types.ts';
 import { BUILDING_ACTION_ABI, BUILDING_TOKEN_ABI, validateBuildingActionTransaction, type BuildingOperation } from './building-revenue-signing.ts';
 import { BUILDING_ABI, buildingRpc, loadBuildingManifest, verifyBuildingDeployment, type BuildingReadOptions } from './building-revenue.ts';
 import { reviewedOperatorFees, reviewedOperatorGas } from './ownership-gas.ts';
 import type { Store } from './store.ts';
 
-type Options = BuildingReadOptions & { now?: () => number };
-type ActionPlan = {
+type Options = BuildingReadOptions & { now?: () => number; planId?: string };
+export type ActionPlan = {
   id: string; request: EvmSigningRequest;
   review: { operation: BuildingOperation; amount: string; asset: 'tHOME' | 'tUSDG'; distributor: string };
+  claimedRaw?: string;
   signed?: Hex; hash?: Hex; status: 'review' | 'pending' | 'confirmed' | 'failed';
 };
 
+const claimedAbi = parseAbi(['event Claimed(address indexed account,uint256 amount)']);
+export function claimedBuildingAmount(receipt: Pick<TransactionReceipt, 'logs'>, distributor: string, account: string) {
+  let total = 0n;
+  for (const log of receipt.logs) {
+    if (log.address.toLowerCase() !== distributor.toLowerCase()) continue;
+    try {
+      const event = decodeEventLog({ abi: claimedAbi, topics: log.topics, data: log.data });
+      if (event.args.account.toLowerCase() === account.toLowerCase()) total += event.args.amount;
+    } catch { /* Other distributor events do not establish a claim. */ }
+  }
+  return total.toString();
+}
+
 export async function readBuildingPosition(store: Store, wallet: string, options: Options = {}) {
   const account = getAddress(wallet), manifest = await (options.loadManifest ?? loadBuildingManifest)();
-  const receipts: { operation: BuildingOperation; quantityRaw: string | null; hash: Hex; status: 'pending' | 'confirmed' | 'failed' }[] = [];
+  const receipts: { planId: string; operation: BuildingOperation; quantityRaw: string | null; claimedRaw: string | null; hash: Hex; status: 'pending' | 'confirmed' | 'failed' }[] = [];
   if (!manifest?.distributor) return { configured: false, distributor: null, account,
     walletUnitsRaw: '0', walletUnits: '0', stakedRaw: '0', staked: '0', earnedRaw: '0', earned: '0', allowanceRaw: '0', pendingRevenueRaw: '0', receipts };
   const rpc = options.rpc ?? buildingRpc;
@@ -39,25 +53,39 @@ export async function readBuildingPosition(store: Store, wallet: string, options
         let receipt;
         try { receipt = await rpc.getTransactionReceipt({ hash }); }
         catch (error) { if (!(error instanceof Error) || error.name !== 'TransactionReceiptNotFoundError') throw error; }
+        if (!receipt && plan.signed) {
+          try { await rpc.sendRawTransaction({ serializedTransaction: plan.signed }); }
+          catch { /* An ambiguous send can only be resolved by this exact hash. */ }
+        }
         if (receipt && receipt.transactionHash.toLowerCase() === hash.toLowerCase() &&
             await rpc.getBlockNumber() >= receipt.blockNumber + 2n) {
           plan = await store.update<ActionPlan>(row.key, current => current.hash === hash
-            ? { ...current, status: receipt.status === 'success' ? 'confirmed' : 'failed' } : current);
+            ? { ...current, status: receipt.status === 'success' ? 'confirmed' : 'failed',
+              claimedRaw: receipt.status === 'success' ? claimedBuildingAmount(receipt, manifest.distributor!, account) : '0' } : current);
         }
       }
-      receipts.push({ operation: plan.review.operation, quantityRaw: plan.request.buildingAction!.quantityRaw,
-        hash: plan.hash!, status: plan.status as 'pending' | 'confirmed' | 'failed' });
+      receipts.push({ planId: plan.id, operation: plan.review.operation, quantityRaw: plan.request.buildingAction!.quantityRaw,
+        claimedRaw: plan.claimedRaw ?? null, hash: plan.hash!, status: plan.status as 'pending' | 'confirmed' | 'failed' });
     }
     if (rows.length < 500) break;
   } while (true);
   return { configured: true, distributor: manifest.distributor, account,
     walletUnitsRaw: walletUnits.toString(), walletUnits: formatUnits(walletUnits, 18),
     stakedRaw: staked.toString(), staked: formatUnits(staked, 18), earnedRaw: earned.toString(), earned: formatUnits(earned, 6),
+    observedAt: Math.floor((options.now ?? Date.now)() / 1000),
     allowanceRaw: allowance.toString(), pendingRevenueRaw: pendingRevenue.toString(), receipts };
 }
 
 export async function prepareBuildingAction(store: Store, wallet: string, walletId: string, operation: string, quantity?: string, options: Options = {}) {
   if (!['approve', 'stake', 'unstake', 'claim', 'exit', 'sync'].includes(operation)) throw new Error('Unknown building staking action.');
+  if (options.planId) {
+    const existing = await store.get<ActionPlan>(`building-revenue:action:${getAddress(wallet).toLowerCase()}:${options.planId}`);
+    if (existing) {
+      if (existing.review.operation !== operation || existing.request.buildingAction?.quantityRaw !== (quantity ?? null))
+        throw new Error('Building action ID belongs to another exact review.');
+      return { plan: existing };
+    }
+  }
   const manifest = await (options.loadManifest ?? loadBuildingManifest)();
   if (!manifest?.distributor) throw new Error('Building staking distributor is not deployed.');
   const rpc = options.rpc ?? buildingRpc, account = getAddress(wallet);
@@ -90,7 +118,7 @@ export async function prepareBuildingAction(store: Store, wallet: string, wallet
   ]);
   const limit = reviewedOperatorGas(gas, 'transfer'), reviewedFees = reviewedOperatorFees(fees);
   if (nonce !== latest || native < limit * reviewedFees.maxFeePerGas) throw new Error('Wallet nonce is busy or testnet gas is insufficient.');
-  const id = randomUUID(), expiresAt = new Date((options.now ?? Date.now)() + 120000).toISOString();
+  const id = options.planId ?? randomUUID(), expiresAt = new Date((options.now ?? Date.now)() + 120000).toISOString();
   const transaction = { chainId: 46630 as const, from: account, to, data, value: '0x0' as const, nonce,
     gasLimit: `0x${limit.toString(16)}` as Hex, maxFeePerGas: `0x${reviewedFees.maxFeePerGas.toString(16)}` as Hex,
     maxPriorityFeePerGas: `0x${reviewedFees.maxPriorityFeePerGas.toString(16)}` as Hex };
@@ -141,7 +169,8 @@ export async function submitBuildingAction(store: Store, wallet: string, planId:
   try { receipt = await rpc.waitForTransactionReceipt({ hash, confirmations: 3, timeout: 10000, checkReplacement: false }); }
   catch { return { hash, status: 'pending' as const }; }
   if (receipt.transactionHash.toLowerCase() !== hash.toLowerCase()) throw new Error('Building transaction receipt does not match its persisted signed bytes.');
-  await store.update<ActionPlan>(key, current => ({ ...current, status: receipt.status === 'success' ? 'confirmed' : 'failed' }));
+  await store.update<ActionPlan>(key, current => ({ ...current, status: receipt.status === 'success' ? 'confirmed' : 'failed',
+    claimedRaw: receipt.status === 'success' ? claimedBuildingAmount(receipt, manifest.distributor!, account) : '0' }));
   if (receipt.status !== 'success') throw new Error('Exact building staking transaction reverted.');
   return { hash, status: 'confirmed' as const };
 }

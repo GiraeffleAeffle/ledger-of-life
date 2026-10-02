@@ -43,6 +43,7 @@ const address = (value: string) => getAddress(value);
 function amount(value: unknown): bigint {
   if (typeof value !== 'string' || !/^[1-9][0-9]{0,8}$/.test(value)) throw new WorkflowError('Choose a canonical positive test-USD atomic amount.');
   const parsed = BigInt(value);
+  if (parsed < 1000n) throw new WorkflowError('Buy at least 0.001 fictional test USD (tUSDG).');
   if (parsed > maxSpend) throw new WorkflowError('The per-order test spend limit is 100 test USD.');
   return parsed;
 }

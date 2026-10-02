@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { deriveAiProgress, type ProgressRequest } from './local-ai-progress-state.ts';
+import { HostKindBadge } from './home-node-host-badge';
 
 const labels = {
   review: 'Review before starting', authorized: 'Payment authorised · waiting for an available host',
@@ -26,6 +27,7 @@ export function LocalAiProgress({ request }: { request: ProgressRequest }) {
   const title = progress.stage === 'answering' && !request.host ? 'Local model answering' : labels[progress.stage];
   return <section className="local-ai-payment-review" aria-label="Answer progress" data-testid="ai-answer-progress">
     <p role="status"><strong>{title}</strong></p>
+    {request.host && <p><strong>{request.host.name}</strong> <HostKindBadge kind={request.host.kind} /></p>}
     {elapsed !== null && <p className="local-ai-meta">{elapsed} s elapsed{terminal ? ' · finished' : ' · no completion estimate'}</p>}
     <ol>
       {events.authorizedAt && <li>Payment authorised at <time dateTime={events.authorizedAt}>{time(events.authorizedAt)}</time> · not charged</li>}
@@ -38,6 +40,6 @@ export function LocalAiProgress({ request }: { request: ProgressRequest }) {
       {progress.money === 'paid' && <li>Paid {new Intl.NumberFormat('en-GB', { maximumFractionDigits: 6 }).format(Number(request.payment.amountAtomic) / 1e6)} tUSDG · {request.usage?.outputTokens ?? 'unknown'} output tokens{events.finishedAt ? ` · confirmed at ${time(events.finishedAt)}` : ''}</li>}
     </ol>
     <p className="local-ai-meta">{progress.money === 'none' ? 'No service payment: free or own compute.' : progress.money === 'pending' ? 'The answer is saved privately. Payment confirmation is pending; the charge is not yet confirmed. Do not authorise again.' : progress.money === 'paid' ? 'Payment confirmed. The answer is now available.' : progress.money === 'not_charged' ? 'No answer charge. An incomplete answer is not charged; any separate access-budget transaction may have a network fee.' : 'Authorisation is not a charge. Nothing is charged unless an answer completes and payment settles.'}</p>
-    {progress.settlementTransaction && <p>Receipt{progress.money !== 'paid' ? ' · pending confirmation' : ''}: <a href={`https://explorer.testnet.chain.robinhood.com/tx/${progress.settlementTransaction}`} target="_blank" rel="noopener noreferrer"><code>{progress.settlementTransaction}</code></a></p>}
+    {progress.settlementTransaction && <p>Receipt{progress.money !== 'paid' ? ' · pending confirmation' : ''}{request.host && <> · {request.host.name} <HostKindBadge kind={request.host.kind} /></>}: <a href={`https://explorer.testnet.chain.robinhood.com/tx/${progress.settlementTransaction}`} target="_blank" rel="noopener noreferrer"><code>{progress.settlementTransaction}</code></a></p>}
   </section>;
 }

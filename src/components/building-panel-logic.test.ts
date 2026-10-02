@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildingActionState, estimateBuildingHeat } from './building-panel-logic.ts';
+import { buildingActionState, estimateBuildingHeat, projectedBuildingEarnings } from './building-panel-logic.ts';
 
 test('measured token energy takes precedence over nominal runtime', () => {
   assert.deepEqual(estimateBuildingHeat({ tokens: 1000, measuredWhPerToken: 0.2, runtimeMs: 3_600_000, nominalWatts: 300 }), { kwh: 0.2, assumption: '1000 served tokens × 0.2 measured Wh/token', method: 'tokens' });
@@ -45,4 +45,13 @@ test('any connected wallet may start a positive income stream without units or e
   assert.equal(buildingActionState({ ...sync, pendingRevenueRaw: null }), 'Wait for verified new income');
   assert.equal(buildingActionState({ ...sync, connected: false }), 'Connect your Robinhood wallet in Me');
   assert.equal(buildingActionState({ ...sync, busy: true }), 'Finish the current building action first');
+});
+
+test('earnings projection ticks by stake share and never past the stream end or through an idle pool', () => {
+  const stream = { earnedRaw: '10400', stakedRaw: '5', totalStakedRaw: '10', rewardRateRaw: (2n * 10n ** 36n).toString(), rewardScaleRaw: (10n ** 36n).toString(), periodFinish: 200, observedAt: 100, now: 101 };
+  assert.equal(projectedBuildingEarnings(stream), '10401');
+  assert.equal(projectedBuildingEarnings({ ...stream, now: 1000 }), '10500');
+  assert.equal(projectedBuildingEarnings({ ...stream, now: 99 }), '10400');
+  assert.equal(projectedBuildingEarnings({ ...stream, totalStakedRaw: '0' }), '10400');
+  assert.equal(projectedBuildingEarnings({ ...stream, stakedRaw: '0' }), '10400');
 });

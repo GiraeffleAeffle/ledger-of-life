@@ -5,10 +5,10 @@ import { createSocket } from 'node:dgram';
 import { chmod, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { Connector, endpointOrigin, jobDeadline, loadIdentity, validateConfig, validateJob, validateAnswer } from './connector.mjs';
+import { Connector, checkPrivatePath, endpointOrigin, jobDeadline, loadIdentity, validateConfig, validateJob, validateAnswer } from './home-node.mjs';
 
 const model = 'fixture:tiny';
 const configInput = { appOrigin: 'http://localhost:3000', ollamaUrl: 'http://localhost:11434', name: 'Fixture GPU', models: [model], stateDirectory: './state' };
@@ -18,7 +18,7 @@ const preload = (extra = {}) => ({ model, done: true, done_reason: 'load', respo
 const json = (response, value, status = 200) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(value)); };
 
 async function temporary(t) {
-  const directory = await mkdtemp(join(tmpdir(), 'host-connector-test-'));
+  const directory = await mkdtemp(join(tmpdir(), 'home-node-connector-test-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   return directory;
 }
@@ -41,7 +41,8 @@ async function runtime(t, options = {}) {
     json(response, {});
   });
   const ollamaUrl = await server(t, options.ollama ?? ((request, response) => request.url === '/api/tags' ? json(response, { models: [{ name: model }, { name: 'unconfigured:huge' }] }) : json(response, request.url === '/api/generate' ? preload() : answer())));
-  const config = validateConfig({ ...configInput, appOrigin, ollamaUrl, stateDirectory: directory, ...options.config });
+  const config = validateConfig({ ...configInput, appOrigin, ollamaUrl, stateDirectory: options.config?.homeAssistant ? dirname(options.config.homeAssistant.tokenFile) : directory, ...options.config });
+  if (config.homeAssistant) await checkPrivatePath(config.homeAssistant.tokenFile);
   const identity = await loadIdentity(config);
   identity.state.hostId = 'host-fixture';
   identity.state.advertisedModels = [model];
@@ -261,7 +262,7 @@ test('identity is persistent Ed25519 with owner-only files; permissive/symlink k
   const other = await loadIdentity({ ...config, stateDirectory: otherDirectory });
   await rm(join(otherDirectory, 'private-key.pem'));
   await symlink(join(directory, 'private-key.pem'), join(otherDirectory, 'private-key.pem'));
-  await assert.rejects(loadIdentity({ ...config, stateDirectory: otherDirectory }), /symlinks/);
+  await assert.rejects(loadIdentity({ ...config, stateDirectory: otherDirectory }), error => error.code === 'HOME_NODE_PERMISSIONS');
   assert.equal(other.privateKey.asymmetricKeyType, 'ed25519');
 });
 
@@ -304,7 +305,7 @@ test('a first-boot asleep host offers configured wake models, then narrows to in
   let asleep = true;
   const appOrigin = await server(t, async (request, response) => { heartbeats.push(JSON.parse(await body(request))); json(response, {}); });
   const ollamaUrl = await server(t, (request, response) => asleep ? json(response, {}, 503) : json(response, { models: [{ name: model }] }));
-  const config = validateConfig({ ...configInput, appOrigin, ollamaUrl, models: [model, 'not-installed:tiny'], stateDirectory: join(directory, 'state'), homeAssistant: { url: 'http://localhost:8123', tokenFile, DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN: true } });
+  const config = validateConfig({ ...configInput, appOrigin, ollamaUrl, models: [model, 'not-installed:tiny'], stateDirectory: directory, homeAssistant: { url: 'http://localhost:8123', tokenFile, DANGEROUS_ALLOW_PLAINTEXT_HTTP_ON_TRUSTED_LAN: true } });
   const identity = await loadIdentity(config);
   identity.state.hostId = 'host-new';
   await identity.save();
@@ -435,6 +436,10 @@ test('executable consumes an owner invitation, signs exact bytes and keeps heart
       assert(Math.abs(Date.now() - Number(timestamp)) < 60_000);
       const canonical = `POST\n${request.url}\n${timestamp}\n${nonce}\n${createHash('sha256').update(raw).digest('hex')}`;
       assert(verify(null, Buffer.from(canonical), publicKey, Buffer.from(request.headers['x-host-signature'], 'base64')));
+      if (request.url === '/api/home-node/capabilities') {
+        assert.deepEqual(input, { gpuModels: [model], solarSensors: [], validatorIds: [] });
+        return json(response, { ok: true });
+      }
       if (request.url.endsWith('/heartbeat')) {
         heartbeats++;
         assert.deepEqual(input.models, [model]);
@@ -469,8 +474,8 @@ test('executable consumes an owner invitation, signs exact bytes and keeps heart
     chatResponse = response;
   });
   const configFile = join(directory, 'config.json');
-  await writeFile(configFile, JSON.stringify({ ...configInput, appOrigin, ollamaUrl, stateDirectory: join(directory, 'state'), pairingCode: 'ABCDEFGH2345' }));
-  const child = spawn(process.execPath, [new URL('./connector.mjs', import.meta.url).pathname, '--config', configFile], { stdio: ['ignore', 'pipe', 'pipe'] });
+  await writeFile(configFile, JSON.stringify({ ...configInput, appOrigin, ollamaUrl, stateDirectory: join(directory, 'state'), pairingCode: 'ABCDEFGH2345' }), { mode: 0o600 });
+  const child = spawn(process.execPath, [new URL('./home-node.mjs', import.meta.url).pathname, '--config', configFile], { stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   child.stdout.on('data', (chunk) => { output += chunk; });
   child.stderr.on('data', (chunk) => { output += chunk; });

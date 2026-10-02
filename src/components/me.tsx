@@ -82,7 +82,7 @@ export function MeArea({ request, tenancies, homeState, go }: {
       <IdentityStrip request={request} status={connections.identity} loading={connections.identityLoading}
         readError={connections.identityError} onStatusChange={connections.updateIdentity} onRefresh={connections.refreshIdentity} homeCity={city?.source === 'home'} />
       <LedgerAdapters inputs={inputs} go={go} />
-      <AdapterSettings request={request} connection={connections.adapters} />
+      <AdapterSettings request={request} connection={connections.adapters} go={go} />
 
 
       <section className="card" id="life-timeline" tabIndex={-1}>

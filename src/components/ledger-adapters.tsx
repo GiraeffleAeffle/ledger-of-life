@@ -26,7 +26,9 @@ export function LedgerAdapters({ inputs, go }: { inputs: LedgerStateInputs; go: 
     ?? LEDGER_ADAPTERS.find((adapter) => adapterState(adapter, inputs).tone === 'setup')
     ?? LEDGER_ADAPTERS[0];
   const state = adapterState(selected, inputs);
-  const action = adapterAction(selected, inputs);
+  const action = selected.id === 'homeAssistant' && inputs.homeAssistantPull === false
+    ? { kind: 'area' as const, area: 'money' as const, section: 'money-devices' as const, label: 'Connect through Home Node' }
+    : adapterAction(selected, inputs);
   useEffect(() => {
     function consume() {
       const id = sessionStorage.getItem(ADAPTER_NAVIGATION_INTENT);
@@ -55,6 +57,8 @@ export function LedgerAdapters({ inputs, go }: { inputs: LedgerStateInputs; go: 
       <article className="ledger-adapter-detail" aria-live="polite" aria-label="Selected adapter">
         <span className="eyebrow">{STATUS_LABEL[selected.maturity]} · {directionLabel[selected.direction]}</span>
         <h3>{selected.name}</h3><p>{selected.explain.brings}</p>
+        {selected.id === 'homeAssistant' && <p className="small-copy">On the hosted site, connect through your Home Node. It reads Home Assistant inside your network and pushes signed sensor readings; the token stays on your device.</p>}
+        {selected.id === 'validator' && <p className="small-copy">Report public validator IDs through your Home Node, or use the read-only adapter here. Neither proves stake ownership.</p>}
         <div className="ledger-detail-chips"><span className={`ledger-state ${state.tone}`}>{state.label}</span><RealityChips levels={[selected.explain.reality]} /><span className="ledger-effort">Effort: {selected.explain.effort}</span></div>
         <div className="ledger-action-row"><button className="button primary" type="button" onClick={() => activateAdapterAction(action, go)}>{action.label}<ArrowUpRight size={16} /></button>
           {selected.secondaryAction && <button className="secondary-button" type="button" onClick={() => activateAdapterAction(selected.secondaryAction!, go)}>{selected.secondaryAction.label}<ArrowUpRight size={15} /></button>}

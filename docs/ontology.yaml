@@ -493,9 +493,9 @@ concepts:
 
 
   InferenceHost:
-    definition: An operator-invited account's GPU reached exclusively through an outbound Ed25519-authenticated connector, with a verified EVM payout wallet and reported models and liveness.
+    definition: A verified account's community or operator GPU reached exclusively through an outbound Ed25519-authenticated Home Node, with a verified EVM payout wallet and reported models and liveness.
     relations: {owned_by: Person, paired_by: HostPairingInvitation, serves: LocalInferenceRequest, may_receive: InferencePayment}
-    lifecycle: [active, revoked]
+    lifecycle: [active, suspended, revoked]
     invariants:
       - Registration consumes an owner-created hashed invitation and binds its account, verified payout and connector public key; no public pending hosts or owner account identifiers appear in status.
       - The private key stays on the connector; tokenless UDP Wake-on-LAN is the owner default. Optional Home Assistant requires HTTPS absent an explicit plaintext trusted-LAN opt-in and uses a dedicated non-admin local token; the app never dials a connector-supplied URL.
@@ -509,7 +509,7 @@ concepts:
       - LAN HTTP Ollama permits anyone on that transport to read questions or forge complete answers; host signatures and payment gating do not authenticate model execution.
       - One app replica is required; multi-replica queue and coordinated leases are not built.
     reality: prototype
-    code: [src/server/local-ai-hosts.ts, host-connector/connector.mjs, app/api/local-ai/hosts, src/components/local-ai-host.tsx]
+    code: [src/server/local-ai-hosts.ts, home-node/home-node.mjs, app/api/local-ai/hosts, src/components/local-ai-host.tsx]
 
 
   HostEconomicsScenario:
