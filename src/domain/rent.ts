@@ -12,3 +12,13 @@ export function berlinRentMonth(now = Date.now()) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit' }).formatToParts(new Date(now));
   return `${parts.find(part => part.type === 'year')!.value}-${parts.find(part => part.type === 'month')!.value}`;
 }
+
+/** A confirmed payment only describes the current Berlin calendar month. */
+export function paidRentMonth(view: { month: string; role: 'tenant' | 'landlord'; payment: { month: string; state: string } | null }) {
+  if (view.payment?.state !== 'confirmed' || view.payment.month !== view.month) return null;
+  const [year, month] = view.month.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  const label = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'Europe/Berlin' }).format(date);
+  const next = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'Europe/Berlin' }).format(new Date(Date.UTC(year, month, 1)));
+  return { heading: `Rent for ${label} ${view.role === 'tenant' ? 'paid' : 'received'}`, nextDue: `Rent for ${next} can be paid from 1 ${next}, Berlin time.` };
+}

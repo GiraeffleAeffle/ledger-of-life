@@ -5,7 +5,7 @@ import type { TenancyJourney } from '@/server/journey';
 import type { PortfolioPartial, PortfolioView } from '@/server/portfolio';
 import { goToSection, openShareWorkflow, type Area } from './areas';
 import { NetPosition } from './net-position';
-import { confirmedRobinhood, netPositionParts, netPositionTotal, shareValuationAvailable, usd, type RobinhoodRead, type SharePositionAmounts } from './money-valuation';
+import { confirmedRobinhood, netPositionParts, netPositionTotal, shareValuationAvailable, todayTestValueLabel, usd, type RobinhoodRead, type SharePositionAmounts } from './money-valuation';
 import { cashDepositStatus } from './money-guidance';
 import type { LocalInvestmentView } from '@/server/local-investments';
 import { TEST_CITY_INVESTMENTS } from '@/data/local-investments';
@@ -178,7 +178,7 @@ export function AssetsOverview({ request, tenancies, tenanciesLoaded = true, sho
   const localHoldings = stakes?.state === 'ready' ? stakes.assets.filter(asset => asset.holdingRaw !== null && BigInt(asset.holdingRaw) > 0n) : [];
 
   if (show === 'summary') return <span className="today-money">
-    {complete ? `${usd(total)} test value` : '— test value'} · <button type="button" className="text-button" onClick={() => goToSection(go, 'money', 'money-overview')}>Holdings →</button>
+    {todayTestValueLabel(complete, Boolean(readError), total)} · <button type="button" className="text-button" onClick={() => goToSection(go, 'money', 'money-overview')}>Holdings →</button>
   </span>;
   return (
     <HoldingsContext value={read}>

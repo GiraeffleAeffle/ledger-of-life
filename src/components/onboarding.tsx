@@ -81,6 +81,7 @@ export function AccountSetup({ step }: { step: Exclude<SetupStep, 'loading' | 'd
         <li>Find sourced information for your city</li>
       </ul>
       {step === 'account' && <nav className="onboarding-public" aria-label="Explore without an account">
+        <Link href="/story">Follow a two-person city story — no account needed</Link>
         <Link href="/welcome/strausberg">Read the Strausberg welcome guide — no account needed</Link>
         <Link href="/replay">See a recorded tenancy — no account needed</Link>
         <div><Link href="/library">Public AI desk — no account needed</Link><p className="small-copy" role="status">{deskStatus}</p></div>

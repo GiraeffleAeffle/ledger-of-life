@@ -120,7 +120,7 @@ export function chainStep(
       return {
         stage: 'living',
         next: role === 'landlord'
-          ? { kind: 'propose_claim', label: 'Propose a move-out deduction', detail: 'Enter any deduction (0 if none) with a reason. The tenant must agree or the arbitrator decides.', maximumAtomic: t.requiredSecurityAtomic }
+          ? waiting('Deposit secured · nothing needs you now', 'At move-out you can propose a deduction (including zero). The tenant must agree or the arbitrator decides. Deposit earnings belong to the tenant.')
           : role === 'tenant'
             ? waiting(cashOnly ? 'Your deposit is locked in the escrow' : 'Your deposit is secured in devnet lending', `At move-out the landlord proposes a deduction (or none); you then agree or dispute. ${cashOnly ? 'The deposit stays as cash; this site pays the tenant labelled simulated yield.' : 'Devnet lending pays nothing, so earnings are simulated.'}`)
             : waiting('Nothing to decide', 'You are only needed if tenant and landlord disagree.'),

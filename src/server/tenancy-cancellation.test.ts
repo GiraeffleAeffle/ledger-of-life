@@ -117,7 +117,7 @@ test('awaiting-funding cancellation is terminal for every party, but direct on-c
     f.snapshot.tenancy.accountedIdleAtomic = f.agreement.requiredSecurity;
     const recovered = await tenancyJourney(f.store, f.landlord, next, f.resolve);
     assert.equal(recovered.stage, 'living');
-    assert.equal(recovered.next.kind, 'propose_claim');
+    assert.equal(recovered.next.kind, 'wait', 'a running tenancy leads with the deposit status; move-out stays a secondary landlord action');
     assert.equal(recovered.cancellable, false);
   } finally { await f.store.close(); }
 });

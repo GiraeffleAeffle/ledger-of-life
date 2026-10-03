@@ -17,7 +17,7 @@ import { AgriPvExample } from './agri-pv-example';
 import { ProjectMap } from './project-map';
 import { DEFAULT_PROJECT_SYSTEMS, type ProjectSystems } from './project-map-model';
 import { TestDollars } from './test-dollars';
-import { BuildingPanel } from './building-panel';
+import { BuildingPanel, type BuildingPosition } from './building-panel';
 import './local-investments.css';
 
 const cash = (raw: string) => new Intl.NumberFormat('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 6 }).format(Number(BigInt(raw)) / 1e6);
@@ -37,6 +37,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
   });
   const [city, setCity] = useState<CityResult | null>(null);
   const [market, setMarket] = useState<LocalInvestmentView | null>(null);
+  const [buildingPosition, setBuildingPosition] = useState<BuildingPosition | null>(null);
   const [order, setOrder] = useState<LocalInvestmentOrder | null>(null);
   const [amount, setAmount] = useState('5');
   const [direction, setDirection] = useState<'buy' | 'sell'>('buy');
@@ -130,6 +131,8 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
   const tradeHash = currentOrder?.state === 'completed' ? currentOrder.steps.find((step) => step.kind !== 'approve')?.hash : null;
   const healthy = market?.state === 'ready' && !readError && asset && !asset.error;
   const hasWallet = wallet.wallets.some((item) => item.chainType === 'ethereum' && item.connected);
+  const account = wallet.wallets.find((item) => item.chainType === 'ethereum' && item.connected)?.address;
+  const ownBuildingPosition = buildingPosition?.configured && buildingPosition.account.toLowerCase() === account?.toLowerCase() ? buildingPosition : null;
   let requestedAmount: string | null = null;
   try { requestedAmount = parseAmount(amount, direction === 'sell' ? 18 : 6); } catch { /* Invalid input is kept editable, never treated as zero. */ }
   const hasGas = market?.nativeAtomic !== null && market?.nativeAtomic !== undefined && BigInt(market.nativeAtomic) > 0n;
@@ -217,7 +220,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
       const Icon = item.kind === 'housing' ? Building2 : Wrench;
       return <div key={item.id} className="local-project-choice"><button type="button" data-project-id={item.id} disabled={Boolean(busy)} aria-pressed={!showAgriPv && selectedId === item.id} onClick={() => { setSelectedId(item.id); setShowAgriPv(false); setActionError(''); }}>
         <span className={`local-project-icon ${item.kind}`}><Icon size={25} /></span><span><strong>{item.kind === 'housing' ? 'Fictional housing example' : 'Fictional workshop example'}</strong><small>{projectDisplayName(item.name)}</small></span>
-        <span className="local-project-owned">{holding?.holdingRaw === null || !holding ? '— units' : `${units(holding.holdingRaw)} ${item.symbol}`}{readError && <small>Last checked</small>}</span>
+        <span className="local-project-owned">{item.kind === 'housing' ? <>{ownBuildingPosition?.walletUnitsRaw == null ? '—' : units(ownBuildingPosition.walletUnitsRaw)} tHOME in wallet<small>{ownBuildingPosition?.stakedRaw == null ? '—' : units(ownBuildingPosition.stakedRaw)} tHOME staked</small></> : <>{holding?.holdingRaw === null || !holding ? '— units' : `${units(holding.holdingRaw)} ${item.symbol}`}{readError && <small>Last checked</small>}</>}</span>
       </button>{!showAgriPv && <button type="button" className="text-button" aria-label={`Sell back ${item.symbol} fictional test units`} disabled={Boolean(busy) || openOrder || !holding?.holdingRaw || BigInt(holding.holdingRaw) === 0n} onClick={() => { setSelectedId(item.id); setShowAgriPv(false); setDirection('sell'); setAmount('1'); setActionError(''); }}>Sell back {item.symbol}</button>}</div>;
     })}<div className="local-project-choice"><button type="button" data-project-id={AGRI_PV_EXAMPLE.id} disabled={Boolean(busy)} aria-pressed={showAgriPv} onClick={() => { setShowAgriPv(true); setActionError(''); }}><span className="local-project-icon"><Leaf size={25} /></span><span><strong>{AGRI_PV_EXAMPLE.name}</strong><small>Electricity + crops · editable income model, no token or purchase</small></span></button></div></div>
     {showAgriPv ? <AgriPvExample /> : <>
@@ -228,8 +231,8 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
     <div className="local-investment-body">
       <div className="local-project-story"><span className="eyebrow">{project.symbol}</span><h3>{project.kind === 'housing' ? 'A fictional housing example.' : 'A fictional workshop example.'}</h3><p>{project.description}</p>
         <div className="local-use-tags">{project.uses.map((use) => <span key={use}>{use}</span>)}</div>
-        <div className="local-stake-display"><Building2 size={26} /><div><strong>{asset?.holdingRaw === null || !asset ? '—' : units(asset.holdingRaw)} <span>{project.symbol}</span></strong><small>Fictional test issuer · {asset?.holdingRaw !== null && asset ? `${percent(asset.holdingRaw, asset.totalSupplyRaw)} of the unit supply` : 'Wallet units appear after a successful network read'}</small></div></div>
-        {project.kind === 'housing' && <p className="small-copy">This balance shows wallet units only. Staked tHOME units earn attributed GPU and simulated solar test dollars. Claim and reinvest earnings below; unstake before sell-back.</p>}
+        {project.kind === 'housing' ? <div className="local-stake-display"><Building2 size={26} /><div><strong>{ownBuildingPosition?.walletUnitsRaw == null ? '—' : units(ownBuildingPosition.walletUnitsRaw)} <span>tHOME in wallet</span></strong><strong>{ownBuildingPosition?.stakedRaw == null ? '—' : units(ownBuildingPosition.stakedRaw)} <span>tHOME staked</span></strong><small>Fictional test units · no value, no rights</small></div></div> : <div className="local-stake-display"><Building2 size={26} /><div><strong>{asset?.holdingRaw === null || !asset ? '—' : units(asset.holdingRaw)} <span>{project.symbol}</span></strong><small>Fictional test issuer · {asset?.holdingRaw !== null && asset ? `${percent(asset.holdingRaw, asset.totalSupplyRaw)} of the unit supply` : 'Wallet units appear after a successful network read'}</small></div></div>}
+        {project.kind === 'housing' && <p className="small-copy">Only staked tHOME units share attributed GPU and simulated solar test-dollar income. Claim and reinvest earnings below; unstake before sell-back.</p>}
         {asset && market && <div className="local-contract-links"><a href={`${market.network.explorerUrl.replace(/\/$/, '')}/address/${asset.unitAddress}`} target="_blank" rel="noopener noreferrer">{project.symbol} contract <ExternalLink size={12} /></a><a href={`${market.network.explorerUrl.replace(/\/$/, '')}/address/${asset.marketAddress}`} target="_blank" rel="noopener noreferrer">Market contract <ExternalLink size={12} /></a></div>}
       </div>
       <div className="local-investment-review">
@@ -261,9 +264,10 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
         {checkedAt && <span className="local-checked">Wallet/market last checked {checkedAt}{readError ? ' · refresh unavailable' : ''}</span>}
       </div>
     </div>
+    {project.kind === 'housing' && <BuildingPanel request={request} position={ownBuildingPosition} setPosition={setBuildingPosition} />}
     <ProjectBlueprint kind={project.kind} go={go} enabled={systems} setEnabled={setSystems} />
     <ProjectMap key={project.id} project={project} systems={systems} />
-    {project.kind === 'housing' && <><BuildingPanel request={request} /><div className="local-housing-precedent"><button type="button" className="text-button" onClick={() => setShowAgriPv(true)}>Explore the Agri-PV income example and its Röbel/Müritz source →</button></div></>}
+    {project.kind === 'housing' && <div className="local-housing-precedent"><button type="button" className="text-button" onClick={() => setShowAgriPv(true)}>Explore the Agri-PV income example and its Röbel/Müritz source →</button></div>}
     <details className="local-investment-details"><summary>Sources, project context &amp; token rights</summary><p>Purchases move test tokens on Robinhood Chain testnet after your wallet signs. These issuers and projects are fictional; they are not the real buildings, owners or companies shown in public city records. They establish no construction, funding, dividend, employment or tax outcome. Test USD (tUSDG) can come from your existing Robinhood Chain wallet or a separate share-backed test loan; Solana assets do not bridge here. Borrowing and buying a stake require separate approvals; buying units does not repay a loan, and collateral can still be liquidated.</p><p>{project.rights} Fictional test units are displayed separately from priced assets: an issue price is not a resale quote, guaranteed exit or legal interest in a building. Shared test USD (tUSDG) is counted once.</p><h4>Real Strausberg research leads</h4><ul>{STRAUSBERG_INVESTMENT_LEADS.map((lead) => <li key={lead.url}><a href={lead.url} target="_blank" rel="noopener noreferrer">{lead.name}</a> · {lead.kind}. Research lead only; check eligibility and terms directly.</li>)}</ul></details>
     </>}
   </section>;

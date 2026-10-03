@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { formatUnits, parseUnits } from 'viem';
 import { useRentalWallet } from '@/wallets';
 import type { EvmSigningRequest } from '../wallets/types';
@@ -20,15 +20,14 @@ type Building = {
   validator?: { name?: string; url?: string; status?: string } | null;
   revenueTransactions: { transactionHash: string; logIndex: number; amountRaw: string; explorerUrl: string; sourceName: string }[];
 };
-type Position = { configured: boolean; account: string; walletUnitsRaw: string | null; stakedRaw: string | null; earnedRaw: string | null; allowanceRaw: string | null; pendingRevenueRaw?: string | null; receipts?: Receipt[]; observedAt?: number; reinvest?: ReinvestView | null };
+export type BuildingPosition = { configured: boolean; account: string; walletUnitsRaw: string | null; stakedRaw: string | null; earnedRaw: string | null; allowanceRaw: string | null; pendingRevenueRaw?: string | null; receipts?: Receipt[]; observedAt?: number; reinvest?: ReinvestView | null };
 type Plan = { id: string; request: EvmSigningRequest; review: { operation: string; amount: string; asset: string; distributor: string } };
 const dollars = (raw: string) => formatUnits(BigInt(raw), 6);
 
-export function BuildingPanel({ request }: { request: AuthorizedRequest }) {
+export function BuildingPanel({ request, position, setPosition }: { request: AuthorizedRequest; position: BuildingPosition | null; setPosition: Dispatch<SetStateAction<BuildingPosition | null>> }) {
   const wallet = useRentalWallet();
   const activeTab = useSectionTabActive();
   const [building, setBuilding] = useState<Building | null>(null);
-  const [position, setPosition] = useState<Position | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [amount, setAmount] = useState('1');
   const [submitted, setSubmitted] = useState<Receipt | null>(null);
@@ -53,12 +52,12 @@ export function BuildingPanel({ request }: { request: AuthorizedRequest }) {
       if (!response.ok) throw new Error('Building read unavailable');
       const value = await response.json() as { building: Building };
       if (active.current && generation === revision.current) setBuilding(value.building);
-      const own = account ? await request<Position>('/api/building/claims') : null;
+      const own = account ? await request<BuildingPosition>('/api/building/claims') : null;
       if (active.current && generation === revision.current) { setPosition(own); setError(''); }
     } catch (cause) {
       if (active.current && generation === revision.current) { setPosition(null); setError(cause instanceof Error ? cause.message : 'Building read unavailable'); }
     } finally { reading.current = false; }
-  }, [account, request]);
+  }, [account, request, setPosition]);
   useEffect(() => {
     if (!activeTab) return;
     active.current = true;
@@ -73,7 +72,7 @@ export function BuildingPanel({ request }: { request: AuthorizedRequest }) {
     const timer = setInterval(() => { if (!lock.current) void refresh(); }, 10_000);
     const tick = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => { cancelled = true; live.current = false; ++revisions.current; clearInterval(timer); clearInterval(tick); };
-  }, [refresh, activeTab]);
+  }, [refresh, activeTab, setPosition]);
   async function act(operation: () => Promise<void>) {
     if (lock.current) return;
     lock.current = true; setBusy(true); setError('');

@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { encodeAbiParameters, encodeEventTopics, keccak256, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import manifestJson from '../../contracts/evm/deployments/building-revenue-46630.json' with { type: 'json' };
-import { berlinRentMonth, splitBuildingRent } from '../domain/rent.ts';
+import { berlinRentMonth, paidRentMonth, splitBuildingRent } from '../domain/rent.ts';
 import { cashDepositForm, canonicalDeposit } from '../domain/deposit-form.ts';
 import { RENT_TOKEN_ABI } from '../wallets/rent-signing.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
@@ -51,6 +51,19 @@ test('fixed split floors building share and gives every remaining atom to landlo
   assert.deepEqual(splitBuildingRent('900000003'),{buildingRaw:'180000000',landlordRaw:'720000003'});
   assert.equal(berlinRentMonth(Date.parse('2026-10-31T23:30:00Z')),'2026-11');
   assert.equal(berlinRentMonth(Date.parse('2026-01-31T23:30:00Z')),'2026-02');
+});
+test('paid rent summary follows the Berlin month, next due month and viewer role', () => {
+  const month = berlinRentMonth(Date.parse('2026-10-31T23:30:00Z'));
+  const payment = { month, state: 'confirmed' };
+  assert.deepEqual(paidRentMonth({ month, role: 'tenant', payment }), {
+    heading: 'Rent for November 2026 paid',
+    nextDue: 'Rent for December 2026 can be paid from 1 December 2026, Berlin time.',
+  });
+  assert.equal(paidRentMonth({ month, role: 'landlord', payment })?.heading, 'Rent for November 2026 received');
+  assert.equal(paidRentMonth({ month: '2026-12', role: 'tenant', payment: { month: '2026-12', state: 'confirmed' } })?.nextDue, 'Rent for January 2027 can be paid from 1 January 2027, Berlin time.');
+  assert.equal(paidRentMonth({ month, role: 'tenant', payment: { month, state: 'pending' } }), null);
+  assert.equal(paidRentMonth({ month, role: 'tenant', payment: null }), null);
+  assert.equal(paidRentMonth({ month, role: 'tenant', payment: { month: '2026-10', state: 'confirmed' } }), null);
 });
 test('publication fixes rent share and binds it only to newly chosen building agreements',async()=>{
   const store=new LocalStore(':memory:');try{

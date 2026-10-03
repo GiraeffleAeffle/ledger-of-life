@@ -96,7 +96,12 @@ test('chain steps give exactly one actor the move each phase', () => {
   const actors = (phase: string, owed?: string) =>
     (['tenant', 'landlord', 'arbitrator'] as const).filter((role) => !['wait', 'done', 'paying_out'].includes(chainStep(role, t(phase, owed), true).next.kind));
   assert.deepEqual(actors('awaiting-funding'), ['tenant']);
-  assert.deepEqual(actors('active'), ['landlord']);
+  assert.deepEqual(actors('active'), []);
+  const landlord = chainStep('landlord', t('active'), true);
+  assert.equal(landlord.stage, 'living');
+  assert.equal(landlord.next.kind, 'wait');
+  assert.match(landlord.next.label, /Deposit secured/);
+  assert.match(landlord.next.detail, /At move-out/);
   assert.deepEqual(actors('claim-proposed'), ['tenant']);
   assert.deepEqual(actors('disputed'), ['arbitrator']);
   assert.deepEqual(actors('closed', '5'), []);

@@ -84,3 +84,10 @@ export function netPositionTotal(parts: NetPositionParts): number {
 }
 
 export const usd = (value: number) => value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+
+/** Today never presents an unread or failed valuation as a bare number. */
+export function todayTestValueLabel(complete: boolean, readFailed: boolean, total: number): string {
+  if (readFailed) return 'Test value: unavailable right now';
+  if (!complete) return 'Test value: checking your test assets…';
+  return `${usd(total)} test value`;
+}

@@ -6,6 +6,7 @@ import type { CityResult } from '../server/city';
 import { currentHomeTenancy } from './home-journey-logic';
 import { AssetsOverview } from './assets';
 import { goToSection, type Area } from './areas';
+import { todayTestValueLabel } from './money-valuation';
 import './ledger-overview.css';
 
 import { PathStrip } from './path-strip';
@@ -24,7 +25,7 @@ export function LedgerOverview({ request, tenancies, listings, homeError, city, 
   return <PathStrip>
     <li><strong>1 · Home</strong> · {home?.property ?? listing?.title ?? (homeError ? 'Status unavailable' : tenancies === null ? 'Checking your home…' : 'No home recorded')} · <button className="text-button" onClick={() => goToSection(go, 'home', target)}>Home →</button></li>
     <li><strong>2 · Deposit</strong> · {progress.deposit === 'unknown' ? 'Status unavailable' : home ? home.stage === 'living' ? 'Secured' : home.stage === 'paid' ? 'Paid out' : 'In progress' : listing ? 'Not secured yet' : 'No deposit recorded'} · <button className="text-button" onClick={() => goToSection(go, 'home', home || listing ? target : 'deposit-options')}>Deposit →</button></li>
-    <li><strong>3 · Assets</strong> · {tenancies !== null && !homeError && !unavailable ? <AssetsOverview request={request} tenancies={ready} show="summary" go={go} /> : 'Checking holdings…'}</li>
+    <li><strong>3 · Assets</strong> · {tenancies !== null && !homeError && !unavailable ? <AssetsOverview request={request} tenancies={ready} show="summary" go={go} /> : <span className="today-money">{todayTestValueLabel(false, Boolean(homeError) || unavailable, 0)} · <button type="button" className="text-button" onClick={() => goToSection(go, 'money', 'money-overview')}>Holdings →</button></span>}</li>
     <li><strong>4 · City</strong> · {city?.name ? <>{city.name} · {citySourceLabel(city.source)}{!city.cityId && ' · not covered yet'}</> : cityError ? 'City check unavailable' : !city ? 'Checking your city…' : 'No city known'} · <button className="text-button" onClick={() => goToSection(go, 'places', city?.cityId ? 'city-news' : 'city-choice')}>Places →</button></li>
   </PathStrip>;
 }
