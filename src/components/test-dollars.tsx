@@ -58,12 +58,12 @@ export function TestDollars({ request, ethBalance, refresh, needDollars = true }
     finally { window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'evm' } })); setPending(false); }
   }
   return <div>
-    {needDollars && <p>1,000 tUSDG per request. You sign with your own wallet. Wait one minute between requests; sign within two minutes.</p>}
-    {noGas && <p role="status">{dripConfigured ? 'Too little test ETH for network fees. This site can send 0.00005 test ETH to your verified wallet, once per 24 hours per account and wallet (200 transfers per UTC day).' : 'Too little test ETH for network fees. Use the faucet first.'}</p>}
     {noGas && dripConfigured && <button type="button" className="button primary" disabled={pending || !hasWallet} onClick={() => { void getGas(); }}>{gettingGas ? 'Getting test ETH…' : 'Get test ETH for fees from this site'}</button>}
-    {noGas && <p>The <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet</a> gives test ETH for fees.</p>}
-    {needDollars && <button type="button" className="button primary" disabled={pending || !hasWallet || noGas} onClick={() => { void mint(); }}>{pending && !gettingGas ? 'Getting test dollars…' : 'Get test dollars (tUSDG)'}</button>}
-    {!hasWallet && <p>Connect your Robinhood Chain wallet in Me.</p>}
+    {noGas && <p role="status">First get a little test ETH for fees: <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet ↗</a>.</p>}
+    {noGas && dripConfigured && <small>Site fee allowance: 0.00005 test ETH per account and wallet every 24 hours; 200 transfers per UTC day.</small>}
+    {needDollars && <button type="button" className="button primary" disabled={pending || !hasWallet || noGas} onClick={() => { void mint(); }}>{pending && !gettingGas ? 'Getting test dollars…' : 'Get test dollars'}</button>}
+    {needDollars && <small>1,000 tUSDG per request · wait one minute between requests · sign within two minutes.</small>}
+    {!hasWallet && <p>Connect your Shares wallet in Me.</p>}
     {error && <p role="alert" className="note">{error}</p>}
     {success && <><p role="status" className="note">{success}</p><button type="button" className="text-button" disabled={pending} onClick={() => { void refresh().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Balance unavailable. Try refreshing again later.')); }}>Refresh balance</button></>}
   </div>;

@@ -1,6 +1,6 @@
 /**
- * The app's one thread, in the same words everywhere: the door, Today, the area headings, Home,
- * the next step and the Roadmap. The owner's destination line with the deposit named as the hinge.
+ * The public onboarding thread, reused by the door and the Roadmap.
+ * The owner's destination line names the deposit as the hinge; signed-in headings stay plain.
  * No runtime imports, like sections.ts.
  */
 export const THREAD = 'Find a home, secure the deposit, keep your assets, help build your city.';

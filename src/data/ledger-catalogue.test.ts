@@ -29,6 +29,16 @@ test('capability destinations and adapter actions target their section owner', (
   }
 });
 
+test('the former cockpit opens Home and no catalogue destination uses Today', () => {
+  assert.equal(IDEAS.find((idea) => idea.id === 'today-cockpit')?.destination?.area, 'home');
+  for (const idea of IDEAS) assert.notEqual(idea.destination?.area as string | undefined, 'overview');
+  for (const adapter of LEDGER_ADAPTERS) {
+    for (const action of [adapter.action, adapter.secondaryAction]) {
+      if (action?.kind === 'area') assert.notEqual(action.area as string, 'overview');
+    }
+  }
+});
+
 test('an adapter is operated in the area that owns its topic', () => {
   // A topic is subject matter; its area is the one place its adapters are operated (Energy & devices -> Money).
   for (const adapter of LEDGER_ADAPTERS) {

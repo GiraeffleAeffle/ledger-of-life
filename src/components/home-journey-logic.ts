@@ -3,6 +3,27 @@ import type { PublicListing } from '../server/listings.ts';
 
 export const HOME_STAGES = ['Find', 'Apply', 'Agree', 'Secure', 'Live', 'Move out', 'Paid out'] as const;
 
+const PASSIVE_TENANCY_STEPS: Record<string, true> = {
+  wait: true, confirming: true, paying_out: true, done: true, cancelled: true, propose_claim: true,
+};
+const VOLUNTARY_SHARE_ACTIONS: Record<string, true> = {
+  approve: true, pledge: true, withdraw: true, requestReturn: true, lowerClaim: true,
+};
+
+/** Only funding-stage actions, top-ups and mandatory settlement steps need this person. */
+export function tenancyNeedsPerson(journey: {
+  stage: string; next: { kind: string }; depositForm?: { kind: string };
+  shareDeposit?: { needsTopUp: boolean; actions: readonly string[] };
+}) {
+  if (journey.depositForm?.kind === 'shares' && journey.stage === 'living') {
+    return journey.next.kind !== 'propose_claim' && Boolean(journey.shareDeposit?.needsTopUp);
+  }
+  const requiredShareAction = journey.shareDeposit?.actions.some(action =>
+    journey.stage === 'deposit' || !VOLUNTARY_SHARE_ACTIONS[action]);
+  return Boolean(journey.shareDeposit?.needsTopUp || requiredShareAction)
+    || !PASSIVE_TENANCY_STEPS[journey.next.kind];
+}
+
 /** Expiry rejected before persistence: discard local approval before obtaining a fresh review. */
 export async function recoverExpiredRentReview(
   reason: unknown, clearApproval: () => void, prepare: () => Promise<void>,
@@ -24,12 +45,12 @@ export function currentHomeTenancy<T extends { stage: string; next: { kind: stri
 
 /** A failed home read is unknown, never evidence that someone needs to find a home. */
 export function homeSituation<L extends Pick<PublicListing, 'relation' | 'status' | 'agreementId' | 'applications'>>({
-  listings, tenancyIds, hasCurrent, homeKnown, browsing,
-}: { listings: readonly L[]; tenancyIds: readonly string[]; hasCurrent: boolean; homeKnown: boolean; browsing: boolean }) {
+  listings, tenancyIds, hasCurrent, homeKnown,
+}: { listings: readonly L[]; tenancyIds: readonly string[]; hasCurrent: boolean; homeKnown: boolean }) {
   return {
     reviewListings: listings.filter(l => l.relation === 'landlord' && l.status === 'open' && (l.applications?.length ?? 0) > 0),
     applicationListings: listings.filter(l => (l.relation === 'chosen' || l.relation === 'applicant') && !(l.agreementId && tenancyIds.includes(l.agreementId))),
-    showBrowser: homeKnown && (browsing || (!hasCurrent && !listings.some(l => l.relation === 'landlord'))),
+    showBrowser: homeKnown && !hasCurrent && !listings.some(l => l.relation === 'landlord'),
   };
 }
 

@@ -72,7 +72,7 @@ export function CityRegionTopics({ request, cityId, cityName }: { request: Autho
   if (result?.state !== 'available') return null;
   const topics = result.topics.filter((topic) => externalTopicUrl(topic.furthest.source.url));
   if (!topics.length) return null;
-  return <section className="card places-section city-region-topics civic-support" aria-label="In your region" id="regional-topics" tabIndex={-1}>
+  return <section className="card places-section city-region-topics civic-support" aria-label="In your region" tabIndex={-1}>
     <div className="places-heading"><div><span className="eyebrow">REGIONAL PUBLISHED SOURCES · {result.regionName.toUpperCase()}</span><h2>What nearby towns are planning</h2></div></div>
     {error && <p className="small-copy" role="status">{error} Showing last checked topics.</p>}
     <p>Compare each town&apos;s source and stage separately. An agenda does not mean adoption.</p>

@@ -4,7 +4,7 @@ import { ArrowRight, Check, Copy, Home as HomeIcon, Loader2, Plus } from 'lucide
 import { useRentalWallet } from '@/wallets';
 import type { RentalWalletAccess } from '@/wallets/types';
 import { authorizedRequest } from './authorized-request';
-import { AREAS, goToSection, type Area } from './areas';
+import { AREAS, goToSection, PUBLISH_HOME_NAVIGATION_INTENT, type Area } from './areas';
 import { IdeasArea } from './ideas';
 import { MeArea } from './me';
 import { MoneyArea, TestUsdc } from './money-area';
@@ -19,16 +19,14 @@ import { DepositIdeas } from './tenancy-walkthrough';
 import { parseAmount } from '@/domain/assets';
 import type { TenancyJourney } from '@/server/journey';
 import type { PublicListing } from '@/server/listings';
-import { Today } from './today';
-import { Badge, money } from './workspace-panels';
+import { money } from './workspace-panels';
 import './home-journey.css';
-import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, recoverExpiredRentReview, settlementSplit } from './home-journey-logic';
+import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, recoverExpiredRentReview, settlementSplit, tenancyNeedsPerson } from './home-journey-logic';
 import { operationLabels } from './deposit-activity';
 import { nextStep } from './next-step';
 import { NextStepCard } from './next-step-card';
 import { DepositYield } from './deposit-yield';
 import { FlatMap } from './flat-map';
-import { Neighbourhood } from './neighbourhood';
 import { MoveInHandover } from './move-in-handover';
 import { moveInAvailable, type HomeLocation } from '@/domain/home-location';
 import { ShareDeposit, ShareDepositRules, depositUsd } from './share-deposit';
@@ -36,7 +34,12 @@ import { ShareDepositApplication } from './share-deposit-application';
 import shareDepositManifest from '../../contracts/evm/deployments/share-deposit-46630.json';
 import { maximumDepositSecurity, validateDepositSecurity, type DepositForm } from '@/domain/deposit-form';
 import type { EvmSigningRequest } from '@/wallets/types';
-import { paidRentMonth } from '@/domain/rent';
+import { paidRentMonth, RENT_BUILDING_ID } from '@/domain/rent';
+import { ActionBox, Figure, Figures, Hero, MoreList, MoreRow, ScreenNote, StatusLine } from './blocks';
+import { ProjectMap } from './project-map';
+import { DEFAULT_PROJECT_SYSTEMS } from './project-map-model';
+import { TEST_CITY_INVESTMENTS } from '@/data/local-investments';
+import type { ReactNode } from 'react';
 
 const BUTTON_LABEL: Record<string, string> = {
   invite_arbitrator: 'Make invitation link',
@@ -107,6 +110,10 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
   const [helpers, setHelpers] = useState<boolean | null>(null);
   const [helperBusy, setHelperBusy] = useState(false);
   const [helperLog, setHelperLog] = useState('');
+  const [automationMessages, setAutomationMessages] = useState<Record<string, string>>({});
+  const reportAutomation = useCallback((agreementId: string, message: string) => {
+    setAutomationMessages(current => current[agreementId] === message ? current : { ...current, [agreementId]: message });
+  }, []);
   useEffect(() => {
     if (area !== 'home' || helpers !== null) return;
     const controller = new AbortController();
@@ -190,12 +197,10 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
   const current = currentHomeTenancy(ready);
   const otherTenancies = ready.filter((t) => t !== current && t.next.kind !== 'done' && t.next.kind !== 'cancelled');
   const unavailable = (tenancies ?? []).filter((t): t is Unavailable => 'unavailable' in t);
-  const [browsing, setBrowsing] = useState(false);
-  if (area !== 'home' && browsing) setBrowsing(false);
-  const [showPast, setShowPast] = useState(false);
+  const openListingCount = listings.filter(listing => listing.relation === 'landlord' && listing.status === 'open').length;
   const { reviewListings, applicationListings, showBrowser } = homeSituation({
     listings, tenancyIds: (tenancies ?? []).map(t => t.agreementId), hasCurrent: Boolean(current),
-    homeKnown: tenancies !== null && !journeyError && unavailable.length === 0, browsing,
+    homeKnown: tenancies !== null && !journeyError && unavailable.length === 0,
   });
   const step = nextStep({
     loading: (tenancies === null && !journeyError) || (!listingsLoaded && !listingsError),
@@ -204,40 +209,36 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
   });
   const meta = AREAS.find((a) => a.id === area)!;
   const firstReadsPending = (tenancies === null && !journeyError) || (!listingsLoaded && !listingsError);
-  const showSkeleton = firstReadsPending && (area === 'overview' || area === 'home');
+  const showSkeleton = firstReadsPending && area === 'home';
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <span className={`eyebrow area-eyebrow area-eyebrow--${area}`}>{meta.eyebrow}</span>
-          <h1 tabIndex={-1}>{meta.label}</h1>
-          <p>{meta.question}</p>
-        </div>
-      </div>
+      <div className="page-heading"><h1 tabIndex={-1}>{meta.label}</h1></div>
       {showSkeleton && <AreaSkeleton area={area} bodyOnly />}
       <div className="area-content" hidden={showSkeleton}>
-      {/* Today always leads with the next step; elsewhere only something waiting for this person follows them.
-          Home never repeats it: its path and tenancy cards carry the action. */}
-      {(area === 'overview' || (step.urgent && area !== 'home')) && <NextStepCard step={step} go={go} />}
+      {step.urgent && area !== 'home' && <NextStepCard step={step} go={go} />}
       {(error || paused) && <p className="note" role="alert">{paused ? 'Updates are paused. Retry. ' : ''}{error} <button className="button secondary" onClick={() => void retryHome()}>Retry</button></p>}
-      {area === 'overview' && <Today request={request} accountId={wallet.subject ?? ''} tenancies={tenancies} listings={listings} invitation={Boolean(invitation)} homeError={error} go={go} />}
 
       {area === 'me' && <MeArea request={request} tenancies={ready} listings={listings} go={go}
         homeState={{ homeLoading: tenancies === null && !journeyError, homeError: journeyError || (tenancies?.some((item) => 'unavailable' in item) ? 'Some tenancy readings are unavailable.' : ''), tenancyCount: tenancies?.length ?? 0, listingCount: listings.filter((l) => l.relation === 'landlord' || (l.relation === 'applicant' && l.status === 'open')).length }} />}
 
       {area === 'home' && (
         <div className="housing-journey">
+          {ready.filter(t => t.next.kind !== 'done' && t.next.kind !== 'cancelled').map(t => <TenancyAutomation key={t.agreementId} journey={t} request={request} reload={load} report={reportAutomation} />)}
           {invitation && <JoinInvitation key={invitation} request={request} encoded={invitation} onDone={load} />}
           {(!invitation || current) && <>
             {reviewListings.map(listing => <ApplicantsReview key={listing.id} listing={listing} request={request} reload={load} />)}
-            <div id="home-tenancies" tabIndex={-1} className="home-tenancy-anchor" aria-label="Your tenancies">
-              {current && <TenancyCard key={current.agreementId} journey={current} request={request} reload={load} go={go} accountId={wallet.subject ?? ''} />}
-            </div>
             {applicationListings.map(listing => <ApplicationStatus key={listing.id} listing={listing} request={request} reload={load} />)}
-            {otherTenancies.map((t) => <TenancyCard compact={t.role !== 'tenant'} key={t.agreementId} journey={t} request={request} reload={load} go={go} accountId={wallet.subject ?? ''} />)}
-            {unavailable.map((t) => <section className="card" key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}><h2>{t.property}</h2><p className="note">{t.unavailable}</p></section>)}
-            {current && !showPast && ready.some(t => t.next.kind === 'done' || t.next.kind === 'cancelled') && <button className="text-button" onClick={() => setShowPast(true)}>Past homes →</button>}
-            {(!current || showPast) && ready.some((t) => t.next.kind === 'done' || t.next.kind === 'cancelled') && <section className="card" id="past-tenancies"><h2>Past homes</h2>
+            <div id="home-tenancies" tabIndex={-1} className="home-tenancy-anchor" aria-label="Your tenancies">
+              {current && <TenancyCard key={current.agreementId} journey={current} request={request} reload={load} accountId={wallet.subject ?? ''} automationMessage={automationMessages[current.agreementId]} />}
+            </div>
+            {otherTenancies.map((t) => <MoreRow key={t.agreementId} id={`tenancy-${t.agreementId}`} title={t.property} meta={tenancyNeedsPerson(t) ? 'Needs you' : t.next.label} defaultOpen={tenancyNeedsPerson(t)}><TenancyCard journey={t} request={request} reload={load} accountId={wallet.subject ?? ''} anchored={false} automationMessage={automationMessages[t.agreementId]} /></MoreRow>)}
+            {unavailable.map((t) => <p className="housing-unavailable" key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}><strong>{t.property}</strong> · {t.unavailable}</p>)}
+            {!current && showBrowser && <div id="home-options" tabIndex={-1}><ListingBrowser listings={listings} request={request} reload={load} loaded={listingsLoaded} loadError={listingsError} testTools={helpers === true} /></div>}
+            <MoreList>
+            {!current && showBrowser && <MoreRow id="deposit-options" title="How the deposit works"><DepositIdeas go={go} /></MoreRow>}
+            {(current || !showBrowser) && <><MoreRow id="home-options" title="Browse other homes"><ListingBrowser listings={listings} request={request} reload={load} loaded={listingsLoaded} loadError={listingsError} testTools={helpers === true} /></MoreRow><MoreRow id="deposit-options" title="How the deposit works"><DepositIdeas go={go} /></MoreRow></>}
+            <MoreRow id="publish-home" title="Rent out a home" meta={listings.some(l => l.relation === 'landlord') ? `${openListingCount} open listing${openListingCount === 1 ? '' : 's'}` : undefined}><PublishHome listings={listings} request={request} reload={load} go={go} tenancyIds={new Set((tenancies ?? []).map((t) => t.agreementId))} /></MoreRow>
+            {ready.some((t) => t.next.kind === 'done' || t.next.kind === 'cancelled') && <MoreRow id="past-tenancies" title="Past homes">
               {ready.filter((t) => t.next.kind === 'done' || t.next.kind === 'cancelled').map((t) => <div key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}>
                 <strong>{t.property}</strong><p>{t.next.kind === 'done' ? 'Paid out' : 'Cancelled'} · {t.role}{t.cancelled && <> · by {t.cancelled.by} · {new Date(t.cancelled.at).toLocaleString('en-GB')}</>}</p>
                 {t.depositForm?.kind === 'shares' ? <>{t.next.kind === 'done' && <p>Paid out in test TSLA.</p>}{t.shareDeposit?.receipts.filter(receipt => receipt.action === 'payout' && receipt.status === 'confirmed').map(receipt => <p key={receipt.planId}><a href={`https://explorer.testnet.chain.robinhood.com/tx/${receipt.transactionHash}`} target="_blank" rel="noopener noreferrer">Confirmed TSLA payout receipt</a></p>)}{t.shareDeposit?.explorerUrl && <a href={t.shareDeposit.explorerUrl} target="_blank" rel="noopener noreferrer">Read share escrow on explorer</a>}</> : <>
@@ -246,11 +247,11 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
                   <TenancyDetails journey={t} request={request} />
                 </>}
               </div>)}
-            </section>}
-            {showBrowser ? <><ListingBrowser listings={listings} request={request} reload={load} loaded={listingsLoaded} loadError={listingsError} testTools={helpers === true} /><DepositIdeas go={go} /></> : <button id="home-options" className="text-button" onClick={() => setBrowsing(true)}>Looking for another home? Browse homes →</button>}
-            <PublishHome listings={listings} request={request} reload={load} go={go} tenancyIds={new Set((tenancies ?? []).map((t) => t.agreementId))} />
-            {helpers && helper && <TestTools tenancies={ready} listings={listings} request={request} helper={helper} busy={helperBusy} log={helperLog} />}
+            </MoreRow>}
+            {helpers && helper && <MoreRow title="Local rehearsal tools"><TestTools tenancies={ready} listings={listings} request={request} helper={helper} busy={helperBusy} log={helperLog} /></MoreRow>}
+            </MoreList>
           </>}
+          <ScreenNote>Test networks only · deposit earnings belong to the tenant · not legal advice.</ScreenNote>
         </div>
       )}
 
@@ -258,7 +259,7 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
 
       {area === 'places' && <PlacesArea request={request} accountId={wallet.subject ?? ''} go={go} />}
 
-      {area === 'ideas' && <IdeasArea go={go} showDepositOptions={showBrowser} />}
+      {area === 'ideas' && <IdeasArea go={go} showDepositOptions={!invitation || Boolean(current)} />}
       </div>
     </>
   );
@@ -274,8 +275,45 @@ function readStoredInvite(key: string): { url: string; createdAt: number } | nul
   } catch { return null; }
 }
 
-function TenancyCard({ journey, request, reload, go, accountId, compact = false }: {
-  journey: TenancyJourney; request: Request; reload: () => Promise<void>; go: (area: Area) => void; accountId: string; compact?: boolean;
+
+/** Exactly one always-mounted owner per active tenancy, independent of lazy details rows. */
+function TenancyAutomation({ journey, request, reload, report }: {
+  journey: TenancyJourney; request: Request; reload: () => Promise<void>; report: (agreementId: string, message: string) => void;
+}) {
+  const advancing = useRef(false);
+  const { agreementId, next } = journey;
+  const shares = journey.depositForm?.kind === 'shares';
+  useEffect(() => {
+    if (shares || next.kind !== 'paying_out') return;
+    let active = true;
+    const advance = async () => {
+      if (advancing.current || !active) return;
+      advancing.current = true;
+      try { await request('/api/journey', { action: 'advance', agreementId }); if (active) report(agreementId, ''); await reload(); }
+      catch { if (active) report(agreementId, 'Payout attempt failed. Retrying while Home is open.'); }
+      finally { advancing.current = false; }
+    };
+    void advance();
+    const timer = setInterval(() => void advance(), 15000);
+    return () => { active = false; clearInterval(timer); };
+  }, [shares, next.kind, agreementId, request, reload, report]);
+  useEffect(() => {
+    if (shares || next.kind !== 'confirming') return;
+    const q = `?agreement=${encodeURIComponent(agreementId)}`;
+    const operationId = next.operationId;
+    const reconcile = async () => {
+      const path = operationId ? `/api/finance/solana/operations/${operationId}/reconcile${q}` : `/api/finance/solana/initialize${q}`;
+      await request(path, operationId ? {} : { action: 'reconcile' });
+      await reload();
+    };
+    const timer = setInterval(() => void reconcile().catch(() => {}), 4000);
+    return () => clearInterval(timer);
+  }, [shares, next, agreementId, request, reload]);
+  return null;
+}
+
+function TenancyCard({ journey, request, reload, accountId, anchored = true, automationMessage }: {
+  journey: TenancyJourney; request: Request; reload: () => Promise<void>; accountId: string; anchored?: boolean; automationMessage?: string;
 }) {
   const wallet = useRentalWallet();
   const [busy, setBusy] = useState(false);
@@ -284,7 +322,6 @@ function TenancyCard({ journey, request, reload, go, accountId, compact = false 
   const [reason, setReason] = useState('');
   const [link, setLink] = useState<{ url: string; createdAt: number } | null>(() => readStoredInvite(invitationKey(accountId, journey.agreementId)));
   const [showDispute, setShowDispute] = useState(false);
-  const [showMoveOut, setShowMoveOut] = useState(false);
   const [agreement, setAgreement] = useState<TenancyAgreement | null>(null);
   const [agreementError, setAgreementError] = useState(false);
   const [agreementRetry, setAgreementRetry] = useState(0);
@@ -292,12 +329,11 @@ function TenancyCard({ journey, request, reload, go, accountId, compact = false 
   const [clock, setClock] = useState(() => Date.now());
   const intent = useRef<{ key: string; requestId: string } | null>(null);
   const recordedOperations = useRef(new Set<string>());
-  const advancing = useRef(false);
   const { next, chain, agreementId } = journey;
   const shareForm = journey.depositForm?.kind === 'shares' ? journey.depositForm : null;
   const cashOnly = chain?.depositMint === SOLANA_TEST_USDC_MINT;
-  const living = journey.stage === 'living' && chain?.phase === 'active';
-  const canProposeMoveOut = living && journey.role === 'landlord';
+  const living = journey.stage === 'living' && (Boolean(shareForm) || chain?.phase === 'active');
+  const canProposeMoveOut = living && !shareForm && journey.role === 'landlord';
   const q = `?agreement=${encodeURIComponent(agreementId)}`;
   const linkKey = invitationKey(accountId, agreementId);
   useEffect(() => {
@@ -314,21 +350,6 @@ function TenancyCard({ journey, request, reload, go, accountId, compact = false 
     return () => { active = false; };
   }, [agreementId, next.kind, request, chain?.phase, agreementRetry]);
 
-  // Payouts run only while a browser has Home open; retry transient failures.
-  useEffect(() => {
-    if (shareForm || next.kind !== 'paying_out') return;
-    let active = true;
-    const advance = async () => {
-      if (advancing.current || !active) return;
-      advancing.current = true;
-      try { await request('/api/journey', { action: 'advance', agreementId }); if (active) setMessage(''); await reload(); }
-      catch { if (active) setMessage('Payout attempt failed. Retrying while Home is open.'); }
-      finally { advancing.current = false; }
-    };
-    void advance();
-    const timer = setInterval(() => void advance(), 15000);
-    return () => { active = false; clearInterval(timer); };
-  }, [next.kind, agreementId, request, reload, shareForm]);
   const reconcile = useCallback(async () => {
     if (shareForm || next.kind !== 'confirming') return;
     const path = next.operationId ? `/api/finance/solana/operations/${next.operationId}/reconcile${q}` : `/api/finance/solana/initialize${q}`;
@@ -343,11 +364,6 @@ function TenancyCard({ journey, request, reload, go, accountId, compact = false 
     const ticker = setInterval(() => setClock(Date.now()), 1000);
     return () => { clearTimeout(started); clearInterval(ticker); };
   }, [confirmingId]);
-  useEffect(() => {
-    if (next.kind !== 'confirming') return;
-    const timer = setInterval(() => void reconcile().catch(() => {}), 4000);
-    return () => clearInterval(timer);
-  }, [next.kind, reconcile]);
 
   async function run(work: () => Promise<void>) {
     setBusy(true);
@@ -446,28 +462,42 @@ function TenancyCard({ journey, request, reload, go, accountId, compact = false 
       <ArrowRight size={17} />
     </button>
   );
-  if (compact && !shareForm && living && next.kind === 'wait' && journey.role !== 'landlord') return <section className="card" id={`tenancy-${agreementId}`} tabIndex={-1}><h2>{journey.property}</h2><p>{journey.role} · Deposit secured</p><p>{next.detail}</p>{journey.rentTerms && <RentPayments agreementId={agreementId} role={journey.role} request={request} />}<TenancyDetails journey={journey} request={request} /></section>;
-  if (shareForm && journey.stage !== 'agreement') return <section className="card tenancy-card" id={`tenancy-${agreementId}`} tabIndex={-1}><h2>{journey.property}</h2><p>{journey.role} · {HOME_STAGES[homeStage(journey.stage)]}</p><ShareDeposit rentalId={agreementId} request={request} reload={reload} />{journey.rentTerms && <RentPayments agreementId={agreementId} role={journey.role} request={request} />}</section>;
-  return (
-    <section className="card tenancy-card" id={`tenancy-${agreementId}`} tabIndex={-1}>
-      <div className="section-heading">
-        <h2><HomeIcon size={18} /> {journey.property}</h2>
-        <Badge tone="neutral">{journey.role} · {shareForm ? 'Robinhood testnet TSLA' : 'Solana devnet test USDC'}{journey.sampleParties ? ' · sample fixture party' : ''}</Badge>
-      </div>
-      <p className="small-copy">{HOME_STAGES[homeStage(journey.stage)]} · step {homeStage(journey.stage) + 1} of {HOME_STAGES.length}</p>
-      {(!living || next.kind === 'confirming') && <div className={`tenancy-action ${AUTO[next.kind] || next.kind === 'done' ? 'passive' : ''}`}>
-        <span className="eyebrow">{next.kind === 'wait' ? 'WAITING ON ANOTHER PARTY' : next.kind === 'done' ? 'FINISHED' : 'THIS HOME · DEPOSIT STEP'}</span>
-        <h3>{AUTO[next.kind] && next.kind !== 'wait' && <Loader2 className="spin" size={18} />} {next.label}</h3>
+  const cancelAction = journey.cancellable && (journey.role === 'landlord' || journey.role === 'tenant') ? <button type="button" className="button secondary" disabled={busy} onClick={() => {
+    if (window.confirm('No deposit is locked, so nothing moves. The tenancy and its listing close for all three of you. You can list the home again; a new tenancy uses test USDC (tUSDC).')) {
+      void run(async () => { await request(`/api/agreements/${encodeURIComponent(agreementId)}`, { action: 'cancel' }); });
+    }
+  }}>Cancel this tenancy</button> : null;
+  const project = TEST_CITY_INVESTMENTS.find(project => project.id === RENT_BUILDING_ID)!;
+  const visual = journey.rentTerms?.buildingId === RENT_BUILDING_ID
+    ? <ProjectMap project={project} systems={DEFAULT_PROJECT_SYSTEMS} variant="hero" label={`${journey.role === 'tenant' ? 'Your home' : journey.role === 'landlord' ? 'The flat you let' : 'The flat'} · fictional house`} />
+    : journey.home?.location ? <FlatMap location={journey.home.location} variant="hero" /> : undefined;
+  return <RentPayments agreementId={agreementId} role={journey.role} request={request} enabled={Boolean(journey.rentTerms && journey.stage !== 'agreement')}>
+    {({ rent, action, history, due }) => {
+      const paid = rent ? paidRentMonth(rent) : null;
+      const nextRentDate = rent ? new Date(`${rent.month}-01T12:00:00`) : null;
+      if (paid && nextRentDate) nextRentDate.setMonth(nextRentDate.getMonth() + 1);
+      return <div className="tenancy-home" id={anchored ? `tenancy-${agreementId}` : undefined} tabIndex={anchored ? -1 : undefined}><Hero visual={visual} className="tenancy-card"
+      title={journey.property} subtitle={`${journey.role === 'tenant' ? 'You rent this home' : journey.role === 'landlord' ? 'You let this home' : 'You are the neutral arbitrator'}${journey.sampleParties ? ' · sample parties' : ''}`}
+      status={<StatusLine tone={next.kind === 'confirming' || next.kind === 'paying_out' ? 'waiting' : due || tenancyNeedsPerson(journey) ? 'action' : living ? 'ok' : 'waiting'}>{next.kind === 'confirming' || next.kind === 'paying_out' ? 'Waiting for the network…' : due ? `${rent?.month ? new Date(`${rent.month}-01T12:00:00`).toLocaleString('en-GB', { month: 'long' }) : 'This month’s'} rent is due` : living && !shareForm && AUTO[next.kind] ? 'Deposit secured · nothing needs you now' : next.label}</StatusLine>}>
+      {AUTO[next.kind] && !living && <p className="small-copy">{next.detail}{next.kind === 'wait' && ' Nothing notifies them: tell them yourself.'}</p>}
+      <Figures>
+        <Figure label={living ? journey.role === 'tenant' ? cashOnly || shareForm ? 'Deposit' : 'In lending' : 'Deposit held' : 'Required deposit'} value={shareForm ? money(shareForm.securityUsd6) : money(!cashOnly && living && chain ? chain.lendingValueAtomic : journey.requiredSecurity)} note={living ? 'Safe in escrow' : undefined} />
+        {journey.role === 'tenant' && cashOnly && living && chain?.simulatedYield?.since && <DepositYield presentation="figure" view={chain.simulatedYield} requiredAtomic={journey.requiredSecurity} tenant request={request} agreementId={agreementId} reload={reload} />}
+        {journey.role === 'tenant' && !shareForm && !cashOnly && living && chain && <Figure label="Earned for you" value={money((BigInt(chain.claimableAtomic) + BigInt(chain.releasedAtomic)).toString())} note={`Simulated · yours to keep${BigInt(chain.releasedAtomic) > 0n ? ` · ${money(chain.releasedAtomic)} claimed` : ''}`} action={BigInt(chain.claimableAtomic) > 0n ? <button className="text-button" disabled={busy} onClick={() => run(() => operation({ kind: 'release_earnings', amountAtomic: chain.claimableAtomic }, 'Claim deposit earnings to your wallet'))}>Claim</button> : undefined} />}
+        {journey.rentTerms && journey.role !== 'arbitrator' && <Figure label={living ? journey.role === 'landlord' ? 'Rent this month received' : 'Rent this month' : 'Monthly rent'} value={money(journey.role === 'landlord' && living ? paid && rent ? rent.payment!.landlordRaw : '0' : journey.rentTerms.rentMonthly)} note={living ? rent ? paid && nextRentDate ? `${journey.role === 'landlord' ? `Your part · the house got ${money(rent.payment!.buildingRaw)} (20 %)` : 'Paid'} · next from ${nextRentDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} (Berlin)` : journey.role === 'landlord' ? 'Awaiting payment' : 'Due' : 'Reading rent status…' : undefined} />}
+        {living && journey.rentTerms && journey.role === 'tenant' && <Figure label="To the house" value={money((BigInt(journey.rentTerms.rentMonthly) * 2000n / 10000n).toString())} note="20 % of this month’s rent" />}
+        {journey.role === 'arbitrator' && chain && BigInt(chain.claimAtomic) > 0n && <Figure label="Deduction proposed" value={money(chain.claimAtomic)} />}
+      </Figures>
+      {!living && <ol className="tenancy-progress" aria-label="Tenancy progress">{HOME_STAGES.slice(0, homeStage(journey.stage) > 4 ? 7 : 5).map((label, index) => <li key={label} className={index < homeStage(journey.stage) ? 'complete' : undefined} aria-current={index === homeStage(journey.stage) ? 'step' : undefined}>{index < homeStage(journey.stage) && <Check size={12} aria-hidden="true" />}{index === homeStage(journey.stage) ? <strong>{label}</strong> : label}</li>)}</ol>}
+      {shareForm && journey.stage !== 'agreement' && <MoreRow title="Share deposit" meta={tenancyNeedsPerson(journey) ? 'Needs you' : next.label} defaultOpen={tenancyNeedsPerson(journey) || journey.stage === 'move-out'}>{(living || !AUTO[next.kind]) && <p className="small-copy">{next.detail}</p>}<ShareDeposit rentalId={agreementId} request={request} reload={reload} /></MoreRow>}
+      {(!shareForm || journey.stage === 'agreement') && !AUTO[next.kind] && next.kind !== 'done' && next.kind !== 'cancelled' && <ActionBox title={next.label}>
         <p>{next.detail}</p>
-        {next.kind === 'wait' && <p className="small-copy">Nothing notifies them: tell them yourself.</p>}
-        {next.kind === 'confirming' && <p role="status">{confirmationSince !== null && confirmationStalled(confirmationSince, clock) && 'This is taking longer than usual. '}{!shareForm && <button className="button secondary" onClick={() => void run(reconcile)} disabled={busy}>Check again</button>}</p>}
-        {next.kind === 'paying_out' && <p className="small-copy">Payouts run while Home is open. A failed attempt retries here.</p>}
-        {next.kind === 'accept_agreement' && <div className="small-copy">
+        {next.kind === 'accept_agreement' && <><p className="small-copy">Deposit: {shareForm ? `${money(shareForm.securityUsd6)} secured by test shares` : money(journey.requiredSecurity)}.{journey.rentTerms && <> Monthly rent: {money(journey.rentTerms.rentMonthly)}, including a 20 % house share.</>} Deposit earnings belong to the tenant.</p><MoreRow title="Review the agreement terms"><div className="small-copy">
           {shareForm ? <><p>Security: {depositUsd(shareForm.securityUsd6)} USD, backed by test TSLA; factory {shareForm.factory ?? 'not deployed yet'}, oracle {shareForm.oracle}. Response: {shareForm.responseWindow / 86400} days; return: {shareForm.returnWindow / 86400} days; arbitration: {shareForm.arbitrationWindow / 86400} days.</p><ShareDepositRules /></> : <p>These terms cover {journey.property}, the {money(journey.requiredSecurity)} test USDC required deposit, and whether the tenant may claim surplus while the tenancy is active. The tenant keeps deposit assets above an approved deduction at settlement, whatever the release setting. Site-minted tUSDC stays in cash escrow: it is not lent. This site pays labelled simulated yield to the tenant in tUSDC, separate from the escrow. Test tokens have no value.</p>}
           {agreement?.rentTerms ? <RentTerms terms={agreement.rentTerms} /> : <p><strong>These terms cover the deposit and its parties, not monthly rent or tenancy dates.</strong> The landlord chooses the arbitrator before acceptance.</p>}
           {agreement && <p>Tenant: {agreement.parties.tenant?.wallet?.address ? `${agreement.parties.tenant.wallet.address.slice(0, 5)}…${agreement.parties.tenant.wallet.address.slice(-5)}` : 'not available'} · Landlord: {agreement.parties.landlord?.wallet?.address ? `${agreement.parties.landlord.wallet.address.slice(0, 5)}…${agreement.parties.landlord.wallet.address.slice(-5)}` : 'not available'} · Arbitrator: {agreement.parties.arbitrator?.wallet?.address ? `${agreement.parties.arbitrator.wallet.address.slice(0, 5)}…${agreement.parties.arbitrator.wallet.address.slice(-5)}` : 'not available'}</p>}
           {agreement && <p>Tenant acceptance: {agreement.accepted.tenant?.digest === agreement.digest ? 'accepted' : 'waiting'} · Landlord acceptance: {agreement.accepted.landlord?.digest === agreement.digest ? 'accepted' : 'waiting'}.{!shareForm && <> Surplus: {agreement.releaseAllowed ? 'tenant may claim during the tenancy' : 'locked until settlement'}.</>}</p>}
-        </div>}
+        </div></MoreRow></>}
         {next.kind === 'accept_agreement' && recordBlocker && <p className="action-blocker" role="status">{recordBlocker}</p>}
         {oneButton && actionButton}
         {next.kind === 'secure_deposit' && <div className="small-copy faucet-note">
@@ -516,78 +546,33 @@ function TenancyCard({ journey, request, reload, go, accountId, compact = false 
             {invitationStatus(link.createdAt, clock) === 'expired' && <p className="small-copy">This link has expired. Make a new one below.</p>}
           </div>
         )}
-      </div>}
-      {living && <div className="housing-living-note">
-        <strong>{journey.role === 'landlord' ? next.label : 'Deposit secured'}</strong>
-        <p>{next.kind === 'confirming' ? 'Approval sent. Waiting for network confirmation.' : 'Nothing needs your approval right now.'}</p>
-        {journey.role === 'tenant' && <p className="small-copy">At move-out, the landlord proposes a deduction (including zero). You agree or dispute it; if disputed, the arbitrator decides. Then the deposit is settled and paid out on the test network.</p>}
-      </div>}
-      {canProposeMoveOut && <div className="tenancy-action">
-        <button type="button" className="button secondary" aria-expanded={showMoveOut} onClick={() => setShowMoveOut(!showMoveOut)}>Tenant moving out? Propose the move-out deduction</button>
-        {showMoveOut && <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void run(() => operation({ kind: 'propose_claim', amountAtomic: claimAmount(amount, journey.requiredSecurity) }, 'Move-out deduction', needsReason(reason))); }}>
-          <p>0 is allowed; the reason is required. The maximum is {money(journey.requiredSecurity)} test USDC. No notification is sent to the tenant; tell them yourself.</p>
-          <label>Deduction in test USDC<input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
-          <label>Reason<textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. No damage, flat handed over clean" /></label>
-          {(amountBlocker || reasonBlocker) && <p className="action-blocker">{amountBlocker || reasonBlocker}</p>}
-          <button className="button primary large" disabled={busy || Boolean(amountBlocker || reasonBlocker)}>Propose deduction to tenant <ArrowRight size={17} /></button>
-        </form>}
-      </div>}
-      {journey.role !== 'arbitrator' && journey.home?.location && <FlatMap location={journey.home.location} />}
-      {journey.role === 'tenant' && (journey.home || moveInAvailable(journey.stage, chain?.phase)) && <Neighbourhood city={journey.home?.city ?? ''} location={journey.home?.location} request={request} movingIn={moveInAvailable(journey.stage, chain?.phase)} />}
-      {journey.role !== 'arbitrator' && moveInAvailable(journey.stage, chain?.phase) && <MoveInHandover agreementId={agreementId} role={journey.role} initial={journey.handover} request={request} />}
-      {(journey.stage === 'space' || journey.stage === 'deposit') && <div className="secure-substeps">
-        <p><strong>Landlord prepares</strong> · {journey.stage === 'deposit' ? 'Empty escrow ready.' : 'Create the empty escrow. No deposit is locked yet.'}</p>
-        <p><strong>Tenant funds</strong> · Secure {money(journey.requiredSecurity)} test USDC after the escrow is ready.</p>
-      </div>}
-      {journey.role !== 'arbitrator' && cashOnly && chain?.simulatedYield?.since && <DepositYield view={chain.simulatedYield} requiredAtomic={journey.requiredSecurity} tenant={journey.role === 'tenant'} request={request} agreementId={agreementId} reload={reload} />}
-      {journey.cancellable && (journey.role === 'landlord' || journey.role === 'tenant') && <button type="button" className="button secondary" disabled={busy} onClick={() => {
-        if (window.confirm('No deposit is locked, so nothing moves. The tenancy and its listing close for all three of you. You can list the home again; a new tenancy uses test USDC (tUSDC).')) {
-          void run(async () => { await request(`/api/agreements/${encodeURIComponent(agreementId)}`, { action: 'cancel' }); });
-        }
-      }}>Cancel this tenancy</button>}
+        {cancelAction}
+      </ActionBox>}
+      {next.kind === 'confirming' && <p role="status">{confirmationSince !== null && confirmationStalled(confirmationSince, clock) && 'This is taking longer than usual. '}{!shareForm && <button className="button secondary" onClick={() => void run(reconcile)} disabled={busy}>Check again</button>}</p>}
+      {action}
+      {canProposeMoveOut && <button type="button" className="text-button" onClick={() => { const row = document.getElementById(`moving-out-${agreementId}`) as HTMLDetailsElement | null; if (row) { row.open = true; row.scrollIntoView({ block: 'start' }); row.focus({ preventScroll: true }); } }}>Tenant moving out?</button>}
+      {cancelAction && (AUTO[next.kind] || (shareForm && journey.stage !== 'agreement')) && <ActionBox title="Cancel during setup" tone="neutral">{cancelAction}</ActionBox>}
       {agreementError && <p className="note" role="alert">Agreement records are unavailable. Review the reasons before signing. <button className="button secondary" onClick={() => setAgreementRetry((count) => count + 1)}>Retry records</button></p>}
-      {message && <p className="note" role="status">{message}</p>}
-      {chain && !cashOnly && chain.phase === 'active' && journey.role === 'tenant' && (BigInt(chain.claimableAtomic) > 0n || BigInt(chain.releasedAtomic) > 0n) && (
-        <div className="earnings-panel">
-          <div>
-            <span className="eyebrow">YOUR DEPOSIT EARNINGS · SIMULATED INTEREST</span>
-            <strong>{BigInt(chain.claimableAtomic) > 0n ? `${money(chain.claimableAtomic)} ready to claim` : `${money(chain.releasedAtomic)} already claimed`}</strong>
-            <span className="small-copy">{BigInt(chain.claimableAtomic) > 0n ? `Already claimed: ${money(chain.releasedAtomic)}. ` : ''}The deposit itself stays locked; only what it earns is yours now. On devnet, earnings are simulated interest in test tokens.</span>
-          </div>
-          {BigInt(chain.claimableAtomic) > 0n && (
-            <button className="button primary" disabled={busy}
-              onClick={() => run(() => operation({ kind: 'release_earnings', amountAtomic: chain.claimableAtomic }, 'Claim deposit earnings to your wallet'))}>
-              {busy && <Loader2 className="spin" size={16} />} Claim to my wallet <ArrowRight size={16} />
-            </button>
-          )}
-        </div>
-      )}
-      {journey.role === 'tenant' && living && chain && <div className="tenancy-money-links">
-        <button className="text-button" onClick={() => goToSection(go, 'money', 'rental-deposit-holding')}>See this Solana test deposit in Money →</button>
-      </div>}
-      {chain && (
-        <dl className="journey-facts">
-          <div><dt>Required deposit · test USDC</dt><dd>{money(journey.requiredSecurity)} test USDC</dd></div>
-          {chain.phase === 'closed' ? (
-            <>
-              <div><dt>Tenant received</dt><dd>{money(chain.tenantPaidAtomic)} test USDC</dd></div>
-              <div><dt>Landlord received</dt><dd>{money(chain.landlordPaidAtomic)} test USDC</dd></div>
-              {BigInt(chain.tenantOwedAtomic) > 0n && <div><dt>Tenant still owed</dt><dd>{money(chain.tenantOwedAtomic)} test USDC</dd></div>}
-              {BigInt(chain.landlordOwedAtomic) > 0n && <div><dt>Landlord still owed</dt><dd>{money(chain.landlordOwedAtomic)} test USDC</dd></div>}
-            </>
-          ) : (
-            <>
-              {!cashOnly && <div><dt>In lending · test USDC</dt><dd>{money(chain.lendingValueAtomic)} test USDC</dd></div>}
-              {BigInt(chain.claimAtomic) > 0n && <div><dt>Deduction proposed · test USDC</dt><dd>{money(chain.claimAtomic)} test USDC</dd></div>}
-            </>
-          )}
-        </dl>
-      )}
-      {journey.role !== 'arbitrator' && living && <ServiceCharges agreementId={agreementId} request={request} />}
-      {journey.rentTerms && journey.stage !== 'agreement' && <RentPayments agreementId={agreementId} role={journey.role} request={request} />}
-      <TenancyDetails journey={journey} request={request} />
-    </section>
-  );
+      {(message || automationMessage) && <p className="note" role="status">{message || automationMessage}</p>}
+      </Hero>
+      <MoreList title="About this tenancy">
+        {journey.rentTerms && journey.role !== 'arbitrator' && <MoreRow title="Rent & receipts" meta={journey.stage === 'agreement' ? 'Terms to review' : paid?.heading ?? (rent ? 'Not paid yet' : 'Reading status')}>{journey.stage !== 'agreement' && history}<RentTerms terms={journey.rentTerms} /></MoreRow>}
+        {journey.role !== 'arbitrator' && moveInAvailable(journey.stage, chain?.phase) && <MoreRow title="Move-in handover" meta={!journey.handover ? 'Not recorded yet' : journey.handover.confirmed.tenant && journey.handover.confirmed.landlord ? 'Confirmed by both' : journey.handover.confirmed[journey.role] ? 'Waiting for the other party' : 'Needs your confirmation'}><MoveInHandover agreementId={agreementId} role={journey.role} initial={journey.handover} request={request} /></MoreRow>}
+        {journey.role !== 'arbitrator' && living && <MoreRow id={`service-charges-${agreementId}`} title="Service charges · example"><ServiceCharges agreementId={agreementId} request={request} /></MoreRow>}
+        {(journey.role === 'tenant' || canProposeMoveOut) && <MoreRow id={`moving-out-${agreementId}`} title="Moving out">
+          {journey.role === 'tenant' && <p>The landlord proposes a deduction, including zero. You agree or dispute it; if disputed, the arbitrator decides. Then the deposit is settled and paid out.</p>}
+          {canProposeMoveOut && <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void run(() => operation({ kind: 'propose_claim', amountAtomic: claimAmount(amount, journey.requiredSecurity) }, 'Move-out deduction', needsReason(reason))); }}>
+            <p>0 is allowed; the reason is required. The maximum is {money(journey.requiredSecurity)} test USDC. No notification is sent to the tenant; tell them yourself.</p>
+            <label>Deduction in test USDC<input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+            <label>Reason<textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. No damage, flat handed over clean" /></label>
+            {(amountBlocker || reasonBlocker) && <p className="action-blocker">{amountBlocker || reasonBlocker}</p>}
+            <button className="button primary large" disabled={busy || Boolean(amountBlocker || reasonBlocker)}>Propose deduction to tenant <ArrowRight size={17} /></button>
+          </form>}
+        </MoreRow>}
+        <MoreRow title="Agreement & activity"><TenancyDetails journey={journey} request={request} />{journey.role !== 'arbitrator' && cashOnly && chain?.simulatedYield?.since && (!living || journey.role === 'landlord') && <DepositYield view={chain.simulatedYield} requiredAtomic={journey.requiredSecurity} tenant={journey.role === 'tenant'} request={request} agreementId={agreementId} reload={reload} />}</MoreRow>
+      </MoreList>
+    </div>;}}
+  </RentPayments>;
 }
 
 type BuildingRentTerms = { buildingId: string; shareBps: number; rentMonthly: string; landlordWallet: string };
@@ -619,7 +604,10 @@ function rentWorkflow(view: RentView | null) {
   return view?.payment ?? view?.history.find(payment => payment.state !== 'confirmed') ?? null;
 }
 
-function RentPayments({ agreementId, role, request }: { agreementId: string; role: TenancyJourney['role']; request: Request }) {
+function RentPayments({ agreementId, role, request, enabled, children }: {
+  agreementId: string; role: TenancyJourney['role']; request: Request; enabled: boolean;
+  children: (view: { rent: RentView | null; due: boolean; action: ReactNode; history: ReactNode }) => ReactNode;
+}) {
   const wallet = useRentalWallet();
   const [rent, setRent] = useState<RentView | null>(null);
   const [error, setError] = useState('');
@@ -636,7 +624,7 @@ function RentPayments({ agreementId, role, request }: { agreementId: string; rol
     return result.rent;
   }, [path, request]);
   useEffect(() => {
-    if (role === 'arbitrator') return;
+    if (!enabled || role === 'arbitrator') return;
     let active = true;
     const update = async () => {
       try {
@@ -647,7 +635,7 @@ function RentPayments({ agreementId, role, request }: { agreementId: string; rol
     void update();
     const timer = setInterval(() => void update(), 15000);
     return () => { active = false; clearInterval(timer); };
-  }, [path, request, role]);
+  }, [path, request, role, enabled]);
   async function run(work: () => Promise<void>) {
     if (acting.current) return;
     acting.current = true;
@@ -688,28 +676,26 @@ function RentPayments({ agreementId, role, request }: { agreementId: string; rol
     // Advance only on a newly confirmed first transfer, not every polling refresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextReviewId, busy, review]);
-  if (role === 'arbitrator') return null;
   const month = payment?.month ?? rent?.month;
+  const monthLabel = month ? new Date(`${month}-01T12:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'This month';
   const paidMonth = rent ? paidRentMonth(rent) : null;
-  return <div className="tenancy-action">
-    <span className="eyebrow">MONTHLY RENT · SEPARATE FROM DEPOSIT</span>
-    <h3>{paidMonth?.heading ?? (role === 'landlord' ? 'Rent received' : 'Pay monthly test rent')}</h3>
+  const due = Boolean(role === 'tenant' && ((rent?.active && !paidMonth) || (payment && payment.state !== 'confirmed')));
+  const actionContent = <div className="rent-action"><ActionBox title={payment && payment.state !== 'confirmed' ? 'Finish this rent payment' : `Pay rent for ${monthLabel}`}>
     {error && <p className="note" role="alert">{error}</p>}
     {!rent && !error && <p role="status">Loading rent status…</p>}
-    <button type="button" className="text-button" disabled={busy} onClick={() => void run(async () => { if (role === 'landlord') await load(); else await action('reconcile'); })}>Refresh</button>
+    <button type="button" className="text-button rent-refresh" disabled={busy} onClick={() => void run(async () => { if (role === 'landlord') await load(); else await action('reconcile'); })}>Refresh</button>
     {rent && <>
+      {rent.role === 'tenant' && rent.active && !payment && <button className="button primary" disabled={busy} onClick={() => void run(prepareReview)}>Pay transfer 1</button>}
       {paidMonth ? <>
         <p>Landlord: {money(payment!.landlordRaw)} test dollars · building stakers: {money(payment!.buildingRaw)} test dollars · Robinhood Chain testnet</p>
         <p>{paidMonth.nextDue}</p>
         {payment!.steps.map(step => step.hash && <p key={step.id}><a href={`https://explorer.testnet.chain.robinhood.com/tx/${step.hash}`} target="_blank" rel="noopener noreferrer">{step.kind === 'landlord' ? 'Landlord' : 'Building stakers'} confirmed receipt</a></p>)}
       </> : <>
-        <p>{month} · {money(payment?.rentMonthly ?? rent.rentMonthly)} test dollars · Robinhood Chain testnet</p>
-        {month !== rent.month && <p role="status">Finish this saved {month} payment before starting rent for {rent.month}. Confirmed transfers will not be paid again.</p>}
-        <p>Landlord: {money(payment?.landlordRaw ?? rent.landlordRaw)} · building stakers: {money(payment?.buildingRaw ?? rent.buildingRaw)} (fixed 20 %, rounded down). Both transfers must confirm.</p>
-        <p role="status">Month status: {payment?.state ?? 'not paid'}. {!rent.active && 'This tenancy is not active for rent payment.'}</p>
+        {month !== rent.month && <p role="status">Finish this saved {monthLabel} payment before starting rent for {new Date(`${rent.month}-01T12:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}. Confirmed transfers will not be paid again.</p>}
+        <p>{money(payment?.rentMonthly ?? rent.rentMonthly)} in two transfers: {money(payment?.landlordRaw ?? rent.landlordRaw)} to your landlord and {money(payment?.buildingRaw ?? rent.buildingRaw)} to the house (fixed 20 %). You review each transfer before signing.</p>
+        {!rent.active && <p role="status">This tenancy is not active for rent payment.</p>}
       </>}
-      <p className="small-copy">Fictional test rent, no value or legal rights. Real rent goes to the property owner. The deposit and its earnings stay separate. Not legal advice.</p>
-      {rent.role === 'tenant' && rent.active && !payment && <button className="button primary" disabled={busy} onClick={() => void run(prepareReview)}>Pay transfer 1</button>}
+      <p className="small-copy">Fictional test rent: no value, no legal rights.</p>
       {payment?.error && <p className="note" role="alert">{payment.error}</p>}
       {!paidMonth && payment?.steps.map((step, index) => <div key={step.id} style={{ marginTop: 16, overflowWrap: 'anywhere' }}>
         <strong>Transfer {index + 1}: {step.kind === 'landlord' ? 'Landlord' : 'Building distributor'} · {money(step.amountRaw)} test dollars</strong>
@@ -740,15 +726,24 @@ function RentPayments({ agreementId, role, request }: { agreementId: string; rol
           if (signed[step.id] && fresh && !fresh.hash && fresh.state !== 'confirmed') await action('submit', step.id, signed[step.id]);
         })}>Retry the same signed transfer</button>}
       </div>)}
-      <details className="tenancy-details"><summary>Rent payment history</summary>
-        {rent.history.length === 0 && <p>No rent payment records yet.</p>}
-        {rent.history.map(payment => <div key={payment.id} style={{ overflowWrap: 'anywhere' }}>
-          <p><strong>{payment.month}</strong> · {payment.state} · landlord {money(payment.landlordRaw)} / building {money(payment.buildingRaw)} test dollars</p>
-          {payment.steps.map(step => <p key={step.id}>{step.kind}: {step.state} · {money(step.amountRaw)} test dollars · exact amount: {step.amountRaw} token units · recipient: {step.recipient}{step.hash && <> · <a href={`https://explorer.testnet.chain.robinhood.com/tx/${step.hash}`} target="_blank" rel="noopener noreferrer">Transaction receipt</a></>}</p>)}
-        </div>)}
-      </details>
     </>}
-  </div>;
+  </ActionBox></div>;
+  const rentRecords = rent?.history.some(record => record.id === payment?.id) || !payment
+    ? rent?.history ?? [] : [payment, ...rent?.history ?? []];
+  const history = <>
+    {error && <p className="note" role="alert">{error}</p>}
+    {!rent && !error && <p>Loading rent status…</p>}
+    <button type="button" className="text-button" disabled={busy} onClick={() => void run(async () => { if (role === 'landlord') await load(); else await action('reconcile'); })}>Refresh</button>
+    {rent && <>
+      {paidMonth && <p>{paidMonth.heading}. {paidMonth.nextDue}</p>}
+      {rentRecords.length === 0 && <p>No rent payment records yet.</p>}
+      {rentRecords.map(payment => <div key={payment.id} style={{ overflowWrap: 'anywhere' }}>
+        <p><strong>{payment.month}</strong> · {payment.state} · landlord {money(payment.landlordRaw)} / building {money(payment.buildingRaw)} test dollars</p>
+        {payment.steps.map(step => <p key={step.id}>{step.kind}: {step.state} · {money(step.amountRaw)} test dollars · exact amount: {step.amountRaw} token units · recipient: {step.recipient}{step.hash && <> · <a href={`https://explorer.testnet.chain.robinhood.com/tx/${step.hash}`} target="_blank" rel="noopener noreferrer">Transaction receipt</a></>}</p>)}
+      </div>)}
+    </>}
+  </>;
+  return children({ rent, due, action: due ? actionContent : error && enabled ? <p role="alert">{error}</p> : null, history });
 }
 
 type TenancyAgreement = {
@@ -771,7 +766,6 @@ type TenancyOperation = {
 };
 
 function TenancyDetails({ journey, request }: { journey: TenancyJourney; request: Request }) {
-  const [open, setOpen] = useState(false);
   const [agreement, setAgreement] = useState<TenancyAgreement | null>(null);
   const [operations, setOperations] = useState<TenancyOperation[]>([]);
   const [error, setError] = useState('');
@@ -779,7 +773,6 @@ function TenancyDetails({ journey, request }: { journey: TenancyJourney; request
   const { agreementId, chain } = journey;
   const hasChain = chain !== null;
   useEffect(() => {
-    if (!open) return;
     let active = true;
     Promise.allSettled([
       request<{ agreement: TenancyAgreement }>(`/api/agreements/${encodeURIComponent(agreementId)}`),
@@ -794,7 +787,7 @@ function TenancyDetails({ journey, request }: { journey: TenancyJourney; request
       setOperationsError(snapshot.status === 'rejected');
     });
     return () => { active = false; };
-  }, [open, request, agreementId, hasChain, chain?.phase, journey.stage, journey.next.kind, chain?.releasedAtomic]);
+  }, [request, agreementId, hasChain, chain?.phase, journey.stage, journey.next.kind, chain?.releasedAtomic]);
   const entries = agreement ? [
     { id: 'created', at: agreement.createdAt, title: 'Agreement created', detail: 'Recorded tenancy terms' },
     ...(['tenant', 'landlord'] as const).flatMap((role) => agreement.accepted[role]
@@ -809,18 +802,16 @@ function TenancyDetails({ journey, request }: { journey: TenancyJourney; request
     })),
   ].sort((a, b) => b.at.localeCompare(a.at)) : [];
   return (
-    <details className="tenancy-details" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>Agreement, claim & activity · this tenancy</summary>
-    <p className="small-copy">Under §551 BGB a real deposit must be invested at the usual savings rate; its earnings belong to the tenant and add to the deposit. On this site, earnings on a real-money deposit would come from lending it out. This is not legal advice; these test tokens have no value.</p>
+    <div className="tenancy-details">
+    <p className="small-copy">Under §551 BGB a real deposit must be invested at the usual savings rate; its earnings belong to the tenant and add to the deposit.{journey.depositForm?.kind === 'shares' ? ' This test share-backed security earns no deposit yield.' : ' On this site, earnings on a real-money deposit would come from lending it out.'} This is not legal advice; these test tokens have no value.</p>
       {error && <p className="note" role="alert">{error}</p>}
       {!agreement && !error && <p className="small-copy">Loading tenancy records…</p>}
       {agreement && (
         <>
-          {agreement.rentTerms && <RentTerms terms={agreement.rentTerms} />}
-          <dl className="journey-facts">
+          <dl className="tenancy-record-facts">
             <div><dt>Agreement</dt><dd>{agreement.digest && agreement.accepted.tenant?.digest === agreement.digest && agreement.accepted.landlord?.digest === agreement.digest ? 'Accepted by both parties' : 'Awaiting acceptance'}</dd></div>
-            <div><dt>Required deposit · test USDC</dt><dd>{money(agreement.requiredSecurity)} test USDC</dd></div>
-            <div><dt>Earnings release policy</dt><dd>{agreement.releaseAllowed ? 'Tenant may claim surplus during tenancy' : 'Surplus remains locked until settlement'} · {!chain ? 'test tokens only; any deposit earnings belong to the tenant.' : chain.depositMint === SOLANA_TEST_USDC_MINT ? 'the deposit stays in cash escrow; this site pays labelled simulated yield to the tenant.' : 'devnet lending pays nothing; earnings are simulated.'}</dd></div>
+            <div><dt>{journey.depositForm?.kind === 'shares' ? 'Security · backed by test TSLA' : 'Required deposit · test USDC'}</dt><dd>{money(journey.depositForm?.kind === 'shares' ? journey.depositForm.securityUsd6 : agreement.requiredSecurity)}{journey.depositForm?.kind !== 'shares' && ' test USDC'}</dd></div>
+            {journey.depositForm?.kind !== 'shares' && <div><dt>Earnings release policy</dt><dd>{agreement.releaseAllowed ? 'Tenant may claim surplus during tenancy' : 'Surplus remains locked until settlement'} · {!chain ? 'test tokens only; any deposit earnings belong to the tenant.' : chain.depositMint === SOLANA_TEST_USDC_MINT ? 'the deposit stays in cash escrow; this site pays labelled simulated yield to the tenant.' : 'devnet lending pays nothing; earnings are simulated.'}</dd></div>}
             {chain && <div><dt>Claim status</dt><dd>{chain.phase === 'claim-proposed' ? 'Awaiting tenant answer' : chain.phase === 'disputed' ? 'Disputed' : chain.phase === 'settling' ? 'Settling' : chain.phase === 'closed' ? 'Closed' : BigInt(chain.claimAtomic) > 0n ? 'Claim recorded' : 'No deduction proposed'}</dd></div>}
             {chain && BigInt(chain.claimAtomic) > 0n && <div><dt>Requested deduction</dt><dd>{money(chain.claimAtomic)} test USDC</dd></div>}
             {chain && (chain.phase === 'settling' || chain.phase === 'closed') && <div><dt>Approved deduction</dt><dd>{money(chain.approvedClaimAtomic)} test USDC</dd></div>}
@@ -840,7 +831,7 @@ function TenancyDetails({ journey, request }: { journey: TenancyJourney; request
           </div>
         </>
       )}
-    </details>
+    </div>
   );
 }
 
@@ -871,17 +862,15 @@ function JoinInvitation({ request, encoded, onDone }: { request: Request; encode
     } finally { setBusy(false); }
   }
   return (
-    <section className="card tenancy-action">
-      <span className="eyebrow">INVITATION</span>
+    <ActionBox level={2} title={value ? `Join as ${value.role}` : 'Invitation'}>
       {!value ? <p>This invitation link is malformed. Ask the landlord for a new one.</p> : <>
-        <h3>Join as {value.role}</h3>
         {home ? <p>{home.property} · {home.depositForm?.kind === 'shares' ? `${depositUsd(home.depositForm.securityUsd6)} USD security in test TSLA. A verified EVM wallet is required.` : `${money(home.requiredSecurity)} test USDC deposit at stake.`}</p> : previewFailed ? <p>This invitation cannot be previewed. It may have expired or been replaced. <button className="button secondary" onClick={() => setPreviewRetry((count) => count + 1)}>Try again</button></p> : <p>Checking this tenancy invitation…</p>}
         <p>{value.role === 'arbitrator' ? 'You decide a disputed deduction only, up to the landlord’s claim. You cannot take the deposit or start a claim.' : 'You join as the tenant. The landlord may propose a deduction at move-out; you may agree or dispute it.'} Joining records your account and wallet as the {value.role} on this tenancy; it does not sign or fund the deposit.</p>
         <button className="button primary large" disabled={!home || busy} onClick={() => void join()}>{busy ? <Loader2 className="spin" size={16} /> : null} Join this tenancy <ArrowRight size={17} /></button>
       </>}
       <button className="button secondary" onClick={() => { history.replaceState(null, '', window.location.pathname + window.location.search); window.dispatchEvent(new HashChangeEvent('hashchange')); }}>Not now</button>
       {message && <p className="note" role="alert">{message}</p>}
-    </section>
+    </ActionBox>
   );
 }
 
@@ -937,14 +926,13 @@ function ApplicantsReview({ listing, request, reload }: { listing: PublicListing
     catch (error) { setError(error instanceof Error ? error.message : 'Please try again.'); }
     finally { setBusy(false); }
   }
-  return <section className="card" id={`listing-${listing.id}`} tabIndex={-1}>
-    <h2>{listing.title} · {listing.applications?.length ?? 0} application{listing.applications?.length === 1 ? '' : 's'}</h2>
+  return <div id={`listing-${listing.id}`} tabIndex={-1}><ActionBox level={2} title={`${listing.title} · ${listing.applications?.length ?? 0} application${listing.applications?.length === 1 ? '' : 's'}`}>
     <p className="small-copy">Choosing creates the agreement and cannot be undone here. Tell the applicant yourself; the app sends no notification.</p>
     {listing.applications?.map(a => <div className="applicant" key={a.id}><div><strong>{a.name}</strong><p>{a.message}</p></div><button className="button primary" disabled={busy} onClick={() => { if (window.confirm(`Choose ${a.name} for ${listing.title}? This creates the agreement and cannot be undone here.`)) void act({action: 'choose', applicationId: a.id}); }}>Choose this tenant</button></div>)}
     <button className="button secondary" disabled={busy} onClick={() => { if (window.confirm(`Close ${listing.title}? Applicants will not be notified. This cannot be undone.`)) void act({action: 'close'}); }}>Close listing</button>
     {error && <p className="note" role="alert">{error}</p>}
     <ListingCard listing={listing} />
-  </section>;
+  </ActionBox></div>;
 }
 
 function ApplicationStatus({ listing, request, reload }: { listing: PublicListing; request: Request; reload: () => Promise<void> }) {
@@ -957,17 +945,29 @@ function ApplicationStatus({ listing, request, reload }: { listing: PublicListin
     catch (error) { setError(error instanceof Error ? error.message : 'Please try again.'); }
     finally { setBusy(false); }
   }
-  return <section className="card" id={`listing-${listing.id}`} tabIndex={-1}><h2>{listing.title}</h2>
+  return <div id={`listing-${listing.id}`} tabIndex={-1}><ActionBox level={2} title={listing.title} tone="waiting">
     <p>{applicationStatusLabel(listing)}</p>
     {listing.relation === 'applicant' && listing.status === 'open' && <button className="button secondary" disabled={busy} onClick={() => void withdraw()}>Withdraw application</button>}
     {error && <p className="note" role="alert">{error}</p>}
-  </section>;
+  </ActionBox></div>;
+}
+
+function takePublishHomeIntent() {
+  if (typeof window === 'undefined') return false;
+  const pending = sessionStorage.getItem(PUBLISH_HOME_NAVIGATION_INTENT) === '1';
+  sessionStorage.removeItem(PUBLISH_HOME_NAVIGATION_INTENT);
+  return pending;
 }
 
 function PublishHome({ listings, request, reload, go, tenancyIds }: {
   listings: PublicListing[]; request: Request; reload: () => Promise<void>; go: (area: Area) => void; tenancyIds: Set<string>;
 }) {
-  const [posting, setPosting] = useState(false);
+  const [posting, setPosting] = useState(takePublishHomeIntent);
+  useEffect(() => {
+    const open = () => { if (takePublishHomeIntent()) setPosting(true); };
+    window.addEventListener(PUBLISH_HOME_NAVIGATION_INTENT, open);
+    return () => window.removeEventListener(PUBLISH_HOME_NAVIGATION_INTENT, open);
+  }, []);
   const [depositForm, setDepositForm] = useState<'cash' | 'shares'>('cash');
   const [depositTracksRent, setDepositTracksRent] = useState(true);
   const [buildingHome, setBuildingHome] = useState(false);
@@ -1015,7 +1015,7 @@ function PublishHome({ listings, request, reload, go, tenancyIds }: {
   } });
   const mine = listings.filter((l) => l.relation === 'landlord' && !(l.agreementId && tenancyIds.has(l.agreementId)) && !(l.status === 'open' && (l.applications?.length ?? 0) > 0));
   return (
-    <section className="card homes" id="publish-home" tabIndex={-1} onFocus={event => { if (event.target === event.currentTarget) setPosting(true); }}>
+    <section className="card homes">
       <div className="housing-listing-heading">
         <button type="button" className="button secondary" aria-expanded={posting} onClick={() => setPosting(!posting)}><Plus size={15} /> {listings.some(l => l.relation === 'landlord') ? 'Rent out another home' : 'Rent out a home'}</button>
       </div>
@@ -1099,7 +1099,7 @@ function ListingBrowser({ listings, request, reload, loaded, loadError, testTool
     setFeedback({target, message: ''});
     try { await work(); await reload(); } catch (error) { setFeedback({target, message: error instanceof Error ? error.message : 'Please try again.'}); }
   }
-  return <section className="card homes" id="home-options" tabIndex={-1}><h2>Find a flat or house</h2><p className="small-copy">Photos are illustrative sample interiors, not photographs of these homes.</p>
+  return <section className="card homes" tabIndex={-1}><h2>Find a home</h2>{others.length > 0 && <p className="small-copy">Photos are illustrative sample interiors, not photographs of these homes.</p>}
       <div className="listing-grid">
         {others.map((l) => (
           <div key={l.id} id={`listing-${l.id}`} tabIndex={-1}>
@@ -1123,9 +1123,7 @@ function ListingBrowser({ listings, request, reload, loaded, loadError, testTool
           </div>
         ))}
       </div>
-      {loaded && !loadError && others.length === 0 && <p className="housing-empty">{testTools
-        ? 'No homes to apply for right now. The local rehearsal tools below can add labelled sample homes.'
-        : listings.length === 0 ? 'No homes have been listed here yet. A landlord can publish one; completing a tenancy needs three separate accounts.' : 'No homes to apply for right now. Your own listings remain above.'}</p>}
+      {loaded && !loadError && others.length === 0 && <p className="small-copy">No homes are available to apply for right now.{testTools && ' Local rehearsal tools below can add sample homes.'}</p>}
       {!loaded && !loadError && <p className="small-copy" role="status">Checking available homes…</p>}
     </section>;
 }
@@ -1139,8 +1137,7 @@ function TestTools({ tenancies, listings, helper, busy, log }: {
   }
   const disabled = busy;
   return (
-    <details className="card test-tools">
-      <summary>Local rehearsal tools · needs a local setup</summary>
+    <div className="test-tools">
       <p className="small-copy">These sample parties sign real test-network transactions with operator-held test keys; they are not proof of a person’s wallet. Simulated earnings are separately credited test USDC. Your own tenancy actions remain in its card.</p>
       <div className="test-tool-row">
         <span>Test listings</span>
@@ -1169,6 +1166,6 @@ function TestTools({ tenancies, listings, helper, busy, log }: {
         </div>
       ))}
       {log && <p className="test-helper-note" role="status">{busy && <Loader2 className="spin" size={14} />} {log}</p>}
-    </details>
+    </div>
   );
 }

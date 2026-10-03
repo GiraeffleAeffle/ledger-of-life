@@ -5,14 +5,17 @@ import type { TestCityInvestment } from '../data/local-investments';
 import { projectMapModel, type ProjectSystems } from './project-map-model';
 import './project-map.css';
 
-/** The fictional model is separate from OSM data and updates without replacing the map. */
-export function ProjectMap({ project, systems }: { project: TestCityInvestment; systems: ProjectSystems }) {
+/** The fictional model is separate from OSM data and updates without replacing the map.
+ * `hero` is the picture-only variant for a screen's hero: no header, copy or controls; a short marker label and the map credit. */
+export function ProjectMap({ project, systems, variant = 'section', label }: {
+  project: TestCityInvestment; systems: ProjectSystems; variant?: 'section' | 'hero'; label?: string;
+}) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
-  const latest = useRef({ project, systems });
+  const latest = useRef({ project, systems, variant, label });
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => { latest.current = { project, systems }; });
+  useEffect(() => { latest.current = { project, systems, variant, label }; });
   useEffect(() => {
     if (!container.current) return;
     const observer = new IntersectionObserver((entries) => {
@@ -27,12 +30,15 @@ export function ProjectMap({ project, systems }: { project: TestCityInvestment; 
     import('maplibre-gl').then((libre) => {
       if (disposed || !container.current) return;
       libre.setWorkerUrl('/maplibre/maplibre-gl-worker.mjs');
-      const { project: initial } = latest.current;
+      const { project: initial, variant: shownAs, label: markerLabel } = latest.current;
+      // The hero turns once into its usual view, unless the person prefers reduced motion.
+      const intro = shownAs === 'hero' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const instance = new libre.Map({ container: container.current, style: '/api/map/styles/liberty',
-        center: [...initial.location.coordinates], zoom: 17, pitch: 58, bearing: -20,
+        center: [...initial.location.coordinates], zoom: 17, pitch: 58, bearing: intro ? -75 : -20,
         attributionControl: false, cooperativeGestures: true });
       map.current = instance;
-      instance.addControl(new libre.NavigationControl({ showCompass: true, visualizePitch: true }), 'top-right');
+      if (shownAs !== 'hero') instance.addControl(new libre.NavigationControl({ showCompass: true, visualizePitch: true }), 'top-right');
+      if (intro) instance.once('load', () => instance.easeTo({ bearing: -20, duration: 2800 }));
       instance.on('style.load', () => {
         if (instance.getLayer('building-3d')) {
           instance.setPaintProperty('building-3d', 'fill-extrusion-color', '#b6b9b2');
@@ -47,19 +53,24 @@ export function ProjectMap({ project, systems }: { project: TestCityInvestment; 
       });
       const label = document.createElement('span');
       label.className = 'project-map-label';
-      label.textContent = initial.kind === 'housing' ? 'Fictional tHOME house · illustrative' : 'Fictional tWORK workshop · illustrative';
+      label.textContent = markerLabel ?? (initial.kind === 'housing' ? 'Fictional tHOME house · illustrative' : 'Fictional tWORK workshop · illustrative');
       new libre.Marker({ element: label, anchor: 'bottom', offset: [0, -38] }).setLngLat([...initial.location.coordinates]).addTo(instance);
       instance.on('error', (event) => { if (!disposed) setError(`Some map details could not load: ${event.error.message}`); });
       const observer = new ResizeObserver(() => instance.resize());
       observer.observe(container.current);
       instance.once('remove', () => observer.disconnect());
-    }).catch(() => { if (!disposed) setError('Map unavailable. The model description is below.'); });
+    }).catch(() => { if (!disposed) setError(latest.current.variant === 'hero' ? 'Map unavailable right now.' : 'Map unavailable. The model description is below.'); });
     return () => { disposed = true; map.current?.remove(); map.current = null; };
   }, [visible]);
   useEffect(() => {
     const source = map.current?.getSource('fictional-project') as GeoJSONSource | undefined;
     source?.setData(projectMapModel(project, systems));
   }, [project, systems]);
+  if (variant === 'hero') return <div className="project-map-hero">
+    <div ref={container} className="project-map project-map--hero" role="region" aria-label={`OpenStreetMap context with the fictional ${project.symbol} model at an illustrative spot`} />
+    <p className="project-map-credit">© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · <a href="https://openfreemap.org/">OpenFreeMap</a></p>
+    {error && <p className="note" role="status">{error}</p>}
+  </div>;
   const shown = [systems.solar && 'rooftop solar panels', systems.heat && 'heat-pump box', systems.validator && 'validator equipment', systems.gpu && 'GPU equipment'].filter(Boolean);
   return <section className="project-map-wrap" aria-label={`${project.symbol} illustrative 3D building`}>
     <header><div><span className="eyebrow">ILLUSTRATIVE CITY PLACEMENT</span><h3>See the fictional {project.kind === 'housing' ? 'house' : 'workshop'} in 3D.</h3></div>

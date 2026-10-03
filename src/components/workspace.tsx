@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChevronRight, ShieldCheck } from 'lucide-react';
 import { AREAS, areaLabel, type Area } from './areas';
 import { MyHome } from './home';
 import { DemoContext } from './demo-context';
@@ -15,7 +14,7 @@ import './workspace.css';
 
 const PRIMARY = AREAS.filter((item) => !item.secondary);
 
-export function Workspace({ initialArea = 'overview', initialTab, sessionHint = false }: { initialArea?: Area; initialTab?: string; sessionHint?: boolean }) {
+export function Workspace({ initialArea = 'home', initialTab, sessionHint = false }: { initialArea?: Area; initialTab?: string; sessionHint?: boolean }) {
   const params = useSearchParams();
   const area = params ? areaFromSearch(params.toString()) : initialArea;
   const [announcement, setAnnouncement] = useState('');
@@ -46,7 +45,7 @@ export function Workspace({ initialArea = 'overview', initialTab, sessionHint = 
     <div className="app-shell wealth-app">
       <a className="skip-link" href="#main">Skip to workspace</a>
       <aside className="sidebar">
-        <button className="brand" onClick={() => openArea('overview')}>
+        <button className="brand" onClick={() => openArea('home')}>
           <svg className="brand-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 44" aria-hidden="true">
             <path d="M5 31 20 39 35 31 20 23Z" fill="#76a753"/>
             <path d="M5 24 20 32 35 24 20 16Z" fill="#39a7b9"/>
@@ -73,7 +72,6 @@ export function Workspace({ initialArea = 'overview', initialTab, sessionHint = 
       </aside>
       <div className="main-shell">
         <header className="topbar">
-          {!signedOut && showAccount && <div className="breadcrumb"><ShieldCheck size={16} /><span>Account</span><ChevronRight size={14} /><strong>{areaLabel(area)}</strong></div>}
           <div className="topbar-actions">
             {wallet.ready && wallet.authenticated && <><span className="account-label">{`Account ${wallet.subject?.slice(-8) ?? ''}`}</span>
               <button className="topbar-signout" onClick={() => void wallet.logout()}>Sign out</button></>}
@@ -82,7 +80,7 @@ export function Workspace({ initialArea = 'overview', initialTab, sessionHint = 
         </header>
         <main id="main" className="main-content">
           <span className="sr-only" role="status" aria-live="polite">{announcement}</span>
-          <AreaErrorBoundary area={area} goToday={() => openArea('overview')}><InitialTabContext.Provider value={initialTab}><MyHome area={area} go={openArea} sessionHint={sessionHint} /></InitialTabContext.Provider></AreaErrorBoundary>
+          <AreaErrorBoundary area={area} goHome={() => openArea('home')}><InitialTabContext.Provider value={initialTab}><MyHome area={area} go={openArea} sessionHint={sessionHint} /></InitialTabContext.Provider></AreaErrorBoundary>
         </main>
         {!signedOut && <nav className="mobile-nav" aria-label="Account navigation">
           {!wallet.ready && !sessionHint ? <div className="skeleton-block nav-skeleton" aria-hidden="true" /> : showAccount && PRIMARY.map((item) => (

@@ -1,11 +1,10 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { KeyRound, LineChart, TrendingUp } from 'lucide-react';
 import type { TenancyJourney } from '@/server/journey';
 import type { PortfolioPartial, PortfolioView } from '@/server/portfolio';
 import { goToSection, openShareWorkflow, type Area } from './areas';
 import { NetPosition } from './net-position';
-import { confirmedRobinhood, netPositionParts, netPositionTotal, shareValuationAvailable, todayTestValueLabel, usd, type RobinhoodRead, type SharePositionAmounts } from './money-valuation';
+import { confirmedRobinhood, netPositionParts, netPositionTotal, shareValuationAvailable, usd, type RobinhoodRead, type SharePositionAmounts } from './money-valuation';
 import { cashDepositStatus } from './money-guidance';
 import type { LocalInvestmentView } from '@/server/local-investments';
 import { TEST_CITY_INVESTMENTS } from '@/data/local-investments';
@@ -13,6 +12,7 @@ import { useSectionTabActive } from './section-tabs';
 import { depositShares, depositUsd } from './share-deposit';
 import { depositHoldings } from './deposit-holdings';
 import type { PortfolioSnapshot } from './portfolio-refresh';
+import { Hero, Figure, Figures, MoreList, MoreRow, ScreenNote, StatusLine } from './blocks';
 
 type AssetsResponse = { robinhood: RobinhoodRead };
 type SharePositions = SharePositionAmounts & { enabled: boolean; testUsdAtomic: string | null };
@@ -35,11 +35,9 @@ export function useHoldingsRead(): HoldingsRead {
 
 const atomicUsd = (atomic: string | null | undefined) => Number(atomic ?? '0') / 1e6;
 
-/**
- * Holdings and the Today summary; device readings live in DeviceReadings.
- */
-export function AssetsOverview({ request, tenancies, tenanciesLoaded = true, show, go, solanaAction, children }: {
-  request: Request; tenancies: TenancyJourney[]; tenanciesLoaded?: boolean; show: 'money' | 'summary'; go: (area: Area) => void;
+/** Wallet value and independently readable holdings. */
+export function AssetsOverview({ request, tenancies, tenanciesLoaded = true, go, solanaAction, children }: {
+  request: Request; tenancies: TenancyJourney[]; tenanciesLoaded?: boolean; go: (area: Area) => void;
   solanaAction?: ReactNode; children?: ReactNode;
 }) {
   const [snapshot, setSnapshot] = useState<MoneySnapshot | null>(null);
@@ -87,8 +85,8 @@ export function AssetsOverview({ request, tenancies, tenanciesLoaded = true, sho
     const workflow = workflowResult.status === 'fulfilled' ? workflowResult.value.workflow : null;
     setLatestRead({ assets, portfolio: solana, workflow, checkedAt: Date.now() });
     const issues = [
-      !official ? 'Robinhood wallet balances' : null,
-      !solana ? 'Solana wallet balances' : 'status' in solana && BigInt(solana.rawAtomic) > 0n ? 'tSPYx price' : null,
+      !official ? 'Shares wallet balances' : null,
+      !solana ? 'Deposit wallet balances' : 'status' in solana && BigInt(solana.rawAtomic) > 0n ? 'tSPYx price' : null,
       !workflow || !shareValuationAvailable(workflow) ? 'fresh shared-market TSLA valuation' : null,
     ].filter((issue): issue is string => issue !== null);
     if (issues.length) {
@@ -128,7 +126,7 @@ export function AssetsOverview({ request, tenancies, tenanciesLoaded = true, sho
     };
   }, [refresh, activeTab]);
   useEffect(() => {
-    if (show !== 'money' || !activeTab || document.visibilityState === 'hidden') return;
+    if (!activeTab || document.visibilityState === 'hidden') return;
     let active = true;
     const refreshStakes = () => { void request<{ market: LocalInvestmentView }>('/api/local-investments')
       .then(({ market }) => { if (active) setStakes(market); })
@@ -137,7 +135,7 @@ export function AssetsOverview({ request, tenancies, tenanciesLoaded = true, sho
     const onBalances = (event: Event) => { if ((event as CustomEvent<{ chain?: string }>).detail?.chain === 'evm') refreshStakes(); };
     window.addEventListener('ledger-balances-changed', onBalances);
     return () => { active = false; window.removeEventListener('ledger-balances-changed', onBalances); };
-  }, [request, show, activeTab]);
+  }, [request, activeTab]);
 
   const assets = latestRead?.assets ?? snapshot?.assets ?? null;
   const portfolio = latestRead?.portfolio ?? snapshot?.portfolio ?? null;
@@ -151,10 +149,9 @@ export function AssetsOverview({ request, tenancies, tenanciesLoaded = true, sho
   const depositSection = onChain ? `tenancy-${onChain.agreementId}` : 'home-tenancies';
   const rh = confirmedRobinhood(assets?.robinhood ?? null);
   const positions = workflow;
-  const hasFreshTokenPrice = Boolean(positions && !positions.suspended && positions.price && !positions.price.stale
-    && positions.priceAtomic !== null && BigInt(positions.priceAtomic) > 0n);
   const walletTestUsd = rh ? atomicUsd(rh.testUsdAtomic) : 0;
   const collateral = atomicUsd(positions?.loan?.valueAtomic);
+  const pledgedShares = positions?.loan?.sharesRaw ?? '0';
   const debt = atomicUsd(positions?.loan?.debtAtomic);
   const lent = atomicUsd(positions?.lender?.valueAtomic);
   const parts = snapshot ? netPositionParts({
@@ -165,69 +162,57 @@ export function AssetsOverview({ request, tenancies, tenanciesLoaded = true, sho
   }) : null;
   const total = parts ? netPositionTotal(parts) : 0;
   const solanaShareValue = !portfolio ? null : 'status' in portfolio ? BigInt(portfolio.rawAtomic) === 0n ? 0 : null : portfolio.valueUsd;
-  const officialTileValue = !readError && positions && shareValuationAvailable(positions)
-    ? atomicUsd(positions.walletValueAtomic) + collateral - debt : null;
   const lockedReady = tenanciesLoaded && !tenancies.some(t => t.shareDeposit && BigInt(t.shareDeposit.lockedShares) > 0n && !t.shareDeposit.quote?.fresh);
   const complete = Boolean(snapshot && !readError && lockedReady);
-  const checkedAt = snapshot ? new Date(snapshot.checkedAt).toLocaleString() : null;
-  const balanceStatus = readError
-    ? `${readError}${checkedAt ? ` Last complete wallet balance: ${checkedAt}.` : ''}`
-    : !lockedReady ? 'Wallet balances read independently; Home deposit entitlement is not yet available.'
-      : snapshot ? `${refreshing ? 'Checking for updates · ' : 'Last checked '}${checkedAt}` : 'Checking your test balances…';
+  const balanceStatus = complete ? 'Your test balances are up to date' : refreshing ? 'Checking your test balances…'
+    : !portfolio ? 'Total unavailable right now: test-share holdings could not be read.'
+    : !rh ? 'Total unavailable right now: wallet balances could not be read.'
+    : !positions || !shareValuationAvailable(positions) ? 'Total unavailable right now: the test-TSLA price could not be read.'
+    : !lockedReady ? 'Total unavailable right now: the deposit value could not be read.'
+    : 'Total unavailable right now: some values could not be read.';
   const read: HoldingsRead = { portfolio: portfolioSnapshot, ethBalance: rh?.ethBalance, refresh };
   const localHoldings = stakes?.state === 'ready' ? stakes.assets.filter(asset => asset.holdingRaw !== null && BigInt(asset.holdingRaw) > 0n) : [];
 
-  if (show === 'summary') return <span className="today-money">
-    {todayTestValueLabel(complete, Boolean(readError), total)} · <button type="button" className="text-button" onClick={() => goToSection(go, 'money', 'money-overview')}>Holdings →</button>
-  </span>;
+  const noTestMoney = Boolean(rh && portfolio && walletTestUsd === 0 && atomicUsd(portfolio.testUsdcAtomic) === 0);
   return (
     <HoldingsContext value={read}>
-    <section className={`card assets ${show}`} id="money-overview" tabIndex={-1} aria-busy={refreshing}>
-      <div className="assets-head">
-        <div className="assets-total"><span>Priced test-asset subtotal</span><strong>{complete ? `${usd(total)} test value` : '—'}</strong><small role="status">{balanceStatus}</small></div>
-      </div>
-      <NetPosition parts={parts && !readError ? { ...parts, locked: lockedReady ? locked : null } : { free: null, locked: lockedReady ? locked : null, pledged: null, lent: null, owed: null }} go={go} depositSection={depositSection} />
-      <div className="asset-grid">
-        {shareDeposits.map(t => <button key={t.agreementId} type="button" className="asset-tile clickable" onClick={() => goToSection(go, 'home', `tenancy-${t.agreementId}`)}><header><KeyRound size={18} /> TSLA locked in your deposit · Robinhood testnet</header><strong>{depositShares(t.shareDeposit!.lockedShares)} test TSLA</strong><span>{t.shareDeposit!.quote?.fresh ? `${depositUsd((BigInt(t.shareDeposit!.lockedShares) * BigInt(t.shareDeposit!.quote!.priceUsd6) / 10n ** 18n).toString())} USD at the quote` : 'USD valuation unavailable — fresh quote required'}</span><span>Open in Home →</span></button>)}
-        {cashDeposits.length > 0 && <button type="button" className="asset-tile clickable" id="rental-deposit-holding" onClick={() => goToSection(go, 'home', depositSection)} aria-label="Open rental home and deposit">
-          <header><KeyRound size={18} /> Rental home &amp; deposit · Solana devnet</header>
-          <strong>{usd(cashLocked)} test value</strong>
-          {cashDeposits.map(t => <span key={t.agreementId}>{t.property} · {{
-            unfunded: 'Deposit not funded yet',
-            paid_out: 'Paid out',
-            no_entitlement: 'No remaining deposit entitlement',
-            secured: 'Deposit secured',
-            claim_owed: 'Approved claim or settlement payout owed to you',
-            held_for_tenant: 'Held for the tenant; not your assets',
-            not_owner: 'Not your deposit',
-          }[cashDepositStatus(t)]}</span>)}
-          <span className="text-button">Open in Home →</span>
-        </button>}
-
-        <article className="asset-tile" id="solana-holding" tabIndex={-1}>
-          <header><LineChart size={18} /> tSPYx · Solana test shares</header>
-          <strong>{solanaShareValue === null ? '—' : `${usd(solanaShareValue)} test value`}</strong>
-          <span>{portfolio ? `${portfolio.shares.toFixed(4)} tSPYx · ${usd(atomicUsd(portfolio.testUsdcAtomic))} test USDC in wallet` : 'Balance not yet available'}</span>
-          {portfolio && !('status' in portfolio) && <span>Reference price {usd(portfolio.referencePriceUsd)} per tSPYx · Jupiter price for mainnet SPYx, not a resale quote for this test token</span>}
-          {portfolio && 'status' in portfolio && <span role="status">Reference price unavailable; share quantity and cash were read, but stock value cannot be shown.</span>}
-          {portfolio && !('status' in portfolio) && portfolio.referencePriceStale && <span>Reference price as of {new Date(portfolio.referencePriceObservedAt).toLocaleString()} · live price unavailable</span>}
-          {portfolio && portfolio.multiplier > 1 && <span className="asset-gain"><TrendingUp size={13} /> +{((portfolio.multiplier - 1) * 100).toFixed(2)} % from simulated distributions (test market)</span>}
-          {solanaAction}
-          <span>tSPYx cannot be pledged, borrowed against, sold or used elsewhere.</span>
-        </article>
-
-        {(rh && rh.tslaShares > 0 || positions?.loan && BigInt(positions.loan.sharesRaw) > 0n) && <article className="asset-tile" id="official-shares" tabIndex={-1}>
-          <header><LineChart size={18} /> TSLA · official Robinhood test token</header>
-          <strong>{officialTileValue === null ? '—' : `${usd(officialTileValue)} test value`}</strong>
-          <span>{rh ? `${rh.tslaShares.toFixed(5)} TSLA in wallet · ${usd(walletTestUsd)} test USD (tUSDG) in Robinhood Chain wallet` : 'Balance not yet available'}</span>
-          {positions && <span>Loan collateral: {(Number(positions.loan?.sharesRaw ?? '0') / 1e18).toFixed(5)} TSLA · debt {usd(debt)} test value. {hasFreshTokenPrice ? `Mirrored Robinhood TSLA token price: ${usd(atomicUsd(positions.priceAtomic))}.` : 'Fresh mirrored token price unavailable; no stock valuation shown.'}</span>}
-          <button className="text-button" type="button" onClick={() => goToSection(go, 'money', 'share-workflows')}>Manage test TSLA &amp; loans</button>
-        </article>}
-        {lent > 0 && <article className="asset-tile"><header>Lent test dollars · shared pool</header><strong>{usd(lent)} test value</strong><span>Pool share value includes borrower interest and losses. Withdrawals depend on available pool cash.</span><button className="text-button" type="button" onClick={() => openShareWorkflow(go, 'lend')}>Manage lent test dollars</button></article>}
-        {localHoldings.length > 0 && <article className="asset-tile"><header>tHOME and tWORK · fictional test units</header><strong>Outside subtotal</strong>{localHoldings.map(asset => <span key={asset.projectId}>{TEST_CITY_INVESTMENTS.find(project => project.id === asset.projectId)?.symbol ?? 'Test units'}: {(Number(BigInt(asset.holdingRaw!)) / 1e18).toFixed(4)} units</span>)}<button className="text-button" type="button" onClick={() => goToSection(go, 'money', 'local-investments')}>See your local stakes →</button></article>}
-      </div>
-    </section>
-    {children}
+      <section className="assets" id="money-overview" tabIndex={-1} aria-busy={refreshing}>
+        <Hero title="Total test value" status={<StatusLine tone={complete ? 'ok' : readError ? 'alert' : 'waiting'}>{balanceStatus}</StatusLine>}>
+          {complete && parts && <>
+            <Figures><Figure label="What you own, less what you owe" value={usd(total)} /></Figures>
+            <NetPosition parts={parts} />
+          </>}
+        </Hero>
+        <section className="card holdings-list" aria-labelledby="holdings-title">
+          <h2 id="holdings-title">What you own</h2>
+          <div className="holding-row" id="rental-deposit-holding">
+            <div><strong>Rental deposit</strong><span>{!tenanciesLoaded ? 'Deposit status unavailable' : cashDeposits.length || shareDeposits.length ? cashDeposits.map(t => ({ unfunded: 'Not funded', paid_out: 'Paid out', no_entitlement: 'No remaining entitlement', secured: 'Secured', claim_owed: 'Payout owed to you', held_for_tenant: 'Held for the tenant', not_owner: 'Not your deposit' }[cashDepositStatus(t)])).join(' · ') || 'Test TSLA secured' : 'No deposit recorded'}</span></div>
+            <strong>{!tenanciesLoaded ? '—' : <>{usd(cashLocked)}{shareDeposits.map(t => <span key={t.agreementId}> · {depositShares(t.shareDeposit!.lockedShares)} TSLA</span>)}</>}</strong>
+            <button className="text-button" onClick={() => goToSection(go, 'home', depositSection)}>Home →</button>
+          </div>
+          <div className="holding-row" id="solana-holding" tabIndex={-1}>
+            <div><strong>tSPYx</strong><span>{solanaShareValue === null ? 'Value unavailable' : 'Test shares'}</span></div><strong>{portfolio ? `${portfolio.shares.toFixed(4)} tSPYx` : '—'}</strong>
+            <details className="holding-buy"><summary>Buy</summary>{solanaAction}</details>
+          </div>
+          <div className="holding-row" id="official-shares" tabIndex={-1}>
+            <div><strong>TSLA</strong><span>{BigInt(pledgedShares) > 0n ? `${depositShares(pledgedShares)} TSLA pledged as collateral` : 'Test shares in your wallet'}</span></div><strong>{rh ? `${rh.tslaShares.toFixed(4)} TSLA` : '—'}</strong>
+            <button className="text-button" onClick={() => goToSection(go, 'money', 'share-workflows')}>Borrow &amp; lend →</button>
+          </div>
+          <div className="holding-row"><div><strong>tUSDG</strong><span>{rh ? 'Free to use' : 'Balance unavailable'}</span></div><strong>{rh ? usd(walletTestUsd) : '—'}</strong><button className="text-button" onClick={() => goToSection(go, 'money', 'test-money')}>Get test money →</button></div>
+          <div className="holding-row"><div><strong>Lent test dollars</strong><span>{!positions?.lender ? 'Balance unavailable' : lent ? 'Withdrawals depend on pool cash' : 'Nothing lent yet'}</span></div><strong>{positions?.lender ? usd(lent) : '—'}</strong><button className="text-button" onClick={() => openShareWorkflow(go, 'lend')}>Lend →</button></div>
+          <div className="holding-row" id="fake-shares" tabIndex={-1}><div><strong>tHOME / tWORK</strong><span>Fictional units · outside total</span></div><strong>{localHoldings.length ? localHoldings.map(asset => `${(Number(BigInt(asset.holdingRaw!)) / 1e18).toFixed(4)} ${TEST_CITY_INVESTMENTS.find(project => project.id === asset.projectId)?.symbol ?? 'units'}`).join(' · ') : 'No units in wallet'}</strong><button className="text-button" onClick={() => goToSection(go, 'money', 'local-investments')}>Local stakes →</button></div>
+        </section>
+        <MoreList>
+          <MoreRow id="test-money" title="Get test money" meta={noTestMoney ? 'Your test-dollar balances are empty' : 'Faucets and funding help'} defaultOpen={noTestMoney}>{children}</MoreRow>
+          <MoreRow title="Valuation details" meta="Prices, reading status and exact deposit values">
+            <p>{readError || 'Wallet values use the last complete reading.'}{snapshot && ` Checked ${new Date(snapshot.checkedAt).toLocaleString()}.`}</p>
+            <p>Loan debt: {positions?.loan ? usd(debt) : 'unavailable'}. Collateral value: {positions?.loan?.valueAtomic == null ? positions?.loan && BigInt(positions.loan.sharesRaw) > 0n ? 'unavailable (stale price)' : 'unavailable' : usd(collateral)}.</p>
+            {portfolio && !('status' in portfolio) && <p>tSPYx reference price: {usd(portfolio.referencePriceUsd)}. Jupiter price for mainnet SPYx, not a resale quote. {portfolio.referencePriceStale && 'The reference price is stale.'} Simulated distribution multiplier: {portfolio.multiplier}. tSPYx cannot be pledged, borrowed against, sold or used elsewhere.</p>}
+            {shareDeposits.map(t => <p key={t.agreementId}>{t.property}: {depositShares(t.shareDeposit!.lockedShares)} TSLA · {t.shareDeposit!.quote?.fresh ? `${depositUsd((BigInt(t.shareDeposit!.lockedShares) * BigInt(t.shareDeposit!.quote!.priceUsd6) / 10n ** 18n).toString())} USD at the quote` : 'Fresh quote unavailable'}</p>)}
+          </MoreRow>
+        </MoreList>
+        <ScreenNote>Test assets have no monetary value. Fictional local units have no value or rights. Simulated distributions are not returns; deposit earnings belong to the tenant.</ScreenNote>
+      </section>
     </HoldingsContext>
   );
 }

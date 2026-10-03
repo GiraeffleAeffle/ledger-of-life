@@ -12,6 +12,7 @@ import { LocalInvestments } from './local-investments';
 import { LocalAiWorkspace } from './local-ai';
 import { SectionTabs, useSectionTabActive } from './section-tabs';
 import { TestDollars } from './test-dollars';
+import { ScreenNote } from './blocks';
 import './money-area.css';
 
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
@@ -21,29 +22,24 @@ const toB64 = (bytes: Uint8Array) => btoa(Array.from(bytes, (b) => String.fromCh
 /**
  * Money answers one question: what do I own, owe and earn? Four sections, one job each. Holdings shows
  * what exists; the other three are where it is changed or earned. A section is never repeated in
- * another area: Today, Home, Places and Me link here.
+ * another area: Home, Places and Me link here.
  */
-export function MoneyArea({ request, tenancies, loaded, homeError, retryHome, go }: {
+export function MoneyArea({ request, tenancies, loaded, homeError, go }: {
   request: Request; tenancies: TenancyJourney[]; loaded: boolean; homeError: string; retryHome: () => Promise<void>; go: (area: Area) => void;
 }) {
   return (
     <div className="money-journey">
       <SectionTabs label="Money sections" tabs={[
-        { id: 'money-holdings', label: 'Holdings', reality: ['testnet_real', 'read_only_live'],
-          summary: 'The priced subtotal separates free, locked, pledged, lent and owed positions. Local stakes and devices are outside it.',
-          content: <AssetsOverview request={request} tenancies={tenancies} tenanciesLoaded={loaded && !homeError} show="money" go={go} solanaAction={<Portfolio request={request} />}>
-            {homeError && <p className="note" role="alert">{homeError} <button className="button secondary" type="button" onClick={() => void retryHome()}>Retry Home read</button></p>}
+        { id: 'money-holdings', label: 'Holdings',
+          content: <AssetsOverview request={request} tenancies={tenancies} tenanciesLoaded={loaded && !homeError} go={go} solanaAction={<Portfolio request={request} />}>
             <TestMoney request={request} />
           </AssetsOverview> },
-        { id: 'money-shares', label: 'Shares & loans', reality: ['testnet_real', 'read_only_live'],
-          summary: 'Borrowing and lending are separate optional tasks, not rental-deposit products.',
+        { id: 'money-shares', label: 'Borrow & lend',
           content: <ShareWorkflows request={request} go={go} /> },
-        { id: 'money-stakes', label: 'Local stakes', reality: ['testnet_simulated'],
-          summary: 'Buy fictional test units in a housing project or a workshop, or explore an illustrative Agri-PV income calculation with no token. Units grant no company, cooperative or property rights.',
+        { id: 'money-stakes', label: 'Local stakes',
           content: <LocalInvestments request={request} go={go} /> },
-        { id: 'money-devices', label: 'Devices & income', reality: ['read_only_live', 'testnet_real'],
-          summary: 'Connect your own GPU, solar sensors or validator IDs. Paid GPU receipts and simulated solar feed-in can support the building; readings stay outside your priced subtotal.',
-          content: <><HomeNode request={request} /><DeviceReadings request={request} go={go} /><LocalAiWorkspace /></> },
+        { id: 'money-devices', label: 'Devices & income',
+          content: <><HomeNode request={request} /><DeviceReadings request={request} go={go} /><LocalAiWorkspace /><ScreenNote>Device receipts use test networks and have no value. Solar income is simulated feed-in, not an electricity sale; readings are outside your Holdings total. AI answers can be wrong.</ScreenNote></> },
       ]} />
     </div>
   );
@@ -58,18 +54,28 @@ function TestMoney({ request }: { request: Request }) {
   const robinhoodAddress = wallet.wallets.find(item => item.chainType === 'ethereum')?.address;
   async function copyAddress(address: string, chain: string) {
     try { await navigator.clipboard.writeText(address); setCopied(`${chain} address copied.`); }
-    catch { setCopied(`Copy failed. Copy your ${chain} address from Me.`); }
+    catch { setCopied(`Copy failed. Select and copy your ${chain} wallet address manually: ${address}`); }
   }
-  return <section className="card test-money" id="test-money" tabIndex={-1} aria-labelledby="test-money-title">
+  return <section className="card test-money" aria-labelledby="test-money-title">
     <h2 id="test-money-title">Test money</h2>
-    <ul className="test-money-list">
-      <li><strong>For site-tUSDC Home deposits (Solana devnet):</strong> site-minted test USDC (tUSDC), below. It is not Circle USDC.</li>
-      <li><strong>For existing Circle-USDC deposits and Solana portfolio trades only:</strong> <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle&apos;s devnet faucet</a> supplies their different legacy token. It cannot fund a site-tUSDC cash deposit. {solanaAddress && <button className="text-button" type="button" onClick={() => void copyAddress(solanaAddress, 'Solana')}>Copy Solana address</button>}</li>
-      <li><strong>For loans, lending, local stakes and paid AI answers (Robinhood Chain testnet):</strong> test ETH for fees and test dollars (tUSDG), below. Test TSLA for collateral comes from the <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet</a>. {robinhoodAddress && <button className="text-button" type="button" onClick={() => void copyAddress(robinhoodAddress, 'Robinhood Chain')}>Copy Robinhood address</button>}</li>
-    </ul>
-    <TestUsdc request={request} />
-    <TestDollars request={request} ethBalance={read.ethBalance} refresh={read.refresh} />
-    {copied && <p role="status">{copied}</p>}
+    <div className="test-money-need">
+      <p>Test dollars for rent, loans, local stakes and paid answers</p>
+      <TestDollars request={request} ethBalance={read.ethBalance} refresh={read.refresh} />
+    </div>
+    <div className="test-money-need">
+      <p>Test USDC for a cash rental deposit</p>
+      <TestUsdc request={request} />
+    </div>
+    <div className="test-money-need">
+      <p>Test TSLA shares: <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet ↗</a></p>
+      {robinhoodAddress && <button className="button secondary" type="button" onClick={() => void copyAddress(robinhoodAddress, 'Shares')}>Copy shares address</button>}
+    </div>
+    <div className="test-money-need">
+      <p>Only for tSPYx trades: <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle&apos;s devnet faucet ↗</a></p>
+      {solanaAddress && <button className="button secondary" type="button" onClick={() => void copyAddress(solanaAddress, 'Deposit')}>Copy deposit address</button>}
+      <small>Circle USDC is a different token; it cannot fund a site-tUSDC cash deposit.</small>
+    </div>
+    {copied && <p className="test-money-copy-status" role="status">{copied}</p>}
   </section>;
 }
 
@@ -93,11 +99,12 @@ export function TestUsdc({ request }: { request: Request }) {
     finally { setBusy(false); }
   }
   return <div className="test-usdc">
-    <p>Site-minted test USDC (tUSDC) · Solana devnet. Sent to your verified Solana wallet. Default allowance: 10,000 tUSDC once per 24 hours per account and wallet, subject to the site&apos;s daily cap.</p>
+    <small>Site-minted tUSDC · Solana devnet · not Circle USDC.</small>
     <button type="button" className="button primary" disabled={busy || !hasWallet} onClick={() => { void getTestUsdc(); }}>
-      {busy ? 'Checking test USDC…' : result?.status === 'pending' ? 'Check pending test USDC request' : 'Get test USDC (tUSDC)'}
+      {busy ? 'Checking test USDC…' : result?.status === 'pending' ? 'Check pending test USDC request' : 'Get test USDC'}
     </button>
-    {!hasWallet && <p>Connect your Solana wallet in Me first.</p>}
+    <small>Up to 10,000 tUSDC per account and wallet every 24 hours, subject to the site&apos;s daily cap.</small>
+    {!hasWallet && <p>Connect your Deposit wallet in Me first.</p>}
     {result?.status === 'unconfigured' && <p className="note" role="status">The site test-USDC faucet is not configured. Circle&apos;s faucet supplies a different token and cannot fund a tUSDC deposit.</p>}
     {result?.status === 'pending' && <p className="note" role="status">Test USDC mint pending. Check this request again to recover its result; do not start a separate mint. <a href={`https://explorer.solana.com/tx/${encodeURIComponent(result.signature)}?cluster=devnet`} target="_blank" rel="noopener noreferrer">View devnet transaction</a>.</p>}
     {result?.status === 'confirmed' && <p className="note" role="status">{(Number(result.amountAtomic) / 1e6).toLocaleString('en-US', { maximumFractionDigits: 6 })} tUSDC received. <a href={`https://explorer.solana.com/tx/${encodeURIComponent(result.signature)}?cluster=devnet`} target="_blank" rel="noopener noreferrer">View devnet transaction</a>.</p>}
@@ -225,7 +232,7 @@ function Portfolio({ request }: { request: Request }) {
       <button className="button primary" disabled={busy || purchase === 'pending' || unavailable || view.referencePriceStale || BigInt(view.testUsdcAtomic) < 5_000_000n} onClick={invest}>
         {busy ? <Loader2 className="spin" size={16} /> : null} {purchase === 'pending' ? 'Purchase pending, checking' : 'Buy tSPYx with 5 test USDC'} <ArrowRight size={16} />
       </button>
-      {BigInt(view.testUsdcAtomic) < 5_000_000n && <p role="status">You need 5 Circle devnet USDC in your Solana wallet to buy; current cash is {(Number(view.testUsdcAtomic) / 1e6).toFixed(2)} test USDC. Funding help is in Test money below.</p>}
+      {BigInt(view.testUsdcAtomic) < 5_000_000n && <p role="status">You need 5 Circle devnet USDC in your Deposit wallet to buy; current cash is {(Number(view.testUsdcAtomic) / 1e6).toFixed(2)} test USDC. Funding help is in Test money below.</p>}
       {message && <p className="note" role="status">{message}</p>}
     </div>
   );

@@ -1,15 +1,15 @@
 import type { Area } from './areas';
 
-const AREAS: Record<Area, true> = { overview: true, me: true, home: true, money: true, places: true, ideas: true };
+const AREAS: Record<Area, true> = { me: true, home: true, money: true, places: true, ideas: true };
 export function areaFromSearch(search: string): Area {
   const value = new URLSearchParams(search).get('area');
-  return value && Object.hasOwn(AREAS, value) ? value as Area : 'overview';
+  return value && Object.hasOwn(AREAS, value) ? value as Area : 'home';
 }
 export function withArea(url: string, area: Area) {
   const next = new URL(url);
   // A tab belongs to the area that showed it; carried into another area it would reopen a stale view later.
   if (areaFromSearch(next.search) !== area) next.searchParams.delete('tab');
-  if (area === 'overview') next.searchParams.delete('area');
+  if (area === 'home') next.searchParams.delete('area');
   else next.searchParams.set('area', area);
   return next.pathname + next.search + next.hash;
 }

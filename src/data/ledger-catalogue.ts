@@ -20,11 +20,11 @@ export interface Idea {
 
 /** Single source for capability status, topic and the one place each capability is operated; mirrors docs/LEDGER_OF_LIFE.md and the ontology's roadmap items. */
 export const IDEAS: Idea[] = [
-  { id: 'today-cockpit', availability: 'Available on this site', topic: 'identity', destination: { area: 'overview' }, status: 'built', title: 'Your ledger at a glance',
-    how: 'A household-first overview connects identity, home, money, productive assets and public life. Real attention, followed projects and dated city news follow; each topic opens its working area.',
-    enables: 'Understand what belongs in your ledger, what is connected and what you can do next.' },
+  { id: 'today-cockpit', availability: 'Available on this site', topic: 'identity', destination: { area: 'home' }, status: 'built', title: 'Your home at a glance',
+    how: 'Home opens with your home, deposit and next action. Money, Places and Me each own their working tools.',
+    enables: 'See whether your home needs you, then open the relevant details.' },
   { id: 'city-news-feed', availability: 'Available on this site', topic: 'places', destination: { area: 'places', section: 'city-news' }, status: 'built', title: 'City news & events',
-    how: 'Dated published snapshots show attributed headlines, original links, publication dates and sourced event times in Places. Köln uses koeln.de events, not city press; cities without a published feed say so. Today previews official press where available.',
+    how: 'Dated published snapshots show attributed headlines, original links, publication dates and sourced event times in Places. Köln uses koeln.de events, not city press; cities without a published feed say so.',
     enables: 'Read a dated local source once, not a copied article or an invented event date.',
     needs: 'Published official feeds for more cities.' },
   { id: 'regional-shared-topics', availability: 'Available on this site', topic: 'places', destination: { area: 'places', section: 'regional-topics' }, status: 'built', title: 'In your region',
@@ -160,7 +160,7 @@ export const LEDGER_TOPICS: { id: LedgerTopicId; name: string; question: string;
   { id: 'places', name: 'Places & participation', question: 'What changes around me and where I can act', area: 'places' },
 ];
 
-/** One catalogue for the ledger overview, connection management and capability map.
+/** One catalogue for connection management and the capability map.
  * A configured connection is not a healthy reading, and a wallet link is not a funded position.
  * Monetary observations remain with the existing account-bound Home/Money readers.
  */
@@ -254,7 +254,7 @@ export const LEDGER_ADAPTERS: LedgerAdapter[] = [
     action: { kind: 'area', area: 'money', section: 'solana-holding', label: 'Open Solana holdings' },
     explain: {
       brings: 'Your own Solana test wallet: see test USDC and tSPYx, a no-value copy of an ETF token, and buy tSPYx with test USDC, separate from your rental deposit.',
-      reads: 'Your test-USDC and tSPYx balances from Solana devnet, and the live SPYx price from Jupiter (only the token, never your wallet). Refreshed every 60 seconds while Today or Money is open.',
+      reads: 'Your test-USDC and tSPYx balances from Solana devnet, and the live SPYx price from Jupiter (only the token, never your wallet). Refreshed every 60 seconds while Money is open.',
       keeps: 'A record of each buy you prepare (wallet, quote, signed transaction) in this app’s database. Balances live on the public chain. No keys.',
       visibility: 'Only you in this app. Balances and transactions on devnet are public. Jupiter sees only the token it prices; the test market maker co-signs and pays the fee.',
       needs: 'A linked wallet (automatic) and test USDC from Circle’s faucet. Buying also needs an operator-run test market, which is off on hosted deployments.',
@@ -327,7 +327,7 @@ export const LEDGER_ADAPTERS: LedgerAdapter[] = [
     settings: 'adapter-home-assistant',
     explain: {
       brings: 'Shows how much electricity your solar panels made today and roughly what it is worth, by reading your own Home Assistant.',
-      reads: 'The app server asks your Home Assistant for the state of every entity, keeps only the solar, savings and daily-consumption sensors, and repeats this every 60 seconds while Today or Money is open.',
+      reads: 'The app server asks your Home Assistant for the state of every entity, keeps only the solar, savings and daily-consumption sensors, and repeats this every 60 seconds while Money is open.',
       keeps: 'Your Home Assistant address, access token, sensor and price per kWh in this app’s database as plain data. The token is never sent back to your browser. Readings are not stored.',
       visibility: 'Only you see the readings. The app’s operator can read the stored token and use it against your Home Assistant.',
       needs: 'A locally run build on your own network, or a production host whose operator explicitly enables Home Assistant pull, plus a reachable Home Assistant and a long-lived access token. A hosted build does not connect by default. The token acts with the permissions of the user who made it and is not limited to reading.',
@@ -342,7 +342,7 @@ export const LEDGER_ADAPTERS: LedgerAdapter[] = [
     settings: 'adapter-validator',
     explain: {
       brings: 'Shows the stake, status and recent rewards of an Ethereum, Gnosis or Solana validator you run or follow, from public blockchain data.',
-      reads: 'The app server asks public Solana or PublicNode endpoints about the validator you named, every 60 seconds while Today or Money is open. Rewards are an approximation, not a statement.',
+      reads: 'The app server asks public Solana or PublicNode endpoints about the validator you named, every 60 seconds while Money is open. Rewards are an approximation, not a statement.',
       keeps: 'The chain and public validator ID in this app’s database. Readings are not stored. There is no secret.',
       visibility: 'You see it. The app’s operator sees the saved ID, and the public endpoints see it in requests from the server, not your identity.',
       needs: 'A Solana vote account, or an Ethereum or Gnosis validator index or key, that exists on mainnet.',

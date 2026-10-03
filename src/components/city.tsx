@@ -1,22 +1,23 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Building2, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import type { CityResult } from '@/server/city';
 import { arrivalGuideCityIds, arrivalGuideFor } from '@/data/arrival';
 import type { CityCoverage } from '@/server/city-signals';
 import { cityIdFor, coveredNames, formatCityDate } from './city-coverage';
-import { CITY_CHANGED_EVENT, readPersonCity, citySourceLabel } from './use-city-signals';
+import { CITY_CHANGED_EVENT, readPersonCity } from './use-city-signals';
+import type { PlacesResult } from '@/server/places-live';
+import { MoreRow } from './blocks';
 
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 
 /** A person's covered city is distinct from a temporary map exploration. */
-export function CityCard({ request, onCityChange, onPreviewCity, previewCity, fallbackSectionIds }: { request: Request; onCityChange?: () => void; onPreviewCity?: (id: string) => void; previewCity?: string; fallbackSectionIds?: readonly string[] }) {
+export function CityCard({ request, onCityChange, onPreviewCity, previewCity, readings }: { request: Request; onCityChange?: () => void; onPreviewCity?: (id: string) => void; previewCity?: string; readings?: PlacesResult | null }) {
   const [city, setCity] = useState<CityResult | null>(null);
   const [cities, setCities] = useState<CityCoverage['cities']>([]);
   const [snapshot, setSnapshot] = useState('');
   const [draft, setDraft] = useState('');
-  const [changing, setChanging] = useState(false);
   const [other, setOther] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -54,7 +55,6 @@ export function CityCard({ request, onCityChange, onPreviewCity, previewCity, fa
     try {
       const response = await request<{ city: CityResult }>('/api/city', { city: name });
       setCity(response.city);
-      setChanging(false);
       window.dispatchEvent(new Event(CITY_CHANGED_EVENT));
       onCityChange?.();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Your city could not be saved. Try again.'); }
@@ -76,28 +76,23 @@ export function CityCard({ request, onCityChange, onPreviewCity, previewCity, fa
     </div>
     {cities.length > 0 && <p className="small-copy">{cities.length} covered cities · published coverage {formatCityDate(snapshot)}. Refreshed only when the collector runs; coverage is incomplete.</p>}
   </form>;
-  return <section className="card city-card" id="city-choice" tabIndex={-1}>
-    {fallbackSectionIds?.map((id) => <span key={id} id={id} className="city-section-anchor" tabIndex={-1} aria-label="Your city" />)}
-    <header><Building2 size={18} /> <strong>{city?.name ? `Your city · ${city.name}` : city ? 'Choose your city' : 'Your city'}</strong>
-      {city?.name && <span className="city-source">{citySourceLabel(city.source)}</span>}
+  return <section className="city-card" aria-label="Your city">
+    <header><h2>{previewCity ? coveredNames[previewCity] || previewCity : !city ? 'Your city' : city.name || 'Choose your city'}</h2>
+      {guideCity && arrivalGuideCityIds.includes(guideCity) && arrivalGuideFor(guideCity) && <Link className="city-guide-link" href={`/welcome/${encodeURIComponent(guideCity)}`}>Get settled ↗</Link>}
+      {readings && <span className="city-reading-chip">{readings.weather.state === 'available' ? `${readings.weather.value.temperature.toFixed(1)} °C · ${readings.weather.value.condition}${readings.weather.stale ? ' · last reading' : ''}` : 'Weather unavailable'}</span>}
     </header>
-    {!city && !error ? <p aria-busy="true" style={{ minHeight: 80 }}>Checking your city…</p> : null}
-    {city?.name && <p className="small-copy">{city.source === 'home' && city.home?.title ? `${city.home.title}${!city.cityId ? ' · ' : ''}` : null}{!city.cityId ? `${city.name} · not covered yet.` : null}</p>}
+    {city?.name && !city.cityId && !previewCity && <p className="small-copy">{city.name} · not covered yet.</p>}
     {!city?.cityId && city?.name && nearest && onPreviewCity && <button type="button" className="secondary-button" onClick={() => onPreviewCity(nearest.id)}>Preview the nearest covered city · {nearest.name}</button>}
     {previewCity && onPreviewCity && <button type="button" className="text-button" onClick={() => onPreviewCity('')}>Back to my city</button>}
-    {city?.name && <button type="button" className="text-button" onClick={() => setChanging(!changing)}>{changing ? 'Cancel' : 'Change city'}</button>}
+    <MoreRow id="city-choice" title="Change city" meta={previewCity ? 'Preview only · your city is unchanged' : !city ? error ? 'City could not be checked' : 'Checking…' : !city.name ? 'No city chosen' : city.source === 'home' ? 'From your home' : city.source === 'identity' ? 'From your EU wallet' : 'Chosen by you'} defaultOpen={Boolean(city && !city.name)}>
     {city?.source === 'chosen' && city.home && <button type="button" className="text-button" disabled={busy} onClick={async () => {
       setBusy(true);
       try { await request('/api/city', { city: null }); window.dispatchEvent(new Event(CITY_CHANGED_EVENT)); onCityChange?.(); }
       catch (cause) { setError(cause instanceof Error ? cause.message : 'Your home city could not be restored.'); }
       finally { setBusy(false); }
     }}>Use my home city</button>}
-    {(changing || (city && !city.name) || (!city && error)) && picker}
-    <div className="city-settled"><h3>Get settled</h3>
-      {guideCity && arrivalGuideCityIds.includes(guideCity) && arrivalGuideFor(guideCity)
-        ? <Link href={`/welcome/${encodeURIComponent(guideCity)}`}>Read the {coveredNames[guideCity]} welcome guide — no account needed</Link>
-        : <p className="small-copy">{guideCity || city?.name ? 'No welcome guide for this city yet.' : 'Choose or preview a city to see whether a welcome guide is available.'}</p>}
-    </div>
+    {picker}
+    </MoreRow>
     {error && <p role="alert">{error} <button type="button" className="text-button" onClick={() => window.dispatchEvent(new Event(CITY_CHANGED_EVENT))}>Retry</button></p>}
   </section>;
 }

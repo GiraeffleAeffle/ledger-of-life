@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { HandoverRecord, MeterReading } from '../server/move-in';
 import { RegistrationConfirmation } from './registration-confirmation';
+import './move-in.css';
 
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 export function MoveInHandover({ agreementId, role, initial, request }: { agreementId: string; role: 'tenant' | 'landlord'; initial?: HandoverRecord; request: Request }) {
@@ -35,8 +36,7 @@ export function MoveInHandover({ agreementId, role, initial, request }: { agreem
     {role === 'landlord' && <RegistrationConfirmation />}
   </>;
   return <section className="move-in-handover" aria-label="Move-in handover">
-    <h3>Move-in handover · readings &amp; room notes</h3>
-    <p>Shared with this agreement’s parties. Record only meter numbers, units, dates and short room notes. No names, addresses, photos or documents. These are entered by the parties, not verified sensor readings.</p>
+    <p className="small-copy">Shared only with this agreement’s parties. Enter meter readings and short room notes, not names, addresses, photos or documents. These are party-entered readings, not verified sensors.</p>
     <button className="button secondary" type="button" disabled={busy} onClick={() => { if (!editing || window.confirm('Discard your unsaved edits and read the latest shared handover?')) void refresh(); }}>Read latest shared handover</button>
     {record && <>
       <p role="status"><strong>{record.confirmed.tenant && record.confirmed.landlord ? 'Confirmed by both parties' : 'Waiting for both parties to confirm'}</strong> · Tenant: {record.confirmed.tenant ? 'confirmed' : 'waiting'} · Landlord: {record.confirmed.landlord ? 'confirmed' : 'waiting'}</p>

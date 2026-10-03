@@ -6,7 +6,7 @@ The machine-readable source of truth is [`ontology.yaml`](ontology.yaml). This p
 
 **Positioning (decided 2026-09-26).** A household-ownership app. Your verified identity is the root, and everything you own, rent or run attaches to it through adapters. The rental deposit is the first and most complete building block.
 
-**Start here for people.** [`LEDGER_OF_LIFE.md`](LEDGER_OF_LIFE.md) describes the Today landing page, the signed-in areas and adapter choices; [`INFORMATION_ARCHITECTURE.md`](INFORMATION_ARCHITECTURE.md) states where each feature lives and how to place a new one.
+**Start here for people.** [`LEDGER_OF_LIFE.md`](LEDGER_OF_LIFE.md) describes the Home landing page, the five signed-in areas and connection choices; [`INFORMATION_ARCHITECTURE.md`](INFORMATION_ARCHITECTURE.md) states where each feature lives and how to place a new one.
 
 **Bigger picture.** Part of [Stadtstack](https://stadtstack.giraeffleaeffle.chatgpt.site): one verified identity, many contexts (tenancy, club, house community, city). Each context gives the person roles, a feed of what is decided, and what they own there. The tenancy is the first context that is built.
 
@@ -92,9 +92,9 @@ next-step notes and structured sourced outputs/measurements create pending event
 retained until individually acknowledged,
 including when a newer event is read first. Missing individual facts are labelled no longer
 stated, not zero/cancelled. 404/outages preserve prior snapshots and do not infer withdrawal
-or delivery. Case-only evidence is an app research record, not live PDF monitoring. Today shows at most two
-pending updates and opens the exact case/signal in Places; the rest remain reachable
-there. No private follow list, pins or interests leave this browser; only public city/signal
+or delivery. Case-only evidence is an app research record, not live PDF monitoring. Places owns
+pending updates and opens the exact case/signal for review.
+No private follow list, pins or interests leave this browser; only public city/signal
 IDs are requested. Browser data loss removes local follows and history.
 
 **One place, three lenses.** Places keeps one Project/CitySignal identity across Map, Outcomes and Connections. MapLibre draws only published geometry; a plan polygon is not a built footprint or affected area. An **Organization** may receive **Funding**, perform an **Activity** and produce an **Output**; an **Outcome** needs an **Indicator** with baseline, follow-up and attribution. Each project's `outputs[]` separately records basis, source URL, locator and date (`null` if unknown), so Kulturpark's reported phase-one facilities do not become its planned phase-two opening. Its own evidence record names the missing benefit indicator, not an inferred failure or zero. Adopting a plan, scheduling an opening, MWp capacity or planned annual outlays do not establish quality-of-life gains, energy generation or tax revenue. Source review and geometry precision remain inspectable.
@@ -109,9 +109,8 @@ are not established. The [official evaluation, PDF pp. 12, 125–141](https://ww
 reports traffic tradeoffs and overlapping roadworks/trials; different years and no control route
 prevent isolating a lane-caused benefit. Münster report route maps are source context, not verified
 CitySignal geometry or an impact area. The other five case records keep their named missing
-benefit indicators. Today can open the exact Münster case without altering chosen city/pins
-only when Münster is the chosen city or a followed development explicitly makes it relevant;
-everyone can find the historical example in Places.
+benefit indicators. Places opens the exact Münster case without altering chosen city/pins;
+everyone can find the clearly dated historical example there.
 
 **Relation evidence.** Solid means evidence-backed observation/report with its original status; proposed links identify a plan and do not inherit delivered status. Dashed means a modeled causal assumption in a fictional **Scenario**. Its allocation conserves capital as wages + local suppliers + external purchases + reserve; wages divided by assumed cost per job-year yields job-years, not permanent hires. Municipal receipts, transfers and service costs are editable *independent* assumptions; no investment→tax conversion, permanent employment, municipal retention of all tax, housing growth or causal improvement is inferred. Switching to observed hides this loop. Neither simulation nor public signals enter the personal Position/net-worth model.
 
@@ -279,7 +278,7 @@ memory, erased on completion, timeout, revocation, clear or process exit.
 | PriceSource | `contracts/evm/src/testnet/MirroredPriceFeed.sol`, `src/server/tsla-price-mirror.ts`: mainnet source and testnet copy provenance |
 | Operation, Release, Payout | `src/server/solana-service.ts`, `src/server/solana-initialization.ts` |
 | Journey (next step per person) | `src/server/journey.ts`, `src/components/home.tsx` |
-| Path (four stages) and next step | `src/data/path.ts`, `src/components/next-step.ts`, `src/components/path-progress.ts`, `src/components/home-journey-logic.ts` (Home's seven steps) |
+| Public-door thread (four stages) and urgent next step | `src/data/path.ts`, `src/components/next-step.ts`, `src/components/home-journey-logic.ts` (Home's tenancy steps); no signed-in path strip or living step counter |
 | Position, Venue, Distribution | `src/server/portfolio.ts`, `src/server/robinhood-demo.ts` |
 | TestFunds | `src/server/test-dollars.ts`, `src/server/gas-drip.ts`, `src/server/test-usdc.ts`, `src/components/test-dollars.tsx`, `src/components/money-area.tsx`: the person's own wallet mints tUSDG; the optional site faucet mints devnet tUSDC to a verified Solana wallet with durable retry and account/wallet/global limits. `robinhood_gas_drip` sends exactly 0.00005 test ETH to a verified wallet below 0.00001 ETH, once per 24 h per account and wallet, capped at 200 per UTC day, with durable exact-transfer recovery. Robinhood's public faucet remains the alternative for test ETH and official test TSLA; Circle supplies only the legacy devnet USDC mint. No paymaster or operator acting as a tenancy party. |
 | LocalInvestment (test units) | `src/data/local-investments.ts`, `src/server/local-investments.ts`, `src/components/local-investments.tsx`, `contracts/evm/src/testnet/FictionalCityUnit.sol`, `contracts/evm/script/local-investments.mjs` |
@@ -297,7 +296,7 @@ memory, erased on completion, timeout, revocation, clear or process exit.
 | CityEvent and sourced Organization profiles | `stadtstack-data/src/event-venues.ts`, `src/components/city-feed.tsx`, `src/data/cities/strausberg-organizations.ts`, `src/components/organization-profile.tsx`; event time/location provenance and attributed public participation, not issuer affiliation |
 | MyPlaces and on-device relevance | `src/components/personal-map.tsx`, `src/components/personal-map-relevance.ts` |
 | ArrivalGuide | `src/data/arrival/`, `src/data/interests.ts`, `src/components/arrival-guide.tsx`, `src/components/arrival-logic.ts`, `src/server/welcome-feed.ts`, `app/welcome/[city]/page.tsx` |
-| ProjectFollow | `src/components/project-following.ts`, `src/components/use-project-following.ts`, `src/components/project-follow-button.tsx`, `src/components/civic-place-lenses.tsx`, `src/components/today.tsx` |
+| ProjectFollow | `src/components/project-following.ts`, `src/components/use-project-following.ts`, `src/components/project-follow-button.tsx`, `src/components/civic-place-lenses.tsx`, `src/components/places-area.tsx` |
 | Test tooling (never evidence) | `src/server/test-signer.ts`, `src/server/test-helpers.ts`, `scripts/` |
 
 ## Open design questions

@@ -2,19 +2,21 @@
 .flat-map { width: 100%; height: 240px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--paper); }
 .flat-map .maplibregl-canvas { position: absolute; inset: 0; }
 .flat-map .maplibregl-ctrl-attrib { font-size: 10px; }
-.neighbourhood, .move-in-handover, .registration-confirmation { margin-block: 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); overflow-wrap: anywhere; }
-.neighbourhood h3, .move-in-handover h3, .registration-confirmation h3 { margin-block: 0 .75rem; }
-.neighbourhood h4 { margin-block: 1rem .5rem; }
-.neighbourhood li { margin-block: .6rem; }
+.flat-map-credit { margin: .5rem 0; font-size: .65rem; line-height: 1.4; color: var(--muted); }
+.flat-map-wrap--hero { position: absolute; inset: 0; width: 100%; height: auto; min-height: 0; margin: 0; }
+.flat-map-wrap--hero .flat-map { position: absolute; inset: 0; height: 100%; border: 0; border-radius: 0; }
+.flat-map-wrap--hero .flat-map-credit { position: absolute; inset: auto 0 0; margin: 0; padding: .35rem .65rem; background: var(--paper); opacity: .92; }
+.flat-map-wrap--hero > .note { position: absolute; inset: auto .65rem 2.5rem; font-size: .75rem; }
+.move-in-handover, .registration-confirmation { min-width: 0; color: var(--ink); overflow-wrap: anywhere; }
+.move-in-handover > p:first-child { margin-top: 0; }
 .move-in-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-block: 1rem; }
 .handover-room { display: grid; gap: .5rem; }
 .handover-room textarea { width: 100%; }
 .registration-confirmation input { width: 100%; }
-.handover-status { margin-block: 1rem; }
-.service-charge-card { margin-block: 1rem; min-height: 190px; }
-.service-charge-card > h3 { margin-block: 0 .75rem; }
+.service-charge-card { min-width: 0; }
+.service-charge-card .figure-value { font-size: clamp(1.25rem, 2.5vw, 1.8rem); }
+.move-in-handover .button, .registration-confirmation .button, .handover-room .text-button { min-height: 44px; }
 @media (max-width: 600px) {
   .flat-map { height: 220px; }
-  .neighbourhood, .move-in-handover, .registration-confirmation { padding: .8rem; }
   .move-in-actions .button { width: 100%; }
 }

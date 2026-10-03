@@ -26,9 +26,6 @@ export function readPersonCity(request: AuthorizedRequest): Promise<CityResult> 
   }
   return pending;
 }
-export function citySourceLabel(source?: CityResult['source']): string {
-  return source === 'home' ? 'From your home' : source === 'chosen' ? 'Chosen by you' : source === 'identity' ? 'From your EU wallet' : '';
-}
 export function useCitySignals(request: AuthorizedRequest, explorationCity?: string) {
   const [city, setCity] = useState<CityResult | null>(null);
   const [result, setResult] = useState<SignalResult | null>(null);

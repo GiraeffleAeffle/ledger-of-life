@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction, type ReactNode } from 'react';
 import { formatUnits, parseUnits } from 'viem';
 import { useRentalWallet } from '@/wallets';
 import type { EvmSigningRequest } from '../wallets/types';
@@ -7,6 +7,8 @@ import type { AuthorizedRequest } from './use-city-signals';
 import { buildingActionState, estimateBuildingHeat, projectedBuildingEarnings } from './building-panel-logic';
 import { useSectionTabActive } from './section-tabs';
 import type { ReinvestView } from '../server/building-revenue-reinvest';
+import { Hero, StatusLine, Figures, Figure, MoreList, MoreRow } from './blocks';
+import { usd } from './money-valuation';
 
 type Operation = 'approve' | 'stake' | 'unstake' | 'claim' | 'sync';
 type Receipt = { operation: string; quantityRaw: string | null; hash: string; status: 'pending' | 'confirmed' | 'failed' };
@@ -24,7 +26,7 @@ export type BuildingPosition = { configured: boolean; account: string; walletUni
 type Plan = { id: string; request: EvmSigningRequest; review: { operation: string; amount: string; asset: string; distributor: string } };
 const dollars = (raw: string) => formatUnits(BigInt(raw), 6);
 
-export function BuildingPanel({ request, position, setPosition }: { request: AuthorizedRequest; position: BuildingPosition | null; setPosition: Dispatch<SetStateAction<BuildingPosition | null>> }) {
+export function BuildingPanel({ request, position, setPosition, visual }: { request: AuthorizedRequest; position: BuildingPosition | null; setPosition: Dispatch<SetStateAction<BuildingPosition | null>>; visual: ReactNode }) {
   const wallet = useRentalWallet();
   const activeTab = useSectionTabActive();
   const [building, setBuilding] = useState<Building | null>(null);
@@ -33,6 +35,7 @@ export function BuildingPanel({ request, position, setPosition }: { request: Aut
   const [submitted, setSubmitted] = useState<Receipt | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [readingPosition, setReadingPosition] = useState(true);
   const [hasSigned, setHasSigned] = useState(false);
   const [reinvestHasSigned, setReinvestHasSigned] = useState(false);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
@@ -46,6 +49,7 @@ export function BuildingPanel({ request, position, setPosition }: { request: Aut
   const refresh = useCallback(async () => {
     if (reading.current) return;
     reading.current = true;
+    setReadingPosition(true);
     const generation = ++revision.current;
     try {
       const response = await fetch('/api/building', { cache: 'no-store' });
@@ -56,7 +60,7 @@ export function BuildingPanel({ request, position, setPosition }: { request: Aut
       if (active.current && generation === revision.current) { setPosition(own); setError(''); }
     } catch (cause) {
       if (active.current && generation === revision.current) { setPosition(null); setError(cause instanceof Error ? cause.message : 'Building read unavailable'); }
-    } finally { reading.current = false; }
+    } finally { reading.current = false; if (active.current && generation === revision.current) setReadingPosition(false); }
   }, [account, request, setPosition]);
   useEffect(() => {
     if (!activeTab) return;
@@ -126,28 +130,26 @@ export function BuildingPanel({ request, position, setPosition }: { request: Aut
   const heat = building ? estimateBuildingHeat({ tokens: building.gpuTokensServed, measuredWhPerToken: building.heat?.measuredWhPerToken, runtimeMs: building.heat?.runtimeSeconds == null ? null : building.heat.runtimeSeconds * 1000, nominalWatts: building.heat?.nominalPowerWatts }) : null;
   const claimReason = buildingActionState({ ...common, operation: 'claim' });
   const reinvestReason = claimReason || (position?.earnedRaw == null ? 'Wait for verified earnings' : BigInt(position.earnedRaw) < 1000n || BigInt(position.earnedRaw) > 100_000_000n ? 'Reinvest requires 0.001–100 tUSDG of verified earnings' : null);
-  return <div className="city-flywheel building-panel" style={{ overflowWrap: 'anywhere' }}>
-    <span className="eyebrow">tHOME</span><h3>Live building</h3>
-    <button type="button" className="text-button" disabled={busy} onClick={() => void refresh()}>Refresh building</button>
+  const units = (raw: string | null | undefined) => raw == null ? '—' : Number(formatUnits(BigInt(raw) / 10n ** 14n, 4)).toLocaleString('en-GB', { maximumFractionDigits: 4 });
+  const openRow = (id: string) => { const row = document.getElementById(id) as HTMLDetailsElement | null; if (row) { row.open = true; row.dispatchEvent(new Event('toggle')); row.scrollIntoView({ behavior: 'smooth', block: 'center' }); } };
+  return <div className="lean-building" style={{ overflowWrap: 'anywhere' }}>
+    <Hero visual={visual} title="Fictional housing example" subtitle="Shared housing with rooftop solar in Strausberg · illustrative" status={<StatusLine tone={position?.configured ? 'ok' : 'neutral'}>{!account ? 'Connect your Shares wallet in Me to see your units' : building && !building.configured ? building.reason || 'Building distributor not configured' : error ? 'Your units could not be checked' : position?.walletUnitsRaw != null && position.stakedRaw != null ? BigInt(position.walletUnitsRaw) + BigInt(position.stakedRaw) === 0n ? 'You hold no tHOME yet' : `You hold ${units((BigInt(position.walletUnitsRaw) + BigInt(position.stakedRaw)).toString())} tHOME · ${BigInt(position.walletUnitsRaw) === 0n ? 'all staked' : `${units(position.stakedRaw)} staked`}` : !readingPosition ? 'Your unit balance is unavailable' : 'Checking your units…'}</StatusLine>}>
+      <Figures>
+        <Figure label="Claimable now" value={position?.earnedRaw == null ? '—' : BigInt(position.earnedRaw) > 0n && BigInt(position.earnedRaw) < 10_000n ? '< $0.01' : usd(Number(dollars(position.earnedRaw)))} note={claimReason && reinvestReason && claimReason !== reinvestReason ? `${claimReason} · ${reinvestReason}` : claimReason || reinvestReason || undefined} action={<div className="lean-claim-actions"><button type="button" className="text-button" title={claimReason || undefined} disabled={Boolean(claimReason) || Boolean(error)} onClick={() => void prepare('claim')}>Claim</button><button type="button" className="text-button" title={reinvestReason || undefined} disabled={Boolean(error) || Boolean(reinvestReason)} onClick={() => void reinvestAction('reinvest_start')}>Reinvest</button></div>} />
+        <Figure label="Your units" value={units(position?.stakedRaw)} unit="tHOME" note={`staked · ${units(position?.walletUnitsRaw)} in wallet`} />
+        <Figure label="House income so far" value={building?.revenueRaw == null ? '—' : BigInt(building.revenueRaw) > 0n && BigInt(building.revenueRaw) < 10_000n ? '< $0.01' : usd(Number(dollars(building.revenueRaw)))} />
+      </Figures>
+      <div className="local-test-actions"><button type="button" className="button primary" onClick={() => openRow('local-unit-desk')}>Buy units</button><button type="button" className="button" onClick={() => openRow('local-unit-staking')}>Stake</button></div>
+    </Hero>
     {error && <p role="alert">{error} · No success or missing balance is inferred.</p>}
     {!building ? <p role="status">Reading the building…</p> : <>
       {!building.configured && <p role="status">Not configured: {building.reason || 'The building distributor has not been provisioned.'}</p>}
       <section className="building-rewards" aria-label="Your building rewards">
-      <h4>What can I claim?</h4>
-      {position?.configured && position.pendingRevenueRaw != null && BigInt(position.pendingRevenueRaw) > 0n && <div><p>{dollars(position.pendingRevenueRaw)} tUSDG of new income awaits a stream update. This does not claim earnings or pay you a lump sum.</p><button type="button" className="button primary" disabled={Boolean(buildingActionState({ ...common, operation: 'sync' })) || Boolean(error)} onClick={() => void prepare('sync')}>Start streaming new income to stakers (anyone can do this)</button></div>}
-      <div className="local-ai-metrics">
-        <div><strong>{position?.configured && position.earnedRaw != null ? dollars(position.earnedRaw) : '—'} tUSDG</strong><span>Claimable now · verified read</span></div>
-        <div><strong>{position?.configured && earnedDisplay != null ? dollars(earnedDisplay) : '—'} tUSDG</strong><span>Earned so far · projected between verified reads</span></div>
-      </div>
-      {position?.configured && position.walletUnitsRaw != null && position.stakedRaw != null && BigInt(position.stakedRaw) === 0n && <p>{BigInt(position.walletUnitsRaw) === 0n ? 'To start earning, buy fictional tHOME at the desk above, then stake it below.' : 'Your wallet has tHOME but none is staked. Stake units below to start earning.'} Only staked units share future income; any already accrued earnings remain claimable.</p>}
-      <p className="small-copy">Claim reviews use a fresh verified read, never the projection. No value, no rights · test networks only.</p>
-      <div className="local-test-actions">
-        <div><button type="button" className="button primary" disabled={Boolean(claimReason) || Boolean(error)} onClick={() => void prepare('claim')}>Claim to my wallet</button>{claimReason && <p className="small-copy">{claimReason}</p>}</div>
-        <div><button type="button" className="button primary" disabled={Boolean(error) || Boolean(reinvestReason)} onClick={() => void reinvestAction('reinvest_start')}>Reinvest</button>{reinvestReason && <p className="small-copy">{reinvestReason}</p>}</div>
-      </div>
       {plan && <div className="local-order-review"><h4>Exact {plan.review.operation} review</h4><p>{plan.review.amount} {plan.review.asset} · Robinhood Chain testnet (46630).</p><p>Distributor: <code>{plan.review.distributor}</code><br />Own wallet: <code>{wallet.wallets.find((item) => item.id === plan.request.walletId)?.address || position?.account}</code></p><p>{plan.request.description} Network fees use test ETH. Fictional test units, no value, no rights.</p><button type="button" className="button primary" disabled={busy || !account} onClick={() => void submit()}>{hasSigned ? 'Retry submitting the same signed transaction' : `${plan.review.operation === 'approve' ? 'Approve exact units' : plan.review.operation === 'stake' ? 'Stake' : plan.review.operation === 'unstake' ? 'Unstake' : plan.review.operation === 'sync' ? 'Start streaming new income' : 'Claim'} with my wallet`}</button>{!hasSigned && <button type="button" className="text-button" disabled={busy} onClick={() => setPlan(null)}>Close unsigned review</button>}</div>}
-      {pending && <p role="status">A signed building transaction is pending. Wait for its verified receipt before another action.</p>}
-      {reinvest && <div className="local-order-review" aria-label="Reinvest earnings workflow">
+      {pending && <p role="status">A signed building transaction is pending. Wait for its verified receipt before another action. {(submitted?.status === 'pending' ? submitted.hash : receipts.find(receipt => receipt.status === 'pending')?.hash) && <a href={`${building.explorerUrl}/tx/${submitted?.status === 'pending' ? submitted.hash : receipts.find(receipt => receipt.status === 'pending')?.hash}`} target="_blank" rel="noopener noreferrer">View pending transaction</a>}</p>}
+      </section>
+      <MoreList>
+      {reinvest && <MoreRow key={reinvesting ? 'active-reinvest' : 'reinvest-history'} title="Reinvest earnings" meta={reinvesting ? 'Review the next step' : reinvest.phase === 'completed' ? 'Completed · receipts' : 'Stopped · receipts'} defaultOpen={reinvesting}><div className="local-order-review" aria-label="Reinvest earnings workflow">
         <h4>Reinvest · {reinvest.phase === 'completed' ? 'completed' : reinvest.phase === 'stopped' ? 'stopped' : `next: ${reinvest.phase}`}</h4>
         <p>Own wallet: <code>{reinvest.account}</code>{reinvest.claimedRaw != null && <> · Confirmed claim: {dollars(reinvest.claimedRaw)} tUSDG</>}{reinvest.unitsRaw != null && <> · Bought: {formatUnits(BigInt(reinvest.unitsRaw), 18)} tHOME</>}</p>
         <ol><li>Claim accrued tUSDG to your wallet</li><li>Approve only the claimed tUSDG if needed; buy tHOME at the pinned desk</li><li>Approve only the bought tHOME; stake it to earn a share of future streams</li></ol>
@@ -158,43 +160,37 @@ export function BuildingPanel({ request, position, setPosition }: { request: Aut
           <button type="button" className="button primary" disabled={busy || !account} onClick={() => void reinvestAction('reinvest_submit')}>{reinvestHasSigned ? 'Retry the same signed step' : 'Sign only this reviewed step in my wallet'}</button>
         </> : reinvesting && <button type="button" className="button primary" disabled={busy || !account} onClick={() => void reinvestAction('reinvest_prepare')}>Review next reinvest step</button>}
         <ul>{reinvest.receipts.map(receipt => <li key={receipt.hash}><a href={`${building.explorerUrl}/tx/${receipt.hash}`} target="_blank" rel="noopener noreferrer">{receipt.operation} · {receipt.status} · {receipt.hash}</a></li>)}</ul>
-      </div>}
-      </section>
-      <section className="building-income" aria-label="Building income">
-      <h4>Where the income comes from</h4>
+      </div></MoreRow>}
+      <MoreRow id="local-unit-staking" title="Stake or unstake" meta={`${units(position?.stakedRaw)} staked`}>
+      {position?.configured && position.walletUnitsRaw != null && position.stakedRaw != null && BigInt(position.stakedRaw) === 0n && BigInt(position.walletUnitsRaw) > 0n && <p className="small-copy">Stake your wallet units to share future house income.</p>}
+      <p>In your wallet: {position?.walletUnitsRaw == null ? '—' : formatUnits(BigInt(position.walletUnitsRaw), 18)} tHOME. Staked: {position?.stakedRaw == null ? '—' : formatUnits(BigInt(position.stakedRaw), 18)} tHOME.</p>
+      <div className="local-test-actions"><button type="button" className="text-button" disabled={busy || Boolean(plan) || pending || position?.walletUnitsRaw == null} onClick={() => position?.walletUnitsRaw != null && setAmount(formatUnits(BigInt(position.walletUnitsRaw), 18))}>Max wallet units</button><button type="button" className="text-button" disabled={busy || Boolean(plan) || pending || position?.stakedRaw == null} onClick={() => position?.stakedRaw != null && setAmount(formatUnits(BigInt(position.stakedRaw), 18))}>Max staked units</button></div>
+      <label>tHOME units to stake or unstake <input aria-label="tHOME stake or unstake amount" inputMode="decimal" value={amount} disabled={busy || Boolean(plan) || pending} onChange={(event) => setAmount(event.target.value)} /></label>
+      <div className="local-test-actions">{(['stake', 'unstake'] as const).map((operation) => {
+        const reason = buildingActionState({ ...common, operation });
+        return <div key={operation}><button type="button" className="button primary" disabled={Boolean(reason) || Boolean(error)} onClick={() => void prepare(operation === 'stake' ? stakeOperation : operation)}>{operation === 'stake' ? stakeOperation === 'approve' ? 'Stake · review exact approval first' : 'Review stake' : 'Review unstake'}</button>{reason && <p className="small-copy">{reason}</p>}</div>;
+      })}</div>
+      <p className="small-copy">Approve only the entered units, then stake after the receipt is confirmed. Never transfer tHOME directly to the distributor: direct transfers do not earn and cannot be recovered.</p>
+      {position?.configured && <p>Wallet: <code>{position.account}</code> · Total building stake: {formatUnits(BigInt(building.totalStakedRaw), 18)} tHOME.</p>}
+      </MoreRow>
+      <MoreRow title="Building action receipts" meta={pending ? 'Pending · receipts' : `${receipts.length} recorded`}>
+      <h4>Your building action receipts</h4>
+      {!receipts.length && !submitted && <p>No building action receipts for this wallet.</p>}
+      <ul>{[...receipts, ...(submitted && !receipts.some((item) => item.hash === submitted.hash) ? [submitted] : [])].map((item) => <li key={item.hash}><a href={`${building.explorerUrl}/tx/${item.hash}`} target="_blank" rel="noopener noreferrer">{item.operation} · {item.status === 'confirmed' ? 'confirmed' : item.status === 'failed' ? 'failed · no success inferred' : 'awaiting verified receipt'} · {item.hash}</a></li>)}</ul>
+      </MoreRow>
+      <MoreRow title="Where the income comes from" meta={position?.pendingRevenueRaw != null && BigInt(position.pendingRevenueRaw) > 0n ? 'New income ready to stream · sources & receipts' : `${building.paidAnswers} paid answers · sources & receipts`}>
+      {position?.configured && position.pendingRevenueRaw != null && BigInt(position.pendingRevenueRaw) > 0n && <div><p>{dollars(position.pendingRevenueRaw)} tUSDG of new income awaits a stream update. This does not claim earnings or pay you a lump sum.</p><button type="button" className="button primary" disabled={Boolean(buildingActionState({ ...common, operation: 'sync' })) || Boolean(error)} onClick={() => void prepare('sync')}>Start streaming new income to stakers (anyone can do this)</button></div>}
       {building.payingDevices.length ? <ul>{building.payingDevices.map((device, index) => <li key={`${device.kind}:${device.name}:${index}`}><strong>{device.name}</strong> · {device.kind === 'operator' ? 'operator device' : 'community device'} · {device.availability}</li>)}</ul> : <p>No device currently pays the building.</p>}
-      <div className="local-ai-metrics">
-        <div><strong>{building.paidAnswers}</strong><span>Recorded paid GPU answers</span></div>
-        <div><strong>{dollars(building.revenueRaw)} tUSDG</strong><span>Verified received by building</span></div>
-        <div><strong>{building.gpuTokensServed}</strong><span>Recorded served tokens</span></div>
-        <div><strong>{heat ? `${heat.kwh.toFixed(6)} kWh` : 'Unavailable'}</strong><span>Estimated GPU heat</span></div>
-      </div>
+      <Figures>
+        <Figure label="Paid answers" value={building.paidAnswers} />
+        <Figure label="Served tokens" value={building.gpuTokensServed} />
+        <Figure label="Estimated GPU heat" value={heat ? heat.kwh.toFixed(6) : '—'} unit="kWh" />
+      </Figures>
       {building.incomeSources.length ? <ul>{building.incomeSources.map(source => <li key={source.id}><strong>{source.name} · {dollars(source.amountRaw)} tUSDG</strong><p className="small-copy">{source.meaning}</p></li>)}</ul> : <p>No confirmed building income yet. Personal host payouts are not building income.</p>}
       <details><summary>All confirmed income receipts</summary>
         {building.revenueTransactions.length ? <ul>{building.revenueTransactions.map(tx => <li key={`${tx.transactionHash}:${tx.logIndex}`}><a href={tx.explorerUrl} target="_blank" rel="noopener noreferrer">{tx.sourceName} · {dollars(tx.amountRaw)} tUSDG · {tx.transactionHash}</a></li>)}</ul> : <p>No distributor transfer receipts recorded.</p>}
       </details>
-      </section>
-      <section aria-label="Stake or unstake tHOME">
-      <h4>Stake or unstake</h4>
-      <div className="local-ai-metrics">
-        <div><strong>{position?.configured && position.walletUnitsRaw != null ? formatUnits(BigInt(position.walletUnitsRaw), 18) : '—'} tHOME</strong><span>In your wallet</span></div>
-        <div><strong>{position?.configured && position.stakedRaw != null ? formatUnits(BigInt(position.stakedRaw), 18) : '—'} tHOME</strong><span>Staked · earning share</span></div>
-      </div>
-      {position?.configured && <p>Wallet: <code>{position.account}</code> · Total building stake: {formatUnits(BigInt(building.totalStakedRaw), 18)} tHOME.</p>}
-      <label>tHOME units to stake or unstake <input aria-label="tHOME stake or unstake amount" inputMode="decimal" value={amount} disabled={busy || Boolean(plan) || pending} onChange={(event) => setAmount(event.target.value)} /></label>
-      <div className="local-test-actions">
-        {(['stake', 'unstake'] as const).map((operation) => {
-          const reason = buildingActionState({ ...common, operation });
-          return <div key={operation}><button type="button" className="button primary" disabled={Boolean(reason) || Boolean(error)} onClick={() => void prepare(operation === 'stake' ? stakeOperation : operation)}>{operation === 'stake' ? stakeOperation === 'approve' ? 'Stake · review exact approval first' : 'Review stake' : 'Review unstake'}</button>{reason && <p className="small-copy">{reason}</p>}</div>;
-        })}
-      </div>
-      <p className="small-copy">Staking needs two separate exact reviews when allowance is insufficient: approve only the entered units, then stake after the approval receipt is confirmed. No unlimited approval.</p>
-      <p className="small-copy">Use the Stake action, never transfer tHOME directly to the distributor: direct unit transfers do not earn rewards and cannot be recovered. Plain tUSDG transfers are revenue, not unit stakes.</p>
-      <h4>Your building action receipts</h4>
-      {!receipts.length && !submitted && <p>No building action receipts for this wallet.</p>}
-      <ul>{[...receipts, ...(submitted && !receipts.some((item) => item.hash === submitted.hash) ? [submitted] : [])].map((item) => <li key={item.hash}><a href={`${building.explorerUrl}/tx/${item.hash}`} target="_blank" rel="noopener noreferrer">{item.operation} · {item.status === 'confirmed' ? 'confirmed' : item.status === 'failed' ? 'failed · no success inferred' : 'awaiting verified receipt'} · {item.hash}</a></li>)}</ul>
-      </section>
-      <details className="building-how"><summary>How the building pays</summary>
+      <p>Projected earned so far: {earnedDisplay == null ? '—' : dollars(earnedDisplay)} tUSDG. Claim reviews always use a fresh verified read.</p>
     <p>Only staked tHOME units earn: income streams to stakers over 7 days, not as an instant payout. Seven days is a scheduling window, not a guaranteed finish: every positive new receipt extends the outstanding stream, even a tiny test-dollar transfer. Revenue during an idle period restarts streaming when staking resumes, never as a lump sum.</p>
     <p>Stake, claim accrued earnings, reinvest them or unstake any time with your own wallet. Reinvest means claim → buy fractional tHOME at 1 tUSDG per tHOME → exact approval → stake. Review each step separately; reload resumes the durable workflow. Unstake units before selling them back at the desk. Fictional testnet accounting, not property rights or real investment returns.</p>
       <p>The earnings projection follows the current stream and stake share and stops at the stream’s end. New income or stake changes require a fresh read. Reinvest requires 0.001–100 tUSDG of verified earnings; test ETH pays each network fee.</p>
@@ -202,7 +198,9 @@ export function BuildingPanel({ request, position, setPosition }: { request: Aut
       <p><strong>Validator:</strong> {building.validator ? <>{building.validator.name || 'Configured validator'} · {building.validator.status || 'Public read'} {building.validator.url && <a href={building.validator.url} target="_blank" rel="noopener noreferrer">View public reading</a>}</> : 'Planned · no building validator configured.'}</p>
       <p><strong>Solar:</strong> Home Node readings can support explicitly assigned, simulated feed-in income. The hosted site never pulls your LAN or Home Assistant token; this is not a real electricity sale.</p>
       <p>Public answers are available only when a host enables them, within the shared allowance; free answers have no payout. <a href="/library">Open the public AI desk</a></p>
-      </details>
+      <button type="button" className="text-button" disabled={busy} onClick={() => void refresh()}>Refresh building</button>
+      </MoreRow>
+      </MoreList>
     </>}
   </div>;
 }

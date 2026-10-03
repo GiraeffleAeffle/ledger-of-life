@@ -29,3 +29,31 @@ test('city setup is offered only after a successful read finds no city', () => {
     assert.equal(adapterState(cityAdapter, unresolved).tone, 'unknown');
   }
 });
+
+test('connection rows distinguish a saved setting from a working live source', () => {
+  const homeAssistant = LEDGER_ADAPTERS.find((adapter) => adapter.id === 'homeAssistant')!;
+  const validator = LEDGER_ADAPTERS.find((adapter) => adapter.id === 'validator')!;
+  const saved = {
+    ...inputs,
+    homeAssistantPull: false,
+    config: {
+      homeAssistant: { url: 'http://homeassistant.local:8123', entity: 'sensor.solar', pricePerKwh: 0.3 },
+      validator: { chain: 'gnosis' as const, id: '123' },
+    },
+  };
+  assert.deepEqual(adapterState(homeAssistant, saved), {
+    label: 'Saved · unavailable on this host', tone: 'unknown', configured: true,
+  });
+  assert.equal(adapterState(validator, saved).label, 'Configured');
+  assert.equal(adapterState(validator, { ...saved, configError: 'offline' }).label, 'Configuration unavailable');
+  assert.equal(adapterState(validator, { ...saved, configLoading: true }).label, 'Checking configuration…');
+  assert.deepEqual(adapterAction(validator, saved), validator.action);
+});
+
+test('EU proof rows distinguish pending, verified and unreadable proof', () => {
+  const identity = LEDGER_ADAPTERS.find((adapter) => adapter.id === 'eudi')!;
+  assert.equal(adapterState(identity, inputs).label, 'Optional proof to add');
+  assert.equal(adapterState(identity, { ...inputs, identity: { state: 'pending', startedAt: '2026-10-03T10:00:00Z' } }).label, 'Verification in progress');
+  assert.equal(adapterState(identity, { ...inputs, identityError: 'offline' }).label, 'Proof status unavailable');
+  assert.equal(adapterState(identity, { ...inputs, identityLoading: true }).checking, true);
+});

@@ -1,8 +1,5 @@
 .civic-place { padding: 22px; min-width: 0; display: grid; gap: 14px; }
 .civic-place .personal-map-section { padding: 0; border: 0; box-shadow: none; }
-.civic-place .personal-heading h2 { font-size: 1.05rem; }
-.civic-heading { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 8px; }
-.civic-heading h2 { margin: 3px 0; font-size: 1.35rem; }
 .civic-key { position: relative; font-size: .78rem; color: var(--ink); }
 .civic-key summary { padding: 6px 9px; background: var(--soft); border-radius: 8px; cursor: pointer; }
 .civic-key p { position: absolute; z-index: 5; top: 100%; right: 0; width: min(290px, calc(100vw - 48px)); margin: 5px 0 0; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--soft); box-shadow: 0 8px 22px #15263b20; line-height: 1.5; }
@@ -143,11 +140,9 @@
 }
 
 .civic-place { padding: clamp(14px, 2.2vw, 28px); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
-.civic-heading { align-items: center; gap: 12px; }
-.civic-heading h2 { font-size: clamp(1.35rem,2.5vw,2rem); }
 .civic-key { background: var(--soft); border: 1px solid var(--line); }
 .civic-selected-project { display: grid; gap: 13px; }
-/* The sheet sticks only while its own row (map + sheet) is on screen; the lens panels below are outside this row, so it can never slide over them. */
+/* The selected sheet stays in its own column beside the map and its disclosure rows. */
 .civic-map-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(265px, 330px); gap: 13px 18px; align-items: start; }
 .civic-map-row > .civic-detail { position: sticky; top: 16px; max-height: min(77vh, 740px); overflow: auto; }
 .civic-story { display: flex; gap: 9px; overflow-x: auto; padding-bottom: 3px; scrollbar-width: thin; }

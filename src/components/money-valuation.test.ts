@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { netPositionParts, netPositionTotal, shareValuationAvailable, todayTestValueLabel, type SharePositionAmounts } from './money-valuation.ts';
+import { netPositionParts, netPositionTotal, shareValuationAvailable, type SharePositionAmounts } from './money-valuation.ts';
 const position: SharePositionAmounts = { deployment: { pool: 'pool' }, price: { stale: false }, suspended: false, priceAtomic: '350000000', sharesRaw: '2000000000000000000', walletValueAtomic: '700000000', loan: null, lender: null };
 const parts = (positions: SharePositionAmounts, cash = 0) => {
   const result = netPositionParts({ positions, lockedUsd: 0, walletCashUsd: cash, walletSharesUsd: 0 });
@@ -47,16 +47,4 @@ test('cash, lender claims and debt remain valued without a quote when stock quan
   assert.equal(shareValuationAvailable(noStock), true);
   assert.deepEqual(parts(noStock, 100), { free: 100, locked: 0, pledged: 0, lent: 25, owed: 10 });
   assert.equal(netPositionTotal(parts(noStock, 100)), 115);
-});
-
-test('Today distinguishes checking, unavailable and confirmed test value, including zero', () => {
-  assert.equal(todayTestValueLabel(false, false, 0), 'Test value: checking your test assets…');
-  assert.equal(todayTestValueLabel(false, true, 0), 'Test value: unavailable right now');
-  assert.equal(todayTestValueLabel(true, false, 0), '$0.00 test value');
-  assert.equal(todayTestValueLabel(true, false, 1234.5), '$1,234.50 test value');
-});
-
-test('a failed refresh cannot present a previous complete subtotal as current', () => {
-  assert.equal(todayTestValueLabel(true, true, 1234.5), 'Test value: unavailable right now');
-  assert.equal(todayTestValueLabel(false, false, 1234.5), 'Test value: checking your test assets…');
 });

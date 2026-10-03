@@ -16,7 +16,7 @@ city that perceives, decides, acts and learns.
 
 ## 2. One person's life
 
-Five domains organise the person's ledger, and one thread runs through them: find a home, secure the deposit, keep your assets, help build your city ([INFORMATION_ARCHITECTURE.md](INFORMATION_ARCHITECTURE.md#the-thread-and-the-next-step)). **Today** gives the next step and where the person is on that path; **Me** owns the shared adapter catalogue and connection settings; the **Roadmap** (area id `ideas`) separates what is planned from working features. Public life is one domain, not the whole product. Which area operates which feature follows one rule: each feature has one home, and every other area shows only a reference that links there.
+Five domains organise the person's ledger, and one thread runs through them: find a home, secure the deposit, keep your assets, help build your city ([INFORMATION_ARCHITECTURE.md](INFORMATION_ARCHITECTURE.md#the-thread-and-the-next-step)). **Home** is the daily entry point for tenancy status and the action needed now; **Money** owns holdings and financial workflows; **Places** owns neighbourhood and public life; **Me** owns sign-in, wallets, private history and grouped connections; the **Roadmap** (area id `ideas`) is a secondary sidebar link separating planned from working features. Public life is one domain, not the whole product. Each feature has one home, and every other area shows only a reference that links there.
 
 ```mermaid
 flowchart TB
@@ -240,10 +240,9 @@ public-finance assumptions; dashed edges and shapes remain distinct from source-
 Selecting a node highlights connected relations but does not create geographic claims or add
 anything to portfolio/net worth. Ideas groups all 16 original capability IDs in a compact
 person → home → enterprise → city → measure journey; selecting one opens one concise detail
-and a working destination where present. Today keeps a selected-city place→output→unknown
-preview where mapped; the historical Münster example appears there only when Münster is the
-chosen city, while Places keeps it discoverable for everyone. Either opens its exact project
-and Outcomes lens without changing the person's chosen city or map pins.
+and a working destination where present. Places owns project outcomes and connections in a
+disclosure, including the clearly dated historical Münster example. It opens the exact project
+and its evidence without changing the person's chosen city or map pins.
 
 ### 2.8 Follow public projects (built 2026-09-28)
 
@@ -273,7 +272,7 @@ evidence record; this does not monitor the external PDF for new publications. Li
 every mapped public record to load.
 
 Unseen changes survive reload and other successful refreshes until individually marked read,
-including older changes not shown in Today's two-item cap. Acknowledging any displayed event
+including older changes outside the compact followed-development preview in Places. Acknowledging any displayed event
 does not consume other unseen events or a later arrival. A disappearing individual evidence
 fact is marked **no longer stated**, not zero or cancellation. Missing public records and
 failed sources retain pending changes and show an unavailable state, never an inferred
@@ -281,7 +280,7 @@ completion. Unfollow deletes only that target's saved state; old in-flight refre
 stale read callbacks cannot affect a newly refollowed instance. A pending first follow
 is also abandoned after *any* intervening selection/review, even if a person navigates
 A→B→A before the old source response arrives. Corrupt browser storage is reported
-and never overwritten as an empty list. Today shows no follow panel when none exist;
+and never overwritten as an empty list. Places shows no follow panel when none exist;
 updates open the exact case and changed linked signal (or generic signal) in Places. Each
 review re-fetches its full public record: current status/evidence replaces the compact
 headline, and a failed detail refresh reports unavailability rather than presenting old
@@ -299,35 +298,38 @@ No push/email service or invented action deadline.
 - Built features and roadmap ideas sat side by side with the same visual weight.
 - Two portfolio views existed (Portfolio tiles and the Invest card).
 
-### Structure (updated 2026-09-28)
+### Structure (updated 2026-10-03)
 
 | Navigation item | Contains | Moves from |
 |---|---|---|
-| **Today** | Actionable Home prompt when needed; five-domain ledger overview with one coherent Money summary and working share-flow links; compact official press, followed developments, chosen-city visit differences and conditional civic preview below | Restores the household-first entry point |
-| **Me** | Identity, contextual roles, private timeline and a shared source/capability directory (19 sources, 18 capabilities); Home Assistant and validator save/remove controls; on-demand passkey, backup, wallet creation and same-wallet recovery settings | One catalogue and one configuration owner |
-| **Home** | Visual find → apply/agree → deposit → live journey; role-specific next steps, service charges and test controls on demand. A hosted tenancy needs actual distinct parties; no fake-stock deposit setup | Reuses listing/agreement/tenancy handlers |
-| **Money** | **Holdings** (wallets, deposit entitlement, lent value and subtotal), **Shares & loans** (official-stock shared loan and lender actions; deposit unavailable without actual parties), **Local stakes** (fictional units and receipts), **Devices & income** (solar, validators, local AI); collateral/debt/cash counted once | Deployment-dependent wallet-signed actions, honest provenance and liquidity limits |
-| **Places** | Persistent OSM 2D/3D context, public planning areas/local places, prominent selected-project Follow and one detail sheet; distinct opt-in fictional issuer markers, unlocated events and source details | One map and one selection, not a stack of prose dashboards |
+| **Home** | Default entry point: one tenancy Hero with a fictional-house 3D map or flat map, role subtitle and status; role-specific figures and one ActionBox only when the person must act. About this tenancy is a full-width row list directly below the Hero for rent/receipts, handover, service charges, moving out and agreement/activity; an idle arbitrator sees only Agreement & activity. Setup and move-out have a compact checked phase line; living has no step counter. With no current home, Find a home opens listings. Final rows open other homes, renting out, past homes and local-only rehearsal tools | Reuses listing/agreement/tenancy handlers; neighbourhood belongs to Places |
+| **Money** | **Holdings** (total test value and free/locked/lent/owed bar when available; otherwise one status sentence replaces figure, bar and legend; holding rows, four plain test-money needs with one action each, Valuation details), **Borrow & lend** (loan/lending cards; task panel only after picking an action), **Local stakes** (House / Workshop / Agri-PV picker, Hero and detail rows), **Devices & income** (device rows, compact city AI and hardware economics); collateral/debt/cash counted once | Deployment-dependent wallet-signed actions, honest provenance and liquidity limits |
+| **Places** | Header with city, Get settled, weather reading and Change city; one visit-change line (“Nothing new since your last visit.” when unchanged), one layer-chip row and map with its 3D/2D switch; one row list for Map settings, Project outcomes & connections, Weather & air; Have your say (Open consultations, Followed projects, Browse projects), Events & news, Who does what, Nearby towns and Council tabs; one public-source note | One owner for neighbourhood, public projects and following |
+| **Me** | Compact Sign-in & wallets (Deposit wallet on Solana, Shares wallet on Robinhood Chain), private Life timeline with earlier places on demand and a plain-caption note; individual connection rows only for EU identity wallet, Home solar (Home Assistant) and Validator activity; Built into your account (13) groups automatic sources with “Included with your account” or “N need you”, Planned connections (3) groups future sources. View reading appears only for configured connections | One configuration owner |
 | **Roadmap** (id `ideas`) | Every capability from `src/data/ledger-catalogue.ts`, grouped by availability (available on this site, needs a local setup, planned), one selected detail, exact working destinations (`Idea.destination`) and links back to the related adapters | One capability definition in `src/data/ledger-catalogue.ts` |
 
-The sidebar and mobile tab bar show five areas in path order: Today, Home, Money, Places, Me. The Roadmap
-is reached from the sidebar foot, Today and the "Test networks" explainer. Account management lives on demand
-under Me rather than in a global proof dashboard. Today is the next step and the stage strip, not a civic
-dashboard or a second set of editable workflows. Places owns the map and public-life detail;
-the Roadmap owns the capability list. A feature that could fit several areas has one home and a reference elsewhere.
+The sidebar and mobile tab bar show Home, Money, Places and Me. Roadmap is the fifth area,
+reached as a secondary sidebar link and from the "Test networks" explainer. `/` opens Home.
+Page headings are an h1 only, without stage eyebrows or subtitles; there is no breadcrumb
+or signed-in path strip. Account management lives in Me. Places owns the map and public-life
+detail; Roadmap owns the capability list. A feature has one home and references elsewhere.
 
-Today shows one next step, the four stages as done, in progress or to do, then three status tiles titled
-by stage (your home, your assets, your city). Money uses the existing complete-snapshot valuation rather than
-adding a second total. Official city press and personally relevant public developments remain below.
+Home answers “Is my home OK?” with status, figures and the action needed now, not a living
+step counter. Outside Home, the next-step card appears only for urgent steps.
+Money → Holdings alone publishes the complete-snapshot priced subtotal.
+Places owns official city press, followed developments and the chosen-city visit comparison.
+Living landlords have two figures: Deposit held and Rent this month received, whose note
+includes the house's 20 % share and next payment date. Money amounts use a "$" prefix and
+two decimals app-wide (for example, "$1,300.00"); token amounts retain their symbol.
 The generic city visit comparison eagerly advances successful city snapshots and is not the
 followed unread queue. The latter starts from first follow, retains individual pending events
 until read and reports source outages rather than inferring project closure. Details expand
-on request without hiding publisher, date, review state or stale/test labels. Home earnings
-and deposits link to their exact Money holding/workflow, and Money's deposit and operation
+on request without hiding publisher, date, review state or stale/test labels. Home owns deposit
+and earnings actions without linking to a Money deposit holding. Money's deposit and operation
 trail links back to the actual tenancy. One tSPYx holding owns its purchase control; the
 official Robinhood test TSLA uses one mirror valuation in wallet and collateral; Solana tSPYx remains separate.
-Today's share-deposit/loan shortcuts select the corresponding Money workflow without starting
-an operation. The actual Borrow action is visible in its main panel when eligible; the existing
+Share rental deposits are operated in Home; loans and lending are operated in Money → Borrow & lend.
+The focused Borrow & lend task panel opens only after the person picks an action; the existing
 wallet-signing and readiness gates are unchanged.
 Shared-market positions distinguish wallet shares, loan collateral, debt and lender value.
 Old fake-stock contracts and store records are unused without migration, not current holdings.
@@ -375,7 +377,7 @@ is undeployed, with no invented price or pool. Failed reads never become zero ba
 Freshness is 26 hours normally, 74 hours Saturday 00:00 UTC–Monday 12:00 UTC.
 Closed markets retain dated last prices; stale pricing freezes price-sensitive actions.
 
-Money and Today publish a **priced-test-assets subtotal** only after Solana, official TSLA
+Money → Holdings publishes a **priced-test-assets subtotal** only after Solana, official TSLA
 and shared loan/lender reads settle successfully together. A nonzero official TSLA holding
 with stale pricing or an undeployed mirror blocks the numeric subtotal. The prior snapshot
 is retained internally; only its dated last-complete timestamp is shown, not its prior numeric value. Wallet TSLA is counted
@@ -415,18 +417,17 @@ All tUSDG is freely mintable test dollars, never income or euros. No operator pr
 desk, yield or liquidity-withdrawal lever substitutes for actual deployment and borrowers.
 
 The published city press feeds live at `cities/<cityId>/feed.json` for eight covered cities.
-Today shows only official press news with publisher, date and source link; Places also lists
+Places → Events & news shows official press news with publisher, date and source link, and
 dated events, displaying an event start only when supplied. A city with no imported news shows
 “No news feed from <city> yet” and its official page link rather than fabricated headlines.
 One published regional file, `regions/brandenburg-mol/topics.json`, supplies eight candidate
-shared topics only to cities explicitly named in its `cityRegions` mapping. Today ranks
-topics with the chosen city's own source items first, showing three municipality counts,
-furthest-stage source links and local source links. Places links all municipalities with
-their own dates and stages; interpretive summaries are “Not yet checked”. Administrative
+shared topics only to cities explicitly named in its `cityRegions` mapping. Places → Nearby towns
+keeps the chosen city's own source items and named municipalities' source links, dates and
+separate stages together; interpretive summaries are “Not yet checked”. Administrative
 address points in the source file are not map areas. No decision is implied unless
 its municipality's sourced stage is adopted. Device-only visit snapshots compare public signal status, review,
-dates, details and precision, plus dated feed additions/corrections; news already in Today’s
-three headline leads is not repeated as a change. Version hashes and feed retrieval timestamps
+dates, details and precision, plus dated feed additions/corrections. Places owns both the
+source feed and the visit-change view. Version hashes and feed retrieval timestamps
 alone do not count; home/work pins never enter a snapshot or an API request.
 
 ## 4. Adapters: a shared catalogue, separate authority
@@ -471,7 +472,7 @@ Home/Money link to these settings and retain the existing `/api/assets` observat
 | Rental deposit escrow (Solana) | Home | Built | **Keep**, core story |
 | Stocks: Solana (tSPYx) | Money | Built | **Keep**, merge the two portfolio views |
 | Stocks: Robinhood Chain (TSLA) | Money | Built | **Keep** as second network; decide if the pitch needs two chains |
-| Stadtstack city data | Today, Places | Published city press feeds for eight cities, city map signals with source/review/precision and optional regional candidate topics when relevant; separate project atlas link | Show dated sources, “Not yet checked” interpretations and honest no-feed states |
+| Stadtstack city data | Places | Published city press feeds for eight cities, city map signals with source/review/precision and optional regional candidate topics when relevant; separate project atlas link | Show dated sources, “Not yet checked” interpretations and honest no-feed states |
 | DWD via Bright Sky and sensor.community | Places | Read-only live weather and nearby uncalibrated citizen PM sensors | **Keep** times, distances, licences and stale labels; no city-wide air-quality claim |
 | OSM sports and leisure | Places | Published map contains OSM club and sport tags; live Overpass adds only leisure-tagged facilities absent from that pipeline | **Keep** ODbL attribution, gap labeling and official Strausberg directory links |
 | Public money flow and Strausberg budget access | Places | Sourced statutory explainer and ordinance headline **planned** investment outlays (2025 €17,941,270; 2026 €12,609,320), no actual spending or detailed project allocations | Obtain the complete plan and verified line items before a spending breakdown |
@@ -485,7 +486,7 @@ Home/Money link to these settings and retain the existing `/api/assets` observat
 | Local AI & GPU hosting | Money (Devices & income); public `/library` | Actual Ollama answers through paired outbound Home Node GPU workers (any signed-in account with a verified EVM wallet may pair up to two community hosts, fifty globally) or direct local mode; signed pairing, heartbeats and privacy-scoped routing. Own-compute and the former flat-price x402 test-token path were proven on the hosted site on 30 September; the per-token `upto` path settled once on the hosted site on 1 October (104 tokens, 0.0104 tUSDG, [evidence](evidence/HOSTED_PER_TOKEN_AI_ANSWER_ROBINHOOD_TESTNET_2026-10-01.json)). Public city AI requires no residence check: opt-in free connector hosts (`freePublicAnswers`, default `false`), explicit public-question consent, 30 shared attempts/day and three/visitor, or 100 atomic test tUSDG per output token for a complete stop, with a signed maximum of `maxOutputTokens × 100`; own/free has no payment/payout and incomplete inference costs nothing. `LOCAL_AI_LIBRARY_ENABLED=1` enables connector and direct free mode. New wake/preload, free-host and per-token payment behavior is not claimed released | 240 s total connector lifetime including wake/preload, 30 s pickup, max 90 s generation; promptly returned resumable requests with polling, unchanged job envelope/signatures and 120 s ingress. Security review, a proven real wake, reliable operations, sustained demand and metered costs before any real-income claim; signatures do not attest a model |
 | Newcomer welcome | Places | Partly built: live OSM clubs and official directories; no matching, registration or voucher | **Next**: clearly simulated vouchers; partners only for real redemption |
 | Shares as a test deposit | Available on this site in Home; built, hosted run proven 1 October 2026 | Deployed ShareDepositFactory and official test TSLA, 150 % activation, app-only top-up below 125 %, fixed consent/arbitration windows and in-kind payouts without a sale | Hosted landlord, tenant and arbitrator run with fresh accounts proven 1 October 2026 ([evidence](evidence/HOSTED_SHARE_DEPOSIT_ROBINHOOD_TESTNET_2026-10-01.json)); timeout exits are contract-tested only; issuer pause, block, burn and upgrade risk remains |
-| Borrow/lend against official test shares | Money (Shares & loans); deployed on Robinhood testnet and live on the hosted site | SharedLendingPool: official faucet TSLA, mirrored token price, 50% borrow LTV, 80% liquidation, 90% utilization, continuous 5% nominal annual interest (about 5.13% effective, read from contract) | Cash-limited withdrawal, bad-debt losses, issuer suspension, burned seed disclosure; no projections. Every operation except liquidation ran with a real Privy wallet on localhost; on the hosted site it awaits a person's first loan |
+| Borrow/lend against official test shares | Money (Borrow & lend); deployed on Robinhood testnet and live on the hosted site | SharedLendingPool: official faucet TSLA, mirrored token price, 50% borrow LTV, 80% liquidation, 90% utilization, continuous 5% nominal annual interest (about 5.13% effective, read from contract) | Cash-limited withdrawal, bad-debt losses, issuer suspension, burned seed disclosure; no projections. Every operation except liquidation ran with a real Privy wallet on localhost; on the hosted site it awaits a person's first loan |
 | Home tokens towards owning | Money (Local stakes) | Fictional test-unit demonstration; real housing rights/down-payment credit remain planned | A real issuer/legal wrapper and property transaction, not a claim that these units buy an apartment |
 | EV and device tokenization | Money | Planned | **Later**: read-only device adapter if a dependable user source appears |
 | Bank account | Money | Planned; no connection, statement import or payment implemented | Add a permissioned provider only when a real integration is chosen |

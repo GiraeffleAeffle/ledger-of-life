@@ -1,10 +1,11 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Cpu, Sun, TrendingUp } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import type { PublicAdapterConfig, SolarReading, ValidatorReading } from '@/server/adapters';
 import { goToSection, type Area } from './areas';
 import { useSectionTabActive } from './section-tabs';
 import './device-readings.css';
+import { MoreList, MoreRow } from './blocks';
 
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 type Settled<T> = { ok: true; value: T } | { ok: false; error: string; code?: 'price_unavailable' } | null;
@@ -41,22 +42,23 @@ export function DeviceReadings({ request, go }: { request: Request; go: (area: A
   const solar = assets?.solar?.ok ? assets.solar.value : null;
   const validator = assets?.validator?.ok ? assets.validator.value : null;
 
-  if (!assets || (!assets.adapters.homeAssistant && !assets.adapters.validator)) return null;
+  if (!assets || (!assets.adapters.homeAssistant && !assets.adapters.validator)) return <section id="device-readings" tabIndex={-1} aria-label="Connected readings"><span id="solar-reading" tabIndex={-1} /><span id="validator-reading" tabIndex={-1} /></section>;
   return (
     <section className="card assets devices" id="device-readings" tabIndex={-1}>
-      <div className="assets-head"><div><span className="eyebrow">EXISTING READ-ONLY CONNECTIONS</span><h2>Connected sensor and validator readings</h2><p className="small-copy">These older adapter connections are outside the priced subtotal. New home devices connect through the Home Node above.</p></div></div>
+      <h2>Connected readings</h2>
       {readError && <p className="note" role="status">Device refresh unavailable; {assets ? 'showing the last checked readings' : 'no reading confirmed yet'}. {readError} <button className="text-button" type="button" onClick={() => void refresh()}>Retry device readings</button></p>}
       {refreshing && <p className="small-copy" role="status">Checking device readings…</p>}
-      <div className="asset-grid">
+      <MoreList>
+        {!assets.adapters.homeAssistant && <span id="solar-reading" tabIndex={-1} />}
         {assets.adapters.homeAssistant && <>
-        <article className="asset-tile" id="solar-reading" tabIndex={-1}>
-          <header><Sun size={18} /> Home solar</header>
+        <MoreRow id="solar-reading" title="Home solar" meta={solar ? `${solar.energyTodayKwh ?? '—'} kWh today` : 'Reading unavailable'}>
+          <div className="device-reading">
           {solar ? (
             <>
               <strong>{solar.valueToday !== null ? `${solar.valueEstimated ? '≈ ' : ''}${money(solar.valueToday, solar.currency)} today` : `${solar.powerW} W now`}</strong>
               <span>{solar.energyTodayKwh !== null ? `${solar.energyTodayKwh} kWh today` : ''}{solar.powerW !== null ? ` · ${solar.powerW} W now` : ''}</span>
               {solar.savings && (solar.savings.month !== null || solar.savings.year !== null) && (
-                <span className="asset-gain"><TrendingUp size={13} /> {solar.savings.month !== null ? `${money(solar.savings.month, solar.currency)} this month` : ''}{solar.savings.month !== null && solar.savings.year !== null ? ' · ' : ''}{solar.savings.year !== null ? `${money(solar.savings.year, solar.currency)} this year` : ''}</span>
+                <span className="device-reading-gain"><TrendingUp size={13} /> {solar.savings.month !== null ? `${money(solar.savings.month, solar.currency)} this month` : ''}{solar.savings.month !== null && solar.savings.year !== null ? ' · ' : ''}{solar.savings.year !== null ? `${money(solar.savings.year, solar.currency)} this year` : ''}</span>
               )}
               <span className="small-copy">via Home Assistant · {solar.entity}</span>
             </>
@@ -67,17 +69,20 @@ export function DeviceReadings({ request, go }: { request: Request; go: (area: A
             </>
           )}
           <button className="text-button" onClick={() => goToSection(go, 'me', 'adapter-home-assistant')}>{assets?.adapters.homeAssistant ? 'Manage Home Assistant in Me' : assets?.homeAssistantPull === false ? 'About Home Assistant in Me' : 'Connect Home Assistant in Me'} →</button>
-        </article>
+          </div>
+        </MoreRow>
         </>}
+        {!assets.adapters.validator && <span id="validator-reading" tabIndex={-1} />}
         {assets.adapters.validator && <>
-        <article className="asset-tile" id="validator-reading" tabIndex={-1}>
-          <header><Cpu size={18} /> Validator · public mainnet data · not your test money</header>
+        <MoreRow id="validator-reading" title="Public validator" meta={validator ? ({ active_ongoing: 'Active', voting: 'Active, voting', delinquent: 'Delinquent', pending_queued: 'In activation queue', exited_unslashed: 'Exited' } as Record<string, string>)[validator.status] ?? validator.status : 'Reading unavailable'}>
+          <div className="device-reading">
+          <p className="small-copy">Public mainnet data · not your test money</p>
           <span className="small-copy">A public validator identifier does not prove you own this stake. This reading is outside your priced test-asset subtotal.</span>
           {validator ? (
             <>
               <strong>{validator.stake.toLocaleString('en-US', { maximumFractionDigits: 3 })} {validator.unit}</strong>
               <span>{({ active_ongoing: 'Active', voting: 'Active, voting', delinquent: 'Delinquent', pending_queued: 'In activation queue', exited_unslashed: 'Exited' } as Record<string, string>)[validator.status] ?? validator.status}{validator.commission !== undefined ? ` · ${validator.commission}% commission` : ''}</span>
-              {validator.rewardsRecent !== null && <span className="asset-gain"><TrendingUp size={13} /> {validator.rewardsRecent} {validator.unit} {validator.rewardsLabel}</span>}
+              {validator.rewardsRecent !== null && <span className="device-reading-gain"><TrendingUp size={13} /> {validator.rewardsRecent} {validator.unit} {validator.rewardsLabel}</span>}
             </>
           ) : (
             <>
@@ -86,9 +91,10 @@ export function DeviceReadings({ request, go }: { request: Request; go: (area: A
             </>
           )}
           <button className="text-button" onClick={() => goToSection(go, 'me', 'adapter-validator')}>{assets?.adapters.validator ? 'Manage validator in Me' : 'Connect validator in Me'} →</button>
-        </article>
+          </div>
+        </MoreRow>
         </>}
-      </div>
+      </MoreList>
     </section>
   );
 }

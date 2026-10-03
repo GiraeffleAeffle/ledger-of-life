@@ -2,8 +2,9 @@
 .design-lab > header { display: grid; gap: 8px; }
 .design-lab h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 2.6rem); letter-spacing: -.03em; }
 .design-lab h2 { margin: 0 0 6px; font-size: 1.3rem; }
-.design-lab h3 { margin: 18px 0 4px; color: var(--muted); font-size: .78rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+.design-lab h3 { margin: 0; color: var(--ink); font-size: 1rem; font-weight: 650; }
 .design-lab p { margin: 0 0 10px; color: var(--ink); line-height: 1.55; }
 .design-lab > header > p { padding: 10px 14px; border-radius: 10px; background: var(--warn-bg); color: var(--warn); }
 .design-lab section { display: grid; gap: 14px; }
-.design-lab article.card { padding: 22px; }
+.design-lab-example { display: grid; gap: 14px; margin-top: 20px; }
+.design-lab-holding { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; padding: 12px 0; border-top: 1px solid var(--line); }

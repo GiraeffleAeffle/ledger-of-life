@@ -1,20 +1,22 @@
 # Information architecture: where a feature lives
 
-Status: 2026-10-01. This page owns the placement rule and the order in which a person meets things. [`LEDGER_OF_LIFE.md`](LEDGER_OF_LIFE.md) describes what each area contains, [`ontology.yaml`](ontology.yaml) defines the concepts, [`src/data/sections.ts`](../src/data/sections.ts) lists every jump target and its one owning area, [`src/data/ledger-catalogue.ts`](../src/data/ledger-catalogue.ts) holds the topics, capability status and each capability's single destination, and [`src/data/path.ts`](../src/data/path.ts) holds the thread and its four stages.
+Status: 2026-10-03. This page owns the placement rule and the order in which a person meets things. [`LEDGER_OF_LIFE.md`](LEDGER_OF_LIFE.md) describes what each area contains, [`ontology.yaml`](ontology.yaml) defines the concepts, [`src/data/sections.ts`](../src/data/sections.ts) lists every jump target and its one owning area, [`src/data/ledger-catalogue.ts`](../src/data/ledger-catalogue.ts) holds the topics, capability status and each capability's single destination, and [`src/data/path.ts`](../src/data/path.ts) holds the public thread and its four stages.
 
 ## The rule
 
 1. **Each area answers one question.** If something does not help answer it, it belongs elsewhere.
 2. **A feature has one home**: one area, and inside it one section. The home is where the person *operates* it (buys, connects, signs, reads its live value).
 3. **Every other place shows a reference**: at most one line of status and one link to the home. A reference never repeats a control, a calculator or a promotional card.
-4. **Topics are subject matter; areas are places to operate.** The five topics (Identity & life, Home & living, Money & ownership, Energy & devices, Places & participation) organise browsing in Today, the Me directory and Ideas. A feature can belong to a topic without being operated in the topic's namesake area. Energy & devices is operated in Money. Home shares belong to Home & living but are bought as test units in Money → Local stakes. The catalogue test fails when an adapter is operated outside the area that owns its topic.
+4. **Topics are subject matter; areas are places to operate.** The five catalogue topics organise the Me directory and Roadmap. Energy & devices is operated in Money. Home shares are bought as fictional units in Money → Local stakes, not operated in Home.
 5. **Rental security and personal money never share a card** ([ADR 0001](adr/0001-separate-rental-security-and-personal-portfolio.md), [`CONTEXT.md`](../CONTEXT.md)).
-6. **Every section states how real it is.** Money's sections carry the ontology's reality level as a chip; the levels are defined in [`ontology.yaml`](ontology.yaml) (`reality_levels`) and `src/components/reality-chip.tsx`.
-7. **The thread decides the order.** Placement says where a feature lives; the thread says what comes next (section below). Every screen uses the same four stage names, and a person always has exactly one next step.
+6. **Status first, facts once.** Each screen has at most one Hero, one status line, 2–4 figures and one primary action. Everything else is a labelled MoreRow, closed by default and mounted on first open, or removed. Specific honesty labels stay with their items; the global test-network chip avoids repeated disclaimers.
+7. **Plain headings.** An area has an h1 only, without eyebrow or subtitle. The top bar has no breadcrumb and retains account, sign-out and the test-network chip.
+
+Current screen contract: Home’s tenancy Hero answers “Is my home OK?”. Money answers “What do I own?”, and Places “What is happening in my city?”. At 390 px there is no horizontal overflow, tap targets are at least 44 px and hero pictures are at most 230 px tall. A single ScreenNote ends each screen with its applicable conservative legal and honesty wording. Historical change notes below describe earlier layouts, not the current navigation.
 
 ## The thread and the next step
 
-One sentence, the owner's destination line with the deposit as its hinge: **Find a home, secure the deposit, keep your assets, help build your city.** It is `THREAD` in `src/data/path.ts`, and the door's heading. Its four stages (`STAGES`) are the only names for the path, used on the door, Today, the area eyebrows, Home and the Roadmap:
+The public door retains the thread **Find a home, secure the deposit, keep your assets, help build your city** (`THREAD` in `src/data/path.ts`). Its stages explain the product there; they are not counters or eyebrows on signed-in screens.
 
 | # | Stage | Operated in | Counts as done |
 |---|---|---|---|
@@ -23,61 +25,71 @@ One sentence, the owner's destination line with the deposit as its hinge: **Find
 | 3 | Keep your assets | Money | never done; a status (free, locked, pledged, lent, owed) |
 | 4 | Help build your city | Places (local stakes and the AI desk are operated in Money) | a city is known |
 
-- **One next step** (`src/components/next-step.ts`, `next-step-card.tsx`). Precedence: an opened invitation, a home step waiting for this person, applicants to review, a step waiting on someone else or the network, an application in progress, a failed read, a secured or paid-out home, then a fresh account's "Start with a home" with two equal alternatives. It is a full card on Today. On Money, Places and Me it appears only when something waits for this person (an invitation, their own home step, applicants to review); Home never repeats it, because its own path already shows the step. A read that failed or is still running is never offered as done or empty.
-- **Today shows where you are** (`ledger-overview.tsx`): one four-row strip references Home, the deposit, Holdings and the resolved city. Civic updates are one count and one link to Places.
-- **Navigation follows the path:** Today, Home, Money, Places, then Me. Area and Money tab are read from the URL on the server and client, including in-app links and browser history. Switching areas preserves account state. The Roadmap is secondary. Signed-out visitors use the door's public links; while sign-in is unknown, a non-secret session hint permits account navigation, otherwise navigation stays neutral.
+- **One next step** (`src/components/next-step.ts`, `next-step-card.tsx`). Existing invitation, tenancy, applicant, waiting and read-failure precedence stays intact. Home owns the action; other areas show only urgent reminders linking back. Failed or pending reads never imply done or empty.
+- **Home replaces Today.** `/` opens Home. The brand and error recovery return there; the overview area and four-row path strip are removed.
+- **Navigation:** Home · Money · Places · Me; Roadmap is secondary. URL-derived areas and tab ids, browser history, account state, invitation hashes and section navigation remain stable.
 - **What is real here** lives in one place: the "Test networks · no real money" chip opens the global explainer with availability labels and every reality-level meaning from `src/data/reality.ts`. Individual reality chips label data without repeating that disclosure.
 - **Ways to hold the deposit** (Home, `deposit-options`) answers the deposit choice: cash tUSDC on Solana retains labelled site-paid simulated yield; share-backed deposits use official test TSLA on Robinhood testnet with no yield. The landlord selects one form at publish; applicants and arbitrator need the matching verified wallet. The share deposit is deployed and available on this site; it was proven on this site on 1 October 2026 with three fresh passkey accounts ([evidence](evidence/HOSTED_SHARE_DEPOSIT_ROBINHOOD_TESTNET_2026-10-01.json)). Missing reviewed deployment disables signing. Loan collateral is a separate Money workflow, never a replacement custody bucket.
 - **Share signing boundary:** every review includes the eight accepted escrow terms. The wallet derives the CREATE2 address from those terms and the bundled factory/implementation pins, checks the signing party, and permits only enumerated escrow calls or exact, capped TSLA approval to that derived address. Failed receipts are terminal, not permanent pending blockers. Cash holdings/yield copy excludes share custody; past share tenancies show TSLA payout receipts.
 
-## The six areas
+## The five areas
 
 In navigation order; the Roadmap is reached from the sidebar foot rather than the main navigation.
 
 | Area | The one question | Operated here | Not operated here (link instead) |
 |---|---|---|---|
-| **Today** | Your next step, and where you are on the path | Nothing. The next step, one four-row reference strip and an unread city-update count | Every control. References link to the area that owns them |
-| **Home** | Find a home, agree the deposit, and see what is owed | Listings with approximate OSM pins and public neighbourhood context, application, agreement, deposit, document-free move-in handover, browser-only registration confirmation, service charges, move-out, payouts | Shares, loans, stakes, device readings (Money); full public project exploration (Places), welcome guide and public AI desk (separate public routes) |
+| **Home** | Is my home OK? | Listings with approximate OSM pins, application, agreement, deposit, document-free move-in handover, browser-only registration confirmation, service charges, move-out, payouts | Shares, loans, stakes, device readings (Money); neighbourhood and full public project exploration (Places), welcome guide and public AI desk (separate public routes) |
 | **Money** | Your test holdings, collateral, loans and recorded activity | Holdings, shared official-stock loans and lender positions, local stakes, devices that earn | The rental itself (Home), connection settings (Me), public projects (Places) |
-| **Places** | Get settled, see what's changing, and find the published ways to take part | Public map, projects, city feed, evidence, following, city choice | Anything with a personal balance. Fictional project markers are illustrations; buying is in Money |
-| **Me** | Your access, private history and connections | Passkeys, wallets, recovery, EU proof, roles, timeline, and the settings of every connection (Home Assistant, validator) | Readings and income from those connections (Money), the tenancy (Home) |
+| **Places** | What is happening in my city? | Header with city, Get settled, weather reading and Change city; one visit-change line (“Nothing new since your last visit.” when unchanged), one layer-chip row and map with 3D/2D switch; one row list for Map settings, Project outcomes & connections, Weather & air; Have your say (Open consultations, Followed projects, Browse projects), Events & news, Who does what, Nearby towns and Council | Anything with a personal balance. Fictional project markers are illustrations; buying is in Money |
+| **Me** | Your access, private history and connections | Compact Sign-in & wallets (Deposit wallet on Solana, Shares wallet on Robinhood Chain), private Life timeline with earlier places on demand and a plain-caption note; individual connection rows only for EU identity wallet, Home solar (Home Assistant) and Validator activity; automatic sources in Built into your account (13), meta “Included with your account” or “N need you”; future sources in Planned connections (3). View reading appears only for configured connections | Readings and income from those connections (Money), the tenancy (Home) |
 | **Roadmap** (id `ideas`) | What is built, what is a prototype, and what is planned? | Nothing. Every capability grouped by availability, with one link to where it works | — |
 
 ## Money has four sections
 
-Money is one page with four tabs (`SectionTabs`). Each has one job and states its reality level. Every panel stays mounted, so a half-finished workflow keeps its state, and a jump from another area selects the right tab first.
+Money has four tabs: **Holdings · Borrow & lend · Local stakes · Devices & income**. Tab ids and URLs remain unchanged. There are no tab summary lines or chips. Panels retain workflow state, and section jumps select the tab and open any labelled row first.
 
-Holdings owns one visible priced breakdown; Today references it with one subtotal line. Only positions the person holds get tiles, and rental operations stay in Home. Funding and purchase controls reuse the holdings reads, which start before tenancy loading finishes. A successful wallet read enables its actions without waiting for other sources; the complete subtotal still waits for the full coherent read. Locked deposits wait for tenancy records, and an unfunded tenant deposit says so instead of showing a landlord explanation. The global test-network explainer is the single no-value notice; transaction reviews retain their specific token, network and rights disclosures.
+Holdings owns the priced breakdown; there is no Today subtotal. If the total is unavailable, one status sentence replaces its figure, bar and legend. Get test money lists four plain needs with one action each. Money amounts use a "$" prefix and two decimals app-wide (for example, "$1,300.00"); token amounts keep their symbol. Funding and purchase controls reuse coherent holdings reads. Locked deposits wait for tenancy records. Exact money reviews keep network names, quantities, addresses, expiry handling, blockers, confirmations and receipts.
 
-Me keeps wallet addresses visible with copy buttons, one private timeline including the resolved city and its source, and inline connection setup actions. Device readings stay in Money; GPU pairing follows the ask panel even before the first host is connected, while operating metrics and the scenario appear only for active hosts. Local stakes show the project and its building readings without nested tabs for holders, including people with remaining earnings or action receipts after unstaking. Roadmap offers the deposit-options link only when Home renders that target; other people open their existing Home instead.
+Me shows the passkey count with Add another, short wallet addresses with Copy and one sentence on who signs what. Its private Life timeline opens earlier places on demand; connection controls live inside grouped state rows. Device readings stay in Money → Devices & income, with Your devices rows, a compact Ask the city AI panel (Paid/Free and Options) and a hardware-economics row. Local stakes uses a House / Workshop / Agri-PV picker, one Hero and labelled detail rows, including for people with remaining earnings or action receipts after unstaking. Roadmap offers the deposit-options link only when Home renders that target; other people open their existing Home instead.
 
 | Section | Jump target | What it is for | Reality |
 |---|---|---|---|
 | **Holdings** | `money-holdings` | Deposit entitlement, wallet shares/cash, lent value, debt and priced subtotal | Test network · mirrored live token price with provenance |
-| **Shares & loans** | `money-shares` | Official-stock collateral, loans, lending, on-demand paginated unhealthy loans; wallet reads do not scan the registry. Share rental deposits are operated in Home, not here | Test network · deployment required · borrower-funded interest |
-| **Local stakes** | `money-stakes` | Fictional local-project units (`tHOME` housing, `tWORK` workshop); each example shows its sketch, the housing one also a pitched 3D OpenStreetMap view of the fictional house at an illustrative spot (never a real project). The live building panel opens with “What can I claim?” (claimable, earned so far, Claim to my wallet, Reinvest), then “Where the income comes from” (devices paying the building, income sources, receipts), then stake/unstake. A third, illustrative Agri-PV example (no token, no purchase) is a calculator with editable assumptions | Test network · simulated input |
+| **Borrow & lend** | `money-shares` | Loan and lending cards, one wallet line and one price line; no task panel until an action is picked, then one focused panel with exact reviews; advanced rows for prices/pool and paginated unsafe-loan liquidation. Wallet reads do not scan the registry. Share rental deposits are operated in Home | Test network · deployment required · borrower-funded interest |
+| **Local stakes** | `money-stakes` | House / Workshop / Agri-PV picker; a Hero with the fictional house's 3D map, holdings, claimable and house income; rows for buy/sell, stake/unstake, income sources and stream update, building toggles, sources and token rights. `tHOME` and `tWORK` are fictional units; Agri-PV is an illustrative calculator with editable assumptions, no token and no purchase | Test network · simulated input · fictional units have no value and no rights |
 | **Devices & income** | `money-devices` | Things you run that produce value: add a device (Home Node download with checksum, pairing code, CLI or AI-assistant setup), then see each host's GPU state, earnings and receipts, solar power and local-day kWh pushed by the node, validator ids, and where each device's income goes: GPU income to “the building (tHOME stakers) since <date>” or “your wallet” (saved on the server until the owner changes it or removes the device; new devices can pay the building from pairing) and solar income to the building | Live · test network; solar income simulated |
+
+Borrow appears on the loan card once collateral is posted and there is no debt. Exact debt
+lives in details; Repay carries the close-the-loan hint. Lend and Withdraw show the lender-risk
+line. The stake row contains exact staked and wallet tHOME quantities and Max buttons;
+displayed units round down. Agri-PV's first view says “Illustrative calculation. Not a forecast,
+offer, yield promise or investment advice.” Devices & income ends with one tab-level note:
+test receipts, simulated solar feed-in, outside Holdings, and AI can be wrong.
+
+With no city selected, Places says “Choose or preview a city first”; an uncovered city says
+“not covered yet”. The header shows weather, not PM₂.₅; air readings are in Weather & air.
+Pending followed-project updates appear in the status line.
 
 ## Where the ambiguous features live
 
 | Feature | Home (area → section) | Configured in | Referenced from, and what the reference shows |
 |---|---|---|---|
-| Rented home: listing, agreement, deposit, move-out (a landlord or tenant can cancel the tenancy until the deposit is locked); optional monthly test rent (below) | Home | Me (wallet) | Today (next step), Money → Holdings (deposit entitlement tile), Me (timeline) |
+| Rented home: listing, agreement, deposit, move-out (a landlord or tenant can cancel the tenancy until the deposit is locked); optional monthly test rent (below) | Home | Me (wallet) | Urgent next-step reminders in other areas, Money → Holdings (deposit entitlement), Me (timeline) |
 | Monthly test rent with a building share (landlord marks a new listing as a flat in the fictional Neighbourhood Homes building; both parties sign rent terms) | Home (inside a living tenancy) | Me (verified EVM wallet) | Money → Local stakes shows only an aggregated “Rent shares” total and count (no flat labels or rent receipt hashes); exact rent receipts stay with tenant and landlord. The deposit stays separate |
 | Service charges | Home (inside a living tenancy) | Me (Home Assistant, for consumption) | Ideas, Me directory |
-| Shared official-stock loan and lending | Money → Shares & loans | Me (wallet); verified shared deployment and hosted mirror job | Today, Ideas, Me directory; no fake landlord/desk setup |
-| Share-backed rental deposit | Home (same seven steps as cash) | Me (verified EVM wallet); pinned share-deposit manifest | Money → Holdings (“locked in your deposit”), never spendable wallet balance or loan collateral; Today next step |
-| Stocks: tSPYx and official faucet test TSLA | Money → Holdings (wallet/lent positions) and Shares & loans (loan collateral) | Me (wallet) | Today (subtotal); wallet/collateral/deposit TSLA use one mirror with source/copy times and price-job health; stale price makes a complete priced total unavailable |
-| **Tokenized local companies and housing** (`tHOME`, `tWORK` test units) | Money → Local stakes | Me (wallet) | Places (issuer markers, an illustration with a link to buy), Ideas, Today, Me directory; devices paying the building are also listed publicly by name, kind and availability only |
-| Home ownership path (home shares) | Ideas (roadmap). Its nearest working surface is Money → Local stakes | — | Today (link), Me directory |
-| **Solar**: readings your Home Node pushes (local setups may read Home Assistant directly) | Money → Devices & income | Me → Home Assistant (local only) | Home (service charges read the same sensor), Today, Me directory |
-| Solar and heat plans of a city (public evidence, for example Solarpark) | Places → project evidence | Me (chosen city) | Today (compact preview) |
-| Validator stake and rewards | Money → Devices & income | Me → validator | Today, Me directory |
+| Shared official-stock loan and lending | Money → Borrow & lend | Me (wallet); verified shared deployment and hosted mirror job | Ideas, Me directory; no fake landlord/desk setup |
+| Share-backed rental deposit | Home (same seven steps as cash) | Me (verified EVM wallet); pinned share-deposit manifest | Money → Holdings (“locked in your deposit”), never spendable wallet balance or loan collateral |
+| Stocks: tSPYx and official faucet test TSLA | Money → Holdings (wallet/lent positions) and Borrow & lend (loan collateral) | Me (wallet) | Wallet/collateral/deposit TSLA use one mirror with source/copy times and price-job health; stale price makes a complete priced total unavailable |
+| **Tokenized local companies and housing** (`tHOME`, `tWORK` test units) | Money → Local stakes | Me (wallet) | Places (issuer markers, an illustration with a link to buy), Ideas, Me directory; devices paying the building are also listed publicly by name, kind and availability only |
+| Home ownership path (home shares) | Ideas (roadmap). Its nearest working surface is Money → Local stakes | — | Me directory |
+| **Solar**: readings your Home Node pushes (local setups may read Home Assistant directly) | Money → Devices & income | Me → Home Assistant (local only) | Home (service charges read the same sensor), Me directory |
+| Solar and heat plans of a city (public evidence, for example Solarpark) | Places → project evidence | Me (chosen city) | Places project map |
+| Validator stake and rewards | Money → Devices & income | Me → validator | Me directory |
 | **GPU**: local AI node, per-answer payment, host income scenario | Money → Devices & income | Money → Devices & income → your paired hosts (any signed-in account with a verified EVM wallet, up to two; operators keep allowlisted hosts) | Places (library profile), Ideas, Me directory |
 | Free public AI desk for visitors | `/library` (no account, separate route) | — | Money → Devices & income offers it as the library access mode |
 | Newcomer welcome guide | `/welcome/<city>` (no account; a separate route, outside the wallet route group) | — | Places (a "New here? Welcome guide" link in the city card); its interests are Places' interests |
 | Recorded hosted run (the 1 Oct three-account share-deposit tenancy as the seven Home steps with receipts, plus loan, stake and paid-answer receipts) | `/replay` (no account, no cookies; a separate route, outside the wallet route group) | — | The door and Home's deposit options link to it |
-| Electric car and other devices | Ideas (roadmap) | — | Today (says feeds remain planned) |
+| Electric car and other devices | Ideas (roadmap) | — | Me directory (planned) |
 
 ## Deciding where something new goes
 
@@ -85,7 +97,7 @@ Ask in order; the first yes decides.
 
 1. Is it who the person is, or a connection they configure? → **Me**. Only configuration lives there; the readings and income live where the person uses them.
 2. Does its life cycle belong to a dwelling or tenancy (listing, agreement, deposit, service charges, move-out)? → **Home**.
-3. Does it hold a balance, position or debt, or produce or spend money for the person? → **Money**, then pick the section: Holdings for balances and positions, Shares & loans for collateral workflows, Local stakes for issuer units, Devices & income for things the person runs.
+3. Does it hold a balance, position or debt, or produce or spend money for the person? → **Money**, then pick the section: Holdings for balances and positions, Borrow & lend for collateral workflows, Local stakes for issuer units, Devices & income for things the person runs.
 4. Is it public information about a place with no personal position? → **Places**.
 5. Is it not built yet? → **Roadmap** (area id `ideas`): one catalogue entry with a status and an availability, and, once it works, one destination.
 
@@ -106,7 +118,7 @@ Worked examples: your own solar panel reads a sensor and produces savings → qu
 | Local AI & GPU hosting | Local intelligence, GPU building option, Useful services, AI answers (as a feature name) |
 | Local stakes (test units) | Invest in the place I live, Project examples, Local investments |
 | Share-backed deposit, Loan against shares | Stocks as your deposit, Shares as deposit, Borrow against shares |
-| Shares & loans, Devices & income, Holdings (Money sections) | Goals, Ownership path (as a section) |
+| Borrow & lend, Devices & income, Holdings (Money sections) | Goals, Ownership path (as a section) |
 | Home ownership path | A path towards ownership |
 | Reality level chips | Prototype, illustration, test used as unlabeled prose |
 | Find a home · Secure the deposit · Keep your assets · Help build your city (the four stages, from `src/data/path.ts`) | Set up your ledger, Getting started, Your home journey, Settle into my city (as a stage) |
@@ -122,12 +134,12 @@ The server renders area metadata immediately. With a session hint, it also rende
 A new person meets these in order, and each says what it is:
 
 1. **The door** (`onboarding.tsx`, progress from `account-setup-state.ts`). Its heading is the thread, followed by public access and passkey/wallet setup. No email or document upload is requested. Until the wallet SDK answers, a session hint allows the URL's area heading and shaped skeleton; without it, loading stays neutral without an account-area heading.
-2. **Your next step** under Today's heading. A new account starts with a home; a published listing with no applicants links to that listing, not to finding a home.
-3. **One four-row status strip** on Today. Home and Money own their facts and controls; Today keeps short references.
+2. **Home at `/`** opens with the person's situation. Current tenants see the home picture, deposit status and key numbers in one Hero; the fictional Neighbourhood Homes map is used where applicable.
+3. **About this tenancy** is a full-width row list directly below the Hero, not inside it. Labelled rows hold rent and receipts, move-in handover, service charges, moving out, and agreement/activity, with state in each row's meta text. An arbitrator sees only Agreement & activity while nothing needs them. Deep-link ids remain on the row or its content. One ActionBox contains the required step. Setup and move-out show a compact checked phase line; no step counter appears while living. Living landlords have two figures, Deposit held and Rent this month received; the rent note includes the house's 20 % share and next payment date. Neighbourhood context belongs to Places.
 
 A stage is known from existing records. Your city comes from your tenant home (including its approximate pin), then a chosen listing or open application, then an EU-wallet city. An explicit city choice overrides these defaults and can be cleared with "Use my home city". Landlord and arbitrator properties never supply a personal city. Uncovered home cities stay visible as not covered, with a nearest-city preview, rather than another setup demand.
 
-Once the deposit is secured, a tenant's Home card shows the neighbourhood around the approximate home pin. Located public projects, places and future events use the same 1 km radius as Places. Dates, source review and incomplete coverage remain explicit; a pin outside the city's bbox is not treated as nearby. The full city feed and welcome guide live in Places.
+Places owns neighbourhood context around the approximate home pin. Located public projects, places and future events use the same 1 km radius. Dates, source review and incomplete coverage remain explicit; a pin outside the city's bbox is not treated as nearby. The city feed and welcome-guide link also live in Places.
 
 The landlord may place a listing pin by map click or drag, without an address field or geocoding request. Only coordinates rounded to a roughly 100 m grid are stored and published. Photos are self-hosted samples, not uploads. Existing Unsplash presets are served from the same local sample paths; unrecognised remote photos are not loaded. Maps use Places’ OSM source through the same-origin map proxy.
 
@@ -224,7 +236,7 @@ Add or change an adapter by reading the code first, then editing the statements.
 - Setup lets the sidebar stay clickable although every area shows the wizard until the wallets exist (signed-out visitors now see only the no-account links).
 - Dead code found while mapping: `src/components/neighborhood.tsx`, `openCityEvent` and the `capabilityIds` of `SYSTEM_NODES` in `civic-system.ts` have no consumer.
 - The Me directory's state chips for the four city adapters still all read "City selected" whatever their coverage.
-- The welcome guide exists only in English and only for Strausberg; it has no registration-desk handout or QR code yet, and Places and Today still need an account, so a visitor without one cannot preview them.
+- The welcome guide exists only in English and only for Strausberg; it has no registration-desk handout or QR code yet, and Places still needs an account, so a visitor without one cannot preview it.
 - The repository and package are `ledger-of-life`, renamed on 1 Oct 2026 from `rental-deposit-hackathon`. The local checkout folder, image name `ghcr.io/giraeffleaeffle/ledger-of-life` and environment keys are unchanged.
 
 ## What changed on 2026-10-02

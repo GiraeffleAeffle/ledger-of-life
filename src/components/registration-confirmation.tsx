@@ -1,9 +1,10 @@
 'use client';
 import { useState } from 'react';
+import { MoreRow } from './blocks';
+import './move-in.css';
 
 /** Required registration particulars exist only in component memory and the browser print document. */
 export function RegistrationConfirmation() {
-  const [open, setOpen] = useState(false);
   const [fields, setFields] = useState({ landlord: '', landlordAddress: '', owner: '', homeAddress: '', tenants: '', movedIn: '' });
   const labels: Record<keyof typeof fields, string> = { landlord: 'Landlord / housing provider name', landlordAddress: 'Housing provider address', owner: 'Owner name (if different from the housing provider)', homeAddress: 'Dwelling address (include floor / flat where needed)', tenants: 'Names of all people moving in', movedIn: 'Move-in date' };
   function print(event: React.FormEvent) {
@@ -35,16 +36,15 @@ export function RegistrationConfirmation() {
     frame.contentWindow!.print();
     setTimeout(() => frame.remove(), 1000);
   }
-  return <section className="registration-confirmation" aria-label="Registration confirmation">
-    <button className="button secondary" type="button" aria-expanded={open} onClick={() => setOpen(!open)}>Print registration confirmation</button>
-    {open && <>
-    <p>Wohnungsgeberbestätigung (§19 BMG). The landlord fills this in and prints it for signing. Nothing in this form is saved, uploaded or sent to the server. Use Clear form to erase the fields.</p>
-    <p>The tenant takes the signed confirmation to the Bürgeramt, generally within two weeks of moving in. Check the authority’s requirements; this sample is not legal advice.</p>
+  return <MoreRow title="Print registration confirmation" meta="Landlord · browser only">
+    <section className="registration-confirmation" aria-label="Registration confirmation">
+    <p className="small-copy">Wohnungsgeberbestätigung (§19 BMG), for the landlord to print and sign. Nothing is saved or sent to the server. Clear form erases these fields.</p>
+    <p className="small-copy">Take the signed form to the Bürgeramt, generally within two weeks. Check the local authority’s requirements; this sample is not legal advice.</p>
     <form className="listing-form" onSubmit={print} autoComplete="off">
       {Object.entries(labels).map(([key, label]) => <label className="wide" key={key}>{label}<input type={key === 'movedIn' ? 'date' : 'text'} required={key !== 'owner'} maxLength={500} value={fields[key as keyof typeof fields]} onChange={(event) => setFields({ ...fields, [key]: event.target.value })} /></label>)}
       <button className="button secondary" type="submit">Print confirmation in this browser</button>
       <button className="button secondary" type="button" onClick={() => setFields({ landlord: '', landlordAddress: '', owner: '', homeAddress: '', tenants: '', movedIn: '' })}>Clear form</button>
     </form>
-    </>}
-  </section>;
+    </section>
+  </MoreRow>;
 }

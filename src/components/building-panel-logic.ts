@@ -9,7 +9,7 @@ export function buildingActionState(input: {
   operation: 'stake' | 'unstake' | 'claim' | 'sync'; configured: boolean; connected: boolean; busy: boolean;
   quantityRaw: string | null; walletUnitsRaw: string | null; stakedRaw: string | null; earnedRaw: string | null; pendingRevenueRaw?: string | null;
 }) {
-  if (!input.connected) return 'Connect your Robinhood wallet in Me';
+  if (!input.connected) return 'Connect your Shares wallet in Me';
   if (!input.configured) return 'Building distributor not configured';
   if (input.busy) return 'Finish the current building action first';
   if (input.operation === 'sync') {

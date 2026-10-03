@@ -243,7 +243,6 @@
 .wealth-app .page-heading {
   margin-bottom: 28px;
 }
-.wealth-app .page-heading p,
 .wealth-app .section-copy {
   font-size: 14px;
   line-height: 1.7;
@@ -1033,19 +1032,10 @@ p {
   border-bottom: 1px solid var(--line);
   background: #fcfcf8;
 }
-.breadcrumb,
 .topbar-right {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-.breadcrumb {
-  color: var(--muted);
-  font-size: 11px;
-}
-.breadcrumb strong {
-  color: var(--muted);
-  font-weight: 500;
 }
 .demo-context { position: relative; margin-left: auto; color: var(--muted); font-size: 11px; }
 .demo-context summary { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--soft); cursor: pointer; white-space: nowrap; list-style: none; }
@@ -1129,15 +1119,6 @@ p {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-}
-.page-heading .eyebrow {
-  display: block;
-  margin-bottom: 10px;
-  font-size: 9px;
-}
-.page-heading p {
-  font-size: 12px;
-  margin-top: 10px;
 }
 .date-pill {
   display: flex;
@@ -2410,9 +2391,6 @@ dd {
   .balance-amount {
     font-size: 47px;
   }
-  .page-heading p {
-    max-width: 490px;
-  }
   .case-grid {
     grid-template-columns: 1fr;
   }
@@ -2468,10 +2446,6 @@ dd {
     height: 62px;
     padding: 0 20px;
   }
-  .breadcrumb {
-    font-size: 10px;
-    gap: 8px;
-  }
   .topbar-right {
     gap: 14px;
   }
@@ -2510,16 +2484,6 @@ dd {
   h1 {
     font-size: 27px;
     letter-spacing: -1px;
-  }
-  .page-heading .eyebrow {
-    font-size: 8px;
-    line-height: 1.7;
-    margin-bottom: 9px;
-  }
-  .page-heading p {
-    font-size: 11px;
-    line-height: 1.7;
-    margin-top: 9px;
   }
   .balance-card {
     padding: 22px 22px 0;
@@ -2816,7 +2780,6 @@ dd {
 }
 
 /* Keep supporting copy legible without competing with balances and actions. */
-.page-heading p,
 .balance-description,
 .future-card p,
 .action-card p,
@@ -2834,7 +2797,6 @@ dd {
   font-size: 12px;
 }
 .eyebrow,
-.page-heading .eyebrow,
 .card-label {
   font-size: 10px;
   color: var(--muted);
@@ -2927,10 +2889,6 @@ dd {
 .inline-form details { display: grid; gap: 8px; }
 .invite-link { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .invite-link p { grid-column: 1 / -1; }
-.journey-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 0; }
-.journey-facts div { display: grid; gap: 2px; }
-.journey-facts dt { font-size: 0.8rem; opacity: 0.65; }
-.journey-facts dd { margin: 0; font-weight: 700; }
 .service-charge-card { border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
 .service-charge-card summary, .local-investments summary { cursor: pointer; font-weight: 700; }
 .prototype-content { display: grid; gap: 16px; padding-top: 16px; }
@@ -2951,8 +2909,6 @@ dd {
 .test-helper-note { margin: 0; padding: 10px 14px; border: 1px dashed #b98a1a; border-radius: 12px; background: #fff8e6; font-size: 0.88rem; }
 .button.test-helper { justify-self: start; border: 1px dashed #b98a1a; background: #fff8e6; color: #6b4e00; }
 .tenancy-details { border-top: 1px solid var(--line); padding-top: 14px; }
-.tenancy-details summary, .test-tools summary { cursor: pointer; font-weight: 700; }
-.tenancy-details[open] summary, .test-tools[open] summary { margin-bottom: 16px; }
 .tenancy-details .mono { overflow-wrap: anywhere; }
 .tenancy-activity { max-height: 420px; overflow-y: auto; }
 .tenancy-activity .record-item { padding: 12px 0; }
@@ -2974,10 +2930,6 @@ dd {
 .setup-step.current { border-color: #e0a526; box-shadow: 0 0 0 3px rgba(224, 165, 38, 0.15); }
 .setup-step.current .journey-dot { background: #e0a526; }
 
-/* Home facts: labelled tiles, overriding the global key/value dl layout */
-.journey-facts > div { display: grid; gap: 4px; justify-content: stretch; border: 0; padding: 14px 16px; border-radius: 14px; background: rgba(0, 0, 0, 0.03); font-size: 0.8rem; }
-.journey-facts dt { color: var(--muted); font-size: 0.78rem; }
-.journey-facts dd { text-align: left; font-size: 1.15rem; font-weight: 700; color: var(--ink); }
 .home > .card, .home > section { margin: 0; }
 .helper-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; font-size: 0.82rem; color: #6b4e00; }
 .helper-strip .helper-log { flex-basis: 100%; opacity: 0.85; }
@@ -3013,33 +2965,14 @@ dd {
 .listing-photo img { position: absolute; inset: 0; }
 .listing-body header strong { min-width: 0; }
 .listing-form label.policy-check { display: flex; align-items: center; gap: 8px; }
-.earnings-panel { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 16px; background: linear-gradient(135deg, var(--soft), var(--soft)); border: 1px solid rgba(31, 122, 77, 0.18); }
-.earnings-panel > div:first-child { display: grid; gap: 4px; }
-.earnings-panel strong { font-size: 1.35rem; }
 
 /* Everything you own */
 .assets { display: grid; gap: 16px; background: linear-gradient(160deg, #ffffff, var(--soft)); }
 .assets-head h2 { margin: 4px 0; font-size: 2.2rem; letter-spacing: -0.02em; }
 .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
-.asset-tile { display: grid; align-content: start; gap: 6px; padding: 16px; border-radius: 16px; background: white; border: 1px solid rgba(0, 0, 0, 0.07); min-width: 0; }
-.asset-tile header { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
-.asset-tile strong { font-size: 1.35rem; }
-.asset-tile > span { font-size: 0.85rem; opacity: 0.8; overflow-wrap: anywhere; }
-.asset-tile .asset-gain { display: inline-flex; align-items: center; gap: 4px; color: #1f7a4d; font-weight: 600; opacity: 1; }
-.asset-tile .text-button { justify-self: start; }
-.asset-tile .button-row { flex-wrap: wrap; }
 .roadmap-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
 .roadmap-tiles > div { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; border: 1px dashed rgba(0, 0, 0, 0.15); font-size: 0.82rem; opacity: 0.85; }
 .roadmap-tiles strong { display: block; margin-bottom: 2px; }
-.identity-strip { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-radius: 14px; background: #eef4ff; border: 1px solid rgba(40, 80, 160, 0.15); }
-.identity-strip .identity-copy { display: grid; gap: 2px; }
-.identity-strip span { font-size: 0.82rem; opacity: 0.75; }
-.asset-tile.clickable { cursor: pointer; text-align: left; color: var(--ink); font: inherit; }
-.asset-tile.clickable:hover { border-color: var(--ink); }
-.asset-tile.clickable:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-.identity-strip { flex-wrap: wrap; }
-.identity-strip .identity-copy { flex: 1; min-width: 220px; }
-.identity-strip.verified { background: #eaf7ef; border-color: rgba(31, 122, 77, 0.25); color: #174d33; }
 .identity-offer { position: relative; flex-basis: 100%; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; padding: 14px; margin-top: 6px; border-radius: 12px; background: #fff; border: 1px solid rgba(40, 80, 160, 0.15); }
 .identity-offer img { border-radius: 8px; image-rendering: pixelated; }
 .identity-offer ol { margin: 6px 0 8px 18px; padding: 0; font-size: 0.86rem; display: grid; gap: 3px; }
@@ -3049,32 +2982,10 @@ dd {
 .identity-option { display: flex; gap: 6px; align-items: center; font-size: 0.82rem; margin-top: 4px; cursor: pointer; }
 .city-card { display: grid; gap: 10px; padding: 14px 16px; border-radius: 14px; background: var(--soft); border: 1px solid rgba(120, 90, 30, 0.14); }
 .city-card header { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.city-source { margin-left: auto; font-size: 0.75rem; opacity: 0.65; }
 .city-picker { display: flex; gap: 8px; }
 .city-picker input { flex: 1; max-width: 240px; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(0, 0, 0, 0.15); font: inherit; }
-/* Areas (Today · Me · Home · Money · Places · Ideas) */
+/* Areas (Home · Money · Places · Me · Roadmap) */
 .area-stack { display: grid; gap: 16px; }
-.today-stack { display: grid; gap: 18px; min-width: 0; }
-.wealth-app .home:has(.today-stack) .page-heading { margin-bottom: 0; }
-.today-news { padding: 28px 32px; border-radius: 18px; background: var(--ink); color: var(--paper); min-width: 0; }
-.today-news-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 1px solid #ffffff3b; }
-.today-news-head .eyebrow { color: var(--paper); }
-.today-news-head > span:last-child { color: var(--paper); font-size: .78rem; }
-.today-news a { color: inherit; }
-.today-lead { display: grid; gap: 8px; padding: 17px 0 14px; text-decoration: none; }
-.today-lead > span { display: flex; align-items: center; gap: 7px; color: var(--paper); font-size: .78rem; letter-spacing: .07em; }
-.today-lead strong { font-size: clamp(1.75rem, 2.25vw, 2.1rem); line-height: 1.22; letter-spacing: -.025em; max-width: 760px; overflow-wrap: anywhere; }
-.today-lead small { color: var(--paper); font-size: .86rem; }
-.today-news a:hover { text-decoration: underline; text-underline-offset: 4px; }
-.today-news-list, .today-change-list { list-style: none; margin: 0; padding: 0; display: grid; }
-.today-news-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid #ffffff3b; margin: 0 0 8px; }
-.today-news-list li { display: grid; gap: 3px; padding: 10px 16px 10px 0; min-width: 0; }
-.today-news-list li + li { border-left: 1px solid #ffffff3b; padding-left: 16px; }
-.today-news-list li a { font-size: .98rem; line-height: 1.3; overflow-wrap: anywhere; }
-.today-news-list li span { color: var(--paper); font-size: .82rem; }
-.today-news .text-button { color: var(--paper); }
-.today-news .today-alert { color: #fff1bd; }
-.today-news p { color: var(--paper); }
 .secondary-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 9px 13px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--panel); color: var(--ink); font-weight: 650; }
 .secondary-button:hover { background: var(--soft); }
 .topbar-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; min-width: 0; }
@@ -3090,50 +3001,9 @@ dd {
   .topbar-signout { padding: 5px; font-size: 11px; }
   .topbar-actions .demo-context summary { padding: 5px; font-size: 10px; }
 }
-.today-attention { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 18px; padding: 14px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
-.today-attention.active { border-color: var(--line); background: var(--soft); }
-.today-attention strong { font-size: 1.07rem; }
-.today-attention > span:not(.eyebrow) { color: var(--muted); }
-.today-attention .today-waiting { flex-basis: 100%; color: var(--muted); font-size: .85rem; }
-.today-following { padding: 16px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
-.today-following h2 { margin-bottom: 6px; }
-.today-following article { padding: 10px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
-.today-following article p { margin: 5px 0; font-size: .9rem; line-height: 1.5; }
-.today-following article small { display: block; color: var(--muted); }
-.today-following article .text-button { margin-right: 16px; }
-.today-briefing { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; padding: 24px 0; border-block: 1px solid var(--line); }
-.today-briefing > section { min-width: 0; }
-.today-briefing > section:only-child { max-width: 850px; }
-.today-briefing-head h2 { margin: 5px 0 12px; font-size: clamp(1.35rem, 2vw, 1.75rem); }
-.today-change-list li { display: grid; gap: 5px; padding: 12px 0; border-top: 1px solid var(--line); }
-.today-change-list li > span, .today-change-list li > small { color: var(--muted); line-height: 1.5; }
-.today-change-list li strong { font-size: 1.04rem; }
-.today-on-demand { margin: 14px 0; color: var(--muted); }
-.today-on-demand summary, .today-money summary { cursor: pointer; }
-.today-system-track { display: grid; gap: 5px; margin: 10px 0 13px; font-size: .82rem; }
-.today-system-track span { border-left: 3px solid var(--line); background: var(--soft); border-radius: 4px; padding: 7px 10px; }
-.today-system-track span:nth-child(2) { border-left-style: dashed; }
-.today-system-track span:last-child { border: 1px dashed #9c846d; background: var(--soft); }
-.today-historical-example { display: grid; gap: 6px; margin-top: 14px; padding: 11px 13px; border-left: 3px solid var(--line); background: var(--soft); border-radius: 5px; }
-.today-historical-example strong { font-size: .92rem; line-height: 1.35; }
-.today-historical-example small { color: var(--muted); line-height: 1.45; }
-.today-historical-example .text-button { justify-self: start; }
-.today-things { display: grid; grid-template-columns: minmax(150px, .7fr) minmax(0, 1.5fr); gap: 12px 24px; align-items: start; padding: 8px 0 30px; }
-.today-things p { margin: 5px 0; }
-.today-things > .text-button { justify-self: start; }
-.today-money { display: inline; color: var(--muted); }
 .home-tenancy-anchor { display: grid; gap: 16px; scroll-margin-top: 20px; }
-.tenancy-card, .past-tenancy, .asset-tile, .share-flow, .city-region-topics, .personal-map-section { scroll-margin-top: 24px; }
-.tenancy-money-links { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.tenancy-card, .past-tenancy, .share-flow, .city-region-topics, .personal-map-section { scroll-margin-top: 24px; }
 @media (max-width: 740px) {
-  .today-briefing, .today-things { grid-template-columns: minmax(0, 1fr); }
-  .today-news-list { grid-template-columns: minmax(0, 1fr); }
-  .today-news-list li + li { border-left: 0; border-top: 1px solid #ffffff3b; padding-left: 0; }
-  .today-news { padding: 16px; }
-  .today-news-list li { padding-block: 7px; }
-  .today-lead { padding: 12px 0 10px; }
-  .today-lead strong { font-size: 23px; line-height: 1.22; }
-  .today-things { padding-bottom: 90px; }
   .wealth-app .button, .wealth-app .text-button, .wealth-app summary {
     scroll-margin-bottom: calc(90px + env(safe-area-inset-bottom));
   }
@@ -3156,8 +3026,6 @@ dd {
 .life-timeline { list-style: none; margin: 8px 0 0; padding: 0 0 0 14px; border-left: 2px solid rgba(31, 122, 77, 0.35); display: grid; gap: 12px; }
 .life-timeline li { display: grid; gap: 2px; position: relative; }
 .life-timeline li::before { content: ''; position: absolute; left: -20px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--ink-2); }
-.life-timeline li.planned { opacity: 0.7; }
-.life-timeline li.planned::before { background: #fff; border: 2px dashed var(--line); width: 6px; height: 6px; }
 .life-timeline span { font-size: 0.85rem; opacity: 0.75; }
 .place-form { width: min(100%, 520px); max-width: none; margin: 8px 0; padding: 16px; border-radius: 14px; background: #f7f9f5; }
 .place-form input { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 10px; background: white; }
@@ -3169,11 +3037,6 @@ dd {
 .connection-level { font-size: 0.75rem; opacity: 0.65; }
 @media (max-width: 760px) { .connection-row { grid-template-columns: 20px 1fr; } }
 
-.page-heading .area-eyebrow { display: inline-flex; align-items: center; gap: 8px; }
-.area-eyebrow::before { content: ''; width: 18px; height: 8px; border-radius: 2px; background: var(--line-strong); }
-.area-eyebrow--home::before { background: linear-gradient(to right, var(--stage-1) 50%, var(--stage-2) 50%); }
-.area-eyebrow--money::before { background: linear-gradient(to right, var(--stage-3) 50%, var(--stage-4) 50%); }
-.area-eyebrow--places::before { background: var(--stage-4); }
 code, kbd, samp, pre { font-family: var(--mono); }
 .card.cancelled-tenancy { padding: 16px 20px; color: var(--muted); background: var(--paper); box-shadow: none; }
 .cancelled-tenancy > p { margin: 6px 0; }
@@ -3184,13 +3047,10 @@ code, kbd, samp, pre { font-family: var(--mono); }
 .area-skeleton--money .skeleton-card { min-height: 600px; }
 .area-skeleton--places .skeleton-card { min-height: 150px; }
 .skeleton-tabs { height: 52px; }
-.skeleton-strip { height: 160px; }
 .skeleton-map { height: 410px; }
-.skeleton-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.skeleton-tiles > div { height: 150px; }
 .nav-skeleton { width: 100%; min-height: 210px; }
 @keyframes skeleton-pulse { 50% { background-position: 100% 0; } }
-@media (max-width: 760px) { .skeleton-tiles { grid-template-columns: 1fr; } .mobile-nav .nav-skeleton { min-height: 48px; } }
+@media (max-width: 760px) { .mobile-nav .nav-skeleton { min-height: 48px; } }
 @media (prefers-reduced-motion: reduce) { .skeleton-block { animation: none; } }
 .area-content { display: contents; }
 .area-content[hidden] { display: none; }

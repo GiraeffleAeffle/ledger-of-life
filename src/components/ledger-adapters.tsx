@@ -1,15 +1,13 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { ArrowUpRight, Building2, CircleUserRound, Cpu, Fingerprint, Home, Landmark, Plug, ShieldCheck, Sun, Wallet, type LucideIcon } from 'lucide-react';
-import { IDEAS, LEDGER_ADAPTERS, LEDGER_TOPICS, STATUS_LABEL, type AdapterAction, type LedgerTopicId } from '@/data/ledger-catalogue';
+import { useEffect, useState, type ReactNode } from 'react';
+import { ArrowUpRight } from 'lucide-react';
+import { IDEAS, LEDGER_ADAPTERS, STATUS_LABEL, type AdapterAction, type LedgerAdapter } from '@/data/ledger-catalogue';
 import { ADAPTER_NAVIGATION_INTENT, goToSection, openCivicScenario, openLedgerIdea, openShareWorkflow, type Area } from './areas';
 import { adapterAction, adapterState, type DynamicHomeAction, type LedgerStateInputs } from './ledger-adapter-state';
+import { WALLET_LABELS } from '@/wallets/labels';
 import { RealityChips } from './reality-chip';
+import { MoreList, MoreRow } from './blocks';
 import './ledger-overview.css';
-
-export const TOPIC_ICONS: Record<LedgerTopicId, LucideIcon> = { identity: Fingerprint, home: Home, money: Wallet, devices: Sun, places: Building2 };
-const adapterIcons: Record<string, LucideIcon> = { account: CircleUserRound, eudi: ShieldCheck, validator: Cpu, 'local-capital': Landmark, 'local-ai': Cpu };
-const directionLabel = { account: 'Account control', 'read-only': 'Read-only', signed: 'Explicit wallet approval', 'device-local': 'On this device', illustration: 'No value movement' };
 
 export function activateAdapterAction(action: AdapterAction | DynamicHomeAction, go: (area: Area) => void) {
   if (action.kind === 'idea') openLedgerIdea(go, action.idea);
@@ -19,64 +17,86 @@ export function activateAdapterAction(action: AdapterAction | DynamicHomeAction,
   else go(action.area);
 }
 
-/** One topic list, one selected source: not another full proof dashboard on every page. */
-export function LedgerAdapters({ inputs, go }: { inputs: LedgerStateInputs; go: (area: Area) => void }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = LEDGER_ADAPTERS.find((adapter) => adapter.id === selectedId)
-    ?? LEDGER_ADAPTERS.find((adapter) => adapterState(adapter, inputs).tone === 'setup')
-    ?? LEDGER_ADAPTERS[0];
-  const state = adapterState(selected, inputs);
-  const action = selected.id === 'homeAssistant' && inputs.homeAssistantPull === false
-    ? { kind: 'area' as const, area: 'money' as const, section: 'money-devices' as const, label: 'Connect through Home Node' }
-    : adapterAction(selected, inputs);
+const rowId = (id: string) => id === 'eudi' ? 'identity-eudi' : id === 'homeAssistant' ? 'adapter-home-assistant' : id === 'validator' ? 'adapter-validator' : `connection-${id}`;
+const PERSONAL_CONNECTIONS: Partial<Record<string, true>> = { eudi: true, homeAssistant: true, validator: true };
+
+/** One labelled door per source; permissions and controls live together inside it. */
+export function LedgerAdapters({ inputs, go, controls = {} }: {
+  inputs: LedgerStateInputs; go: (area: Area) => void; controls?: Partial<Record<string, ReactNode>>;
+}) {
+  const [plannedOpen, setPlannedOpen] = useState(false);
+  const [builtInOpen, setBuiltInOpen] = useState(false);
   useEffect(() => {
     function consume() {
       const id = sessionStorage.getItem(ADAPTER_NAVIGATION_INTENT);
       if (!id) return;
       sessionStorage.removeItem(ADAPTER_NAVIGATION_INTENT);
-      if (LEDGER_ADAPTERS.some((adapter) => adapter.id === id)) queueMicrotask(() => setSelectedId(id));
+      const adapter = LEDGER_ADAPTERS.find((item) => item.id === id);
+      if (!adapter) return;
+      if (adapter.connection === 'future') setPlannedOpen(true);
+      else if (!PERSONAL_CONNECTIONS[adapter.id]) setBuiltInOpen(true);
+      const groupId = adapter.connection === 'future' ? 'planned-connections' : !PERSONAL_CONNECTIONS[adapter.id] ? 'built-in-connections' : null;
+      const group = groupId ? document.getElementById(groupId) : null;
+      if (group instanceof HTMLDetailsElement) group.open = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const row = document.getElementById(rowId(id));
+        if (row instanceof HTMLDetailsElement) row.open = true;
+        row?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        row?.focus({ preventScroll: true });
+      }));
     }
     window.addEventListener(ADAPTER_NAVIGATION_INTENT, consume);
     consume();
     return () => window.removeEventListener(ADAPTER_NAVIGATION_INTENT, consume);
   }, []);
-  return <section className="card ledger-adapters" id="ledger-adapters" tabIndex={-1} aria-label="Ledger connections">
-    <div className="ledger-section-heading"><div><span className="eyebrow">ONE LEDGER · MANY SOURCES</span><h2>Your connections</h2></div><span className="ledger-catalogue-count">{LEDGER_ADAPTERS.length} sources</span></div>
-    <p className="ledger-intro">Connections use adapters to read or act on a source. Select one to see its purpose, status and data permissions. Planned sources do nothing yet; they are not unfinished account setup.</p>
-    <div className="ledger-topic-tabs" role="group" aria-label="Ledger connection topics">
-      {LEDGER_TOPICS.map((topic) => { const Icon = TOPIC_ICONS[topic.id]; return <button type="button" key={topic.id} aria-pressed={selected.topic === topic.id} onClick={() => setSelectedId(LEDGER_ADAPTERS.find((adapter) => adapter.topic === topic.id)!.id)}><Icon size={18} />{topic.name}</button>; })}
-    </div>
-    <div className="ledger-adapter-browser">
-      <div className="ledger-adapter-options" aria-label={`${LEDGER_TOPICS.find((topic) => topic.id === selected.topic)?.name} adapters`}>
-        {LEDGER_ADAPTERS.filter((adapter) => adapter.topic === selected.topic).map((adapter) => {
-          const status = adapterState(adapter, inputs);
-          const Icon = adapterIcons[adapter.id] ?? TOPIC_ICONS[adapter.topic];
-          return <button type="button" key={adapter.id} className="ledger-adapter-option" aria-pressed={adapter.id === selected.id} onClick={() => setSelectedId(adapter.id)}><Icon size={19} /><span><strong>{adapter.name}</strong><small>{adapter.environment}</small></span><span className={`ledger-state ${status.tone}`}>{status.label}</span></button>;
-        })}
-      </div>
-      <article className="ledger-adapter-detail" aria-live="polite" aria-label="Selected adapter">
-        <span className="eyebrow">{STATUS_LABEL[selected.maturity]} · {directionLabel[selected.direction]}</span>
-        <h3>{selected.name}</h3><p>{selected.explain.brings}</p>
-        {selected.id === 'homeAssistant' && <p className="small-copy">On the hosted site, connect through your Home Node. It reads Home Assistant inside your network and pushes signed sensor readings; the token stays on your device.</p>}
-        {selected.id === 'validator' && <p className="small-copy">Report public validator IDs through your Home Node, or use the read-only adapter here. Neither proves stake ownership.</p>}
-        <div className="ledger-detail-chips"><span className={`ledger-state ${state.tone}`}>{state.label}</span><RealityChips levels={[selected.explain.reality]} /><span className="ledger-effort">Effort: {selected.explain.effort}</span></div>
-        <div className="ledger-action-row"><button className="button primary" type="button" onClick={() => activateAdapterAction(action, go)}>{action.label}<ArrowUpRight size={16} /></button>
-          {selected.secondaryAction && <button className="secondary-button" type="button" onClick={() => activateAdapterAction(selected.secondaryAction!, go)}>{selected.secondaryAction.label}<ArrowUpRight size={15} /></button>}
-          {selected.settings && state.configured && <button className="text-button" type="button" onClick={() => goToSection(go, 'me', selected.settings!)}><Plug size={15} />Manage connection</button>}
-        </div>
+
+  function connectionRow(adapter: LedgerAdapter) {
+    const state = adapterState(adapter, inputs);
+    const action = adapter.id === 'homeAssistant' && inputs.homeAssistantPull === false
+      ? { kind: 'area' as const, area: 'money' as const, section: 'money-devices' as const, label: 'Connect through Home Node' }
+      : adapterAction(adapter, inputs);
+    return <MoreRow key={adapter.id} id={rowId(adapter.id)} title={adapter.id === 'solana' ? WALLET_LABELS.solana : adapter.id === 'robinhood' ? WALLET_LABELS.ethereum : adapter.name}
+      meta={<span className={`ledger-state ${state.tone}`}>{state.label}</span>}>
+      <div className="ledger-adapter-detail">
+        <p>{adapter.explain.brings}</p>
+        <RealityChips levels={[adapter.explain.reality]} />
         <dl className="ledger-explain">
-          <div><dt>Reads</dt><dd>{selected.explain.reads}</dd></div>
-          <div><dt>Keeps</dt><dd>{selected.explain.keeps}</dd></div>
-          <div><dt>Who can see it</dt><dd>{selected.explain.visibility}</dd></div>
-          <div><dt>You need</dt><dd>{selected.explain.needs}</dd></div>
-          <div><dt>To disconnect</dt><dd>{selected.explain.disconnect}</dd></div>
+          <div><dt>Reads</dt><dd>{adapter.explain.reads}</dd></div>
+          <div><dt>Keeps</dt><dd>{adapter.explain.keeps}</dd></div>
+          <div><dt>Who can see it</dt><dd>{adapter.explain.visibility}</dd></div>
+          <div><dt>You need</dt><dd>{adapter.explain.needs}</dd></div>
+          <div><dt>Disconnect</dt><dd>{adapter.explain.disconnect}</dd></div>
         </dl>
-        {selected.explain.caveat && <p className="ledger-caveat"><strong>Good to know.</strong> {selected.explain.caveat}</p>}
+        {adapter.explain.caveat && <p className="ledger-caveat">{adapter.explain.caveat}</p>}
+        {controls[adapter.id] ?? <div className="ledger-action-row">
+          <button className="button primary" type="button" onClick={() => activateAdapterAction(action, go)}>{action.label}<ArrowUpRight size={16} /></button>
+          {adapter.secondaryAction && <button className="secondary-button" type="button" onClick={() => activateAdapterAction(adapter.secondaryAction!, go)}>{adapter.secondaryAction.label}</button>}
+        </div>}
+        {controls[adapter.id] && adapter.settings && state.configured && !(adapter.connection === 'homeAssistant' && inputs.homeAssistantPull === false) && <div className="ledger-action-row">
+          <button className="secondary-button" type="button" onClick={() => activateAdapterAction(adapter.action, go)}>{adapter.action.label}<ArrowUpRight size={16} /></button>
+        </div>}
         <details><summary>Technical source &amp; related capabilities</summary>
-          <dl className="ledger-source-facts"><div><dt>Source</dt><dd>{selected.source}</dd></div><div><dt>Environment</dt><dd>{selected.environment}</dd></div></dl>
-          <div className="ledger-capability-links">{selected.capabilities.map((id) => { const idea = IDEAS.find((item) => item.id === id); return idea ? <button className="text-button" type="button" key={id} onClick={() => openLedgerIdea(go, id)}>{idea.title} · {STATUS_LABEL[idea.status]} →</button> : null; })}</div>
+          <dl className="ledger-source-facts"><div><dt>Source</dt><dd>{adapter.source}</dd></div><div><dt>Environment</dt><dd>{adapter.environment}</dd></div></dl>
+          <div className="ledger-capability-links">{adapter.capabilities.map((id) => { const idea = IDEAS.find((item) => item.id === id); return idea ? <button className="text-button" type="button" key={id} onClick={() => openLedgerIdea(go, id)}>{idea.title} · {STATUS_LABEL[idea.status]} →</button> : null; })}</div>
         </details>
-      </article>
+      </div>
+    </MoreRow>;
+  }
+  const planned = LEDGER_ADAPTERS.filter((adapter) => adapter.connection === 'future');
+  const builtIn = LEDGER_ADAPTERS.filter((adapter) => adapter.connection !== 'future' && !PERSONAL_CONNECTIONS[adapter.id]);
+  const builtInNeedsYou = builtIn.reduce((count, adapter) => count + Number(adapterState(adapter, inputs).tone === 'setup'), 0);
+  return <section className="ledger-adapters" id="ledger-adapters" tabIndex={-1} aria-label="Connections">
+    <h2>Connections</h2>
+    <div id="adapter-settings" tabIndex={-1}>
+      <MoreList>
+        {LEDGER_ADAPTERS.filter((adapter) => PERSONAL_CONNECTIONS[adapter.id]).map(connectionRow)}
+        <MoreRow id="built-in-connections" title={`Built into your account (${builtIn.length})`} meta={builtInNeedsYou ? `${builtInNeedsYou} ${builtInNeedsYou === 1 ? 'needs' : 'need'} you` : 'Included with your account'} defaultOpen={builtInOpen}>
+          <MoreList>{builtIn.map(connectionRow)}</MoreList>
+        </MoreRow>
+        <MoreRow id="planned-connections" title={`Planned connections (${planned.length})`} meta="Not available yet · nothing to set up" defaultOpen={plannedOpen}>
+          <MoreList>{planned.map(connectionRow)}</MoreList>
+        </MoreRow>
+      </MoreList>
     </div>
   </section>;
 }

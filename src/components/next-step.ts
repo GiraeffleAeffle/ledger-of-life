@@ -10,7 +10,7 @@ export type NextStep = {
   action?: NextStepLink;
   /** Equal alternatives when nothing waits for this person. */
   choices?: NextStepLink[];
-  /** Something waits for this person: shown in full on every area, not only on Today and Home. */
+  /** Something waits for this person: other areas link back to the Home action. */
   urgent?: boolean;
 };
 

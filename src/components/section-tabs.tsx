@@ -2,17 +2,12 @@
 import { createContext, useContext, type KeyboardEvent, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { tabFromSearch, withTab } from './workspace-location';
-import { RealityChips } from './reality-chip';
-import type { RealityLevel } from '@/data/reality';
 import './section-tabs.css';
 
 export interface SectionTab {
   /** Also the panel's element id, so it is a jump target (see `SECTIONS` in data/sections.ts). */
   id: string;
   label: string;
-  /** One sentence: what this section is for, and what it deliberately does not include. */
-  summary: string;
-  reality: RealityLevel[];
   content: ReactNode;
 }
 
@@ -55,7 +50,6 @@ export function SectionTabs({ label, tabs, initialTab }: { label: string; tabs: 
         <section key={tab.id} id={tab.id} role="tabpanel" aria-labelledby={`${tab.id}-tab`} className="section-panel" data-section-panel={tab.id} tabIndex={-1}
           hidden={active !== tab.id}>
           <ActiveTabContext.Provider value={active === tab.id}>
-            <header className="section-panel-head"><p>{tab.summary}</p><RealityChips levels={tab.reality} /></header>
             {tab.content}
           </ActiveTabContext.Provider>
         </section>

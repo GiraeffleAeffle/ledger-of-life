@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { GeoJSONSource, GeoJSONSourceSpecification, Map as LibreMap, Marker } from 'maplibre-gl';
 import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
 import type { Coordinate, CityFeature, CityFeedItem, SignalKind } from '../server/city-signals';
@@ -9,6 +9,7 @@ import { parsePins, saveInterests, useInterests, usePersonalPins } from './perso
 import { TEST_CITY_INVESTMENTS, type TestCityInvestmentId } from '@/data/local-investments';
 import { displayCityText, formatCityDate } from './city-coverage';
 import { readAccountPins } from './personal-map-storage';
+import { MoreList, MoreRow } from './blocks';
 
 const kinds: { id: SignalKind; label: string; color: string }[] = [
   { id: 'planning', label: 'Planning', color: '#7750ac' },
@@ -51,13 +52,14 @@ function Ring({ title, items, empty, open }: { title: string; items: MatchedSign
 }
 
 /** Public city data enters the browser; home/work never enter an API request or tile URL. */
-export function PersonalMap({ request, accountId, explorationCity = '', selectedId, onSelect, events = noEvents, selectedEventId = null, onSelectEvent, showInvestments = false, selectedInvestmentId, onSelectInvestment }: {
+export function PersonalMap({ request, accountId, explorationCity = '', selectedId, onSelect, events = noEvents, selectedEventId = null, onSelectEvent, showInvestments = false, selectedInvestmentId, onSelectInvestment, details }: {
   request: AuthorizedRequest; accountId: string; explorationCity?: string;
   selectedId?: string | null; onSelect?: (feature: CityFeature) => void;
   events?: CityFeedItem[]; selectedEventId?: string | null; onSelectEvent?: (id: string) => void;
   showInvestments?: boolean; selectedInvestmentId?: TestCityInvestmentId | null; onSelectInvestment?: (id: TestCityInvestmentId | null) => void;
+  details?: ReactNode;
 }) {
-  const { cityId, result, error, homePin } = useCitySignals(request, explorationCity || undefined);
+  const { cityId, result, error, homePin, city } = useCitySignals(request, explorationCity || undefined);
   const devicePins = usePersonalPins(cityId, accountId);
   const homeInside = homePin && result?.state === 'covered' && homePin.lon >= result.data.catalogue.bbox[0] && homePin.lon <= result.data.catalogue.bbox[2] && homePin.lat >= result.data.catalogue.bbox[1] && homePin.lat <= result.data.catalogue.bbox[3];
   const pins = useMemo(() => ({ ...devicePins, home: devicePins.home ?? (homeInside && homePin ? [homePin.lon, homePin.lat] as Coordinate : undefined) }), [devicePins, homeInside, homePin]);
@@ -335,25 +337,28 @@ export function PersonalMap({ request, accountId, explorationCity = '', selected
     );
   }
   return <section className="card personal-map-section" aria-label="Personal city map" id="personal-map" tabIndex={-1}>
-    <div className="personal-heading"><div><span className="eyebrow">EXPLORE THE CITY · SOURCE-BACKED CONTEXT</span><h2>Homes, local places &amp; council papers</h2></div><span className="places-level">PUBLIC CITY DATA · PRIVATE PINS</span></div>
     {error && <p role="alert">{error} The map needs published city signals; other Places sections still work.</p>}
-    {!result && !error && <p>Reading city-wide public signals…</p>}
-    {result?.state === 'not_covered' && <p className="personal-uncovered">{cityId ? 'Your place is not covered yet.' : 'Choose your city above.'} You can look at another covered city without changing yours.</p>}
+    {!result && !error && <p>{!city ? 'Checking your city…' : !cityId ? city.name ? `No published map or city feed for ${city.name} yet.` : 'Choose or preview a city first.' : 'Reading city-wide public signals…'}</p>}
+    {result?.state === 'not_covered' && <p className="personal-uncovered">No published map or city feed for {city?.name || cityId || 'this city'} yet. You can preview a covered city above.</p>}
     {result?.state === 'covered' && <>
       <div className="personal-map-toolbar" role="group" aria-label="Map layers and view">
-        <button type="button" aria-pressed={showProjects} onClick={() => setShowProjects((value) => !value)}>▧ Public projects</button>
-        <button type="button" aria-pressed={showPlaces} onClick={() => setShowPlaces((value) => !value)}>● OSM places</button>
-        <button type="button" aria-pressed={showOther} onClick={() => setShowOther((value) => !value)}>⌁ Council papers &amp; budget</button>
-        <button type="button" aria-pressed={showEvents} onClick={() => setShowEvents((value) => !value)}>◉ Event venues ({events.filter((item) => item.geometry).length})</button>
+        <button type="button" aria-pressed={showProjects} onClick={() => setShowProjects((value) => !value)}>Public projects</button>
+        <button type="button" aria-pressed={showPlaces} onClick={() => setShowPlaces((value) => !value)}>Local places</button>
+        <button type="button" aria-pressed={showOther} onClick={() => setShowOther((value) => !value)}>Council papers &amp; budget</button>
+        <button type="button" aria-pressed={showEvents} onClick={() => setShowEvents((value) => !value)}>Event venues ({events.filter((item) => item.geometry).length})</button>
         {onSelectInvestment && <button type="button" className="personal-demo-toggle" aria-pressed={showInvestments}
           onClick={() => onSelectInvestment(showInvestments ? null : TEST_CITY_INVESTMENTS[0].id)}>◇ Fictional test project · test tokens · no rights</button>}
-        <button type="button" className="personal-3d-toggle" aria-pressed={threeD} onClick={() => setThreeD((value) => !value)}>{threeD ? '3D buildings · switch to 2D' : '2D map · switch to 3D'}</button>
       </div>
-      <details className="personal-map-caption"><summary>About map shapes and sources</summary><p>Public projects and places use linked city or OpenStreetMap records. OpenStreetMap building heights may be estimated. Planning areas show published boundaries, not building footprints. Fictional test projects are illustrative placements, not real properties or offers.</p></details>
-      <p className="small-copy">A council paper is not a decision.</p>
       {placing && <p role="status">Click anywhere on the map to mark your {placing} (no address search).</p>}
       {positionError && <p role="alert">{positionError}</p>}
-      <div className="personal-map-layout"><div><div className="personal-map-canvas" ref={container} aria-label={`Map of ${result.data.catalogue.name}`} />
+      <div className="personal-map-visual"><div className="personal-map-canvas" ref={container} aria-label={`Map of ${result.data.catalogue.name}`} />
+        <button type="button" className="personal-3d-toggle" aria-pressed={threeD} aria-label={threeD ? '3D buildings on · switch to 2D' : '2D map · switch to 3D'} title={threeD ? 'Switch to 2D' : 'Switch to 3D'} onClick={() => setThreeD((value) => !value)}>{threeD ? '3D' : '2D'}</button>
+      </div>
+    </>}
+    <MoreList>
+      {result?.state === 'covered' && <MoreRow title="Map settings" meta="Filters · device pins · home & work · record lists">
+      <details className="personal-map-caption"><summary>About map shapes and sources</summary><p>Public projects and places use linked city or OpenStreetMap records. OpenStreetMap building heights may be estimated. Planning areas show published boundaries, not building footprints. Fictional test projects are illustrative placements, not real properties or offers.</p></details>
+      <p className="small-copy">A council paper is not a decision.</p>
         <p className="personal-tile-note">Map assets pass through Ledger: OpenFreeMap sees the server’s IP and requested map area, not your IP or saved pin coordinates. © OpenStreetMap contributors / OpenMapTiles / OpenFreeMap.</p>
         <section className="personal-map-options"><h3>Map filters and device pins</h3>
           <p>{result.data.catalogue.name} · snapshot {date(result.data.generatedAt)} · {signals.length} items, not a complete inventory. Publication changes: +{result.data.changes.added.length} / {result.data.changes.changed.length} changed / −{result.data.changes.removed.length}; not construction progress.</p>
@@ -381,7 +386,6 @@ export function PersonalMap({ request, accountId, explorationCity = '', selected
           </label>
           {categories.map((category) => <button type="button" className="secondary-button" key={category} onClick={() => setCategorySelection({ cityId, values: categories.filter((item) => item !== category) })}>Remove {category.split(';')[0].replaceAll('_', ' ')} ×</button>)}
         </div>}
-      </div></div>
       <section ref={citywideRef} className="personal-map-options personal-citywide"><h3>Public records near home and across the city</h3>
         {pinConfirmation && <p role="status">{pinConfirmation} {pins.home && 'Nearby public items appear in Near my home.'}</p>}
         <p className="personal-corridor">Near home: within 1 km straight-line, not a walking route. Way to work: approximate 400 m corridor around a straight line; no routing or travel-time prediction. Unlocated city items stay in these lists, never invented pins.</p>
@@ -389,7 +393,9 @@ export function PersonalMap({ request, accountId, explorationCity = '', selected
           {pins.home && pins.work && <Ring title="On my way to work" items={rings.commute} empty="No mapped public items in the approximate corridor." open={openFeature} />}
           <Ring title="In my city" items={rings.city} empty="No citywide public items or selected place categories here yet." open={openFeature} /></div>
       </section>
-    </>}
+      </MoreRow>}
+      {details}
+    </MoreList>
   </section>;
 }
 

@@ -4,6 +4,11 @@
 .project-map { width: 100%; height: 420px; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
 .project-map-wrap .small-copy { line-height: 1.6; overflow-wrap: anywhere; }
 .project-map-label { display: block; max-width: 210px; padding: 6px 9px; border-radius: 7px; border: 1px solid #b16c3e; background: #fffaf1; color: #4b3625; font: 600 11px/1.4 system-ui, sans-serif; white-space: normal; text-align: center; box-shadow: 0 2px 8px #15263b22; }
+.project-map-hero { position: absolute; inset: 0; }
+.project-map.project-map--hero { height: 100%; border: 0; border-radius: 0; }
+.project-map-credit { position: absolute; left: 8px; bottom: 8px; margin: 0; padding: 2px 7px; border-radius: 6px; background: #ffffffd9; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.project-map-credit a { color: inherit; }
+.project-map-hero > .note { position: absolute; top: 12px; left: 12px; right: 12px; margin: 0; }
 @media (max-width: 680px) {
   .project-map-wrap { padding: 20px 16px; }
   .project-map { height: 320px; }

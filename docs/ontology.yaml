@@ -413,7 +413,7 @@ concepts:
       topics: [identity, home, money, devices, places]
       definition: src/data/ledger-catalogue.ts
       state: src/components/ledger-adapter-state.ts
-      surfaces: [src/components/ledger-overview.tsx, src/components/ledger-adapters.tsx, src/components/ideas.tsx]
+      surfaces: [src/components/ledger-adapters.tsx, src/components/ideas.tsx]
       note: Shared display/action metadata, not a common backend ingestion or execution API. Existing readers retain value provenance and timestamps.
     explanation:
       definition: src/data/ledger-catalogue.ts#AdapterExplanation

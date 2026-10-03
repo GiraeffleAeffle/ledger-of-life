@@ -1,0 +1,64 @@
+/* Shared layout blocks (blocks.tsx): one pattern per job, used by every area. */
+.hero-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); }
+.hero-card--plain { grid-template-columns: minmax(0, 1fr); }
+.hero-visual { position: relative; min-width: 0; min-height: 320px; border-right: 1px solid var(--line); background: var(--soft); }
+.hero-body { display: grid; align-content: start; gap: 18px; min-width: 0; padding: 26px 28px 28px; }
+.hero-head h2 { margin: 0; color: var(--ink); font-family: var(--serif); font-size: 1.7rem; line-height: 1.15; letter-spacing: -.02em; }
+.hero-subtitle { margin: 6px 0 0; color: var(--muted); font-size: .92rem; line-height: 1.45; }
+
+.status-line { display: flex; align-items: baseline; gap: 9px; margin: 0; color: var(--ink); font-size: 1rem; font-weight: 600; line-height: 1.4; }
+.status-line-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); }
+.status-line--ok .status-line-dot { background: var(--stage-1); }
+.status-line--action .status-line-dot { background: var(--stage-3); }
+.status-line--waiting .status-line-dot { background: var(--stage-2); }
+.status-line--alert .status-line-dot { background: var(--stage-4); }
+
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 0; }
+.figure { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 14px 16px; border-radius: 12px; background: var(--soft); }
+.figure dt { color: var(--muted); font-size: .78rem; font-weight: 600; }
+.figure dd { min-width: 0; margin: 0; }
+.figure-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; }
+.figure-value { color: var(--ink); font-size: 1.45rem; font-weight: 700; line-height: 1.15; letter-spacing: -.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.figure-unit { color: var(--muted); font-size: .78rem; font-weight: 600; }
+.figure-note { color: var(--ink-2); font-size: .8rem; line-height: 1.4; }
+.figure-action { margin-top: 6px; }
+.figure--ok { background: color-mix(in srgb, var(--stage-1) 11%, var(--panel)); }
+.figure--action { background: var(--warn-bg); }
+.figure--waiting { background: color-mix(in srgb, var(--stage-2) 10%, var(--panel)); }
+.figure--alert { background: color-mix(in srgb, var(--stage-4) 12%, var(--panel)); }
+
+.action-box { display: grid; gap: 10px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.action-box--action { border-color: color-mix(in srgb, var(--stage-3) 45%, var(--line)); background: var(--warn-bg); }
+.action-box--alert { border-color: color-mix(in srgb, var(--stage-4) 45%, var(--line)); background: color-mix(in srgb, var(--stage-4) 8%, var(--panel)); }
+.action-box-title { margin: 0; color: var(--ink); font-size: 1.05rem; line-height: 1.35; }
+.action-box > p { margin: 0; }
+
+.more-list { display: grid; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.more-list-title { margin: 0; padding: 14px 18px 4px; color: var(--muted); font-size: .78rem; font-weight: 650; }
+.more-row { min-width: 0; }
+.more-row + .more-row { border-top: 1px solid var(--line); }
+.more-row > summary { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 12px 18px; cursor: pointer; list-style: none; }
+.more-row > summary::-webkit-details-marker { display: none; }
+.more-row > summary:hover { background: var(--paper); }
+.more-row > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.more-row-title { color: var(--ink); font-size: .95rem; font-weight: 600; }
+.more-row-meta { margin-left: auto; color: var(--muted); font-size: .82rem; text-align: right; }
+.more-row-chevron { flex: none; margin-left: auto; color: var(--muted); transition: transform .15s ease; }
+.more-row-meta + .more-row-chevron { margin-left: 0; }
+.more-row[open] > summary .more-row-chevron { transform: rotate(90deg); }
+.more-row-body { min-width: 0; padding: 4px 18px 20px; }
+
+.screen-note { margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.5; }
+
+@media (max-width: 760px) {
+  .hero-card { grid-template-columns: minmax(0, 1fr); border-radius: 16px; }
+  .hero-visual { min-height: 230px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .hero-body { gap: 16px; padding: 20px 18px 22px; }
+  .hero-head h2 { font-size: 1.4rem; }
+  .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .figure { padding: 12px 13px; }
+  .figure-value { font-size: 1.2rem; }
+  .more-row > summary { padding: 12px 14px; }
+  .more-row-body { padding: 4px 14px 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .more-row-chevron { transition: none; } }

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { BadgeCheck, Fingerprint, Loader2, ShieldCheck, X } from 'lucide-react';
+import { Loader2, ShieldCheck, X } from 'lucide-react';
 import type { IdentityStatus } from '@/server/eudi';
 import { CITY_CHANGED_EVENT } from './use-city-signals';
 
@@ -52,15 +52,9 @@ export function IdentityStrip({ request, status, loading, readError, onStatusCha
 
   const verified = status?.state === 'verified' ? status.statement : null;
   return (
-    <div id="identity-eudi" tabIndex={-1} className={`identity-strip${verified ? ' verified' : ''}`}>
-      {verified ? <BadgeCheck size={20} /> : <Fingerprint size={18} />}
+    <div className="ledger-identity">
       <div className="identity-copy">
-        <strong>Optional EU test-wallet proof{verified ? ' · 18 or over' : ''}</strong>
-        <span>
-          {verified
-            ? `Test credential, checked ${new Date(verified.verifiedAt).toLocaleDateString()}. Kept: "18 or over"${verified.city ? ' and your city' : ''}. Not kept: name, birth date, street address.`
-            : loading ? 'Checking the saved identity proof…' : readError ? 'The saved identity proof could not be checked.' : 'Optional adult predicate and city from the EU test wallet. No birth date is retained.'}
-        </span>
+        {verified && <span>Checked {new Date(verified.verifiedAt).toLocaleDateString()}. Kept: &ldquo;18 or over&rdquo;{verified.city ? ' and your city' : ''}. No name, birth date or street address kept.</span>}
         {!homeCity && !verified && !offer && !loading && !readError && (
           <label className="identity-option">
             <input type="checkbox" checked={shareCity} onChange={(e) => setShareCity(e.target.checked)} />

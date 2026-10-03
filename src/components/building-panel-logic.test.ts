@@ -34,7 +34,7 @@ test('claims require known positive earnings but no stake input or remaining sta
   assert.equal(buildingActionState({ ...claim, earnedRaw: null }), 'Wait for verified earnings');
 });
 test('disconnected, unconfigured and in-flight actions cannot be prepared', () => {
-  assert.equal(buildingActionState({ ...ready, connected: false }), 'Connect your Robinhood wallet in Me');
+  assert.equal(buildingActionState({ ...ready, connected: false }), 'Connect your Shares wallet in Me');
   assert.equal(buildingActionState({ ...ready, configured: false }), 'Building distributor not configured');
   assert.equal(buildingActionState({ ...ready, busy: true }), 'Finish the current building action first');
 });
@@ -43,7 +43,7 @@ test('any connected wallet may start a positive income stream without units or e
   assert.equal(buildingActionState(sync), null);
   assert.equal(buildingActionState({ ...sync, pendingRevenueRaw: '0' }), 'No new income to start streaming');
   assert.equal(buildingActionState({ ...sync, pendingRevenueRaw: null }), 'Wait for verified new income');
-  assert.equal(buildingActionState({ ...sync, connected: false }), 'Connect your Robinhood wallet in Me');
+  assert.equal(buildingActionState({ ...sync, connected: false }), 'Connect your Shares wallet in Me');
   assert.equal(buildingActionState({ ...sync, busy: true }), 'Finish the current building action first');
 });
 

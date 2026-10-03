@@ -1,21 +1,24 @@
-.money-journey { display: grid; gap: 24px; min-width: 0; }
-.money-journey .assets.money { gap: 20px; background: var(--soft); }
-.money-journey .assets.money .assets-head { display: grid; grid-template-columns: minmax(0, 1fr); }
-.money-journey .assets-total { display: grid; gap: 4px; padding: 15px 18px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); }
-.money-journey .assets-total span { font-size: 12px; color: var(--muted); }
-.money-journey .assets-total strong { font-size: clamp(1.5rem, 3vw, 2rem); font-variant-numeric: tabular-nums; }
-.money-journey .assets-total small { color: var(--muted); line-height: 1.4; }
-.money-journey .assets.money .asset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.money-journey .assets.money .asset-tile { padding: 20px; gap: 9px; }
+.money-journey, .money-journey .assets { display: grid; gap: 20px; min-width: 0; }
+.money-journey .assets .hero-body .figures { grid-template-columns: minmax(0, 1fr); }
+.holdings-list h2 { margin: 0 0 12px; font-size: 1.2rem; }
+.holding-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); font-size: .9rem; }
+.holding-row > div { display: grid; gap: 4px; }
+.holding-row > div > span { color: var(--muted); font-size: .8rem; }
+.holding-row .text-button, .holding-buy summary { min-height: 44px; display: inline-flex; align-items: center; }
+.holding-buy[open] { grid-column: 1 / -1; }
+.holding-buy summary { cursor: pointer; font-weight: 650; }
+.holding-row strong { overflow-wrap: anywhere; }
 .test-money { display: grid; gap: 10px; scroll-margin-top: 95px; }
 .test-money h2 { margin: 0; font-size: 1.15rem; }
 .test-money p, .test-money li { margin: 0; line-height: 1.5; color: var(--ink); }
-.test-money-list { display: grid; gap: 6px; margin: 0; padding-left: 18px; }
+.test-money-copy-status { overflow-wrap: anywhere; user-select: text; }
+.test-money-need { display: grid; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); }
+.test-money-need > div { display: grid; justify-items: start; gap: 8px; }
+.test-money small { display: block; color: var(--muted); font-size: .78rem; line-height: 1.5; }
 .test-money .button { justify-self: start; margin-top: 4px; }
-@media (max-width: 560px) { .money-journey { gap: 16px; } .money-journey .assets.money .assets-head, .money-journey .assets.money .asset-grid { grid-template-columns: minmax(0, 1fr); } }
-.money-journey .assets.money { min-height: 520px; }
-.money-journey .assets-total { min-height: 120px; }
-.money-journey .net-position { min-height: 110px; }
-.money-journey .asset-tile { min-height: 240px; }
-.solana-buy-row { min-height: 100px; display: grid; gap: 8px; align-content: start; }
-.test-money { min-height: 380px; }
+.solana-buy-row { display: grid; gap: 8px; align-content: start; }
+@media (max-width: 560px) { .holding-row { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; } .holding-row > button, .holding-buy { grid-column: 1 / -1; justify-self: start; } }
+@media (max-width: 560px) {
+  .money-journey .section-tabs-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .money-journey .section-tabs-nav button { padding: 6px 4px; font-size: 12px; }
+}

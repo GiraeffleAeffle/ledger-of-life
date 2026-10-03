@@ -12,6 +12,7 @@ import { useLedgerConnections } from './use-ledger-connections';
 import { LedgerAdapters } from './ledger-adapters';
 import { AdapterSettings } from './adapter-settings';
 import type { LedgerStateInputs } from './ledger-adapter-state';
+import { MoreList, MoreRow, ScreenNote } from './blocks';
 
 const emptyPlace = { city: '', from: '', to: '', note: '' };
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
@@ -79,25 +80,21 @@ export function MeArea({ request, tenancies, homeState, go }: {
       <section className="card account-settings" id="account-settings" tabIndex={-1}>
         <WalletAccessPanel />
       </section>
-      <IdentityStrip request={request} status={connections.identity} loading={connections.identityLoading}
-        readError={connections.identityError} onStatusChange={connections.updateIdentity} onRefresh={connections.refreshIdentity} homeCity={city?.source === 'home'} />
-      <LedgerAdapters inputs={inputs} go={go} />
-      <AdapterSettings request={request} connection={connections.adapters} go={go} />
-
-
       <section className="card" id="life-timeline" tabIndex={-1}>
         <h2><History size={18} /> Life timeline</h2>
-        <p className="small-copy">Private to your account. Tenancy records are recorded by this app; earlier places are your own statements. Choosing a city does not record a move or prove residence.</p>
+        <p className="small-copy">Private to your account · earlier places are your own statements.</p>
         <ol className="life-timeline">
-          {city?.name && (
-            <li><strong>Now · {city.name}</strong><span>{city.source === 'home' ? `From your home${city.home?.title ? ` · ${city.home.title}` : ''}` : city.source === 'identity' ? 'From your EU wallet' : 'Chosen by you'}</span></li>
-          )}
-          {tenancies.map((t) => (
-            <li key={t.agreementId}>
-              <strong>{t.property}</strong>
-              <span>Tenancy as {t.role} · {STAGE_LABEL[t.stage] ?? t.stage} · recorded by this app</span>
-            </li>
-          ))}
+          {city?.name && <li><strong>Now · {city.name}</strong><span>{city.source === 'home' ? 'From your home' : city.source === 'identity' ? 'From your EU wallet' : 'Chosen by you · not proof of residence'}</span></li>}
+          {tenancies.map((t) => <li key={t.agreementId}><strong>{t.property}</strong><span>{STAGE_LABEL[t.stage] ?? t.stage} · {t.role} · recorded by this app</span></li>)}
+        </ol>
+        {(homeState.homeError || cityError) && <p className="small-copy" role="status">Home could not be checked.</p>}
+        {!city?.name && tenancies.length === 0 && !homeState.homeLoading && !homeState.homeError && city !== null && !cityError && <p className="small-copy">No home recorded yet.</p>}
+      </section>
+
+
+      <MoreList>
+      <MoreRow title="Earlier places" meta={`${places.length} recorded · add or remove a place`}>
+        <ol className="life-timeline">
           {places.toSorted((a, b) => b.to.localeCompare(a.to) || b.from.localeCompare(a.from)).map((place) => (
             <li key={place.id}>
               <strong>{place.city} · {place.from}–{place.to}</strong>
@@ -121,7 +118,15 @@ export function MeArea({ request, tenancies, homeState, go }: {
             </div>
           </form>
         )}
-      </section>
+      </MoreRow>
+      </MoreList>
+      <LedgerAdapters inputs={inputs} go={go} controls={{
+        eudi: <IdentityStrip request={request} status={connections.identity} loading={connections.identityLoading}
+          readError={connections.identityError} onStatusChange={connections.updateIdentity} onRefresh={connections.refreshIdentity} homeCity={city?.source === 'home'} />,
+        homeAssistant: <AdapterSettings kind="homeAssistant" request={request} connection={connections.adapters} go={go} />,
+        validator: <AdapterSettings kind="validator" request={request} connection={connections.adapters} go={go} />,
+      }} />
+      <ScreenNote>EU wallet proofs use test credentials, not a real identity check. Connection permissions are shown before you connect.</ScreenNote>
     </div>
   );
 }

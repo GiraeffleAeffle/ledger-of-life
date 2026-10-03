@@ -1,11 +1,13 @@
 'use client';
 import { useState } from 'react';
-import { Leaf, Sun } from 'lucide-react';
+import { Leaf } from 'lucide-react';
 import { AGRI_PV_EXAMPLE } from '../data/local-investments';
 import { AGRI_PV_INPUT_BOUNDS, simulateAgriPv, type AgriPvInputs, type AgriPvResult } from '../domain/agri-pv-simulation';
 import { RoebelPrecedent } from './city-flywheel';
+import { Hero, StatusLine, Figures, Figure, MoreList, MoreRow } from './blocks';
 import './agri-pv-example.css';
 
+const wholeEuro = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 const fields: { key: keyof AgriPvInputs; label: string; step: string; source: string }[] = [
   { key: 'plantSizeMWp', label: 'Plant size (MWp)', step: '0.1', source: 'Röbel variant 1 · developer proposal, 21 Jan 2026. Context only; edit annual production separately.' },
   { key: 'annualProductionKWh', label: 'Annual electricity sold (kWh)', step: '1000', source: 'Röbel variant 1 annual production · developer proposal, 21 Jan 2026. Editable assumption: all production is sold.' },
@@ -43,7 +45,7 @@ export function AgriPvExample() {
     { label: 'Total after operating costs', project: result?.netIncomeEuro, ticket: result?.ticketNetEuro },
   ];
   return <article className="agri-pv-example" aria-label="Illustrative Agri-PV income model">
-    <div className="agri-pv-intro">
+    <Hero title="Agri-PV income idea" subtitle="Electricity above, crops below · illustrative" status={<StatusLine tone="neutral">An editable model, not an offered investment</StatusLine>} visual={
       <div className="city-blueprint-art">
         <span className="city-scenario-label">Illustrative project sketch</span>
         <svg viewBox="0 0 420 310" role="img" aria-label="Solar panel rows on high stands over crops; fictional Agri-PV concept, not a site plan">
@@ -58,17 +60,17 @@ export function AgriPvExample() {
           <g stroke="#6c8d62" strokeWidth="2" fill="#78a06c">{[88, 126, 164, 202, 240, 278, 316].map((x) => <g key={x}><path d={`M${x} 267v-23`} /><path d={`M${x} 258q-18-4-14-15q16 0 14 15m0-6q18-4 14-15q-16 0-14 15`} /></g>)}</g>
         </svg>
         <div className="city-blueprint-caption"><Leaf size={16} />Crops below, electricity above</div>
-      </div>
-      <div className="agri-pv-story">
-        <span className="eyebrow">ILLUSTRATION · NO TOKEN OR PURCHASE</span>
-        <h3>One piece of land, two possible income streams.</h3>
-        <p>In a hypothetical legally defined project, a token holder’s share could be funded by electricity sold and agricultural products sold. Here, a ticket is only a calculator input: no units, contracts, desk, buy/sell or payout.</p>
-        <ul className="city-blueprint-benefits"><li><Sun size={17} /><span><strong>Electricity sold</strong>Annual sold kWh × an assumed price per kWh.</span></li><li><Leaf size={17} /><span><strong>Agricultural products sold</strong>Crop hectares × assumed annual revenue per hectare.</span></li></ul>
-        <p className="agri-pv-caveat"><strong>Illustrative calculation with editable assumptions.</strong> Not a forecast, offer, yield promise or investment advice. Developer’s figures, not verified; a proposal, not a decision. Existing fictional issuer units elsewhere use test networks only; this example has no token.</p>
-      </div>
-    </div>
+      </div>}>
+      <Figures>
+        <Figure label="Annual electricity income" value={result ? wholeEuro.format(result.electricityRevenueEuro) : '—'} />
+        <Figure label="Annual crop income" value={result ? wholeEuro.format(result.cropRevenueEuro) : '—'} />
+        <Figure label="Illustrative share income (simulated)" value={result ? euro.format(result.ticketNetEuro) : '—'} note="per year, after assumed costs" />
+      </Figures>
+      <p className="small-copy">Illustrative calculation. Not a forecast, offer, yield promise or investment advice.</p>
+    </Hero>
+    <MoreList><MoreRow title="Edit the income assumptions" meta="Electricity, crops, costs & illustrative ticket">
     <section className="agri-pv-calculator" aria-label="Agri-PV calculator">
-      <h4>Edit the assumptions</h4>
+      <h4>Illustrative calculator</h4>
       <p>All figures remain editable. The model assumes one common income pool and allocates it by ticket ÷ investment. This is not the DKB-Crowd product’s legal payout model.</p>
       <div className="agri-pv-fields">{fields.map(({ key, label, step, source }) => <div className="agri-pv-field" key={key}>
         <label htmlFor={`agri-pv-${key}`}>{label}</label>
@@ -85,5 +87,6 @@ export function AgriPvExample() {
       <details className="city-blueprint-evidence agri-pv-price-source"><summary>Electricity benchmark · source and limits</summary><p><a href={AGRI_PV_EXAMPLE.electricitySource.url} target="_blank" rel="noopener noreferrer">{AGRI_PV_EXAMPLE.electricitySource.label}</a></p><p>{AGRI_PV_EXAMPLE.electricitySource.description}</p></details>
       <RoebelPrecedent />
     </section>
+    </MoreRow></MoreList>
   </article>;
 }

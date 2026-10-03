@@ -4,6 +4,7 @@ import { useSectionTabActive } from './section-tabs';
 import { atomicDollars, gpuPayoutSummary, installCommand, mcpConfig, pairingStatus, readingFresh, solarSummary, solarAssignmentPayload, solarApprovalAllowed, operatorSolarApprovalAllowed, type HomeDevicesResponse, type OperatorSolarAssignmentFields } from './home-node-logic';
 import './home-node.css';
 import { HostKindBadge } from './home-node-host-badge';
+import { MoreList, MoreRow } from './blocks';
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 type OperatorDevice = OperatorSolarAssignmentFields & { hostId: string; name: string; state: string; kind: 'operator' | 'community'; availability: string; canSuspend: boolean; assignSolarToBuilding: boolean };
 export function HomeNode({ request }: { request: Request }) {
@@ -66,7 +67,7 @@ export function HomeNode({ request }: { request: Request }) {
     void manage(async () => { await request('/api/home-node/assignment', payload); });
   }
   return <section className="card home-node" id="home-node" tabIndex={-1}>
-    <header className="home-node-heading"><div><span className="eyebrow">THINGS YOU RUN</span><h2>Your devices &amp; income</h2><p>{data ? `${data.devices.filter((device) => device.state !== 'revoked').length} connected devices` : 'Checking your devices…'} · test-network receipts only, no value or rights.</p></div><button type="button" className="button primary" onClick={() => setAdding(!adding)} aria-expanded={adding}>{adding ? 'Close setup' : 'Add a device'}</button></header>
+    <header className="home-node-heading"><h2>Your devices</h2><button type="button" className="button primary" onClick={() => setAdding(!adding)} aria-expanded={adding}>{adding ? 'Close setup' : 'Add a device'}</button></header>
     {error && <p role="alert">{error} <button className="text-button" type="button" onClick={() => void refresh()}>Retry</button></p>}
     {notice && <p role="status">{notice}</p>}
     {adding && <div className="home-node-setup">
@@ -80,19 +81,19 @@ export function HomeNode({ request }: { request: Request }) {
           <label><input type="radio" name="pair-payout" value="own" checked={pairPayout === 'own'} disabled={!data?.ownPayoutAvailable} onChange={() => setPairPayout('own')} />My wallet</label>
           <label><input type="radio" name="pair-payout" value="building" checked={pairPayout === 'building'} disabled={!data?.buildingPayoutAvailable} onChange={() => setPairPayout('building')} />The building (tHOME stakers)</label>
         </fieldset>
-        {data && !data.ownPayoutAvailable && <p>My wallet requires one verified EVM wallet on your account.</p>}
+        {data && !data.ownPayoutAvailable && <p>My wallet requires one verified Shares wallet on your account.</p>}
         {data && !data.buildingPayoutAvailable && <p>The building payout is unavailable until its test-network distributor is deployed.</p>}
         <button type="button" className="button primary" disabled={busy || !data?.canPair || !(pairPayout === 'own' ? data.ownPayoutAvailable : data.buildingPayoutAvailable)} onClick={() => void manage(async () => { setPairBaseline(data?.devices.map((device) => device.hostId) ?? []); setInvitation(await request('/api/local-ai/hosts/invitations', { payoutTarget: pairPayout })); })}>Create pairing code</button>
-        {data && !data.canPair && <p>Pairing unavailable: verify your EVM wallet in Me.</p>}
+        {data && !data.canPair && <p>Pairing unavailable: verify your Shares wallet in Me.</p>}
       </>}
       <h4>3 · Connect by CLI or your AI assistant</h4><pre><code>node home-node.mjs setup</code></pre><p>The setup wizard asks for this site ({origin}), your private pairing code and local connections. Then run <code>node home-node.mjs run</code>.</p>
       <p className="small-copy">For solar, choose a daily energy sensor that resets at local midnight. Set the Home Node computer&apos;s timezone to match Home Assistant so daily production and simulated feed-in use the same local day.</p>
       <details><summary>Connect your AI assistant · MCP stdio configuration</summary><p>Replace the absolute path with your downloaded file. Add this to your assistant&apos;s MCP configuration; do not put tokens or keys in it.</p><pre><code>{mcpConfig()}</code></pre><button type="button" className="text-button" onClick={() => void copy(mcpConfig(), 'MCP configuration')}>Copy MCP configuration</button><p>Ask: “Set up my Ledger Home Node for {origin}. Pair my device, then help me configure local Ollama, solar sensors or public validator IDs.” Supply the private pairing code only to a trusted assistant.</p></details>
       {invitation && <p role="status">{pairingStatus(data?.devices ?? [], pairBaseline, invitation.expiresAt)}</p>}
     </div>}
-    {data && !data.devices.length && <p>No devices connected yet. Add a device to bring your own GPU, solar readings or validator IDs into this ledger.</p>}
-    <div className="home-node-list">{data?.devices.map((device) => <article className="home-node-device" key={device.hostId}>
-      <header><h3>{device.name}</h3><HostKindBadge kind={device.kind} /><span>{device.state === 'active' ? device.availability : device.state}</span></header>
+    {data && !data.devices.length && <p>No devices connected.</p>}
+    {!!data?.devices.length && <MoreList>{data.devices.map((device) => <MoreRow key={device.hostId} title={device.name} meta={`${device.solarAnomaly || device.solarAssignmentState === 'rejected' || (device.solarAssignmentState === 'pending' && data.isOperator) ? 'Needs you · ' : device.solarAssignmentState === 'pending' ? 'Waiting for approval · ' : ''}${device.state === 'active' ? device.availability : device.state}${device.state === 'revoked' ? '' : ` · ${device.payoutTarget === 'building' ? 'pays the building' : device.payoutTarget === 'own' ? 'pays your wallet' : 'pays another wallet'}`}`}>
+      <HostKindBadge kind={device.kind} />
       <p><strong>GPU</strong> · {(device.capabilities?.gpuModels.length ? device.capabilities.gpuModels : device.models).join(', ') || 'No GPU models reported'}</p>
       <p><strong>{atomicDollars(device.earnings.amountAtomic)}</strong> · {device.earnings.settledAnswers} settled paid answers for this host</p>
       <p className="home-node-hash">{gpuPayoutSummary(device)}</p>
@@ -118,7 +119,7 @@ export function HomeNode({ request }: { request: Request }) {
         <button type="button" className="text-button" disabled={busy} onClick={() => { if (window.confirm(`Remove ${device.name}? Its signing key will no longer work. Recorded receipts remain.`)) void manage(async () => { await request('/api/local-ai/hosts/revoke', { hostId: device.hostId }); }); }}>Remove device</button>
       </div>}
       {!!device.solarIncome.length && <details><summary>Simulated solar income receipts</summary><ul>{device.solarIncome.map((income) => <li key={income.day}>{income.day} · {income.energyKwh} kWh · {atomicDollars(income.amountAtomic)} · {income.state}{income.txHash && <> · <a href={`https://explorer.testnet.chain.robinhood.com/tx/${income.txHash}`} target="_blank" rel="noreferrer">Receipt</a></>}</li>)}</ul></details>}
-    </article>)}</div>
+    </MoreRow>)}</MoreList>}
     {data?.isOperator && <details><summary>Operator controls · other hosts &amp; solar approvals</summary>{operatorDevices.length ? operatorDevices.map((device) => <div key={device.hostId}><strong>{device.name}</strong><HostKindBadge kind={device.kind} /> · {device.state} · {device.availability}<p>Solar assignment · {device.solarAssignmentState} · declared {device.peakCapacityKwp ?? '—'} kWp</p>{device.aboveCeiling ? <p>Above declared capacity — paused for review</p> : device.pausedForReview && <p>Paused for operator review. The revised declaration is within the ceiling.</p>}{device.assignSolarToBuilding && <><button className="text-button" type="button" disabled={busy || !operatorSolarApprovalAllowed(device)} onClick={() => void manage(async () => { await request('/api/home-node/approval', { hostId: device.hostId, approved: true }); })}>Approve solar assignment</button><button className="text-button" type="button" disabled={busy} onClick={() => void manage(async () => { await request('/api/home-node/approval', { hostId: device.hostId, approved: false }); })}>Reject solar assignment</button></>}{device.canSuspend && <button className="text-button" type="button" disabled={busy} onClick={() => void manage(async () => { await request('/api/local-ai/hosts/suspend', { hostId: device.hostId, suspended: device.state !== 'suspended' }); })}>{device.state === 'suspended' ? 'Resume community host' : 'Suspend community host'}</button>}</div>) : <p>No other hosts to manage. Your own hosts&apos; approvals are on their cards above.</p>}</details>}
   </section>;
 }

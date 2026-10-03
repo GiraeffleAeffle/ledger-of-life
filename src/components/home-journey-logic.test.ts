@@ -1,7 +1,29 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, recoverExpiredRentReview, settlementSplit } from './home-journey-logic.ts';
+import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, recoverExpiredRentReview, settlementSplit, tenancyNeedsPerson } from './home-journey-logic.ts';
 import type { PublicListing } from '../server/listings.ts';
+
+test('share attention separates living top-ups from voluntary actions and move-out deadlines', () => {
+  const living = { stage: 'living', next: { kind: 'wait' }, depositForm: { kind: 'shares' }, shareDeposit: { needsTopUp: false, actions: ['requestReturn', 'withdraw'] } };
+  assert.equal(tenancyNeedsPerson(living), false);
+  assert.equal(tenancyNeedsPerson({ ...living, next: { kind: 'propose_claim' }, shareDeposit: { needsTopUp: false, actions: ['proposeClaim'] } }), false);
+  assert.equal(tenancyNeedsPerson({ ...living, shareDeposit: { ...living.shareDeposit, needsTopUp: true } }), true);
+  assert.equal(tenancyNeedsPerson({ ...living, next: { kind: 'propose_claim' }, shareDeposit: { needsTopUp: true, actions: ['proposeClaim'] } }), false);
+  assert.equal(tenancyNeedsPerson({ ...living, stage: 'move-out', shareDeposit: { needsTopUp: false, actions: ['approve', 'pledge', 'acceptClaim'] } }), true);
+  assert.equal(tenancyNeedsPerson({ ...living, stage: 'move-out', shareDeposit: { needsTopUp: false, actions: ['approve', 'pledge'] } }), false);
+  assert.equal(tenancyNeedsPerson({ ...living, stage: 'move-out', shareDeposit: { needsTopUp: false, actions: ['lowerClaim'] } }), false);
+  assert.equal(tenancyNeedsPerson({ ...living, stage: 'move-out', shareDeposit: { needsTopUp: false, actions: ['approve', 'pledge', 'withdraw', 'requestReturn'] } }), false);
+  assert.equal(tenancyNeedsPerson({ ...living, stage: 'deposit', shareDeposit: { needsTopUp: false, actions: ['approve', 'pledge'] } }), true);
+});
+
+test('cash setup requires its person while automatic confirmation and payout remain passive', () => {
+  for (const kind of ['accept_agreement', 'create_space', 'secure_deposit', 'respond_claim', 'decide_claim']) {
+    assert.equal(tenancyNeedsPerson({ stage: 'agreement', next: { kind } }), true);
+  }
+  for (const kind of ['wait', 'confirming', 'paying_out', 'done', 'cancelled', 'propose_claim']) {
+    assert.equal(tenancyNeedsPerson({ stage: 'living', next: { kind } }), false);
+  }
+});
 
 test('claim respects the full deposit and six-decimal atomic precision', () => {
   assert.equal(claimAmount('0,50', '1000001'), '500000');
@@ -52,7 +74,7 @@ test('listing progress distinguishes a pending application from a chosen or ende
   assert.equal(homeStage('living', { relation: 'applicant', status: 'open' }), 4);
 });
 
-test('cancelled tenancies never drive Home or Today while another tenancy is live', () => {
+test('cancelled tenancies never drive Home while another tenancy is live', () => {
   const cancelled = { stage: 'agreement', next: { kind: 'cancelled' } };
   const living = { stage: 'living', next: { kind: 'wait' } };
   const accepting = { stage: 'agreement', next: { kind: 'accept_agreement' } };
@@ -65,7 +87,7 @@ test('cancelled tenancies never drive Home or Today while another tenancy is liv
 const listing = (id: string, relation: PublicListing['relation'], status: PublicListing['status'] = 'open', agreementId: string | null = null) => ({
   id, relation, status, agreementId, applications: [{ id: `${id}-application`, name: 'Applicant', message: '', at: '2026-10-02T00:00:00Z' }],
 });
-const homeState = { tenancyIds: [], hasCurrent: false, homeKnown: true, browsing: false };
+const homeState = { tenancyIds: [], hasCurrent: false, homeKnown: true };
 
 test('each open application and landlord review remains reachable alongside other listings', () => {
   const listings = [listing('offer', null), listing('application-1', 'applicant'), listing('application-2', 'applicant'), listing('review-1', 'landlord'), listing('review-2', 'landlord')];
@@ -77,17 +99,16 @@ test('each open application and landlord review remains reachable alongside othe
 
 test('unreadable home state never becomes a newcomer or duplicates its chosen listing', () => {
   const listings = [listing('own-home', 'chosen', 'let', 'unavailable-home'), listing('other-home', null)];
-  const unknown = homeSituation({ ...homeState, listings, tenancyIds: ['unavailable-home'], homeKnown: false, browsing: true });
+  const unknown = homeSituation({ ...homeState, listings, tenancyIds: ['unavailable-home'], homeKnown: false });
   assert.equal(unknown.showBrowser, false);
   assert.deepEqual(unknown.applicationListings, []);
   assert.equal(homeSituation({ ...homeState, listings: [], homeKnown: false }).showBrowser, false);
   assert.equal(homeSituation({ ...homeState, listings: [listing('offer', null)] }).showBrowser, true);
 });
 
-test('a current home hides offers until an explicit browser request', () => {
+test('a current home keeps available offers behind the browser row', () => {
   const state = { ...homeState, listings: [listing('offer', null)], hasCurrent: true };
   assert.equal(homeSituation(state).showBrowser, false);
-  assert.equal(homeSituation({ ...state, browsing: true }).showBrowser, true);
 });
 
 test('rejected and closed applications are not presented as waiting for a decision', () => {

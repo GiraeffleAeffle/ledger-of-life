@@ -120,7 +120,7 @@ _Avoid_: Earnings release, investment sale; those are separate actions.
 ### The workspace
 
 **Area**:
-One of the six places in the signed-in app (Today, Me, Home, Money, Places, Ideas). Each answers one question, and a feature is operated in exactly one area.
+One of the five places in the signed-in app (Home, Money, Places, Me, Roadmap; Roadmap has area id `ideas` and is a secondary sidebar link). Each answers one question, and a feature is operated in exactly one area.
 _Avoid_: Page, module, tab.
 
 **Feature home**:

@@ -1,7 +1,8 @@
 'use client';
-import { NetPosition, NetPositionStrip } from './net-position';
+import { NetPosition } from './net-position';
 import { netPositionTotal, usd, type NetPositionParts } from './money-valuation';
 import { DepositIdeas } from './tenancy-walkthrough';
+import { Figure, Figures, Hero, MoreRow, ScreenNote, StatusLine } from './blocks';
 import './design-lab.css';
 
 const HOLDINGS: { name: string; note: string; parts: NetPositionParts }[] = [
@@ -19,21 +20,26 @@ export function DesignLab() {
   return (
     <main className="design-lab">
       <header>
-        <span className="eyebrow">DESIGN LAB · DEVELOPMENT ONLY</span>
         <h1>How should it look?</h1>
         <p role="note">Every figure here is invented for this page. None of it is your account, and none of it is on a chain.</p>
       </header>
       <section aria-labelledby="lab-holdings">
-        <h2 id="lab-holdings">Money → Holdings: what the subtotal is made of</h2>
-        <p>Rules applied: bars start from one zero line and are drawn strictly in proportion; parts are labelled where they are, so no legend is needed; a part that is zero is not listed; the parts add up to the total shown.</p>
+        <h2 id="lab-holdings">Money → Holdings</h2>
+        <p>A total, a compact balance bar and labelled rows for details.</p>
         {HOLDINGS.map(({ name, note, parts }) => (
-          <article className="card" key={name}>
-            <span className="eyebrow">{name.toUpperCase()} · SUBTOTAL {usd(netPositionTotal(parts))}</span>
-            <p>{note}</p>
-            <h3>In Money → Holdings</h3>
-            <NetPosition parts={parts} go={() => {}} depositSection="home-tenancies" />
-            <h3>On Today</h3>
-            <NetPositionStrip parts={parts} />
+          <article className="design-lab-example" key={name}>
+            <h3>{name}</h3>
+            <Hero title="Total test value" status={<StatusLine tone="ok">Your test balances are up to date</StatusLine>}>
+              <Figures><Figure label="What you own, less what you owe" value={usd(netPositionTotal(parts))} /></Figures>
+              <NetPosition parts={parts} />
+            </Hero>
+            <section className="card">
+              <h3>What you own</h3>
+              <div className="design-lab-holding"><span>Test dollars</span><strong>{usd(parts.free)}</strong><span>Free to use</span></div>
+              <div className="design-lab-holding"><span>Rental deposit</span><strong>{usd(parts.locked)}</strong><span>Locked</span></div>
+            </section>
+            <MoreRow title="Valuation details" meta="Prices and exact balances"><p>{note}</p></MoreRow>
+            <ScreenNote>Illustration only. These invented test balances have no monetary value.</ScreenNote>
           </article>
         ))}
       </section>

@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import type { ServiceChargeView } from '@/server/service-charges';
+import { Figure, Figures } from './blocks';
+import './move-in.css';
 
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
 const euroFormat = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
@@ -43,18 +45,17 @@ export function ServiceCharges({ agreementId, request }: { agreementId: string; 
   }
 
   return (
-    <section className="service-charge-card" aria-labelledby={`service-charges-${agreementId}`}>
-      <h3 id={`service-charges-${agreementId}`}>Service charges · prototype · simulated figures</h3>
+    <section className="service-charge-card" aria-label="Service charges">
       {error && <p role="alert" className="note">{error}</p>}
       {!account && !error && <p className="small-copy">Loading this tenancy’s example account…</p>}
       {account && (
         <div className="prototype-content">
-          <p className="small-copy">Illustrative monthly statement, not an invoice or a payment. Annual building totals, allocation keys and shares are examples.</p>
-          <dl className="journey-facts">
-            <div><dt>Monthly prepayment · editable test value</dt><dd>{euro(account.prepaymentCents)}</dd></div>
-            <div><dt>Estimated monthly share</dt><dd>{euro(account.estimatedMonthlyCostCents)}</dd></div>
-            <div><dt>Running balance this month</dt><dd>{euro(Math.abs(account.balanceCents))} {account.balanceCents >= 0 ? 'ahead' : 'behind'}</dd></div>
-          </dl>
+          <p className="small-copy">Prototype · simulated monthly statement, not an invoice or payment.</p>
+          <Figures label="Monthly service charges">
+            <Figure label="Monthly prepayment" value={euro(account.prepaymentCents)} note="Example value" />
+            <Figure label="Estimated monthly share" value={euro(account.estimatedMonthlyCostCents)} />
+            <Figure label="Running balance" value={euro(Math.abs(account.balanceCents))} note={account.balanceCents >= 0 ? 'Ahead this month' : 'Behind this month'} tone={account.balanceCents >= 0 ? 'ok' : 'waiting'} />
+          </Figures>
           {account.role === 'landlord' && (
             <form className="inline-form" onSubmit={save}>
               <label>Monthly test prepayment (€)<input type="number" min="0" max="1000" step="0.01" required value={prepayment} onChange={(event) => setPrepayment(event.target.value)} /></label>
@@ -81,7 +82,7 @@ export function ServiceCharges({ agreementId, request }: { agreementId: string; 
               {account.items.map((item) => <li key={item.name}><strong>{item.name}</strong><span>{item.allocation}</span><span>Building {euro(item.annualBuildingCents)} · illustrative share {euro(item.annualShareCents)}/year</span></li>)}
             </ul>
           </div>
-          <p><strong>Projected monthly surplus release: {euro(account.projectedReleaseCents)}</strong> (illustration only; no transfer or on-chain action). In a future version, prepayments would sit in the same escrow as the deposit.</p>
+          <p className="small-copy">Projected monthly surplus: <strong>{euro(account.projectedReleaseCents)}</strong>. Illustration only; nothing is transferred.</p>
         </div>
       )}
     </section>

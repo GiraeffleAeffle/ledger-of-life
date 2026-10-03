@@ -2,8 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { roundedLocation, moveInAvailable } from '../domain/home-location.ts';
 import { handoverInput, updateHandover } from './move-in.ts';
-import { listingNeighbourhood } from '../components/neighbourhood-logic.ts';
-import type { SignalResult, CityFeedItem } from './city-signals.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import type { Agreement } from './agreements.ts';
 import type { Store } from './store.ts';
@@ -74,26 +72,4 @@ test('meter values, real dates, units and duplicate meters are validated', () =>
   for (const row of [{ ...content.readings[0], value: -1 }, { ...content.readings[0], value: NaN }, { ...content.readings[0], unit: 'm³' }, { ...content.readings[0], date: '2026-02-30' }]) assert.throws(() => handoverInput({ ...content, readings: [row] }));
   assert.throws(() => handoverInput({ ...content, readings: [content.readings[0], content.readings[0]] }), /only once/);
   assert.throws(() => handoverInput({ readings: [], rooms: [] }), /Add a meter/);
-});
-
-test('neighbourhood requires covered city bounds and located nearby data; past or unlocated events stay out', () => {
-  const unavailable: SignalResult = { state: 'not_covered', city: 'unknown', coveredCities: [], generatedAt: '2026-10-01' };
-  assert.equal(listingNeighbourhood(unavailable, { lat: 52.581, lon: 13.883 }, []), null);
-  const snapshot = { state: 'covered', data: { catalogue: { id: 'strausberg', bbox: [13.8, 52.5, 14, 52.7] }, generatedAt: '2026-10-01', signals: { features: [
-    { geometry: { type: 'Point', coordinates: [13.883, 52.581] }, properties: { id: 'library', kind: 'place', asOf: '2026-10-01' } },
-    { geometry: { type: 'Point', coordinates: [13.897, 52.581] }, properties: { id: 'works', kind: 'construction', asOf: '2026-10-01' } },
-    { geometry: { type: 'Point', coordinates: [13.9, 52.581] }, properties: { id: 'outside-one-km', kind: 'construction', asOf: '2026-10-01' } },
-    { geometry: { type: 'Point', coordinates: [13.98, 52.581] }, properties: { id: 'far', kind: 'place', asOf: '2026-10-01' } },
-    { geometry: null, properties: { id: 'unlocated', kind: 'place', asOf: '2026-10-01' } },
-  ] } } } as SignalResult;
-  assert.equal(listingNeighbourhood(snapshot, { lat: 48.1, lon: 11.5 }, []), null);
-  const events = [
-    { id: 'upcoming', kind: 'event', geometry: { type: 'Point', coordinates: [13.883, 52.581] }, eventStart: '2026-10-02' },
-    { id: 'past', kind: 'event', geometry: { type: 'Point', coordinates: [13.883, 52.581] }, eventStart: '2026-09-30' },
-    { id: 'unlocated', kind: 'event', geometry: null, eventStart: '2026-10-02' },
-  ] as CityFeedItem[];
-  const nearby = listingNeighbourhood(snapshot, { lat: 52.581, lon: 13.883 }, events, new Date('2026-10-01'))!;
-  assert.deepEqual(nearby.places.map((row) => row.feature.properties.id), ['library']);
-  assert.deepEqual(nearby.projects.map((row) => row.feature.properties.id), ['works']);
-  assert.deepEqual(nearby.events.map((row) => row.item.id), ['upcoming']);
 });

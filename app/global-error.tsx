@@ -8,10 +8,10 @@ export default function GlobalError({ retry }: { error: Error & { digest?: strin
         <style>{'button:focus-visible,a:focus-visible{outline:3px solid #2d5fb3;outline-offset:2px}a{color:#15263b}button:hover{background:#33455a}'}</style>
         <main>
           <h1>Ledger of Life could not be shown.</h1>
-          <p>You can try again or return to Today.</p>
+          <p>You can try again or return to Home.</p>
           <button style={{ minHeight: '44px', padding: '12px 20px', background: '#15263b', color: '#fff', border: 0, borderRadius: '999px', cursor: 'pointer' }} onClick={retry}>Try again</button>{' '}
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- the root layout failed, so a full page load is the point */}
-          <a href="/">Go to Today</a>
+          <a href="/">Go to Home</a>
         </main>
       </body>
     </html>

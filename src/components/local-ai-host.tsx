@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { LocalAiServiceStatus, LocalAiUsageSummary } from '../server/local-ai-types';
 import { DEFAULT_HOST_SCENARIO, hostEconomics, type HostScenario } from './local-ai-economics';
+import { MoreRow } from './blocks';
 
 const euros = (value: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format(value);
 const fields: { key: keyof HostScenario; label: string; min: number; max?: number; step: number }[] = [
@@ -20,11 +21,10 @@ export function LocalAiHost({ usage, error, service }: {
   usage: LocalAiUsageSummary | null; error: string; service: LocalAiServiceStatus | null;
 }) {
   const [inputs, setInputs] = useState<HostScenario>(DEFAULT_HOST_SCENARIO);
+  if (!service?.hosts?.some((host) => host.own && host.state === 'active')) return null;
   const plan = hostEconomics(inputs, usage?.meanWallMs ?? null);
-  return <div className="local-ai-host">
-    {service?.hosts?.some((host) => host.own && host.state === 'active') && <>
-    <div className="local-ai-planner">
-      <div className="local-ai-section-title"><span className="eyebrow">EDITABLE EURO SCENARIO</span><h3>Could the hardware pay its way?</h3><p>Plan paid access, a free library service, or both. Euro prices below are assumptions—not a conversion of the receipt ledger.</p></div>
+  return <MoreRow title="Could your hardware pay its way?" meta={plan ? `${euros(plan.marginEuro)} illustrative monthly margin` : 'Edit your assumptions'}>
+      <div className="local-ai-section-title"><h3>Could the hardware pay its way?</h3><p>Euro prices are assumptions, not a conversion of the receipt ledger.</p></div>
       {error && <p className="local-ai-alert" role="status">Observed usage unavailable: {error}. The calculation below uses your assumptions without measured request capacity.</p>}
       <div className="local-ai-plan-layout">
         <div className="local-ai-assumptions">{fields.map(({ key, label, ...limits }) => <label key={key}>{label}<input type="number" {...limits} value={Number.isFinite(inputs[key]) ? inputs[key] : ''} onChange={(event) => { const value = event.currentTarget.valueAsNumber; setInputs((current) => ({ ...current, [key]: value })); }} /></label>)}</div>
@@ -38,7 +38,5 @@ export function LocalAiHost({ usage, error, service }: {
         </div>
       </div>
       <details className="local-ai-method"><summary>What the calculation includes</summary><p>Power is a whole-host assumption, not a GPU power measurement. Electricity covers all online hours, including idle time. Hardware is allocated over the entered months. Add hosting, financing, maintenance and transaction costs to other monthly costs; tax is not calculated.</p><p>Observed request time depends on model, prompt length, output and cold starts. The capacity check excludes wallet review, payment settlement and queue overhead. It is an upper-bound compute check, not a prediction of customers or continuous throughput. Free answers use the same node without a payment.</p></details>
-    </div>
-    </>}
-  </div>;
+    </MoreRow>;
 }

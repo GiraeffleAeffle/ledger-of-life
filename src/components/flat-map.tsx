@@ -5,7 +5,7 @@ import { roundedLocation, type HomeLocation } from '../domain/home-location';
 import './move-in.css';
 
 /** Same map engine, worker and OSM tile source as Places; no address lookup or geolocation. */
-export function FlatMap({ location, center, onChange }: { location?: HomeLocation; center?: readonly [number, number]; onChange?: (location: HomeLocation) => void }) {
+export function FlatMap({ location, center, onChange, variant = 'default' }: { location?: HomeLocation; center?: readonly [number, number]; onChange?: (location: HomeLocation) => void; variant?: 'default' | 'hero' }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const marker = useRef<Marker | null>(null);
@@ -66,11 +66,11 @@ export function FlatMap({ location, center, onChange }: { location?: HomeLocatio
     if (!location && centerLon !== undefined && centerLat !== undefined && map.current)
       map.current.jumpTo({ center: [centerLon, centerLat], zoom: 12 });
   }, [location, centerLon, centerLat]);
-  return <div className="flat-map-wrap">
+  return <div className={`flat-map-wrap${variant === 'hero' ? ' flat-map-wrap--hero' : ''}`}>
     <div ref={container} className="flat-map" role="region" aria-label={onChange ? 'Place the flat on the OpenStreetMap map' : 'Approximate flat location on OpenStreetMap'} />
-    <p className="small-copy">Map tiles by <a href="https://openfreemap.org/">OpenFreeMap</a> · <a href="https://openmaptiles.org/">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a></p>
+    <p className="flat-map-credit">Map tiles by <a href="https://openfreemap.org/">OpenFreeMap</a> · <a href="https://openmaptiles.org/">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a></p>
     {onChange && <p className="small-copy">Click the map or drag the pin. Only a roughly 100 m grid location is published, not an exact address. Pan and zoom to your area; no address search is sent.</p>}
-    {location && <p className="small-copy mono">Approximate pin: {location.lat.toFixed(3)}, {location.lon.toFixed(3)}</p>}
+    {location && onChange && <p className="small-copy mono">Approximate pin: {location.lat.toFixed(3)}, {location.lon.toFixed(3)}</p>}
     {error && <p className="note" role="status">{error}</p>}
   </div>;
 }

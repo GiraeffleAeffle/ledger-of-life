@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore } from 'react';
 import { useRentalWallet } from './provider.tsx';
 import { pendingInvitationRole } from './pending-invitation.ts';
+import { WALLET_LABELS } from './labels.ts';
 import styles from './access-panel.module.css';
 
 const subscribe = () => () => undefined;
@@ -36,7 +37,7 @@ export function WalletAccessPanel() {
       await navigator.clipboard.writeText(address);
       setCopyStatus('Address copied.');
     } catch {
-      setCopyStatus('Could not copy the address. Select and copy it manually.');
+      setCopyStatus(`Could not copy the address. Select and copy this full address manually: ${address}`);
     }
   }
   const passkeysAvailable = useSyncExternalStore(subscribe, supportsPasskeys, () => false);
@@ -51,9 +52,8 @@ export function WalletAccessPanel() {
   if (!access.configured) {
     return (
       <section className={styles.panel} aria-labelledby="wallet-access-title">
-        <div className={styles.eyebrow}>Account access</div>
-        <h3 id="wallet-access-title">Your assets, your account</h3>
-        <p>Passkey sign-in and personal wallets are not configured yet. Once available, you can access your own account and the test-network services it is eligible to use.</p>
+        <h2 id="wallet-access-title">Sign-in &amp; wallets</h2>
+        <p>Account access is not configured yet.</p>
         <span className={styles.pending}>Provider setup pending</span>
       </section>
     );
@@ -61,9 +61,7 @@ export function WalletAccessPanel() {
 
   return (
     <section className={styles.panel} aria-label="Passkeys and wallets" aria-busy={access.busy}>
-      <p>
-        We recommend a second passkey on another device as an optional backup. If you lose every passkey, you lose this account.
-      </p>
+      <h2>Sign-in &amp; wallets</h2>
       {!access.ready && <p role="status">Connecting account access…</p>}
       {!access.authenticated ? (
         <>
@@ -117,26 +115,11 @@ export function WalletAccessPanel() {
                 {access.passkeyCount ? 'Add another' : 'Add passkey'}
               </button>
             </li>
-            <li>
-              <div>
-                <strong>Personal wallets</strong>
-                <span>
-                  {hasBothWallets
-                    ? 'Robinhood and Solana wallets linked'
-                    : 'Create wallets after securing your account'}
-                </span>
-              </div>
-              {!hasBothWallets && (
-                <button
-                  type="button"
-                  disabled={disabled || access.passkeyCount === 0}
-                  onClick={() => run(access.createMissingWallets)}
-                >
-                  Create wallets
-                </button>
-              )}
-            </li>
           </ol>
+          {!hasBothWallets && <div className={styles.actions}>
+            <span>Create wallets after securing your account.</span>
+            <button type="button" disabled={disabled || access.passkeyCount === 0} onClick={() => run(access.createMissingWallets)}>Create wallets</button>
+          </div>}
           {access.hasLinkedEmail && access.passkeyCount > 0 && (
             <div className={styles.note}>
               <p>An email is still linked to this older Privy account. Remove it to keep passkey-only access; keep your passkeys safe.</p>
@@ -144,25 +127,18 @@ export function WalletAccessPanel() {
             </div>
           )}
           {access.wallets.length > 0 && (
-            <div className={styles.details}>
+            <div>
               {access.wallets.map((wallet) => (
                 <div className={styles.wallet} key={wallet.id}>
-                  <strong>{wallet.chainType === 'solana' ? 'Solana' : 'Robinhood Chain'}</strong>
-                  <code>{wallet.address}</code>
-                  <button type="button" onClick={() => void copyAddress(wallet.address)}>Copy {wallet.chainType === 'solana' ? 'Solana' : 'Robinhood'} address</button>
-                  <span>
-                    {wallet.connected
-                      ? 'Ready to request your signature'
-                      : 'Waiting for wallet connection'}
-                  </span>
+                  <strong title={wallet.chainType === 'solana' ? 'Solana' : 'Robinhood Chain'}>{WALLET_LABELS[wallet.chainType]}</strong>
+                  <code title={wallet.address}>{wallet.address.slice(0, 6)}…{wallet.address.slice(-4)}</code>
+                  <button type="button" aria-label={`Copy ${WALLET_LABELS[wallet.chainType]} address`} onClick={() => void copyAddress(wallet.address)}>Copy</button>
+                  {!wallet.connected && <span>Waiting for wallet connection</span>}
                 </div>
               ))}
-              <p>
-                Your passkey signs you in; your embedded wallet signs transactions you approve. This
-                app does not add a server signer or give landlords or arbitrators access to your
-                personal wallet.
-              </p>
-              {copyStatus && <p role="status">{copyStatus}</p>}
+              <p>Your passkey signs you in; only you approve your wallet’s transactions, not your landlord or this app.</p>
+              <details className={styles.backup}><summary>Passkey backup</summary><p>Add a passkey on another device. Losing every passkey means losing this account.</p></details>
+              {copyStatus && <p className={styles.copyStatus} role="status">{copyStatus}</p>}
             </div>
           )}
         </>

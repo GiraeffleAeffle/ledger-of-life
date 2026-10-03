@@ -1,29 +1,4 @@
-.local-capital { margin: 24px 0; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; min-width: 0; }
-.local-capital-heading { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; padding: 28px 28px 18px; }
-.local-capital-heading h2 { margin: 6px 0 8px; font-size: clamp(1.45rem, 2.4vw, 2rem); letter-spacing: -.04em; }
-.local-capital-heading p { margin: 0; color: var(--muted); max-width: 570px; line-height: 1.5; }
-.local-project-picker { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; padding: 0 28px; }
-.local-project-choice { min-width: 0; display: grid; gap: 6px; }
-.local-project-choice > button:first-child { display: grid; grid-template-columns: 48px minmax(0,1fr) auto; align-items: center; gap: 12px; min-width: 0; border: 1px solid var(--line-strong); border-radius: 13px; background: var(--soft); padding: 16px; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
-.local-project-choice > button[aria-pressed=true] { background: var(--soft); border-color: var(--ink); box-shadow: inset 0 0 0 1px #15263b12; }
-.local-project-picker strong { display: block; font-size: .94rem; line-height: 1.4; }
-.local-project-picker small { display: block; margin-top: 4px; color: var(--muted); font-size: .72rem; line-height: 1.4; }
-.local-project-icon { display: grid; place-items: center; width: 46px; height: 48px; border-radius: 11px; background: var(--soft); color: var(--muted); }
-.local-project-icon.business { background: var(--soft); color: var(--muted); }
-.local-project-owned { font-size: .81rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.local-project-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 14px 28px; color: var(--muted); font-size: .75rem; }
-.local-project-toolbar > div, .local-project-toolbar button { display: inline-flex; align-items: center; gap: 6px; }
-.local-investment-body { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
-.local-project-story { padding: 30px; background: radial-gradient(ellipse at bottom left, var(--soft), transparent 70%), var(--soft); }
-.local-project-story h3 { font-size: clamp(1.4rem, 2.1vw, 1.9rem); line-height: 1.2; letter-spacing: -.035em; margin: 9px 0 14px; max-width: 390px; }
-.local-project-story > p { font-size: .89rem; color: var(--muted); line-height: 1.65; max-width: 430px; }
-.local-use-tags { display: flex; flex-wrap: wrap; gap: 7px; margin: 18px 0; }
-.local-use-tags span { background: var(--soft); color: var(--muted); border: 1px solid var(--line); padding: 5px 8px; font-size: .71rem; border-radius: 6px; }
-.local-stake-display { display: flex; align-items: flex-start; gap: 13px; margin: 25px 0 20px; padding: 20px; border: 1px solid var(--line); background: var(--panel); border-radius: 14px; }
-.local-stake-display > svg { color: var(--muted); margin-top: 7px; flex-shrink: 0; }
-.local-stake-display strong { display: block; font-size: 2rem; font-variant-numeric: tabular-nums; font-weight: 650; letter-spacing: -.05em; }
-.local-stake-display strong > span { font-size: .95rem; letter-spacing: 0; }
-.local-stake-display small { display: block; margin-top: 6px; color: var(--muted); font-size: .75rem; line-height: 1.5; }
+.local-capital { display: grid; gap: 16px; margin: 0; min-width: 0; }
 .local-investment-review { padding: 28px; min-width: 0; }
 .local-cash { display: grid; grid-template-columns: 18px minmax(0,1fr) auto; align-items: center; gap: 10px; padding-bottom: 17px; margin-bottom: 19px; border-bottom: 1px solid var(--line); font-size: .77rem; color: var(--muted); }
 .local-cash strong { color: var(--ink); font-size: 1rem; white-space: nowrap; }
@@ -33,12 +8,13 @@
 .local-investment-review label > span { font-weight: 400; color: var(--muted); font-size: .75rem; }
 .local-investment-review input { grid-column: 1 / -1; width: 100%; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: white; color: var(--ink); font: inherit; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
 .local-amount-presets { display: flex; gap: 6px; }
-.local-amount-presets button { border: 1px solid var(--line-strong); background: var(--soft); border-radius: 6px; padding: 6px 16px; font: inherit; font-size: .8rem; color: var(--muted); cursor: pointer; }
+.local-amount-presets button { min-height: 44px; border: 1px solid var(--line-strong); background: var(--soft); border-radius: 6px; padding: 6px 16px; font: inherit; font-size: .8rem; color: var(--muted); cursor: pointer; }
 .local-amount-presets button[aria-pressed=true] { border-color: var(--ink); background: var(--soft); }
 .local-price { margin: 0 0 5px; font-size: .78rem; color: var(--muted); }
 .local-price small { display: block; margin-top: 4px; font-size: .7rem; color: var(--ink); }
 .local-investment-review .button { justify-content: center; }
 .local-test-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 12px; }
+.local-capital .local-test-actions button { min-height: 44px; }
 .local-funding-note { font-size: .73rem; color: var(--ink); line-height: 1.6; }
 .local-checked { display: block; font-size: .68rem; color: var(--ink); margin-top: 15px; }
 .local-market-alert { margin: 12px 28px; padding: 11px 13px; border-radius: 8px; background: #f8efdc; color: #856432; font-size: .81rem; line-height: 1.5; }
@@ -56,10 +32,6 @@
 .local-order-success > svg { flex-shrink: 0; margin-top: 3px; }
 .local-order-success span { display: block; font-size: .76rem; line-height: 1.5; margin: 5px 0; }
 .local-order-success a { display: inline-flex; align-items: center; gap: 5px; font-size: .73rem; color: inherit; }
-.local-investment-details { padding: 17px 28px; border-top: 1px solid var(--line); color: var(--muted); font-size: .78rem; line-height: 1.7; }
-.local-investment-details summary { cursor: pointer; color: var(--muted); font-weight: 600; }
-.local-investment-details li { margin-bottom: 10px; }
-.local-investment-details li span { display: block; font-size: .73rem; }
 .city-blueprint { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: start; }
 .city-blueprint-art { position: sticky; top: 20px; padding: 27px 18px 24px; background: var(--soft); }
 .city-scenario-label { display: table; margin: 0 auto; padding: 5px 9px; border: 1px dashed var(--line); border-radius: 5px; font-size: .68rem; color: var(--muted); }
@@ -78,51 +50,51 @@
 .city-blueprint-benefits strong { display: block; color: var(--ink); }
 .city-blueprint-evidence { color: var(--muted); font-size: .74rem; line-height: 1.6; }
 .city-blueprint-evidence summary { cursor: pointer; font-weight: 600; }
-.city-flywheel { padding: 30px; }
-.city-flywheel h3 { margin: 9px 0 25px; font-size: 1.55rem; letter-spacing: -.035em; }
-.building-panel > section { margin: 22px 0; min-width: 0; }
-.building-panel h4 { margin: 0 0 16px; font-size: 1.05rem; }
-.building-panel .building-rewards { padding: 22px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--soft); }
 .building-rewards .local-test-actions > div { flex: 1 1 180px; min-width: 0; }
 .building-rewards .button { width: 100%; justify-content: center; }
-.building-income, .building-how { padding-top: 22px; border-top: 1px solid var(--line); }
-.building-how summary { font-weight: 600; cursor: pointer; }
-.building-panel label { display: grid; gap: 8px; max-width: 420px; margin: 16px 0; }
-.building-panel input { width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font: inherit; color: var(--ink); }
-.local-housing-precedent { padding: 0 30px 24px; }
 @media (max-width: 1000px) {
-  .local-project-choice > button:first-child { grid-template-columns: 42px minmax(0,1fr); }
-  .local-project-owned { grid-column: 2; }
   .local-cash { grid-template-columns: 18px minmax(0,1fr); }
   .local-cash strong { grid-column: 2; }
 }
 @media (max-width: 680px) {
-  .local-capital { border-radius: 15px; }
-  .local-capital-heading { padding: 20px 17px 16px; }
-  .local-capital-heading p { font-size: .83rem; }
-  .local-project-picker { grid-template-columns: minmax(0,1fr); padding: 0 16px; gap: 8px; }
-  .local-project-picker > button { padding: 12px; gap: 7px 12px; }
-  .local-project-icon { grid-row: 1 / span 2; width: 40px; height: 42px; }
-  .local-project-picker strong { font-size: .86rem; }
-  .local-project-owned { font-size: .76rem; }
-  .local-project-toolbar { padding: 13px 17px; font-size: .7rem; }
-  .local-investment-body, .city-blueprint { grid-template-columns: minmax(0,1fr); }
-  .local-project-story, .local-investment-review, .city-blueprint-options { padding: 20px; }
-  .local-stake-display { margin: 18px 0; padding: 15px; }
-  .local-project-story h3 { font-size: 1.5rem; }
-  .local-project-story > p { font-size: .82rem; }
+  .city-blueprint { grid-template-columns: minmax(0,1fr); }
+  .local-investment-review, .city-blueprint-options { padding: 20px; }
   .local-cash { grid-template-columns: 18px minmax(0,1fr) auto; }
   .local-cash > span { font-size: .7rem; }
   .local-cash strong { grid-column: auto; font-size: .85rem; }
   .local-cash strong small { display: block; text-align: right; }
   .local-market-alert { margin: 12px 17px; }
-  .local-investment-details { padding: 16px 19px; font-size: .74rem; }
   .city-blueprint-art { position: static; padding: 20px 10px; }
   .city-blueprint-art > svg { max-width: 340px; }
-  .city-flywheel { padding: 23px 19px; }
-  .city-flywheel h3 { font-size: 1.3rem; }
-  .building-panel .building-rewards { padding: 16px; }
-  .local-housing-precedent { padding: 0 19px 20px; }
 }
 .local-contract-links { display: flex; flex-wrap: wrap; gap: 12px; margin: -7px 0 15px; color: var(--muted); font-size: .72rem; }
 .local-contract-links a { display: inline-flex; align-items: center; gap: 5px; color: inherit; }
+.lean-project-picker { display: flex; width: fit-content; max-width: 100%; padding: 4px; gap: 4px; border: 1px solid var(--line); background: var(--soft); border-radius: 12px; }
+.lean-project-picker button { min-height: 44px; padding: 8px 20px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+.lean-project-picker button[aria-pressed=true] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 4px #0001; }
+.lean-building { display: grid; gap: 16px; }
+.lean-claim-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.lean-claim-actions button { min-height: 44px; }
+.lean-building .building-rewards:empty { display: none; }
+.lean-building .building-rewards { margin: 0; }
+.lean-building label { display: grid; gap: 8px; }
+.lean-building input { width: 100%; min-height: 44px; border: 1px solid var(--line); padding: 10px; border-radius: 8px; }
+.local-capital .local-investment-review { padding: 4px 0; }
+@media (max-width: 600px) {
+  .lean-project-picker { width: 100%; }
+  .lean-project-picker button { flex: 1; padding: 8px; }
+  .local-cash { grid-template-columns: 18px minmax(0,1fr); }
+  .local-cash strong { grid-column: 2; }
+  .local-capital .city-blueprint-art { position: static; }
+}
+.local-capital .city-blueprint { display: block; }
+.local-capital .city-blueprint-options { padding: 0; }
+.local-capital .city-tech-toggles button { min-height: 44px; }
+.local-capital .agri-pv-example { display: grid; gap: 16px; }
+.local-capital .agri-pv-example .city-blueprint-art { position: static; padding: 10px; }
+.local-capital .agri-pv-example .city-blueprint-art > svg { max-height: 260px; }
+@media (max-width: 600px) {
+  .local-capital .agri-pv-example .city-blueprint-art > svg { max-height: 150px; }
+  .local-capital .agri-pv-fields { grid-template-columns: 1fr; }
+  .local-capital .agri-pv-results { overflow-x: auto; }
+}

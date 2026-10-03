@@ -26,26 +26,26 @@ npm run setup
 npm run dev
 ```
 
-Open [the workspace](http://localhost:4175). Use this hostname for passkeys; WebAuthn cannot use an IP address as its relying-party ID. Setup creates a private `.env.local` without printing secrets. Account setup and the six signed-in areas use the real account; test-network balance and finance workflows require the relevant wallet, connection, and test-network configuration.
+Open [the workspace](http://localhost:4175). Use this hostname for passkeys; WebAuthn cannot use an IP address as its relying-party ID. Setup creates a private `.env.local` without printing secrets. Account setup and the five signed-in areas use the real account; test-network balance and finance workflows require the relevant wallet, connection, and test-network configuration.
 
 For the real, passkey-signed flow on the Solana test network (post a home → apply → choose → deposit → move-out → payout, one next step at a time), open **Home**. See [the home journey](docs/HOME_JOURNEY.md).
 
 Home also offers **Shares · test TSLA** when publishing: official test TSLA on Robinhood Chain testnet covers the USD security at 150 %, is locked in the rental escrow, and settles in TSLA without a forced sale. Below 125 % the app asks for a top-up; silence never awards the landlord. Fixed response, return and arbitration windows are agreed before funding. The share deposit is available on this site with the [pinned deployment](contracts/evm/deployments/share-deposit-46630.json); it was run on this site on 1 October 2026 with three fresh passkey accounts (landlord, tenant, arbitrator; [evidence](docs/evidence/HOSTED_SHARE_DEPOSIT_ROBINHOOD_TESTNET_2026-10-01.json)); the timeout exits are contract-tested only. Cash tUSDC and its simulated yield are unchanged. Test tokens have no value; issuer pause, block, burn and upgrade powers remain.
 
-Today starts with **Identity & life, Home & living, Money & ownership, Energy & devices, and Places & participation**. **Explore all adapters** opens Me's shared catalogue: working actions, saved connection state, source/permission details and explicitly planned capabilities. Home Assistant and validator settings have one home in Me; their readings live in **Money → Devices & income**. Each feature has one home area and a reference elsewhere: see [where a feature lives](docs/INFORMATION_ARCHITECTURE.md).
+The five signed-in areas are **Home**, the default entry point for tenancy status and the action needed now; **Money**, for holdings, borrowing, lending, local stakes and device income; **Places**, for the neighbourhood, city map and public participation; **Me**, for sign-in, wallets, private life history and grouped connections; and **Roadmap** (area id `ideas`), a secondary sidebar link separating working and planned capabilities. Home Assistant and validator controls live inside their connection rows in Me; their readings live in **Money → Devices & income**. Each feature has one home area and a reference elsewhere: see [where a feature lives](docs/INFORMATION_ARCHITECTURE.md).
 
-To follow a public project: **Today → Explore & follow projects → Follow** on a project card. With no covered city selected, use the covered-city map or the clearly dated historical example. Follows are account-scoped on this device, not project membership; saved developments appear in Today and can be reviewed in Places.
+To follow a public project: open **Places**, select it on the map or in **Have your say**, then choose **Follow**. With no covered city selected, use the covered-city map or the clearly dated historical example. Follows are account-scoped on this device, not project membership; saved developments are reviewed in Places.
 
 Every financial action has a review, an explicit authorization and a separate result check. A failed purchase leaves personal cash intact. A claim decision alone does not pay anyone.
 
 ## Test local investment · Robinhood Chain
 
-**Money** has four sections: **Holdings**, **Shares & loans**, **Local stakes** and **Devices & income**. Its **Holdings** tab
+**Money** has four sections: **Holdings**, **Borrow & lend**, **Local stakes** and **Devices & income**. Its **Holdings** tab
 carries the ownership path (available shares, an explicitly reviewed loan, and wallet-signed housing/workshop
 stakes `tHOME`, `tWORK` in **Local stakes**). The separate rental-deposit route remains available in Home. Issuer
 examples have separate markers on the OSM 3D map; real public projects retain source-based Follow actions. The housing
-example shows its building sketch and a 3D OpenStreetMap view of the fictional house at an illustrative spot; the live
-building panel starts with what a holder can claim, then where the income comes from. On 2 October a paid answer on the
+example has a Hero with a 3D map of the fictional house, holdings, claimable and house income. A House / Workshop /
+Agri-PV picker selects the example; buy/sell, stake/unstake and income details open in labelled rows. On 2 October a paid answer on the
 owner's GPU (payout set to the building) settled 0.0082 tUSDG into the distributor and the sole staker claimed 0.000019
 tUSDG ([evidence](docs/evidence/HOSTED_BUILDING_INCOME_CLAIM_ROBINHOOD_TESTNET_2026-10-02.json)). The same evening a
 recorded two-person story paid a month of test rent with its fixed 20 % building share and an early investor claimed and
