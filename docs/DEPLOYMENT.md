@@ -201,6 +201,36 @@ Limits: the host reads every assigned question in clear; city routing requires a
   - investor: 10.607455 tUSDG claimable, 50.1089 tHOME staked;
   - signed out: the `/story` link.
 
+- **Revision 26, 3 October, image `sha256:1ef28df6…` built from `3f45de2` (pin `cd4fa1c`).** `--release` only. It carries the lean redesign ("weniger ist mehr"):
+  - every screen opens with one hero, one status sentence, two to four numbers and one action, and rarely needed tools and records sit in labelled rows;
+  - Today is removed and Home is the start;
+  - "Shares & loans" is renamed "Borrow & lend";
+  - Places is map-first with five tabs;
+  - Me's connections went from 16 rows to 5;
+  - one money format, "$1,300.00".
+
+  There were no server, API or contract changes. Two independent reviews (68 findings) were fixed before the image was built, among them:
+  - payouts for a second tenancy never running inside a closed row;
+  - a landlord being told the tenant's deposit earnings were "yours to keep";
+  - the Agri-PV yield-promise disclaimer;
+  - the hidden paid-AI consent;
+  - Places loading forever without a chosen city.
+
+  Checked locally on the image (pages 200 without cookies, including the old Today URL, which lands on Home; `/api/rent` 401) and live (the pod runs that digest, and `/` is "Home · Ledger of Life"). Signed in as the story's test accounts:
+  - tenant: the 3D house, "Deposit secured · nothing needs you now", "$1,300.00";
+  - Places: Strausberg, "Nothing new since your last visit";
+  - Me: "Shares wallet" and "Deposit wallet".
+- **Revision 27, 3 October, image `sha256:74845435…` built from `c8b8bc7` (pin `17cd778`).** `--release` only. Found while verifying revision 26 live:
+  - the live `/api/building` read takes about 22 s (three requests: 22.8, 23.4 and 21.9 s; configured, 3 stakers, 60.108885 tHOME staked);
+  - until it arrived, the house hero said "Building distributor not configured";
+  - blocker reasons now wait for the first building and position reads.
+
+  Checked live, signed in:
+  - tenant: while loading, "Claimable now" shows only a dash; once loaded, "You hold 5 tHOME · all staked", $1.38 claimable, $130.01 house income;
+  - investor: $13.74 claimable;
+  - house operator: "Deposit held $1,300.00", "Rent this month received $520.00".
+
+  The slow building read itself is unchanged and still open.
 ## Checked, and not
 
 Checked in a container built from this tree: the pages, the store on a volume, the reconcile route's `local-ai` scope with and without the secret (and an unknown scope), non-root and read-only operation, shutdown on `SIGTERM`, the absence of secrets and contract artifacts, and the whole retention path against a stub model (question asked, text removed after the grace period and on "Finish & clear this desk", usage counts kept, no copy left in the database file or log).
