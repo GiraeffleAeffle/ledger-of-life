@@ -1,7 +1,7 @@
 host: ledger.stadtstack.eu
 image:
-  # From the image workflow run 37055812971 for tag image-20261002-255c9b7 (commit 255c9b7), pushed 2 Oct 2026.
-  digest: "sha256:c69da03a12c43c54c34d6f7f9a17e28ef969a083a36b008788efa07782312885"
+  # From the image workflow run 37120417471 for tag image-20261003-0e2087b (commit 0e2087b), pushed 3 Oct 2026.
+  digest: "sha256:e25b387cf1d1c670faa86107cd658a8bf787291953ffff493ca88d5f455c42e3"
 config:
   # The hosted demo has no project atlas (a local research prototype). Empty means say nothing, not claim an outage.
   STADTSTACK_ATLAS_URL: ""
