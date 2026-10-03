@@ -231,6 +231,7 @@ Limits: the host reads every assigned question in clear; city routing requires a
   - house operator: "Deposit held $1,300.00", "Rent this month received $520.00".
 
   The slow building read itself is unchanged and still open.
+
 ## Checked, and not
 
 Checked in a container built from this tree: the pages, the store on a volume, the reconcile route's `local-ai` scope with and without the secret (and an unknown scope), non-root and read-only operation, shutdown on `SIGTERM`, the absence of secrets and contract artifacts, and the whole retention path against a stub model (question asked, text removed after the grace period and on "Finish & clear this desk", usage counts kept, no copy left in the database file or log).
