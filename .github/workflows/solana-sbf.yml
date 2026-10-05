@@ -5,11 +5,17 @@ on:
     paths:
       - '.github/workflows/solana-sbf.yml'
       - 'programs/rental_escrow/**'
+      - 'programs/house/**'
+      - 'programs/shares/**'
+      - 'Cargo.toml'
       - 'Cargo.lock'
   pull_request:
     paths:
       - '.github/workflows/solana-sbf.yml'
       - 'programs/rental_escrow/**'
+      - 'programs/house/**'
+      - 'programs/shares/**'
+      - 'Cargo.toml'
       - 'Cargo.lock'
 
 permissions:
@@ -33,6 +39,18 @@ jobs:
           mkdir -p "$RUNNER_TEMP/agave"
           tar -xjf "$RUNNER_TEMP/agave-v4.2.2.tar.bz2" -C "$RUNNER_TEMP/agave"
           echo "$RUNNER_TEMP/agave/solana-release/bin" >> "$GITHUB_PATH"
+      - name: Build classic-token house program
+        run: cargo build-sbf --manifest-path programs/house/Cargo.toml --sbf-out-dir "$RUNNER_TEMP/house-sbf"
+      - name: Exercise house instructions and cross-language layout in LiteSVM
+        env:
+          HOUSE_PROGRAM_SO: ${{ runner.temp }}/house-sbf/house.so
+        run: cargo test --locked -p house --test layout --test svm
+      - name: Build classic-token shares program
+        run: cargo build-sbf --manifest-path programs/shares/Cargo.toml --sbf-out-dir "$RUNNER_TEMP/shares-sbf"
+      - name: Exercise share token, lending and escrow in LiteSVM
+        env:
+          SHARES_PROGRAM_SO: ${{ runner.temp }}/shares-sbf/shares.so
+        run: cargo test --locked -p shares --test token --test lending --test escrow
       - name: Build staged test program
         run: cargo build-sbf --manifest-path programs/rental_escrow/Cargo.toml --features test-deployment --sbf-out-dir "$RUNNER_TEMP/rental-sbf"
       - name: Download read-only public KLend fixture

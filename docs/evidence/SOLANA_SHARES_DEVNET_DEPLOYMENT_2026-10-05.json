@@ -1,0 +1,226 @@
+{
+  "status": "deployed-and-initialized",
+  "programSha256": "4cb725582718c5683ee8c542c742740b05a53e1d6a0f020376402b794030fbfd",
+  "programCodeLength": 530728,
+  "network": "Solana devnet only",
+  "intendedManifest": {
+    "cluster": "devnet",
+    "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+    "programId": "97j5CWWKUALG2XRUBoZ1spqtN5YWJPVdTiRLNN5CWYkQ",
+    "cashMint": "BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE",
+    "priceAuthority": "3AoHstmog6FiCcBaVAh8jnB8iVc2v9oUvN2Pnn76YtbH",
+    "initializer": "HEZ9ERxb1W9WfBjUGE6A4jFZU3jUMJRSM1kyERgac38G",
+    "initialPriceUsdE6": "370448000",
+    "initialPricePublishedAt": "1790970931",
+    "dailyFaucetBudgetAtomic": "50000000",
+    "debtExposureCapAtomic": "2000000000",
+    "faucetBudget": "E296bb49RF41BjkgADcMm37NkzjN5WgUaKTKFEnvDrFj",
+    "shareMint": "6KtXAdkRJ7J8csPnhS11kof9wjFHnWimpEKTvJHCbJsU",
+    "price": "6TFJTYJFKmcm87zjKVC46DkqRxA57XWznLDaX6NUU4eN",
+    "pool": "DU16LQzZbQumNeQKgPcQaHmfNUQdK2YeA4rYcVsdvBCT",
+    "cashVault": "6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU",
+    "collateralVault": "BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35"
+  },
+  "verification": {
+    "sbfBuild": "cargo build-sbf --manifest-path programs/shares/Cargo.toml -- --locked",
+    "liteSvm": {
+      "command": "SHARES_PROGRAM_SO=$PWD/target/deploy/shares.so cargo test --locked -p shares --test token --test lending --test escrow",
+      "passed": 33,
+      "escrow": 18,
+      "lending": 8,
+      "token": 7,
+      "coverage": [
+        "all escrow transitions and timeout boundaries",
+        "150 percent activation and protected active withdrawals",
+        "stale/weekend/future price boundaries",
+        "wrong actor, mint, vault, source and recipient",
+        "in-kind independent payouts and frozen recipient rollback",
+        "issuer cosignature and five-share per-wallet faucet cooldown",
+        "global fifty-share UTC daily budget, reset and rollback",
+        "ten-wallet mint aggregation blocked at budget and aggregate debt exposure cap",
+        "interest-inclusive exposure cap across multiple borrowers",
+        "cryptographic issuer signature refusal with runtime verification enabled",
+        "initializer squatting refusal before any PDA exists",
+        "hourly bounded mirror updates preserving immutable initial price",
+        "cash-limited lender withdrawals and lender receivers",
+        "minimum borrow and utilization limits",
+        "continuous nominal yearly interest",
+        "partial/full repay and collateral withdrawal",
+        "half-close liquidation, ten percent bonus, exhausted collateral and bad debt",
+        "arithmetic overflow rollback"
+      ],
+      "authorityFixtureNote": "Authorized fixture setup transactions impersonate the hardcoded public admin/issuer addresses with LiteSVM signature verification temporarily disabled; no production key is loaded and Anchor account/signer constraints run. Signature verification is restored immediately. A separate runtime-verification-enabled test proves a missing issuer signature is cryptographically refused."
+    },
+    "typescript": {
+      "command": "node --experimental-strip-types --test src/finance/solana/shares.test.ts src/server/solana-shares-config.test.ts",
+      "passed": 15,
+      "scopedTypecheck": "npx tsc --noEmit --target ES2022 --module nodenext --moduleResolution nodenext --allowImportingTsExtensions --skipLibCheck --strict src/finance/solana/shares.ts src/finance/solana/shares.test.ts src/server/solana-shares-config.ts src/server/solana-shares-config.test.ts",
+      "scopedTypecheckPassed": true,
+      "eslint": "npx eslint src/finance/solana/shares.ts src/finance/solana/shares.test.ts src/server/solana-shares-config.ts src/server/solana-shares-config.test.ts",
+      "eslintPassed": true
+    }
+  },
+  "interfaces": {
+    "client": "src/finance/solana/shares.ts",
+    "config": "src/server/solana-shares-config.ts",
+    "configEnvironment": "SOLANA_SHARES_MANIFEST",
+    "configuration": "Flat intendedManifest shape. Unset returns null; parser validates devnet genesis, fixed initializer/program/cash/issuer, exact fifty-share daily budget and two-thousand-tUSDC debt cap and every derived PDA. Initial price/time are mandatory immutable provenance; initialization script decodes chain state and verifies these against the persisted manifest. Do not enable it before status is deployed-and-initialized.",
+    "clientBehaviour": "Unsigned @solana/kit instructions only, all 28 builders, six strict account decoders and exact bigint share/debt/price/claim quotes including interest-inclusive borrow exposure limits. Transaction sponsorship stays in existing shared app machinery.",
+    "appRoutes": "GET/POST /api/share-workflows uses Solana as primary when the manifest is set; network=robinhood retains earlier positions. /api/share-workflows/faucet binds recipient to the verified personal Solana wallet and enforces one claim per verified account per twenty-four hours before issuer cosigning.",
+    "appOperations": "Lend, cash-limited withdraw, borrow, repay, collateral add/return and advanced liquidation compose classic token ATAs and program instructions through solana-operations.ts. Exact server reviews precede signatures. Durable active-operation journals and domain kind checks bind submit, reconcile and cancellation; pending signed transactions never authorize a replacement.",
+    "appPriceCopy": "Before stale price-sensitive prepare, solana-price-mirror.ts validates the pinned Robinhood mirror and bounded hourly update, uses executeAsSponsor, and requires a fresh finalized chain reread. A pending copy is not a usable price. Durable source/operation pinning survives upstream changes.",
+    "appDisplays": "Borrow & lend preserves cards and no-default-task selection, uses six-decimal tTSLA/tUSDC, shows separate earlier Robinhood pool/holdings and devnet Explorer receipts. Get test money exposes Test TSLA on Solana with owner and hosted issuer signatures.",
+    "pdaSeeds": {
+      "shareMint": [
+        "share_mint"
+      ],
+      "price": [
+        "price",
+        "shareMint"
+      ],
+      "cooldown": [
+        "faucet",
+        "shareMint",
+        "owner"
+      ],
+      "faucetBudget": [
+        "faucet_budget",
+        "shareMint"
+      ],
+      "pool": [
+        "pool",
+        "shareMint"
+      ],
+      "cashVault": [
+        "pool_cash",
+        "pool"
+      ],
+      "collateralVault": [
+        "pool_collateral",
+        "pool"
+      ],
+      "loanPosition": [
+        "loan",
+        "pool",
+        "owner"
+      ],
+      "escrow": [
+        "escrow",
+        "landlord",
+        "agreementHash"
+      ],
+      "escrowVault": [
+        "escrow_vault",
+        "escrow"
+      ]
+    },
+    "token": "Classic SPL tTSLA, six decimals. Mint authority is shareMint PDA itself. Initialization is restricted to the hardcoded deployer. Faucet requires owner and hosted issuer signatures, a per-wallet twenty-four-hour cooldown and a global fifty-share UTC daily budget. The hosted issuer must enforce one claim per verified account per twenty-four hours before cosigning; wallet cooldown alone is not an identity boundary.",
+    "mirror": "Hosted sponsor address is the on-chain price authority. setPriceInstruction is the unsigned mirror-job builder. Source timestamp must advance, at most five minutes future, updates at least hourly, maximum twenty percent step; fresh reads 26 hours normally or 74 hours Saturday through Monday before 12 UTC.",
+    "escrow": "In-kind payouts; silence escalates to arbitration and never awards the landlord automatically",
+    "lending": "Lender-funded tUSDC cash ignores donations. Pool/debt virtual share offset 1e12. Debt assets compound continuously at five percent nominal yearly with 1e27 fractions. Fifty percent borrow LTV, eighty percent liquidation LTV, ninety percent maximum utilization, half-debt close factor and ten percent liquidation bonus. Aggregate new borrowing is capped at two thousand tUSDC total debt, including accrued interest; accrual can exceed the cap but new borrowing remains refused until debt falls below it. Cash limits exits; bad debt is borne by lenders. Optional lender receiver is supported; withdrawals may select a cash recipient.",
+    "faucet": "5 tTSLA per verified account per 24 hours; owner plus hosted issuer signatures; global 50 tTSLA per UTC day; PDA mint authority",
+    "interest": "Continuous 5% nominal yearly; borrower debt shares; 1e27 precision; total-debt 2000 tUSDC cap including accrued interest blocks new borrowing above cap"
+  },
+  "operatorCommands": {
+    "deploy": "bash scripts/solana/deploy-shares.sh /absolute/deployer-keypair.json",
+    "manifestOutput": "~/.cache/ledger-solana/shares-manifest.json",
+    "initializeOrRecover": "node scripts/solana/shares-initialize.mjs /absolute/deployer-keypair.json --send",
+    "deploymentGate": "Uses SOLANA_RPC_URL when configured, with fixed devnet genesis assertion before signing; public devnet is only the fallback. Operator failures redact URLs and omit subprocess command/stack details. Existing buffer owner, authority and length are validated and funded rent credited; fresh program account/ProgramData rent plus fee/initialization reserve remain required. Public exact deployment and initialization reviews precede signing. Deploys only when absent and otherwise verifies reviewed on-chain bytes; initializes only when needed; records full ProgramData and executable-body hashes and verifies immutable initialization price and exact caps before writing the manifest cache.",
+    "balanceRefusalProof": "Executed bash scripts/solana/deploy-shares.sh /Users/max/.config/solana/ledger-devnet-deployer.json: exited 1 with zero available lamports and minimum 5493954160; no transaction signed.",
+    "priorSyntaxChecksPassed": "Before this transport/accounting fix: bash -n scripts/solana/deploy-shares.sh; node --check scripts/solana/shares-deploy.mjs; node --check scripts/solana/shares-initialize.mjs",
+    "configuredRpcDeployment": "node --env-file=.env.local --experimental-strip-types scripts/solana/shares-deploy.mjs /Users/max/.config/solana/ledger-devnet-deployer.json /Users/max/.config/solana/shares-program.json /Users/max/.config/solana/shares-buffer.json",
+    "deploymentBalanceReview": {
+      "bufferAddress": "42MtSrPW4nDU3JZ2H4zzctSkeekpH8uFktAaV1SAWCox",
+      "existingValidatedBufferLamports": "2696977080",
+      "bufferTopUpLamports": "0",
+      "minimumDeployerLamports": "2797810200",
+      "availableDeployerLamports": "5255343600",
+      "shortfallLamports": "0",
+      "transport": "Configured RPC URL withheld; devnet genesis verified",
+      "leftoverTransfer": "Performed only under separate LaunchOwner continuation authorization; finalized public receipt below"
+    }
+  },
+  "authorizedLeftoverFunding": {
+    "network": "Solana devnet",
+    "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+    "source": "HEZ9ERxb1W9WfBjUGE6A4jFZU3jUMJRSM1kyERgac38G",
+    "recipient": "3AoHstmog6FiCcBaVAh8jnB8iVc2v9oUvN2Pnn76YtbH",
+    "amountLamports": "5144163320",
+    "feeLamports": "5000",
+    "sourceBeforeLamports": "5244168320",
+    "sourceAfterLamports": "100000000",
+    "recipientBeforeLamports": "297992920",
+    "recipientAfterLamports": "5442156240",
+    "signature": "2tEy8CYowHp6P9sS5abvHVWxL4UFZ4shFfYcVAFHazPaPn4BP26ACWcAkwAgtDAUrtKBdegXuTExQt4dwnkB5uZU",
+    "status": "finalized",
+    "simulated": true,
+    "exactPublicReviewBeforeSigning": true,
+    "recordedAt": "2026-10-05T09:05:54.307Z"
+  },
+  "appVerification": {
+    "logicCommand": "node --experimental-strip-types --test src/finance/solana/shares.test.ts src/server/solana-shares-config.test.ts src/server/solana-price-mirror.test.ts src/server/shared-market-solana.test.ts src/server/solana-operations.test.ts",
+    "projectTypecheckCommand": "npx tsc --noEmit --incremental false -p .",
+    "projectTypecheckPassed": true,
+    "eslintCommand": "npx eslint src/server/shared-market-solana.ts src/server/shared-market-solana.test.ts src/server/solana-price-mirror.ts src/server/solana-price-mirror.test.ts app/api/share-workflows/route.ts app/api/share-workflows/faucet/route.ts src/components/share-workflows.tsx src/components/assets.tsx src/components/money-area.tsx",
+    "eslintPassed": true,
+    "logicPassed": 88,
+    "liveDevnetActions": "Shares deployment and initializeSharesAndPool finalized; user faucet/lending/escrow flows are separately owned and not claimed by deployment evidence.",
+    "screenshots": [],
+    "pendingEvidence": [
+      "faucet",
+      "lend",
+      "borrow",
+      "repay",
+      "withdraw",
+      "1280-pixel and 390-pixel browser captures"
+    ]
+  },
+  "disclosures": [
+    "Devnet only. Test tokens have no value.",
+    "Fictional shares confer no stock, company, property or rental rights.",
+    "Rental deposit earnings belong to the tenant."
+  ],
+  "deploymentSignatures": [
+    "8Qw9r4dERioq4mViWyyVK76CGawaTwSho6ZXtVoinCZx3QViWfTHSRUfwdnW8BxfqbHvwKfdFUkcFq8Wdfs3HAA"
+  ],
+  "initializationSignatures": {
+    "initializeSharesAndPool": "5ujA2YYxq6yUdcTF7QWcAX1wWGNqz6jmB8en3TjsNZ4jWog61ZrwZZ6GEoT2TevoJCDYN4ZFB3FJuHjrvkjv7Rkp"
+  },
+  "deployedAt": "2026-10-05T09:03:27.330Z",
+  "deployment": {
+    "programId": "97j5CWWKUALG2XRUBoZ1spqtN5YWJPVdTiRLNN5CWYkQ",
+    "signature": "8Qw9r4dERioq4mViWyyVK76CGawaTwSho6ZXtVoinCZx3QViWfTHSRUfwdnW8BxfqbHvwKfdFUkcFq8Wdfs3HAA"
+  },
+  "onChainProgramDataSha256": "9cc98e5973ddc80f547a53aadcfad096f23d3f9025b15209f1925575fdeae253",
+  "onChainProgramCodeSha256": "4cb725582718c5683ee8c542c742740b05a53e1d6a0f020376402b794030fbfd",
+  "programDataAddress": "CPc2CkcJSYXDRLqNofTFGNNHXksipFumHq22yJMxfktE",
+  "upgradeAuthority": "HEZ9ERxb1W9WfBjUGE6A4jFZU3jUMJRSM1kyERgac38G",
+  "manifest": {
+    "cluster": "devnet",
+    "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+    "programId": "97j5CWWKUALG2XRUBoZ1spqtN5YWJPVdTiRLNN5CWYkQ",
+    "cashMint": "BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE",
+    "shareMint": "6KtXAdkRJ7J8csPnhS11kof9wjFHnWimpEKTvJHCbJsU",
+    "price": "6TFJTYJFKmcm87zjKVC46DkqRxA57XWznLDaX6NUU4eN",
+    "priceAuthority": "3AoHstmog6FiCcBaVAh8jnB8iVc2v9oUvN2Pnn76YtbH",
+    "initializer": "HEZ9ERxb1W9WfBjUGE6A4jFZU3jUMJRSM1kyERgac38G",
+    "pool": "DU16LQzZbQumNeQKgPcQaHmfNUQdK2YeA4rYcVsdvBCT",
+    "cashVault": "6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU",
+    "collateralVault": "BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35",
+    "faucetBudget": "E296bb49RF41BjkgADcMm37NkzjN5WgUaKTKFEnvDrFj",
+    "dailyFaucetBudgetAtomic": "50000000",
+    "debtExposureCapAtomic": "2000000000",
+    "initialPriceUsdE6": "372355000",
+    "initialPricePublishedAt": "1791167743"
+  },
+  "priceSource": {
+    "label": "Robinhood testnet mirror (not Chainlink; test tokens have no value)",
+    "chainId": 46630,
+    "oracle": "0x5196C8713A529bd676B875fB9Cea3F8a47ba48Be",
+    "priceUsdE6": "372355000",
+    "publishedAt": 1791167743
+  },
+  "pendingInitialization": null,
+  "recordedAt": "2026-10-05T09:03:31.223Z",
+  "initializationVerified": true
+}

@@ -1,0 +1,74 @@
+{
+  "recordedAt": "2026-10-05T08:46:59.255Z",
+  "network": "solana-devnet",
+  "testAssetsOnly": true,
+  "unitsCarryNoRights": true,
+  "depositEarningsBelongToTenant": true,
+  "programId": "CWUN8LKoKNEBJ6SQAVAqDFrb3rDP7vbVXMcf2EoAqjQM",
+  "programDataAddress": "72modagjQj18J8HHsM3xkRWf53JEx4QdpsRUakb6pPMm",
+  "programSha256": "57e85257bb507d44844e3149fdf969acddb5ad1655be1ed97c702148adc5a71a",
+  "programDataSha256": "7d3f8910481ff58de9863d157bae27efa6c214d499b60e288d5bdc48d7516ab1",
+  "deployedCodeSha256": "57e85257bb507d44844e3149fdf969acddb5ad1655be1ed97c702148adc5a71a",
+  "programDataLength": 399325,
+  "deployedBytesVerified": true,
+  "upgradeAuthority": "HEZ9ERxb1W9WfBjUGE6A4jFZU3jUMJRSM1kyERgac38G",
+  "deploymentSignature": "2gS8CTWyp5Fbo8NbNbHWCEic9A3bVKWNZ1s6iruJZ27WqJkWGvdwJQa4SbUvt5LTTBz1zVVnQdLzL2Mnd5CZ6riw",
+  "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "cashMint": "BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE",
+  "rewards": {
+    "scheme": "staking_stream_v1",
+    "durationSeconds": 604800,
+    "scale": "1000000000000",
+    "idleRevenue": "carry_then_stream_over_fresh_window_never_lump_sum",
+    "rounding": "global_and_position_scaled_remainders",
+    "fullExitFraction": "recycle_without_extending_active_finish"
+  },
+  "houses": {
+    "neighbourhood-homes": {
+      "house": "BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z",
+      "unitMint": "2XtDmPPg9Rzu7kNufRsUVG3CGhkrp4KnuRm14rsGqwXy",
+      "deskVault": "2nmfyiHuN4edcMLqxtx1bksTwZ8h2XbfdkPZ5HAm7TNC",
+      "rewardVault": "7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk",
+      "stakeVault": "4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR",
+      "symbol": "tHOME",
+      "priceCashPerUnit": "1000000",
+      "sellCapUnits": "100000000",
+      "rewardDuration": "604800",
+      "initSignature": "4fc4PyzRCxvTe8Wk7matGbPWXEsv4B8koduRWgMpXvhH96aev27jb3Bo9WGHoFtV8yA4mSoATsrmZSQtUsjM2CNM"
+    },
+    "workshop": {
+      "house": "3mHkUkhPA1xicPXRzh1wD8Xt9ioampSgWDWrxdiHiH3g",
+      "unitMint": "Agijyc5RtmT3H4jubYakCdehMoWdFffkTAA8PdfkcCCe",
+      "deskVault": "9DjEXgR62geawNGbqFjjqcC5NiiWa3QJJzkLT1DN5myN",
+      "rewardVault": "BGEt59aFtTEkSAoqCv2yw9dCsvAxcokDzmR4jNWgaQi9",
+      "stakeVault": "71UFtrL2tzP9Bg3F8o4FbPSs3oK7Htv6ufrpbmWLrq6x",
+      "symbol": "tWORK",
+      "priceCashPerUnit": "1000000",
+      "sellCapUnits": "100000000",
+      "rewardDuration": "604800",
+      "initSignature": "3Vy3jpwQeYLc98cDeZiutdbhXAdA2MDqnsSyWt1BSubUQ2qzVpzzRCHRVf8kkxysunxeT6gy5pWgR4qD5voAmn6Z"
+    }
+  },
+  "manifest": {
+    "cluster": "devnet",
+    "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+    "programId": "CWUN8LKoKNEBJ6SQAVAqDFrb3rDP7vbVXMcf2EoAqjQM",
+    "cashMint": "BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE",
+    "houses": {
+      "neighbourhood-homes": {
+        "house": "BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z",
+        "unitMint": "2XtDmPPg9Rzu7kNufRsUVG3CGhkrp4KnuRm14rsGqwXy",
+        "deskVault": "2nmfyiHuN4edcMLqxtx1bksTwZ8h2XbfdkPZ5HAm7TNC",
+        "rewardVault": "7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk",
+        "stakeVault": "4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR"
+      },
+      "workshop": {
+        "house": "3mHkUkhPA1xicPXRzh1wD8Xt9ioampSgWDWrxdiHiH3g",
+        "unitMint": "Agijyc5RtmT3H4jubYakCdehMoWdFffkTAA8PdfkcCCe",
+        "deskVault": "9DjEXgR62geawNGbqFjjqcC5NiiWa3QJJzkLT1DN5myN",
+        "rewardVault": "BGEt59aFtTEkSAoqCv2yw9dCsvAxcokDzmR4jNWgaQi9",
+        "stakeVault": "71UFtrL2tzP9Bg3F8o4FbPSs3oK7Htv6ufrpbmWLrq6x"
+      }
+    }
+  }
+}
