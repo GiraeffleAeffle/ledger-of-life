@@ -636,8 +636,10 @@
   },
   "shares": {
     "source": "SOLANA_SHARES_APP_PROOFS_2026-10-05.json",
-    "state": "deferred-to-hosted-site",
-    "reason": "Local sponsor7h3d… differs from the shares program issuer/price authority3AoH…; no key swapping or false local proof."
+    "localState": "not-executed-sponsor-authority-mismatch",
+    "hostedState": "completed",
+    "hostedEvidence": "HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+    "network": "solana-devnet"
   },
   "fixtureFunding": {
     "source": "Hosted resident wallet, passkey-unlocked signing; exact reviews before each signature",

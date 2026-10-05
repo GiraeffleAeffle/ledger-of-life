@@ -1,0 +1,1661 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-05",
+  "recordedAt": "2026-10-05T10:06:26.653Z",
+  "hostedOrigin": "https://ledger.stadtstack.eu",
+  "release": {
+    "image": "run37289962917 release28",
+    "digest": "b61100e563900d93516483d720d4c2ab954ffdee759cca70b65700a11e44e573",
+    "authorization": "LaunchOwner explicitly released resident role and authorized testnet stake, lending, revenue claim and paid Solana AI"
+  },
+  "network": "solana-devnet",
+  "wallet": "4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa",
+  "walletId": "cq74a8e72ajupkt7phqeaw91",
+  "browserIsolation": "Chrome dedicated user-data-dir chrome-solana-lending-cdp-20261005, CDP port9337",
+  "status": {
+    "lendingCycle": "complete_confirmed",
+    "houseStake": "50tHOME confirmed",
+    "houseClaim": "0.016257tUSDC observed cash delta, confirmed",
+    "paidAi": "approved and host received/woke; final answer/settlement unresolved503 after10min",
+    "residentSession": "signed out; dedicated browser stopped"
+  },
+  "productTruth": "Testnets only. Fictional local units and test tokens have no value or rights. Deposit earnings belong to tenant (§551BGB). No production launch/release or real-money action claimed.",
+  "steps": [
+    {
+      "action": "stake",
+      "reviewObserved": "Money area\nMoney\nHoldings\nBorrow & lend\nLocal stakes\nDevices & income\nHouse\nWorkshop\nAgri-PV\nUse ⌘ + scroll to zoom the map\nFictional tHOME house · illustrative\n\n© OpenStreetMap · OpenFreeMap\n\nFictional housing example\n\nSolana devnet · fictional local units, no value or rights\n\nYou hold 50 tHOME · 0 staked\n\nYour units\n50\ntHOME\n0 staked · 50 in wallet\nClaimable now\n0\ntUSDC\nClaim\nReinvest · one signature\nHouse income so far\n121.1637\ntUSDC\nBuy units\nStake or unstake\n\nHouse income is streamed to stakers over 7 days. Only staked units earn. New revenue extends the remaining stream. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant.\n\nExact stake review · Solana devnet\n\nStake exactly 50 tHOME from your wallet into the house stake vault. Income is streamed to stakers over 7 days; new revenue extends the remaining stream. Sponsored network fees and account rent. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant.\n\nYour wallet / recipient\n4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa\nHouse\nBymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z\nYour cash account\nCtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX\nYour unit account\nFDCTX5fzDzr1Loq7UZk9iB7cGPWxe956RgxjExpCbjzW\nDesk / reward / stake vaults\n2nmfyiHuN4edcMLqxtx1bksTwZ8h2XbfdkPZ5HAm7TNC\n7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk\n4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR\nFee sponsor · maximum 0.01 test SOL\n3AoHstmog6FiCcBaVAh8jnB8iVc2v9oUvN2Pnn76YtbH\n\nReview expires 11:42:56. Only this exact reviewed transaction is signed.\n\nSign stake · one signatureCancel unsigned review\nBuy or sell units\n3578 tUSDC available\nStake or unstake\n0 tHOME staked\n\nWallet: 50 tHOME · staked: 0 tHOME.\n\nMax wallet units\nMax staked units\ntHOME units to stake or unstake\nReview stake\n\nFinish the current house review or transaction first\n\nReview unstake\n\nFinish the current house review or transaction first\n\nNo separate token approval: each action is one sponsored transaction signed by your own Solana wallet. Unstake before selling. Never transfer units directly to the vault.\n\nWhere the income comes from\n1 stakers · on-chain sources\nHouse action receipts\n1 recorded\nRobinhood Chain test house · earlier units\nEarlier unstake, claim and sell lanes\nExplore the building idea\nFictional plans · solar, heat & shared spaces\nSources & token rights\nFictional units · no rights\n\nFictional test units: no value, no property or company rights. Solana devnet only.",
+      "reviewedAmount": "50 tHOME",
+      "reviewedRecipient": "4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR",
+      "network": "Solana devnet",
+      "at": "2026-10-05T09:41:16.147Z",
+      "receipt": {
+        "state": "failed",
+        "signature": "5mwT6A5XEFC7Xq4V1cMiaado6o7pzQCy99tUJ6ehhpbH9jiT9DmvvAE6Agvqv7MPY7UFNd77EoxKcrcXP1avxZJX",
+        "explorerUrl": "https://explorer.solana.com/tx/5mwT6A5XEFC7Xq4V1cMiaado6o7pzQCy99tUJ6ehhpbH9jiT9DmvvAE6Agvqv7MPY7UFNd77EoxKcrcXP1avxZJX?cluster=devnet"
+      }
+    },
+    {
+      "action": "faucet",
+      "review": {
+        "operation": "faucet",
+        "network": "Solana devnet",
+        "account": "4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa",
+        "recipient": "CBz9AaQVDU5kcVFwUjMwaSoAddpHxzwAVpNwacJ6c4Xb",
+        "asset": "tTSLA",
+        "amount": "5",
+        "amountAtomic": "5000000",
+        "issuer": "3AoHstmog6FiCcBaVAh8jnB8iVc2v9oUvN2Pnn76YtbH",
+        "shareMint": "6KtXAdkRJ7J8csPnhS11kof9wjFHnWimpEKTvJHCbJsU",
+        "dailyBudgetAtomic": "50000000",
+        "description": "Receive exactly five centrally issued fictional tTSLA on Solana devnet to your own wallet. One claim per verified account and wallet per twenty-four hours; fifty test shares globally per UTC day. The hosted issuer co-signs and pays capped network fees/account rent. These test shares have no value and confer no stock, property or rental rights."
+      },
+      "at": "2026-10-05T09:47:21.342Z",
+      "receipts": [
+        {
+          "state": "broadcast",
+          "signature": "5UgYFgGyvJL1rkkZgmivQAZZXV428jPR3EjuPw2Myj8R9P3bHtdx2zaVEg9EtRifqcJz24T1bP9fMkZnGxRVdQrH",
+          "id": "3f9d047a0d6b371633c1c0a791aeea8d6d2edb0e752e43abc1d012609cfdf95e"
+        },
+        {
+          "state": "confirmed",
+          "signature": "5UgYFgGyvJL1rkkZgmivQAZZXV428jPR3EjuPw2Myj8R9P3bHtdx2zaVEg9EtRifqcJz24T1bP9fMkZnGxRVdQrH",
+          "id": "3f9d047a0d6b371633c1c0a791aeea8d6d2edb0e752e43abc1d012609cfdf95e",
+          "explorerUrl": "https://explorer.solana.com/tx/5UgYFgGyvJL1rkkZgmivQAZZXV428jPR3EjuPw2Myj8R9P3bHtdx2zaVEg9EtRifqcJz24T1bP9fMkZnGxRVdQrH?cluster=devnet"
+        }
+      ],
+      "receipt": {
+        "state": "confirmed",
+        "signature": "5UgYFgGyvJL1rkkZgmivQAZZXV428jPR3EjuPw2Myj8R9P3bHtdx2zaVEg9EtRifqcJz24T1bP9fMkZnGxRVdQrH",
+        "id": "3f9d047a0d6b371633c1c0a791aeea8d6d2edb0e752e43abc1d012609cfdf95e",
+        "explorerUrl": "https://explorer.solana.com/tx/5UgYFgGyvJL1rkkZgmivQAZZXV428jPR3EjuPw2Myj8R9P3bHtdx2zaVEg9EtRifqcJz24T1bP9fMkZnGxRVdQrH?cluster=devnet"
+      }
+    },
+    {
+      "action": "lend",
+      "review": {
+        "operation": "lend",
+        "network": "Solana devnet",
+        "account": "4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa",
+        "asset": "tUSDC",
+        "amount": "10",
+        "amountAtomic": "10000000",
+        "maximumDebitAtomic": "10000000",
+        "amountIsMaximum": false,
+        "recipient": "6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU",
+        "pool": "DU16LQzZbQumNeQKgPcQaHmfNUQdK2YeA4rYcVsdvBCT",
+        "cashAccount": "CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX",
+        "shareAccount": "CBz9AaQVDU5kcVFwUjMwaSoAddpHxzwAVpNwacJ6c4Xb",
+        "cashVault": "6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU",
+        "collateralVault": "BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35",
+        "priceUsdE6": "372355000",
+        "pricePublishedAt": "1791167743",
+        "debtExposureCapAtomic": "2000000000",
+        "description": "Lend exactly 10 tUSDC to the shared pool and receive a lender share entitlement. Withdrawals are limited by pool cash; borrower bad debt can reduce your lender value. Sponsored network fees and account rent. Solana devnet only. Test tUSDC and fictional tTSLA have no value and confer no stock, property or rental rights. Borrower-funded interest and lender losses are real test-chain accounting, not investment income. Deposit earnings belong to the tenant."
+      },
+      "at": "2026-10-05T09:48:55.796Z",
+      "receipts": [],
+      "observedResult": "Exact server review · Solana devnet\n{\n  \"operation\": \"lend\",\n  \"network\": \"Solana devnet\",\n  \"account\": \"4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa\",\n  \"asset\": \"tUSDC\",\n  \"amount\": \"10\",\n  \"amountAtomic\": \"10000000\",\n  \"maximumDebitAtomic\": \"10000000\",\n  \"amountIsMaximum\": false,\n  \"recipient\": \"6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU\",\n  \"pool\": \"DU16LQzZbQumNeQKgPcQaHmfNUQdK2YeA4rYcVsdvBCT\",\n  \"cashAccount\": \"CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX\",\n  \"shareAccount\": \"CBz9AaQVDU5kcVFwUjMwaSoAddpHxzwAVpNwacJ6c4Xb\",\n  \"cashVault\": \"6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU\",\n  \"collateralVault\": \"BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35\",\n  \"priceUsdE6\": \"372355000\",\n  \"pricePublishedAt\": \"1791167743\",\n  \"debtExposureCapAtomic\": \"2000000000\",\n  \"description\": \"Lend exactly 10 tUSDC to the shared pool and receive a lender share entitlement. Withdrawals are limited by pool cash; borrower bad debt can reduce your lender value. Sponsored network fees and account rent. Solana devnet only. Test tUSDC and fictional tTSLA have no value and confer no stock, property or rental rights. Borrower-funded interest and lender losses are real test-chain accounting, not investment income. Deposit earnings belong to the tenant.\"\n}\n\nOperation 10333abec285c6e65b814251a8a799d23107e0ed4528207d97e204bdd3703907 · fee sponsor 3AoHstmog6FiCcBaVAh8jnB8iVc2v9oUvN2Pnn76YtbH · signing wallet cq74a8e72ajupkt7phqeaw91 · expires 5.10.2026, 11:50:55.\n\nTransaction expired.\n\nDone\n\nTransaction expired. Its receipt is retained below.\n\nRecover existing operation",
+      "outcome": "Expired after submit503 and identical resend503; no signature observed. Freshreview only after terminal expired."
+    },
+    {
+      "action": "paid_solana_ai",
+      "reviewObserved": "Money area\nMoney\nHoldings\nBorrow & lend\nLocal stakes\nDevices & income\nYour devices\nAdd a device\n\nNo devices connected.\n\nAsk the city AI\nasleep · wakes on request\n\nThe host reads your question; don't send private information.\n\nPaid\nReview before paying\nFree\nShared allowance\nWhat would you like to explore?\nBetter homes\nLocal businesses\nA useful library\n\nPay per token: 0.0001 tUSDC per generated token, at most 0.0128 tUSDC for this answer. The site sponsor pays network fees.\n\nYou pay the host-reported generated token count, capped by the answer limit and the UTF-8 bytes of answer plus reasoning text received. This is at most the amount shown below, not a fixed charge.\n\nREVIEW THIS ANSWER\nAt most 0.0128 tUSDC · 0.0001 tUSDC per generated token\n\nSolana devnet · test tokens only, no value. Your question and payout are fixed. Sign one sponsored SPL approval before the model runs.\n\nRecipient\nBymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z · Neighbourhood Homes rewards, source AI\nDelegate and fee payer\n3AoHstmog6FiCcBaVAh8jnB8iVc2v9oUvN2Pnn76YtbH\nToken account\nCtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX\n\nThe site sponsor charges the host-reported generated token count capped by the answer limit and UTF-8 bytes of answer plus reasoning text received, never more than 0.0128 tUSDC. An unused allowance of at most this answer's maximum remains until your next approval replaces it.\n\nRewards are streamed to stakers over 7 days. Fictional units carry no rights; deposit earnings belong to the tenant.\n\nOnly Owner desktop GPU receives this fixed question. Its payout cannot change after this review.\n\nApprove at most 0.0128 tUSDCChange question\nOptions\nCity hosts · up to 128 answer tokens\nHost details\nOwner desktop GPU\nService details\nSaved request and routing\n\nDevice receipts use test networks and have no value. Solar income is simulated feed-in, not an electricity sale; readings are outside your Holdings total. AI answers can be wrong.",
+      "maximumAmount": "0.0128 tUSDC",
+      "recipient": "BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z",
+      "host": "Owner desktop GPU",
+      "at": "2026-10-05T09:51:52.417Z",
+      "finalRecovery": {
+        "path": "/api/local-ai/requests/1a993d41-f9fa-42f0-836e-0dd523894d97",
+        "status": 503,
+        "error": "This service is not configured or temporarily unavailable. Check the connection status and retry.",
+        "request": null
+      },
+      "finalUiObserved": "Money\nHoldings\nBorrow & lend\nLocal stakes\nDevices & income\nYour devices\nAdd a device\n\nNo devices connected.\n\nAsk the city AI\nNode ready · model on demand\n\nThe host reads your question; don't send private information.\n\nPaid\nReview before paying\nFree\nShared allowance\nWhat would you like to explore?\nBetter homes\nLocal businesses\nA useful library\nReview paid question\n\nNo GPU host of yours is online or able to wake. To ask a city host, choose “Allow city hosts” and confirm that your question is public.\n\nAsk a city host instead\n\nPay per token: 0.0001 tUSDC per generated token, at most 0.0128 tUSDC for this answer.\n\nSaved request unavailable: This service is not configured or temporarily unavailable. Check the connection status and retry.\n\nOptions\nNeeds you\nHost details\n1 available hosts\nService details\nSaved request and routing\n\nDevice receipts use test networks and have no value. Solar income is simulated feed-in, not an electricity sale; readings are outside your Holdings total. AI answers can be wrong.",
+      "requestId": "1a993d41-f9fa-42f0-836e-0dd523894d97",
+      "approvalReceipt": {
+        "state": "completed",
+        "maximumDebitAtomic": "12800",
+        "signature": "4NzCyfoFu4qoY5Tch9EQ47sVT9TiUYcQCyiz4cuA7s8VNayMPmMdD6Sdr3XNQM8GJAAnctks2QspuQA8iFsTNXCb",
+        "explorerUrl": "https://explorer.solana.com/tx/4NzCyfoFu4qoY5Tch9EQ47sVT9TiUYcQCyiz4cuA7s8VNayMPmMdD6Sdr3XNQM8GJAAnctks2QspuQA8iFsTNXCb?cluster=devnet"
+      },
+      "lastAccessibleRequest": {
+        "at": "2026-10-05T09:52:37.542Z",
+        "state": "running",
+        "answer": null,
+        "payment": {
+          "state": "authorized",
+          "amountAtomic": "12800",
+          "receipt": null
+        },
+        "progress": {
+          "stage": "answering",
+          "events": {
+            "queuedAt": "2026-10-05T09:52:23.069Z",
+            "pickedUpAt": "2026-10-05T09:52:23.088Z"
+          },
+          "money": "authorized",
+          "startedAt": "2026-10-05T09:52:05.579Z",
+          "endedAt": null,
+          "settlementTransaction": null
+        },
+        "usage": null,
+        "error": null
+      },
+      "outcome": "unresolved_after_more_than_10_minutes",
+      "observation": "Owner desktop GPU received question and woke; paid answer completion and settlement could not be established. Same authenticated saved-request GET returned503. No new question/approval or charge retries. Do not infer host offline, answer failed, no charge, or settled payment from this final error."
+    },
+    {
+      "action": "lend_retry_after_expired",
+      "review": {
+        "operation": "lend",
+        "network": "Solana devnet",
+        "account": "4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa",
+        "asset": "tUSDC",
+        "amount": "10",
+        "amountAtomic": "10000000",
+        "maximumDebitAtomic": "10000000",
+        "amountIsMaximum": false,
+        "recipient": "6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU",
+        "pool": "DU16LQzZbQumNeQKgPcQaHmfNUQdK2YeA4rYcVsdvBCT",
+        "cashAccount": "CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX",
+        "shareAccount": "CBz9AaQVDU5kcVFwUjMwaSoAddpHxzwAVpNwacJ6c4Xb",
+        "cashVault": "6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU",
+        "collateralVault": "BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35",
+        "priceUsdE6": "372355000",
+        "pricePublishedAt": "1791167743",
+        "debtExposureCapAtomic": "2000000000",
+        "description": "Lend exactly 10 tUSDC to the shared pool and receive a lender share entitlement. Withdrawals are limited by pool cash; borrower bad debt can reduce your lender value. Sponsored network fees and account rent. Solana devnet only. Test tUSDC and fictional tTSLA have no value and confer no stock, property or rental rights. Borrower-funded interest and lender losses are real test-chain accounting, not investment income. Deposit earnings belong to the tenant."
+      },
+      "at": "2026-10-05T09:53:52.970Z",
+      "receiptObserved": "Exact server review · Solana devnet\n{\n  \"operation\": \"lend\",\n  \"network\": \"Solana devnet\",\n  \"account\": \"4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa\",\n  \"asset\": \"tUSDC\",\n  \"amount\": \"10\",\n  \"amountAtomic\": \"10000000\",\n  \"maximumDebitAtomic\": \"10000000\",\n  \"amountIsMaximum\": false,\n  \"recipient\": \"6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU\",\n  \"pool\": \"DU16LQzZbQumNeQKgPcQaHmfNUQdK2YeA4rYcVsdvBCT\",\n  \"cashAccount\": \"CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX\",\n  \"shareAccount\": \"CBz9AaQVDU5kcVFwUjMwaSoAddpHxzwAVpNwacJ6c4Xb\",\n  \"cashVault\": \"6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU\",\n  \"collateralVault\": \"BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35\",\n  \"priceUsdE6\": \"372355000\",\n  \"pricePublishedAt\": \"1791167743\",\n  \"debtExposureCapAtomic\": \"2000000000\",\n  \"description\": \"Lend exactly 10 tUSDC to the shared pool and receive a lender share entitlement. Withdrawals are limited by pool cash; borrower bad debt can reduce your lender value. Sponsored network fees and account rent. Solana devnet only. Test tUSDC and fictional tTSLA have no value and confer no stock, property or rental rights. Borrower-funded interest and lender losses are real test-chain accounting, not investment income. Deposit earnings belong to the tenant.\"\n}\n\nOperation d6c476c437ac597b727e775409b2b9fc862b7088e28c9dc5d0c4de45e79caf9f · fee sponsor 3AoHstmog6FiCcBaVAh8jnB8iVc2v9oUvN2Pnn76YtbH · signing wallet cq74a8e72ajupkt7phqeaw91 · expires 5.10.2026, 11:55:44.\n\nTransaction confirmed.\n\nView devnet transaction\n\nDone\n\nWaiting for wallet or devnet confirmation…",
+      "receipts": [
+        {
+          "state": "broadcast",
+          "signature": "5jAsUC9yPb5qaPq8Gkxqyg8cBYe4WTSvmHBFU1EGmcgECnivpCYDpR8T3hthLqzWvcn6EkYvQtQA8aNcmNZt2hkF",
+          "id": "d6c476c437ac597b727e775409b2b9fc862b7088e28c9dc5d0c4de45e79caf9f"
+        },
+        {
+          "state": "confirmed",
+          "signature": "5jAsUC9yPb5qaPq8Gkxqyg8cBYe4WTSvmHBFU1EGmcgECnivpCYDpR8T3hthLqzWvcn6EkYvQtQA8aNcmNZt2hkF",
+          "id": "d6c476c437ac597b727e775409b2b9fc862b7088e28c9dc5d0c4de45e79caf9f",
+          "explorerUrl": "https://explorer.solana.com/tx/5jAsUC9yPb5qaPq8Gkxqyg8cBYe4WTSvmHBFU1EGmcgECnivpCYDpR8T3hthLqzWvcn6EkYvQtQA8aNcmNZt2hkF?cluster=devnet"
+        }
+      ],
+      "receipt": {
+        "state": "confirmed",
+        "signature": "5jAsUC9yPb5qaPq8Gkxqyg8cBYe4WTSvmHBFU1EGmcgECnivpCYDpR8T3hthLqzWvcn6EkYvQtQA8aNcmNZt2hkF",
+        "id": "d6c476c437ac597b727e775409b2b9fc862b7088e28c9dc5d0c4de45e79caf9f",
+        "explorerUrl": "https://explorer.solana.com/tx/5jAsUC9yPb5qaPq8Gkxqyg8cBYe4WTSvmHBFU1EGmcgECnivpCYDpR8T3hthLqzWvcn6EkYvQtQA8aNcmNZt2hkF?cluster=devnet"
+      }
+    },
+    {
+      "action": "deposit_collateral",
+      "review": {
+        "operation": "deposit_collateral",
+        "network": "Solana devnet",
+        "account": "4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa",
+        "asset": "tTSLA",
+        "amount": "1",
+        "amountAtomic": "1000000",
+        "maximumDebitAtomic": "1000000",
+        "amountIsMaximum": false,
+        "recipient": "BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35",
+        "pool": "DU16LQzZbQumNeQKgPcQaHmfNUQdK2YeA4rYcVsdvBCT",
+        "cashAccount": "CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX",
+        "shareAccount": "CBz9AaQVDU5kcVFwUjMwaSoAddpHxzwAVpNwacJ6c4Xb",
+        "cashVault": "6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU",
+        "collateralVault": "BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35",
+        "priceUsdE6": "372355000",
+        "pricePublishedAt": "1791167743",
+        "debtExposureCapAtomic": "2000000000",
+        "description": "Lock exactly 1 fictional tTSLA in the shared pool as collateral. These shares can be seized if the loan becomes liquidatable. Sponsored network fees and account rent. Solana devnet only. Test tUSDC and fictional tTSLA have no value and confer no stock, property or rental rights. Borrower-funded interest and lender losses are real test-chain accounting, not investment income. Deposit earnings belong to the tenant."
+      },
+      "at": "2026-10-05T09:55:28.492Z",
+      "receipt": {
+        "state": "confirmed",
+        "explorerUrl": "https://explorer.solana.com/tx/2Hc1YknGWnP1jbMBfrvsA32QQhYS1sk9JGm1dMcMoWtRteL25kSNWGXpkXqjChWTnGDGjYitkkctuPDxPpnTBYCZ?cluster=devnet",
+        "signature": "2Hc1YknGWnP1jbMBfrvsA32QQhYS1sk9JGm1dMcMoWtRteL25kSNWGXpkXqjChWTnGDGjYitkkctuPDxPpnTBYCZ"
+      }
+    },
+    {
+      "action": "borrow",
+      "review": {
+        "operation": "borrow",
+        "network": "Solana devnet",
+        "account": "4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa",
+        "asset": "tUSDC",
+        "amount": "1",
+        "amountAtomic": "1000000",
+        "maximumDebitAtomic": "0",
+        "amountIsMaximum": false,
+        "recipient": "CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX",
+        "pool": "DU16LQzZbQumNeQKgPcQaHmfNUQdK2YeA4rYcVsdvBCT",
+        "cashAccount": "CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX",
+        "shareAccount": "CBz9AaQVDU5kcVFwUjMwaSoAddpHxzwAVpNwacJ6c4Xb",
+        "cashVault": "6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU",
+        "collateralVault": "BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35",
+        "priceUsdE6": "372355000",
+        "pricePublishedAt": "1791167743",
+        "debtExposureCapAtomic": "2000000000",
+        "description": "Borrow exactly 1 tUSDC from the pool to your own wallet against locked tTSLA. Debt accrues continuously at five percent nominal annually; liquidation starts at eighty percent loan-to-value. Sponsored network fees and account rent. Solana devnet only. Test tUSDC and fictional tTSLA have no value and confer no stock, property or rental rights. Borrower-funded interest and lender losses are real test-chain accounting, not investment income. Deposit earnings belong to the tenant."
+      },
+      "at": "2026-10-05T09:56:30.637Z",
+      "receipt": {
+        "state": "confirmed",
+        "explorerUrl": "https://explorer.solana.com/tx/3ibZ5gHREcoq5GQrV24zRLsfwUg8Xf1oyREs1gVef5vujsKgNXEi3bBUGbkySaGMsjeTKUBp7Wwdmua6VSniFKdz?cluster=devnet",
+        "signature": "3ibZ5gHREcoq5GQrV24zRLsfwUg8Xf1oyREs1gVef5vujsKgNXEi3bBUGbkySaGMsjeTKUBp7Wwdmua6VSniFKdz"
+      }
+    },
+    {
+      "action": "full_repay",
+      "review": {
+        "operation": "repay",
+        "network": "Solana devnet",
+        "account": "4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa",
+        "asset": "tUSDC",
+        "amount": "1.01",
+        "amountAtomic": "1010000",
+        "maximumDebitAtomic": "1010000",
+        "amountIsMaximum": true,
+        "recipient": "6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU",
+        "pool": "DU16LQzZbQumNeQKgPcQaHmfNUQdK2YeA4rYcVsdvBCT",
+        "cashAccount": "CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX",
+        "shareAccount": "CBz9AaQVDU5kcVFwUjMwaSoAddpHxzwAVpNwacJ6c4Xb",
+        "cashVault": "6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU",
+        "collateralVault": "BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35",
+        "priceUsdE6": "372355000",
+        "pricePublishedAt": "1791167743",
+        "debtExposureCapAtomic": "2000000000",
+        "description": "Repay up to 1.01 tUSDC from your own wallet. Only outstanding debt is paid, rounded in the pool's favor; interest continues until the transaction executes. The remaining cap stays in your wallet. Sponsored network fees and account rent. Solana devnet only. Test tUSDC and fictional tTSLA have no value and confer no stock, property or rental rights. Borrower-funded interest and lender losses are real test-chain accounting, not investment income. Deposit earnings belong to the tenant."
+      },
+      "at": "2026-10-05T09:57:18.438Z",
+      "receipt": {
+        "state": "confirmed",
+        "explorerUrl": "https://explorer.solana.com/tx/55KWd4MCjv1iKyzThYS9wNayC82V5uYziJESYn9qYvhLRxqN8iTutaHezmhxXkkY1Vz5kWbY3Zcs1twQ6Jq76WJv?cluster=devnet",
+        "signature": "55KWd4MCjv1iKyzThYS9wNayC82V5uYziJESYn9qYvhLRxqN8iTutaHezmhxXkkY1Vz5kWbY3Zcs1twQ6Jq76WJv"
+      },
+      "balancesObserved": "Money\nHoldings\nBorrow & lend\nLocal stakes\nDevices & income\nBorrow test dollars against test TSLA, or lend test dollars to earn interest.\n\nSolana devnet · tTSLA and tUSDC · 6 decimals · sponsored fees\n\nYour loan\nBorrowed\n0 tUSDC\nCollateral\n1\ntTSLA\n\nHealthy · 0% borrowed\n\nBorrow\nAdd collateral\nWithdraw collateral\nYour lending\nLent\n10 tUSDC\nEarned\n0 tUSDC\nWithdrawable\n10 tUSDC\nLend\nWithdraw\n\nWallet: 3,568 tUSDC · 4 tTSLA · fees sponsored · 4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa\n\n1 tTSLA ≈ 372.355 tUSDC · price from 7.4 h ago\n\nRepay\nAmount in tUSDC\n\n1.01 tUSDC to repay\n\nReview repay\n\nBorrow up to 50% of collateral value; liquidation from 80%.\n\nCentrally issued test shares have no value or rights. Price synchronization and liquidation can fail; collateral remains at risk.\n\nTo close the loan, enter a little more than the debt; Repay takes only what you owe.\n\nFinish or recover the existing Solana operation before preparing another.\n\nHow prices and the pool work\nPrice source, job status and pool limits\nLiquidate an unsafe loan · advanced\nAssess unsafe loans before choosing a repayment\n"
+    },
+    {
+      "action": "collateral_return",
+      "review": {
+        "operation": "withdraw_collateral",
+        "network": "Solana devnet",
+        "account": "4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa",
+        "asset": "tTSLA",
+        "amount": "1",
+        "amountAtomic": "1000000",
+        "maximumDebitAtomic": "0",
+        "amountIsMaximum": false,
+        "recipient": "CBz9AaQVDU5kcVFwUjMwaSoAddpHxzwAVpNwacJ6c4Xb",
+        "pool": "DU16LQzZbQumNeQKgPcQaHmfNUQdK2YeA4rYcVsdvBCT",
+        "cashAccount": "CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX",
+        "shareAccount": "CBz9AaQVDU5kcVFwUjMwaSoAddpHxzwAVpNwacJ6c4Xb",
+        "cashVault": "6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU",
+        "collateralVault": "BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35",
+        "priceUsdE6": "372355000",
+        "pricePublishedAt": "1791167743",
+        "debtExposureCapAtomic": "2000000000",
+        "description": "Return exactly 1 locked fictional tTSLA to your own wallet, in kind. Nothing is sold. Any remaining debt must stay within fifty percent loan-to-value. Sponsored network fees and account rent. Solana devnet only. Test tUSDC and fictional tTSLA have no value and confer no stock, property or rental rights. Borrower-funded interest and lender losses are real test-chain accounting, not investment income. Deposit earnings belong to the tenant."
+      },
+      "at": "2026-10-05T09:58:00.999Z",
+      "receipt": {
+        "state": "confirmed",
+        "explorerUrl": "https://explorer.solana.com/tx/5pqsV3K5tAoHtcfeHCeJHiuXaiSN23bB6fRCNK7yNbafTBqQw5n2rhoweCJWFsCbH9qn3A9r7vLqtxoZyKeGFmhB?cluster=devnet",
+        "signature": "5pqsV3K5tAoHtcfeHCeJHiuXaiSN23bB6fRCNK7yNbafTBqQw5n2rhoweCJWFsCbH9qn3A9r7vLqtxoZyKeGFmhB"
+      }
+    },
+    {
+      "action": "withdraw_lending",
+      "review": {
+        "operation": "unlend",
+        "network": "Solana devnet",
+        "account": "4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa",
+        "asset": "tUSDC",
+        "amount": "10",
+        "amountAtomic": "10000000",
+        "maximumDebitAtomic": "0",
+        "amountIsMaximum": false,
+        "recipient": "CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX",
+        "pool": "DU16LQzZbQumNeQKgPcQaHmfNUQdK2YeA4rYcVsdvBCT",
+        "cashAccount": "CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX",
+        "shareAccount": "CBz9AaQVDU5kcVFwUjMwaSoAddpHxzwAVpNwacJ6c4Xb",
+        "cashVault": "6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU",
+        "collateralVault": "BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35",
+        "priceUsdE6": "372355000",
+        "pricePublishedAt": "1791167743",
+        "debtExposureCapAtomic": "2000000000",
+        "description": "Withdraw exactly 10 tUSDC from your lender entitlement to your own wallet. Pool shares are burned at the execution-time pool conversion; borrower bad debt can change that conversion. Sponsored network fees and account rent. Solana devnet only. Test tUSDC and fictional tTSLA have no value and confer no stock, property or rental rights. Borrower-funded interest and lender losses are real test-chain accounting, not investment income. Deposit earnings belong to the tenant."
+      },
+      "at": "2026-10-05T09:59:04.261Z",
+      "attemptOutcome": "Exact server review · Solana devnet\n{\n  \"operation\": \"unlend\",\n  \"network\": \"Solana devnet\",\n  \"account\": \"4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa\",\n  \"asset\": \"tUSDC\",\n  \"amount\": \"10\",\n  \"amountAtomic\": \"10000000\",\n  \"maximumDebitAtomic\": \"0\",\n  \"amountIsMaximum\": false,\n  \"recipient\": \"CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX\",\n  \"pool\": \"DU16LQzZbQumNeQKgPcQaHmfNUQdK2YeA4rYcVsdvBCT\",\n  \"cashAccount\": \"CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX\",\n  \"shareAccount\": \"CBz9AaQVDU5kcVFwUjMwaSoAddpHxzwAVpNwacJ6c4Xb\",\n  \"cashVault\": \"6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU\",\n  \"collateralVault\": \"BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35\",\n  \"priceUsdE6\": \"372355000\",\n  \"pricePublishedAt\": \"1791167743\",\n  \"debtExposureCapAtomic\": \"2000000000\",\n  \"description\": \"Withdraw exactly 10 tUSDC from your lender entitlement to your own wallet. Pool shares are burned at the execution-time pool conversion; borrower bad debt can change that conversion. Sponsored network fees and account rent. Solana devnet only. Test tUSDC and fictional tTSLA have no value and confer no stock, property or rental rights. Borrower-funded interest and lender losses are real test-chain accounting, not investment income. Deposit earnings belong to the tenant.\"\n}\n\nOperation f357f566e363371b4f0cdd8efc6b387592af58537a3ee42166bd57dfd0b1ecfb · fee sponsor 3AoHstmog6FiCcBaVAh8jnB8iVc2v9oUvN2Pnn76YtbH · signing wallet cq74a8e72ajupkt7phqeaw91 · expires 5.10.2026, 12:00:49.\n\nTransaction expired.\n\nDone\n\nTransaction expired. Its receipt is retained below.\n\nRecover existing operation",
+      "outcome": "Expired after submit503 and identical resend503; no signature observed. Freshreview only after terminal expired."
+    },
+    {
+      "action": "stake_retry_after_terminal_failed",
+      "reviewObserved": "Money\nHoldings\nBorrow & lend\nLocal stakes\nDevices & income\nHouse\nWorkshop\nAgri-PV\nUse ⌘ + scroll to zoom the map\nFictional tHOME house · illustrative\n\n© OpenStreetMap · OpenFreeMap\n\nFictional housing example\n\nSolana devnet · fictional local units, no value or rights\n\nYou hold 50 tHOME · 0 staked\n\nYour units\n50\ntHOME\n0 staked · 50 in wallet\nClaimable now\n0\ntUSDC\nClaim\nReinvest · one signature\nHouse income so far\n251.1637\ntUSDC\nBuy units\nStake or unstake\n\nHouse income is streamed to stakers over 7 days. Only staked units earn. New revenue extends the remaining stream. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant.\n\nExact stake review · Solana devnet\n\nStake exactly 50 tHOME from your wallet into the house stake vault. Income is streamed to stakers over 7 days; new revenue extends the remaining stream. Sponsored network fees and account rent. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant.\n\nYour wallet / recipient\n4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa\nHouse\nBymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z\nYour cash account\nCtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX\nYour unit account\nFDCTX5fzDzr1Loq7UZk9iB7cGPWxe956RgxjExpCbjzW\nDesk / reward / stake vaults\n2nmfyiHuN4edcMLqxtx1bksTwZ8h2XbfdkPZ5HAm7TNC\n7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk\n4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR\nFee sponsor · maximum 0.01 test SOL\n3AoHstmog6FiCcBaVAh8jnB8iVc2v9oUvN2Pnn76YtbH\n\nReview expires 12:01:53. Only this exact reviewed transaction is signed.\n\nSign stake · one signatureCancel unsigned review\nBuy or sell units\n3568 tUSDC available\nStake or unstake\n0 tHOME staked\n\nWallet: 50 tHOME · staked: 0 tHOME.\n\nMax wallet units\nMax staked units\ntHOME units to stake or unstake\nReview stake\n\nFinish the current house review or transaction first\n\nReview unstake\n\nFinish the current house review or transaction first\n\nNo separate token approval: each action is one sponsored transaction signed by your own Solana wallet. Unstake before selling. Never transfer units directly to the vault.\n\nWhere the income comes from\n1 stakers · on-chain sources\nHouse action receipts\n2 recorded\nbuy · finalized · 3FbyCzi17GGCQigdEVZ8rRkmTgofoc18TaFrunKgpRMjNeuSvCvUkDbUZjBKWSz7shiMxyikHq3iuVJduptwuHJ\nstake · failed · no success inferred · 5mwT6A5XEFC7Xq4V1cMiaado6o7pzQCy99tUJ6ehhpbH9jiT9DmvvAE6Agvqv7MPY7UFNd77EoxKcrcXP1avxZJX\nRefresh Solana house\nRobinhood Chain test house · earlier units\nEarlier unstake, claim and sell lanes\nExplore the building idea\nFictional plans · solar, heat & shared spaces\nSources & token rights\nFictional units · no rights\n\nFictional test units: no value, no property or company rights. Solana devnet only.",
+      "reviewedAmount": "50 tHOME",
+      "reviewedRecipient": "4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR",
+      "network": "Solana devnet",
+      "at": "2026-10-05T10:00:10.749Z",
+      "receipt": {
+        "planId": "d698f284e01ef16a89c73020d2f5658d6049fd538fc1e92db178409ec8e70c15",
+        "operation": "stake",
+        "quantityRaw": "50000000",
+        "claimedRaw": null,
+        "hash": "2JEeZwixVPkyEuvV2ySHdDCY1CbYhTe8pDuY2BfrGTC2GkbE4DWaXbMT2eyKvbD8VWpaaQzLiUr931SRcgzgbdds",
+        "status": "confirmed",
+        "explorerUrl": "https://explorer.solana.com/tx/2JEeZwixVPkyEuvV2ySHdDCY1CbYhTe8pDuY2BfrGTC2GkbE4DWaXbMT2eyKvbD8VWpaaQzLiUr931SRcgzgbdds?cluster=devnet"
+      },
+      "observation": {
+        "staked": "50",
+        "earned": "0.004877"
+      }
+    },
+    {
+      "action": "claim_accrued_house_income",
+      "review": {
+        "operation": "claim",
+        "houseId": "neighbourhood-homes",
+        "distributor": "BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z",
+        "account": "4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa",
+        "network": "Solana devnet",
+        "amount": "at least $0.006503",
+        "asset": "tUSDC",
+        "unitsRaw": "0",
+        "cashRaw": "0",
+        "claimRaw": "6503",
+        "cashAccount": "CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX",
+        "unitAccount": "FDCTX5fzDzr1Loq7UZk9iB7cGPWxe956RgxjExpCbjzW",
+        "deskVault": "2nmfyiHuN4edcMLqxtx1bksTwZ8h2XbfdkPZ5HAm7TNC",
+        "rewardVault": "7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk",
+        "stakeVault": "4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR",
+        "description": "Claim all your accrued tUSDC to your own cash account: at least $0.006503 in test dollars (earnings keep streaming until the transaction lands). Income is streamed to stakers over 7 days; new revenue extends the remaining stream. Sponsored network fees and account rent. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant."
+      },
+      "reviewObserved": "Money\nHoldings\nBorrow & lend\nLocal stakes\nDevices & income\nHouse\nWorkshop\nAgri-PV\nUse ⌘ + scroll to zoom the map\nFictional tHOME house · illustrative\n\n© OpenStreetMap · OpenFreeMap\n\nFictional housing example\n\nSolana devnet · fictional local units, no value or rights\n\nYou hold 50 tHOME · 50 staked\n\nYour units\n50\ntHOME\n50 staked · 0 in wallet\nClaimable now\n0.013006\ntUSDC\nClaim\nReinvest · one signature\nHouse income so far\n251.1637\ntUSDC\nBuy units\nStake or unstake\n\nHouse income is streamed to stakers over 7 days. Only staked units earn. New revenue extends the remaining stream. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant.\n\nExact claim review · Solana devnet\n\nClaim all your accrued tUSDC to your own cash account: at least $0.006503 in test dollars (earnings keep streaming until the transaction lands). Income is streamed to stakers over 7 days; new revenue extends the remaining stream. Sponsored network fees and account rent. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant.\n\nYour wallet / recipient\n4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa\nHouse\nBymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z\nYour cash account\nCtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX\nYour unit account\nFDCTX5fzDzr1Loq7UZk9iB7cGPWxe956RgxjExpCbjzW\nDesk / reward / stake vaults\n2nmfyiHuN4edcMLqxtx1bksTwZ8h2XbfdkPZ5HAm7TNC\n7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk\n4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR\nFee sponsor · maximum 0.01 test SOL\n3AoHstmog6FiCcBaVAh8jnB8iVc2v9oUvN2Pnn76YtbH\n\nReview expires 12:02:33. Only this exact reviewed transaction is signed.\n\nSign claim · one signatureCancel unsigned review\nBuy or sell units\n3568 tUSDC available\nStake or unstake\n50 tHOME staked\n\nWallet: 0 tHOME · staked: 50 tHOME.\n\nMax wallet units\nMax staked units\ntHOME units to stake or unstake\nReview stake\n\nFinish the current house review or transaction first\n\nReview unstake\n\nFinish the current house review or transaction first\n\nNo separate token approval: each action is one sponsored transaction signed by your own Solana wallet. Unstake before selling. Never transfer units directly to the vault.\n\nWhere the income comes from\n2 stakers · on-chain sources\nHouse action receipts\n3 recorded\nbuy · finalized · 3FbyCzi17GGCQigdEVZ8rRkmTgofoc18TaFrunKgpRMjNeuSvCvUkDbUZjBKWSz7shiMxyikHq3iuVJduptwuHJ\nstake · failed · no success inferred · 5mwT6A5XEFC7Xq4V1cMiaado6o7pzQCy99tUJ6ehhpbH9jiT9DmvvAE6Agvqv7MPY7UFNd77EoxKcrcXP1avxZJX\nstake · finalized · 2JEeZwixVPkyEuvV2ySHdDCY1CbYhTe8pDuY2BfrGTC2GkbE4DWaXbMT2eyKvbD8VWpaaQzLiUr931SRcgzgbdds\nRefresh Solana house\nRobinhood Chain test house · earlier units\nEarlier unstake, claim and sell lanes\nExplore the building idea\nFictional plans · solar, heat & shared spaces\nSources & token rights\nFictional units · no rights\n\nFictional test units: no value, no property or company rights. Solana devnet only.",
+      "at": "2026-10-05T10:00:49.741Z",
+      "receipt": {
+        "planId": "31978438cec6eded2e330976ede672d91599c7c7569780f2eca37c0f435a5d81",
+        "operation": "claim",
+        "quantityRaw": null,
+        "claimedRaw": null,
+        "hash": "bbf3hWMmGtwJMFtLdkTtp2RkQQkviAja6L7bZEHtDHFmaRGcqXdXxdDQ9w8TsZSS8dFJFio43Avm1ZyCenuixyJ",
+        "status": "confirmed",
+        "explorerUrl": "https://explorer.solana.com/tx/bbf3hWMmGtwJMFtLdkTtp2RkQQkviAja6L7bZEHtDHFmaRGcqXdXxdDQ9w8TsZSS8dFJFio43Avm1ZyCenuixyJ?cluster=devnet"
+      },
+      "observedBalances": [
+        {
+          "at": "2026-10-05T10:01:05.569Z",
+          "cashAtomic": "3568016257",
+          "earned": "0.003252",
+          "staked": "50",
+          "receipts": [
+            {
+              "planId": "c58e9e2986f42cdc5b97b7bfcb06d17e512c63c9adbd1cce3f4a0be598d28fe2",
+              "operation": "buy",
+              "quantityRaw": "50000000",
+              "claimedRaw": null,
+              "hash": "3FbyCzi17GGCQigdEVZ8rRkmTgofoc18TaFrunKgpRMjNeuSvCvUkDbUZjBKWSz7shiMxyikHq3iuVJduptwuHJ",
+              "status": "confirmed",
+              "explorerUrl": "https://explorer.solana.com/tx/3FbyCzi17GGCQigdEVZ8rRkmTgofoc18TaFrunKgpRMjNeuSvCvUkDbUZjBKWSz7shiMxyikHq3iuVJduptwuHJ?cluster=devnet"
+            },
+            {
+              "planId": "7a7b743592c89f764d441dc355ac3a3fba40d37f618352146ee10bc754aad8a1",
+              "operation": "stake",
+              "quantityRaw": "50000000",
+              "claimedRaw": null,
+              "hash": "5mwT6A5XEFC7Xq4V1cMiaado6o7pzQCy99tUJ6ehhpbH9jiT9DmvvAE6Agvqv7MPY7UFNd77EoxKcrcXP1avxZJX",
+              "status": "failed",
+              "explorerUrl": "https://explorer.solana.com/tx/5mwT6A5XEFC7Xq4V1cMiaado6o7pzQCy99tUJ6ehhpbH9jiT9DmvvAE6Agvqv7MPY7UFNd77EoxKcrcXP1avxZJX?cluster=devnet"
+            },
+            {
+              "planId": "d698f284e01ef16a89c73020d2f5658d6049fd538fc1e92db178409ec8e70c15",
+              "operation": "stake",
+              "quantityRaw": "50000000",
+              "claimedRaw": null,
+              "hash": "2JEeZwixVPkyEuvV2ySHdDCY1CbYhTe8pDuY2BfrGTC2GkbE4DWaXbMT2eyKvbD8VWpaaQzLiUr931SRcgzgbdds",
+              "status": "confirmed",
+              "explorerUrl": "https://explorer.solana.com/tx/2JEeZwixVPkyEuvV2ySHdDCY1CbYhTe8pDuY2BfrGTC2GkbE4DWaXbMT2eyKvbD8VWpaaQzLiUr931SRcgzgbdds?cluster=devnet"
+            },
+            {
+              "planId": "31978438cec6eded2e330976ede672d91599c7c7569780f2eca37c0f435a5d81",
+              "operation": "claim",
+              "quantityRaw": null,
+              "claimedRaw": null,
+              "hash": "bbf3hWMmGtwJMFtLdkTtp2RkQQkviAja6L7bZEHtDHFmaRGcqXdXxdDQ9w8TsZSS8dFJFio43Avm1ZyCenuixyJ",
+              "status": "confirmed",
+              "explorerUrl": "https://explorer.solana.com/tx/bbf3hWMmGtwJMFtLdkTtp2RkQQkviAja6L7bZEHtDHFmaRGcqXdXxdDQ9w8TsZSS8dFJFio43Avm1ZyCenuixyJ?cluster=devnet"
+            }
+          ]
+        },
+        {
+          "at": "2026-10-05T10:01:09.468Z",
+          "cashAtomic": "3568016257",
+          "earned": "0.004877",
+          "staked": "50",
+          "receipts": [
+            {
+              "planId": "c58e9e2986f42cdc5b97b7bfcb06d17e512c63c9adbd1cce3f4a0be598d28fe2",
+              "operation": "buy",
+              "quantityRaw": "50000000",
+              "claimedRaw": null,
+              "hash": "3FbyCzi17GGCQigdEVZ8rRkmTgofoc18TaFrunKgpRMjNeuSvCvUkDbUZjBKWSz7shiMxyikHq3iuVJduptwuHJ",
+              "status": "confirmed",
+              "explorerUrl": "https://explorer.solana.com/tx/3FbyCzi17GGCQigdEVZ8rRkmTgofoc18TaFrunKgpRMjNeuSvCvUkDbUZjBKWSz7shiMxyikHq3iuVJduptwuHJ?cluster=devnet"
+            },
+            {
+              "planId": "7a7b743592c89f764d441dc355ac3a3fba40d37f618352146ee10bc754aad8a1",
+              "operation": "stake",
+              "quantityRaw": "50000000",
+              "claimedRaw": null,
+              "hash": "5mwT6A5XEFC7Xq4V1cMiaado6o7pzQCy99tUJ6ehhpbH9jiT9DmvvAE6Agvqv7MPY7UFNd77EoxKcrcXP1avxZJX",
+              "status": "failed",
+              "explorerUrl": "https://explorer.solana.com/tx/5mwT6A5XEFC7Xq4V1cMiaado6o7pzQCy99tUJ6ehhpbH9jiT9DmvvAE6Agvqv7MPY7UFNd77EoxKcrcXP1avxZJX?cluster=devnet"
+            },
+            {
+              "planId": "d698f284e01ef16a89c73020d2f5658d6049fd538fc1e92db178409ec8e70c15",
+              "operation": "stake",
+              "quantityRaw": "50000000",
+              "claimedRaw": null,
+              "hash": "2JEeZwixVPkyEuvV2ySHdDCY1CbYhTe8pDuY2BfrGTC2GkbE4DWaXbMT2eyKvbD8VWpaaQzLiUr931SRcgzgbdds",
+              "status": "confirmed",
+              "explorerUrl": "https://explorer.solana.com/tx/2JEeZwixVPkyEuvV2ySHdDCY1CbYhTe8pDuY2BfrGTC2GkbE4DWaXbMT2eyKvbD8VWpaaQzLiUr931SRcgzgbdds?cluster=devnet"
+            },
+            {
+              "planId": "31978438cec6eded2e330976ede672d91599c7c7569780f2eca37c0f435a5d81",
+              "operation": "claim",
+              "quantityRaw": null,
+              "claimedRaw": null,
+              "hash": "bbf3hWMmGtwJMFtLdkTtp2RkQQkviAja6L7bZEHtDHFmaRGcqXdXxdDQ9w8TsZSS8dFJFio43Avm1ZyCenuixyJ",
+              "status": "confirmed",
+              "explorerUrl": "https://explorer.solana.com/tx/bbf3hWMmGtwJMFtLdkTtp2RkQQkviAja6L7bZEHtDHFmaRGcqXdXxdDQ9w8TsZSS8dFJFio43Avm1ZyCenuixyJ?cluster=devnet"
+            }
+          ]
+        },
+        {
+          "at": "2026-10-05T10:01:14.489Z",
+          "cashAtomic": "3568016257",
+          "earned": "0.00691",
+          "staked": "50",
+          "receipts": [
+            {
+              "planId": "c58e9e2986f42cdc5b97b7bfcb06d17e512c63c9adbd1cce3f4a0be598d28fe2",
+              "operation": "buy",
+              "quantityRaw": "50000000",
+              "claimedRaw": null,
+              "hash": "3FbyCzi17GGCQigdEVZ8rRkmTgofoc18TaFrunKgpRMjNeuSvCvUkDbUZjBKWSz7shiMxyikHq3iuVJduptwuHJ",
+              "status": "confirmed",
+              "explorerUrl": "https://explorer.solana.com/tx/3FbyCzi17GGCQigdEVZ8rRkmTgofoc18TaFrunKgpRMjNeuSvCvUkDbUZjBKWSz7shiMxyikHq3iuVJduptwuHJ?cluster=devnet"
+            },
+            {
+              "planId": "7a7b743592c89f764d441dc355ac3a3fba40d37f618352146ee10bc754aad8a1",
+              "operation": "stake",
+              "quantityRaw": "50000000",
+              "claimedRaw": null,
+              "hash": "5mwT6A5XEFC7Xq4V1cMiaado6o7pzQCy99tUJ6ehhpbH9jiT9DmvvAE6Agvqv7MPY7UFNd77EoxKcrcXP1avxZJX",
+              "status": "failed",
+              "explorerUrl": "https://explorer.solana.com/tx/5mwT6A5XEFC7Xq4V1cMiaado6o7pzQCy99tUJ6ehhpbH9jiT9DmvvAE6Agvqv7MPY7UFNd77EoxKcrcXP1avxZJX?cluster=devnet"
+            },
+            {
+              "planId": "d698f284e01ef16a89c73020d2f5658d6049fd538fc1e92db178409ec8e70c15",
+              "operation": "stake",
+              "quantityRaw": "50000000",
+              "claimedRaw": null,
+              "hash": "2JEeZwixVPkyEuvV2ySHdDCY1CbYhTe8pDuY2BfrGTC2GkbE4DWaXbMT2eyKvbD8VWpaaQzLiUr931SRcgzgbdds",
+              "status": "confirmed",
+              "explorerUrl": "https://explorer.solana.com/tx/2JEeZwixVPkyEuvV2ySHdDCY1CbYhTe8pDuY2BfrGTC2GkbE4DWaXbMT2eyKvbD8VWpaaQzLiUr931SRcgzgbdds?cluster=devnet"
+            },
+            {
+              "planId": "31978438cec6eded2e330976ede672d91599c7c7569780f2eca37c0f435a5d81",
+              "operation": "claim",
+              "quantityRaw": null,
+              "claimedRaw": null,
+              "hash": "bbf3hWMmGtwJMFtLdkTtp2RkQQkviAja6L7bZEHtDHFmaRGcqXdXxdDQ9w8TsZSS8dFJFio43Avm1ZyCenuixyJ",
+              "status": "confirmed",
+              "explorerUrl": "https://explorer.solana.com/tx/bbf3hWMmGtwJMFtLdkTtp2RkQQkviAja6L7bZEHtDHFmaRGcqXdXxdDQ9w8TsZSS8dFJFio43Avm1ZyCenuixyJ?cluster=devnet"
+            }
+          ]
+        }
+      ],
+      "actualClaimAtomicObserved": "16257",
+      "actualClaimAmountObserved": "0.016257 tUSDC"
+    },
+    {
+      "action": "withdraw_lending_retry_after_expired",
+      "review": {
+        "operation": "unlend",
+        "network": "Solana devnet",
+        "account": "4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa",
+        "asset": "tUSDC",
+        "amount": "10",
+        "amountAtomic": "10000000",
+        "maximumDebitAtomic": "0",
+        "amountIsMaximum": false,
+        "recipient": "CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX",
+        "pool": "DU16LQzZbQumNeQKgPcQaHmfNUQdK2YeA4rYcVsdvBCT",
+        "cashAccount": "CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX",
+        "shareAccount": "CBz9AaQVDU5kcVFwUjMwaSoAddpHxzwAVpNwacJ6c4Xb",
+        "cashVault": "6s1ptM7N22kXL5N5S6LZiKktbx5dkyyztir8o6F5fkKU",
+        "collateralVault": "BjJhe79C6oxsSa4gXM7wjfBh9i3vtYccZ3aZqdXTp35",
+        "priceUsdE6": "372355000",
+        "pricePublishedAt": "1791167743",
+        "debtExposureCapAtomic": "2000000000",
+        "description": "Withdraw exactly 10 tUSDC from your lender entitlement to your own wallet. Pool shares are burned at the execution-time pool conversion; borrower bad debt can change that conversion. Sponsored network fees and account rent. Solana devnet only. Test tUSDC and fictional tTSLA have no value and confer no stock, property or rental rights. Borrower-funded interest and lender losses are real test-chain accounting, not investment income. Deposit earnings belong to the tenant."
+      },
+      "at": "2026-10-05T10:02:56.096Z",
+      "receipt": {
+        "state": "confirmed",
+        "explorerUrl": "https://explorer.solana.com/tx/PyK7DKz8GuYsoDkoR19JGqxovw23tWGrqc1Q7BL1aTsdC4FRqXVwKWmHMZ58hd6ZC9NCgRpehJbchu2PVQoTnnt?cluster=devnet",
+        "signature": "PyK7DKz8GuYsoDkoR19JGqxovw23tWGrqc1Q7BL1aTsdC4FRqXVwKWmHMZ58hd6ZC9NCgRpehJbchu2PVQoTnnt"
+      }
+    }
+  ],
+  "positionObservations": [
+    {
+      "at": "2026-10-05T09:46:42.645Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578000000",
+      "walletSharesAtomic": "0",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T09:46:56.990Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578000000",
+      "walletSharesAtomic": "0",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T09:46:58.299Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "robinhood",
+      "walletCashAtomic": "930000000",
+      "walletSharesAtomic": "0",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T09:47:56.621Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T09:47:59.709Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "robinhood",
+      "walletCashAtomic": "930000000",
+      "walletSharesAtomic": "0",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T09:48:44.320Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T09:48:45.330Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T09:48:45.677Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "robinhood",
+      "walletCashAtomic": "930000000",
+      "walletSharesAtomic": "0",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T09:49:46.492Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T09:50:45.255Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T09:51:30.398Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T09:51:31.937Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "robinhood",
+      "walletCashAtomic": "930000000",
+      "walletSharesAtomic": "0",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T09:52:40.057Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T09:54:24.629Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:54:24.629Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:54:35.914Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:54:49.947Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:54:50.242Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:55:36.712Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:55:40.909Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "4000000",
+      "loan": {
+        "sharesRaw": "1000000",
+        "debtAtomic": "0",
+        "valueAtomic": "372355000",
+        "ltvBps": 0,
+        "availableAtomic": "9000000",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:55:41.249Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "4000000",
+      "loan": {
+        "sharesRaw": "1000000",
+        "debtAtomic": "0",
+        "valueAtomic": "372355000",
+        "ltvBps": 0,
+        "availableAtomic": "9000000",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:56:35.831Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "4000000",
+      "loan": {
+        "sharesRaw": "1000000",
+        "debtAtomic": "0",
+        "valueAtomic": "372355000",
+        "ltvBps": 0,
+        "availableAtomic": "9000000",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:56:41.525Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3569000000",
+      "walletSharesAtomic": "4000000",
+      "loan": {
+        "sharesRaw": "1000000",
+        "debtAtomic": "1000000",
+        "valueAtomic": "372355000",
+        "ltvBps": 27,
+        "availableAtomic": "8000000",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "9000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:56:41.829Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3569000000",
+      "walletSharesAtomic": "4000000",
+      "loan": {
+        "sharesRaw": "1000000",
+        "debtAtomic": "1000000",
+        "valueAtomic": "372355000",
+        "ltvBps": 27,
+        "availableAtomic": "8000000",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "9000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:57:29.468Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "4000000",
+      "loan": {
+        "sharesRaw": "1000000",
+        "debtAtomic": "0",
+        "valueAtomic": "372355000",
+        "ltvBps": 0,
+        "availableAtomic": "9000000",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:57:29.838Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "4000000",
+      "loan": {
+        "sharesRaw": "1000000",
+        "debtAtomic": "0",
+        "valueAtomic": "372355000",
+        "ltvBps": 0,
+        "availableAtomic": "9000000",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:57:37.145Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "4000000",
+      "loan": {
+        "sharesRaw": "1000000",
+        "debtAtomic": "0",
+        "valueAtomic": "372355000",
+        "ltvBps": 0,
+        "availableAtomic": "9000000",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:58:13.075Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T09:58:35.907Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568000000",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T10:01:23.266Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568016257",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T10:02:32.684Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568016257",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T10:03:08.858Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578016257",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T10:03:09.200Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578016257",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T10:03:32.606Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578016257",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T10:02:32.684Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3568016257",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "10000000000000000000",
+        "netContributedAtomic": "10000000",
+        "valueAtomic": "10000000",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "10000000"
+      }
+    },
+    {
+      "at": "2026-10-05T10:03:08.858Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578016257",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T10:03:09.200Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578016257",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T10:03:32.606Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578016257",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    },
+    {
+      "at": "2026-10-05T10:04:33.949Z",
+      "path": "/api/share-workflows",
+      "status": 200,
+      "network": "solana-devnet",
+      "walletCashAtomic": "3578016257",
+      "walletSharesAtomic": "5000000",
+      "loan": {
+        "sharesRaw": "0",
+        "debtAtomic": "0",
+        "valueAtomic": "0",
+        "ltvBps": 0,
+        "availableAtomic": "0",
+        "priceFresh": true
+      },
+      "lender": {
+        "sharesRaw": "0",
+        "netContributedAtomic": "0",
+        "valueAtomic": "0",
+        "earnedAtomic": "0",
+        "maxWithdrawAtomic": "0"
+      }
+    }
+  ],
+  "finalPosition": {
+    "at": "2026-10-05T10:04:33.949Z",
+    "path": "/api/share-workflows",
+    "status": 200,
+    "network": "solana-devnet",
+    "walletCashAtomic": "3578016257",
+    "walletSharesAtomic": "5000000",
+    "loan": {
+      "sharesRaw": "0",
+      "debtAtomic": "0",
+      "valueAtomic": "0",
+      "ltvBps": 0,
+      "availableAtomic": "0",
+      "priceFresh": true
+    },
+    "lender": {
+      "sharesRaw": "0",
+      "netContributedAtomic": "0",
+      "valueAtomic": "0",
+      "earnedAtomic": "0",
+      "maxWithdrawAtomic": "0"
+    }
+  },
+  "filteredFailures": [
+    {
+      "at": "2026-10-05T09:49:14.592Z",
+      "path": "/api/share-workflows",
+      "status": 503,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry."
+    },
+    {
+      "at": "2026-10-05T09:50:37.755Z",
+      "path": "/api/share-workflows",
+      "status": 503,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry."
+    },
+    {
+      "at": "2026-10-05T09:51:30.699Z",
+      "path": "/api/share-workflows",
+      "status": 503,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry."
+    },
+    {
+      "at": "2026-10-05T09:51:39.648Z",
+      "path": "/api/local-ai/requests/1a993d41-f9fa-42f0-836e-0dd523894d97",
+      "status": 402
+    },
+    {
+      "at": "2026-10-05T09:53:59.496Z",
+      "path": "/api/share-workflows",
+      "status": 503,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry."
+    },
+    {
+      "at": "2026-10-05T09:53:59.496Z",
+      "path": "/api/share-workflows",
+      "status": 503,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry."
+    },
+    {
+      "at": "2026-10-05T09:54:32.029Z",
+      "path": "/api/local-ai/requests/1a993d41-f9fa-42f0-836e-0dd523894d97",
+      "status": 503,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry."
+    },
+    {
+      "at": "2026-10-05T09:54:34.960Z",
+      "path": "/api/local-ai/requests/1a993d41-f9fa-42f0-836e-0dd523894d97",
+      "status": 503,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry."
+    },
+    {
+      "at": "2026-10-05T09:55:54.924Z",
+      "path": "/api/share-workflows",
+      "status": 503,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry."
+    },
+    {
+      "at": "2026-10-05T09:58:13.612Z",
+      "path": "/api/share-workflows",
+      "status": 503,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry."
+    },
+    {
+      "at": "2026-10-05T09:59:09.668Z",
+      "path": "/api/share-workflows",
+      "status": 503,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry."
+    },
+    {
+      "at": "2026-10-05T09:59:29.156Z",
+      "path": "/api/share-workflows",
+      "status": 503,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry."
+    },
+    {
+      "at": "2026-10-05T10:01:18.956Z",
+      "path": "/api/building",
+      "status": 503,
+      "error": "House clock does not match its finalized bank."
+    }
+  ],
+  "operationalFailures": [
+    {
+      "action": "lend",
+      "phase": "submit",
+      "status": 503,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry.",
+      "recovery": "Same operation reconciled prepared; resubmit identical signed transaction only."
+    },
+    {
+      "action": "borrow",
+      "phase": "prepare",
+      "status": 503,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry.",
+      "recovery": "Recover same preparation"
+    },
+    {
+      "phase": "resident_passkey_save_after_reload",
+      "error": "Virtual Authenticator Environment has not been enabled for this session",
+      "handling": "Did not overwrite saved passkey with empty credentials. Runtime setCredential had persisted its monotonic counter increment before sign-in."
+    }
+  ],
+  "captures": [
+    {
+      "path": "/Users/max/Code/ledger-of-life-review/videos/captures/solana-lending-cursor.mp4",
+      "kind": "actual hosted borrow signature and confirmation",
+      "cursor": true,
+      "encodedDurationSeconds": 15.77,
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "path": "/Users/max/Code/ledger-of-life-review/videos/captures/solana-lending-lend-cursor.mp4",
+      "kind": "initial failed lend review, signature and same-operation recovery UI",
+      "cursor": true,
+      "recordStopDurationMs": 65475
+    },
+    {
+      "path": "/Users/max/Code/ledger-of-life-review/videos/captures/solana-lending-borrow-cursor.mp4",
+      "kind": "original short borrow recording",
+      "cursor": true,
+      "recordStopDurationMs": 13389
+    },
+    {
+      "path": "/Users/max/Code/ledger-of-life-review/videos/captures/solana-lending-localstakes-claim-cursor.mp4",
+      "kind": "real accrued house claim signing and confirmation",
+      "cursor": true,
+      "recordStopDurationMs": 12355
+    },
+    {
+      "path": "/Users/max/Code/ledger-of-life-review/videos/captures/solana-lending-ai-cursor.mp4",
+      "kind": "actual paid AI approval, saved-request resume and host pickup",
+      "cursor": true,
+      "recordStopDurationMs": 36612
+    },
+    {
+      "path": "/Users/max/Code/ledger-of-life-review/videos/captures/solana-lending-1280.png",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "path": "/Users/max/Code/ledger-of-life-review/videos/captures/solana-lending-390.png",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "path": "/Users/max/Code/ledger-of-life-review/videos/captures/solana-lending-final-1280.png",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "path": "/Users/max/Code/ledger-of-life-review/videos/captures/solana-lending-final-390.png",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "path": "/Users/max/Code/ledger-of-life-review/videos/captures/solana-lending-localstakes-1280.png",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "path": "/Users/max/Code/ledger-of-life-review/videos/captures/solana-lending-localstakes-390.png",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "path": "/Users/max/Code/ledger-of-life-review/videos/captures/solana-lending-ai-unresolved-1280.png",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "path": "/Users/max/Code/ledger-of-life-review/videos/captures/solana-lending-ai-unresolved-390.png",
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "revision29SameRequestRecovery": {
+    "releaseSource": "39d2219",
+    "releaseDigest": "da9bc523af3037f1417f3a7c3e85783941c165417204f1cd8d2607812921a62e",
+    "observedAt": "2026-10-05T10:28:23.407Z",
+    "path": "/api/local-ai/requests/1a993d41-f9fa-42f0-836e-0dd523894d97",
+    "status": 503,
+    "error": "This service is not configured or temporarily unavailable. Check the connection status and retry.",
+    "request": null,
+    "outcome": "Unchanged unresolved saved-request read. No new question, approval, charge intent or signature. Answer completion and final payment state remain unproven.",
+    "sessionCleanup": "Reauthenticated resident in the dedicated isolated CDP9337 profile, performed one authenticated GET of the original request, saved resident credential through runtime helper, signed out, released tab and stopped isolated browser."
+  },
+  "verification": "Only real hosted UI transactions, authenticated same-request recovery, API selected-field observations and capture encoding were exercised. No builds/tests/lint/commits or application changes."
+}
