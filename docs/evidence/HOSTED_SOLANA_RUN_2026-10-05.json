@@ -2,8 +2,8 @@
   "recordedAt": "2026-10-05T09:37:27.786Z",
   "site": "https://ledger.stadtstack.eu",
   "network": "solana-devnet",
-  "revision": 30,
-  "imageDigest": "sha256:65a327e1d6fb038382541253a040d3defa73f91a7a582720d446549690cdb2f3",
+  "revision": 32,
+  "imageDigest": "sha256:583fece300f83082f081cfd45c7e6767355e1e924fed406c05ad7c7a1f205729",
   "testAssetsOnly": true,
   "unitsHaveNoValueOrRights": true,
   "depositEarningsBelongToTenant": true,
@@ -20,7 +20,7 @@
       "sourceRevision": 28
     }
   ],
-  "completedAt": "2026-10-05T11:56:34.184Z",
+  "completedAt": "2026-10-05T16:46:47.492Z",
   "releases": [
     {
       "revision": 28,
@@ -42,6 +42,25 @@
       "releasedAt": "2026-10-05T11:48:18.450Z",
       "imageRun": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/37304384344",
       "sourceValidationRun": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/37304064662"
+    },
+    {
+      "revision": 31,
+      "source": "0e292c4473fd09bfd4602c0f130d8d371492f736",
+      "digest": "sha256:6ca34af53878939f9aadbea88cbb323a451f9f246f040bcb3bc59a3d9cee05f6",
+      "pin": "746b198",
+      "releasedAt": "2026-10-05T15:44:02Z",
+      "imageRun": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/37333791085",
+      "outcome": "Deployed safely, but hosted claim reliability remained unproven: blockhash expiry and cross-RPC bank mismatch still observed."
+    },
+    {
+      "revision": 32,
+      "source": "fe756306f00fdc8b87afebb5dd334897e7d863f0",
+      "digest": "sha256:583fece300f83082f081cfd45c7e6767355e1e924fed406c05ad7c7a1f205729",
+      "pin": "4c86c07",
+      "releasedAt": "2026-10-05T16:35:50Z",
+      "imageRun": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/37340697692",
+      "sourceValidationRun": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/37340316122",
+      "outcome": "Atomic finalized simulation evidence; regression tiny buy, house claim and paid AI all finalized in the required order."
     }
   ],
   "resident": {
@@ -2431,7 +2450,7 @@
     "typescript": "passed",
     "lint": "passed",
     "tests": {
-      "passed": 915,
+      "passed": 958,
       "skipped": 2,
       "failed": 0
     },
@@ -2441,7 +2460,7 @@
     "livePodDigest": "verified",
     "publicPages": "200",
     "unauthenticatedRent": "401",
-    "paymentRecoverySecurityReview": "passed; no surviving findings",
+    "paymentRecoverySecurityReview": "passed; atomic delta, sponsor-debit, prepared-resume and blockhash-expiry review found no surviving findings",
     "filteredViewerRestored": true
   },
   "limitations": [
@@ -2615,7 +2634,7 @@
   "claimAiFollowup": {
     "reportedRevision": 30,
     "reportedAtBerlin": "2026-10-05 16:48–16:59",
-    "recordingCoordination": "VideoStory explicitly confirmed all hosted recording finished and authorized a governed release before this agent opened its resident diagnosis session.",
+    "recordingCoordination": "VideoStory explicitly authorized the revision31 window. That permission was revoked when long recording resumed; this agent closed its tab without signout and stayed off the hosted site. A fresh explicit exclusive window authorized revision32 and the ordered proofs. The proof tab was closed without shared signout and ownership returned to VideoStory afterward.",
     "claimBaseline": {
       "reported": "First reviewed and authorized claim submission returned409 without a receipt. A subsequent private read was unavailable; a later unsigned review explicitly failed with Simulation bank changed; request a fresh review.",
       "observedAt": "2026-10-05T15:04:47.898Z",
@@ -2641,7 +2660,7 @@
       "settledAtomic": "0",
       "diagnosis": "Revision30 recovered already-linked operations by reconciliation only. A prepared but unexecuted settlement could not resume after a presign failure and expired roughly two minutes after the answer arrived. The expired original is not replaced or charged anew."
     },
-    "localVerification": {
+    "revision31Verification": {
       "typescript": "passed",
       "lint": "passed",
       "testsPassed": 949,
@@ -2654,6 +2673,119 @@
       "simulationReviewedMinimumAtomic": "7761236",
       "simulationMatchedSlots": ["507775065", "507775067", "507775068", "507775071", "507775072"],
       "simulationBoundary": "Actual devnet gateway and exact claim instruction/delta builders, without private-key signing or broadcast. All original owner/mint/token/native-fee/sponsor bounds retained. This is not a claim receipt."
+    },
+    "revision31HostedRetest": {
+      "claimReviewedMinimumAtomic": "8349169",
+      "claimSubmissionStatus": 409,
+      "claimSubmissionCode": "invalid_operation",
+      "claimSubmissionError": "This review expired; prepare a new request ID.",
+      "claimSubmissionAt": "2026-10-05T15:46:48.009Z",
+      "claimDisplayedPolicyDeadline": "2026-10-05T15:48:04Z",
+      "nextUnsignedReviewError": "Simulation bank changed; request a fresh review",
+      "newClaimReceipt": null,
+      "interpretation": "The policy wall-clock deadline was not the blockhash lifetime, and separately sampled finalized banks could still differ despite concurrency. No successful claim is inferred from revision31."
+    },
+    "atomicFix": {
+      "simulationEvidence": "One finalized simulateTransaction response supplies pre/post native balances, pre/post token metadata, fee and post-account bytes. Cross-request bank matching and guessed fallback balances are removed.",
+      "refusalCoverage": "Exact debit/credit bounds; pre/post owner, mint, classic-token program and decimals; metadata cardinality/index/amount validity; post-account consistency and initialized/frozen state; unreviewed protected-owner losses; creation/closure permissions; user native debit; conservative sponsor debit plus fee ceiling.",
+      "expiry": "Original inclusive last-valid block height plus observed confirmed height/remaining blocks; canonical validity is checked before the wallet prompt. The independent maximum120-second server review policy is labelled separately, not as blockchain expiry. Signed absence still needs finalized height beyond lifetime and a fresh signature lookup.",
+      "recovery": "Action errors persist across successful refreshes. Linked unsigned AI settlement resumes only the same durable approved intent, with token-fenced signing leases; signed ambiguity and original byte identity remain protected.",
+      "testsPassed": 958,
+      "testsSkipped": 2,
+      "testsFailed": 0,
+      "typescriptLintDiffCheckProductionBuild": "passed",
+      "securityReview": "passed; no surviving findings",
+      "readOnlyAtomicClaimSimulationSlots": ["507789917", "507789917", "507789919", "507789919", "507789920"],
+      "readOnlyAtomicClaimMinimumAtomic": "9184082",
+      "livePod": "ledger-of-life-b6b7cfb8f-qxxzj",
+      "liveDigestVerified": true,
+      "recordingWindowExplicitlyAuthorized": true,
+      "filteredViewerRestored": true,
+      "rollbackRequired": false
+    },
+    "orderedHostedProofs": {
+      "revision": 32,
+      "actor": "resident",
+      "payer": "4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa",
+      "network": "solana-devnet",
+      "sequence": ["tiny-house-buy", "house-claim", "paid-ai-answer"],
+      "tinyHouseBuy": {
+        "reviewedAt": "2026-10-05T16:38:12.990Z",
+        "review": "Pay exactly0.001tUSDC to Neighbourhood Homes desk; receive0.001tHOME in the same resident wallet. Sponsored fees; test tokens and fictional units only.",
+        "cashAtomic": "1000",
+        "unitsAtomic": "1000",
+        "signature": "2n8zrEHYiDRcJWGY6pdK6v6vDw3RogPqJMbN1vKn8yjj2EtXGjC5PjLF9WvhWviVnxqfT1pVHCbPC2nYkP2Pnz5H",
+        "explorerUrl": "https://explorer.solana.com/tx/2n8zrEHYiDRcJWGY6pdK6v6vDw3RogPqJMbN1vKn8yjj2EtXGjC5PjLF9WvhWviVnxqfT1pVHCbPC2nYkP2Pnz5H?cluster=devnet",
+        "confirmationStatus": "finalized",
+        "slot": 507794323,
+        "residentCashDeltaAtomic": "-1000",
+        "houseDeskDeltaAtomic": "1000",
+        "residentUnitDeltaAtomic": "1000",
+        "observedApiStatus": 200,
+        "observedApiReceipt": "confirmed",
+        "regressionBoundary": "A previously working house-buy flow succeeded before claim and AI testing; no rollback was required."
+      },
+      "houseClaim": {
+        "reviewedAt": "2026-10-05T16:40:38.605Z",
+        "minimumReviewedAtomic": "9663986",
+        "minimumReviewedAmount": "9.663986 tUSDC",
+        "actualClaimAtomic": "9667600",
+        "actualClaimAmount": "9.667600 tUSDC",
+        "preSignConfirmedBlockHeight": "495038892",
+        "originalLastValidBlockHeight": "495039038",
+        "preSignBlockhashValid": true,
+        "signature": "4yyeAacs8mBRPiwZMjzisFQm5nGSPJxoBSm2rbWGhRVDM82cvUgKsaf8uFhKphUR91qu1nCjzbMU7n8tdjrQFxr",
+        "explorerUrl": "https://explorer.solana.com/tx/4yyeAacs8mBRPiwZMjzisFQm5nGSPJxoBSm2rbWGhRVDM82cvUgKsaf8uFhKphUR91qu1nCjzbMU7n8tdjrQFxr?cluster=devnet",
+        "confirmationStatus": "finalized",
+        "slot": 507794939,
+        "residentCashDeltaAtomic": "9667600",
+        "houseRewardVaultDeltaAtomic": "-9667600",
+        "observedAt": "2026-10-05T16:41:23.691Z",
+        "observedApiStatus": 200,
+        "observedApiReceipt": "confirmed",
+        "remainingClaimableAtomicAtRead": "14457",
+        "outcome": "Fresh revision32 claim review and authorization succeeded without another claim review or replacement intent."
+      },
+      "paidAiAnswer": {
+        "requestId": "5dc9abc9-3248-4fde-b4a3-800ee4a4a0b3",
+        "host": "Owner desktop GPU",
+        "model": "qwen3.8:27b-ud-q3-k-xl",
+        "synthetic": false,
+        "maximumApprovedAtomic": "12800",
+        "prompt": "Explain in one short sentence the difference between a token allowance and a settled payment.",
+        "answer": "A token allowance is a pre-authorized limit allowing a smart contract to spend a specific amount of your assets, whereas a settled payment is the final, irreversible transfer of those assets that has already occurred.",
+        "answerLabel": "Actual host-generated answer; AI-generated, check important facts.",
+        "inputTokens": 60,
+        "outputTokens": 41,
+        "inferenceWallMs": 33407,
+        "settledAtomic": "4100",
+        "settledAmount": "0.0041 tUSDC",
+        "approvalSignature": "3xvQYoEzsDCEE7HgDFyCZZ5bHCLPiiN8n59zof3dZZSz1EsDr3gnDuWV794DLjJAtsSpoRX2iZgifzvbkuGAxuy1",
+        "approvalExplorerUrl": "https://explorer.solana.com/tx/3xvQYoEzsDCEE7HgDFyCZZ5bHCLPiiN8n59zof3dZZSz1EsDr3gnDuWV794DLjJAtsSpoRX2iZgifzvbkuGAxuy1?cluster=devnet",
+        "approvalFinality": "finalized",
+        "approvalSlot": 507795510,
+        "approvalTokenDebitAtomic": "0",
+        "settlementSignature": "ULJZPaxrHEhZfLyp339p9dE6ABfAgZfi4PG9WfPQDgQ1LFWj2Snw94wZq6ibsh7RUaGKR59BGjhA2QR5ZqNCEAf",
+        "settlementExplorerUrl": "https://explorer.solana.com/tx/ULJZPaxrHEhZfLyp339p9dE6ABfAgZfi4PG9WfPQDgQ1LFWj2Snw94wZq6ibsh7RUaGKR59BGjhA2QR5ZqNCEAf?cluster=devnet",
+        "settlementFinality": "finalized",
+        "settlementSlot": 507795756,
+        "residentCashDeltaAtomic": "-4100",
+        "houseRewardVaultDeltaAtomic": "4100",
+        "authorizedAt": "2026-10-05T16:43:08.166Z",
+        "pickedUpAt": "2026-10-05T16:43:26.681Z",
+        "hostAwakeAt": "2026-10-05T16:43:53.271Z",
+        "answerReceivedAt": "2026-10-05T16:44:00.072Z",
+        "settledAt": "2026-10-05T16:44:04.103Z",
+        "observedApiStatus": 200,
+        "observedState": "completed",
+        "observedPaymentState": "settled",
+        "answerVisible": true,
+        "remainingDelegateAllowanceAtomic": "8700",
+        "remainingAllowanceObservedAt": "2026-10-05T16:46:47.492Z",
+        "allowanceBoundary": "0.0087tUSDC remained as a bounded delegate allowance, not another charge or automatic revocation; future approved questions can replace it only after prior settlement resolves."
+      },
+      "chainVerification": "Independent read-only devnet genesis, finalized signature status and transaction metadata checks; exact cash/unit deltas verified. Evidence stores selected public proof fields, not credentials or signed payloads.",
+      "sessionCleanup": "Proof tab closed without shared signout; hosted browser ownership explicitly returned to VideoStory, with finalized claim success reported for its final scene."
     }
   }
 }
