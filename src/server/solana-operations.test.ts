@@ -13,13 +13,14 @@ async function fixture(sponsorshipLimits: Partial<SponsorshipLimits> = {}) {
   const [actor, payer, stranger] = await Promise.all([generateKeyPairSigner(), generateKeyPairSigner(), generateKeyPairSigner()]);
   const store = new LocalStore(':memory:');
   const identity: VerifiedIdentity = { subject: 'did:privy:operation', sessionId: 'session', expiresAt: 9999999999, passkeyCount: 1, wallets: [{ id: 'sol-wallet', chainType: 'solana', address: actor.address }] };
-  let height = 10n, lastValidBlockHeight = 100n, clock = 1000, simulationDebit = 20_000n;
+  let height = 10n, confirmedHeight = 10n, lastValidBlockHeight = 100n, clock = 1000, simulationDebit = 20_000n;
   let sponsorCalls = 0, broadcastError = false;
   let observation: SignatureReconciliation = { status: 'unknown', reason: 'signature-not-observed-do-not-resubmit-new-intent' };
   let nextObservation: SignatureReconciliation | null = null;
   const broadcasts: Uint8Array[] = [], simulations: Uint8Array[] = [];
   const gateway: SolanaOperationsGateway = {
     lifetime: async () => ({ blockhash: SOLANA_IDS.system, lastValidBlockHeight: lastValidBlockHeight.toString(), blockHeight: height.toString() }),
+    blockHeight: async commitment => (commitment === 'confirmed' ? confirmedHeight : height).toString(),
     simulate: async bytes => { simulations.push(bytes); return { slot: '10', sponsorDebitCeilingLamports: simulationDebit.toString(), networkFeeLamports: '10000' }; },
     broadcast: async bytes => { broadcasts.push(bytes); if (broadcastError) throw new Error('Ambiguous broadcast timeout'); return getBase58Decoder().decode(getTransactionDecoder().decode(bytes).signatures[payer.address]!); },
     reconcile: async () => { const current = observation; if (nextObservation) { observation = nextObservation; nextObservation = null; } return current; },
@@ -45,7 +46,8 @@ async function fixture(sponsorshipLimits: Partial<SponsorshipLimits> = {}) {
     },
     setBroadcastError: (value: boolean) => { broadcastError = value; },
     setLastValidHeight: (value: bigint) => { lastValidBlockHeight = value; },
-    setHeight: (value: bigint) => { height = value; }, setClock: (value: number) => { clock = value; }, setDebit: (value: bigint) => { simulationDebit = value; },
+    setHeight: (value: bigint) => { height = value; confirmedHeight = value; }, setConfirmedHeight: (value: bigint) => { confirmedHeight = value; },
+    setClock: (value: number) => { clock = value; }, setDebit: (value: bigint) => { simulationDebit = value; },
     setObservation: (value: SignatureReconciliation, next: SignatureReconciliation | null = null) => { observation = value; nextObservation = next; },
   };
 }
@@ -114,10 +116,10 @@ test('expiry requires finalized height beyond lifetime and a fresh missing-signa
   await f.store.close();
 });
 
-test('unsigned canonical expiry uses the original finalized block-height bound and never refreshes its envelope', async () => {
+test('unsigned canonical expiry uses the original confirmed block-height bound and never refreshes its envelope', async () => {
   const f = await fixture(), prepared = await f.operations.prepare(f.input);
   f.setLastValidHeight(200n);
-  f.setHeight(100n);
+  f.setConfirmedHeight(101n);
   assert.equal((await f.operations.reconcile({ identity: f.identity, id: prepared.id })).state, 'expired');
   const same = await f.operations.prepare(f.input);
   assert.equal(same.id, prepared.id);
@@ -129,14 +131,71 @@ test('unsigned canonical expiry uses the original finalized block-height bound a
   await f.store.close();
 });
 
-test('finalized-height expiry atomically fences an in-flight unsigned signer and releases only its unsent reservation', async () => {
+test('house lifetime metadata uses the original inclusive last-valid height and the actual confirmed tip', async () => {
+  const f = await fixture(), prepared = await f.operations.prepare(f.input);
+  assert.equal(prepared.lastValidBlockHeight, '100');
+  f.setLastValidHeight(200n);
+  f.setConfirmedHeight(100n);
+  const valid = await f.operations.reconcile({ id: prepared.id });
+  assert.equal(valid.state, 'prepared');
+  assert.equal(valid.blockHeight, '100');
+  assert.equal(valid.blockhashValid, true, 'the original last-valid block remains valid');
+  f.setConfirmedHeight(101n);
+  const expired = await f.operations.reconcile({ id: prepared.id });
+  assert.equal(expired.state, 'expired');
+  assert.equal(expired.blockHeight, '101');
+  assert.equal(expired.blockhashValid, false);
+  assert.equal((await f.operations.get(prepared.id)).lastValidBlockHeight, '100');
+  assert.equal((await f.operations.get(prepared.id)).transactionBase64, prepared.transactionBase64);
+  assert.equal(f.signerCalls(), 0);
+  await f.store.close();
+});
+
+test('house review-policy expiry is separate from observed blockhash validity and remains terminal', async () => {
+  const f = await fixture(), prepared = await f.operations.prepare(f.input);
+  f.setClock(121_001);
+  const policyExpired = await f.operations.reconcile({ id: prepared.id });
+  assert.equal(policyExpired.state, 'expired');
+  assert.equal(policyExpired.blockHeight, '10');
+  assert.equal(policyExpired.blockhashValid, true, 'a closed review does not imply an expired blockhash');
+  f.setConfirmedHeight(101n);
+  const observedAgain = await f.operations.reconcile({ id: prepared.id });
+  assert.equal(observedAgain.state, 'expired');
+  assert.equal(observedAgain.blockHeight, '101');
+  assert.equal(observedAgain.blockhashValid, false);
+  assert.equal((await f.operations.prepare(f.input)).transactionBase64, prepared.transactionBase64);
+  assert.equal(f.signerCalls(), 0);
+  assert.equal(f.broadcasts.length, 0);
+  await f.store.close();
+});
+
+test('confirmed tip expiry cannot release signed ambiguity before the finalized absence proof', async () => {
+  const f = await fixture({ globalDailyLamports: 20_000n }), prepared = await f.operations.prepare(f.input);
+  const submitted = await f.operations.submit({ identity: f.identity, id: prepared.id, signedTransactionBase64: await f.sign(prepared.transactionBase64) });
+  f.setConfirmedHeight(101n);
+  const stillAmbiguous = await f.createAgain().reconcile({ id: prepared.id });
+  assert.equal(stillAmbiguous.state, 'broadcast');
+  assert.equal(stillAmbiguous.signature, submitted.signature);
+  assert.equal(stillAmbiguous.blockHeight, undefined);
+  assert.equal(stillAmbiguous.blockhashValid, undefined);
+  assert.equal((await f.readLedger())[prepared.id].state, 'reserved');
+  assert.equal(f.signerCalls(), 1);
+  f.setHeight(101n);
+  const provenAbsent = await f.operations.reconcile({ id: prepared.id });
+  assert.equal(provenAbsent.state, 'expired');
+  assert.deepEqual(await f.readLedger(), {});
+  assert.equal(f.signerCalls(), 1);
+  await f.store.close();
+});
+
+test('confirmed-height expiry atomically fences an in-flight unsigned signer and releases only its unsent reservation', async () => {
   const f = await fixture({ globalDailyLamports: 20_000n }), prepared = await f.operations.prepare(f.input);
   const started = Promise.withResolvers<void>(), release = Promise.withResolvers<void>(), originalSign = f.sponsor.sign;
   f.sponsor.sign = async bytes => { started.resolve(); await release.promise; return originalSign(bytes); };
   const submission = f.operations.submit({ identity: f.identity, id: prepared.id, signedTransactionBase64: await f.sign(prepared.transactionBase64) });
   await started.promise;
   assert.equal((await f.readLedger())[prepared.id].state, 'reserved');
-  f.setHeight(100n);
+  f.setConfirmedHeight(101n);
   assert.equal((await f.operations.reconcile({ id: prepared.id })).state, 'expired');
   assert.deepEqual(await f.readLedger(), {});
   release.resolve();
@@ -147,10 +206,10 @@ test('finalized-height expiry atomically fences an in-flight unsigned signer and
 });
 
 test('submission expiry is durably terminal before returning a fresh-review error', async t => {
-  for (const bound of ['clock', 'finalized height']) await t.test(bound, async () => {
+  for (const bound of ['clock', 'confirmed height']) await t.test(bound, async () => {
     const f = await fixture(), prepared = await f.operations.prepare(f.input), signedTransactionBase64 = await f.sign(prepared.transactionBase64);
     if (bound === 'clock') f.setClock(121_001);
-    else { f.setLastValidHeight(200n); f.setHeight(100n); }
+    else { f.setLastValidHeight(200n); f.setConfirmedHeight(101n); }
     await assert.rejects(f.operations.submit({ identity: f.identity, id: prepared.id, signedTransactionBase64 }), /review expired/);
     assert.equal((await f.operations.get(prepared.id)).state, 'expired');
     assert.equal((await f.operations.get(prepared.id)).signature, undefined);

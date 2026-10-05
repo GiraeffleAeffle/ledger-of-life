@@ -8,9 +8,9 @@ import { configuredFeeSponsor, SolanaServiceError, type FeeSponsor } from './sol
 import type { Store } from './store.ts';
 
 export type SolanaOperationState = 'prepared' | 'broadcast' | 'confirmed' | 'failed' | 'expired';
-export type PreparedSolanaOperation = { id: string; kind: string; walletId: string; feePayer: string; transactionBase64: string; expiresAt: string; review: Record<string, unknown> };
-export type SolanaOperationResult = { id: string; state: SolanaOperationState; signature?: string; error?: string };
-export type SolanaOperationsGateway = Pick<SolanaGateway, 'lifetime' | 'simulate' | 'broadcast' | 'reconcile'>;
+export type PreparedSolanaOperation = { id: string; kind: string; walletId: string; feePayer: string; transactionBase64: string; expiresAt: string; lastValidBlockHeight: string; review: Record<string, unknown> };
+export type SolanaOperationResult = { id: string; state: SolanaOperationState; signature?: string; error?: string; blockHeight?: string; blockhashValid?: boolean };
+export type SolanaOperationsGateway = Pick<SolanaGateway, 'lifetime' | 'blockHeight' | 'simulate' | 'broadcast' | 'reconcile'>;
 export type SponsorshipLimits = { subjectRollingLamports: bigint; subjectRollingTransactions: number; globalDailyLamports: bigint };
 export const DEFAULT_SPONSORSHIP_LIMITS: SponsorshipLimits = { subjectRollingLamports: 50_000_000n, subjectRollingTransactions: 60, globalDailyLamports: 1_500_000_000n };
 export type SolanaOperationsConfig = { cluster: 'devnet' | 'localnet'; genesisHash: string; maximumSponsorLamports: bigint; sponsorshipLimits?: Partial<SponsorshipLimits> };
@@ -25,7 +25,7 @@ export type SolanaOperations = {
   cancel(input: { identity: VerifiedIdentity; id: string }): Promise<SolanaOperationResult>;
   get(id: string, identity?: VerifiedIdentity): Promise<PreparedSolanaOperation & SolanaOperationResult>;
 };
-type RecordOperation = PreparedSolanaOperation & { subject: string; sponsorshipSubject?: string | null; actor: string; fingerprint: string; messageSha256: string; lastValidBlockHeight: string; expectedDeltas: ExpectedTokenDelta[]; state: SolanaOperationState; signature?: string; signedTransactionBase64?: string; error?: string; signingLease?: { ownerToken: string; expiresAt: number } };
+type RecordOperation = PreparedSolanaOperation & { subject: string; sponsorshipSubject?: string | null; actor: string; fingerprint: string; messageSha256: string; expectedDeltas: ExpectedTokenDelta[]; state: SolanaOperationState; signature?: string; signedTransactionBase64?: string; error?: string; signingLease?: { ownerToken: string; expiresAt: number } };
 type SponsorshipReservation = { amountLamports: string; subject: string | null; reservedAt: number; chargedAt?: number; state: 'reserved' | 'charged'; ownerToken: string };
 type SponsorshipLedger = { reservations: Record<string, SponsorshipReservation> };
 const SIGNING_LEASE_MS = 30_000;
@@ -37,7 +37,7 @@ function signingKey(wallet: string) {
   return createPublicKey({ key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), Buffer.from(getAddressEncoder().encode(address(wallet)))]), format: 'der', type: 'spki' });
 }
 function publicPrepared(op: RecordOperation): PreparedSolanaOperation {
-  return { id: op.id, kind: op.kind, walletId: op.walletId, feePayer: op.feePayer, transactionBase64: op.transactionBase64, expiresAt: op.expiresAt, review: op.review };
+  return { id: op.id, kind: op.kind, walletId: op.walletId, feePayer: op.feePayer, transactionBase64: op.transactionBase64, expiresAt: op.expiresAt, lastValidBlockHeight: op.lastValidBlockHeight, review: op.review };
 }
 function result(op: RecordOperation): SolanaOperationResult { return { id: op.id, state: op.state, ...(op.signature ? { signature: op.signature } : {}), ...(op.error ? { error: op.error } : {}) }; }
 
@@ -174,13 +174,22 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
     }
     return publicPrepared(op);
   }
+  async function unsignedLifetime(op: RecordOperation): Promise<{ expired: boolean; observation?: { blockHeight: string; blockhashValid: boolean } }> {
+    if (op.kind.startsWith('house:')) {
+      const blockHeight = await gateway.blockHeight('confirmed');
+      const blockhashValid = BigInt(blockHeight) <= BigInt(op.lastValidBlockHeight);
+      return { expired: now() >= Date.parse(op.expiresAt) || !blockhashValid, observation: { blockHeight, blockhashValid } };
+    }
+    return { expired: now() >= Date.parse(op.expiresAt) ||
+      BigInt((await gateway.lifetime()).blockHeight) >= BigInt(op.lastValidBlockHeight) };
+  }
   async function reconcile(input: { identity?: VerifiedIdentity; id: string }): Promise<SolanaOperationResult> {
     let op = await load(input.id, input.identity);
-    if (op.state === 'prepared') {
-      const expired = now() >= Date.parse(op.expiresAt) ||
-        BigInt((await gateway.lifetime()).blockHeight) >= BigInt(op.lastValidBlockHeight);
-      if (expired) op = await expireUnsigned(op);
-      return result(op);
+    if (op.state === 'prepared' || (op.state === 'expired' && !op.signature && op.kind.startsWith('house:'))) {
+      const lifetime = await unsignedLifetime(op);
+      if (op.state === 'prepared' && lifetime.expired) op = await expireUnsigned(op);
+      else if (op.state === 'expired') await settleBudget(op);
+      return { ...result(op), ...lifetime.observation };
     }
     if (op.state !== 'broadcast' || !op.signature || !op.signedTransactionBase64) { await settleBudget(op); return result(op); }
     try {
@@ -293,7 +302,7 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
     submit: async (input: { identity: VerifiedIdentity; id: string; signedTransactionBase64: string }): Promise<SolanaOperationResult & { signature: string }> => {
       const op = await load(input.id, input.identity);
       if (op.state !== 'prepared') { const next = await reconcile(input); if (!next.signature) fail('This review expired; prepare a new request ID.'); return { ...next, signature: next.signature }; }
-      if (now() >= Date.parse(op.expiresAt) || BigInt((await gateway.lifetime()).blockHeight) >= BigInt(op.lastValidBlockHeight)) {
+      if ((await unsignedLifetime(op)).expired) {
         const expired = await expireUnsigned(op);
         if (expired.signature) return { ...await reconcile(input), signature: expired.signature };
         fail('This review expired; prepare a fresh review.');
@@ -311,7 +320,7 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
       const prepared = await prepareAsSponsor(input);
       const op = await load(prepared.id);
       if (op.state !== 'prepared') { const next = await reconcile({ id: op.id }); if (!next.signature) fail('Server operation expired; use a fresh request ID.'); return { ...next, signature: next.signature }; }
-      if (now() >= Date.parse(op.expiresAt) || BigInt((await gateway.lifetime()).blockHeight) >= BigInt(op.lastValidBlockHeight)) {
+      if ((await unsignedLifetime(op)).expired) {
         const expired = await expireUnsigned(op);
         if (expired.signature) return { ...await reconcile({ id: op.id }), signature: expired.signature };
         fail('Server operation lifetime expired.');

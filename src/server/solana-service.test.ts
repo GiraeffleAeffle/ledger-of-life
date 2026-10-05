@@ -156,6 +156,7 @@ async function fixture() {
   };
   const gateway: SolanaGateway = {
     snapshot: async () => structuredClone(snapshot),
+    blockHeight: async () => state.blockHeight,
     lifetime: async () => {
       if (state.lifetimeUnavailable) throw new Error('RPC height unavailable');
       return { blockhash: key(30), lastValidBlockHeight: '150', blockHeight: state.blockHeight };
@@ -1063,64 +1064,41 @@ test('program code hash, loader, length and upgrade authority are verified', asy
     await f.store.close();
   }
 });
-test('RPC simulation applies sponsor rent debit and fee together and refuses changed banks', async () => {
+test('RPC simulation atomically applies sponsor rent debit and fee without cross-bank reads', async () => {
   const f = await fixture();
   try {
     const op = await f.service.prepare(f.identity, 'request_0001', { kind: 'fund' });
     const payer = f.sponsor.address;
-    let bank = 50;
-    let simulatedSlots: number[] = [];
-    let rentDebit = 100000;
+    const bytes = new Uint8Array(Buffer.from(op.transactionBase64, 'base64'));
+    const message = getCompiledTransactionMessageDecoder().decode(getTransactionDecoder().decode(bytes).messageBytes);
+    let bank = 50, rentDebit = 100000, completeEvidence = true;
+    const calls: string[] = [];
     const fetcher = (async (_url: unknown, options?: RequestInit) => {
       const body = JSON.parse(String(options?.body));
-      let result: unknown;
-      if (body.method === 'getMultipleAccounts')
-        result = {
-          context: { slot: 50 },
-          value: body.params[0].map(() => ({
-            owner: SOLANA_IDS.system,
-            lamports: 1000000000,
-            executable: false,
-            data: ['', 'base64'],
-          })),
-        };
-      else if (body.method === 'simulateTransaction')
-        result = {
-          context: { slot: simulatedSlots.shift() ?? bank },
-          value: {
-            err: null,
-            accounts: body.params[1].accounts.addresses.map((key: string) => ({
-              owner: SOLANA_IDS.system,
-              lamports: key === payer ? 1000000000 - rentDebit : 1000000000,
-              executable: false,
-              data: ['', 'base64'],
-            })),
-          },
-        };
-      else if (body.method === 'getFeeForMessage') result = { context: { slot: 50 }, value: 10000 };
-      else throw new Error('Unexpected RPC method');
-      return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }));
+      calls.push(body.method);
+      assert.equal(body.method, 'simulateTransaction');
+      const result = { context: { slot: bank }, value: {
+        err: null,
+        accounts: body.params[1].accounts.addresses.map((key: string) => ({
+          owner: SOLANA_IDS.system, lamports: key === payer ? 1000000000 - rentDebit : 1000000000,
+          executable: false, data: ['', 'base64'],
+        })),
+        preBalances: completeEvidence ? message.staticAccounts.map(() => 1000000000) : undefined,
+        postBalances: message.staticAccounts.map(key => key === payer ? 1000000000 - rentDebit : 1000000000),
+        preTokenBalances: [], postTokenBalances: [], fee: 10000,
+      } };
+      return Response.json({ jsonrpc: '2.0', id: 1, result });
     }) as typeof fetch;
     const gateway = new RpcSolanaGateway(f.config, fetcher);
-    const bytes = new Uint8Array(Buffer.from(op.transactionBase64, 'base64'));
     await assert.rejects(gateway.simulate(bytes, payer, f.tenant.address), /fee and rent/);
     rentDebit = 0;
-    assert.equal(
-      (await gateway.simulate(bytes, payer, f.tenant.address)).sponsorDebitCeilingLamports,
-      '10000',
-    );
+    assert.equal((await gateway.simulate(bytes, payer, f.tenant.address)).sponsorDebitCeilingLamports, '10000');
     bank = 51;
-    await assert.rejects(gateway.simulate(bytes, payer, f.tenant.address), /bank changed/);
-    bank = 50;
-    simulatedSlots = [51, 50];
-    assert.equal(
-      (await gateway.simulate(bytes, payer, f.tenant.address)).sponsorDebitCeilingLamports,
-      '10000',
-    );
-    assert.deepEqual(simulatedSlots, []);
-  } finally {
-    await f.store.close();
-  }
+    assert.equal((await gateway.simulate(bytes, payer, f.tenant.address)).slot, '51');
+    completeEvidence = false;
+    await assert.rejects(gateway.simulate(bytes, payer, f.tenant.address), /Atomic simulation native balances unavailable/);
+    assert.deepEqual(calls, Array(4).fill('simulateTransaction'));
+  } finally { await f.store.close(); }
 });
 
 for (const kind of ['fund', 'fund_and_supply'] as const) {

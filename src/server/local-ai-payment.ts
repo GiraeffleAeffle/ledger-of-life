@@ -507,7 +507,8 @@ const settlementServiceCodes: Record<string, true> = {
   sponsor_limit: true, sponsor_reservation: true, sponsor_subject_budget: true, sponsor_global_budget: true,
 };
 const settlementErrorCodes: Record<string, string> = {
-  'Simulation bank changed; request a fresh review': 'simulation_bank_changed',
+  'Atomic simulation native balances unavailable': 'simulation_evidence_unavailable',
+  'Atomic simulation token balances unavailable': 'simulation_evidence_unavailable',
   'Exact transaction simulation failed': 'simulation_failed',
   'Wrong simulated token owner or mint': 'simulation_token_owner',
   'Missing simulated token balance': 'simulation_balance_missing',

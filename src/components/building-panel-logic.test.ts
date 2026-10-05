@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildingActionState, estimateBuildingHeat, projectedBuildingEarnings, solanaHouseActionState } from './building-panel-logic.ts';
+import { buildingActionState, estimateBuildingHeat, projectedBuildingEarnings, solanaHouseActionState, solanaHouseBlockhashStatus, solanaHouseSigningBlocker } from './building-panel-logic.ts';
 
 test('measured token energy takes precedence over nominal runtime', () => {
   assert.deepEqual(estimateBuildingHeat({ tokens: 1000, measuredWhPerToken: 0.2, runtimeMs: 3_600_000, nominalWatts: 300 }), { kwh: 0.2, assumption: '1000 served tokens × 0.2 measured Wh/token', method: 'tokens' });
@@ -83,4 +83,31 @@ test('Solana claim and one-signature reinvest need verified income, never approv
   assert.equal(solanaHouseActionState({ ...solanaReady, connected: false }), 'Connect your Solana wallet in Me');
   assert.equal(solanaHouseActionState({ ...solanaReady, configured: false }), 'Wait for the verified Solana house');
   assert.equal(solanaHouseActionState({ ...solanaReady, busy: true }), 'Finish the current house review or transaction first');
+});
+
+test('house wallet prompts are blocked by canonical terminal or ambiguous states, not inferred from balances', () => {
+  assert.match(solanaHouseSigningBlocker({ state: 'prepared' })!, /validity could not be verified.*No wallet prompt/);
+  assert.match(solanaHouseSigningBlocker({ state: 'prepared', blockhashValid: false })!, /validity could not be verified/);
+  assert.equal(solanaHouseSigningBlocker({ state: 'prepared', blockhashValid: true }), null);
+  assert.match(solanaHouseSigningBlocker({ state: 'expired', blockhashValid: false })!, /network blockhash expired/);
+  assert.match(solanaHouseSigningBlocker({ state: 'expired', blockhashValid: false })!, /No transaction was sent.*Prepare a fresh review/);
+  const policyEnded = solanaHouseSigningBlocker({ state: 'expired', blockhashValid: true })!;
+  assert.match(policyEnded, /server review-policy deadline ended/); assert.doesNotMatch(policyEnded, /network blockhash expired/);
+  assert.match(solanaHouseSigningBlocker({ state: 'expired', signature: 'original-signed-transaction' })!, /did not land before expiry/);
+  assert.match(solanaHouseSigningBlocker({ state: 'broadcast', signature: 'original-signed-transaction' })!, /Continue checking.*instead of signing a replacement/);
+  assert.match(solanaHouseSigningBlocker({ state: 'failed', signature: 'original-signed-transaction' })!, /no successful payout receipt.*Prepare a fresh review/);
+  assert.match(solanaHouseSigningBlocker({ state: 'confirmed', signature: 'original-signed-transaction' })!, /verified finalized receipt.*do not sign it again/);
+});
+
+test('house network countdown uses observed confirmed heights and includes the last valid height', () => {
+  assert.match(solanaHouseBlockhashStatus({ lastValidBlockHeight: '100', blockHeight: '90', blockhashValid: true }), /11 valid block heights remaining/);
+  const lastValid = solanaHouseBlockhashStatus({ lastValidBlockHeight: '100', blockHeight: '100', blockhashValid: true });
+  assert.match(lastValid, /valid at confirmed height 100.*1 valid block heights remaining/);
+  assert.doesNotMatch(lastValid, /seconds|minutes|120/);
+  assert.match(solanaHouseBlockhashStatus({ lastValidBlockHeight: '100', blockHeight: '101', blockhashValid: false }), /expired.*height 101.*last valid height 100/);
+});
+
+test('missing canonical height or validity never invents a blockchain expiry time', () => {
+  for (const input of [{ lastValidBlockHeight: '100' }, { lastValidBlockHeight: '100', blockHeight: '90' }, { lastValidBlockHeight: '100', blockHeight: 'invalid', blockhashValid: true }])
+    assert.match(solanaHouseBlockhashStatus(input), /has not been verified yet.*before a wallet prompt/);
 });

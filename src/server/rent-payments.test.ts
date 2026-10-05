@@ -227,7 +227,7 @@ test('Solana rent has exactly memo, sponsored landlord ATA, checked landlord tra
 });
 test('Solana rent is one user signature, sponsored, reserved across lost responses, paid once per Berlin month and readable by landlord',async()=>{
   const f=await solanaFixture(),store=new LocalStore(':memory:');let now=Date.parse('2026-10-31T21:59:59Z'),finalized=false,sends=0;
-  const gateway={lifetime:async()=>({blockhash:'11111111111111111111111111111111',lastValidBlockHeight:'200',blockHeight:'100'}),simulate:async()=>({slot:'1',sponsorDebitCeilingLamports:'3000000',networkFeeLamports:'10000'}),broadcast:async(bytes:Uint8Array)=>{sends++;return getBase58Decoder().decode(getTransactionDecoder().decode(bytes).signatures[f.payer.address]!);},reconcile:async(signature:string)=>finalized?{status:'finalized' as const,signature,slot:'1',deltas:[]}:{status:'unknown' as const,reason:'signature-not-observed-do-not-resubmit-new-intent'}};
+  const gateway={lifetime:async()=>({blockhash:'11111111111111111111111111111111',lastValidBlockHeight:'200',blockHeight:'100'}),blockHeight:async()=>'100',simulate:async()=>({slot:'1',sponsorDebitCeilingLamports:'3000000',networkFeeLamports:'10000'}),broadcast:async(bytes:Uint8Array)=>{sends++;return getBase58Decoder().decode(getTransactionDecoder().decode(bytes).signatures[f.payer.address]!);},reconcile:async(signature:string)=>finalized?{status:'finalized' as const,signature,slot:'1',deltas:[]}:{status:'unknown' as const,reason:'signature-not-observed-do-not-resubmit-new-intent'}};
   const sponsor={address:f.payer.address,sign:async(bytes:Uint8Array)=>new Uint8Array(getTransactionEncoder().encode(await partiallySignTransaction([f.payer.keyPair],getTransactionDecoder().decode(bytes))))};
   const operations=createSolanaOperations({store,gateway,sponsor,config:{cluster:'devnet',genesisHash:f.manifest.genesisHash,maximumSponsorLamports:10_000_000n},now:()=>now});
   const options={houseManifest:f.manifest,solana:{operations,sponsor},now:()=>now,readJourney:(async()=>({stage:'living',chain:{phase:'active'}} as TenancyJourney)) as typeof tenancyJourney};
@@ -259,6 +259,7 @@ test('Solana rent expiry refreshes unsigned reviews, reserves missing signatures
   const f=await solanaFixture(),store=new LocalStore(':memory:');let now=Date.parse('2026-10-04T12:00:00Z'),height='100',receipt:'missing'|'bad'='missing',lookupCount=0,sends=0,short=false;
   const gateway={
     lifetime:async()=>({blockhash:'11111111111111111111111111111111',lastValidBlockHeight:'200',blockHeight:height}),
+    blockHeight:async()=>height,
     simulate:async()=>{if(short)throw new Error('Exact transaction simulation failed');return{slot:'1',sponsorDebitCeilingLamports:'3000000',networkFeeLamports:'10000'};},
     broadcast:async(bytes:Uint8Array)=>{sends++;return getBase58Decoder().decode(getTransactionDecoder().decode(bytes).signatures[f.payer.address]!);},
     reconcile:async()=>{lookupCount++;return receipt==='bad'?{status:'failed' as const,reason:'receipt-does-not-match-authorized-message'}:{status:'unknown' as const,reason:'signature-not-observed-do-not-resubmit-new-intent'};},

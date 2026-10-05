@@ -60,6 +60,7 @@ export type SolanaAccountSnapshot = {
 };
 export type SolanaGateway = {
   snapshot(): Promise<SolanaSnapshot>;
+  blockHeight(commitment: 'confirmed' | 'finalized'): Promise<string>;
   lifetime(): Promise<{ blockhash: string; lastValidBlockHeight: string; blockHeight: string }>;
   simulate(bytes: Uint8Array, sponsor: string, actor: string, expectedDeltas?: readonly ExpectedTokenDelta[]): Promise<SolanaSimulation>;
   broadcast(bytes: Uint8Array): Promise<string>;
@@ -107,6 +108,24 @@ function account(key: string, value: unknown): AccountObservation & { lamports: 
     data: bytes(row.data),
     lamports: numeric(row.lamports),
   };
+}
+
+type SimulatedTokenBalance = { mint: string; authority: string; programId: string; amountAtomic: string; decimals: number };
+function simulatedTokens(value: unknown, accountCount: number) {
+  if (!Array.isArray(value)) throw new Error('Atomic simulation token balances unavailable');
+  const balances = new Map<number, SimulatedTokenBalance>();
+  for (const entry of value) {
+    const row = object(entry), amount = object(row.uiTokenAmount);
+    if (!Number.isSafeInteger(row.accountIndex) || Number(row.accountIndex) < 0 || Number(row.accountIndex) >= accountCount ||
+        balances.has(Number(row.accountIndex)) || typeof row.mint !== 'string' || typeof row.owner !== 'string' ||
+        typeof row.programId !== 'string' || typeof amount.amount !== 'string' ||
+        !Number.isInteger(amount.decimals) || Number(amount.decimals) < 0 || Number(amount.decimals) > 255)
+      throw new Error('Invalid atomic simulation token balance');
+    address(row.mint); address(row.owner); address(row.programId); atomic(amount.amount);
+    balances.set(Number(row.accountIndex), { mint: row.mint, authority: row.owner, programId: row.programId,
+      amountAtomic: amount.amount, decimals: Number(amount.decimals) });
+  }
+  return balances;
 }
 
 export function solanaConfiguration(
@@ -247,6 +266,10 @@ export class BaseSolanaGateway {
       throw new Error('RPC genesis mismatch');
     return String(genesis);
   }
+  async blockHeight(commitment: 'confirmed' | 'finalized'): Promise<string> {
+    await this.checkedGenesis();
+    return numeric(await this.rpc('getBlockHeight', [{ commitment }]));
+  }
   async multiple(keys: readonly string[]): Promise<SolanaAccountSnapshot> {
     const result = object(
       await this.rpc('getMultipleAccounts', [
@@ -285,130 +308,98 @@ export class BaseSolanaGateway {
   ): Promise<SolanaSimulation> {
     const decoded = getTransactionDecoder().decode(transactionBytes);
     const message = getCompiledTransactionMessageDecoder().decode(decoded.messageBytes);
-    if (
-      message.version !== 0 ||
-      (message.addressTableLookups?.length ?? 0) > 0 ||
-      message.staticAccounts[0] !== sponsor
-    )
+    if (message.version !== 0 || (message.addressTableLookups?.length ?? 0) > 0 || message.staticAccounts[0] !== sponsor ||
+        message.header.numSignerAccounts < 1 || message.header.numReadonlySignerAccounts >= message.header.numSignerAccounts)
       throw new Error('Unexpected transaction structure');
     const keys = message.staticAccounts.filter((_, index) =>
       index < message.header.numSignerAccounts
         ? index < message.header.numSignerAccounts - message.header.numReadonlySignerAccounts
         : index < message.staticAccounts.length - message.header.numReadonlyNonSignerAccounts,
     );
-    // Start both finalized reads together: waiting for the account response before
-    // starting simulation adds a full network round trip in which the bank can advance.
-    // Concurrency is not a consistency guarantee; accept only identical bank slots.
-    // A load-balanced RPC can serve adjacent finalized roots. Keep at most three
-    // samples per side so an exact matching bank is not discarded between attempts.
-    const snapshots = new Map<string, SolanaAccountSnapshot>();
-    const simulations = new Map<string, Record<string, unknown>>();
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const [sample, simulated] = await Promise.all([
-        this.multiple(keys),
-        this.rpc('simulateTransaction', [
-          Buffer.from(transactionBytes).toString('base64'),
-          {
-            encoding: 'base64',
-            sigVerify: false,
-            replaceRecentBlockhash: false,
-            commitment: 'finalized',
-            accounts: { encoding: 'base64', addresses: keys },
-          },
-        ]),
-      ]);
-      const observed = object(simulated);
-      const observedSlot = numeric(object(observed.context).slot);
-      snapshots.set(sample.slot, sample);
-      simulations.set(observedSlot, observed);
-      const before = snapshots.get(observedSlot) ?? sample;
-      const result = before.slot === observedSlot ? observed : simulations.get(before.slot);
-      if (!result) {
-        if (attempt < 2) continue;
-        throw new Error('Simulation bank changed; request a fresh review');
-      }
-      const slot = numeric(object(result.context).slot);
-      if (slot !== before.slot) throw new Error('Simulation bank changed; request a fresh review');
-      const value = object(result.value);
-      if (
-        value.err !== null ||
-        !Array.isArray(value.accounts) ||
-        value.accounts.length !== keys.length
-      )
-        throw new Error('Exact transaction simulation failed');
-      const payerIndex = keys.indexOf(address(sponsor));
-      const pre = before.accounts[payerIndex],
-        post =
-          value.accounts[payerIndex] === null ? null : account(sponsor, value.accounts[payerIndex]);
-      if (!pre || !post) throw new Error('Sponsor simulation unavailable');
-      const debit =
-        atomic(pre.lamports) > atomic(post.lamports)
-          ? atomic(pre.lamports) - atomic(post.lamports)
-          : 0n;
-      // Sponsor-run permissionless actions (pull-v2 payouts) have no separate user to protect.
-      const actorIndex = actor === sponsor ? -1 : keys.indexOf(address(actor));
-      if (actorIndex >= 0) {
-        const original = before.accounts[actorIndex];
-        const final =
-          value.accounts[actorIndex] === null ? null : account(actor, value.accounts[actorIndex]);
-        if (original && (!final || atomic(final.lamports) < atomic(original.lamports)))
-          throw new Error('The user would pay native fees');
-      }
-      if (expectedDeltas !== undefined) {
-        if (new Set(expectedDeltas.map(delta => delta.account)).size !== expectedDeltas.length)
-          throw new Error('Duplicate simulated token expectation');
-        const expectedAccounts = new Set(expectedDeltas.map(delta => delta.account));
-        const expectedOwners = new Set(expectedDeltas.map(delta => delta.owner));
-        for (const expected of expectedDeltas) {
-          const index = keys.indexOf(address(expected.account));
-          if (index < 0) throw new Error('Expected token account is not writable');
-          const original = before.accounts[index];
-          const final = value.accounts[index] === null ? null : account(expected.account, value.accounts[index]);
-          if ((!original && !expected.allowCreated) || (!final && !expected.allowClosed) || (!original && !final))
-            throw new Error('Missing simulated token balance');
-          const preToken = original ? decodeClassicTokenAccount(original) : null;
-          const postToken = final ? decodeClassicTokenAccount(final) : null;
-          for (const token of [preToken, postToken]) {
-            if (token && (token.mint !== expected.mint || token.authority !== expected.owner || !token.initialized || token.frozen))
-              throw new Error('Wrong simulated token owner or mint');
-          }
-          const signed = (postToken ? atomic(postToken.amountAtomic) : 0n) - (preToken ? atomic(preToken.amountAtomic) : 0n);
-          const amount = expected.direction === 'debit' ? -signed : signed;
-          const minimum = atomic(expected.minimumAtomic), maximum = atomic(expected.maximumAtomic);
-          if (maximum < minimum || (expected.direction === 'unchanged' ? signed !== 0n : amount < minimum || amount > maximum))
-            throw new Error('Simulated token delta differs from review');
-        }
-        for (let index = 0; index < keys.length; index++) {
-          const original = before.accounts[index];
-          // Writable mints (82 bytes), e.g. house unit issuance, are not token balances.
-          if (!original || original.owner !== SOLANA_IDS.token || original.data.length !== 165 || expectedAccounts.has(keys[index])) continue;
-          const preToken = decodeClassicTokenAccount(original);
-          if (!expectedOwners.has(preToken.authority)) continue;
-          const final = value.accounts[index] === null ? null : account(keys[index], value.accounts[index]);
-          const postToken = final ? decodeClassicTokenAccount(final) : null;
-          if (!postToken || postToken.authority !== preToken.authority || postToken.mint !== preToken.mint || atomic(postToken.amountAtomic) < atomic(preToken.amountAtomic))
-            throw new Error('Unexpected simulated token loss');
-        }
-      }
-      const feeResult = object(
-        await this.rpc('getFeeForMessage', [
-          Buffer.from(decoded.messageBytes).toString('base64'),
-          { commitment: 'finalized' },
-        ]),
-      );
-      if (feeResult.value === null) throw new Error('Transaction fee unavailable');
-      const fee = atomic(numeric(feeResult.value));
-      // Deliberately conservative: includes fee even when the simulation already deducted it.
-      const ceiling = debit + fee;
-      if (ceiling > atomic(this.config.maximumSponsorLamports))
-        throw new Error('Sponsor fee and rent ceiling exceeded');
-      return {
-        slot,
-        sponsorDebitCeilingLamports: ceiling.toString(),
-        networkFeeLamports: fee.toString(),
-      };
+    // Modern simulation returns pre/post balances and the fee from this one bank.
+    // Never reconstruct deltas from a separately sampled RPC bank or missing fields.
+    const result = object(await this.rpc('simulateTransaction', [
+      Buffer.from(transactionBytes).toString('base64'),
+      { encoding: 'base64', sigVerify: false, replaceRecentBlockhash: false, commitment: 'finalized',
+        accounts: { encoding: 'base64', addresses: keys } },
+    ]));
+    const slot = numeric(object(result.context).slot), value = object(result.value);
+    if (value.err !== null || !Array.isArray(value.accounts) || value.accounts.length !== keys.length)
+      throw new Error('Exact transaction simulation failed');
+    if (!Array.isArray(value.preBalances) || !Array.isArray(value.postBalances) ||
+        value.preBalances.length !== message.staticAccounts.length || value.postBalances.length !== message.staticAccounts.length)
+      throw new Error('Atomic simulation native balances unavailable');
+    if (value.loadedAddresses != null) {
+      const loaded = object(value.loadedAddresses);
+      if (!Array.isArray(loaded.writable) || !Array.isArray(loaded.readonly) || loaded.writable.length || loaded.readonly.length)
+        throw new Error('Unexpected simulated lookup addresses');
     }
-    throw new Error('Simulation bank changed; request a fresh review');
+    const preNative = value.preBalances.map(item => atomic(numeric(item)));
+    const postNative = value.postBalances.map(item => atomic(numeric(item)));
+    const postAccounts = value.accounts.map((item, index) => {
+      const row = item === null ? null : account(keys[index], item);
+      const native = postNative[message.staticAccounts.indexOf(keys[index])];
+      if (row ? atomic(row.lamports) !== native : native !== 0n)
+        throw new Error('Simulated account and native balance disagree');
+      return row;
+    });
+    if (!postAccounts[0] || preNative[0] === 0n) throw new Error('Sponsor simulation unavailable');
+    const debit = preNative[0] > postNative[0] ? preNative[0] - postNative[0] : 0n;
+    const actorIndex = actor === sponsor ? -1 : message.staticAccounts.indexOf(address(actor));
+    if (actorIndex >= 0 && postNative[actorIndex] < preNative[actorIndex])
+      throw new Error('The user would pay native fees');
+    if (expectedDeltas !== undefined) {
+      const before = simulatedTokens(value.preTokenBalances, message.staticAccounts.length);
+      const after = simulatedTokens(value.postTokenBalances, message.staticAccounts.length);
+      if (new Set(expectedDeltas.map(delta => delta.account)).size !== expectedDeltas.length)
+        throw new Error('Duplicate simulated token expectation');
+      const expectedAccounts = new Set(expectedDeltas.map(delta => delta.account));
+      const expectedOwners = new Set(expectedDeltas.map(delta => delta.owner));
+      // Cross-check the atomic metadata against the actual post-simulation account bytes.
+      for (let index = 0; index < keys.length; index++) {
+        const row = postAccounts[index], balance = after.get(message.staticAccounts.indexOf(keys[index]));
+        if (row?.owner === SOLANA_IDS.token && row.data.length === 165) {
+          const token = decodeClassicTokenAccount(row);
+          if (!balance || balance.programId !== SOLANA_IDS.token || token.mint !== balance.mint ||
+              token.authority !== balance.authority || token.amountAtomic !== balance.amountAtomic ||
+              !token.initialized || token.frozen)
+            throw new Error('Wrong simulated token owner or mint');
+        } else if (balance) throw new Error('Simulated token account evidence disagrees');
+      }
+      for (const expected of expectedDeltas) {
+        const writableIndex = keys.indexOf(address(expected.account));
+        if (writableIndex < 0) throw new Error('Expected token account is not writable');
+        const index = message.staticAccounts.indexOf(address(expected.account));
+        const pre = before.get(index), post = after.get(index);
+        if ((!pre && !expected.allowCreated) || (!post && !expected.allowClosed) || (!pre && !post))
+          throw new Error('Missing simulated token balance');
+        for (const token of [pre, post]) {
+          if (token && (token.programId !== SOLANA_IDS.token || token.mint !== expected.mint || token.authority !== expected.owner))
+            throw new Error('Wrong simulated token owner or mint');
+        }
+        if (pre && post && pre.decimals !== post.decimals) throw new Error('Simulated token decimals changed');
+        if (!post && postAccounts[writableIndex] !== null) throw new Error('Missing simulated token balance');
+        if (!pre && preNative[index] !== 0n) throw new Error('Created simulated token account already existed');
+        const signed = (post ? atomic(post.amountAtomic) : 0n) - (pre ? atomic(pre.amountAtomic) : 0n);
+        const amount = expected.direction === 'debit' ? -signed : signed;
+        const minimum = atomic(expected.minimumAtomic), maximum = atomic(expected.maximumAtomic);
+        if (maximum < minimum || (expected.direction === 'unchanged' ? signed !== 0n : amount < minimum || amount > maximum))
+          throw new Error('Simulated token delta differs from review');
+      }
+      for (const [index, pre] of before) {
+        if (expectedAccounts.has(message.staticAccounts[index]) || !expectedOwners.has(pre.authority)) continue;
+        const post = after.get(index);
+        if (!post || post.programId !== pre.programId || post.authority !== pre.authority || post.mint !== pre.mint ||
+            post.decimals !== pre.decimals || atomic(post.amountAtomic) < atomic(pre.amountAtomic))
+          throw new Error('Unexpected simulated token loss');
+      }
+    }
+    if (value.fee === null || value.fee === undefined) throw new Error('Transaction fee unavailable');
+    const fee = atomic(numeric(value.fee));
+    // Keep the previous conservative ceiling: include the fee even when already debited.
+    const ceiling = debit + fee;
+    if (ceiling > atomic(this.config.maximumSponsorLamports)) throw new Error('Sponsor fee and rent ceiling exceeded');
+    return { slot, sponsorDebitCeilingLamports: ceiling.toString(), networkFeeLamports: fee.toString() };
   }
   async broadcast(transactionBytes: Uint8Array) {
     await this.checkedGenesis();

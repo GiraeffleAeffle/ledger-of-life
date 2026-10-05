@@ -32,7 +32,7 @@ async function fixture() {
   const calls: PrepareSolanaInput[] = [];
   const results = new Map<string, { id: string; state: 'prepared' | 'broadcast' | 'confirmed'; signature?: string }>();
   const operations: SolanaOperations = {
-    prepare: async input => { calls.push(input); const id = `plan-${calls.length}`; results.set(id, { id, state: 'prepared' }); return { id, kind: input.kind, walletId: input.walletId, feePayer: SHARES_PRICE_AUTHORITY, transactionBase64: 'dGVzdA==', expiresAt: new Date(Date.now() + 120000).toISOString(), review: input.review }; },
+    prepare: async input => { calls.push(input); const id = `plan-${calls.length}`; results.set(id, { id, state: 'prepared' }); return { id, kind: input.kind, walletId: input.walletId, feePayer: SHARES_PRICE_AUTHORITY, transactionBase64: 'dGVzdA==', expiresAt: new Date(Date.now() + 120000).toISOString(), lastValidBlockHeight: '200', review: input.review }; },
     submit: async ({ id }) => { results.set(id, { id, state: 'confirmed', signature: 'fixture-signature-not-chain-evidence' }); return { ...results.get(id)!, signature: 'fixture-signature-not-chain-evidence' }; },
     reconcile: async ({ id }) => results.get(id)!,
     cancel: async ({ id }) => ({ id, state: 'expired' }),

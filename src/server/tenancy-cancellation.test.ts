@@ -64,6 +64,7 @@ async function fixture(accepted = true) {
   const state = { exists: false, reads: 0 };
   const gateway: SolanaGateway = {
     async snapshot() { state.reads++; if (!state.exists) throw new EscrowAbsentError(); return snapshot; },
+    async blockHeight() { throw new Error('Cancellation must not read block height'); },
     async lifetime() { throw new Error('Cancellation must not prepare a transaction'); },
     async simulate() { throw new Error('Cancellation must not simulate'); },
     async broadcast() { throw new Error('Cancellation must not broadcast'); },

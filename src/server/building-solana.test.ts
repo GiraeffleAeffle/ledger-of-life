@@ -8,7 +8,7 @@ import { houseAddresses, HOUSE_DISCRIMINATORS, pendingOwed, positionAddress, typ
 import { SOLANA_DEVNET_MANIFEST, SOLANA_IDS, SOLANA_TEST_USDC_MINT } from '../finance/solana/manifest.ts';
 import type { AccountObservation } from '../finance/solana/observations.ts';
 import type { SolanaHouseManifest } from './solana-house-config.ts';
-import { assertSolanaHouseOperation, buildSolanaHouseAction, houseActionQuote, prepareSolanaHouseAction, readSolanaBuildingPosition, readSolanaHouseSnapshot, solanaHouseReadModel, submitSolanaHouseAction, type HouseReadGateway, type SolanaHouseSnapshot } from './building-solana.ts';
+import { assertSolanaHouseOperation, buildSolanaHouseAction, houseActionQuote, prepareSolanaHouseAction, readSolanaBuildingPosition, readSolanaHouseSnapshot, reconcileSolanaHouseAction, solanaHouseReadModel, submitSolanaHouseAction, type HouseReadGateway, type SolanaHouseSnapshot } from './building-solana.ts';
 import { BaseSolanaGateway } from './solana-rpc.ts';
 import { LocalStore } from './store.ts';
 import { SolanaServiceError } from './solana-service.ts';
@@ -78,7 +78,7 @@ async function lifecycleFixture(t: TestContext, overrides: Parameters<typeof fix
   const sponsorBytes = Buffer.concat([keys.privateKey.export({ format: 'der', type: 'pkcs8' }).subarray(-32), keys.publicKey.export({ format: 'der', type: 'spki' }).subarray(-32)]);
   const environment = { SOLANA_RPC_URL: 'http://127.0.0.1:1', SOLANA_HOUSE_MANIFEST: JSON.stringify(f.manifest), SOLANA_SPONSOR_KEYPAIR: JSON.stringify([...sponsorBytes]) };
   const identity: VerifiedIdentity = { subject: 'did:privy:house-claim', sessionId: 'fixture', expiresAt: 9999999999, passkeyCount: 1, wallets: [{ id: 'owner', chainType: 'solana', address: f.owner.address }] };
-  const state = { now: 1_000_000_000, height: 10n, lastValidHeight: 100n, blockhash: SOLANA_IDS.system as string, slot: '50', simulationError: null as Error | null, broadcastError: false, receipt: 'unknown' as 'unknown' | 'finalized' | 'failed', reads: [] as string[][], simulations: [] as { bytes: Uint8Array; expectedDeltas: readonly ExpectedTokenDelta[] }[], broadcasts: [] as Uint8Array[] };
+  const state = { now: 1_000_000_000, height: 10n, confirmedHeight: 10n, lastValidHeight: 100n, blockhash: SOLANA_IDS.system as string, slot: '50', simulationError: null as Error | null, broadcastError: false, receipt: 'unknown' as 'unknown' | 'finalized' | 'failed', reads: [] as string[][], simulations: [] as { bytes: Uint8Array; expectedDeltas: readonly ExpectedTokenDelta[] }[], broadcasts: [] as Uint8Array[] };
   t.mock.method(Date, 'now', () => state.now);
   t.mock.method(globalThis, 'fetch', async () => { throw new Error('A journal regression must not make a network request.'); });
   t.mock.method(BaseSolanaGateway.prototype, 'checkedGenesis', async () => f.manifest.genesisHash);
@@ -87,6 +87,7 @@ async function lifecycleFixture(t: TestContext, overrides: Parameters<typeof fix
     return { slot: state.slot, accounts: requested.map(key => f.accounts.get(key) ?? null) };
   });
   t.mock.method(BaseSolanaGateway.prototype, 'lifetime', async () => ({ blockhash: state.blockhash, lastValidBlockHeight: state.lastValidHeight.toString(), blockHeight: state.height.toString() }));
+  t.mock.method(BaseSolanaGateway.prototype, 'blockHeight', async (commitment: 'confirmed' | 'finalized') => (commitment === 'confirmed' ? state.confirmedHeight : state.height).toString());
   t.mock.method(BaseSolanaGateway.prototype, 'simulate', async (bytes: Uint8Array, _sponsor: string, _actor: string, expectedDeltas: readonly ExpectedTokenDelta[] = []) => {
     state.simulations.push({ bytes: Uint8Array.from(bytes), expectedDeltas });
     if (state.simulationError) throw state.simulationError;
@@ -319,16 +320,18 @@ test('expired unsigned claim stops being a signable plan and a fresh request can
   f.state.now += 120_001;
   const expired = await f.read();
   assert.equal(expired.plan, null); assert.deepEqual(expired.receipts, []); assert.equal(f.state.broadcasts.length, 0);
+  assert.equal(expired.activeOperation?.id, first.plan.id); assert.equal(expired.activeOperation?.state, 'expired');
   await assert.rejects(f.prepare('unsigned-expired'), /already finished or expired/);
   const next = await f.prepare('fresh-after-expiry');
   assert.notEqual(next.plan.id, first.plan.id); assert.equal(next.plan.review.claimRaw, first.plan.review.claimRaw);
 });
 
-test('unsigned claim expires at its original finalized block-height boundary without waiting for wall time', async t => {
+test('unsigned claim expires only after its original confirmed last-valid height without waiting for wall time', async t => {
   const f = await lifecycleFixture(t), first = await f.prepare('block-height-expired');
-  f.state.height = 100n; f.state.lastValidHeight = 200n; f.state.blockhash = f.owner.address;
+  f.state.height = 100n; f.state.confirmedHeight = 101n; f.state.lastValidHeight = 200n; f.state.blockhash = f.owner.address;
   const expired = await f.read();
   assert.equal(expired.plan, null); assert.deepEqual(expired.receipts, []); assert.equal(f.state.broadcasts.length, 0);
+  assert.equal(expired.activeOperation?.state, 'expired'); assert.equal(expired.activeOperation?.blockHeight, '101'); assert.equal(expired.activeOperation?.blockhashValid, false);
   await assert.rejects(f.prepare('block-height-expired'), /already finished or expired/);
   const next = await f.prepare('fresh-height-review');
   assert.notEqual(next.plan.id, first.plan.id); assert.notEqual(next.plan.transactionBase64, first.plan.transactionBase64);
@@ -344,4 +347,19 @@ test('failed landed claim preserves its failed receipt and permits a separately 
   assert.notEqual(next.plan.id, first.plan.id); assert.equal(next.plan.review.claimRaw, first.plan.review.claimRaw);
   const original = await f.store.get<{ state: string; signature: string }>(`solana-operation:${first.plan.id}`);
   assert.equal(original?.state, 'failed'); assert.equal(original?.signature, submitted.signature);
+});
+
+test('house pre-sign recovery reports actual inclusive blockhash validity without signing or changing the review', async t => {
+  const f = await lifecycleFixture(t), first = await f.prepare('pre-sign-check'), simulations = f.state.simulations.length;
+  assert.equal(first.plan.lastValidBlockHeight, '100');
+  f.state.confirmedHeight = 100n;
+  const valid = await reconcileSolanaHouseAction(f.store, f.identity, first.plan.id, f.environment);
+  assert.equal(valid.state, 'prepared'); assert.equal(valid.status, 'review'); assert.equal(valid.blockHeight, '100'); assert.equal(valid.blockhashValid, true);
+  assert.equal(f.state.simulations.length, simulations); assert.equal(f.state.broadcasts.length, 0);
+  f.state.confirmedHeight = 101n;
+  const expired = await reconcileSolanaHouseAction(f.store, f.identity, first.plan.id, f.environment);
+  assert.equal(expired.state, 'expired'); assert.equal(expired.blockhashValid, false); assert.equal(expired.signature, undefined);
+  assert.equal(f.state.simulations.length, simulations); assert.equal(f.state.broadcasts.length, 0);
+  const saved = await f.store.get<{ transactionBase64: string; review: unknown }>(`solana-operation:${first.plan.id}`);
+  assert.equal(saved?.transactionBase64, first.plan.transactionBase64); assert.deepEqual(saved?.review, first.plan.review);
 });

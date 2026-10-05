@@ -8,7 +8,7 @@ import type { ExpectedTokenDelta } from '../finance/solana/reconcile.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { walletFor } from './agreements.ts';
 import { createBaseSolanaGateway } from './solana-rpc.ts';
-import { configuredSolanaOperations, type PreparedSolanaOperation } from './solana-operations.ts';
+import { configuredSolanaOperations, type PreparedSolanaOperation, type SolanaOperationResult } from './solana-operations.ts';
 import { loadSolanaHouseManifest, type SolanaHouseManifest } from './solana-house-config.ts';
 import { SolanaServiceError } from './solana-service.ts';
 import type { Store } from './store.ts';
@@ -226,18 +226,20 @@ export async function readSolanaBuildingPosition(store: Store, identity: Verifie
   const wallet = walletFor(identity, 'solana'), snapshot = await readSolanaHouseSnapshot(manifest, id, readGateway(manifest, environment), wallet.address), lane = await journal(store, identity);
   const receipts: { planId: string; operation: string; quantityRaw: string | null; claimedRaw: string | null; hash: string; status: 'pending' | 'confirmed' | 'failed'; explorerUrl: string }[] = [];
   let plan: SolanaHousePlan | null = null;
+  let activeOperation: (SolanaOperationResult & { operation: SolanaHouseAction }) | null = null;
   if (lane.entries.length) {
     const { operations } = await actionContext(store, environment);
     for (const entry of lane.entries.filter(entry => entry.houseId === id)) {
       const prepared = await operations.get(entry.id, identity);
       assertSolanaHouseOperation(prepared, entry);
       const result = await operations.reconcile({ identity, id: entry.id });
+      if (entry.id === lane.active) activeOperation = { ...result, operation: entry.operation };
       if (entry.id === lane.active && result.state === 'prepared') plan = { ...prepared, review: entry.review };
       if (result.signature) receipts.push({ planId: entry.id, operation: entry.operation, quantityRaw: entry.quantityRaw, claimedRaw: null, hash: result.signature, status: result.state === 'confirmed' ? 'confirmed' : result.state === 'failed' || result.state === 'expired' ? 'failed' : 'pending', explorerUrl: `https://explorer.solana.com/tx/${result.signature}?cluster=devnet` });
     }
   }
   const earned = snapshot.position ? pendingOwed(snapshot.house, snapshot.position, snapshot.nowSeconds) : 0n;
-  return { configured: true, network: `solana-${manifest.cluster}`, unitDecimals: 6, houseId: id, account: wallet.address, distributor: manifest.houses[id].house, walletUnitsRaw: snapshot.walletUnits.toString(), walletUnits: formatUnits(snapshot.walletUnits, 6), stakedRaw: (snapshot.position?.staked ?? 0n).toString(), staked: formatUnits(snapshot.position?.staked ?? 0n, 6), earnedRaw: earned.toString(), earned: formatUnits(earned, 6), cashAtomic: snapshot.cash.toString(), allowanceRaw: '0', pendingRevenueRaw: (snapshot.house.undistributedScaled / HOUSE_SCALE).toString(), receipts, plan, observedAt: Number(snapshot.nowSeconds), observedSlot: snapshot.slot, observedChainTimestampRaw: snapshot.nowSeconds.toString() };
+  return { configured: true, network: `solana-${manifest.cluster}`, unitDecimals: 6, houseId: id, account: wallet.address, distributor: manifest.houses[id].house, walletUnitsRaw: snapshot.walletUnits.toString(), walletUnits: formatUnits(snapshot.walletUnits, 6), stakedRaw: (snapshot.position?.staked ?? 0n).toString(), staked: formatUnits(snapshot.position?.staked ?? 0n, 6), earnedRaw: earned.toString(), earned: formatUnits(earned, 6), cashAtomic: snapshot.cash.toString(), allowanceRaw: '0', pendingRevenueRaw: (snapshot.house.undistributedScaled / HOUSE_SCALE).toString(), receipts, plan, activeOperation, observedAt: Number(snapshot.nowSeconds), observedSlot: snapshot.slot, observedChainTimestampRaw: snapshot.nowSeconds.toString() };
 }
 export async function readSolanaLocalInvestments(identity: VerifiedIdentity, environment: Record<string, string | undefined> = process.env): Promise<LocalInvestmentView> {
   const manifest = loadSolanaHouseManifest(environment); if (!manifest) throw new Error('Solana house is not configured.');

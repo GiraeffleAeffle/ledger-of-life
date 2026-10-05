@@ -9,7 +9,8 @@ import { useSectionTabActive } from './section-tabs';
 import type { ReinvestView } from '../server/building-revenue-reinvest';
 import { Hero, StatusLine, Figures, Figure, MoreList, MoreRow } from './blocks';
 import type { SolanaHouseAction, SolanaHouseId, SolanaHousePlan } from '../server/building-solana';
-import { solanaHouseActionState } from './building-panel-logic';
+import { solanaHouseActionState, solanaHouseBlockhashStatus, solanaHouseSigningBlocker } from './building-panel-logic';
+import type { SolanaOperationResult } from '../server/solana-operations';
 import { usd } from './money-valuation';
 
 type Operation = 'approve' | 'stake' | 'unstake' | 'claim' | 'sync';
@@ -218,7 +219,7 @@ type SolanaBuilding = {
   sellCapUnitsRaw: string; deskCashAtomic: string; observedSlot: string;
   incomeSources: { id: string; name: string; meaning: string; amountRaw: string }[];
 };
-type SolanaPosition = Omit<BuildingPosition, 'receipts'> & { cashAtomic: string; plan: SolanaHousePlan | null; receipts: (Receipt & { explorerUrl: string })[] };
+type SolanaPosition = Omit<BuildingPosition, 'receipts'> & { cashAtomic: string; plan: SolanaHousePlan | null; activeOperation: (SolanaOperationResult & { operation: SolanaHouseAction }) | null; receipts: (Receipt & { explorerUrl: string })[] };
 
 /** Primary test-network house. Reinvest is a single reviewed transaction, not an EVM workflow. */
 export function SolanaBuildingPanel({ request, houseId, visual }: { request: AuthorizedRequest; houseId: SolanaHouseId; visual: ReactNode }) {
@@ -231,6 +232,7 @@ export function SolanaBuildingPanel({ request, houseId, visual }: { request: Aut
   const [direction, setDirection] = useState<'buy' | 'sell'>('buy');
   const [stakeAmount, setStakeAmount] = useState('1');
   const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
   const [hasSigned, setHasSigned] = useState(false);
   const live = useRef(false), reading = useRef(false), lock = useRef(false), generation = useRef(0);
@@ -246,7 +248,10 @@ export function SolanaBuildingPanel({ request, houseId, visual }: { request: Aut
       const body = await response.json() as { building?: SolanaBuilding; error?: string };
       if (!response.ok || !body.building) throw new Error(body.error || 'Solana house read unavailable');
       const own = account ? await request<SolanaPosition>(`/api/building/claims?houseId=${houseId}`) : null;
-      if (live.current && revision === generation.current) { setBuilding(body.building); setPosition(own); setPlan(own?.plan ?? null); setError(''); }
+      if (live.current && revision === generation.current) {
+        setBuilding(body.building); setPosition(own); setPlan(own?.plan ?? null); setError('');
+        if (own?.activeOperation && ['confirmed', 'failed', 'expired'].includes(own.activeOperation.state)) { signed.current = null; setHasSigned(false); }
+      }
     } catch (cause) {
       if (live.current && revision === generation.current) { setPosition(null); setError(cause instanceof Error ? cause.message : 'Solana house read unavailable'); }
     } finally { reading.current = false; }
@@ -265,7 +270,13 @@ export function SolanaBuildingPanel({ request, houseId, visual }: { request: Aut
     window.addEventListener('ledger-balances-changed', changed);
     return () => { cancelled = true; active.current = false; ++revisions.current; clearInterval(timer); window.removeEventListener('ledger-balances-changed', changed); };
   }, [activeTab, refresh]);
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled) setActionError(''); });
+    return () => { cancelled = true; };
+  }, [account, houseId]);
   const pending = position?.receipts.some(receipt => receipt.status === 'pending') ?? false;
+  const endedReview = position?.activeOperation && ['expired', 'failed'].includes(position.activeOperation.state) ? position.activeOperation : null;
   const displayUnits = (raw: string | null | undefined) => raw == null ? '—' : Number(formatUnits(BigInt(raw), 6)).toLocaleString('en-GB', { maximumFractionDigits: 6 });
   let tradeQuantity: string | null = null, stakeQuantity: string | null = null;
   try { if (/^\d+(?:\.\d{1,6})?$/.test(amount)) tradeQuantity = parseUnits(amount, 6).toString(); } catch { /* Editable, invalid input is never zero. */ }
@@ -274,8 +285,8 @@ export function SolanaBuildingPanel({ request, houseId, visual }: { request: Aut
   const blocker = (operation: SolanaHouseAction) => solanaHouseActionState({ ...common, operation, quantityRaw: operation === 'stake' || operation === 'unstake' ? stakeQuantity : tradeQuantity });
   async function act(action: () => Promise<void>) {
     if (lock.current) return;
-    lock.current = true; setBusy(true); setError('');
-    try { await action(); } catch (cause) { if (live.current) setError(cause instanceof Error ? cause.message : 'House action unavailable'); }
+    lock.current = true; setBusy(true); setActionError('');
+    try { await action(); } catch (cause) { if (live.current) setActionError(cause instanceof Error ? cause.message : 'House action unavailable'); }
     finally { lock.current = false; if (live.current) setBusy(false); }
   }
   async function prepare(operation: SolanaHouseAction) {
@@ -292,6 +303,16 @@ export function SolanaBuildingPanel({ request, houseId, visual }: { request: Aut
     const reviewed = plan;
     await act(async () => {
       if (!signed.current) {
+        const checked = await request<SolanaOperationResult>(endpoint, { action: 'reconcile', planId: reviewed.id });
+        const signingBlocker = solanaHouseSigningBlocker(checked);
+        if (signingBlocker) {
+          if (live.current) setPlan(null);
+          await refresh();
+          throw new Error(signingBlocker);
+        }
+        if (checked.blockhashValid !== true || checked.blockHeight === undefined)
+          throw new Error('Network blockhash validity could not be verified. No wallet prompt was opened; retry checking this same review.');
+        if (live.current) setPosition(current => current ? { ...current, activeOperation: { ...checked, operation: reviewed.review.operation } } : current);
         const bytes = await wallet.signSolanaTransaction({ walletId: reviewed.walletId, operationId: reviewed.id, chain: 'solana:devnet', feePayer: reviewed.feePayer, expiresAt: reviewed.expiresAt, transaction: Uint8Array.from(atob(reviewed.transactionBase64), character => character.charCodeAt(0)), description: reviewed.review.description });
         if (!live.current) return;
         signed.current = { id: reviewed.id, bytes: btoa(String.fromCharCode(...bytes)) }; setHasSigned(true);
@@ -311,7 +332,7 @@ export function SolanaBuildingPanel({ request, houseId, visual }: { request: Aut
   const totalUnits = position?.walletUnitsRaw != null && position.stakedRaw != null ? (BigInt(position.walletUnitsRaw) + BigInt(position.stakedRaw)).toString() : null;
   const openRow = (id: string) => { const row = document.getElementById(id) as HTMLDetailsElement | null; if (row) { row.open = true; row.dispatchEvent(new Event('toggle')); row.scrollIntoView({ behavior: 'smooth', block: 'center' }); } };
   return <div className="lean-building solana-house" style={{ overflowWrap: 'anywhere' }}>
-    <Hero visual={visual} title={houseId === 'workshop' ? 'Fictional workshop example' : 'Fictional housing example'} subtitle="Solana devnet · fictional local units, no value or rights" status={<StatusLine tone={position ? 'ok' : 'neutral'}>{!account ? 'Connect your Solana wallet in Me' : error ? 'Verified reads unavailable' : totalUnits == null ? 'Checking your house units…' : `You hold ${displayUnits(totalUnits)} ${symbol} · ${displayUnits(position?.stakedRaw)} staked`}</StatusLine>}>
+    <Hero visual={visual} title={houseId === 'workshop' ? 'Fictional workshop example' : 'Fictional housing example'} subtitle="Solana devnet · fictional local units, no value or rights" status={<StatusLine tone={position && !error && !actionError ? 'ok' : 'neutral'}>{!account ? 'Connect your Solana wallet in Me' : error ? 'Verified reads unavailable' : actionError ? 'House action needs attention' : totalUnits == null ? 'Checking your house units…' : `You hold ${displayUnits(totalUnits)} ${symbol} · ${displayUnits(position?.stakedRaw)} staked`}</StatusLine>}>
       <Figures>
         <Figure label="Your units" value={displayUnits(totalUnits)} unit={symbol} note={`${displayUnits(position?.stakedRaw)} staked · ${displayUnits(position?.walletUnitsRaw)} in wallet`} />
         <Figure label="Claimable now" value={position?.earnedRaw == null ? '—' : dollars(position.earnedRaw)} unit="tUSDC" action={<div className="lean-claim-actions">{(['claim', 'reinvest'] as const).map(operation => <button key={operation} type="button" className="text-button" disabled={Boolean(blocker(operation))} title={blocker(operation) ?? undefined} onClick={() => void prepare(operation)}>{operation === 'claim' ? 'Claim' : 'Reinvest · one signature'}</button>)}</div>} />
@@ -321,11 +342,17 @@ export function SolanaBuildingPanel({ request, houseId, visual }: { request: Aut
     </Hero>
     <p className="small-copy">House income is <strong>streamed to stakers over 7 days</strong>. Only staked units earn. New revenue extends the remaining stream. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant.</p>
     {error && <p className="local-market-alert" role="alert">{error} · No success or missing balance is inferred.</p>}
+    {actionError && <p className="local-market-alert" role="alert">Last action attempt: {actionError} · Only a verified finalized receipt establishes success.</p>}
+    {endedReview && !plan && <div className="local-order-review" aria-label="House review recovery">
+      <p role="status">{solanaHouseSigningBlocker(endedReview)}</p>
+      <button type="button" className="button primary" disabled={Boolean(blocker(endedReview.operation))} onClick={() => void prepare(endedReview.operation)}>Prepare fresh {endedReview.operation} review</button>
+    </div>}
     {plan && <div className="local-order-review" aria-label="Exact Solana house review">
       <h4>Exact {plan.review.operation} review · {plan.review.network}</h4><p>{plan.review.description}</p>
       <dl className="solana-review-addresses"><dt>Your wallet / recipient</dt><dd><code>{plan.review.account}</code></dd><dt>House</dt><dd><code>{plan.review.distributor}</code></dd><dt>Your cash account</dt><dd><code>{plan.review.cashAccount}</code></dd><dt>Your unit account</dt><dd><code>{plan.review.unitAccount}</code></dd><dt>Desk / reward / stake vaults</dt><dd><code>{plan.review.deskVault}</code><br /><code>{plan.review.rewardVault}</code><br /><code>{plan.review.stakeVault}</code></dd><dt>Fee sponsor · maximum 0.01 test SOL</dt><dd><code>{plan.feePayer}</code></dd></dl>
-      <p>Review expires {new Date(plan.expiresAt).toLocaleTimeString()}. {plan.review.operation === 'reinvest' ? 'Claim + buy + stake are atomic: all succeed or none do.' : 'Only this exact reviewed transaction is signed.'}</p>
-      <button type="button" className="button primary" disabled={busy || !account} onClick={() => void submit()}>{hasSigned ? 'Retry the same signed transaction' : `Sign ${plan.review.operation} · one signature`}</button>
+      <p>{solanaHouseBlockhashStatus({ lastValidBlockHeight: plan.lastValidBlockHeight, ...(position?.activeOperation?.id === plan.id ? { blockHeight: position.activeOperation.blockHeight, blockhashValid: position.activeOperation.blockhashValid } : {}) })}</p>
+      <p>Maximum server review-policy deadline: {new Date(plan.expiresAt).toLocaleTimeString()} (not the blockchain expiry). Actual network validity is checked again before signing. {plan.review.operation === 'reinvest' ? 'Claim + buy + stake are atomic: all succeed or none do.' : 'Only this exact reviewed transaction is signed.'}</p>
+      <button type="button" className="button primary" disabled={busy || !account} onClick={() => void submit()}>{hasSigned ? 'Retry the same signed transaction' : `Check validity and sign ${plan.review.operation} · one signature`}</button>
       <button type="button" className="text-button" disabled={busy || hasSigned} onClick={() => void cancel()}>Cancel unsigned review</button>
     </div>}
     {pending && <p role="status">Your signed transaction awaits a verified finalized receipt. Do not start a replacement action; reload safely resumes checking.</p>}

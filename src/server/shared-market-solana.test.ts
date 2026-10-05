@@ -42,7 +42,7 @@ async function fixture() {
   let state: SolanaOperationResult['state'] = 'prepared', hold: Promise<void> | null = null, mintCopy = true;
   const prepareReached = Promise.withResolvers<void>();
   const operations: SolanaOperations = {
-    prepare: async input => { calls.push(input); prepareReached.resolve(); if (hold) await hold; const id = `operation-${calls.length}`; const prepared = { id, kind: input.kind, walletId: input.walletId, feePayer: SHARES_PRICE_AUTHORITY, transactionBase64: Buffer.from([1, 2, 3]).toString('base64'), expiresAt: new Date(now + 120000).toISOString(), review: input.review, state: 'prepared' as const, actor: String(input.actor), subject: input.identity.subject }; ops.set(id, prepared); return prepared; },
+    prepare: async input => { calls.push(input); prepareReached.resolve(); if (hold) await hold; const id = `operation-${calls.length}`; const prepared = { id, kind: input.kind, walletId: input.walletId, feePayer: SHARES_PRICE_AUTHORITY, transactionBase64: Buffer.from([1, 2, 3]).toString('base64'), expiresAt: new Date(now + 120000).toISOString(), lastValidBlockHeight: '200', review: input.review, state: 'prepared' as const, actor: String(input.actor), subject: input.identity.subject }; ops.set(id, prepared); return prepared; },
     get: async (id, subject) => { const p = ops.get(id); if (!p || (subject && (p.subject !== subject.subject || !subject.wallets.some(w => w.id === p.walletId && w.address === p.actor)))) throw new Error('operation_owner'); return p; },
     submit: async input => { const p = ops.get(input.id); assert.ok(p); if (p.state === 'expired') throw new Error('expired'); submitted.push(input.id); p.state = state === 'prepared' ? 'confirmed' : state; p.signature = `devnet-signature-${input.id}`; return { id: input.id, state: p.state, signature: p.signature }; },
     reconcile: async input => { const p = ops.get(input.id); assert.ok(p); if (p.state === 'prepared' && now >= Date.parse(p.expiresAt)) p.state = 'expired'; return { id: input.id, state: p.state, ...(p.signature ? { signature: p.signature } : {}) }; },
@@ -52,7 +52,7 @@ async function fixture() {
       executions.push(input); const data = input.instructions[0].data!;
       if (mintCopy) price = { ...price, priceUsdE6: Buffer.from(data).readBigUInt64LE(8), publishedAt: Buffer.from(data).readBigInt64LE(16), copiedAt: clock };
       const result = { id: 'mirror-operation', state: mintCopy ? 'confirmed' as const : 'broadcast' as const, signature: 'mirror-devnet-signature' };
-      ops.set(result.id, { ...result, kind: input.kind, walletId: 'sponsor', actor: SHARES_PRICE_AUTHORITY, subject: 'server:sponsor', feePayer: SHARES_PRICE_AUTHORITY, transactionBase64: '', expiresAt: new Date(now + 120000).toISOString(), review: input.review });
+      ops.set(result.id, { ...result, kind: input.kind, walletId: 'sponsor', actor: SHARES_PRICE_AUTHORITY, subject: 'server:sponsor', feePayer: SHARES_PRICE_AUTHORITY, transactionBase64: '', expiresAt: new Date(now + 120000).toISOString(), lastValidBlockHeight: '200', review: input.review });
       return result;
     },
   };

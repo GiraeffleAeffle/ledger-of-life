@@ -45,6 +45,7 @@ async function settlementFixture(t: TestContext, sponsorshipLimits: Partial<Spon
   } };
   const gateway: SolanaOperationsGateway = {
     lifetime: async () => ({ blockhash: '11111111111111111111111111111111', lastValidBlockHeight: '999', blockHeight: '1' }),
+    blockHeight: async () => '1',
     simulate: async () => { state.simulations++; return { slot: '1', sponsorDebitCeilingLamports: '5000', networkFeeLamports: '5000' }; },
     broadcast: async bytes => { state.broadcasts.push(Uint8Array.from(bytes)); return getBase58Decoder().decode(getTransactionDecoder().decode(bytes).signatures[f.sponsor.address]!); },
     reconcile: async signature => state.finalized ? { status: 'finalized', signature, slot: '2', deltas: [] } :
@@ -137,6 +138,7 @@ test('pending settlement reconciles identical journal, records actual receipt an
   const sponsor = { address: f.sponsor.address, sign: async (bytes: Uint8Array) => new Uint8Array(getTransactionEncoder().encode(await partiallySignTransaction([f.sponsor.keyPair], getTransactionDecoder().decode(bytes)))) };
   const gateway: SolanaOperationsGateway = {
     lifetime: async () => ({ blockhash: '11111111111111111111111111111111', lastValidBlockHeight: '999', blockHeight: '1' }),
+    blockHeight: async () => '1',
     simulate: async () => ({ slot: '1', sponsorDebitCeilingLamports: '5000', networkFeeLamports: '5000' }),
     broadcast: async bytes => { broadcasts++; return getBase58Decoder().decode(getTransactionDecoder().decode(bytes).signatures[f.sponsor.address]!); },
     reconcile: async signature => finalized ? ({ status: 'finalized', signature, slot: '2', deltas: [] }) : ({ status: 'pending', reason: 'awaiting-finality' }),
@@ -184,7 +186,8 @@ test('context outages preserve the saved answer and expose only a safe stage/cod
 
 test('prepare simulation failures map exact reviewed messages and never disclose arbitrary error text or codes', async t => {
   const cases = [
-    { error: new Error('Simulation bank changed; request a fresh review'), code: 'simulation_bank_changed', retryable: true },
+    { error: new Error('Atomic simulation native balances unavailable'), code: 'simulation_evidence_unavailable', retryable: true },
+    { error: new Error('Atomic simulation token balances unavailable'), code: 'simulation_evidence_unavailable', retryable: true },
     { error: new Error('Exact transaction simulation failed'), code: 'simulation_failed', retryable: true },
     { error: new Error('Wrong simulated token owner or mint'), code: 'simulation_token_owner', retryable: false },
     { error: new Error('Missing simulated token balance'), code: 'simulation_balance_missing', retryable: false },
@@ -215,21 +218,21 @@ test('prepare simulation failures map exact reviewed messages and never disclose
   });
 });
 
-test('a transient presign simulation failure resumes the linked exact unsigned settlement without a new approval', async t => {
+test('a transient presign RPC failure resumes the linked exact unsigned settlement without a new approval', async t => {
   const f = await settlementFixture(t), simulate = f.gateway.simulate;
   let failSubmission = true;
   t.mock.method(console, 'warn', () => {});
   f.gateway.simulate = async (...args) => {
     if (f.state.simulations === 1 && failSubmission) {
       failSubmission = false;
-      throw new Error('Simulation bank changed; request a fresh review');
+      throw new Error('RPC unavailable');
     }
     return simulate(...args);
   };
   await settleSolanaAi(f.store, f.key, f.dependencies);
   const pending = await f.saved(), operationId = pending.solanaJournal.settlementId!;
   assert.ok(operationId);
-  assert.deepEqual(pending.request.recovery, { stage: 'settlement_submit', code: 'simulation_bank_changed', retryable: true });
+  assert.deepEqual(pending.request.recovery, { stage: 'settlement_submit', code: 'rpc_unavailable', retryable: true });
   const prepared = await f.operations.get(operationId);
   assert.equal(prepared.state, 'prepared');
   assert.equal(f.state.signatures, 0);

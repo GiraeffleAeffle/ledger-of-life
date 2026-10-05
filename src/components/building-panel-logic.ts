@@ -1,3 +1,5 @@
+import type { SolanaOperationResult } from '../server/solana-operations.ts';
+
 export function estimateBuildingHeat(input: { tokens: number; measuredWhPerToken?: number | null; runtimeMs?: number | null; nominalWatts?: number | null }) {
   const valid = (value: number | null | undefined): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
   if (valid(input.tokens) && valid(input.measuredWhPerToken)) return { kwh: input.tokens * input.measuredWhPerToken / 1000, assumption: `${input.tokens} served tokens × ${input.measuredWhPerToken} measured Wh/token`, method: 'tokens' as const };
@@ -80,4 +82,28 @@ export function solanaHouseActionState(input: {
     if (cash > BigInt(input.deskCashAtomic)) return 'The house desk needs more test USDC';
   }
   return null;
+}
+
+/** Only canonical prepared state permits a wallet prompt; expiry never implies a payout. */
+export function solanaHouseSigningBlocker(operation: Pick<SolanaOperationResult, 'state' | 'signature' | 'blockhashValid'>): string | null {
+  if (operation.state === 'prepared') return operation.blockhashValid === true ? null
+    : 'Network blockhash validity could not be verified. No wallet prompt was opened; retry checking this same review.';
+  if (operation.state === 'expired') return operation.signature
+    ? 'Finalized recovery found that this signed transaction did not land before expiry. Prepare a fresh review to try again.'
+    : operation.blockhashValid === false
+      ? 'This review’s network blockhash expired. No transaction was sent and no payout receipt exists for it. Prepare a fresh review before signing.'
+      : 'This unsigned review is closed or its maximum server review-policy deadline ended. No transaction was sent and no payout receipt exists for it. Prepare a fresh review before signing.';
+  if (operation.state === 'failed') return 'This transaction failed on chain. It has no successful payout receipt. Prepare a fresh review to try again.';
+  if (operation.state === 'broadcast') return 'Your existing signed transaction still awaits a verified finalized receipt. Continue checking it instead of signing a replacement.';
+  return 'This transaction already has a verified finalized receipt. See House action receipts; do not sign it again.';
+}
+
+/** Displays only observed heights; block time and wall-clock policy deadlines are not estimates. */
+export function solanaHouseBlockhashStatus(input: { lastValidBlockHeight: string; blockHeight?: string; blockhashValid?: boolean }): string {
+  if (!/^\d+$/.test(input.lastValidBlockHeight) || input.blockHeight === undefined || !/^\d+$/.test(input.blockHeight) || input.blockhashValid === undefined)
+    return 'Network blockhash validity has not been verified yet; it will be checked before a wallet prompt.';
+  const current = BigInt(input.blockHeight), lastValid = BigInt(input.lastValidBlockHeight);
+  if (!input.blockhashValid || current > lastValid)
+    return `Network blockhash expired · observed confirmed height ${current} is past last valid height ${lastValid}.`;
+  return `Network blockhash valid at confirmed height ${current} · last valid height ${lastValid} · ${lastValid - current + 1n} valid block heights remaining at this check.`;
 }

@@ -4,7 +4,7 @@ import { errorResponse, readBody, sameOrigin } from '@/server/http';
 import { prepareBuildingAction, readBuildingPosition, submitBuildingAction } from '@/server/building-revenue-claims';
 import { prepareBuildingReinvest, readBuildingReinvest, startBuildingReinvest, submitBuildingReinvest } from '@/server/building-revenue-reinvest';
 import { loadSolanaHouseManifest } from '@/server/solana-house-config';
-import { cancelSolanaHouseReview, prepareSolanaHouseAction, readSolanaBuildingPosition, solanaHouseId, submitSolanaHouseAction } from '@/server/building-solana';
+import { cancelSolanaHouseReview, prepareSolanaHouseAction, readSolanaBuildingPosition, reconcileSolanaHouseAction, solanaHouseId, submitSolanaHouseAction } from '@/server/building-solana';
 import { SolanaServiceError } from '@/server/solana-service';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };
@@ -41,6 +41,8 @@ export async function POST(request: Request) {
         return Response.json(await submitSolanaHouseAction(store, identity, body.planId, body.signedTransaction), noStore);
       if (body.action === 'cancel' && typeof body.planId === 'string')
         return Response.json(await cancelSolanaHouseReview(store, identity, body.planId), noStore);
+      if (body.action === 'reconcile' && typeof body.planId === 'string')
+        return Response.json(await reconcileSolanaHouseAction(store, identity, body.planId), noStore);
       throw new Error('Unknown Solana house action.');
     }
     const wallet = identity.wallets.find(wallet => wallet.chainType === 'ethereum');
