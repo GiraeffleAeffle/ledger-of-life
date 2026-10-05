@@ -40,6 +40,8 @@ async function fixture() {
     executeAsSponsor: async () => { throw new Error('Fresh price must not invoke mirror signing'); },
   };
   const gateway = { checkedGenesis: async () => state.genesis, multiple: async (keys: readonly string[]) => {
+    for (const account of keys) assert.equal(encoder.encode(address(account)).length, 32, 'Snapshot RPC keys must encode to exactly 32 bytes.');
+    if (keys.length > 1) assert.equal(keys[4], 'SysvarC1ock11111111111111111111111111111111', 'Use the canonical Solana Clock sysvar for the finalized bank.');
     const mint = bytes(82); new DataView(mint.buffer).setUint32(0, 1, true); key(mint, 4, state.mintAuthority); mint[44] = 6; mint[45] = 1;
     const price = bytes(113, [50,107,127,61,83,36,39,75]); key(price, 8, config.priceAuthority); key(price, 40, config.shareMint); u64(price, 72, state.price); u64(price, 80, state.publishedAt); u64(price, 88, state.publishedAt); u64(price, 96, BigInt(config.initialPriceUsdE6)); u64(price, 104, BigInt(config.initialPricePublishedAt));
     const clock = bytes(40); u64(clock, 0, 123n); u64(clock, 32, state.now);

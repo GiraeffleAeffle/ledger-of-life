@@ -2,6 +2,38 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, recoverExpiredRentReview, settlementSplit, tenancyNeedsPerson } from './home-journey-logic.ts';
 import type { PublicListing } from '../server/listings.ts';
+import { prepareEmptyEscrowReview, signEmptyEscrowReview } from './home-journey-logic.ts';
+import type { SolanaInitializationView } from '../server/solana-initialization.ts';
+
+test('empty escrow preparation cannot sign; signing requires the explicitly prepared unexpired review', async () => {
+  const review: SolanaInitializationView = {
+    setupMode: 'staged', agreementId: 'listing-review', tenancyAddress: 'escrow', escrowProgram: 'program',
+    policyHash: 'digest', leaseIdHex: 'lease', tenantDestination: 'tenant-token', landlordDestination: 'landlord-token',
+    tenant: 'tenant', landlord: 'landlord', arbitrator: 'arbitrator', requiredSecurityAtomic: '1300000000',
+    depositMint: 'mint', releasePermitted: true, state: 'prepared', transactionBase64: 'unsigned',
+    messageSha256: 'message', expiresAt: new Date(Date.now() + 90000).toISOString(), lastValidBlockHeight: '123',
+    signature: null, simulation: { slot: '100', sponsorDebitCeilingLamports: '2000000', networkFeeLamports: '10000' },
+    lastError: null, receipt: null, signedRoles: [], role: 'landlord', walletId: 'wallet',
+    feePayer: 'sponsor', cluster: 'devnet', walletChain: 'solana:devnet',
+  };
+  const calls: { path: string; body: unknown }[] = [];
+  const request = async <T>(path: string, body?: unknown): Promise<T> => {
+    calls.push({ path, body });
+    return { initialization: review } as T;
+  };
+  let signatures = 0;
+  const sign = async (input: SolanaInitializationView) => { assert.equal(input, review); signatures++; return 'exact-signed-message'; };
+  const prepared = await prepareEmptyEscrowReview(request, review.agreementId);
+  assert.equal(prepared, review);
+  assert.equal(signatures, 0);
+  assert.deepEqual(calls.map(call => call.body), [{ action: 'advance', agreementId: review.agreementId }, { action: 'prepare' }]);
+  await assert.rejects(signEmptyEscrowReview(null, request, sign), /Prepare and review/);
+  await assert.rejects(signEmptyEscrowReview({ ...review, expiresAt: new Date(0).toISOString() }, request, sign), /expired/);
+  assert.equal(signatures, 0);
+  await signEmptyEscrowReview(prepared, request, sign);
+  assert.equal(signatures, 1);
+  assert.deepEqual(calls.at(-1)?.body, { action: 'sign', signedTxBase64: 'exact-signed-message' });
+});
 
 test('share attention separates living top-ups from voluntary actions and move-out deadlines', () => {
   const living = { stage: 'living', next: { kind: 'wait' }, depositForm: { kind: 'shares' }, shareDeposit: { needsTopUp: false, actions: ['requestReturn', 'withdraw'] } };

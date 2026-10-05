@@ -24,7 +24,7 @@ export type ShareDepositReadGateway = Pick<BaseSolanaGateway, 'checkedGenesis' |
 export type SolanaShareDepositDependencies = { manifest?: () => Promise<SolanaSharesManifest | null>; gateway?: ShareDepositReadGateway; operations?: SolanaOperations; sponsor?: string; environment?: Record<string, string | undefined> };
 export type SolanaShareDepositSnapshot = { escrow: ShareEscrow | null; price: SharesPrice; walletShares: bigint; lockedShares: bigint; escrowAddress: string; vault: string; shareAccount: string; now: bigint };
 type StoredPlan = SolanaShareDepositPlan & { subject: string; record?: Agreement['records'][number] };
-const clockAddress = 'SysvarC1ock11111111111111111111111111111111111';
+const clockAddress = 'SysvarC1ock11111111111111111111111111111111';
 const states = { 'awaiting-lock': 'AwaitingLock', active: 'Active', 'claim-pending': 'ClaimPending', 'claim-contested': 'ClaimContested', closed: 'Closed' } as const;
 const hashBytes = (hash: string) => { if (!/^0x[0-9a-f]{64}$/.test(hash)) throw new WorkflowError('An accepted agreement digest is required.'); return new Uint8Array(Buffer.from(hash.slice(2), 'hex')); };
 const historyKey = (id: string) => `solana-share-deposit-history:${id}`;

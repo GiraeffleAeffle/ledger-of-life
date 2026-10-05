@@ -1,5 +1,28 @@
 import type { JourneyStage } from '../server/journey.ts';
 import type { PublicListing } from '../server/listings.ts';
+import type { SolanaInitializationView } from '../server/solana-initialization.ts';
+
+type InitializationRequest = <T>(path: string, body?: unknown) => Promise<T>;
+
+/** Preparation never opens a wallet signer, even when that wallet is already unlocked. */
+export async function prepareEmptyEscrowReview(request: InitializationRequest, agreementId: string) {
+  await request('/api/journey', { action: 'advance', agreementId });
+  const { initialization } = await request<{ initialization: SolanaInitializationView }>(
+    `/api/finance/solana/initialize?agreement=${encodeURIComponent(agreementId)}`, { action: 'prepare' });
+  return initialization.state === 'prepared' ? initialization : null;
+}
+
+/** Only the explicit review action may invoke the wallet and submit its exact message. */
+export async function signEmptyEscrowReview(
+  review: SolanaInitializationView | null, request: InitializationRequest,
+  sign: (review: SolanaInitializationView) => Promise<string>,
+) {
+  if (!review || review.state !== 'prepared') throw new Error('Prepare and review the empty escrow before signing.');
+  if (Date.parse(review.expiresAt) <= Date.now()) throw new Error('This escrow review expired. Prepare it again before signing.');
+  const signedTxBase64 = await sign(review);
+  await request(`/api/finance/solana/initialize?agreement=${encodeURIComponent(review.agreementId)}`,
+    { action: 'sign', signedTxBase64 });
+}
 
 export const HOME_STAGES = ['Find', 'Apply', 'Agree', 'Secure', 'Live', 'Move out', 'Paid out'] as const;
 

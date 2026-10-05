@@ -93,7 +93,7 @@ export type SolanaInitialization = {
   lastError: string | null;
   receipt: unknown | null;
 };
-type View = Omit<SolanaInitialization, 'signatures' | 'signedTxBase64'> & {
+export type SolanaInitializationView = Omit<SolanaInitialization, 'signatures' | 'signedTxBase64'> & {
   signedRoles: PartyRole[];
   role: 'tenant' | 'landlord' | 'arbitrator';
   walletId: string;
@@ -101,6 +101,7 @@ type View = Omit<SolanaInitialization, 'signatures' | 'signedTxBase64'> & {
   depositMint: string;
   cluster: 'devnet' | 'localnet';
   walletChain: 'solana:devnet' | null;
+  escrowProgram: string;
 };
 export type InitializationGateway = Pick<
   SolanaGateway,
@@ -271,7 +272,7 @@ export function createSolanaInitializationService(input: {
       landlordDestination,
     };
   }
-  function publicView(record: SolanaInitialization, verified: Awaited<ReturnType<typeof access>>): View {
+  function publicView(record: SolanaInitialization, verified: Awaited<ReturnType<typeof access>>): SolanaInitializationView {
     const { signatures, signedTxBase64: _, ...visible } = record;
     void _;
     return {
@@ -283,6 +284,7 @@ export function createSolanaInitializationService(input: {
       walletId: verified.wallet.id,
       feePayer: sponsor.address,
       cluster: config.cluster,
+      escrowProgram: config.escrowProgram,
       walletChain: config.cluster === 'devnet' ? 'solana:devnet' : null,
     };
   }

@@ -42,6 +42,8 @@ import { ProjectMap } from './project-map';
 import { DEFAULT_PROJECT_SYSTEMS } from './project-map-model';
 import { TEST_CITY_INVESTMENTS } from '@/data/local-investments';
 import type { ReactNode } from 'react';
+import type { SolanaInitializationView } from '@/server/solana-initialization';
+import { prepareEmptyEscrowReview, signEmptyEscrowReview } from './home-journey-logic';
 
 const BUTTON_LABEL: Record<string, string> = {
   invite_arbitrator: 'Make invitation link',
@@ -328,6 +330,7 @@ function TenancyCard({ journey, request, reload, accountId, anchored = true, aut
   const [agreementError, setAgreementError] = useState(false);
   const [agreementRetry, setAgreementRetry] = useState(0);
   const [confirmation, setConfirmation] = useState<{ id: string; since: number } | null>(null);
+  const [escrowReview, setEscrowReview] = useState<SolanaInitializationView | null>(null);
   const [clock, setClock] = useState(() => Date.now());
   const intent = useRef<{ key: string; requestId: string } | null>(null);
   const recordedOperations = useRef(new Set<string>());
@@ -426,17 +429,9 @@ function TenancyCard({ journey, request, reload, accountId, anchored = true, aut
       case 'accept_agreement':
         await request(`/api/agreements/${agreementId}`, { action: 'accept', digest: next.digest });
         return;
-      case 'create_space': {
-        // The sponsor first creates both parties' own payout accounts (no approval needed).
-        await request('/api/journey', { action: 'advance', agreementId });
-        const { initialization: init } = await request<{
-          initialization: { state: string; walletId: string; expiresAt: string; transactionBase64: string; feePayer: string; walletChain: string | null };
-        }>(`/api/finance/solana/initialize${q}`, { action: 'prepare' });
-        if (init.state !== 'prepared') return;
-        const signed = await sign({ ...init, id: `setup-${agreementId}` }, 'Prepare the empty escrow');
-        await request(`/api/finance/solana/initialize${q}`, { action: 'sign', signedTxBase64: signed });
+      case 'create_space':
+        setEscrowReview(await prepareEmptyEscrowReview(request, agreementId));
         return;
-      }
       case 'secure_deposit':
         return operation({ kind: 'fund_and_supply' }, 'Secure the test-USDC deposit');
       case 'settle':
@@ -502,6 +497,20 @@ function TenancyCard({ journey, request, reload, accountId, anchored = true, aut
         </div></MoreRow></>}
         {next.kind === 'accept_agreement' && recordBlocker && <p className="action-blocker" role="status">{recordBlocker}</p>}
         {oneButton && actionButton}
+        {next.kind === 'create_space' && escrowReview && <div className="small-copy" aria-label="Exact empty escrow signing review">
+          <h3>Review the empty escrow before signing</h3>
+          <p>Network: Solana {escrowReview.cluster}. Empty escrow: {escrowReview.tenancyAddress}. Program: {escrowReview.escrowProgram}.</p>
+          <p>Tenant: {escrowReview.tenant}. Landlord: {escrowReview.landlord}. Arbitrator: {escrowReview.arbitrator}.</p>
+          <p>Tenant payout account: {escrowReview.tenantDestination}. Landlord payout account: {escrowReview.landlordDestination}. Deposit mint: {escrowReview.depositMint}.</p>
+          <p>Accepted agreement digest: 0x{escrowReview.policyHash}. Required future deposit: {money(escrowReview.requiredSecurityAtomic)} test USDC. Tenant earnings policy: {escrowReview.releasePermitted ? 'surplus may be claimed during the tenancy' : 'locked until settlement'}.</p>
+          <p>Fee sponsor: {escrowReview.feePayer}. Network fee: {escrowReview.simulation.networkFeeLamports} lamports. Maximum sponsor debit including account rent: {escrowReview.simulation.sponsorDebitCeilingLamports} lamports. No tenant or landlord funds are transferred or locked by this initialization.</p>
+          <p>Exact message: {escrowReview.messageSha256}. Review expires: {escrowReview.expiresAt}. Test tokens have no value or legal rights; deposit earnings belong to the tenant.</p>
+          <button className="button primary" disabled={busy} onClick={() => void run(async () => {
+            await signEmptyEscrowReview(escrowReview, request, review => sign({ ...review, id: `setup-${agreementId}` }, 'Create the reviewed empty escrow · no deposit funds transferred'));
+            setEscrowReview(null);
+          })}>Sign the reviewed empty escrow</button>
+          <button className="button secondary" disabled={busy} onClick={() => setEscrowReview(null)}>Discard unsigned review</button>
+        </div>}
         {next.kind === 'secure_deposit' && <div className="small-copy faucet-note">
           {cashOnly ? <TestUsdc request={request} /> : <p>This existing tenancy uses Circle devnet test USDC, not the site&apos;s tUSDC. Use <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle&apos;s faucet</a> on Solana devnet, sent to your wallet {wallet.wallets.find((w) => w.chainType === 'solana')?.address ?? 'address in Me'}.</p>}
         </div>}
