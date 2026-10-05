@@ -1,8 +1,26 @@
 # Ledger of Life: overview of ideas, structure and adapters
 
-Status: 2026-09-28. This is the entry point for the product idea. Precise definitions and rules live in
+Status: 2026-10-05 (current Solana port below; dated earlier evidence retained). This is the entry point for the product idea. Precise definitions and rules live in
 [`ontology.yaml`](ontology.yaml) and [`ONTOLOGY.md`](ONTOLOGY.md); this page explains how the pieces fit
 together for one person, how the app should be organised, and how to decide on adapters.
+
+## Current Solana port · 5 October 2026
+
+The live entry point is <https://ledger.stadtstack.eu>; see [README → For judges](../README.md#for-judges) for passkey testing and deployment boundaries. These are implementation descriptions, not claims that every flow has been exercised hosted.
+
+| Flow | Current implementation and boundary |
+|---|---|
+| Home: monthly rent | New Solana building-home terms bind monthly tUSDC, fixed 2000 bps, landlord wallet and house address in **agreement digest v4**. A single reviewed transaction and **one tenant signature** pay 80 % to the landlord and 20 % to the house reward vault. The memo, landlord transfer and reward deposit land atomically. Earlier v3 Robinhood agreements retain their two-transfer path. |
+| Home: share security | Publication uses `shares-solana` / **Shares · test TSLA on Solana** only with a configured reviewed shares deployment. **Digest v5** binds the Solana share-deposit terms and any rent terms. Activation needs 150 % cover; below 125 % the app requests a top-up. Claims use the current mirrored price, fixed response/return/arbitration windows and independent in-kind payouts; silence does not award the landlord. The shares program is deployed and initialized with verified on-chain bytes; hosted-flow evidence is separate. |
+| Money → Local stakes | The deployed Solana house handles tHOME/tWORK buy, capped cash-backed sell, stake, unstake, claim and **one-signature claim → buy → stake reinvest**. Revenue from rent, AI and other sources streams over **604,800 seconds (7 days)**; idle revenue starts a fresh stream rather than a lump-sum first-staker payout. Claim review says **at least** the prepared earnings; reinvest buys/stakes the fixed reviewed units and leaves any additional accrual in cash. Earlier Robinhood units retain their own access. |
+| Money → Devices & income: AI | Solana SPL approval delegates at most one answer's maximum tUSDC charge to the existing fee sponsor. After a saved complete answer, measured generated tokens determine the actual settlement: house rewards (AI source) or the reviewed host owner's Solana wallet. Unused allowance can remain, bounded by that answer's maximum; the next approval replaces it. An outstanding/ambiguous settlement must be reconciled before another approval replaces the allowance. |
+| Money → Borrow & lend | The deployed Solana shares pool uses lender-funded tUSDC and locked tTSLA, 50 % borrow LTV, 5 % nominal yearly debt accrual, liquidation from 80 % LTV and cash-limited lender exits. Mirrored prices and the reviewed manifest are required; bad debt is borne by lenders. Faucet issuance and aggregate borrowing are bounded. The existing Robinhood pool remains separately accessible. |
+| Shared signing infrastructure | `solana-operations.ts` persists exact reviews, signed bytes and receipts, simulates sponsor debit and reconciles finalized outcomes. A durable sponsor budget ledger reserves capacity before sponsor signing, enforces per-account rolling and global UTC-day budgets, carries ambiguous reservations across midnight, and charges landed failures as well as successes; only proven absence releases signed capacity. |
+
+Sources: [`agreements.ts`](../src/server/agreements.ts), [`listings.ts`](../src/server/listings.ts), [`rent-payments.ts`](../src/server/rent-payments.ts), [`building-solana.ts`](../src/server/building-solana.ts), [`local-ai-payment.ts`](../src/server/local-ai-payment.ts), [`shared-market-solana.ts`](../src/server/shared-market-solana.ts), [`solana-operations.ts`](../src/server/solana-operations.ts), [house deployment evidence](evidence/SOLANA_HOUSE_DEVNET_DEPLOYMENT_2026-10-05.json) and [shares status evidence](evidence/SOLANA_SHARES_DEVNET_DEPLOYMENT_2026-10-05.json).
+
+All are test-network operations with no monetary value or unit rights. Deposit earnings belong to the tenant (§551 BGB); rent, AI allowance, lending and personal stakes never spend the protected deposit.
+
 
 ## 1. The idea in one paragraph
 

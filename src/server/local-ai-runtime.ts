@@ -7,6 +7,7 @@ import { ConflictError } from './errors.ts';
 import type { LocalAiContext, LocalAiRequestUsage } from './local-ai-types.ts';
 import type { Store } from './store.ts';
 import { AI_PRICE, AI_MAX_OUTPUT } from '../domain/ai-pricing.ts';
+import { boundedOutputTokens } from './local-ai-usage.ts';
 
 export const AI_CHAIN = defineChain({ id: 46630, name: 'Robinhood Chain Testnet', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://rpc.testnet.chain.robinhood.com'] } }, testnet: true });
 export const aiRpc = createPublicClient({ chain: AI_CHAIN, transport: http() });
@@ -92,7 +93,8 @@ export async function runLocalInference(input: { prompt: string; context: LocalA
     const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
     const duration = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value / 1e6 : null;
     const inputTokens = 'prompt_eval_count' in data ? count(data.prompt_eval_count) : null;
-    const outputTokens = 'eval_count' in data ? count(data.eval_count) : null;
+    const outputTokens = boundedOutputTokens('eval_count' in data ? data.eval_count : null, input.maxOutputTokens,
+      data.message.content, 'thinking' in data.message ? data.message.thinking : null);
     const evalMs = 'eval_duration' in data ? duration(data.eval_duration) : null;
     return { answer: data.message.content.trim(), usage: {
       inputTokens, outputTokens, wallMs: Math.round(performance.now() - started),

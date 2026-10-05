@@ -14,6 +14,14 @@ import { LocalStore } from './store.ts';
 import { prepareRent, readRent, submitRent, verifyRentReceipt, type RentPayment, type RentReceipt } from './rent-payments.ts';
 import type { BuildingManifest, BuildingRpc } from './building-revenue.ts';
 import type { tenancyJourney, TenancyJourney } from './journey.ts';
+import { AccountRole, generateKeyPairSigner, getBase58Decoder, getCompiledTransactionMessageDecoder, getTransactionDecoder, getTransactionEncoder, partiallySignTransaction } from '@solana/kit';
+import { MEMO_PROGRAM_ADDRESS } from '@solana-program/memo';
+import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
+import { houseAddresses, HOUSE_DISCRIMINATORS } from '../finance/solana/house.ts';
+import { SOLANA_DEVNET_MANIFEST, SOLANA_TEST_USDC_MINT } from '../finance/solana/manifest.ts';
+import { createSolanaOperations } from './solana-operations.ts';
+import { solanaRentInstructions } from './rent-payments.ts';
+import type { SolanaHouseManifest } from './solana-house-config.ts';
 const tenantAccount = privateKeyToAccount(`0x${'11'.repeat(32)}`);
 const landlordAddress = '0x2222222222222222222222222222222222222222';
 const identity = (subject: string, address: string): VerifiedIdentity => ({ subject,sessionId:subject,expiresAt:Date.now()/1000+3600,passkeyCount:1,wallets:[{id:`evm-${subject}`,chainType:'ethereum',address},{id:`sol-${subject}`,chainType:'solana',address:`solana-${subject}`}] });
@@ -67,7 +75,7 @@ test('paid rent summary follows the Berlin month, next due month and viewer role
 });
 test('publication fixes rent share and binds it only to newly chosen building agreements',async()=>{
   const store=new LocalStore(':memory:');try{
-    const listing=await createListing(store,landlord,{title:'Berlin flat 4',requiredSecurity:'1800000000',rentMonthly:'900000000',releaseAllowed:true,buildingHome:true});
+    const listing=await createListing(store,landlord,{title:'Berlin flat 4',requiredSecurity:'1800000000',rentMonthly:'900000000',releaseAllowed:true,buildingHome:true},{});
     assert.equal(listing.buildingRent?.shareBps,2000);
     await assert.rejects(createListing(store,landlord,{title:'Invalid',requiredSecurity:'1800000000',rentMonthly:'900000000',releaseAllowed:true,buildingHome:true,shareBps:1000}),/fixed/);
     await applyToListing(store,tenant,listing.id,{name:'Tenant',message:''});
@@ -168,4 +176,110 @@ test('receipt proof rejects wrong token, recipient, sender, amount, hash and rev
   const payment={tenantWallet:tenantAccount.address,token:manifestJson.payoutToken,steps:[{recipient:landlordAddress,amountRaw:'8000000',hash:`0x${'aa'.repeat(32)}`}]} as RentPayment;
   const step=payment.steps[0],receipt=receiptFor(payment,0);verifyRentReceipt(receipt,payment,step);
   for(const changed of [ {...receipt,transactionHash:`0x${'bb'.repeat(32)}`}, {...receipt,status:'reverted'}, {...receipt,logs:[{...receipt.logs[0],address:landlordAddress}]}, {...receipt,logs:[{...receipt.logs[0],data:encodeAbiParameters([{type:'uint256'}],[8000001n])}]}, {...receipt,logs:[{...receipt.logs[0],topics:encodeEventTopics({abi:RENT_TOKEN_ABI,eventName:'Transfer',args:{from:tenantAccount.address,to:arb.wallets[0].address as Hex}})}]}, {...receipt,logs:[{...receipt.logs[0],topics:encodeEventTopics({abi:RENT_TOKEN_ABI,eventName:'Transfer',args:{from:arb.wallets[0].address as Hex,to:landlordAddress}})}]} ]) assert.throws(()=>verifyRentReceipt(changed as typeof receipt,payment,step),/exact|Transfer/);
+});
+
+async function solanaFixture() {
+  const owner = await generateKeyPairSigner(), recipient = await generateKeyPairSigner(), payer = await generateKeyPairSigner();
+  const programId = 'DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb';
+  const house = await houseAddresses('neighbourhood-homes',programId), workshop = await houseAddresses('workshop',programId);
+  const manifest: SolanaHouseManifest = { cluster:'devnet',genesisHash:SOLANA_DEVNET_MANIFEST.genesisHash,programId,cashMint:SOLANA_TEST_USDC_MINT,houses:{'neighbourhood-homes':house,workshop} };
+  const person = (subject: string, wallet: string): VerifiedIdentity => ({ ...identity(subject,landlordAddress),wallets:[{id:`sol-${subject}`,chainType:'solana',address:wallet}] });
+  const tenant = person('sol-tenant',owner.address), landlord = person('sol-landlord',recipient.address), arb = person('sol-arb',payer.address);
+  const value = agreement();
+  value.id='sol-rent-test';
+  value.rentTerms={network:'solana-devnet',rentMonthly:'650000003',shareBps:2000,landlordWallet:recipient.address,house:house.house};
+  value.parties={tenant:{subject:tenant.subject,wallet:tenant.wallets[0]},landlord:{subject:landlord.subject,wallet:landlord.wallets[0]},arbitrator:{subject:arb.subject,wallet:arb.wallets[0]}};
+  const digest=agreementDigest(value)!;value.accepted={tenant:{digest,at:value.createdAt},landlord:{digest,at:value.createdAt}};
+  return { owner,recipient,payer,manifest,house,tenant,landlord,arb,value };
+}
+test('v4 canonically binds Solana rent network, amount, share, landlord and house; v3 bytes remain unchanged',async()=>{
+  const {value}=await solanaFixture(),terms=value.rentTerms!,base=agreementDigest(value);
+  const expected=`0x${createHash('sha256').update(JSON.stringify({domain:'rental-agreement-v4',id:value.id,network:value.network,property:value.property,deposit:canonicalDeposit(value.depositForm!),rent:{network:terms.network,rentMonthly:terms.rentMonthly,shareBps:terms.shareBps,landlordWallet:terms.landlordWallet,house:terms.house},requiredSecurity:value.requiredSecurity,releaseAllowed:value.releaseAllowed,tenant:value.parties.tenant!.wallet.address,landlord:value.parties.landlord!.wallet.address,arbitrator:value.parties.arbitrator!.wallet.address})).digest('hex')}`;
+  assert.equal(base,expected);
+  for(const [field,replacement] of Object.entries({network:'robinhood-testnet',rentMonthly:'650000004',shareBps:1999,landlordWallet:'11111111111111111111111111111111',house:'11111111111111111111111111111111'})) {
+    const changed=structuredClone(value);Object.assign(changed.rentTerms!,{[field]:replacement});assert.notEqual(agreementDigest(changed),base,field);
+  }
+  const legacy=agreement(),rent=legacy.rentTerms!;
+  assert.equal(agreementDigest(legacy),`0x${createHash('sha256').update(JSON.stringify({domain:'rental-agreement-v3',id:legacy.id,network:legacy.network,property:legacy.property,deposit:canonicalDeposit(legacy.depositForm!),rent:{buildingId:rent.buildingId,shareBps:rent.shareBps,rentMonthly:rent.rentMonthly,landlordWallet:rent.landlordWallet},requiredSecurity:legacy.requiredSecurity,releaseAllowed:legacy.releaseAllowed,tenant:legacy.parties.tenant!.wallet.address,landlord:legacy.parties.landlord!.wallet.address,arbitrator:legacy.parties.arbitrator!.wallet.address})).digest('hex')}`);
+});
+test('new building listings use the verified Solana landlord and configured house; unconfigured legacy path stays available',async()=>{
+  const f=await solanaFixture(),store=new LocalStore(':memory:');
+  try {
+    const listing=await createListing(store,f.landlord,{title:'New building flat',requiredSecurity:'1300000000',rentMonthly:'650000000',releaseAllowed:true,buildingHome:true},{SOLANA_HOUSE_MANIFEST:JSON.stringify(f.manifest)});
+    assert.deepEqual(listing.buildingRent,{network:'solana-devnet',shareBps:2000,landlordWallet:f.recipient.address,house:f.house.house});
+    await applyToListing(store,f.tenant,listing.id,{name:'Tenant',message:''});
+    const saved=await store.get<{applications:{id:string}[]}>(`listing:${listing.id}`),chosen=await chooseApplicant(store,f.landlord,listing.id,saved!.applications[0].id),value=await store.get<Agreement>(`agreement:${chosen.agreementId}`);
+    assert.deepEqual(value!.rentTerms,{...listing.buildingRent,rentMonthly:'650000000'});
+  } finally { await store.close(); }
+});
+test('Solana rent has exactly memo, sponsored landlord ATA, checked landlord transfer and source-zero house deposit',async()=>{
+  const f=await solanaFixture(),tx=await solanaRentInstructions({month:'2026-10',tenant:f.owner.address,landlord:f.recipient.address,sponsor:f.payer.address,mint:f.manifest.cashMint,house:f.house.house,rewardVault:f.house.rewardVault,programId:f.manifest.programId,rentMonthly:'650000003'});
+  const [memo,ata,transfer,house]=tx.instructions;
+  assert.equal(tx.instructions.length,4);assert.equal(memo.programAddress,MEMO_PROGRAM_ADDRESS);
+  assert.equal(new TextDecoder().decode(memo.data),'ledger-of-life rent 2026-10');assert.deepEqual(memo.accounts,[]);
+  assert.equal(ata.programAddress,ASSOCIATED_TOKEN_PROGRAM_ADDRESS);assert.deepEqual(Array.from(ata.data!),[1]);
+  assert.deepEqual(ata.accounts!.map(row=>row.address),[f.payer.address,tx.landlordAta,f.recipient.address,f.manifest.cashMint,'11111111111111111111111111111111',TOKEN_PROGRAM_ADDRESS]);assert.equal(ata.accounts![0].role,AccountRole.WRITABLE_SIGNER);
+  assert.equal(transfer.programAddress,TOKEN_PROGRAM_ADDRESS);assert.deepEqual(transfer.accounts!.map(row=>row.address),[tx.source,f.manifest.cashMint,tx.landlordAta,f.owner.address]);
+  assert.equal(transfer.data![0],12);assert.equal(new DataView(Uint8Array.from(transfer.data!).buffer).getBigUint64(1,true),520000003n);assert.equal(transfer.data![9],6);assert.equal(transfer.accounts![3].role,AccountRole.READONLY_SIGNER);
+  assert.equal(house.programAddress,f.manifest.programId);assert.deepEqual(house.accounts!.map(row=>row.address),[f.owner.address,f.house.house,tx.source,f.house.rewardVault,TOKEN_PROGRAM_ADDRESS]);
+  assert.deepEqual(Array.from(house.data!.slice(0,8)),HOUSE_DISCRIMINATORS.deposit_rewards);assert.equal(new DataView(Uint8Array.from(house.data!).buffer).getBigUint64(8,true),130000000n);assert.equal(house.data![16],0);
+  assert.deepEqual(tx.expectedDeltas.map(row=>[row.account,row.owner,row.direction,row.minimumAtomic,row.maximumAtomic]),[[tx.source,f.owner.address,'debit','650000003','650000003'],[tx.landlordAta,f.recipient.address,'credit','520000003','520000003'],[f.house.rewardVault,f.house.house,'credit','130000000','130000000']]);
+});
+test('Solana rent is one user signature, sponsored, reserved across lost responses, paid once per Berlin month and readable by landlord',async()=>{
+  const f=await solanaFixture(),store=new LocalStore(':memory:');let now=Date.parse('2026-10-31T21:59:59Z'),finalized=false,sends=0;
+  const gateway={lifetime:async()=>({blockhash:'11111111111111111111111111111111',lastValidBlockHeight:'200',blockHeight:'100'}),simulate:async()=>({slot:'1',sponsorDebitCeilingLamports:'3000000',networkFeeLamports:'10000'}),broadcast:async(bytes:Uint8Array)=>{sends++;return getBase58Decoder().decode(getTransactionDecoder().decode(bytes).signatures[f.payer.address]!);},reconcile:async(signature:string)=>finalized?{status:'finalized' as const,signature,slot:'1',deltas:[]}:{status:'unknown' as const,reason:'signature-not-observed-do-not-resubmit-new-intent'}};
+  const sponsor={address:f.payer.address,sign:async(bytes:Uint8Array)=>new Uint8Array(getTransactionEncoder().encode(await partiallySignTransaction([f.payer.keyPair],getTransactionDecoder().decode(bytes))))};
+  const operations=createSolanaOperations({store,gateway,sponsor,config:{cluster:'devnet',genesisHash:f.manifest.genesisHash,maximumSponsorLamports:10_000_000n},now:()=>now});
+  const options={houseManifest:f.manifest,solana:{operations,sponsor},now:()=>now,readJourney:(async()=>({stage:'living',chain:{phase:'active'}} as TenancyJourney)) as typeof tenancyJourney};
+  try {
+    await store.create(`agreement:${f.value.id}`,f.value);
+    const [first,duplicate]=await Promise.all([prepareRent(store,f.tenant,f.value.id,options),prepareRent(store,f.tenant,f.value.id,options)]);
+    const step=first!.payment!.steps[0],review=step.solanaRequest!;assert.equal(first!.payment!.steps.length,1);assert.equal(step.operationId,duplicate!.payment!.steps[0].operationId);
+    const tx=getTransactionDecoder().decode(Buffer.from(review.transactionBase64,'base64')),message=getCompiledTransactionMessageDecoder().decode(tx.messageBytes);
+    assert.equal(message.staticAccounts[0],f.payer.address);assert.equal(message.header.numSignerAccounts,2);assert.equal(message.instructions.length,4);
+    const signed=Buffer.from(getTransactionEncoder().encode(await partiallySignTransaction([f.owner.keyPair],tx))).toString('base64');
+    await assert.rejects(submitRent(store,f.landlord,f.value.id,step.id,signed,options),/Only the tenant/);
+    const opKey=`solana-operation:${step.operationId}`,op=await store.get<{kind:string;review:Record<string,unknown>}>(opKey);
+    for (const changed of [{kind:'test-usdc-faucet',review:op!.review},{kind:op!.kind,review:{...op!.review,month:'2026-11'}},{kind:op!.kind,review:{...op!.review,agreementId:'another-tenancy'}},{kind:op!.kind,review:{...op!.review,tenantWallet:f.recipient.address}}]) {
+      await store.update<{kind:string;review:Record<string,unknown>}>(opKey,current=>({...current,...changed}));
+      await assert.rejects(submitRent(store,f.tenant,f.value.id,step.id,signed,options),/exact tenancy and rent month/);
+      await assert.rejects(readRent(store,f.tenant,f.value.id,options),/exact tenancy and rent month/);
+    }
+    await store.update<{kind:string;review:Record<string,unknown>}>(opKey,current=>({...current,kind:op!.kind,review:op!.review}));assert.equal(sends,0);
+    await submitRent(store,f.tenant,f.value.id,step.id,signed,options);
+    const pending=await readRent(store,f.tenant,f.value.id,options);assert.equal(pending!.payment!.state,'pending');assert.ok(pending!.payment!.steps[0].signature);assert.equal(pending!.payment!.steps[0].solanaRequest,null);
+    assert.equal((await prepareRent(store,f.tenant,f.value.id,options))!.payment!.steps[0].operationId,step.operationId);
+    finalized=true;const paid=await readRent(store,f.landlord,f.value.id,options);assert.equal(paid!.payment!.state,'confirmed');assert.equal(paid!.payment!.landlordRaw,'520000003');assert.equal(paid!.payment!.buildingRaw,'130000000');
+    await assert.rejects(prepareRent(store,f.tenant,f.value.id,options),/already paid/);
+    now=Date.parse('2026-10-31T23:00:00Z');const next=await prepareRent(store,f.tenant,f.value.id,options);assert.equal(next!.month,'2026-11');assert.equal(next!.payment!.month,'2026-11');assert.notEqual(next!.payment!.id,first!.payment!.id);assert.ok(sends>=1);
+  } finally {await store.close();}
+});
+
+test('Solana rent expiry refreshes unsigned reviews, reserves missing signatures until finalized lifetime and never replaces suspicious receipts',async()=>{
+  const f=await solanaFixture(),store=new LocalStore(':memory:');let now=Date.parse('2026-10-04T12:00:00Z'),height='100',receipt:'missing'|'bad'='missing',lookupCount=0,sends=0,short=false;
+  const gateway={
+    lifetime:async()=>({blockhash:'11111111111111111111111111111111',lastValidBlockHeight:'200',blockHeight:height}),
+    simulate:async()=>{if(short)throw new Error('Exact transaction simulation failed');return{slot:'1',sponsorDebitCeilingLamports:'3000000',networkFeeLamports:'10000'};},
+    broadcast:async(bytes:Uint8Array)=>{sends++;return getBase58Decoder().decode(getTransactionDecoder().decode(bytes).signatures[f.payer.address]!);},
+    reconcile:async()=>{lookupCount++;return receipt==='bad'?{status:'failed' as const,reason:'receipt-does-not-match-authorized-message'}:{status:'unknown' as const,reason:'signature-not-observed-do-not-resubmit-new-intent'};},
+  };
+  const sponsor={address:f.payer.address,sign:async(bytes:Uint8Array)=>new Uint8Array(getTransactionEncoder().encode(await partiallySignTransaction([f.payer.keyPair],getTransactionDecoder().decode(bytes))))};
+  const operations=createSolanaOperations({store,gateway,sponsor,config:{cluster:'devnet',genesisHash:f.manifest.genesisHash,maximumSponsorLamports:10_000_000n},now:()=>now});
+  const options={houseManifest:f.manifest,solana:{operations,sponsor},now:()=>now,readJourney:(async()=>({stage:'living',chain:{phase:'active'}} as TenancyJourney)) as typeof tenancyJourney};
+  const signReview=async(review:NonNullable<RentPayment['steps'][number]['solanaRequest']>)=>Buffer.from(getTransactionEncoder().encode(await partiallySignTransaction([f.owner.keyPair],getTransactionDecoder().decode(Buffer.from(review.transactionBase64,'base64'))))).toString('base64');
+  try {
+    await store.create(`agreement:${f.value.id}`,f.value);
+    short=true;const stopped=await prepareRent(store,f.tenant,f.value.id,options);assert.match(stopped!.payment!.error!,/tUSDC balance/);short=false;
+    const first=await prepareRent(store,f.tenant,f.value.id,options),step=first!.payment!.steps[0],signed=await signReview(step.solanaRequest!);
+    now+=120000;await assert.rejects(submitRent(store,f.tenant,f.value.id,step.id,signed,options),/rent review expired/);assert.equal(sends,0);
+    const refreshed=await prepareRent(store,f.tenant,f.value.id,options),fresh=refreshed!.payment!.steps[0];assert.equal(fresh.id,step.id);assert.notEqual(fresh.operationId,step.operationId);assert.equal(fresh.attempt,1);
+    const inactive={...options,readJourney:(async()=>({stage:'move-out',chain:{phase:'claim-proposed'}} as TenancyJourney)) as typeof tenancyJourney};
+    await assert.rejects(submitRent(store,f.tenant,f.value.id,fresh.id,await signReview(fresh.solanaRequest!),inactive),/active tenancy/);
+    await submitRent(store,f.tenant,f.value.id,fresh.id,await signReview(fresh.solanaRequest!),options);
+    height='200';const boundary=await prepareRent(store,f.tenant,f.value.id,options);assert.equal(boundary!.payment!.steps[0].operationId,fresh.operationId);assert.equal(boundary!.payment!.state,'pending');
+    const before=lookupCount;height='201';const expired=await readRent(store,f.tenant,f.value.id,options);assert.ok(lookupCount>=before+2);assert.equal(expired!.payment!.steps[0].retryable,true);
+    height='100';const replacement=await prepareRent(store,f.tenant,f.value.id,options),newStep=replacement!.payment!.steps[0];assert.notEqual(newStep.operationId,fresh.operationId);assert.equal(newStep.attempt,2);
+    receipt='bad';await submitRent(store,f.tenant,f.value.id,newStep.id,await signReview(newStep.solanaRequest!),options);
+    const suspicious=await prepareRent(store,f.tenant,f.value.id,options);assert.equal(suspicious!.payment!.state,'pending');assert.equal(suspicious!.payment!.steps[0].retryable,false);assert.equal(suspicious!.payment!.steps[0].operationId,newStep.operationId);
+  } finally {await store.close();}
 });

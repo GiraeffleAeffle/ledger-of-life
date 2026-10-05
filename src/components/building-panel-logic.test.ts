@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildingActionState, estimateBuildingHeat, projectedBuildingEarnings } from './building-panel-logic.ts';
+import { buildingActionState, estimateBuildingHeat, projectedBuildingEarnings, solanaHouseActionState } from './building-panel-logic.ts';
 
 test('measured token energy takes precedence over nominal runtime', () => {
   assert.deepEqual(estimateBuildingHeat({ tokens: 1000, measuredWhPerToken: 0.2, runtimeMs: 3_600_000, nominalWatts: 300 }), { kwh: 0.2, assumption: '1000 served tokens × 0.2 measured Wh/token', method: 'tokens' });
@@ -54,4 +54,33 @@ test('earnings projection ticks by stake share and never past the stream end or 
   assert.equal(projectedBuildingEarnings({ ...stream, now: 99 }), '10400');
   assert.equal(projectedBuildingEarnings({ ...stream, totalStakedRaw: '0' }), '10400');
   assert.equal(projectedBuildingEarnings({ ...stream, stakedRaw: '0' }), '10400');
+});
+
+const solanaReady = { operation: 'buy' as const, connected: true, configured: true, busy: false, quantityRaw: '5000000', cashAtomic: '10000000', walletUnitsRaw: '5000000', stakedRaw: '3000000', earnedRaw: '2000000', priceAtomic: '1000000', sellCapUnitsRaw: '100000000', deskCashAtomic: '10000000' };
+test('Solana buys need verified cash but no native fee balance; atomic limits are enforced', () => {
+  assert.equal(solanaHouseActionState(solanaReady), null);
+  assert.equal(solanaHouseActionState({ ...solanaReady, cashAtomic: null }), 'Wait for your verified tUSDC balance');
+  assert.equal(solanaHouseActionState({ ...solanaReady, cashAtomic: '4999999' }), 'Get more test USDC in Me');
+  assert.equal(solanaHouseActionState({ ...solanaReady, quantityRaw: '999' }), 'Buy between 0.001 and 100 tUSDC');
+  assert.equal(solanaHouseActionState({ ...solanaReady, quantityRaw: '100000001' }), 'Buy between 0.001 and 100 tUSDC');
+  for (const quantityRaw of [null, '0', '-1', '1.1', '18446744073709551616']) assert.equal(solanaHouseActionState({ ...solanaReady, quantityRaw }), 'Enter a positive six-decimal amount');
+});
+test('Solana sell and unstake respect separate wallet/stake balances, desk liquidity and caps', () => {
+  assert.equal(solanaHouseActionState({ ...solanaReady, operation: 'sell' }), null);
+  assert.equal(solanaHouseActionState({ ...solanaReady, operation: 'sell', deskCashAtomic: '4999999' }), 'The house desk needs more test USDC');
+  assert.equal(solanaHouseActionState({ ...solanaReady, operation: 'sell', sellCapUnitsRaw: '4999999' }), 'Sell-back exceeds the house unit cap');
+  assert.equal(solanaHouseActionState({ ...solanaReady, operation: 'stake', quantityRaw: '5000001' }), 'Not enough wallet units; unstake before selling');
+  assert.equal(solanaHouseActionState({ ...solanaReady, operation: 'unstake', quantityRaw: '3000001' }), 'Not enough of your own staked units');
+  assert.equal(solanaHouseActionState({ ...solanaReady, operation: 'unstake', quantityRaw: '3000000' }), null);
+});
+test('Solana claim and one-signature reinvest need verified income, never approval or gas', () => {
+  assert.equal(solanaHouseActionState({ ...solanaReady, operation: 'claim', quantityRaw: null, stakedRaw: '0' }), null);
+  assert.equal(solanaHouseActionState({ ...solanaReady, operation: 'reinvest', quantityRaw: null }), null);
+  assert.equal(solanaHouseActionState({ ...solanaReady, operation: 'claim', earnedRaw: null }), 'Wait for verified claimable income');
+  assert.equal(solanaHouseActionState({ ...solanaReady, operation: 'claim', earnedRaw: '0' }), 'No claimable test USDC');
+  assert.equal(solanaHouseActionState({ ...solanaReady, operation: 'reinvest', earnedRaw: '100000001' }), 'One reinvest is capped at 100 tUSDC');
+  assert.equal(solanaHouseActionState({ ...solanaReady, operation: 'reinvest', earnedRaw: '1', priceAtomic: '2000000' }), 'Income is too small to buy an atomic unit');
+  assert.equal(solanaHouseActionState({ ...solanaReady, connected: false }), 'Connect your Solana wallet in Me');
+  assert.equal(solanaHouseActionState({ ...solanaReady, configured: false }), 'Wait for the verified Solana house');
+  assert.equal(solanaHouseActionState({ ...solanaReady, busy: true }), 'Finish the current house review or transaction first');
 });

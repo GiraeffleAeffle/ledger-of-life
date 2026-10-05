@@ -1,5 +1,6 @@
 import type { LocalAiApproval, LocalAiRequest } from '../server/local-ai-types.ts';
 
+// Solana approvals use prepareSolanaInferenceApproval, which decodes the complete SPL transaction.
 /** Never let server-supplied operation metadata select a weaker generic signing policy. */
 export function inferenceApprovalForReview(request: LocalAiRequest, approval: LocalAiApproval) {
   const signing = approval.request;

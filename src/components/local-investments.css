@@ -98,3 +98,13 @@
   .local-capital .agri-pv-fields { grid-template-columns: 1fr; }
   .local-capital .agri-pv-results { overflow-x: auto; }
 }
+.solana-house .local-order-review { border: 1px solid var(--line); border-radius: 12px; padding: 18px; min-width: 0; }
+.solana-review-addresses { display: grid; grid-template-columns: minmax(130px, .5fr) minmax(0, 1fr); gap: 8px 16px; font-size: .78rem; }
+.solana-review-addresses dt { color: var(--muted); }
+.solana-review-addresses dd { margin: 0; overflow-wrap: anywhere; }
+.solana-house .local-test-actions { flex-wrap: wrap; }
+.earlier-house { display: grid; gap: 16px; min-width: 0; }
+@media (max-width: 600px) {
+  .solana-review-addresses { grid-template-columns: minmax(0, 1fr); }
+  .solana-review-addresses dd { margin-bottom: 8px; }
+}

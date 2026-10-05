@@ -14,7 +14,7 @@ export async function readLocalAiResponse<T>(response: Response, expectedRequest
     throw new Error(typeof data.error === 'string' ? data.error : `The request failed (${response.status}).`);
   if (expectedRequestId && (!request || request.id !== expectedRequestId))
     throw new Error('The saved result does not match this request.');
-  if (response.status === 402) {
+  if (response.status === 402 && !request?.solanaReview) {
     if (!request) throw new Error('The node returned a payment challenge without a request.');
     request.paymentRequired = codec.getPaymentRequiredResponse((name) => response.headers.get(name));
   }

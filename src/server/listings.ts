@@ -6,9 +6,11 @@ import { requireReady, walletFor, type Agreement } from './agreements.ts';
 import { AccessError, ConflictError } from './errors.ts';
 import type { Store } from './store.ts';
 import { roundedLocation, type HomeLocation } from '../domain/home-location.ts';
-import { cashDepositForm, shareDepositForm, validateDepositSecurity, type DepositForm } from '../domain/deposit-form.ts';
+import { cashDepositForm, shareDepositForm, solanaShareDepositForm, validateDepositSecurity, type DepositForm } from '../domain/deposit-form.ts';
 import { loadShareDepositManifest, requireDeposit } from './share-deposit-chain.ts';
 import { BUILDING_RENT_SHARE_BPS, RENT_BUILDING_ID, type BuildingRent } from '../domain/rent.ts';
+import { loadSolanaHouseManifest } from './solana-house-config.ts';
+import { solanaSharesConfiguration } from './solana-shares-config.ts';
 
 /**
  * Pre-tenancy workflow: a landlord publishes a home, verified people apply, the landlord chooses
@@ -146,27 +148,34 @@ function details(input: Record<string, unknown>): HomeDetails {
   };
 }
 
-export async function createListing(store: Store, identity: VerifiedIdentity, input: Record<string, unknown>) {
+export async function createListing(store: Store, identity: VerifiedIdentity, input: Record<string, unknown>, environment: Record<string, string | undefined> = process.env) {
   requireReady(identity);
   if (input.buildingHome !== undefined && typeof input.buildingHome !== 'boolean')
     throw new WorkflowError('Choose whether this flat is in the fictional Neighbourhood Homes building.');
   if (input.shareBps !== undefined || input.buildingRent !== undefined)
     throw new WorkflowError('The building rent share is fixed at 20%, not editable.');
+  const houseManifest = input.buildingHome ? loadSolanaHouseManifest(environment) : null;
   const buildingRent: BuildingRent | undefined = input.buildingHome
-    ? { buildingId: RENT_BUILDING_ID, shareBps: BUILDING_RENT_SHARE_BPS, landlordWallet: walletFor(identity, 'robinhood').address }
+    ? houseManifest
+      ? { network: 'solana-devnet', house: houseManifest.houses['neighbourhood-homes'].house, shareBps: BUILDING_RENT_SHARE_BPS, landlordWallet: walletFor(identity, 'solana').address }
+      : { buildingId: RENT_BUILDING_ID, shareBps: BUILDING_RENT_SHARE_BPS, landlordWallet: walletFor(identity, 'robinhood').address }
     : undefined;
   if (typeof input.releaseAllowed !== 'boolean') throw new WorkflowError('Choose the earnings policy.');
-  if (input.depositForm !== undefined && input.depositForm !== 'cash' && input.depositForm !== 'shares')
-    throw new WorkflowError('Choose cash or shares for the deposit.');
+  if (input.depositForm !== undefined && input.depositForm !== 'cash' && input.depositForm !== 'shares' && input.depositForm !== 'shares-solana')
+    throw new WorkflowError('Choose cash or shares for the deposit (Robinhood or Solana test shares).');
   const security = amount(input.requiredSecurity, 'The deposit');
   const rent = amount(input.rentMonthly, 'The monthly cold rent');
-  validateDepositSecurity(rent, security, input.depositForm === 'shares' ? 'shares' : 'cash');
+  validateDepositSecurity(rent, security, input.depositForm === 'shares' || input.depositForm === 'shares-solana' ? 'shares' : 'cash');
   const deployment = input.depositForm === 'shares' ? await loadShareDepositManifest() : null;
   if (input.depositForm === 'shares') requireDeposit(deployment?.factory, 'Share deposit not deployed yet');
-  const form = input.depositForm === 'shares'
-    ? shareDepositForm(security, deployment!.factory, input)
-    : cashDepositForm();
-  const network = form.kind === 'shares' ? 'robinhood' : 'solana';
+  const solanaDeployment = input.depositForm === 'shares-solana' ? await solanaSharesConfiguration(environment) : null;
+  if (input.depositForm === 'shares-solana' && !solanaDeployment) throw new WorkflowError('Solana share deposit not deployed yet.');
+  const form = input.depositForm === 'shares-solana'
+    ? solanaShareDepositForm(security, solanaDeployment!, input)
+    : input.depositForm === 'shares'
+      ? shareDepositForm(security, deployment!.factory, input)
+      : cashDepositForm();
+  const network = form.kind === 'shares' && form.network !== 'solana-devnet' ? 'robinhood' : 'solana';
   const value: Listing = {
     id: randomUUID(),
     network,
@@ -203,7 +212,7 @@ export async function listListings(store: Store, identity: VerifiedIdentity | nu
 export async function applyToListing(store: Store, identity: VerifiedIdentity, id: string, input: Record<string, unknown>) {
   requireReady(identity);
   const next = await store.update<Listing>(key(id), (value) => {
-    const wallet = walletFor(identity, value.depositForm?.kind === 'shares' ? 'robinhood' : 'solana');
+    const wallet = walletFor(identity, value.depositForm?.kind === 'shares' && value.depositForm.network !== 'solana-devnet' ? 'robinhood' : 'solana');
     if (value.status !== 'open') throw new ConflictError('This home is no longer available.');
     if (value.landlord.subject === identity.subject || value.landlord.wallet.address === wallet.address)
       throw new AccessError('Landlords cannot apply to their own listing.');

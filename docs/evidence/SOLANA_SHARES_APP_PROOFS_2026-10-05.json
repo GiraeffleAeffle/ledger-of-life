@@ -1,0 +1,35 @@
+{
+  "date": "2026-10-05",
+  "network": "solana-devnet",
+  "status": "prepared-not-executed-local-sponsor-mismatch",
+  "gateAuthorization": false,
+  "proofsExecuted": false,
+  "signatures": [],
+  "sponsorDiscovery": {
+    "api": "Authenticated GET /api/finance/solana exposes feePayer",
+    "localApiObservation": "LaunchOwner reported HTTP 401: expired session",
+    "source": "configuredFeeSponsor().address using existing runtime environment; only public address printed",
+    "localFeePayer": "7h3dQn7ZSaq21MsaQYCYVruESdLH2DjnBK9FbUKieaDY",
+    "requiredHostedIssuerAndPriceAuthority": "3AoHstmog6FiCcBaVAh8jnB8iVc2v9oUvN2Pnn76YtbH",
+    "matches": false,
+    "keysSwapped": false
+  },
+  "runners": [
+    {
+      "path": "src/server/shared-market-solana.devnet.test.ts",
+      "optIn": "SOLANA_LENDING_DEVNET_PROOF=1",
+      "coverage": ["site tUSDC faucet", "share faucet", "lend", "deposit collateral", "borrow", "repay full outstanding debt within reviewed cap", "withdraw collateral", "withdraw one tUSDC of lender entitlement"],
+      "residualPosition": "Remaining lender entitlement is disclosed in final read model, not claimed closed."
+    },
+    {
+      "path": "src/server/share-deposit-solana.devnet.test.ts",
+      "optIn": "SOLANA_SHARE_DEPOSIT_DEVNET_PROOF=1",
+      "coverage": ["share faucet", "create agreement and escrow", "pledge", "activate", "propose claim", "accept claim", "landlord in-kind payout", "tenant in-kind payout", "closed state"]
+    }
+  ],
+  "signing": "Ephemeral in-memory fixture signers, not Privy evidence; configured site sponsor only; exact prepared review printed before each actor signature; devnet Explorer receipts after finalized reconciliation.",
+  "prerequisites": ["LaunchOwner gate authorization", "Deployed SOLANA_SHARES_MANIFEST", "SOLANA_TEST_SIGNER_MODE=1", "Existing server RPC and sponsor environment", "Configured site cash faucet for lending fixture", "Hosted issuer sponsor must match: do not substitute keys"],
+  "deferred": "Local sponsor mismatch prevents market signing including lending. Faucet, price and price-dependent share deposit proofs are deferred to authorized hosted release using its existing sponsor.",
+  "verification": "No builds, lint, tests or transaction proofs executed. Public sponsor discovery only.",
+  "disclaimer": "Test tokens and fictional shares have no value or legal rights. Prepared runners are not successful execution evidence."
+}

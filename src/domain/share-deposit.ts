@@ -2,7 +2,7 @@ import type { ShareDepositForm } from './deposit-form.ts';
 import type { PriceJobStatus } from '../server/price-job-health.ts';
 export type ShareDepositAction = 'create' | 'approve' | 'pledge' | 'activate' | 'withdraw' | 'proposeClaim' | 'acceptClaim' | 'contestClaim' | 'lowerClaim' | 'escalateClaim' | 'resolveClaim' | 'requestReturn' | 'closeUnclaimed' | 'closeUnresolved' | 'payout';
 export type ShareDepositView = {
-  kind: 'shares'; rentalId: string; deployment: 'not_deployed' | 'deployed'; chainId: 46630;
+  kind: 'shares'; rentalId: string; deployment: 'not_deployed' | 'deployed'; chainId: 46630 | 'solana-devnet'; network?: 'solana-devnet'; decimals?: 6 | 18;
   escrow: string | null; state: 'AwaitingLock' | 'Active' | 'ClaimPending' | 'ClaimContested' | 'Closed' | null;
   agreementHash: string | null; form: ShareDepositForm; role: 'tenant' | 'landlord' | 'arbitrator';
   quote: { priceUsd6: string; sourceTime: number; copiedAt: number | null; fresh: boolean } | null;
@@ -18,3 +18,4 @@ export type ShareDepositTerms = { tenant: string; landlord: string; arbitrator: 
 export type ShareDepositReview = { title: string; lines: string[]; factory: string; escrow: string; stock: string; functionName: string; args: unknown[]; terms: ShareDepositTerms; role: ShareDepositView['role']; approvalShares: string | null; priceUsd6: string | null };
 export type ShareDepositTransaction = { chainId: 46630; to: string; data: string; value: '0x0'; nonce: number; gas: string; maxFeePerGas: string; maxPriorityFeePerGas: string };
 export type ShareDepositPlan = { id: string; rentalId: string; action: ShareDepositAction; walletId: string; chainId: 46630; from: string; to: string; data: string; value: '0x0'; transaction: ShareDepositTransaction; review: ShareDepositReview; expiresAt: string };
+export type SolanaShareDepositPlan = { id: string; rentalId: string; action: ShareDepositAction; walletId: string; network: 'solana-devnet'; transactionBase64: string; feePayer: string; expiresAt: string; review: { title: string; lines: string[]; programId: string; mint: string; escrow: string; agreementHash: string; securityUsd6: string; responseWindow: number; returnWindow: number; arbitrationWindow: number; actor: string; tenant: string; landlord: string; arbitrator: string; shares: string | null; usd6: string | null; priceUsd6: string | null } };

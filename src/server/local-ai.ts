@@ -15,18 +15,20 @@ import { PERMIT2_ADDRESS } from '@x402/evm';
 import { assertAiPaymentVerified, createAiResource, facilitatorAccount, inspectAiReceipt, recoverExpiredUnsignedSettlement, validatePaymentPayload, type AiPayment } from './local-ai-payment.ts';
 import { acquireVisitorLease, assertVisitorActive, type VisitorLease } from './local-ai-session.ts';
 import type { LocalAiApproval, LocalAiContext, LocalAiMode, LocalAiRequest } from './local-ai-types.ts';
+import { createSolanaAiQuote, settleSolanaAi, solanaAiEnabled, type SolanaAiJournal } from './local-ai-payment.ts';
 import { purged, textDue, textGraceMs } from './local-ai-retention.ts';
 import { CONNECTOR_JOB_TIMEOUT_MS, cancelConnectorInference, chooseConnectorHost, enqueueConnectorInference, reserveConnectorHost, releaseConnectorHost } from './local-ai-hosts.ts';
 import { deriveAiProgress, type AiProgressEvents, type ProgressRequest } from '../components/local-ai-progress-state.ts';
 
 export type AiInput = { mode: LocalAiMode; prompt: string; maxOutputTokens: number; context: LocalAiContext; hostScope: 'own' | 'city'; publicQuestion: boolean };
-export type PaidAiOwner = { subject: string; walletId: string; payer: Address };
+export type PaidAiOwner = { subject: string; walletId: string; payer: Address; network?: 'solana-devnet' };
 export type VisitorAiOwner = { visitor: string };
 export type AiOwner = PaidAiOwner | VisitorAiOwner;
 type AiRecord = {
   id: string; mode: LocalAiMode; owner: AiOwner; request: LocalAiRequest; context: LocalAiContext;
   payee: Address | null; resourceUrl: string; paymentJournal: AiPayment | null; runningAt?: number; completedAt?: string;
   progressEvents?: AiProgressEvents;
+  solanaJournal?: SolanaAiJournal;
   approvalJournal: { signed: Hex | null; hash: Hex | null; transaction: NonNullable<LocalAiApproval['request']>['transaction'] } | null;
 };
 const prefix = 'local-ai:request:';
@@ -35,7 +37,7 @@ const own = (record: AiRecord, owner: AiOwner) => {
   if ('visitor' in record.owner) {
     if (!('visitor' in owner) || !owner.visitor || record.owner.visitor !== owner.visitor) throw new AccessError('This answer belongs to another visitor.');
   } else if (!('subject' in owner) || record.owner.subject !== owner.subject || record.owner.walletId !== owner.walletId ||
-      record.owner.payer.toLowerCase() !== owner.payer.toLowerCase()) throw new AccessError('This answer belongs to another account.');
+      (record.owner.network === 'solana-devnet' ? record.owner.payer !== owner.payer : record.owner.payer.toLowerCase() !== owner.payer.toLowerCase())) throw new AccessError('This answer belongs to another account.');
 };
 const fingerprint = (parts: unknown[]): Hex => `0x${createHash('sha256').update(JSON.stringify(parts)).digest('hex')}`;
 function inputFingerprint(id: string, owner: AiOwner, input: AiInput, resourceUrl: string, payee: Address | null, hostId?: string): Hex {
@@ -45,9 +47,15 @@ function inputFingerprint(id: string, owner: AiOwner, input: AiInput, resourceUr
     input.mode === 'paid' && payee ? ['eip155:46630', TEST_USDG_ADDRESS, inferenceMaximum(input.maxOutputTokens).toString(), payee] : [input.mode === 'paid' ? 'own-compute' : 'library', '0']]);
 }
 function validId(id: string) { if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new WorkflowError('Use a UUID request ID.'); }
-export function paidOwner(identity: VerifiedIdentity): PaidAiOwner {
-  const wallet = walletFor(identity, 'robinhood');
-  return { subject: identity.subject, walletId: wallet.id, payer: getAddress(wallet.address) };
+export function paidOwner(identity: VerifiedIdentity, network: 'solana-devnet' | 'robinhood' = solanaAiEnabled() ? 'solana-devnet' : 'robinhood'): PaidAiOwner {
+  const wallet = walletFor(identity, network === 'solana-devnet' ? 'solana' : 'robinhood');
+  // Legacy EVM settlement types stay isolated; Solana uses the explicit network discriminator.
+  return { subject: identity.subject, walletId: wallet.id, payer: wallet.address as Address,
+    ...(network === 'solana-devnet' ? { network } : {}) };
+}
+export async function paidOwnerForRequest(store: Store, id: string, identity: VerifiedIdentity) {
+  const record = await store.get<AiRecord>(prefix + id);
+  return paidOwner(identity, record ? record.owner && 'payer' in record.owner && record.owner.network === 'solana-devnet' ? 'solana-devnet' : 'robinhood' : undefined);
 }
 export function libraryOwner(visitor: string): VisitorAiOwner {
   if (!/^[a-f0-9]{64}$/.test(visitor)) throw new AccessError('A private visitor session is required.');
@@ -187,9 +195,11 @@ async function prepareQuote(store: Store, id: string, owner: AiOwner, input: AiI
   if (!process.env.LOCAL_AI_OLLAMA_URL && !connector) throw new ConflictError('No online host serves this model within your chosen question privacy scope.');
   const ownCompute = !!connector && 'subject' in owner && connector.ownerSubject === owner.subject;
   const charge = input.mode === 'paid' && !ownCompute;
-  const payee = charge ? connector ? getAddress(connector.payoutWallet!) : await inferencePayee() : null;
+  const solana = charge && 'payer' in owner && owner.network === 'solana-devnet';
+  const solanaQuote = solana ? await createSolanaAiQuote(id, owner, input.maxOutputTokens, connector) : null;
+  const payee = charge && !solana ? connector ? getAddress(connector.payoutWallet!) : await inferencePayee() : null;
   const payer = 'payer' in owner ? owner.payer : null;
-  if (charge) {
+  if (charge && !solana) {
     if (!payer || !payee || payee.toLowerCase() === payer.toLowerCase()) throw new ConflictError('Paid requests require separate payer and provider wallets.');
     if (!connector) await assertInferenceAvailable();
     await assertInferenceContracts();
@@ -197,10 +207,11 @@ async function prepareQuote(store: Store, id: string, owner: AiOwner, input: AiI
     if (await aiRpc.getBalance({ address: account.address }) < 50000000000000n)
       throw new ConflictError('Dedicated facilitator account needs testnet gas before paid inference.');
   }
-  const signature = inputFingerprint(id, owner, input, resourceUrl, payee, connector?.id);
+  const signature = solanaQuote ? fingerprint(['local-ai-solana-v1', inputFingerprint(id, owner, input, resourceUrl, null, connector?.id), solanaQuote]) :
+    inputFingerprint(id, owner, input, resourceUrl, payee, connector?.id);
   let required: PaymentRequired | null = null;
   const expiry = new Date(now + 18 * 60_000).toISOString();
-  if (charge) {
+  if (charge && !solana) {
     const resource = await createAiResource(store, prefix + id, payer!, payee!);
     const requirements = await resource.buildPaymentRequirements({ scheme: 'upto', network: 'eip155:46630', payTo: payee!,
       price: { asset: TEST_USDG_ADDRESS, amount: inferenceMaximum(input.maxOutputTokens).toString() }, maxTimeoutSeconds: 1200,
@@ -213,17 +224,18 @@ async function prepareQuote(store: Store, id: string, owner: AiOwner, input: AiI
     maxOutputTokens: input.maxOutputTokens, requestFingerprint: signature, createdAt: new Date(now).toISOString(), expiresAt: expiry,
     answer: null, purgedAt: null, usage: null, error: null,
     payment: { state: charge ? 'quoted' : 'none', amountAtomic: charge ? inferenceMaximum(input.maxOutputTokens).toString() : '0', receipt: null },
-    review: charge ? { walletId: (owner as Extract<AiOwner, { walletId: string }>).walletId,
+    review: charge && !solana ? { walletId: (owner as Extract<AiOwner, { walletId: string }>).walletId,
       operationId: id, description: `Pay per token: 0.0001 tUSDG per generated token, at most ${Number(inferenceMaximum(input.maxOutputTokens)) / 1e6} tUSDG for this answer`, expiresAt: expiry,
       requestId: id, requestFingerprint: signature, resourceUrl, chainId: 46630,
       asset: TEST_USDG_ADDRESS, payTo: payee!, amountAtomic: inferenceMaximum(input.maxOutputTokens).toString(),
       maxOutputTokens: input.maxOutputTokens, facilitatorAddress: (await facilitatorAccount()).address } : null,
     paymentRequired: required, approval: null,
   };
+  if (solanaQuote) request.solanaReview = { ...solanaQuote, requestFingerprint: signature, expiresAt: expiry };
   if (connector) request.host = { id: connector.id, name: connector.name, own: ownCompute, kind: connector.kind ?? 'community', payoutWallet: charge ? connector.payoutWallet! : null };
   request.hostScope = input.hostScope; request.publicQuestion = input.publicQuestion;
   const record: AiRecord = { id, mode: input.mode, owner, request, context: input.context, payee, resourceUrl,
-    paymentJournal: null, approvalJournal: null };
+    paymentJournal: null, approvalJournal: null, ...(solanaQuote ? { solanaJournal: { approvalId: null, settlementId: null } } : {}) };
   await store.create(prefix + id, record);
   return record;
 }
@@ -251,6 +263,10 @@ async function reserveNonce(store: Store, record: AiRecord, payload: PaymentPayl
   return latest;
 }
 async function settleStored(store: Store, record: AiRecord): Promise<AiRecord> {
+  if (record.request.solanaReview) {
+    await settleSolanaAi(store, prefix + record.id);
+    return (await store.get<AiRecord>(prefix + record.id))!;
+  }
   if (!record.request.answer || !record.paymentJournal || !record.payee || !('payer' in record.owner)) throw new ConflictError('No completed authorized inference is available.');
   if (await recoverExpiredUnsignedSettlement(store, prefix + record.id, record.owner.payer, record.payee))
     return (await store.get<AiRecord>(prefix + record.id))!;
@@ -302,8 +318,10 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
   if (record && textDue(record, Date.now(), textGraceMs())) record = await purgeDueText(store, id, Date.now());
   if (record) {
     own(record, owner);
-    if (record.request.requestFingerprint !== inputFingerprint(id, owner, input, resourceUrl, record.payee, record.request.host?.id))
-      throw new ConflictError('Request ID already belongs to different inference inputs.');
+    const expected = record.request.solanaReview ? fingerprint(['local-ai-solana-v1',
+      inputFingerprint(id, owner, input, resourceUrl, null, record.request.host?.id),
+      { ...record.request.solanaReview, requestFingerprint: undefined, expiresAt: undefined }]) : inputFingerprint(id, owner, input, resourceUrl, record.payee, record.request.host?.id);
+    if (record.request.requestFingerprint !== expected) throw new ConflictError('Request ID already belongs to different inference inputs.');
   }
   else {
     try { record = await prepareQuote(store, id, owner, input, resourceUrl); }
@@ -311,7 +329,9 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
       record = await store.get<AiRecord>(prefix + id);
       if (!record) throw error;
       own(record, owner);
-      if (record.request.requestFingerprint !== inputFingerprint(id, owner, input, resourceUrl, record.payee, record.request.host?.id)) throw new ConflictError('Request ID already belongs to different inference inputs.');
+      if (record.request.prompt !== input.prompt || record.request.maxOutputTokens !== input.maxOutputTokens || record.context !== input.context ||
+          record.request.hostScope !== input.hostScope || record.request.publicQuestion !== input.publicQuestion || record.resourceUrl !== resourceUrl)
+        throw new ConflictError('Request ID already belongs to different inference inputs.');
     }
   }
   const payee = record.payee;
@@ -328,7 +348,9 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
     if (!value.paymentJournal) { value.request.state = 'expired'; value.request.error = 'Inference review expired without a payment.'; }
     return value;
   }));
-  if (input.mode === 'paid' && record.request.payment.state !== 'none') {
+  if (input.mode === 'paid' && record.request.solanaReview) {
+    if (record.request.approval?.state !== 'completed' || record.request.payment.state !== 'authorized') return publicRequest(record);
+  } else if (input.mode === 'paid' && record.request.payment.state !== 'none') {
     if (!paymentHeader && !record.paymentJournal) return publicRequest(record);
     if (!record.paymentJournal) {
       const payer = (owner as Extract<AiOwner, { payer: Address }>).payer;
@@ -399,8 +421,9 @@ export async function executeAiRequest(store: Store, id: string, owner: AiOwner,
         visitorLease?.assertActive();
         if (value.request.state !== 'running' || value.request.purgedAt) throw new ConflictError('Inference ownership changed.');
         if (value.request.payment.state !== 'none') {
-          value.request.payment.amountAtomic = inferenceCharge(inference.usage.outputTokens, BigInt(value.paymentJournal!.requirements.amount)).toString();
-          value.paymentJournal!.amount = value.request.payment.amountAtomic;
+          value.request.payment.amountAtomic = inferenceCharge(inference.usage.outputTokens,
+            BigInt(value.request.solanaReview?.amountAtomic ?? value.paymentJournal!.requirements.amount)).toString();
+          if (value.paymentJournal) value.paymentJournal.amount = value.request.payment.amountAtomic;
         }
         value.request.answer = inference.answer; value.request.usage = inference.usage;
         (value.progressEvents ??= {}).answerReceivedAt = new Date().toISOString();

@@ -57,7 +57,7 @@ export type SolanaSimulation = {
 export type SolanaGateway = {
   snapshot(): Promise<SolanaSnapshot>;
   lifetime(): Promise<{ blockhash: string; lastValidBlockHeight: string; blockHeight: string }>;
-  simulate(bytes: Uint8Array, sponsor: string, actor: string): Promise<SolanaSimulation>;
+  simulate(bytes: Uint8Array, sponsor: string, actor: string, expectedDeltas?: readonly ExpectedTokenDelta[]): Promise<SolanaSimulation>;
   broadcast(bytes: Uint8Array): Promise<string>;
   reconcile(
     signature: string,
@@ -206,10 +206,12 @@ export function verifyDeployedProgram(
   if (hash !== config.programSha256) throw new Error('Program code hash changed');
 }
 
-export class RpcSolanaGateway implements SolanaGateway {
-  config: SolanaConfiguration;
+export type BaseSolanaGatewayConfig = Pick<SolanaConfiguration, 'rpcUrl' | 'genesisHash' | 'maximumSponsorLamports'>;
+
+export class BaseSolanaGateway {
+  config: BaseSolanaGatewayConfig;
   fetcher: typeof fetch;
-  constructor(config: SolanaConfiguration, fetcher: typeof fetch = fetch) {
+  constructor(config: BaseSolanaGatewayConfig, fetcher: typeof fetch = fetch) {
     this.config = config;
     this.fetcher = fetcher;
   }
@@ -256,6 +258,178 @@ export class RpcSolanaGateway implements SolanaGateway {
         value === null ? null : account(keys[index], value),
       ),
     };
+  }
+  async lifetime() {
+    await this.checkedGenesis();
+    const [latest, height] = await Promise.all([
+      this.rpc('getLatestBlockhash', [{ commitment: 'finalized' }]),
+      this.rpc('getBlockHeight', [{ commitment: 'finalized' }]),
+    ]);
+    const value = object(object(latest).value);
+    if (typeof value.blockhash !== 'string') throw new Error('Blockhash unavailable');
+    return {
+      blockhash: value.blockhash,
+      lastValidBlockHeight: numeric(value.lastValidBlockHeight),
+      blockHeight: numeric(height),
+    };
+  }
+  async simulate(
+    transactionBytes: Uint8Array,
+    sponsor: string,
+    actor: string,
+    expectedDeltas?: readonly ExpectedTokenDelta[],
+  ): Promise<SolanaSimulation> {
+    const decoded = getTransactionDecoder().decode(transactionBytes);
+    const message = getCompiledTransactionMessageDecoder().decode(decoded.messageBytes);
+    if (
+      message.version !== 0 ||
+      (message.addressTableLookups?.length ?? 0) > 0 ||
+      message.staticAccounts[0] !== sponsor
+    )
+      throw new Error('Unexpected transaction structure');
+    const keys = message.staticAccounts.filter((_, index) =>
+      index < message.header.numSignerAccounts
+        ? index < message.header.numSignerAccounts - message.header.numReadonlySignerAccounts
+        : index < message.staticAccounts.length - message.header.numReadonlyNonSignerAccounts,
+    );
+    // Two finalized RPC reads can straddle a slot boundary. Never compare
+    // balances from different banks; retry the same exact transaction instead.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const before = await this.multiple(keys);
+      const result = object(
+        await this.rpc('simulateTransaction', [
+          Buffer.from(transactionBytes).toString('base64'),
+          {
+            encoding: 'base64',
+            sigVerify: false,
+            replaceRecentBlockhash: false,
+            commitment: 'finalized',
+            accounts: { encoding: 'base64', addresses: keys },
+          },
+        ]),
+      );
+      const value = object(result.value);
+      if (
+        value.err !== null ||
+        !Array.isArray(value.accounts) ||
+        value.accounts.length !== keys.length
+      )
+        throw new Error('Exact transaction simulation failed');
+      const slot = numeric(object(result.context).slot);
+      if (slot !== before.slot) {
+        if (attempt < 2) continue;
+        throw new Error('Simulation bank changed; request a fresh review');
+      }
+      const payerIndex = keys.indexOf(address(sponsor));
+      const pre = before.accounts[payerIndex],
+        post =
+          value.accounts[payerIndex] === null ? null : account(sponsor, value.accounts[payerIndex]);
+      if (!pre || !post) throw new Error('Sponsor simulation unavailable');
+      const debit =
+        atomic(pre.lamports) > atomic(post.lamports)
+          ? atomic(pre.lamports) - atomic(post.lamports)
+          : 0n;
+      // Sponsor-run permissionless actions (pull-v2 payouts) have no separate user to protect.
+      const actorIndex = actor === sponsor ? -1 : keys.indexOf(address(actor));
+      if (actorIndex >= 0) {
+        const original = before.accounts[actorIndex];
+        const final =
+          value.accounts[actorIndex] === null ? null : account(actor, value.accounts[actorIndex]);
+        if (original && (!final || atomic(final.lamports) < atomic(original.lamports)))
+          throw new Error('The user would pay native fees');
+      }
+      if (expectedDeltas !== undefined) {
+        if (new Set(expectedDeltas.map(delta => delta.account)).size !== expectedDeltas.length)
+          throw new Error('Duplicate simulated token expectation');
+        const expectedAccounts = new Set(expectedDeltas.map(delta => delta.account));
+        const expectedOwners = new Set(expectedDeltas.map(delta => delta.owner));
+        for (const expected of expectedDeltas) {
+          const index = keys.indexOf(address(expected.account));
+          if (index < 0) throw new Error('Expected token account is not writable');
+          const original = before.accounts[index];
+          const final = value.accounts[index] === null ? null : account(expected.account, value.accounts[index]);
+          if ((!original && !expected.allowCreated) || (!final && !expected.allowClosed) || (!original && !final))
+            throw new Error('Missing simulated token balance');
+          const preToken = original ? decodeClassicTokenAccount(original) : null;
+          const postToken = final ? decodeClassicTokenAccount(final) : null;
+          for (const token of [preToken, postToken]) {
+            if (token && (token.mint !== expected.mint || token.authority !== expected.owner || !token.initialized || token.frozen))
+              throw new Error('Wrong simulated token owner or mint');
+          }
+          const signed = (postToken ? atomic(postToken.amountAtomic) : 0n) - (preToken ? atomic(preToken.amountAtomic) : 0n);
+          const amount = expected.direction === 'debit' ? -signed : signed;
+          const minimum = atomic(expected.minimumAtomic), maximum = atomic(expected.maximumAtomic);
+          if (maximum < minimum || (expected.direction === 'unchanged' ? signed !== 0n : amount < minimum || amount > maximum))
+            throw new Error('Simulated token delta differs from review');
+        }
+        for (let index = 0; index < keys.length; index++) {
+          const original = before.accounts[index];
+          // Writable mints (82 bytes), e.g. house unit issuance, are not token balances.
+          if (!original || original.owner !== SOLANA_IDS.token || original.data.length !== 165 || expectedAccounts.has(keys[index])) continue;
+          const preToken = decodeClassicTokenAccount(original);
+          if (!expectedOwners.has(preToken.authority)) continue;
+          const final = value.accounts[index] === null ? null : account(keys[index], value.accounts[index]);
+          const postToken = final ? decodeClassicTokenAccount(final) : null;
+          if (!postToken || postToken.authority !== preToken.authority || postToken.mint !== preToken.mint || atomic(postToken.amountAtomic) < atomic(preToken.amountAtomic))
+            throw new Error('Unexpected simulated token loss');
+        }
+      }
+      const feeResult = object(
+        await this.rpc('getFeeForMessage', [
+          Buffer.from(decoded.messageBytes).toString('base64'),
+          { commitment: 'finalized' },
+        ]),
+      );
+      if (feeResult.value === null) throw new Error('Transaction fee unavailable');
+      const fee = atomic(numeric(feeResult.value));
+      // Deliberately conservative: includes fee even when the simulation already deducted it.
+      const ceiling = debit + fee;
+      if (ceiling > atomic(this.config.maximumSponsorLamports))
+        throw new Error('Sponsor fee and rent ceiling exceeded');
+      return {
+        slot,
+        sponsorDebitCeilingLamports: ceiling.toString(),
+        networkFeeLamports: fee.toString(),
+      };
+    }
+    throw new Error('Simulation bank changed; request a fresh review');
+  }
+  async broadcast(transactionBytes: Uint8Array) {
+    await this.checkedGenesis();
+    const result = await this.rpc('sendTransaction', [
+      Buffer.from(transactionBytes).toString('base64'),
+      { encoding: 'base64', skipPreflight: false, preflightCommitment: 'finalized' },
+    ]);
+    if (typeof result !== 'string') throw new Error('Broadcast response ambiguous');
+    return result;
+  }
+  reconcile(
+    signature: string,
+    messageSha256: string,
+    expectedDeltas: readonly ExpectedTokenDelta[],
+  ) {
+    return observeSolanaSignature(
+      {
+        rpcUrl: this.config.rpcUrl,
+        signature,
+        genesisHash: this.config.genesisHash,
+        expectedMessageSha256: messageSha256,
+        expectedDeltas,
+      },
+      this.fetcher,
+    );
+  }
+}
+
+/** The same network, simulation and reconciliation machinery without an escrow snapshot. */
+export function createBaseSolanaGateway(config: BaseSolanaGatewayConfig, fetcher: typeof fetch = fetch) {
+  return new BaseSolanaGateway(config, fetcher);
+}
+
+export class RpcSolanaGateway extends BaseSolanaGateway implements SolanaGateway {
+  declare config: SolanaConfiguration;
+  constructor(config: SolanaConfiguration, fetcher: typeof fetch = fetch) {
+    super(config, fetcher);
   }
   async snapshot(): Promise<SolanaSnapshot> {
     const c = this.config;
@@ -373,128 +547,5 @@ export class RpcSolanaGateway implements SolanaGateway {
       availableLiquidityAtomic: lending.availableLiquidityAtomic,
       requiresRefresh: lending.requiresRefresh,
     };
-  }
-  async lifetime() {
-    await this.checkedGenesis();
-    const [latest, height] = await Promise.all([
-      this.rpc('getLatestBlockhash', [{ commitment: 'finalized' }]),
-      this.rpc('getBlockHeight', [{ commitment: 'finalized' }]),
-    ]);
-    const value = object(object(latest).value);
-    if (typeof value.blockhash !== 'string') throw new Error('Blockhash unavailable');
-    return {
-      blockhash: value.blockhash,
-      lastValidBlockHeight: numeric(value.lastValidBlockHeight),
-      blockHeight: numeric(height),
-    };
-  }
-  async simulate(
-    transactionBytes: Uint8Array,
-    sponsor: string,
-    actor: string,
-  ): Promise<SolanaSimulation> {
-    const decoded = getTransactionDecoder().decode(transactionBytes);
-    const message = getCompiledTransactionMessageDecoder().decode(decoded.messageBytes);
-    if (
-      message.version !== 0 ||
-      (message.addressTableLookups?.length ?? 0) > 0 ||
-      message.staticAccounts[0] !== sponsor
-    )
-      throw new Error('Unexpected transaction structure');
-    const keys = message.staticAccounts.filter((_, index) =>
-      index < message.header.numSignerAccounts
-        ? index < message.header.numSignerAccounts - message.header.numReadonlySignerAccounts
-        : index < message.staticAccounts.length - message.header.numReadonlyNonSignerAccounts,
-    );
-    // Two finalized RPC reads can straddle a slot boundary. Never compare
-    // balances from different banks; retry the same exact transaction instead.
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const before = await this.multiple(keys);
-      const result = object(
-        await this.rpc('simulateTransaction', [
-          Buffer.from(transactionBytes).toString('base64'),
-          {
-            encoding: 'base64',
-            sigVerify: false,
-            replaceRecentBlockhash: false,
-            commitment: 'finalized',
-            accounts: { encoding: 'base64', addresses: keys },
-          },
-        ]),
-      );
-      const value = object(result.value);
-      if (
-        value.err !== null ||
-        !Array.isArray(value.accounts) ||
-        value.accounts.length !== keys.length
-      )
-        throw new Error('Exact transaction simulation failed');
-      const slot = numeric(object(result.context).slot);
-      if (slot !== before.slot) {
-        if (attempt < 2) continue;
-        throw new Error('Simulation bank changed; request a fresh review');
-      }
-      const payerIndex = keys.indexOf(address(sponsor));
-      const pre = before.accounts[payerIndex],
-        post =
-          value.accounts[payerIndex] === null ? null : account(sponsor, value.accounts[payerIndex]);
-      if (!pre || !post) throw new Error('Sponsor simulation unavailable');
-      const debit =
-        atomic(pre.lamports) > atomic(post.lamports)
-          ? atomic(pre.lamports) - atomic(post.lamports)
-          : 0n;
-      // Sponsor-run permissionless actions (pull-v2 payouts) have no separate user to protect.
-      const actorIndex = actor === sponsor ? -1 : keys.indexOf(address(actor));
-      if (actorIndex >= 0) {
-        const original = before.accounts[actorIndex];
-        const final =
-          value.accounts[actorIndex] === null ? null : account(actor, value.accounts[actorIndex]);
-        if (original && (!final || atomic(final.lamports) < atomic(original.lamports)))
-          throw new Error('The user would pay native fees');
-      }
-      const feeResult = object(
-        await this.rpc('getFeeForMessage', [
-          Buffer.from(decoded.messageBytes).toString('base64'),
-          { commitment: 'finalized' },
-        ]),
-      );
-      if (feeResult.value === null) throw new Error('Transaction fee unavailable');
-      const fee = atomic(numeric(feeResult.value));
-      // Deliberately conservative: includes fee even when the simulation already deducted it.
-      const ceiling = debit + fee;
-      if (ceiling > atomic(this.config.maximumSponsorLamports))
-        throw new Error('Sponsor fee and rent ceiling exceeded');
-      return {
-        slot,
-        sponsorDebitCeilingLamports: ceiling.toString(),
-        networkFeeLamports: fee.toString(),
-      };
-    }
-    throw new Error('Simulation bank changed; request a fresh review');
-  }
-  async broadcast(transactionBytes: Uint8Array) {
-    await this.checkedGenesis();
-    const result = await this.rpc('sendTransaction', [
-      Buffer.from(transactionBytes).toString('base64'),
-      { encoding: 'base64', skipPreflight: false, preflightCommitment: 'finalized' },
-    ]);
-    if (typeof result !== 'string') throw new Error('Broadcast response ambiguous');
-    return result;
-  }
-  reconcile(
-    signature: string,
-    messageSha256: string,
-    expectedDeltas: readonly ExpectedTokenDelta[],
-  ) {
-    return observeSolanaSignature(
-      {
-        rpcUrl: this.config.rpcUrl,
-        signature,
-        genesisHash: this.config.genesisHash,
-        expectedMessageSha256: messageSha256,
-        expectedDeltas,
-      },
-      this.fetcher,
-    );
   }
 }

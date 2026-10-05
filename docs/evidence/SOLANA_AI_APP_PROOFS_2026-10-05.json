@@ -1,0 +1,36 @@
+{
+  "evidenceKind": "ephemeral-test-signer-devnet-stub-payment-only-not-privy-not-gpu",
+  "network": "solana-devnet",
+  "requestId": "ee8110aa-b61d-40fb-8fb5-f97b798e6f34",
+  "payer": "AvXJpUFbCnaPn6z5XaRey95brnJBsXcEsoNkK9v7vkxP",
+  "feePayer": "7h3dQn7ZSaq21MsaQYCYVruESdLH2DjnBK9FbUKieaDY",
+  "house": "BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z",
+  "programId": "CWUN8LKoKNEBJ6SQAVAqDFrb3rDP7vbVXMcf2EoAqjQM",
+  "mint": "BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE",
+  "maxAtomic": "12800",
+  "actualAtomic": "3700",
+  "outputTokens": 37,
+  "syntheticUsage": true,
+  "route": "house",
+  "sourceKind": 1,
+  "fundingMode": "explicit-sponsor-owned-cash",
+  "signatures": [
+    {
+      "action": "fixture-funding",
+      "signature": "5HQGApBLtoMfCeEeKC3BiWdBtqyf2z93fHBvhF2e7GreWiz5fDaCMg6PyXK9nW7Ayd8VpEyJHB2bANvvBwLfn8w7",
+      "explorerUrl": "https://explorer.solana.com/tx/5HQGApBLtoMfCeEeKC3BiWdBtqyf2z93fHBvhF2e7GreWiz5fDaCMg6PyXK9nW7Ayd8VpEyJHB2bANvvBwLfn8w7?cluster=devnet"
+    },
+    {
+      "action": "ai-approval",
+      "signature": "YaZppQfuybdNiATDJ14ip2YRM9xNn1EdUyySjGRw2Y6fXgjmf7en1ZM8J1V4sPGGNY1oWJgW1xtESpqC8ioBMXT",
+      "explorerUrl": "https://explorer.solana.com/tx/YaZppQfuybdNiATDJ14ip2YRM9xNn1EdUyySjGRw2Y6fXgjmf7en1ZM8J1V4sPGGNY1oWJgW1xtESpqC8ioBMXT?cluster=devnet"
+    },
+    {
+      "action": "ai-settlement",
+      "signature": "51CCYaYRJpXer8ea3xdorcm1GGuYa4CdrFrivwT8Df5KtbKzx2zCgcw9r27Q9ZSfUG92monxubaYAfpAWe9b3jXY",
+      "explorerUrl": "https://explorer.solana.com/tx/51CCYaYRJpXer8ea3xdorcm1GGuYa4CdrFrivwT8Df5KtbKzx2zCgcw9r27Q9ZSfUG92monxubaYAfpAWe9b3jXY?cluster=devnet"
+    }
+  ],
+  "state": "completed",
+  "note": "Real sponsored devnet transactions; synthetic answer, no GPU or Privy evidence. Test tokens have no value. Fictional units carry no rights; deposit earnings belong to the tenant."
+}

@@ -11,6 +11,7 @@ import { RpcSolanaGateway } from './solana-rpc.ts';
 import type { DepositForm } from '../domain/deposit-form.ts';
 import type { ShareDepositView } from '../domain/share-deposit.ts';
 import { readShareDeposit } from './share-deposit.ts';
+import { readSolanaShareDeposit } from './share-deposit-solana.ts';
 
 export type JourneyRole = 'tenant' | 'landlord' | 'arbitrator';
 export type JourneyStage = 'agreement' | 'space' | 'deposit' | 'living' | 'move-out' | 'paid';
@@ -180,19 +181,28 @@ export async function tenancyJourney(
   agreement: Agreement,
   resolveServices: typeof solanaServicesFor = solanaServicesFor,
   readShares: typeof readShareDeposit = readShareDeposit,
+  readSolanaShares: typeof readSolanaShareDeposit = readSolanaShareDeposit,
 ): Promise<TenancyJourney> {
   const role = agreementRole(agreement, identity);
   const base = { agreementId: agreement.id, property: agreement.property, role, depositForm: agreement.depositForm, rentTerms: agreement.rentTerms, requiredSecurity: agreement.requiredSecurity, chain: null,
     home: agreement.home, handover: agreement.handover, cancelled: agreement.cancelled, cancellable: false,
     sampleParties: Object.values(agreement.parties).some((party) => party?.subject.startsWith('test-signer:')) };
   if (agreement.depositForm?.kind === 'shares') {
-    const shareDeposit = await readShares(store, identity, agreement.id);
+    const solana = agreement.depositForm.network === 'solana-devnet';
+    const shareDeposit = await (solana ? readSolanaShares : readShares)(store, identity, agreement.id);
     const shareBase = { ...base, depositForm: agreement.depositForm, shareDeposit };
     const early = agreementStep(agreement, role);
     if (early) return { ...shareBase, stage: 'agreement', next: early };
-    if (shareDeposit.deployment === 'not_deployed') return { ...shareBase, stage: 'space', next: waiting('Share deposit not deployed yet', 'The reviewed factory is not deployed. No transaction is available.') };
+    if (shareDeposit.deployment === 'not_deployed') return { ...shareBase, stage: 'space', next: waiting('Share deposit not deployed yet', `The reviewed ${solana ? 'Solana program' : 'factory'} is not deployed. No transaction is available.`) };
     if (!shareDeposit.escrow) return { ...shareBase, stage: 'space', next: role === 'landlord' ? { kind: 'create_space', label: 'Prepare the share escrow', detail: 'Create the empty escrow bound to these accepted terms.' } : waiting('Waiting for the landlord', 'The landlord creates the accepted share escrow.') };
-    if (shareDeposit.state === 'AwaitingLock') return { ...shareBase, stage: 'deposit', next: role === 'tenant' ? { kind: 'secure_deposit', label: 'Lock test TSLA for your deposit', detail: 'Approve exactly the reviewed shares, then pledge. Activation needs 150% cover.' } : waiting('Waiting for the tenant', 'The tenant locks test TSLA at 150% cover.') };
+    if (shareDeposit.state === 'AwaitingLock') {
+      const ready = solana && shareDeposit.actions.includes('activate');
+      return { ...shareBase, stage: 'deposit', next: role === 'tenant'
+        ? { kind: 'secure_deposit', label: ready ? 'Activate your share deposit' : 'Lock test TSLA for your deposit', detail: solana
+          ? ready ? 'Your locked shares cover 150%. Activate the deposit with one Solana signature.' : 'Pledge exactly the remaining shares needed for 150% cover with one Solana signature. No token approval is needed.'
+          : 'Approve exactly the reviewed shares, then pledge. Activation needs 150% cover.' }
+        : waiting('Waiting for the tenant', 'The tenant locks test TSLA at 150% cover and activates the deposit.') };
+    }
     if (shareDeposit.state === 'Closed') return { ...shareBase, stage: shareDeposit.paidOut ? 'paid' : 'move-out', next: shareDeposit.paidOut ? { kind: 'done', label: 'Deposit paid out', detail: 'The payout receipt is confirmed, the escrow is closed and actual custody is empty.' } : { kind: 'settle', label: 'Collect the share payout', detail: 'Landlord award has priority; tenant collects the remainder. Payout sides are independent.' } };
     if (shareDeposit.state === 'ClaimPending' || shareDeposit.state === 'ClaimContested' || shareDeposit.returnDeadline)
       return { ...shareBase, stage: 'move-out', next: waiting('Move-out share settlement', 'Review the available claim, arbitration and timeout actions below. Silence is not consent.') };

@@ -16,6 +16,7 @@ import { useSectionTabActive } from './section-tabs';
 import './local-ai.css';
 import { LocalAiProgress } from './local-ai-progress';
 import { MoreList, MoreRow, ScreenNote } from './blocks';
+import { prepareSolanaInferenceApproval } from '../wallets/solana-inference-signing';
 
 const amount = (atomic: string) => new Intl.NumberFormat('en-GB', { maximumFractionDigits: 6 }).format(Number(BigInt(atomic)) / 1e6);
 const LIBRARY_REQUEST_KEY = 'ledger-of-life:local-ai:library';
@@ -107,7 +108,7 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
       setPaymentSubmitted(false); paymentHeaders.current = null;
       if (next.mode === 'paid' && next.state === 'completed' && next.payment.state === 'settled' && next.payment.receipt?.success) {
         try { if (subject) sessionStorage.setItem(`${LOCAL_AI_RECEIPT_KEY}:${subject}`, next.id); } catch { /* The saved server receipt remains available in this view. */ }
-        window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'evm' } }));
+        window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: next.solanaReview ? 'solana' : 'evm' } }));
       }
     }
   }, [subject]);
@@ -125,7 +126,7 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
   useEffect(() => {
     if (activeTab && document.visibilityState === 'visible') void refresh();
     const balancesChanged = (event: Event) => {
-      if (activeTab && document.visibilityState === 'visible' && (event as CustomEvent<{ chain?: string }>).detail?.chain === 'evm' && !action.current) void refresh();
+      if (activeTab && document.visibilityState === 'visible' && ['evm', 'solana'].includes((event as CustomEvent<{ chain?: string }>).detail?.chain ?? '') && !action.current) void refresh();
     };
     const onVisible = () => { if (activeTab && document.visibilityState === 'visible') void refresh(); };
     window.addEventListener('ledger-balances-changed', balancesChanged);
@@ -180,12 +181,12 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
       void api<{ approval: LocalAiApproval }>(`/api/local-ai/requests/${approvalPending}/approval`, { action: 'reconcile' }, undefined, true).then(({ approval: next }) => {
         if (!active) return;
         setApproval(next);
-        if (next.state === 'completed') void refresh();
+        if (next.state === 'completed') { void refresh(); void readSaved(approvalPending); }
       }, (cause: unknown) => { if (active) setError(`Access approval remains unresolved: ${errorMessage(cause)}`); }).finally(() => { checking = false; });
     };
     const timer = window.setInterval(check, 4000);
     return () => { active = false; window.clearInterval(timer); };
-  }, [approvalPending, api, refresh, activeTab]);
+  }, [approvalPending, api, refresh, activeTab, readSaved]);
 
   async function run(label: string, operation: () => Promise<void>) {
     if (action.current) return;
@@ -238,15 +239,25 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
     });
   }
   function signApproval() {
-    if (!current || !approval?.request) return;
-    void run('Waiting for your access-budget signature', async () => {
-      const signing = inferenceApprovalForReview(current, approval);
-      const signedTransaction = await wallet.signEvmTransaction(signing);
+    if (!current || (!approval?.request && !approval?.solanaRequest)) return;
+    void run('Waiting for your one-answer allowance signature', async () => {
+      let signedTransaction: string;
+      if (current.solanaReview) {
+        const signing = await prepareSolanaInferenceApproval(current, approval, wallet.wallets.find(selected => selected.id === current.solanaReview!.walletId));
+        const bytes = await wallet.signSolanaTransaction(signing);
+        signedTransaction = btoa(String.fromCharCode(...bytes));
+      } else {
+        const signing = inferenceApprovalForReview(current, approval);
+        signedTransaction = await wallet.signEvmTransaction(signing);
+      }
       if (!mounted.current) return;
       setBusy('Confirming the access budget');
       try {
         const result = await api<{ approval: LocalAiApproval }>(`/api/local-ai/requests/${current.id}/approval`, { action: 'submit', signedTransaction }, undefined, true);
-        if (mounted.current) setApproval(result.approval);
+        if (mounted.current) {
+          setApproval(result.approval);
+          if (current.solanaReview && result.approval.state === 'completed') await readSaved(current.id);
+        }
       } catch (cause) {
         try { await readSaved(current.id); } catch { /* The durable approval remains the authority after a lost response. */ }
         throw cause;
@@ -256,13 +267,13 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
   function payAndAsk() {
     if (!current || current.purgedAt) return;
     void run(paymentHeaders.current ? 'Resuming the same authorized request' : 'Waiting for your one-answer authorization', async () => {
-      if (!paymentHeaders.current) paymentHeaders.current = await localAiPaymentHeaders(wallet, current);
+      if (!current.solanaReview && !paymentHeaders.current) paymentHeaders.current = await localAiPaymentHeaders(wallet, current);
       if (!mounted.current) return;
       setBusy('Submitting the saved payment authorisation · waiting for server evidence'); setPaymentSubmitted(true);
       try {
         const result = await api<{ request: LocalAiRequest }>(`/api/local-ai/requests/${current.id}`, {
           mode: current.mode, prompt: current.prompt, maxOutputTokens: current.maxOutputTokens, context: 'general', hostScope: current.hostScope ?? 'own', publicQuestion: current.publicQuestion ?? false,
-        }, paymentHeaders.current, true);
+        }, paymentHeaders.current ?? undefined, true);
         if (mounted.current) accept(result.request);
       } catch (cause) {
         try { await readSaved(current.id); } catch { /* No replacement authorization or inference is started. */ }
@@ -280,7 +291,11 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
     });
   }
 
-  const price = service?.price;
+  const price = current?.review ? { ...service?.price, network: 'eip155:46630' as const, asset: current.review.asset,
+    payTo: current.review.payTo, symbol: 'tUSDG', amountAtomic: '100', decimals: 6 as const, permit2: service?.price?.network === 'eip155:46630' ? service.price.permit2 : '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    proxy: '', approvalBudgetAtomic: '100000' } : service?.price;
+  const solanaPayment = !!current?.solanaReview || (!current?.review && price?.network === 'solana-devnet');
+  const cashSymbol = solanaPayment ? 'tUSDC' : 'tUSDG';
   const maximumOutput = mode === 'library' ? service?.library.maxOutputTokens ?? 128 : service?.maxOutputTokens ?? 256;
   const maximumPaymentAtomic = (BigInt(current?.maxOutputTokens ?? Math.min(outputLimit, maximumOutput)) * 100n).toString();
   const connectorHosts = service?.hosts?.filter((host) => host.state === 'active') ?? [];
@@ -289,10 +304,11 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
   const ownCompute = current ? Boolean(current.host?.own && current.payment.state === 'none') : ownComputeAvailable;
   const needsApproval = Boolean(current && !ownCompute && price && approval?.state !== 'completed');
   const paidFundingReason = mode !== 'paid' || ownCompute || !service || !wallet.authenticated ? '' : !price
-    ? 'The test USD (tUSDG) price is unavailable.'
-    : service.wallet?.cashAtomic == null ? 'Robinhood Chain wallet cash could not be checked.'
-      : BigInt(service.wallet.cashAtomic) < BigInt(maximumPaymentAtomic) ? `This answer authorizes at most ${amount(maximumPaymentAtomic)} test USD (tUSDG); this wallet needs more test cash.`
-        : approval?.state !== 'completed' && service.wallet?.nativeAtomic === '0' ? 'Network-fee test ETH is needed for the payment-budget approval.'
+    ? 'The test-cash price is unavailable.'
+    : current?.review && service.price?.network === 'solana-devnet' ? ''
+      : service.wallet?.cashAtomic == null ? `${solanaPayment ? 'Solana devnet' : 'Robinhood Chain'} wallet cash could not be checked.`
+        : BigInt(service.wallet.cashAtomic) < BigInt(maximumPaymentAtomic) ? `This answer authorizes at most ${amount(maximumPaymentAtomic)} ${cashSymbol}; this wallet needs more test cash.`
+          : !solanaPayment && approval?.state !== 'completed' && service.wallet?.nativeAtomic === '0' ? 'Network-fee test ETH is needed for the payment-budget approval.'
           : '';
   // "Only my own hosts" without one would only earn a refusal from the server; say what to do instead.
   const scopeReason = connectorMode && mode === 'paid' && wallet.authenticated && hostScope === 'own' && !ownComputeAvailable
@@ -334,7 +350,7 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
       {scopeReason && !current && <div className="local-ai-scope-action"><p className="local-ai-meta" role="status">{scopeReason}</p><button type="button" className="text-button" disabled={locked} onClick={() => { setHostScope('city'); setPublicQuestion(false); }}>Ask a city host instead</button></div>}
       {!current && !statusError && deskState.reason && <p className="local-ai-alert" role="status" data-testid="desk-unavailable">{deskState.reason}</p>}
       {!current && !statusError && deskState.notice && <p className="local-ai-meta" role="status" data-testid="desk-asleep">{deskState.notice}</p>}
-      {mode === 'paid' && service && <p role="status">{ownCompute ? 'Own compute · no charge. Your account gives you access; no payment authorization or receipt is needed.' : <>Pay per token: 0.0001 tUSDG per generated token, at most {amount(maximumPaymentAtomic)} tUSDG for this answer. {paidFundingReason || (needsApproval ? 'Approving the payment budget also needs network-fee test ETH.' : '')}</>}</p>}
+      {mode === 'paid' && service && <p role="status">{ownCompute ? 'Own compute · no charge. Your account gives you access; no payment authorization or receipt is needed.' : <>Pay per token: 0.0001 {cashSymbol} per generated token, at most {amount(maximumPaymentAtomic)} {cashSymbol} for this answer. {paidFundingReason || (needsApproval ? solanaPayment ? 'The site sponsor pays network fees.' : 'Approving the payment budget also needs network-fee test ETH.' : '')}</>}</p>}
       {cityId && <p className="local-ai-meta" data-testid="desk-city">Suggestions for {coveredNames[cityId]}. Edit or replace the question freely.</p>}
       {mode === 'library' && service && service.library.remainingRequests === 0 && <p role="status">The free allowance is exhausted. It resets at midnight UTC; paid answers remain a separate option.</p>}
       {mode === 'library' && service && !service.library.enabled && deskState.canAsk && <p role="status">The free public desk is switched off on this site. You can choose paid access instead.</p>}
@@ -342,7 +358,9 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
       {readyToResume && <div className="local-ai-payment-review"><h3>This question is saved and ready.</h3><p>The shared node was busy. Continue the same request{ownCompute ? ' on your own compute, with no charge or signature' : current?.mode === 'paid' ? ' with its existing payment authorization—no new signature' : ' for free'}.</p><button type="button" className="primary-btn" disabled={Boolean(busy)} onClick={resumeSaved}>Run this saved question</button></div>}
       {!current && draft && mode === 'paid' && <button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => resetQuestion()}>Change the unsubmitted question</button>}
       {mode === 'paid' && !wallet.authenticated && <p className="local-ai-meta">Sign in from Me for personal access, or choose the free public desk.</p>}
-      {reviewing && price && <div className="local-ai-payment-review"><span className="eyebrow">REVIEW THIS ANSWER</span><h3>Pay per token: 0.0001 tUSDG per generated token, at most {amount(current.review?.amountAtomic ?? maximumPaymentAtomic)} tUSDG for this answer</h3><p>Your question is fixed for this authorization. The node runs the model before it settles payment.</p><dl><div><dt>Network</dt><dd>Robinhood testnet · x402 v2</dd></div><div><dt>Recipient</dt><dd><code title={current.review?.payTo ?? price.payTo}>{short(current.review?.payTo ?? price.payTo)}</code></dd></div><div><dt>Wallet cash</dt><dd>{service?.wallet?.cashAtomic != null ? `${amount(service.wallet.cashAtomic)} ${price.symbol}` : 'Unavailable'}</dd></div></dl>
+      {reviewing && <p className="local-ai-meta">You pay the host-reported generated token count, capped by the answer limit and the UTF-8 bytes of answer plus reasoning text received. This is at most the amount shown below, not a fixed charge.</p>}
+      {reviewing && current.solanaReview && <div className="local-ai-payment-review"><span className="eyebrow">REVIEW THIS ANSWER</span><h3>At most {amount(current.solanaReview.amountAtomic)} tUSDC · 0.0001 tUSDC per generated token</h3><p>Solana devnet · test tokens only, no value. Your question and payout are fixed. Sign one sponsored SPL approval before the model runs.</p><dl><div><dt>Recipient</dt><dd><code>{current.solanaReview.payTo}</code> · {current.solanaReview.route === 'house' ? 'Neighbourhood Homes rewards, source AI' : 'Host owner verified Solana wallet'}</dd></div><div><dt>Delegate and fee payer</dt><dd><code>{current.solanaReview.delegate}</code></dd></div><div><dt>Token account</dt><dd><code>{current.solanaReview.source}</code></dd></div></dl><p>The site sponsor charges the host-reported generated token count capped by the answer limit and UTF-8 bytes of answer plus reasoning text received, never more than {amount(current.solanaReview.amountAtomic)} tUSDC. An unused allowance of at most this answer&apos;s maximum remains until your next approval replaces it.</p>{current.solanaReview.route === 'house' && <p>Rewards are streamed to stakers over 7 days. Fictional units carry no rights; deposit earnings belong to the tenant.</p>}{current.host && <p>Only <strong>{current.host.name}</strong> receives this fixed question. Its payout cannot change after this review.</p>}{approval?.state === 'review' && approval.solanaRequest ? <button type="button" className="primary-btn" disabled={Boolean(busy)} onClick={signApproval}>Approve at most {amount(current.solanaReview.amountAtomic)} tUSDC</button> : approval?.state === 'pending' ? <p>Confirming the same sponsored approval. No second signature is requested.</p> : approval?.state === 'completed' ? <button type="button" className="primary-btn" disabled={Boolean(busy)} onClick={resumeSaved}>Ask with the saved approval</button> : <button type="button" className="primary-btn" disabled={Boolean(busy)} onClick={prepareApproval}>Prepare sponsored approval</button>}{approval?.error && <p role="alert">{approval.error}</p>}{approval?.state !== 'pending' && <button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => resetQuestion()}>Change question</button>}</div>}
+      {reviewing && !current.solanaReview && price && <div className="local-ai-payment-review"><span className="eyebrow">REVIEW THIS ANSWER</span><h3>Pay per token: 0.0001 tUSDG per generated token, at most {amount(current.review?.amountAtomic ?? maximumPaymentAtomic)} tUSDG for this answer</h3><p>Your question is fixed for this authorization. The node runs the model before it settles payment.</p><dl><div><dt>Network</dt><dd>Robinhood testnet · x402 v2</dd></div><div><dt>Recipient</dt><dd><code title={current.review?.payTo ?? price.payTo}>{short(current.review?.payTo ?? price.payTo)}</code></dd></div><div><dt>Wallet cash</dt><dd>{service?.wallet?.cashAtomic != null && service.price?.network === 'eip155:46630' ? `${amount(service.wallet.cashAtomic)} ${price.symbol}` : 'Unavailable'}</dd></div></dl>
         {current.host && <p>Payment review for <strong>{current.host.name}</strong> <HostKindBadge kind={current.host.kind} />. The server-recorded host class cannot be changed by the host&apos;s chosen name.</p>}
         {needsApproval ? <><p>Approve a finite {amount(price.approvalBudgetAtomic)} {price.symbol} Permit2 budget. Each answer still needs a separate authorization; the budget approval is not a service payment.</p>{approval?.state === 'review' && approval.request ? <><div aria-label="Access-budget transaction details"><p>Token <code>{price.asset}</code></p><p>Allowance spender <code>{price.permit2}</code></p><p>{approval.request.description}. The wallet also pays the approval transaction&apos;s network fee.</p></div><button type="button" className="primary-btn" disabled={Boolean(busy)} onClick={signApproval}>Sign access budget</button></> : approval?.state === 'pending' ? <p className="local-ai-progress"><Loader2 size={16} className="spin" />Confirming the signed access budget. No new transaction is being created.</p> : <button type="button" className="primary-btn" disabled={Boolean(busy || !canStart)} onClick={prepareApproval}>Review access budget</button>}</> : <button type="button" className="primary-btn" disabled={Boolean(busy || !canStart)} onClick={payAndAsk}>{paymentSubmitted ? 'Retry the same authorization' : `Authorize at most ${amount(current.review?.amountAtomic ?? maximumPaymentAtomic)} ${price.symbol} and ask`}</button>}
         {current.host && <p>You authorize this answer on <strong>{current.host.name}</strong> <HostKindBadge kind={current.host.kind} /> only. It receives your question; its saved payout recipient is shown above.</p>}
@@ -352,7 +370,7 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
       {current && <LocalAiProgress request={current} />}
       {error && <p className="local-ai-alert" role="alert">{error}</p>}
       {current?.error && <p className="local-ai-alert" role="alert">{current.error}{current.payment.state === 'none' || current.payment.state === 'failed' || current.payment.state === 'quoted' ? ' No service payment was settled.' : ''}</p>}
-      {current?.state === 'completed' && current.answer && <article className="local-ai-answer"><header><span><Check size={17} />Answer from the local model</span><small>AI-generated · check important facts</small></header><div className="local-ai-answer-text">{current.answer}</div><footer><span>{current.usage?.inputTokens ?? 'Unknown'} input · {current.usage?.outputTokens ?? 'unknown'} output tokens</span><span>{current.usage ? `${(current.usage.wallMs / 1000).toFixed(2)} s inference` : 'Timing unavailable'}</span><span>{current.usage?.tokensPerSecond != null ? `${current.usage.tokensPerSecond.toFixed(1)} output tok/s` : 'Decode rate unavailable'}</span><span>{ownCompute ? 'Own compute · no charge' : current.mode === 'library' ? 'Free answer · no payment' : current.payment.state === 'settled' ? `${current.usage?.outputTokens ?? 'Unknown'} tokens · ${amount(current.payment.amountAtomic)} tUSDG settled` : 'Payment not settled'}</span>{receiptHash && <a href={`https://explorer.testnet.chain.robinhood.com/tx/${receiptHash}`} target="_blank" rel="noopener noreferrer">Payment receipt {current.host && <HostKindBadge kind={current.host.kind} />} <ExternalLink size={13} /></a>}</footer></article>}
+      {current?.state === 'completed' && current.answer && <article className="local-ai-answer"><header><span><Check size={17} />Answer from the local model</span><small>AI-generated · check important facts</small></header><div className="local-ai-answer-text">{current.answer}</div><footer><span>{current.usage?.inputTokens ?? 'Unknown'} input · {current.usage?.outputTokens ?? 'unknown'} output tokens</span><span>{current.usage ? `${(current.usage.wallMs / 1000).toFixed(2)} s inference` : 'Timing unavailable'}</span><span>{current.usage?.tokensPerSecond != null ? `${current.usage.tokensPerSecond.toFixed(1)} output tok/s` : 'Decode rate unavailable'}</span><span>{ownCompute ? 'Own compute · no charge' : current.mode === 'library' ? 'Free answer · no payment' : current.payment.state === 'settled' ? `${current.usage?.outputTokens ?? 'Unknown'} tokens · ${amount(current.payment.amountAtomic)} ${cashSymbol} settled` : 'Payment not settled'}</span>{receiptHash && <a href={current.solanaReview ? `https://explorer.solana.com/tx/${receiptHash}?cluster=devnet` : `https://explorer.testnet.chain.robinhood.com/tx/${receiptHash}`} target="_blank" rel="noopener noreferrer">Payment receipt {current.host && <HostKindBadge kind={current.host.kind} />} <ExternalLink size={13} /></a>}</footer></article>}
       {current?.purgedAt && <p className="local-ai-meta" role="status">The question and answer were removed from the server after the retention period.</p>}
       <MoreList>
       <MoreRow title="Options" meta={!current && scopeReason ? 'Needs you' : `${hostScope === 'own' ? 'Your hosts only' : 'City hosts'} · up to ${Math.min(outputLimit, maximumOutput)} answer tokens`}>

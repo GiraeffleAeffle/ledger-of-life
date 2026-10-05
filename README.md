@@ -1,5 +1,18 @@
 # Ledger of Life
 
+## For judges
+
+Ledger of Life is a home-centred household ledger: agree a tenancy, secure its deposit, pay test rent, and operate separate personal holdings, fictional local stakes and paid local AI. **Live app: <https://ledger.stadtstack.eu>.** Solana devnet is the new-action path when its reviewed manifests are configured; earlier Robinhood Chain testnet agreements and positions remain accessible.
+
+- **House program:** [`CWUN8LKoKNEBJ6SQAVAqDFrb3rDP7vbVXMcf2EoAqjQM`](https://explorer.solana.com/address/CWUN8LKoKNEBJ6SQAVAqDFrb3rDP7vbVXMcf2EoAqjQM?cluster=devnet), deployed and initialized for `tHOME` and `tWORK`, with on-chain bytes verified in [5 October deployment evidence](docs/evidence/SOLANA_HOUSE_DEVNET_DEPLOYMENT_2026-10-05.json). Revenue is **streamed to stakers over 7 days**, not paid instantly.
+- **Shares program:** [`97j5CWWKUALG2XRUBoZ1spqtN5YWJPVdTiRLNN5CWYkQ`](https://explorer.solana.com/address/97j5CWWKUALG2XRUBoZ1spqtN5YWJPVdTiRLNN5CWYkQ?cluster=devnet), deployed and initialized for test-TSLA security and lending. [Deployment evidence](docs/evidence/SOLANA_SHARES_DEVNET_DEPLOYMENT_2026-10-05.json) records finalized receipts and verified on-chain program hashes. App actions require the reviewed manifest and hosted sponsor; deployment alone is not a hosted-flow proof.
+- **Try with a passkey:** open the live hostname in a passkey-capable browser, create an account and register a passkey (no real identity document required for test accounts). In **Money → Holdings → Get test money**, request site tUSDC. In **Money → Local stakes**, select House or Workshop, review and sign a buy, then stake; claim appears as the stream accrues. Home's full tenancy journey needs separate landlord, tenant and assigned arbitrator accounts. Review the exact amount, recipient, network and effects before every signature, then open the result's Solana Explorer receipt with `?cluster=devnet`. Availability depends on configured manifests and sponsor capacity; deployment evidence alone is not a hosted-flow proof.
+- **No account needed:** `/replay` and `/story` retain dated Robinhood receipts, not proof of the new Solana flows.
+
+**Test networks only.** tUSDC, test TSLA and fictional units have no monetary value; units confer no equity, property or rental rights. Rental security stays separate from personal borrowing/stakes. Deposit earnings belong to the tenant (§551 BGB). Never send real funds.
+Current flow details—v4 one-signature 80/20 rent, v5 `shares-solana` security, 7-day staking streams, AI allowance settlement, lending and the durable sponsor-budget ledger—are in the [5 October implementation overview](docs/LEDGER_OF_LIFE.md#current-solana-port--5-october-2026). Historical Robinhood instructions and receipts below remain valid for that network.
+
+
 _Formerly "Deposit workspace". Package names, repository name and environment keys are unchanged._
 
 **Live:** <https://ledger.stadtstack.eu> · **Repository:** <https://github.com/GiraeffleAeffle/ledger-of-life> (default branch `main`, work on `develop`) · **Licence:** MIT ([LICENSE](LICENSE)).

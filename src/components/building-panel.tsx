@@ -8,6 +8,8 @@ import { buildingActionState, estimateBuildingHeat, projectedBuildingEarnings } 
 import { useSectionTabActive } from './section-tabs';
 import type { ReinvestView } from '../server/building-revenue-reinvest';
 import { Hero, StatusLine, Figures, Figure, MoreList, MoreRow } from './blocks';
+import type { SolanaHouseAction, SolanaHouseId, SolanaHousePlan } from '../server/building-solana';
+import { solanaHouseActionState } from './building-panel-logic';
 import { usd } from './money-valuation';
 
 type Operation = 'approve' | 'stake' | 'unstake' | 'claim' | 'sync';
@@ -26,7 +28,7 @@ export type BuildingPosition = { configured: boolean; account: string; walletUni
 type Plan = { id: string; request: EvmSigningRequest; review: { operation: string; amount: string; asset: string; distributor: string } };
 const dollars = (raw: string) => formatUnits(BigInt(raw), 6);
 
-export function BuildingPanel({ request, position, setPosition, visual }: { request: AuthorizedRequest; position: BuildingPosition | null; setPosition: Dispatch<SetStateAction<BuildingPosition | null>>; visual: ReactNode }) {
+export function BuildingPanel({ request, position, setPosition, visual, earlier = false }: { request: AuthorizedRequest; position: BuildingPosition | null; setPosition: Dispatch<SetStateAction<BuildingPosition | null>>; visual: ReactNode; earlier?: boolean }) {
   const wallet = useRentalWallet();
   const activeTab = useSectionTabActive();
   const [building, setBuilding] = useState<Building | null>(null);
@@ -52,11 +54,11 @@ export function BuildingPanel({ request, position, setPosition, visual }: { requ
     setReadingPosition(true);
     const generation = ++revision.current;
     try {
-      const response = await fetch('/api/building', { cache: 'no-store' });
+      const response = await fetch('/api/building?network=robinhood', { cache: 'no-store' });
       if (!response.ok) throw new Error('Building read unavailable');
       const value = await response.json() as { building: Building };
       if (active.current && generation === revision.current) setBuilding(value.building);
-      const own = account ? await request<BuildingPosition>('/api/building/claims') : null;
+      const own = account ? await request<BuildingPosition>('/api/building/claims?network=robinhood') : null;
       if (active.current && generation === revision.current) { setPosition(own); setError(''); }
     } catch (cause) {
       if (active.current && generation === revision.current) { setPosition(null); setError(cause instanceof Error ? cause.message : 'Building read unavailable'); }
@@ -93,7 +95,7 @@ export function BuildingPanel({ request, position, setPosition, visual }: { requ
   const stakeOperation = quantity && position?.allowanceRaw != null && BigInt(position.allowanceRaw) >= BigInt(quantity) ? 'stake' : 'approve';
   async function prepare(operation: Operation) {
     await act(async () => {
-      const next = await request<{ plan: Plan }>('/api/building/claims', { action: 'prepare', operation, ...(['approve', 'stake', 'unstake'].includes(operation) ? { quantity } : {}) });
+      const next = await request<{ plan: Plan }>('/api/building/claims?network=robinhood', { action: 'prepare', operation, ...(['approve', 'stake', 'unstake'].includes(operation) ? { quantity } : {}) });
       if (active.current) { signed.current = null; setPlan(next.plan); }
     });
   }
@@ -102,7 +104,7 @@ export function BuildingPanel({ request, position, setPosition, visual }: { requ
     await act(async () => {
       if (!signed.current) signed.current = { planId: plan.id, bytes: await wallet.signEvmTransaction(plan.request) };
       if (active.current) setHasSigned(true);
-      const next = await request<{ hash: string; status: 'pending' | 'confirmed' }>('/api/building/claims', { action: 'submit', planId: signed.current.planId, signedTransaction: signed.current.bytes });
+      const next = await request<{ hash: string; status: 'pending' | 'confirmed' }>('/api/building/claims?network=robinhood', { action: 'submit', planId: signed.current.planId, signedTransaction: signed.current.bytes });
       if (active.current) { setSubmitted({ ...next, operation: plan.review.operation, quantityRaw: quantity }); setPlan(null); setHasSigned(false); signed.current = null; }
       await refresh();
     });
@@ -115,7 +117,7 @@ export function BuildingPanel({ request, position, setPosition, visual }: { requ
         if (!reinvestSigned.current) reinvestSigned.current = { stepId: reinvest.stepId, bytes: await wallet.signEvmTransaction(step) };
         if (active.current) setReinvestHasSigned(true);
       }
-      const next = await request<{ reinvest: ReinvestView }>('/api/building/claims', {
+      const next = await request<{ reinvest: ReinvestView }>('/api/building/claims?network=robinhood', {
         action, ...(action === 'reinvest_submit' && reinvestSigned.current ? { stepId: reinvestSigned.current.stepId, signedTransaction: reinvestSigned.current.bytes } : {}),
       });
       if (active.current) { setPosition(current => current ? { ...current, reinvest: next.reinvest } : current); reinvestSigned.current = null; setReinvestHasSigned(false); }
@@ -135,6 +137,7 @@ export function BuildingPanel({ request, position, setPosition, visual }: { requ
   const units = (raw: string | null | undefined) => raw == null ? '—' : Number(formatUnits(BigInt(raw) / 10n ** 14n, 4)).toLocaleString('en-GB', { maximumFractionDigits: 4 });
   const openRow = (id: string) => { const row = document.getElementById(id) as HTMLDetailsElement | null; if (row) { row.open = true; row.dispatchEvent(new Event('toggle')); row.scrollIntoView({ behavior: 'smooth', block: 'center' }); } };
   return <div className="lean-building" style={{ overflowWrap: 'anywhere' }}>
+    {!earlier && <>
     <Hero visual={visual} title="Fictional housing example" subtitle="Shared housing with rooftop solar in Strausberg · illustrative" status={<StatusLine tone={position?.configured ? 'ok' : 'neutral'}>{!account ? 'Connect your Shares wallet in Me to see your units' : building && !building.configured ? building.reason || 'Building distributor not configured' : error ? 'Your units could not be checked' : position?.walletUnitsRaw != null && position.stakedRaw != null ? BigInt(position.walletUnitsRaw) + BigInt(position.stakedRaw) === 0n ? 'You hold no tHOME yet' : `You hold ${units((BigInt(position.walletUnitsRaw) + BigInt(position.stakedRaw)).toString())} tHOME · ${BigInt(position.walletUnitsRaw) === 0n ? 'all staked' : `${units(position.stakedRaw)} staked`}` : !readingPosition ? 'Your unit balance is unavailable' : 'Checking your units…'}</StatusLine>}>
       <Figures>
         <Figure label="Claimable now" value={position?.earnedRaw == null ? '—' : BigInt(position.earnedRaw) > 0n && BigInt(position.earnedRaw) < 10_000n ? '< $0.01' : usd(Number(dollars(position.earnedRaw)))} note={settling ? undefined : claimReason && reinvestReason && claimReason !== reinvestReason ? `${claimReason} · ${reinvestReason}` : claimReason || reinvestReason || undefined} action={<div className="lean-claim-actions"><button type="button" className="text-button" title={settling ? undefined : claimReason || undefined} disabled={Boolean(claimReason) || Boolean(error)} onClick={() => void prepare('claim')}>Claim</button><button type="button" className="text-button" title={settling ? undefined : reinvestReason || undefined} disabled={Boolean(error) || Boolean(reinvestReason)} onClick={() => void reinvestAction('reinvest_start')}>Reinvest</button></div>} />
@@ -143,6 +146,8 @@ export function BuildingPanel({ request, position, setPosition, visual }: { requ
       </Figures>
       <div className="local-test-actions"><button type="button" className="button primary" onClick={() => openRow('local-unit-desk')}>Buy units</button><button type="button" className="button" onClick={() => openRow('local-unit-staking')}>Stake</button></div>
     </Hero>
+    </>}
+    {earlier && <div className="local-test-actions"><p>Earlier tHOME: {units(position?.stakedRaw)} staked · {units(position?.walletUnitsRaw)} in wallet · {position?.earnedRaw == null ? '—' : dollars(position.earnedRaw)} tUSDG claimable.</p><button type="button" className="button" disabled={Boolean(claimReason) || Boolean(error)} onClick={() => void prepare('claim')}>Review earlier claim</button></div>}
     {error && <p role="alert">{error} · No success or missing balance is inferred.</p>}
     {!building ? <p role="status">Reading the building…</p> : <>
       {!building.configured && <p role="status">Not configured: {building.reason || 'The building distributor has not been provisioned.'}</p>}
@@ -204,5 +209,149 @@ export function BuildingPanel({ request, position, setPosition, visual }: { requ
       </MoreRow>
       </MoreList>
     </>}
+  </div>;
+}
+
+type SolanaBuilding = {
+  configured: boolean; revenueRaw: string; totalStakedRaw: string; stakerCount: number;
+  distributor: string; shareToken: string; assetToken: string; priceAtomic: string;
+  sellCapUnitsRaw: string; deskCashAtomic: string; observedSlot: string;
+  incomeSources: { id: string; name: string; meaning: string; amountRaw: string }[];
+};
+type SolanaPosition = Omit<BuildingPosition, 'receipts'> & { cashAtomic: string; plan: SolanaHousePlan | null; receipts: (Receipt & { explorerUrl: string })[] };
+
+/** Primary test-network house. Reinvest is a single reviewed transaction, not an EVM workflow. */
+export function SolanaBuildingPanel({ request, houseId, visual }: { request: AuthorizedRequest; houseId: SolanaHouseId; visual: ReactNode }) {
+  const wallet = useRentalWallet(), activeTab = useSectionTabActive();
+  const account = wallet.wallets.find(item => item.chainType === 'solana' && item.connected)?.address;
+  const [building, setBuilding] = useState<SolanaBuilding | null>(null);
+  const [position, setPosition] = useState<SolanaPosition | null>(null);
+  const [plan, setPlan] = useState<SolanaHousePlan | null>(null);
+  const [amount, setAmount] = useState('5');
+  const [direction, setDirection] = useState<'buy' | 'sell'>('buy');
+  const [stakeAmount, setStakeAmount] = useState('1');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [hasSigned, setHasSigned] = useState(false);
+  const live = useRef(false), reading = useRef(false), lock = useRef(false), generation = useRef(0);
+  const signed = useRef<{ id: string; bytes: string } | null>(null);
+  const symbol = houseId === 'workshop' ? 'tWORK' : 'tHOME';
+  const endpoint = `/api/building/claims?houseId=${houseId}`;
+  const refresh = useCallback(async () => {
+    if (reading.current) return;
+    reading.current = true;
+    const revision = generation.current;
+    try {
+      const response = await fetch(`/api/building?houseId=${houseId}`, { cache: 'no-store' });
+      const body = await response.json() as { building?: SolanaBuilding; error?: string };
+      if (!response.ok || !body.building) throw new Error(body.error || 'Solana house read unavailable');
+      const own = account ? await request<SolanaPosition>(`/api/building/claims?houseId=${houseId}`) : null;
+      if (live.current && revision === generation.current) { setBuilding(body.building); setPosition(own); setPlan(own?.plan ?? null); setError(''); }
+    } catch (cause) {
+      if (live.current && revision === generation.current) { setPosition(null); setError(cause instanceof Error ? cause.message : 'Solana house read unavailable'); }
+    } finally { reading.current = false; }
+  }, [account, houseId, request]);
+  useEffect(() => {
+    live.current = true;
+    const active = live, revisions = generation;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      ++revisions.current; setBuilding(null); setPosition(null); setPlan(null); signed.current = null; setHasSigned(false);
+      if (activeTab) void refresh();
+    });
+    const timer = setInterval(() => { if (activeTab && !lock.current && document.visibilityState === 'visible') void refresh(); }, 5000);
+    const changed = () => { if (activeTab && !lock.current) void refresh(); };
+    window.addEventListener('ledger-balances-changed', changed);
+    return () => { cancelled = true; active.current = false; ++revisions.current; clearInterval(timer); window.removeEventListener('ledger-balances-changed', changed); };
+  }, [activeTab, refresh]);
+  const pending = position?.receipts.some(receipt => receipt.status === 'pending') ?? false;
+  const displayUnits = (raw: string | null | undefined) => raw == null ? '—' : Number(formatUnits(BigInt(raw), 6)).toLocaleString('en-GB', { maximumFractionDigits: 6 });
+  let tradeQuantity: string | null = null, stakeQuantity: string | null = null;
+  try { if (/^\d+(?:\.\d{1,6})?$/.test(amount)) tradeQuantity = parseUnits(amount, 6).toString(); } catch { /* Editable, invalid input is never zero. */ }
+  try { if (/^\d+(?:\.\d{1,6})?$/.test(stakeAmount)) stakeQuantity = parseUnits(stakeAmount, 6).toString(); } catch { /* Editable, invalid input is never zero. */ }
+  const common = { configured: Boolean(building?.configured && position?.configured && !error), connected: Boolean(account), busy: busy || pending || Boolean(plan), cashAtomic: position?.cashAtomic ?? null, walletUnitsRaw: position?.walletUnitsRaw ?? null, stakedRaw: position?.stakedRaw ?? null, earnedRaw: position?.earnedRaw ?? null, priceAtomic: building?.priceAtomic ?? null, sellCapUnitsRaw: building?.sellCapUnitsRaw ?? null, deskCashAtomic: building?.deskCashAtomic ?? null };
+  const blocker = (operation: SolanaHouseAction) => solanaHouseActionState({ ...common, operation, quantityRaw: operation === 'stake' || operation === 'unstake' ? stakeQuantity : tradeQuantity });
+  async function act(action: () => Promise<void>) {
+    if (lock.current) return;
+    lock.current = true; setBusy(true); setError('');
+    try { await action(); } catch (cause) { if (live.current) setError(cause instanceof Error ? cause.message : 'House action unavailable'); }
+    finally { lock.current = false; if (live.current) setBusy(false); }
+  }
+  async function prepare(operation: SolanaHouseAction) {
+    if (blocker(operation)) return;
+    await act(async () => {
+      try {
+        const next = await request<{ plan: SolanaHousePlan }>(endpoint, { action: 'prepare', houseId, operation, requestId: crypto.randomUUID(), ...(operation === 'buy' ? { cashAtomic: tradeQuantity } : ['sell', 'stake', 'unstake'].includes(operation) ? { quantity: operation === 'sell' ? tradeQuantity : stakeQuantity } : {}) });
+        if (live.current) { setPlan(next.plan); signed.current = null; setHasSigned(false); }
+      } catch (cause) { await refresh(); throw cause; }
+    });
+  }
+  async function submit() {
+    if (!plan || !account) return;
+    const reviewed = plan;
+    await act(async () => {
+      if (!signed.current) {
+        const bytes = await wallet.signSolanaTransaction({ walletId: reviewed.walletId, operationId: reviewed.id, chain: 'solana:devnet', feePayer: reviewed.feePayer, expiresAt: reviewed.expiresAt, transaction: Uint8Array.from(atob(reviewed.transactionBase64), character => character.charCodeAt(0)), description: reviewed.review.description });
+        if (!live.current) return;
+        signed.current = { id: reviewed.id, bytes: btoa(String.fromCharCode(...bytes)) }; setHasSigned(true);
+      }
+      try {
+        await request(endpoint, { action: 'submit', planId: signed.current.id, signedTransaction: signed.current.bytes });
+        if (live.current) { setPlan(null); signed.current = null; setHasSigned(false); }
+        await refresh();
+        window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'solana' } }));
+      } catch (cause) { await refresh(); throw cause; }
+    });
+  }
+  async function cancel() {
+    if (!plan || signed.current) return;
+    await act(async () => { await request(endpoint, { action: 'cancel', planId: plan.id }); if (live.current) setPlan(null); await refresh(); });
+  }
+  const totalUnits = position?.walletUnitsRaw != null && position.stakedRaw != null ? (BigInt(position.walletUnitsRaw) + BigInt(position.stakedRaw)).toString() : null;
+  const openRow = (id: string) => { const row = document.getElementById(id) as HTMLDetailsElement | null; if (row) { row.open = true; row.dispatchEvent(new Event('toggle')); row.scrollIntoView({ behavior: 'smooth', block: 'center' }); } };
+  return <div className="lean-building solana-house" style={{ overflowWrap: 'anywhere' }}>
+    <Hero visual={visual} title={houseId === 'workshop' ? 'Fictional workshop example' : 'Fictional housing example'} subtitle="Solana devnet · fictional local units, no value or rights" status={<StatusLine tone={position ? 'ok' : 'neutral'}>{!account ? 'Connect your Solana wallet in Me' : error ? 'Verified reads unavailable' : totalUnits == null ? 'Checking your house units…' : `You hold ${displayUnits(totalUnits)} ${symbol} · ${displayUnits(position?.stakedRaw)} staked`}</StatusLine>}>
+      <Figures>
+        <Figure label="Your units" value={displayUnits(totalUnits)} unit={symbol} note={`${displayUnits(position?.stakedRaw)} staked · ${displayUnits(position?.walletUnitsRaw)} in wallet`} />
+        <Figure label="Claimable now" value={position?.earnedRaw == null ? '—' : dollars(position.earnedRaw)} unit="tUSDC" action={<div className="lean-claim-actions">{(['claim', 'reinvest'] as const).map(operation => <button key={operation} type="button" className="text-button" disabled={Boolean(blocker(operation))} title={blocker(operation) ?? undefined} onClick={() => void prepare(operation)}>{operation === 'claim' ? 'Claim' : 'Reinvest · one signature'}</button>)}</div>} />
+        <Figure label={houseId === 'workshop' ? 'Workshop income so far' : 'House income so far'} value={building ? dollars(building.revenueRaw) : '—'} unit="tUSDC" />
+      </Figures>
+      <div className="local-test-actions"><button type="button" className="button primary" onClick={() => openRow('solana-unit-desk')}>Buy units</button><button type="button" className="button" onClick={() => openRow('solana-unit-staking')}>Stake or unstake</button></div>
+    </Hero>
+    <p className="small-copy">House income is <strong>streamed to stakers over 7 days</strong>. Only staked units earn. New revenue extends the remaining stream. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant.</p>
+    {error && <p className="local-market-alert" role="alert">{error} · No success or missing balance is inferred.</p>}
+    {plan && <div className="local-order-review" aria-label="Exact Solana house review">
+      <h4>Exact {plan.review.operation} review · {plan.review.network}</h4><p>{plan.review.description}</p>
+      <dl className="solana-review-addresses"><dt>Your wallet / recipient</dt><dd><code>{plan.review.account}</code></dd><dt>House</dt><dd><code>{plan.review.distributor}</code></dd><dt>Your cash account</dt><dd><code>{plan.review.cashAccount}</code></dd><dt>Your unit account</dt><dd><code>{plan.review.unitAccount}</code></dd><dt>Desk / reward / stake vaults</dt><dd><code>{plan.review.deskVault}</code><br /><code>{plan.review.rewardVault}</code><br /><code>{plan.review.stakeVault}</code></dd><dt>Fee sponsor · maximum 0.01 test SOL</dt><dd><code>{plan.feePayer}</code></dd></dl>
+      <p>Review expires {new Date(plan.expiresAt).toLocaleTimeString()}. {plan.review.operation === 'reinvest' ? 'Claim + buy + stake are atomic: all succeed or none do.' : 'Only this exact reviewed transaction is signed.'}</p>
+      <button type="button" className="button primary" disabled={busy || !account} onClick={() => void submit()}>{hasSigned ? 'Retry the same signed transaction' : `Sign ${plan.review.operation} · one signature`}</button>
+      <button type="button" className="text-button" disabled={busy || hasSigned} onClick={() => void cancel()}>Cancel unsigned review</button>
+    </div>}
+    {pending && <p role="status">Your signed transaction awaits a verified finalized receipt. Do not start a replacement action; reload safely resumes checking.</p>}
+    <MoreList>
+      <MoreRow id="solana-unit-desk" title="Buy or sell units" meta={`${position ? dollars(position.cashAtomic) : '—'} tUSDC available`}>
+        <div className="local-test-actions" role="group" aria-label="Choose Solana unit action">{(['buy', 'sell'] as const).map(value => <button key={value} type="button" className="text-button" disabled={busy || pending || Boolean(plan)} aria-pressed={direction === value} onClick={() => setDirection(value)}>{value === 'buy' ? 'Buy test units' : 'Sell back wallet units'}</button>)}</div>
+        <form onSubmit={event => { event.preventDefault(); void prepare(direction); }}><label>{direction === 'buy' ? 'Test USDC budget' : `${symbol} units to sell`}<input aria-label={direction === 'buy' ? 'Solana purchase budget in tUSDC' : `Solana sell amount in ${symbol}`} inputMode="decimal" value={amount} disabled={busy || pending || Boolean(plan)} onChange={event => setAmount(event.target.value)} /></label><p>Fixed test price: {building ? dollars(building.priceAtomic) : '—'} tUSDC per {symbol}. Fractional units have six decimals; buy from 0.001 to 100 tUSDC. Sell-back requires enough desk cash and is capped at {building ? displayUnits(building.sellCapUnitsRaw) : '—'} units (app maximum 100).</p><button className="button primary" disabled={Boolean(blocker(direction))}>Review {direction === 'buy' ? 'purchase' : 'sell-back'}</button></form>
+        {blocker(direction) && <p className="small-copy">{blocker(direction)}</p>}
+      </MoreRow>
+      <MoreRow id="solana-unit-staking" title="Stake or unstake" meta={`${displayUnits(position?.stakedRaw)} ${symbol} staked`}>
+        <p>Wallet: {displayUnits(position?.walletUnitsRaw)} {symbol} · staked: {displayUnits(position?.stakedRaw)} {symbol}.</p>
+        <div className="local-test-actions"><button type="button" className="text-button" disabled={busy || pending || Boolean(plan) || position?.walletUnitsRaw == null} onClick={() => setStakeAmount(formatUnits(BigInt(position!.walletUnitsRaw!), 6))}>Max wallet units</button><button type="button" className="text-button" disabled={busy || pending || Boolean(plan) || position?.stakedRaw == null} onClick={() => setStakeAmount(formatUnits(BigInt(position!.stakedRaw!), 6))}>Max staked units</button></div>
+        <label>{symbol} units to stake or unstake<input aria-label={`Solana stake or unstake amount in ${symbol}`} inputMode="decimal" value={stakeAmount} disabled={busy || pending || Boolean(plan)} onChange={event => setStakeAmount(event.target.value)} /></label>
+        <div className="local-test-actions">{(['stake', 'unstake'] as const).map(operation => <div key={operation}><button type="button" className="button" disabled={Boolean(blocker(operation))} onClick={() => void prepare(operation)}>Review {operation}</button>{blocker(operation) && <p className="small-copy">{blocker(operation)}</p>}</div>)}</div>
+        <p>No separate token approval: each action is one sponsored transaction signed by your own Solana wallet. Unstake before selling. Never transfer units directly to the vault.</p>
+      </MoreRow>
+      <MoreRow title="Where the income comes from" meta={`${building?.stakerCount ?? '—'} stakers · on-chain sources`}>
+        <p>Income is streamed to stakers over 7 days, pro rata to staked units. New revenue reschedules the remaining income over a fresh seven-day window. Income from idle periods starts a fresh stream when staking resumes, never an instant first-staker payout. Fractional earnings carry forward.</p>
+        {building ? <ul>{building.incomeSources.map(source => <li key={source.id}><strong>{source.name} · {dollars(source.amountRaw)} tUSDC</strong><p className="small-copy">{source.meaning}</p></li>)}</ul> : <p>Waiting for verified on-chain source totals.</p>}
+        <p>Total stake: {displayUnits(building?.totalStakedRaw)} {symbol}. Read from finalized slot {building?.observedSlot ?? '—'}; no income or energy output is inferred from a missing reading.</p>
+        {building && <a href={`https://explorer.solana.com/address/${building.distributor}?cluster=devnet`} target="_blank" rel="noopener noreferrer">View house on Solana Explorer</a>}
+      </MoreRow>
+      <MoreRow title="House action receipts" meta={`${position?.receipts.length ?? 0} recorded`}>
+        {!position?.receipts.length ? <p>No signed house receipts for this wallet yet.</p> : <ul>{position.receipts.map(receipt => <li key={receipt.hash}><a href={receipt.explorerUrl} target="_blank" rel="noopener noreferrer">{receipt.operation} · {receipt.status === 'confirmed' ? 'finalized' : receipt.status === 'failed' ? 'failed · no success inferred' : 'awaiting finalized receipt'} · {receipt.hash}</a></li>)}</ul>}
+        <button type="button" className="text-button" disabled={busy} onClick={() => void refresh()}>Refresh Solana house</button>
+      </MoreRow>
+    </MoreList>
   </div>;
 }

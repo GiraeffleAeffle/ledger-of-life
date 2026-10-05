@@ -4,10 +4,11 @@ import { errorResponse, readBody, sameOrigin } from '@/server/http';
 import { prepareRent, readRent, submitRent } from '@/server/rent-payments';
 import { AccessError } from '@/server/errors';
 import { WorkflowError } from '@/domain/errors';
+import { SolanaServiceError } from '@/server/solana-service';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization, Origin' } };
 function failure(error: unknown) {
-  const response = errorResponse(error);
+  const response = error instanceof SolanaServiceError ? Response.json({ error: error.message, code: error.code }, { status: error.status }) : errorResponse(error);
   response.headers.set('Cache-Control', 'private, no-store');
   response.headers.set('Vary', 'Authorization, Origin');
   return response;

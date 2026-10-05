@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
 import type { TenancyJourney } from '@/server/journey';
@@ -7,7 +7,7 @@ import { AssetsOverview, useHoldingsRead } from './assets';
 import type { Area } from './areas';
 import { DeviceReadings } from './device-readings';
 import { HomeNode } from './home-node';
-import { ShareWorkflows } from './share-workflows';
+import { ShareWorkflows, SolanaOperationReview, useReviewedSolanaOperation } from './share-workflows';
 import { LocalInvestments } from './local-investments';
 import { LocalAiWorkspace } from './local-ai';
 import { SectionTabs, useSectionTabActive } from './section-tabs';
@@ -59,16 +59,17 @@ function TestMoney({ request }: { request: Request }) {
   return <section className="card test-money" aria-labelledby="test-money-title">
     <h2 id="test-money-title">Test money</h2>
     <div className="test-money-need">
-      <p>Test dollars for rent, loans, local stakes and paid answers</p>
+      <p>Earlier Robinhood test dollars for earlier loans, stakes and paid answers</p>
       <TestDollars request={request} ethBalance={read.ethBalance} refresh={read.refresh} />
     </div>
     <div className="test-money-need">
-      <p>Test USDC for a cash rental deposit</p>
+      <p>Site tUSDC for Solana rent, cash deposits, loans, lending, local stakes and paid answers</p>
       <TestUsdc request={request} />
     </div>
+    <div className="test-money-need"><p>Test tTSLA shares · Solana devnet</p><TestTsla request={request} /></div>
     <div className="test-money-need">
-      <p>Test TSLA shares: <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet ↗</a></p>
-      {robinhoodAddress && <button className="button secondary" type="button" onClick={() => void copyAddress(robinhoodAddress, 'Shares')}>Copy shares address</button>}
+      <p>Earlier test TSLA shares · Robinhood Chain testnet: <a href="https://faucet.testnet.chain.robinhood.com/" target="_blank" rel="noopener noreferrer">Robinhood faucet ↗</a></p>
+      {robinhoodAddress && <button className="button secondary" type="button" onClick={() => void copyAddress(robinhoodAddress, 'Robinhood shares')}>Copy earlier shares address</button>}
     </div>
     <div className="test-money-need">
       <p>Only for tSPYx trades: <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer">Circle&apos;s devnet faucet ↗</a></p>
@@ -77,6 +78,47 @@ function TestMoney({ request }: { request: Request }) {
     </div>
     {copied && <p className="test-money-copy-status" role="status">{copied}</p>}
   </section>;
+}
+
+type TestTslaAvailability = { configured: boolean; availableAt: number; remainingTodayAtomic: string };
+
+export function TestTsla({ request }: { request: Request }) {
+  const wallet = useRentalWallet();
+  const account = `${wallet.subject}:${wallet.wallets.find(item => item.chainType === 'solana')?.id ?? ''}`;
+  return <TestTslaWallet key={account} request={request} account={account} />;
+}
+
+function TestTslaWallet({ request, account }: { request: Request; account: string }) {
+  const wallet = useRentalWallet();
+  const [availability, setAvailability] = useState<TestTslaAvailability | null>(null);
+  const [error, setError] = useState('');
+  const [now, setNow] = useState<number | null>(null);
+  const refresh = useCallback(async () => {
+    try { setAvailability(await request<TestTslaAvailability>('/api/share-workflows/faucet')); setError(''); }
+    catch (cause) { setAvailability(null); setError(cause instanceof Error ? cause.message : 'Test-share faucet availability could not be read.'); }
+  }, [request]);
+  const operation = useReviewedSolanaOperation(request, '/api/share-workflows/faucet', account, refresh);
+  useEffect(() => {
+    const read = () => { if (document.visibilityState === 'visible') { setNow(Math.floor(Date.now() / 1000)); void refresh(); } };
+    const firstRead = setTimeout(read, 0);
+    const timer = setInterval(read, 60_000);
+    document.addEventListener('visibilitychange', read);
+    return () => { clearTimeout(firstRead); clearInterval(timer); document.removeEventListener('visibilitychange', read); };
+  }, [refresh]);
+  const hasWallet = wallet.wallets.some(item => item.chainType === 'solana');
+  const coolingDown = Boolean(availability && (now === null || availability.availableAt > now));
+  const budgetEmpty = Boolean(availability && BigInt(availability.remainingTodayAtomic) < 5_000_000n);
+  return <div className="test-usdc">
+    <small>Centrally issued tTSLA · 6 decimals · test shares, no monetary value or rights. The issuer co-signs; your Solana wallet approves the exact transaction. Fees are sponsored.</small>
+    <p>5 tTSLA per verified account every 24 hours, also subject to the on-chain wallet cooldown and a global budget of 50 tTSLA per UTC day.</p>
+    <button type="button" className="button primary" disabled={!hasWallet || !operation.loaded || operation.busy || Boolean(operation.attempt) || !availability?.configured || coolingDown || budgetEmpty} onClick={() => void operation.prepare({})}>Review 5 test tTSLA</button>
+    {!hasWallet && <p>Connect your Solana wallet in Me first.</p>}
+    {availability && !availability.configured && <p role="status">The Solana test-share faucet is not configured. The earlier Robinhood faucet remains available below.</p>}
+    {availability?.configured && <p role="status">{coolingDown ? `Next account/wallet claim: ${new Date(availability.availableAt * 1000).toLocaleString()}. ` : ''}Global budget remaining today: {(Number(availability.remainingTodayAtomic) / 1e6).toLocaleString('en-US', { maximumFractionDigits: 6 })} tTSLA.{budgetEmpty && ' The next budget day starts at 00:00 UTC.'}</p>}
+    {error && <p role="alert">{error}</p>}
+    <button type="button" className="button secondary" disabled={operation.busy} onClick={() => void refresh()}>Check faucet availability</button>
+    <SolanaOperationReview operation={operation} />
+  </div>;
 }
 
 type TestUsdcResult = { status: 'unconfigured' } | { status: 'pending'; signature: string } | { status: 'confirmed'; signature: string; amountAtomic: string };

@@ -9,10 +9,25 @@ import { UptoEvmScheme as UptoFacilitator } from '@x402/evm/upto/facilitator';
 import { PERMIT2_ADDRESS, isUptoPermit2Payload, uptoPermit2WitnessTypes, x402UptoPermit2ProxyABI, x402UptoPermit2ProxyAddress, type UptoPermit2Payload, type FacilitatorEvmSigner } from '@x402/evm';
 import { decodeEventLog, encodeFunctionData, keccak256, parseTransaction, type Address, type Hex, type TransactionReceipt } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { inferenceCharge, inferenceMaximum, aiRpc, aiTokenAbi, assertInferenceContracts } from './local-ai-runtime.ts';
+import { inferenceCharge, inferenceMaximum, inferencePayee, aiRpc, aiTokenAbi, assertInferenceContracts } from './local-ai-runtime.ts';
 import { TEST_USDG_ADDRESS } from '../wallets/inference-token.ts';
 import { ConflictError } from './errors.ts';
 import type { Store } from './store.ts';
+import { address, createNoopSigner, createSolanaRpc, type Instruction } from '@solana/kit';
+import { TOKEN_PROGRAM_ADDRESS, fetchMaybeToken, findAssociatedTokenPda, getApproveInstruction, getCreateAssociatedTokenIdempotentInstruction, getTransferCheckedInstruction } from '@solana-program/token';
+import { addressesForHouse, depositRewardsInstruction } from '../finance/solana/house.ts';
+import { loadSolanaHouseManifest } from './solana-house-config.ts';
+import { configuredSolanaOperations } from './solana-operations.ts';
+import { configuredFeeSponsor } from './solana-service.ts';
+import { loadBuildingManifest } from './building-revenue.ts';
+import type { SolanaInferenceReview, LocalAiRequest } from './local-ai-types.ts';
+import type { PaidAiOwner } from './local-ai.ts';
+import type { ConnectorHost } from './local-ai-hosts.ts';
+import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
+import { AI_PRICE } from '../domain/ai-pricing.ts';
+import type { SolanaHouseManifest } from './solana-house-config.ts';
+import type { SolanaOperations } from './solana-operations.ts';
+import type { ExpectedTokenDelta } from '../finance/solana/reconcile.ts';
 
 export type AiPayment = { payload: PaymentPayload; requirements: PaymentRequirements; amount?: string; signed: Hex | null; hash: Hex | null; nonce: number | null };
 export type AiPaidRecord = { id: string; owner: { payer: Address }; payee: Address | null; request: {
@@ -310,4 +325,169 @@ export async function createAiResource(store: Store, recordKey: string, payer: A
   const resource = new x402ResourceServer(client).register('eip155:46630', new UptoServer());
   await resource.initialize();
   return resource;
+}
+
+export type SolanaAiJournal = { approvalId: string | null; settlementId: string | null };
+type SolanaAiRecord = { id: string; owner: PaidAiOwner; request: LocalAiRequest; solanaJournal: SolanaAiJournal; completedAt?: string; progressEvents?: { authorizedAt?: string; finishedAt?: string } };
+export const solanaAiEnabled = () => !!loadSolanaHouseManifest();
+async function solanaAiContext(store: Store) {
+  const manifest = loadSolanaHouseManifest();
+  if (!manifest) throw new ConflictError('Solana house payments are not configured.');
+  const context = await configuredSolanaOperations(store, { cluster: manifest.cluster, genesisHash: manifest.genesisHash, maximumSponsorLamports: 10_000_000n });
+  return { ...context, manifest };
+}
+export async function solanaAiRecipient(host: Pick<ConnectorHost, 'ownerSubject' | 'payoutWallet'> | null,
+  dependencies?: { manifest: SolanaHouseManifest; distributor: string | null; wallet: (subject: string) => Promise<{ id: string; address: string } | null> }) {
+  const manifest = dependencies?.manifest ?? loadSolanaHouseManifest();
+  if (!manifest) throw new ConflictError('Solana house payments are not configured.');
+  const distributor = dependencies ? dependencies.distributor : (await loadBuildingManifest())?.distributor;
+  const payout = host?.payoutWallet ?? await inferencePayee();
+  if (distributor && same(payout!, distributor))
+    return { route: 'house' as const, payTo: manifest.houses['neighbourhood-homes'].house, hostOwnerSubject: host?.ownerSubject ?? null };
+  if (!host?.ownerSubject) throw new ConflictError('This host has no verified owner for Solana payments.');
+  // Plain Node payment tests cannot load Next's server-only identity module; lookup is lazy at its server boundary.
+  const lookup = dependencies?.wallet ?? (await import('./identity.ts')).verifiedSolanaWalletForSubject;
+  const wallet = await lookup(host.ownerSubject);
+  if (!wallet) throw new ConflictError("This host's owner has no Solana wallet yet.");
+  return { route: 'wallet' as const, payTo: wallet.address, hostOwnerSubject: host.ownerSubject };
+}
+export async function createSolanaAiQuote(id: string, owner: PaidAiOwner, maxOutputTokens: number, host: ConnectorHost | null) {
+  const manifest = loadSolanaHouseManifest();
+  const sponsor = await configuredFeeSponsor();
+  if (!manifest || !sponsor) throw new ConflictError('Sponsored Solana AI payments are unavailable.');
+  const recipient = await solanaAiRecipient(host);
+  if (recipient.payTo === owner.payer || sponsor.address === owner.payer) throw new ConflictError('Paid requests require separate payer and provider wallets.');
+  const [source] = await findAssociatedTokenPda({ owner: address(owner.payer), mint: address(manifest.cashMint), tokenProgram: TOKEN_PROGRAM_ADDRESS });
+  return {
+    walletId: owner.walletId, operationId: id, requestId: id, network: 'solana-devnet' as const,
+    description: `Approve at most ${Number(inferenceMaximum(maxOutputTokens)) / 1e6} tUSDC for this answer; charge the host-reported token count capped by the job limit and UTF-8 bytes of answer plus reasoning received.`,
+    asset: manifest.cashMint, payer: owner.payer, source, delegate: sponsor.address, ...recipient,
+    maxOutputTokens, amountAtomic: inferenceMaximum(maxOutputTokens).toString(), priceAtomic: AI_PRICE.toString(),
+  };
+}
+export function solanaAiApprovalInstructions(review: SolanaInferenceReview): Instruction[] {
+  if (review.amountAtomic !== inferenceMaximum(review.maxOutputTokens).toString() || review.priceAtomic !== AI_PRICE.toString())
+    throw new ConflictError('AI allowance differs from the reviewed token cap.');
+  return [getApproveInstruction({ source: address(review.source), delegate: address(review.delegate), owner: createNoopSigner(address(review.payer)), amount: BigInt(review.amountAtomic) })];
+}
+/** Reserve one outstanding answer per token account: a new approve must not replace a running answer's allowance. */
+async function reserveSolanaAiAllowance(store: Store, row: SolanaAiRecord) {
+  const lane = `local-ai:solana-allowance:${row.request.solanaReview!.payer}`;
+  try { await store.create(lane, { requestId: row.id }); } catch {
+    const previous = await store.get<{ requestId: string }>(lane);
+    if (previous?.requestId === row.id) return;
+    const active = previous ? await store.get<SolanaAiRecord>(`local-ai:request:${previous.requestId}`) : null;
+    if (active?.request.approval?.state === 'pending') throw new ConflictError('Reconcile the earlier signed Solana approval before replacing its allowance.');
+    if (active && !['completed', 'failed', 'expired', 'interrupted'].includes(active.request.state))
+      throw new ConflictError('Finish or reconcile your earlier Solana AI question before replacing its allowance.');
+    // An ambiguous settlement is never released, even if an outer request has failed.
+    if (active?.solanaJournal.settlementId && active.request.payment.state !== 'settled' && active.request.payment.state !== 'failed')
+      throw new ConflictError('The earlier Solana settlement must be reconciled first.');
+    await store.update<{ requestId: string }>(lane, current => {
+      if (current.requestId !== previous?.requestId) throw new ConflictError('Another question reserved this allowance.');
+      return { requestId: row.id };
+    });
+  }
+}
+export async function solanaAiApproval(store: Store, key: string, identity: VerifiedIdentity, action: unknown, signedTransaction?: unknown) {
+  const row = await store.get<SolanaAiRecord>(key), review = row?.request.solanaReview;
+  if (!row || !review || row.owner.subject !== identity.subject || !identity.wallets.some(wallet => wallet.id === review.walletId && wallet.address === review.payer && wallet.chainType === 'solana'))
+    throw new ConflictError('This Solana AI question belongs to another wallet.');
+  const { operations, sponsor, manifest } = await solanaAiContext(store);
+  if (review.delegate !== sponsor.address || review.asset !== manifest.cashMint) throw new ConflictError('Solana AI deployment changed; review a new question.');
+  if (action === 'prepare') {
+    if (!['payment_required', 'approval_required'].includes(row.request.state) || Date.now() >= Date.parse(row.request.expiresAt))
+      throw new ConflictError('This AI quote is no longer available for approval.');
+    await reserveSolanaAiAllowance(store, row);
+    const prepared = await operations.prepare({ identity, kind: 'ai-approve', requestId: row.id,
+      actor: address(review.payer), walletId: review.walletId, instructions: solanaAiApprovalInstructions(review), review: { ...review },
+      expectedDeltas: [{ account: review.source, mint: review.asset, owner: review.payer, direction: 'unchanged', minimumAtomic: '0', maximumAtomic: '0' }] });
+    const updated = await store.update<SolanaAiRecord>(key, current => {
+      current.solanaJournal.approvalId = prepared.id;
+      current.request.approval = { id: prepared.id, state: 'review', budgetAtomic: review.amountAtomic,
+        request: null, hash: null, error: null,
+        solanaRequest: { ...prepared, operationId: `local-ai-approval:${row.id}`, description: review.description, chain: 'solana:devnet' } };
+      current.request.state = 'approval_required'; return current;
+    });
+    return updated.request.approval!;
+  }
+  if ((action !== 'submit' && action !== 'reconcile') || !row.solanaJournal.approvalId) throw new ConflictError('Prepare this Solana AI approval first.');
+  const result = action === 'submit' ? await operations.submit({ identity, id: row.solanaJournal.approvalId, signedTransactionBase64: typeof signedTransaction === 'string' ? signedTransaction : '' }) :
+    await operations.reconcile({ identity, id: row.solanaJournal.approvalId });
+  return (await store.update<SolanaAiRecord>(key, current => {
+    const approval = current.request.approval!;
+    approval.hash = result.signature ?? null; approval.error = result.error ?? null;
+    approval.state = result.state === 'confirmed' ? 'completed' : result.state === 'failed' ? 'failed' : result.state === 'expired' ? 'expired' : 'pending';
+    if (result.state === 'confirmed' && ['approval_required', 'payment_required'].includes(current.request.state)) {
+      current.request.payment.state = 'authorized'; current.request.state = 'ready';
+      (current.progressEvents ??= {}).authorizedAt = new Date().toISOString();
+    }
+    return current;
+  })).request.approval!;
+}
+export async function solanaAiSettlementInstructions(review: SolanaInferenceReview, amount: bigint, programId: string) {
+  if (amount < 0n || amount > BigInt(review.amountAtomic)) throw new ConflictError('Measured AI settlement exceeds the approval.');
+  if (review.route === 'house') return [await depositRewardsInstruction({ authority: review.delegate, source: review.source, house: review.payTo, amount, sourceKind: 1, programId })];
+  const [destination] = await findAssociatedTokenPda({ owner: address(review.payTo), mint: address(review.asset), tokenProgram: TOKEN_PROGRAM_ADDRESS });
+  const authority = createNoopSigner(address(review.delegate));
+  return [
+    getCreateAssociatedTokenIdempotentInstruction({ payer: authority, ata: destination, owner: address(review.payTo), mint: address(review.asset), tokenProgram: TOKEN_PROGRAM_ADDRESS }),
+    getTransferCheckedInstruction({ source: address(review.source), mint: address(review.asset), destination, authority, amount, decimals: 6 }),
+  ];
+}
+export type SolanaAiSettlementContext = { operations: SolanaOperations; manifest: SolanaHouseManifest; sponsor: { address: string } };
+export type SolanaAiSettlementDependencies = {
+  context: (store: Store) => Promise<SolanaAiSettlementContext>;
+  wallet: (subject: string) => Promise<{ id: string; address: string } | null>;
+};
+export async function settleSolanaAi(store: Store, key: string, dependencies?: SolanaAiSettlementDependencies) {
+  const row = await store.get<SolanaAiRecord>(key), review = row?.request.solanaReview;
+  if (!row || !review || row.request.state === 'completed' || row.request.payment.state === 'settled') return;
+  if (row.request.state !== 'settling' || !row.request.answer || !row.request.usage || row.request.approval?.state !== 'completed')
+    throw new ConflictError('No completed approved Solana AI answer is available.');
+  const amount = inferenceCharge(row.request.usage.outputTokens, BigInt(review.amountAtomic));
+  if (amount.toString() !== row.request.payment.amountAtomic) throw new ConflictError('Saved AI usage differs from settlement.');
+  const { operations, manifest, sponsor } = await (dependencies?.context ?? solanaAiContext)(store);
+  if (review.delegate !== sponsor.address || review.asset !== manifest.cashMint) throw new ConflictError('AI payment deployment changed.');
+  if (!row.solanaJournal.settlementId && review.route === 'wallet') {
+    // Identity is server-only; focused Node transaction tests inject the same ownership lookup boundary.
+    const lookup = dependencies?.wallet ?? (await import('./identity.ts')).verifiedSolanaWalletForSubject;
+    const recipient = review.hostOwnerSubject ? await lookup(review.hostOwnerSubject) : null;
+    if (!recipient || recipient.address !== review.payTo) throw new ConflictError('The host owner wallet changed; this answer cannot be settled to a different recipient.');
+  }
+  const result = amount === 0n ? null : row.solanaJournal.settlementId ?
+    await operations.reconcile({ id: row.solanaJournal.settlementId }) :
+    await operations.executeAsSponsor({ kind: 'ai-settle', requestId: row.id, sponsorshipSubject: row.owner.subject,
+      instructions: await solanaAiSettlementInstructions(review, amount, manifest.programId), review: { ...review, actualAmountAtomic: amount.toString(), sourceKind: 1 },
+      expectedDeltas: await solanaAiSettlementDeltas(review, amount, manifest.programId) });
+  await store.update<SolanaAiRecord>(key, current => {
+    if (current.request.payment.state === 'settled') return current;
+    if (result) current.solanaJournal.settlementId = result.id;
+    if (!result || result.state === 'confirmed') {
+      current.request.payment.state = 'settled'; current.request.state = 'completed'; current.request.error = null;
+      current.request.payment.receipt = { success: true, network: 'solana:devnet', payer: review.payer,
+        transaction: result?.signature ?? '', amount: amount.toString() };
+      current.completedAt = new Date().toISOString(); (current.progressEvents ??= {}).finishedAt = current.completedAt;
+    } else if (result.state === 'failed' || result.state === 'expired') {
+      current.request.payment.state = 'failed'; current.request.state = 'failed'; current.request.error = result.error ?? 'Solana AI settlement failed; no new settlement is created.';
+      (current.progressEvents ??= {}).finishedAt = new Date().toISOString();
+    } else { current.request.payment.state = 'pending'; current.request.error = 'Solana settlement confirmation is pending. The saved answer remains private.'; }
+    return current;
+  });
+}
+export async function solanaAiWalletBalance(payer: string, mint: string) {
+  if (!process.env.SOLANA_RPC_URL) throw new ConflictError('Solana RPC is unavailable.');
+  const rpc = createSolanaRpc(process.env.SOLANA_RPC_URL);
+  const [source] = await findAssociatedTokenPda({ owner: address(payer), mint: address(mint), tokenProgram: TOKEN_PROGRAM_ADDRESS });
+  const token = await fetchMaybeToken(rpc, source, { commitment: 'confirmed' });
+  return { cashAtomic: token.exists ? token.data.amount.toString() : '0', allowanceAtomic: token.exists ? token.data.delegatedAmount.toString() : '0' };
+}
+
+export async function solanaAiSettlementDeltas(review: SolanaInferenceReview, amount: bigint, programId: string): Promise<ExpectedTokenDelta[]> {
+  const destination = review.route === 'house' ? (await addressesForHouse(review.payTo, programId)).rewardVault :
+    (await findAssociatedTokenPda({ owner: address(review.payTo), mint: address(review.asset), tokenProgram: TOKEN_PROGRAM_ADDRESS }))[0];
+  return [
+    { account: review.source, mint: review.asset, owner: review.payer, direction: 'debit', minimumAtomic: amount.toString(), maximumAtomic: amount.toString() },
+    { account: destination, mint: review.asset, owner: review.payTo, direction: 'credit', minimumAtomic: amount.toString(), maximumAtomic: amount.toString(), allowCreated: review.route === 'wallet' },
+  ];
 }

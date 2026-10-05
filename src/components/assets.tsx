@@ -72,7 +72,7 @@ export function AssetsOverview({ request, tenancies, tenanciesLoaded = true, go,
         if (current === revision.current) setPortfolioSnapshot(previous => ({ ...previous, unavailable: true }));
         throw error;
       }),
-      request<{ workflow: SharePositions }>('/api/share-workflows').then(result => {
+      request<{ workflow: SharePositions }>('/api/share-workflows?network=robinhood').then(result => {
         if (current === revision.current) setLatestRead(previous => ({ assets: previous?.assets ?? null, portfolio: previous?.portfolio ?? null, workflow: result.workflow, checkedAt: Date.now() }));
         return result;
       }),
@@ -151,7 +151,6 @@ export function AssetsOverview({ request, tenancies, tenanciesLoaded = true, go,
   const positions = workflow;
   const walletTestUsd = rh ? atomicUsd(rh.testUsdAtomic) : 0;
   const collateral = atomicUsd(positions?.loan?.valueAtomic);
-  const pledgedShares = positions?.loan?.sharesRaw ?? '0';
   const debt = atomicUsd(positions?.loan?.debtAtomic);
   const lent = atomicUsd(positions?.lender?.valueAtomic);
   const parts = snapshot ? netPositionParts({
@@ -194,13 +193,10 @@ export function AssetsOverview({ request, tenancies, tenanciesLoaded = true, go,
             <div><strong>tSPYx</strong><span>{solanaShareValue === null ? 'Value unavailable' : 'Test shares'}</span></div><strong>{portfolio ? `${portfolio.shares.toFixed(4)} tSPYx` : '—'}</strong>
             <details className="holding-buy"><summary>Buy</summary>{solanaAction}</details>
           </div>
-          <div className="holding-row" id="official-shares" tabIndex={-1}>
-            <div><strong>TSLA</strong><span>{BigInt(pledgedShares) > 0n ? `${depositShares(pledgedShares)} TSLA pledged as collateral` : 'Test shares in your wallet'}</span></div><strong>{rh ? `${rh.tslaShares.toFixed(4)} TSLA` : '—'}</strong>
-            <button className="text-button" onClick={() => goToSection(go, 'money', 'share-workflows')}>Borrow &amp; lend →</button>
-          </div>
+          <TslaHoldingRow request={request} earlierUnits={rh?.tslaShares ?? null} earlierLocked={positions?.loan?.sharesRaw ?? null} go={go} />
           <div className="holding-row"><div><strong>tUSDG</strong><span>{rh ? 'Free to use' : 'Balance unavailable'}</span></div><strong>{rh ? usd(walletTestUsd) : '—'}</strong><button className="text-button" onClick={() => goToSection(go, 'money', 'test-money')}>Get test money →</button></div>
           <div className="holding-row"><div><strong>Lent test dollars</strong><span>{!positions?.lender ? 'Balance unavailable' : lent ? 'Withdrawals depend on pool cash' : 'Nothing lent yet'}</span></div><strong>{positions?.lender ? usd(lent) : '—'}</strong><button className="text-button" onClick={() => openShareWorkflow(go, 'lend')}>Lend →</button></div>
-          <div className="holding-row" id="fake-shares" tabIndex={-1}><div><strong>tHOME / tWORK</strong><span>Fictional units · outside total</span></div><strong>{localHoldings.length ? localHoldings.map(asset => `${(Number(BigInt(asset.holdingRaw!)) / 1e18).toFixed(4)} ${TEST_CITY_INVESTMENTS.find(project => project.id === asset.projectId)?.symbol ?? 'units'}`).join(' · ') : 'No units in wallet'}</strong><button className="text-button" onClick={() => goToSection(go, 'money', 'local-investments')}>Local stakes →</button></div>
+          <div className="holding-row" id="fake-shares" tabIndex={-1}><div><strong>tHOME / tWORK</strong><span>{stakes?.network.chainId === 'solana-devnet' ? 'Solana devnet · fictional units · outside total' : 'Earlier Robinhood test units · outside total'}</span></div><strong>{localHoldings.length || stakes?.assets.some(asset => BigInt(asset.stakedRaw ?? '0') > 0n) ? (stakes?.assets ?? []).filter(asset => asset.holdingRaw != null && BigInt(asset.holdingRaw) + BigInt(asset.stakedRaw ?? '0') > 0n).map(asset => `${(Number(BigInt(asset.holdingRaw!) + BigInt(asset.stakedRaw ?? '0')) / 10 ** asset.unitDecimals).toFixed(4)} ${TEST_CITY_INVESTMENTS.find(project => project.id === asset.projectId)?.symbol ?? 'units'}`).join(' · ') : stakes?.state === 'ready' ? 'No units in wallet or staked' : 'Verified units unavailable'}</strong><button className="text-button" onClick={() => goToSection(go, 'money', 'local-investments')}>Local stakes →</button></div>
         </section>
         <MoreList>
           <MoreRow id="test-money" title="Get test money" meta={noTestMoney ? 'Your test-dollar balances are empty' : 'Faucets and funding help'} defaultOpen={noTestMoney}>{children}</MoreRow>
@@ -215,4 +211,35 @@ export function AssetsOverview({ request, tenancies, tenanciesLoaded = true, go,
       </section>
     </HoldingsContext>
   );
+}
+
+/** Keep six-decimal devnet shares outside the earlier eighteen-decimal valuation. */
+function TslaHoldingRow({ request, earlierUnits, earlierLocked, go }: { request: Request; earlierUnits: number | null; earlierLocked: string | null; go: (area: Area) => void }) {
+  const activeTab = useSectionTabActive();
+  const [view, setView] = useState<{ network?: 'solana-devnet'; sharesRaw: string | null; loan: { sharesRaw: string } | null } | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let live = true;
+    const read = async () => {
+      if (!activeTab || document.visibilityState !== 'visible') return;
+      try {
+        const { workflow } = await request<{ workflow: { network?: 'solana-devnet'; sharesRaw: string | null; loan: { sharesRaw: string } | null } }>('/api/share-workflows');
+        if (live) { setView(workflow); setError(''); }
+      } catch (cause) { if (live) { setView(null); setError(cause instanceof Error ? cause.message : 'Test-TSLA balances unavailable.'); } }
+    };
+    void read(); const timer = setInterval(() => void read(), 60_000);
+    window.addEventListener('ledger-balances-changed', read);
+    document.addEventListener('visibilitychange', read);
+    return () => { live = false; clearInterval(timer); window.removeEventListener('ledger-balances-changed', read); document.removeEventListener('visibilitychange', read); };
+  }, [request, activeTab]);
+  const solana = view?.network === 'solana-devnet';
+  return <div className="holding-row" id="official-shares" tabIndex={-1}>
+    <div><strong>{solana ? 'tTSLA · Solana devnet' : 'TSLA · Robinhood testnet'}</strong>
+      <span>{solana ? view.loan ? `${(Number(view.loan.sharesRaw) / 1e6).toLocaleString('en-US', { maximumFractionDigits: 6 })} tTSLA locked as collateral · test shares, no value · outside earlier total` : 'Collateral unavailable' : earlierLocked !== null ? `${depositShares(earlierLocked)} TSLA pledged as collateral` : 'Collateral unavailable'}</span>
+      {solana && <span>Earlier Robinhood wallet: {earlierUnits === null ? 'unavailable' : `${earlierUnits.toFixed(4)} TSLA`} · locked: {earlierLocked === null ? 'unavailable' : `${depositShares(earlierLocked)} TSLA`}. Separate token and valuation.</span>}
+      {error && <span role="alert">{error}</span>}
+    </div>
+    <strong>{solana ? view.sharesRaw === null ? '—' : `${(Number(view.sharesRaw) / 1e6).toLocaleString('en-US', { maximumFractionDigits: 6 })} tTSLA` : earlierUnits === null ? '—' : `${earlierUnits.toFixed(4)} TSLA`}</strong>
+    <button className="text-button" onClick={() => goToSection(go, 'money', 'share-workflows')}>Borrow &amp; lend →</button>
+  </div>;
 }

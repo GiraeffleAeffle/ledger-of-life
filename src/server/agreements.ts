@@ -65,6 +65,19 @@ export function agreementRole(value: Agreement, identity: VerifiedIdentity): Rol
 export function agreementDigest(value: Agreement): string | null {
   if (!value.parties.tenant || !value.parties.landlord || !value.parties.arbitrator) return null;
   // Domain separation and canonical field order make exactly what is accepted reproducible.
+  if (value.depositForm?.kind === 'shares' && value.depositForm.network === 'solana-devnet') {
+    const rent = value.rentTerms;
+    return `0x${digest(JSON.stringify({
+      domain: 'rental-agreement-v5', id: value.id, network: value.network, property: value.property,
+      deposit: canonicalDeposit(value.depositForm),
+      ...(rent ? { rent: rent.network === 'solana-devnet'
+        ? { network: rent.network, rentMonthly: rent.rentMonthly, shareBps: rent.shareBps, landlordWallet: rent.landlordWallet, house: rent.house }
+        : { buildingId: rent.buildingId, shareBps: rent.shareBps, rentMonthly: rent.rentMonthly, landlordWallet: rent.landlordWallet } } : {}),
+      requiredSecurity: value.requiredSecurity, releaseAllowed: value.releaseAllowed,
+      tenant: value.parties.tenant.wallet.address, landlord: value.parties.landlord.wallet.address, arbitrator: value.parties.arbitrator.wallet.address,
+    }))}`;
+  }
+  if (value.rentTerms?.network === 'solana-devnet') return `0x${digest(JSON.stringify({ domain: 'rental-agreement-v4', id: value.id, network: value.network, property: value.property, deposit: canonicalDeposit(value.depositForm ?? cashDepositForm(value.network)), rent: { network: value.rentTerms.network, rentMonthly: value.rentTerms.rentMonthly, shareBps: value.rentTerms.shareBps, landlordWallet: value.rentTerms.landlordWallet, house: value.rentTerms.house }, requiredSecurity: value.requiredSecurity, releaseAllowed: value.releaseAllowed, tenant: value.parties.tenant.wallet.address, landlord: value.parties.landlord.wallet.address, arbitrator: value.parties.arbitrator.wallet.address }))}`;
   if (value.rentTerms) return `0x${digest(JSON.stringify({ domain: 'rental-agreement-v3', id: value.id, network: value.network, property: value.property, deposit: canonicalDeposit(value.depositForm ?? cashDepositForm(value.network)), rent: { buildingId: value.rentTerms.buildingId, shareBps: value.rentTerms.shareBps, rentMonthly: value.rentTerms.rentMonthly, landlordWallet: value.rentTerms.landlordWallet }, requiredSecurity: value.requiredSecurity, releaseAllowed: value.releaseAllowed, tenant: value.parties.tenant.wallet.address, landlord: value.parties.landlord.wallet.address, arbitrator: value.parties.arbitrator.wallet.address }))}`;
   if (value.depositForm) return `0x${digest(JSON.stringify({ domain: 'rental-agreement-v2', id: value.id, network: value.network, property: value.property, deposit: canonicalDeposit(value.depositForm), requiredSecurity: value.requiredSecurity, releaseAllowed: value.releaseAllowed, tenant: value.parties.tenant.wallet.address, landlord: value.parties.landlord.wallet.address, arbitrator: value.parties.arbitrator.wallet.address }))}`;
   return `0x${digest(JSON.stringify({ domain: 'rental-agreement-v1', id: value.id, network: value.network, property: value.property, asset: value.network === 'solana' ? 'USDC' : 'USDG', requiredSecurity: value.requiredSecurity, releaseAllowed: value.releaseAllowed, tenant: value.parties.tenant.wallet.address, landlord: value.parties.landlord.wallet.address, arbitrator: value.parties.arbitrator.wallet.address }))}`;
@@ -169,7 +182,7 @@ export async function joinAgreement(
     const invite = value.invitations[role];
     if (!invite || invite.expiresAt < Date.now() || invite.digest !== digest(token))
       throw new AccessError('The invitation is invalid, expired or already used.');
-    const wallet = walletFor(identity, value.network);
+    const wallet = walletFor(identity, value.depositForm?.kind === 'shares' && value.depositForm.network === 'solana-devnet' ? 'solana' : value.network);
     if (
       value.parties[role] ||
       Object.values(value.parties).some(

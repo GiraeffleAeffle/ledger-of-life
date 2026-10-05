@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { decodeEventLog, encodeFunctionData, formatUnits, getAddress, keccak256, parseTransaction, recoverTransactionAddress, type Hex, type TransactionReceipt } from 'viem';
+import { address, createNoopSigner, type Instruction } from '@solana/kit';
+import { findAssociatedTokenPda, getCreateAssociatedTokenIdempotentInstruction, getTransferCheckedInstruction, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
+import { getAddMemoInstruction } from '@solana-program/memo';
+import { depositRewardsInstruction } from '../finance/solana/house.ts';
+import type { ExpectedTokenDelta } from '../finance/solana/reconcile.ts';
 import { BUILDING_RENT_MEANING, BUILDING_RENT_SHARE_BPS, RENT_BUILDING_ID, berlinRentMonth, splitBuildingRent } from '../domain/rent.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import type { EvmSigningRequest } from '../wallets/types.ts';
@@ -11,13 +16,17 @@ import { AccessError, ConflictError } from './errors.ts';
 import { reviewedOperatorFees, reviewedOperatorGas } from './ownership-gas.ts';
 import { tenancyJourney } from './journey.ts';
 import type { Store } from './store.ts';
+import { loadSolanaHouseManifest, type SolanaHouseManifest } from './solana-house-config.ts';
+import { configuredSolanaOperations, type PreparedSolanaOperation, type SolanaOperations, type SolanaOperationResult } from './solana-operations.ts';
 
-export type RentStep = { id: string; kind: 'landlord' | 'building'; recipient: string; amountRaw: string; state: 'prepared' | 'signed' | 'submitted' | 'confirmed' | 'stopped'; request: EvmSigningRequest | null; signed?: Hex; hash?: Hex; error: string | null; retryable?: boolean };
-export type RentPayment = { id: string; agreementId: string; month: string; flatLabel: string; tenantWallet: string; landlordWallet: string; distributor: string; token: string; rentMonthly: string; landlordRaw: string; buildingRaw: string; state: 'prepared' | 'pending' | 'confirmed' | 'stopped'; error: string | null; steps: RentStep[]; createdAt: string };
+export type RentSolanaReview = { id: string; walletId: string; feePayer: string; transactionBase64: string; expiresAt: string; description: string };
+export type RentStep = { id: string; kind: 'landlord' | 'building' | 'rent'; recipient: string; amountRaw: string; state: 'prepared' | 'signed' | 'submitted' | 'confirmed' | 'stopped'; request: EvmSigningRequest | null; solanaRequest?: RentSolanaReview | null; operationId?: string; attempt?: number; signature?: string; signed?: Hex; hash?: Hex; error: string | null; retryable?: boolean };
+export type RentPayment = { id: string; network?: 'solana-devnet' | 'robinhood-testnet'; agreementId: string; month: string; flatLabel: string; tenantWallet: string; landlordWallet: string; distributor: string; token: string; rentMonthly: string; landlordRaw: string; buildingRaw: string; state: 'prepared' | 'pending' | 'confirmed' | 'stopped'; error: string | null; steps: RentStep[]; createdAt: string };
 export type RentPublicPayment = Omit<RentPayment, 'tenantWallet' | 'steps'> & { steps: Omit<RentStep, 'signed'>[] };
-export type RentView = { agreementId: string; month: string; rentMonthly: string; landlordRaw: string; buildingRaw: string; role: 'tenant' | 'landlord'; active: boolean; payment: RentPublicPayment | null; history: RentPublicPayment[] };
+export type RentView = { network: 'solana-devnet' | 'robinhood-testnet'; landlordWallet: string; house: string; agreementId: string; month: string; rentMonthly: string; landlordRaw: string; buildingRaw: string; role: 'tenant' | 'landlord'; active: boolean; payment: RentPublicPayment | null; history: RentPublicPayment[] };
 export type RentReceipt = Pick<TransactionReceipt, 'status' | 'transactionHash'> & { logs: { address: string; data: Hex; topics: [] | [Hex, ...Hex[]] }[] };
-type Options = BuildingReadOptions & { now?: () => number; readJourney?: typeof tenancyJourney };
+type RentSolanaRuntime = { operations: SolanaOperations; sponsor: { address: string } };
+type Options = BuildingReadOptions & { now?: () => number; readJourney?: typeof tenancyJourney; environment?: Record<string, string | undefined>; solana?: RentSolanaRuntime; houseManifest?: SolanaHouseManifest };
 const RENT_REVIEW_LIFETIME_MS = 2 * 60_000;
 const keyOf = (id: string, month: string) => `rent-payment:${id}:${month}`;
 const stateOf = (steps: RentStep[]): RentPayment['state'] => steps.every(step => step.state === 'confirmed') ? 'confirmed' : steps.some(step => step.state === 'stopped') ? 'stopped' : steps.some(step => step.signed) ? 'pending' : 'prepared';
@@ -28,7 +37,7 @@ async function context(store: Store, identity: VerifiedIdentity, id: string, pay
   const role = agreementRole(agreement, identity);
   if (role === 'arbitrator' || (pay && role !== 'tenant')) throw new AccessError('Only the tenant can pay rent; only tenant and landlord can read it.');
   if (!agreement.rentTerms) { if (pay) throw new ConflictError('Rent payments are only available for the fictional building.'); return null; }
-  if (agreement.rentTerms.shareBps !== BUILDING_RENT_SHARE_BPS || agreement.rentTerms.buildingId !== RENT_BUILDING_ID) throw new ConflictError('The agreed building rent terms are invalid.');
+  if (agreement.rentTerms.shareBps !== BUILDING_RENT_SHARE_BPS || (agreement.rentTerms.network !== 'solana-devnet' && agreement.rentTerms.buildingId !== RENT_BUILDING_ID)) throw new ConflictError('The agreed building rent terms are invalid.');
   const digest = agreementDigest(agreement);
   const accepted = Boolean(digest && agreement.accepted.tenant?.digest === digest && agreement.accepted.landlord?.digest === digest);
   const journey = await (options.readJourney ?? tenancyJourney)(store, identity, agreement);
@@ -42,7 +51,7 @@ async function journals(store: Store, id: string) {
 }
 function visible(payment: RentPayment, role: 'tenant' | 'landlord'): RentPublicPayment {
   const { tenantWallet: _, steps, ...rest } = payment; void _;
-  return { ...rest, steps: steps.map(step => { const { signed: _, ...value } = step; void _; return { ...value, request: role === 'tenant' && step.state === 'prepared' ? step.request : null }; }) };
+  return { ...rest, steps: steps.map(step => { const { signed: _, ...value } = step; void _; const signing = role === 'tenant' && step.state === 'prepared'; return { ...value, request: signing ? step.request : null, solanaRequest: signing ? step.solanaRequest : null }; }) };
 }
 export function verifyRentReceipt(receipt: RentReceipt, payment: RentPayment, step: RentStep) {
   if (!step.hash || receipt.transactionHash.toLowerCase() !== step.hash.toLowerCase() || receipt.status !== 'success') throw new Error('The exact rent transaction did not succeed.');
@@ -100,12 +109,14 @@ async function recover(store: Store, payment: RentPayment, broadcast: boolean, o
 export async function readRent(store: Store, identity: VerifiedIdentity, id: string, options: Options = {}): Promise<RentView | null> {
   const ctx = await context(store,identity,id,false,options); if (!ctx) return null;
   const month = berlinRentMonth((options.now ?? Date.now)()), history: RentPayment[] = [];
-  for (const payment of await journals(store,id)) history.push(await recover(store,payment,ctx.role === 'tenant',options));
-  return { agreementId:id, month, rentMonthly:ctx.agreement.rentTerms!.rentMonthly, ...splitBuildingRent(ctx.agreement.rentTerms!.rentMonthly), role:ctx.role, active:ctx.active, payment:history.find(item => item.month === month) ? visible(history.find(item => item.month === month)!,ctx.role) : null, history:history.map(item => visible(item,ctx.role)) };
+  for (const payment of await journals(store,id)) history.push(payment.network === 'solana-devnet' ? await recoverSolanaRent(store,payment,options) : await recover(store,payment,ctx.role === 'tenant',options));
+  const terms = ctx.agreement.rentTerms!;
+  return { network: terms.network === 'solana-devnet' ? 'solana-devnet' : 'robinhood-testnet', landlordWallet: terms.landlordWallet, house: terms.house ?? terms.buildingId, agreementId:id, month, rentMonthly:terms.rentMonthly, ...splitBuildingRent(terms.rentMonthly), role:ctx.role, active:ctx.active, payment:history.find(item => item.month === month) ? visible(history.find(item => item.month === month)!,ctx.role) : null, history:history.map(item => visible(item,ctx.role)) };
 }
 export async function prepareRent(store: Store, identity: VerifiedIdentity, id: string, options: Options = {}) {
   const ctx = await context(store,identity,id,true,options);
   if (!ctx?.active) throw new ConflictError('Rent can only be paid in an active tenancy after both parties accept these terms.');
+  if (ctx.agreement.rentTerms!.network === 'solana-devnet') return prepareSolanaRent(store,identity,ctx.agreement,options);
   const wallet = walletFor(identity,'robinhood'), terms = ctx.agreement.rentTerms!;
   const currentMonth = berlinRentMonth((options.now ?? Date.now)());
   const unfinished = (await journals(store,id)).find(item => item.month < currentMonth && item.state !== 'confirmed');
@@ -124,6 +135,7 @@ export async function prepareRent(store: Store, identity: VerifiedIdentity, id: 
     throw new ConflictError('Rent for this calendar month is already paid. A second payment is refused.');
   }
   const step = payment.steps.find(item => item.state !== 'confirmed')!;
+  if (step.kind === 'rent') throw new ConflictError('This payment requires its Solana rent review.');
   if (step.signed && !step.retryable) return readRent(store,identity,id,options);
   if (step.request && step.state === 'prepared' && Date.parse(step.request.expiresAt) > (options.now ?? Date.now)()) return readRent(store,identity,id,options);
   try {
@@ -151,6 +163,22 @@ export async function prepareRent(store: Store, identity: VerifiedIdentity, id: 
 export async function submitRent(store: Store, identity: VerifiedIdentity, id: string, stepId: string, signed: string, options: Options = {}) {
   const ctx = await context(store,identity,id,true,options);
   const payment = (await journals(store,id)).find(item => item.steps.some(step => step.id === stepId));
+  if (payment?.network === 'solana-devnet') {
+    const step = payment.steps.find(item => item.id === stepId)!;
+    if (!ctx?.active && !step.signature) throw new ConflictError('A new rent payment requires an active tenancy and both accepted terms.');
+    if (!step.operationId || !step.solanaRequest) throw new ConflictError('Prepare the exact Solana rent review before signing.');
+    const wallet = walletFor(identity,'solana');
+    if (wallet.address !== payment.tenantWallet) throw new ConflictError('The saved rent wallet changed.');
+    const runtime = await rentSolanaRuntime(store,options);
+    assertRentOperation(payment,await runtime.operations.get(step.operationId,identity));
+    try { await runtime.operations.submit({ identity,id:step.operationId,signedTransactionBase64:signed }); }
+    catch (cause) {
+      if (!step.signature && cause instanceof Error && /review expired/i.test(cause.message)) throw new ConflictError('The rent review expired before signing. Review the refreshed payment.');
+      throw cause;
+    }
+    await recoverSolanaRent(store,payment,options);
+    return readRent(store,identity,id,options);
+  }
   if (!payment || !/^0x02(?:[0-9a-fA-F]{2})+$/.test(signed) || signed.length > 20000) throw new ConflictError('Prepare the exact rent transfer before submitting.');
   const step = payment.steps.find(item => item.id === stepId)!, request = step.request;
   if (!step.signed && !ctx?.active) throw new ConflictError('A new rent transfer requires an active tenancy and both accepted terms.');
@@ -166,4 +194,100 @@ export async function submitRent(store: Store, identity: VerifiedIdentity, id: s
   await store.update<RentPayment>(keyOf(id,payment.month),current => { const target = current.steps.find(item => item.id === stepId)!; if (target.signed && target.signed !== serialized) throw new ConflictError('Rent was already signed differently.'); if (JSON.stringify(target.request) !== JSON.stringify(request)) throw new ConflictError('The rent review changed; review again.'); if (target.state === 'confirmed') return current; if (target.state !== 'prepared' && !target.signed) throw new ConflictError('Prepare the stopped rent step again.'); return {...current,state:'pending',error:null,steps:current.steps.map(item => item.id === stepId ? {...item,signed:serialized,hash:keccak256(serialized),state:'signed',error:null}:item)}; });
   await recover(store,(await store.get<RentPayment>(keyOf(id,payment.month)))!,true,options);
   return readRent(store,identity,id,options);
+}
+
+/** One public month memo and one atomic split; the agreement identifier never goes on chain. */
+export async function solanaRentInstructions(input: { month: string; tenant: string; landlord: string; sponsor: string; mint: string; house: string; rewardVault: string; programId: string; rentMonthly: string }) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(input.month)) throw new ConflictError('Choose a Berlin calendar month.');
+  const split = splitBuildingRent(input.rentMonthly);
+  const tenant = createNoopSigner(address(input.tenant)), sponsor = createNoopSigner(address(input.sponsor)), mint = address(input.mint);
+  const [source] = await findAssociatedTokenPda({ owner: tenant.address, mint, tokenProgram: TOKEN_PROGRAM_ADDRESS });
+  const [landlordAta] = await findAssociatedTokenPda({ owner: address(input.landlord), mint, tokenProgram: TOKEN_PROGRAM_ADDRESS });
+  const instructions: Instruction[] = [
+    getAddMemoInstruction({ memo: `ledger-of-life rent ${input.month}` }),
+    getCreateAssociatedTokenIdempotentInstruction({ payer: sponsor, ata: landlordAta, owner: address(input.landlord), mint, tokenProgram: TOKEN_PROGRAM_ADDRESS }),
+    getTransferCheckedInstruction({ source, mint, destination: landlordAta, authority: tenant, amount: BigInt(split.landlordRaw), decimals: 6 }),
+    await depositRewardsInstruction({ authority: tenant.address, source, house: input.house, programId: input.programId, amount: BigInt(split.buildingRaw), sourceKind: 0 }),
+  ];
+  const expectedDeltas: ExpectedTokenDelta[] = [
+    { account: source, mint, owner: input.tenant, direction: 'debit', minimumAtomic: input.rentMonthly, maximumAtomic: input.rentMonthly },
+    { account: landlordAta, mint, owner: input.landlord, direction: 'credit', minimumAtomic: split.landlordRaw, maximumAtomic: split.landlordRaw, allowCreated: true },
+    { account: input.rewardVault, mint, owner: input.house, direction: 'credit', minimumAtomic: split.buildingRaw, maximumAtomic: split.buildingRaw },
+  ];
+  return { instructions, expectedDeltas, source, landlordAta, ...split };
+}
+
+function rentHouseManifest(options: Options) {
+  const manifest = options.houseManifest ?? loadSolanaHouseManifest(options.environment ?? process.env);
+  if (!manifest || manifest.cluster !== 'devnet') throw new ConflictError('Solana devnet house rent is not configured.');
+  return manifest;
+}
+async function rentSolanaRuntime(store: Store, options: Options): Promise<RentSolanaRuntime> {
+  if (options.solana) return options.solana;
+  const manifest = rentHouseManifest(options);
+  return configuredSolanaOperations(store,{ cluster:manifest.cluster,genesisHash:manifest.genesisHash,maximumSponsorLamports:10_000_000n },options.environment ?? process.env);
+}
+function assertRentOperation(payment: RentPayment, op: PreparedSolanaOperation) {
+  const step = payment.steps[0];
+  const expected = { agreementId:payment.agreementId,tenantWallet:payment.tenantWallet,month:payment.month,rentMonthly:payment.rentMonthly,landlordRaw:payment.landlordRaw,buildingRaw:payment.buildingRaw,shareBps:BUILDING_RENT_SHARE_BPS,landlordWallet:payment.landlordWallet,house:payment.distributor,mint:payment.token,network:payment.network };
+  if (op.kind !== 'rent' || op.id !== step.operationId || op.walletId !== step.solanaRequest?.walletId || Object.entries(expected).some(([field,value]) => op.review[field] !== value)) throw new ConflictError('The reviewed operation does not belong to this exact tenancy and rent month.');
+}
+async function saveSolanaRentResult(store: Store, payment: RentPayment, op: SolanaOperationResult) {
+  return store.update<RentPayment>(keyOf(payment.agreementId,payment.month),current => {
+    const step = current.steps[0];
+    if (step.operationId !== op.id || current.state === 'confirmed') return current;
+    const state = op.state === 'confirmed' ? 'confirmed' : op.state === 'broadcast' ? 'submitted' : op.state === 'prepared' ? 'prepared' : 'stopped';
+    const retryable = op.state === 'expired' || (op.state === 'failed' && ['transaction-error','receipt-error'].includes(op.error ?? ''));
+    return { ...current,state:state === 'submitted' ? 'pending' : state,error:op.error ?? null,steps:[{ ...step,state,signature:op.signature,error:op.error ?? null,retryable }] };
+  });
+}
+async function recoverSolanaRent(store: Store, payment: RentPayment, options: Options) {
+  const step = payment.steps[0];
+  if (!step?.operationId || payment.state === 'confirmed') return payment;
+  const runtime = await rentSolanaRuntime(store,options);
+  assertRentOperation(payment,await runtime.operations.get(step.operationId));
+  return saveSolanaRentResult(store,payment,await runtime.operations.reconcile({ id:step.operationId }));
+}
+async function prepareSolanaRent(store: Store, identity: VerifiedIdentity, agreement: Agreement, options: Options) {
+  const terms = agreement.rentTerms!;
+  if (terms.network !== 'solana-devnet') throw new ConflictError('Solana rent terms are required.');
+  const manifest = rentHouseManifest(options), house = manifest.houses['neighbourhood-homes'];
+  if (terms.house !== house.house) throw new ConflictError('The agreed house differs from the configured Solana deployment.');
+  const wallet = walletFor(identity,'solana'), currentMonth = berlinRentMonth((options.now ?? Date.now)());
+  const unfinished = (await journals(store,agreement.id)).find(item => item.month < currentMonth && item.state !== 'confirmed');
+  const month = unfinished?.month ?? currentMonth, key = keyOf(agreement.id,month);
+  let payment = unfinished ?? await store.get<RentPayment>(key);
+  if (!payment) {
+    payment = { id:randomUUID(),network:'solana-devnet',agreementId:agreement.id,month,flatLabel:agreement.property,tenantWallet:wallet.address,landlordWallet:terms.landlordWallet,distributor:terms.house,token:manifest.cashMint,rentMonthly:terms.rentMonthly,...splitBuildingRent(terms.rentMonthly),state:'prepared',error:null,createdAt:new Date((options.now ?? Date.now)()).toISOString(),steps:[{id:randomUUID(),kind:'rent',recipient:terms.house,amountRaw:terms.rentMonthly,state:'prepared',request:null,error:null,attempt:0}] };
+    try { await store.create(key,payment); } catch (error) { payment = await store.get<RentPayment>(key); if (!payment) throw error; }
+  }
+  payment = await recoverSolanaRent(store,payment,options);
+  if (payment.state === 'confirmed') {
+    if (month !== currentMonth) return readRent(store,identity,agreement.id,options);
+    throw new ConflictError('Rent for this calendar month is already paid. A second payment is refused.');
+  }
+  if (payment.tenantWallet !== wallet.address || payment.landlordWallet !== terms.landlordWallet || payment.distributor !== terms.house || payment.token !== manifest.cashMint || payment.rentMonthly !== terms.rentMonthly) throw new ConflictError('The saved rent differs from the agreed wallet, amount or deployment.');
+  const step = payment.steps[0];
+  if ((step.signature && !step.retryable) || (step.state === 'stopped' && step.operationId && !step.retryable)) return readRent(store,identity,agreement.id,options);
+  if (step.solanaRequest && step.state === 'prepared' && Date.parse(step.solanaRequest.expiresAt) > (options.now ?? Date.now)()) return readRent(store,identity,agreement.id,options);
+  if (step.retryable) payment = await store.update<RentPayment>(key,current => {
+    if (current.steps[0].operationId !== step.operationId || !current.steps[0].retryable) return current;
+    return { ...current,state:'prepared',error:null,steps:[{ ...current.steps[0],attempt:(current.steps[0].attempt ?? 0)+1,operationId:undefined,solanaRequest:null,signature:undefined,state:'prepared',retryable:false,error:null }] };
+  });
+  const attempt = payment.steps[0].attempt ?? 0;
+  try {
+    const runtime = await rentSolanaRuntime(store,options);
+    const tx = await solanaRentInstructions({ month,tenant:wallet.address,landlord:terms.landlordWallet,sponsor:runtime.sponsor.address,mint:manifest.cashMint,house:terms.house,rewardVault:house.rewardVault,programId:manifest.programId,rentMonthly:terms.rentMonthly });
+    const description = `${formatUnits(BigInt(terms.rentMonthly),6)} tUSDC in one signature: ${formatUnits(BigInt(tx.landlordRaw),6)} to your landlord (${terms.landlordWallet}) and ${formatUnits(BigInt(tx.buildingRaw),6)} to the house (${terms.house}), fixed 20 % · Solana devnet. Sponsored network fees. Test tokens only, no value. Fictional units carry no rights. Deposit earnings belong to the tenant.`;
+    const prepared = await runtime.operations.prepare({ identity,kind:'rent',requestId:`${payment.id}:${attempt}`,actor:address(wallet.address),walletId:wallet.id,instructions:tx.instructions,expectedDeltas:tx.expectedDeltas,review:{ agreementId:agreement.id,tenantWallet:wallet.address,month,rentMonthly:terms.rentMonthly,landlordRaw:tx.landlordRaw,buildingRaw:tx.buildingRaw,shareBps:terms.shareBps,landlordWallet:terms.landlordWallet,house:terms.house,mint:manifest.cashMint,network:terms.network,description } });
+    await store.update<RentPayment>(key,current => {
+      if ((current.steps[0].attempt ?? 0) !== attempt || current.state === 'confirmed' || current.steps[0].signature) return current;
+      return { ...current,state:'prepared',error:null,steps:[{ ...current.steps[0],state:'prepared',operationId:prepared.id,solanaRequest:{ ...prepared,description },error:null }] };
+    });
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : 'Solana rent preparation failed.';
+    const error = message === 'Exact transaction simulation failed' ? 'Rent simulation failed. Check your site tUSDC balance for the whole month, then review again.' : message;
+    await store.update<RentPayment>(key,current => current.steps[0].signature || current.steps[0].operationId || (current.steps[0].attempt ?? 0) !== attempt ? current : { ...current,state:'stopped',error,steps:[{ ...current.steps[0],state:'stopped',error }] });
+  }
+  return readRent(store,identity,agreement.id,options);
 }

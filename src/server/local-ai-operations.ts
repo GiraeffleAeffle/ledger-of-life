@@ -9,7 +9,11 @@ import { AI_PRICE, AI_MAX_OUTPUT } from '../domain/ai-pricing.ts';
 import { AI_BUDGET, AI_MODEL, AI_CONTEXT_TOKENS, aiRpc, aiTokenAbi, assertInferenceContracts, inferencePayee } from './local-ai-runtime.ts';
 import type { AiOwner, PaidAiOwner } from './local-ai.ts';
 import type { LocalAiApproval, LocalAiRequest, LocalAiServiceStatus, LocalAiUsageSummary } from './local-ai-types.ts';
-import { facilitatorAccount } from './local-ai-payment.ts';
+import { facilitatorAccount, solanaAiApproval, solanaAiEnabled, solanaAiRecipient, solanaAiWalletBalance } from './local-ai-payment.ts';
+import { loadSolanaHouseManifest } from './solana-house-config.ts';
+import { configuredFeeSponsor } from './solana-service.ts';
+import { connectorHosts as listConnectorHosts } from './local-ai-hosts.ts';
+import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { publicConnectorHosts } from './local-ai-hosts.ts';
 type ApprovalRecord = { signed: Hex | null; hash: Hex | null; transaction: NonNullable<LocalAiApproval['request']>['transaction'] };
 type RecordRow = { id: string; mode: string; owner: AiOwner; request: LocalAiRequest; approvalJournal: ApprovalRecord | null; completedAt?: string };
@@ -18,10 +22,14 @@ function checked(record: RecordRow | null, owner: PaidAiOwner): asserts record i
       record.owner.walletId !== owner.walletId || record.owner.payer.toLowerCase() !== owner.payer.toLowerCase())
     throw new AccessError('No request belongs to this wallet.');
 }
-export async function aiApproval(store: Store, id: string, owner: PaidAiOwner, action: unknown, signedTransaction?: unknown) {
+export async function aiApproval(store: Store, id: string, owner: PaidAiOwner, action: unknown, signedTransaction?: unknown, identity?: VerifiedIdentity) {
   const key = `local-ai:request:${id}`;
   const row = await store.get<RecordRow>(key);
   checked(row, owner);
+  if (row.request.solanaReview) {
+    if (!identity) throw new AccessError('Verified Solana wallet ownership is required.');
+    return solanaAiApproval(store, key, identity, action, signedTransaction);
+  }
   if (row.mode !== 'paid' || !row.request.paymentRequired) throw new ConflictError('Only a paid quoted request can approve Permit2.');
   if (action === 'prepare') {
     if (row.request.state === 'expired' || Date.now() >= Date.parse(row.request.expiresAt))
@@ -180,7 +188,20 @@ export async function localAiStatus(store: Store, owner?: AiOwner): Promise<Loca
     } catch { error = 'Local model endpoint is unreachable.'; }
   } else if (selected) { reachable = true; }
   else error = configured ? 'Connector hosts are asleep or offline.' : 'No paired inference host is configured.';
-  if (!ownHostAvailable) try {
+  const solana = solanaAiEnabled();
+  let solanaPrice: LocalAiServiceStatus['price'] = null;
+  if (solana && !ownHostAvailable) try {
+    const manifest = loadSolanaHouseManifest()!;
+    const sponsor = await configuredFeeSponsor();
+    if (!sponsor) throw new ConflictError('Solana fee sponsorship is unavailable.');
+    const host = direct ? null : (await listConnectorHosts(store)).find(host => host.id === selected?.id) ?? null;
+    const recipient = await solanaAiRecipient(host);
+    solanaPrice = { network: 'solana-devnet', asset: manifest.cashMint, symbol: 'tUSDC', decimals: 6,
+      amountAtomic: AI_PRICE.toString(), payTo: recipient.payTo, permit2: sponsor.address, proxy: manifest.programId,
+      approvalBudgetAtomic: (BigInt(AI_MAX_OUTPUT) * AI_PRICE).toString() };
+    paidEnabled = !owner || !('payer' in owner) || (owner.payer !== recipient.payTo && owner.payer !== sponsor.address);
+  } catch (cause) { error ??= cause instanceof Error ? cause.message : 'Solana AI payment routing is unavailable.'; }
+  if (!solana && !ownHostAvailable) try {
     payee = direct ? await inferencePayee() : selected ? selected.payoutWallet as Address : null;
     if (!payee) throw new ConflictError('No online connector payout is available.');
     await assertInferenceContracts();
@@ -193,7 +214,11 @@ export async function localAiStatus(store: Store, owner?: AiOwner): Promise<Loca
   let wallet: LocalAiServiceStatus['wallet'] = null;
   if (owner && 'payer' in owner) {
     wallet = { walletId: owner.walletId, address: owner.payer, cashAtomic: null, nativeAtomic: null, allowanceAtomic: null, error: null };
-    if (!ownHostAvailable) try {
+    if (solana && !ownHostAvailable) try {
+      const balance = await solanaAiWalletBalance(owner.payer, loadSolanaHouseManifest()!.cashMint);
+      wallet.cashAtomic = balance.cashAtomic; wallet.allowanceAtomic = balance.allowanceAtomic;
+    } catch { wallet.error = 'Solana wallet cash could not be verified.'; }
+    if (!solana && !ownHostAvailable) try {
       const [cash, native, allowance] = await Promise.all([
         aiRpc.readContract({ address: TEST_USDG_ADDRESS, abi: aiTokenAbi, functionName: 'balanceOf', args: [owner.payer] }),
         aiRpc.getBalance({ address: owner.payer }),
@@ -215,7 +240,7 @@ export async function localAiStatus(store: Store, owner?: AiOwner): Promise<Loca
     lastSuccessAt: usage.lastSuccessAt, modelResident, vramBytes,
     hardwareLabel: direct ? process.env.LOCAL_AI_HARDWARE_LABEL || 'Local inference host' : selected?.name || 'Outbound connector hosts',
     paidEnabled: paidEnabled && configured && reachable, error,
-    price: payee ? { network: 'eip155:46630', asset: TEST_USDG_ADDRESS, symbol: 'tUSDG', decimals: 6,
+    price: solana ? solanaPrice : payee ? { network: 'eip155:46630', asset: TEST_USDG_ADDRESS, symbol: 'tUSDG', decimals: 6,
       amountAtomic: AI_PRICE.toString(), payTo: payee, permit2: PERMIT2_ADDRESS,
       proxy: '0x4020A4f3b7b90ccA423B9fabCc0CE57C6C240002', approvalBudgetAtomic: AI_BUDGET.toString() } : null,
     wallet, library: { enabled: free && (direct ? reachable : connectorHosts.some((host) => host.freePublicAnswers === true &&

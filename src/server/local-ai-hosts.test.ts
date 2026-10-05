@@ -425,10 +425,18 @@ test('incomplete, wrong-model, oversized and connector-error answers reject the 
     await completeConnectorJob(store, host.hostId, { jobId: picked.job!.id, error: 'Private endpoint failed with a secret' });
     assert.match((await outcome).error!.message, /inference failed/);
     assert.equal(JSON.stringify(await store.scan('local-ai:')).includes('secret'), false);
-    const sanitized = sanitizeConnectorAnswer({ ...answer, prompt_eval_count: -1, eval_count: 1.5, total_duration: Infinity, load_duration: -1, eval_duration: 'fake' }, input.model, 10);
+    const sanitized = sanitizeConnectorAnswer({ ...answer, prompt_eval_count: -1, eval_count: 1.5, total_duration: Infinity, load_duration: -1, eval_duration: 'fake' }, input.model, 10, input.options.num_predict);
     assert.deepEqual(sanitized.usage, { inputTokens: null, outputTokens: null, wallMs: 10, totalMs: null, loadMs: null, evalMs: null, tokensPerSecond: null });
-    assert.equal(sanitizeConnectorAnswer({ ...answer, message: { role: 'assistant', content: 'x'.repeat(16000) } }, input.model, 1).answer.length, 16000);
+    assert.equal(sanitizeConnectorAnswer({ ...answer, message: { role: 'assistant', content: 'x'.repeat(16000) } }, input.model, 1, input.options.num_predict).answer.length, 16000);
   } finally { await store.close(); }
+});
+
+test('connector charges host counts bounded by job limit and received answer plus reasoning UTF-8 bytes', () => {
+  const response = { ...answer, eval_count: 10000, message: { role: 'assistant', content: 'é', thinking: '思考' } };
+  assert.equal(sanitizeConnectorAnswer(response, input.model, 10, 128).usage.outputTokens, 8);
+  assert.equal(sanitizeConnectorAnswer(response, input.model, 10, 4).usage.outputTokens, 4);
+  assert.equal(sanitizeConnectorAnswer({ ...response, eval_count: 3 }, input.model, 10, 128).usage.outputTokens, 3);
+  assert.equal(sanitizeConnectorAnswer({ ...response, eval_count: 0 }, input.model, 10, 128).usage.outputTokens, 0);
 });
 
 test('pickup and result deadlines fail cleanly, release the host, and erase queued questions; retention cancellation does too', async () => {

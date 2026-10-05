@@ -12,6 +12,19 @@ The machine-readable source of truth is [`ontology.yaml`](ontology.yaml). This p
 
 **The app in one sentence.** A home-centred app that shows everything you own. It secures rental deposits in escrows that earn, lets tenants claim and invest those earnings, and connects the other things a household owns that produce value.
 
+## Current Solana semantics · 5 October 2026
+
+The [current implementation overview](LEDGER_OF_LIFE.md#current-solana-port--5-october-2026) links the code and deployment records. Agreement **v4** binds Solana monthly rent, 2000-bps house share, landlord wallet and house address; payment is one atomic transaction/signature for 80 % landlord and 20 % house. Earlier Robinhood **v3** agreements are unchanged. Solana share deposits use **v5** and listing form `shares-solana`, binding immutable three-party share terms plus any rent terms; missing deployment disables publication/funding.
+
+The Solana house program is deployed and initialized ([evidence](evidence/SOLANA_HOUSE_DEVNET_DEPLOYMENT_2026-10-05.json)). Its tHOME/tWORK revenue **streams over 7 days**, including a fresh stream for idle revenue; fractional remainders carry. Claim pays at least the prepared amount. Reinvest claims, buys and stakes fixed reviewed units in one signature; extra accrued cash stays with the owner. These units have no value or legal rights.
+
+InferencePayment has two network-specific authorizations: existing Robinhood x402/Permit2 and Solana SPL delegate approval capped at one answer's maximum. The Solana sponsor settles only measured generated-token charges to the house AI reward source or reviewed owner wallet; leftover allowance remains bounded and the next approval replaces it only after the previous answer/settlement is resolved. Authorization is not a receipt.
+
+The Solana shares pool supplies tUSDC against tTSLA at 50 % borrow LTV, 5 % nominal annual interest and 80 % liquidation LTV; lender exits depend on cash and lenders bear bad debt. Its faucet has issuance budgets and new borrowing has an aggregate exposure cap. [Shares deployment evidence](evidence/SOLANA_SHARES_DEVNET_DEPLOYMENT_2026-10-05.json) records finalized deployment and initialization with verified on-chain hashes; hosted-flow proof remains a separate evidence boundary.
+
+Operation includes a durable sponsor reservation ledger: account rolling/global UTC-day limits, reservations before signing, ambiguous reservations retained across budget windows, landed failures charged and release only on proven absence. Rent, stakes, loans and AI spend personal cash, never rental security; all deposit earnings remain the tenant's (§551 BGB). Dated earlier proofs below remain evidence of their original network only.
+
+
 ## Seven layers
 
 | Layer | Question it answers | Concepts |
@@ -133,28 +146,31 @@ sequenceDiagram
   E->>L: Payout: deduction
 ```
 
-**Monthly rent is separate from the deposit.** A new listing can explicitly join the fictional
-`demo-neighbourhood-homes` building. Its share is fixed at **20% (2000 basis points)**, not an
-editable rate. Only the resulting new agreement binds the building ID, monthly rent, fixed share
-and landlord wallet into its accepted v3 digest; legacy/unmarked agreements remain unchanged.
+**Monthly rent is separate from the deposit.** A new listing can explicitly join fictional
+Neighbourhood Homes. Its share is fixed at **20% (2000 basis points)**, not editable. When the
+Solana house manifest is configured, agreement digest **v4** binds every rent term: `solana-devnet`,
+monthly tUSDC atomic rent, fixed share, verified landlord Solana wallet and house address.
+Unconfigured listings retain the Robinhood path; existing **v3** terms and digests are unchanged.
 
 A **RentPayment** journal (`rent-payment:`) records the agreement's **Europe/Berlin calendar month**
-(`YYYY-MM`) and two separately reviewed, tenant-wallet-signed real test **tUSDG** transfers:
-`floor(rent atomic units × 2000 / 10000)` to the tHOME staking distributor and the exact remainder
-to the landlord. One journal per agreement/month prevents paying a confirmed month twice.
-Prepared, pending and stopped payments recover the same signed transfers rather than silently
-creating replacement spends; both steps must confirm before the whole payment is confirmed.
-Rent never draws from deposit escrow, and deposit earnings remain the tenant's.
+(`YYYY-MM`). Solana rent is one sponsored transaction with one tenant signature: a public memo
+`ledger-of-life rent YYYY-MM` (no agreement ID), sponsor-paid idempotent landlord ATA creation,
+`TransferChecked` of the landlord remainder, and `deposit_rewards` of exactly
+`floor(rent atomic units × 2000 / 10000)` to the house (source 0). The house share streams to
+stakers over seven days. Existing v3 rent remains two separately reviewed tUSDG transfers on Robinhood Chain testnet.
+One journal per agreement/month prevents paying a confirmed month twice; the next month opens
+on the 1st, Berlin time. Ambiguous submissions only rebroadcast identical durable signed bytes.
+A replacement is allowed only after definitive transaction failure or finalized-height expiry
+with a fresh absence lookup. Rent never draws from deposit escrow; its earnings remain the tenant's.
 
-Public building income emits one aggregated **“Rent shares”** source: a total and receipt count,
-never flat labels, tenant identity, names, wallets or private agreement/payment IDs. Internal
-matching requires a confirmed **building** step and an exact inflow transaction hash, amount,
-token and distributor match, attributing each receipt once. Rent-associated hashes and explorer
-links are omitted from public receipt rows; exact rent receipts and flat labels stay in the
-authenticated tenant/landlord rent view. The building step can count while the independent
-landlord transfer is unfinished; landlord transfers, pending steps and unrelated inflows cannot
-borrow its evidence. Other public income receipts also omit sender wallets. This disclosure
-policy does not make blockchain transactions anonymous.
+Public building income shows aggregated **“Rent shares”**, never flat labels or private
+agreement/payment IDs. Solana reads the house's source-zero revenue total; a rent payment is
+confirmed only after the exact authorized transaction and all three token deltas reconcile.
+The two Robinhood steps keep their earlier evidence rules: a confirmed building inflow can count
+while the landlord transfer is unfinished, with an exact hash, amount, token and distributor match.
+Exact rent receipts and flat labels stay in the authenticated tenant/landlord rent view.
+Transfers, wallets, token amounts and the month-only Solana memo remain public on chain;
+this disclosure policy does not make blockchain transactions anonymous.
 GPU and simulated-solar income retain their own evidence and meanings.
 
 A fixed 20% of this test rent goes to the fictional building's tHOME stakers; the rest goes to the

@@ -29,12 +29,14 @@ import { DepositYield } from './deposit-yield';
 import { FlatMap } from './flat-map';
 import { MoveInHandover } from './move-in-handover';
 import { moveInAvailable, type HomeLocation } from '@/domain/home-location';
-import { ShareDeposit, ShareDepositRules, depositUsd } from './share-deposit';
+import { ShareDeposit, ShareDepositRules, depositShares, depositUsd } from './share-deposit';
 import { ShareDepositApplication } from './share-deposit-application';
+import { shareDepositReceiptUrl } from './share-deposit-logic';
 import shareDepositManifest from '../../contracts/evm/deployments/share-deposit-46630.json';
 import { maximumDepositSecurity, validateDepositSecurity, type DepositForm } from '@/domain/deposit-form';
 import type { EvmSigningRequest } from '@/wallets/types';
-import { paidRentMonth, RENT_BUILDING_ID } from '@/domain/rent';
+import { paidRentMonth, RENT_BUILDING_ID, type RentTerms as AgreedRentTerms } from '@/domain/rent';
+import type { RentSolanaReview } from '@/server/rent-payments';
 import { ActionBox, Figure, Figures, Hero, MoreList, MoreRow, ScreenNote, StatusLine } from './blocks';
 import { ProjectMap } from './project-map';
 import { DEFAULT_PROJECT_SYSTEMS } from './project-map-model';
@@ -241,7 +243,7 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
             {ready.some((t) => t.next.kind === 'done' || t.next.kind === 'cancelled') && <MoreRow id="past-tenancies" title="Past homes">
               {ready.filter((t) => t.next.kind === 'done' || t.next.kind === 'cancelled').map((t) => <div key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}>
                 <strong>{t.property}</strong><p>{t.next.kind === 'done' ? 'Paid out' : 'Cancelled'} · {t.role}{t.cancelled && <> · by {t.cancelled.by} · {new Date(t.cancelled.at).toLocaleString('en-GB')}</>}</p>
-                {t.depositForm?.kind === 'shares' ? <>{t.next.kind === 'done' && <p>Paid out in test TSLA.</p>}{t.shareDeposit?.receipts.filter(receipt => receipt.action === 'payout' && receipt.status === 'confirmed').map(receipt => <p key={receipt.planId}><a href={`https://explorer.testnet.chain.robinhood.com/tx/${receipt.transactionHash}`} target="_blank" rel="noopener noreferrer">Confirmed TSLA payout receipt</a></p>)}{t.shareDeposit?.explorerUrl && <a href={t.shareDeposit.explorerUrl} target="_blank" rel="noopener noreferrer">Read share escrow on explorer</a>}</> : <>
+                {t.depositForm?.kind === 'shares' ? <>{t.next.kind === 'done' && <p>Paid out in test TSLA · {t.depositForm.network === 'solana-devnet' ? 'Solana devnet' : 'Robinhood Chain testnet'}.</p>}{t.shareDeposit?.receipts.filter(receipt => receipt.action === 'payout' && receipt.status === 'confirmed').map(receipt => <p key={receipt.planId}><a href={shareDepositReceiptUrl(receipt.transactionHash, t.shareDeposit?.network)} target="_blank" rel="noopener noreferrer">Confirmed TSLA payout receipt</a></p>)}{t.shareDeposit?.explorerUrl && <a href={t.shareDeposit.explorerUrl} target="_blank" rel="noopener noreferrer">Read share escrow on explorer</a>}</> : <>
                   {t.next.kind === 'done' && <p>Tenant received {money(t.chain?.tenantPaidAtomic ?? '0')} test USDC · landlord received {money(t.chain?.landlordPaidAtomic ?? '0')} test USDC.</p>}
                   {t.role !== 'arbitrator' && t.chain?.depositMint === SOLANA_TEST_USDC_MINT && t.chain.simulatedYield?.since && <DepositYield view={t.chain.simulatedYield} requiredAtomic={t.requiredSecurity} tenant={t.role === 'tenant'} request={request} agreementId={t.agreementId} reload={load} />}
                   <TenancyDetails journey={t} request={request} />
@@ -468,7 +470,7 @@ function TenancyCard({ journey, request, reload, accountId, anchored = true, aut
     }
   }}>Cancel this tenancy</button> : null;
   const project = TEST_CITY_INVESTMENTS.find(project => project.id === RENT_BUILDING_ID)!;
-  const visual = journey.rentTerms?.buildingId === RENT_BUILDING_ID
+  const visual = journey.rentTerms?.buildingId === RENT_BUILDING_ID || journey.rentTerms?.network === 'solana-devnet'
     ? <ProjectMap project={project} systems={DEFAULT_PROJECT_SYSTEMS} variant="hero" label={`${journey.role === 'tenant' ? 'Your home' : journey.role === 'landlord' ? 'The flat you let' : 'The flat'} · fictional house`} />
     : journey.home?.location ? <FlatMap location={journey.home.location} variant="hero" /> : undefined;
   return <RentPayments agreementId={agreementId} role={journey.role} request={request} enabled={Boolean(journey.rentTerms && journey.stage !== 'agreement')}>
@@ -481,7 +483,7 @@ function TenancyCard({ journey, request, reload, accountId, anchored = true, aut
       status={<StatusLine tone={next.kind === 'confirming' || next.kind === 'paying_out' ? 'waiting' : due || tenancyNeedsPerson(journey) ? 'action' : living ? 'ok' : 'waiting'}>{next.kind === 'confirming' || next.kind === 'paying_out' ? 'Waiting for the network…' : due ? `${rent?.month ? new Date(`${rent.month}-01T12:00:00`).toLocaleString('en-GB', { month: 'long' }) : 'This month’s'} rent is due` : living && !shareForm && AUTO[next.kind] ? 'Deposit secured · nothing needs you now' : next.label}</StatusLine>}>
       {AUTO[next.kind] && !living && <p className="small-copy">{next.detail}{next.kind === 'wait' && ' Nothing notifies them: tell them yourself.'}</p>}
       <Figures>
-        <Figure label={living ? journey.role === 'tenant' ? cashOnly || shareForm ? 'Deposit' : 'In lending' : 'Deposit held' : 'Required deposit'} value={shareForm ? money(shareForm.securityUsd6) : money(!cashOnly && living && chain ? chain.lendingValueAtomic : journey.requiredSecurity)} note={living ? 'Safe in escrow' : undefined} />
+        <Figure label={living ? journey.role === 'tenant' ? cashOnly || shareForm ? 'Deposit' : 'In lending' : 'Deposit held' : 'Required deposit'} value={shareForm ? depositUsd(shareForm.securityUsd6) : money(!cashOnly && living && chain ? chain.lendingValueAtomic : journey.requiredSecurity)} note={shareForm ? `${journey.shareDeposit ? depositShares(journey.shareDeposit.lockedShares, shareForm.network === 'solana-devnet' ? 6 : 18) : '—'} test TSLA locked · ${shareForm.network === 'solana-devnet' ? 'Solana devnet' : 'Robinhood testnet'}` : living ? 'Safe in escrow' : undefined} />
         {journey.role === 'tenant' && cashOnly && living && chain?.simulatedYield?.since && <DepositYield presentation="figure" view={chain.simulatedYield} requiredAtomic={journey.requiredSecurity} tenant request={request} agreementId={agreementId} reload={reload} />}
         {journey.role === 'tenant' && !shareForm && !cashOnly && living && chain && <Figure label="Earned for you" value={money((BigInt(chain.claimableAtomic) + BigInt(chain.releasedAtomic)).toString())} note={`Simulated · yours to keep${BigInt(chain.releasedAtomic) > 0n ? ` · ${money(chain.releasedAtomic)} claimed` : ''}`} action={BigInt(chain.claimableAtomic) > 0n ? <button className="text-button" disabled={busy} onClick={() => run(() => operation({ kind: 'release_earnings', amountAtomic: chain.claimableAtomic }, 'Claim deposit earnings to your wallet'))}>Claim</button> : undefined} />}
         {journey.rentTerms && journey.role !== 'arbitrator' && <Figure label={living ? journey.role === 'landlord' ? 'Rent this month received' : 'Rent this month' : 'Monthly rent'} value={money(journey.role === 'landlord' && living ? paid && rent ? rent.payment!.landlordRaw : '0' : journey.rentTerms.rentMonthly)} note={living ? rent ? paid && nextRentDate ? `${journey.role === 'landlord' ? `Your part · the house got ${money(rent.payment!.buildingRaw)} (20 %)` : 'Paid'} · next from ${nextRentDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} (Berlin)` : journey.role === 'landlord' ? 'Awaiting payment' : 'Due' : 'Reading rent status…' : undefined} />}
@@ -489,11 +491,11 @@ function TenancyCard({ journey, request, reload, accountId, anchored = true, aut
         {journey.role === 'arbitrator' && chain && BigInt(chain.claimAtomic) > 0n && <Figure label="Deduction proposed" value={money(chain.claimAtomic)} />}
       </Figures>
       {!living && <ol className="tenancy-progress" aria-label="Tenancy progress">{HOME_STAGES.slice(0, homeStage(journey.stage) > 4 ? 7 : 5).map((label, index) => <li key={label} className={index < homeStage(journey.stage) ? 'complete' : undefined} aria-current={index === homeStage(journey.stage) ? 'step' : undefined}>{index < homeStage(journey.stage) && <Check size={12} aria-hidden="true" />}{index === homeStage(journey.stage) ? <strong>{label}</strong> : label}</li>)}</ol>}
-      {shareForm && journey.stage !== 'agreement' && <MoreRow title="Share deposit" meta={tenancyNeedsPerson(journey) ? 'Needs you' : next.label} defaultOpen={tenancyNeedsPerson(journey) || journey.stage === 'move-out'}>{(living || !AUTO[next.kind]) && <p className="small-copy">{next.detail}</p>}<ShareDeposit rentalId={agreementId} request={request} reload={reload} /></MoreRow>}
+      {shareForm && journey.stage !== 'agreement' && <MoreRow title="Share deposit" meta={tenancyNeedsPerson(journey) ? 'Needs you' : living ? 'Locked · no action needed' : next.label} defaultOpen={tenancyNeedsPerson(journey) || journey.stage === 'move-out'}>{(living || !AUTO[next.kind]) && <p className="small-copy">{next.detail}</p>}<ShareDeposit rentalId={agreementId} network={shareForm.network} request={request} reload={reload} /></MoreRow>}
       {(!shareForm || journey.stage === 'agreement') && !AUTO[next.kind] && next.kind !== 'done' && next.kind !== 'cancelled' && <ActionBox title={next.label}>
         <p>{next.detail}</p>
         {next.kind === 'accept_agreement' && <><p className="small-copy">Deposit: {shareForm ? `${money(shareForm.securityUsd6)} secured by test shares` : money(journey.requiredSecurity)}.{journey.rentTerms && <> Monthly rent: {money(journey.rentTerms.rentMonthly)}, including a 20 % house share.</>} Deposit earnings belong to the tenant.</p><MoreRow title="Review the agreement terms"><div className="small-copy">
-          {shareForm ? <><p>Security: {depositUsd(shareForm.securityUsd6)} USD, backed by test TSLA; factory {shareForm.factory ?? 'not deployed yet'}, oracle {shareForm.oracle}. Response: {shareForm.responseWindow / 86400} days; return: {shareForm.returnWindow / 86400} days; arbitration: {shareForm.arbitrationWindow / 86400} days.</p><ShareDepositRules /></> : <p>These terms cover {journey.property}, the {money(journey.requiredSecurity)} test USDC required deposit, and whether the tenant may claim surplus while the tenancy is active. The tenant keeps deposit assets above an approved deduction at settlement, whatever the release setting. Site-minted tUSDC stays in cash escrow: it is not lent. This site pays labelled simulated yield to the tenant in tUSDC, separate from the escrow. Test tokens have no value.</p>}
+          {shareForm ? <><p>Security: {depositUsd(shareForm.securityUsd6)} USD, backed by test TSLA on {shareForm.network === 'solana-devnet' ? `Solana devnet; program ${shareForm.programId}, mint ${shareForm.mint}, price account ${shareForm.oracle}` : `Robinhood Chain testnet; factory ${shareForm.factory ?? 'not deployed yet'}, oracle ${shareForm.oracle}`}. Response: {shareForm.responseWindow / 86400} days; return: {shareForm.returnWindow / 86400} days; arbitration: {shareForm.arbitrationWindow / 86400} days.</p><ShareDepositRules network={shareForm.network} /></> : <p>These terms cover {journey.property}, the {money(journey.requiredSecurity)} test USDC required deposit, and whether the tenant may claim surplus while the tenancy is active. The tenant keeps deposit assets above an approved deduction at settlement, whatever the release setting. Site-minted tUSDC stays in cash escrow: it is not lent. This site pays labelled simulated yield to the tenant in tUSDC, separate from the escrow. Test tokens have no value.</p>}
           {agreement?.rentTerms ? <RentTerms terms={agreement.rentTerms} /> : <p><strong>These terms cover the deposit and its parties, not monthly rent or tenancy dates.</strong> The landlord chooses the arbitrator before acceptance.</p>}
           {agreement && <p>Tenant: {agreement.parties.tenant?.wallet?.address ? `${agreement.parties.tenant.wallet.address.slice(0, 5)}…${agreement.parties.tenant.wallet.address.slice(-5)}` : 'not available'} · Landlord: {agreement.parties.landlord?.wallet?.address ? `${agreement.parties.landlord.wallet.address.slice(0, 5)}…${agreement.parties.landlord.wallet.address.slice(-5)}` : 'not available'} · Arbitrator: {agreement.parties.arbitrator?.wallet?.address ? `${agreement.parties.arbitrator.wallet.address.slice(0, 5)}…${agreement.parties.arbitrator.wallet.address.slice(-5)}` : 'not available'}</p>}
           {agreement && <p>Tenant acceptance: {agreement.accepted.tenant?.digest === agreement.digest ? 'accepted' : 'waiting'} · Landlord acceptance: {agreement.accepted.landlord?.digest === agreement.digest ? 'accepted' : 'waiting'}.{!shareForm && <> Surplus: {agreement.releaseAllowed ? 'tenant may claim during the tenancy' : 'locked until settlement'}.</>}</p>}
@@ -575,33 +577,39 @@ function TenancyCard({ journey, request, reload, accountId, anchored = true, aut
   </RentPayments>;
 }
 
-type BuildingRentTerms = { buildingId: string; shareBps: number; rentMonthly: string; landlordWallet: string };
+type BuildingRentTerms = AgreedRentTerms;
 
 function RentTerms({ terms }: { terms: BuildingRentTerms }) {
   const buildingRaw = (BigInt(terms.rentMonthly) * 2000n / 10000n).toString();
   return <div className="small-copy">
-    <p><strong>Monthly rent: {money(terms.rentMonthly)} test dollars · Robinhood Chain testnet.</strong> Fixed 20 % building share: {money(buildingRaw)}; landlord receives {money((BigInt(terms.rentMonthly) - BigInt(buildingRaw)).toString())}. Building share rounds down to the token unit; landlord receives the remainder.</p>
+    <p><strong>Monthly rent: {money(terms.rentMonthly)} test dollars · {terms.network === 'solana-devnet' ? 'Solana devnet · tUSDC' : 'Robinhood Chain testnet'}.</strong> Fixed 20 % building share: {money(buildingRaw)}; landlord receives {money((BigInt(terms.rentMonthly) - BigInt(buildingRaw)).toString())}. Building share rounds down to the token unit; landlord receives the remainder.</p>
     <p>A fixed 20 % of this test rent goes to the fictional building&apos;s tHOME stakers; the rest goes to the landlord. This simulates how a tokenized building could share net rental income; in a real building rent goes to the property owner under the lease. Not legal advice.</p>
-    <p>Building: {terms.buildingId}. Landlord recipient: <span style={{ overflowWrap: 'anywhere' }}>{terms.landlordWallet}</span>. These accepted terms bind the rent split as well as the separate deposit terms. Deposit earnings belong to the tenant; fictional units have no value or legal rights.</p>
+    <p>Building: <span style={{ overflowWrap: 'anywhere' }}>{terms.house ?? terms.buildingId}</span>. Landlord recipient: <span style={{ overflowWrap: 'anywhere' }}>{terms.landlordWallet}</span>. These accepted terms bind the rent split as well as the separate deposit terms. Deposit earnings belong to the tenant; fictional units have no value or legal rights.</p>
   </div>;
 }
 
 type RentStepView = {
-  id: string; kind: 'landlord' | 'building'; recipient: string; amountRaw: string;
+  id: string; kind: 'landlord' | 'building' | 'rent'; recipient: string; amountRaw: string;
   state: 'prepared' | 'signed' | 'submitted' | 'confirmed' | 'stopped';
-  request: EvmSigningRequest | null; hash?: `0x${string}`; error: string | null; retryable?: boolean;
+  request: EvmSigningRequest | null; solanaRequest?: RentSolanaReview | null; signature?: string; hash?: `0x${string}`; error: string | null; retryable?: boolean;
 };
 type RentPaymentView = {
   id: string; month: string; rentMonthly: string; landlordRaw: string; buildingRaw: string;
+  network?: 'solana-devnet' | 'robinhood-testnet';
   state: 'prepared' | 'pending' | 'confirmed' | 'stopped'; steps: RentStepView[]; error: string | null;
 };
 type RentView = {
   agreementId: string; month: string; rentMonthly: string; landlordRaw: string; buildingRaw: string;
+  network: 'solana-devnet' | 'robinhood-testnet'; landlordWallet: string; house: string;
   role: 'tenant' | 'landlord'; active: boolean; payment: RentPaymentView | null; history: RentPaymentView[];
 };
 
 function rentWorkflow(view: RentView | null) {
   return view?.payment ?? view?.history.find(payment => payment.state !== 'confirmed') ?? null;
+}
+
+function rentReceipt(step: RentStepView) {
+  return step.signature ? `https://explorer.solana.com/tx/${step.signature}?cluster=devnet` : step.hash ? `https://explorer.testnet.chain.robinhood.com/tx/${step.hash}` : null;
 }
 
 function RentPayments({ agreementId, role, request, enabled, children }: {
@@ -613,7 +621,7 @@ function RentPayments({ agreementId, role, request, enabled, children }: {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   // Keep exact approved bytes through ambiguous submission failures; never approve replacements.
-  const [signed, setSigned] = useState<Record<string, `0x${string}`>>({});
+  const [signed, setSigned] = useState<Record<string, string>>({});
   const [review, setReview] = useState<string | null>(null);
   const acting = useRef(false);
   const automaticReview = useRef<string | null>(null);
@@ -649,7 +657,7 @@ function RentPayments({ agreementId, role, request, enabled, children }: {
       } catch (refreshError) { setError(refreshError instanceof Error ? refreshError.message : 'Could not refresh rent review.'); }
     } finally { acting.current = false; setBusy(false); }
   }
-  async function action(action: 'prepare' | 'reconcile' | 'submit', stepId?: string, signedTransaction?: `0x${string}`) {
+  async function action(action: 'prepare' | 'reconcile' | 'submit', stepId?: string, signedTransaction?: string) {
     const result = await request<{ rent: RentView | null }>('/api/rent', { agreementId, action, stepId, signedTransaction });
     setRent(result.rent);
     return result.rent;
@@ -657,7 +665,7 @@ function RentPayments({ agreementId, role, request, enabled, children }: {
   async function prepareReview() {
     const updated = await action('prepare');
     const step = rentWorkflow(updated)?.steps.find(item => item.state !== 'confirmed');
-    if (step?.state === 'prepared' && !step.hash && step.request) {
+    if (step?.state === 'prepared' && !step.hash && !step.signature && (step.request || step.solanaRequest)) {
       setSigned(bytes => { const retained = { ...bytes }; delete retained[step.id]; return retained; });
       setReview(step.id);
     } else setReview(null);
@@ -680,50 +688,58 @@ function RentPayments({ agreementId, role, request, enabled, children }: {
   const monthLabel = month ? new Date(`${month}-01T12:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'This month';
   const paidMonth = rent ? paidRentMonth(rent) : null;
   const due = Boolean(role === 'tenant' && ((rent?.active && !paidMonth) || (payment && payment.state !== 'confirmed')));
+  const solanaRent = rent?.network === 'solana-devnet';
+  const faucetNeeded = solanaRent && /tUSDC|balance|insufficient/i.test(`${error} ${payment?.error ?? ''}`);
   const actionContent = <div className="rent-action"><ActionBox title={payment && payment.state !== 'confirmed' ? 'Finish this rent payment' : `Pay rent for ${monthLabel}`}>
     {error && <p className="note" role="alert">{error}</p>}
     {!rent && !error && <p role="status">Loading rent status…</p>}
     <button type="button" className="text-button rent-refresh" disabled={busy} onClick={() => void run(async () => { if (role === 'landlord') await load(); else await action('reconcile'); })}>Refresh</button>
     {rent && <>
-      {rent.role === 'tenant' && rent.active && !payment && <button className="button primary" disabled={busy} onClick={() => void run(prepareReview)}>Pay transfer 1</button>}
+      {rent.role === 'tenant' && rent.active && !payment && <button className="button primary" disabled={busy} onClick={() => void run(prepareReview)}>{solanaRent ? 'Review rent payment' : 'Pay transfer 1'}</button>}
       {paidMonth ? <>
-        <p>Landlord: {money(payment!.landlordRaw)} test dollars · building stakers: {money(payment!.buildingRaw)} test dollars · Robinhood Chain testnet</p>
+        <p>Landlord: {money(payment!.landlordRaw)} test dollars · building stakers: {money(payment!.buildingRaw)} test dollars · {solanaRent ? 'Solana devnet' : 'Robinhood Chain testnet'}</p>
         <p>{paidMonth.nextDue}</p>
-        {payment!.steps.map(step => step.hash && <p key={step.id}><a href={`https://explorer.testnet.chain.robinhood.com/tx/${step.hash}`} target="_blank" rel="noopener noreferrer">{step.kind === 'landlord' ? 'Landlord' : 'Building stakers'} confirmed receipt</a></p>)}
+        {payment!.steps.map(step => rentReceipt(step) && <p key={step.id}><a href={rentReceipt(step)!} target="_blank" rel="noopener noreferrer">{step.kind === 'rent' ? 'Rent payment' : step.kind === 'landlord' ? 'Landlord' : 'Building stakers'} confirmed receipt</a></p>)}
       </> : <>
         {month !== rent.month && <p role="status">Finish this saved {monthLabel} payment before starting rent for {new Date(`${rent.month}-01T12:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}. Confirmed transfers will not be paid again.</p>}
-        <p>{money(payment?.rentMonthly ?? rent.rentMonthly)} in two transfers: {money(payment?.landlordRaw ?? rent.landlordRaw)} to your landlord and {money(payment?.buildingRaw ?? rent.buildingRaw)} to the house (fixed 20 %). You review each transfer before signing.</p>
+        <p>{money(payment?.rentMonthly ?? rent.rentMonthly)} {solanaRent ? 'in one signature' : 'in two transfers'}: {money(payment?.landlordRaw ?? rent.landlordRaw)} to your landlord and {money(payment?.buildingRaw ?? rent.buildingRaw)} to the house (fixed 20 %){solanaRent ? ' · Solana devnet' : '. You review each transfer before signing.'}</p>
+        {solanaRent && <p className="small-copy" style={{ overflowWrap: 'anywhere' }}>Landlord recipient: {rent.landlordWallet} · house: {rent.house}. tUSDC test tokens only; the sponsor pays network fees. The house share streams to stakers over seven days.</p>}
         {!rent.active && <p role="status">This tenancy is not active for rent payment.</p>}
       </>}
       <p className="small-copy">Fictional test rent: no value, no legal rights.</p>
       {payment?.error && <p className="note" role="alert">{payment.error}</p>}
+      {faucetNeeded && <div className="small-copy faucet-note"><p>Add enough site tUSDC for the whole month, then review again.</p><TestUsdc request={request} /></div>}
       {!paidMonth && payment?.steps.map((step, index) => <div key={step.id} style={{ marginTop: 16, overflowWrap: 'anywhere' }}>
-        <strong>Transfer {index + 1}: {step.kind === 'landlord' ? 'Landlord' : 'Building distributor'} · {money(step.amountRaw)} test dollars</strong>
-        <p className="small-copy">Exact amount: {step.amountRaw} token units · recipient: {step.recipient} · {step.state}</p>
-        {step.hash && <a href={`https://explorer.testnet.chain.robinhood.com/tx/${step.hash}`} target="_blank" rel="noopener noreferrer">{step.state === 'confirmed' ? 'Confirmed transfer receipt' : 'Submitted transaction (not yet confirmed)'}</a>}
+        <strong>{step.kind === 'rent' ? 'One rent payment' : `Transfer ${index + 1}: ${step.kind === 'landlord' ? 'Landlord' : 'Building distributor'}`} · {money(step.amountRaw)} test dollars</strong>
+        <p className="small-copy">Exact amount: {step.amountRaw} token units · {step.kind === 'rent' ? 'house' : 'recipient'}: {step.recipient} · {step.state}</p>
+        {rentReceipt(step) && <a href={rentReceipt(step)!} target="_blank" rel="noopener noreferrer">{step.state === 'confirmed' ? 'Confirmed payment receipt' : 'Submitted transaction (not yet confirmed)'}</a>}
         {step.error && <p className="note" role="alert">{step.error}</p>}
-        {rent.role === 'tenant' && rent.active && currentTransfer?.id === step.id && ((!step.hash && !signed[step.id] && step.state === 'prepared') || (step.state === 'stopped' && (step.retryable || (!step.hash && !signed[step.id])))) && <>
-          {review !== step.id || !step.request ? <button className="button primary" disabled={busy} onClick={() => void run(prepareReview)}>Pay transfer {index + 1}</button> : <div className="small-copy">
-            <p>{step.request.description}</p>
-            <p>Chain ID: {step.request.transaction.chainId} · token contract: {step.request.transaction.to} · expires: {step.request.expiresAt}</p>
-            <p>Transaction data: {String(step.request.transaction.data ?? '')}</p>
+        {rent.role === 'tenant' && rent.active && currentTransfer?.id === step.id && ((!step.hash && !step.signature && !signed[step.id] && step.state === 'prepared') || (step.state === 'stopped' && (step.retryable || (!step.hash && !step.signature && !signed[step.id])))) && <>
+          {review !== step.id || (!step.request && !step.solanaRequest) ? <button className="button primary" disabled={busy} onClick={() => void run(prepareReview)}>{solanaRent ? 'Review rent payment' : `Pay transfer ${index + 1}`}</button> : <div className="small-copy">
+            <p>{step.solanaRequest?.description ?? step.request!.description}</p>
+            {step.solanaRequest ? <p>Solana devnet · fee sponsor: {step.solanaRequest.feePayer} · expires: {step.solanaRequest.expiresAt}</p> : <><p>Chain ID: {step.request!.transaction.chainId} · token contract: {step.request!.transaction.to} · expires: {step.request!.expiresAt}</p><p>Transaction data: {String(step.request!.transaction.data ?? '')}</p></>}
             <button className="button primary" disabled={busy} onClick={() => void run(async () => {
               const current = await load();
               const fresh = rentWorkflow(current)?.steps.find(item => item.id === step.id);
-              if (!current?.active || fresh?.state !== 'prepared' || fresh.hash || !fresh.request) { setReview(null); throw new Error('Transfer status changed. Check rent status.'); }
-              if (JSON.stringify(fresh.request) !== JSON.stringify(step.request)) { setReview(null); throw new Error('Transfer changed. Review it again.'); }
-              if (Date.parse(fresh.request.expiresAt) <= Date.now()) { await prepareReview(); setError('Review refreshed. Check it before signing.'); return; }
-              const bytes = await wallet.signEvmTransaction(fresh.request);
+              const signing = fresh?.solanaRequest ?? fresh?.request;
+              if (!current?.active || fresh?.state !== 'prepared' || fresh.hash || fresh.signature || !signing) { setReview(null); throw new Error('Payment status changed. Check rent status.'); }
+              if (JSON.stringify(signing) !== JSON.stringify(step.solanaRequest ?? step.request)) { setReview(null); throw new Error('Payment changed. Review it again.'); }
+              if (Date.parse(signing.expiresAt) <= Date.now()) { await prepareReview(); setError('Review refreshed. Check it before signing.'); return; }
+              const bytes = fresh.solanaRequest ? toB64(await wallet.signSolanaTransaction({
+                operationId: fresh.solanaRequest.id, walletId: fresh.solanaRequest.walletId, chain: 'solana:devnet',
+                feePayer: fresh.solanaRequest.feePayer, expiresAt: fresh.solanaRequest.expiresAt,
+                transaction: b64(fresh.solanaRequest.transactionBase64), description: fresh.solanaRequest.description,
+              })) : await wallet.signEvmTransaction(fresh.request!);
               setSigned(previous => ({ ...previous, [step.id]: bytes }));
               setReview(null);
               await action('submit', step.id, bytes);
-            })}>Sign and send transfer {index + 1}</button>
+            })}>{solanaRent ? 'Sign and pay rent' : `Sign and send transfer ${index + 1}`}</button>
           </div>}
         </>}
         {rent.role === 'tenant' && !step.retryable && (signed[step.id] || step.state === 'signed' || step.state === 'submitted') && step.state !== 'confirmed' && <button className="button primary" disabled={busy} onClick={() => void run(async () => {
           const current = await action('reconcile');
           const fresh = rentWorkflow(current)?.steps.find(item => item.id === step.id);
-          if (signed[step.id] && fresh && !fresh.hash && fresh.state !== 'confirmed') await action('submit', step.id, signed[step.id]);
+          if (signed[step.id] && fresh && !fresh.hash && !fresh.signature && fresh.state !== 'confirmed') await action('submit', step.id, signed[step.id]);
         })}>Retry the same signed transfer</button>}
       </div>)}
     </>}
@@ -739,7 +755,7 @@ function RentPayments({ agreementId, role, request, enabled, children }: {
       {rentRecords.length === 0 && <p>No rent payment records yet.</p>}
       {rentRecords.map(payment => <div key={payment.id} style={{ overflowWrap: 'anywhere' }}>
         <p><strong>{payment.month}</strong> · {payment.state} · landlord {money(payment.landlordRaw)} / building {money(payment.buildingRaw)} test dollars</p>
-        {payment.steps.map(step => <p key={step.id}>{step.kind}: {step.state} · {money(step.amountRaw)} test dollars · exact amount: {step.amountRaw} token units · recipient: {step.recipient}{step.hash && <> · <a href={`https://explorer.testnet.chain.robinhood.com/tx/${step.hash}`} target="_blank" rel="noopener noreferrer">Transaction receipt</a></>}</p>)}
+        {payment.steps.map(step => <p key={step.id}>{step.kind}: {step.state} · {money(step.amountRaw)} test dollars · exact amount: {step.amountRaw} token units · recipient: {step.recipient}{rentReceipt(step) && <> · <a href={rentReceipt(step)!} target="_blank" rel="noopener noreferrer">Transaction receipt · {step.signature ? 'Solana devnet' : 'Robinhood Chain testnet'}</a></>}</p>)}
       </div>)}
     </>}
   </>;
@@ -864,7 +880,7 @@ function JoinInvitation({ request, encoded, onDone }: { request: Request; encode
   return (
     <ActionBox level={2} title={value ? `Join as ${value.role}` : 'Invitation'}>
       {!value ? <p>This invitation link is malformed. Ask the landlord for a new one.</p> : <>
-        {home ? <p>{home.property} · {home.depositForm?.kind === 'shares' ? `${depositUsd(home.depositForm.securityUsd6)} USD security in test TSLA. A verified EVM wallet is required.` : `${money(home.requiredSecurity)} test USDC deposit at stake.`}</p> : previewFailed ? <p>This invitation cannot be previewed. It may have expired or been replaced. <button className="button secondary" onClick={() => setPreviewRetry((count) => count + 1)}>Try again</button></p> : <p>Checking this tenancy invitation…</p>}
+        {home ? <p>{home.property} · {home.depositForm?.kind === 'shares' ? `${depositUsd(home.depositForm.securityUsd6)} USD security in test TSLA on ${home.depositForm.network === 'solana-devnet' ? 'Solana devnet. A verified Solana wallet' : 'Robinhood Chain testnet. A verified EVM wallet'} is required.` : `${money(home.requiredSecurity)} test USDC deposit at stake.`}</p> : previewFailed ? <p>This invitation cannot be previewed. It may have expired or been replaced. <button className="button secondary" onClick={() => setPreviewRetry((count) => count + 1)}>Try again</button></p> : <p>Checking this tenancy invitation…</p>}
         <p>{value.role === 'arbitrator' ? 'You decide a disputed deduction only, up to the landlord’s claim. You cannot take the deposit or start a claim.' : 'You join as the tenant. The landlord may propose a deduction at move-out; you may agree or dispute it.'} Joining records your account and wallet as the {value.role} on this tenancy; it does not sign or fund the deposit.</p>
         <button className="button primary large" disabled={!home || busy} onClick={() => void join()}>{busy ? <Loader2 className="spin" size={16} /> : null} Join this tenancy <ArrowRight size={17} /></button>
       </>}
@@ -896,11 +912,11 @@ function ListingCard({ listing, children, photoNotice = true }: { listing: Publi
         {d.photos.length > 1 && <span className="photo-count">{photoIndex + 1}/{d.photos.length}</span>}
       </div>
       <div className="listing-body">
-        <header><strong>{listing.title}{listing.sample && !listing.title.toLowerCase().includes('sample') ? ' · sample home' : ''}</strong><span className="listing-rent">{money(listing.rentMonthly)}<small>/month · {listing.buildingRent ? 'test dollars · Robinhood testnet' : 'test USDC'}</small></span></header>
+        <header><strong>{listing.title}{listing.sample && !listing.title.toLowerCase().includes('sample') ? ' · sample home' : ''}</strong><span className="listing-rent">{money(listing.rentMonthly)}<small>/month · {listing.buildingRent ? listing.buildingRent.network === 'solana-devnet' ? 'tUSDC · Solana devnet' : 'test dollars · Robinhood testnet' : 'test USDC'}</small></span></header>
         {listing.buildingRent && <p className="small-copy">Fictional tHOME building · fixed 20 % rent share to stakers; 80 % to the landlord. Deposit and its earnings stay separate; test units have no value or legal rights.</p>}
         {facts.length > 0 && <p className="listing-facts">{facts.join(' · ')}</p>}
         {photoNotice && d.photos.length > 0 && <p className="small-copy">Illustrative sample interiors, not photographs of this dwelling.</p>}
-        <p className="listing-deposit"><span>Required deposit · {listing.depositForm?.kind === 'shares' ? 'Robinhood Chain testnet' : 'Solana devnet'}</span><strong>{listing.depositForm?.kind === 'shares' ? `${depositUsd(listing.depositForm.securityUsd6)} USD · test TSLA` : `${money(listing.requiredSecurity)} test USDC`}</strong></p>
+        <p className="listing-deposit"><span>Required deposit · {listing.depositForm?.kind === 'shares' && listing.depositForm.network !== 'solana-devnet' ? 'Robinhood Chain testnet' : 'Solana devnet'}</span><strong>{listing.depositForm?.kind === 'shares' ? `${depositUsd(listing.depositForm.securityUsd6)} USD · test TSLA` : `${money(listing.requiredSecurity)} test USDC`}</strong></p>
         {listing.location && <FlatMap location={listing.location} />}
         {children}
         {(listing.description || d.photos.length > 1) && <div className="listing-details">
@@ -968,7 +984,16 @@ function PublishHome({ listings, request, reload, go, tenancyIds }: {
     window.addEventListener(PUBLISH_HOME_NAVIGATION_INTENT, open);
     return () => window.removeEventListener(PUBLISH_HOME_NAVIGATION_INTENT, open);
   }, []);
-  const [depositForm, setDepositForm] = useState<'cash' | 'shares'>('cash');
+  const [depositForm, setDepositForm] = useState<'cash' | 'shares' | 'shares-solana'>('cash');
+  const [solanaShares, setSolanaShares] = useState<{ network: 'solana-devnet'; programId: string; mint: string; price: string } | null>(null);
+  useEffect(() => {
+    if (!posting) return;
+    let active = true;
+    void request<{ solana: typeof solanaShares }>('/api/share-deposit?configuration=1')
+      .then(result => { if (active) setSolanaShares(result.solana); })
+      .catch(() => { if (active) setSolanaShares(null); });
+    return () => { active = false; };
+  }, [posting, request]);
   const [depositTracksRent, setDepositTracksRent] = useState(true);
   const [buildingHome, setBuildingHome] = useState(false);
   const [form, setForm] = useState({ title: '', city: '', rooms: '2', sizeSqm: '55', availableFrom: '', description: '', rent: '900', deposit: '2700', releaseAllowed: true });
@@ -995,7 +1020,7 @@ function PublishHome({ listings, request, reload, go, tenancyIds }: {
   }
   const suggestedDeposit = (rent: string, kind = depositForm) => {
     try {
-      const maximum = BigInt(maximumDepositSecurity(parseAmount(rent.replace(',', '.')), kind));
+      const maximum = BigInt(maximumDepositSecurity(parseAmount(rent.replace(',', '.')), kind === 'shares-solana' ? 'shares' : kind));
       const fraction = (maximum % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
       return `${maximum / 1_000_000n}${fraction ? `.${fraction}` : ''}`;
     } catch { return null; }
@@ -1024,7 +1049,7 @@ function PublishHome({ listings, request, reload, go, tenancyIds }: {
         <form className="listing-form" onSubmit={(e) => { e.preventDefault(); void act(async () => {
           const rentMonthly = parseAmount(form.rent.replace(',', '.'));
           const requiredSecurity = parseAmount(form.deposit.replace(',', '.'));
-          validateDepositSecurity(rentMonthly, requiredSecurity, depositForm);
+          validateDepositSecurity(rentMonthly, requiredSecurity, depositForm === 'shares-solana' ? 'shares' : depositForm);
           await request('/api/listings', {
             title: form.title, city: form.city, location, rooms: Number(form.rooms), sizeSqm: Number(form.sizeSqm), availableFrom: form.availableFrom,
             description: form.description, photos, rentMonthly, requiredSecurity, releaseAllowed: form.releaseAllowed,
@@ -1038,20 +1063,20 @@ function PublishHome({ listings, request, reload, go, tenancyIds }: {
           <label>Size (m²)<input type="number" min={10} max={1000} {...field('sizeSqm')} /></label>
           <label>Available from<input type="date" {...field('availableFrom')} /></label>
           <label>Monthly cold rent ({buildingHome ? 'test dollars · Robinhood testnet' : 'test USDC'})<input inputMode="decimal" {...field('rent')} /></label>
-          <label>Deposit ({depositForm === 'shares' ? 'USD' : 'test USDC'})<input inputMode="decimal" {...field('deposit')} /></label>
+          <label>Deposit ({depositForm !== 'cash' ? 'USD' : 'test USDC'})<input inputMode="decimal" {...field('deposit')} /></label>
           <label>Deposit form<select value={depositForm} onChange={e => {
-            const kind = e.target.value as 'cash' | 'shares';
+            const kind = e.target.value as 'cash' | 'shares' | 'shares-solana';
             setDepositForm(kind);
             setDepositTracksRent(true);
             const suggestion = suggestedDeposit(form.rent, kind);
             if (suggestion !== null) setForm(current => ({ ...current, deposit: suggestion }));
-          }}><option value="cash">Cash · site tUSDC</option><option value="shares">Shares · test TSLA</option></select></label>
-          {depositForm === 'shares' && <div className="wide"><ShareDepositRules />{!shareDepositManifest.factory && <p role="status">Share deposit not deployed yet. Publication and funding are disabled.</p>}</div>}
+          }}><option value="cash">Cash · site tUSDC</option>{solanaShares && <option value="shares-solana">Shares · test TSLA on Solana</option>}<option value="shares">Shares · test TSLA on Robinhood</option></select></label>
+          {depositForm !== 'cash' && <div className="wide"><ShareDepositRules network={depositForm === 'shares-solana' ? 'solana-devnet' : undefined} />{(depositForm === 'shares-solana' ? !solanaShares : !shareDepositManifest.factory) && <p role="status">Share deposit not deployed yet. Publication and funding are disabled.</p>}</div>}
           <label className="policy-check wide"><input type="checkbox" checked={buildingHome} onChange={event => setBuildingHome(event.target.checked)} /> Fictional tHOME building home · fixed 20 % of test rent to building stakers, 80 % to landlord.</label>
           {buildingHome && <div className="wide small-copy"><p>A fixed 20 % of this test rent goes to the fictional building&apos;s tHOME stakers; the rest goes to the landlord. This simulates how a tokenized building could share net rental income; in a real building rent goes to the property owner under the lease. Not legal advice.</p><p>Monthly rent uses test dollars on Robinhood Chain testnet in two separate transfers. The deposit remains separate; deposit earnings belong to the tenant. Fictional units have no value and confer no ownership or tenancy rights.</p></div>}
-          <p className="wide small-copy">{depositForm === 'shares'
+          <p className="wide small-copy">{depositForm !== 'cash'
             ? 'Share-backed security is capped at two months’ net cold rent because 150% share cover reaches the three-month cap under §551(1) BGB; not legal advice; test networks.'
-            : 'Cash security is capped at three months’ net cold rent under §551(1) BGB; not legal advice; test networks.'} {suggestedDeposit(form.rent) !== null && `Suggested maximum: ${suggestedDeposit(form.rent)} ${depositForm === 'shares' ? 'test USD security' : 'test USDC'}.`} Token escrow is not a statement of legal compliance.</p>
+            : 'Cash security is capped at three months’ net cold rent under §551(1) BGB; not legal advice; test networks.'} {suggestedDeposit(form.rent) !== null && `Suggested maximum: ${suggestedDeposit(form.rent)} ${depositForm !== 'cash' ? 'test USD security' : 'test USDC'}.`} Token escrow is not a statement of legal compliance.</p>
           <label className="wide">Description<textarea rows={3} placeholder="Balcony, fitted kitchen, 5 minutes to the U-Bahn…" {...field('description')} /></label>
           <div className="wide"><span className="field-label">Place the flat on the map (optional)</span><FlatMap location={location} center={cityCenter} onChange={setLocation} /></div>
           <div className="wide">
@@ -1068,7 +1093,7 @@ function PublishHome({ listings, request, reload, go, tenancyIds }: {
           </div>
           {depositForm === 'cash' && <label className="policy-check wide"><input type="checkbox" checked={form.releaseAllowed} onChange={(e) => setForm({ ...form, releaseAllowed: e.target.checked })} /> Let the tenant claim surplus and simulated yield during the tenancy. Site tUSDC stays in cash escrow; this site separately pays labelled simulated yield (5 % a year by default). Otherwise it is claimable after settlement. Any deposit earnings belong to the tenant, who keeps deposit value above an approved deduction at settlement either way.</label>}
           {feedback.target === 'post' && feedback.message && <p className="note wide" role="alert">{feedback.message}</p>}
-          <button className="button primary large" disabled={depositForm === 'shares' && !shareDepositManifest.factory}>Publish home</button>
+          <button className="button primary large" disabled={depositForm === 'shares-solana' ? !solanaShares : depositForm === 'shares' && !shareDepositManifest.factory}>Publish home</button>
         </form>
       )}
       {mine.length > 0 && (
@@ -1113,7 +1138,7 @@ function ListingBrowser({ listings, request, reload, loaded, loadError, testTool
                 <label>Message to the landlord (optional)<input maxLength={500} value={application.message} onChange={(e) => setApplication({ ...application, message: e.target.value })} /></label>
                 {feedback.target === l.id && feedback.message && <p className="note" role="alert">{feedback.message}</p>}
                 <p className="small-copy">{l.depositForm?.kind !== 'shares' && <>Site tUSDC stays in cash escrow, not lent. Yield is simulated and paid separately to the tenant; {l.releaseAllowed ? 'claimable during the tenancy.' : 'claimable after settlement.'} </>}This sends your application. It does not reserve the home or lock a deposit.</p>
-                {l.depositForm?.kind === 'shares' ? <ShareDepositApplication listingId={l.id} request={request} /> : <button className="button primary">Send application</button>}
+                {l.depositForm?.kind === 'shares' ? <ShareDepositApplication listingId={l.id} network={l.depositForm.network} request={request} /> : <button className="button primary">Send application</button>}
               </form>
             ) : (
               <button className="button primary" onClick={() => setApplyTo(l.id)}>Apply for this home</button>

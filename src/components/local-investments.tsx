@@ -16,7 +16,7 @@ import { AgriPvExample } from './agri-pv-example';
 import { ProjectMap } from './project-map';
 import { DEFAULT_PROJECT_SYSTEMS, type ProjectSystems } from './project-map-model';
 import { TestDollars } from './test-dollars';
-import { BuildingPanel, type BuildingPosition } from './building-panel';
+import { BuildingPanel, SolanaBuildingPanel, type BuildingPosition } from './building-panel';
 import { Hero, StatusLine, Figures, Figure, MoreList, MoreRow, ScreenNote } from './blocks';
 import './local-investments.css';
 
@@ -25,7 +25,7 @@ const units = (raw: string) => new Intl.NumberFormat('en-GB', { maximumFractionD
 const message = (cause: unknown) => cause instanceof Error ? cause.message : 'The test-unit order could not be checked.';
 
 /** Real signed test-unit purchases; project rights, physical plans and local effects remain fictional. */
-export function LocalInvestments({ request, go }: { request: AuthorizedRequest; go: (area: Area) => void }) {
+export function LocalInvestments({ request, go, earlier = false }: { request: AuthorizedRequest; go: (area: Area) => void; earlier?: boolean }) {
   const wallet = useRentalWallet();
   const activeTab = useSectionTabActive();
   const [selectedId, setSelectedId] = useState<TestCityInvestmentId>(TEST_CITY_INVESTMENTS[0].id);
@@ -39,11 +39,14 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
   const [buildingPosition, setBuildingPosition] = useState<BuildingPosition | null>(null);
   const [order, setOrder] = useState<LocalInvestmentOrder | null>(null);
   const [amount, setAmount] = useState('5');
-  const [direction, setDirection] = useState<'buy' | 'sell'>('buy');
+  const [direction, setDirection] = useState<'buy' | 'sell'>(earlier ? 'sell' : 'buy');
   const [readError, setReadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState('');
   const [checkedAt, setCheckedAt] = useState('');
+  const [primaryNetwork, setPrimaryNetwork] = useState<'checking' | 'solana' | 'robinhood' | 'unavailable'>(earlier ? 'robinhood' : 'checking');
+  const [networkError, setNetworkError] = useState('');
+  const [networkRetry, setNetworkRetry] = useState(0);
   const mounted = useRef(false);
   const readRevision = useRef(0);
   const actionRevision = useRef(0);
@@ -52,7 +55,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
   const refresh = useCallback((afterMutation = false) => {
     if (mutating.current && !afterMutation) return Promise.resolve();
     const revision = ++readRevision.current;
-    return request<{ market: LocalInvestmentView }>('/api/local-investments').then(({ market: next }) => {
+    return request<{ market: LocalInvestmentView }>(earlier ? '/api/local-investments?network=robinhood' : '/api/local-investments').then(({ market: next }) => {
       if (!mounted.current || (mutating.current && !afterMutation) || revision !== readRevision.current) return;
       if (next.order && (next.order.state === 'review' || next.order.state === 'pending') &&
         preparation.current?.projectId === next.order.projectId && preparation.current.direction === next.order.direction && preparation.current.amountRaw === (next.order.direction === 'sell' ? next.order.minimumUnitsRaw : next.order.cashAtomic)) {
@@ -63,7 +66,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
     }, (cause: unknown) => {
       if (mounted.current && (!mutating.current || afterMutation) && revision === readRevision.current) setReadError(message(cause));
     });
-  }, [request]);
+  }, [request, earlier]);
   useEffect(() => {
     mounted.current = true;
     const active = mounted; const reads = readRevision; const actions = actionRevision;
@@ -79,6 +82,16 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
     document.addEventListener('visibilitychange', onVisible);
     return () => { window.removeEventListener('ledger-balances-changed', balancesChanged); document.removeEventListener('visibilitychange', onVisible); };
   }, [refresh, activeTab]);
+  useEffect(() => {
+    if (earlier || !activeTab) return;
+    let current = true;
+    void fetch('/api/building', { cache: 'no-store' }).then(async response => {
+      const body = await response.json() as { building?: { network?: string }; error?: string };
+      if (!response.ok || !body.building) throw new Error(body.error || 'The primary house network could not be verified.');
+      if (current) { setPrimaryNetwork(body.building.network?.startsWith('solana-') ? 'solana' : 'robinhood'); setNetworkError(''); }
+    }).catch((cause: unknown) => { if (current) { setPrimaryNetwork('unavailable'); setNetworkError(message(cause)); } });
+    return () => { current = false; };
+  }, [activeTab, earlier, networkRetry]);
   useEffect(() => {
     if (!activeTab) return;
     let current = true;
@@ -106,7 +119,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
     const check = () => {
       if (checking || !activeTab || document.visibilityState === 'hidden') return;
       checking = true;
-      void request<{ order: LocalInvestmentOrder }>('/api/local-investments', { action: 'reconcile', orderId: pendingOrderId }).then(({ order: next }) => {
+      void request<{ order: LocalInvestmentOrder }>('/api/local-investments?network=robinhood', { action: 'reconcile', orderId: pendingOrderId }).then(({ order: next }) => {
         if (!active) return;
         ++readRevision.current; setOrder(next); setActionError('');
         if (next.state === 'completed' || next.state === 'failed') window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'evm' } }));
@@ -163,7 +176,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
     const intent = preparation.current;
     setBusy('Preparing review'); setActionError('');
     try {
-      const { order: prepared } = await request<{ order: LocalInvestmentOrder }>('/api/local-investments', {
+      const { order: prepared } = await request<{ order: LocalInvestmentOrder }>('/api/local-investments?network=robinhood', {
         action: 'prepare', requestId: intent.id, projectId: intent.projectId, direction: intent.direction,
         ...(intent.direction === 'sell' ? { unitsRaw: intent.amountRaw } : { cashAtomic: intent.amountRaw }),
       });
@@ -184,7 +197,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
       const signedTransaction = await wallet.signEvmTransaction(nextStep.request);
       if (!mounted.current || generation !== actionRevision.current) return;
       setBusy('Submitting your signed step');
-      const { order: next } = await request<{ order: LocalInvestmentOrder }>('/api/local-investments', {
+      const { order: next } = await request<{ order: LocalInvestmentOrder }>('/api/local-investments?network=robinhood', {
         action: 'submit', orderId: currentOrder.id, stepId: nextStep.id, signedTransaction,
       });
       if (!mounted.current || generation !== actionRevision.current) return;
@@ -201,7 +214,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
     const generation = ++actionRevision.current; ++readRevision.current; mutating.current = true;
     setBusy('Closing review'); setActionError('');
     try {
-      const { order: next } = await request<{ order: LocalInvestmentOrder }>('/api/local-investments', { action: 'cancel', orderId: currentOrder.id });
+      const { order: next } = await request<{ order: LocalInvestmentOrder }>('/api/local-investments?network=robinhood', { action: 'cancel', orderId: currentOrder.id });
       if (mounted.current && generation === actionRevision.current) {
         ++readRevision.current; preparation.current = null; setOrder(next);
       }
@@ -227,7 +240,7 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
         </div> : <>
           {currentOrder?.state === 'completed' && <div className="local-order-success" role="status"><Check size={18} /><div><strong>{currentOrder.direction === 'sell' ? 'Sell-back' : 'Purchase'} confirmed.</strong><span>{formatUnits(BigInt(currentOrder.minimumUnitsRaw), 18)} {project.symbol} {currentOrder.direction === 'sell' ? 'in' : 'out'} · {cash(currentOrder.cashAtomic)} tUSDG {currentOrder.direction === 'sell' ? 'out' : 'in'} at the fixed test price. Receipt and both transfers verified.</span>{tradeHash && market && <a href={`${market.network.explorerUrl.replace(/\/$/, '')}/tx/${tradeHash}`} target="_blank" rel="noopener noreferrer">View {currentOrder.direction === 'sell' ? 'sell-back' : 'purchase'} transaction <ExternalLink size={13} /></a>}</div></div>}
           {currentOrder?.error && <p className="local-market-alert">{currentOrder.error}</p>}
-          <div className="local-test-actions" role="group" aria-label="Choose test-unit action"><button type="button" className="text-button" disabled={Boolean(busy) || openOrder} aria-pressed={direction === 'buy'} onClick={() => setDirection('buy')}>Buy test units</button><button type="button" className="text-button" disabled={Boolean(busy) || openOrder} aria-pressed={direction === 'sell'} onClick={() => setDirection('sell')}>Sell back</button></div>
+          <div className="local-test-actions" role="group" aria-label="Choose test-unit action">{!earlier && <button type="button" className="text-button" disabled={Boolean(busy) || openOrder} aria-pressed={direction === 'buy'} onClick={() => setDirection('buy')}>Buy test units</button>}<button type="button" className="text-button" disabled={Boolean(busy) || openOrder} aria-pressed={direction === 'sell'} onClick={() => setDirection('sell')}>Sell back</button></div>
           <form onSubmit={(event) => { event.preventDefault(); void prepare(); }}>
             <label>{direction === 'sell' ? 'Units to sell back' : 'Test dollars to spend'} <span>{direction === 'sell' ? project.symbol : 'tUSDG'}</span><input aria-label={direction === 'sell' ? `Sell-back amount in ${project.symbol}` : 'Stake amount in test USD (tUSDG)'} inputMode="decimal" value={amount} disabled={Boolean(busy) || openOrder} onChange={(event) => setAmount(event.target.value)} /></label>
             <div className="local-amount-presets">{['5', '10', '25'].map((value) => <button type="button" key={value} disabled={Boolean(busy) || openOrder} aria-pressed={amount === value} onClick={() => setAmount(value)}>{value}</button>)}</div>
@@ -242,6 +255,28 @@ export function LocalInvestments({ request, go }: { request: AuthorizedRequest; 
         {checkedAt && <span className="local-checked">Wallet/market last checked {checkedAt}{readError ? ' · refresh unavailable' : ''}</span>}
       </div>
   </MoreRow>;
+  if (!earlier && (primaryNetwork === 'checking' || primaryNetwork === 'unavailable')) return <section className="local-capital" id="local-investments" tabIndex={-1} aria-label="Local stakes"><p role={primaryNetwork === 'unavailable' ? 'alert' : 'status'}>{primaryNetwork === 'checking' ? 'Reading the primary house network…' : networkError}</p>{primaryNetwork === 'unavailable' && <button type="button" className="text-button" onClick={() => { setPrimaryNetwork('checking'); setNetworkRetry(value => value + 1); }}>Retry verified house reading</button>}</section>;
+  if (!earlier && primaryNetwork === 'solana') return <section className="local-capital" id="local-investments" tabIndex={-1} aria-label="Local stakes">
+    <div className="lean-project-picker" role="group" aria-label="Choose a fictional Solana project">{TEST_CITY_INVESTMENTS.map(item => <button type="button" key={item.id} data-project-id={item.id} aria-pressed={!showAgriPv && selectedId === item.id} onClick={() => { setSelectedId(item.id); setShowAgriPv(false); }}>{item.kind === 'housing' ? 'House' : 'Workshop'}</button>)}<button type="button" aria-pressed={showAgriPv} onClick={() => setShowAgriPv(true)}>Agri-PV</button></div>
+    {showAgriPv ? <AgriPvExample /> : <>
+      <SolanaBuildingPanel key={selectedId} request={request} houseId={project.kind === 'housing' ? 'neighbourhood-homes' : 'workshop'} visual={<ProjectMap key={project.id} project={project} systems={systems} variant="hero" />} />
+      <MoreList>
+        <MoreRow title="Robinhood Chain test house · earlier units" meta="Earlier unstake, claim and sell lanes">
+          <p>Your earlier Robinhood Chain balances and receipts stay on that test network. Unstake and claim there, then sell wallet units at its test desk. They are not Solana balances.</p>
+          <LocalInvestments request={request} go={go} earlier />
+        </MoreRow>
+        <MoreRow title="Explore the building idea" meta="Fictional plans · solar, heat & shared spaces"><ProjectBlueprint kind={project.kind} go={go} enabled={systems} setEnabled={setSystems} /><button type="button" className="text-button" onClick={() => openInvestmentOnMap(go, project.id)}>See on the city map</button></MoreRow>
+        <MoreRow title="Sources & token rights" meta="Fictional units · no rights"><p>{project.description}</p><p>{project.rights}</p><p>Test networks only, no value. Unit issue and sell-back prices are fixed test accounting, not a valuation or a guaranteed exit. Solar income is simulated, not a real electricity sale. Deposit earnings belong to the tenant.</p><ul>{STRAUSBERG_INVESTMENT_LEADS.map(lead => <li key={lead.url}><a href={lead.url} target="_blank" rel="noopener noreferrer">{lead.name}</a> · {lead.kind}</li>)}</ul></MoreRow>
+      </MoreList>
+    </>}
+    <ScreenNote>Fictional test units: no value, no property or company rights. Solana devnet only.</ScreenNote>
+  </section>;
+  if (earlier) return <div className="earlier-house">
+    <div className="local-test-actions">{TEST_CITY_INVESTMENTS.map(item => <button type="button" className="text-button" key={item.id} aria-pressed={selectedId === item.id} onClick={() => setSelectedId(item.id)}>{item.symbol} earlier units</button>)}</div>
+    {readError && <p role="alert">Earlier balances unavailable: {readError}</p>}
+    {project.kind === 'housing' && <BuildingPanel request={request} position={ownBuildingPosition} setPosition={setBuildingPosition} visual={null} earlier />}
+    <MoreList>{desk}</MoreList>
+  </div>;
   return <section className="local-capital" id="local-investments" tabIndex={-1} aria-label="Local stakes">
     <div className="lean-project-picker" role="group" aria-label="Choose a fictional local project">
       {TEST_CITY_INVESTMENTS.map(item => <button type="button" key={item.id} data-project-id={item.id} disabled={Boolean(busy)} aria-pressed={!showAgriPv && selectedId === item.id} onClick={() => { setSelectedId(item.id); setShowAgriPv(false); setActionError(''); }}>{item.kind === 'housing' ? 'House' : 'Workshop'}</button>)}

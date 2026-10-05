@@ -1,4 +1,4 @@
-import type { ShareDepositAction, ShareDepositView, ShareDepositPlan } from '../domain/share-deposit.ts';
+import type { ShareDepositAction, ShareDepositView, ShareDepositPlan, SolanaShareDepositPlan } from '../domain/share-deposit.ts';
 import { parseUnits } from 'viem';
 
 /** Never invent permission from a local clock; the server's readable actions are authoritative. */
@@ -57,5 +57,41 @@ export function shareDepositAmount(value: string, decimals: 6 | 18): string {
   const amount = parseUnits(text, decimals);
   if (amount >= 1n << 256n) throw new Error('The amount exceeds the contract range.');
   return amount.toString();
+}
+
+export type ShareReviewParties = { tenant: string; landlord: string; arbitrator: string };
+
+/** Solana addresses are case-sensitive, including the accepted program and mint. */
+export function requireBoundSolanaShareReview(plan: SolanaShareDepositPlan, view: ShareDepositView, parties: ShareReviewParties, actor: { id: string; address: string }) {
+  const form = view.form;
+  const review = plan.review;
+  if (view.network !== 'solana-devnet' || form.network !== 'solana-devnet' || plan.network !== 'solana-devnet' ||
+      plan.rentalId !== view.rentalId || review.programId !== form.programId || review.mint !== form.mint ||
+      !review.escrow || (view.escrow !== null && review.escrow !== view.escrow) ||
+      !view.actions.includes(plan.action) || plan.action === 'approve')
+    throw new Error('Review does not match this accepted Solana deposit.');
+  if (!view.agreementHash || review.agreementHash !== view.agreementHash || review.securityUsd6 !== form.securityUsd6 ||
+      review.responseWindow !== form.responseWindow || review.returnWindow !== form.returnWindow ||
+      review.arbitrationWindow !== form.arbitrationWindow)
+    throw new Error('Review differs from the accepted security, digest or windows.');
+  if (plan.walletId !== actor.id || review.actor !== actor.address || review.actor !== parties[view.role] ||
+      review.tenant !== parties.tenant || review.landlord !== parties.landlord || review.arbitrator !== parties.arbitrator ||
+      !parties.tenant || !parties.landlord || !parties.arbitrator)
+    throw new Error('Review differs from the accepted parties or verified Solana wallet.');
+  if (!Number.isFinite(Date.parse(plan.expiresAt)) || Date.parse(plan.expiresAt) <= Date.now())
+    throw new Error('This review expired. Prepare and review the transaction again.');
+}
+
+export function formatDepositShares(raw: string, decimals: 6 | 18 = 18) {
+  const amount = BigInt(raw);
+  const scale = 10n ** BigInt(decimals);
+  const fraction = (amount % scale).toString().padStart(decimals, '0').replace(/0+$/, '');
+  return `${(amount / scale).toLocaleString('en-US')}${fraction ? `.${fraction}` : ''}`;
+}
+
+export function shareDepositReceiptUrl(hash: string, network?: 'solana-devnet') {
+  return network === 'solana-devnet'
+    ? `https://explorer.solana.com/tx/${encodeURIComponent(hash)}?cluster=devnet`
+    : `https://explorer.testnet.chain.robinhood.com/tx/${encodeURIComponent(hash)}`;
 }
 

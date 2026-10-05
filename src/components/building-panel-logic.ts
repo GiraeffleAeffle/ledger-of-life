@@ -37,3 +37,47 @@ export function projectedBuildingEarnings(input: {
   if (total <= 0n || scale <= 0n || elapsed === 0) return input.earnedRaw;
   return (BigInt(input.earnedRaw) + BigInt(Math.floor(elapsed)) * BigInt(input.rewardRateRaw) * BigInt(input.stakedRaw) / total / scale).toString();
 }
+
+/** Solana units and tUSDC both have six decimals; fees and account rent are sponsored. */
+export function solanaHouseActionState(input: {
+  operation: 'buy' | 'sell' | 'stake' | 'unstake' | 'claim' | 'reinvest';
+  configured: boolean; connected: boolean; busy: boolean; quantityRaw: string | null;
+  cashAtomic: string | null; walletUnitsRaw: string | null; stakedRaw: string | null; earnedRaw: string | null;
+  priceAtomic?: string | null; sellCapUnitsRaw?: string | null; deskCashAtomic?: string | null;
+}) {
+  if (!input.connected) return 'Connect your Solana wallet in Me';
+  if (!input.configured) return 'Wait for the verified Solana house';
+  if (input.busy) return 'Finish the current house review or transaction first';
+  if (input.operation === 'claim' || input.operation === 'reinvest') {
+    if (input.earnedRaw == null) return 'Wait for verified claimable income';
+    const earned = BigInt(input.earnedRaw);
+    if (earned <= 0n) return 'No claimable test USDC';
+    if (input.operation === 'reinvest') {
+      if (earned > 100_000_000n) return 'One reinvest is capped at 100 tUSDC';
+      if (input.priceAtomic == null) return 'Wait for the verified unit price';
+      if (earned * 1_000_000n / BigInt(input.priceAtomic) <= 0n) return 'Income is too small to buy an atomic unit';
+    }
+    return null;
+  }
+  if (input.quantityRaw == null || !/^[1-9]\d{0,19}$/.test(input.quantityRaw) || BigInt(input.quantityRaw) > (1n << 64n) - 1n) return 'Enter a positive six-decimal amount';
+  const quantity = BigInt(input.quantityRaw);
+  if (input.operation === 'buy') {
+    if (quantity < 1000n || quantity > 100_000_000n) return 'Buy between 0.001 and 100 tUSDC';
+    if (input.cashAtomic == null) return 'Wait for your verified tUSDC balance';
+    if (quantity > BigInt(input.cashAtomic)) return 'Get more test USDC in Me';
+    if (input.priceAtomic == null) return 'Wait for the verified unit price';
+    if (quantity * 1_000_000n / BigInt(input.priceAtomic) <= 0n) return 'This amount buys no atomic unit';
+    return null;
+  }
+  const balance = input.operation === 'unstake' ? input.stakedRaw : input.walletUnitsRaw;
+  if (balance == null) return 'Wait for verified unit balances';
+  if (quantity > BigInt(balance)) return input.operation === 'unstake' ? 'Not enough of your own staked units' : 'Not enough wallet units; unstake before selling';
+  if (input.operation === 'sell') {
+    if (input.sellCapUnitsRaw == null || input.deskCashAtomic == null || input.priceAtomic == null) return 'Wait for the verified desk balance and sell cap';
+    if (quantity > 100_000_000n || quantity > BigInt(input.sellCapUnitsRaw)) return 'Sell-back exceeds the house unit cap';
+    const cash = quantity * BigInt(input.priceAtomic) / 1_000_000n;
+    if (cash === 0n) return 'This amount returns no atomic test USDC';
+    if (cash > BigInt(input.deskCashAtomic)) return 'The house desk needs more test USDC';
+  }
+  return null;
+}

@@ -1,0 +1,667 @@
+{
+  "recordedAt": "2026-10-05T09:24:43.534Z",
+  "network": "solana-devnet",
+  "testAssetsOnly": true,
+  "unitsHaveNoValueOrRights": true,
+  "depositEarningsBelongToTenant": true,
+  "scope": "Local app-service/operator fixtures, not hosted browser or GPU evidence",
+  "gate": {
+    "typescript": "passed",
+    "lint": "passed",
+    "tests": {
+      "passed": 875,
+      "skipped": 2,
+      "failed": 0
+    },
+    "diffCheck": "passed",
+    "nextBuild": "passed",
+    "aiSecurityReview": {
+      "findings": [],
+      "scope": "SOL-AI-001 metering and sponsor attribution"
+    }
+  },
+  "houseAndRent": {
+    "source": "SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+    "runId": "8fb7f212-76eb-4dad-9652-934d432823d4",
+    "proofs": [
+      {
+        "action": "fixture-sponsor-ata-funding",
+        "review": {
+          "network": "solana-devnet",
+          "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+          "asset": "BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE",
+          "amountAtomic": "64000000",
+          "source": "6SB92gvf4SojBRFKKYur5wXHLcJPgbkTz6jjsWYeYHjQ",
+          "recipient": "3Lxe9JgazZ7kVbjaokatFVg5dBwvmkGRPsCBEPt7HxVD",
+          "owner": "2daZCF2sKfNG7X5knNHkbmnbjhLJujw3mvSvmaQoGYjG",
+          "authority": "7h3dQn7ZSaq21MsaQYCYVruESdLH2DjnBK9FbUKieaDY",
+          "feePayer": "7h3dQn7ZSaq21MsaQYCYVruESdLH2DjnBK9FbUKieaDY",
+          "description": "Transfer exactly 64 fictional tUSDC from the configured site sponsor ATA to this ephemeral fixture; sponsor is the only funding signer and fee payer. No minting or escrow validator changes."
+        },
+        "operationId": "92f14e27bfe62711bf2c9c5be2c93da5648ed569571efb9b1c22b7af52aa67d0",
+        "signature": "5EHWEpXYPvoBQikUQ4zofDzpmeYxwsrupGEf2zo6TErUCC5FqirDWm1R3kTXuJ5zRuDBpBaYLT6HayGBMHSP2Vuo",
+        "explorerUrl": "https://explorer.solana.com/tx/5EHWEpXYPvoBQikUQ4zofDzpmeYxwsrupGEf2zo6TErUCC5FqirDWm1R3kTXuJ5zRuDBpBaYLT6HayGBMHSP2Vuo?cluster=devnet",
+        "amountAtomic": "64000000"
+      },
+      {
+        "action": "buy",
+        "operationId": "0d70eca13e729fd821281753ec0105e78e9396aecb0c90d347555fad8c5670dc",
+        "review": {
+          "operation": "buy",
+          "houseId": "neighbourhood-homes",
+          "distributor": "BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z",
+          "account": "2daZCF2sKfNG7X5knNHkbmnbjhLJujw3mvSvmaQoGYjG",
+          "network": "Solana devnet",
+          "amount": "1",
+          "asset": "tHOME",
+          "unitsRaw": "1000000",
+          "cashRaw": "1000000",
+          "claimRaw": "0",
+          "cashAccount": "3Lxe9JgazZ7kVbjaokatFVg5dBwvmkGRPsCBEPt7HxVD",
+          "unitAccount": "6N9WU1yDwmD5fMiKCpxjXjknaBi18RrSaH4UfrDjqB5b",
+          "deskVault": "2nmfyiHuN4edcMLqxtx1bksTwZ8h2XbfdkPZ5HAm7TNC",
+          "rewardVault": "7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk",
+          "stakeVault": "4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR",
+          "description": "Pay exactly 1 tUSDC to the house desk and receive 1 tHOME in your wallet. Income is streamed to stakers over 7 days; new revenue extends the remaining stream. Sponsored network fees and account rent. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant."
+        },
+        "signature": "2r6LhKhzKYdRDCbX3mUywHJM4ZxJCgoYXFxZmjLTU9KGiRceMJ4DkxeqjKJb4wfK2FwDUyKsdaKTHKPi1fuRQ3V",
+        "explorerUrl": "https://explorer.solana.com/tx/2r6LhKhzKYdRDCbX3mUywHJM4ZxJCgoYXFxZmjLTU9KGiRceMJ4DkxeqjKJb4wfK2FwDUyKsdaKTHKPi1fuRQ3V?cluster=devnet",
+        "state": "confirmed",
+        "before": {
+          "slot": "507684809",
+          "chainTimestamp": "1791192120",
+          "cashAtomic": "64000000",
+          "walletUnitsAtomic": "0",
+          "stakedAtomic": "0",
+          "claimedTotalAtomic": "0",
+          "earnedAtomic": "0",
+          "revenueTotalAtomic": "60483700",
+          "revenueBySourceAtomic": [
+            "0",
+            "3700",
+            "0",
+            "60480000"
+          ],
+          "rewardCashAtomic": "60483700",
+          "deskCashAtomic": "1000000",
+          "totalStakedAtomic": "1000000",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796592"
+        },
+        "after": {
+          "slot": "507684829",
+          "chainTimestamp": "1791192124",
+          "cashAtomic": "63000000",
+          "walletUnitsAtomic": "1000000",
+          "stakedAtomic": "0",
+          "claimedTotalAtomic": "0",
+          "earnedAtomic": "0",
+          "revenueTotalAtomic": "60483700",
+          "revenueBySourceAtomic": [
+            "0",
+            "3700",
+            "0",
+            "60480000"
+          ],
+          "rewardCashAtomic": "60483700",
+          "deskCashAtomic": "2000000",
+          "totalStakedAtomic": "1000000",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796592"
+        },
+        "actualClaimedAtomic": "0",
+        "actualCashChangeAtomic": "-1000000",
+        "userSignatureCount": 1,
+        "feePayer": "7h3dQn7ZSaq21MsaQYCYVruESdLH2DjnBK9FbUKieaDY"
+      },
+      {
+        "action": "stake",
+        "operationId": "cbc00761d1021a8eb8237814b93fae6ac3192f941f3d6b94b2b7929a1f416d77",
+        "review": {
+          "operation": "stake",
+          "houseId": "neighbourhood-homes",
+          "distributor": "BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z",
+          "account": "2daZCF2sKfNG7X5knNHkbmnbjhLJujw3mvSvmaQoGYjG",
+          "network": "Solana devnet",
+          "amount": "1",
+          "asset": "tHOME",
+          "unitsRaw": "1000000",
+          "cashRaw": "0",
+          "claimRaw": "0",
+          "cashAccount": "3Lxe9JgazZ7kVbjaokatFVg5dBwvmkGRPsCBEPt7HxVD",
+          "unitAccount": "6N9WU1yDwmD5fMiKCpxjXjknaBi18RrSaH4UfrDjqB5b",
+          "deskVault": "2nmfyiHuN4edcMLqxtx1bksTwZ8h2XbfdkPZ5HAm7TNC",
+          "rewardVault": "7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk",
+          "stakeVault": "4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR",
+          "description": "Stake exactly 1 tHOME from your wallet into the house stake vault. Income is streamed to stakers over 7 days; new revenue extends the remaining stream. Sponsored network fees and account rent. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant."
+        },
+        "signature": "RFCYoEcDTS4NTrXU91hhKakQvRyubGDqXQJ335rvy63q8uBiY8dDxWimodLcxjyaHSHV11kvJ8LpELXRRm3bbi8",
+        "explorerUrl": "https://explorer.solana.com/tx/RFCYoEcDTS4NTrXU91hhKakQvRyubGDqXQJ335rvy63q8uBiY8dDxWimodLcxjyaHSHV11kvJ8LpELXRRm3bbi8?cluster=devnet",
+        "state": "confirmed",
+        "before": {
+          "slot": "507684831",
+          "chainTimestamp": "1791192125",
+          "cashAtomic": "63000000",
+          "walletUnitsAtomic": "1000000",
+          "stakedAtomic": "0",
+          "claimedTotalAtomic": "0",
+          "earnedAtomic": "0",
+          "revenueTotalAtomic": "60483700",
+          "revenueBySourceAtomic": [
+            "0",
+            "3700",
+            "0",
+            "60480000"
+          ],
+          "rewardCashAtomic": "60483700",
+          "deskCashAtomic": "2000000",
+          "totalStakedAtomic": "1000000",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796592"
+        },
+        "after": {
+          "slot": "507684847",
+          "chainTimestamp": "1791192129",
+          "cashAtomic": "63000000",
+          "walletUnitsAtomic": "0",
+          "stakedAtomic": "1000000",
+          "claimedTotalAtomic": "0",
+          "earnedAtomic": "50",
+          "revenueTotalAtomic": "60483700",
+          "revenueBySourceAtomic": [
+            "0",
+            "3700",
+            "0",
+            "60480000"
+          ],
+          "rewardCashAtomic": "60483700",
+          "deskCashAtomic": "2000000",
+          "totalStakedAtomic": "2000000",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796592"
+        },
+        "actualClaimedAtomic": "0",
+        "actualCashChangeAtomic": "0",
+        "userSignatureCount": 1,
+        "feePayer": "7h3dQn7ZSaq21MsaQYCYVruESdLH2DjnBK9FbUKieaDY"
+      },
+      {
+        "action": "deposit-rewards",
+        "operationId": "4e2b0c94e0ee7fa2bce9bc0662bde359c7dd9cf885cf01ca2773ce8b96c3e830",
+        "review": {
+          "network": "solana-devnet",
+          "asset": "BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE",
+          "amountAtomic": "60480000",
+          "authority": "2daZCF2sKfNG7X5knNHkbmnbjhLJujw3mvSvmaQoGYjG",
+          "source": "3Lxe9JgazZ7kVbjaokatFVg5dBwvmkGRPsCBEPt7HxVD",
+          "recipient": "7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk",
+          "house": "BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z",
+          "sourceKind": 3,
+          "description": "Exactly 60.48 fictional tUSDC; streamed over seven real days, not instant rewards."
+        },
+        "signature": "nn4B4L8hTJVG3iMPa6meMMe2WMUqHWgidKGDwrkcrgjh2uHneH42on1ZMRw3w1jLyc5LgKPZQWfm1kLmXst2m4H",
+        "explorerUrl": "https://explorer.solana.com/tx/nn4B4L8hTJVG3iMPa6meMMe2WMUqHWgidKGDwrkcrgjh2uHneH42on1ZMRw3w1jLyc5LgKPZQWfm1kLmXst2m4H?cluster=devnet",
+        "state": "confirmed",
+        "before": {
+          "slot": "507684847",
+          "chainTimestamp": "1791192129",
+          "cashAtomic": "63000000",
+          "walletUnitsAtomic": "0",
+          "stakedAtomic": "1000000",
+          "claimedTotalAtomic": "0",
+          "earnedAtomic": "50",
+          "revenueTotalAtomic": "60483700",
+          "revenueBySourceAtomic": [
+            "0",
+            "3700",
+            "0",
+            "60480000"
+          ],
+          "rewardCashAtomic": "60483700",
+          "deskCashAtomic": "2000000",
+          "totalStakedAtomic": "2000000",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796592"
+        },
+        "after": {
+          "slot": "507684867",
+          "chainTimestamp": "1791192133",
+          "cashAtomic": "2520000",
+          "walletUnitsAtomic": "0",
+          "stakedAtomic": "1000000",
+          "claimedTotalAtomic": "0",
+          "earnedAtomic": "299",
+          "revenueTotalAtomic": "120963700",
+          "revenueBySourceAtomic": [
+            "0",
+            "3700",
+            "0",
+            "120960000"
+          ],
+          "rewardCashAtomic": "120963700",
+          "deskCashAtomic": "2000000",
+          "totalStakedAtomic": "2000000",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796932"
+        },
+        "actualClaimedAtomic": "0",
+        "actualCashChangeAtomic": "-60480000",
+        "userSignatureCount": 1,
+        "feePayer": "7h3dQn7ZSaq21MsaQYCYVruESdLH2DjnBK9FbUKieaDY"
+      },
+      {
+        "action": "claim",
+        "operationId": "625abee5c6171f6ec9f0fff94ff01b648e107c7a6095345494b9c5192d0a82d1",
+        "review": {
+          "operation": "claim",
+          "houseId": "neighbourhood-homes",
+          "distributor": "BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z",
+          "account": "2daZCF2sKfNG7X5knNHkbmnbjhLJujw3mvSvmaQoGYjG",
+          "network": "Solana devnet",
+          "amount": "at least $0.001399",
+          "asset": "tUSDC",
+          "unitsRaw": "0",
+          "cashRaw": "0",
+          "claimRaw": "1399",
+          "cashAccount": "3Lxe9JgazZ7kVbjaokatFVg5dBwvmkGRPsCBEPt7HxVD",
+          "unitAccount": "6N9WU1yDwmD5fMiKCpxjXjknaBi18RrSaH4UfrDjqB5b",
+          "deskVault": "2nmfyiHuN4edcMLqxtx1bksTwZ8h2XbfdkPZ5HAm7TNC",
+          "rewardVault": "7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk",
+          "stakeVault": "4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR",
+          "description": "Claim all your accrued tUSDC to your own cash account: at least $0.001399 in test dollars (earnings keep streaming until the transaction lands). Income is streamed to stakers over 7 days; new revenue extends the remaining stream. Sponsored network fees and account rent. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant."
+        },
+        "signature": "3JEnVcJ28xdLPi9rSn6tcX9CdckR2KbM7LVEJ3UrBURNBo5h6QdB9Dy3D9Nzd2YVBSWicwGcW2h13UWaLxgsLx81",
+        "explorerUrl": "https://explorer.solana.com/tx/3JEnVcJ28xdLPi9rSn6tcX9CdckR2KbM7LVEJ3UrBURNBo5h6QdB9Dy3D9Nzd2YVBSWicwGcW2h13UWaLxgsLx81?cluster=devnet",
+        "state": "confirmed",
+        "before": {
+          "slot": "507684903",
+          "chainTimestamp": "1791192142",
+          "cashAtomic": "2520000",
+          "walletUnitsAtomic": "0",
+          "stakedAtomic": "1000000",
+          "claimedTotalAtomic": "0",
+          "earnedAtomic": "1199",
+          "revenueTotalAtomic": "120963700",
+          "revenueBySourceAtomic": [
+            "0",
+            "3700",
+            "0",
+            "120960000"
+          ],
+          "rewardCashAtomic": "120963700",
+          "deskCashAtomic": "2000000",
+          "totalStakedAtomic": "2000000",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796932"
+        },
+        "after": {
+          "slot": "507684929",
+          "chainTimestamp": "1791192148",
+          "cashAtomic": "2521699",
+          "walletUnitsAtomic": "0",
+          "stakedAtomic": "1000000",
+          "claimedTotalAtomic": "1699",
+          "earnedAtomic": "100",
+          "revenueTotalAtomic": "120963700",
+          "revenueBySourceAtomic": [
+            "0",
+            "3700",
+            "0",
+            "120960000"
+          ],
+          "rewardCashAtomic": "120962001",
+          "deskCashAtomic": "2000000",
+          "totalStakedAtomic": "2000000",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796932"
+        },
+        "actualClaimedAtomic": "1699",
+        "actualCashChangeAtomic": "1699",
+        "userSignatureCount": 1,
+        "feePayer": "7h3dQn7ZSaq21MsaQYCYVruESdLH2DjnBK9FbUKieaDY"
+      },
+      {
+        "action": "reinvest",
+        "operationId": "dacafcd4c1695be9df28782529e6a0e0613e7c8eedf3c41dcbb9e503a749d96b",
+        "review": {
+          "operation": "reinvest",
+          "houseId": "neighbourhood-homes",
+          "distributor": "BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z",
+          "account": "2daZCF2sKfNG7X5knNHkbmnbjhLJujw3mvSvmaQoGYjG",
+          "network": "Solana devnet",
+          "amount": "0.0011",
+          "asset": "tHOME",
+          "unitsRaw": "1100",
+          "cashRaw": "1100",
+          "claimRaw": "1100",
+          "cashAccount": "3Lxe9JgazZ7kVbjaokatFVg5dBwvmkGRPsCBEPt7HxVD",
+          "unitAccount": "6N9WU1yDwmD5fMiKCpxjXjknaBi18RrSaH4UfrDjqB5b",
+          "deskVault": "2nmfyiHuN4edcMLqxtx1bksTwZ8h2XbfdkPZ5HAm7TNC",
+          "rewardVault": "7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk",
+          "stakeVault": "4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR",
+          "description": "In one transaction and one wallet signature: claim all accrued tUSDC (at least $0.0011 in test dollars; earnings keep streaming until the transaction lands), buy exactly 0.0011 tHOME for exactly 0.0011 tUSDC from the house desk, then stake those exact units. Any leftover or extra accrual stays in your own cash account. Income is streamed to stakers over 7 days; new revenue extends the remaining stream. Sponsored network fees and account rent. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant."
+        },
+        "signature": "3mCh2HptrupxkSsZZy7pVYN8kFHLU3Ptueruss3U6FAieXz2NGGHJnRbVzrfiFcaRQvUKxXdHy65USQA7VBSYTD4",
+        "explorerUrl": "https://explorer.solana.com/tx/3mCh2HptrupxkSsZZy7pVYN8kFHLU3Ptueruss3U6FAieXz2NGGHJnRbVzrfiFcaRQvUKxXdHy65USQA7VBSYTD4?cluster=devnet",
+        "state": "confirmed",
+        "before": {
+          "slot": "507684968",
+          "chainTimestamp": "1791192158",
+          "cashAtomic": "2521699",
+          "walletUnitsAtomic": "0",
+          "stakedAtomic": "1000000",
+          "claimedTotalAtomic": "1699",
+          "earnedAtomic": "1100",
+          "revenueTotalAtomic": "120963700",
+          "revenueBySourceAtomic": [
+            "0",
+            "3700",
+            "0",
+            "120960000"
+          ],
+          "rewardCashAtomic": "120962001",
+          "deskCashAtomic": "2000000",
+          "totalStakedAtomic": "2000000",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796932"
+        },
+        "after": {
+          "slot": "507684989",
+          "chainTimestamp": "1791192163",
+          "cashAtomic": "2521999",
+          "walletUnitsAtomic": "0",
+          "stakedAtomic": "1001100",
+          "claimedTotalAtomic": "3099",
+          "earnedAtomic": "200",
+          "revenueTotalAtomic": "120963700",
+          "revenueBySourceAtomic": [
+            "0",
+            "3700",
+            "0",
+            "120960000"
+          ],
+          "rewardCashAtomic": "120960601",
+          "deskCashAtomic": "2001100",
+          "totalStakedAtomic": "2001100",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796932"
+        },
+        "actualClaimedAtomic": "1400",
+        "actualCashChangeAtomic": "300",
+        "userSignatureCount": 1,
+        "feePayer": "7h3dQn7ZSaq21MsaQYCYVruESdLH2DjnBK9FbUKieaDY"
+      },
+      {
+        "action": "rent-one-signature-80-20",
+        "operationId": "bf893a014d5601009dd5cbb3cc1c13e840dcf527071acbf543205624d067a639",
+        "review": {
+          "network": "solana-devnet",
+          "month": "2026-10",
+          "rentMonthlyAtomic": "1000000",
+          "landlordAtomic": "800000",
+          "houseAtomic": "200000",
+          "landlord": "DZVE891HwMUyyDvbrYvyS543DJ3qwHM3diEuVuB8UPXF",
+          "landlordAta": "5c7emq88fP5KwPP9Vv6uERWqzepM67mEzxZUbXpK38y1",
+          "house": "BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z",
+          "rewardVault": "7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk",
+          "source": "3Lxe9JgazZ7kVbjaokatFVg5dBwvmkGRPsCBEPt7HxVD",
+          "asset": "BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE",
+          "description": "One user signature: exactly 0.8 fictional tUSDC to landlord and 0.2 to house reward vault (7-day stream). App rent builder fixture, not accepted-tenancy UX evidence."
+        },
+        "signature": "p2vwZiHEHMys84KqcqJAyRv2AYw4KAEuap8cz1sfBr7DUfL2981PCv3LfJyZXEZ6kXKmEURV6Ed4ganmcnQUnd8",
+        "explorerUrl": "https://explorer.solana.com/tx/p2vwZiHEHMys84KqcqJAyRv2AYw4KAEuap8cz1sfBr7DUfL2981PCv3LfJyZXEZ6kXKmEURV6Ed4ganmcnQUnd8?cluster=devnet",
+        "state": "confirmed",
+        "before": {
+          "slot": "507685007",
+          "chainTimestamp": "1791192167",
+          "cashAtomic": "2521999",
+          "walletUnitsAtomic": "0",
+          "stakedAtomic": "1001100",
+          "claimedTotalAtomic": "3099",
+          "earnedAtomic": "600",
+          "revenueTotalAtomic": "120963700",
+          "revenueBySourceAtomic": [
+            "0",
+            "3700",
+            "0",
+            "120960000"
+          ],
+          "rewardCashAtomic": "120960601",
+          "deskCashAtomic": "2001100",
+          "totalStakedAtomic": "2001100",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796932"
+        },
+        "after": {
+          "slot": "507685027",
+          "chainTimestamp": "1791192172",
+          "cashAtomic": "1521999",
+          "walletUnitsAtomic": "0",
+          "stakedAtomic": "1001100",
+          "claimedTotalAtomic": "3099",
+          "earnedAtomic": "1100",
+          "revenueTotalAtomic": "121163700",
+          "revenueBySourceAtomic": [
+            "200000",
+            "3700",
+            "0",
+            "120960000"
+          ],
+          "rewardCashAtomic": "121160601",
+          "deskCashAtomic": "2001100",
+          "totalStakedAtomic": "2001100",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796971"
+        },
+        "actualClaimedAtomic": "0",
+        "actualCashChangeAtomic": "-1000000",
+        "userSignatureCount": 1,
+        "feePayer": "7h3dQn7ZSaq21MsaQYCYVruESdLH2DjnBK9FbUKieaDY"
+      },
+      {
+        "action": "unstake",
+        "operationId": "ae18023ae350dbaa33c83f51db9ee8ad9d6091325f5f6bae550684594570399b",
+        "review": {
+          "operation": "unstake",
+          "houseId": "neighbourhood-homes",
+          "distributor": "BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z",
+          "account": "2daZCF2sKfNG7X5knNHkbmnbjhLJujw3mvSvmaQoGYjG",
+          "network": "Solana devnet",
+          "amount": "1.0011",
+          "asset": "tHOME",
+          "unitsRaw": "1001100",
+          "cashRaw": "0",
+          "claimRaw": "0",
+          "cashAccount": "3Lxe9JgazZ7kVbjaokatFVg5dBwvmkGRPsCBEPt7HxVD",
+          "unitAccount": "6N9WU1yDwmD5fMiKCpxjXjknaBi18RrSaH4UfrDjqB5b",
+          "deskVault": "2nmfyiHuN4edcMLqxtx1bksTwZ8h2XbfdkPZ5HAm7TNC",
+          "rewardVault": "7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk",
+          "stakeVault": "4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR",
+          "description": "Unstake exactly 1.0011 tHOME from the house stake vault into your own wallet. Income is streamed to stakers over 7 days; new revenue extends the remaining stream. Sponsored network fees and account rent. Test networks only, no value; fictional units carry no rights. Deposit earnings belong to the tenant."
+        },
+        "signature": "4aqDnZB83izzxXfmo15U2yxyv7wmf92iq12gStejEWDPWvpGCBaJHovj3Hgk3zD5nN9vXsrc3sDwFGjqKdZUy2Bq",
+        "explorerUrl": "https://explorer.solana.com/tx/4aqDnZB83izzxXfmo15U2yxyv7wmf92iq12gStejEWDPWvpGCBaJHovj3Hgk3zD5nN9vXsrc3sDwFGjqKdZUy2Bq?cluster=devnet",
+        "state": "confirmed",
+        "before": {
+          "slot": "507685029",
+          "chainTimestamp": "1791192173",
+          "cashAtomic": "1521999",
+          "walletUnitsAtomic": "0",
+          "stakedAtomic": "1001100",
+          "claimedTotalAtomic": "3099",
+          "earnedAtomic": "1200",
+          "revenueTotalAtomic": "121163700",
+          "revenueBySourceAtomic": [
+            "200000",
+            "3700",
+            "0",
+            "120960000"
+          ],
+          "rewardCashAtomic": "121160601",
+          "deskCashAtomic": "2001100",
+          "totalStakedAtomic": "2001100",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796971"
+        },
+        "after": {
+          "slot": "507685051",
+          "chainTimestamp": "1791192178",
+          "cashAtomic": "1521999",
+          "walletUnitsAtomic": "1001100",
+          "stakedAtomic": "0",
+          "claimedTotalAtomic": "3099",
+          "earnedAtomic": "1401",
+          "revenueTotalAtomic": "121163700",
+          "revenueBySourceAtomic": [
+            "200000",
+            "3700",
+            "0",
+            "120960000"
+          ],
+          "rewardCashAtomic": "121160601",
+          "deskCashAtomic": "2001100",
+          "totalStakedAtomic": "1000000",
+          "rewardDurationSeconds": "604800",
+          "periodFinish": "1791796971"
+        },
+        "actualClaimedAtomic": "0",
+        "actualCashChangeAtomic": "0",
+        "userSignatureCount": 1,
+        "feePayer": "7h3dQn7ZSaq21MsaQYCYVruESdLH2DjnBK9FbUKieaDY"
+      }
+    ],
+    "abortedAttempts": [
+      {
+        "runId": "6b9398b5-c0d0-436a-8657-22ac1f582303",
+        "wallet": "FUk2HpoNtakBEZZwyP8XE16kqePmoHiWodNbDtvQ1SA9",
+        "status": "prior-aborted-attempt-preserved",
+        "receipts": [
+          {
+            "action": "fixture-sponsor-ata-funding",
+            "signature": "cbysDTNaH1YUpsrvas4ybyjxpEE2Co9nKYEzQFEGg8GCrdUsFKqGvYYDX68jGM5nAHbEbkfwuwFGUiXojwGhZU2",
+            "explorerUrl": "https://explorer.solana.com/tx/cbysDTNaH1YUpsrvas4ybyjxpEE2Co9nKYEzQFEGg8GCrdUsFKqGvYYDX68jGM5nAHbEbkfwuwFGUiXojwGhZU2?cluster=devnet"
+          }
+        ]
+      },
+      {
+        "runId": "96d12823-4171-4e66-8835-d5912d457955",
+        "wallet": "3cwmB6H3nhb2tkGkQT7yMcfR134hYJPSHiJEnm5jEmbj",
+        "status": "prior-aborted-attempt-preserved",
+        "receipts": [
+          {
+            "action": "fixture-sponsor-ata-funding",
+            "signature": "4w3obueqVVU8nbZP8iVhFVugPadAg9PNTjLbzJmPfzp5Y3Puzu7wa34bZx79KMUnavQrspHjVzsZdV9fLX8TU88x",
+            "explorerUrl": "https://explorer.solana.com/tx/4w3obueqVVU8nbZP8iVhFVugPadAg9PNTjLbzJmPfzp5Y3Puzu7wa34bZx79KMUnavQrspHjVzsZdV9fLX8TU88x?cluster=devnet"
+          }
+        ]
+      },
+      {
+        "runId": "044122a7-7bc7-43d5-a921-0122edc8e5f6",
+        "wallet": "9AbHVvumeqePcWWPgQx2Z5kexNVk2cDBtYTMKhUMMuuk",
+        "status": "prior-aborted-attempt-preserved",
+        "receipts": [
+          {
+            "action": "fixture-sponsor-ata-funding",
+            "signature": "3pdWQSqyfaEkEkUi2mxrcqDnJRXwwxt1MNERg3VvVzZwfKnwXu7mhoevS5mdDjNfURyVJFAbU3BDzikqL1mGJ2wH",
+            "explorerUrl": "https://explorer.solana.com/tx/3pdWQSqyfaEkEkUi2mxrcqDnJRXwwxt1MNERg3VvVzZwfKnwXu7mhoevS5mdDjNfURyVJFAbU3BDzikqL1mGJ2wH?cluster=devnet"
+          },
+          {
+            "action": "buy",
+            "signature": "5H7fz9raC67RVYZR8eNxiNYQdqygZFUfvrXNb9Kae48n3xXj65Cgdt3MZg59LwfaUnxkGPuqogjWCx8bNGjVnvKs",
+            "explorerUrl": "https://explorer.solana.com/tx/5H7fz9raC67RVYZR8eNxiNYQdqygZFUfvrXNb9Kae48n3xXj65Cgdt3MZg59LwfaUnxkGPuqogjWCx8bNGjVnvKs?cluster=devnet"
+          },
+          {
+            "action": "stake",
+            "signature": "3HYGLEkEWRtdPzEitHQ4ywWAd7mphChiwUYRYUqbkMUpxG7tRg5zvZi122Xv9rdGEeJE6jumASAcviLwSfVbZw4g",
+            "explorerUrl": "https://explorer.solana.com/tx/3HYGLEkEWRtdPzEitHQ4ywWAd7mphChiwUYRYUqbkMUpxG7tRg5zvZi122Xv9rdGEeJE6jumASAcviLwSfVbZw4g?cluster=devnet"
+          },
+          {
+            "action": "deposit-rewards",
+            "signature": "5Yn6zru6hoa2EJmc7XSAumPMQv5oAPRpN5fK7ptjjW2M6uvRXFG2v4i4mQLV11VECfGZeVYLwkJXDZ5yTyzQKMds",
+            "explorerUrl": "https://explorer.solana.com/tx/5Yn6zru6hoa2EJmc7XSAumPMQv5oAPRpN5fK7ptjjW2M6uvRXFG2v4i4mQLV11VECfGZeVYLwkJXDZ5yTyzQKMds?cluster=devnet"
+          }
+        ]
+      },
+      {
+        "runId": "883b7370-587c-4df3-9f5a-6a4f36546cef",
+        "wallet": "CC7xPqGxXYydubESSfuw5kgQyXaB45F1aML8vap9rf4p",
+        "status": "prior-aborted-attempt-preserved",
+        "receipts": [
+          {
+            "action": "fixture-sponsor-ata-funding",
+            "signature": "1GxDszaErFfxwefauUj64qC46k2fzLMWEKWG43xNeWV5454xpajKCrw4wv2RyzEf7jajL86JiWhghyioiCcEKYd",
+            "explorerUrl": "https://explorer.solana.com/tx/1GxDszaErFfxwefauUj64qC46k2fzLMWEKWG43xNeWV5454xpajKCrw4wv2RyzEf7jajL86JiWhghyioiCcEKYd?cluster=devnet"
+          }
+        ]
+      }
+    ],
+    "scope": "House actions use the app service; rent proves the exact app transaction builder and reconciliation, not tenancy acceptance or browser UX. Funding and rewards are fictional; real devnet time, no clock warp. User wallet signs once per operation, sponsor also signs as fee payer."
+  },
+  "ai": {
+    "source": "SOLANA_AI_APP_PROOFS_2026-10-05.json",
+    "evidenceKind": "ephemeral-test-signer-devnet-stub-payment-only-not-privy-not-gpu",
+    "network": "solana-devnet",
+    "requestId": "ee8110aa-b61d-40fb-8fb5-f97b798e6f34",
+    "payer": "AvXJpUFbCnaPn6z5XaRey95brnJBsXcEsoNkK9v7vkxP",
+    "feePayer": "7h3dQn7ZSaq21MsaQYCYVruESdLH2DjnBK9FbUKieaDY",
+    "house": "BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z",
+    "programId": "CWUN8LKoKNEBJ6SQAVAqDFrb3rDP7vbVXMcf2EoAqjQM",
+    "mint": "BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE",
+    "maxAtomic": "12800",
+    "actualAtomic": "3700",
+    "outputTokens": 37,
+    "syntheticUsage": true,
+    "route": "house",
+    "sourceKind": 1,
+    "fundingMode": "explicit-sponsor-owned-cash",
+    "signatures": [
+      {
+        "action": "fixture-funding",
+        "signature": "5HQGApBLtoMfCeEeKC3BiWdBtqyf2z93fHBvhF2e7GreWiz5fDaCMg6PyXK9nW7Ayd8VpEyJHB2bANvvBwLfn8w7",
+        "explorerUrl": "https://explorer.solana.com/tx/5HQGApBLtoMfCeEeKC3BiWdBtqyf2z93fHBvhF2e7GreWiz5fDaCMg6PyXK9nW7Ayd8VpEyJHB2bANvvBwLfn8w7?cluster=devnet"
+      },
+      {
+        "action": "ai-approval",
+        "signature": "YaZppQfuybdNiATDJ14ip2YRM9xNn1EdUyySjGRw2Y6fXgjmf7en1ZM8J1V4sPGGNY1oWJgW1xtESpqC8ioBMXT",
+        "explorerUrl": "https://explorer.solana.com/tx/YaZppQfuybdNiATDJ14ip2YRM9xNn1EdUyySjGRw2Y6fXgjmf7en1ZM8J1V4sPGGNY1oWJgW1xtESpqC8ioBMXT?cluster=devnet"
+      },
+      {
+        "action": "ai-settlement",
+        "signature": "51CCYaYRJpXer8ea3xdorcm1GGuYa4CdrFrivwT8Df5KtbKzx2zCgcw9r27Q9ZSfUG92monxubaYAfpAWe9b3jXY",
+        "explorerUrl": "https://explorer.solana.com/tx/51CCYaYRJpXer8ea3xdorcm1GGuYa4CdrFrivwT8Df5KtbKzx2zCgcw9r27Q9ZSfUG92monxubaYAfpAWe9b3jXY?cluster=devnet"
+      }
+    ],
+    "state": "completed",
+    "note": "Real sponsored devnet transactions; synthetic answer, no GPU or Privy evidence. Test tokens have no value. Fictional units carry no rights; deposit earnings belong to the tenant."
+  },
+  "shares": {
+    "source": "SOLANA_SHARES_APP_PROOFS_2026-10-05.json",
+    "state": "deferred-to-hosted-site",
+    "reason": "Local sponsor7h3d… differs from the shares program issuer/price authority3AoH…; no key swapping or false local proof."
+  },
+  "fixtureFunding": {
+    "source": "Hosted resident wallet, passkey-unlocked signing; exact reviews before each signature",
+    "mint": "BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE",
+    "recipient": "7h3dQn7ZSaq21MsaQYCYVruESdLH2DjnBK9FbUKieaDY",
+    "transfers": [
+      {
+        "amountAtomic": "6052000000",
+        "signature": "5wmLZVmQ8Y5KXynw1Sd3WHHHj2Df1nQNbtJw7sGbxdMaRZAm4xFACfi6N95w5f9EL2PeC6B1vBP2kKpFa5uXUu8F",
+        "explorerUrl": "https://explorer.solana.com/tx/5wmLZVmQ8Y5KXynw1Sd3WHHHj2Df1nQNbtJw7sGbxdMaRZAm4xFACfi6N95w5f9EL2PeC6B1vBP2kKpFa5uXUu8F?cluster=devnet",
+        "state": "confirmed"
+      },
+      {
+        "amountAtomic": "64000000",
+        "signature": "uAwPqYez7vF8L7K4yxM9JkNLy1J4N8TPDwApd71jWd44BmLEhhtXC1W4P3HLuGkQ3WLyHDyEGLKu3Fu5NA7pnqy",
+        "explorerUrl": "https://explorer.solana.com/tx/uAwPqYez7vF8L7K4yxM9JkNLy1J4N8TPDwApd71jWd44BmLEhhtXC1W4P3HLuGkQ3WLyHDyEGLKu3Fu5NA7pnqy?cluster=devnet",
+        "state": "confirmed"
+      },
+      {
+        "amountAtomic": "256000000",
+        "signature": "29xxNBaTrCkkxQDkTJaukfyX23ZqTdTVaoEoSXqoRLvzUm3eBVWjHs8q77FhGPQvP5o8LCTsaLN6t3XfzzLRTUEN",
+        "explorerUrl": "https://explorer.solana.com/tx/29xxNBaTrCkkxQDkTJaukfyX23ZqTdTVaoEoSXqoRLvzUm3eBVWjHs8q77FhGPQvP5o8LCTsaLN6t3XfzzLRTUEN?cluster=devnet",
+        "state": "confirmed"
+      }
+    ]
+  }
+}

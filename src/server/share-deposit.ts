@@ -55,7 +55,7 @@ async function rental(store: Store, identity: VerifiedIdentity, id: string) {
   const agreement = await store.get<Agreement>(`agreement:${id}`);
   if (!agreement) throw new AccessError('This tenancy is unavailable.');
   const role = agreementRole(agreement, identity);
-  requireDeposit(agreement.depositForm?.kind === 'shares', 'This tenancy uses a cash deposit.');
+  requireDeposit(agreement.depositForm?.kind === 'shares' && agreement.depositForm.network !== 'solana-devnet', 'This tenancy does not use a Robinhood share deposit.');
   return { agreement, role };
 }
 async function readDepositQuote(config: ShareDepositManifest, rpc: DepositRpc, time: number): Promise<ShareDepositView['quote']> {
@@ -70,7 +70,7 @@ async function readDepositQuote(config: ShareDepositManifest, rpc: DepositRpc, t
 }
 export async function readShareListingQuote(store:Store,identity:VerifiedIdentity,id:string,dependencies:Dependencies={}) {
   const listing=await store.get<Listing>(`listing:${id}`);
-  requireDeposit(listing?.depositForm?.kind==='shares','This share-deposit listing is unavailable.');
+  requireDeposit(listing?.depositForm?.kind==='shares' && listing.depositForm.network !== 'solana-devnet','This share-deposit listing is unavailable.');
   const rpc=dependencies.rpc??sharedMarketRpc;const time=Math.floor((dependencies.now??Date.now)()/1000);
   const priceJob=shapePriceJob(await readPriceJob(store),time);
   const config=await (dependencies.manifest??loadShareDepositManifest)();

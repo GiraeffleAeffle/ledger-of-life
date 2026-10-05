@@ -1,7 +1,9 @@
 export const BUILDING_RENT_SHARE_BPS = 2000 as const;
 export const RENT_BUILDING_ID = 'demo-neighbourhood-homes' as const;
 export const BUILDING_RENT_MEANING = "A fixed 20 % of this test rent goes to the fictional building's tHOME stakers; the rest goes to the landlord. This simulates how a tokenized building could share net rental income; in a real building rent goes to the property owner under the lease.";
-export type BuildingRent = { buildingId: typeof RENT_BUILDING_ID; shareBps: typeof BUILDING_RENT_SHARE_BPS; landlordWallet: string };
+export type RobinhoodBuildingRent = { network?: 'robinhood-testnet'; buildingId: typeof RENT_BUILDING_ID; shareBps: typeof BUILDING_RENT_SHARE_BPS; landlordWallet: string; house?: never };
+export type SolanaBuildingRent = { network: 'solana-devnet'; shareBps: typeof BUILDING_RENT_SHARE_BPS; landlordWallet: string; house: string; buildingId?: never };
+export type BuildingRent = RobinhoodBuildingRent | SolanaBuildingRent;
 export type RentTerms = BuildingRent & { rentMonthly: string };
 export function splitBuildingRent(rentMonthly: string) {
   if (!/^[1-9][0-9]*$/.test(rentMonthly) || BigInt(rentMonthly) > 10_000_000_000n) throw new Error('Use a positive monthly test rent up to 10,000 test dollars.');

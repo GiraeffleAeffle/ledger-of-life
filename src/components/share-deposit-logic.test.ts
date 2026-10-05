@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextShareDepositAction, pendingShareDepositReceipt, requireBoundShareReview, shareDepositAmount, shareRefreshIsCurrent, showShareClaim, showTenantFunding, shareFeeBalance, shareReceiptPollDelay } from './share-deposit-logic.ts';
-import type { ShareDepositPlan, ShareDepositView } from '../domain/share-deposit.ts';
+import { nextShareDepositAction, pendingShareDepositReceipt, requireBoundShareReview, requireBoundSolanaShareReview, formatDepositShares, shareDepositReceiptUrl, shareDepositAmount, shareRefreshIsCurrent, showShareClaim, showTenantFunding, shareFeeBalance, shareReceiptPollDelay } from './share-deposit-logic.ts';
+import type { ShareDepositPlan, SolanaShareDepositPlan, ShareDepositView } from '../domain/share-deposit.ts';
 
 test('next action respects server role permissions and timeout priority', () => {
   const view = {deployment:'deployed' as const,state:'AwaitingLock' as const,role:'tenant' as const,needsTopUp:false,actions:['create' as const]};
@@ -111,4 +111,41 @@ test('pending receipt retries use five seconds normally and capped error backoff
   assert.equal(shareReceiptPollDelay(1), 10000);
   assert.equal(shareReceiptPollDelay(2), 20000);
   assert.equal(shareReceiptPollDelay(10), 60000);
+});
+
+test('Solana share amounts retain all six decimals without floating point loss', () => {
+  assert.equal(formatDepositShares('1000001', 6), '1.000001');
+  assert.equal(formatDepositShares('0', 6), '0');
+  assert.equal(formatDepositShares('18446744073709551615', 6), '18,446,744,073,709.551615');
+  assert.equal(shareDepositReceiptUrl('signature', 'solana-devnet'), 'https://explorer.solana.com/tx/signature?cluster=devnet');
+  assert.equal(shareDepositReceiptUrl('0x123'), 'https://explorer.testnet.chain.robinhood.com/tx/0x123');
+});
+
+test('every Solana review binds accepted terms, program, mint, parties and signer case-sensitively', () => {
+  const parties = { tenant: 'TenantAddress', landlord: 'LandlordAddress', arbitrator: 'ArbitratorAddress' };
+  const actor = { id: 'tenant-wallet', address: parties.tenant };
+  const view = {
+    rentalId: 'rental', network: 'solana-devnet', role: 'tenant', escrow: 'EscrowAddress', agreementHash: '0xdigest',
+    actions: ['pledge'], form: { network: 'solana-devnet', programId: 'ProgramAddress', mint: 'MintAddress',
+      securityUsd6: '1000000', responseWindow: 604800, returnWindow: 604800, arbitrationWindow: 2592000 },
+  } as ShareDepositView;
+  const plan = {
+    rentalId: 'rental', network: 'solana-devnet', action: 'pledge', walletId: actor.id,
+    expiresAt: new Date(Date.now() + 60000).toISOString(),
+    review: { programId: 'ProgramAddress', mint: 'MintAddress', escrow: view.escrow, agreementHash: view.agreementHash,
+      securityUsd6: '1000000', responseWindow: 604800, returnWindow: 604800, arbitrationWindow: 2592000,
+      actor: actor.address, ...parties },
+  } as SolanaShareDepositPlan;
+  requireBoundSolanaShareReview(plan, view, parties, actor);
+  for (const change of [
+    { programId: 'programaddress' }, { mint: 'mintaddress' }, { escrow: 'OtherEscrow' },
+    { agreementHash: '0xother' }, { securityUsd6: '2000000' }, { responseWindow: 1 },
+    { returnWindow: 1 }, { arbitrationWindow: 1 }, { actor: parties.landlord }, { tenant: 'OtherTenant' },
+    { landlord: 'OtherLandlord' }, { arbitrator: 'OtherArbitrator' },
+  ]) assert.throws(() => requireBoundSolanaShareReview({ ...plan, review: { ...plan.review, ...change } }, view, parties, actor));
+  assert.throws(() => requireBoundSolanaShareReview({ ...plan, rentalId: 'another' }, view, parties, actor));
+  assert.throws(() => requireBoundSolanaShareReview({ ...plan, walletId: 'another' }, view, parties, actor));
+  assert.throws(() => requireBoundSolanaShareReview(plan, { ...view, actions: [] }, parties, actor));
+  assert.throws(() => requireBoundSolanaShareReview({ ...plan, expiresAt: 'invalid' }, view, parties, actor), /expired/);
+  assert.throws(() => requireBoundSolanaShareReview({ ...plan, expiresAt: '2020-01-01T00:00:00Z' }, view, parties, actor), /expired/);
 });

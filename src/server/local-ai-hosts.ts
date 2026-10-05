@@ -6,6 +6,7 @@ import type { LocalAiRequestUsage } from './local-ai-types.ts';
 import type { Store } from './store.ts';
 import { getAddress } from 'viem';
 import { loadBuildingManifest, verifyBuildingDeployment, type BuildingReadOptions } from './building-revenue.ts';
+import { boundedOutputTokens } from './local-ai-usage.ts';
 
 import type { AiProgressEvents } from '../components/local-ai-progress-state.ts';
 
@@ -549,7 +550,7 @@ export async function pollConnectorJob(store: Store, hostId: string, waitMs = 25
     }
   }
 }
-export function sanitizeConnectorAnswer(response: unknown, model: string, wallMs: number): { answer: string; usage: LocalAiRequestUsage } {
+export function sanitizeConnectorAnswer(response: unknown, model: string, wallMs: number, maxOutputTokens: number): { answer: string; usage: LocalAiRequestUsage } {
   const data = object(response);
   const message = data.message && typeof data.message === 'object' ? object(data.message) : null;
   if (data.done !== true || data.done_reason !== 'stop' || data.model !== model || data.error || !message || message.role !== 'assistant' ||
@@ -557,7 +558,7 @@ export function sanitizeConnectorAnswer(response: unknown, model: string, wallMs
     throw new WorkflowError('The connector returned an incomplete answer. No inference payment was sent.');
   const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
   const duration = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value / 1e6 : null;
-  const outputTokens = count(data.eval_count);
+  const outputTokens = boundedOutputTokens(data.eval_count, maxOutputTokens, message.content as string, message.thinking);
   const evalMs = duration(data.eval_duration);
   const speed = outputTokens !== null && evalMs && evalMs > 0 ? Math.round(outputTokens / evalMs * 100000) / 100 : null;
   return { answer: message.content.trim(), usage: { inputTokens: count(data.prompt_eval_count), outputTokens, wallMs: Math.max(0, Math.round(wallMs)),
@@ -576,7 +577,7 @@ export async function completeConnectorJob(store: Store, hostId: string, input: 
     if (!job || job.id !== body.jobId || !job.pickedUp) throw new ConflictError('Job is expired, unassigned, or already completed.');
     if ('error' in body) finish(store, hostId, new ConflictError('Connector inference failed. No inference payment was sent.'));
     else {
-      try { finish(store, hostId, undefined, sanitizeConnectorAnswer(body.response, job.model, now - job.started)); }
+      try { finish(store, hostId, undefined, sanitizeConnectorAnswer(body.response, job.model, now - job.started, job.options.num_predict)); }
       catch (error) { finish(store, hostId, error instanceof Error ? error : new Error('Connector answer failed.')); }
     }
     return registry;

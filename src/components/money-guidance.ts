@@ -14,7 +14,7 @@ export function cashDepositStatus(tenancy: Pick<TenancyJourney, 'role' | 'chain'
   return 'no_entitlement';
 }
 
-export const TEST_EXIT_NOTICE = 'Fictional test units, no value, no rights. Local tHOME and tWORK units can be sold back for tUSDG at the fixed test price only when the desk has enough test cash. Other test units have no app sell lane. Test cash and shared-pool withdrawals have no monetary value.';
+export const TEST_EXIT_NOTICE = 'Fictional test units, no value, no rights. Local tHOME and tWORK units can be sold back at the fixed test price only when the desk has enough test cash: tUSDC on Solana devnet, tUSDG for earlier Robinhood Chain units. Unstake before selling. Other test units have no app sell lane. Test cash and shared-pool withdrawals have no monetary value. Deposit earnings belong to the tenant.';
 
 export function stakeDisabledReason(input: { amountAtomic: string | null; cashAtomic: string | null; nativeAtomic: string | null; hasWallet: boolean }): string {
   if (!input.hasWallet) return 'Connect your Shares wallet in Me first.';

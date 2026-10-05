@@ -2,7 +2,7 @@ import { assertVisitorActive, visitorToken } from '@/server/local-ai-session';
 import { authenticated } from '@/server/authenticated';
 import { errorResponse, readBody, sameOrigin } from '@/server/http';
 import { getStore } from '@/server/store';
-import { executeAiRequest, libraryOwner, paidOwner, readAiRequest, type AiOwner } from '@/server/local-ai';
+import { executeAiRequest, libraryOwner, paidOwnerForRequest, readAiRequest, type AiOwner } from '@/server/local-ai';
 import { encodePaymentRequiredHeader, encodePaymentResponseHeader } from '@x402/core/http';
 import { AccessError } from '@/server/errors';
 import type { LocalAiRequest } from '@/server/local-ai-types';
@@ -13,7 +13,7 @@ function result(request: LocalAiRequest) {
   const responseHeaders = new Headers(headers);
   if (request.mode === 'paid' && request.paymentRequired && request.payment.state !== 'settled')
     responseHeaders.set('PAYMENT-REQUIRED', encodePaymentRequiredHeader(request.paymentRequired));
-  if (request.mode === 'paid' && request.payment.state === 'settled' && request.payment.receipt)
+  if (request.mode === 'paid' && !request.solanaReview && request.payment.state === 'settled' && request.payment.receipt)
     responseHeaders.set('PAYMENT-RESPONSE', encodePaymentResponseHeader(request.payment.receipt));
   // Library cookies are established before inference, never reissued by a paid or model response.
   const status = request.state === 'failed' ? 502 : request.state === 'interrupted' ? 503 :
@@ -35,7 +35,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const store = await getStore();
     let owner: AiOwner;
     let visitor: string | null = null;
-    if (body.mode === 'paid') owner = paidOwner(await authenticated(request));
+    if (body.mode === 'paid') owner = await paidOwnerForRequest(store, id, await authenticated(request));
     else {
       if (body.mode !== 'library' || process.env.LOCAL_AI_LIBRARY_ENABLED !== '1') throw new AccessError('Public library inference is not enabled.');
       visitor = visitorToken(request);
@@ -52,7 +52,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 }
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const owner = request.headers.has('authorization') ? paidOwner(await authenticated(request)) : libraryOwner(visitorToken(request) || '');
-    return result(await readAiRequest(await getStore(), (await params).id, owner));
+    const store = await getStore();
+    const id = (await params).id;
+    const owner = request.headers.has('authorization') ? await paidOwnerForRequest(store, id, await authenticated(request)) : libraryOwner(visitorToken(request) || '');
+    return result(await readAiRequest(store, id, owner));
   } catch (error) { return failure(error); }
 }

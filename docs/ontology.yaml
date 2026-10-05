@@ -4,7 +4,7 @@
 # Human-readable companion: docs/ONTOLOGY.md. Keep both in sync when concepts change.
 
 version: 1
-updated: 2026-09-30
+updated: 2026-10-05
 product:
   working_name: Ledger of Life   # chosen 2026-09-26; technical identifiers unchanged
   thesis: >-
@@ -275,12 +275,13 @@ concepts:
     invariants:
       - The on-chain Escrow's policy hash equals the accepted agreement digest.
       - Changing terms or parties changes the digest and requires new acceptance.
-      - Only new marked building-home agreements bind building ID, fixed 2000-bps share, monthly rent and landlord wallet in the accepted v3 digest; existing agreements retain their original digest and have no retroactive rent obligation.
+      - New Solana building-home agreements bind network, fixed 2000-bps share, monthly rent, landlord wallet and house address in digest v4; earlier Robinhood v3 digests remain unchanged.
+      - Solana share-deposit form shares-solana binds immutable share terms and any rent terms in digest v5; missing reviewed deployment blocks publication and funding.
     code: [src/server/agreements.ts]
     reality: testnet_real
 
   RentPayment:
-    definition: A durable monthly journal for two tenant-wallet-signed test tUSDG transfers, separately paying the landlord and the fictional building's tHOME staking distributor.
+    definition: A durable monthly journal paying 80 percent to the landlord and 20 percent to the fictional house; Solana tUSDC uses one atomic transaction and tenant signature, earlier Robinhood tUSDG uses two signed transfers.
     fields: [agreementId, month, flatLabel, tenantWallet, landlordWallet, distributor, token, rentMonthly, landlordRaw, buildingRaw, state, steps]
     lifecycle: [prepared, pending, confirmed | stopped]
     relations: {bound_to: Agreement, pays: Person(landlord), shares_with: Distribution(home_rent_share)}
@@ -288,7 +289,7 @@ concepts:
       - Applies only to accepted new building-home agreements; rent terms are bound into their accepted digest.
       - The month is YYYY-MM in Europe/Berlin; one journal per agreement and month prevents a confirmed month from being paid twice. Recovery resumes the same signed transfers, not a replacement payment.
       - Building amount is floor(monthly rent atomic units * 2000 / 10000); the landlord receives the exact remainder, conserving the rent.
-      - Each transfer is separately reviewed, signed and receipt-confirmed; a confirmed building step can be attributed even while the landlord step is unfinished.
+      - Solana reviews both recipients and amounts before one signature covering memo, landlord TransferChecked and house deposit_rewards; both legs land atomically. Earlier Robinhood transfers remain separately reviewed and confirmed.
       - Rent is paid from the tenant's own wallet, not the deposit escrow; deposit protection and all deposit earnings remain the tenant's.
       - Internal attribution accepts only confirmed building steps with an exact transaction hash, amount, token and distributor match and consumes each receipt once; publicly it emits one aggregated Rent shares source with total and receipt count, never flat labels.
       - Public building income never exposes tenant identity, name, wallet, flat label or private agreement/payment IDs. Rent-associated hashes and explorer links are omitted from the public receipt list; exact rent receipts and labels stay in authenticated tenant/landlord views. Other income sender wallets are also omitted. Blockchain transactions themselves are not anonymous.
@@ -321,8 +322,9 @@ concepts:
       - Signed bytes are immutable; retries resend the same bytes.
       - An expired unsigned review may be replaced only with the same action, deltas, fee ceiling and deployment.
       - Finality requires the expected token deltas and state transition.
+      - The shared Solana sponsorship ledger reserves debit ceilings before signing, enforces account rolling and global UTC-day budgets, retains ambiguous reservations across windows and charges landed failures; signed capacity releases only on proven absence.
     bundles: [fund_and_supply, accept_and_settle, resolve_and_settle, redeem_and_settle]
-    code: [src/server/solana-service.ts, src/server/solana-initialization.ts]
+    code: [src/server/solana-service.ts, src/server/solana-initialization.ts, src/server/solana-operations.ts]
     reality: testnet_real
 
   YieldSource:
@@ -399,7 +401,8 @@ concepts:
       token_multiplier: {reality: testnet_simulated, note: "tSPYx scaled-UI multiplier, as xStocks do."}
       validator_rewards: {reality: read_only_live}
       solar_savings: {reality: read_only_live}
-      home_rent_share: {reality: testnet_real, note: "Fixed 20% of fictional monthly test rent reaches the tHOME distributor through a confirmed RentPayment building step; actual test tUSDG execution, no real rent or property rights."}
+      home_rent_share: {reality: testnet_real, note: "Fixed 20 percent of fictional monthly rent reaches house rewards: atomic tUSDC on Solana or confirmed tUSDG building step on earlier Robinhood. No real rent or property rights."}
+      solana_house_stream: {reality: testnet_real, note: "Deployed house program streams tHOME/tWORK rewards over 604800 seconds; idle revenue starts a fresh stream and fractional remainders carry. Claim pays at least the reviewed amount; one-signature reinvest buys/stakes fixed reviewed units and leaves extra cash with the owner.", code: [programs/house/src/lib.rs, src/server/building-solana.ts], evidence: docs/evidence/SOLANA_HOUSE_DEVNET_DEPLOYMENT_2026-10-05.json}
 
   Adapter:
     definition: A connector between the person's assets and an external system; observation adapters and signed financial flows have different authority.
@@ -449,9 +452,9 @@ concepts:
     code: [src/server/service-charges.ts, src/components/service-charges.tsx]
 
   LocalInvestment:
-    definition: Wallet-held units of a distinctly fictional housing or workshop issuer on Robinhood testnet; actual test-token transfers are separate from real cooperative research leads and hypothetical city effects.
+    definition: Wallet-held fictional housing/workshop units on Solana devnet and earlier Robinhood testnet; test-token transfers are separate from real cooperative research and hypothetical city effects.
     forms:
-      fictional_test_units: {reality: testnet_simulated, note: "Distinct fixed-supply tHOME/tWORK tokens, shared 6-decimal test USD, operator-set test issue price; no real issuer, cooperative or property rights."}
+      fictional_test_units: {reality: testnet_simulated, note: "Distinct tHOME/tWORK test tokens with six-decimal test cash and configured issue price; Solana house mints/burns units on buy/sell while earlier Robinhood units are fixed supply. No real issuer, cooperative or property rights."}
       cooperative_share: {reality: roadmap, note: "Genossenschaft (housing, energy); proven, no tokens needed. First step: directory via the Stadtstack atlas."}
       electronic_security: {reality: roadmap, note: "eWpG; electronic shares since 1 Jan 2024 (ZuFinG), crypto registers need a BaFin-licensed operator. The app shows and holds; issuers do the regulated part."}
       crowdfunding: {reality: roadmap, note: "ECSPR: up to EUR 5 million per project owner per 12 months via licensed platforms; link out."}
@@ -486,14 +489,16 @@ concepts:
     code: [src/server/local-ai.ts, src/server/local-ai-retention.ts, src/server/local-ai-runtime.ts, src/server/local-ai-session.ts, src/components/local-ai.tsx, "app/(wallet)/library/page.tsx"]
 
   InferencePayment:
-    definition: Official x402 v2 upto/Permit2 authorization on eip155:46630 for at most maxOutputTokens times 100 atomic tUSDG, settling 100 atomic tUSDG per reported output token only after a saved complete-stop local answer.
+    definition: A bounded per-answer authorization, using Solana SPL delegate approval for tUSDC or existing Robinhood x402 v2 upto/Permit2 for tUSDG; only measured generated tokens after a saved complete answer determine settlement.
     relations: {authorizes: LocalInferenceRequest, paid_by: Person (owned wallet), settles_in: Asset}
     invariants:
-      - Approval is a finite 100000-atomic Permit2 budget; each answer needs a separate bounded authorization.
-      - The same dedicated facilitator key pays gas; the signed witness binds to, facilitator and validAfter, restricting settlement to the named facilitator and payee within the authorized maximum and validity window.
-      - The upto settlement proxy is 0x4020A4f3b7b90ccA423B9fabCc0CE57C6C240002, replacing the former exact-payment proxy.
-      - The quote amountAtomic is the maximum, status.price.amountAtomic is the 100-atomic unit price, and request.payment.amountAtomic becomes the actual output-token charge after inference; review.maxOutputTokens and review.facilitatorAddress expose the signed bounds.
-      - Request ownership and a globally reserved payer/nonce bind authorization to one immutable request; the Permit2 witness does not cryptographically sign the prompt.
+      - Solana approves the existing fee sponsor for at most one answer maximum; the sponsor settles actual usage into house rewards with AI source or the reviewed host owner's Solana wallet.
+      - Solana unused allowance remains bounded by that answer maximum; the next approval replaces it only after the prior answer and ambiguous settlement are resolved.
+      - Robinhood approval is a finite 100000-atomic Permit2 budget; each answer needs a separate bounded authorization.
+      - Robinhood's dedicated facilitator pays gas; the signed witness binds recipient, facilitator and validAfter within the authorized maximum and validity window.
+      - Robinhood's upto settlement proxy is 0x4020A4f3b7b90ccA423B9fabCc0CE57C6C240002, replacing the former exact-payment proxy.
+      - The quote is a maximum and payment becomes the actual output-token charge after inference; reviews expose token cap and network-specific delegate or facilitator.
+      - Request ownership binds authorization to one immutable request; Robinhood additionally reserves payer/nonce and its Permit2 witness does not cryptographically sign the prompt.
       - Immutable unsigned envelope and exact signed bytes are durable before broadcast; canonical receipt and matching token effects establish settlement.
       - Only settled transfers count as recorded receipts; signatures, quotes, failed jobs and free access do not.
       - Own-compute answers are counted separately and never contribute to paid answers or settled revenue.
@@ -567,28 +572,30 @@ concepts:
     code: [contracts/evm/src/testnet/MirroredPriceFeed.sol, src/server/tsla-price-mirror.ts]
 
   CollateralDeposit:
-    definition: Available Home rental deposit backed by official test TSLA on Robinhood Chain testnet; built; proven on the hosted site on 1 October 2026 with three fresh passkey accounts.
+    definition: Home rental security in test shares with no forced sale; Robinhood official TSLA is hosted-proven on 1 October 2026, while deployed Solana tTSLA uses shares-solana/v5 and requires the reviewed manifest and hosted sponsor.
     invariant: Shares stay in the bound escrow until consent, arbitration or the agreed tenant-return timeout permits in-kind payouts; there is no forced sale.
-    code: [contracts/evm/src/ShareDeposit.sol, contracts/evm/src/ShareDepositFactory.sol, src/components/share-deposit.tsx]
+    code: [contracts/evm/src/ShareDeposit.sol, contracts/evm/src/ShareDepositFactory.sol, programs/shares/src/lib.rs, src/server/share-deposit-solana.ts, src/components/share-deposit.tsx]
     reality: testnet_real
     historical_evidence: "Earlier sale-based official-stock and fake-stock cycles do not prove this in-kind share-deposit flow. Hosted three-party run with fresh accounts proven 1 October 2026 (docs/evidence/HOSTED_SHARE_DEPOSIT_ROBINHOOD_TESTNET_2026-10-01.json); timeout exits are contract-tested only."
 
   BorrowAgainstShares:
-    definition: One shared Robinhood Chain testnet pool accepts official faucet test TSLA and lends freely mintable tUSDG supplied by lenders, valued at the mainnet Chainlink RHTSLA/USD mirror.
+    definition: Shared lender-funded test pools against test TSLA; existing Robinhood uses official faucet TSLA/tUSDG and Solana uses classic SPL tTSLA/tUSDC when its reviewed shares deployment is configured.
     rules:
       - Requires a verified shared-market deployment; otherwise honestly undeployed.
+      - Solana deployment and initialization with verified on-chain hashes are recorded in docs/evidence/SOLANA_SHARES_DEVNET_DEPLOYMENT_2026-10-05.json; deployment is distinct from hosted-flow proof.
+      - Solana faucet requires owner and issuer signatures, wallet cooldown and account quota, with a global fifty-share UTC-day budget; new borrowing is capped at two thousand tUSDC aggregate debt including interest.
       - Borrowing is limited to 50 % loan-to-value and 90 % utilization at a fresh price.
       - Borrowers accrue continuous 5 % nominal annual interest (approximately 5.13 % effective annually, read from the contract); lenders receive it pro rata, without projections.
       - Anyone may liquidate at 80 % loan-to-value with a fresh price, repaying at most 50 % of debt with a 10 % collateral bonus.
       - Bad debt reduces lender value; lender withdrawal is limited by pool cash.
       - Freshness is 26 hours normally and 74 hours Saturday 00:00 UTC through Monday 12:00 UTC.
       - Stale prices do not block adding collateral, repayment or debt-free collateral withdrawal.
-      - Disclose 10,000 tUSDG seed shares at the burn address, including their locked share of interest.
+      - Robinhood discloses 10,000 tUSDG seed shares at the burn address, including their locked share of interest; this is not a Solana seed claim.
       - No operator price/yield/liquidity withdrawal lever or staged liquidation.
       - Wallet reads never scan the borrower registry; unhealthy loans are a separate on-demand paginated read with a continuation cursor.
       - Immutable collateral issuer and implementation pins are not refreshed silently after upgrades.
       - TSLA paused, pool blocked, implementation changed or collateral shortfall suspends the market; reads expose suspension reasons.
-    code: [contracts/evm/src/testnet/SharedLendingPool.sol, src/server/shared-market.ts, src/components/share-workflows.tsx]
+    code: [contracts/evm/src/testnet/SharedLendingPool.sol, programs/shares/src/lib.rs, src/server/shared-market.ts, src/server/shared-market-solana.ts, src/components/share-workflows.tsx]
     reality: testnet_real
 
   HomeEquityPath:
@@ -611,7 +618,7 @@ journeys:
   home_path_ui: {stages: [Find, Apply, Agree, Secure, Live, Move out, Paid out], code: src/components/home-journey-logic.ts, rule: "Person-facing progress only; never advances a pending chain operation."}
 
 networks:
-  solana_devnet: {used_for: [Escrow, Operation, tSPYx market], rpc: "Helius (SOLANA_RPC_URL)"}
+  solana_devnet: {used_for: [Escrow, Operation, RentPayment, LocalInvestment, InferencePayment, CollateralDeposit, SharedLendingPool, tSPYx market], rpc: "Helius (SOLANA_RPC_URL)"}
   robinhood_testnet: {chain_id: 46630, used_for: [official faucet test TSLA, BorrowAgainstShares in SharedLendingPool, lender shares, RentalEscrow shared-pool rehearsal], note: "Verified manifest required; no fake-stock fallback. Localhost shares the hosted market and needs no updater key."}
   robinhood_mainnet_read: {chain_id: 4663, used_for: [Chainlink RHTSLA/USD mirror source], note: "Read-only source, not mainnet financial execution."}
   gnosis_beacon: {used_for: [validator adapter]}
