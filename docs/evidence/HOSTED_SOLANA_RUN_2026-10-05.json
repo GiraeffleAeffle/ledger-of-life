@@ -2,8 +2,8 @@
   "recordedAt": "2026-10-05T09:37:27.786Z",
   "site": "https://ledger.stadtstack.eu",
   "network": "solana-devnet",
-  "revision": 29,
-  "imageDigest": "sha256:da9bc523af3037f1417f3a7c3e85783941c165417204f1cd8d2607812921a62e",
+  "revision": 30,
+  "imageDigest": "sha256:65a327e1d6fb038382541253a040d3defa73f91a7a582720d446549690cdb2f3",
   "testAssetsOnly": true,
   "unitsHaveNoValueOrRights": true,
   "depositEarningsBelongToTenant": true,
@@ -20,7 +20,7 @@
       "sourceRevision": 28
     }
   ],
-  "completedAt": "2026-10-05T10:39:15.164Z",
+  "completedAt": "2026-10-05T11:56:34.184Z",
   "releases": [
     {
       "revision": 28,
@@ -33,6 +33,15 @@
       "source": "39d221928b6683d9139dd4b8ec8ec852fc52c50f",
       "digest": "sha256:da9bc523af3037f1417f3a7c3e85783941c165417204f1cd8d2607812921a62e",
       "pin": "aa5d2f7"
+    },
+    {
+      "revision": 30,
+      "source": "62f42511bb2f9d59db7bfb28f493c876721732b6",
+      "digest": "sha256:65a327e1d6fb038382541253a040d3defa73f91a7a582720d446549690cdb2f3",
+      "pin": "d91c958cfee2eb31a8f9a8544e396c9a48029367",
+      "releasedAt": "2026-10-05T11:48:18.450Z",
+      "imageRun": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/37304384344",
+      "sourceValidationRun": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/37304064662"
     }
   ],
   "resident": {
@@ -2422,7 +2431,7 @@
     "typescript": "passed",
     "lint": "passed",
     "tests": {
-      "passed": 876,
+      "passed": 915,
       "skipped": 2,
       "failed": 0
     },
@@ -2431,10 +2440,12 @@
     "publishedReadOnlyAmd64Smoke": "passed",
     "livePodDigest": "verified",
     "publicPages": "200",
-    "unauthenticatedRent": "401"
+    "unauthenticatedRent": "401",
+    "paymentRecoverySecurityReview": "passed; no surviving findings",
+    "filteredViewerRestored": true
   },
   "limitations": [
-    "Paid AI approval is finalized; GPU pickup/wake observed, but final answer and settlement remain unproven after more than ten minutes of saved-request503 responses, including a revision29 recovery. No absence of charge or host-offline diagnosis is inferred.",
+    "The original paid AI request was resolved on revision30 as settlement_expired with no inference charge: its GPU answer had arrived, but an unlinked unsigned settlement operation expired and the old recovery repeatedly threw. The initiating pre-sign exception is not recoverable from the intentionally unavailable logs. A separate real hosted paid answer is now proven below in aiRecoveryInvestigation.paidAnswer; earlier unresolved observations are retained as history.",
     "Initial empty cash-escrow setup lacks established full-review/explicit-authorization attribution. This is preserved as a limitation; revision29 separates unsigned preparation from exact review and explicit signing.",
     "Local fixture proofs and hosted Privy/browser evidence are separate; local synthetic AI answer is not GPU proof."
   ],
@@ -2524,6 +2535,81 @@
       "sponsorDebitCeilingLamports": "10000",
       "networkFeeLamports": "5000",
       "interpretation": "Actual application instruction/delta builders and the devnet gateway accepted a simulated delegate payment from the same resident source to the reviewed house. No private key, signature or broadcast was used. This is not an AI answer or settlement proof."
+    },
+    "originalRecoveryAfterRelease": {
+      "observedAt": "2026-10-05T11:49:22.282Z",
+      "httpStatus": 200,
+      "requestState": "failed",
+      "paymentState": "failed",
+      "recovery": { "stage": "settlement_reconcile", "code": "settlement_expired", "retryable": false },
+      "settlementTransaction": null,
+      "settledAtomic": "0",
+      "attemptedMeasuredAmountAtomic": "7000",
+      "answerReceivedAt": "2026-10-05T09:53:33.076Z",
+      "hostAwakeAt": "2026-10-05T09:52:46.452Z",
+      "cause": "Application settlement journaling/recovery bug, not an unavailable GPU. The complete host result reached the server; the old code linked the deterministic sponsor operation only after execution returned, then repeatedly tried to execute its expired unsigned operation and mapped the exception to generic503.",
+      "fix": "Link the sponsor operation before signing; recover existing operations without replacement; expose safe stage/code and owned request state; preserve ambiguous payment fences; canonically expire unsigned approvals and hand off their allowance lane only when safe.",
+      "uiObserved": "Request stopped; no answer charge; settlement_reconcile / settlement_expired; no automatic retry; remaining finite SPL allowance disclosed; deliberate Ask another question available.",
+      "limitation": "The exact exception preceding the old unsigned settlement expiry cannot be established because the filtered viewer intentionally excludes logs. No GPU-host access or modification was used."
+    },
+    "intermediateApprovalAttempt": {
+      "requestId": "e00aee2e-a025-4432-94a0-46281b054020",
+      "outcome": "Approval submission returned503. Same-request GET200 at 2026-10-05T11:54:26.077Z canonically recovered the unsigned operation as approval_expired, no approval hash and no inference charge. Only then was a separate question reviewed.",
+      "recovery": { "stage": "approval", "code": "approval_expired", "retryable": false }
+    },
+    "paidAnswer": {
+      "requestId": "b5732ab4-888c-425f-be17-8b988e19e47e",
+      "site": "https://ledger.stadtstack.eu",
+      "revision": 30,
+      "network": "solana-devnet",
+      "actor": "signed-in resident",
+      "payer": "4KsM36Kgz7o87PUJ66LoGyBEvn4Hac9K7oipDJydEqFa",
+      "hostId": "7b9f3ffa-49c9-442f-b5ec-582e478d51ca",
+      "host": "Owner desktop GPU",
+      "model": "qwen3.8:27b-ud-q3-k-xl",
+      "synthetic": false,
+      "maximumApprovedAtomic": "12800",
+      "pricePerOutputTokenAtomic": "100",
+      "review": "Public-question consent; one fixed question and Owner desktop GPU; Solana devnet; at most0.0128tUSDC; recipientBymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z (Neighbourhood Homes AI rewards); delegate/fee payer3AoHstmog6FiCcBaVAh8jnB8iVc2v9oUvN2Pnn76YtbH; own sourceCtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX. Exact UI review observed before Privy authorization; Run this saved question was then explicitly selected.",
+      "prompt": "In one short sentence, explain why rental-deposit earnings belong to the tenant. No lists.",
+      "answer": "Rental-deposit earnings belong to the tenant because the deposit is legally the tenant's own money held in trust by the landlord, not an investment asset owned by the landlord.",
+      "answerLabel": "Actual host-generated response; AI-generated and not legal advice.",
+      "inputTokens": 62,
+      "outputTokens": 36,
+      "inferenceWallMs": 34750,
+      "settledAtomic": "3600",
+      "settledAmount": "0.0036 tUSDC",
+      "approvalSignature": "2RpVfTyNEVxfqZc6ZZVFwEY9dsWAeZ1Y5kiFAVXU1bqXkoGCC1xu8rq1meFNakxTcbYL5tnVn7aKaw73AqXwacB9",
+      "approvalExplorerUrl": "https://explorer.solana.com/tx/2RpVfTyNEVxfqZc6ZZVFwEY9dsWAeZ1Y5kiFAVXU1bqXkoGCC1xu8rq1meFNakxTcbYL5tnVn7aKaw73AqXwacB9?cluster=devnet",
+      "settlementSignature": "xj1CYJHkynZ8v7EkDedmuvkzGZJ7c1NGsdmdRqkdZQG4Av66BHhnJGSKKXv96MSymjSXLp9j3ATaqx6rCBEFNRX",
+      "settlementExplorerUrl": "https://explorer.solana.com/tx/xj1CYJHkynZ8v7EkDedmuvkzGZJ7c1NGsdmdRqkdZQG4Av66BHhnJGSKKXv96MSymjSXLp9j3ATaqx6rCBEFNRX?cluster=devnet",
+      "progress": {
+        "authorizedAt": "2026-10-05T11:54:56.240Z",
+        "queuedAt": "2026-10-05T11:55:03.251Z",
+        "pickedUpAt": "2026-10-05T11:55:03.264Z",
+        "hostAwakeAt": "2026-10-05T11:55:15.389Z",
+        "modelReachableAt": "2026-10-05T11:55:15.389Z",
+        "answerReceivedAt": "2026-10-05T11:55:38.002Z",
+        "paymentConfirmedAt": "2026-10-05T11:55:44.638Z"
+      },
+      "savedRecovery": { "observedAt": "2026-10-05T11:56:17.397Z", "httpStatus": 200, "state": "completed", "paymentState": "settled", "receiptSuccess": true, "answerVisible": true },
+      "canonicalChainCheck": {
+        "observedAt": "2026-10-05T11:56:34.184Z",
+        "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+        "approvalFinality": "finalized",
+        "approvalSlot": 507723160,
+        "approvalSourceDeltaAtomic": "0",
+        "settlementFinality": "finalized",
+        "settlementSlot": 507723364,
+        "transactionErrors": null,
+        "sourceDeltaAtomic": "-3600",
+        "houseRewardVaultDeltaAtomic": "3600",
+        "houseRewardVault": "7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk",
+        "remainingDelegateAllowanceAtomic": "9200",
+        "allowanceNotice": "0.0092tUSDC remains as bounded SPL delegate allowance, not a charge or automatic revocation. Another approval replaces it only after this resolved request."
+      },
+      "capture": "/Users/max/Code/ledger-of-life-review/videos/captures/HOSTED_SOLANA_AI_PAID_2026-10-05.png",
+      "sessionCleanup": "Resident passkey saved, resident signed out and dedicated managed browser tab released. Credential backup retained privately."
     }
   }
 }
