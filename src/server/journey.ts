@@ -228,7 +228,7 @@ export async function tenancyJourney(
       next: pending
         ? { kind: 'confirming', label: 'Preparing the escrow…', detail: 'Waiting for final confirmation on the network.', operationId: null }
         : role === 'landlord'
-          ? { kind: 'create_space', label: 'Prepare the empty escrow', detail: 'One approval creates the empty escrow. It holds no security until the tenant funds it.' }
+          ? { kind: 'create_space', label: 'Prepare the empty escrow', detail: 'Prepare the unsigned transaction, review its exact parties and costs, then explicitly sign to create the empty escrow. It holds no security until the tenant funds it.' }
           : waiting('Waiting for the landlord', 'The landlord prepares the empty escrow for these terms.'),
     };
   }
