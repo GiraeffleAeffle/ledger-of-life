@@ -2611,5 +2611,49 @@
       "capture": "/Users/max/Code/ledger-of-life-review/videos/captures/HOSTED_SOLANA_AI_PAID_2026-10-05.png",
       "sessionCleanup": "Resident passkey saved, resident signed out and dedicated managed browser tab released. Credential backup retained privately."
     }
+  },
+  "claimAiFollowup": {
+    "reportedRevision": 30,
+    "reportedAtBerlin": "2026-10-05 16:48–16:59",
+    "recordingCoordination": "VideoStory explicitly confirmed all hosted recording finished and authorized a governed release before this agent opened its resident diagnosis session.",
+    "claimBaseline": {
+      "reported": "First reviewed and authorized claim submission returned409 without a receipt. A subsequent private read was unavailable; a later unsigned review explicitly failed with Simulation bank changed; request a fresh review.",
+      "observedAt": "2026-10-05T15:04:47.898Z",
+      "authenticatedReadStatus": 200,
+      "configured": true,
+      "observedSlot": "507770843",
+      "claimableAtomic": "7354824",
+      "activePlan": null,
+      "claimReceipts": "Only the earlier finalized bbf3hWMm… claim was present; no receipt for the reported later attempt.",
+      "limitation": "The first409's exact exception and transient private503 cannot be reconstructed from unavailable logs. No persistent active-plan blockage was observed in this diagnosis."
+    },
+    "aiBaseline": {
+      "requestId": "8b5c4240-e7a9-4314-b57b-708073546d87",
+      "observedAt": "2026-10-05T15:04:16.502Z",
+      "httpStatus": 200,
+      "state": "failed",
+      "paymentState": "failed",
+      "recoveryStage": "settlement_reconcile",
+      "recoveryCode": "settlement_expired",
+      "answerReceivedAt": "2026-10-05T14:57:15.297Z",
+      "measuredAmountAtomic": "7800",
+      "settlementTransaction": null,
+      "settledAtomic": "0",
+      "diagnosis": "Revision30 recovered already-linked operations by reconciliation only. A prepared but unexecuted settlement could not resume after a presign failure and expired roughly two minutes after the answer arrived. The expired original is not replaced or charged anew."
+    },
+    "localVerification": {
+      "typescript": "passed",
+      "lint": "passed",
+      "testsPassed": 949,
+      "testsSkipped": 2,
+      "testsFailed": 0,
+      "diffCheck": "passed",
+      "productionBuild": "passed",
+      "readOnlyClaimSimulations": 5,
+      "readOnlyClaimSimulationsPassed": 5,
+      "simulationReviewedMinimumAtomic": "7761236",
+      "simulationMatchedSlots": ["507775065", "507775067", "507775068", "507775071", "507775072"],
+      "simulationBoundary": "Actual devnet gateway and exact claim instruction/delta builders, without private-key signing or broadcast. All original owner/mint/token/native-fee/sponsor bounds retained. This is not a claim receipt."
+    }
   }
 }

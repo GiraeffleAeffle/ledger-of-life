@@ -523,28 +523,44 @@ function settlementRecoveryCode(error: unknown) {
   if (error instanceof SolanaServiceError && Object.hasOwn(settlementServiceCodes, error.code)) return error.code;
   return error instanceof Error && Object.hasOwn(settlementErrorCodes, error.message) ? settlementErrorCodes[error.message] : 'settlement_unavailable';
 }
+function authorizedSolanaAiAnswer(row: SolanaAiRecord) {
+  const { request, owner, solanaJournal } = row, review = request.solanaReview;
+  if (!review || request.state !== 'settling' || !request.answer || !request.usage ||
+      request.approval?.state !== 'completed' || !request.approval.hash ||
+      !solanaJournal.approvalId || request.approval.id !== solanaJournal.approvalId || request.approval.budgetAtomic !== review.amountAtomic ||
+      owner.network !== 'solana-devnet' || owner.payer !== review.payer || owner.walletId !== review.walletId ||
+      review.requestId !== row.id || review.requestFingerprint !== request.requestFingerprint ||
+      review.maxOutputTokens !== request.maxOutputTokens || review.amountAtomic !== inferenceMaximum(request.maxOutputTokens).toString() ||
+      review.priceAtomic !== AI_PRICE.toString())
+    throw new SolanaServiceError(409, 'invalid_operation', 'No completed approved Solana AI answer is available.');
+  const amount = inferenceCharge(request.usage.outputTokens, BigInt(review.amountAtomic));
+  if (amount.toString() !== request.payment.amountAtomic)
+    throw new SolanaServiceError(409, 'invalid_operation', 'Saved AI usage differs from settlement.');
+  return { review, amount };
+}
 export async function settleSolanaAi(store: Store, key: string, dependencies?: SolanaAiSettlementDependencies) {
   const row = await store.get<SolanaAiRecord>(key), review = row?.request.solanaReview;
   if (!row || !review || row.request.state === 'completed' || row.request.payment.state === 'settled') return;
-  if (row.request.state !== 'settling' || !row.request.answer || !row.request.usage || row.request.approval?.state !== 'completed')
-    throw new ConflictError('No completed approved Solana AI answer is available.');
-  const amount = inferenceCharge(row.request.usage.outputTokens, BigInt(review.amountAtomic));
-  if (amount.toString() !== row.request.payment.amountAtomic) throw new ConflictError('Saved AI usage differs from settlement.');
+  const { amount } = authorizedSolanaAiAnswer(row);
   let stage: SolanaAiSettlementStage = 'settlement_context';
   try {
     const { operations, manifest, sponsor } = await (dependencies?.context ?? solanaAiContext)(store);
     if (review.delegate !== sponsor.address || review.asset !== manifest.cashMint) throw new ConflictError('AI payment deployment changed.');
     let result: SolanaOperationResult | null = null;
     if (amount !== 0n) {
+      const savedIntent = async (saved: SolanaAiRecord) => {
+        const authorized = authorizedSolanaAiAnswer(saved);
+        return { kind: 'ai-settle', requestId: saved.id, sponsorshipSubject: saved.owner.subject,
+          instructions: await solanaAiSettlementInstructions(authorized.review, authorized.amount, manifest.programId),
+          review: { ...authorized.review, actualAmountAtomic: authorized.amount.toString(), sourceKind: 1 },
+          expectedDeltas: await solanaAiSettlementDeltas(authorized.review, authorized.amount, manifest.programId) };
+      };
       if (row.solanaJournal.settlementId) {
         stage = 'settlement_reconcile';
         result = await operations.reconcile({ id: row.solanaJournal.settlementId });
       } else {
         stage = 'settlement_prepare';
-        const intent = { kind: 'ai-settle', requestId: row.id, sponsorshipSubject: row.owner.subject,
-          instructions: await solanaAiSettlementInstructions(review, amount, manifest.programId),
-          review: { ...review, actualAmountAtomic: amount.toString(), sourceKind: 1 },
-          expectedDeltas: await solanaAiSettlementDeltas(review, amount, manifest.programId) };
+        const intent = await savedIntent(row);
         // Preparation also finds operations from older releases whose signed-write succeeded
         // before the inference journal was linked. Persist that link before any signing.
         const prepared = await operations.prepareAsSponsor(intent);
@@ -557,18 +573,29 @@ export async function settleSolanaAi(store: Store, key: string, dependencies?: S
         if (linked.request.state !== 'settling' || linked.request.payment.state === 'settled' || linked.request.payment.state === 'failed') return;
         stage = 'settlement_reconcile';
         result = await operations.reconcile({ id: prepared.id });
-        if (result.state === 'prepared') {
-          if (review.route === 'wallet') {
-            stage = 'settlement_recipient';
-            // Revalidate only before signing, never block recovery of already signed bytes.
-            // Static Next server-only identity imports cannot run in focused Node payment tests.
-            const lookup = dependencies?.wallet ?? (await import('./identity.ts')).verifiedSolanaWalletForSubject;
-            const recipient = review.hostOwnerSubject ? await lookup(review.hostOwnerSubject) : null;
-            if (!recipient || recipient.address !== review.payTo) throw new ConflictError('The host owner wallet changed; this answer cannot be settled to a different recipient.');
-          }
-          stage = 'settlement_submit';
-          result = await operations.executeAsSponsor(intent);
+      }
+      if (result.state === 'prepared') {
+        // A durable link may precede execution or outlive a presign/context failure. Rebuild
+        // only the saved authorization; prepare verifies its fingerprint and keeps the exact
+        // unsigned envelope. Signed/ambiguous operations never enter this branch.
+        stage = 'settlement_prepare';
+        const current = await store.get<SolanaAiRecord>(key);
+        if (!current || current.solanaJournal.settlementId !== result.id)
+          throw new SolanaServiceError(409, 'invalid_operation', 'The saved Solana settlement link changed.');
+        const intent = await savedIntent(current);
+        const prepared = await operations.prepareAsSponsor(intent);
+        if (prepared.id !== result.id)
+          throw new SolanaServiceError(409, 'invalid_operation', 'The saved Solana settlement reviews another operation.');
+        if (review.route === 'wallet') {
+          stage = 'settlement_recipient';
+          // Revalidate before every unsigned resume, never block recovery of signed bytes.
+          // Static Next server-only identity imports cannot run in focused Node payment tests.
+          const lookup = dependencies?.wallet ?? (await import('./identity.ts')).verifiedSolanaWalletForSubject;
+          const recipient = review.hostOwnerSubject ? await lookup(review.hostOwnerSubject) : null;
+          if (!recipient || recipient.address !== review.payTo) throw new ConflictError('The host owner wallet changed; this answer cannot be settled to a different recipient.');
         }
+        stage = 'settlement_submit';
+        result = await operations.executeAsSponsor(intent);
       }
     }
     await store.update<SolanaAiRecord>(key, current => {

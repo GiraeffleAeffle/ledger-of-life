@@ -25,9 +25,10 @@ export type SolanaOperations = {
   cancel(input: { identity: VerifiedIdentity; id: string }): Promise<SolanaOperationResult>;
   get(id: string, identity?: VerifiedIdentity): Promise<PreparedSolanaOperation & SolanaOperationResult>;
 };
-type RecordOperation = PreparedSolanaOperation & { subject: string; sponsorshipSubject?: string | null; actor: string; fingerprint: string; messageSha256: string; lastValidBlockHeight: string; expectedDeltas: ExpectedTokenDelta[]; state: SolanaOperationState; signature?: string; signedTransactionBase64?: string; error?: string };
+type RecordOperation = PreparedSolanaOperation & { subject: string; sponsorshipSubject?: string | null; actor: string; fingerprint: string; messageSha256: string; lastValidBlockHeight: string; expectedDeltas: ExpectedTokenDelta[]; state: SolanaOperationState; signature?: string; signedTransactionBase64?: string; error?: string; signingLease?: { ownerToken: string; expiresAt: number } };
 type SponsorshipReservation = { amountLamports: string; subject: string | null; reservedAt: number; chargedAt?: number; state: 'reserved' | 'charged'; ownerToken: string };
 type SponsorshipLedger = { reservations: Record<string, SponsorshipReservation> };
+const SIGNING_LEASE_MS = 30_000;
 const sha = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex');
 const json = (value: unknown) => JSON.stringify(value, (_, item) => typeof item === 'bigint' ? item.toString() : item);
 const key = (id: string) => `solana-operation:${id}`;
@@ -70,7 +71,7 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
     if (await store.get<SponsorshipLedger>(ledgerKey)) return;
     try { await store.create<SponsorshipLedger>(ledgerKey, { reservations: {} }); } catch (error) { if (!await store.get(ledgerKey)) throw error; }
   }
-  async function reserveBudget(op: RecordOperation, amount: bigint, token: string, resize = false): Promise<boolean> {
+  async function reserveBudget(op: RecordOperation, amount: bigint, token: string, resize = false, previousOwnerToken?: string): Promise<boolean> {
     await ensureLedger();
     let acquired = false;
     await store.update<SponsorshipLedger>(ledgerKey, current => {
@@ -81,7 +82,7 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
       }
       const existing = reservations[op.id];
       if (resize && (!existing || existing.state !== 'reserved' || existing.ownerToken !== token)) fail('Sponsorship reservation changed; do not broadcast.', 'sponsor_reservation');
-      if (!resize && existing) return { reservations };
+      if (!resize && existing && (existing.state !== 'reserved' || existing.ownerToken !== previousOwnerToken)) return { reservations };
       const subject = op.sponsorshipSubject === undefined ? op.subject === 'server:sponsor' ? null : op.subject : op.sponsorshipSubject;
       const ceiling = existing && BigInt(existing.amountLamports) > amount ? BigInt(existing.amountLamports) : amount;
       let subjectLamports = 0n, subjectTransactions = 0, globalLamports = 0n;
@@ -126,6 +127,15 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
       return { reservations: { ...current.reservations, [op.id]: { ...entry, state: 'charged', chargedAt: now(), ownerToken: '' } } };
     });
   }
+  async function expireUnsigned(op: RecordOperation) {
+    const expired = await store.update<RecordOperation>(key(op.id), current => {
+      if (current.state !== 'prepared') return current;
+      if (current.signature || current.signedTransactionBase64) fail('A potentially signed operation cannot expire as unsigned.');
+      return { ...current, state: 'expired', signingLease: undefined };
+    });
+    await settleBudget(expired);
+    return expired;
+  }
   async function load(id: string, identity?: VerifiedIdentity) {
     const op = await store.get<RecordOperation>(key(id));
     if (!op || (identity && (op.subject !== identity.subject || !identity.wallets.some(wallet => wallet.chainType === 'solana' && wallet.id === op.walletId && wallet.address === op.actor)))) fail('Operation is not available to this wallet.', 'operation_owner');
@@ -167,8 +177,9 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
   async function reconcile(input: { identity?: VerifiedIdentity; id: string }): Promise<SolanaOperationResult> {
     let op = await load(input.id, input.identity);
     if (op.state === 'prepared') {
-      if (now() >= Date.parse(op.expiresAt)) op = await store.update<RecordOperation>(key(op.id), current => current.state === 'prepared' ? { ...current, state: 'expired' } : current);
-      await settleBudget(op);
+      const expired = now() >= Date.parse(op.expiresAt) ||
+        BigInt((await gateway.lifetime()).blockHeight) >= BigInt(op.lastValidBlockHeight);
+      if (expired) op = await expireUnsigned(op);
       return result(op);
     }
     if (op.state !== 'broadcast' || !op.signature || !op.signedTransactionBase64) { await settleBudget(op); return result(op); }
@@ -210,12 +221,25 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
   }
   async function signAndBroadcast(op: RecordOperation, bytes: Uint8Array): Promise<SolanaOperationResult & { signature: string }> {
     const ceiling = await simulate(bytes, op.actor, op.expectedDeltas), token = randomUUID();
-    if (!await reserveBudget(op, ceiling, token)) {
-      const existing = await load(op.id);
-      if (existing.signature) return { ...await reconcile({ id: op.id }), signature: existing.signature };
+    const previousReservation = (await store.get<SponsorshipLedger>(ledgerKey))?.reservations[op.id];
+    let previousOwnerToken: string | undefined;
+    const claimed = await store.update<RecordOperation>(key(op.id), current => {
+      if (current.state !== 'prepared' || (current.signingLease && current.signingLease.expiresAt > now())) return current;
+      if (current.signature || current.signedTransactionBase64) fail('Operation already has immutable signed bytes.');
+      if (now() >= Date.parse(current.expiresAt)) fail('Operation lifetime expired before signing.');
+      previousOwnerToken = current.signingLease?.ownerToken ?? previousReservation?.ownerToken;
+      return { ...current, signingLease: { ownerToken: token, expiresAt: now() + SIGNING_LEASE_MS } };
+    });
+    if (claimed.signingLease?.ownerToken !== token) {
+      if (claimed.signature) return { ...await reconcile({ id: op.id }), signature: claimed.signature };
       fail('Another request is sponsoring this operation. Retry checking its existing review.', 'operation_pending');
     }
     try {
+      // Only the atomic operation-lease owner may transfer an orphan unsigned reservation.
+      // Its existing ceiling/window attribution remain intact; signed reservations never
+      // enter this path. The signed-write below fences any delayed previous owner.
+      if (!await reserveBudget(claimed, ceiling, token, false, previousOwnerToken))
+        fail('Another request is sponsoring this operation. Retry checking its existing review.', 'operation_pending');
       const signedBytes = await sponsor.sign(bytes), signed = getTransactionDecoder().decode(signedBytes), original = getTransactionDecoder().decode(bytes);
       if (sha(new Uint8Array(signed.messageBytes)) !== op.messageSha256) fail('Sponsor changed the approved message.');
       const payerSignature = signed.signatures[sponsorAddress];
@@ -224,11 +248,11 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
       await reserveBudget(op, await simulate(signedBytes, op.actor, op.expectedDeltas), token, true);
       const signature = getBase58Decoder().decode(payerSignature), encoded = Buffer.from(signedBytes).toString('base64');
       const persisted = await store.update<RecordOperation>(key(op.id), current => {
-        if (current.state !== 'prepared') {
-          if (current.signature === signature && current.signedTransactionBase64 === encoded) return current;
-          fail('Operation already has an immutable signed transaction.');
-        }
-        return { ...current, state: 'broadcast', signature, signedTransactionBase64: encoded };
+        if (current.signingLease?.ownerToken !== token || current.signingLease.expiresAt <= now())
+          fail('Sponsorship signing lease changed; do not broadcast.', 'sponsor_reservation');
+        if (current.state !== 'prepared' || now() >= Date.parse(current.expiresAt))
+          fail('Operation is no longer available for signing.');
+        return { ...current, state: 'broadcast', signature, signedTransactionBase64: encoded, signingLease: undefined };
       });
       if (persisted.state === 'broadcast') {
         try { if (await gateway.broadcast(signedBytes) !== signature) fail('Broadcast signature mismatch.'); } catch { /* The persisted bytes and reservation remain immutable. */ }
@@ -239,7 +263,11 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
       // signed-write attempt with no persisted signature is provably not sent. A cancelled
       // review also cannot pass the atomic signed-write, even if signing was in flight.
       const current = await load(op.id);
-      if (!current.signature || current.state === 'expired') await releaseBudget(current, token);
+      if (!current.signature || current.state === 'expired') {
+        await store.update<RecordOperation>(key(op.id), latest => latest.signingLease?.ownerToken === token
+          ? { ...latest, signingLease: undefined } : latest);
+        await releaseBudget(current, token);
+      }
       throw error;
     }
   }
@@ -265,7 +293,11 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
     submit: async (input: { identity: VerifiedIdentity; id: string; signedTransactionBase64: string }): Promise<SolanaOperationResult & { signature: string }> => {
       const op = await load(input.id, input.identity);
       if (op.state !== 'prepared') { const next = await reconcile(input); if (!next.signature) fail('This review expired; prepare a new request ID.'); return { ...next, signature: next.signature }; }
-      if (now() >= Date.parse(op.expiresAt) || BigInt((await gateway.lifetime()).blockHeight) >= BigInt(op.lastValidBlockHeight)) fail('This review expired; prepare a fresh review.');
+      if (now() >= Date.parse(op.expiresAt) || BigInt((await gateway.lifetime()).blockHeight) >= BigInt(op.lastValidBlockHeight)) {
+        const expired = await expireUnsigned(op);
+        if (expired.signature) return { ...await reconcile(input), signature: expired.signature };
+        fail('This review expired; prepare a fresh review.');
+      }
       if (typeof input.signedTransactionBase64 !== 'string' || input.signedTransactionBase64.length > 1644) fail('Invalid signed transaction encoding.');
       const bytes = Buffer.from(input.signedTransactionBase64, 'base64');
       if (bytes.length > 1232 || bytes.toString('base64') !== input.signedTransactionBase64) fail('Invalid signed transaction encoding.');
@@ -279,7 +311,11 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
       const prepared = await prepareAsSponsor(input);
       const op = await load(prepared.id);
       if (op.state !== 'prepared') { const next = await reconcile({ id: op.id }); if (!next.signature) fail('Server operation expired; use a fresh request ID.'); return { ...next, signature: next.signature }; }
-      if (now() >= Date.parse(op.expiresAt) || BigInt((await gateway.lifetime()).blockHeight) >= BigInt(op.lastValidBlockHeight)) fail('Server operation lifetime expired.');
+      if (now() >= Date.parse(op.expiresAt) || BigInt((await gateway.lifetime()).blockHeight) >= BigInt(op.lastValidBlockHeight)) {
+        const expired = await expireUnsigned(op);
+        if (expired.signature) return { ...await reconcile({ id: op.id }), signature: expired.signature };
+        fail('Server operation lifetime expired.');
+      }
       return signAndBroadcast(op, new Uint8Array(Buffer.from(op.transactionBase64, 'base64')));
     },
     prepareAsSponsor,

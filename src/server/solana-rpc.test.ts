@@ -52,3 +52,97 @@ test('simulation rejects an unreviewed token loss from a reviewed owner', async 
   const f = await fixture();
   await assert.rejects(f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address, [f.expected[1]]), /Unexpected simulated token loss/);
 });
+
+test('simulation starts before the finalized account response arrives without weakening bank checks', async () => {
+  const f = await fixture();
+  const original = f.gateway.fetcher;
+  let accountReadPending = false;
+  let overlappingSimulations = 0;
+  f.gateway.fetcher = async (url, options) => {
+    const body = JSON.parse(String(options?.body));
+    if (body.method === 'getMultipleAccounts') {
+      assert.equal(body.params[1].commitment, 'finalized');
+      accountReadPending = true;
+      await new Promise<void>(resolve => queueMicrotask(resolve));
+      const response = await original(url, options);
+      accountReadPending = false;
+      return response;
+    }
+    if (body.method === 'simulateTransaction') {
+      assert.equal(accountReadPending, true, 'Do not wait a network round trip before sampling the simulation bank.');
+      assert.equal(body.params[0], Buffer.from(f.bytes).toString('base64'));
+      assert.equal(body.params[1].commitment, 'finalized');
+      assert.equal(body.params[1].replaceRecentBlockhash, false);
+      overlappingSimulations++;
+    }
+    return original(url, options);
+  };
+  assert.equal((await f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address, f.expected)).sponsorDebitCeilingLamports, '20000');
+  assert.equal(overlappingSimulations, 1);
+});
+
+test('concurrent simulation still refuses mismatched finalized banks and retries only identical bytes', async () => {
+  const f = await fixture();
+  const original = f.gateway.fetcher;
+  let simulations = 0;
+  let mismatches = 3;
+  f.gateway.fetcher = async (url, options) => {
+    const body = JSON.parse(String(options?.body));
+    const response = await original(url, options);
+    if (body.method !== 'simulateTransaction') return response;
+    simulations++;
+    assert.equal(body.params[0], Buffer.from(f.bytes).toString('base64'));
+    const envelope = await response.json();
+    if (mismatches-- > 0) envelope.result.context.slot = 11;
+    return Response.json(envelope);
+  };
+  await assert.rejects(f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address, f.expected), /bank changed/);
+  assert.equal(simulations, 3);
+  mismatches = 1;
+  assert.equal((await f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address, f.expected)).sponsorDebitCeilingLamports, '20000');
+  assert.equal(simulations, 5);
+  f.setCredit(99n);
+  await assert.rejects(f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address, f.expected), /delta differs/);
+});
+
+for (const laggingSide of ['accounts', 'simulation'] as const) {
+  test(`simulation joins an exact finalized bank when ${laggingSide} responses lag one sample`, async () => {
+    const f = await fixture();
+    const original = f.gateway.fetcher;
+    let reads = 0, simulations = 0;
+    f.gateway.fetcher = async (url, options) => {
+      const body = JSON.parse(String(options?.body));
+      const response = await original(url, options);
+      if (!['getMultipleAccounts', 'simulateTransaction'].includes(body.method)) return response;
+      const envelope = await response.json();
+      if (body.method === 'getMultipleAccounts')
+        envelope.result.context.slot = 10 + reads++ + (laggingSide === 'simulation' ? 1 : 0);
+      else
+        envelope.result.context.slot = 10 + simulations++ + (laggingSide === 'accounts' ? 1 : 0);
+      return Response.json(envelope);
+    };
+    const result = await f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address, f.expected);
+    assert.equal(result.slot, '11');
+    assert.equal(reads, 2);
+    assert.equal(simulations, 2);
+    assert.equal(result.sponsorDebitCeilingLamports, '20000');
+  });
+}
+
+test('a matched prior simulation must still satisfy every reviewed token delta', async () => {
+  const f = await fixture();
+  const original = f.gateway.fetcher;
+  let reads = 0, simulations = 0;
+  f.gateway.fetcher = async (url, options) => {
+    const body = JSON.parse(String(options?.body));
+    if (body.method === 'simulateTransaction') f.setCredit(simulations === 0 ? 99n : 100n);
+    const response = await original(url, options);
+    if (!['getMultipleAccounts', 'simulateTransaction'].includes(body.method)) return response;
+    const envelope = await response.json();
+    envelope.result.context.slot = body.method === 'getMultipleAccounts' ? 10 + reads++ : 11 + simulations++;
+    return Response.json(envelope);
+  };
+  await assert.rejects(f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address, f.expected), /delta differs/);
+  assert.equal(reads, 2);
+  assert.equal(simulations, 2);
+});

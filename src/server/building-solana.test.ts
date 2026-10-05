@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AccountRole, address, appendTransactionMessageInstructions, blockhash, compileTransaction, createTransactionMessage, generateKeyPairSigner, getAddressEncoder, getCompiledTransactionMessageDecoder, pipe, setTransactionMessageFeePayer, setTransactionMessageLifetimeUsingBlockhash } from '@solana/kit';
+import type { TestContext } from 'node:test';
+import { generateKeyPairSync } from 'node:crypto';
+import { AccountRole, address, appendTransactionMessageInstructions, blockhash, compileTransaction, createTransactionMessage, generateKeyPairSigner, getAddressEncoder, getBase58Decoder, getCompiledTransactionMessageDecoder, getTransactionDecoder, getTransactionEncoder, partiallySignTransaction, pipe, setTransactionMessageFeePayer, setTransactionMessageLifetimeUsingBlockhash } from '@solana/kit';
 import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { houseAddresses, HOUSE_DISCRIMINATORS, pendingOwed, positionAddress, type HouseAccount, type PositionAccount } from '../finance/solana/house.ts';
 import { SOLANA_DEVNET_MANIFEST, SOLANA_IDS, SOLANA_TEST_USDC_MINT } from '../finance/solana/manifest.ts';
 import type { AccountObservation } from '../finance/solana/observations.ts';
 import type { SolanaHouseManifest } from './solana-house-config.ts';
-import { assertSolanaHouseOperation, buildSolanaHouseAction, houseActionQuote, readSolanaHouseSnapshot, solanaHouseReadModel, type HouseReadGateway, type SolanaHouseSnapshot } from './building-solana.ts';
+import { assertSolanaHouseOperation, buildSolanaHouseAction, houseActionQuote, prepareSolanaHouseAction, readSolanaBuildingPosition, readSolanaHouseSnapshot, solanaHouseReadModel, submitSolanaHouseAction, type HouseReadGateway, type SolanaHouseSnapshot } from './building-solana.ts';
+import { BaseSolanaGateway } from './solana-rpc.ts';
+import { LocalStore } from './store.ts';
+import { SolanaServiceError } from './solana-service.ts';
+import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
+import type { ExpectedTokenDelta } from '../finance/solana/reconcile.ts';
 
 async function fixture(overrides: { house?: Partial<HouseAccount>; position?: Partial<PositionAccount>; nowSeconds?: bigint } = {}) {
   const [program, owner, payer, admin] = await Promise.all(Array.from({ length: 4 }, () => generateKeyPairSigner()));
@@ -61,6 +68,44 @@ async function fixture(overrides: { house?: Partial<HouseAccount>; position?: Pa
   ]);
   const gateway: HouseReadGateway = { checkedGenesis: async () => manifest.genesisHash, multiple: async keys => ({ slot: '50', accounts: keys.map(key => accounts.get(key) ?? null) }) };
   return { manifest, owner, payer, snapshot, accounts, gateway, homes, positionKey };
+}
+
+/** Exercises the configured production journal with ephemeral keys and no network transport. */
+async function lifecycleFixture(t: TestContext, overrides: Parameters<typeof fixture>[0] = {}) {
+  const f = await fixture(overrides), store = new LocalStore(':memory:');
+  t.after(() => store.close());
+  const keys = generateKeyPairSync('ed25519');
+  const sponsorBytes = Buffer.concat([keys.privateKey.export({ format: 'der', type: 'pkcs8' }).subarray(-32), keys.publicKey.export({ format: 'der', type: 'spki' }).subarray(-32)]);
+  const environment = { SOLANA_RPC_URL: 'http://127.0.0.1:1', SOLANA_HOUSE_MANIFEST: JSON.stringify(f.manifest), SOLANA_SPONSOR_KEYPAIR: JSON.stringify([...sponsorBytes]) };
+  const identity: VerifiedIdentity = { subject: 'did:privy:house-claim', sessionId: 'fixture', expiresAt: 9999999999, passkeyCount: 1, wallets: [{ id: 'owner', chainType: 'solana', address: f.owner.address }] };
+  const state = { now: 1_000_000_000, height: 10n, lastValidHeight: 100n, blockhash: SOLANA_IDS.system as string, slot: '50', simulationError: null as Error | null, broadcastError: false, receipt: 'unknown' as 'unknown' | 'finalized' | 'failed', reads: [] as string[][], simulations: [] as { bytes: Uint8Array; expectedDeltas: readonly ExpectedTokenDelta[] }[], broadcasts: [] as Uint8Array[] };
+  t.mock.method(Date, 'now', () => state.now);
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('A journal regression must not make a network request.'); });
+  t.mock.method(BaseSolanaGateway.prototype, 'checkedGenesis', async () => f.manifest.genesisHash);
+  t.mock.method(BaseSolanaGateway.prototype, 'multiple', async (requested: readonly string[]) => {
+    state.reads.push([...requested]);
+    return { slot: state.slot, accounts: requested.map(key => f.accounts.get(key) ?? null) };
+  });
+  t.mock.method(BaseSolanaGateway.prototype, 'lifetime', async () => ({ blockhash: state.blockhash, lastValidBlockHeight: state.lastValidHeight.toString(), blockHeight: state.height.toString() }));
+  t.mock.method(BaseSolanaGateway.prototype, 'simulate', async (bytes: Uint8Array, _sponsor: string, _actor: string, expectedDeltas: readonly ExpectedTokenDelta[] = []) => {
+    state.simulations.push({ bytes: Uint8Array.from(bytes), expectedDeltas });
+    if (state.simulationError) throw state.simulationError;
+    return { slot: state.slot, sponsorDebitCeilingLamports: '5000', networkFeeLamports: '5000' };
+  });
+  t.mock.method(BaseSolanaGateway.prototype, 'broadcast', async (bytes: Uint8Array) => {
+    state.broadcasts.push(Uint8Array.from(bytes));
+    if (state.broadcastError) throw new Error('Ambiguous broadcast timeout.');
+    const transaction = getTransactionDecoder().decode(bytes), message = getCompiledTransactionMessageDecoder().decode(transaction.messageBytes);
+    return getBase58Decoder().decode(transaction.signatures[message.staticAccounts[0]]!);
+  });
+  t.mock.method(BaseSolanaGateway.prototype, 'reconcile', async (signature: string) => state.receipt === 'finalized'
+    ? { status: 'finalized', signature, slot: state.slot, deltas: [] }
+    : state.receipt === 'failed' ? { status: 'failed', reason: 'transaction-error' }
+      : { status: 'unknown', reason: 'signature-not-observed-do-not-resubmit-new-intent' });
+  const sign = async (transactionBase64: string) => Buffer.from(getTransactionEncoder().encode(await partiallySignTransaction([f.owner.keyPair], getTransactionDecoder().decode(Buffer.from(transactionBase64, 'base64'))))).toString('base64');
+  const prepare = (requestId: string) => prepareSolanaHouseAction(store, identity, { operation: 'claim', requestId }, environment);
+  const read = () => readSolanaBuildingPosition(store, identity, 'neighbourhood-homes', environment);
+  return { ...f, store, environment, identity, state, sign, prepare, read };
 }
 
 test('house finalized read uses on-chain revenue sources, total stake, staker count and pendingOwed', async () => {
@@ -201,4 +246,102 @@ test('house routes bind exact journal kind and refuse cross-domain operations fr
   }
   assert.throws(() => assertSolanaHouseOperation({ id: 'another-id', kind: 'house:neighbourhood-homes:buy' }, entry), /not bound/);
   assert.throws(() => assertSolanaHouseOperation({ id: entry.id, kind: 'house:neighbourhood-homes:buy' }, undefined), /not bound/);
+});
+
+test('house and owner balances use one snapshot containing the canonical Clock', async () => {
+  const f = await fixture(), requests: string[][] = [];
+  const gateway: HouseReadGateway = { checkedGenesis: f.gateway.checkedGenesis, multiple: async keys => { requests.push([...keys]); return f.gateway.multiple(keys); } };
+  const snapshot = await readSolanaHouseSnapshot(f.manifest, 'neighbourhood-homes', gateway, f.owner.address);
+  assert.equal(requests.length, 1);
+  assert.ok(requests[0].includes(f.homes.house)); assert.ok(requests[0].includes(f.homes.rewardVault));
+  assert.ok(requests[0].includes(f.positionKey)); assert.ok(requests[0].includes(f.snapshot.cashAccount!));
+  assert.ok(requests[0].includes('SysvarC1ock11111111111111111111111111111111'));
+  assert.equal(snapshot.slot, '50'); assert.equal(snapshot.nowSeconds, 1000n);
+});
+
+test('retrying a claim prepare recovers the exact reviewed minimum and bytes despite more streamed income', async t => {
+  const rate = 10_000n * 1_000_000_000_000n;
+  const f = await lifecycleFixture(t, { house: { totalStaked: 2_000_000n, rewardPerUnitStored: 0n, rewardRate: rate, lastUpdateTime: 1_000_000n, periodFinish: 1_000_600n, streamRemainingScaled: 600n * rate }, position: { staked: 1_000_000n, owed: 0n, rewardDebt: 0n }, nowSeconds: 1_000_010n });
+  const first = await f.prepare('same-claim-request'), reads = f.state.reads.length, simulations = f.state.simulations.length;
+  const clock = f.accounts.get('SysvarC1ock11111111111111111111111111111111')!;
+  new DataView(clock.data.buffer).setBigUint64(0, 51n, true); new DataView(clock.data.buffer).setBigInt64(32, 1_000_020n, true); f.state.slot = '51';
+  const second = await f.prepare('same-claim-request');
+  assert.deepEqual(second.plan, { ...first.plan, state: 'prepared' }); assert.equal(second.plan.review.claimRaw, '50000');
+  assert.equal(f.state.reads.length, reads, 'recovery must not re-quote current streaming accrual');
+  assert.equal(f.state.simulations.length, simulations, 'recovery must not replace the reviewed transaction');
+  assert.equal((await f.read()).earnedRaw, '100000');
+  assert.deepEqual((await f.read()).plan, { ...first.plan, state: 'prepared' });
+  await assert.rejects(prepareSolanaHouseAction(f.store, f.identity, { operation: 'reinvest', requestId: 'same-claim-request' }, f.environment), error => error instanceof SolanaServiceError && error.code === 'house_request_conflict');
+  await assert.rejects(prepareSolanaHouseAction(f.store, f.identity, { operation: 'claim', requestId: 'same-claim-request', cashAtomic: '1' }, f.environment), /different house action/);
+});
+
+test('failed pre-broadcast simulation leaves the same claim review recoverable without a receipt', async t => {
+  const f = await lifecycleFixture(t), first = await f.prepare('claim-simulation-failed'), signed = await f.sign(first.plan.transactionBase64);
+  f.state.simulationError = new Error('Simulation bank changed; request a fresh review');
+  await assert.rejects(submitSolanaHouseAction(f.store, f.identity, first.plan.id, signed, f.environment), /Simulation bank changed/);
+  assert.equal(f.state.broadcasts.length, 0);
+  const saved = await f.store.get<{ state: string; signature?: string; signedTransactionBase64?: string }>(`solana-operation:${first.plan.id}`);
+  assert.equal(saved?.state, 'prepared'); assert.equal(saved?.signature, undefined); assert.equal(saved?.signedTransactionBase64, undefined);
+  const position = await f.read();
+  assert.deepEqual(position.plan, { ...first.plan, state: 'prepared' }); assert.deepEqual(position.receipts, []); assert.equal(position.earnedRaw, '6000000');
+  assert.deepEqual((await f.prepare('claim-simulation-failed')).plan, { ...first.plan, state: 'prepared' });
+  await assert.rejects(f.prepare('replacement-before-expiry'), error => error instanceof SolanaServiceError && error.code === 'house_review_pending');
+  f.state.simulationError = null;
+  const result = await submitSolanaHouseAction(f.store, f.identity, first.plan.id, signed, f.environment);
+  assert.equal(result.status, 'pending'); assert.ok(result.signature);
+  assert.ok(f.state.broadcasts.every(bytes => Buffer.from(bytes).equals(Buffer.from(f.state.broadcasts[0]))));
+  const minimum = f.state.simulations.at(-1)!.expectedDeltas.find(delta => delta.account === f.snapshot.cashAccount)!;
+  assert.equal(minimum.minimumAtomic, first.plan.review.claimRaw);
+});
+
+test('ambiguous signed claim stays fenced across reload and confirms only its original receipt', async t => {
+  const f = await lifecycleFixture(t), first = await f.prepare('ambiguous-claim');
+  f.state.broadcastError = true;
+  const submitted = await submitSolanaHouseAction(f.store, f.identity, first.plan.id, await f.sign(first.plan.transactionBase64), f.environment);
+  assert.equal(submitted.status, 'pending');
+  const saved = await f.store.get<{ signedTransactionBase64: string; signature: string }>(`solana-operation:${first.plan.id}`);
+  assert.ok(saved?.signedTransactionBase64); assert.equal(saved?.signature, submitted.signature);
+  const position = await f.read();
+  assert.equal(position.plan, null); assert.equal(position.receipts[0]?.status, 'pending'); assert.equal(position.receipts[0]?.hash, submitted.signature);
+  await assert.rejects(f.prepare('another-claim'), error => error instanceof SolanaServiceError && error.code === 'house_review_pending');
+  f.state.broadcastError = false;
+  const retried = await submitSolanaHouseAction(f.store, f.identity, first.plan.id, await f.sign(first.plan.transactionBase64), f.environment);
+  assert.equal(retried.signature, submitted.signature);
+  assert.ok(f.state.broadcasts.every(bytes => Buffer.from(bytes).toString('base64') === saved!.signedTransactionBase64));
+  f.state.receipt = 'finalized';
+  const finalized = await f.read();
+  assert.equal(finalized.plan, null); assert.equal(finalized.receipts[0]?.status, 'confirmed'); assert.equal(finalized.receipts[0]?.hash, submitted.signature);
+  await assert.rejects(f.prepare('ambiguous-claim'), /already finished or expired/);
+});
+
+test('expired unsigned claim stops being a signable plan and a fresh request can claim again', async t => {
+  const f = await lifecycleFixture(t), first = await f.prepare('unsigned-expired');
+  f.state.now += 120_001;
+  const expired = await f.read();
+  assert.equal(expired.plan, null); assert.deepEqual(expired.receipts, []); assert.equal(f.state.broadcasts.length, 0);
+  await assert.rejects(f.prepare('unsigned-expired'), /already finished or expired/);
+  const next = await f.prepare('fresh-after-expiry');
+  assert.notEqual(next.plan.id, first.plan.id); assert.equal(next.plan.review.claimRaw, first.plan.review.claimRaw);
+});
+
+test('unsigned claim expires at its original finalized block-height boundary without waiting for wall time', async t => {
+  const f = await lifecycleFixture(t), first = await f.prepare('block-height-expired');
+  f.state.height = 100n; f.state.lastValidHeight = 200n; f.state.blockhash = f.owner.address;
+  const expired = await f.read();
+  assert.equal(expired.plan, null); assert.deepEqual(expired.receipts, []); assert.equal(f.state.broadcasts.length, 0);
+  await assert.rejects(f.prepare('block-height-expired'), /already finished or expired/);
+  const next = await f.prepare('fresh-height-review');
+  assert.notEqual(next.plan.id, first.plan.id); assert.notEqual(next.plan.transactionBase64, first.plan.transactionBase64);
+});
+
+test('failed landed claim preserves its failed receipt and permits a separately reviewed replacement', async t => {
+  const f = await lifecycleFixture(t), first = await f.prepare('landed-failed');
+  const submitted = await submitSolanaHouseAction(f.store, f.identity, first.plan.id, await f.sign(first.plan.transactionBase64), f.environment);
+  f.state.receipt = 'failed';
+  const failed = await f.read();
+  assert.equal(failed.plan, null); assert.equal(failed.receipts[0]?.status, 'failed'); assert.equal(failed.receipts[0]?.hash, submitted.signature);
+  const next = await f.prepare('separate-reviewed-claim');
+  assert.notEqual(next.plan.id, first.plan.id); assert.equal(next.plan.review.claimRaw, first.plan.review.claimRaw);
+  const original = await f.store.get<{ state: string; signature: string }>(`solana-operation:${first.plan.id}`);
+  assert.equal(original?.state, 'failed'); assert.equal(original?.signature, submitted.signature);
 });

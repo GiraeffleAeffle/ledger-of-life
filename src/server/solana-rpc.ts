@@ -54,6 +54,10 @@ export type SolanaSimulation = {
   sponsorDebitCeilingLamports: string;
   networkFeeLamports: string;
 };
+export type SolanaAccountSnapshot = {
+  slot: string;
+  accounts: (AccountObservation & { lamports: string } | null)[];
+};
 export type SolanaGateway = {
   snapshot(): Promise<SolanaSnapshot>;
   lifetime(): Promise<{ blockhash: string; lastValidBlockHeight: string; blockHeight: string }>;
@@ -243,7 +247,7 @@ export class BaseSolanaGateway {
       throw new Error('RPC genesis mismatch');
     return String(genesis);
   }
-  async multiple(keys: readonly string[]) {
+  async multiple(keys: readonly string[]): Promise<SolanaAccountSnapshot> {
     const result = object(
       await this.rpc('getMultipleAccounts', [
         keys,
@@ -292,12 +296,17 @@ export class BaseSolanaGateway {
         ? index < message.header.numSignerAccounts - message.header.numReadonlySignerAccounts
         : index < message.staticAccounts.length - message.header.numReadonlyNonSignerAccounts,
     );
-    // Two finalized RPC reads can straddle a slot boundary. Never compare
-    // balances from different banks; retry the same exact transaction instead.
+    // Start both finalized reads together: waiting for the account response before
+    // starting simulation adds a full network round trip in which the bank can advance.
+    // Concurrency is not a consistency guarantee; accept only identical bank slots.
+    // A load-balanced RPC can serve adjacent finalized roots. Keep at most three
+    // samples per side so an exact matching bank is not discarded between attempts.
+    const snapshots = new Map<string, SolanaAccountSnapshot>();
+    const simulations = new Map<string, Record<string, unknown>>();
     for (let attempt = 0; attempt < 3; attempt++) {
-      const before = await this.multiple(keys);
-      const result = object(
-        await this.rpc('simulateTransaction', [
+      const [sample, simulated] = await Promise.all([
+        this.multiple(keys),
+        this.rpc('simulateTransaction', [
           Buffer.from(transactionBytes).toString('base64'),
           {
             encoding: 'base64',
@@ -307,7 +316,19 @@ export class BaseSolanaGateway {
             accounts: { encoding: 'base64', addresses: keys },
           },
         ]),
-      );
+      ]);
+      const observed = object(simulated);
+      const observedSlot = numeric(object(observed.context).slot);
+      snapshots.set(sample.slot, sample);
+      simulations.set(observedSlot, observed);
+      const before = snapshots.get(observedSlot) ?? sample;
+      const result = before.slot === observedSlot ? observed : simulations.get(before.slot);
+      if (!result) {
+        if (attempt < 2) continue;
+        throw new Error('Simulation bank changed; request a fresh review');
+      }
+      const slot = numeric(object(result.context).slot);
+      if (slot !== before.slot) throw new Error('Simulation bank changed; request a fresh review');
       const value = object(result.value);
       if (
         value.err !== null ||
@@ -315,11 +336,6 @@ export class BaseSolanaGateway {
         value.accounts.length !== keys.length
       )
         throw new Error('Exact transaction simulation failed');
-      const slot = numeric(object(result.context).slot);
-      if (slot !== before.slot) {
-        if (attempt < 2) continue;
-        throw new Error('Simulation bank changed; request a fresh review');
-      }
       const payerIndex = keys.indexOf(address(sponsor));
       const pre = before.accounts[payerIndex],
         post =

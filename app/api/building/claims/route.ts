@@ -5,11 +5,14 @@ import { prepareBuildingAction, readBuildingPosition, submitBuildingAction } fro
 import { prepareBuildingReinvest, readBuildingReinvest, startBuildingReinvest, submitBuildingReinvest } from '@/server/building-revenue-reinvest';
 import { loadSolanaHouseManifest } from '@/server/solana-house-config';
 import { cancelSolanaHouseReview, prepareSolanaHouseAction, readSolanaBuildingPosition, solanaHouseId, submitSolanaHouseAction } from '@/server/building-solana';
+import { SolanaServiceError } from '@/server/solana-service';
 export const runtime = 'nodejs';
 const noStore = { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization' } };
 export async function GET(request: Request) {
+  let readingPosition = false;
   try {
     const identity = await authenticated(request);
+    readingPosition = true;
     const query = new URL(request.url).searchParams;
     if (query.get('network') !== 'robinhood' && loadSolanaHouseManifest())
       return Response.json(await readSolanaBuildingPosition(await getStore(), identity, solanaHouseId(query.get('houseId'))), noStore);
@@ -17,7 +20,14 @@ export async function GET(request: Request) {
     if (!wallet) throw new Error('Your account has no Robinhood wallet.');
     const store = await getStore();
     return Response.json({ ...await readBuildingPosition(store, wallet.address), reinvest: await readBuildingReinvest(store, identity) }, noStore);
-  } catch (error) { return errorResponse(error); }
+  } catch (error) {
+    if (error instanceof SolanaServiceError)
+      return Response.json({ error: error.message, code: error.code }, { status: error.status, ...noStore });
+    const response = errorResponse(error);
+    if (response.status === 503 && readingPosition)
+      return Response.json({ error: 'Verified building position or operation recovery is temporarily unavailable. Retry checking the same review; no success or zero balance is inferred.', code: 'building_position_unavailable' }, { status: 503, ...noStore });
+    return response;
+  }
 }
 export async function POST(request: Request) {
   try {
@@ -46,5 +56,5 @@ export async function POST(request: Request) {
     if (body.action === 'submit' && typeof body.planId === 'string' && typeof body.signedTransaction === 'string')
       return Response.json(await submitBuildingAction(store, wallet.address, body.planId, body.signedTransaction), noStore);
     throw new Error('Unknown building staking action.');
-  } catch (error) { return Response.json({ error: error instanceof Error ? error.message : 'Building action unavailable.' }, { status: 409, ...noStore }); }
+  } catch (error) { return Response.json({ error: error instanceof Error ? error.message : 'Building action unavailable.', ...(error instanceof SolanaServiceError ? { code: error.code } : {}) }, { status: error instanceof SolanaServiceError ? error.status : 409, ...noStore }); }
 }

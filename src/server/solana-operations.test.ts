@@ -7,7 +7,7 @@ import { SOLANA_DEVNET_MANIFEST, SOLANA_IDS } from '../finance/solana/manifest.t
 import type { SignatureReconciliation } from '../finance/solana/reconcile.ts';
 import { LocalStore } from './store.ts';
 import { createSolanaOperations, DEFAULT_SPONSORSHIP_LIMITS, sponsorshipLimitsFromEnvironment, type SolanaOperationsConfig, type SolanaOperationsGateway, type SponsorshipLimits } from './solana-operations.ts';
-type LedgerView = { reservations: Record<string, { amountLamports: string; subject: string | null; state: 'reserved' | 'charged'; chargedAt?: number }> };
+type LedgerView = { reservations: Record<string, { amountLamports: string; subject: string | null; state: 'reserved' | 'charged'; reservedAt: number; chargedAt?: number; ownerToken: string }> };
 
 async function fixture(sponsorshipLimits: Partial<SponsorshipLimits> = {}) {
   const [actor, payer, stranger] = await Promise.all([generateKeyPairSigner(), generateKeyPairSigner(), generateKeyPairSigner()]);
@@ -31,7 +31,7 @@ async function fixture(sponsorshipLimits: Partial<SponsorshipLimits> = {}) {
   const input = { identity, actor: actor.address, walletId: 'sol-wallet', kind: 'house:buy', requestId: 'request-one', instructions, review: { unitsRaw: '5000000', cashRaw: '5000000' } };
   const sign = async (transactionBase64: string, signer = actor) => Buffer.from(getTransactionEncoder().encode(await partiallySignTransaction([signer.keyPair], getTransactionDecoder().decode(Buffer.from(transactionBase64, 'base64'))))).toString('base64');
   return {
-    operations, store, identity, actor, payer, sponsor, stranger, input, sign, broadcasts, simulations,
+    operations, store, identity, actor, payer, sponsor, stranger, input, sign, broadcasts, simulations, gateway, config,
     createAgain: () => createSolanaOperations({ store, gateway, sponsor, config, now: () => clock }),
     signerCalls: () => sponsorCalls,
     readLedger: async () => { const rows = await store.scan<LedgerView>('solana-sponsorship:'); return rows[0]?.value.reservations ?? {}; },
@@ -111,6 +111,68 @@ test('expiry requires finalized height beyond lifetime and a fresh missing-signa
   f.setObservation({ status: 'unknown', reason: 'signature-not-observed-do-not-resubmit-new-intent' });
   const expired = await f.operations.reconcile({ id: prepared.id });
   assert.equal(expired.state, 'expired'); assert.equal(expired.signature, submitted.signature);
+  await f.store.close();
+});
+
+test('unsigned canonical expiry uses the original finalized block-height bound and never refreshes its envelope', async () => {
+  const f = await fixture(), prepared = await f.operations.prepare(f.input);
+  f.setLastValidHeight(200n);
+  f.setHeight(100n);
+  assert.equal((await f.operations.reconcile({ identity: f.identity, id: prepared.id })).state, 'expired');
+  const same = await f.operations.prepare(f.input);
+  assert.equal(same.id, prepared.id);
+  assert.equal(same.transactionBase64, prepared.transactionBase64);
+  assert.equal((await f.operations.get(prepared.id)).state, 'expired');
+  assert.equal(f.signerCalls(), 0);
+  assert.equal(f.broadcasts.length, 0);
+  assert.deepEqual(await f.readLedger(), {});
+  await f.store.close();
+});
+
+test('finalized-height expiry atomically fences an in-flight unsigned signer and releases only its unsent reservation', async () => {
+  const f = await fixture({ globalDailyLamports: 20_000n }), prepared = await f.operations.prepare(f.input);
+  const started = Promise.withResolvers<void>(), release = Promise.withResolvers<void>(), originalSign = f.sponsor.sign;
+  f.sponsor.sign = async bytes => { started.resolve(); await release.promise; return originalSign(bytes); };
+  const submission = f.operations.submit({ identity: f.identity, id: prepared.id, signedTransactionBase64: await f.sign(prepared.transactionBase64) });
+  await started.promise;
+  assert.equal((await f.readLedger())[prepared.id].state, 'reserved');
+  f.setHeight(100n);
+  assert.equal((await f.operations.reconcile({ id: prepared.id })).state, 'expired');
+  assert.deepEqual(await f.readLedger(), {});
+  release.resolve();
+  await assert.rejects(submission, /Sponsorship reservation changed/);
+  assert.equal(f.broadcasts.length, 0);
+  assert.equal((await f.operations.get(prepared.id)).signature, undefined);
+  await f.store.close();
+});
+
+test('submission expiry is durably terminal before returning a fresh-review error', async t => {
+  for (const bound of ['clock', 'finalized height']) await t.test(bound, async () => {
+    const f = await fixture(), prepared = await f.operations.prepare(f.input), signedTransactionBase64 = await f.sign(prepared.transactionBase64);
+    if (bound === 'clock') f.setClock(121_001);
+    else { f.setLastValidHeight(200n); f.setHeight(100n); }
+    await assert.rejects(f.operations.submit({ identity: f.identity, id: prepared.id, signedTransactionBase64 }), /review expired/);
+    assert.equal((await f.operations.get(prepared.id)).state, 'expired');
+    assert.equal((await f.operations.get(prepared.id)).signature, undefined);
+    assert.equal(f.signerCalls(), 0);
+    assert.equal(f.broadcasts.length, 0);
+    await f.store.close();
+  });
+});
+
+test('sponsor-only execution terminalizes its expired original envelope without preparing a replacement', async () => {
+  const f = await fixture();
+  const input = { kind: 'ai-settle', requestId: 'sponsor-expired', sponsorshipSubject: f.identity.subject,
+    instructions: [{ programAddress: MEMO_PROGRAM_ADDRESS, accounts: [], data: new TextEncoder().encode('bounded answer') }],
+    review: { amount: '3700' } };
+  const prepared = await f.operations.prepareAsSponsor(input);
+  f.setLastValidHeight(200n); f.setHeight(100n);
+  await assert.rejects(f.operations.executeAsSponsor(input), /Server operation lifetime expired/);
+  assert.equal((await f.operations.get(prepared.id)).state, 'expired');
+  assert.equal((await f.operations.get(prepared.id)).transactionBase64, prepared.transactionBase64);
+  assert.equal((await f.store.scan('solana-operation:')).length, 1);
+  assert.equal(f.signerCalls(), 0);
+  assert.equal(f.broadcasts.length, 0);
   await f.store.close();
 });
 
@@ -390,5 +452,95 @@ test('an ambiguous signed-write acknowledgement retains budget and recovers the 
   assert.equal(recovered.state, 'broadcast'); assert.equal(f.signerCalls(), 1); assert.ok(f.broadcasts.length > 0);
   const other = await f.operations.prepare({ ...f.input, requestId: 'cannot-bypass-ambiguous-write' });
   await assert.rejects(f.operations.submit({ identity: f.identity, id: other.id, signedTransactionBase64: await f.sign(other.transactionBase64) }), /site's daily network-fee budget/);
+  await f.store.close();
+});
+
+test('orphan unsigned reservations resume after a crash without losing their ceiling, subject or window attribution', async t => {
+  for (const lease of [false, true]) await t.test(lease ? 'expired durable lease' : 'legacy reservation without a lease', async () => {
+    const f = await fixture({ globalDailyLamports: 40_000n, subjectRollingLamports: 40_000n, subjectRollingTransactions: 1 });
+    const prepared = await f.operations.prepare(f.input), signedTransactionBase64 = await f.sign(prepared.transactionBase64);
+    const paused = createSolanaOperations({ store: f.store, gateway: f.gateway, sponsor: f.sponsor,
+      config: { ...f.config, sponsorshipLimits: { globalDailyLamports: 0n } }, now: () => 1000 });
+    await assert.rejects(paused.submit({ identity: f.identity, id: prepared.id, signedTransactionBase64 }), /site's daily network-fee budget/);
+    const ledger = (await f.store.scan<LedgerView>('solana-sponsorship:'))[0];
+    await f.store.update<LedgerView>(ledger.key, current => ({ reservations: { ...current.reservations,
+      [prepared.id]: { amountLamports: '40000', subject: f.identity.subject, state: 'reserved', reservedAt: 1000, ownerToken: 'terminated-worker' } } }));
+    if (lease) {
+      await f.store.update<{ signingLease?: { ownerToken: string; expiresAt: number } }>(`solana-operation:${prepared.id}`, current =>
+        ({ ...current, signingLease: { ownerToken: 'terminated-worker', expiresAt: 31_000 } }));
+      await assert.rejects(f.createAgain().submit({ identity: f.identity, id: prepared.id, signedTransactionBase64 }), /Another request is sponsoring/);
+      assert.equal(f.signerCalls(), 0);
+      assert.equal((await f.readLedger())[prepared.id].ownerToken, 'terminated-worker');
+    }
+    f.setClock(31_001);
+    const recovered = await f.createAgain().submit({ identity: f.identity, id: prepared.id, signedTransactionBase64 });
+    assert.equal(recovered.state, 'broadcast');
+    assert.equal((await f.operations.get(prepared.id)).transactionBase64, prepared.transactionBase64);
+    assert.equal(f.signerCalls(), 1);
+    assert.equal((await f.readLedger())[prepared.id].amountLamports, '40000');
+    assert.equal((await f.readLedger())[prepared.id].subject, f.identity.subject);
+    assert.equal((await f.readLedger())[prepared.id].reservedAt, 1000);
+    await f.complete(prepared.id);
+    assert.equal((await f.readLedger())[prepared.id].state, 'charged');
+    assert.equal(Object.keys(await f.readLedger()).length, 1);
+    const next = await f.operations.prepare({ ...f.input, requestId: 'after-orphan-recovery' });
+    await assert.rejects(f.operations.submit({ identity: f.identity, id: next.id, signedTransactionBase64: await f.sign(next.transactionBase64) }), /used today's free network fees/);
+    assert.equal(f.signerCalls(), 1);
+    await f.store.close();
+  });
+});
+
+test('lease takeover fences a stale signer at the atomic signed-write even after its budget resize succeeded', async () => {
+  const f = await fixture({ globalDailyLamports: 20_000n }), prepared = await f.operations.prepare(f.input);
+  const signedTransactionBase64 = await f.sign(prepared.transactionBase64), originalUpdate = f.store.update.bind(f.store);
+  const started = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+  let writes = 0;
+  f.store.update = async (key, change) => {
+    if (key === `solana-operation:${prepared.id}` && ++writes === 2) {
+      started.resolve();
+      await release.promise;
+    }
+    return originalUpdate(key, change);
+  };
+  const stale = f.operations.submit({ identity: f.identity, id: prepared.id, signedTransactionBase64 });
+  await started.promise;
+  const oldReservation = (await f.readLedger())[prepared.id];
+  assert.equal(oldReservation.state, 'reserved');
+  assert.equal(f.signerCalls(), 1);
+  assert.equal(f.broadcasts.length, 0);
+  f.setClock(31_001);
+  f.setObservation({ status: 'pending', reason: 'awaiting-finality' });
+  const recovered = await f.createAgain().submit({ identity: f.identity, id: prepared.id, signedTransactionBase64 });
+  assert.equal(recovered.state, 'broadcast');
+  const signed = await f.store.get<{ signedTransactionBase64: string; signature: string }>(`solana-operation:${prepared.id}`);
+  assert.notEqual((await f.readLedger())[prepared.id].ownerToken, oldReservation.ownerToken);
+  assert.equal(Object.keys(await f.readLedger()).length, 1);
+  assert.equal(f.broadcasts.length, 1);
+  release.resolve();
+  await assert.rejects(stale, /Sponsorship signing lease changed/);
+  assert.equal(f.broadcasts.length, 1, 'the fenced signer must never reach broadcast');
+  assert.equal((await f.operations.get(prepared.id)).signature, signed!.signature);
+  assert.equal(Buffer.from(f.broadcasts[0]).toString('base64'), signed!.signedTransactionBase64);
+  assert.equal((await f.readLedger())[prepared.id].state, 'reserved');
+  await f.complete(prepared.id);
+  assert.equal((await f.readLedger())[prepared.id].state, 'charged');
+  assert.equal(Object.keys(await f.readLedger()).length, 1);
+  f.store.update = originalUpdate;
+  await f.store.close();
+});
+
+test('signed ambiguity keeps immutable bytes and its reservation after the unsigned signing lease would expire', async () => {
+  const f = await fixture({ globalDailyLamports: 20_000n }), prepared = await f.operations.prepare(f.input);
+  f.setBroadcastError(true);
+  const submitted = await f.operations.submit({ identity: f.identity, id: prepared.id, signedTransactionBase64: await f.sign(prepared.transactionBase64) });
+  const signed = await f.store.get<{ signedTransactionBase64: string; signingLease?: unknown }>(`solana-operation:${prepared.id}`);
+  assert.equal(signed!.signingLease, undefined);
+  f.setClock(31_001);
+  await f.createAgain().submit({ identity: f.identity, id: prepared.id, signedTransactionBase64: await f.sign(prepared.transactionBase64) });
+  assert.equal(f.signerCalls(), 1);
+  assert.equal((await f.operations.get(prepared.id)).signature, submitted.signature);
+  assert.equal((await f.readLedger())[prepared.id].state, 'reserved');
+  assert.equal(Object.keys(await f.readLedger()).length, 1);
+  assert.ok(f.broadcasts.every(bytes => Buffer.from(bytes).toString('base64') === signed!.signedTransactionBase64));
   await f.store.close();
 });

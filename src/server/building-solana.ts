@@ -10,6 +10,7 @@ import { walletFor } from './agreements.ts';
 import { createBaseSolanaGateway } from './solana-rpc.ts';
 import { configuredSolanaOperations, type PreparedSolanaOperation } from './solana-operations.ts';
 import { loadSolanaHouseManifest, type SolanaHouseManifest } from './solana-house-config.ts';
+import { SolanaServiceError } from './solana-service.ts';
 import type { Store } from './store.ts';
 import type { LocalInvestmentView } from './local-investments.ts';
 
@@ -20,7 +21,7 @@ export type SolanaHouseSnapshot = { house: HouseAccount; position: PositionAccou
 export type HouseActionQuote = { operation: SolanaHouseAction; units: bigint; cash: bigint; claim: bigint };
 export type SolanaHouseReview = { operation: SolanaHouseAction; houseId: SolanaHouseId; distributor: string; account: string; network: string; amount: string; asset: string; unitsRaw: string; cashRaw: string; claimRaw: string; description: string; cashAccount: string; unitAccount: string; deskVault: string; rewardVault: string; stakeVault: string };
 export type SolanaHousePlan = PreparedSolanaOperation & { review: SolanaHouseReview };
-type HouseJournal = { active: string | null; entries: { id: string; houseId: SolanaHouseId; operation: SolanaHouseAction; quantityRaw: string | null; review: SolanaHouseReview }[] };
+type HouseJournal = { active: string | null; entries: { id: string; houseId: SolanaHouseId; operation: SolanaHouseAction; quantityRaw: string | null; review: SolanaHouseReview; request?: { id: string; quantity?: string; cashAtomic?: string } }[] };
 const maxU64 = (1n << 64n) - 1n;
 const clockAddress = 'SysvarC1ock11111111111111111111111111111111';
 const sources = [
@@ -179,17 +180,30 @@ export function assertSolanaHouseOperation(operation: Pick<PreparedSolanaOperati
 export async function prepareSolanaHouseAction(store: Store, identity: VerifiedIdentity, input: { houseId?: unknown; operation?: unknown; quantity?: unknown; cashAtomic?: unknown; requestId?: unknown }, environment: Record<string, string | undefined> = process.env): Promise<{ plan: SolanaHousePlan }> {
   const context = await actionContext(store, environment), id = solanaHouseId(input.houseId), wallet = walletFor(identity, 'solana'), lane = await journal(store, identity);
   if (typeof input.requestId !== 'string') throw new Error('A durable request ID is required.');
+  const request = { id: input.requestId, ...(typeof input.quantity === 'string' ? { quantity: input.quantity } : {}), ...(typeof input.cashAtomic === 'string' ? { cashAtomic: input.cashAtomic } : {}) };
+  const existing = lane.entries.find(entry => entry.request?.id === input.requestId);
+  if (existing) {
+    if (existing.houseId !== id || existing.operation !== input.operation || existing.request?.quantity !== input.quantity || existing.request?.cashAtomic !== input.cashAtomic)
+      throw new SolanaServiceError(409, 'house_request_conflict', 'This request ID already reviews a different house action.');
+    const prepared = await context.operations.get(existing.id, identity);
+    assertSolanaHouseOperation(prepared, existing);
+    const previous = await context.operations.reconcile({ identity, id: existing.id });
+    if (previous.state !== 'prepared' || lane.active !== existing.id)
+      throw new SolanaServiceError(409, 'house_review_finished', 'This house request already finished or expired; recover its receipt or prepare a fresh request ID.');
+    // Streaming accrual must not replace the minimum or bytes that were already reviewed.
+    return { plan: { ...prepared, review: existing.review } };
+  }
   if (lane.active) {
     assertSolanaHouseOperation(await context.operations.get(lane.active, identity), lane.entries.find(entry => entry.id === lane.active));
     const previous = await context.operations.reconcile({ identity, id: lane.active });
-    if (previous.state === 'broadcast' || previous.state === 'prepared') throw new Error('Finish or cancel the current house review before another action.');
+    if (previous.state === 'broadcast' || previous.state === 'prepared') throw new SolanaServiceError(409, 'house_review_pending', 'Finish or cancel the current house review before another action.');
   }
   const snapshot = await readSolanaHouseSnapshot(context.manifest, id, context.gateway, wallet.address), quote = houseActionQuote(input.operation, input, snapshot);
   const built = await buildSolanaHouseAction(context.manifest, id, wallet.address, context.sponsor.address, quote, snapshot);
   const prepared = await context.operations.prepare({ identity, kind: `house:${id}:${quote.operation}`, requestId: input.requestId, actor: address(wallet.address), walletId: wallet.id, instructions: built.instructions, review: built.review, expectedDeltas: built.expectedDeltas });
   await store.update<HouseJournal>(journalKey(identity), current => {
     if (current.active !== lane.active && current.active !== prepared.id) throw new Error('Another house action was prepared.');
-    return { active: prepared.id, entries: current.entries.some(entry => entry.id === prepared.id) ? current.entries : [...current.entries, { id: prepared.id, houseId: id, operation: quote.operation, quantityRaw: quote.operation === 'claim' ? null : quote.units.toString(), review: built.review }] };
+    return { active: prepared.id, entries: current.entries.some(entry => entry.id === prepared.id) ? current.entries : [...current.entries, { id: prepared.id, houseId: id, operation: quote.operation, quantityRaw: quote.operation === 'claim' ? null : quote.units.toString(), review: built.review, request }] };
   });
   return { plan: { ...prepared, review: built.review } };
 }

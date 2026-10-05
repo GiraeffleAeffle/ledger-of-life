@@ -12,7 +12,7 @@ import { createSolanaOperations } from './solana-operations.ts';
 import { LocalStore } from './store.ts';
 import type { SolanaHouseManifest } from './solana-house-config.ts';
 import type { LocalAiApproval, LocalAiRequest, SolanaInferenceReview } from './local-ai-types.ts';
-import type { SolanaOperationsGateway } from './solana-operations.ts';
+import type { SolanaOperationsGateway, SponsorshipLimits } from './solana-operations.ts';
 import { SolanaServiceError } from './solana-service.ts';
 import { paidOwner, readAiRequest } from './local-ai.ts';
 type SavedSolanaAi = { id: string; mode?: 'paid'; owner: { subject: string; walletId: string; payer: string; network: 'solana-devnet' }; request: LocalAiRequest; solanaJournal: SolanaAiJournal };
@@ -35,7 +35,7 @@ async function fixture() {
     approval: { id: 'approved', state: 'completed', budgetAtomic: '12800', request: null, hash: 'approval-signature', error: null }, solanaReview: review };
   return { payer, sponsor, review, manifest, request };
 }
-async function settlementFixture(t: TestContext) {
+async function settlementFixture(t: TestContext, sponsorshipLimits: Partial<SponsorshipLimits> = {}) {
   const f = await fixture(), store = new LocalStore(':memory:');
   t.after(() => store.close());
   const state = { now: Date.now(), signatures: 0, simulations: 0, finalized: false, failed: false, broadcasts: [] as Uint8Array[] };
@@ -51,7 +51,7 @@ async function settlementFixture(t: TestContext) {
       state.failed ? { status: 'failed', reason: 'transaction-error' } : { status: 'unknown', reason: 'signature-not-observed-do-not-resubmit-new-intent' },
   };
   const operations = createSolanaOperations({ store, sponsor, gateway, now: () => state.now,
-    config: { cluster: 'devnet', genesisHash: f.manifest.genesisHash, maximumSponsorLamports: 10_000_000n } });
+    config: { cluster: 'devnet', genesisHash: f.manifest.genesisHash, maximumSponsorLamports: 10_000_000n, sponsorshipLimits } });
   const key = `local-ai:request:${requestId}`;
   await store.create<SavedSolanaAi>(key, { id: requestId,
     owner: { subject: 'did:privy:payer', walletId: 'payer', payer: f.payer.address, network: 'solana-devnet' },
@@ -215,26 +215,63 @@ test('prepare simulation failures map exact reviewed messages and never disclose
   });
 });
 
-test('a submission failure keeps the durable operation link and an expired unsigned review resolves without signing', async t => {
+test('a transient presign simulation failure resumes the linked exact unsigned settlement without a new approval', async t => {
   const f = await settlementFixture(t), simulate = f.gateway.simulate;
+  let failSubmission = true;
   t.mock.method(console, 'warn', () => {});
   f.gateway.simulate = async (...args) => {
-    if (f.state.simulations === 1) throw new Error('Simulation bank changed; request a fresh review');
+    if (f.state.simulations === 1 && failSubmission) {
+      failSubmission = false;
+      throw new Error('Simulation bank changed; request a fresh review');
+    }
     return simulate(...args);
   };
   await settleSolanaAi(f.store, f.key, f.dependencies);
   const pending = await f.saved(), operationId = pending.solanaJournal.settlementId!;
   assert.ok(operationId);
   assert.deepEqual(pending.request.recovery, { stage: 'settlement_submit', code: 'simulation_bank_changed', retryable: true });
-  assert.equal((await f.operations.get(operationId)).state, 'prepared');
+  const prepared = await f.operations.get(operationId);
+  assert.equal(prepared.state, 'prepared');
   assert.equal(f.state.signatures, 0);
+  f.state.finalized = true;
   await settleSolanaAi(f.store, f.key, f.dependencies);
-  const checked = await f.saved();
-  assert.equal(checked.request.recovery, undefined, 'a canonical prepared observation resumes normal polling');
-  assert.equal(checked.request.payment.state, 'pending');
-  assert.equal(checked.request.payment.receipt, null);
-  assert.equal(checked.request.state, 'settling');
+  const completed = await f.saved();
+  assert.equal(completed.request.state, 'completed');
+  assert.equal(completed.request.payment.state, 'settled');
+  assert.equal(completed.request.payment.receipt!.amount, '3700');
+  assert.equal(completed.request.recovery, undefined);
+  assert.equal(completed.solanaJournal.settlementId, operationId);
+  assert.deepEqual(completed.request.approval, pending.request.approval);
+  assert.equal((await f.operations.get(operationId)).transactionBase64, prepared.transactionBase64);
+  assert.equal((await f.store.scan('solana-operation:')).length, 1);
+  assert.equal(f.state.signatures, 1);
+  assert.equal(f.state.broadcasts.length, 1);
+});
+
+test('a crash after linking preparation and a later context outage resume the same durable unsigned operation', async t => {
+  const f = await settlementFixture(t), prepared = await f.operations.prepareAsSponsor(f.intent);
+  await f.store.update<SavedSolanaAi>(f.key, row => { row.solanaJournal.settlementId = prepared.id; return row; });
+  t.mock.method(console, 'warn', () => {});
+  await settleSolanaAi(f.store, f.key, { ...f.dependencies, context: async () => { throw new Error('RPC unavailable'); } });
+  assert.deepEqual((await f.saved()).request.recovery, { stage: 'settlement_context', code: 'rpc_unavailable', retryable: true });
   assert.equal(f.state.signatures, 0);
+  const restarted = createSolanaOperations({ store: f.store, gateway: f.gateway, sponsor: f.sponsor, now: () => f.state.now,
+    config: { cluster: 'devnet', genesisHash: f.manifest.genesisHash, maximumSponsorLamports: 10_000_000n } });
+  f.state.finalized = true;
+  await settleSolanaAi(f.store, f.key, { ...f.dependencies, context: async () => ({ operations: restarted, manifest: f.manifest, sponsor: f.sponsor }) });
+  const completed = await f.saved();
+  assert.equal(completed.request.state, 'completed');
+  assert.equal(completed.request.payment.receipt!.amount, '3700');
+  assert.equal(completed.solanaJournal.settlementId, prepared.id);
+  assert.equal((await restarted.get(prepared.id)).transactionBase64, prepared.transactionBase64);
+  assert.equal(f.state.signatures, 1);
+  assert.equal(f.state.broadcasts.length, 1);
+  assert.equal((await f.store.scan('solana-operation:')).length, 1);
+});
+
+test('an expired linked unsigned settlement is terminal and never replaced or charged', async t => {
+  const f = await settlementFixture(t), prepared = await f.operations.prepareAsSponsor(f.intent);
+  await f.store.update<SavedSolanaAi>(f.key, row => { row.solanaJournal.settlementId = prepared.id; return row; });
   f.state.now += 121_000;
   await settleSolanaAi(f.store, f.key, f.dependencies);
   const failed = await f.saved();
@@ -242,11 +279,120 @@ test('a submission failure keeps the durable operation link and an expired unsig
   assert.equal(failed.request.payment.state, 'failed');
   assert.equal(failed.request.payment.receipt, null);
   assert.deepEqual(failed.request.recovery, { stage: 'settlement_reconcile', code: 'settlement_expired', retryable: false });
-  assert.equal(failed.solanaJournal.settlementId, operationId);
-  assert.equal((await f.operations.get(operationId)).state, 'expired');
+  assert.equal(failed.solanaJournal.settlementId, prepared.id);
+  assert.equal((await f.operations.get(prepared.id)).state, 'expired');
   assert.equal((await f.store.scan('solana-operation:')).length, 1);
+  assert.equal((await f.store.scan('solana-sponsorship:')).length, 0);
   assert.equal(f.state.signatures, 0);
   assert.equal(f.state.broadcasts.length, 0);
+});
+
+test('linked unsigned resume rechecks recipient ownership and never substitutes a new payout wallet', async t => {
+  const f = await settlementFixture(t), host = await generateKeyPairSigner(), replacement = await generateKeyPairSigner();
+  await f.store.update<SavedSolanaAi>(f.key, row => {
+    row.request.solanaReview = { ...f.review, route: 'wallet', payTo: host.address };
+    return row;
+  });
+  let recipient: { id: string; address: string } | null = null, lookups = 0;
+  const dependencies = { ...f.dependencies, wallet: async () => { lookups++; return recipient; } };
+  t.mock.method(console, 'warn', () => {});
+  await settleSolanaAi(f.store, f.key, dependencies);
+  const operationId = (await f.saved()).solanaJournal.settlementId!, prepared = await f.operations.get(operationId);
+  assert.equal(prepared.state, 'prepared');
+  assert.equal(f.state.signatures, 0);
+  recipient = { id: 'replacement', address: replacement.address };
+  await settleSolanaAi(f.store, f.key, dependencies);
+  assert.equal((await f.saved()).request.recovery!.stage, 'settlement_recipient');
+  assert.equal(f.state.signatures, 0);
+  assert.equal((await f.operations.get(operationId)).transactionBase64, prepared.transactionBase64);
+  recipient = { id: 'host', address: host.address };
+  f.state.finalized = true;
+  await settleSolanaAi(f.store, f.key, dependencies);
+  assert.equal((await f.saved()).request.payment.state, 'settled');
+  assert.equal((await f.saved()).solanaJournal.settlementId, operationId);
+  assert.equal(lookups, 3);
+  assert.equal(f.state.signatures, 1);
+  assert.equal((await f.store.scan('solana-operation:')).length, 1);
+});
+
+test('linked unsigned resume requires the still-durable approval, payer ownership and measured intent', async t => {
+  const changes: { name: string; change: (row: SavedSolanaAi) => void }[] = [
+    { name: 'approval', change: row => { row.request.approval!.state = 'pending'; } },
+    { name: 'approval cap', change: row => { row.request.approval!.budgetAtomic = '12900'; } },
+    { name: 'owner', change: row => { row.owner.walletId = 'another-wallet'; } },
+    { name: 'usage', change: row => { row.request.usage!.outputTokens = 38; } },
+    { name: 'recipient intent', change: row => { row.request.solanaReview!.hostOwnerSubject = 'another-owner'; } },
+  ];
+  for (const scenario of changes) await t.test(scenario.name, async t => {
+    const f = await settlementFixture(t), prepared = await f.operations.prepareAsSponsor(f.intent);
+    await f.store.update<SavedSolanaAi>(f.key, row => { row.solanaJournal.settlementId = prepared.id; return row; });
+    t.mock.method(console, 'warn', () => {});
+    await settleSolanaAi(f.store, f.key, { ...f.dependencies, context: async () => {
+      await f.store.update<SavedSolanaAi>(f.key, row => { scenario.change(row); return row; });
+      return { operations: f.operations, manifest: f.manifest, sponsor: f.sponsor };
+    } });
+    const saved = await f.saved();
+    assert.deepEqual(saved.request.recovery, { stage: 'settlement_prepare', code: 'invalid_operation', retryable: false });
+    assert.equal(saved.request.payment.receipt, null);
+    assert.equal(saved.solanaJournal.settlementId, prepared.id);
+    assert.equal((await f.operations.get(prepared.id)).transactionBase64, prepared.transactionBase64);
+    assert.equal(f.state.signatures, 0);
+    assert.equal(f.state.broadcasts.length, 0);
+    assert.equal((await f.store.scan('solana-operation:')).length, 1);
+  });
+});
+
+test('a sponsorship pause keeps the linked intent and recovery charges the same subject exactly once', async t => {
+  const f = await settlementFixture(t, { subjectRollingLamports: 0n });
+  t.mock.method(console, 'warn', () => {});
+  await settleSolanaAi(f.store, f.key, f.dependencies);
+  const pending = await f.saved(), operationId = pending.solanaJournal.settlementId!, prepared = await f.operations.get(operationId);
+  assert.deepEqual(pending.request.recovery, { stage: 'settlement_submit', code: 'sponsor_subject_budget', retryable: true });
+  assert.equal(f.state.signatures, 0);
+  assert.equal(prepared.state, 'prepared');
+  const resumed = createSolanaOperations({ store: f.store, gateway: f.gateway, sponsor: f.sponsor, now: () => f.state.now,
+    config: { cluster: 'devnet', genesisHash: f.manifest.genesisHash, maximumSponsorLamports: 10_000_000n,
+      sponsorshipLimits: { subjectRollingLamports: 5000n, subjectRollingTransactions: 1, globalDailyLamports: 5000n } } });
+  f.state.finalized = true;
+  const dependencies = { ...f.dependencies, context: async () => ({ operations: resumed, manifest: f.manifest, sponsor: f.sponsor }) };
+  await settleSolanaAi(f.store, f.key, dependencies);
+  await settleSolanaAi(f.store, f.key, dependencies);
+  const completed = await f.saved(), ledger = await f.store.scan<{ reservations: Record<string, { state: string; subject: string; amountLamports: string }> }>('solana-sponsorship:');
+  assert.equal(completed.request.payment.state, 'settled');
+  assert.equal(completed.request.payment.receipt!.amount, '3700');
+  assert.equal(completed.solanaJournal.settlementId, operationId);
+  assert.equal((await resumed.get(operationId)).transactionBase64, prepared.transactionBase64);
+  assert.deepEqual(Object.keys(ledger[0].value.reservations), [operationId]);
+  assert.equal(ledger[0].value.reservations[operationId].state, 'charged');
+  assert.equal(ledger[0].value.reservations[operationId].subject, 'did:privy:payer');
+  assert.equal(ledger[0].value.reservations[operationId].amountLamports, '5000');
+  assert.equal(f.state.signatures, 1);
+  assert.equal(f.state.broadcasts.length, 1);
+});
+
+test('concurrent linked prepared recovery signs once and holds one shared sponsorship reservation', async t => {
+  const f = await settlementFixture(t, { subjectRollingLamports: 5000n, subjectRollingTransactions: 1, globalDailyLamports: 5000n });
+  const prepared = await f.operations.prepareAsSponsor(f.intent);
+  await f.store.update<SavedSolanaAi>(f.key, row => { row.solanaJournal.settlementId = prepared.id; return row; });
+  const started = Promise.withResolvers<void>(), release = Promise.withResolvers<void>(), sign = f.sponsor.sign;
+  f.sponsor.sign = async bytes => { started.resolve(); await release.promise; return sign(bytes); };
+  t.mock.method(console, 'warn', () => {});
+  const first = settleSolanaAi(f.store, f.key, f.dependencies);
+  await started.promise;
+  await settleSolanaAi(f.store, f.key, f.dependencies);
+  const pending = await f.saved();
+  assert.deepEqual(pending.request.recovery, { stage: 'settlement_submit', code: 'operation_pending', retryable: true });
+  const ledger = await f.store.scan<{ reservations: Record<string, { state: string }> }>('solana-sponsorship:');
+  assert.deepEqual(Object.keys(ledger[0].value.reservations), [prepared.id]);
+  assert.equal(ledger[0].value.reservations[prepared.id].state, 'reserved');
+  f.state.finalized = true;
+  release.resolve();
+  await first;
+  assert.equal((await f.saved()).request.payment.state, 'settled');
+  assert.equal((await f.saved()).request.recovery, undefined);
+  assert.equal(f.state.signatures, 1);
+  assert.equal(f.state.broadcasts.length, 1);
+  assert.equal((await f.store.scan('solana-operation:')).length, 1);
 });
 
 test('legacy orphaned expired sponsor preparation is linked and resolved instead of executing the expired intent forever', async t => {
