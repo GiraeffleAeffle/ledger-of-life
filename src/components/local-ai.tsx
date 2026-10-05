@@ -15,6 +15,7 @@ import { coveredNames } from './city-coverage';
 import { useSectionTabActive } from './section-tabs';
 import './local-ai.css';
 import { LocalAiProgress } from './local-ai-progress';
+import { aiApprovalPollId, aiRequestPollId, aiSelectedHostStatus, aiTerminalError, isAiRequestTerminal } from './local-ai-progress-state';
 import { MoreList, MoreRow, ScreenNote } from './blocks';
 import { prepareSolanaInferenceApproval } from '../wallets/solana-inference-signing';
 
@@ -29,7 +30,6 @@ const samples = [
   { label: 'A useful library', text: 'Suggest three concise, practical uses for a free local AI service in a public library. Mention how a visitor can check an answer.' },
 ];
 type Draft = { id: string; mode: LocalAiMode; prompt: string; maxOutputTokens: number; context: 'general'; hostScope: 'own' | 'city'; publicQuestion: boolean };
-const finished = (request: LocalAiRequest) => ['completed', 'failed', 'expired', 'interrupted'].includes(request.state);
 
 export function LocalAiWorkspace({ initialMode = 'paid', publicAccess = false, cityId = null }: { initialMode?: LocalAiMode; publicAccess?: boolean; cityId?: string | null }) {
   const wallet = useRentalWallet();
@@ -49,6 +49,7 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
   const [publicQuestion, setPublicQuestion] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [current, setCurrent] = useState<LocalAiRequest | null>(null);
+  const [savedRequestId, setSavedRequestId] = useState<string | null>(null);
   const [approval, setApproval] = useState<LocalAiApproval | null>(null);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -86,7 +87,7 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const requestId = /^\/api\/local-ai\/requests\/([^/]+)$/.exec(path)?.[1];
-    return readLocalAiResponse<T>(response, requestId);
+    return readLocalAiResponse<T>(response, requestId, body ? 'POST' : 'GET');
   }, [mode, authenticated, getAccessToken]);
 
   const refresh = useCallback(async () => {
@@ -102,9 +103,9 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
   }, [api, publicAccess]);
 
   const accept = useCallback((next: LocalAiRequest) => {
-    setCurrent(next); setApproval(next.approval); setPrompt(next.purgedAt ? '' : next.prompt); if (next.purgedAt) setDraft(null); setOutputLimit(next.maxOutputTokens);
+    setSavedRequestId(null); setError(''); setCurrent(next); setApproval(next.approval); setPrompt(next.purgedAt ? '' : next.prompt); if (next.purgedAt) setDraft(null); setOutputLimit(next.maxOutputTokens);
     setHostScope(next.hostScope ?? 'own'); setPublicQuestion(next.publicQuestion ?? false);
-    if (finished(next)) {
+    if (isAiRequestTerminal(next)) {
       setPaymentSubmitted(false); paymentHeaders.current = null;
       if (next.mode === 'paid' && next.state === 'completed' && next.payment.state === 'settled' && next.payment.receipt?.success) {
         try { if (subject) sessionStorage.setItem(`${LOCAL_AI_RECEIPT_KEY}:${subject}`, next.id); } catch { /* The saved server receipt remains available in this view. */ }
@@ -136,27 +137,34 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
   useEffect(() => {
     let active = true;
     const requests = requestRevision;
-    try {
-      const id = sessionStorage.getItem(storageKey);
-      if (id && /^[0-9a-f-]{36}$/i.test(id)) void readSaved(id).catch((cause: unknown) => {
+    queueMicrotask(() => {
+      if (!active || !mounted.current) return;
+      let id: string | null = null;
+      try {
+        const stored = sessionStorage.getItem(storageKey);
+        if (stored && /^[0-9a-f-]{36}$/i.test(stored)) id = stored;
+      } catch { /* Session storage is optional; requests themselves are persisted on the server. */ }
+      setSavedRequestId(id);
+      if (id) void readSaved(id).catch((cause: unknown) => {
         if (active && mounted.current) setError(`Saved request unavailable: ${errorMessage(cause)}`);
       });
-    } catch { /* Session storage is optional; requests themselves are persisted on the server. */ }
+    });
     return () => { active = false; ++requests.current; };
   }, [storageKey, readSaved]);
   useEffect(() => {
     if (publicAccess) return;
     const consume = () => {
       const selected = sessionStorage.getItem(LOCAL_AI_NAVIGATION_INTENT);
-      if ((selected !== 'paid' && selected !== 'library') || action.current) return;
+      if ((selected !== 'paid' && selected !== 'library') || action.current || savedRequestId || current?.state === 'running' || current?.state === 'settling') return;
       sessionStorage.removeItem(LOCAL_AI_NAVIGATION_INTENT);
-      queueMicrotask(() => { ++requestRevision.current; setMode(selected); setCurrent(null); setDraft(null); setApproval(null); setError(''); setHostScope(selected === 'library' ? 'city' : 'own'); setPublicQuestion(false); setPaymentSubmitted(false); paymentHeaders.current = null; });
+      queueMicrotask(() => { ++requestRevision.current; setMode(selected); setCurrent(null); setSavedRequestId(null); setDraft(null); setApproval(null); setError(''); setHostScope(selected === 'library' ? 'city' : 'own'); setPublicQuestion(false); setPaymentSubmitted(false); paymentHeaders.current = null; });
     };
     consume(); window.addEventListener(LOCAL_AI_NAVIGATION_INTENT, consume);
     return () => window.removeEventListener(LOCAL_AI_NAVIGATION_INTENT, consume);
-  }, [publicAccess]);
+  }, [publicAccess, current, savedRequestId]);
 
-  const unresolvedId = current && (current.state === 'running' || current.state === 'settling') ? current.id : null;
+  const unresolvedId = aiRequestPollId(current);
+  const hasUnresolvedRequest = current?.state === 'running' || current?.state === 'settling';
   useEffect(() => {
     if (!unresolvedId) return;
     let checking = false; let active = true;
@@ -171,7 +179,7 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
     return () => { active = false; window.clearInterval(timer); };
   }, [unresolvedId, readSaved, refresh, activeTab]);
 
-  const approvalPending = approval?.state === 'pending' ? current?.id : null;
+  const approvalPending = aiApprovalPollId(current, approval);
   useEffect(() => {
     if (!approvalPending) return;
     let checking = false; let active = true;
@@ -200,11 +208,12 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
     catch { setError('This browser cannot save the request link. Keep this page open until the result arrives.'); }
   }
   function resetQuestion(nextMode = mode) {
-    ++requestRevision.current; setMode(nextMode); setCurrent(null); setDraft(null); setApproval(null); setError(''); setPaymentSubmitted(false); paymentHeaders.current = null;
+    ++requestRevision.current; setMode(nextMode); setCurrent(null); setSavedRequestId(null); setDraft(null); setApproval(null); setError(''); setPaymentSubmitted(false); paymentHeaders.current = null;
     setHostScope(nextMode === 'library' ? 'city' : 'own'); setPublicQuestion(false);
     if (nextMode === mode) try { sessionStorage.removeItem(storageKey); } catch { /* No persistent request link was available. */ }
   }
   function submitQuestion() {
+    if (savedRequestId || current) return;
     if (service?.mode !== 'direct' && hostScope === 'city' && !publicQuestion) { setError('Confirm that your question is public before using a city host.'); return; }
     void run(mode === 'paid' && !ownComputeAvailable ? 'Preparing your payment review' : 'Asking the local model', async () => {
       if (mode === 'library') {
@@ -232,14 +241,14 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
     });
   }
   function prepareApproval() {
-    if (!current) return;
+    if (!current || current.recovery || inferenceNextAction(current) !== 'payment-review') return;
     void run('Preparing a finite access budget', async () => {
       const result = await api<{ approval: LocalAiApproval }>(`/api/local-ai/requests/${current.id}/approval`, { action: 'prepare' }, undefined, true);
       if (mounted.current) setApproval(result.approval);
     });
   }
   function signApproval() {
-    if (!current || (!approval?.request && !approval?.solanaRequest)) return;
+    if (!current || current.recovery || inferenceNextAction(current) !== 'payment-review' || (!approval?.request && !approval?.solanaRequest)) return;
     void run('Waiting for your one-answer allowance signature', async () => {
       let signedTransaction: string;
       if (current.solanaReview) {
@@ -265,7 +274,7 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
     });
   }
   function payAndAsk() {
-    if (!current || current.purgedAt) return;
+    if (!current || current.purgedAt || inferenceNextAction(current) !== 'payment-review') return;
     void run(paymentHeaders.current ? 'Resuming the same authorized request' : 'Waiting for your one-answer authorization', async () => {
       if (!current.solanaReview && !paymentHeaders.current) paymentHeaders.current = await localAiPaymentHeaders(wallet, current);
       if (!mounted.current) return;
@@ -282,7 +291,7 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
     });
   }
   function resumeSaved() {
-    if (!current || current.purgedAt) return;
+    if (!current || current.purgedAt || inferenceNextAction(current) !== 'resume') return;
     void run('Recovering the saved request', async () => {
       const result = await api<{ request: LocalAiRequest }>(`/api/local-ai/requests/${current.id}`, {
         mode: current.mode, prompt: current.prompt, maxOutputTokens: current.maxOutputTokens, context: 'general', hostScope: current.hostScope ?? 'own', publicQuestion: current.publicQuestion ?? false,
@@ -315,10 +324,12 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
     ? 'No GPU host of yours is online or able to wake. To ask a city host, choose “Allow city hosts” and confirm that your question is public.' : '';
   const deskState = deskAvailability(service, mode, hostScope);
   const canStart = Boolean((service?.reachable || ownComputeAvailable) && !statusError && !scopeReason && deskState.canAsk && (!connectorMode || hostScope === 'own' || publicQuestion) && (mode === 'library' ? service?.library.enabled && (service.library.remainingRequests ?? 0) > 0 : wallet.authenticated && (ownComputeAvailable || (service?.paidEnabled && !paidFundingReason))));
-  const receiptHash = current?.payment.state === 'settled' && !ownCompute ? current.payment.receipt?.transaction : null;
+  const receiptHash = current?.payment.state === 'settled' && current.payment.receipt?.success && !ownCompute ? current.payment.receipt.transaction : null;
   const reviewing = current && !ownCompute && !current.purgedAt && inferenceNextAction(current) === 'payment-review';
   const readyToResume = current && !current.purgedAt && inferenceNextAction(current) === 'resume';
-  const locked = Boolean(busy || draft || current);
+  const terminalError = current ? aiTerminalError(current) : null;
+  const selectedHostStatus = current ? aiSelectedHostStatus(current, service?.hosts, Boolean(statusError)) : null;
+  const locked = Boolean(busy || draft || current || savedRequestId);
   function clearLibraryDesk() {
     void run('Ending this visitor session', async () => {
       const response = await fetch('/api/local-ai/library-session', { method: 'DELETE', credentials: 'same-origin', cache: 'no-store' });
@@ -332,7 +343,7 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
     });
   }
   const availability = statusError ? 'offline' : service?.availability ?? (service?.reachable ? 'online' : 'offline');
-  const nodeLabel = statusError ? 'Status unavailable' : availability === 'asleep' ? 'asleep · wakes on request' : service?.reachable
+  const nodeLabel = statusError ? 'Status unavailable' : availability === 'asleep' ? 'AI service asleep · wake not confirmed' : service?.reachable
     ? service.modelResident ? service.vramBytes && service.vramBytes > 0 ? 'GPU model resident' : 'Model resident · CPU' : 'Node ready · model on demand'
     : service ? 'Node unavailable' : 'Checking the node';
 
@@ -342,15 +353,15 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
     <div className="local-ai-ask">
       {/* Default grace is 10 minutes; deployments may configure LOCAL_AI_TEXT_GRACE_SECONDS. */}
       <p className="local-ai-host-warning">The host reads your question; don&apos;t send private information.</p>
-      <div className="local-ai-access" role="group" aria-label="Choose AI access"><button type="button" disabled={Boolean(busy || unresolvedId || paymentSubmitted)} aria-pressed={mode === 'paid'} onClick={() => resetQuestion('paid')}><Wallet size={18} /><span><strong>Paid</strong><small>{ownComputeAvailable ? 'Your host · no charge' : 'Review before paying'}</small></span></button><button type="button" disabled={Boolean(busy || unresolvedId || paymentSubmitted)} aria-pressed={mode === 'library'} onClick={() => resetQuestion('library')}><Library size={18} /><span><strong>Free</strong><small>Shared allowance</small></span></button></div>
+      <div className="local-ai-access" role="group" aria-label="Choose AI access"><button type="button" disabled={Boolean(busy || hasUnresolvedRequest || paymentSubmitted || savedRequestId)} aria-pressed={mode === 'paid'} onClick={() => resetQuestion('paid')}><Wallet size={18} /><span><strong>Paid</strong><small>{ownComputeAvailable ? 'Your host · no charge' : 'Review before paying'}</small></span></button><button type="button" disabled={Boolean(busy || hasUnresolvedRequest || paymentSubmitted || savedRequestId)} aria-pressed={mode === 'library'} onClick={() => resetQuestion('library')}><Library size={18} /><span><strong>Free</strong><small>Shared allowance</small></span></button></div>
       {mode === 'library' && <div className="local-ai-library-note"><Library size={18} /><p>The host covers the compute. {service?.library.remainingRequests != null ? `${service.library.remainingRequests} requests remaining within the shared service limits.` : 'A bounded visitor allowance keeps the shared node available.'}{!publicAccess && <> <a href="/library" target="_blank" rel="noopener noreferrer">Open the public desk <ArrowUpRight size={13} /></a></>}</p></div>}
       <div className="local-ai-question"><label htmlFor={publicAccess ? 'library-question' : 'local-ai-question'}>What would you like to explore?</label><div className="local-ai-samples">{samples.map((sample) => <button type="button" key={sample.label} disabled={locked} onClick={() => setPrompt(sample.text)}>{sample.label}</button>)}</div><textarea id={publicAccess ? 'library-question' : 'local-ai-question'} value={prompt} minLength={3} maxLength={2000} rows={3} disabled={locked} onChange={(event) => setPrompt(event.target.value)} />
         {connectorMode && hostScope === 'city' && !current && <label className="local-ai-consent"><input type="checkbox" checked={publicQuestion} disabled={locked} onChange={(event) => setPublicQuestion(event.target.checked)} /><span>My question is public and contains no private information. I consent to a city host reading it.</span></label>}
-        <div className="local-ai-question-footer">{!current && <button type="button" className="primary-btn" disabled={Boolean(busy || !canStart || prompt.trim().length < 3)} title={!canStart ? deskState.reason || undefined : undefined} onClick={submitQuestion}>{busy ? <Loader2 size={16} className="spin" /> : <Send size={16} />}{draft ? 'Retry the same question' : mode === 'paid' ? ownComputeAvailable ? 'Ask on my host · no charge' : 'Review paid question' : 'Ask for free'}</button>}{current && finished(current) && <button type="button" className="primary-btn" disabled={Boolean(busy)} onClick={() => resetQuestion()}>Ask another question</button>}</div></div>
+        <div className="local-ai-question-footer">{!current && !savedRequestId && <button type="button" className="primary-btn" disabled={Boolean(busy || !canStart || prompt.trim().length < 3)} title={!canStart ? deskState.reason || undefined : undefined} onClick={submitQuestion}>{busy ? <Loader2 size={16} className="spin" /> : <Send size={16} />}{draft ? 'Retry the same question' : mode === 'paid' ? ownComputeAvailable ? 'Ask on my host · no charge' : 'Review paid question' : 'Ask for free'}</button>}{current && isAiRequestTerminal(current) && <button type="button" className="primary-btn" disabled={Boolean(busy)} onClick={() => resetQuestion()}>Ask another question</button>}</div></div>
       {scopeReason && !current && <div className="local-ai-scope-action"><p className="local-ai-meta" role="status">{scopeReason}</p><button type="button" className="text-button" disabled={locked} onClick={() => { setHostScope('city'); setPublicQuestion(false); }}>Ask a city host instead</button></div>}
       {!current && !statusError && deskState.reason && <p className="local-ai-alert" role="status" data-testid="desk-unavailable">{deskState.reason}</p>}
       {!current && !statusError && deskState.notice && <p className="local-ai-meta" role="status" data-testid="desk-asleep">{deskState.notice}</p>}
-      {mode === 'paid' && service && <p role="status">{ownCompute ? 'Own compute · no charge. Your account gives you access; no payment authorization or receipt is needed.' : <>Pay per token: 0.0001 {cashSymbol} per generated token, at most {amount(maximumPaymentAtomic)} {cashSymbol} for this answer. {paidFundingReason || (needsApproval ? solanaPayment ? 'The site sponsor pays network fees.' : 'Approving the payment budget also needs network-fee test ETH.' : '')}</>}</p>}
+      {mode === 'paid' && service && !(current && isAiRequestTerminal(current)) && <p role="status">{ownCompute ? 'Own compute · no charge. Your account gives you access; no payment authorization or receipt is needed.' : <>Pay per token: 0.0001 {cashSymbol} per generated token, at most {amount(maximumPaymentAtomic)} {cashSymbol} for this answer. {paidFundingReason || (needsApproval ? solanaPayment ? 'The site sponsor pays network fees.' : 'Approving the payment budget also needs network-fee test ETH.' : '')}</>}</p>}
       {cityId && <p className="local-ai-meta" data-testid="desk-city">Suggestions for {coveredNames[cityId]}. Edit or replace the question freely.</p>}
       {mode === 'library' && service && service.library.remainingRequests === 0 && <p role="status">The free allowance is exhausted. It resets at midnight UTC; paid answers remain a separate option.</p>}
       {mode === 'library' && service && !service.library.enabled && deskState.canAsk && <p role="status">The free public desk is switched off on this site. You can choose paid access instead.</p>}
@@ -369,8 +380,11 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
       {busy && !unresolvedId && <p className="local-ai-progress" role="status">{busy}</p>}
       {current && <LocalAiProgress request={current} />}
       {error && <p className="local-ai-alert" role="alert">{error}</p>}
-      {current?.error && <p className="local-ai-alert" role="alert">{current.error}{current.payment.state === 'none' || current.payment.state === 'failed' || current.payment.state === 'quoted' ? ' No service payment was settled.' : ''}</p>}
-      {current?.state === 'completed' && current.answer && <article className="local-ai-answer"><header><span><Check size={17} />Answer from the local model</span><small>AI-generated · check important facts</small></header><div className="local-ai-answer-text">{current.answer}</div><footer><span>{current.usage?.inputTokens ?? 'Unknown'} input · {current.usage?.outputTokens ?? 'unknown'} output tokens</span><span>{current.usage ? `${(current.usage.wallMs / 1000).toFixed(2)} s inference` : 'Timing unavailable'}</span><span>{current.usage?.tokensPerSecond != null ? `${current.usage.tokensPerSecond.toFixed(1)} output tok/s` : 'Decode rate unavailable'}</span><span>{ownCompute ? 'Own compute · no charge' : current.mode === 'library' ? 'Free answer · no payment' : current.payment.state === 'settled' ? `${current.usage?.outputTokens ?? 'Unknown'} tokens · ${amount(current.payment.amountAtomic)} ${cashSymbol} settled` : 'Payment not settled'}</span>{receiptHash && <a href={current.solanaReview ? `https://explorer.solana.com/tx/${receiptHash}?cluster=devnet` : `https://explorer.testnet.chain.robinhood.com/tx/${receiptHash}`} target="_blank" rel="noopener noreferrer">Payment receipt {current.host && <HostKindBadge kind={current.host.kind} />} <ExternalLink size={13} /></a>}</footer></article>}
+      {savedRequestId && <div className="local-ai-payment-review"><p role="status">The saved request&apos;s outcome is not known until it can be read. An authorization is not proof of payment or an answer. Do not sign or submit another payment while recovering it.</p><button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => void run('Reading the saved request', () => readSaved(savedRequestId))}>Read saved request again</button></div>}
+      {(terminalError || current?.error) && <p className="local-ai-alert" role="alert">{terminalError || current?.error}</p>}
+      {current?.recovery && !isAiRequestTerminal(current) && <div className="local-ai-payment-review"><p role="status">Automatic recovery checks are paused. {current.recovery.retryable ? 'Check this same saved request when you are ready; do not sign another approval or submit another payment.' : 'The saved request needs service recovery before it can continue. Do not sign another approval or submit another payment.'}</p>{current.recovery.retryable && <button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => void run('Checking saved recovery', () => readSaved(current.id))}>Check saved recovery</button>}</div>}
+      {selectedHostStatus && <p className="local-ai-meta" role="status">{selectedHostStatus}</p>}
+      {current?.state === 'completed' && current.answer && (ownCompute || current.mode === 'library' || receiptHash) && <article className="local-ai-answer"><header><span><Check size={17} />Answer from the local model</span><small>AI-generated · check important facts</small></header><div className="local-ai-answer-text">{current.answer}</div><footer><span>{current.usage?.inputTokens ?? 'Unknown'} input · {current.usage?.outputTokens ?? 'unknown'} output tokens</span><span>{current.usage ? `${(current.usage.wallMs / 1000).toFixed(2)} s inference` : 'Timing unavailable'}</span><span>{current.usage?.tokensPerSecond != null ? `${current.usage.tokensPerSecond.toFixed(1)} output tok/s` : 'Decode rate unavailable'}</span><span>{ownCompute ? 'Own compute · no charge' : current.mode === 'library' ? 'Free answer · no payment' : receiptHash ? `${current.usage?.outputTokens ?? 'Unknown'} tokens · ${amount(current.payment.amountAtomic)} ${cashSymbol} settled` : 'Payment not settled'}</span>{receiptHash && <a href={current.solanaReview ? `https://explorer.solana.com/tx/${receiptHash}?cluster=devnet` : `https://explorer.testnet.chain.robinhood.com/tx/${receiptHash}`} target="_blank" rel="noopener noreferrer">Payment receipt {current.host && <HostKindBadge kind={current.host.kind} />} <ExternalLink size={13} /></a>}</footer></article>}
       {current?.purgedAt && <p className="local-ai-meta" role="status">The question and answer were removed from the server after the retention period.</p>}
       <MoreList>
       <MoreRow title="Options" meta={!current && scopeReason ? 'Needs you' : `${hostScope === 'own' ? 'Your hosts only' : 'City hosts'} · up to ${Math.min(outputLimit, maximumOutput)} answer tokens`}>
@@ -384,7 +398,8 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
       {connectorMode && current?.host && <div className="local-ai-selected-host" role="status"><strong>Selected host: {current.host.name}</strong><HostKindBadge kind={current.host.kind} /><span>{current.host.own ? 'Your host · own compute · no charge' : current.mode === 'library' ? 'City host · free public answer · no payout' : 'City host'} · <code>{current.host.id}</code></span>{current.host.payoutWallet && <span>Payout wallet: <code>{current.host.payoutWallet}</code></span>}<p>Host reads your question. This saved request stays assigned to this host.</p></div>}
       </MoreRow>
       <MoreRow title="Service details" meta="Saved request and routing">
-      {current && !current.purgedAt && <div className="local-ai-request-id"><span>Request <code>{current.id}</code></span><button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => void run('Reading the saved request', () => readSaved(current.id))}>Refresh saved result</button></div>}
+      {current && <div className="local-ai-request-id"><span>Request <code>{current.id}</code></span><button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => void run('Reading the saved request', () => readSaved(current.id))}>Refresh saved result</button></div>}
+      {current?.recovery && <p className="local-ai-meta" role="status">Saved recovery stage: <code>{current.recovery.stage}</code> · code: <code>{current.recovery.code}</code>. {current.recovery.retryable ? 'The same saved request can be checked again.' : 'No automatic retry is offered.'}</p>}
       <p className="local-ai-meta">Only the selected host runs this request. If it is unavailable, this service does not substitute a cloud model or a prepared answer.</p>
       <p className="local-ai-meta">Question and answer text is removed here after about 10 minutes, but the host may retain a copy.</p>
       </MoreRow>

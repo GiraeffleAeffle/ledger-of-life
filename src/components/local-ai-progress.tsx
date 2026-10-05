@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { deriveAiProgress, type ProgressRequest } from './local-ai-progress-state.ts';
+import { aiSolanaAllowanceNotice, deriveAiProgress, isAiRequestTerminal, type ProgressRequest } from './local-ai-progress-state.ts';
 import { HostKindBadge } from './home-node-host-badge';
 
 const labels = {
@@ -14,7 +14,8 @@ const time = (at: string) => new Date(at).toLocaleTimeString('en-GB', { hour12: 
 
 export function LocalAiProgress({ request }: { request: ProgressRequest }) {
   const progress = request.progress ?? deriveAiProgress({ request });
-  const terminal = ['failed', 'paid', 'complete'].includes(progress.stage);
+  const terminal = isAiRequestTerminal(request);
+  const allowanceNotice = aiSolanaAllowanceNotice(request);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!progress.startedAt || progress.endedAt || terminal) return;
@@ -39,7 +40,8 @@ export function LocalAiProgress({ request }: { request: ProgressRequest }) {
       {events.answerReceivedAt && <li>Answer received at <time dateTime={events.answerReceivedAt}>{time(events.answerReceivedAt)}</time>{progress.money === 'pending' ? ' · withheld until payment confirmation' : ''}</li>}
       {progress.money === 'paid' && <li>Paid {new Intl.NumberFormat('en-GB', { maximumFractionDigits: 6 }).format(Number(request.payment.amountAtomic) / 1e6)} {request.solanaReview ? 'tUSDC' : 'tUSDG'} · {request.usage?.outputTokens ?? 'unknown'} output tokens{events.finishedAt ? ` · confirmed at ${time(events.finishedAt)}` : ''}</li>}
     </ol>
-    <p className="local-ai-meta">{progress.money === 'none' ? 'No service payment: free or own compute.' : progress.money === 'pending' ? 'The answer is saved privately. Payment confirmation is pending; the charge is not yet confirmed. Do not authorise again.' : progress.money === 'paid' ? 'Payment confirmed. The answer is now available.' : progress.money === 'not_charged' ? 'No answer charge. An incomplete answer is not charged; any separate access-budget transaction may have a network fee.' : 'Authorisation is not a charge. Nothing is charged unless an answer completes and payment settles.'}</p>
-    {progress.settlementTransaction && <p>Receipt{progress.money !== 'paid' ? ' · pending confirmation' : ''}{request.host && <> · {request.host.name} <HostKindBadge kind={request.host.kind} /></>}: <a href={request.solanaReview ? `https://explorer.solana.com/tx/${progress.settlementTransaction}?cluster=devnet` : `https://explorer.testnet.chain.robinhood.com/tx/${progress.settlementTransaction}`} target="_blank" rel="noopener noreferrer"><code>{progress.settlementTransaction}</code></a></p>}
+    <p className="local-ai-meta">{progress.money === 'none' ? 'No service payment: free or own compute.' : progress.money === 'pending' ? 'Payment confirmation is unresolved; the charge is not yet confirmed. Do not authorise again. Any saved answer remains withheld until payment is confirmed.' : progress.money === 'paid' ? 'Payment confirmed. The answer is now available.' : progress.money === 'not_charged' ? 'No answer charge. An incomplete answer is not charged; any separate access-budget transaction may have a network fee.' : 'Authorisation is not a charge. Nothing is charged unless an answer completes and payment settles.'}</p>
+    {allowanceNotice && <p className="local-ai-meta">{allowanceNotice}</p>}
+    {progress.settlementTransaction && <p>{progress.money === 'paid' ? 'Payment receipt' : progress.money === 'pending' ? 'Settlement transaction · pending confirmation' : 'Settlement transaction · no confirmed charge'}{request.host && <> · {request.host.name} <HostKindBadge kind={request.host.kind} /></>}: <a href={request.solanaReview ? `https://explorer.solana.com/tx/${progress.settlementTransaction}?cluster=devnet` : `https://explorer.testnet.chain.robinhood.com/tx/${progress.settlementTransaction}`} target="_blank" rel="noopener noreferrer"><code>{progress.settlementTransaction}</code></a></p>}
   </section>;
 }

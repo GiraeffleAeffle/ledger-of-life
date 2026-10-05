@@ -4,11 +4,11 @@ import type { LocalAiRequest } from '../server/local-ai-types.ts';
 const codec = new x402HTTPClient(new x402Client());
 const terminalStatuses: Record<string, number> = { failed: 502, interrupted: 503, expired: 410 };
 
-/** A failed job is still an owned resource that must replace a stale running view. */
-export async function readLocalAiResponse<T>(response: Response, expectedRequestId?: string): Promise<T> {
+/** POST action failures can return an owned terminal result; saved GET resources must succeed. */
+export async function readLocalAiResponse<T>(response: Response, expectedRequestId?: string, method: 'GET' | 'POST' = 'GET'): Promise<T> {
   const data = await response.json() as { error?: string; request?: LocalAiRequest };
   const request = data.request;
-  const ownedTerminal = Boolean(expectedRequestId && request?.id === expectedRequestId &&
+  const ownedTerminal = Boolean(method === 'POST' && expectedRequestId && request?.id === expectedRequestId &&
     (request.mode === 'paid' || request.mode === 'library') && terminalStatuses[request.state] === response.status);
   if (!response.ok && response.status !== 402 && !ownedTerminal)
     throw new Error(typeof data.error === 'string' ? data.error : `The request failed (${response.status}).`);

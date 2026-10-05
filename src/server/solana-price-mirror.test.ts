@@ -72,6 +72,7 @@ async function fixture() {
     },
     reconcile: async input => { reconciles.push(input.id); return { id: input.id, state: reconcileState, signature: 'test-signature' }; },
     prepare: async () => { throw new Error('User signing forbidden'); },
+    prepareAsSponsor: async () => { throw new Error('Unexpected sponsor preparation'); },
     submit: async () => { throw new Error('User signing forbidden'); },
     cancel: async () => { throw new Error('Unexpected cancellation'); },
     get: async () => { throw new Error('Unexpected lookup'); },

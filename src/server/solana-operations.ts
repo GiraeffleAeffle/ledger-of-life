@@ -18,6 +18,7 @@ export type PrepareSolanaInput = { identity: VerifiedIdentity; kind: string; req
 export type ExecuteSponsorInput = { kind: string; requestId: string; instructions: readonly Instruction[]; review: Record<string, unknown>; expectedDeltas?: ExpectedTokenDelta[]; sponsorshipSubject?: string };
 export type SolanaOperations = {
   prepare(input: PrepareSolanaInput): Promise<PreparedSolanaOperation>;
+  prepareAsSponsor(input: ExecuteSponsorInput): Promise<PreparedSolanaOperation>;
   submit(input: { identity: VerifiedIdentity; id: string; signedTransactionBase64: string }): Promise<SolanaOperationResult & { signature: string }>;
   executeAsSponsor(input: ExecuteSponsorInput): Promise<SolanaOperationResult & { signature: string }>;
   reconcile(input: { identity?: VerifiedIdentity; id: string }): Promise<SolanaOperationResult>;
@@ -242,6 +243,10 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
       throw error;
     }
   }
+  async function prepareAsSponsor(input: ExecuteSponsorInput): Promise<PreparedSolanaOperation> {
+    if (input.sponsorshipSubject !== undefined && (typeof input.sponsorshipSubject !== 'string' || !input.sponsorshipSubject || input.sponsorshipSubject.length > 512)) fail('Invalid server sponsorship subject.');
+    return prepareInternal({ ...input, subject: 'server:sponsor', sponsorshipSubject: input.sponsorshipSubject ?? null, actor: sponsorAddress, walletId: 'sponsor' });
+  }
   return {
     cancel: async (input: { identity: VerifiedIdentity; id: string }) => {
       const op = await load(input.id, input.identity);
@@ -271,13 +276,13 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
       return signAndBroadcast(op, new Uint8Array(bytes));
     },
     executeAsSponsor: async (input: ExecuteSponsorInput): Promise<SolanaOperationResult & { signature: string }> => {
-      if (input.sponsorshipSubject !== undefined && (typeof input.sponsorshipSubject !== 'string' || !input.sponsorshipSubject || input.sponsorshipSubject.length > 512)) fail('Invalid server sponsorship subject.');
-      const prepared = await prepareInternal({ ...input, subject: 'server:sponsor', sponsorshipSubject: input.sponsorshipSubject ?? null, actor: sponsorAddress, walletId: 'sponsor' });
+      const prepared = await prepareAsSponsor(input);
       const op = await load(prepared.id);
       if (op.state !== 'prepared') { const next = await reconcile({ id: op.id }); if (!next.signature) fail('Server operation expired; use a fresh request ID.'); return { ...next, signature: next.signature }; }
       if (now() >= Date.parse(op.expiresAt) || BigInt((await gateway.lifetime()).blockHeight) >= BigInt(op.lastValidBlockHeight)) fail('Server operation lifetime expired.');
       return signAndBroadcast(op, new Uint8Array(Buffer.from(op.transactionBase64, 'base64')));
     },
+    prepareAsSponsor,
     reconcile,
     get: async (id: string, identity?: VerifiedIdentity) => { const op = await load(id, identity); return { ...publicPrepared(op), ...result(op) }; },
   };

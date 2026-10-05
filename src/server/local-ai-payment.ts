@@ -18,7 +18,7 @@ import { TOKEN_PROGRAM_ADDRESS, fetchMaybeToken, findAssociatedTokenPda, getAppr
 import { addressesForHouse, depositRewardsInstruction } from '../finance/solana/house.ts';
 import { loadSolanaHouseManifest } from './solana-house-config.ts';
 import { configuredSolanaOperations } from './solana-operations.ts';
-import { configuredFeeSponsor } from './solana-service.ts';
+import { configuredFeeSponsor, SolanaServiceError } from './solana-service.ts';
 import { loadBuildingManifest } from './building-revenue.ts';
 import type { SolanaInferenceReview, LocalAiRequest } from './local-ai-types.ts';
 import type { PaidAiOwner } from './local-ai.ts';
@@ -26,7 +26,7 @@ import type { ConnectorHost } from './local-ai-hosts.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { AI_PRICE } from '../domain/ai-pricing.ts';
 import type { SolanaHouseManifest } from './solana-house-config.ts';
-import type { SolanaOperations } from './solana-operations.ts';
+import type { PreparedSolanaOperation, SolanaOperationResult, SolanaOperations } from './solana-operations.ts';
 import type { ExpectedTokenDelta } from '../finance/solana/reconcile.ts';
 
 export type AiPayment = { payload: PaymentPayload; requirements: PaymentRequirements; amount?: string; signed: Hex | null; hash: Hex | null; nonce: number | null };
@@ -371,17 +371,23 @@ export function solanaAiApprovalInstructions(review: SolanaInferenceReview): Ins
   return [getApproveInstruction({ source: address(review.source), delegate: address(review.delegate), owner: createNoopSigner(address(review.payer)), amount: BigInt(review.amountAtomic) })];
 }
 /** Reserve one outstanding answer per token account: a new approve must not replace a running answer's allowance. */
-async function reserveSolanaAiAllowance(store: Store, row: SolanaAiRecord) {
+async function reserveSolanaAiAllowance(store: Store, row: SolanaAiRecord, dependencies?: Pick<SolanaAiSettlementDependencies, 'context'>) {
   const lane = `local-ai:solana-allowance:${row.request.solanaReview!.payer}`;
   try { await store.create(lane, { requestId: row.id }); } catch {
     const previous = await store.get<{ requestId: string }>(lane);
     if (previous?.requestId === row.id) return;
-    const active = previous ? await store.get<SolanaAiRecord>(`local-ai:request:${previous.requestId}`) : null;
+    let active = previous ? await store.get<SolanaAiRecord>(`local-ai:request:${previous.requestId}`) : null;
+    if (active?.request.solanaReview && active.solanaJournal.approvalId &&
+        (active.request.approval?.state === 'review' || active.request.approval?.state === 'pending')) {
+      await reconcileSolanaAiApproval(store, `local-ai:request:${active.id}`, dependencies);
+      active = await store.get<SolanaAiRecord>(`local-ai:request:${active.id}`);
+    }
     if (active?.request.approval?.state === 'pending') throw new ConflictError('Reconcile the earlier signed Solana approval before replacing its allowance.');
     if (active && !['completed', 'failed', 'expired', 'interrupted'].includes(active.request.state))
       throw new ConflictError('Finish or reconcile your earlier Solana AI question before replacing its allowance.');
     // An ambiguous settlement is never released, even if an outer request has failed.
-    if (active?.solanaJournal.settlementId && active.request.payment.state !== 'settled' && active.request.payment.state !== 'failed')
+    if (active && (active.solanaJournal.settlementId || active.request.answer && active.request.usage) &&
+        active.request.payment.state !== 'settled' && active.request.payment.state !== 'failed')
       throw new ConflictError('The earlier Solana settlement must be reconciled first.');
     await store.update<{ requestId: string }>(lane, current => {
       if (current.requestId !== previous?.requestId) throw new ConflictError('Another question reserved this allowance.');
@@ -389,41 +395,96 @@ async function reserveSolanaAiAllowance(store: Store, row: SolanaAiRecord) {
     });
   }
 }
-export async function solanaAiApproval(store: Store, key: string, identity: VerifiedIdentity, action: unknown, signedTransaction?: unknown) {
+async function applySolanaAiApprovalResult(store: Store, key: string, result: SolanaOperationResult, prepared?: PreparedSolanaOperation) {
+  return store.update<SolanaAiRecord>(key, current => {
+    if (current.solanaJournal.approvalId && current.solanaJournal.approvalId !== result.id)
+      throw new ConflictError('This question already has a different Solana approval.');
+    if (prepared) {
+      current.solanaJournal.approvalId = prepared.id;
+      current.request.approval = { id: prepared.id, state: 'review', budgetAtomic: current.request.solanaReview!.amountAtomic,
+        request: null, hash: null, error: null, solanaRequest: result.state === 'prepared'
+          ? { ...prepared, operationId: `local-ai-approval:${current.id}`, description: current.request.solanaReview!.description, chain: 'solana:devnet' }
+          : null };
+    }
+    const approval = current.request.approval;
+    if (!approval) throw new ConflictError('This question has no saved Solana approval.');
+    approval.hash = result.signature ?? null; approval.error = result.error ?? null;
+    approval.state = result.state === 'prepared' ? 'review' : result.state === 'confirmed' ? 'completed' :
+      result.state === 'failed' ? 'failed' : result.state === 'expired' ? 'expired' : 'pending';
+    if (result.state !== 'prepared') approval.solanaRequest = null;
+    if (current.request.recovery?.stage === 'approval') delete current.request.recovery;
+    if (!current.request.answer && ['payment_required', 'approval_required', 'ready', 'expired'].includes(current.request.state)) {
+      if (result.state === 'confirmed') {
+        current.request.payment.state = 'authorized'; current.request.state = 'ready'; current.request.error = null;
+        (current.progressEvents ??= {}).authorizedAt = new Date().toISOString();
+        if (Date.now() >= Date.parse(current.request.expiresAt)) {
+          current.request.state = 'expired';
+          current.request.error = 'The inference quote expired before execution. The confirmed SPL allowance remains bounded; no inference tokens were charged.';
+          current.request.recovery = { stage: 'approval', code: 'inference_quote_expired', retryable: false };
+          current.completedAt = new Date().toISOString(); (current.progressEvents ??= {}).finishedAt = current.completedAt;
+        }
+      } else if (result.state === 'expired' || result.state === 'failed') {
+        current.request.state = result.state === 'expired' ? 'expired' : 'failed';
+        current.request.error = result.state === 'expired' && !result.signature
+          ? 'This unsigned Solana approval review expired before submission. Create a new question for a new approval review. No inference tokens were charged.'
+          : 'The Solana approval transaction did not complete. Create a new question for a new approval review. No inference tokens were charged.';
+        approval.error ??= current.request.error;
+        current.request.recovery = { stage: 'approval', code: result.state === 'failed' ? 'approval_failed' :
+          result.signature ? 'approval_transaction_expired' : 'approval_expired', retryable: false };
+        current.completedAt = new Date().toISOString(); (current.progressEvents ??= {}).finishedAt = current.completedAt;
+      } else {
+        current.request.state = 'approval_required';
+      }
+    }
+    return current;
+  });
+}
+
+/** Canonical operation state, not quote time, resolves a potentially signed approval. */
+export async function reconcileSolanaAiApproval(store: Store, key: string, dependencies?: Pick<SolanaAiSettlementDependencies, 'context'>) {
+  const row = await store.get<SolanaAiRecord>(key);
+  if (!row?.request.solanaReview || !row.solanaJournal.approvalId ||
+      (row.request.approval?.state !== 'review' && row.request.approval?.state !== 'pending')) return;
+  try {
+    const { operations } = await (dependencies?.context ?? solanaAiContext)(store);
+    await applySolanaAiApprovalResult(store, key, await operations.reconcile({ id: row.solanaJournal.approvalId }));
+  } catch (error) {
+    const cause = settlementRecoveryCode(error), code = cause === 'settlement_unavailable' ? 'approval_unavailable' : cause;
+    const saved = await store.update<SolanaAiRecord>(key, current => {
+      if (current.request.approval?.state !== 'review' && current.request.approval?.state !== 'pending') return current;
+      if (current.request.approval.state === 'pending' && current.request.state === 'expired') current.request.state = 'approval_required';
+      current.request.error = 'Solana approval is unresolved. Check this saved question before approving another payment.';
+      current.request.recovery = { stage: 'approval', code, retryable: !Object.hasOwn(settlementNonRetryableCodes, code) };
+      return current;
+    });
+    if (saved.request.recovery?.stage === 'approval' && saved.request.recovery.code === code)
+      console.warn('local-ai-approval', { requestId: row.id, stage: 'approval', code });
+  }
+}
+
+export async function solanaAiApproval(store: Store, key: string, identity: VerifiedIdentity, action: unknown, signedTransaction?: unknown,
+  dependencies?: Pick<SolanaAiSettlementDependencies, 'context'>) {
   const row = await store.get<SolanaAiRecord>(key), review = row?.request.solanaReview;
   if (!row || !review || row.owner.subject !== identity.subject || !identity.wallets.some(wallet => wallet.id === review.walletId && wallet.address === review.payer && wallet.chainType === 'solana'))
     throw new ConflictError('This Solana AI question belongs to another wallet.');
-  const { operations, sponsor, manifest } = await solanaAiContext(store);
+  const { operations, sponsor, manifest } = await (dependencies?.context ?? solanaAiContext)(store);
   if (review.delegate !== sponsor.address || review.asset !== manifest.cashMint) throw new ConflictError('Solana AI deployment changed; review a new question.');
   if (action === 'prepare') {
     if (!['payment_required', 'approval_required'].includes(row.request.state) || Date.now() >= Date.parse(row.request.expiresAt))
       throw new ConflictError('This AI quote is no longer available for approval.');
-    await reserveSolanaAiAllowance(store, row);
+    await reserveSolanaAiAllowance(store, row, dependencies);
     const prepared = await operations.prepare({ identity, kind: 'ai-approve', requestId: row.id,
       actor: address(review.payer), walletId: review.walletId, instructions: solanaAiApprovalInstructions(review), review: { ...review },
       expectedDeltas: [{ account: review.source, mint: review.asset, owner: review.payer, direction: 'unchanged', minimumAtomic: '0', maximumAtomic: '0' }] });
-    const updated = await store.update<SolanaAiRecord>(key, current => {
-      current.solanaJournal.approvalId = prepared.id;
-      current.request.approval = { id: prepared.id, state: 'review', budgetAtomic: review.amountAtomic,
-        request: null, hash: null, error: null,
-        solanaRequest: { ...prepared, operationId: `local-ai-approval:${row.id}`, description: review.description, chain: 'solana:devnet' } };
-      current.request.state = 'approval_required'; return current;
-    });
-    return updated.request.approval!;
+    const result = await operations.reconcile({ identity, id: prepared.id });
+    return (await applySolanaAiApprovalResult(store, key, result, prepared)).request.approval!;
   }
   if ((action !== 'submit' && action !== 'reconcile') || !row.solanaJournal.approvalId) throw new ConflictError('Prepare this Solana AI approval first.');
-  const result = action === 'submit' ? await operations.submit({ identity, id: row.solanaJournal.approvalId, signedTransactionBase64: typeof signedTransaction === 'string' ? signedTransaction : '' }) :
-    await operations.reconcile({ identity, id: row.solanaJournal.approvalId });
-  return (await store.update<SolanaAiRecord>(key, current => {
-    const approval = current.request.approval!;
-    approval.hash = result.signature ?? null; approval.error = result.error ?? null;
-    approval.state = result.state === 'confirmed' ? 'completed' : result.state === 'failed' ? 'failed' : result.state === 'expired' ? 'expired' : 'pending';
-    if (result.state === 'confirmed' && ['approval_required', 'payment_required'].includes(current.request.state)) {
-      current.request.payment.state = 'authorized'; current.request.state = 'ready';
-      (current.progressEvents ??= {}).authorizedAt = new Date().toISOString();
-    }
-    return current;
-  })).request.approval!;
+  const reconciled = await operations.reconcile({ identity, id: row.solanaJournal.approvalId });
+  const result = action === 'submit' && reconciled.state === 'prepared'
+    ? await operations.submit({ identity, id: row.solanaJournal.approvalId, signedTransactionBase64: typeof signedTransaction === 'string' ? signedTransaction : '' })
+    : reconciled;
+  return (await applySolanaAiApprovalResult(store, key, result)).request.approval!;
 }
 export async function solanaAiSettlementInstructions(review: SolanaInferenceReview, amount: bigint, programId: string) {
   if (amount < 0n || amount > BigInt(review.amountAtomic)) throw new ConflictError('Measured AI settlement exceeds the approval.');
@@ -440,6 +501,28 @@ export type SolanaAiSettlementDependencies = {
   context: (store: Store) => Promise<SolanaAiSettlementContext>;
   wallet: (subject: string) => Promise<{ id: string; address: string } | null>;
 };
+type SolanaAiSettlementStage = Exclude<NonNullable<LocalAiRequest['recovery']>['stage'], 'host' | 'approval'>;
+const settlementServiceCodes: Record<string, true> = {
+  invalid_operation: true, operation_owner: true, operation_pending: true, sponsor_configuration: true,
+  sponsor_limit: true, sponsor_reservation: true, sponsor_subject_budget: true, sponsor_global_budget: true,
+};
+const settlementErrorCodes: Record<string, string> = {
+  'Simulation bank changed; request a fresh review': 'simulation_bank_changed',
+  'Exact transaction simulation failed': 'simulation_failed',
+  'Wrong simulated token owner or mint': 'simulation_token_owner',
+  'Missing simulated token balance': 'simulation_balance_missing',
+  'Simulated token delta differs from review': 'simulation_delta_mismatch',
+  'RPC unavailable': 'rpc_unavailable',
+  'RPC request failed': 'rpc_unavailable',
+};
+const settlementNonRetryableCodes: Record<string, true> = {
+  invalid_operation: true, operation_owner: true, sponsor_configuration: true,
+  simulation_token_owner: true, simulation_balance_missing: true, simulation_delta_mismatch: true,
+};
+function settlementRecoveryCode(error: unknown) {
+  if (error instanceof SolanaServiceError && Object.hasOwn(settlementServiceCodes, error.code)) return error.code;
+  return error instanceof Error && Object.hasOwn(settlementErrorCodes, error.message) ? settlementErrorCodes[error.message] : 'settlement_unavailable';
+}
 export async function settleSolanaAi(store: Store, key: string, dependencies?: SolanaAiSettlementDependencies) {
   const row = await store.get<SolanaAiRecord>(key), review = row?.request.solanaReview;
   if (!row || !review || row.request.state === 'completed' || row.request.payment.state === 'settled') return;
@@ -447,33 +530,80 @@ export async function settleSolanaAi(store: Store, key: string, dependencies?: S
     throw new ConflictError('No completed approved Solana AI answer is available.');
   const amount = inferenceCharge(row.request.usage.outputTokens, BigInt(review.amountAtomic));
   if (amount.toString() !== row.request.payment.amountAtomic) throw new ConflictError('Saved AI usage differs from settlement.');
-  const { operations, manifest, sponsor } = await (dependencies?.context ?? solanaAiContext)(store);
-  if (review.delegate !== sponsor.address || review.asset !== manifest.cashMint) throw new ConflictError('AI payment deployment changed.');
-  if (!row.solanaJournal.settlementId && review.route === 'wallet') {
-    // Identity is server-only; focused Node transaction tests inject the same ownership lookup boundary.
-    const lookup = dependencies?.wallet ?? (await import('./identity.ts')).verifiedSolanaWalletForSubject;
-    const recipient = review.hostOwnerSubject ? await lookup(review.hostOwnerSubject) : null;
-    if (!recipient || recipient.address !== review.payTo) throw new ConflictError('The host owner wallet changed; this answer cannot be settled to a different recipient.');
+  let stage: SolanaAiSettlementStage = 'settlement_context';
+  try {
+    const { operations, manifest, sponsor } = await (dependencies?.context ?? solanaAiContext)(store);
+    if (review.delegate !== sponsor.address || review.asset !== manifest.cashMint) throw new ConflictError('AI payment deployment changed.');
+    let result: SolanaOperationResult | null = null;
+    if (amount !== 0n) {
+      if (row.solanaJournal.settlementId) {
+        stage = 'settlement_reconcile';
+        result = await operations.reconcile({ id: row.solanaJournal.settlementId });
+      } else {
+        stage = 'settlement_prepare';
+        const intent = { kind: 'ai-settle', requestId: row.id, sponsorshipSubject: row.owner.subject,
+          instructions: await solanaAiSettlementInstructions(review, amount, manifest.programId),
+          review: { ...review, actualAmountAtomic: amount.toString(), sourceKind: 1 },
+          expectedDeltas: await solanaAiSettlementDeltas(review, amount, manifest.programId) };
+        // Preparation also finds operations from older releases whose signed-write succeeded
+        // before the inference journal was linked. Persist that link before any signing.
+        const prepared = await operations.prepareAsSponsor(intent);
+        const linked = await store.update<SolanaAiRecord>(key, current => {
+          if (current.solanaJournal.settlementId && current.solanaJournal.settlementId !== prepared.id)
+            throw new ConflictError('This answer already has a different Solana settlement.');
+          current.solanaJournal.settlementId = prepared.id;
+          return current;
+        });
+        if (linked.request.state !== 'settling' || linked.request.payment.state === 'settled' || linked.request.payment.state === 'failed') return;
+        stage = 'settlement_reconcile';
+        result = await operations.reconcile({ id: prepared.id });
+        if (result.state === 'prepared') {
+          if (review.route === 'wallet') {
+            stage = 'settlement_recipient';
+            // Revalidate only before signing, never block recovery of already signed bytes.
+            // Static Next server-only identity imports cannot run in focused Node payment tests.
+            const lookup = dependencies?.wallet ?? (await import('./identity.ts')).verifiedSolanaWalletForSubject;
+            const recipient = review.hostOwnerSubject ? await lookup(review.hostOwnerSubject) : null;
+            if (!recipient || recipient.address !== review.payTo) throw new ConflictError('The host owner wallet changed; this answer cannot be settled to a different recipient.');
+          }
+          stage = 'settlement_submit';
+          result = await operations.executeAsSponsor(intent);
+        }
+      }
+    }
+    await store.update<SolanaAiRecord>(key, current => {
+      if (current.request.payment.state === 'settled' || current.request.payment.state === 'failed') return current;
+      if (!result || result.state === 'confirmed') {
+        current.request.payment.state = 'settled'; current.request.state = 'completed'; current.request.error = null;
+        delete current.request.recovery;
+        current.request.payment.receipt = { success: true, network: 'solana:devnet', payer: review.payer,
+          transaction: result?.signature ?? '', amount: amount.toString() };
+        current.completedAt = new Date().toISOString(); (current.progressEvents ??= {}).finishedAt = current.completedAt;
+      } else if (result.state === 'failed' || result.state === 'expired') {
+        current.request.payment.state = 'failed'; current.request.state = 'failed'; current.request.error = result.error ?? 'Solana AI settlement failed; no new settlement is created.';
+        current.request.recovery = { stage: 'settlement_reconcile',
+          code: result.state === 'expired' ? 'settlement_expired' : 'settlement_failed', retryable: false };
+        (current.progressEvents ??= {}).finishedAt = new Date().toISOString();
+      } else {
+        current.request.payment.state = 'pending'; current.request.error = 'Solana settlement confirmation is pending. The saved answer remains private.';
+        delete current.request.recovery;
+      }
+      return current;
+    });
+  } catch (error) {
+    const code = settlementRecoveryCode(error);
+    // If storage cannot safely read/update the record this rejects, rather than fabricating
+    // a recoverable saved resource. Unknown signing outcomes remain linked and unresolved.
+    const saved = await store.update<SolanaAiRecord>(key, current => {
+      if (current.request.state !== 'settling' || current.request.payment.state === 'settled' || current.request.payment.state === 'failed') return current;
+      current.request.payment.state = 'pending';
+      current.request.error = 'Solana payment is unresolved. The saved answer remains private; check this request again without approving another payment.';
+      current.request.recovery = { stage, code, retryable: !Object.hasOwn(settlementNonRetryableCodes, code) };
+      return current;
+    });
+    if (saved.request.recovery?.stage === stage && saved.request.recovery.code === code)
+      console.warn('local-ai-settlement', { requestId: row.id, stage, code });
   }
-  const result = amount === 0n ? null : row.solanaJournal.settlementId ?
-    await operations.reconcile({ id: row.solanaJournal.settlementId }) :
-    await operations.executeAsSponsor({ kind: 'ai-settle', requestId: row.id, sponsorshipSubject: row.owner.subject,
-      instructions: await solanaAiSettlementInstructions(review, amount, manifest.programId), review: { ...review, actualAmountAtomic: amount.toString(), sourceKind: 1 },
-      expectedDeltas: await solanaAiSettlementDeltas(review, amount, manifest.programId) });
-  await store.update<SolanaAiRecord>(key, current => {
-    if (current.request.payment.state === 'settled') return current;
-    if (result) current.solanaJournal.settlementId = result.id;
-    if (!result || result.state === 'confirmed') {
-      current.request.payment.state = 'settled'; current.request.state = 'completed'; current.request.error = null;
-      current.request.payment.receipt = { success: true, network: 'solana:devnet', payer: review.payer,
-        transaction: result?.signature ?? '', amount: amount.toString() };
-      current.completedAt = new Date().toISOString(); (current.progressEvents ??= {}).finishedAt = current.completedAt;
-    } else if (result.state === 'failed' || result.state === 'expired') {
-      current.request.payment.state = 'failed'; current.request.state = 'failed'; current.request.error = result.error ?? 'Solana AI settlement failed; no new settlement is created.';
-      (current.progressEvents ??= {}).finishedAt = new Date().toISOString();
-    } else { current.request.payment.state = 'pending'; current.request.error = 'Solana settlement confirmation is pending. The saved answer remains private.'; }
-    return current;
-  });
 }
 export async function solanaAiWalletBalance(payer: string, mint: string) {
   if (!process.env.SOLANA_RPC_URL) throw new ConflictError('Solana RPC is unavailable.');

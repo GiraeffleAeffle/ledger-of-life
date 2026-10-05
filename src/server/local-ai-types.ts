@@ -48,6 +48,10 @@ export interface LocalAiRequest {
   payment: { state: 'none' | 'quoted' | 'authorized' | 'pending' | 'settled' | 'failed'; amountAtomic: string; receipt: SettleResponse | null };
   review: InferencePaymentReview | null; paymentRequired: PaymentRequired | null; approval: LocalAiApproval | null;
   solanaReview?: SolanaInferenceReview | null;
+  recovery?: {
+    stage: 'host' | 'approval' | 'settlement_context' | 'settlement_recipient' | 'settlement_prepare' | 'settlement_submit' | 'settlement_reconcile';
+    code: string; retryable: boolean;
+  } | null;
   host?: { id: string; name: string; own: boolean; payoutWallet: string | null; kind?: 'operator' | 'community' };
   hostScope?: 'own' | 'city'; publicQuestion?: boolean;
 }

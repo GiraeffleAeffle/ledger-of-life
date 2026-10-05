@@ -9,14 +9,16 @@ import type { LocalAiRequest } from '@/server/local-ai-types';
 
 export const runtime = 'nodejs';
 const headers = { 'Cache-Control': 'private, no-store', Vary: 'Authorization, Cookie' };
-function result(request: LocalAiRequest) {
+function result(request: LocalAiRequest, savedRead = false) {
   const responseHeaders = new Headers(headers);
   if (request.mode === 'paid' && request.paymentRequired && request.payment.state !== 'settled')
     responseHeaders.set('PAYMENT-REQUIRED', encodePaymentRequiredHeader(request.paymentRequired));
   if (request.mode === 'paid' && !request.solanaReview && request.payment.state === 'settled' && request.payment.receipt)
     responseHeaders.set('PAYMENT-RESPONSE', encodePaymentResponseHeader(request.payment.receipt));
   // Library cookies are established before inference, never reissued by a paid or model response.
-  const status = request.state === 'failed' ? 502 : request.state === 'interrupted' ? 503 :
+  // Reading an owned saved resource succeeds even when its inference failed.
+  // Keep action failures distinct from transport/authentication failures.
+  const status = savedRead ? 200 : request.state === 'failed' ? 502 : request.state === 'interrupted' ? 503 :
     request.state === 'expired' ? 410 :
     request.state === 'payment_required' || request.state === 'approval_required' ? 402 :
     request.state === 'completed' ? 200 : 202;
@@ -55,6 +57,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const store = await getStore();
     const id = (await params).id;
     const owner = request.headers.has('authorization') ? await paidOwnerForRequest(store, id, await authenticated(request)) : libraryOwner(visitorToken(request) || '');
-    return result(await readAiRequest(store, id, owner));
+    return result(await readAiRequest(store, id, owner), true);
   } catch (error) { return failure(error); }
 }

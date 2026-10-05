@@ -13,14 +13,26 @@ function request(state: LocalAiRequest['state']): LocalAiRequest {
     payment: { state: 'failed', amountAtomic: '10000', receipt: null }, review: null, paymentRequired: null, approval: null };
 }
 
-test('reloading failed, interrupted and expired owned requests replaces stale running state without another inference', async () => {
+test('saved terminal GET resources use HTTP200 and retain failure evidence', async () => {
+  for (const state of ['failed', 'interrupted', 'expired'] as const) {
+    const result = await readLocalAiResponse<{ request: LocalAiRequest }>(Response.json({ request: request(state) }), id);
+    assert.equal(result.request.state, state);
+    assert.equal(result.request.error, 'The model did not produce a complete answer.');
+    assert.equal(result.request.payment.receipt, null);
+  }
+});
+
+test('POST terminal action statuses replace running state without another inference', async () => {
   for (const [state, status] of [['failed', 502], ['interrupted', 503], ['expired', 410]] as const) {
-    let saved = request('running');
-    const result = await readLocalAiResponse<{ request: LocalAiRequest }>(Response.json({ request: request(state) }, { status }), id);
-    saved = result.request;
-    assert.equal(saved.state, state);
-    assert.equal(saved.answer, null);
-    assert.equal(saved.payment.receipt, null);
+    const result = await readLocalAiResponse<{ request: LocalAiRequest }>(Response.json({ request: request(state) }, { status }), id, 'POST');
+    assert.equal(result.request.state, state);
+    assert.equal(result.request.answer, null);
+  }
+});
+
+test('infrastructure GET failures are errors even if a matching terminal payload is present', async () => {
+  for (const [state, status] of [['failed', 502], ['interrupted', 503], ['expired', 410]] as const) {
+    await assert.rejects(readLocalAiResponse(Response.json({ error: 'Service unavailable', request: request(state) }, { status }), id), /Service unavailable/);
   }
 });
 
@@ -38,6 +50,9 @@ test('busy-host ready requests resume without creating a second payment or askin
   assert.equal(inferenceNextAction({ ...paid, mode: 'library', payment: { ...paid.payment, state: 'none' } }), 'resume');
   assert.equal(inferenceNextAction({ ...paid, state: 'payment_required', payment: { ...paid.payment, state: 'quoted' } }), 'payment-review');
   assert.equal(inferenceNextAction({ ...paid, state: 'completed' }), null);
+  for (const state of ['failed', 'interrupted', 'expired'] as const) {
+    assert.equal(inferenceNextAction({ ...paid, state }), null);
+  }
 });
 
 test('an altered approval cannot bypass the finite policy by changing its operation or wallet metadata', () => {

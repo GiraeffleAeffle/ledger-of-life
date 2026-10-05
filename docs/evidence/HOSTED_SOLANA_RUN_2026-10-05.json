@@ -2486,5 +2486,44 @@
       }
     ],
     "totalEncodedSeconds": 142.566667
+  },
+  "aiRecoveryInvestigation": {
+    "requestId": "1a993d41-f9fa-42f0-836e-0dd523894d97",
+    "revisionBefore": 29,
+    "initialRecovery": {
+      "status": 503,
+      "requestReturned": false,
+      "error": "This service is not configured or temporarily unavailable. Check the connection status and retry.",
+      "controls": "The same signed-in resident received 200 from AI status and usage, and 400 Unknown inference request for a different UUID."
+    },
+    "clusterAccess": "Filtered pod listing established the revision-29 image and sole running web pod. Pod logs were intentionally forbidden; no other kubeconfig, exec, Secrets or GPU-host access was used.",
+    "hostObservation": {
+      "id": "7b9f3ffa-49c9-442f-b5ec-582e478d51ca",
+      "availability": "asleep",
+      "ollamaReachable": false,
+      "awake": false,
+      "canWake": true,
+      "lastSuccessAt": "2026-10-03T11:17:51.587Z",
+      "limitation": "A fresh signed connector heartbeat does not prove physical sleep, Wake-on-LAN delivery or model availability. No current connector code fault was demonstrated."
+    },
+    "sourceAccountEvidence": {
+      "observedAt": "2026-10-05T11:23:49.070Z",
+      "source": "CtjP8dXZy9q2ZXHqXnymmp1oNPfj7qopUuSxSsJwr1aX",
+      "approvalSignature": "4NzCyfoFu4qoY5Tch9EQ47sVT9TiUYcQCyiz4cuA7s8VNayMPmMdD6Sdr3XNQM8GJAAnctks2QspuQA8iFsTNXCb",
+      "scannedNewerFinalizedTransactions": 7,
+      "historyCapped": false,
+      "sponsorOnlyTransactions": [],
+      "delegatedAmountAtomic": "12800",
+      "delegateMatches": true,
+      "interpretation": "The approved finite allowance was still present. No newer finalized source-account transaction had the hosted sponsor as its sole signer. This observation does not exclude a not-yet-finalized transaction."
+    },
+    "readOnlySettlementSimulation": {
+      "readOnly": true,
+      "simulatedAtomic": "100",
+      "slot": "507715025",
+      "sponsorDebitCeilingLamports": "10000",
+      "networkFeeLamports": "5000",
+      "interpretation": "Actual application instruction/delta builders and the devnet gateway accepted a simulated delegate payment from the same resident source to the reviewed house. No private key, signature or broadcast was used. This is not an AI answer or settlement proof."
+    }
   }
 }

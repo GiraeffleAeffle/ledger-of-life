@@ -15,7 +15,8 @@ import { PERMIT2_ADDRESS } from '@x402/evm';
 import { assertAiPaymentVerified, createAiResource, facilitatorAccount, inspectAiReceipt, recoverExpiredUnsignedSettlement, validatePaymentPayload, type AiPayment } from './local-ai-payment.ts';
 import { acquireVisitorLease, assertVisitorActive, type VisitorLease } from './local-ai-session.ts';
 import type { LocalAiApproval, LocalAiContext, LocalAiMode, LocalAiRequest } from './local-ai-types.ts';
-import { createSolanaAiQuote, settleSolanaAi, solanaAiEnabled, type SolanaAiJournal } from './local-ai-payment.ts';
+import { createSolanaAiQuote, reconcileSolanaAiApproval, settleSolanaAi, solanaAiEnabled } from './local-ai-payment.ts';
+import type { SolanaAiJournal, SolanaAiSettlementDependencies } from './local-ai-payment.ts';
 import { purged, textDue, textGraceMs } from './local-ai-retention.ts';
 import { CONNECTOR_JOB_TIMEOUT_MS, cancelConnectorInference, chooseConnectorHost, enqueueConnectorInference, reserveConnectorHost, releaseConnectorHost } from './local-ai-hosts.ts';
 import { deriveAiProgress, type AiProgressEvents, type ProgressRequest } from '../components/local-ai-progress-state.ts';
@@ -128,17 +129,26 @@ export async function purgeVisitorText(store: Store, visitor: string) {
   await store.reclaim?.();
 }
 
-export async function readAiRequest(store: Store, id: string, owner: AiOwner) {
+export async function readAiRequest(store: Store, id: string, owner: AiOwner, dependencies?: Pick<SolanaAiSettlementDependencies, 'context'>) {
   validId(id);
   let record = await store.get<AiRecord>(prefix + id);
   if (!record) throw new WorkflowError('Unknown inference request.');
   own(record, owner);
   if ('visitor' in owner) await assertVisitorActive(store, owner.visitor);
+  if (record.request.solanaReview && record.solanaJournal?.approvalId &&
+      (record.request.approval?.state === 'pending' || record.request.approval?.state === 'review' &&
+        (Date.now() >= Date.parse(record.request.approval.solanaRequest?.expiresAt ?? record.request.expiresAt) ||
+          Date.now() >= Date.parse(record.request.expiresAt)))) {
+    await reconcileSolanaAiApproval(store, prefix + id, dependencies);
+    record = (await store.get<AiRecord>(prefix + id))!;
+  }
   if (textDue(record, Date.now(), textGraceMs())) record = await purgeDueText(store, id, Date.now());
   if (!record.paymentJournal && Date.now() >= Date.parse(record.request.expiresAt) &&
-      (record.request.state === 'payment_required' || record.request.state === 'approval_required' || record.request.state === 'ready'))
+      (record.request.state === 'payment_required' || record.request.state === 'approval_required' || record.request.state === 'ready') &&
+      !(record.request.solanaReview && (record.request.approval?.state === 'review' || record.request.approval?.state === 'pending')))
     return publicRequest(await store.update<AiRecord>(prefix + id, (current) => {
-      if (!current.paymentJournal && Date.now() >= Date.parse(current.request.expiresAt)) {
+      if (!current.paymentJournal && Date.now() >= Date.parse(current.request.expiresAt) &&
+          !(current.request.solanaReview && (current.request.approval?.state === 'review' || current.request.approval?.state === 'pending'))) {
         current.request.state = 'expired'; current.request.error = 'Review expired before inference. No inference payment was sent.';
       }
       return current;
@@ -163,7 +173,12 @@ export async function readAiRequest(store: Store, id: string, owner: AiOwner) {
     if (record.request.host) await cancelConnectorInference(store, id);
     const interrupted = await store.update<AiRecord>(prefix + id, (current) => {
       if (current.request.state === 'running') {
-        current.request.state = 'interrupted'; current.request.error = 'Inference was interrupted. No inference tokens were charged.';
+        current.request.state = 'interrupted';
+        current.request.error = current.request.host
+          ? 'The selected host did not return a complete answer before the request deadline. No inference tokens were charged. A new question requires a new review.'
+          : 'Inference was interrupted. No inference tokens were charged.';
+        current.request.payment.amountAtomic = '0';
+        current.request.recovery = { stage: 'host', code: 'host_result_missing', retryable: false };
         (current.progressEvents ??= {}).finishedAt = new Date().toISOString();
         if (current.request.host && current.runningAt) current.completedAt = new Date(current.runningAt + connectorRequestTimeoutMs).toISOString();
       }

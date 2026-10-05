@@ -37,6 +37,7 @@ async function fixture() {
     reconcile: async ({ id }) => results.get(id)!,
     cancel: async ({ id }) => ({ id, state: 'expired' }),
     get: async () => { throw new Error('Unused mock get'); },
+    prepareAsSponsor: async () => { throw new Error('Fresh price must not invoke mirror preparation'); },
     executeAsSponsor: async () => { throw new Error('Fresh price must not invoke mirror signing'); },
   };
   const gateway = { checkedGenesis: async () => state.genesis, multiple: async (keys: readonly string[]) => {

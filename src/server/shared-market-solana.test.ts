@@ -47,6 +47,7 @@ async function fixture() {
     submit: async input => { const p = ops.get(input.id); assert.ok(p); if (p.state === 'expired') throw new Error('expired'); submitted.push(input.id); p.state = state === 'prepared' ? 'confirmed' : state; p.signature = `devnet-signature-${input.id}`; return { id: input.id, state: p.state, signature: p.signature }; },
     reconcile: async input => { const p = ops.get(input.id); assert.ok(p); if (p.state === 'prepared' && now >= Date.parse(p.expiresAt)) p.state = 'expired'; return { id: input.id, state: p.state, ...(p.signature ? { signature: p.signature } : {}) }; },
     cancel: async input => { const p = ops.get(input.id); assert.ok(p); if (p.state !== 'prepared') throw new Error('signed-cannot-cancel'); p.state = 'expired'; return { id: input.id, state: 'expired' }; },
+    prepareAsSponsor: async () => { throw new Error('Unexpected sponsor preparation'); },
     executeAsSponsor: async input => {
       executions.push(input); const data = input.instructions[0].data!;
       if (mintCopy) price = { ...price, priceUsdE6: Buffer.from(data).readBigUInt64LE(8), publishedAt: Buffer.from(data).readBigInt64LE(16), copiedAt: clock };

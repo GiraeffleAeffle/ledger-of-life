@@ -156,6 +156,36 @@ test('stale running inference becomes interrupted without answer or paid revenue
   } finally { await store.close(); }
 });
 
+test('approved Solana connector timeout returns a terminal owned result without settling or replacing its allowance', async () => {
+  const store = new LocalStore(':memory:');
+  const id = '88888888-8888-4888-8888-888888888888';
+  const payer = { subject: 'payer', walletId: 'solana-wallet', payer: 'So11111111111111111111111111111111111111112' as `0x${string}`, network: 'solana-devnet' as const };
+  const request: LocalAiRequest = {
+    id, mode: 'paid', state: 'running', model: 'Qwen', prompt: 'Public question',
+    maxOutputTokens: 128, requestFingerprint: 'fixed',
+    createdAt: new Date(Date.now() - 300000).toISOString(), expiresAt: new Date(Date.now() + 600000).toISOString(),
+    answer: null, usage: null, error: null, payment: { state: 'authorized', amountAtomic: '12800', receipt: null },
+    review: null, paymentRequired: null,
+    approval: { id: 'approved', state: 'completed', budgetAtomic: '12800', request: null, hash: 'approval-receipt', error: null },
+    host: { id: 'unavailable-host', name: 'Selected GPU', own: false, payoutWallet: null },
+  };
+  try {
+    await store.create(`local-ai:request:${id}`, { id, owner: payer, mode: 'paid', request,
+      runningAt: Date.now() - 300000, paymentJournal: null, solanaJournal: { approvalId: 'approved', settlementId: null } });
+    const saved = await readAiRequest(store, id, payer);
+    assert.equal(saved.state, 'interrupted');
+    assert.equal(saved.payment.amountAtomic, '0');
+    assert.equal(saved.payment.receipt, null);
+    assert.equal(saved.approval?.budgetAtomic, '12800');
+    assert.equal(saved.answer, null);
+    assert.deepEqual(saved.recovery, { stage: 'host', code: 'host_result_missing', retryable: false });
+    assert.equal(saved.progress?.money, 'not_charged');
+    assert.match(saved.error!, /selected host did not return a complete answer/);
+    assert.deepEqual(await readAiRequest(store, id, payer), saved);
+    await assert.rejects(readAiRequest(store, id, { ...payer, subject: 'another-account' }), /another account/);
+  } finally { await store.close(); }
+});
+
 test('completed library and paid results retain text until grace and preserve the public usage summary', async () => {
   const store = new LocalStore(':memory:');
   const originalFetch = globalThis.fetch;
