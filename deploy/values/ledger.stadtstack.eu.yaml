@@ -1,7 +1,7 @@
 host: ledger.stadtstack.eu
 image:
-  # Image workflow 37961932781, tag image-20261009-4acb358; native civic and city-service integration, 9 Oct 2026.
-  digest: "sha256:efd9b2cc592824afade220a44007f093680d5fc7dcad06f908698f1f9f4e7c57"
+  # Image workflow 37981538964, tag image-20261009-d113bd1; relevant dated civic AI grounding, 9 Oct 2026.
+  digest: "sha256:2ce075945202d267ace7e9c01a7c591e87fce2c7829f31428d72de00433888cc"
 config:
   # Reviewed devnet programs deployed and initialized 5 Oct 2026; fictional units have no value or rights.
   SOLANA_HOUSE_MANIFEST: '{"cluster":"devnet","genesisHash":"EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG","programId":"CWUN8LKoKNEBJ6SQAVAqDFrb3rDP7vbVXMcf2EoAqjQM","cashMint":"BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE","houses":{"neighbourhood-homes":{"house":"BymrM735VyWUv5QVF5SaeNvMSNRxaY48H2HghN3NZu8z","unitMint":"2XtDmPPg9Rzu7kNufRsUVG3CGhkrp4KnuRm14rsGqwXy","deskVault":"2nmfyiHuN4edcMLqxtx1bksTwZ8h2XbfdkPZ5HAm7TNC","rewardVault":"7J8GauBE5Yk1DMf4EkJrzxChy2ZVQD9FCMNY7pCXkErk","stakeVault":"4mFt3PMdib2kJF2pYjFHCd5AWgtg6uim9rnCv6cLnwzR"},"workshop":{"house":"3mHkUkhPA1xicPXRzh1wD8Xt9ioampSgWDWrxdiHiH3g","unitMint":"Agijyc5RtmT3H4jubYakCdehMoWdFffkTAA8PdfkcCCe","deskVault":"9DjEXgR62geawNGbqFjjqcC5NiiWa3QJJzkLT1DN5myN","rewardVault":"BGEt59aFtTEkSAoqCv2yw9dCsvAxcokDzmR4jNWgaQi9","stakeVault":"71UFtrL2tzP9Bg3F8o4FbPSs3oK7Htv6ufrpbmWLrq6x"}}}'
