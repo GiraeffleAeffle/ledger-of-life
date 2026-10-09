@@ -2,16 +2,48 @@
 
 ## For judges
 
-Ledger of Life is a home-centred household ledger: agree a tenancy, secure its deposit, pay test rent, and operate separate personal holdings, fictional local stakes and paid local AI. **Live app: <https://ledger.stadtstack.eu>.** The Solana port launched in revision 28 on 5 October and now runs [revision 29](docs/DEPLOYMENT.md), including the hosted-proof corrections: Solana devnet is the primary new-action path; earlier Robinhood Chain testnet agreements and positions remain accessible.
+Ledger of Life is a home-centred household ledger: agree a tenancy, secure its deposit and pay test rent.
+Personal holdings, fictional local stakes, paid local AI and source-linked city discovery stay separate from rental security.
+
+**Live test app: <https://ledger.stadtstack.eu>.** The Solana port launched in revision 28 on 5 October; [revision 32](docs/DEPLOYMENT.md) is the latest recorded release, with ordered hosted buy → claim → real paid-AI proofs. Solana devnet is the primary new-action path; earlier Robinhood Chain testnet agreements and positions remain accessible.
+
+- **Rental escrow, pull-v2:** [`DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb`](https://explorer.solana.com/address/DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb?cluster=devnet), for bounded rental-security custody and consent/arbitration settlement.
 
 - **House program:** [`CWUN8LKoKNEBJ6SQAVAqDFrb3rDP7vbVXMcf2EoAqjQM`](https://explorer.solana.com/address/CWUN8LKoKNEBJ6SQAVAqDFrb3rDP7vbVXMcf2EoAqjQM?cluster=devnet), deployed and initialized for `tHOME` and `tWORK`, with on-chain bytes verified in [5 October deployment evidence](docs/evidence/SOLANA_HOUSE_DEVNET_DEPLOYMENT_2026-10-05.json). Revenue is **streamed to stakers over 7 days**, not paid instantly.
 - **Shares program:** [`97j5CWWKUALG2XRUBoZ1spqtN5YWJPVdTiRLNN5CWYkQ`](https://explorer.solana.com/address/97j5CWWKUALG2XRUBoZ1spqtN5YWJPVdTiRLNN5CWYkQ?cluster=devnet), deployed and initialized for test-TSLA security and lending. [Deployment evidence](docs/evidence/SOLANA_SHARES_DEVNET_DEPLOYMENT_2026-10-05.json) records finalized receipts and verified on-chain program hashes. App actions require the reviewed manifest and hosted sponsor; deployment alone is not a hosted-flow proof.
-- **Hosted evidence:** [5 October run](docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json) records cash-deposit funding, one-signature rent, buy/stake/accrued claim, the full lending cycle and a completed three-person Solana share-deposit settlement. The paid AI allowance was approved, but its final answer and settlement remain unproven after saved-request 503 responses; the separate local AI proof uses an explicitly synthetic answer.
+- **Hosted evidence:** [5 October run](docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json) records cash-deposit funding, one-signature rent, buy/stake/accrued claim, the full lending cycle and completed three-person Solana share-deposit settlement. Real owner-GPU paid answers were proven on revisions 30 and 32: revision 32 settled **41 output tokens / 0.0041 tUSDC**, after the reviewed 0.0128 tUSDC maximum. Earlier expired requests are preserved as failures, not successes. The local fixture's synthetic answer is separate. Availability depends on the host; unused delegated allowance is not another payment and is not automatically revoked.
 - **Try with a passkey:** open the live hostname in a passkey-capable browser, create an account and register a passkey (no real identity document required for test accounts). In **Money → Holdings → Get test money**, request site tUSDC. In **Money → Local stakes**, select House or Workshop, review and sign a buy, then stake; claim appears as the stream accrues. Home's full tenancy journey needs separate landlord, tenant and assigned arbitrator accounts. Review the exact amount, recipient, network and effects before every signature, then open the result's Solana Explorer receipt with `?cluster=devnet`. Availability depends on configured manifests and sponsor capacity; deployment evidence alone is not a hosted-flow proof.
-- **No account needed:** `/replay` and `/story` retain dated Robinhood receipts, not proof of the new Solana flows.
+- **Fast path, no account:** inspect the recorded Solana receipts below. `/replay` and `/story` retain dated Robinhood receipts, not proof of the new Solana flows. For a full live tenancy use three separate browser profiles/accounts: landlord, tenant and assigned arbitrator; publish/apply/select/join/accept before escrow setup/funding. Monthly rent is separate from the protected deposit. Configured embedded-wallet/sponsored flows need no seed phrase or SOL purchase, but still depend on passkey support, provider, RPC and sponsor availability.
 
-**Test networks only.** tUSDC, test TSLA and fictional units have no monetary value; units confer no equity, property or rental rights. Rental security stays separate from personal borrowing/stakes. Deposit earnings belong to the tenant (§551 BGB). Never send real funds.
+### 5 October Solana receipts shown in the demo
+
+These are the six demo-video receipts, not substitutes from other rehearsal runs. Every link targets **devnet**.
+
+| Recorded action | Receipt |
+|---|---|
+| Mara buys Workshop units | [Buy](https://explorer.solana.com/tx/5TBW4YsRGXVAxnXQ1TBwFFcXLzpSJ4r7sw8DFqJuAvupyiENce79eRztrsPBk1tc9HjiJjTeapwz587SXrm4Yc2M?cluster=devnet) |
+| Jonas funds 1,300 tUSDC rental security | [Escrow funding](https://explorer.solana.com/tx/3txUAroRf3VQ3ogZHcAne8co5TKjgKxk3mQ5xDp2tS9ZwD8dPjZ51Ed6NZJiN8n8ESXJCAMY5pqBbdgX7yRDaQ52?cluster=devnet) |
+| Jonas pays 650 tUSDC rent: 520 landlord / 130 house reward vault, one signature | [Atomic rent](https://explorer.solana.com/tx/2PvzMyrWSLaQiPAfBsyP3TVGTP8WwEgKr7DdkXtvCcTcVegJW1rBrhg6W5S9ePwafvmQwtcaiU9G14YqdBBh1SUm?cluster=devnet) |
+| Jonas buys house units; buying is not staking | [Buy](https://explorer.solana.com/tx/2xPedTkq2GruUkR2YR3n4x7EDW8Fgr5gaA1XJuQemzt5octu6TXLjukb4xGgGBh3SDWxtC1fRLfwpkuSddbZXZex?cluster=devnet) |
+| Jonas's paid AI answer settles to the house | [AI settlement](https://explorer.solana.com/tx/44UpJ9FyPMDbsbCce472wiAbE6zbxwwETgb6iXPcyoAKxMXxqPSFwqnJipphgqvALWnb1mHSyB7XTXgj57bvZh2c?cluster=devnet) |
+| Mara claims accrued streamed income | [Claim](https://explorer.solana.com/tx/2XyYY61cXEQ1h7U8uuwdUhkMs8Zw5H6YBQgL9sNfjuDYAF3XQRzVZKTqpf4NEzcXUhMSrYvwfrcZ8qiKeDpcfNPH?cluster=devnet) |
+
+**Test networks only: Solana devnet and Robinhood Chain testnet.** tUSDC, site-issued Solana tTSLA and fictional units have no monetary value; tTSLA is not a claim on Tesla, and units confer no equity, property or rental rights. Current cash-deposit yield is a **simulated test payout, default 5% simple interest**, not live investment income or current Kamino yield. Rental security stays separate from personal borrowing/stakes. Deposit earnings belong to the tenant and increase the security (§551 BGB); this demonstration does not establish legal compliance or capital protection. Programs remain upgradeable by the test deployer; no external audit or mainnet financial service is claimed. Never send real funds.
 Current flow details—v4 one-signature 80/20 rent, v5 `shares-solana` security, 7-day staking streams, AI allowance settlement, lending and the durable sponsor-budget ledger—are in the [5 October implementation overview](docs/LEDGER_OF_LIFE.md#current-solana-port--5-october-2026). Historical Robinhood instructions and receipts below remain valid for that network.
+
+## Built during Crypto World's Fair (14 Sep–12 Oct 2026)
+
+**Disclosure recorded 9 October 2026; history inspected through 5 October.** Only event-window work should be judged. Commit dates describe this repository's recorded changes, not proof that every idea or dependency originated during the event.
+
+| Period and commit range (inclusive) | Recorded work / prior-work boundary |
+|---|---|
+| Before 14 September | The separate Smart Rental Deposit predecessor already covered onboarding, tenancy administration, claims and release, with Gnosis/Safe, Monerium EURe and optional Aave. Its history includes `41d50a5` (30 Nov 2025) through `07573bd` (10 May 2026); a 6 Sep 2026 production review explicitly blocked real deposits and called real Monerium movement unproven. This is prior problem/workflow work, not a new event invention. |
+| 21–25 September, `6a9c0c9`–`58f6710` | This repository starts with the three-role rental prototype; passkeys/user signing, restricted Robinhood and Solana escrows, durable signed-operation APIs, connected devnet custody and pull payouts follow. Robinhood flows therefore **predate the October Solana port but fall inside this event**, not before the event. |
+| 26–30 September, `3cd946f`–`3292803` | Ledger of Life reorganisation, household holdings, sourced multi-city Places/maps/feeds, welcome guide, paired GPU connector/per-token AI, shared Robinhood test-TSLA lending market, site tUSDC and hosted release path. |
+| 1–3 October, `8808d3b`–`0ce17be` | Robinhood share-backed security and hosted three-account evidence, simulated cash-deposit payout, local-stake building revenue, public replay/story, Home Node, one-signature rent story and situation-first redesign. |
+| 5 October, `7451b3a`–`e4fac4f` | New Solana house/reward and share-security/lending programs, primary Solana app path, hosted proof corrections, durable AI recovery and atomic balance simulation; rollout revisions 28–32 and ordered real paid-answer receipts. |
+
+The public repository does not preserve the predecessor's old/private backend history. Imported concepts, dependencies, external contributions and personal funding/submission history still require explicit owner attribution; the chronology is not a claim of sole authorship or eligibility approval. No work dated after this disclosure is represented here.
 
 
 _Formerly "Deposit workspace". Package names, repository name and environment keys are unchanged._
@@ -24,9 +56,9 @@ _Formerly "Deposit workspace". Package names, repository name and environment ke
 
 Start with [docs/LEDGER_OF_LIFE.md](docs/LEDGER_OF_LIFE.md) for the idea, structure and adapter overview.
 
-**Ledger of Life** keeps a person’s home, deposit, money and places in one real-account workspace. A tenant's eligible deposit earnings can become contributions to a separate personal portfolio. Landlords retain a bounded rental-security workflow; assigned human arbitrators can resolve disputed claims.
+**Ledger of Life** keeps a person’s home, deposit, money and places in one real-account workspace. Personal stakes remain separate from rental security; moving deposit earnings outside that security would require legal review, not just tenant ownership. Landlords retain a bounded rental-security workflow; assigned human arbitrators can resolve disputed claims.
 
-This public hackathon implementation explores **Robinhood Chain and Solana in parallel**. It includes verified-account and private-agreement services, restricted native escrows, and signing/reconciliation APIs. Local native proofs passed on both stacks. A separate operator-key Solana devnet rehearsal completed test-USDC funding, Kamino supply/redemption and no-claim settlement. One Privy-connected tenancy remains active after funding and supplying 10 test USDC to Kamino. A second Privy-connected tenancy on the staged program completed asynchronous setup, funding, supply, redemption, zero-claim acceptance and a full 10-test-USDC return to the tenant's fixed payout account.
+This public hackathon implementation explores **Robinhood Chain and Solana in parallel**. It includes verified-account and private-agreement services, restricted native escrows, and signing/reconciliation APIs. Historical local native proofs passed on both stacks. The **earlier Circle devnet USDC/Kamino lane**, separate from current site-tUSDC simulated payouts, recorded an operator-key funding/supply/redemption/no-claim rehearsal and a Privy-connected staged-program cycle through asynchronous setup, funding, supply, redemption, zero-claim acceptance and return of 10 test USDC to the tenant's fixed payout account. Those records do not establish today's tenancy state or live investment income for the current cash-deposit path.
 
 Ledger of Life is [part of Stadtstack](https://stadtstack.eu). Its bound-pages mark and four numbered stage accents share the family palette; stage colors decorate rather than carry text or meaning alone. Display type is Fraunces, UI type is Public Sans, and technical values use IBM Plex Mono. All six WOFF2 files are self-hosted in `public/fonts/` with their SIL OFL notices. Social images use the renderer's default font. The test-network and reality labels remain separate from the brand: test tokens have no monetary value, and city welcome guides are not official city services.
 
