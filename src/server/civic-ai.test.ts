@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { hasCityAiTag } from '../data/civic-ai.ts';
+import { cityAiQuestion, hasCityAiTag } from '../data/civic-ai.ts';
 import type { CivicTopic } from '../data/civic.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
-import { buildCityAiPrompt, civicAiJobId, cityAiPublicText, handleCivicAiRequest, requestCivicAi } from './civic-ai.ts';
+import { buildCityAiPrompt, civicAiJobId, cityAiPublicText, fullCityAiEvidence, handleCivicAiRequest, rankCityAiEvidence, regionalCityAiEvidence, requestCivicAi } from './civic-ai.ts';
 import type { CivicAiDependencies, CivicAiEvidence } from './civic-ai.ts';
 import { mutateCivic, readCivicTopic, resolveCivicAiTrigger } from './civic.ts';
 import type { AiOwner } from './local-ai.ts';
@@ -17,6 +17,7 @@ import { AI_MODEL } from './local-ai-runtime.ts';
 import type { LocalAiRequest } from './local-ai-types.ts';
 import { LocalStore } from './store.ts';
 import type { Store } from './store.ts';
+import type { CityFeature, RelevantRegionalTopic, RegionalTopicItem, Signal } from './city-signals.ts';
 
 const evidence: CivicAiEvidence[] = [{ id: 'published-council-record', title: 'Council walking routes consultation',
   url: 'https://www.strausberg.de/council', asOf: '2026-09-21', kind: 'council_paper', reviewState: 'candidate',
@@ -71,6 +72,16 @@ function provider() {
 test('explicit tags exclude emails and account-name prefixes; alias is City AI', () => {
   for (const text of ['@city-ai help', 'Please @CITY-AI, help', '(@Mecky)']) assert.equal(hasCityAiTag(text), true);
   for (const text of ['not@city-ai.example', '@city-ai-extra', '@Meckys', '@@city-ai', 'mecky']) assert.equal(hasCityAiTag(text), false);
+});
+
+test('question extraction distinguishes a prefixed context from an appended tag', () => {
+  assert.equal(cityAiQuestion('English example context. @city-ai Was sagt die Quelle?'), 'Was sagt die Quelle?');
+  assert.equal(cityAiQuestion('Was sagt die Quelle? @city-ai'), 'Was sagt die Quelle?');
+  assert.equal(cityAiQuestion('Was sagt die Quelle? (@city-ai)'), 'Was sagt die Quelle?');
+  assert.equal(cityAiQuestion('Was sagt die Quelle? [@Mecky]'), 'Was sagt die Quelle?');
+  assert.equal(cityAiQuestion('(@city-ai) Was sagt die Quelle?'), 'Was sagt die Quelle?');
+  assert.equal(cityAiQuestion('@Mecky What does the record say?'), 'What does the record say?');
+  assert.equal(cityAiQuestion('An untagged question'), 'An untagged question');
 });
 
 test('stored ownership, tag and topic binding are checked before inference; GET never creates', async () => {
@@ -186,6 +197,145 @@ test('prompt uses only selected dated evidence; escaped source text and personal
     assert.doesNotMatch(result.prompt, /<script>|private@example|491234567890|0x123456|attacker\.example|PRIVATE-/);
     assert.match(result.prompt, /2026-09-21/); assert.match(result.prompt, /candidate/);
     assert.equal(cityAiPublicText('Public walking routes are useful.'), 'Public walking routes are useful.');
+  } finally { await store.close(); }
+});
+
+test('German heat terms match topic evidence, not unrelated places sharing the city name or boilerplate', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity();
+  try {
+    const current = await topic(store, owner);
+    const base = await resolveCivicAiTrigger(store, owner, { topicId: current.id, contributionId: null });
+    const places: CivicAiEvidence[] = ['Rolling Wheels MC Strausberg', 'Volkshaus Strausberg', 'Dorfgemeinschaftshaus Hohenstein'].map((title, index) => ({
+      ...evidence[0], id: `place-${index}`, title, kind: 'place', statement: 'A mapped place in Strausberg. Public community information, not reviewed.',
+    }));
+    const heat: CivicAiEvidence = { ...evidence[0], id: 'heat', title: 'Kommunale Wärmeplanung', kind: 'cityWebsite',
+      statement: 'Heizungsversorgung und Wärmeplan werden untersucht; kein Heizungsgebot.' };
+    for (const question of ['@city-ai Was ist zur Wärmeplanung in Strausberg bekannt? Bitte Quelle und Stand nennen.',
+      '@city-ai Welche Quellen gibt es zur Waerme in Strausberg?', '@city-ai Bitte erkläre den Stand zur Heizung.']) {
+      const trigger = { ...base, triggerText: question, topicTitle: 'Demo: sourced city questions', topicQuestion: 'Is dated source context useful before a community discussion?' };
+      assert.deepEqual(rankCityAiEvidence(trigger, [...places, heat]).map((item) => item.id), ['heat']);
+      assert.deepEqual(buildCityAiPrompt(trigger, places), { prompt: '', sources: [], reason: 'no_relevant_sources' });
+    }
+    const unrelated = { ...base, triggerText: '@city-ai Wie hoch ist der Wasserstand des Straussees?', topicBody: 'The community previously discussed Wärmeplanung.' };
+    assert.deepEqual(rankCityAiEvidence(unrelated, [...places, heat]), []);
+  } finally { await store.close(); }
+});
+
+test('an eligible topic-linked record and council sources rank ahead of generic places, without admitting an unrelated link', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity();
+  try {
+    const current = await topic(store, owner);
+    const trigger = await resolveCivicAiTrigger(store, owner, { topicId: current.id, contributionId: null });
+    const place = { ...evidence[0], id: 'place', kind: 'place' };
+    const linked = { ...evidence[0], id: 'linked', kind: 'cityWebsite', url: 'https://www.strausberg.de/source' };
+    const council = { ...evidence[0], id: 'council' };
+    const web = { ...evidence[0], id: 'web', kind: 'cityWebsite' };
+    const selected = rankCityAiEvidence({ ...trigger, topicSourceUrl: `${linked.url}#section` }, [place, web, council, linked]);
+    assert.deepEqual(selected.map((item) => item.id), ['linked', 'council', 'web', 'place']);
+    assert.deepEqual(buildCityAiPrompt({ ...trigger, topicSourceUrl: linked.url, triggerText: '@city-ai Wasserstand des Straussees?' }, [linked]).sources, []);
+    const neutral = { ...trigger, topicTitle: 'Demo', topicQuestion: 'Which source?', topicBody: '',
+      triggerText: '@city-ai Was steht in dieser Quelle?', topicSourceUrl: linked.url };
+    assert.equal(rankCityAiEvidence(neutral, [linked])[0].id, 'linked');
+    assert.deepEqual(rankCityAiEvidence({ ...neutral, topicSourceUrl: 'https://attacker.example/not-published' }, [linked]), []);
+  } finally { await store.close(); }
+});
+
+test('the tagged question controls answer language even when the opinion poll uses the other language', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity();
+  try {
+    const current = await topic(store, owner);
+    const base = await resolveCivicAiTrigger(store, owner, { topicId: current.id, contributionId: null });
+    for (const [question, poll, expectedQuestion] of [
+      ['English example context. @city-ai Was sagen die Quellen über walking routes?', 'Which walking routes should we discuss?', 'Was sagen die Quellen über walking routes?'],
+      ['@city-ai What does the council say about walking routes?', 'Welche Wege sollten wir besprechen?', 'What does the council say about walking routes?'],
+      ['Was sagen die Quellen über walking routes? @city-ai', 'Which walking routes should we discuss?', 'Was sagen die Quellen über walking routes?'],
+      ['Was sagen die Quellen über walking routes? (@city-ai)', 'Which walking routes should we discuss?', 'Was sagen die Quellen über walking routes?'],
+      ['[@Mecky] Was sagen die Quellen über walking routes?', 'Which walking routes should we discuss?', 'Was sagen die Quellen über walking routes?'],
+    ]) {
+      const built = buildCityAiPrompt({ ...base, triggerText: question, topicQuestion: poll }, evidence);
+      const packet = JSON.parse(built.prompt.slice(built.prompt.indexOf('\n') + 1));
+      assert.equal(packet.question, expectedQuestion);
+      assert.equal(packet.topicQuestion, poll);
+      assert.equal('request' in packet, false, 'there is only one unambiguous question field');
+      assert.match(built.prompt, /ONLY in the language of question.*not topicQuestion or sources/);
+      assert.ok(built.prompt.length <= 2000);
+    }
+  } finally { await store.close(); }
+});
+
+test('the model receives each source exact recorded kind and title, never a guessed shared category', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity();
+  try {
+    const current = await topic(store, owner);
+    const trigger = await resolveCivicAiTrigger(store, owner, { topicId: current.id, contributionId: null });
+    const club = { ...evidence[0], id: 'club', kind: 'place', title: 'Rolling Wheels MC Strausberg', statement: 'An OpenStreetMap place record.' };
+    const built = buildCityAiPrompt({ ...trigger, triggerText: '@city-ai Was ist Rolling Wheels MC?' }, [club]);
+    const packet = JSON.parse(built.prompt.slice(built.prompt.indexOf('\n') + 1));
+    assert.equal(packet.sources[0].kind, 'place'); assert.equal(packet.sources[0].title, club.title);
+    assert.match(built.prompt, /exact recorded kind; never infer a common physical category/);
+    assert.doesNotMatch(JSON.stringify(packet), /community center/);
+  } finally { await store.close(); }
+});
+
+test('all locally published regional agenda items retain their title, type and exact status locator', async () => {
+  const publication = JSON.parse(await readFile(new URL('../../stadtstack-data/out/regions/brandenburg-mol/topics.json', import.meta.url), 'utf8')) as {
+    topics: { id: string; label: string; summary: string; reviewState: RelevantRegionalTopic['reviewState'];
+      municipalities: { municipalityId: string; stage: string; items: RegionalTopicItem[] }[] }[];
+  };
+  const topics: RelevantRegionalTopic[] = publication.topics.flatMap((group) => {
+    const local = group.municipalities.find((item) => item.municipalityId === 'hoppegarten');
+    return local?.items.length ? [{ id: group.id, label: group.label, summary: group.summary, reviewState: group.reviewState,
+      stage: local.stage, items: local.items, neighbours: [],
+      furthest: { name: 'Hoppegarten', stage: local.stage, source: local.items[0] } }] : [];
+  });
+  const records = regionalCityAiEvidence(topics);
+  const skate = records.find((item) => item.url.endsWith('__ktonr=72225'));
+  assert.ok(skate); assert.equal(skate.kind, 'councilAgenda'); assert.equal(skate.asOf, '2026-09-07');
+  assert.equal(skate.title, 'Außerplanmäßige Aufwendungen Skateanlage Hönow');
+  assert.equal(skate.status, 'referred'); assert.match(skate.locator ?? '', /an Ausschuss\/Fraktion verwiesen/);
+  assert.equal(new Set(records.map((item) => item.id)).size, records.length);
+  const store = new LocalStore(':memory:'); const owner = identity();
+  try {
+    const current = await topic(store, owner);
+    const trigger = await resolveCivicAiTrigger(store, owner, { topicId: current.id, contributionId: null });
+    const built = buildCityAiPrompt({ ...trigger, cityId: 'hoppegarten', triggerText: '@city-ai Welchen Beschlussstatus nennt die Ratsagenda zur Skateanlage Hönow?' }, records);
+    assert.equal(built.sources[0].id, skate.id);
+    assert.match(built.prompt, /an Ausschuss\/Fraktion verwiesen/);
+    const heat = buildCityAiPrompt({ ...trigger, cityId: 'hoppegarten', triggerText: '@city-ai What stage is the Wärmeplanung at?' }, records);
+    assert.equal(heat.sources.length, 1);
+    assert.match(heat.sources[0].id, /^regional:waermeplanung:/);
+    const campus = records.find((item) => item.url.includes('eb568622-04ec-41e7-8069-fd8204fa88d8'));
+    assert.ok(campus); assert.ok(campus.locator!.length > 240);
+    const campusPrompt = buildCityAiPrompt({ ...trigger, cityId: 'hoppegarten', triggerText: '@city-ai Welche Gemeinde nennt die DiPlan-Liste beim Schulcampus Lindenallee?' }, [campus]);
+    const packet = JSON.parse(campusPrompt.prompt.slice(campusPrompt.prompt.indexOf('\n') + 1));
+    assert.equal(packet.sources[0].locator, campus.locator);
+    assert.match(packet.sources[0].locator, /Neuenhagen bei Berlin.*Gemeinde Hoppegarten/);
+    assert.ok(campusPrompt.prompt.length <= 2000);
+  } finally { await store.close(); }
+});
+
+test('no relevant record produces a plain no-source status without dispatching inference', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity(); const p = provider();
+  try {
+    const current = await topic(store, owner, '@city-ai Wie hoch ist der Wasserstand des Straussees?');
+    const result = await requestCivicAi(store, owner, { topicId: current.id, contributionId: null }, true, p.dependencies);
+    assert.equal(result?.status, 'unavailable'); assert.deepEqual(result?.sources, []); assert.equal(result?.answer, null);
+    assert.match(result?.message ?? '', /No matching published/); assert.equal(p.calls.length, 0);
+  } finally { await store.close(); }
+});
+
+test('an explicit fresh provider attempt reranks current evidence but a published answer keeps its original sources', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity(); const p = provider();
+  try {
+    const current = await topic(store, owner); const input = { topicId: current.id, contributionId: null };
+    const first = await requestCivicAi(store, owner, input, true, { ...p.dependencies, execute: async () => { throw new Error('Fixture host unavailable'); } });
+    assert.equal(first?.status, 'unavailable'); assert.equal(first?.sources[0].id, evidence[0].id);
+    const changed = { ...evidence[0], id: 'new-walking-record', statement: 'A newly published walking routes consultation.', asOf: '2026-10-09' };
+    const second = await requestCivicAi(store, owner, input, true, { ...p.dependencies, evidence: async () => [changed] });
+    assert.equal(second?.status, 'completed'); assert.equal(second?.sources[0].id, changed.id);
+    assert.equal(p.calls.length, 1); assert.match(String(p.calls[0].body.prompt), /newly published/);
+    const replay = await requestCivicAi(store, owner, input, true, { ...p.dependencies, evidence: async () => [] });
+    assert.deepEqual(replay, second); assert.equal(p.calls.length, 1);
   } finally { await store.close(); }
 });
 
@@ -429,7 +579,7 @@ test('real interrupted library attempt gets a new budgeted generation; stale com
         originalRecord.resourceUrl, null);
       assert.equal(terminal.state, 'interrupted', 'the real adapter never restarts the old request');
       transport.gate = null;
-      const retried = await requestCivicAi(store, owner, input, true);
+      const retried = await requestCivicAi(store, owner, input, true, { evidence: async () => evidence });
       assert.equal(retried?.status, 'completed'); assert.equal(retried?.id, publicId);
       const replacement = (await store.get<{ generation: number; attempt: { id: string } }>(`civic-ai:job:${publicId}`))!;
       assert.equal(replacement.generation, 2); assert.notEqual(replacement.attempt.id, original.id);
@@ -467,4 +617,76 @@ test('persistent attempt lease expires without dispatching on GET and fresh retr
     assert.equal(topicAfter.contributions[0].text, fresh?.answer);
     assert.doesNotMatch(topicAfter.contributions[0].text, /stale/);
   } finally { release?.(); await pending; await store.close(); }
+});
+
+test('invalid and unknown source dates cannot dispatch inference as dated evidence', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity(); const p = provider();
+  try {
+    const current = await topic(store, owner);
+    const trigger = await resolveCivicAiTrigger(store, owner, { topicId: current.id, contributionId: null });
+    for (const asOf of ['undated', '', '2026-02-30', '2026-13-01', 'yesterday', '2026-09-27 garbage']) {
+      assert.deepEqual(buildCityAiPrompt(trigger, [{ ...evidence[0], asOf }]), { prompt: '', sources: [], reason: 'no_relevant_sources' });
+    }
+    const result = await requestCivicAi(store, owner, { topicId: current.id, contributionId: null }, true,
+      { ...p.dependencies, evidence: async () => [{ ...evidence[0], asOf: 'undated' }] });
+    assert.equal(result?.status, 'unavailable'); assert.deepEqual(result?.sources, []); assert.equal(p.calls.length, 0);
+  } finally { await store.close(); }
+});
+
+test('full published records preserve source unknowns and linked secondary locators; compact map summaries cannot ground answers', async () => {
+  const full = JSON.parse(await readFile(new URL('../../stadtstack-data/out/cities/strausberg/signals.geojson', import.meta.url), 'utf8')) as { features: Signal[] };
+  const compact = JSON.parse(await readFile(new URL('../../stadtstack-data/out/cities/strausberg/signals.min.geojson', import.meta.url), 'utf8')) as { features: CityFeature[] };
+  const record = full.features.find((item) => item.properties.id === 'atlas:altstadt-plan69')!;
+  assert.ok(record);
+  const linked = record.properties.sources[1];
+  const projected = fullCityAiEvidence([record], `${linked.url}#page=1`);
+  assert.equal(projected[0].url, linked.url);
+  assert.deepEqual(projected[0].unknowns, record.properties.unknowns);
+  assert.deepEqual(fullCityAiEvidence(compact.features.filter((item) => item.properties.id === record.properties.id)), []);
+  const store = new LocalStore(':memory:'); const owner = identity();
+  try {
+    const current = await topic(store, owner);
+    const trigger = await resolveCivicAiTrigger(store, owner, { topicId: current.id, contributionId: null });
+    const built = buildCityAiPrompt({ ...trigger, triggerText: '@city-ai Was ist beim Altstadt-Plan zum Bearbeitungsstand und nächsten Termin bekannt?' }, projected);
+    const packet = JSON.parse(built.prompt.slice(built.prompt.indexOf('\n') + 1));
+    assert.deepEqual(packet.sources[0].unknowns, record.properties.unknowns);
+    assert.equal(packet.sources[0].locator, linked.locator);
+    assert.equal(packet.sources[0].status, record.properties.status);
+    assert.ok(built.prompt.length <= 2000);
+  } finally { await store.close(); }
+});
+
+test('context packing preserves whole questions and records or explicitly declines without fabricated absence', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity(); const p = provider();
+  try {
+    const current = await topic(store, owner);
+    const trigger = await resolveCivicAiTrigger(store, owner, { topicId: current.id, contributionId: null });
+    const long = { ...evidence[0], id: 'a-long', locator: 'Walking routes caveat. '.repeat(200), unknowns: ['A material final caveat.'] };
+    const built = buildCityAiPrompt(trigger, [long, evidence[0]]);
+    assert.equal(built.sources.length, 1); assert.equal(built.sources[0].id, evidence[0].id);
+    const noFit = buildCityAiPrompt(trigger, [long]);
+    assert.deepEqual(noFit, { prompt: '', sources: [], reason: 'context_too_large' });
+    const longQuestion = '@city-ai What about walking routes? ' + 'Public context. '.repeat(150);
+    assert.equal(buildCityAiPrompt({ ...trigger, triggerText: longQuestion }, evidence).reason, 'context_too_large');
+    const result = await requestCivicAi(store, owner, { topicId: current.id, contributionId: null }, true,
+      { ...p.dependencies, evidence: async () => [long] });
+    assert.equal(result?.status, 'unavailable'); assert.match(result?.message ?? '', /bounded AI context/);
+    assert.equal(p.calls.length, 0);
+  } finally { await store.close(); }
+});
+
+test('keyword-rich places cannot crowd a relevant linked record or council paper out of the source cap', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity();
+  try {
+    const current = await topic(store, owner);
+    const base = await resolveCivicAiTrigger(store, owner, { topicId: current.id, contributionId: null });
+    const linked = { ...evidence[0], id: 'linked', kind: 'cityWebsite', url: 'https://www.strausberg.de/linked-source' };
+    const council = { ...evidence[0], id: 'council' };
+    const places = [0, 1, 2].map((index) => ({ ...evidence[0], id: `place-${index}`, kind: 'place',
+      title: `Walking routes station lake ${index}`, statement: 'Walking routes around the station and lake.',
+      url: `https://www.strausberg.de/places/${index}` }));
+    const trigger = { ...base, topicSourceUrl: linked.url, triggerText: '@city-ai Explain walking routes around the station and lake.' };
+    assert.deepEqual(rankCityAiEvidence(trigger, [...places, council, linked]).slice(0, 2).map((item) => item.id), ['linked', 'council']);
+    assert.deepEqual(buildCityAiPrompt(trigger, [...places, council, linked]).sources.slice(0, 2).map((item) => item.id), ['linked', 'council']);
+  } finally { await store.close(); }
 });

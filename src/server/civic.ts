@@ -316,7 +316,7 @@ export async function readCivicTopic(store: Store, identity: VerifiedIdentity, i
 
 export interface CivicAiTrigger {
   accountId: string; topicId: string; contributionId: string | null; cityId: string;
-  topicTitle: string; topicBody: string; topicQuestion: string; triggerText: string;
+  topicTitle: string; topicBody: string; topicQuestion: string; topicSourceUrl: string | null; triggerText: string;
   topicStatus: CivicTopic['phase']; version: number;
 }
 
@@ -337,7 +337,7 @@ export async function resolveCivicAiTrigger(store: Store, identity: VerifiedIden
   if (trigger?.ai || !hasCityAiTag(triggerText)) invalid('Request a reply from an authored @city-ai or @Mecky tag.');
   return {
     accountId: owner, topicId: topic.id, contributionId: input.contributionId, cityId: topic.cityId,
-    topicTitle: topic.title, topicBody: topic.context, topicQuestion: topic.question, triggerText,
+    topicTitle: topic.title, topicBody: topic.context, topicQuestion: topic.question, topicSourceUrl: topic.sourceUrl, triggerText,
     topicStatus: topic.phase, version: topic.version,
   };
 }

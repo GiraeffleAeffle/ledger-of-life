@@ -112,12 +112,16 @@ concepts:
       - Source records retain their own provenance and authority; user discussion is not a municipal submission.
       - Cross-city references keep one canonical topic, poll and frozen result.
   CivicContribution:
-    definition: An account-authored discussion note or structured pro/con argument with an optional parent.
+    definition: An account-authored discussion note or structured pro/con argument, or a distinctly labelled sourced model reply.
     reality: prototype
     code: [src/components/civic-arguments.tsx, src/components/civic-argument-layout.ts]
     invariants:
       - Accessible tree and sunburst share one hierarchy; area represents structure, not support or votes.
       - Question/options/contributions freeze before voting; account identity is not exposed with public text.
+      - City AI source eligibility follows the tagged question; shared geography or conversational boilerplate alone is not relevance. Topic links only match published local records and are never fetched.
+      - Relevant council records and explicit source matches outrank generic places. Preserve each source's exact kind/title/date/locator; no inferred common physical category.
+      - The tagged question controls answer language, not the poll question. No relevant source means no model call; explicit fresh attempts may rerank but completed/in-flight evidence remains bound.
+      - Grounding reads full records and preserves included locators, recorded unknowns and the actual question; invalid/absent dates are not dated evidence. Oversized complete context is declined explicitly, not silently truncated.
   OpinionPoll:
     definition: A non-binding Ledger test-account poll moving through discussion, ready, open and closed.
     reality: prototype

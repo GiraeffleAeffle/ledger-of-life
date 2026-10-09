@@ -101,14 +101,14 @@ export async function readSignalsCatalogue(): Promise<SignalCatalogue> {
   if (catalogue.schemaVersion !== 'stadtstack-signals-v1' || !Array.isArray(catalogue.cities)) throw new Error('Unsupported city signals catalogue.');
   return catalogue;
 }
-export async function readCitySignals(cityId: string): Promise<SignalResult> {
+export async function readCitySignals(cityId: string, detail: 'compact' | 'full' = 'compact'): Promise<SignalResult> {
   const catalogue = await readSignalsCatalogue();
   // Never use raw input as a filesystem path: only catalogue IDs select directories.
   const city = catalogue.cities.find((entry) => entry.id === cityId && /^[a-z0-9-]+$/.test(entry.id));
   if (!city) return { state: 'not_covered', city: cityId, coveredCities: catalogue.cities, generatedAt: catalogue.generatedAt };
   const directory = join(dataDirectory(), 'cities', city.id);
   const [signals, changes] = await Promise.all([
-    jsonFile<CityCollection>(join(directory, city.minUrl ? 'signals.min.geojson' : 'signals.geojson')),
+    jsonFile<CityCollection>(join(directory, detail === 'compact' && city.minUrl ? 'signals.min.geojson' : 'signals.geojson')),
     jsonFile<CitySignals['changes']>(join(directory, 'changes.json')),
   ]);
   if (signals.type !== 'FeatureCollection' || !Array.isArray(signals.features)) throw new Error('Invalid city signals collection.');
