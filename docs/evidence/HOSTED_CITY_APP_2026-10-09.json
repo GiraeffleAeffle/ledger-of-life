@@ -1,0 +1,68 @@
+{
+  "release": {
+    "revision": 33,
+    "deployedAt": "2026-10-09T18:59:56+02:00",
+    "sourceCommit": "4acb3582a73a63a5f140dfb0c0d88241bc716b2d",
+    "pinCommit": "206ead9282b1cf1530decd4d6d310ac8d280a357",
+    "digest": "sha256:efd9b2cc592824afade220a44007f093680d5fc7dcad06f908698f1f9f4e7c57",
+    "sourceCi": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/37961477425",
+    "imageBuild": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/37961932781",
+    "pod": "ledger-of-life-54cd496f48-wcfwh",
+    "podReady": true,
+    "podSpecAndImageIdMatchDigest": true,
+    "method": "Governed release only; filtered viewer stopped, no wireproxy remained, release applied and viewer restored. No secret, program, authority or other-product deployment changes."
+  },
+  "gate": {"typescript": "passed", "lint": "passed", "testsPassed": 1053, "testsSkipped": 2, "testsFailed": 0, "whitespace": "passed", "nextBuild": "passed", "sourceCi": "passed", "colimaSmoke": "passed: amd64, uid1000, read-only root, dropped capabilities, temporary data/cache, public pages200, new private APIs401, old reader/offline routes404, storeAvailabletrue, private files absent"},
+  "moneyRegression": {
+    "network": "Solana devnet",
+    "action": "buy",
+    "reviewedCash": "0.001 tUSDC",
+    "receivedUnits": "0.001 tHOME",
+    "signature": "5xF4LTEHybeXcbVHH6ZrEf67nCJ8Q5pMrVEiGYfDzY22xcY21VK1wwtFm6SGwWaBr1C8o6BH7ibJs2y1BarCEaWx",
+    "explorer": "https://explorer.solana.com/tx/5xF4LTEHybeXcbVHH6ZrEf67nCJ8Q5pMrVEiGYfDzY22xcY21VK1wwtFm6SGwWaBr1C8o6BH7ibJs2y1BarCEaWx?cluster=devnet",
+    "blockTime": "2026-10-09T17:08:14Z",
+    "slot": 509249084,
+    "commitment": "finalized",
+    "transactionError": null,
+    "userTokenDeltasAtomic": {"BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE": "-1000", "2XtDmPPg9Rzu7kNufRsUVG3CGhkrp4KnuRm14rsGqwXy": "1000"},
+    "independentCheck": "Public devnet getTransaction at finalized commitment; matching receipt and exact user token deltas.",
+    "earlierObservation": "An earlier house snapshot failed its finalized-clock check before any signature. A fresh verified review later completed the tiny buy; no guard was loosened and no failed read was called successful."
+  },
+  "nativeCivic": {
+    "topicId": "90931f8c-17db-4458-b653-4d7eab6a1387",
+    "url": "https://ledger.stadtstack.eu/?area=places&tab=places-say&civicTopic=90931f8c-17db-4458-b653-4d7eab6a1387",
+    "title": "Demo: welcoming neighbours across city boundaries",
+    "classification": "Actual persisted test-account workflow with explicitly labelled example discussion/arguments. Not verified residents, municipal consultation, official vote or delivered outcome.",
+    "steps": ["create", "discussion", "pro and con arguments", "sunburst", "link Altlandsberg", "ready/freeze", "open", "review and cast one account choice", "close", "reopen from Altlandsberg list", "keyboard-select con argument"],
+    "origin": "strausberg",
+    "linkedCity": "altlandsberg",
+    "sameCanonicalTopicAndResult": true,
+    "counts": [1, 0],
+    "totalAccountChoices": 1,
+    "resultHash": "0e8cc8a28a2d7223b99ddd54aa5e7d38c20169e096850aabe71d70bc9bb7f334",
+    "onchainAnchor": false,
+    "sunburstSectors": 2,
+    "mobileOverflow": false
+  },
+  "taggedCityAi": {
+    "topicId": "43938082-9d4f-440f-bc0b-5854810d3bbc",
+    "statusObserved": "unavailable",
+    "classification": "Real authenticated stored tag and actual job availability response, not a generated-answer proof.",
+    "message": "The configured free host or provider attempt is unavailable. An explicit retry uses a new budgeted private attempt.",
+    "ownerPrerequisite": "Sole configured owner GPU reported freePublicAnswers:false. Owner must opt in; no consent bypass, new payment or fake reply was introduced.",
+    "limits": {"accountPerUtcDay": 3, "topicPerUtcDay": 3, "sitePerUtcDay": 30, "outputTokens": 192}
+  },
+  "otherFeatures": {
+    "cityScopes": "14 native discussion scopes; existing 8 map snapshots plus 6 source-backed Strausberg neighbours, without inventing map/council coverage.",
+    "game": "Live Strausberg preview links https://spiel.stadtstack.eu/strausberg; unknown city offers explicit edition chooser. Full gameplay not retested.",
+    "loyalty": "Live map toggle reports needs hosting, with zero verified merchant pins or handoffs. Owner must provision the approved Stadtstack origin and genuine merchant/program/location evidence.",
+    "localHomeNode": "Separate Mac local HTTP server returned an actual qwen3.8:27b-ud-q3-k-xl answer from the owner-authorized private LAN interface while the page's public internet access was blocked. Reload worked and cleared conversation. Only the dated Strausberg basics pack is supplied; no radio, hosted offline AI or physical WOL acceptance claim.",
+    "localAnswer": "The number listed for a life-threatening emergency is 112, according to the emergency-numbers entry checked on 2026-09-29.",
+    "localSetupLink": "https://github.com/GiraeffleAeffle/ledger-of-life/blob/main/home-node/README.md",
+    "removedBeforeRelease": ["Röbel-App reader", "closed mitmachen handoff", "public PWA worker/cache"],
+    "roadmapOnly": ["self-hosted native passkey wallets", "Bluetooth PAN or Reticulum transport", "mesh transaction relay", "Myotis"]
+  },
+  "evidenceDirectory": "/Users/max/Code/ledger-of-life-review/videos/captures-v4/",
+  "evidence": ["live-native-discussion-1280.png", "live-native-result-1280.png", "live-native-result-390.png", "live-native-cross-city-1280.png", "live-native-review-cursor.mp4", "live-native-journey-cursor.mp4", "live-money-regression-390.png", "live-city-ai-status-390.png", "live-game-loyalty-1280.png", "local-node-approved-lan-1280.png", "local-node-approved-lan-390.png", "local-node-approved-lan-cursor.mp4", "local-acceptance.json"],
+  "reviewLimits": "Focused code/UX reviews are not external audits. Existing map proxy aggregate-resource-admission risk remains outside this delta. PostgreSQL support was exercised through SQL-contract tests, not a live migration."
+}

@@ -2,10 +2,10 @@
 
 ## For judges
 
-Ledger of Life is a home-centred household ledger: agree a tenancy, secure its deposit and pay test rent.
-Personal holdings, fictional local stakes, paid local AI and source-linked city discovery stay separate from rental security.
+Ledger of Life combines Home and Money workflows with source-linked city information, native discussions and account-based opinion polls.
+Rental security stays separate from personal holdings, fictional local stakes, paid AI and civic opinions.
 
-**Live test app: <https://ledger.stadtstack.eu>.** The Solana port launched in revision 28 on 5 October; [revision 32](docs/DEPLOYMENT.md) is the latest recorded release, with ordered hosted buy → claim → real paid-AI proofs. Solana devnet is the primary new-action path; earlier Robinhood Chain testnet agreements and positions remain accessible.
+**Live test app: <https://ledger.stadtstack.eu>.** [Revision 33](docs/DEPLOYMENT.md), released 9 October, adds the native city workflow; [hosted acceptance](docs/evidence/HOSTED_CITY_APP_2026-10-09.json) records its complete opinion-poll journey and a finalized tiny house-buy regression. The Solana port launched in revision 28 on 5 October; revision 32 retains the ordered buy → claim → paid-AI evidence. Solana devnet remains the primary new-action path; earlier Robinhood Chain testnet agreements and positions remain accessible.
 
 - **Rental escrow, pull-v2:** [`DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb`](https://explorer.solana.com/address/DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb?cluster=devnet), for bounded rental-security custody and consent/arbitration settlement.
 
@@ -14,6 +14,9 @@ Personal holdings, fictional local stakes, paid local AI and source-linked city 
 - **Hosted evidence:** [5 October run](docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json) records cash-deposit funding, one-signature rent, buy/stake/accrued claim, the full lending cycle and completed three-person Solana share-deposit settlement. Real owner-GPU paid answers were proven on revisions 30 and 32: revision 32 settled **41 output tokens / 0.0041 tUSDC**, after the reviewed 0.0128 tUSDC maximum. Earlier expired requests are preserved as failures, not successes. The local fixture's synthetic answer is separate. Availability depends on the host; unused delegated allowance is not another payment and is not automatically revoked.
 - **Try with a passkey:** open the live hostname in a passkey-capable browser, create an account and register a passkey (no real identity document required for test accounts). In **Money → Holdings → Get test money**, request site tUSDC. In **Money → Local stakes**, select House or Workshop, review and sign a buy, then stake; claim appears as the stream accrues. Home's full tenancy journey needs separate landlord, tenant and assigned arbitrator accounts. Review the exact amount, recipient, network and effects before every signature, then open the result's Solana Explorer receipt with `?cluster=devnet`. Availability depends on configured manifests and sponsor capacity; deployment evidence alone is not a hosted-flow proof.
 - **Fast path, no account:** inspect the recorded Solana receipts below. `/replay` and `/story` retain dated Robinhood receipts, not proof of the new Solana flows. For a full live tenancy use three separate browser profiles/accounts: landlord, tenant and assigned arbitrator; publish/apply/select/join/accept before escrow setup/funding. Monthly rent is separate from the protected deposit. Configured embedded-wallet/sponsored flows need no seed phrase or SOL purchase, but still depend on passkey support, provider, RPC and sponsor availability.
+- **Native city flow:** in **Places → Have your say**, choose a discussion city, create a topic, add discussion and pro/con arguments, inspect the same hierarchy as a sunburst/list, then author-review readiness, open an opinion poll and close its frozen result. Authors can link one canonical topic across cities; everyone can share its safe public route. The hosted [labelled example](https://ledger.stadtstack.eu/?area=places&tab=places-say&civicTopic=90931f8c-17db-4458-b653-4d7eab6a1387) has one test-account choice, not resident traction or a municipal decision. No wallet transaction is needed and no onchain poll anchor is claimed. Existing atlas/council/regional records keep their source dates and separate authority.
+- **Tagged City AI:** `@city-ai` requests a sourced, AI-labelled public answer through the existing free-host path, bounded to 3 attempts/account/day, 3/topic/day and 30/site/day at 192 tokens. The live acceptance returned **unavailable**: the sole owner GPU had not opted into free public answers. No completed hosted tagged answer is claimed; the owner must enable that consent flag. Existing paid Money AI is unchanged.
+- **City services and local offline desk:** Places links the confirmed city-game edition and prepares an evidence-only loyalty map layer. Loyalty currently says **needs hosting**, with no fabricated shop pins; a Stadtstack-hosted service and real merchant evidence are owner prerequisites. The separate [Home Node local HTTP desk](home-node/README.md) serves dated Strausberg basics and direct local-model chat without public Ledger, accounts or payments. A real LAN Qwen answer was exercised on this Mac with the page's public internet blocked; this is not radio transport or hosted AI working offline. Privy remains; self-hosted passkey wallets, mesh relay and Myotis are roadmap.
 
 ### 5 October Solana receipts shown in the demo
 
@@ -33,7 +36,7 @@ Current flow details—v4 one-signature 80/20 rent, v5 `shares-solana` security,
 
 ## Built during Crypto World's Fair (14 Sep–12 Oct 2026)
 
-**Disclosure recorded 9 October 2026; history inspected through 5 October.** Only event-window work should be judged. Commit dates describe this repository's recorded changes, not proof that every idea or dependency originated during the event.
+**Disclosure updated 9 October 2026; recorded source work through `4acb358`.** Only event-window work should be judged. Commit dates describe this repository's recorded changes, not proof that every idea or dependency originated during the event.
 
 | Period and commit range (inclusive) | Recorded work / prior-work boundary |
 |---|---|
@@ -42,6 +45,7 @@ Current flow details—v4 one-signature 80/20 rent, v5 `shares-solana` security,
 | 26–30 September, `3cd946f`–`3292803` | Ledger of Life reorganisation, household holdings, sourced multi-city Places/maps/feeds, welcome guide, paired GPU connector/per-token AI, shared Robinhood test-TSLA lending market, site tUSDC and hosted release path. |
 | 1–3 October, `8808d3b`–`0ce17be` | Robinhood share-backed security and hosted three-account evidence, simulated cash-deposit payout, local-stake building revenue, public replay/story, Home Node, one-signature rent story and situation-first redesign. |
 | 5 October, `7451b3a`–`e4fac4f` | New Solana house/reward and share-security/lending programs, primary Solana app path, hosted proof corrections, durable AI recovery and atomic balance simulation; rollout revisions 28–32 and ordered real paid-answer receipts. |
+| 9 October, `4acb358` (release pin `206ead9`) | Native discussion/arguments/sunburst/account opinion polls, canonical cross-city links, source-to-draft handoffs, bounded tagged city-AI jobs, evidence-only loyalty map integration and an independent local Home Node information/chat desk. These reuse prior published city-source data and existing sign-in/AI infrastructure; external city-game/loyalty products are not claimed as newly authored Ledger code. |
 
 The public repository does not preserve the predecessor's old/private backend history. Imported concepts, dependencies, external contributions and personal funding/submission history still require explicit owner attribution; the chronology is not a claim of sole authorship or eligibility approval. No work dated after this disclosure is represented here.
 
