@@ -71,7 +71,7 @@ export function CityCard({ request, onCityChange, onPreviewCity, previewCity, re
     </select></label>
     {draft === 'another' && <label>Place name · not covered unless it matches one of the eight cities <input value={other} onChange={(event) => setOther(event.target.value)} placeholder="Enter your place" />{cityIdFor(other) && <span className="small-copy">We cover this spelling as {coveredNames[cityIdFor(other)!]}.</span>}</label>}
     <div className="city-picker-actions">
-      {onPreviewCity && <button type="button" className="secondary-button" disabled={busy || !draftId || !draftName} onClick={() => { if (draftId) onPreviewCity(draftId); }}>Preview {draftName || 'a city'} — don’t save</button>}
+      {onPreviewCity && <button type="button" className="secondary-button" disabled={busy || !draftId || !draftName} onClick={(event) => { if (draftId) { onPreviewCity(draftId); const row = event.currentTarget.closest('details'); if (row) row.open = false; } }}>Preview {draftName || 'a city'} — don’t save</button>}
       <button className="button primary" disabled={busy || !cities.length || !(draft === 'another' ? other.trim() : draft)}>{busy ? <Loader2 className="spin" size={14} /> : null} Make this my city</button>
     </div>
     {cities.length > 0 && <p className="small-copy">{cities.length} covered cities · published coverage {formatCityDate(snapshot)}. Refreshed only when the collector runs; coverage is incomplete.</p>}

@@ -24,13 +24,13 @@ All are test-network operations with no monetary value or unit rights. Deposit e
 
 ## 1. The idea in one paragraph
 
-Ledger of Life is one place where a person sees everything that belongs to their life: who they are
-(verified, privacy-preserving), where they live and lived, what they own and earn, and what is being
-decided around them, from their home to their city, district, state, the EU and the world. Every piece
-arrives through an **adapter** (a connection to a wallet, a contract, a device, a public data source).
-The rental deposit is the first complete building block. The bigger frame is
-[Stadtstack](https://stadtstack.giraeffleaeffle.chatgpt.site): this app is the personal entry point into a
-city that perceives, decides, acts and learns.
+Ledger of Life brings home, personal money and city life into one interface. The working test-network
+tenancy and Money workflows remain separate from native civic discussions and account-based opinion
+polls. Places reuses attributed council, project-atlas and regional sources, then lets people organise
+arguments and link one topic across city contexts. Choosing a city is not residence verification;
+neither a poll result nor an AI answer is a municipal decision. The wider
+[Stadtstack](https://stadtstack.eu) direction connects public evidence, deliberation and useful
+local services without merging their authority, accounts or asset claims.
 
 ## 2. One person's life
 
@@ -331,6 +331,8 @@ reached as a secondary sidebar link and from the "Test networks" explainer. `/` 
 Page headings are an h1 only, without stage eyebrows or subtitles; there is no breadcrumb
 or signed-in path strip. Account management lives in Me. Places owns the map and public-life
 detail; Roadmap owns the capability list. A feature has one home and references elsewhere.
+
+The 9 October owner-directed city addition is native rather than a Röbel-App client: **Places → Have your say** owns topic/discussion, structured pro/con arguments, one argument tree/sunburst, readiness, one opinion per Ledger test account and frozen closed results. Accounts are not verified residents and polls are not municipal decisions. Linking a topic across city contexts preserves its canonical vote; regional/council/atlas sources retain their own dates and authority. Source-to-draft links open an explicit user-authored discussion. Stadtstack-Spiel remains a contextual exploration entry; loyalty is prepared as evidence-backed shop pins on the Places map with a separate Stadtstack-hosted service, not Money holdings. No closed mitmachen link, Röbel API, Reticulum/Myotis integration or replacement wallet stack is offered. Privy stays; self-hosted passkey wallets are roadmap. [Placement and boundaries](INFORMATION_ARCHITECTURE.md#native-city-participation--9-october-2026).
 
 Home answers “Is my home OK?” with status, figures and the action needed now, not a living
 step counter. Outside Home, the next-step card appears only for urgent steps.

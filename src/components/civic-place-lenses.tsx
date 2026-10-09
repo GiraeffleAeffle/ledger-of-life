@@ -21,6 +21,9 @@ import { OrganizationDetail, OrganizationShelf } from './organization-profile';
 import { consultationGroups, displayCityText, formatCityDate, formatCityEventDate, shortlistFeatures } from './city-coverage';
 import { MoreRow } from './blocks';
 import { SectionTabs } from './section-tabs';
+import { NativeCivicPanel } from './city-participation';
+import { CityGameRow } from './stadtstack-services';
+import { civicSourceDraftHref } from './civic-source-link';
 
 const number = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 });
 const noFeatures: CityFeature[] = [];
@@ -88,7 +91,7 @@ function Outcomes({ caseStudy, feature }: { caseStudy?: CivicOutcomeEvidence; fe
 }
 export function CivicPlaceLenses({ request, accountId, previewRequest, onExplorationCityChange, go, nearby, community, council, readings }: { request: AuthorizedRequest; accountId: string; previewRequest?: { cityId: string } | null; onExplorationCityChange?: (cityId: string) => void; go: (area: Area) => void; nearby?: React.ReactNode; community?: React.ReactNode; council?: React.ReactNode; readings?: React.ReactNode }) {
   const eventClock = useEventClock();
-  const [explorationCity, setExplorationCity] = useState('');
+  const [explorationCity, setExplorationCity] = useState(previewRequest?.cityId ?? '');
   // A new preview request replaces the exploration city; adjusting state during render avoids an effect cascade.
   const [seenPreview, setSeenPreview] = useState(previewRequest);
   if (previewRequest !== seenPreview) {
@@ -216,6 +219,8 @@ export function CivicPlaceLenses({ request, accountId, previewRequest, onExplora
     (selected === caseStudy?.id && !linkedId ? features.find((item) => caseStudy.signalIds.includes(item.properties.id)) : undefined);
   const detailReady = full?.cityId === cityId && full.id === feature?.properties.id && full.revision === reviewRevision;
   const evidenceFeature = detailReady ? full?.feature : undefined;
+  const discussionDraft = evidenceFeature?.properties.sources[0]?.url
+    ? civicSourceDraftHref(cityId, evidenceFeature.properties.title, evidenceFeature.properties.sources[0].url) : null;
   useEffect(() => {
     if (!feature) return;
     let active = true;
@@ -460,14 +465,20 @@ export function CivicPlaceLenses({ request, accountId, previewRequest, onExplora
       {followError && <p role="alert">{followError}</p>}
       {following.storageError && <p role="alert">{following.storageError}</p>}
       {!issuer && <Evidence caseStudy={caseStudy} feature={evidenceFeature} />}
+      {!issuer && discussionDraft && <p><a className="button secondary" href={discussionDraft}>Discuss this source in Ledger</a><span className="small-copy"> Your opinion topic, not a municipal submission.</span></p>}
       </>}
     </div>}
     </div>
     </section>
     <SectionTabs label="Explore city information" tabs={[
-      { id: 'places-say', label: 'Have your say', content: <><MoreRow title="Open consultations" meta={cityContentUnavailable ? cityName ? 'No published consultations' : 'Choose a city first' : consultations ? consultations.open.length ? `${consultations.open.length} open` : 'None open right now' : cityContentPrompt || 'Checking published dates'}>{participation}</MoreRow><MoreRow id="followed-projects" title="Followed projects" meta={`${followedEntries.length} saved on this device${unreadFollowedUpdates ? ` · ${unreadFollowedUpdates} unread` : ''}`}>{followed}</MoreRow><MoreRow id="project-browser" title="Browse projects" meta={cityContentUnavailable ? cityName ? 'No published projects' : 'Choose a city first' : `${shortlist.length} published projects`}>{browser}</MoreRow></> },
+      { id: 'places-say', label: 'Have your say', content: <>
+        <NativeCivicPanel request={request} cityId={cityId} />
+        <MoreRow title="Open consultations" meta={cityContentUnavailable ? cityName ? 'No published consultations' : 'Choose a city first' : consultations ? consultations.open.length ? `${consultations.open.length} open` : 'None open right now' : cityContentPrompt || 'Checking published dates'}>{participation}</MoreRow>
+        <MoreRow id="followed-projects" title="Followed projects" meta={`${followedEntries.length} saved on this device${unreadFollowedUpdates ? ` · ${unreadFollowedUpdates} unread` : ''}`}>{followed}</MoreRow>
+        <MoreRow id="project-browser" title="Browse projects" meta={cityContentUnavailable ? cityName ? 'No published projects' : 'Choose a city first' : `${shortlist.length} published projects`}>{browser}</MoreRow>
+      </> },
       { id: 'places-events', label: 'Events & news', content: feed },
-      { id: 'places-people', label: 'Who does what', content: <><MoreRow title="Organisations" meta={cityId === 'strausberg' ? `${strausbergOrganizations.length} profiles` : 'No published profiles'}>{cityId === 'strausberg' && <OrganizationShelf selectedId={organizationId} onSelect={selectOrganization} />}</MoreRow>{community}</> },
+      { id: 'places-people', label: 'Who does what', content: <><MoreRow title="Organisations" meta={cityId === 'strausberg' ? `${strausbergOrganizations.length} profiles` : 'No published profiles'}>{cityId === 'strausberg' && <OrganizationShelf selectedId={organizationId} onSelect={selectOrganization} />}</MoreRow>{community}<CityGameRow cityId={cityId} /></> },
       { id: 'places-nearby', label: 'Nearby towns', content: nearby },
       { id: 'places-council', label: 'Council', content: council },
     ]} />

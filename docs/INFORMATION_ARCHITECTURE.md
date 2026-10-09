@@ -23,6 +23,22 @@ Every Solana money action shows exact quantities, recipients, network and conseq
 
 Current screen contract: Home’s tenancy Hero answers “Is my home OK?”. Money answers “What do I own?”, and Places “What is happening in my city?”. At 390 px there is no horizontal overflow, tap targets are at least 44 px and hero pictures are at most 230 px tall. A single ScreenNote ends each screen with its applicable conservative legal and honesty wording. Historical change notes below describe earlier layouts, not the current navigation.
 
+## Native city participation · 9 October 2026
+
+Ledger is a general city app, with Strausberg and surrounding municipalities as demonstration geography rather than a single-town client. **Places → Have your say** owns native topics, discussion, structured pros/cons, an argument sunburst, readiness, account-based opinion polling and frozen results. The topic's city selector is a discussion context, not a saved home-city change or proof of residence. Linking a topic to another city preserves its one canonical discussion, poll and result.
+
+The sunburst and accessible list project the same argument hierarchy; area represents argument structure, not public support or vote weight. Authors ready and open their questions only after pro and con arguments exist. Question, options and contributions then stay frozen for the vote. Test accounts are **not verified residents**; one choice per Ledger account is not one person, one vote, an official election, quorum or municipal authority. Closed counts and a deterministic result hash are evidence of this app's recorded poll only; no onchain anchoring or execution is claimed.
+
+Existing atlas-derived snapshots, evaluated council/source records, regional comparisons and private project follows remain native source context. **Discuss this source in Ledger** opens a reviewable draft from a selected project or regional source; it does not publish automatically or submit to the municipality. Nearby-town stages retain their original source/date/review and are not overwritten by Ledger opinions.
+
+**Places → Who does what → Explore the city through play** opens the confirmed Strausberg game edition or an explicitly separate edition chooser. Gameplay and origin-local progress are not civic participation evidence. Loyalty belongs on the **Places map**, only for configured, evidenced shops with sourced coordinates/program/network and a reviewed Stadtstack-hosted origin; missing hosting or merchants is an explicit empty/unavailable state, never fictional pins. Signup, collect and exchange stay in the separate loyalty service; no balance enters Money.
+
+Privy passkeys/sign-in/wallets remain to protect all existing money flows. Self-hosted native passkey wallets, mesh transaction relay and Myotis are roadmap. The old Röbel-App reader and closed mitmachen handoff were superseded before release. Native civic routes reuse Ledger's authenticated, same-origin, bounded Store APIs (Postgres-capable; existing governed deployment storage unchanged). Home and Money actions are intentionally unchanged.
+
+Tagging **@city-ai** in a topic or discussion requests a free, rate/budget-bounded public model answer through the existing city-AI path unless separately authorized service reachability is established. AI replies are labelled and cite server-selected dated city context, not municipal authority. Provider failure is not a fake answer; no automatic payment is taken.
+
+**Me → Local offline city desk** explains the independent Home Node HTTP website. Nearby people open it directly on the LAN/Wi-Fi/hotspot: cached public city basics and the node's local model require no public Ledger, account or payment. Existing online Home Node pairing stays unchanged. No service worker caches the hosted app. The separate September Reticulum/LXMF/Qwen lab is historical setup evidence, not accepted MeshCore coverage or a public radio endpoint; Bluetooth PAN, mesh transaction relay and Myotis remain roadmap.
+
 ## The thread and the next step
 
 The public door retains the thread **Find a home, secure the deposit, keep your assets, help build your city** (`THREAD` in `src/data/path.ts`). Its stages explain the product there; they are not counters or eyebrows on signed-in screens.

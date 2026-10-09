@@ -5,7 +5,7 @@ import { CityCard } from './city';
 import { CivicPlaceLenses } from './civic-place-lenses';
 import { CityRegionTopics } from './region-topics';
 import { CivicDecisionsPanel } from './civic-decisions-panel';
-import { useCitySignals } from './use-city-signals';
+import { CITY_CHANGED_EVENT, useCitySignals } from './use-city-signals';
 import type { PlacesResult } from '@/server/places-live';
 import { citySlug } from '@/server/city';
 import { CityVisitChanges } from './city-visit-changes';
@@ -32,6 +32,11 @@ export function PlacesArea({ request, accountId, go }: { request: Request; accou
   const [showAllSensors, setShowAllSensors] = useState(false);
   const { cityId, result, cityDisplayName, city } = useCitySignals(request, exploredCity || undefined);
   const onExplorationCityChange = useCallback((id: string) => { setExploredCity(id); }, []);
+  useEffect(() => {
+    const resetPreview = () => { setExploredCity(''); setPreviewRequest({ cityId: '' }); };
+    window.addEventListener(CITY_CHANGED_EVENT, resetPreview);
+    return () => window.removeEventListener(CITY_CHANGED_EVENT, resetPreview);
+  }, []);
   const readingCityId = exploredCity || city?.cityId || '';
   useEffect(() => {
     let active = true;
@@ -65,7 +70,7 @@ export function PlacesArea({ request, accountId, go }: { request: Request; accou
     </section>
   </MoreRow>;
   return <div className="places-area">
-    <CityCard request={request} previewCity={exploredCity} onPreviewCity={(id) => setPreviewRequest({ cityId: id })} readings={places} />
+    <CityCard request={request} previewCity={exploredCity} onPreviewCity={(id) => { setExploredCity(id); setPreviewRequest({ cityId: id }); }} readings={places} />
     <CityVisitChanges request={request} accountId={accountId} go={go} />
     <CivicPlaceLenses request={request} accountId={accountId} go={go} previewRequest={previewRequest} onExplorationCityChange={onExplorationCityChange}
       readings={readings} community={community} council={council}

@@ -4,7 +4,7 @@
 # Human-readable companion: docs/ONTOLOGY.md. Keep both in sync when concepts change.
 
 version: 1
-updated: 2026-10-05
+updated: 2026-10-09
 product:
   working_name: Ledger of Life   # chosen 2026-09-26; technical identifiers unchanged
   thesis: >-
@@ -17,13 +17,12 @@ product:
     This app is the personal entry point: one verified identity, many contexts (tenancy, club,
     neighbourhood, city), with evidence and scenarios visibly distinguished.
   positioning: >-
-    Decided 2026-09-26: a household-ownership app. The person's verified identity is the root;
-    everything they own, rent or run is attached through adapters. The rental deposit is the
-    first and most complete building block.
+    Decided 2026-10-09: a general city-and-household app, not a single-town client.
+    Home and Money retain working test-network workflows; Places combines sourced local
+    context with native discussion, non-binding account opinions and exchange between cities.
   one_sentence: >-
-    A home-centred app that shows everything you own, secures rental deposits in escrows that
-    earn, lets tenants claim and invest those earnings, and connects the other things a
-    household owns that produce value (solar, validators, later cars and home shares).
+    One interface for home, personal money and public city life, keeping rental security,
+    sourced evidence, account-based opinions and hypothetical examples visibly separate.
 
 # How real something is. Every number or feature shown to users must map to one level.
 reality_levels:
@@ -51,7 +50,7 @@ layers:  # product architecture, bottom-up
   - id: local_services
     concepts: [LocalInferenceRequest, InferencePayment, InferenceHost, HostPairingInvitation, HostEconomicsScenario]
   - id: civic_system
-    concepts: [Organization, CityEvent, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence]
+    concepts: [Organization, CityEvent, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence, CivicTopic, CivicContribution, OpinionPoll]
   - id: vision
     concepts: [ServiceChargeAccount, HomeEquityPath, DeviceTokenization, LocalInvestment, LifeTimeline]
 
@@ -95,13 +94,37 @@ concepts:
     definition: A shared space a Person takes part in, with its own members, rules, decisions and feed. A tenancy is one Context; so are a sports club, a house community, a neighbourhood or a city.
     open_ended: true   # kinds are examples, not a closed list; a life has many more
     kinds:
-      tenancy: {reality: testnet_real, note: "Agreement plus escrow; the only transactional shared context built today. City is read-only."}
-      city: {reality: read_only_live, note: "Built read-only: atlas projects/consultations and public Stadtstack CitySignals for EU-wallet or chosen city, with as-of, review and geometry precision. Private MyPlaces matching runs on device. Bright Sky/DWD weather, citizen PM and OSM clubs retain their own times/licences. Strausberg ALLRIS links are outbound only; the published 2025/26 ordinance has headline planned investment outlays, not actual spending or a detailed plan."}
+      tenancy: {reality: testnet_real, note: "Agreement plus escrow; financial custody is confined to authorized tenancy and Money workflows."}
+      city: {reality: prototype, note: "Native account-based discussion/opinion polls and cross-city references are non-binding. Separate read-only atlas/CitySignals keep source dates, review and geometry. Private MyPlaces remains on-device; Strausberg ALLRIS is outbound-only and its budget ordinance figures are plans, not spending."}
       house_community: {reality: roadmap, note: "Shared building costs; ties to ServiceChargeAccount."}
       examples: [work/employer, health/insurer, mobility, family, learning, club, bank, energy supplier]
     rules:
       - A Context grants roles; the app never infers a role from onboarding choices alone.
       - Each Context applies its own DisclosurePolicy; joining one never reveals membership in another.
+      - Native civic topics grant no municipal authority; Ledger accounts are not verified residents or unique humans.
+      - Topic scopes and cross-city links do not create map/atlas coverage or duplicate a poll.
+      - Game progress and separate test loyalty balances are not participation evidence or personal Position; Privy remains and native self-hosted wallets are roadmap.
+  CivicTopic:
+    definition: A user-authored public topic with an originating city, optional source context and linked city scopes.
+    reality: prototype
+    code: [src/data/civic.ts, src/server/civic.ts, app/api/civic/route.ts, src/components/city-participation.tsx]
+    invariants:
+      - Source records retain their own provenance and authority; user discussion is not a municipal submission.
+      - Cross-city references keep one canonical topic, poll and frozen result.
+  CivicContribution:
+    definition: An account-authored discussion note or structured pro/con argument with an optional parent.
+    reality: prototype
+    code: [src/components/civic-arguments.tsx, src/components/civic-argument-layout.ts]
+    invariants:
+      - Accessible tree and sunburst share one hierarchy; area represents structure, not support or votes.
+      - Question/options/contributions freeze before voting; account identity is not exposed with public text.
+  OpinionPoll:
+    definition: A non-binding Ledger test-account poll moving through discussion, ready, open and closed.
+    reality: prototype
+    invariants:
+      - One choice per authenticated account is not one verified person or resident; no official election, quorum or legal effect.
+      - Stored account-linked ballots are visible to the operator, not cryptographically anonymous; public projection excludes individual ballots.
+      - Closed counts, denominator, time and hash are immutable; no onchain anchoring, payment or municipal execution is implied.
 
   CitySignal:
     definition: A public, versioned city-wide statement or place published by Stadtstack; its source, as-of, review state, geometry precision and (for LLM extraction) faithfulness score qualify every claim.
@@ -208,9 +231,9 @@ concepts:
     invariants:
       - Home and work coordinates are stored only in this device's per-city localStorage and can be removed.
       - Sport, kids, shops, health, culture, nature and volunteering interests are stored only on this device and rank places and council items locally; the welcome guide reads and writes the same interests.
-      - Neither exact coordinates, interests nor a commute route is sent to our server or a geocoder/router.
+      - Exact saved coordinates, interests and commute routes are not posted to the server or a geocoder/router; map viewport requests are a separate disclosure.
       - The browser matches public CitySignals within 1 km of home and an approximate 400 m straight-line commute corridor only when viewing the pin's city.
-      - Map tile requests reveal the viewed map area to OpenFreeMap, not saved pin coordinates.
+      - Same-origin tile paths reveal the viewed area to Ledger's server/edge; the upstream map provider sees Ledger's connection and requested tiles, not the visitor's saved pin record.
     relations: {belongs_to: Person, matches: CitySignal (on device)}
     code: [src/components/personal-map.tsx, src/components/personal-map-relevance.ts]
 

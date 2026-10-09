@@ -5,6 +5,8 @@ import type { RelevantRegionalTopic, RegionalTopicItem, RegionalTopicResult } fr
 import { REVIEW_LABELS } from './personal-map-relevance';
 import type { AuthorizedRequest } from './use-city-signals';
 import { formatCityDate } from './city-coverage';
+import { CIVIC_CITIES } from '@/data/civic-cities';
+import { civicSourceDraftHref } from './civic-source-link';
 
 export const externalTopicUrl = (url: string) => url.startsWith('https://') || url.startsWith('http://');
 const stageLabels: Record<string, string> = {
@@ -40,6 +42,10 @@ export function RegionalComparison({ topic, cityName, compact = false }: {
 }) {
   const local = topic.items.find((item) => externalTopicUrl(item.url));
   const neighbour = topic.neighbours.find((item) => externalTopicUrl(item.source.url));
+  const localCity = CIVIC_CITIES.find((city) => city.name === cityName);
+  const nearbyCity = CIVIC_CITIES.find((city) => city.name === neighbour?.name);
+  const localDraft = local && localCity ? civicSourceDraftHref(localCity.id, local.title, local.url) : null;
+  const nearbyDraft = neighbour && nearbyCity ? civicSourceDraftHref(nearbyCity.id, neighbour.source.title, neighbour.source.url) : null;
   return <article className="regional-comparison">
     <h3>{topic.label}</h3>
     <div className="regional-comparison-rows">
@@ -47,14 +53,17 @@ export function RegionalComparison({ topic, cityName, compact = false }: {
         <strong>{local ? regionalStageLabel(local.stage) : 'No local item in this publication'}</strong>
         <p>{local ? `${local.sourceType === 'planningProcedure' ? 'The planning procedure' : local.sourceType === 'councilAgenda' ? 'The council agenda' : 'The city source'} names “${local.title}”.` : 'This topic is published elsewhere in the region; no source item names this city.'}</p>
         {local && <span className="regional-evidence">{local.date ? `Source dated ${formatCityDate(local.date)}` : 'Source date not supplied'}</span>}
+        {localDraft && <p><a className="button secondary" href={localDraft}>Discuss this source in Ledger</a></p>}
       </div>
       <div><span className="eyebrow">ELSEWHERE IN YOUR REGION</span>
         <strong>{neighbour ? `${neighbour.name} · ${regionalStageLabel(neighbour.source.stage)}` : 'No other municipality listed'}</strong>
         <p>{neighbour ? `${neighbour.source.sourceType === 'planningProcedure' ? 'The planning procedure' : neighbour.source.sourceType === 'councilAgenda' ? 'The council agenda' : 'The city source'} names “${neighbour.source.title}”.` : 'No comparable source item published here.'}</p>
         {neighbour && <span className="regional-evidence">{neighbour.source.date ? `Source dated ${formatCityDate(neighbour.source.date)}` : 'Source date not supplied'}</span>}
+        {nearbyDraft && <p><a className="button secondary" href={nearbyDraft}>Discuss this neighbouring topic</a></p>}
       </div>
     </div>
     <span className="regional-review">{REVIEW_LABELS[topic.reviewState] ?? 'Not yet checked'} · comparison of separate published source items, not a shared outcome</span>
+    {(localDraft || nearbyDraft) && <p className="small-copy">Opens your own discussion draft, not a submission to a council. The source&apos;s decision and the Ledger opinion poll stay separate.</p>}
     {!compact && <details className="regional-topic-neighbours"><summary>Source evidence · {topic.items.length} local, {topic.neighbours.length} elsewhere</summary>
       {topic.summary && <p>{topic.summary} · {REVIEW_LABELS[topic.reviewState] ?? 'Not yet checked'}</p>}
       {topic.items.length > 0 && <><h4>In {cityName}</h4><ul>{topic.items.filter((item) => externalTopicUrl(item.url)).map((item) =>

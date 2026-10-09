@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { CityFeature, SignalCity } from '../server/city-signals.ts';
-import { cityIdFor, homeCityId, consultationGroups, displayCityText, formatCityDate, nearestCoveredCity, shortlistFeatures } from './city-coverage.ts';
+import { cityIdFor, homeCityId, consultationGroups, displayCityText, formatCityDate, formatCityEventDate, nearestCoveredCity, shortlistFeatures } from './city-coverage.ts';
 import { oldPinsKey, pinsKey, readAccountPins } from './personal-map-storage.ts';
 
 test('covered spellings resolve without treating arbitrary names as covered', () => {
@@ -36,6 +36,9 @@ test('participation windows use the published as-of date and preserve recently c
   assert.deepEqual(grouped.open.map((item) => item.properties.id), ['open']);
   assert.deepEqual(grouped.closed.map((item) => item.properties.id), ['closed']);
   assert.equal(formatCityDate('2026-09-28T12:00:00Z'), '28 Sep 2026');
+});
+test('source freshness uses one Berlin date and time across local midnight', () => {
+  assert.equal(formatCityEventDate('2026-10-09T22:30:00Z'), '10 Oct 2026, 00:30');
 });
 test('source prose presents dates and the first OSM category without raw tags', () => {
   assert.equal(displayCityText('als martial_arts;taekwondo;boxing eingetragen 2026-09-28'), 'als Martial Arts eingetragen 28 Sep 2026');

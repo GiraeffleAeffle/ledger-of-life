@@ -17,6 +17,7 @@ export const SECTIONS = {
   'personal-map': 'places', 'selected-project': 'places', 'project-browser': 'places', 'followed-projects': 'places',
   'city-choice': 'places', 'city-system': 'places', 'city-news': 'places', 'regional-topics': 'places',
   'local-readings': 'places', 'community-discovery': 'places', 'public-decisions': 'places',
+  'native-civic': 'places',
   'selected-capability': 'ideas',
 } as const satisfies Record<string, Area>;
 export type SectionId = keyof typeof SECTIONS;

@@ -13,6 +13,7 @@ import { LedgerAdapters } from './ledger-adapters';
 import { AdapterSettings } from './adapter-settings';
 import type { LedgerStateInputs } from './ledger-adapter-state';
 import { MoreList, MoreRow, ScreenNote } from './blocks';
+import { LocalOfflineDeskRow } from './stadtstack-services';
 
 const emptyPlace = { city: '', from: '', to: '', note: '' };
 type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
@@ -126,6 +127,7 @@ export function MeArea({ request, tenancies, homeState, go }: {
         homeAssistant: <AdapterSettings kind="homeAssistant" request={request} connection={connections.adapters} go={go} />,
         validator: <AdapterSettings kind="validator" request={request} connection={connections.adapters} go={go} />,
       }} />
+      <LocalOfflineDeskRow />
       <ScreenNote>EU wallet proofs use test credentials, not a real identity check. Connection permissions are shown before you connect.</ScreenNote>
     </div>
   );

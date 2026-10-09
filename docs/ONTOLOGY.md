@@ -4,13 +4,13 @@ The machine-readable source of truth is [`ontology.yaml`](ontology.yaml). This p
 
 **Thesis.** Money and assets that everyday life forces people to lock away (rental deposits first) should keep working for their owner, without weakening the protection they exist for.
 
-**Positioning (decided 2026-09-26).** A household-ownership app. Your verified identity is the root, and everything you own, rent or run attaches to it through adapters. The rental deposit is the first and most complete building block.
+**Positioning (owner decision 2026-10-09).** A general city-and-household app, not a single-town client. Home and Money retain the working test-network workflows; Places connects source-backed city context, native discussion and account-based opinion polls across city contexts. Test accounts are not verified residents.
 
 **Start here for people.** [`LEDGER_OF_LIFE.md`](LEDGER_OF_LIFE.md) describes the Home landing page, the five signed-in areas and connection choices; [`INFORMATION_ARCHITECTURE.md`](INFORMATION_ARCHITECTURE.md) states where each feature lives and how to place a new one.
 
-**Bigger picture.** Part of [Stadtstack](https://stadtstack.giraeffleaeffle.chatgpt.site): one verified identity, many contexts (tenancy, club, house community, city). Each context gives the person roles, a feed of what is decided, and what they own there. The tenancy is the first context that is built.
+**Bigger picture.** Part of [Stadtstack](https://stadtstack.eu): one account, multiple contexts such as tenancy, house community and city. Permissions come from recorded roles, never merely from choosing a city. Public evidence, user opinions and financial authority remain separate.
 
-**The app in one sentence.** A home-centred app that shows everything you own. It secures rental deposits in escrows that earn, lets tenants claim and invest those earnings, and connects the other things a household owns that produce value.
+**The app in one sentence.** One interface for home, personal money and public city life, keeping rental security, sourced evidence, account opinions and hypothetical examples visibly separate.
 
 ## Current Solana semantics · 5 October 2026
 
@@ -38,6 +38,8 @@ Operation includes a durable sponsor reservation ledger: account rolling/global 
 | 7. Vision | What could follow, subject to verification? | ServiceChargeAccount, HomeEquityPath, DeviceTokenization, LocalInvestment, LifeTimeline |
 
 Financial custody still depends on identity, home and signed operations. The civic lens reuses the city Context and CitySignal rather than introducing a separate atlas or portfolio.
+
+**Native city participation (9 October).** A **CivicTopic** has an originating city, public context/question, optional source link and linked city scopes. **CivicContribution** is a discussion note or a pro/con argument with an optional parent. The argument list and sunburst are projections of this one hierarchy; area is structure, never support. An **OpinionPoll** moves from discussion through ready/open to closed, freezing question/options/arguments before voting. A Ledger account may record one opinion, but is not a verified resident or unique human. The operator can read stored account-linked ballots; this is not cryptographic anonymity or an official election. Closed option counts, denominator/time and a deterministic hash remain bound to the original topic even when it is linked across cities; no municipal action or onchain anchoring is inferred. Existing evaluated CitySignals, council/atlas source snapshots and ProjectFollows remain source context, not poll results. Game progress stays outside civic participation. Evidence-backed loyalty places have a separate hosted account and test-network label; no rewards enter Position. Privy remains; self-hosted native passkey wallets are roadmap, and offline/Myotis integration is not yet offered.
 
 ## Concept map
 
@@ -80,8 +82,9 @@ human-reviewed**, not fact-checked by the city. A **Person** may mark optional *
 home/work pins per city and select sport, kids, shops, health, culture, nature and volunteering
 interests, all kept only in that device's localStorage. The person sees relevant CitySignals
 through ranking and matching entirely in the browser (1 km near home; approximate 400 m
-straight-line home-to-work corridor). A city switch uses only pins saved for that city. No pin,
-interest or route is sent to the app server; map tiles do reveal the viewed area to OpenFreeMap.
+straight-line home-to-work corridor). A city switch uses only pins saved for that city. Saved pin
+coordinates, interests and commute routes are not posted, but viewport tile paths reveal the viewed
+area to Ledger's server/edge. The upstream map provider sees Ledger's connection and requested tiles.
 The fictional test fixture is an illustration, never an app data source.
 
 **Getting onboarded into a city.** An **ArrivalGuide** is a public, account-free page for a city,

@@ -163,6 +163,7 @@
 .city-reading-chip { margin-left: auto; border-radius: 999px; padding: 7px 12px; background: var(--soft); font-size: .8rem; color: var(--muted); }
 .places-area .city-card > .more-row { max-width: 420px; border: 0; background: transparent; }
 .places-area .city-card > .more-row > summary { min-height: 44px; padding: 0; }
+.city-card .text-button { min-height: 44px; }
 .city-visit-line { display: grid; gap: 0; }
 .city-visit-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
 .city-visit-status .status-line { margin: 0; font-size: .88rem; }
@@ -187,3 +188,7 @@
 }
 .city-visit-line > .more-row > summary:not(:has(.more-row-meta)) .more-row-title { color: var(--muted); font-size: .88rem; font-weight: 400; }
 .city-visit-line > .more-row > summary:not(:has(.more-row-meta)) .more-row-chevron { margin-left: 0; }
+.loyalty-map-marker { width: 44px; height: 44px; border-radius: 50%; border: 3px solid var(--paper); background: var(--ink); color: var(--paper); font: inherit; font-weight: 700; cursor: pointer; }
+.loyalty-shop-layer button, .loyalty-shop-layer a { min-height: 44px; }
+.loyalty-shop-layer a { display: inline-flex; align-items: center; }
+.loyalty-shop-layer nav { display: flex; flex-wrap: wrap; gap: 8px; }

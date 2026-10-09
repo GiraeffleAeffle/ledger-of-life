@@ -169,6 +169,160 @@ What leaves the house: bounded GPU answers and reported token/timing counts for 
 
 What does **not** leave through this app: HA token, private Ed25519 key, local HA/Ollama URL, unrelated HA entities/attributes, validator signing keys, wallet private keys. The hosted app cannot pull LAN URLs. Logs and MCP failures use generic messages rather than endpoint bodies, prompts or credentials. Local LLM clients have their own privacy policies; do not paste secrets into chat. Protect backups of the local config/state/token files and review updates before running them.
 
+## Separate local information and AI server (Node 24+)
+
+This is a **different command and process**, not a mode of the online paired worker above.
+It serves one account-free city page over local plain HTTP, with dated public information and
+direct local Ollama chat. It never reads pairing configuration, private keys, accounts, payments,
+Home Assistant credentials or hosted Ledger APIs. Keep the existing online worker running if
+desired; its pairing and polling behavior is unchanged. The processes may compete for the same
+GPU, so choose a model and machine with sufficient capacity.
+
+From a reviewed repository checkout, with **Node 24 or newer**:
+
+```sh
+node home-node/offline-server.mjs
+```
+
+Open **http://127.0.0.1:4318/** directly. Default binding is loopback only; default model is
+`qwen3:4b` at `http://127.0.0.1:11434`. This does not install Ollama or a model. Install them
+from trusted sources and download your chosen model while online first. The information page
+works even when Ollama is stopped. Chat reports model failure rather than fabricating an answer.
+The readiness console prints only the nonsecret bound page URLs; it is not a model-health claim.
+Stop this separate process with Ctrl-C.
+
+Keep `offline-server.mjs`, `offline-public.mjs`, `offline.css` and `offline-client.js` together.
+There are no npm packages, external fonts, map tiles, hosted API calls, service workers or
+browser caches in this server. No internet is needed once Node, these files, Ollama and the
+model are installed, provided the browser can reach this computer and it can reach the model.
+An operator-configured local hostname also needs functioning local DNS. Opening source websites still
+need internet; telephone numbers still need working phone service.
+
+### Choose the model and trusted local network
+
+```sh
+node home-node/offline-server.mjs \
+  --bind 127.0.0.1 --port 4318 --city strausberg \
+  --ollama-url http://127.0.0.1:11434 --model qwen3:4b
+```
+
+`--city` only accepts an actually supplied pack: currently `strausberg`. Unknown cities fail
+closed; no nearby-town facts are generated or borrowed. The public-only snapshot is selected
+from `src/data/arrival/strausberg-contacts.ts` and `strausberg-steps.ts`. It contains medical
+emergency guidance, public contacts, key places and first-weeks welcome steps, with the
+**original 2026-09-29 source checks**, not a claim of review on the 2026-10-09 packaging date.
+It excludes personal data, live feeds, events, current opening hours and unsourced nearby data.
+Update the selected pack and version deliberately after editorial review; there is no updater.
+
+On a Mac, find the current LAN IP and the existing local hostname:
+
+```sh
+networksetup -listallhardwareports
+# Match the active Wi-Fi/Ethernet device above; en0 is only an example:
+ipconfig getifaddr en0
+scutil --get LocalHostName
+```
+
+For example, **only if those commands really report** `192.168.50.10` and `My-Mac`:
+
+```sh
+node home-node/offline-server.mjs \
+  --bind 192.168.50.10 --port 4318 --trusted-lan --hostname my-mac.local \
+  --ollama-url http://127.0.0.1:11434 --model qwen3:4b
+```
+
+On a phone on the same trusted Wi-Fi, open **http://192.168.50.10:4318/** or, if the Mac's
+system mDNS advertisement resolves there, **http://my-mac.local:4318/**. Substitute your
+actual IP/name; these are examples, not discovered hosts. `--hostname` only admits that
+already advertised `.local` name in the Host guard. The server does **not** publish Bonjour
+records or manufacture a hostname. Use the IP if mDNS is unavailable. A phone's `localhost`
+is the phone, not the Mac. Open the HTTP URL as a top-level page, never embedded in hosted
+Ledger or fetched from its HTTPS page.
+
+Prefer binding the specific private LAN IP. `--bind 0.0.0.0 --trusted-lan` (or `::`) is an
+explicit all-interface option, **not a security boundary or a claim of safe public binding**.
+Only private/loopback interface addresses present at startup are admitted as Host values;
+restart after a network change. Configure the macOS/router firewall to allow only the intended
+trusted LAN; do not expose the port through forwarding, tunnels or public reverse proxies.
+Client isolation on guest Wi-Fi may intentionally prevent access. Do not disable browser
+security or the firewall broadly to make it work.
+
+**Plain HTTP is visible and alterable on the network.** Anyone admitted to that LAN can use
+the unauthenticated local service and consume its shared question budget. The gateway operator,
+model operator and network peers may see prompts and answers. This server writes no chat,
+account or IP logs and sets no cookies; the browser keeps only bounded tab-memory history.
+Reload/Clear removes that history, not logs a separate Ollama operator may keep. Do not enter
+private information. Host/Origin/DNS guards and a firewall are not encryption or user identity.
+
+### Desktop example and optional Wake-on-LAN
+
+The following is an **example only**, not a discovered or authorized device. Replace the
+hostname, MAC and broadcast with your own explicitly authorized local settings:
+
+```sh
+node home-node/offline-server.mjs \
+  --bind 127.0.0.1 --port 4318 --city strausberg --trusted-lan \
+  --ollama-url http://example-desktop.home.arpa:11434 \
+  --model qwen3.8:27b-ud-q3-k-xl \
+  --context-tokens 32768 --model-timeout-ms 120000 \
+  --wake-mac 02:00:00:00:00:01 --wake-broadcast 192.168.50.255 \
+  --wake-budget-ms 90000
+```
+
+This is **not evidence of a completed live model/wake test**.
+For phone access replace `--bind` with the Mac's actual private LAN IP and optionally add its
+real `--hostname ...local`. The node does not change your desktop or router configuration.
+Use a subnet-appropriate directed broadcast: `.255` is only appropriate when the actual
+network uses that broadcast address. Wake capability must already be enabled on the desktop.
+
+Ollama origins are restricted to literal loopback/RFC1918/private-IPv6 addresses, `localhost`,
+or an operator-configured `.local`, `.home.arpa` or `.fritz.box` hostname. Before each
+model/readiness attempt, every resolved address must be private LAN, then the HTTP connection
+uses a pinned numeric address. Public/mixed DNS results, other DNS suffixes, credentials,
+URL paths/queries and redirects are refused. Information reads do not require local DNS.
+Local DNS failure is an explicit error, never a public-provider fallback. A changed private IP requires
+operator trust in the local DNS/device, not an assertion of authenticated model identity.
+
+Wake is optional and requires both `--wake-mac` and `--wake-broadcast` plus `--trusted-lan`.
+Only a valid, same-origin **explicit chat question** checks `/api/tags`; if unreachable, it
+sends one bounded UDP magic packet and polls the fixed Ollama origin for at most the wake
+budget. The page shows “Waking the local AI…” while waiting. No model is downloaded, no
+shell is run, and page loads/status reads never wake the desktop. A reachable Ollama without
+the configured installed model fails explicitly. Generation starts only after readiness, with
+its own timeout; a failed wake leaves public information working.
+
+### Bounds and offline acceptance
+
+One chat request at a time; a shared 12-attempt/minute budget (no IP identity tracking);
+32 HTTP connections; 12 KiB request bodies; 5-second body deadline; 2,000 UTF-8-byte questions;
+at most three complete history pairs totaling 6,000 bytes. Output is capped at 384 requested
+tokens, 8,000 answer bytes and 64 KiB upstream response bytes. Context defaults to 4,096
+tokens and accepts an operator-set maximum of 32,768 via `--context-tokens`; model timeout
+defaults to 90 seconds with a 120-second maximum. Wake budget defaults/maxes at 90 seconds.
+Cancellation closes upstream work. The model may be wrong even within these limits.
+
+Chat requires exact same-origin JSON POST and matching local Host/Origin; cross-origin
+requests, form posts, arbitrary model/URL/options fields, system/tool history and oversized
+payloads are refused. No CORS is enabled. Model/user text is rendered as text, not HTML or
+clickable model-generated links. The page identifies the configured model, source dates and
+local gateway, with an AI-generated/can-be-wrong label on every answer.
+
+For an acceptance check, disconnect WAN (and phone cellular fallback) **without losing LAN**,
+reload the direct node URL at 390 px, open the dated public sections and ask a new local-model
+question. Browser-only WAN blocking must still permit the node origin, while the Node process
+needs its authorized private DNS/Ollama/UDP route. Separately stop the model and verify the
+honest unavailable/timeout state. Model fixture tests do not establish this live proof.
+
+Bluetooth PAN and Reticulum/LXMF transport remain later work, not implemented browser radio
+access. Nothing here makes online Ledger sign-in, tenancy, wallets or payments work offline.
+
+Node 24 fixture suite (real loopback HTTP servers; explicit example model/DNS responses and
+stubbed wake UDP, not live AI or hardware evidence):
+
+```sh
+node --test home-node/offline-server.test.mjs
+```
+
 ## Tests
 
 ```sh

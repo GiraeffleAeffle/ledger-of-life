@@ -10,6 +10,7 @@ import { TEST_CITY_INVESTMENTS, type TestCityInvestmentId } from '@/data/local-i
 import { displayCityText, formatCityDate } from './city-coverage';
 import { readAccountPins } from './personal-map-storage';
 import { MoreList, MoreRow } from './blocks';
+import { LoyaltyMapLayer } from './loyalty-map-layer';
 
 const kinds: { id: SignalKind; label: string; color: string }[] = [
   { id: 'planning', label: 'Planning', color: '#7750ac' },
@@ -355,6 +356,7 @@ export function PersonalMap({ request, accountId, explorationCity = '', selected
         <button type="button" className="personal-3d-toggle" aria-pressed={threeD} aria-label={threeD ? '3D buildings on · switch to 2D' : '2D map · switch to 3D'} title={threeD ? 'Switch to 2D' : 'Switch to 3D'} onClick={() => setThreeD((value) => !value)}>{threeD ? '3D' : '2D'}</button>
       </div>
     </>}
+    <LoyaltyMapLayer key={`${accountId}:${cityId}`} request={request} cityId={cityId} mapRef={map} mapReady={mapReady} />
     <MoreList>
       {result?.state === 'covered' && <MoreRow title="Map settings" meta="Filters · device pins · home & work · record lists">
       <details className="personal-map-caption"><summary>About map shapes and sources</summary><p>Public projects and places use linked city or OpenStreetMap records. OpenStreetMap building heights may be estimated. Planning areas show published boundaries, not building footprints. Fictional test projects are illustrative placements, not real properties or offers.</p></details>
@@ -372,7 +374,7 @@ export function PersonalMap({ request, accountId, explorationCity = '', selected
             <button type="button" className="secondary-button" onClick={() => geolocate(which)}>Use browser location for {which}</button>
             {pins[which] && <button type="button" className="secondary-button" onClick={() => savePin(which)}>Remove {which}</button>}
           </div>)}</div>
-          <p className="personal-privacy">Home defaults to your approximate tenancy pin; overrides and work pins stay on this device.</p>
+          <p className="personal-privacy">Home defaults to your approximate tenancy pin; overrides and work pins stay on this device. Viewed map areas are revealed by tile requests to Ledger, whose proxy fetches tiles from the provider; exact saved pins are not posted.</p>
           <div className="personal-legend" aria-label="Map layer filters">{kinds.map(({ id, label, color }) => <label key={id}><input type="checkbox" checked={enabled.includes(id)} onChange={() => setEnabled((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} /><i style={{ background: color }} />{label}</label>)}</div>
         </section>
         {availableCategories.length > 0 && <div className="personal-category-picker" aria-label="Place categories">
