@@ -1,0 +1,72 @@
+{
+  "release": {
+    "revision": 34,
+    "deployedAt": "2026-10-09T21:46:53+02:00",
+    "sourceCommit": "d113bd1d3f575c8709f4941d1b971dbe24de9659",
+    "pinCommit": "c4e65d057d7d035506fe49ee5a419534cd588c19",
+    "digest": "sha256:2ce075945202d267ace7e9c01a7c591e87fce2c7829f31428d72de00433888cc",
+    "sourceCi": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/37981141084",
+    "imageBuild": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/37981538964",
+    "pod": "ledger-of-life-6cbc667d85-vt6tz",
+    "podReady": true,
+    "podSpecAndImageIdMatchDigest": true,
+    "method": "Governed Ledger release only; filtered viewer stopped, no wireproxy remained, release applied, viewer restored. No Secret, program, authority, database migration or other-product deployment change."
+  },
+  "gates": {
+    "typescript": "passed",
+    "lint": "passed",
+    "testsPassed": 1065,
+    "testsSkipped": 2,
+    "testsFailed": 0,
+    "whitespace": "passed",
+    "productionBuild": "passed",
+    "sourceCi": "application, EVM and Solana-host passed",
+    "reviews": "Independent GPT-6.1-sol correctness and security reviews cleared their concrete findings; not an external audit.",
+    "imageSmoke": "Published amd64 image: uid1000, read-only root, dropped capabilities, temporary data/cache, public pages200, civic/AI/loyalty/rent authentication401, superseded reader/offline routes404, available SQLite, full city corpus present, private files absent. Container/image removed.",
+    "dockerInputs": "Changed hosted imports remain within existing src/app allowlist and COPY. Full source records remain in already copied stadtstack-data/out."
+  },
+  "cityAi": {
+    "topicId": "b539bd60-db18-4781-a6c6-dab295e19d1e",
+    "url": "https://ledger.stadtstack.eu/?area=places&tab=places-say&civicCity=hoppegarten&civicTopic=b539bd60-db18-4781-a6c6-dab295e19d1e",
+    "title": "Demo: Ratsquelle zur Skateanlage Hönow",
+    "classification": "Explicitly labelled test-account topic and actual public model answer, not resident participation or a municipal decision.",
+    "question": "Welchen Beschlussstatus vermerkt die Ratsagenda vom 7. September 2026 zur Skateanlage Hönow? Bitte kurz mit Quelle und Datum.",
+    "separatePollQuestion": "Should this test topic collect further source-linked context?",
+    "generatedAt": "2026-10-09T21:48:50+02:00",
+    "status": "completed",
+    "model": "qwen3.8:27b-ud-q3-k-xl",
+    "answer": "Die Ratsagenda vom 7. September 2026 vermerkt den Beschlussstatus „an Ausschuss/Fraktion verwiesen“ [1]. Quelle: „Außerplanmäßige Aufwendungen Skateanlage Hönow“ (councilAgenda), Stand 2026-09-07, Status: candidate.",
+    "source": {
+      "title": "Außerplanmäßige Aufwendungen Skateanlage Hönow",
+      "url": "https://buergerinfo.gemeinde-hoppegarten.de/to0050.asp?__ktonr=72225",
+      "kind": "councilAgenda",
+      "asOf": "2026-09-07",
+      "reviewStatus": "candidate",
+      "recordedDecisionStatus": "an Ausschuss/Fraktion verwiesen"
+    },
+    "acceptance": "One relevant council source, German answer despite English poll question, exact recorded source kind and referral status. Primary public council page independently read with the same date/status. No unrelated places or invented expenditure approval.",
+    "availability": "Owner enabled free public answers before this request; existing consent and shared quota gates remained in force. One new tagged request was used for this release proof; no quota bypass or wallet payment.",
+    "limits": {"accountPerUtcDay": 3, "topicPerUtcDay": 3, "sitePerUtcDay": 30, "outputTokens": 192},
+    "mobile": {"viewportWidth": 390, "documentWidth": 390},
+    "sourceCoverageLimit": "No Straussee water-level record exists in the current published Ledger corpus; older public water-topic/feed endpoints returned503. The actual available Hoppegarten council case was used instead. No water-level claim is made.",
+    "historicalCorrection": "The revision33 initial unavailable state remains recorded in HOSTED_CITY_APP_2026-10-09.json. After owner opt-in, the 20:00 Berlin answer was real but selected unrelated places and used English. That completed answer was not rewritten; this new topic demonstrates the correction."
+  },
+  "moneyRegression": {
+    "network": "Solana devnet",
+    "action": "buy",
+    "reviewedCash": "0.001 tUSDC",
+    "receivedUnits": "0.001 tHOME",
+    "signature": "2eWRTwamFBckFLPhVKCA5z72oQRpDv9xCG4TD2yrxfS6NQedRwd4wjg6nMb478QsannUgfU9FUqr8vmTqDKJobWr",
+    "explorer": "https://explorer.solana.com/tx/2eWRTwamFBckFLPhVKCA5z72oQRpDv9xCG4TD2yrxfS6NQedRwd4wjg6nMb478QsannUgfU9FUqr8vmTqDKJobWr?cluster=devnet",
+    "blockTime": "2026-10-09T19:49:32Z",
+    "slot": 509289675,
+    "commitment": "finalized",
+    "transactionError": null,
+    "userTokenDeltasAtomic": {"BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE": "-1000", "2XtDmPPg9Rzu7kNufRsUVG3CGhkrp4KnuRm14rsGqwXy": "1000"},
+    "independentCheck": "Public devnet getTransaction at finalized commitment, exact reviewed effects and no error.",
+    "earlierObservation": "Initial house read refused a finalized-clock mismatch before signing. The explicit fresh verified reading produced a valid exact review and the tiny buy finalized; no guard was weakened."
+  },
+  "evidenceDirectory": "/Users/max/Code/ledger-of-life-review/videos/captures-v4/",
+  "screenshots": ["live-city-ai-ranked-answer-1280.png", "live-city-ai-ranked-answer-390.png", "live-city-ai-ranking-money-regression-1280.png"],
+  "unchangedLimits": "Loyalty still needs separate owner hosting and genuine merchant evidence. Existing map-proxy aggregate concurrent upstream buffering risk remains outside this delta. No mainnet, radio, residence or legal-compliance claim."
+}
