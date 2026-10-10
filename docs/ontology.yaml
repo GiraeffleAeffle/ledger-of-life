@@ -124,6 +124,8 @@ concepts:
       - Relevant council records and explicit source matches outrank generic places. Preserve each source's exact kind/title/date/locator; no inferred common physical category.
       - The tagged question controls answer language, not the poll question. No relevant source means no model call; explicit fresh attempts may rerank but completed/in-flight evidence remains bound.
       - Grounding reads full records and preserves included locators, recorded unknowns and the actual question; invalid/absent dates are not dated evidence. Oversized complete context is declined explicitly, not silently truncated.
+      - Relevant auto-verified core evidence outranks candidates without bypassing relevance; measurement dates and budget years remain distinct from source document dates.
+      - Failed core publication bindings exclude that claim from City AI; auto_checked alone never grants auto-verified status.
   OpinionPoll:
     definition: A non-binding Ledger test-account poll moving through discussion, ready, open and closed.
     reality: prototype
@@ -133,7 +135,7 @@ concepts:
       - Closed counts, denominator, time and hash are immutable; no onchain anchoring, payment or municipal execution is implied.
 
   CitySignal:
-    definition: A public, versioned city-wide statement or place published by Stadtstack; its source, as-of, review state, geometry precision and (for LLM extraction) faithfulness score qualify every claim.
+    definition: A public, versioned city-wide statement, dated measurement, budget plan or place published by Stadtstack; its source dates, review/verification state, geometry precision and automated evidence qualify every claim.
     source: stadtstack-data/out/catalogue.json plus cities/<cityId>/signals.min.geojson for browsing and signals.geojson for detail
     reality: read_only_live
     levels:
@@ -142,6 +144,11 @@ concepts:
       compact_browse: {reality: read_only_live, note: "Map and lists read compact public records; selecting an item loads full sources by public ID only."}
     relations: {located_in: Context (city), relevant_to: Person (matched in the browser with MyPlaces)}
     code: [src/server/city-signals.ts, app/api/city-signals/route.ts, src/components/personal-map.tsx]
+    invariants:
+      - Auto-verified means named automated gates passed against a single primary source, not human review, independent corroboration or municipal endorsement; reviewState remains auto_checked.
+      - Core bundle and full/compact corpus hashes must match the immutable release manifest, with content-bound assertions, primary sources and actual DeepEval receipts.
+      - Missing or mismatched core publication metadata shows unverified and grants no core AI admission; raw pipeline receipts are projected to a public allowlist.
+      - Measurement date is not PDF date or today's level; budget year and planned outlay are not actual spending.
 
   Organization:
     definition: A public body, enterprise, cooperative or builder in a city Context; sourced Strausberg profiles describe products, participation channels, published opportunities and documented group membership. These independent organizations are separate from fictional test issuers.

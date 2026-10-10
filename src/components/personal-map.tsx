@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { GeoJSONSource, GeoJSONSourceSpecification, Map as LibreMap, Marker } from 'maplibre-gl';
 import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
 import type { Coordinate, CityFeature, CityFeedItem, SignalKind } from '../server/city-signals';
-import { displayStatus, interestOptions, matchPersonalRings, PRECISION_LABELS, REVIEW_LABELS, type MatchedSignal } from './personal-map-relevance';
+import { displayStatus, interestOptions, matchPersonalRings, PRECISION_LABELS, type MatchedSignal } from './personal-map-relevance';
+import { sourceAssertionLabel, sourceReviewLabel } from '@/data/city-source-evidence';
 import { CITY_CHANGED_EVENT, PINS_CHANGED_EVENT, pinsKey, useCitySignals, type AuthorizedRequest } from './use-city-signals';
 import { parsePins, saveInterests, useInterests, usePersonalPins } from './personal-map-preferences';
 import { TEST_CITY_INVESTMENTS, type TestCityInvestmentId } from '@/data/local-investments';
@@ -20,12 +21,13 @@ const kinds: { id: SignalKind; label: string; color: string }[] = [
   { id: 'council_meeting', label: 'Council meetings', color: '#5273b0' },
   { id: 'budget', label: 'Budget', color: '#2c8063' },
   { id: 'consultation', label: 'Consultations', color: '#b15288' },
+  { id: 'measurement', label: 'Measurements', color: '#267c88' },
   { id: 'place', label: 'Places', color: '#6b873b' },
 ];
 const signalColors: ExpressionSpecification = ['match', ['get', 'kind'],
   'planning', '#7750ac', 'construction', '#bd662c', 'roadworks', '#be3938',
   'council_paper', '#315d9c', 'council_meeting', '#5273b0', 'budget', '#2c8063',
-  'consultation', '#b15288', 'place', '#6b873b', '#677c79'];
+  'consultation', '#b15288', 'measurement', '#267c88', 'place', '#6b873b', '#677c79'];
 const pointLayer = (kind: SignalKind) => `signals-${kind}-point`;
 const clusterLayer = (kind: SignalKind) => `signals-${kind}-cluster`;
 const countLayer = (kind: SignalKind) => `signals-${kind}-count`;
@@ -36,10 +38,10 @@ const emptyCategories: string[] = [];
 const date = (value: string | null) => value ? formatCityDate(value) : 'not established';
 
 function SignalMeta({ feature }: { feature: CityFeature }) {
-  const { reviewState, geometryPrecision, asOf } = feature.properties;
+  const { reviewState, verification, assertion, geometryPrecision, asOf } = feature.properties;
   const source = 'sources' in feature.properties ? feature.properties.sources[0] : feature.properties.primarySource;
   const count = 'sources' in feature.properties ? feature.properties.sources.length : feature.properties.sourceCount;
-  return <p className="personal-source-meta">Source: {source?.publisher || 'not supplied'}{count > 1 && ` + ${count - 1} more`} · as of {date(asOf)} · {REVIEW_LABELS[reviewState]} · {PRECISION_LABELS[geometryPrecision]}</p>;
+  return <p className="personal-source-meta">Source: {source?.publisher || 'not supplied'}{count > 1 && ` + ${count - 1} more`} · {assertion ? 'document date' : 'as of'} {date(asOf)} · {sourceReviewLabel(reviewState, verification)}{assertion && ` · ${sourceAssertionLabel(assertion)}`} · {PRECISION_LABELS[geometryPrecision]}</p>;
 }
 
 function Ring({ title, items, empty, open }: { title: string; items: MatchedSignal[]; empty: string; open: (item: MatchedSignal) => void }) {
@@ -345,7 +347,7 @@ export function PersonalMap({ request, accountId, explorationCity = '', selected
       <div className="personal-map-toolbar" role="group" aria-label="Map layers and view">
         <button type="button" aria-pressed={showProjects} onClick={() => setShowProjects((value) => !value)}>Public projects</button>
         <button type="button" aria-pressed={showPlaces} onClick={() => setShowPlaces((value) => !value)}>Local places</button>
-        <button type="button" aria-pressed={showOther} onClick={() => setShowOther((value) => !value)}>Council papers &amp; budget</button>
+        <button type="button" aria-pressed={showOther} onClick={() => setShowOther((value) => !value)}>Council, budget &amp; measurements</button>
         <button type="button" aria-pressed={showEvents} onClick={() => setShowEvents((value) => !value)}>Event venues ({events.filter((item) => item.geometry).length})</button>
         {onSelectInvestment && <button type="button" className="personal-demo-toggle" aria-pressed={showInvestments}
           onClick={() => onSelectInvestment(showInvestments ? null : TEST_CITY_INVESTMENTS[0].id)}>◇ Fictional test project · test tokens · no rights</button>}

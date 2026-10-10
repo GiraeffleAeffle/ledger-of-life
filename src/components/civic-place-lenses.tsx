@@ -4,7 +4,8 @@ import { Bookmark } from 'lucide-react';
 import { civicOutcomeEvidence, MUNSTER_BUS_TRIAL_ID, type CivicOutcomeEvidence } from '@/data/civic-outcome-evidence';
 import { TEST_CITY_INVESTMENTS, type TestCityInvestmentId } from '@/data/local-investments';
 import type { CityFeature, Signal } from '@/server/city-signals';
-import { displayStatus, PRECISION_LABELS, REVIEW_LABELS } from './personal-map-relevance';
+import { displayStatus, PRECISION_LABELS } from './personal-map-relevance';
+import { sourceAssertionLabel, sourceReviewLabel } from '@/data/city-source-evidence';
 import { PersonalMap } from './personal-map';
 import { CITY_CHANGED_EVENT, useCitySignals, type AuthorizedRequest } from './use-city-signals';
 import { CityFeedList, eventTimeState, useCityFeed, useEventClock } from './city-feed';
@@ -32,8 +33,9 @@ function quantity(value: number | string, unit?: string) {
 }
 function Evidence({ caseStudy, feature }: { caseStudy?: CivicOutcomeEvidence; feature?: Signal }) {
   return <details className="civic-evidence"><summary>Evidence, review &amp; geometry</summary>
-    {feature && <><p>{displayCityText(feature.properties.statement)}</p><p>Source status (original wording): {displayCityText(feature.properties.status || 'not established')} · as of {formatCityDate(feature.properties.asOf)} · review: {REVIEW_LABELS[feature.properties.reviewState]} · location: {PRECISION_LABELS[feature.properties.geometryPrecision]} ({feature.geometry?.type ?? 'unlocated'}).</p>
+    {feature && <><p>{displayCityText(feature.properties.statement)}</p><p>Source status (original wording): {displayCityText(feature.properties.status || 'not established')} · {feature.properties.assertion ? 'document date' : 'as of'} {formatCityDate(feature.properties.asOf)} · review: {sourceReviewLabel(feature.properties.reviewState, feature.properties.verification)}{feature.properties.assertion && ` · ${sourceAssertionLabel(feature.properties.assertion)}`} · location: {PRECISION_LABELS[feature.properties.geometryPrecision]} ({feature.geometry?.type ?? 'unlocated'}).</p>
       {feature.properties.sources.map((source, index) => <p key={`${source.url}\0${source.locator}\0${index}`}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title || source.publisher} ↗</a> · {source.publisher} · {source.locator} · retrieved {formatCityDate(source.retrievedAt)} · {source.licence} ({source.reuse})</p>)}
+      {feature.properties.verification?.status === 'auto-verified' && <p>{feature.properties.verification.meaning}. {feature.properties.verification.evidenceBasis}. {feature.properties.verification.metric} {feature.properties.verification.metricVersion} · {feature.properties.verification.model} · score {feature.properties.verification.score}, threshold {feature.properties.verification.threshold} · checked {feature.properties.verification.evaluatedAt}.</p>}
       {feature.properties.unknowns.length > 0 && <p>Unresolved: {feature.properties.unknowns.join('; ')}</p>}</>}
     {caseStudy && <><p>{caseStudy.geometryNote}</p><p>{caseStudy.comparisonCaveat}</p><p><strong>Evidence needed:</strong> {caseStudy.missingEvidence.join('; ')}. Missing in these reviewed records does not mean nobody measured it elsewhere.</p><p>Research checked {formatCityDate(caseStudy.checkedAt)}. Source publications and automated checks are not human review.</p>
       {[...caseStudy.outputs, ...caseStudy.metrics, ...(caseStudy.relations ?? []), ...(caseStudy.spending ? [caseStudy.spending.planned, caseStudy.spending.recorded] : []), ...(caseStudy.indicator ? [{ ...caseStudy.indicator.baseline, label: 'Full-route before-trial measurement' }, { ...caseStudy.indicator.followUp, label: 'Full-route during-trial measurement' }] : [])].map((item, index) => <p key={`${index}:${item.locator}`}><a href={item.sourceUrl} target="_blank" rel="noopener noreferrer">{'from' in item ? `${item.from} → ${item.predicate} → ${item.to}` : item.label} ↗</a> · {item.locator}{'basis' in item ? ` · ${item.basis}` : ''}{'date' in item && item.date ? ` · ${formatCityDate(item.date)}` : ''}{'period' in item && item.period ? ` · ${item.period}` : ''}</p>)}</>}
@@ -261,7 +263,7 @@ export function CivicPlaceLenses({ request, accountId, previewRequest, onExplora
       shown.add(key);
       shortlist.push({ target, title: target.kind === 'case' ? caseForTarget(target)!.title : item.properties.title,
         selectionId: target.id,
-        context: `${item.properties.kind.replaceAll('_', ' ')} · ${displayCityText(displayStatus(item))} · source as of ${formatCityDate(item.properties.asOf)} · ${REVIEW_LABELS[item.properties.reviewState]}` });
+        context: `${item.properties.kind.replaceAll('_', ' ')} · ${displayCityText(displayStatus(item))} · source as of ${formatCityDate(item.properties.asOf)} · ${sourceReviewLabel(item.properties.reviewState, item.properties.verification)}` });
     }
   }
   const selectedTarget: FollowTarget | null = investmentId ? null : selected && caseStudy ? { kind: 'case', cityId, id: caseStudy.id }
@@ -444,11 +446,11 @@ export function CivicPlaceLenses({ request, accountId, previewRequest, onExplora
       <header className="civic-detail-header">
         <div><span className="eyebrow">{issuer ? 'Fictional test project · test tokens · no rights' : feature ? `${feature.properties.kind.replaceAll('_', ' ')} · PUBLIC RECORD` : 'PUBLIC CITY CONTEXT'}</span>
           <h3>{issuer ? projectDisplayName(issuer.name) : caseStudy?.title ?? feature?.properties.title ?? `Select a place or project in ${cityName ?? 'your city'}`}</h3>
-          {feature && <p>Published stage: <strong>{displayCityText(displayStatus(feature))}</strong> · {PRECISION_LABELS[feature.properties.geometryPrecision]} · as of {formatCityDate(feature.properties.asOf)}</p>}
+          {feature && <p>{feature.properties.kind === 'measurement' ? 'Measurement status' : 'Published stage'}: <strong>{displayCityText(displayStatus(feature))}</strong> · {PRECISION_LABELS[feature.properties.geometryPrecision]} · {feature.properties.assertion ? 'document date' : 'as of'} {formatCityDate(feature.properties.asOf)}{feature.properties.assertion && ` · ${sourceAssertionLabel(feature.properties.assertion)}`}</p>}
         </div>
         {selectedTarget && (followedSelection
           ? <button type="button" className="civic-follow-button" aria-pressed="true" onClick={() => following.remove(selectedTarget)}><Bookmark size={17} fill="currentColor" />Following · Unfollow</button>
-          : <button type="button" className="civic-follow-button" aria-pressed="false" disabled={!canFollow} onClick={() => void followCurrent(selectedTarget)}><Bookmark size={17} />{followingTarget === selectedKey ? 'Checking sources…' : 'Follow project'}</button>)}
+          : <button type="button" className="civic-follow-button" aria-pressed="false" disabled={!canFollow} onClick={() => void followCurrent(selectedTarget)}><Bookmark size={17} />{followingTarget === selectedKey ? 'Checking sources…' : feature?.properties.kind === 'measurement' ? 'Follow record' : 'Follow project'}</button>)}
       </header>
       {selectedTarget && <p className="small-copy">Following is saved in this browser for this account. Nobody is notified; changes appear only when the published data is refreshed and you reopen the app.</p>}
       {issuer && <><p>{issuer.description}</p><p>{issuer.rights}</p><p>{issuer.location.label}</p>

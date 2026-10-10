@@ -9,12 +9,6 @@ export const COMMUTE_CORRIDOR_METRES = 400;
 export type PersonalPins = { home?: Coordinate; work?: Coordinate };
 export type MatchedSignal = { feature: CityFeature; distanceMetres: number | null; explanation: string };
 export type PersonalRings = { home: MatchedSignal[]; commute: MatchedSignal[]; city: MatchedSignal[] };
-export const REVIEW_LABELS: Record<CityFeature['properties']['reviewState'], string> = {
-  candidate: 'Not yet checked',
-  auto_checked: 'Automatically checked · not reviewed by a person',
-  reviewed: 'Human-reviewed',
-  rejected: 'Rejected interpretation',
-};
 export const PRECISION_LABELS: Record<CityFeature['properties']['geometryPrecision'], string> = {
   exact: 'Mapped location',
   approximate: 'Approximate location',
@@ -111,6 +105,7 @@ function means(feature: CityFeature, ring: 'home' | 'commute' | 'city', distance
   if (kind === 'consultation' && endDate && endDate < today) return `${displayStatus(feature, today).replace(/[.]+$/, '')}. A closed window is not open for comments.`;
   if (kind === 'roadworks' && endDate && endDate < today) return `${displayStatus(feature, today)}.`;
   if (kind === 'budget') return `Planned, not spent: ${statement}`;
+  if (kind === 'measurement') return `Dated measurement, not a live reading: ${statement}`;
   if (kind === 'council_paper' || kind === 'council_meeting') return `${/agenda/i.test(status) ? 'Your city council has on its agenda' : kind === 'council_paper' ? 'Council paper' : 'Council meeting'}: ${title}${startDate ? ` (${formatCityDate(startDate)})` : ''}. A paper or meeting does not confirm a decision.`;
   if (ring === 'commute' && kind === 'roadworks') return `Near your approximate way to work: ${title}${endDate ? ` until ${formatCityDate(endDate)}` : ''}. Check its status before travelling.`;
   if (ring === 'home' && distance !== null) return `${Math.round(distance)} m from your home: ${title}${nextStep ? `; next: ${nextStep.replace(/[.]+$/, '')}` : ''}. Nearby does not necessarily mean your street is affected.`;
@@ -134,7 +129,7 @@ export function interestWordList(interest: Interest): string[] {
   return interestWords[interest].source.split('|').map((word) => /^\\b.+\\b$/.test(word) ? `${word.slice(2, -2)} (whole word)` : word);
 }
 function interestMatch(feature: CityFeature, interests: readonly Interest[]): boolean {
-  if (feature.properties.kind !== 'place' && feature.properties.kind !== 'council_paper' && feature.properties.kind !== 'council_meeting') return false;
+  if (feature.properties.kind !== 'place' && feature.properties.kind !== 'council_paper' && feature.properties.kind !== 'council_meeting' && feature.properties.kind !== 'measurement') return false;
   const words = `${feature.properties.title} ${feature.properties.category}`;
   return interests.some((interest) => interestWords[interest].test(words));
 }

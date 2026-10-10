@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, randomUUID } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,6 +18,8 @@ import type { LocalAiRequest } from './local-ai-types.ts';
 import { LocalStore } from './store.ts';
 import type { Store } from './store.ts';
 import type { CityFeature, RelevantRegionalTopic, RegionalTopicItem, Signal } from './city-signals.ts';
+import { CORE_FACT_IDS, projectCorePublication, validateCorePublication } from './core-publication.ts';
+import type { CityCollection } from './city-signals.ts';
 
 const evidence: CivicAiEvidence[] = [{ id: 'published-council-record', title: 'Council walking routes consultation',
   url: 'https://www.strausberg.de/council', asOf: '2026-09-21', kind: 'council_paper', reviewState: 'candidate',
@@ -688,5 +690,76 @@ test('keyword-rich places cannot crowd a relevant linked record or council paper
     const trigger = { ...base, topicSourceUrl: linked.url, triggerText: '@city-ai Explain walking routes around the station and lake.' };
     assert.deepEqual(rankCityAiEvidence(trigger, [...places, council, linked]).slice(0, 2).map((item) => item.id), ['linked', 'council']);
     assert.deepEqual(buildCityAiPrompt(trigger, [...places, council, linked]).sources.slice(0, 2).map((item) => item.id), ['linked', 'council']);
+  } finally { await store.close(); }
+});
+
+async function coreEvidence() {
+  const snapshots = await Promise.all(['core/strausberg-facts.json', 'core/release-manifest.json', 'cities/strausberg/signals.geojson', 'cities/strausberg/signals.min.geojson'].map(async (path) => {
+    const bytes = await readFile(new URL(`../../stadtstack-data/out/${path}`, import.meta.url), 'utf8');
+    return { value: JSON.parse(bytes) as unknown, sha256: createHash('sha256').update(bytes).digest('hex') };
+  }));
+  const admission = validateCorePublication(snapshots[0], snapshots[1], snapshots[2], snapshots[3]);
+  return fullCityAiEvidence(projectCorePublication(snapshots[2].value as CityCollection, admission).features);
+}
+
+test('actual core lake source preserves measurement date, document date and non-live caveat in bounded German grounding', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity();
+  try {
+    const current = await topic(store, owner);
+    const base = await resolveCivicAiTrigger(store, owner, { topicId: current.id, contributionId: null });
+    const trigger = { ...base, triggerText: '@city-ai Wie lag der Wasserstand des Straussees am 14.09.2026 zum Normalstau? Ist das ein heutiger Messwert?' };
+    const built = buildCityAiPrompt(trigger, await coreEvidence());
+    assert.equal(built.sources[0].id, CORE_FACT_IDS[0]);
+    assert.equal(built.sources[0].reviewState, 'auto_checked');
+    assert.equal(built.sources[0].verification?.status, 'auto-verified');
+    assert.equal(built.sources[0].asOf, '2026-10-05');
+    const packet = JSON.parse(built.prompt.slice(built.prompt.indexOf('\n') + 1));
+    assert.equal(packet.sources[0].documentDate, '2026-10-05');
+    assert.deepEqual(packet.sources[0].assertion, { date: '2026-09-14', value: -1.61, unit: 'm', reference: 'Normalstau' });
+    assert.match(packet.sources[0].evidence, /1,61 m unter Normalstau/);
+    assert.ok(packet.sources[0].unknowns.includes('Keine Aussage zum heutigen Wasserstand'));
+    assert.match(built.prompt, /Document date is not measurement date/);
+    assert.ok(built.prompt.length <= 2000);
+  } finally { await store.close(); }
+});
+
+test('both actual budget years fit together and auto-verified relevant plans outrank candidates', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity();
+  try {
+    const current = await topic(store, owner);
+    const base = await resolveCivicAiTrigger(store, owner, { topicId: current.id, contributionId: null });
+    const published = await coreEvidence();
+    const candidate = { ...evidence[0], id: 'candidate-budget', title: 'Investitionsauszahlungen und Haushaltsplan', statement: 'Haushaltsplan 2026 Investitionstätigkeit, Auszahlungen und Projekte.', kind: 'council_paper' };
+    const trigger = { ...base, triggerText: '@city-ai Welche Investitionsauszahlungen sind für 2025 und 2026 im Haushaltsplan vorgesehen? Sind das tatsächlich ausgegebene Beträge?' };
+    const built = buildCityAiPrompt(trigger, [candidate, ...published]);
+    assert.deepEqual(built.sources.slice(0, 2).map((source) => source.id), CORE_FACT_IDS.slice(1));
+    const packet = JSON.parse(built.prompt.slice(built.prompt.indexOf('\n') + 1));
+    assert.deepEqual(packet.sources.slice(0, 2).map((source: { assertion: unknown }) => source.assertion), [
+      { year: 2025, value: 17941270, unit: 'EUR' }, { year: 2026, value: 12609320, unit: 'EUR' },
+    ]);
+    assert.ok(packet.sources.slice(0, 2).every((source: { documentDate: string; unknowns: string[] }) => source.documentDate === '2024-11-07' && source.unknowns.includes('Tatsächliche Ausgaben und Einzelprojekte nicht belegt')));
+    assert.match(built.prompt, /PLANNED, not spent/);
+    assert.ok(built.prompt.length <= 2000);
+    assert.equal(rankCityAiEvidence({ ...trigger, triggerText: '@city-ai Welche Investitionsauszahlungen waren für 2026 geplant?' }, published)[0].id, CORE_FACT_IDS[2]);
+    const unverified = published.filter((item) => item.id === CORE_FACT_IDS[0]).map(({ verification: _verification, ...item }) => { void _verification; return item; });
+    assert.deepEqual(rankCityAiEvidence({ ...base, triggerText: '@city-ai Wasserstand Straussee?' }, unverified), []);
+  } finally { await store.close(); }
+});
+
+test('auto-verification and assertion DTOs survive durable AI publication without private pipeline fields', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity(); const p = provider();
+  try {
+    const current = await topic(store, owner, '@city-ai Wie lag der Wasserstand des Straussees am 14.09.2026?');
+    const published = await coreEvidence();
+    p.change({ answer: 'Test-double answer: historical source dated 14 September, not a live reading [1].' });
+    const input = { topicId: current.id, contributionId: null };
+    const result = await requestCivicAi(store, owner, input, true, { ...p.dependencies, evidence: async () => published });
+    assert.equal(result?.status, 'completed');
+    const view = await readCivicTopic(store, identity('reader'), current.id);
+    assert.deepEqual(view.contributions[0].ai?.sources, result?.sources);
+    assert.equal(view.contributions[0].ai?.sources[0].verification?.status, 'auto-verified');
+    assert.deepEqual(view.contributions[0].ai?.sources[0].assertion, published.find((source) => source.id === CORE_FACT_IDS[0])?.assertion);
+    assert.doesNotMatch(JSON.stringify(view.contributions[0]), /PRIVATE-|contextHash|privatePrompt/);
+    assert.equal(p.calls.length, 1);
   } finally { await store.close(); }
 });
