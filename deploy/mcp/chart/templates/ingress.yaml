@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: civic-mcp
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer | quote }}
+    # Perform the redirect in the backend AFTER suppressing logs, instead of the
+    # shared frontend redirect which could log the URL/query before this rule.
+    haproxy-ingress.github.io/ssl-redirect: "false"
+    haproxy-ingress.github.io/timeout-server: "120s"
+    haproxy-ingress.github.io/config-backend: |
+      http-request set-log-level silent
+      http-request redirect scheme https code 308 unless { ssl_fc }
+spec:
+  ingressClassName: haproxy
+  rules:
+    - host: mcp.stadtstack.eu
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: civic-mcp
+                port:
+                  name: http
+  tls:
+    - hosts:
+        - mcp.stadtstack.eu
+      secretName: civic-mcp-tls

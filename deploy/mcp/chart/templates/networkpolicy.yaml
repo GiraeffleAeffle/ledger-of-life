@@ -1,0 +1,70 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# HTTP-01 solver is not the MCP workload. Limit it to the same trusted ingress
+# sources so default-deny does not block letsencrypt-prod certificate renewal.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: civic-mcp-http01
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      acme.cert-manager.io/http01-solver: "true"
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: haproxy-ingress
+              app.kubernetes.io/instance: haproxy-ingress
+        {{- range .Values.ingress.haproxySources }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - port: 8089
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: civic-mcp-web
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: civic-mcp
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        # Controller labels from the governed inventory; host-network ingress
+        # additionally requires verified controller source addresses below.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: haproxy-ingress
+              app.kubernetes.io/instance: haproxy-ingress
+        {{- range .Values.ingress.haproxySources }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - port: 4318
+          protocol: TCP
+  # Bundled data and projected credentials require no DNS or outbound requests.
+  egress: []
+# Kubernetes NetworkPolicy allows traffic from the pod's own node; kubelet
+# /health probes do not require a broad ingress exception or public health route.

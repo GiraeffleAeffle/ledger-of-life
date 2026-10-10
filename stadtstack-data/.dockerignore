@@ -1,0 +1,19 @@
+# Explicit release-only context: no caches, credentials, tests or local env files.
+**
+!Dockerfile
+!.dockerignore
+!package.json
+!package-lock.json
+!src/
+!src/**
+!out/
+!out/**
+# Do not ship superseded publications in the runtime image.
+out/previous/
+out/previous/**
+# Defense in depth if a credential ever lands in an included directory.
+**/.env*
+**/.npmrc
+**/*token-hashes*
+**/*.pem
+**/*.key

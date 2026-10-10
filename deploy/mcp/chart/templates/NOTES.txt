@@ -1,0 +1,29 @@
+Civic MCP: https://mcp.stadtstack.eu/mcp
+Image: {{ include "civicMcp.image" . }}
+
+This chart never creates a Namespace or Secret. The governed wrapper must provision
+namespace stadtstack-mcp and Secret {{ .Values.secretName }} containing the key
+token-hashes.json as a JSON array of {"id": "...", "sha256": "..."}. Store only
+lowercase SHA-256 bearer-token hashes. Never pass plaintext tokens through Helm,
+container build arguments, workflow inputs, command arguments, or logs.
+
+The pod reads /run/secrets/mcp/token-hashes.json and bundled /app/out. Run one
+replica with Recreate because per-token limits are process-local. Rotate the
+existing Secret and increment tokenSecretRevision to force a controlled restart.
+
+The image runs as UID/GID 1000 with a read-only root filesystem, no capabilities,
+no service-account token and no writable volumes. GET /health is a kubelet probe;
+POST /mcp is the stateless Streamable HTTP endpoint and requires authorization.
+
+Egress is denied, including DNS. Ingress follows the existing governed HAProxy
+controller's ingress-system namespace and host-network source IP list. Refresh
+that list from approved inventory if the controller changes. The cert-manager
+HTTP-01 solver receives the same ingress allowance on its own port 8089.
+
+HAProxy backend access logging is silenced before the backend HTTPS redirect.
+The shared frontend's automatic redirect is disabled for this host to avoid
+logging redirected request queries. The governed ingress owner must ensure the
+controller permits config-backend snippets and any frontend-level logging of
+requests rejected before backend routing is disabled for mcp.stadtstack.eu.
+
+No cluster changes or rollout verification are performed by the image workflow.

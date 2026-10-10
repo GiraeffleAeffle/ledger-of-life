@@ -2,6 +2,11 @@
   "schemaVersion": "stadtstack-signals-v1",
   "generatedAt": "2026-09-28T18:37:13.581Z",
   "publisher": "Stadtstack (independent derived factual summaries)",
+  "coreBundle": {
+    "path": "core/strausberg-facts.json",
+    "version": "4de6e538c19be61e9014b782e2b5f75f9228c5794d340967e0ccc67c0e4d4d08",
+    "manifestPath": "core/release-manifest.json"
+  },
   "cities": [
     {
       "id": "koeln",
@@ -1556,6 +1561,26 @@
           "reuse": "unknown",
           "retrievedAt": "2026-09-28T18:37:25.667Z",
           "status": "ok"
+        },
+        {
+          "id": "straussee-monitoring",
+          "kind": "water",
+          "publisher": "Stadt Strausberg",
+          "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/05/26-10-05_Stauhoehe-Straussee.pdf",
+          "licence": "unknown",
+          "reuse": "facts_with_attribution",
+          "retrievedAt": "2026-10-10T09:11:40.515Z",
+          "status": "ok"
+        },
+        {
+          "id": "budget-ordinance",
+          "kind": "budget",
+          "publisher": "Stadt Strausberg",
+          "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
+          "licence": "§ 5 UrhG – amtliches Werk",
+          "reuse": "official_work",
+          "retrievedAt": "2026-10-10T09:11:40.645Z",
+          "status": "ok"
         }
       ],
       "temporalCoverage": {
@@ -1566,8 +1591,8 @@
       "licence": "Mixed; see each source",
       "feedUrl": "cities/strausberg/feed.json",
       "minUrl": "cities/strausberg/signals.min.geojson",
-      "fullBytes": 300828,
-      "minBytes": 147144
+      "fullBytes": 312784,
+      "minBytes": 154142
     }
   ]
 }

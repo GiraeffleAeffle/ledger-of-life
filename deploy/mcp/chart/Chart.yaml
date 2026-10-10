@@ -1,0 +1,6 @@
+apiVersion: v2
+name: civic-mcp
+description: Protected read-only Stadtstack civic MCP deployment
+version: 0.1.0
+appVersion: "0.1.0"
+type: application
