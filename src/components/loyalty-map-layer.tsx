@@ -2,12 +2,11 @@
 import { useEffect, useMemo, useState, type RefObject } from 'react';
 import type { Map as LibreMap, Marker } from 'maplibre-gl';
 import { isCivicCity } from '@/data/civic-cities';
-import { loyaltyMapMerchants, type LoyaltyPlaces } from '@/data/loyalty-places';
-import type { AuthorizedRequest } from './use-city-signals';
+import { fetchLoyaltyPlaces, LOYALTY_ORIGIN, loyaltyMapMerchants, type LoyaltyPlaces } from '@/data/loyalty-places';
 
 /** Companion layer: no changes to holdings, personal pins, council or project sources. */
-export function LoyaltyMapLayer({ request, cityId, mapRef, mapReady }: {
-  request: AuthorizedRequest; cityId: string; mapRef: RefObject<LibreMap | null>; mapReady: boolean;
+export function LoyaltyMapLayer({ cityId, mapRef, mapReady }: {
+  cityId: string; mapRef: RefObject<LibreMap | null>; mapReady: boolean;
 }) {
   const [enabled, setEnabled] = useState(false);
   const [result, setResult] = useState<LoyaltyPlaces | null>(null);
@@ -18,11 +17,12 @@ export function LoyaltyMapLayer({ request, cityId, mapRef, mapReady }: {
   useEffect(() => {
     if (!enabled || !supported) return;
     let current = true;
-    request<LoyaltyPlaces>(`/api/loyalty-places?city=${encodeURIComponent(cityId)}`).then((next) => {
+    const controller = new AbortController();
+    fetchLoyaltyPlaces(cityId, controller.signal).then((next) => {
       if (current) { setResult(next); setError(''); }
-    }).catch(() => { if (current) { setResult(null); setError('Loyalty shop evidence could not be read. No shops are shown.'); } });
-    return () => { current = false; };
-  }, [request, cityId, enabled, supported]);
+    }).catch(() => { if (current) { setResult(null); setError('Shops could not be loaded right now. No pins are shown.'); } });
+    return () => { current = false; controller.abort(); };
+  }, [cityId, enabled, supported]);
   const merchants = useMemo(() => loyaltyMapMerchants(result, cityId, enabled), [result, cityId, enabled]);
   const selected = merchants.find((merchant) => merchant.id === selectedId);
   useEffect(() => {
@@ -48,12 +48,14 @@ export function LoyaltyMapLayer({ request, cityId, mapRef, mapReady }: {
   }, [mapRef, mapReady, merchants]);
   if (!supported) return null;
   return <section className="personal-map-options loyalty-shop-layer" aria-label="Loyalty shop map layer">
-    <button type="button" className="button secondary" aria-pressed={enabled} onClick={() => setEnabled((value) => !value)}>Loyalty shops · Sepolia test</button>
+    <button type="button" className="button secondary" aria-pressed={enabled} onClick={() => {
+      setResult(null); setError(''); setSelectedId(null); setEnabled((value) => !value);
+    }}>Loyalty shops · Sepolia test</button>
     {enabled && <>
       {!result && !error && <p role="status">Reading owner-published merchant evidence…</p>}
       {error && <p role="alert">{error}</p>}
-      {result?.state === 'needs_hosting' && <p>Needs hosting: a Stadtstack-hosted loyalty service is not configured. No verified shop pins or handoff links are available.</p>}
-      {result?.state === 'no_verified_shops' && <p>No verified shops for this city. Hosting configuration is not merchant evidence; no shop pins or handoff links are shown.</p>}
+      {result?.state === 'empty' && <p>No shops yet: be the first. <a href={LOYALTY_ORIGIN} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Open ZK Loyalty for your shop</a></p>}
+      <p>Public shop feed from ZK Loyalty · Sepolia test. Loading it shares your IP address with that service, not your Ledger account, city choice or wallet.</p>
       {merchants.length > 0 && <>
         <p>Owner-reviewed merchant registry · Sepolia test, not real customer rewards. Separate Safe/passkey account; Ledger sign-in and holdings do not transfer. Merchant enrollment and exchange approval happen in the loyalty service.</p>
         {(!mapReady || markerError) && <p>Shop locations are available in the list; map pins are currently unavailable.</p>}

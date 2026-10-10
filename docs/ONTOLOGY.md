@@ -45,6 +45,8 @@ Financial custody still depends on identity, home and signed operations. The civ
 
 Grounding uses full published source records with their original unknowns, status and locators. Only valid recorded dates qualify as dated evidence. Relevance ignores engine-generated field labels; source type preference follows substantive matching. The bounded prompt retains complete included facts/caveats and the actual question, or declines explicitly; it does not turn a context-size failure into a false claim of missing evidence.
 
+**Public loyalty places.** Enabling the optional map layer reads the separate Stadtstack loyalty service's public merchant feed in the browser. Only validated, city-matching published records create **Sepolia test** pins with their evidence links. A successful empty feed invites shop owners to the service; failed/invalid reads create no pins and remain failures. No Ledger identity, wallet, city choice or personal balance is sent, and the separate service's membership/rewards never become a Ledger Position.
+
 ## Concept map
 
 ```mermaid

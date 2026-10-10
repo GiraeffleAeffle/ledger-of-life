@@ -104,6 +104,8 @@ concepts:
       - Native civic topics grant no municipal authority; Ledger accounts are not verified residents or unique humans.
       - Topic scopes and cross-city links do not create map/atlas coverage or duplicate a poll.
       - Game progress and separate test loyalty balances are not participation evidence or personal Position; Privy remains and native self-hosted wallets are roadmap.
+      - Loyalty map pins require validated public feed evidence and retain the Sepolia test label; empty feeds offer an owner handoff, not invented shops.
+      - Optional loyalty feed reads occur in the browser without credentials, city or wallet data; failures are distinct from successful empty results and balances remain outside Ledger.
   CivicTopic:
     definition: A user-authored public topic with an originating city, optional source context and linked city scopes.
     reality: prototype

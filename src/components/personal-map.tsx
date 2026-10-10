@@ -356,7 +356,7 @@ export function PersonalMap({ request, accountId, explorationCity = '', selected
         <button type="button" className="personal-3d-toggle" aria-pressed={threeD} aria-label={threeD ? '3D buildings on · switch to 2D' : '2D map · switch to 3D'} title={threeD ? 'Switch to 2D' : 'Switch to 3D'} onClick={() => setThreeD((value) => !value)}>{threeD ? '3D' : '2D'}</button>
       </div>
     </>}
-    <LoyaltyMapLayer key={`${accountId}:${cityId}`} request={request} cityId={cityId} mapRef={map} mapReady={mapReady} />
+    <LoyaltyMapLayer key={`${accountId}:${cityId}`} cityId={cityId} mapRef={map} mapReady={mapReady} />
     <MoreList>
       {result?.state === 'covered' && <MoreRow title="Map settings" meta="Filters · device pins · home & work · record lists">
       <details className="personal-map-caption"><summary>About map shapes and sources</summary><p>Public projects and places use linked city or OpenStreetMap records. OpenStreetMap building heights may be estimated. Planning areas show published boundaries, not building footprints. Fictional test projects are illustrative placements, not real properties or offers.</p></details>
