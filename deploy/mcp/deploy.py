@@ -2,7 +2,10 @@
 """Run only from session.sh's temporary governed credential environment."""
 import datetime, hashlib, json, os, pathlib, re, subprocess
 
-ROOT = pathlib.Path('/Users/max/Code/civic-mcp-hosted')
+release_repo = os.environ.get('MCP_RELEASE_REPO', '')
+ROOT = pathlib.Path(release_repo)
+if not release_repo or not ROOT.is_absolute() or not ROOT.is_dir() or ROOT.is_symlink() or ROOT.resolve() != ROOT:
+    raise RuntimeError('MCP_RELEASE_REPO must name an explicit canonical absolute checkout')
 CACHE = pathlib.Path.home() / '.cache/cluster-ops'
 NS = 'stadtstack-mcp'
 K = os.environ['KUBECTL']
@@ -26,6 +29,10 @@ def kub(args, payload=None, check=True):
 
 for ref in ['HEAD', '@{upstream}']:
     if cmd(['git', '-C', str(ROOT), 'rev-parse', ref]).stdout.strip() != revision: raise RuntimeError('Approved source/upstream differs')
+if cmd(['git','-C',str(ROOT),'rev-parse','--show-toplevel']).stdout.strip()!=str(ROOT):
+    raise RuntimeError('Release repository must be its Git worktree root')
+if cmd(['git','-C',str(ROOT),'status','--porcelain','--untracked-files=no']).stdout:
+    raise RuntimeError('Release checkout has tracked modifications; use a fresh clone')
 # Trust GitHub's authenticated run metadata/logs, not caller-written smoke metadata,
 # to bind the approved digest to the exact reviewed workflow/source revision.
 run_id=os.environ.get('MCP_WORKFLOW_RUN_ID','')

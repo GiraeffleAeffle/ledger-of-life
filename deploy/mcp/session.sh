@@ -113,7 +113,8 @@ Usage: mcp-session.sh --diff-only | --release
 
 --release requires LIVE_MCP_ACK=release-civic-mcp-through-governed-wrapper-v1
 and CLUSTER_OPS_MCP_GO=protected-read-only-civic-mcp.
-Both require explicit MCP_APPROVED_SHA and MCP_IMAGE_DIGEST.
+Both require explicit MCP_RELEASE_REPO (canonical clean checkout),
+MCP_APPROVED_SHA and MCP_IMAGE_DIGEST. No repository-path fallback is used.
 Stop the filtered viewer first and restore it after this session cleans up.
 EOF
 }
@@ -178,6 +179,14 @@ fi
 [[ -t 0 ]] || fail 'run it from an interactive terminal; changes need typed confirmations'
 
 for command_name in age git helm nc pgrep python3 tar; do require_command "${command_name}"; done
+: "${MCP_RELEASE_REPO:?Explicit isolated release checkout required}"
+release_repo="${MCP_RELEASE_REPO}"
+[[ "${release_repo}" == /* && -d "${release_repo}" && ! -L "${release_repo}" ]] ||
+  fail 'release repository must be an absolute non-symlink checkout'
+[[ "$(git -C "${release_repo}" rev-parse --show-toplevel)" == "${release_repo}" ]] ||
+  fail 'release repository must be its canonical Git worktree root'
+[[ -z "$(git -C "${release_repo}" status --porcelain --untracked-files=no)" ]] ||
+  fail 'release checkout has tracked modifications; use a fresh clone'
 [[ "${wireproxy_sha256}" =~ ^[0-9a-f]{64}$ ]] || fail 'rootless wireproxy checksum is invalid'
 assert_owned_executable_digest "${wireproxy_bin}" "${wireproxy_sha256}" ||
   fail 'pinned rootless wireproxy is unavailable or differs'
@@ -328,5 +337,5 @@ export MCP_RELEASE_MODE="${mode}"
 : "${MCP_IMAGE_DIGEST:?Explicit approved immutable image digest required}"
 : "${MCP_APPROVED_SHA:?Explicit approved pushed source required}"
 [[ "${MCP_APPROVED_SHA}" =~ ^[0-9a-f]{40}$ ]] || fail 'invalid approved source revision'
-git -C /Users/max/Code/civic-mcp-hosted show "${MCP_APPROVED_SHA}:deploy/mcp/deploy.py" >"${tmp_dir}/deploy.py"
+git -C "${release_repo}" show "${MCP_APPROVED_SHA}:deploy/mcp/deploy.py" >"${tmp_dir}/deploy.py"
 python3 "${tmp_dir}/deploy.py"
