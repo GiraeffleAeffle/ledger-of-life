@@ -1,0 +1,35 @@
+# Governed wrapper creates namespace stadtstack-mcp and the Secret before install.
+# helm upgrade --install civic-mcp deploy/mcp/chart --namespace stadtstack-mcp \
+#   --set-string image.digest=sha256:<owner-approved digest from image workflow>
+# No tags or synthetic digest defaults are accepted.
+image:
+  repository: ghcr.io/giraeffleaeffle/stadtstack-mcp
+  digest: ""
+# Existing Secret must contain token-hashes.json: JSON array of {id, sha256}.
+# sha256 is the lowercase SHA-256 of the bearer token; never store plaintext tokens.
+secretName: civic-mcp-token-hashes
+# Increment to roll the pod after rotating the existing Secret. No subPath mount:
+# Kubernetes can refresh the projected file if the server supports live reload.
+tokenSecretRevision: "1"
+web:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+ingress:
+  clusterIssuer: letsencrypt-prod
+  # Actual governed Loyalty ingress is HAProxy in ingress-system, not ingress-nginx.
+  # Host-network sources copied from that chart; owner refreshes from inventory.
+  haproxySources:
+    - 10.42.0.10/32
+    - 10.42.0.11/32
+    - 10.42.0.12/32
+    - 10.244.0.0/32
+    - 10.244.1.0/32
+    - 10.244.2.0/32
+    - 10.244.0.1/32
+    - 10.244.1.1/32
+    - 10.244.2.1/32

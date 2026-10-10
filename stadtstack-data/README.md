@@ -74,6 +74,10 @@ The faithfulness threshold is `0.8`; production uses DeepEval `FaithfulnessMetri
 
 `get_core_bundle()` returns `{bundle,manifest}` from the exact shared release. `search_signals(cityId,query?,topic?)` searches citywide/full features by all case-insensitive text terms and optional topic/kind/category, including null geometry. `topic:"water"` finds the historical lake assertion; `topic:"budget"` finds the planned outlays. `get_sources` additionally returns assertions and verification. City IDs are restricted to safe catalogue-style slugs. These local tools are read-only and do not require or send geometry.
 
+Text and spatial searches accept `offset` (default 0) and `limit` (default 20, maximum 50), returning `{features,total,offset}`. Buffered lines accept at most 32 vertices. All tool registrations are annotated read-only and non-destructive. Hosted transport uses these same registrations and released files, adds cross-city/topic, council and regional lookups, and wraps results with publication provenance while retaining per-fact source/date/status.
+
+For protected hosted Streamable HTTP, per-person hash-only bearer authentication, exact-image deployment and client setup, see [the owner connection guide](docs/HOSTED_MCP.md). The hosted container runs `src/mcp-hosted.ts`; the existing `mcp:http` command remains loopback-only local development and is not the public service.
+
 ## Consumers
 
 The owner's Stadtstack Projektatlas reads this `out/` snapshot for its optional city views via `GET /api/signals`, `GET /api/signals/<city>?kind=<kind>` (compact map data), and `GET /api/signals/<city>/<encoded-id>` (full record). Its existing `/api/atlas/<city>` and `/map` remain the pipeline's curated-project input, not pipeline output.
