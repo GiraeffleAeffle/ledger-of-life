@@ -1,6 +1,6 @@
 # Protected hosted civic MCP: owner guide
 
-This guide describes the hosting contract and owner workflow, not proof of deployment. The intended endpoint is **https://mcp.stadtstack.eu/mcp**. It exposes read-only civic tools; use MCP `tools/list` for the actual tool inventory rather than assuming a tool name from a client example.
+The protected endpoint is **https://mcp.stadtstack.eu/mcp**, deployed on 10 October 2026. It exposes read-only civic tools; use MCP `tools/list` for the current inventory. Personal bearer access is required. Client-specific GUI interoperability is not implied by the exercised generic HTTP acceptance below.
 
 ## HTTP and security contract
 
@@ -188,4 +188,15 @@ The chart disables backend HAProxy access logging before redirect handling. Its 
 
 ## Rollout evidence
 
-This guide contains no claim that deployment, client interoperability, container digest, or production checks have been completed. Record the final tool inventory and exercised rollout evidence separately when the owning integration work has actually verified them.
+- Release tag: `civic-mcp-v0.1.0`; deployed source: `5835267aa798fe134ff587c1f503563586205487`.
+- Image: `ghcr.io/giraeffleaeffle/stadtstack-mcp@sha256:9c0774cef10ee1037b15983b026587719b6590507edb85be1f8affa92173c858`.
+- To redeploy this exact release, use a clean checkout of the deployed source/tag, not a later documentation-only HEAD with the old image digest: the source-binding gate deliberately rejects that mismatch.
+- [Successful amd64/arm64 publication workflow](https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/38041303228), bound to the source/digest by the governed deploy.
+- Namespace/release: `stadtstack-mcp` / `civic-mcp`. The Ready pod's desired image and runtime imageID matched that digest; non-MCP resource identities/specs were unchanged. The filtered viewer was restored and the shared privileged-session lock released.
+- Security reviewer: final static **PASS**, no surviving findings, after workflow provenance binding, base-image pinning, controller-selector tightening and disposable smoke-credential fixes.
+- Exact amd64 image acceptance passed with non-root/read-only runtime, 401 for missing/wrong bearer, exact-path and Origin rejection, initialization, all 12 read-only tools, three shared auto-verified core facts, sourced/dated council/regional lookups, 32 KiB/batch rejection and 429 per-token quota.
+- Authenticated public HTTPS acceptance passed the same protocol/data/protection checks. TLS 1.3 verified `mcp.stadtstack.eu`, issued by Let's Encrypt YR2, valid through 8 January 2027.
+- DNS `mcp` A record is `77.42.11.9`, confirmed through resolver `1.1.1.1`. At acceptance time the workstation's default resolver retained an earlier NXDOMAIN for approximately 48 minutes. Public acceptance therefore used that independently observed address while retaining hostname/SNI/certificate validation; TLS verification was never disabled. Other clients with cached NXDOMAIN must allow their negative cache to expire or use a fresh resolver.
+- Owner's issued personal file: `~/.config/stadtstack/mcp-tokens/max.token`; hash-only manifest: `~/.config/stadtstack/mcp-tokens/token-hashes.json`. Neither value is printed here.
+- Workstation evidence: `~/.cache/cluster-ops/mcp-security-review.json`, `mcp-image-smoke.json`, `mcp-public-smoke.json`, `mcp-tls-evidence.json`, and `mcp-release-5835267aa798-20261010T093041Z/` (workflow identity, render/dry-run, rollout, pod identities and protected before/after boundary).
+- The smoke driver was adjusted for transient startup connection resets and desktop-Docker shared temporary paths after the image build; these operator-only changes do not alter the deployed image. Unit tests were added but not run; native Claude/Cursor/Desktop sessions were not exercised.

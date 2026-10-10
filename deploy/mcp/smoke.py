@@ -17,7 +17,8 @@ private=pathlib.Path.home()/'.config/stadtstack/mcp-tokens'
 token=(private/(args.person+'.token')).read_text().strip() if args.url else secrets.token_urlsafe(32)
 if not re.fullmatch(r'[A-Za-z0-9_-]{43}',token): raise RuntimeError('Invalid private token file')
 container=None
-hash_mount=tempfile.TemporaryDirectory(prefix='mcp-smoke-hashes-')
+# Home is shared by desktop Docker/Colima; macOS system temp folders may not be.
+hash_mount=tempfile.TemporaryDirectory(prefix='.mcp-smoke-hashes-',dir=pathlib.Path.home())
 checks={}
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -68,7 +69,7 @@ try:
     for _ in range(30):
         try:
             if request('/health',auth=False)[0]==200: break
-        except (urllib.error.URLError,TimeoutError): pass
+        except (urllib.error.URLError,TimeoutError,ConnectionError): pass
         time.sleep(1)
     else: raise RuntimeError('Health did not become ready within 30 seconds')
     checks['health']=True
