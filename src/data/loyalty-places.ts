@@ -2,6 +2,7 @@ import { isCivicCity } from './civic-cities.ts';
 
 export const LOYALTY_ORIGIN = 'https://loyalty.stadtstack.eu';
 export const LOYALTY_FEED = `${LOYALTY_ORIGIN}/api/loyalty-merchants`;
+export const LOYALTY_TEST_LABEL = 'Test entry · not a real business';
 const MAX_FEED_BYTES = 262144;
 
 /** Owner-reviewed public records only; no customer identity, balances or wallet data. */
@@ -14,6 +15,7 @@ export interface LoyaltyMerchant {
   program: { id: string; name: string };
   network: 'sepolia';
   checkedAt: string;
+  test?: true;
 }
 export interface LoyaltyPlaces {
   state: 'empty' | 'ready';
@@ -25,14 +27,26 @@ export interface LoyaltyPlaces {
 export function loyaltyMapMerchants(result: LoyaltyPlaces | null, city: string, enabled: boolean): LoyaltyMerchant[] {
   return enabled && result?.state === 'ready' ? result.merchants.filter((merchant) => merchant.city === city) : [];
 }
+
+/** Test entries can be explored, but never contribute to real-shop participation. */
+export function loyaltyRealShopCount(merchants: readonly LoyaltyMerchant[]): number {
+  let count = 0;
+  for (const merchant of merchants) if (merchant.test !== true) count++;
+  return count;
+}
+export function loyaltyEntryLabel(merchant: LoyaltyMerchant): string {
+  return merchant.test ? `${merchant.name} · ${LOYALTY_TEST_LABEL}` : merchant.name;
+}
 const sourceHosts = ['stadtstack.eu', 'loyalty.stadtstack.eu'];
 const idPattern = /^[a-z0-9][a-z0-9-]{0,79}$/;
 const text = (value: unknown, max: number): value is string => typeof value === 'string' && value.length > 0 && value.length <= max && value === value.trim() && !/[\u0000-\u001f\u007f]/.test(value);
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 function merchantRecord(value: unknown, today: string): LoyaltyMerchant | null {
-  if (!object(value) || Object.keys(value).some((key) => !['id', 'city', 'name', 'coordinates', 'source', 'program', 'network', 'checkedAt'].includes(key))) return null;
-  const { id, city, name, coordinates, source, program, network, checkedAt } = value;
+  if (!object(value) || Object.keys(value).some((key) => !['id', 'city', 'name', 'coordinates', 'source', 'program', 'network', 'checkedAt', 'test'].includes(key))) return null;
+  const { id, city, name, coordinates, source, program, network, checkedAt, test } = value;
+  const testEntry = Object.hasOwn(value, 'test');
+  if (testEntry && test !== true) return null;
   if (!text(id, 80) || !idPattern.test(id) || typeof city !== 'string' || !isCivicCity(city) || !text(name, 160) || network !== 'sepolia') return null;
   if (!Array.isArray(coordinates) || coordinates.length !== 2 || !coordinates.every((coordinate) => typeof coordinate === 'number' && Number.isFinite(coordinate)) || Math.abs(coordinates[0]) > 180 || Math.abs(coordinates[1]) > 85.051129) return null;
   if (!object(program) || Object.keys(program).some((key) => key !== 'id' && key !== 'name') || !text(program.id, 16) || !/^(0|[1-9][0-9]*)$/.test(program.id) || !Number.isSafeInteger(Number(program.id)) || !text(program.name, 160)) return null;
@@ -47,7 +61,7 @@ function merchantRecord(value: unknown, today: string): LoyaltyMerchant | null {
     if (url.protocol !== 'https:' || !sourceHosts.includes(url.hostname) || url.port || url.username || url.password || url.search || url.hash || url.pathname === '/' || url.href !== source) return null;
     if (/%(?:0[0-9a-f]|1[0-9a-f]|7f|2f|5c)/i.test(url.pathname)) return null;
   } catch { return null; }
-  return { id, city, name, coordinates: [coordinates[0], coordinates[1]], source, program: { id: program.id, name: program.name }, network, checkedAt };
+  return { id, city, name, coordinates: [coordinates[0], coordinates[1]], source, program: { id: program.id, name: program.name }, network, checkedAt, ...(testEntry ? { test: true as const } : {}) };
 }
 
 /** Invalid evidence is an error, never a misleading successful empty feed. */

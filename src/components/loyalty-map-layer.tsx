@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, type RefObject } from 'react';
 import type { Map as LibreMap, Marker } from 'maplibre-gl';
 import { isCivicCity } from '@/data/civic-cities';
-import { fetchLoyaltyPlaces, LOYALTY_ORIGIN, loyaltyMapMerchants, type LoyaltyPlaces } from '@/data/loyalty-places';
+import { fetchLoyaltyPlaces, LOYALTY_ORIGIN, LOYALTY_TEST_LABEL, loyaltyEntryLabel, loyaltyMapMerchants, loyaltyRealShopCount, type LoyaltyPlaces } from '@/data/loyalty-places';
 
 /** Companion layer: no changes to holdings, personal pins, council or project sources. */
 export function LoyaltyMapLayer({ cityId, mapRef, mapReady }: {
@@ -24,6 +24,7 @@ export function LoyaltyMapLayer({ cityId, mapRef, mapReady }: {
     return () => { current = false; controller.abort(); };
   }, [cityId, enabled, supported]);
   const merchants = useMemo(() => loyaltyMapMerchants(result, cityId, enabled), [result, cityId, enabled]);
+  const realShopCount = loyaltyRealShopCount(merchants);
   const selected = merchants.find((merchant) => merchant.id === selectedId);
   useEffect(() => {
     const instance = mapRef.current;
@@ -35,10 +36,10 @@ export function LoyaltyMapLayer({ cityId, mapRef, mapReady }: {
       for (const merchant of merchants) {
         const button = document.createElement('button');
         button.type = 'button';
-        button.textContent = 'L';
-        button.setAttribute('aria-label', `${merchant.name} · loyalty · Sepolia test`);
-        button.title = `${merchant.name} · Sepolia test loyalty`;
-        button.className = 'loyalty-map-marker';
+        button.textContent = merchant.test ? 'T' : 'L';
+        button.setAttribute('aria-label', `${loyaltyEntryLabel(merchant)} · loyalty · Sepolia test`);
+        button.title = `${loyaltyEntryLabel(merchant)} · Sepolia test loyalty`;
+        button.className = `loyalty-map-marker${merchant.test ? ' loyalty-map-marker-test' : ''}`;
         button.addEventListener('click', (event) => { event.stopPropagation(); setSelectedId(merchant.id); });
         markers.push(new Marker({ element: button }).setLngLat(merchant.coordinates).addTo(instance));
       }
@@ -54,19 +55,20 @@ export function LoyaltyMapLayer({ cityId, mapRef, mapReady }: {
     {enabled && <>
       {!result && !error && <p role="status">Reading owner-published merchant evidence…</p>}
       {error && <p role="alert">{error}</p>}
-      {result?.state === 'empty' && <p>No shops yet: be the first. <a href={LOYALTY_ORIGIN} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Open ZK Loyalty for your shop</a></p>}
+      {result && realShopCount === 0 && <p>{merchants.length ? 'No real shops yet: be the first.' : 'No shops yet: be the first.'} <a href={LOYALTY_ORIGIN} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Open ZK Loyalty for your shop</a></p>}
       <p>Public shop feed from ZK Loyalty · Sepolia test. Loading it shares your IP address with that service, not your Ledger account, city choice or wallet.</p>
       {merchants.length > 0 && <>
-        <p>Owner-reviewed merchant registry · Sepolia test, not real customer rewards. Separate Safe/passkey account; Ledger sign-in and holdings do not transfer. Merchant enrollment and exchange approval happen in the loyalty service.</p>
+        <p>Owner-published entries · Sepolia test, not real customer rewards. Test entries are not real businesses and do not count as participation. Separate Safe/passkey account; Ledger sign-in and holdings do not transfer. Merchant enrollment and exchange approval happen in the loyalty service.</p>
         {(!mapReady || markerError) && <p>Shop locations are available in the list; map pins are currently unavailable.</p>}
-        <ul>{merchants.map((merchant) => <li key={merchant.id}>
+        <ul>{merchants.map((merchant) => <li key={merchant.id} className={merchant.test ? 'loyalty-test-entry' : undefined}>
           <button type="button" aria-pressed={selectedId === merchant.id} onClick={() => {
             setSelectedId(merchant.id);
             if (mapReady) mapRef.current?.easeTo({ center: merchant.coordinates, zoom: 16 });
-          }}>{merchant.name} · {merchant.program.name}</button>
+          }}>{loyaltyEntryLabel(merchant)} · {merchant.program.name} · Sepolia test</button>
         </li>)}</ul>
         {selected && <article aria-label={`${selected.name} loyalty details`}>
           <h3>{selected.name}</h3>
+          {selected.test && <p className="loyalty-test-label">{LOYALTY_TEST_LABEL}. Operator test record, not evidence of real business participation.</p>}
           <p>{selected.program.name} · program {selected.program.id} · Sepolia test</p>
           <p>Location: {selected.coordinates[1]}, {selected.coordinates[0]} · checked {selected.checkedAt}</p>
           <p><a href={selected.source} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Merchant, location and program source</a></p>

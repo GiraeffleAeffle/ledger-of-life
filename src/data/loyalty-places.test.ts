@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { fetchLoyaltyPlaces, LOYALTY_FEED, LOYALTY_ORIGIN, parseLoyaltyPlaces, loyaltyMapMerchants } from './loyalty-places.ts';
+import { fetchLoyaltyPlaces, LOYALTY_FEED, LOYALTY_ORIGIN, LOYALTY_TEST_LABEL, loyaltyEntryLabel, parseLoyaltyPlaces, loyaltyMapMerchants, loyaltyRealShopCount } from './loyalty-places.ts';
 
 // Deliberately synthetic test fixture, never production merchant seed data.
 const merchant = {
@@ -113,4 +113,31 @@ test('stream bytes are bounded and pending reads carry cancellation', async () =
   });
   controller.abort();
   await assert.rejects(pending, { name: 'AbortError' });
+});
+
+test('explicit operator test entries retain their label and pins but never count as real shops', () => {
+  const testEntry = { ...merchant, id: 'operator-test', name: 'Operator test entry', test: true };
+  const testOnly = parseLoyaltyPlaces('strausberg', [testEntry], today);
+  assert.equal(testOnly.state, 'ready');
+  assert.equal(testOnly.merchants[0].test, true);
+  assert.equal(loyaltyRealShopCount(testOnly.merchants), 0);
+  assert.deepEqual(loyaltyMapMerchants(testOnly, 'strausberg', true), [testEntry]);
+  assert.equal(loyaltyEntryLabel(testOnly.merchants[0]), `Operator test entry · ${LOYALTY_TEST_LABEL}`);
+  assert.equal(LOYALTY_TEST_LABEL, 'Test entry · not a real business');
+  const mixed = parseLoyaltyPlaces('strausberg', [merchant, testEntry, { ...testEntry, id: 'other-city-test', city: 'hoppegarten' }], today);
+  assert.equal(mixed.merchants.length, 2);
+  assert.equal(loyaltyRealShopCount(mixed.merchants), 1);
+  assert.equal('test' in mixed.merchants[0], false);
+  assert.equal(loyaltyEntryLabel(mixed.merchants[0]), merchant.name);
+  assert.equal(loyaltyRealShopCount([]), 0);
+});
+
+test('test flag accepts only literal true and never bypasses ordinary evidence validation', async () => {
+  for (const testFlag of [false, null, undefined, 0, 1, 'true', 'false', {}, []])
+    assert.throws(() => parseLoyaltyPlaces('strausberg', [{ ...merchant, test: testFlag }], today), /Invalid merchant evidence/);
+  for (const patch of [{ source: 'javascript:alert(1)' }, { network: 'mainnet' }, { checkedAt: '2026-02-30' }, { coordinates: [181, 52] }, { unrelated: true }])
+    assert.throws(() => parseLoyaltyPlaces('strausberg', [{ ...merchant, ...patch, test: true }], today), /Invalid merchant evidence/);
+  const result = await fetchLoyaltyPlaces('strausberg', new AbortController().signal, async () => Response.json([{ ...merchant, test: true }]));
+  assert.equal(result.merchants[0].test, true);
+  assert.equal(loyaltyRealShopCount(result.merchants), 0);
 });

@@ -105,6 +105,7 @@ concepts:
       - Topic scopes and cross-city links do not create map/atlas coverage or duplicate a poll.
       - Game progress and separate test loyalty balances are not participation evidence or personal Position; Privy remains and native self-hosted wallets are roadmap.
       - Loyalty map pins require validated public feed evidence and retain the Sepolia test label; empty feeds offer an owner handoff, not invented shops.
+      - Operator-test loyalty entries require the literal true test flag; their pins/list/details say Test entry, not a real business and never contribute to real-shop participation.
       - Optional loyalty feed reads occur in the browser without credentials, city or wallet data; failures are distinct from successful empty results and balances remain outside Ledger.
   CivicTopic:
     definition: A user-authored public topic with an originating city, optional source context and linked city scopes.

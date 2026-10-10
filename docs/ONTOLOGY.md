@@ -53,6 +53,8 @@ If a question names admitted budget years, every such year must remain in its gr
 
 **Public loyalty places.** Enabling the optional map layer reads the separate Stadtstack loyalty service's public merchant feed in the browser. Only validated, city-matching published records create **Sepolia test** pins with their evidence links. A successful empty feed invites shop owners to the service; failed/invalid reads create no pins and remain failures. No Ledger identity, wallet, city choice or personal balance is sent, and the separate service's membership/rewards never become a Ledger Position.
 
+An optional literal `test: true` marks an owner-published operator test entry, not a real business. Its muted dashed **T** pin, accessible name, list row and selected detail say **Test entry · not a real business**, alongside **Sepolia test**. Test entries remain explorable but contribute zero to the real-shop count; a test-only city still offers the no-real-shops owner handoff. `false`, `null`, strings and unknown fields fail validation rather than silently becoming ordinary participation.
+
 ## Concept map
 
 ```mermaid
