@@ -126,6 +126,7 @@ concepts:
       - Grounding reads full records and preserves included locators, recorded unknowns and the actual question; invalid/absent dates are not dated evidence. Oversized complete context is declined explicitly, not silently truncated.
       - Relevant auto-verified core evidence outranks candidates without bypassing relevance; measurement dates and budget years remain distinct from source document dates.
       - Failed core publication bindings exclude that claim from City AI; auto_checked alone never grants auto-verified status.
+      - Every requested admitted budget year must fit the grounding packet or the request declines explicitly; a dropped source must not become a false claim of missing data.
   OpinionPoll:
     definition: A non-binding Ledger test-account poll moving through discussion, ready, open and closed.
     reality: prototype

@@ -763,3 +763,40 @@ test('auto-verification and assertion DTOs survive durable AI publication withou
     assert.equal(p.calls.length, 1);
   } finally { await store.close(); }
 });
+
+test('the exact hosted long budget requests retain both admitted years instead of substituting smaller candidates', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity();
+  try {
+    const current = await topic(store, owner);
+    const base = await resolveCivicAiTrigger(store, owner, { topicId: current.id, contributionId: null });
+    const published = await coreEvidence();
+    for (const triggerText of [
+      '@city-ai Welche Investitionsauszahlungen sind für 2025 und 2026 im Strausberger Haushaltsplan vorgesehen? Nenne beide Beträge und das Dokumentdatum. Sind das tatsächlich ausgegebene Beträge?',
+      '@city-ai In höchstens zwei kurzen Sätzen ohne Aufzählung: Welche Investitionsauszahlungen sind für 2025 und 2026 geplant? Nenne beide EUR-Beträge, das Dokumentdatum und dass keine Ist-Ausgaben belegt sind.',
+    ]) {
+      const built = buildCityAiPrompt({ ...base, triggerText }, published);
+      assert.equal(built.reason, undefined);
+      assert.deepEqual(built.sources.slice(0, 2).map((source) => source.id), CORE_FACT_IDS.slice(1));
+      assert.ok(built.prompt.length <= 2000);
+      const packet = JSON.parse(built.prompt.slice(built.prompt.indexOf('\n') + 1));
+      assert.deepEqual(packet.sources.slice(0, 2).map((source: { assertion: { year: number } }) => source.assertion.year), [2025, 2026]);
+      assert.ok(packet.sources.slice(0, 2).every((source: { documentDate: string; asOf?: string }) => source.documentDate === '2024-11-07' && !('asOf' in source)));
+    }
+  } finally { await store.close(); }
+});
+
+test('a requested admitted budget year that cannot fit causes explicit context refusal, never a partial answer', async () => {
+  const store = new LocalStore(':memory:'); const owner = identity(); const p = provider();
+  try {
+    const current = await topic(store, owner, '@city-ai Welche Investitionsauszahlungen sind für 2025 und 2026 geplant?');
+    const trigger = await resolveCivicAiTrigger(store, owner, { topicId: current.id, contributionId: null });
+    const published = (await coreEvidence()).map((source) => source.id === CORE_FACT_IDS[2]
+      ? { ...source, locator: 'A complete required source locator and caveat. '.repeat(80) } : source);
+    const built = buildCityAiPrompt(trigger, published);
+    assert.deepEqual(built, { prompt: '', sources: [], reason: 'context_too_large' });
+    const result = await requestCivicAi(store, owner, { topicId: current.id, contributionId: null }, true, { ...p.dependencies, evidence: async () => published });
+    assert.equal(result?.status, 'unavailable');
+    assert.match(result?.message ?? '', /bounded AI context/);
+    assert.equal(p.calls.length, 0);
+  } finally { await store.close(); }
+});

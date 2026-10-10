@@ -49,6 +49,8 @@ Grounding uses full published source records with their original unknowns, statu
 
 The hosted reader binds the core bundle, full/compact corpus and source/assertion/evaluation hashes to their committed release manifest before projecting public verification metadata. Missing/mismatched evidence stays explicitly unverified and cannot ground City AI. The immutable image is the manifest trust boundary, not a signed municipal certificate. Relevant admitted core records outrank candidates; source DTOs and UI preserve document date, measurement date/budget year and automated-evidence caveats.
 
+If a question names admitted budget years, every such year must remain in its grounding packet. Redundant metadata can be compacted, but not the facts/caveats; an oversized complete year set is declined rather than presenting omitted data as unavailable.
+
 **Public loyalty places.** Enabling the optional map layer reads the separate Stadtstack loyalty service's public merchant feed in the browser. Only validated, city-matching published records create **Sepolia test** pins with their evidence links. A successful empty feed invites shop owners to the service; failed/invalid reads create no pins and remain failures. No Ledger identity, wallet, city choice or personal balance is sent, and the separate service's membership/rewards never become a Ledger Position.
 
 ## Concept map
