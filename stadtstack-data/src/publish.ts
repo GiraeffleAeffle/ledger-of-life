@@ -5,9 +5,21 @@ import {cacheDir,outDir,jsonFile,save} from './common.ts';
 import {validatePublication,cityFeedSchema} from './schema.ts';
 import {compactCollection} from './min.ts';
 import type {Catalogue,FeatureCollection,CityFeed} from './schema.ts';
+import {hash} from './common.ts';
+import {validateCore,validateCoreBytes,extractorVersion} from './core.ts';
+import type {CoreBundle} from './core-schema.ts';
 const catalogue=await jsonFile<Catalogue>(join(cacheDir,'staging','catalogue.json'));if(!catalogue)throw Error('Run npm run collect first');const collections:Record<string,unknown>={},feeds:Record<string,unknown>={};for(const city of catalogue.cities){collections[city.id]=await jsonFile<FeatureCollection>(join(cacheDir,'staging','cities',city.id,'signals.geojson'));feeds[city.id]=await jsonFile(join(cacheDir,'staging','cities',city.id,'feed.json'));}
 const validated=validatePublication(catalogue,collections);const validatedFeeds:Record<string,CityFeed>=Object.fromEntries(Object.entries(feeds).map(([id,feed])=>[id,cityFeedSchema.parse(feed)]));for(const city of catalogue.cities)if(validatedFeeds[city.id].cityId!==city.id)throw Error(`Wrong feed city for ${city.id}`);
-const prepared=validated.catalogue.cities.map(city=>{
+// All required gates are validated before the first public output is replaced.
+let core:CoreBundle|undefined;
+if(validated.collections.strausberg){
+ core=validateCore(await jsonFile(join(cacheDir,'staging','core','strausberg-facts.json')),validated.collections.strausberg);
+ await validateCoreBytes(core);
+ if(validated.catalogue.coreBundle?.version!==core.version)throw Error('Catalogue/core release binding mismatch');
+}
+const coreOnly=process.argv.includes('--core-only');
+if(coreOnly&&!core)throw Error('Core-only publication requires Strausberg core gates');
+const prepared=validated.catalogue.cities.filter(city=>!coreOnly||city.id==='strausberg').map(city=>{
  const collection=validated.collections[city.id],full=JSON.stringify(collection,null,2)+'\n',min=JSON.stringify(compactCollection(collection))+'\n';
  city.minUrl=`cities/${city.id}/signals.min.geojson`;
  city.fullBytes=Buffer.byteLength(full);
@@ -26,10 +38,17 @@ for(const {city,collection,full,min} of prepared){
   await save(changesPath,JSON.stringify(changes,null,2)+'\n');
  }else if(!await jsonFile(changesPath))throw Error(`Missing change manifest for ${city.id}`);
  await save(join(directory,'signals.min.geojson'),min);
- const feed=validatedFeeds[city.id];await save(join(directory,'feed.json'),JSON.stringify(feed,null,2)+'\n');
+ if(!coreOnly){const feed=validatedFeeds[city.id];await save(join(directory,'feed.json'),JSON.stringify(feed,null,2)+'\n');}
  console.log(city.id,collection.features.length,city.fullBytes,city.minBytes);
 }
 await save(join(outDir,'catalogue.json'),JSON.stringify(validated.catalogue,null,2)+'\n');
+if(core){
+ const bytes=JSON.stringify(core,null,2)+'\n',bundleSha256=hash(bytes);
+ const manifest={schemaVersion:'stadtstack-core-release-v1',cityId:'strausberg',generatedAt:core.generatedAt,bundlePath:'core/strausberg-facts.json',bundleSha256,bundleVersion:core.version,extractorVersion,facts:core.facts.map(f=>({id:f.id,version:f.version,assertionHash:f.verification.assertionHash,sourceSha256:f.source.sha256,evidenceHash:f.verification.faithfulness.evidenceHash})),sources:core.facts.map(f=>({url:f.source.url,sha256:f.source.sha256,retrievedAt:f.source.retrievedAt,documentDate:f.source.documentDate})),gates:{required:true,deterministic:'passed',faithfulnessThreshold:.8,model:'codex:gpt-6-luna'},corpus:{fullPath:'cities/strausberg/signals.geojson',fullSha256:hash(prepared.find(p=>p.city.id==='strausberg')!.full),minPath:'cities/strausberg/signals.min.geojson',minSha256:hash(prepared.find(p=>p.city.id==='strausberg')!.min)}};
+ await save(join(outDir,'core','strausberg-facts.json'),bytes);
+ await save(join(outDir,'core','release-manifest.json'),JSON.stringify(manifest,null,2)+'\n');
+ await save(join(outDir,'core','handover-draft.json'),JSON.stringify({schemaVersion:'stadtstack-handover-draft-v1',label:'DRAFT — not sent; no municipality handover or receipt',status:'not-sent',recipient:'Stadt Strausberg (draft only)',bundleVersion:core.version,bundleSha256,facts:manifest.facts,request:'Bitte die verlinkten Originalquellen und gegebenenfalls neuere Veröffentlichungen prüfen.',pollResults:null,councilReceipt:null},null,2)+'\n');
+}
 const summary=[
  '# Stadtstack open-data snapshot',
  '',
@@ -47,6 +66,10 @@ const summary=[
  '## Shared object identity',
  '',
  'CCF and live OParl records sharing the same upstream object URL become one council feature with a provider-independent `council:` id. HTTP/HTTPS and trailing slash variations are normalized; the newer upstream modification wins, but both archive and live source entries remain attributed. Nearby OSM nodes and ways with the same name/category are represented once with both ODbL sources. Repeated title and date alone do not prove identity: separate binding-plan polygons, highway segments and committee meetings may legitimately share them. On this first canonical-ID cutover, removed legacy `ccf:`/`oparl:` identifiers and added `council:` identifiers are a migration, not proof that proposals were withdrawn.',
+ '',
+ '## Automated core facts',
+ '',
+ 'core/strausberg-facts.json and core/release-manifest.json bind three selected assertions to original PDF byte SHA-256, extractor/assertion versions, named deterministic checks and actual DeepEval/Codex faithfulness evidence (threshold 0.8). auto-verified means these automated gates passed, not human review or independent truth certification; the evidence uses one primary source per assertion, not independent corroboration. The 14 September 2026 lake value is historical, relative to Normalstau, and its source is dated 5 October 2026. Budget values are planned investment outlays, not actual spending. core/handover-draft.json is labelled not-sent: no poll result, municipal endorsement or council receipt is claimed. Original PDFs and extracted text stay in ignored cache.',
  '',
  '## Coverage and privacy',
  '',

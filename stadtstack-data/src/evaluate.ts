@@ -8,35 +8,13 @@ import {provider} from './provider.ts';
 import {geocode} from './council.ts';
 import {councilId} from './dedupe.ts';
 import type {Catalogue,FeatureCollection} from './schema.ts';
+import {evaluateCore} from './evaluate-core.ts';
 const threshold=.8,penalizeAmbiguousClaims=true;const model=provider.id;const mode=process.env.FAITHFULNESS_MODE??'llm';if(!['llm','hybrid','system_one'].includes(mode))throw Error('FAITHFULNESS_MODE must be llm, hybrid, or system_one');const jev=mode!=='llm';if(jev&&!process.env.TYPESAFE_API_KEY)throw Error(`FAITHFULNESS_MODE=${mode} requires TYPESAFE_API_KEY; set it in stadtstack-data/.env.local (value redacted)`);
 async function pdfText(bytes:Uint8Array,identifier:string){const filename=join(cacheDir,'pdf',identifier+'.pdf'),textfile=join(cacheDir,'pdf',identifier+'.txt');await save(filename,bytes);const task=getDocument({data:new Uint8Array(bytes),useSystemFonts:true});try{const pdf=await task.promise,page=await pdf.getPage(1),content=await page.getTextContent(),text=content.items.map(item=>'str' in item?item.str:'').join(' ');await save(textfile,text);return text;}finally{await task.destroy();}}
 const codex=provider.generateJson;
 async function faithfulness(statement:string,text:string){const key=hash(`faithfulness-v2\n${mode}\n${mode==='system_one'?'typesafe:jev':model}\n${threshold}\n${penalizeAmbiguousClaims}\n${statement}\n${text}`);const path=join(cacheDir,'faithfulness',key+'.json');const previous=await jsonFile<{score:number;reason:string;evaluator:string;threshold:number}>(path);if(previous)return previous;const pythonEnv=mode==='llm'?'venv':'venv-jev';const judge=spawnSync(join(cacheDir,pythonEnv,'bin','python'),[join('src','faithfulness.py')],{input:JSON.stringify({statement,source:text,threshold,penalize_ambiguous_claims:penalizeAmbiguousClaims,mode}),encoding:'utf8',timeout:240000,env:{...process.env,DEEPEVAL_TELEMETRY_OPT_OUT:'YES'}});if(judge.status!==0)throw Error(`DeepEval failed: ${judge.stderr.slice(-700)}`);const result=JSON.parse(judge.stdout.trim().split('\n').at(-1)!) as {score:number;reason:string;evaluator:string;threshold:number};await save(path,JSON.stringify(result));return result;}
-const catalogue=await jsonFile<Catalogue>(join(cacheDir,'staging','catalogue.json'));if(!catalogue)throw Error('Collect first');
-const budgetUrl='https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf';const strausberg=await jsonFile<FeatureCollection>(join(cacheDir,'staging','cities','strausberg','signals.geojson'));
-if(strausberg&&catalogue.cities.some(c=>c.id==='strausberg')){
- try{
-  const e=await cachedFetch(budgetUrl,2592000000,{timeout:30000});
-  const text=(await pdfText(e.body,'strausberg-budget')).slice(0,4800);
-  const excerpt=text.slice(Math.max(0,text.indexOf('§ 1')-100),text.indexOf('§ 2')>0?text.indexOf('§ 2'):4800);
-  for(const [year,amount] of [[2025,'17.941.270'],[2026,'12.609.320']] as const){
-   if(!text.includes(amount))throw Error(`Source page 1 lacks ${amount}`);
-   const draft=await codex(`Du schreibst eine eigenständige, quellentreue deutsche Kurzfassung für eine Stadtkarte. § 1 der Haushaltssatzung führt für das Haushaltsjahr ${year} Auszahlungen aus Investitionstätigkeit von ${amount} EUR als Haushaltsposition auf und setzt den Haushaltsplan fest. Antworte nur JSON {"statement":"...","nextStep":"...","placeMentions":[]}. Das statement muss das Haushaltsjahr, den Betrag und „Auszahlungen aus Investitionstätigkeit“ wiedergeben. Nenne sie als geplante bzw. festgesetzte Haushaltsposition, ohne zusätzliche Vorbehalte, Erläuterungen oder Negationen. Quellenauszug:\n${excerpt}`);
-   if(!draft.nextStep.trim())draft.nextStep='Bei der Stadt Strausberg nach konkreten Projekten und dem tatsächlichen Ausgabestand fragen.';
-   if(!draft.statement.includes(String(year))||!draft.statement.includes(amount)||!/(auszahlungen aus investitionstätigkeit)/i.test(draft.statement)||!/(geplant|plan|haushaltsansatz|haushaltsplan|vorgesehen)/i.test(draft.statement)||/\b(?:nicht|kein(?:e|en|er|em|es)?|ohne)\b/i.test(draft.statement)||/(tatsächlich.{0,30}ausgegeben|bereits.{0,30}ausgegeben|wurden.{0,30}ausgegeben)/i.test(draft.statement))throw Error(`LLM did not produce a source-supported planned amount statement for ${year}`);
-   const verdict=await faithfulness(draft.statement,excerpt);
-   const feature=signal({id:`budget:investment-outlays-${year}`,cityId:'strausberg',kind:'budget',category:'Geplante Investitionsauszahlungen',title:`Investitionsplan ${year}: ${amount} €`,statement:draft.statement,status:'Plan (Haushaltssatzung)',startDate:`${year}-01-01`,endDate:`${year}-12-31`,nextStep:draft.nextStep,unknowns:['Tatsächliche Ausgaben nicht belegt','Einzelprojekte und vollständiger Plan online nicht verfügbar'],scale:'city',geometryPrecision:'none',sources:[sourceFrom(e,'Haushaltssatzung 2025/2026','Stadt Strausberg',`PDF Seite 1, § 1, Zeile „Auszahlungen aus Investitionstätigkeit“, Spalte ${year}`,'§ 5 UrhG – amtliches Werk','official_work')],extraction:{method:'llm',model,faithfulness:verdict},reviewState:verdict.score>=threshold?'auto_checked':'candidate',asOf:e.retrievedAt},null);
-   strausberg.features=strausberg.features.filter(f=>f.properties.id!==feature.properties.id);
-   strausberg.features.push(feature);
-   console.log('budget',year,verdict.score,feature.properties.reviewState);
-  }
-  catalogue.cities.find(c=>c.id==='strausberg')!.sources.push({id:'budget-ordinance',kind:'budget',publisher:'Stadt Strausberg',url:budgetUrl,licence:'§ 5 UrhG – amtliches Werk',reuse:'official_work',retrievedAt:e.retrievedAt});
-  await save(join(cacheDir,'staging','cities','strausberg','signals.geojson'),JSON.stringify(strausberg));
- }catch(error){
-  console.error('budget evaluation:',String(error));
-  catalogue.cities.find(c=>c.id==='strausberg')!.sources.push({id:'budget-ordinance',kind:'budget',publisher:'Stadt Strausberg',url:budgetUrl,licence:'unknown',reuse:'official_work',retrievedAt:new Date().toISOString(),status:'failed',error:String(error)});
- }
-}
+const stagingCatalogue=await jsonFile<Catalogue>(join(cacheDir,'staging','catalogue.json'));if(!stagingCatalogue)throw Error('Collect first');
+const catalogue=stagingCatalogue.cities.some(city=>city.id==='strausberg')?await evaluateCore():stagingCatalogue;
 for(const city of cities.filter(c=>c.endpoint&&catalogue.cities.some(x=>x.id===c.id))){
  const path=join(cacheDir,'staging','cities',city.id,'signals.geojson');
  const collection=await jsonFile<FeatureCollection>(path);
