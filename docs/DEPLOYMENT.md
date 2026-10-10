@@ -327,6 +327,12 @@ Limits: the host reads every assigned question in clear; city routing requires a
 - Docker import audit: new hosted imports are under `src/` and `app/`, already admitted/copied; source context reads the already copied `stadtstack-data/out`. Local-node files are distributed in the repository rather than copied into the web image. No new static document/secret import or allowlist broadening is required.
 - Focused security reviews found no surviving new-delta issue after author-link, private share-URL and AI-attempt fencing fixes. A **pre-existing map proxy availability risk remains outside this delta**: per-response/cache limits do not bound aggregate concurrent upstream buffering. This is not an external audit or a claim of production safety.
 
+## Contact and legal footer
+
+The shared document footer provides direct, same-tab **Kontakt · Impressum · Datenschutz** links to `https://stadtstack.eu/kontakt`, `/impressum` and `/datenschutz`, including the standalone global-error document. Links send no referrer; bilingual accessible names retain the German visible labels. The wrapping footer keeps 44px link targets and clears the mobile bottom navigation.
+
+This is a footer-only change. The owner paused automated account/civic/agreement purges, restore-journal enforcement and the new political-opinion consent checkbox on 10 October; their unfinished work is isolated on `retention-enforcement-20261010`, not included in this release. Approved organisational policies are not evidence of deployed automation.
+
 ## Checked, and not
 
 Checked in a container built from this tree: the pages, the store on a volume, the reconcile route's `local-ai` scope with and without the secret (and an unknown scope), non-root and read-only operation, shutdown on `SIGTERM`, the absence of secrets and contract artifacts, and the whole retention path against a stub model (question asked, text removed after the grace period and on "Finish & clear this desk", usage counts kept, no copy left in the database file or log).

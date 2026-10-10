@@ -1,5 +1,7 @@
 'use client';
 
+import { LegalFooter } from '../src/components/legal-footer.tsx';
+
 /** Replaces the root layout when it fails, so it brings its own document and uses a full reload rather than client routing. */
 export default function GlobalError({ retry }: { error: Error & { digest?: string }; retry: () => void }) {
   return (
@@ -13,6 +15,7 @@ export default function GlobalError({ retry }: { error: Error & { digest?: strin
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- the root layout failed, so a full page load is the point */}
           <a href="/">Go to Home</a>
         </main>
+        <LegalFooter />
       </body>
     </html>
   );

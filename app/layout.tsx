@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { THREAD } from '../src/data/path.ts';
+import { LegalFooter } from '../src/components/legal-footer.tsx';
 import './globals.css';
 
 function metadataBaseFromOrigin(): URL | undefined {
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body>
         {children}
+        <LegalFooter />
       </body>
     </html>
   );
