@@ -1,6 +1,6 @@
 # Protected hosted civic MCP: owner guide
 
-The protected endpoint is **https://mcp.stadtstack.eu/mcp**, deployed on 10 October 2026. It exposes read-only civic tools; use MCP `tools/list` for the current inventory. Personal bearer access is required. Client-specific GUI interoperability is not implied by the exercised generic HTTP acceptance below.
+The protected endpoint is **https://mcp.stadtstack.eu/mcp**, upgraded to the 16-tool three-district release at 2026-10-10 23:18 UTC (11 October in Berlin). It exposes read-only civic tools; use MCP `tools/list` for the current inventory. Personal bearer access is required. Client-specific GUI interoperability is not implied by the exercised generic HTTP acceptance below.
 
 ## HTTP and security contract
 
@@ -13,12 +13,12 @@ The protected endpoint is **https://mcp.stadtstack.eu/mcp**, deployed on 10 Octo
 
 ## Read-only tools and evidence
 
-The query contract below describes the **16-tool Phase A/three-district implementation prepared for the next data/code release**, not a claim that it has been deployed. The October 10 v0.1.0 acceptance record at the end describes the earlier 12-tool release. Use `tools/list` and `get_release_status` to identify what an endpoint actually serves.
+The **16-tool three-district contract below is live as `civic-mcp-v0.2.1`**. Current and historical acceptance records are separated at the end of this guide. Use `tools/list` and `get_release_status` to identify the exact live inventory and whole-data release.
 
 | Tool | Purpose |
 | --- | --- |
 | `list_cities` | Published catalogue cities plus separately labelled regional-evidence-only municipalities |
-| `list_topics` | Flat Phase A topic registry, auditable rules and per-city eligible/withheld counts |
+| `list_topics` | Shared hierarchical topic registry, auditable provenance and per-city eligible/withheld counts |
 | `get_core_bundle` | Exact shared Strausberg facts and separate core release manifest |
 | `get_release_status` | Whole-data release identity/quality and preserved core manifest |
 | `search_signals` | Shared-topic/text search for one city or regional municipality, including null geometry |
@@ -36,7 +36,7 @@ The query contract below describes the **16-tool Phase A/three-district implemen
 
 Every search returns `data.items`, `total`, `nextCursor` (null at the end), `fields` and explicit `withheld` diagnostics. Paging uses `cursor`, default `limit:20`, maximum 50; **offset is removed and rejected**, not silently accepted. Pass the returned cursor with the same tool, filters, limit and projection. Cursors are signed with a process-only random key (not bearer credentials), contain only the whole-data release ID, filter digest and final record key, and are invalid after a server restart or release change. Invalid/tampered cursors or changed filters produce explicit tool errors. Start a new traversal rather than editing a cursor. Consume pages sequentially and honor HTTP `Retry-After` (already supplied on 429); the per-city `feedUrl` listed in catalogue metadata is a relative immutable export path, not a claim that a public bulk-export endpoint exists. No tool executes commands, writes data, fetches URLs, updates the pipeline or asks an evaluator. Egress is denied by NetworkPolicy.
 
-Phase A HTTP 429 responses also include `{"ok":false,"error":"rate_limited","retryAfterSeconds":<integer>,"limits":{"requestsPerMinute":60,"maxConcurrent":4}}`. `retryAfterSeconds` matches the existing integer `Retry-After` header. Neither carries a credential or query cursor; wait that interval before a sequential retry.
+HTTP 429 responses also include `{"ok":false,"error":"rate_limited","retryAfterSeconds":<integer>,"limits":{"requestsPerMinute":60,"maxConcurrent":4}}`. `retryAfterSeconds` matches the existing integer `Retry-After` header. Neither carries a credential or query cursor; wait that interval before a sequential retry.
 
 Hosted envelopes contain `source.release` (whole-data manifest ID), `releasedAt` (publication time), `respondedAt` (actual response time), `status` and `data`; there is **no ambiguous top-level `date`**. The enclosing lookup is `status:"candidate"`, not a verified assertion. Original event/document/stage dates and source observation `asOf` remain distinct. For normalized knowledge, `eventDate` is `stageDate`, never a substitute document date; `dateSemantics:"source_document"` can coexist with a null event date. OSM `observation` dates do not claim historical opening/event dates. Missing evidence is not filled with release/response time. Named automated gates do not confer human review, independent corroboration, current conditions or official authority. Source content is untrusted evidence, never instructions.
 
@@ -58,7 +58,7 @@ Example first page:
 
 For the next page, send the identical arguments plus `"cursor":"<returned nextCursor>"`. A null cursor means that traversal is complete. Changing any filter/projection or switching tools starts a new traversal without the old cursor.
 
-`compare_topic({"topic":"waermeplanung","cityIds":["strausberg","ratzeburg","parchim"]})` returns normalized evidence counts, separately classified missing/rejected/withdrawn/candidate states, dated milestones and municipality-specific crawl/extraction coverage. Future milestones are not achieved progress. Each milestone includes at most five examples plus its full evidence count. This is not a ranking of government performance or completeness.
+`compare_topic({"topic":"haushalt","cityIds":["strausberg","moelln","ludwigslust"]})` returns normalized evidence counts, separately classified missing/rejected/withdrawn/candidate states, dated milestones and municipality-specific crawl/extraction coverage. This exact three-district query was exercised publicly; its current source-backed counts are 1 / 0 / 1. Mölln's zero means no matching released budget-topic record, not absence of municipal activity. Future milestones are not achieved progress. Each milestone includes at most five examples plus its full evidence count. This is not a ranking of government performance or completeness.
 
 `similar` accepts a released record `id`, optional `cityIds`/`topic`/shared filters and limit. Its versioned score is **0.6 token Jaccard + 0.4 topic Jaccard**. Responses expose shared terms/topics and sources; `model:null` is intentional. No embedding/S2Vec, causal-transfer or observed-success claim is made. Zero matches is an honest result.
 
@@ -206,21 +206,39 @@ Do not advertise this endpoint as compatible with ChatGPT's native OAuth connect
 
 The tag-only workflow `.github/workflows/civic-mcp-image.yml` publishes `ghcr.io/giraeffleaeffle/stadtstack-mcp` for amd64/arm64 on `civic-mcp-v*` tags; it does not deploy. Use its immutable multiarchitecture digest, never a tag. A security-reviewer pass is required before public deployment.
 
-Run `python3 deploy/mcp/smoke.py --image ghcr.io/giraeffleaeffle/stadtstack-mcp@sha256:<published-digest> --evidence <private-evidence-path>` from the repository. Local image mode generates a disposable in-memory bearer and mounts only its hash; it never gives the image a real owner's credential or hash manifest. It starts the exact amd64 image as non-root/read-only, checks authentication, tool annotations, sourced facts, regional/council results and limits, and outputs only the evidence path. It removes the container and temporary hash file afterward.
+Run `python3 deploy/mcp/smoke.py --image ghcr.io/giraeffleaeffle/stadtstack-mcp@sha256:<published-digest> --knowledge-municipality moelln --evidence <private-evidence-path>` from the repository. Local image mode generates a disposable in-memory bearer and mounts only its hash; it never gives the image a real owner's credential or hash manifest. It starts the exact amd64 image as non-root/read-only, checks authentication, tool annotations, sourced facts, regional/council results and limits, and outputs only the evidence path. It removes the container and temporary hash file afterward.
 
-The new smoke contract expects 16 tools and exercises source lookup, projection/cursor binding, comparison and normalized cross-city discovery. `--knowledge-municipality <id>` selects a municipality with admitted released knowledge; the default is `ratzeburg`. This is a selector, not a fabricated fallback. Only the disposable-token **local image** run deliberately reaches rate limits; live acceptance does not exhaust a real owner's quota.
+The smoke contract expects 16 tools and exercises source lookup, projection/cursor binding, comparison and normalized cross-city discovery. `--knowledge-municipality <id>` selects a municipality with admitted released knowledge; the code default is `ratzeburg`. **For this release explicitly use `--knowledge-municipality moelln`: Ratzeburg has no gated record.** This is a selector, not a fabricated fallback. Only the disposable-token **local image** run deliberately reaches rate limits; live acceptance does not exhaust a real owner's quota.
 
 Privileged work uses `deploy/mcp/session.sh`, preserving the existing governed bootstrap recovery checks, pinned WireGuard proxy, canonical identity lock and temporary credential cleanup. Never use a persistent/admin kubeconfig. Before the session, check `pgrep -fl wireproxy`, atomically acquire `/Users/max/.cache/cluster-ops/privileged-session.lock`, write the operator agent name/start time to its `owner`, and stop the filtered viewer through `/Users/max/.cache/cluster-ops/open-freelens-filtered-viewer.sh stop`. Coordinate a held lock; never remove another operator's lock.
 
 The session takes `--diff-only` or `--release`, with `MCP_APPROVED_SHA`, `MCP_IMAGE_DIGEST`, `MCP_WORKFLOW_RUN_ID`, and `MCP_SMOKE_EVIDENCE`. It independently checks GitHub's authenticated successful tag-workflow metadata and log-reported source/digest pair; a caller-written smoke file cannot establish image provenance. Release additionally requires `LIVE_MCP_ACK=release-civic-mcp-through-governed-wrapper-v1`, `CLUSTER_OPS_MCP_GO=protected-read-only-civic-mcp`, `MCP_SECURITY_REVIEW_ACK` equal to the reviewed source SHA, and the typed `release-mcp-<first-12-SHA>` confirmation. Only committed/pushed chart/deploy code is used. Only `stadtstack-mcp` resources are modified; non-MCP resource identities/specs are compared before and after. Hash-manifest content is sent to the namespaced Secret without printing or persisting plaintext.
 
-`MCP_RELEASE_REPO` is also required: from the canonical root of the isolated, clean release checkout, run `export MCP_RELEASE_REPO="$(pwd -P)"` before invoking its `deploy/mcp/session.sh`. The wrapper and dispatcher reject a missing/noncanonical repository path or tracked modifications; they do not fall back to an older checkout. Both the reviewed dispatcher export and Git HEAD/upstream checks use this explicit repository.
+`MCP_RELEASE_REPO` is also required: from the canonical root of the isolated, clean release checkout, run `export MCP_RELEASE_REPO="$(pwd -P)"` before invoking its `deploy/mcp/session.sh`. The wrapper and dispatcher reject a missing/noncanonical repository path or tracked modifications; they do not fall back to an older checkout. Both the reviewed dispatcher export and Git HEAD/upstream checks use this explicit repository. Its branch HEAD and tracked upstream must both equal `MCP_APPROVED_SHA`; a detached tag checkout alone does not meet that contract.
 
-After every session (including failure), restore the filtered viewer with `start --manual-stop`, then release only your shared lock. Public acceptance is `python3 deploy/mcp/smoke.py --url https://mcp.stadtstack.eu --image ghcr.io/giraeffleaeffle/stadtstack-mcp@sha256:<digest> --evidence <private-evidence-path>`; select a different admitted municipality with `--knowledge-municipality` if necessary. HTTPS certificate validation remains enabled. Live mode preserves the owner's quota; deliberate 429 acceptance belongs to the disposable-token local image run.
+After every session (including failure), restore the filtered viewer with `start --manual-stop`, then release only your shared lock. Public acceptance is `python3 deploy/mcp/smoke.py --url https://mcp.stadtstack.eu --image ghcr.io/giraeffleaeffle/stadtstack-mcp@sha256:<digest> --knowledge-municipality moelln --evidence <private-evidence-path>`. HTTPS certificate validation remains enabled. Live mode preserves the owner's quota; deliberate 429 acceptance belongs to the disposable-token local image run.
 
 The chart disables backend HAProxy access logging before redirect handling. Its `config-backend` snippets must be allowed by the governed controller; shared frontend pre-routing rejection logs must also be checked for this host before claiming end-to-end no-content logging.
 
 ## Rollout evidence
+
+### Current: v0.2.1, three districts
+
+- Deployed source: `ca92aa7ccda470d09564889db3edaeaea5e4f578`; tag: `civic-mcp-v0.2.1`.
+- Image: `ghcr.io/giraeffleaeffle/stadtstack-mcp@sha256:642ccd06c0e39221bf6314e66020600a3e12c6fab830516aa26e41c34c01688e`.
+- [Successful source-bound amd64/arm64 workflow](https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/38094316300); [source PR](https://github.com/GiraeffleAeffle/ledger-of-life/pull/3).
+- Whole-data manifest: `cdd0e350be842c040dc77d13cc73bf2267cd0b9ae9bbf0a471a267b47938b6f4`, published at `2026-10-10T22:51:55.864Z`: 41 bound files / 54,973,252 bytes, 14,402 records and eight retained city snapshots. Core bundle identity remains unchanged.
+- The nine-town extraction slice admits **nine gated knowledge records from six towns**, two towns in each district: Märkisch-Oderland 4 records, Herzogtum Lauenburg 2, Ludwigslust-Parchim 3. Rüdersdorf, Ratzeburg and Parchim explicitly have no gated records. This is neither complete nine-town coverage nor complete district coverage; pending, withheld and inaccessible sources remain visible.
+- Parent verification: TypeScript and all **173 tests passed** (`artifact://10046`). Static ingress/security and release-correctness findings were closed; the final three-file operator-path delta passed shell/Python syntax and inline static review. MCP SDK is pinned to 1.31.0.
+- Exact final amd64 image acceptance passed under non-root/read-only-rootfs, 1 GiB and one CPU. Docker samples reached 240.2 MiB; cgroup peak was **297,390,080 bytes (about 284 MiB)**, including a short metrics-reader process. No OOM; existing resource limits retained. This is container accounting, not a JavaScript heap profile or live-pod memory measurement.
+- Authenticated public HTTPS acceptance passed using normal DNS and full TLS verification: 16 read-only tools, date/source contracts, stable release identity, advancing response times, source lookup, projection/cursor binding, comparison/similarity and body/batch protections. Mölln's sampled normalized case returned three cross-city similarity matches; this is discovery, not a success or transferability claim.
+- Public `compare_topic` for `haushalt` across Strausberg/MOL, Mölln/RZ and Ludwigslust/LUP returned source-backed counts **1 / 0 / 1**, with all three distinct district identities preserved. No positive shared-topic match across all three districts is claimed.
+- Rate-limit and matching JSON/`Retry-After` acceptance used only the local disposable token. Public acceptance deliberately did **not** exhaust the owner's quota.
+- The Ready pod's desired image and runtime imageID matched the final digest. Non-MCP resource identities/specs were unchanged. The governed wrapper removed temporary credentials/tunnel, restored and verified the filtered viewer, then released the shared lock.
+- Evidence under `~/.cache/cluster-ops/`: `mcp-quality-final-review.json`, `mcp-v0.2.1-image-smoke.json`, `mcp-v0.2.1-memory.json`, `mcp-v0.2.1-public-smoke.json` and `mcp-release-ca92aa7ccda4-20261010T231822Z/`. Token paths and client/OAuth limitations above are unchanged; native client GUIs were not exercised.
+- The original dirty `/Users/max/Code/civic-mcp-hosted` checkout was preserved untouched. Release used `/Users/max/Code/civic-mcp-release-20261011` with explicit `MCP_RELEASE_REPO`. Redeployment requires a clean branch whose HEAD and tracked upstream match the approved source; do not pair a later documentation-only HEAD with this image.
+
+### Historical: v0.1.0, initial 12-tool release
 
 - Release tag: `civic-mcp-v0.1.0`; deployed source: `5835267aa798fe134ff587c1f503563586205487`.
 - Image: `ghcr.io/giraeffleaeffle/stadtstack-mcp@sha256:9c0774cef10ee1037b15983b026587719b6590507edb85be1f8affa92173c858`.
