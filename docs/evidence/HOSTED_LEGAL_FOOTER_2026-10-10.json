@@ -1,0 +1,281 @@
+{
+  "schemaVersion": "ledger-hosted-legal-footer-v1",
+  "origin": "https://ledger.stadtstack.eu",
+  "scope": "Kontakt, Impressum and Datenschutz footer only; no financial implementation, contract, Secret, authority or data-migration change.",
+  "retentionAndConsent": {
+    "deployed": false,
+    "status": "Owner-paused unfinished WIP; automated purges and political-opinion checkbox are backlog.",
+    "branch": "retention-enforcement-20261010",
+    "localWipCommit": "155460b",
+    "verificationRun": false
+  },
+  "initialRelease": {
+    "revision": 39,
+    "deployedAt": "2026-10-10T22:42:36+02:00",
+    "source": "dc1f8369bbf839342cc18906c1be2f62e5093678",
+    "pin": "e4f82e5268fd27595d62042efa702c6cf2017417",
+    "digest": "sha256:51245c19d8840ac00ab7ef5423747d4487788d922bd1570ceaecf5f98c377630",
+    "sourceCi": 38074811744,
+    "imageRun": 38075049692,
+    "pinCi": 38075789660,
+    "money": {
+      "signature": "4tUaHcjBHfdsbM7Y8vefQcz8nCfLtFZwK6EdHQSFgZUJt3J8kDQN5HNvV8WprVBoDMypSiDDX5NrdycVkgdQsS7f",
+      "cluster": "devnet",
+      "commitment": "finalized",
+      "slot": 509665140,
+      "at": "2026-10-10T20:45:25.000Z",
+      "error": null,
+      "cashDeltaAtoms": "-1000",
+      "unitDeltaAtoms": "1000"
+    },
+    "authenticatedMobileAcceptance": "failed",
+    "finding": "Privy inserted an iframe between app-shell and footer; adjacent-sibling rules did not apply, and mobile navigation covered the links.",
+    "desktop": {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "legalNavCount": 1,
+      "marginLeft": "0px",
+      "links": [
+        {
+          "label": "Kontakt",
+          "href": "https://stadtstack.eu/kontakt",
+          "referrerPolicy": "no-referrer",
+          "height": 44
+        },
+        {
+          "label": "Impressum",
+          "href": "https://stadtstack.eu/impressum",
+          "referrerPolicy": "no-referrer",
+          "height": 44
+        },
+        {
+          "label": "Datenschutz",
+          "href": "https://stadtstack.eu/datenschutz",
+          "referrerPolicy": "no-referrer",
+          "height": 44
+        }
+      ]
+    },
+    "mobile": {
+      "width": 390,
+      "scrollWidth": 390,
+      "paddingBottom": "20px",
+      "mobileNavTop": 778.953125,
+      "clearsMobileNav": false,
+      "links": [
+        {
+          "label": "Kontakt",
+          "left": 68.734375,
+          "right": 119.828125,
+          "top": 779.609375,
+          "bottom": 823.609375,
+          "height": 44
+        },
+        {
+          "label": "Impressum",
+          "left": 143.828125,
+          "right": 215.953125,
+          "top": 779.609375,
+          "bottom": 823.609375,
+          "height": 44
+        },
+        {
+          "label": "Datenschutz",
+          "left": 239.953125,
+          "right": 321.265625,
+          "top": 779.609375,
+          "bottom": 823.609375,
+          "height": 44
+        }
+      ]
+    },
+    "failedScreenshot": "live-footer-390.png"
+  },
+  "correctedRelease": {
+    "revision": 40,
+    "deployedAt": "2026-10-10T23:07:03+02:00",
+    "source": "649416b5a8c5bae663db99142ca2c09c95dca436",
+    "pin": "50402d781198ca0af3d98735f1a6ba807a7f8436",
+    "digest": "sha256:e74a3a71c3944a9a15e76265f3f5bc8cb641f6b34f0a78641a8863150a9f2e71",
+    "sourceCi": 38085345808,
+    "imageRun": 38085562957,
+    "pinCi": 38086088187,
+    "pod": "ledger-of-life-7bdd6d8bdf-ttp7h",
+    "ready": true,
+    "specAndImageIdMatch": true,
+    "governedSessionExit": 0,
+    "filteredViewerRestored": true,
+    "ownSharedLockReleased": true,
+    "correction": "General-sibling selectors tolerate the actual intervening wallet iframe.",
+    "checks": {
+      "routeTypes": true,
+      "typeScript": true,
+      "lint": true,
+      "testsPassed": 1083,
+      "testsSkipped": 2,
+      "whitespace": true,
+      "productionBuild": true,
+      "hardenedAmd64Image": {
+        "uid": 1000,
+        "readOnlyRoot": true,
+        "dropAllCapabilities": true,
+        "noNewPrivileges": true,
+        "privatePathsAbsent": true,
+        "publicBundleHashesMatched": true,
+        "routes": [
+          {
+            "path": "/",
+            "status": 200,
+            "legalNavCount": 1
+          },
+          {
+            "path": "/story",
+            "status": 200,
+            "legalNavCount": 1
+          },
+          {
+            "path": "/replay",
+            "status": 200,
+            "legalNavCount": 1
+          },
+          {
+            "path": "/library",
+            "status": 200,
+            "legalNavCount": 1
+          },
+          {
+            "path": "/api/rent",
+            "status": 401,
+            "legalNavCount": 0
+          },
+          {
+            "path": "/api/account",
+            "status": 404,
+            "legalNavCount": 1
+          },
+          {
+            "path": "/api/jobs/retention",
+            "status": 404,
+            "legalNavCount": 1
+          }
+        ],
+        "servedCss": {
+          "generalSiblingRules": 4,
+          "adjacentSiblingRules": 0
+        }
+      }
+    },
+    "authenticatedDesktop": {
+      "width": 1280,
+      "scrollWidth": 1280,
+      "iframeImmediatelyBeforeFooter": true,
+      "marginLeft": "232px",
+      "links": [
+        {
+          "label": "Kontakt",
+          "href": "https://stadtstack.eu/kontakt",
+          "height": 44,
+          "visible": true,
+          "hitTest": true
+        },
+        {
+          "label": "Impressum",
+          "href": "https://stadtstack.eu/impressum",
+          "height": 44,
+          "visible": true,
+          "hitTest": true
+        },
+        {
+          "label": "Datenschutz",
+          "href": "https://stadtstack.eu/datenschutz",
+          "height": 44,
+          "visible": true,
+          "hitTest": true
+        }
+      ]
+    },
+    "authenticatedMobile": {
+      "width": 390,
+      "scrollWidth": 390,
+      "iframeImmediatelyBeforeFooter": true,
+      "paddingBottom": "100px",
+      "mobileNavTop": 778.953125,
+      "clearsMobileNav": true,
+      "links": [
+        {
+          "label": "Kontakt",
+          "top": 699.625,
+          "bottom": 743.625,
+          "height": 44,
+          "visible": true,
+          "hitTest": true
+        },
+        {
+          "label": "Impressum",
+          "top": 699.625,
+          "bottom": 743.625,
+          "height": 44,
+          "visible": true,
+          "hitTest": true
+        },
+        {
+          "label": "Datenschutz",
+          "top": 699.625,
+          "bottom": 743.625,
+          "height": 44,
+          "visible": true,
+          "hitTest": true
+        }
+      ]
+    },
+    "destinations": [
+      {
+        "link": "kontakt",
+        "url": "https://stadtstack.eu/kontakt",
+        "status": 304,
+        "heading": "Schreib uns direkt",
+        "freshStatus": 200
+      },
+      {
+        "link": "impressum",
+        "url": "https://stadtstack.eu/impressum",
+        "status": 304,
+        "heading": "Impressum",
+        "freshStatus": 200
+      },
+      {
+        "link": "datenschutz",
+        "url": "https://stadtstack.eu/datenschutz",
+        "status": 304,
+        "heading": "Datenschutzerklärung",
+        "freshStatus": 200
+      }
+    ],
+    "money": {
+      "signature": "3XT1Zmsig5i3NERT5z9YK7Yfnyr49e411aa4DKjggQwLqwtyU1VFRHHUxrkrdNc1MYRP8oNckTduzaMDxwW9ovSN",
+      "cluster": "devnet",
+      "commitment": "finalized",
+      "slot": 509671048,
+      "at": "2026-10-10T21:08:59.000Z",
+      "error": null,
+      "cashDeltaAtoms": "-1000",
+      "unitDeltaAtoms": "1000"
+    },
+    "screenshots": [
+      "live-footer-rev40-1280.png",
+      "live-footer-rev40-390.png",
+      "live-footer-rev40-money-1280.png"
+    ]
+  },
+  "screenshotDirectory": "/Users/max/Code/ledger-of-life-review/videos/captures-v4",
+  "testShopAcceptance": {
+    "status": "not performed: no actual TEST shop publication in the aborted Ladenrunde acceptance window; no fixture substituted",
+    "transactionsAuthorized": false
+  },
+  "notes": [
+    "The initial logged-out preview was not sufficient authenticated mobile proof; the production failure is retained above.",
+    "Story, replay and library retain their separate existing content footers; each page has exactly one legal navigation.",
+    "Mobile live link navigations used normal304 cache revalidation and rendered the expected headings; fresh independent GETs were200.",
+    "All money receipts are Solana devnet fictional test units with no monetary value or rights."
+  ]
+}

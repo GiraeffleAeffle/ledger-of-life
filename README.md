@@ -5,7 +5,11 @@
 Ledger of Life combines Home and Money workflows with source-linked city information, native discussions and account-based opinion polls.
 Rental security stays separate from personal holdings, fictional local stakes, paid AI and civic opinions.
 
-**Live test app: <https://ledger.stadtstack.eu>.** [Revision 38](docs/DEPLOYMENT.md), released 10 October, adds explicit not-a-real-business loyalty test-entry labels. [Label acceptance](docs/evidence/HOSTED_LOYALTY_TEST_LABELS_2026-10-10.json) separates browser-local fixtures from actual production data and records a finalized tiny house buy. [Core source evidence](docs/evidence/HOSTED_CORE_SOURCES_2026-10-10.json) retains the real historical lake answer, three live source DTOs and preserved budget-answer failures; corrected two-year hosted inference still awaits its next daily quota window. Earlier loyalty, council and native opinion-poll evidence retains its own dates. Solana devnet remains the primary new-action path; earlier Robinhood Chain testnet agreements and positions remain accessible.
+**Live test app: <https://ledger.stadtstack.eu>.** [Revision 40](docs/DEPLOYMENT.md), released 10 October, provides direct Kontakt · Impressum · Datenschutz links. [Footer evidence](docs/evidence/HOSTED_LEGAL_FOOTER_2026-10-10.json) preserves the initial authenticated mobile failure and the corrected 1280/390 acceptance with the wallet iframe present, plus a finalized tiny house buy.
+
+[Label acceptance](docs/evidence/HOSTED_LOYALTY_TEST_LABELS_2026-10-10.json) separates browser-local test-shop fixtures from actual production data. [Core source evidence](docs/evidence/HOSTED_CORE_SOURCES_2026-10-10.json) retains the real historical lake answer, three live source DTOs and preserved budget-answer failures; corrected two-year hosted inference still requires its real quota-window replay. Earlier loyalty, council and native opinion-poll evidence retains its own dates. Solana devnet remains the primary new-action path; earlier Robinhood Chain testnet agreements and positions remain accessible.
+
+Broader automated account/civic/agreement purges and the new political-opinion consent checkbox are owner-paused backlog, **not deployed**. This does not remove the existing AI-desk text cleanup.
 
 - **Rental escrow, pull-v2:** [`DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb`](https://explorer.solana.com/address/DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb?cluster=devnet), for bounded rental-security custody and consent/arbitration settlement.
 
