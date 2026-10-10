@@ -1,0 +1,74 @@
+{
+  "release": {
+    "revision": 38,
+    "deployedAt": "2026-10-10T17:45:27+02:00",
+    "sourceCommit": "95172aafcda3f840cad9e80bd60f6b86afa9cfb0",
+    "pinCommit": "1fbfb9f83a0bafaf1940039d8f49dffbdddbcd9d",
+    "digest": "sha256:96facf7355cba385a48f1cc0f7bced5d50b688c4faa406ce1f6f6bef4038b38d",
+    "sourceCi": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/38064186677",
+    "imageBuild": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/38064378089",
+    "pod": "ledger-of-life-6678cfd774-mwsvg",
+    "podReady": true,
+    "podSpecAndImageIdMatchDigest": true,
+    "method": "Governed Ledger release only after PatchUpgrade explicitly returned the recovered viewer/shared lock. Atomic mkdir lock held for apply, viewer restored, lock released. No financial program, authority, NetworkPolicy, Secret or migration change."
+  },
+  "gates": {
+    "routeTypeGeneration": "passed",
+    "typescript": "passed",
+    "lint": "passed",
+    "testsPassed": 1083,
+    "testsSkipped": 2,
+    "testsFailed": 0,
+    "whitespace": "passed",
+    "productionBuild": "passed",
+    "sourceCi": "application, EVM and Solana-host passed",
+    "independentReviews": "Focused security and GPT-6.1-sol correctness/UX reviews found no surviving issue; not an external audit.",
+    "imageSmoke": "Published amd64 image passed uid1000/read-only/drop-ALL Colima smoke: public200/private401/retired404 boundaries, SQLite/private-file checks and three core facts/full/compact manifest hashes. Temporary container/image removed."
+  },
+  "contract": {
+    "flag": "Optional literal test:true only. Absent is ordinary publication; false/null/undefined-valued own properties/numbers/strings/unknown keys fail atomically.",
+    "unchangedAdmission": "Source URL, city, network, coordinate, date, program, duplicate-ID, record/byte/time bounds and credential/referrer isolation remain unchanged.",
+    "label": "Test entry · not a real business",
+    "display": "Explicit marker accessible name/title, list button and selected detail; muted dashed T pin rather than ordinary L pin.",
+    "counting": "Flagged entries contribute zero to real-shop count. A test-only city still shows No real shops yet: be the first and the root owner handoff.",
+    "meaning": "An operator test entry is not a real business or real participation. Sepolia test and evidence links remain visible; no balance, membership or reward is imported into Ledger."
+  },
+  "servedFrontendFixtureAcceptance": {
+    "observedAt": "2026-10-10T15:49:00.292Z",
+    "classification": "Explicitly synthetic browser-local feed response on the actual released frontend. Never published or stored in production; not a production merchant or operator-test enrollment claim.",
+    "fixtureName": "Browser-local TEST entry",
+    "observedMarker": {"text":"T","borderStyle":"dashed","accessibleLabel":"Browser-local TEST entry · Test entry · not a real business · loyalty · Sepolia test"},
+    "observedListLabel": "Browser-local TEST entry · Test entry · not a real business · Synthetic acceptance program · Sepolia test",
+    "observedDetailLabel": "Test entry · not a real business. Operator test record, not evidence of real business participation.",
+    "observedEmptyRealShopState": "No real shops yet: be the first.",
+    "viewportWidth": 390,
+    "documentWidth": 390,
+    "cleanup": "Temporary request interception removed. Layer disabled/re-enabled against the actual feed afterwards; actual No shops yet state and zero loyalty pins returned.",
+    "actualProductionFeedAtGate": "[]; public test publication was held until LABEL LIVE and lock-clear confirmation was sent to LoyaltyContractFix and its acceptance/governance owners.",
+    "language": "Ledger English UI; no unsupported German UI locale is claimed. Publisher-provided German names are preserved."
+  },
+  "moneyRegression": {
+    "revision": 38,
+    "network": "Solana devnet",
+    "action": "buy",
+    "reviewedCash": "0.001 tUSDC",
+    "receivedUnits": "0.001 tHOME",
+    "signature": "Q6wP5rrhosyYcVF1eu2Ei8FLhYpnvU22JbY6SWN9gvusYfASzSSJZWKsd3W8RiCjhtcNvwVnQUPmM1Eyzxk64C7",
+    "explorer": "https://explorer.solana.com/tx/Q6wP5rrhosyYcVF1eu2Ei8FLhYpnvU22JbY6SWN9gvusYfASzSSJZWKsd3W8RiCjhtcNvwVnQUPmM1Eyzxk64C7?cluster=devnet",
+    "blockTime": "2026-10-10T15:50:50Z",
+    "slot": 509591420,
+    "commitment": "finalized",
+    "transactionError": null,
+    "userTokenDeltasAtomic": {"BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE":"-1000","2XtDmPPg9Rzu7kNufRsUVG3CGhkrp4KnuRm14rsGqwXy":"1000"},
+    "independentCheck": "Public devnet getTransaction(finalized), exact reviewed effects and no error."
+  },
+  "ownerRequestedPatchCheckpoints": {
+    "classification": "Separate baseline and post-recovery money checks for PatchUpgrade; not a claim that the aborted cluster patch succeeded.",
+    "baseline": {"signature":"54BsNYbwgBeCSYL6B78Z8woktAS1SybuY9fCAnkmzMUmCVE9NR817eGH6i9A9k7o2Vy7Cg3YvKWhBXGnvcxEXAf2","slot":509575887,"blockTime":"2026-10-10T14:48:52Z","status":"finalized/error-free; exact -1000 cash/+1000 unit atoms"},
+    "postRecovery": {"signature":"41jR5k17zBLHwSsZzFE1qB2YF6hu4JjxJJFDGxAyhEmKQ5GnejWeXRsDfJVbN1H7p3vDaD5DmwJbfW1pkQpr9NEo","slot":509586951,"blockTime":"2026-10-10T15:33:03Z","status":"finalized/error-free; exact -1000 cash/+1000 unit atoms"}
+  },
+  "evidenceDirectory": "/Users/max/Code/ledger-of-life-review/videos/captures-v4/",
+  "fixtureScreenshots": ["fixture-loyalty-test-map-1280.png","fixture-loyalty-test-details-1280.png","fixture-loyalty-test-details-390.png"],
+  "actualMoneyScreenshot": "live-loyalty-test-label-money-1280.png",
+  "remainingSeparateAcceptance": "Actual published operator-test pin readback awaits the separately governed loyalty publication. Corrected native City AI two-year replay still awaits its next UTC quota window; neither is fabricated here."
+}
