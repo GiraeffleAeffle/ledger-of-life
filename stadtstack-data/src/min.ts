@@ -10,6 +10,8 @@ export type CompactProperties = Pick<Properties,'id'|'version'|'cityId'|'kind'|'
  sourceCount:number;
  primarySource:Pick<Properties['sources'][number],'url'|'title'|'publisher'|'licence'|'reuse'>;
  faithfulness?:{score:number;threshold:number};
+ verification?:Properties['verification'];
+ assertion?:Properties['assertion'];
 };
 export interface CompactCollection {type:'FeatureCollection';features:{type:'Feature';geometry:Geometry;properties:CompactProperties}[]}
 const grid=(number:number)=>Number(number.toFixed(5));
@@ -95,6 +97,8 @@ export function compactCollection(collection:FeatureCollection):CompactCollectio
  return {type:'FeatureCollection',features:collection.features.map(feature=>{
   const p=feature.properties,source=p.sources[0],faithfulness=p.extraction.faithfulness;
   const properties:CompactProperties={id:p.id,version:p.version,cityId:p.cityId,kind:p.kind,category:p.category,title:p.title,statement:p.statement,status:p.status,startDate:p.startDate,endDate:p.endDate,nextStep:p.nextStep,scale:p.scale,geometryPrecision:p.geometryPrecision,reviewState:p.reviewState,asOf:p.asOf,sourceCount:p.sources.length,primarySource:{url:source.url,title:source.title,publisher:source.publisher,licence:source.licence,reuse:source.reuse},...(faithfulness?{faithfulness:{score:faithfulness.score,threshold:faithfulness.threshold}}:{})};
+  if(p.verification)properties.verification=p.verification;
+  if(p.assertion)properties.assertion=p.assertion;
   const geometry=compactGeometry(feature.geometry,p.id);
   if(geometry?.type==='Point'&&feature.geometry?.type!=='Point')properties.geometryPrecision='approximate';
   if(geometry&&!booleanValid(geometry))throw Error(`Invalid compact geometry: ${p.id}`);

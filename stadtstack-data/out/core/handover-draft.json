@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "stadtstack-handover-draft-v1",
+  "label": "DRAFT — not sent; no municipality handover or receipt",
+  "status": "not-sent",
+  "recipient": "Stadt Strausberg (draft only)",
+  "bundleVersion": "4de6e538c19be61e9014b782e2b5f75f9228c5794d340967e0ccc67c0e4d4d08",
+  "bundleSha256": "ff2cc11e26322a30663f1f62ad39873056cfb4f9ff34c44684b36453f70e3c75",
+  "facts": [
+    {
+      "id": "lake:straussee-level-2026-09-14",
+      "version": "c0af066cab55be9c3d6bb05e2821e5a2aef1af26b1df7feb3308aa60d7111fcf",
+      "assertionHash": "e426f721c889d830c10039014e563d41e74dd776e88577728d2f2bc1bebeba6a",
+      "sourceSha256": "11b2d8b03c0d615e056e9aa399bb47ce1665b5f99ac9a79c41dae067e81214b4",
+      "evidenceHash": "e8951e39cc35591fb15ad1be5672987a67a0a2f5436aa08f18b81175c944622b"
+    },
+    {
+      "id": "budget:investment-outlays-2025",
+      "version": "06beccf5c9cd824cca03ac5a8ee687eac6a7522d65fc90ce1715ecc23e89bb73",
+      "assertionHash": "800e464451a2bad68981c445de4262803b4fd905cf306250f2c7a038ab5abddc",
+      "sourceSha256": "721b47b826a1913cee55054d1251857b2c2a6cf4a7f7319a8124110d16332315",
+      "evidenceHash": "dd3f5c406a4681ceff21f548527f9c198a14e31fe6b4f3cd7b1d84122387f03f"
+    },
+    {
+      "id": "budget:investment-outlays-2026",
+      "version": "bd1bd7de3299334ac30625edb2b9379b18fb7a399398b8361cbfc7fd39ad3230",
+      "assertionHash": "cbd107971a2f12429f6e31d5745f464f0a83adc35730dc0c33e6d000474fdee8",
+      "sourceSha256": "721b47b826a1913cee55054d1251857b2c2a6cf4a7f7319a8124110d16332315",
+      "evidenceHash": "628889f1aa4e4bdd2201d5eb0c77b1332755a3ea913cde10fd3b9cb451bb73c4"
+    }
+  ],
+  "request": "Bitte die verlinkten Originalquellen und gegebenenfalls neuere Veröffentlichungen prüfen.",
+  "pollResults": null,
+  "councilReceipt": null
+}

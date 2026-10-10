@@ -20,6 +20,21 @@ The gitignored `cache/` holds fetched source-byte snapshots, a shallow CCF git c
 
 For Jev modes, create the separate ignored DeepEval 4 environment once: `python3 -m venv stadtstack-data/cache/venv-jev && stadtstack-data/cache/venv-jev/bin/pip install 'deepeval>=4,<5' 'typesafe-sdk>=0.7,<1'`. The `jev:check` command validates dependencies and, once an actual key is configured, locally constructs the selected metric without contacting TypeSafe.
 
+## Required Strausberg core release
+
+Pin the core evaluator with `cache/venv/bin/pip install 'deepeval==3.9.9'`; the exact metric version is part of the required judge policy.
+
+`npm run weekend` fetches the two original city PDFs fresh, evaluates only the three selected core assertions, and publishes Strausberg/core outputs from the existing snapshot without recollecting or replacing other cities or feeds. `npm run evaluate:core -- --from-published` prepares staging only; `npm run publish -- --core-only` validates and publishes it. Normal `evaluate` also requires these gates for Strausberg; collect-only selected facts cannot be published.
+
+The shared contract is `out/core/strausberg-facts.json` (`stadtstack-core-facts-v1`) plus `out/core/release-manifest.json` (`stadtstack-core-release-v1`). Stable IDs are `lake:straussee-level-2026-09-14`, `budget:investment-outlays-2025` and `budget:investment-outlays-2026`. The lake measurement is **historical**, −1.61 m relative to Normalstau on **2026-09-14**, from the PDF headed **2026-10-05**; the newer document date does not turn it into a current measurement. The two budget assertions are **planned** investment outlays: **17,941,270 EUR (2025)** and **12,609,320 EUR (2026)**. Their document heading remains 2024-11-07, not their retrieval date or the later ordinance publication date.
+
+Each fact retains its assertion/date/unit, original PDF URL and byte SHA-256, exact page/row locator, extractor version, assertion hash, deterministic checks and actual DeepEval `FaithfulnessMetric` evidence from **codex:gpt-6-luna**, threshold **0.8**, ambiguity penalization enabled (metric 3.9.9). No model substitution or LLM rewriting is used. The schema preserves the evidence in full and compact signals; the lake uses `kind:"measurement"`. `reviewState:"auto_checked"` is retained for compatibility; explicit `verification.status:"auto-verified"` means **only that the named automated gates passed**, not human review or independent truth certification. The evidence basis is one primary source per assertion, not cross-source corroboration.
+
+Publication validates **all three assertions and gates before any public output replacement**, including exact corpus equality, original cached PDF hashes, re-extracted row/unit checks, context and statement hashes, and local actual-judge evidence. Missing, failed, altered or stale-to-source evidence aborts publication. The manifest binds bundle file bytes/version, each fact version, source/assertion/evidence hashes and full/compact corpus hashes. The exact bundle is the game/MCP contract, not separately rewritten facts. `out/core/handover-draft.json` is explicitly **not sent** and includes exact release/fact references; poll results and council receipt are null.
+
+Gate caching is keyed by exact source-byte hash, statement/context hashes, extractor version and judge policy; changed input/configuration requires actual re-evaluation. Originals, extracted page text and evaluator working files stay under ignored `cache/`; public files contain only attributed facts and short gate reasons, never the PDFs, secrets or request headers. A fresh cache needs the documented DeepEval environment and authenticated Codex access; an unavailable required model fails closed. Run focused regression checks with `node --experimental-strip-types --test test/core.test.ts` after generation; tests use the actual released evidence, not invented judge scores.
+
+
 ## Public files
 
 `out/catalogue.json`: `{schemaVersion:"stadtstack-signals-v1",generatedAt,publisher,cities:[{id,name,state,center:[lon,lat],bbox:[w,s,e,n],sources:[{id,kind,publisher,url,licence,reuse,retrievedAt,status?,error?}],temporalCoverage?,spatialCoverage?,licence?,feedUrl,minUrl,fullBytes,minBytes}]}`. `feedUrl` and `minUrl` are relative to `out/catalogue.json`; `fullBytes` and `minBytes` are exact UTF-8 file sizes, including the final newline.
@@ -56,6 +71,8 @@ The faithfulness threshold is `0.8`; production uses DeepEval `FaithfulnessMetri
 ## Read-only MCP tools
 
 `list_cities`; `search_signals_near(cityId,lon,lat,radius_m,kinds?)`; `search_signals_along(cityId,line:[[lon,lat],...],buffer_m,kinds?)`; `get_signal(id)`; `get_sources(id)`; `get_changes(cityId)`. Spatial searches return full signal Features with exact sources, precision, review status, as-of. Changes return stable ID arrays, not duplicated city-sized Feature payloads; retrieve current records via `get_signal` and removed records from `out/previous/`. Null-geometry citywide records are intentionally not assigned to arbitrary nearby points; retrieve by id or process the citywide collection separately. MCP only reads published files and cannot fetch or mutate source documents.
+
+`get_core_bundle()` returns `{bundle,manifest}` from the exact shared release. `search_signals(cityId,query?,topic?)` searches citywide/full features by all case-insensitive text terms and optional topic/kind/category, including null geometry. `topic:"water"` finds the historical lake assertion; `topic:"budget"` finds the planned outlays. `get_sources` additionally returns assertions and verification. City IDs are restricted to safe catalogue-style slugs. These local tools are read-only and do not require or send geometry.
 
 ## Consumers
 
