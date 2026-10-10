@@ -49,3 +49,43 @@ test('node and nearby way of the same place merge evidence; distinct and distant
  assert.equal(merged[0].properties.sources.length,2);
  assert.equal(duplicateStats(merged).osmNodeWay,0);
 });
+
+const planning=(id:string,caseKey:string,date:string,geometry:Signal['geometry'],locator:string)=>signal({id,caseKey,cityId:'koeln',kind:'planning',category:'Bebauungsplan',title:`Bebauungsplan ${caseKey}`,statement:'Source plan boundary, not new construction',status:`rechtskräftig seit ${date}`,startDate:date,endDate:null,nextStep:'Check plan documents',unknowns:[locator],scale:'city',geometryPrecision:geometry?'area':'none',sources:[{...source('https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1','https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query'),locator}],extraction:{method:'structured'},reviewState:'auto_checked',asOf:'2026-10-10'},geometry);
+
+test('authoritative case/date dedupe merges multipart polygons, holes and every row locator without title heuristics',()=>{
+ const ring:[number,number][]=[[6.9,50.9],[6.91,50.9],[6.91,50.91],[6.9,50.9]],hole:[number,number][]=[[6.902,50.902],[6.903,50.902],[6.903,50.903],[6.902,50.902]],second:[number,number][]=[[7,51],[7.01,51],[7.01,51.01],[7,51]];
+ const key='koeln-bplan:63419.02.000.00';
+ const first=planning('koeln-bplan:15',key,'2020-12-02',{type:'Polygon',coordinates:[ring,hole]},'layer[oid=15]; Ausgleichsfläche eA1');
+ const other=planning('koeln-bplan:16',key,'2020-12-02',{type:'MultiPolygon',coordinates:[[second],[ring,hole]]},'layer[oid=16]; Ausgleichsfläche eA3');
+ const duplicate=planning('koeln-bplan:17',key,'2020-12-02',{type:'Polygon',coordinates:[ring,hole]},'layer[oid=17]');
+ assert.equal(duplicateStats([first,other,duplicate]).planningCase,2);
+ const merged=deduplicateCitySignals([first,other,duplicate]);
+ assert.equal(merged.length,1);
+ assert.equal(merged[0].properties.id,`${key}@2020-12-02`);
+ assert.equal(merged[0].geometry?.type,'MultiPolygon');
+ if(merged[0].geometry?.type==='MultiPolygon')assert.deepEqual(merged[0].geometry.coordinates,[[ring,hole],[second]]);
+ assert.equal(merged[0].properties.sources.length,3);
+ assert.equal(merged[0].properties.unknowns.length,3);
+ assert.equal(merged[0].properties.geometryPrecision,'area');
+ assert.notEqual(merged[0].properties.version,first.properties.version);
+ assert.equal(duplicateStats(merged).planningCase,0);
+});
+
+test('legal-date versions, complete amendment IDs and authoritative Münster plan IDs remain distinct',()=>{
+ const first=planning('koeln-bplan:227','koeln-bplan:59518.03.000.00','2008-12-10',null,'layer[oid=227]; 1. Bauabschnitt');
+ const second=planning('koeln-bplan:380','koeln-bplan:59518.03.000.00','2011-11-16',null,'layer[oid=380]; 2. Bauabschnitt');
+ const amendment=planning('koeln-bplan:55','koeln-bplan:58480.03.004.03','2013-04-24',null,'layer[oid=55]');
+ const distinctAmendment=planning('koeln-bplan:107','koeln-bplan:58480.03.005.03','2013-04-24',null,'layer[oid=107]');
+ const muensterFirst=planning('muenster-bplan:2','muenster-bplan:DE_05515000_St. Mauritz_8__2','1974-12-04',null,'planid=DE_05515000_St. Mauritz_8__2');
+ const muensterSecond=planning('muenster-bplan:3','muenster-bplan:DE_05515000_St. Mauritz_8__3','1974-12-04',null,'planid=DE_05515000_St. Mauritz_8__3');
+ assert.equal(deduplicateCitySignals([first,second,amendment,distinctAmendment,muensterFirst,muensterSecond]).length,6);
+});
+
+test('same source locator with different fetched byte hashes retains both provenance versions',()=>{
+ const first=planning('koeln-bplan:15','koeln-bplan:63419.02.000.00','2020-12-02',null,'layer[oid=15]');
+ const later=planning('koeln-bplan:15','koeln-bplan:63419.02.000.00','2020-12-02',null,'layer[oid=15]');
+ later.properties.sources[0].sha256='b'.repeat(64);
+ const merged=deduplicateCitySignals([first,later]);
+ assert.equal(merged.length,1);
+ assert.deepEqual(new Set(merged[0].properties.sources.map(s=>s.sha256)),new Set(['a'.repeat(64),'b'.repeat(64)]));
+});

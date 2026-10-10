@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Exact-image or public HTTPS acceptance. Outputs evidence, never bearer values."""
-import argparse, datetime, hashlib, json, pathlib, re, secrets, subprocess, tempfile, time, urllib.error, urllib.request
+import argparse, base64, datetime, hashlib, json, pathlib, re, secrets, subprocess, tempfile, time, urllib.error, urllib.request
 
 p=argparse.ArgumentParser()
 p.add_argument('--image',required=True)
 p.add_argument('--evidence',required=True)
 p.add_argument('--url',help='Use the live HTTPS origin instead of starting Docker')
 p.add_argument('--person',default='max')
+p.add_argument('--knowledge-municipality',default='ratzeburg',help='Municipality with a released normalized knowledge record for comparison/similarity acceptance')
 args=p.parse_args()
 if not re.fullmatch(r'ghcr\.io/giraeffleaeffle/stadtstack-mcp@sha256:[0-9a-f]{64}',args.image): p.error('Exact published image digest required')
 if not re.fullmatch(r'[a-z][a-z0-9_-]{0,63}',args.person): p.error('Invalid person')
+if not re.fullmatch(r'[a-z0-9-]{1,80}',args.knowledge_municipality): p.error('Invalid knowledge municipality')
 if args.url and args.url!='https://mcp.stadtstack.eu': p.error('Live origin must be https://mcp.stadtstack.eu')
 private=pathlib.Path.home()/'.config/stadtstack/mcp-tokens'
 # Never give an image under test a real operator credential. Local smoke tokens
@@ -42,13 +44,27 @@ def request(path='/mcp',data=None,auth=True,extra=None,method=None):
         with opener.open(req,timeout=35) as response:
             return response.status,json.loads(response.read() or b'null')
     except urllib.error.HTTPError as error:
+        if error.code==429:
+            retry_after=error.headers.get('Retry-After','')
+            assert retry_after.isdecimal() and 1<=int(retry_after)<=60, 'Invalid rate-limit Retry-After'
+            guidance=json.loads(error.read())
+            assert guidance=={'ok':False,'error':'rate_limited','retryAfterSeconds':int(retry_after),'limits':{'requestsPerMinute':60,'maxConcurrent':4}}, 'Rate-limit JSON/header guidance differs'
+            checks['retryAfterSeconds']=int(retry_after)
         return error.code,None
 
 def call(name,arguments={}):
     status,result=request(data={'jsonrpc':'2.0','id':7,'method':'tools/call','params':{'name':name,'arguments':arguments}})
     assert status==200 and 'result' in result and not result['result'].get('isError'), 'Tool acceptance failed: '+name
     value=result['result']['structuredContent']
-    assert value['source'] and value['date'] and value['status'] in ('candidate','auto-verified')
+    assert value['source']['release'] and value['releasedAt'] and value['respondedAt'] and value['status'] in ('candidate','auto-verified')
+    assert 'date' not in value and 'sources' not in value, 'Obsolete envelope date/source aliases remain'
+    assert value['source']['release']==checks.setdefault('envelopeRelease',value['source']['release'])
+    assert value['releasedAt']==checks.setdefault('releasedAt',value['releasedAt'])
+    assert datetime.datetime.fromisoformat(value['releasedAt'].replace('Z','+00:00')).tzinfo is not None
+    assert datetime.datetime.fromisoformat(value['respondedAt'].replace('Z','+00:00')).tzinfo is not None
+    # Response time may advance between calls; it is not a release/event date.
+    checks.setdefault('firstRespondedAt',value['respondedAt'])
+    checks['lastRespondedAt']=value['respondedAt']
     return value['data']
 
 try:
@@ -84,28 +100,72 @@ try:
     status,listing=request(data={'jsonrpc':'2.0','id':2,'method':'tools/list'})
     assert status==200
     tools=listing['result']['tools'];names=[t['name'] for t in tools]
-    expected=['list_cities','get_core_bundle','search_signals','search_signals_near','search_signals_along','get_signal','get_sources','get_changes','search_topics','get_council_items','get_regional_topics','get_release_status']
+    expected=['list_cities','list_topics','get_core_bundle','search_signals','search_signals_near','search_signals_along','get_signal','get_sources','get_source','get_changes','search_topics','get_council_items','get_regional_topics','get_release_status','compare_topic','similar']
     assert sorted(names)==sorted(expected)
     assert all(t['annotations']['readOnlyHint'] and not t['annotations']['destructiveHint'] for t in tools)
     checks['readOnlyTools']=names
     core=call('get_core_bundle')
-    assert len(core['bundle']['facts'])==3 and all(f['status']=='auto-verified' and f['source']['url'] and f['date'] for f in core['bundle']['facts'])
+    assert len(core['bundle']['facts'])==3 and all(f['verification']['status']=='auto-verified' and f['source']['url'] and f['source']['documentDate'] and 'date' not in f for f in core['bundle']['facts'])
     checks['sharedCoreBundleVersion']=core['bundle']['version']
     fact=call('get_signal',{'id':'lake:straussee-level-2026-09-14'})
-    assert fact['status']=='auto-verified' and fact['source'] and fact['date']
-    assert call('search_topics',{'query':'Straussee','limit':5})['features']
-    assert call('get_council_items',{'limit':1})['features']
-    assert call('get_regional_topics',{'limit':1})['items']
-    assert call('get_release_status')['manifest']['bundleVersion']==core['bundle']['version']
+    assert fact['verification']['status']=='auto-verified' and fact['sourceIds'] and fact['eventDate']=='2026-09-14' and fact['asOf']
+    assert not {'source','sources','date','properties'}.intersection(fact), 'Obsolete full-record aliases remain'
+    attribution=call('get_sources',{'id':fact['id']})
+    assert attribution['sources'] and attribution['sourceIds']==fact['sourceIds'] and 'source' not in attribution
+    source=call('get_source',{'sourceId':fact['sourceIds'][0]})
+    assert source['id']==fact['sourceIds'][0] and source['url'] and source['retrievedAt']
+    assert source in attribution['sources']
+    topics=call('list_topics')['topics']
+    assert topics
+    assert call('search_topics',{'query':'Straussee','limit':5})['items']
+    assert call('get_council_items',{'limit':1})['items']
+    regional=call('get_regional_topics',{'sourceTypes':['councilAgenda'],'limit':50,'fields':['id','cityId','sourceIds','eventDate','comparisonEligible']})
+    eligible=next(item for item in regional['items'] if item['comparisonEligible'])
+    regional_search=call('search_signals',{'cityId':eligible['cityId'],'query':eligible['id'],'fields':['id','origin'],'limit':5})
+    assert any(item['id']==eligible['id'] and item['origin']=='regional' for item in regional_search['items'])
+    projection={'limit':1,'fields':['id','cityId','sourceIds']}
+    first=call('search_topics',projection)
+    assert first['total']>1 and first['nextCursor'] and set(first['items'][0])==set(projection['fields'])
+    following=call('search_topics',{**projection,'cursor':first['nextCursor']})
+    assert following['total']==first['total'] and following['items']
+    assert (following['items'][0]['cityId'],following['items'][0]['id'])!=(first['items'][0]['cityId'],first['items'][0]['id'])
+    status,rejected=request(data={'jsonrpc':'2.0','id':8,'method':'tools/call','params':{'name':'search_topics','arguments':{**projection,'limit':2,'cursor':first['nextCursor']}}})
+    assert status==200 and rejected['result'].get('isError'), 'Cursor was accepted with changed query filters'
+    release=call('get_release_status')
+    assert release['manifest']['bundleVersion']==core['bundle']['version'] and release['dataManifest']['id']==checks['envelopeRelease']
+    encoded_cursor=first['nextCursor'].split('.')[0]
+    cursor_payload=json.loads(base64.urlsafe_b64decode(encoded_cursor+'='*(-len(encoded_cursor)%4)))
+    assert cursor_payload['release']==release['dataManifest']['id']
+    checks['sharedDataRelease']=release['dataManifest']['id']
     checks['sourcedDatedLookups']=True
+    checks['topicSourceRegionalCursorContract']=True
+    knowledge=call('get_regional_topics',{'municipalityId':args.knowledge_municipality,'limit':50,'fields':['id','cityId','origin','topics']})
+    candidates=[item for item in knowledge['items'] if item['origin']=='knowledge']
+    assert candidates, 'Selected municipality has no released knowledge record in the discovery page; supply --knowledge-municipality from the release'
+    target=next((item for item in candidates if item['topics']),candidates[0])
+    topic=target['topics'][0]['id'] if target['topics'] else topics[0]['id']
+    comparison_cities=list(dict.fromkeys([target['cityId'],fact['cityId']]))
+    comparison=call('compare_topic',{'topic':topic,'cityIds':comparison_cities})
+    assert comparison['releaseId']==checks['envelopeRelease'] and comparison['method']['method']=='source-evidenced-stage-summary'
+    assert {city['cityId'] for city in comparison['cities']}==set(comparison_cities)
+    assert all(city['coverage'] and 0<=city['sourceBackedRecordCount']<=city['recordCount'] for city in comparison['cities'])
+    similar=call('similar',{'id':target['id'],'limit':3})
+    assert similar['releaseId']==checks['envelopeRelease'] and similar['method']['method']=='weighted-token-topic-jaccard'
+    assert similar['target']['id']==target['id'] and similar['total']>=len(similar['items']) and len(similar['items'])<=3
+    assert all(item['cityId']!=target['cityId'] and 0<item['score']<=1 and item['sourceIds'] and item['verification'] and isinstance(item['sharedTerms'],list) and isinstance(item['sharedTopics'],list) for item in similar['items'])
+    checks['comparisonAndSimilarity']={'municipality':target['cityId'],'targetId':target['id'],'crossCityMatches':similar['total']}
     assert request(data='x'*32769)[0]==413
     assert request(data='['+json.dumps({'jsonrpc':'2.0','id':1,'method':'ping'})+']')[0]==400
     checks['sizeAndBatchLimits']=True
-    # Bound the loop to 65; initialize/list/lookup calls also consume this window.
-    for _ in range(65):
-        if request()[0]==429: break
-    else: raise RuntimeError('Per-token rate limit not enforced')
-    checks['rateLimit']=True
+    # Only the disposable local token is stressed. Never exhaust a real user's
+    # production quota; live checks rely on the exact-image local rate evidence.
+    checks['rateLimitExercised']=not bool(args.url)
+    if not args.url:
+        for _ in range(65):
+            if request()[0]==429: break
+        else: raise RuntimeError('Per-token rate limit not enforced')
+        checks['rateLimit']=True
+        assert 'retryAfterSeconds' in checks
     evidence={'passed':True,'image':args.image,'origin':origin,'checks':checks,'timestamp':datetime.datetime.now(datetime.timezone.utc).isoformat()}
     destination=pathlib.Path(args.evidence);destination.parent.mkdir(parents=True,exist_ok=True)
     destination.write_text(json.dumps(evidence,indent=2)+'\n')

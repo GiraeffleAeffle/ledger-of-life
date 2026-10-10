@@ -21,7 +21,10 @@ export async function loadTokens(path:string):Promise<Token[]> {
 function reply(res:ServerResponse,status:number,headers:Record<string,string>={}) {
   if (res.headersSent) {res.destroy();return;}
   res.writeHead(status,{'content-type':'application/json','cache-control':'no-store','x-content-type-options':'nosniff','connection':'close',...headers});
-  res.end(JSON.stringify({ok:status===200}));
+  const payload=status===429
+    ? {ok:false,error:'rate_limited',retryAfterSeconds:Number(headers['retry-after']),limits:{requestsPerMinute:limits.requestsPerMinute,maxConcurrent:limits.concurrentPerToken}}
+    : {ok:status===200};
+  res.end(JSON.stringify(payload));
 }
 async function body(req:IncomingMessage):Promise<unknown> {
   const chunks:Buffer[]=[]; let size=0;

@@ -1,0 +1,219 @@
+{
+  "schemaVersion": "stadtstack-data-release-v1",
+  "id": "cdd0e350be842c040dc77d13cc73bf2267cd0b9ae9bbf0a471a267b47938b6f4",
+  "generatedAt": "2026-10-10T22:51:55.864Z",
+  "files": [
+    {
+      "path": "catalogue.json",
+      "sha256": "6aa5bfc3f01670454847e951d8645a411b33fb9a815facc97fa79838149cc668",
+      "bytes": 187013
+    },
+    {
+      "path": "cities/castrop-rauxel/changes.json",
+      "sha256": "46072e4d65ed0f4993ca931bc205377b481e7413ed70328134ddfa3f72dbc78f",
+      "bytes": 2222
+    },
+    {
+      "path": "cities/castrop-rauxel/feed.json",
+      "sha256": "bb48fa82d518f7fecd667e1b01b0c7b0b846088164608cff04e944b289896555",
+      "bytes": 524
+    },
+    {
+      "path": "cities/castrop-rauxel/signals.geojson",
+      "sha256": "4f8a7665054e027dd2699a3d04129955a75efb590d03635f1b6bf989e2f7f6b1",
+      "bytes": 582553
+    },
+    {
+      "path": "cities/castrop-rauxel/signals.min.geojson",
+      "sha256": "9ee74f67f2843e3a3ae40c2a9508b528776a6c3a383906a319965171b9d4da30",
+      "bytes": 300902
+    },
+    {
+      "path": "cities/dresden/changes.json",
+      "sha256": "80af2466efc5dddfb7b2756f474e4f667b6eb1078fe5b390fb48de080a251f03",
+      "bytes": 1719
+    },
+    {
+      "path": "cities/dresden/feed.json",
+      "sha256": "940a50e8da9b8432274845f9d808a71e3c4f3e13fed407eabe63195fd73cf153",
+      "bytes": 90177
+    },
+    {
+      "path": "cities/dresden/signals.geojson",
+      "sha256": "0c74b3707299dc16b35d6b1c25ebc1b6e6e4d3c30a8b9fa1a730d4ae7ce5abf6",
+      "bytes": 4009511
+    },
+    {
+      "path": "cities/dresden/signals.min.geojson",
+      "sha256": "2af0759bb540beecaf9d6e802879c75d8e1e2349900a13248fcf3204c48f7809",
+      "bytes": 2031453
+    },
+    {
+      "path": "cities/duesseldorf/changes.json",
+      "sha256": "1fbafde22fbb0914e450c209a956eb5b8b008b32c94412321bb802d161a23301",
+      "bytes": 34405
+    },
+    {
+      "path": "cities/duesseldorf/feed.json",
+      "sha256": "39542f25a7d4a76f8f51584c06b470cbf0feea02c598bb1c9f397affa30daf69",
+      "bytes": 540
+    },
+    {
+      "path": "cities/duesseldorf/signals.geojson",
+      "sha256": "66056de4b870aca6494c1fd0997600c32e5ae9623f610f909875281b0a1c7e76",
+      "bytes": 3697582
+    },
+    {
+      "path": "cities/duesseldorf/signals.min.geojson",
+      "sha256": "27a34bfa10a1f1dade0c5fe73b096e1a7fe577eb4430c863bfbbb6343cce9333",
+      "bytes": 1876148
+    },
+    {
+      "path": "cities/freiburg/changes.json",
+      "sha256": "e4953ed71963d06306c5234b0e343fcacce5ed023904902ebf550180b5a68dd3",
+      "bytes": 4989
+    },
+    {
+      "path": "cities/freiburg/feed.json",
+      "sha256": "b259e5c32e5458f60204db44a01900acb9f1d23714f2f8e1937eee93860434ad",
+      "bytes": 544
+    },
+    {
+      "path": "cities/freiburg/signals.geojson",
+      "sha256": "e395123a16c385a087251d1679c750956c35efe97d35a97252f624b7003d070b",
+      "bytes": 1870262
+    },
+    {
+      "path": "cities/freiburg/signals.min.geojson",
+      "sha256": "3ab5337537841814587c418ab6d6f11fbaceaa908f9e116f945d2b03fc25592c",
+      "bytes": 943522
+    },
+    {
+      "path": "cities/koeln/changes.json",
+      "sha256": "d808acbf155942301a1ba6c0ca38b0f088a507d13a52189e283c60dcf38421f9",
+      "bytes": 11301
+    },
+    {
+      "path": "cities/koeln/feed.json",
+      "sha256": "3a34ae91595410388527aa176b8adbbcee20779c62b650b2e45366db1f9718bc",
+      "bytes": 5384
+    },
+    {
+      "path": "cities/koeln/signals.geojson",
+      "sha256": "2408c0bb4b1ac2b96d8a0957e9aa70699ca4c56a3d05d32acf563df6face030e",
+      "bytes": 15119678
+    },
+    {
+      "path": "cities/koeln/signals.min.geojson",
+      "sha256": "404a715e671885886e49c914b5dde7c437fa6f8f5b6992c97a5611e51e6dd88d",
+      "bytes": 5698381
+    },
+    {
+      "path": "cities/muenster/changes.json",
+      "sha256": "522f00f2c01fb82aba6e01137851a5a4093604b8c76bd28fe02be106775c2c67",
+      "bytes": 3101
+    },
+    {
+      "path": "cities/muenster/feed.json",
+      "sha256": "066245bb2ed0cbcc4ca5817325dbdd3f6afc5cdd6ff2db370be5bbd897327364",
+      "bytes": 16752
+    },
+    {
+      "path": "cities/muenster/signals.geojson",
+      "sha256": "aa07b8a847236770935d48ddc6c8ffe35b62ca5baf259f9fa6c4567fea9d356a",
+      "bytes": 11118741
+    },
+    {
+      "path": "cities/muenster/signals.min.geojson",
+      "sha256": "1d624d98adb61c0c533076e0deda2e1d33cd691c00a3f8eebd5088563e9b9008",
+      "bytes": 2236941
+    },
+    {
+      "path": "cities/strausberg/changes.json",
+      "sha256": "efa507043d5963ff9929ede5a4ba0c86aeb54d18208e0e52b066e6728a253c58",
+      "bytes": 721
+    },
+    {
+      "path": "cities/strausberg/feed.json",
+      "sha256": "653ab823b3c9426a703ae8414017a3e3265cae98795f6ce820d1bdfcdb54acb8",
+      "bytes": 20188
+    },
+    {
+      "path": "cities/strausberg/signals.geojson",
+      "sha256": "b87e96a2df101be316f9af6d028cb106f10110f1170ef9e050869aa222af4f3c",
+      "bytes": 305529
+    },
+    {
+      "path": "cities/strausberg/signals.min.geojson",
+      "sha256": "586e872beac9f56981e930a0a4d137a07673a474f7a83548a1e937c1cb47537d",
+      "bytes": 143251
+    },
+    {
+      "path": "cities/wuppertal/changes.json",
+      "sha256": "62fd478a5f0b0cfa8813a5fb40ebf5436ce80fe147c590bd86ec65542567bb7a",
+      "bytes": 17758
+    },
+    {
+      "path": "cities/wuppertal/feed.json",
+      "sha256": "a735c82e50e9bff2907a95f1c9cdeea6ae1727e0b31a5bfb27066d9256a65dad",
+      "bytes": 22676
+    },
+    {
+      "path": "cities/wuppertal/signals.geojson",
+      "sha256": "343cf98b0185a3641c4156e9efb7be86585464b6ed321e5aba04ef92067c6e24",
+      "bytes": 2561615
+    },
+    {
+      "path": "cities/wuppertal/signals.min.geojson",
+      "sha256": "be691e51b9c3063e601e24af41dd3a5539e943cd9e5305ebeb999515e7e62ecc",
+      "bytes": 1272394
+    },
+    {
+      "path": "core/handover-draft.json",
+      "sha256": "d8b49e028e103fa1007aaaacb6f17daa40fe09d3e119bbc1dd108550cad21d57",
+      "bytes": 1786
+    },
+    {
+      "path": "core/release-manifest.json",
+      "sha256": "8a41d0aeaea62a8284b4194269dbd4ff0f5561cb931b186181433656a6852bcc",
+      "bytes": 2989
+    },
+    {
+      "path": "core/strausberg-facts.json",
+      "sha256": "ff2cc11e26322a30663f1f62ad39873056cfb4f9ff34c44684b36453f70e3c75",
+      "bytes": 8074
+    },
+    {
+      "path": "knowledge/coverage.json",
+      "sha256": "aa94e68e93840e58640fdfe35e82cda9abe6006f601b3dc9dc9a395c0a209ec1",
+      "bytes": 65790
+    },
+    {
+      "path": "knowledge/records.json",
+      "sha256": "d93d20bb9694e65688297483c1ec872e4640971c5e471d491fd98d279e4ab856",
+      "bytes": 112194
+    },
+    {
+      "path": "knowledge/registry.json",
+      "sha256": "750bd5d58621661dd78934da541d559935cd5583b27f8fa54e5361683945840b",
+      "bytes": 292397
+    },
+    {
+      "path": "quality-report.json",
+      "sha256": "bfca149998871a724173594e71d8c2fac987221e14b57b350c81c548307246c1",
+      "bytes": 246747
+    },
+    {
+      "path": "regions/brandenburg-mol/topics.json",
+      "sha256": "92754508a6d887ebd89b78be50ade7813a031cc1e5a7e33cd61f8993944d1185",
+      "bytes": 54798
+    }
+  ],
+  "quality": {
+    "publishedRecords": 14402,
+    "quarantinedRecords": 795,
+    "cities": 8,
+    "knowledgeMunicipalities": 6,
+    "districts": 3
+  }
+}

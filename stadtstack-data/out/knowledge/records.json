@@ -1,0 +1,2406 @@
+{
+  "schemaVersion": "stadtstack-knowledge-v1",
+  "generatedAt": "2026-10-10T22:29:36.531Z",
+  "records": [
+    {
+      "title": "Begründung 2. Änderung Bebauungsplan Nr. 86 Stadt Mölln",
+      "titleQuote": "Begründung 2. Änderung Bebauungsplan Nr. 86 Stadt Mölln",
+      "summary": "Die Stadt Mölln hat die Aufstellung der zweiten Änderung des Bebauungsplans Nr. 86 für einen mittleren Teilbereich beschlossen; die Änderung wird als Bebauungsplan der Innenentwicklung aufgestellt.",
+      "summaryQuote": "Der Bauausschuss der Stadt Mölln hat am 25 Juli 2024 beschlossen, für den mittleren Teilbereich des Gebietes südlich des Eichholzberges, östlich der Bahntrasse, westlich des Grambeker Weges, nördlich der Berliner Straße die 2. Änderung des Bebauungsplanes Nr. 86 aufzustellen.",
+      "municipalityQuote": "Stadt Mölln",
+      "caseKey": "Bebauungsplan Nr. 86",
+      "caseKeyType": "plan_number",
+      "caseQuote": "2. Änderung Bebauungsplan Nr. 86",
+      "caseType": "planning",
+      "documentDate": null,
+      "documentDateQuote": null,
+      "documentDateReason": "Die Datumsangabe „Stand: April 2026“ enthält keinen exakten Tag.",
+      "topics": [
+        {
+          "id": "wohnbau",
+          "parentId": "siedlung",
+          "provenance": "model",
+          "confidence": 0.81,
+          "quote": "Nachverdichtung"
+        }
+      ],
+      "stage": "draft",
+      "stageDate": "2024-07-25",
+      "stageDateQuote": "am 25 Juli 2024 beschlossen, für den mittleren Teilbereich des Gebietes südlich des Eichholzberges, östlich der Bahntrasse, westlich des Grambeker Weges, nördlich der Berliner Straße die 2. Änderung des Bebauungsplanes Nr. 86 aufzustellen",
+      "stageDateReason": null,
+      "originalStatus": "aufzustellen",
+      "stageQuote": "die 2. Änderung des Bebauungsplanes Nr. 86 aufzustellen",
+      "stages": [
+        {
+          "stage": "draft",
+          "date": "2024-07-25",
+          "dateQuote": "am 25 Juli 2024 beschlossen, für den mittleren Teilbereich des Gebietes südlich des Eichholzberges, östlich der Bahntrasse, westlich des Grambeker Weges, nördlich der Berliner Straße die 2. Änderung des Bebauungsplanes Nr. 86 aufzustellen",
+          "originalStatus": "aufzustellen",
+          "quote": "die 2. Änderung des Bebauungsplanes Nr. 86 aufzustellen"
+        }
+      ],
+      "entities": [
+        {
+          "name": "Stadt Mölln",
+          "type": "municipality",
+          "quote": "Stadt Mölln"
+        },
+        {
+          "name": "Bauausschuss der Stadt Mölln",
+          "type": "authority",
+          "quote": "Der Bauausschuss der Stadt Mölln"
+        }
+      ],
+      "locations": [
+        {
+          "label": "des Gebietes südlich des Eichholzberges, östlich der Bahntrasse, westlich des Grambeker Weges, nördlich der Berliner Straße",
+          "quote": "des Gebietes südlich des Eichholzberges, östlich der Bahntrasse, westlich des Grambeker Weges, nördlich der Berliner Straße",
+          "geometry": null,
+          "precision": "none"
+        }
+      ],
+      "id": "knowledge:moelln:75dbc7da57ba32a9924d02b8",
+      "municipalityId": "moelln",
+      "ags": "01053090",
+      "districtId": "herzogtum-lauenburg",
+      "sources": [
+        {
+          "id": "moelln-participation",
+          "url": "https://www.moelln.de/fileadmin/Stadt_Moelln/Dateien/Bebauungsplaene/BP_86/2.Aenderung/Begruendung.pdf",
+          "sha256": "019ab1e458f22836784659db9b16119a7b0919cc242c0fada8f07af307acb594",
+          "retrievedAt": "2026-10-10T19:06:10.921Z",
+          "locator": "text-sha256:d3bf7289f65139b9d967cf810acdc2838dafdacde3d124c51822553f9382cb74;chars:0-4729",
+          "mimeType": "application/pdf",
+          "sourceType": "participation",
+          "policy": {
+            "robots": {
+              "state": "allowed",
+              "url": "https://www.moelln.de/robots.txt",
+              "checkedAt": "2026-10-10T20:55:40.555Z"
+            },
+            "tdm": {
+              "state": "not_declared",
+              "evidence": [
+                {
+                  "url": "https://www.moelln.de/.well-known/tdmrep.json",
+                  "locator": "TDMRep standardized location HTTP absence",
+                  "value": "404",
+                  "checkedAt": "2026-10-10T20:55:41.526Z"
+                },
+                {
+                  "url": "https://www.moelln.de/fileadmin/Stadt_Moelln/Dateien/Bebauungsplaene/BP_86/2.Aenderung/Begruendung.pdf",
+                  "locator": "PDF.js 6.3.289 XMP metadata (pdf-tdm-v2)",
+                  "value": "no_tdm_reservation_field",
+                  "sha256": "019ab1e458f22836784659db9b16119a7b0919cc242c0fada8f07af307acb594",
+                  "checkedAt": "2026-10-10T20:55:49.256Z"
+                }
+              ]
+            },
+            "access": "public",
+            "legalClassification": "not_assessed",
+            "publication": "facts_with_attribution_only"
+          }
+        }
+      ],
+      "extraction": {
+        "extractorVersion": "district-extractor-v5-reading-order",
+        "extractorSha256": "d188ccc526a9d2f070529dc6a33dd723be21f37795e205c3bba02f2e46076e28",
+        "model": "gpt-6-luna",
+        "provider": "openai-subscription",
+        "tool": "codex-cli",
+        "toolVersion": "0.160.0",
+        "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+        "modelIdentityBasis": "configured-cli-model-and-tool-version",
+        "returnedModel": null,
+        "runtimeWarnings": [
+          "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+        ],
+        "quoteNormalization": {
+          "version": "whitespace-spans-v1",
+          "offsetUnit": "utf16_code_units",
+          "restorations": [],
+          "displayFields": []
+        },
+        "promptVersion": "district-claims-v3-literal-spans",
+        "promptSha256": "554ccabf027fd7d98cd73d67557a0964655d50b6c956ac654341381564ab17c7",
+        "judgePromptVersion": "district-faithfulness-v2-critical-stages",
+        "judgePromptSha256": "29390372d8b151e3f9ded2445789fc51afc36b6638d9a06827237147f59297cc",
+        "inputSha256": "019ab1e458f22836784659db9b16119a7b0919cc242c0fada8f07af307acb594",
+        "textSha256": "d3bf7289f65139b9d967cf810acdc2838dafdacde3d124c51822553f9382cb74",
+        "responseSha256": "3df25bcef8c4f42920bd548f56c35d8d0a3bafdde645d197767c6f6dd7cb445c",
+        "ocrUsed": false,
+        "textMethod": "pdf_text",
+        "documentLimitations": [
+          "Source references sharing identical document bytes are not independent corroboration."
+        ],
+        "cacheKey": "d7892b4dbdb482f775fee64a259bc84f5fff82263f4c15b52317cfb13c5f0f11",
+        "extractedAt": "2026-10-10T21:51:17.508Z",
+        "chunk": {
+          "index": 0,
+          "count": 18,
+          "start": 0,
+          "end": 4729
+        }
+      },
+      "verification": {
+        "status": "auto-verified",
+        "deterministic": {
+          "passed": true,
+          "checks": [
+            {
+              "id": "schema",
+              "passed": true,
+              "reason": "Strict extraction claim schema"
+            },
+            {
+              "id": "exact_quotes",
+              "passed": true,
+              "reason": "Every supporting quote is an exact contiguous source excerpt"
+            },
+            {
+              "id": "municipality",
+              "passed": true,
+              "reason": "Source quotation names the registry municipality; source binding separately checked"
+            },
+            {
+              "id": "title",
+              "passed": true,
+              "reason": "Title preserves exact source characters/token order; display whitespace may collapse"
+            },
+            {
+              "id": "case_identity",
+              "passed": true,
+              "reason": "Authority identifier is quoted or explicit source-document fallback"
+            },
+            {
+              "id": "document_date",
+              "passed": true,
+              "reason": "Document date occurs in its quote, not retrieval metadata"
+            },
+            {
+              "id": "stage_date",
+              "passed": true,
+              "reason": "Stage date occurs in its quote"
+            },
+            {
+              "id": "stage",
+              "passed": true,
+              "reason": "Original status is exact supporting source wording; unknown remains unknown"
+            },
+            {
+              "id": "stage_history",
+              "passed": true,
+              "reason": "Historical stage wording and dates have source quotations"
+            },
+            {
+              "id": "critical_stage_promotion",
+              "passed": true,
+              "reason": "Preparatory votes/consultation and future announcements cannot become final adoption, legal effect or completed works"
+            },
+            {
+              "id": "critical_budget_spending",
+              "passed": true,
+              "reason": "Budget allocations and planned expenditure are not evidence of actual spending"
+            },
+            {
+              "id": "topic_hierarchy",
+              "passed": true,
+              "reason": "Canonical hierarchical topic IDs and actual assignment provenance"
+            },
+            {
+              "id": "entity_labels",
+              "passed": true,
+              "reason": "Entity labels preserve source characters/token order with display-only whitespace collapse"
+            },
+            {
+              "id": "location_labels",
+              "passed": true,
+              "reason": "Location labels preserve source characters/token order with display-only whitespace collapse; no geocoding"
+            },
+            {
+              "id": "geometry",
+              "passed": true,
+              "reason": "Geometry requires exact explicit GeoJSON in source; no inferred coordinates"
+            },
+            {
+              "id": "summary_numbers",
+              "passed": true,
+              "reason": "Every non-date numeric token is literal source evidence; valid calendar dates may use equivalent ISO, numeric or German month spelling"
+            },
+            {
+              "id": "no_contacts",
+              "passed": true,
+              "reason": "No extracted email/phone contact details"
+            }
+          ]
+        },
+        "faithfulness": {
+          "score": 0.97,
+          "threshold": 0.8,
+          "model": "gpt-6-luna",
+          "provider": "openai-subscription",
+          "tool": "codex-cli",
+          "toolVersion": "0.160.0",
+          "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+          "returnedModel": null,
+          "runtimeWarnings": [
+            "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+          ],
+          "reason": "Identity, title, preparatory stage and date, location, and infill topic are supported. No final adoption or implementation is claimed. Minor imprecision: the source says the Bauausschuss resolved to initiate the change, while the summary attributes the resolution more generally to the city.",
+          "evaluatedAt": "2026-10-10T21:51:17.508Z",
+          "responseSha256": "a489ff8c63aab3d09f61fe2c3129b65dc8299927127601b2ac2f1210776f6fa9",
+          "sameModel": true,
+          "limitation": "Same-model judgment is not independent verification."
+        },
+        "evidenceHash": "b439d81d5b6fb5467468c0f183bf1d42656bd2547ad8a9a2b4ab31360867a35f"
+      }
+    },
+    {
+      "title": "Der Vorentwurf der 6. Änderung des Flächennutzungsplanes",
+      "titleQuote": "Der Vorentwurf der 6. Änderung des Flächennutzungsplanes",
+      "summary": "Die Stadt Hagenow legt den Vorentwurf der 6. Änderung des Flächennutzungsplanes öffentlich aus und gibt Gelegenheit zur Stellungnahme.",
+      "summaryQuote": "Der Vorentwurf der 6. Änderung des Flächennutzungsplanes\nder Stadt Hagenow bestehend aus:",
+      "municipalityQuote": "der Stadt Hagenow",
+      "caseKey": "source_document:eb31f0734ec2d0c99a8e3879394e5fedbb9f18b4b49079f7ff32c847e477ecaf",
+      "caseKeyType": "source_document",
+      "caseQuote": null,
+      "caseType": "planning",
+      "documentDate": "2026-07-24",
+      "documentDateQuote": "24. JULI 2026",
+      "documentDateReason": null,
+      "topics": [
+        {
+          "id": "windenergie",
+          "parentId": "energie",
+          "provenance": "model",
+          "confidence": 0.98,
+          "quote": "Rotorbewegung"
+        },
+        {
+          "id": "umwelt",
+          "parentId": null,
+          "provenance": "model",
+          "confidence": 0.98,
+          "quote": "Umweltbericht"
+        }
+      ],
+      "stage": "consultation",
+      "stageDate": null,
+      "stageDateQuote": null,
+      "stageDateReason": "Die Auslegungsfrist ist angegeben, aber kein einzelnes Ereignisdatum für den Beginn der Konsultation wird eindeutig separat ausgewiesen.",
+      "originalStatus": "Der Öffentlichkeit wird hiermit Gelegenheit zur Stellungnahme",
+      "stageQuote": "Der Öffentlichkeit wird hiermit Gelegenheit zur Stellungnahme",
+      "stages": [
+        {
+          "stage": "consultation",
+          "date": null,
+          "dateQuote": null,
+          "originalStatus": "Der Öffentlichkeit wird hiermit Gelegenheit zur Stellungnahme",
+          "quote": "Der Öffentlichkeit wird hiermit Gelegenheit zur Stellungnahme"
+        }
+      ],
+      "entities": [
+        {
+          "name": "Stadt Hagenow",
+          "type": "municipality",
+          "quote": "Der Vorentwurf der 6. Änderung des Flächennutzungsplanes\nder Stadt Hagenow bestehend aus:"
+        },
+        {
+          "name": "Stadtverwaltung Hagenow",
+          "type": "authority",
+          "quote": "in den Räumen der Stadtverwaltung Hagenow, Lange Straße\n28 - 32, 19230 Hagenow"
+        }
+      ],
+      "locations": [
+        {
+          "label": "Bekow",
+          "quote": "„Bekow“",
+          "geometry": null,
+          "precision": "none"
+        }
+      ],
+      "id": "knowledge:hagenow:e558e547dd2c467205f9ace1",
+      "municipalityId": "hagenow",
+      "ags": "13076060",
+      "districtId": "ludwigslust-parchim",
+      "sources": [
+        {
+          "id": "hagenow-publisher-gazette",
+          "url": "https://epaper.wittich.de/frontend/catalogs/547927/1/pdf/complete.pdf",
+          "sha256": "eb31f0734ec2d0c99a8e3879394e5fedbb9f18b4b49079f7ff32c847e477ecaf",
+          "retrievedAt": "2026-10-10T20:56:51.410Z",
+          "locator": "text-sha256:60ca5f3d5473b72d8514ecf6943970a0540ef0e149e7891f7b715cd44298e08f;chars:7910-12635",
+          "mimeType": "application/pdf",
+          "sourceType": "gazette",
+          "policy": {
+            "robots": {
+              "state": "allowed",
+              "url": "https://epaper.wittich.de/robots.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "checkedAt": "2026-10-10T21:50:09.208Z"
+            },
+            "tdm": {
+              "state": "not_declared",
+              "evidence": [
+                {
+                  "url": "https://epaper.wittich.de/.well-known/tdmrep.json",
+                  "locator": "TDMRep standardized location HTTP absence",
+                  "value": "404",
+                  "checkedAt": "2026-10-10T21:50:10.313Z"
+                },
+                {
+                  "url": "https://epaper.wittich.de/frontend/catalogs/547927/1/pdf/complete.pdf",
+                  "locator": "PDF.js 6.3.289 XMP metadata (pdf-tdm-v2)",
+                  "value": "no_tdm_reservation_field",
+                  "sha256": "eb31f0734ec2d0c99a8e3879394e5fedbb9f18b4b49079f7ff32c847e477ecaf",
+                  "checkedAt": "2026-10-10T20:56:54.735Z"
+                }
+              ]
+            },
+            "access": "public",
+            "legalClassification": "not_assessed",
+            "publication": "facts_with_attribution_only"
+          }
+        }
+      ],
+      "extraction": {
+        "extractorVersion": "district-extractor-v5-reading-order",
+        "extractorSha256": "d188ccc526a9d2f070529dc6a33dd723be21f37795e205c3bba02f2e46076e28",
+        "model": "gpt-6-luna",
+        "provider": "openai-subscription",
+        "tool": "codex-cli",
+        "toolVersion": "0.160.0",
+        "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+        "modelIdentityBasis": "configured-cli-model-and-tool-version",
+        "returnedModel": null,
+        "runtimeWarnings": [
+          "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+        ],
+        "quoteNormalization": {
+          "version": "whitespace-spans-v1",
+          "offsetUnit": "utf16_code_units",
+          "restorations": [],
+          "displayFields": []
+        },
+        "promptVersion": "district-claims-v3-literal-spans",
+        "promptSha256": "554ccabf027fd7d98cd73d67557a0964655d50b6c956ac654341381564ab17c7",
+        "judgePromptVersion": "district-faithfulness-v2-critical-stages",
+        "judgePromptSha256": "29390372d8b151e3f9ded2445789fc51afc36b6638d9a06827237147f59297cc",
+        "inputSha256": "eb31f0734ec2d0c99a8e3879394e5fedbb9f18b4b49079f7ff32c847e477ecaf",
+        "textSha256": "60ca5f3d5473b72d8514ecf6943970a0540ef0e149e7891f7b715cd44298e08f",
+        "responseSha256": "59178db7b1764c5489e5d363e8409fcc60886ac825d24ae5afd30de06d43eff1",
+        "ocrUsed": false,
+        "textMethod": "pdf_text",
+        "documentLimitations": [
+          "Source references sharing identical document bytes are not independent corroboration."
+        ],
+        "cacheKey": "88c10054ad22ef995b65c98a302c6554943c9c2fbd6eeff15a2e6c2b8764f26b",
+        "extractedAt": "2026-10-10T21:31:28.070Z",
+        "chunk": {
+          "index": 2,
+          "count": 18,
+          "start": 7910,
+          "end": 12635
+        }
+      },
+      "verification": {
+        "status": "auto-verified",
+        "deterministic": {
+          "passed": true,
+          "checks": [
+            {
+              "id": "schema",
+              "passed": true,
+              "reason": "Strict extraction claim schema"
+            },
+            {
+              "id": "exact_quotes",
+              "passed": true,
+              "reason": "Every supporting quote is an exact contiguous source excerpt"
+            },
+            {
+              "id": "municipality",
+              "passed": true,
+              "reason": "Source quotation names the registry municipality; source binding separately checked"
+            },
+            {
+              "id": "title",
+              "passed": true,
+              "reason": "Title preserves exact source characters/token order; display whitespace may collapse"
+            },
+            {
+              "id": "case_identity",
+              "passed": true,
+              "reason": "Authority identifier is quoted or explicit source-document fallback"
+            },
+            {
+              "id": "document_date",
+              "passed": true,
+              "reason": "Document date occurs in its quote, not retrieval metadata"
+            },
+            {
+              "id": "stage_date",
+              "passed": true,
+              "reason": "Stage date occurs in its quote"
+            },
+            {
+              "id": "stage",
+              "passed": true,
+              "reason": "Original status is exact supporting source wording; unknown remains unknown"
+            },
+            {
+              "id": "stage_history",
+              "passed": true,
+              "reason": "Historical stage wording and dates have source quotations"
+            },
+            {
+              "id": "critical_stage_promotion",
+              "passed": true,
+              "reason": "Preparatory votes/consultation and future announcements cannot become final adoption, legal effect or completed works"
+            },
+            {
+              "id": "critical_budget_spending",
+              "passed": true,
+              "reason": "Budget allocations and planned expenditure are not evidence of actual spending"
+            },
+            {
+              "id": "topic_hierarchy",
+              "passed": true,
+              "reason": "Canonical hierarchical topic IDs and actual assignment provenance"
+            },
+            {
+              "id": "entity_labels",
+              "passed": true,
+              "reason": "Entity labels preserve source characters/token order with display-only whitespace collapse"
+            },
+            {
+              "id": "location_labels",
+              "passed": true,
+              "reason": "Location labels preserve source characters/token order with display-only whitespace collapse; no geocoding"
+            },
+            {
+              "id": "geometry",
+              "passed": true,
+              "reason": "Geometry requires exact explicit GeoJSON in source; no inferred coordinates"
+            },
+            {
+              "id": "summary_numbers",
+              "passed": true,
+              "reason": "Every non-date numeric token is literal source evidence; valid calendar dates may use equivalent ISO, numeric or German month spelling"
+            },
+            {
+              "id": "no_contacts",
+              "passed": true,
+              "reason": "No extracted email/phone contact details"
+            }
+          ]
+        },
+        "faithfulness": {
+          "score": 0.98,
+          "threshold": 0.8,
+          "model": "gpt-6-luna",
+          "provider": "openai-subscription",
+          "tool": "codex-cli",
+          "toolVersion": "0.160.0",
+          "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+          "returnedModel": null,
+          "runtimeWarnings": [
+            "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+          ],
+          "reason": "The municipality, draft plan amendment, consultation stage, publication date, topics, entities, and Bekow reference are supported by the excerpt. The summary accurately describes the stated public opportunity to comment and public display. No unsupported critical claim is present.",
+          "evaluatedAt": "2026-10-10T21:31:28.070Z",
+          "responseSha256": "bad7cd2bf492244d27b7f137aaab38a2a31121599c61d7d012d34aaf16176437",
+          "sameModel": true,
+          "limitation": "Same-model judgment is not independent verification."
+        },
+        "evidenceHash": "92277a38e51edbe286e2cf65d9678a7bf19e15d1b6db79bca2331254437535fe"
+      }
+    },
+    {
+      "title": "Jahresempfang in Hagenow",
+      "titleQuote": "Jahresempfang in Hagenow",
+      "summary": "Die Stadt Hagenow und das Panzergrenadierbataillon 401 luden zu einem gemeinsamen Jahresempfang ein.",
+      "summaryQuote": "Am Mittwoch, den 1. Juli, luden die Stadt Hagenow und das\nPanzergrenadierbataillon 401 zum gemeinsamen Jahresempfang",
+      "municipalityQuote": "Stadt Hagenow",
+      "caseKey": "source_document:eb31f0734ec2d0c99a8e3879394e5fedbb9f18b4b49079f7ff32c847e477ecaf",
+      "caseKeyType": "source_document",
+      "caseQuote": null,
+      "caseType": "unknown",
+      "documentDate": "2026-07-24",
+      "documentDateQuote": "24. JULI 2026",
+      "documentDateReason": null,
+      "topics": [],
+      "stage": "unknown",
+      "stageDate": null,
+      "stageDateQuote": null,
+      "stageDateReason": "Kein Verfahrensstadium oder zugehöriges Datum für einen kommunalen Plan oder Beschluss genannt.",
+      "originalStatus": "",
+      "stageQuote": "",
+      "stages": [],
+      "entities": [
+        {
+          "name": "Stadt Hagenow",
+          "type": "municipality",
+          "quote": "Stadt Hagenow"
+        },
+        {
+          "name": "Panzergrenadierbataillon 401",
+          "type": "organization",
+          "quote": "Panzergrenadierbataillon 401"
+        }
+      ],
+      "locations": [],
+      "id": "knowledge:hagenow:61d994185a2bcc470e33280c",
+      "municipalityId": "hagenow",
+      "ags": "13076060",
+      "districtId": "ludwigslust-parchim",
+      "sources": [
+        {
+          "id": "hagenow-publisher-gazette",
+          "url": "https://epaper.wittich.de/frontend/catalogs/547927/1/pdf/complete.pdf",
+          "sha256": "eb31f0734ec2d0c99a8e3879394e5fedbb9f18b4b49079f7ff32c847e477ecaf",
+          "retrievedAt": "2026-10-10T20:56:51.410Z",
+          "locator": "text-sha256:60ca5f3d5473b72d8514ecf6943970a0540ef0e149e7891f7b715cd44298e08f;chars:23748-28527",
+          "mimeType": "application/pdf",
+          "sourceType": "gazette",
+          "policy": {
+            "robots": {
+              "state": "allowed",
+              "url": "https://epaper.wittich.de/robots.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "checkedAt": "2026-10-10T21:50:09.208Z"
+            },
+            "tdm": {
+              "state": "not_declared",
+              "evidence": [
+                {
+                  "url": "https://epaper.wittich.de/.well-known/tdmrep.json",
+                  "locator": "TDMRep standardized location HTTP absence",
+                  "value": "404",
+                  "checkedAt": "2026-10-10T21:50:10.313Z"
+                },
+                {
+                  "url": "https://epaper.wittich.de/frontend/catalogs/547927/1/pdf/complete.pdf",
+                  "locator": "PDF.js 6.3.289 XMP metadata (pdf-tdm-v2)",
+                  "value": "no_tdm_reservation_field",
+                  "sha256": "eb31f0734ec2d0c99a8e3879394e5fedbb9f18b4b49079f7ff32c847e477ecaf",
+                  "checkedAt": "2026-10-10T20:56:54.735Z"
+                }
+              ]
+            },
+            "access": "public",
+            "legalClassification": "not_assessed",
+            "publication": "facts_with_attribution_only"
+          }
+        }
+      ],
+      "extraction": {
+        "extractorVersion": "district-extractor-v5-reading-order",
+        "extractorSha256": "d188ccc526a9d2f070529dc6a33dd723be21f37795e205c3bba02f2e46076e28",
+        "model": "gpt-6-luna",
+        "provider": "openai-subscription",
+        "tool": "codex-cli",
+        "toolVersion": "0.160.0",
+        "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+        "modelIdentityBasis": "configured-cli-model-and-tool-version",
+        "returnedModel": null,
+        "runtimeWarnings": [
+          "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+        ],
+        "quoteNormalization": {
+          "version": "whitespace-spans-v1",
+          "offsetUnit": "utf16_code_units",
+          "restorations": [],
+          "displayFields": []
+        },
+        "promptVersion": "district-claims-v3-literal-spans",
+        "promptSha256": "554ccabf027fd7d98cd73d67557a0964655d50b6c956ac654341381564ab17c7",
+        "judgePromptVersion": "district-faithfulness-v2-critical-stages",
+        "judgePromptSha256": "29390372d8b151e3f9ded2445789fc51afc36b6638d9a06827237147f59297cc",
+        "inputSha256": "eb31f0734ec2d0c99a8e3879394e5fedbb9f18b4b49079f7ff32c847e477ecaf",
+        "textSha256": "60ca5f3d5473b72d8514ecf6943970a0540ef0e149e7891f7b715cd44298e08f",
+        "responseSha256": "43dcb7281f8f372f05c87e292454b971a55e12ad897fa0a9c0d4ee0064550557",
+        "ocrUsed": false,
+        "textMethod": "pdf_text",
+        "documentLimitations": [
+          "Source references sharing identical document bytes are not independent corroboration."
+        ],
+        "cacheKey": "3e7124e7295b426767c672a09e5d2d37d814588ef785357983eabdcef62575a6",
+        "extractedAt": "2026-10-10T21:32:14.045Z",
+        "chunk": {
+          "index": 6,
+          "count": 18,
+          "start": 23748,
+          "end": 28527
+        }
+      },
+      "verification": {
+        "status": "auto-verified",
+        "deterministic": {
+          "passed": true,
+          "checks": [
+            {
+              "id": "schema",
+              "passed": true,
+              "reason": "Strict extraction claim schema"
+            },
+            {
+              "id": "exact_quotes",
+              "passed": true,
+              "reason": "Every supporting quote is an exact contiguous source excerpt"
+            },
+            {
+              "id": "municipality",
+              "passed": true,
+              "reason": "Source quotation names the registry municipality; source binding separately checked"
+            },
+            {
+              "id": "title",
+              "passed": true,
+              "reason": "Title preserves exact source characters/token order; display whitespace may collapse"
+            },
+            {
+              "id": "case_identity",
+              "passed": true,
+              "reason": "Authority identifier is quoted or explicit source-document fallback"
+            },
+            {
+              "id": "document_date",
+              "passed": true,
+              "reason": "Document date occurs in its quote, not retrieval metadata"
+            },
+            {
+              "id": "stage_date",
+              "passed": true,
+              "reason": "Stage date occurs in its quote"
+            },
+            {
+              "id": "stage",
+              "passed": true,
+              "reason": "Original status is exact supporting source wording; unknown remains unknown"
+            },
+            {
+              "id": "stage_history",
+              "passed": true,
+              "reason": "Historical stage wording and dates have source quotations"
+            },
+            {
+              "id": "critical_stage_promotion",
+              "passed": true,
+              "reason": "Preparatory votes/consultation and future announcements cannot become final adoption, legal effect or completed works"
+            },
+            {
+              "id": "critical_budget_spending",
+              "passed": true,
+              "reason": "Budget allocations and planned expenditure are not evidence of actual spending"
+            },
+            {
+              "id": "topic_hierarchy",
+              "passed": true,
+              "reason": "Canonical hierarchical topic IDs and actual assignment provenance"
+            },
+            {
+              "id": "entity_labels",
+              "passed": true,
+              "reason": "Entity labels preserve source characters/token order with display-only whitespace collapse"
+            },
+            {
+              "id": "location_labels",
+              "passed": true,
+              "reason": "Location labels preserve source characters/token order with display-only whitespace collapse; no geocoding"
+            },
+            {
+              "id": "geometry",
+              "passed": true,
+              "reason": "Geometry requires exact explicit GeoJSON in source; no inferred coordinates"
+            },
+            {
+              "id": "summary_numbers",
+              "passed": true,
+              "reason": "Every non-date numeric token is literal source evidence; valid calendar dates may use equivalent ISO, numeric or German month spelling"
+            },
+            {
+              "id": "no_contacts",
+              "passed": true,
+              "reason": "No extracted email/phone contact details"
+            }
+          ]
+        },
+        "faithfulness": {
+          "score": 0.97,
+          "threshold": 0.8,
+          "model": "gpt-6-luna",
+          "provider": "openai-subscription",
+          "tool": "codex-cli",
+          "toolVersion": "0.160.0",
+          "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+          "returnedModel": null,
+          "runtimeWarnings": [
+            "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+          ],
+          "reason": "The title, summary, municipality, document date, and named entities are supported by the excerpt. Unknown case type and stage are appropriate for this event report; no unsupported location or outcome is asserted.",
+          "evaluatedAt": "2026-10-10T21:32:14.045Z",
+          "responseSha256": "fa769d30952dbf271d502ec8162f7cd38debb70d9d2d313fddedcc806bcf314d",
+          "sameModel": true,
+          "limitation": "Same-model judgment is not independent verification."
+        },
+        "evidenceHash": "868bb12ed1de260ad1315055bb906cefca9a8a17f9a6d47dcc5d166760f97f7a"
+      }
+    },
+    {
+      "title": "Wirtschaftsplan 2026 des Eigenbetriebes Stadtforst Strausberg",
+      "titleQuote": "Wirtschaftsplan 2026 des Eigenbetriebes Stadtforst Strausberg",
+      "summary": "Die Stadtverordnetenversammlung beschließt den Wirtschaftsplan 2026 für den Eigenbetrieb Stadtforst Strausberg.",
+      "summaryQuote": "Die Stadtverordnetenversammlung beschließt den Wirtschaftsplan 2026 für den Eigenbetrieb Stadtforst Strausberg.",
+      "municipalityQuote": "Stadt Strausberg",
+      "caseKey": "BV-SVV-2025/0172",
+      "caseKeyType": "paper_reference",
+      "caseQuote": "Beschluss BV-SVV-2025/0172",
+      "caseType": "budget",
+      "documentDate": "2026-02-23",
+      "documentDateQuote": "23. Februar 2026",
+      "documentDateReason": null,
+      "topics": [
+        {
+          "id": "haushalt",
+          "parentId": "verwaltung",
+          "provenance": "model",
+          "confidence": 0.98,
+          "quote": "Wirtschaftsplan 2026"
+        }
+      ],
+      "stage": "decision",
+      "stageDate": "2025-12-11",
+      "stageDateQuote": "Beschluss\nBV-SVV-2025/0172 vom 11.12.2025 über den Wirtschaftsplan 2026",
+      "stageDateReason": null,
+      "originalStatus": "beschließt den Wirtschaftsplan",
+      "stageQuote": "Die Stadtverordnetenversammlung beschließt den Wirtschaftsplan 2026 für den Eigenbetrieb Stadtforst Strausberg.",
+      "stages": [
+        {
+          "stage": "decision",
+          "date": "2025-12-11",
+          "dateQuote": "Beschluss\nBV-SVV-2025/0172 vom 11.12.2025 über den Wirtschaftsplan 2026",
+          "originalStatus": "beschließt den Wirtschaftsplan",
+          "quote": "Die Stadtverordnetenversammlung beschließt den Wirtschaftsplan 2026 für den Eigenbetrieb Stadtforst Strausberg."
+        }
+      ],
+      "entities": [
+        {
+          "name": "Strausberg",
+          "type": "municipality",
+          "quote": "Stadt Strausberg"
+        },
+        {
+          "name": "Eigenbetrieb Stadtforst Strausberg",
+          "type": "organization",
+          "quote": "Eigenbetrieb Stadtforst Strausberg"
+        }
+      ],
+      "locations": [],
+      "id": "knowledge:strausberg:f49c52084e322466d62ed63a",
+      "municipalityId": "strausberg",
+      "ags": "12064472",
+      "districtId": "maerkisch-oderland",
+      "sources": [
+        {
+          "id": "strausberg-gazette",
+          "url": "https://www.stadt-strausberg.de/wp-content/uploads/2026/02/2026-01-Amtsblatt.pdf",
+          "sha256": "1848a032f2e492f0f22d0376c1826e33c4e6e1bb72e16ec0677f0b83cc6d456a",
+          "retrievedAt": "2026-10-10T19:05:23.371Z",
+          "locator": "text-sha256:502f150f8b1bc30f8d8de6fe6068e810bcf2b538258a8820f552435299153296;chars:11939-16713",
+          "mimeType": "application/pdf",
+          "sourceType": "gazette",
+          "policy": {
+            "robots": {
+              "state": "allowed",
+              "url": "https://www.stadt-strausberg.de/robots.txt",
+              "sha256": "3aba232d9b1979cdac37dc7f70f59c5fdeda9e57e653beade4e4405ff41e449e",
+              "checkedAt": "2026-10-10T20:43:58.197Z"
+            },
+            "tdm": {
+              "state": "not_declared",
+              "evidence": [
+                {
+                  "url": "https://www.stadt-strausberg.de/.well-known/tdmrep.json",
+                  "locator": "TDMRep standardized location HTTP absence",
+                  "value": "404",
+                  "checkedAt": "2026-10-10T20:44:00.576Z"
+                },
+                {
+                  "url": "https://www.stadt-strausberg.de/wp-content/uploads/2026/02/2026-01-Amtsblatt.pdf",
+                  "locator": "PDF.js 6.3.289 XMP metadata (pdf-tdm-v2)",
+                  "value": "no_tdm_reservation_field",
+                  "sha256": "1848a032f2e492f0f22d0376c1826e33c4e6e1bb72e16ec0677f0b83cc6d456a",
+                  "checkedAt": "2026-10-10T20:48:45.350Z"
+                }
+              ]
+            },
+            "access": "public",
+            "legalClassification": "not_assessed",
+            "publication": "facts_with_attribution_only"
+          }
+        }
+      ],
+      "extraction": {
+        "extractorVersion": "district-extractor-v5-reading-order",
+        "extractorSha256": "d188ccc526a9d2f070529dc6a33dd723be21f37795e205c3bba02f2e46076e28",
+        "model": "gpt-6-luna",
+        "provider": "openai-subscription",
+        "tool": "codex-cli",
+        "toolVersion": "0.160.0",
+        "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+        "modelIdentityBasis": "configured-cli-model-and-tool-version",
+        "returnedModel": null,
+        "runtimeWarnings": [
+          "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+        ],
+        "quoteNormalization": {
+          "version": "whitespace-spans-v1",
+          "offsetUnit": "utf16_code_units",
+          "restorations": [
+            {
+              "field": "stageDateQuote",
+              "proposedSha256": "481ffd6bdc24ebed4d720c27c5ee97dc1bdf019867f6b05ea6e979349290bd4d",
+              "restoredSha256": "296fa6ffaa0d72a0b883946b0166f17a224df8ae20851550baafe94a881c5265",
+              "start": 13846,
+              "end": 13917
+            },
+            {
+              "field": "stages[0].dateQuote",
+              "proposedSha256": "481ffd6bdc24ebed4d720c27c5ee97dc1bdf019867f6b05ea6e979349290bd4d",
+              "restoredSha256": "296fa6ffaa0d72a0b883946b0166f17a224df8ae20851550baafe94a881c5265",
+              "start": 13846,
+              "end": 13917
+            }
+          ],
+          "displayFields": []
+        },
+        "promptVersion": "district-claims-v3-literal-spans",
+        "promptSha256": "554ccabf027fd7d98cd73d67557a0964655d50b6c956ac654341381564ab17c7",
+        "judgePromptVersion": "district-faithfulness-v2-critical-stages",
+        "judgePromptSha256": "29390372d8b151e3f9ded2445789fc51afc36b6638d9a06827237147f59297cc",
+        "inputSha256": "1848a032f2e492f0f22d0376c1826e33c4e6e1bb72e16ec0677f0b83cc6d456a",
+        "textSha256": "502f150f8b1bc30f8d8de6fe6068e810bcf2b538258a8820f552435299153296",
+        "responseSha256": "3e882fae663085776e55712f0676322cb3c4e057a97e9e0b3ebeeeeaeb20513d",
+        "ocrUsed": false,
+        "textMethod": "pdf_text",
+        "documentLimitations": [
+          "Source references sharing identical document bytes are not independent corroboration."
+        ],
+        "cacheKey": "481f66cef6b1257bcaf005a9dee1c2ae4190e6083ff14476ddae945dd9839765",
+        "extractedAt": "2026-10-10T21:55:33.714Z",
+        "chunk": {
+          "index": 3,
+          "count": 8,
+          "start": 11939,
+          "end": 16713
+        }
+      },
+      "verification": {
+        "status": "auto-verified",
+        "deterministic": {
+          "passed": true,
+          "checks": [
+            {
+              "id": "schema",
+              "passed": true,
+              "reason": "Strict extraction claim schema"
+            },
+            {
+              "id": "exact_quotes",
+              "passed": true,
+              "reason": "Every supporting quote is an exact contiguous source excerpt"
+            },
+            {
+              "id": "municipality",
+              "passed": true,
+              "reason": "Source quotation names the registry municipality; source binding separately checked"
+            },
+            {
+              "id": "title",
+              "passed": true,
+              "reason": "Title preserves exact source characters/token order; display whitespace may collapse"
+            },
+            {
+              "id": "case_identity",
+              "passed": true,
+              "reason": "Authority identifier is quoted or explicit source-document fallback"
+            },
+            {
+              "id": "document_date",
+              "passed": true,
+              "reason": "Document date occurs in its quote, not retrieval metadata"
+            },
+            {
+              "id": "stage_date",
+              "passed": true,
+              "reason": "Stage date occurs in its quote"
+            },
+            {
+              "id": "stage",
+              "passed": true,
+              "reason": "Original status is exact supporting source wording; unknown remains unknown"
+            },
+            {
+              "id": "stage_history",
+              "passed": true,
+              "reason": "Historical stage wording and dates have source quotations"
+            },
+            {
+              "id": "critical_stage_promotion",
+              "passed": true,
+              "reason": "Preparatory votes/consultation and future announcements cannot become final adoption, legal effect or completed works"
+            },
+            {
+              "id": "critical_budget_spending",
+              "passed": true,
+              "reason": "Budget allocations and planned expenditure are not evidence of actual spending"
+            },
+            {
+              "id": "topic_hierarchy",
+              "passed": true,
+              "reason": "Canonical hierarchical topic IDs and actual assignment provenance"
+            },
+            {
+              "id": "entity_labels",
+              "passed": true,
+              "reason": "Entity labels preserve source characters/token order with display-only whitespace collapse"
+            },
+            {
+              "id": "location_labels",
+              "passed": true,
+              "reason": "Location labels preserve source characters/token order with display-only whitespace collapse; no geocoding"
+            },
+            {
+              "id": "geometry",
+              "passed": true,
+              "reason": "Geometry requires exact explicit GeoJSON in source; no inferred coordinates"
+            },
+            {
+              "id": "summary_numbers",
+              "passed": true,
+              "reason": "Every non-date numeric token is literal source evidence; valid calendar dates may use equivalent ISO, numeric or German month spelling"
+            },
+            {
+              "id": "no_contacts",
+              "passed": true,
+              "reason": "No extracted email/phone contact details"
+            }
+          ]
+        },
+        "faithfulness": {
+          "score": 0.99,
+          "threshold": 0.8,
+          "model": "gpt-6-luna",
+          "provider": "openai-subscription",
+          "tool": "codex-cli",
+          "toolVersion": "0.160.0",
+          "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+          "returnedModel": null,
+          "runtimeWarnings": [
+            "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+          ],
+          "reason": "The title, summary, municipality, paper reference, budget topic, and decision stage/date are supported by the excerpt. The date is explicitly linked to the plan decision; no final legal effect or implementation is claimed.",
+          "evaluatedAt": "2026-10-10T21:55:33.713Z",
+          "responseSha256": "50d8b09ae83946b46400a5365c28c5e3d37a988558c6d4cf60c4b5329a35d286",
+          "sameModel": true,
+          "limitation": "Same-model judgment is not independent verification."
+        },
+        "evidenceHash": "f726695f26c201f35e1d93033b89c48ae0f5c5696d9d74af2aa6915986e9b64b"
+      }
+    },
+    {
+      "title": "Einberufung der Vollversammlung der Angliederungsgenossenschaften der Eigenjagdbezirke der Stadt Strausberg 1 und 2",
+      "titleQuote": "Einberufung der Vollversammlung der\nAngliederungsgenossenschaften\nder Eigenjagdbezirke der Stadt Strausberg 1 und 2",
+      "summary": "Die jährliche Vollversammlung der Angliederungsgenossenschaften ist für den 14. April 2026 im Dorfgemeinschaftshaus Hohenstein angesetzt.",
+      "summaryQuote": "die jährliche Genossenschaftsversammlung findet am\nDienstag, den 14.04.2026, um 19.00 Uhr im\nDorfgemeinschaftshaus Hohenstein Garziner Straße\n13, 15344 Strausberg Ortsteil Hohenstein\nstatt.",
+      "municipalityQuote": "Amtsblatt der Stadt Strausberg",
+      "caseKey": "source_document:1848a032f2e492f0f22d0376c1826e33c4e6e1bb72e16ec0677f0b83cc6d456a",
+      "caseKeyType": "source_document",
+      "caseQuote": null,
+      "caseType": "consultation",
+      "documentDate": "2026-02-23",
+      "documentDateQuote": "23. Februar 2026",
+      "documentDateReason": null,
+      "topics": [],
+      "stage": "motion",
+      "stageDate": null,
+      "stageDateQuote": null,
+      "stageDateReason": "Die Versammlung ist angekündigt; ein Beschlussdatum ist nicht angegeben.",
+      "originalStatus": "Einberufung der Vollversammlung",
+      "stageQuote": "Einberufung der Vollversammlung",
+      "stages": [
+        {
+          "stage": "motion",
+          "date": null,
+          "dateQuote": null,
+          "originalStatus": "Einberufung der Vollversammlung",
+          "quote": "Einberufung der Vollversammlung der\nAngliederungsgenossenschaften\nder Eigenjagdbezirke der Stadt Strausberg 1 und 2"
+        }
+      ],
+      "entities": [
+        {
+          "name": "Stadt Strausberg",
+          "type": "municipality",
+          "quote": "Amtsblatt der Stadt Strausberg"
+        },
+        {
+          "name": "Angliederungsgenossenschaften",
+          "type": "organization",
+          "quote": "Einberufung der Vollversammlung der\nAngliederungsgenossenschaften\nder Eigenjagdbezirke der Stadt Strausberg 1 und 2"
+        },
+        {
+          "name": "Dorfgemeinschaftshaus Hohenstein",
+          "type": "place",
+          "quote": "Dorfgemeinschaftshaus Hohenstein"
+        }
+      ],
+      "locations": [
+        {
+          "label": "Dorfgemeinschaftshaus Hohenstein",
+          "quote": "Dorfgemeinschaftshaus Hohenstein",
+          "geometry": null,
+          "precision": "none"
+        }
+      ],
+      "id": "knowledge:strausberg:236145633c6ecebb6a7eba30",
+      "municipalityId": "strausberg",
+      "ags": "12064472",
+      "districtId": "maerkisch-oderland",
+      "sources": [
+        {
+          "id": "strausberg-gazette",
+          "url": "https://www.stadt-strausberg.de/wp-content/uploads/2026/02/2026-01-Amtsblatt.pdf",
+          "sha256": "1848a032f2e492f0f22d0376c1826e33c4e6e1bb72e16ec0677f0b83cc6d456a",
+          "retrievedAt": "2026-10-10T19:05:23.371Z",
+          "locator": "text-sha256:502f150f8b1bc30f8d8de6fe6068e810bcf2b538258a8820f552435299153296;chars:27889-31860",
+          "mimeType": "application/pdf",
+          "sourceType": "gazette",
+          "policy": {
+            "robots": {
+              "state": "allowed",
+              "url": "https://www.stadt-strausberg.de/robots.txt",
+              "sha256": "3aba232d9b1979cdac37dc7f70f59c5fdeda9e57e653beade4e4405ff41e449e",
+              "checkedAt": "2026-10-10T20:43:58.197Z"
+            },
+            "tdm": {
+              "state": "not_declared",
+              "evidence": [
+                {
+                  "url": "https://www.stadt-strausberg.de/.well-known/tdmrep.json",
+                  "locator": "TDMRep standardized location HTTP absence",
+                  "value": "404",
+                  "checkedAt": "2026-10-10T20:44:00.576Z"
+                },
+                {
+                  "url": "https://www.stadt-strausberg.de/wp-content/uploads/2026/02/2026-01-Amtsblatt.pdf",
+                  "locator": "PDF.js 6.3.289 XMP metadata (pdf-tdm-v2)",
+                  "value": "no_tdm_reservation_field",
+                  "sha256": "1848a032f2e492f0f22d0376c1826e33c4e6e1bb72e16ec0677f0b83cc6d456a",
+                  "checkedAt": "2026-10-10T20:48:45.350Z"
+                }
+              ]
+            },
+            "access": "public",
+            "legalClassification": "not_assessed",
+            "publication": "facts_with_attribution_only"
+          }
+        }
+      ],
+      "extraction": {
+        "extractorVersion": "district-extractor-v5-reading-order",
+        "extractorSha256": "d188ccc526a9d2f070529dc6a33dd723be21f37795e205c3bba02f2e46076e28",
+        "model": "gpt-6-luna",
+        "provider": "openai-subscription",
+        "tool": "codex-cli",
+        "toolVersion": "0.160.0",
+        "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+        "modelIdentityBasis": "configured-cli-model-and-tool-version",
+        "returnedModel": null,
+        "runtimeWarnings": [
+          "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+        ],
+        "quoteNormalization": {
+          "version": "whitespace-spans-v1",
+          "offsetUnit": "utf16_code_units",
+          "restorations": [],
+          "displayFields": [
+            "title"
+          ]
+        },
+        "promptVersion": "district-claims-v3-literal-spans",
+        "promptSha256": "554ccabf027fd7d98cd73d67557a0964655d50b6c956ac654341381564ab17c7",
+        "judgePromptVersion": "district-faithfulness-v2-critical-stages",
+        "judgePromptSha256": "29390372d8b151e3f9ded2445789fc51afc36b6638d9a06827237147f59297cc",
+        "inputSha256": "1848a032f2e492f0f22d0376c1826e33c4e6e1bb72e16ec0677f0b83cc6d456a",
+        "textSha256": "502f150f8b1bc30f8d8de6fe6068e810bcf2b538258a8820f552435299153296",
+        "responseSha256": "4162cdaea9b049190860ae836cb4654e0ef744b0f2fb3deb3bad0bfc00431576",
+        "ocrUsed": false,
+        "textMethod": "pdf_text",
+        "documentLimitations": [
+          "Source references sharing identical document bytes are not independent corroboration."
+        ],
+        "cacheKey": "ff2066572b380c25a57007490eeabf6fe50cfeee81cb64966861cf7e220efa2d",
+        "extractedAt": "2026-10-10T21:56:00.726Z",
+        "chunk": {
+          "index": 7,
+          "count": 8,
+          "start": 27889,
+          "end": 31860
+        }
+      },
+      "verification": {
+        "status": "auto-verified",
+        "deterministic": {
+          "passed": true,
+          "checks": [
+            {
+              "id": "schema",
+              "passed": true,
+              "reason": "Strict extraction claim schema"
+            },
+            {
+              "id": "exact_quotes",
+              "passed": true,
+              "reason": "Every supporting quote is an exact contiguous source excerpt"
+            },
+            {
+              "id": "municipality",
+              "passed": true,
+              "reason": "Source quotation names the registry municipality; source binding separately checked"
+            },
+            {
+              "id": "title",
+              "passed": true,
+              "reason": "Title preserves exact source characters/token order; display whitespace may collapse"
+            },
+            {
+              "id": "case_identity",
+              "passed": true,
+              "reason": "Authority identifier is quoted or explicit source-document fallback"
+            },
+            {
+              "id": "document_date",
+              "passed": true,
+              "reason": "Document date occurs in its quote, not retrieval metadata"
+            },
+            {
+              "id": "stage_date",
+              "passed": true,
+              "reason": "Stage date occurs in its quote"
+            },
+            {
+              "id": "stage",
+              "passed": true,
+              "reason": "Original status is exact supporting source wording; unknown remains unknown"
+            },
+            {
+              "id": "stage_history",
+              "passed": true,
+              "reason": "Historical stage wording and dates have source quotations"
+            },
+            {
+              "id": "critical_stage_promotion",
+              "passed": true,
+              "reason": "Preparatory votes/consultation and future announcements cannot become final adoption, legal effect or completed works"
+            },
+            {
+              "id": "critical_budget_spending",
+              "passed": true,
+              "reason": "Budget allocations and planned expenditure are not evidence of actual spending"
+            },
+            {
+              "id": "topic_hierarchy",
+              "passed": true,
+              "reason": "Canonical hierarchical topic IDs and actual assignment provenance"
+            },
+            {
+              "id": "entity_labels",
+              "passed": true,
+              "reason": "Entity labels preserve source characters/token order with display-only whitespace collapse"
+            },
+            {
+              "id": "location_labels",
+              "passed": true,
+              "reason": "Location labels preserve source characters/token order with display-only whitespace collapse; no geocoding"
+            },
+            {
+              "id": "geometry",
+              "passed": true,
+              "reason": "Geometry requires exact explicit GeoJSON in source; no inferred coordinates"
+            },
+            {
+              "id": "summary_numbers",
+              "passed": true,
+              "reason": "Every non-date numeric token is literal source evidence; valid calendar dates may use equivalent ISO, numeric or German month spelling"
+            },
+            {
+              "id": "no_contacts",
+              "passed": true,
+              "reason": "No extracted email/phone contact details"
+            }
+          ]
+        },
+        "faithfulness": {
+          "score": 0.96,
+          "threshold": 0.8,
+          "model": "gpt-6-luna",
+          "provider": "openai-subscription",
+          "tool": "codex-cli",
+          "toolVersion": "0.160.0",
+          "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+          "returnedModel": null,
+          "runtimeWarnings": [
+            "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+          ],
+          "reason": "The title, meeting announcement, date, venue, municipality, and preparatory status are supported. Minor omissions include the 19:00 time and full venue address; the paper does not identify a case number.",
+          "evaluatedAt": "2026-10-10T21:56:00.726Z",
+          "responseSha256": "f5e35fdf1561585e75d58abc6ef2ce5a30f6e88fd5ff62472de674b3919aa490",
+          "sameModel": true,
+          "limitation": "Same-model judgment is not independent verification."
+        },
+        "evidenceHash": "4be6ab405d6429265e2ec58725cb9c3fad67d7ec8397096238c677c5a9f02f5a"
+      }
+    },
+    {
+      "title": "Erweiterungsbau der Grund- und Gemeinschaftsschule in Schwarzenbek hier: Aufzugsanlagen",
+      "titleQuote": "Erweiterungsbau der Grund- und Gemeinschaftsschule in Schwarzenbek\nhier: Aufzugsanlagen",
+      "summary": "Die Stadt Schwarzenbek teilt die Zuschlagserteilung für Aufzugsanlagen für den Erweiterungsbau der Grund- und Gemeinschaftsschule mit.",
+      "summaryQuote": "Information der Öffentlichkeit über die Zuschlagserteilung einer\nAusschreibung der Stadt Schwarzenbek",
+      "municipalityQuote": "Stadt Schwarzenbek",
+      "caseKey": "source_document:9b4ed61eea1c96d0528d1d256e7dea89490964ea871c17d8e597b79aadcf8114",
+      "caseKeyType": "source_document",
+      "caseQuote": null,
+      "caseType": "infrastructure",
+      "documentDate": "2026-07-02",
+      "documentDateQuote": "2. Juli 2026",
+      "documentDateReason": null,
+      "topics": [
+        {
+          "id": "schule",
+          "parentId": "daseinsvorsorge",
+          "provenance": "model",
+          "confidence": 0.96,
+          "quote": "Erweiterungsbau der Grund- und Gemeinschaftsschule in Schwarzenbek"
+        },
+        {
+          "id": "daseinsvorsorge",
+          "parentId": null,
+          "provenance": "model",
+          "confidence": 0.9,
+          "quote": "Erweiterungsbau der Grund- und Gemeinschaftsschule in Schwarzenbek\nhier: Aufzugsanlagen"
+        }
+      ],
+      "stage": "decision",
+      "stageDate": null,
+      "stageDateQuote": null,
+      "stageDateReason": "Ein Datum für die Zuschlagserteilung ist im Text nicht angegeben.",
+      "originalStatus": "Erhalt des Zuschlages",
+      "stageQuote": "Erhalt des Zuschlages: Kone GmbH",
+      "stages": [
+        {
+          "stage": "decision",
+          "date": null,
+          "dateQuote": null,
+          "originalStatus": "Erhalt des Zuschlages",
+          "quote": "Erhalt des Zuschlages: Kone GmbH"
+        }
+      ],
+      "entities": [
+        {
+          "name": "Stadt Schwarzenbek",
+          "type": "municipality",
+          "quote": "Stadt Schwarzenbek"
+        },
+        {
+          "name": "Kone GmbH",
+          "type": "organization",
+          "quote": "Erhalt des Zuschlages: Kone GmbH"
+        }
+      ],
+      "locations": [
+        {
+          "label": "Breslauer Straße 2",
+          "quote": "Breslauer Straße 2, 21493 Schwarzenbek",
+          "geometry": null,
+          "precision": "none"
+        }
+      ],
+      "id": "knowledge:schwarzenbek:1199e9b49e464d027616ac98",
+      "municipalityId": "schwarzenbek",
+      "ags": "01053116",
+      "districtId": "herzogtum-lauenburg",
+      "sources": [
+        {
+          "id": "schwarzenbek-gazette",
+          "url": "https://www.schwarzenbek.de/PDF/Information_der_%C3%96ffentlichkeit_%C3%BCber_die_Zuschlagserteilung_einer_Ausschreibung_der_Stadt_Schwarzenbek_Erweiterungsbau_der_Grund_und_Gemeinschaftsschule_in_Schwarzenbek_hier_Aufzugsanlagen.PDF?ObjSvrID=3787&ObjID=1709&ObjLa=1&Ext=PDF&WTR=1&_ts=1782989465",
+          "sha256": "9b4ed61eea1c96d0528d1d256e7dea89490964ea871c17d8e597b79aadcf8114",
+          "retrievedAt": "2026-10-10T20:56:06.008Z",
+          "locator": "text-sha256:98bead24cad7f451f4f02971f81743cfbb89c4e24de1773fdc6902741e4cc250;chars:0-691",
+          "mimeType": "application/pdf",
+          "sourceType": "gazette",
+          "policy": {
+            "robots": {
+              "state": "allowed",
+              "url": "https://www.schwarzenbek.de/robots.txt",
+              "sha256": "0513ac17d7f7b881d5cd511c3796513a99696e968c0c4b5c25bdbdd0eea8ea4a",
+              "checkedAt": "2026-10-10T20:55:55.917Z"
+            },
+            "tdm": {
+              "state": "not_declared",
+              "evidence": [
+                {
+                  "url": "https://www.schwarzenbek.de/.well-known/tdmrep.json",
+                  "locator": "TDMRep standardized location HTTP absence",
+                  "value": "404",
+                  "checkedAt": "2026-10-10T20:55:57.062Z"
+                },
+                {
+                  "url": "https://www.schwarzenbek.de/PDF/Information_der_%C3%96ffentlichkeit_%C3%BCber_die_Zuschlagserteilung_einer_Ausschreibung_der_Stadt_Schwarzenbek_Erweiterungsbau_der_Grund_und_Gemeinschaftsschule_in_Schwarzenbek_hier_Aufzugsanlagen.PDF?ObjSvrID=3787&ObjID=1709&ObjLa=1&Ext=PDF&WTR=1&_ts=1782989465",
+                  "locator": "PDF.js 6.3.289 XMP metadata (pdf-tdm-v2)",
+                  "value": "no_tdm_reservation_field",
+                  "sha256": "9b4ed61eea1c96d0528d1d256e7dea89490964ea871c17d8e597b79aadcf8114",
+                  "checkedAt": "2026-10-10T20:56:07.833Z"
+                }
+              ]
+            },
+            "access": "public",
+            "legalClassification": "not_assessed",
+            "publication": "facts_with_attribution_only"
+          }
+        }
+      ],
+      "extraction": {
+        "extractorVersion": "district-extractor-v5-reading-order",
+        "extractorSha256": "d188ccc526a9d2f070529dc6a33dd723be21f37795e205c3bba02f2e46076e28",
+        "model": "gpt-6-luna",
+        "provider": "openai-subscription",
+        "tool": "codex-cli",
+        "toolVersion": "0.160.0",
+        "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+        "modelIdentityBasis": "configured-cli-model-and-tool-version",
+        "returnedModel": null,
+        "runtimeWarnings": [
+          "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+        ],
+        "quoteNormalization": {
+          "version": "whitespace-spans-v1",
+          "offsetUnit": "utf16_code_units",
+          "restorations": [],
+          "displayFields": [
+            "title"
+          ]
+        },
+        "promptVersion": "district-claims-v3-literal-spans",
+        "promptSha256": "554ccabf027fd7d98cd73d67557a0964655d50b6c956ac654341381564ab17c7",
+        "judgePromptVersion": "district-faithfulness-v2-critical-stages",
+        "judgePromptSha256": "29390372d8b151e3f9ded2445789fc51afc36b6638d9a06827237147f59297cc",
+        "inputSha256": "9b4ed61eea1c96d0528d1d256e7dea89490964ea871c17d8e597b79aadcf8114",
+        "textSha256": "98bead24cad7f451f4f02971f81743cfbb89c4e24de1773fdc6902741e4cc250",
+        "responseSha256": "567992d30114a006b9e798d4f6e575b433813deb8e9df401a52349d5a4af41b7",
+        "ocrUsed": false,
+        "textMethod": "pdf_text",
+        "documentLimitations": [
+          "Source references sharing identical document bytes are not independent corroboration."
+        ],
+        "cacheKey": "c21aa5b158f35fa99ce4127b0550a489102972453189281de53a8e7f0795ee60",
+        "extractedAt": "2026-10-10T22:26:49.037Z",
+        "chunk": {
+          "index": 0,
+          "count": 1,
+          "start": 0,
+          "end": 691
+        }
+      },
+      "verification": {
+        "status": "auto-verified",
+        "deterministic": {
+          "passed": true,
+          "checks": [
+            {
+              "id": "schema",
+              "passed": true,
+              "reason": "Strict extraction claim schema"
+            },
+            {
+              "id": "exact_quotes",
+              "passed": true,
+              "reason": "Every supporting quote is an exact contiguous source excerpt"
+            },
+            {
+              "id": "municipality",
+              "passed": true,
+              "reason": "Source quotation names the registry municipality; source binding separately checked"
+            },
+            {
+              "id": "title",
+              "passed": true,
+              "reason": "Title preserves exact source characters/token order; display whitespace may collapse"
+            },
+            {
+              "id": "case_identity",
+              "passed": true,
+              "reason": "Authority identifier is quoted or explicit source-document fallback"
+            },
+            {
+              "id": "document_date",
+              "passed": true,
+              "reason": "Document date occurs in its quote, not retrieval metadata"
+            },
+            {
+              "id": "stage_date",
+              "passed": true,
+              "reason": "Stage date occurs in its quote"
+            },
+            {
+              "id": "stage",
+              "passed": true,
+              "reason": "Original status is exact supporting source wording; unknown remains unknown"
+            },
+            {
+              "id": "stage_history",
+              "passed": true,
+              "reason": "Historical stage wording and dates have source quotations"
+            },
+            {
+              "id": "critical_stage_promotion",
+              "passed": true,
+              "reason": "Preparatory votes/consultation and future announcements cannot become final adoption, legal effect or completed works"
+            },
+            {
+              "id": "critical_budget_spending",
+              "passed": true,
+              "reason": "Budget allocations and planned expenditure are not evidence of actual spending"
+            },
+            {
+              "id": "topic_hierarchy",
+              "passed": true,
+              "reason": "Canonical hierarchical topic IDs and actual assignment provenance"
+            },
+            {
+              "id": "entity_labels",
+              "passed": true,
+              "reason": "Entity labels preserve source characters/token order with display-only whitespace collapse"
+            },
+            {
+              "id": "location_labels",
+              "passed": true,
+              "reason": "Location labels preserve source characters/token order with display-only whitespace collapse; no geocoding"
+            },
+            {
+              "id": "geometry",
+              "passed": true,
+              "reason": "Geometry requires exact explicit GeoJSON in source; no inferred coordinates"
+            },
+            {
+              "id": "summary_numbers",
+              "passed": true,
+              "reason": "Every non-date numeric token is literal source evidence; valid calendar dates may use equivalent ISO, numeric or German month spelling"
+            },
+            {
+              "id": "no_contacts",
+              "passed": true,
+              "reason": "No extracted email/phone contact details"
+            }
+          ]
+        },
+        "faithfulness": {
+          "score": 0.98,
+          "threshold": 0.8,
+          "model": "gpt-6-luna",
+          "provider": "openai-subscription",
+          "tool": "codex-cli",
+          "toolVersion": "0.160.0",
+          "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+          "returnedModel": null,
+          "runtimeWarnings": [
+            "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+          ],
+          "reason": "Claims are well supported: the title, municipality, publication date, school construction topic, winning contractor, and execution address match the excerpt. “decision” is a reasonable label for the stated award, though no award date is given. The case type is plausible but not explicitly stated.",
+          "evaluatedAt": "2026-10-10T22:26:49.037Z",
+          "responseSha256": "a8b6b6f9f67d90802c985d4a03da4787b8c4fc415f50b7fb571c4333f081e25f",
+          "sameModel": true,
+          "limitation": "Same-model judgment is not independent verification."
+        },
+        "evidenceHash": "011cefd428a77b79fa06c60bb6e189d4de17f7b6eca1b38cb7725f12f6c3af5c"
+      }
+    },
+    {
+      "title": "Offenlage B-Plan \"Reitschule Mönchsheimer Weg\"",
+      "titleQuote": "Offenlage B-Plan \"Reitschule Mönchsheimer Weg\"",
+      "summary": "Die Gemeinde Hoppegarten führt die Öffentlichkeits- und Behördenbeteiligung zum Bebauungsplan für die touristische Nutzung des Reitsportstandorts durch.",
+      "summaryQuote": "Die Gemeindevertretung hat in ihrer öffentlichen Sitzung am 06.05.2024 beschlossen, die Beteiligung der Öffentlichkeit gem. § 3 Abs. 2 BauGB und der Behörden und Träger sonstiger Belange gem. § 4 Abs. 2 BauGB für den Bebauungsplan „Reitschule Mönchsheimer Weg“ durchzuführen.",
+      "municipalityQuote": "Gemeinde Hoppegarten",
+      "caseKey": "source_document:0bd3b6a548c0e86a7ea4c003c5ec412d8ef30c0905c8759d75cf6325fa8db1ad",
+      "caseKeyType": "source_document",
+      "caseQuote": null,
+      "caseType": "planning",
+      "documentDate": null,
+      "documentDateQuote": null,
+      "documentDateReason": "Im Auszug ist kein Veröffentlichungs- oder Dokumentdatum eindeutig angegeben.",
+      "topics": [
+        {
+          "id": "sport",
+          "parentId": "daseinsvorsorge",
+          "provenance": "model",
+          "confidence": 0.93,
+          "quote": "Reitsport"
+        }
+      ],
+      "stage": "consultation",
+      "stageDate": "2025-03-19",
+      "stageDateQuote": "Zeitraum Beteiligung beendet 19.03.2025 – 23.04.2025",
+      "stageDateReason": "Der Beginn des dort als beendet bezeichneten Beteiligungszeitraums wird verwendet; ein genaues Beendigungsdatum ist ebenfalls angegeben.",
+      "originalStatus": "Beteiligung beendet",
+      "stageQuote": "Zeitraum Beteiligung beendet 19.03.2025 – 23.04.2025",
+      "stages": [
+        {
+          "stage": "decision",
+          "date": "2024-05-06",
+          "dateQuote": "Die Gemeindevertretung hat in ihrer öffentlichen Sitzung am 06.05.2024 beschlossen, die Beteiligung der Öffentlichkeit gem. § 3 Abs. 2 BauGB und der Behörden und Träger sonstiger Belange gem. § 4 Abs. 2 BauGB für den Bebauungsplan „Reitschule Mönchsheimer Weg“ durchzuführen.",
+          "originalStatus": "beschlossen, die Beteiligung der Öffentlichkeit gem. § 3 Abs. 2 BauGB und der Behörden und Träger sonstiger Belange gem. § 4 Abs. 2 BauGB",
+          "quote": "Die Gemeindevertretung hat in ihrer öffentlichen Sitzung am 06.05.2024 beschlossen, die Beteiligung der Öffentlichkeit gem. § 3 Abs. 2 BauGB und der Behörden und Träger sonstiger Belange gem. § 4 Abs. 2 BauGB für den Bebauungsplan „Reitschule Mönchsheimer Weg“ durchzuführen."
+        },
+        {
+          "stage": "consultation",
+          "date": "2025-03-19",
+          "dateQuote": "Zeitraum Beteiligung beendet 19.03.2025 – 23.04.2025",
+          "originalStatus": "Beteiligung beendet",
+          "quote": "Zeitraum Beteiligung beendet 19.03.2025 – 23.04.2025"
+        }
+      ],
+      "entities": [
+        {
+          "name": "Gemeinde Hoppegarten",
+          "type": "municipality",
+          "quote": "durchführende Organisation Gemeinde Hoppegarten"
+        },
+        {
+          "name": "Münchehofe",
+          "type": "place",
+          "quote": "Das Plangebiet liegt im Ortsteil Münchehofe"
+        }
+      ],
+      "locations": [
+        {
+          "label": "Münchehofe",
+          "quote": "Das Plangebiet liegt im Ortsteil Münchehofe",
+          "geometry": null,
+          "precision": "none"
+        }
+      ],
+      "id": "knowledge:hoppegarten:5a669abc1832b4fe2a613f81",
+      "municipalityId": "hoppegarten",
+      "ags": "12064227",
+      "districtId": "maerkisch-oderland",
+      "sources": [
+        {
+          "id": "hoppegarten-participation",
+          "url": "https://bb.beteiligung.diplanung.de/verfahren/aee06f36-2a5f-4569-94ad-7d2736cc6aaa/public/detail",
+          "sha256": "0bd3b6a548c0e86a7ea4c003c5ec412d8ef30c0905c8759d75cf6325fa8db1ad",
+          "retrievedAt": "2026-10-10T19:05:32.031Z",
+          "locator": "text-sha256:9cd03d89daf965ab62c2763e2dfea83baa781b5e9b072be7ea377030d384438c;chars:0-3228",
+          "mimeType": "text/html",
+          "sourceType": "participation",
+          "policy": {
+            "robots": {
+              "state": "allowed",
+              "url": "https://bb.beteiligung.diplanung.de/robots.txt",
+              "sha256": "7c55f46de40de31de6cd1ddebe7663ace5183933647b3600c2a328c135299b13",
+              "checkedAt": "2026-10-10T19:05:13.495Z"
+            },
+            "tdm": {
+              "state": "not_declared",
+              "evidence": [
+                {
+                  "url": "https://bb.beteiligung.diplanung.de/.well-known/tdmrep.json",
+                  "locator": "TDMRep standardized location HTTP absence",
+                  "value": "404",
+                  "checkedAt": "2026-10-10T19:05:15.582Z"
+                }
+              ]
+            },
+            "access": "public",
+            "legalClassification": "not_assessed",
+            "publication": "facts_with_attribution_only"
+          }
+        }
+      ],
+      "extraction": {
+        "extractorVersion": "district-extractor-v5-reading-order",
+        "extractorSha256": "d188ccc526a9d2f070529dc6a33dd723be21f37795e205c3bba02f2e46076e28",
+        "model": "gpt-6-luna",
+        "provider": "openai-subscription",
+        "tool": "codex-cli",
+        "toolVersion": "0.160.0",
+        "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+        "modelIdentityBasis": "configured-cli-model-and-tool-version",
+        "returnedModel": null,
+        "runtimeWarnings": [
+          "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+        ],
+        "quoteNormalization": {
+          "version": "whitespace-spans-v1",
+          "offsetUnit": "utf16_code_units",
+          "restorations": [],
+          "displayFields": []
+        },
+        "promptVersion": "district-claims-v3-literal-spans",
+        "promptSha256": "554ccabf027fd7d98cd73d67557a0964655d50b6c956ac654341381564ab17c7",
+        "judgePromptVersion": "district-faithfulness-v2-critical-stages",
+        "judgePromptSha256": "29390372d8b151e3f9ded2445789fc51afc36b6638d9a06827237147f59297cc",
+        "inputSha256": "0bd3b6a548c0e86a7ea4c003c5ec412d8ef30c0905c8759d75cf6325fa8db1ad",
+        "textSha256": "9cd03d89daf965ab62c2763e2dfea83baa781b5e9b072be7ea377030d384438c",
+        "responseSha256": "ad5602089f92a874a17f8ad23baa8b66afd51499655b32ad2e560a3be29b398d",
+        "ocrUsed": false,
+        "textMethod": "html",
+        "documentLimitations": [
+          "Source references sharing identical document bytes are not independent corroboration."
+        ],
+        "cacheKey": "25234870af95e12a1a10949e8e3d2e8f4fe05e9704149c640ec5fed7577f20bd",
+        "extractedAt": "2026-10-10T22:02:25.105Z",
+        "chunk": {
+          "index": 0,
+          "count": 1,
+          "start": 0,
+          "end": 3228
+        }
+      },
+      "verification": {
+        "status": "auto-verified",
+        "deterministic": {
+          "passed": true,
+          "checks": [
+            {
+              "id": "schema",
+              "passed": true,
+              "reason": "Strict extraction claim schema"
+            },
+            {
+              "id": "exact_quotes",
+              "passed": true,
+              "reason": "Every supporting quote is an exact contiguous source excerpt"
+            },
+            {
+              "id": "municipality",
+              "passed": true,
+              "reason": "Source quotation names the registry municipality; source binding separately checked"
+            },
+            {
+              "id": "title",
+              "passed": true,
+              "reason": "Title preserves exact source characters/token order; display whitespace may collapse"
+            },
+            {
+              "id": "case_identity",
+              "passed": true,
+              "reason": "Authority identifier is quoted or explicit source-document fallback"
+            },
+            {
+              "id": "document_date",
+              "passed": true,
+              "reason": "Document date occurs in its quote, not retrieval metadata"
+            },
+            {
+              "id": "stage_date",
+              "passed": true,
+              "reason": "Stage date occurs in its quote"
+            },
+            {
+              "id": "stage",
+              "passed": true,
+              "reason": "Original status is exact supporting source wording; unknown remains unknown"
+            },
+            {
+              "id": "stage_history",
+              "passed": true,
+              "reason": "Historical stage wording and dates have source quotations"
+            },
+            {
+              "id": "critical_stage_promotion",
+              "passed": true,
+              "reason": "Preparatory votes/consultation and future announcements cannot become final adoption, legal effect or completed works"
+            },
+            {
+              "id": "critical_budget_spending",
+              "passed": true,
+              "reason": "Budget allocations and planned expenditure are not evidence of actual spending"
+            },
+            {
+              "id": "topic_hierarchy",
+              "passed": true,
+              "reason": "Canonical hierarchical topic IDs and actual assignment provenance"
+            },
+            {
+              "id": "entity_labels",
+              "passed": true,
+              "reason": "Entity labels preserve source characters/token order with display-only whitespace collapse"
+            },
+            {
+              "id": "location_labels",
+              "passed": true,
+              "reason": "Location labels preserve source characters/token order with display-only whitespace collapse; no geocoding"
+            },
+            {
+              "id": "geometry",
+              "passed": true,
+              "reason": "Geometry requires exact explicit GeoJSON in source; no inferred coordinates"
+            },
+            {
+              "id": "summary_numbers",
+              "passed": true,
+              "reason": "Every non-date numeric token is literal source evidence; valid calendar dates may use equivalent ISO, numeric or German month spelling"
+            },
+            {
+              "id": "no_contacts",
+              "passed": true,
+              "reason": "No extracted email/phone contact details"
+            }
+          ]
+        },
+        "faithfulness": {
+          "score": 0.92,
+          "threshold": 0.8,
+          "model": "gpt-6-luna",
+          "provider": "openai-subscription",
+          "tool": "codex-cli",
+          "toolVersion": "0.160.0",
+          "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+          "returnedModel": null,
+          "runtimeWarnings": [
+            "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+          ],
+          "reason": "Title, municipality, planning purpose, consultation stage, and dates are supported. The stages record 19 March 2025 as a date for the consultation period, though the source gives it as the start of a period labeled ended; the 2024 entry correctly describes a decision to conduct participation. `caseKeyType` is unsupported because no case key is provided.",
+          "evaluatedAt": "2026-10-10T22:02:25.105Z",
+          "responseSha256": "66f62f1a72b9ae651362d6f4c9cf55acefce58f3e3fb153ef0741eb2f2f584e0",
+          "sameModel": true,
+          "limitation": "Same-model judgment is not independent verification."
+        },
+        "evidenceHash": "7f76d0c0e3b2479a18e61bb84690cb661b5d5257035b5210113b06910b725bf9"
+      }
+    },
+    {
+      "title": "„Reitschule Mönchsheimer Weg“ (Entwurf)",
+      "titleQuote": "„Reitschule Mönchsheimer Weg“ (Entwurf)",
+      "summary": "Die Gemeinde legt den Entwurf des Bebauungsplans zur Öffentlichkeits- und Behördenbeteiligung aus.",
+      "summaryQuote": "beschlossen, die Beteiligung der Öffentlichkeit gemäß § 3 Abs. 2 BauGB und der\nBehörden und Träger sonstiger Belange gemäß § 4 Abs. 2 BauGB für den\nBebauungsplan\n\n„Reitschule Mönchsheimer Weg“ (Entwurf)\ndurchzuführen.",
+      "municipalityQuote": "Die Gemeindevertretung Hoppegarten hat in ihrer Sitzung am 06.05.2024",
+      "caseKey": "source_document:beebf4c76bc3ac837a70818749e979a4049fcd11f00a5b1e3e92e6cab5937d2f",
+      "caseKeyType": "source_document",
+      "caseQuote": null,
+      "caseType": "planning",
+      "documentDate": null,
+      "documentDateQuote": null,
+      "documentDateReason": "Im Auszug ist kein Datum der Bekanntmachung angegeben.",
+      "topics": [
+        {
+          "id": "siedlung",
+          "parentId": null,
+          "provenance": "model",
+          "confidence": 0.71,
+          "quote": "Bebauungsplan"
+        }
+      ],
+      "stage": "consultation",
+      "stageDate": "2025-03-19",
+      "stageDateQuote": "vom 19.03.2025 bis zum 23.04.2025 (jeweils einschließlich)",
+      "stageDateReason": "Das Datum ist der Beginn des ausdrücklich genannten Zeitraums für die Auslegung und Beteiligung.",
+      "originalStatus": "Entwurf",
+      "stageQuote": "Der Entwurf des Bebauungsplans (Stand 02/2024) mit dem Entwurf der Begründung\ninklusive dem Umweltbericht (Stand 02/2024) liegt in der Zeit\n\nvom 19.03.2025 bis zum 23.04.2025 (jeweils einschließlich)",
+      "stages": [
+        {
+          "stage": "decision",
+          "date": "2024-05-06",
+          "dateQuote": "in ihrer Sitzung am 06.05.2024",
+          "originalStatus": "beschlossen, die Beteiligung der Öffentlichkeit gemäß § 3 Abs. 2 BauGB und der\nBehörden und Träger sonstiger Belange gemäß § 4 Abs. 2 BauGB für den\nBebauungsplan\n\n„Reitschule Mönchsheimer Weg“ (Entwurf)\ndurchzuführen.",
+          "quote": "Die Gemeindevertretung Hoppegarten hat in ihrer Sitzung am 06.05.2024\nbeschlossen, die Beteiligung der Öffentlichkeit gemäß § 3 Abs. 2 BauGB und der\nBehörden und Träger sonstiger Belange gemäß § 4 Abs. 2 BauGB für den\nBebauungsplan\n\n„Reitschule Mönchsheimer Weg“ (Entwurf)\ndurchzuführen."
+        },
+        {
+          "stage": "consultation",
+          "date": "2025-03-19",
+          "dateQuote": "vom 19.03.2025 bis zum 23.04.2025 (jeweils einschließlich)",
+          "originalStatus": "Entwurf",
+          "quote": "Der Entwurf des Bebauungsplans (Stand 02/2024) mit dem Entwurf der Begründung\ninklusive dem Umweltbericht (Stand 02/2024) liegt in der Zeit\n\nvom 19.03.2025 bis zum 23.04.2025 (jeweils einschließlich)"
+        }
+      ],
+      "entities": [
+        {
+          "name": "Hoppegarten",
+          "type": "municipality",
+          "quote": "Die Gemeindevertretung Hoppegarten hat in ihrer Sitzung am 06.05.2024"
+        }
+      ],
+      "locations": [
+        {
+          "label": "Münchehofe",
+          "quote": "Das Plangebiet liegt im Ortsteil Münchehofe der Gemeinde Hoppegarten",
+          "geometry": null,
+          "precision": "none"
+        },
+        {
+          "label": "Mönchsheimer Weg",
+          "quote": "im Bereich\ndes Mönchsheimer Weges",
+          "geometry": null,
+          "precision": "none"
+        }
+      ],
+      "id": "knowledge:hoppegarten:7a24098988becd6ff63404db",
+      "municipalityId": "hoppegarten",
+      "ags": "12064227",
+      "districtId": "maerkisch-oderland",
+      "sources": [
+        {
+          "id": "hoppegarten-participation",
+          "url": "https://bb.beteiligung.diplanung.de/file/aee06f36-2a5f-4569-94ad-7d2736cc6aaa/e153c0f8-063d-4cfe-8002-29543d2d6a73",
+          "sha256": "beebf4c76bc3ac837a70818749e979a4049fcd11f00a5b1e3e92e6cab5937d2f",
+          "retrievedAt": "2026-10-10T20:52:10.229Z",
+          "locator": "text-sha256:96adf500366682afc6b2dd89843a0ae0af1e341711a36171a3f366b0b8d961fc;chars:0-4760",
+          "mimeType": "application/pdf",
+          "sourceType": "participation",
+          "policy": {
+            "robots": {
+              "state": "allowed",
+              "url": "https://bb.beteiligung.diplanung.de/robots.txt",
+              "sha256": "7c55f46de40de31de6cd1ddebe7663ace5183933647b3600c2a328c135299b13",
+              "checkedAt": "2026-10-10T20:47:29.390Z"
+            },
+            "tdm": {
+              "state": "not_declared",
+              "evidence": [
+                {
+                  "url": "https://bb.beteiligung.diplanung.de/.well-known/tdmrep.json",
+                  "locator": "TDMRep standardized location HTTP absence",
+                  "value": "404",
+                  "checkedAt": "2026-10-10T20:47:31.482Z"
+                },
+                {
+                  "url": "https://bb.beteiligung.diplanung.de/file/aee06f36-2a5f-4569-94ad-7d2736cc6aaa/e153c0f8-063d-4cfe-8002-29543d2d6a73",
+                  "locator": "PDF.js 6.3.289 XMP metadata (pdf-tdm-v2)",
+                  "value": "no_tdm_reservation_field",
+                  "sha256": "beebf4c76bc3ac837a70818749e979a4049fcd11f00a5b1e3e92e6cab5937d2f",
+                  "checkedAt": "2026-10-10T20:52:11.231Z"
+                }
+              ]
+            },
+            "access": "public",
+            "legalClassification": "not_assessed",
+            "publication": "facts_with_attribution_only"
+          }
+        }
+      ],
+      "extraction": {
+        "extractorVersion": "district-extractor-v5-reading-order",
+        "extractorSha256": "d188ccc526a9d2f070529dc6a33dd723be21f37795e205c3bba02f2e46076e28",
+        "model": "gpt-6-luna",
+        "provider": "openai-subscription",
+        "tool": "codex-cli",
+        "toolVersion": "0.160.0",
+        "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+        "modelIdentityBasis": "configured-cli-model-and-tool-version",
+        "returnedModel": null,
+        "runtimeWarnings": [
+          "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+        ],
+        "quoteNormalization": {
+          "version": "whitespace-spans-v1",
+          "offsetUnit": "utf16_code_units",
+          "restorations": [
+            {
+              "field": "stageQuote",
+              "proposedSha256": "c8a8b67185ff1b161780da331e18d307cbae5cc55b6d91218bdfe9e1ab21790c",
+              "restoredSha256": "bc7d491f83d72a7cdae910928930b28077d4b7014c3776a15ad98b5562088b6f",
+              "start": 973,
+              "end": 1172
+            }
+          ],
+          "displayFields": []
+        },
+        "promptVersion": "district-claims-v3-literal-spans",
+        "promptSha256": "554ccabf027fd7d98cd73d67557a0964655d50b6c956ac654341381564ab17c7",
+        "judgePromptVersion": "district-faithfulness-v2-critical-stages",
+        "judgePromptSha256": "29390372d8b151e3f9ded2445789fc51afc36b6638d9a06827237147f59297cc",
+        "inputSha256": "beebf4c76bc3ac837a70818749e979a4049fcd11f00a5b1e3e92e6cab5937d2f",
+        "textSha256": "96adf500366682afc6b2dd89843a0ae0af1e341711a36171a3f366b0b8d961fc",
+        "responseSha256": "0c5d9aa0093a11d04f87832c5a2c7e4b23ae1a519fca171d2e0b06488becbdea",
+        "ocrUsed": true,
+        "textMethod": "pdf_ocr",
+        "documentLimitations": [
+          "Source references sharing identical document bytes are not independent corroboration."
+        ],
+        "cacheKey": "d8e1d435c70cd83ac20ba3036cb9a2618b4961f9fd1e24944aacd3d4be2d7fe2",
+        "extractedAt": "2026-10-10T22:07:26.535Z",
+        "chunk": {
+          "index": 0,
+          "count": 2,
+          "start": 0,
+          "end": 4760
+        }
+      },
+      "verification": {
+        "status": "auto-verified",
+        "deterministic": {
+          "passed": true,
+          "checks": [
+            {
+              "id": "schema",
+              "passed": true,
+              "reason": "Strict extraction claim schema"
+            },
+            {
+              "id": "exact_quotes",
+              "passed": true,
+              "reason": "Every supporting quote is an exact contiguous source excerpt"
+            },
+            {
+              "id": "municipality",
+              "passed": true,
+              "reason": "Source quotation names the registry municipality; source binding separately checked"
+            },
+            {
+              "id": "title",
+              "passed": true,
+              "reason": "Title preserves exact source characters/token order; display whitespace may collapse"
+            },
+            {
+              "id": "case_identity",
+              "passed": true,
+              "reason": "Authority identifier is quoted or explicit source-document fallback"
+            },
+            {
+              "id": "document_date",
+              "passed": true,
+              "reason": "Document date occurs in its quote, not retrieval metadata"
+            },
+            {
+              "id": "stage_date",
+              "passed": true,
+              "reason": "Stage date occurs in its quote"
+            },
+            {
+              "id": "stage",
+              "passed": true,
+              "reason": "Original status is exact supporting source wording; unknown remains unknown"
+            },
+            {
+              "id": "stage_history",
+              "passed": true,
+              "reason": "Historical stage wording and dates have source quotations"
+            },
+            {
+              "id": "critical_stage_promotion",
+              "passed": true,
+              "reason": "Preparatory votes/consultation and future announcements cannot become final adoption, legal effect or completed works"
+            },
+            {
+              "id": "critical_budget_spending",
+              "passed": true,
+              "reason": "Budget allocations and planned expenditure are not evidence of actual spending"
+            },
+            {
+              "id": "topic_hierarchy",
+              "passed": true,
+              "reason": "Canonical hierarchical topic IDs and actual assignment provenance"
+            },
+            {
+              "id": "entity_labels",
+              "passed": true,
+              "reason": "Entity labels preserve source characters/token order with display-only whitespace collapse"
+            },
+            {
+              "id": "location_labels",
+              "passed": true,
+              "reason": "Location labels preserve source characters/token order with display-only whitespace collapse; no geocoding"
+            },
+            {
+              "id": "geometry",
+              "passed": true,
+              "reason": "Geometry requires exact explicit GeoJSON in source; no inferred coordinates"
+            },
+            {
+              "id": "summary_numbers",
+              "passed": true,
+              "reason": "Every non-date numeric token is literal source evidence; valid calendar dates may use equivalent ISO, numeric or German month spelling"
+            },
+            {
+              "id": "no_contacts",
+              "passed": true,
+              "reason": "No extracted email/phone contact details"
+            }
+          ]
+        },
+        "faithfulness": {
+          "score": 0.98,
+          "threshold": 0.8,
+          "model": "gpt-6-luna",
+          "provider": "openai-subscription",
+          "tool": "codex-cli",
+          "toolVersion": "0.160.0",
+          "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+          "returnedModel": null,
+          "runtimeWarnings": [
+            "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+          ],
+          "reason": "The title, summary, municipality, topic, consultation stage and dates, decision to conduct participation, and named locations are supported. The quoted dates are correctly linked to the participation decision and consultation interval; no final adoption or implementation is claimed. Minor issue: caseKeyType is labeled source_document despite no case key being provided.",
+          "evaluatedAt": "2026-10-10T22:07:26.535Z",
+          "responseSha256": "22c63d76478fbd2dcda9b55e2ccf6c8e26b72675bcdbd5da8e1f9c7499e5b6b1",
+          "sameModel": true,
+          "limitation": "Same-model judgment is not independent verification."
+        },
+        "evidenceHash": "7cfd42eb4a60670384dc7fb65fee59afdb41a4e0364098f6abc4009e768ff646"
+      }
+    },
+    {
+      "title": "Jahresrechnung 2025 der Stadt Ludwigslust für das städtebauliche Sondervermögen „Altstadt“",
+      "titleQuote": "Jahresrechnung 2025 der Stadt Ludwigslust für das\nstädtebauliche Sondervermögen „Altstadt“",
+      "summary": "Die Stadtvertretung beschloss die Jahresrechnung und die Entlastung des Bürgermeisters für das Haushaltsjahr 2025.",
+      "summaryQuote": "Die Stadtvertretung Ludwigslust hat am 30.06.2026 die Jahresrechnung sowie die Entlastung des\nBürgermeisters für das Haushaltsjahr 2025 beschlossen.",
+      "municipalityQuote": "Stadt Ludwigslust",
+      "caseKey": "source_document:6b77f7dc1678fdb3b716ec1d9ec3022ef6bb9f5fee132ff5858614aa1fc1e789",
+      "caseKeyType": "source_document",
+      "caseQuote": null,
+      "caseType": "budget",
+      "documentDate": "2026-07-09",
+      "documentDateQuote": "Ludwigslust, 09.07.2026",
+      "documentDateReason": null,
+      "topics": [
+        {
+          "id": "haushalt",
+          "parentId": "verwaltung",
+          "provenance": "model",
+          "confidence": 0.98,
+          "quote": "Jahresrechnung 2025"
+        }
+      ],
+      "stage": "decision",
+      "stageDate": "2026-06-30",
+      "stageDateQuote": "Die Stadtvertretung Ludwigslust hat am 30.06.2026 die Jahresrechnung sowie die Entlastung des\nBürgermeisters für das Haushaltsjahr 2025 beschlossen.",
+      "stageDateReason": null,
+      "originalStatus": "beschlossen",
+      "stageQuote": "Die Stadtvertretung Ludwigslust hat am 30.06.2026 die Jahresrechnung sowie die Entlastung des\nBürgermeisters für das Haushaltsjahr 2025 beschlossen.",
+      "stages": [
+        {
+          "stage": "decision",
+          "date": "2026-06-30",
+          "dateQuote": "Die Stadtvertretung Ludwigslust hat am 30.06.2026 die Jahresrechnung sowie die Entlastung des\nBürgermeisters für das Haushaltsjahr 2025 beschlossen.",
+          "originalStatus": "beschlossen",
+          "quote": "Die Stadtvertretung Ludwigslust hat am 30.06.2026 die Jahresrechnung sowie die Entlastung des\nBürgermeisters für das Haushaltsjahr 2025 beschlossen."
+        }
+      ],
+      "entities": [
+        {
+          "name": "Stadt Ludwigslust",
+          "type": "municipality",
+          "quote": "Stadt Ludwigslust"
+        },
+        {
+          "name": "Rechnungsprüfungsausschusses",
+          "type": "authority",
+          "quote": "Rechnungsprüfungsausschusses"
+        },
+        {
+          "name": "Rathaus",
+          "type": "place",
+          "quote": "im Rathaus"
+        }
+      ],
+      "locations": [
+        {
+          "label": "Schloßstraße 38",
+          "quote": "Schloßstraße 38",
+          "geometry": null,
+          "precision": "none"
+        }
+      ],
+      "id": "knowledge:ludwigslust:5d87b66233b24d3d1f043731",
+      "municipalityId": "ludwigslust",
+      "ags": "13076090",
+      "districtId": "ludwigslust-parchim",
+      "sources": [
+        {
+          "id": "ludwigslust-gazette",
+          "url": "https://www.ludwigslust.de/PDF/2026_07_09_Amtliche_Bekanntmachung_der_Jahresrechnung_2025_der_Stadt_Ludwigslust_f%C3%BCr_das_st%C3%A4dtebauliche_Sonderverm%C3%B6gen_Altstadt.PDF?ObjSvrID=3634&ObjID=4667&ObjLa=1&Ext=PDF&WTR=1&_ts=1783597860",
+          "sha256": "6b77f7dc1678fdb3b716ec1d9ec3022ef6bb9f5fee132ff5858614aa1fc1e789",
+          "retrievedAt": "2026-10-10T20:56:30.438Z",
+          "locator": "text-sha256:0e5959db0519efd5ab435e6813ca1d6a75d1d9a669548b7face9af8f7f325ef0;chars:0-701",
+          "mimeType": "application/pdf",
+          "sourceType": "gazette",
+          "policy": {
+            "robots": {
+              "state": "allowed",
+              "url": "https://www.ludwigslust.de/robots.txt",
+              "sha256": "1372d18fa887f9be9cf4b142767b1e1828347e96c3f54013f5fb56ccbb90aee0",
+              "checkedAt": "2026-10-10T20:56:17.911Z"
+            },
+            "tdm": {
+              "state": "not_declared",
+              "evidence": [
+                {
+                  "url": "https://www.ludwigslust.de/.well-known/tdmrep.json",
+                  "locator": "TDMRep standardized location HTTP absence",
+                  "value": "404",
+                  "checkedAt": "2026-10-10T20:56:19.067Z"
+                },
+                {
+                  "url": "https://www.ludwigslust.de/PDF/2026_07_09_Amtliche_Bekanntmachung_der_Jahresrechnung_2025_der_Stadt_Ludwigslust_f%C3%BCr_das_st%C3%A4dtebauliche_Sonderverm%C3%B6gen_Altstadt.PDF?ObjSvrID=3634&ObjID=4667&ObjLa=1&Ext=PDF&WTR=1&_ts=1783597860",
+                  "locator": "PDF.js 6.3.289 XMP metadata (pdf-tdm-v2)",
+                  "value": "no_tdm_reservation_field",
+                  "sha256": "6b77f7dc1678fdb3b716ec1d9ec3022ef6bb9f5fee132ff5858614aa1fc1e789",
+                  "checkedAt": "2026-10-10T20:56:32.156Z"
+                }
+              ]
+            },
+            "access": "public",
+            "legalClassification": "not_assessed",
+            "publication": "facts_with_attribution_only"
+          }
+        },
+        {
+          "id": "ludwigslust-website",
+          "url": "https://www.ludwigslust.de/PDF/2026_07_09_Amtliche_Bekanntmachung_der_Jahresrechnung_2025_der_Stadt_Ludwigslust_f%C3%BCr_das_st%C3%A4dtebauliche_Sonderverm%C3%B6gen_Altstadt.PDF?ObjSvrID=3634&ObjID=4667&ObjLa=1&Ext=PDF&WTR=1&_ts=1783597860",
+          "sha256": "6b77f7dc1678fdb3b716ec1d9ec3022ef6bb9f5fee132ff5858614aa1fc1e789",
+          "retrievedAt": "2026-10-10T21:00:27.531Z",
+          "locator": "text-sha256:0e5959db0519efd5ab435e6813ca1d6a75d1d9a669548b7face9af8f7f325ef0;chars:0-701",
+          "mimeType": "application/pdf",
+          "sourceType": "website",
+          "policy": {
+            "robots": {
+              "state": "allowed",
+              "url": "https://www.ludwigslust.de/robots.txt",
+              "sha256": "1372d18fa887f9be9cf4b142767b1e1828347e96c3f54013f5fb56ccbb90aee0",
+              "checkedAt": "2026-10-10T21:00:16.438Z"
+            },
+            "tdm": {
+              "state": "not_declared",
+              "evidence": [
+                {
+                  "url": "https://www.ludwigslust.de/.well-known/tdmrep.json",
+                  "locator": "TDMRep standardized location HTTP absence",
+                  "value": "404",
+                  "checkedAt": "2026-10-10T21:00:17.619Z"
+                },
+                {
+                  "url": "https://www.ludwigslust.de/PDF/2026_07_09_Amtliche_Bekanntmachung_der_Jahresrechnung_2025_der_Stadt_Ludwigslust_f%C3%BCr_das_st%C3%A4dtebauliche_Sonderverm%C3%B6gen_Altstadt.PDF?ObjSvrID=3634&ObjID=4667&ObjLa=1&Ext=PDF&WTR=1&_ts=1783597860",
+                  "locator": "PDF.js 6.3.289 XMP metadata (pdf-tdm-v2)",
+                  "value": "no_tdm_reservation_field",
+                  "sha256": "6b77f7dc1678fdb3b716ec1d9ec3022ef6bb9f5fee132ff5858614aa1fc1e789",
+                  "checkedAt": "2026-10-10T20:56:32.156Z"
+                }
+              ]
+            },
+            "access": "public",
+            "legalClassification": "not_assessed",
+            "publication": "facts_with_attribution_only"
+          }
+        }
+      ],
+      "extraction": {
+        "extractorVersion": "district-extractor-v5-reading-order",
+        "extractorSha256": "d188ccc526a9d2f070529dc6a33dd723be21f37795e205c3bba02f2e46076e28",
+        "model": "gpt-6-luna",
+        "provider": "openai-subscription",
+        "tool": "codex-cli",
+        "toolVersion": "0.160.0",
+        "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+        "modelIdentityBasis": "configured-cli-model-and-tool-version",
+        "returnedModel": null,
+        "runtimeWarnings": [
+          "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+          "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+        ],
+        "quoteNormalization": {
+          "version": "whitespace-spans-v1",
+          "offsetUnit": "utf16_code_units",
+          "restorations": [],
+          "displayFields": [
+            "title"
+          ]
+        },
+        "promptVersion": "district-claims-v3-literal-spans",
+        "promptSha256": "554ccabf027fd7d98cd73d67557a0964655d50b6c956ac654341381564ab17c7",
+        "judgePromptVersion": "district-faithfulness-v2-critical-stages",
+        "judgePromptSha256": "29390372d8b151e3f9ded2445789fc51afc36b6638d9a06827237147f59297cc",
+        "inputSha256": "6b77f7dc1678fdb3b716ec1d9ec3022ef6bb9f5fee132ff5858614aa1fc1e789",
+        "textSha256": "0e5959db0519efd5ab435e6813ca1d6a75d1d9a669548b7face9af8f7f325ef0",
+        "responseSha256": "038012eb030cbcf35d2c93987635aa1a1a6d86777f14e4975a8ba9bdf82e913f",
+        "ocrUsed": true,
+        "textMethod": "pdf_ocr",
+        "documentLimitations": [
+          "Source references sharing identical document bytes are not independent corroboration."
+        ],
+        "cacheKey": "060dbde4ac446b20ca0705b9a7232e467fc8912a751387f3f6f108217e7a83da",
+        "extractedAt": "2026-10-10T22:09:35.441Z",
+        "chunk": {
+          "index": 0,
+          "count": 1,
+          "start": 0,
+          "end": 701
+        }
+      },
+      "verification": {
+        "status": "auto-verified",
+        "deterministic": {
+          "passed": true,
+          "checks": [
+            {
+              "id": "schema",
+              "passed": true,
+              "reason": "Strict extraction claim schema"
+            },
+            {
+              "id": "exact_quotes",
+              "passed": true,
+              "reason": "Every supporting quote is an exact contiguous source excerpt"
+            },
+            {
+              "id": "municipality",
+              "passed": true,
+              "reason": "Source quotation names the registry municipality; source binding separately checked"
+            },
+            {
+              "id": "title",
+              "passed": true,
+              "reason": "Title preserves exact source characters/token order; display whitespace may collapse"
+            },
+            {
+              "id": "case_identity",
+              "passed": true,
+              "reason": "Authority identifier is quoted or explicit source-document fallback"
+            },
+            {
+              "id": "document_date",
+              "passed": true,
+              "reason": "Document date occurs in its quote, not retrieval metadata"
+            },
+            {
+              "id": "stage_date",
+              "passed": true,
+              "reason": "Stage date occurs in its quote"
+            },
+            {
+              "id": "stage",
+              "passed": true,
+              "reason": "Original status is exact supporting source wording; unknown remains unknown"
+            },
+            {
+              "id": "stage_history",
+              "passed": true,
+              "reason": "Historical stage wording and dates have source quotations"
+            },
+            {
+              "id": "critical_stage_promotion",
+              "passed": true,
+              "reason": "Preparatory votes/consultation and future announcements cannot become final adoption, legal effect or completed works"
+            },
+            {
+              "id": "critical_budget_spending",
+              "passed": true,
+              "reason": "Budget allocations and planned expenditure are not evidence of actual spending"
+            },
+            {
+              "id": "topic_hierarchy",
+              "passed": true,
+              "reason": "Canonical hierarchical topic IDs and actual assignment provenance"
+            },
+            {
+              "id": "entity_labels",
+              "passed": true,
+              "reason": "Entity labels preserve source characters/token order with display-only whitespace collapse"
+            },
+            {
+              "id": "location_labels",
+              "passed": true,
+              "reason": "Location labels preserve source characters/token order with display-only whitespace collapse; no geocoding"
+            },
+            {
+              "id": "geometry",
+              "passed": true,
+              "reason": "Geometry requires exact explicit GeoJSON in source; no inferred coordinates"
+            },
+            {
+              "id": "summary_numbers",
+              "passed": true,
+              "reason": "Every non-date numeric token is literal source evidence; valid calendar dates may use equivalent ISO, numeric or German month spelling"
+            },
+            {
+              "id": "no_contacts",
+              "passed": true,
+              "reason": "No extracted email/phone contact details"
+            }
+          ]
+        },
+        "faithfulness": {
+          "score": 0.97,
+          "threshold": 0.8,
+          "model": "gpt-6-luna",
+          "provider": "openai-subscription",
+          "tool": "codex-cli",
+          "toolVersion": "0.160.0",
+          "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+          "returnedModel": null,
+          "runtimeWarnings": [
+            "Codex non-fatal item: cli_configuration; evidence-sha256:94c69a44def3563492c6849bc027956dabe2f19ce0d7200b7f1933aad5d7a8da",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:85c00936ba9a96ad40211383ad70e5602bf041a4d407d327a0b674d4e1112e0c",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:79145eea3bdb952d844bd8e927ae03be90a2a549bc486877356a338246e461bb",
+            "Codex non-fatal item: cli_configuration; evidence-sha256:fd6918bf209f4ba21b0111579898c355757acd7fa773ad47c64a51d47a9dd9bf"
+          ],
+          "reason": "Title, municipality, budget topic, decision and its 30.06.2026 date, document date, entities, and address are supported. Case type and null case key are reasonable; no unsupported outcome or material claim.",
+          "evaluatedAt": "2026-10-10T22:09:35.441Z",
+          "responseSha256": "0275518bc54606cce2eccb0575a021eff1fe2d4518d18c7be6827a8abfe1817c",
+          "sameModel": true,
+          "limitation": "Same-model judgment is not independent verification."
+        },
+        "evidenceHash": "74f76b60b40a4ead0142ff9fb6a7ae39c2752a25ed87248fd79a2d7c5392f73a"
+      }
+    }
+  ]
+}

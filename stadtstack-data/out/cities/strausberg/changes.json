@@ -1,10 +1,32 @@
 {
-  "added": [
-    "budget:investment-outlays-2025",
-    "budget:investment-outlays-2026",
-    "lake:straussee-level-2026-09-14"
+  "added": [],
+  "changed": [
+    "atlas:altstadt-plan69",
+    "atlas:altstadt-quartier",
+    "atlas:fliessstrasse",
+    "atlas:heger-walk",
+    "atlas:kieferngrund",
+    "atlas:kinderland",
+    "atlas:krankenhaus",
+    "atlas:kulturpark",
+    "atlas:muehlenweg",
+    "atlas:solarpark-flugplatz",
+    "atlas:thaelmann-nw",
+    "atlas:weinberg"
   ],
-  "changed": [],
-  "removed": [],
-  "generatedAt": "2026-09-28T18:37:13.581Z"
+  "removed": [
+    "atlas:biotop",
+    "atlas:fischerkietz",
+    "atlas:garzauer-bruecke",
+    "atlas:gleise",
+    "atlas:grosse-strasse",
+    "atlas:hubertusallee",
+    "atlas:klosterdorfer",
+    "atlas:lustgarten",
+    "atlas:ringstrasse",
+    "atlas:schulcampus",
+    "atlas:stadtmauer",
+    "atlas:tausendfuessler"
+  ],
+  "generatedAt": "2026-10-10T21:56:45.237Z"
 }

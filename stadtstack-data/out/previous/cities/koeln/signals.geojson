@@ -14010,6 +14010,30 @@
             "snapshot": true,
             "licence": "unknown",
             "reuse": "facts_with_attribution"
+          },
+          {
+            "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/downloadfiles/01113003.pdf",
+            "snapshotUrl": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/downloadfiles/01113003.pdf",
+            "title": "Ratsvorlage PDF, Seite 1",
+            "publisher": "Köln",
+            "locator": "PDF Seite 1; Textauszug der Vorlage",
+            "retrievedAt": "2026-09-26T17:28:40.980Z",
+            "sha256": "d4db5796baad577e81f6aca02177009da7dcd37aedff95e5237d32a816540edf",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "facts_with_attribution"
+          },
+          {
+            "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/downloadfiles/01113003.pdf",
+            "snapshotUrl": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/downloadfiles/01113003.pdf",
+            "title": "Ratsvorlage PDF, Seite 1",
+            "publisher": "Köln",
+            "locator": "PDF Seite 1; Textauszug der Vorlage",
+            "retrievedAt": "2026-09-26T17:28:40.980Z",
+            "sha256": "d4db5796baad577e81f6aca02177009da7dcd37aedff95e5237d32a816540edf",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "facts_with_attribution"
           }
         ],
         "extraction": {
@@ -14017,7 +14041,7 @@
           "model": "codex:gpt-6-luna",
           "faithfulness": {
             "score": 1,
-            "reason": "The score is 1.00 because no contradictions are listed, so the actual output aligns fully with the retrieval context.",
+            "reason": "The score is 1.00 because no contradictions are listed, indicating the actual output aligns with the retrieval context. Great job.",
             "evaluator": "DeepEval FaithfulnessMetric / codex:gpt-6-luna",
             "threshold": 0.8
           }

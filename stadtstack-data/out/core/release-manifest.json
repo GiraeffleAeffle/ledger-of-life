@@ -57,8 +57,8 @@
   },
   "corpus": {
     "fullPath": "cities/strausberg/signals.geojson",
-    "fullSha256": "914ace7b9cc90e38b56d51e877abfe9e55ae39b2efff075259894648ca3f70b4",
+    "fullSha256": "b87e96a2df101be316f9af6d028cb106f10110f1170ef9e050869aa222af4f3c",
     "minPath": "cities/strausberg/signals.min.geojson",
-    "minSha256": "84b175310dfe73884b65fc41321cbb0678511b5108bb05a8adc28606dba5f892"
+    "minSha256": "586e872beac9f56981e930a0a4d137a07673a474f7a83548a1e937c1cb47537d"
   }
 }

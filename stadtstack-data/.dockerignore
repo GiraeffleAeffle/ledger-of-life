@@ -6,6 +6,8 @@
 !package-lock.json
 !src/
 !src/**
+!regional/
+!regional/taxonomy.mjs
 !out/
 !out/**
 # Do not ship superseded publications in the runtime image.

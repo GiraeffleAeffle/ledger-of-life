@@ -13,6 +13,7 @@ WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json ./
 COPY src/ ./src/
+COPY regional/taxonomy.mjs ./regional/taxonomy.mjs
 COPY out/ ./out/
 # Verify the exact shared core manifest/bundle/corpus and all published schemas.
 RUN node --experimental-strip-types --input-type=module -e "import {loadRelease} from './src/mcp-tools.ts'; await loadRelease()"

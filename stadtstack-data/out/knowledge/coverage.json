@@ -1,0 +1,1347 @@
+{
+  "schemaVersion": "stadtstack-district-coverage-v1",
+  "generatedAt": "2026-10-10T22:50:17.081Z",
+  "districts": [
+    {
+      "id": "maerkisch-oderland",
+      "ags": "12064",
+      "municipalitiesRegistered": 45,
+      "municipalitiesAttempted": 3,
+      "municipalitiesWithRecords": 2,
+      "municipalitiesWithDatedStages": 2,
+      "documents": 752,
+      "publishedRecords": 4,
+      "quarantinedRecords": 41
+    },
+    {
+      "id": "herzogtum-lauenburg",
+      "ags": "01053",
+      "municipalitiesRegistered": 132,
+      "municipalitiesAttempted": 3,
+      "municipalitiesWithRecords": 2,
+      "municipalitiesWithDatedStages": 2,
+      "documents": 1218,
+      "publishedRecords": 2,
+      "quarantinedRecords": 52
+    },
+    {
+      "id": "ludwigslust-parchim",
+      "ags": "13076",
+      "municipalitiesRegistered": 142,
+      "municipalitiesAttempted": 3,
+      "municipalitiesWithRecords": 2,
+      "municipalitiesWithDatedStages": 2,
+      "documents": 872,
+      "publishedRecords": 3,
+      "quarantinedRecords": 83
+    }
+  ],
+  "municipalities": [
+    {
+      "id": "strausberg",
+      "ags": "12064472",
+      "districtId": "maerkisch-oderland",
+      "selectedForSlice": true,
+      "status": "gated_records",
+      "documents": 476,
+      "publishedRecords": 2,
+      "datedStagedRecords": 2,
+      "quarantinedRecords": 21,
+      "extraction": {
+        "fetchedDocumentGroups": 420,
+        "attemptedDocumentGroups": 6,
+        "pendingDocumentGroups": 414,
+        "unavailableAttemptedDocumentGroups": 0
+      },
+      "sources": [
+        {
+          "sourceId": "strausberg-planning",
+          "kind": "participation",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:47:29.390Z",
+          "documentCount": 215,
+          "publishedRecords": 0,
+          "quarantinedRecords": 13,
+          "coverage": {
+            "state": "blocked",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 4,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 4,
+          "failureExamples": [
+            {
+              "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/02/20240503-Bekanntmachung-Scan-1.zip",
+              "failure": "too_large",
+              "checkedAt": "2026-10-10T19:51:13.026Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/06/01_Datenschutzhinweis.pdf",
+              "failure": "http_error",
+              "checkedAt": "2026-10-10T19:52:24.658Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.stadt-strausberg.de/wp-content/uploads/2018/01/Bebauungsplan-Nr-17-96-Oestliches-Villengebiet-Strausberg-Vorstadt-Geltungsbereich.jpg",
+              "failure": "representation_error",
+              "checkedAt": "2026-10-10T19:55:05.357Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier blocked: 215 documents, 0 queued links, 4 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "strausberg-website",
+          "kind": "website",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:05:09.719Z",
+          "documentCount": 1,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        },
+        {
+          "sourceId": "strausberg-council",
+          "kind": "council",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:05:13.493Z",
+          "documentCount": 0,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "blocked",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 1,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 1,
+          "failureExamples": [
+            {
+              "url": "https://strausberg.allris.cloud/public/si010",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T19:05:13.493Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier blocked: 0 documents, 0 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "strausberg-participation",
+          "kind": "participation",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:58:54.485Z",
+          "documentCount": 77,
+          "publishedRecords": 0,
+          "quarantinedRecords": 2,
+          "coverage": {
+            "state": "blocked",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 1,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 1,
+          "failureExamples": [
+            {
+              "url": "https://bb.beteiligung.diplanung.de/connect/keycloak_ozg",
+              "failure": "access_barrier",
+              "checkedAt": "2026-10-10T19:55:21.329Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Observed diplan-list public list https://bb.beteiligung.diplanung.de/list/json; sha256 7554684d89a3a861ecb79634d9e2df406b85dfb98464a21c93e2cef6d91c7f20; all 905 listed procedures considered for municipal discovery; Scoped frontier blocked: 77 documents, 0 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "strausberg-gazette",
+          "kind": "gazette",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:52:09.109Z",
+          "documentCount": 183,
+          "publishedRecords": 2,
+          "quarantinedRecords": 6,
+          "coverage": {
+            "state": "partial",
+            "pendingCount": 16,
+            "runnableCount": 0,
+            "blockedCount": 6,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 22,
+          "failureExamples": [
+            {
+              "url": "https://www.stadt-strausberg.de/wp-content/uploads/2020/09/NSZ_05-Sep2020.pdf",
+              "failure": "too_large",
+              "checkedAt": "2026-10-10T19:58:08.434Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.stadt-strausberg.de/wpcontent/uploads/2020/11/NSZ_November_2020.pdf",
+              "failure": "http_error",
+              "checkedAt": "2026-10-10T19:58:24.759Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.stadt-strausberg.de/neu/cms/upload/bilder/aktuelles/NSZ_02_2017_Maerz.pdf",
+              "failure": "http_error",
+              "checkedAt": "2026-10-10T19:58:55.693Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 183 documents, 0 queued links, 22 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        }
+      ]
+    },
+    {
+      "id": "hoppegarten",
+      "ags": "12064227",
+      "districtId": "maerkisch-oderland",
+      "selectedForSlice": true,
+      "status": "gated_records",
+      "documents": 19,
+      "publishedRecords": 2,
+      "datedStagedRecords": 2,
+      "quarantinedRecords": 8,
+      "extraction": {
+        "fetchedDocumentGroups": 18,
+        "attemptedDocumentGroups": 6,
+        "pendingDocumentGroups": 12,
+        "unavailableAttemptedDocumentGroups": 0
+      },
+      "sources": [
+        {
+          "sourceId": "hoppegarten-website",
+          "kind": "website",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:05:27.411Z",
+          "documentCount": 1,
+          "publishedRecords": 0,
+          "quarantinedRecords": 2,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        },
+        {
+          "sourceId": "hoppegarten-council",
+          "kind": "council",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:05:29.654Z",
+          "documentCount": 1,
+          "publishedRecords": 0,
+          "quarantinedRecords": 1,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        },
+        {
+          "sourceId": "hoppegarten-participation",
+          "kind": "participation",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:58:54.485Z",
+          "documentCount": 13,
+          "publishedRecords": 2,
+          "quarantinedRecords": 5,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Observed diplan-list public list https://bb.beteiligung.diplanung.de/list/json; sha256 7554684d89a3a861ecb79634d9e2df406b85dfb98464a21c93e2cef6d91c7f20; all 905 listed procedures considered for municipal discovery; Scoped frontier complete: 13 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        },
+        {
+          "sourceId": "hoppegarten-gazette",
+          "kind": "gazette",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:00:28.325Z",
+          "documentCount": 4,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 4 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        }
+      ]
+    },
+    {
+      "id": "ruedersdorf-bei-berlin",
+      "ags": "12064428",
+      "districtId": "maerkisch-oderland",
+      "selectedForSlice": true,
+      "status": "checked_no_gated_records",
+      "documents": 257,
+      "publishedRecords": 0,
+      "datedStagedRecords": 0,
+      "quarantinedRecords": 12,
+      "extraction": {
+        "fetchedDocumentGroups": 183,
+        "attemptedDocumentGroups": 6,
+        "pendingDocumentGroups": 177,
+        "unavailableAttemptedDocumentGroups": 0
+      },
+      "sources": [
+        {
+          "sourceId": "ruedersdorf-bei-berlin-website",
+          "kind": "website",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:52:28.701Z",
+          "documentCount": 27,
+          "publishedRecords": 0,
+          "quarantinedRecords": 8,
+          "coverage": {
+            "state": "blocked",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 5,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 5,
+          "failureExamples": [
+            {
+              "url": "https://www.ruedersdorf.de/politik-verwaltung/bekanntmachungen/beschluesse/",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T20:01:18.100Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ruedersdorf.de/:translation/uk/gv-ruedersdorf/startseite-gemeinde-ruedersdorf-bei-berlin/politik-verwaltung/bekanntmachungen/beschluesse/",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T20:01:24.650Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ruedersdorf.de/:translation/en/gv-ruedersdorf/startseite-gemeinde-ruedersdorf-bei-berlin/politik-verwaltung/bekanntmachungen/beschluesse/",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T20:01:26.993Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier blocked: 27 documents, 0 queued links, 5 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "ruedersdorf-bei-berlin-council",
+          "kind": "council",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:05:43.321Z",
+          "documentCount": 0,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "blocked",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 1,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 1,
+          "failureExamples": [
+            {
+              "url": "https://ratsinfo-online.net/ruedersdorf-bi/allris.net.asp",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T19:05:43.321Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier blocked: 0 documents, 0 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "ruedersdorf-bei-berlin-participation",
+          "kind": "participation",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T21:11:56.754Z",
+          "documentCount": 209,
+          "publishedRecords": 0,
+          "quarantinedRecords": 4,
+          "coverage": {
+            "state": "blocked",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 1,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 1,
+          "failureExamples": [
+            {
+              "url": "https://bb.beteiligung.diplanung.de/connect/keycloak_ozg",
+              "failure": "access_barrier",
+              "checkedAt": "2026-10-10T20:01:46.917Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Observed diplan-list public list https://bb.beteiligung.diplanung.de/list/json; sha256 7554684d89a3a861ecb79634d9e2df406b85dfb98464a21c93e2cef6d91c7f20; all 905 listed procedures considered for municipal discovery; Scoped frontier blocked: 209 documents, 0 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "ruedersdorf-bei-berlin-gazette",
+          "kind": "gazette",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:55:13.313Z",
+          "documentCount": 21,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "blocked",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 5,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 5,
+          "failureExamples": [
+            {
+              "url": "https://www.ruedersdorf.de/politik-verwaltung/bekanntmachungen/beschluesse/",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T20:05:33.081Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ruedersdorf.de/:translation/uk/gv-ruedersdorf/startseite-gemeinde-ruedersdorf-bei-berlin/politik-verwaltung/bekanntmachungen/beschluesse/",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T20:05:36.099Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ruedersdorf.de/:translation/en/gv-ruedersdorf/startseite-gemeinde-ruedersdorf-bei-berlin/politik-verwaltung/bekanntmachungen/beschluesse/",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T20:05:39.266Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier blocked: 21 documents, 0 queued links, 5 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        }
+      ]
+    },
+    {
+      "id": "ratzeburg",
+      "ags": "01053100",
+      "districtId": "herzogtum-lauenburg",
+      "selectedForSlice": true,
+      "status": "checked_no_gated_records",
+      "documents": 743,
+      "publishedRecords": 0,
+      "datedStagedRecords": 0,
+      "quarantinedRecords": 13,
+      "extraction": {
+        "fetchedDocumentGroups": 336,
+        "attemptedDocumentGroups": 6,
+        "pendingDocumentGroups": 330,
+        "unavailableAttemptedDocumentGroups": 0
+      },
+      "sources": [
+        {
+          "sourceId": "ratzeburg-website",
+          "kind": "website",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T21:38:12.333Z",
+          "documentCount": 305,
+          "publishedRecords": 0,
+          "quarantinedRecords": 5,
+          "coverage": {
+            "state": "partial",
+            "pendingCount": 14,
+            "runnableCount": 0,
+            "blockedCount": 359,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 373,
+          "failureExamples": [
+            {
+              "url": "https://www.ratzeburg.de/B%C3%BCrgerservice/Bekanntmachungen-Ortsrecht/Wahlen/index.php?La=1&object=tx,2559.6949.1&kat=&kuo=2&sub=0",
+              "failure": "redirect_limit",
+              "checkedAt": "2026-10-10T20:06:18.075Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ratzeburg.de/B%C3%BCrgerservice/Bekanntmachungen-Ortsrecht/Wahlen/index.php?La=1&object=tx,2559.384.1&kat=&kuo=2&sub=0",
+              "failure": "redirect_limit",
+              "checkedAt": "2026-10-10T20:06:32.090Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ratzeburg.de/B%C3%BCrgerservice/Bekanntmachungen-Ortsrecht/Wahlen/index.php?La=1&object=tx,2559.385.1&kat=&kuo=2&sub=0",
+              "failure": "redirect_limit",
+              "checkedAt": "2026-10-10T20:06:38.103Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 305 documents, 0 queued links, 373 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "ratzeburg-council",
+          "kind": "council",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:05:51.170Z",
+          "documentCount": 1,
+          "publishedRecords": 0,
+          "quarantinedRecords": 1,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        },
+        {
+          "sourceId": "ratzeburg-participation",
+          "kind": "participation",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T21:18:23.515Z",
+          "documentCount": 133,
+          "publishedRecords": 0,
+          "quarantinedRecords": 6,
+          "coverage": {
+            "state": "partial",
+            "pendingCount": 4,
+            "runnableCount": 0,
+            "blockedCount": 340,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 344,
+          "failureExamples": [
+            {
+              "url": "https://www.ratzeburg.de/output/download.php?file=%2Fmedia%2Fcustom%2F2559_7389_1.PDF%3F1745313664&fn=Bekanntmachung_56_2_3",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T19:05:53.274Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ratzeburg.de/output/download.php?file=%2Fmedia%2Fcustom%2F2559_2709_1.PDF%3F1564048649&fn=B_Plan_2_Begr%C3%BCndung_4",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T20:12:38.088Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ratzeburg.de/output/download.php?file=%2Fmedia%2Fcustom%2F2559_2708_1.PDF%3F1564048598&fn=B_Plan_2_Bekanntmachung_4",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T20:12:38.093Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 133 documents, 0 queued links, 344 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "ratzeburg-gazette",
+          "kind": "gazette",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T21:38:27.954Z",
+          "documentCount": 303,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "partial",
+            "pendingCount": 14,
+            "runnableCount": 0,
+            "blockedCount": 359,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 373,
+          "failureExamples": [
+            {
+              "url": "https://www.ratzeburg.de/index.php?La=1&object=tx,2559.12840.1&kuo=2&sub=0",
+              "failure": "redirect_limit",
+              "checkedAt": "2026-10-10T20:16:06.990Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ratzeburg.de/B%C3%BCrgerservice/Bekanntmachungen-Ortsrecht/Wahlen/index.php?La=1&object=tx,2559.6949.1&kat=&kuo=2&sub=0",
+              "failure": "redirect_limit",
+              "checkedAt": "2026-10-10T20:17:35.074Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ratzeburg.de/B%C3%BCrgerservice/Bekanntmachungen-Ortsrecht/Wahlen/index.php?La=1&object=tx,2559.384.1&kat=&kuo=2&sub=0",
+              "failure": "redirect_limit",
+              "checkedAt": "2026-10-10T20:17:49.115Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 303 documents, 0 queued links, 373 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "ratzeburg-bob-sh",
+          "kind": "participation",
+          "registryState": "not_checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:05:56.474Z",
+          "documentCount": 1,
+          "publishedRecords": 0,
+          "quarantinedRecords": 1,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Endpoint discovery only: municipal procedure binding is not established; no statewide link expansion; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        }
+      ]
+    },
+    {
+      "id": "moelln",
+      "ags": "01053090",
+      "districtId": "herzogtum-lauenburg",
+      "selectedForSlice": true,
+      "status": "gated_records",
+      "documents": 447,
+      "publishedRecords": 1,
+      "datedStagedRecords": 1,
+      "quarantinedRecords": 32,
+      "extraction": {
+        "fetchedDocumentGroups": 255,
+        "attemptedDocumentGroups": 6,
+        "pendingDocumentGroups": 249,
+        "unavailableAttemptedDocumentGroups": 0
+      },
+      "sources": [
+        {
+          "sourceId": "moelln-website",
+          "kind": "website",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T21:42:06.020Z",
+          "documentCount": 234,
+          "publishedRecords": 0,
+          "quarantinedRecords": 4,
+          "coverage": {
+            "state": "partial",
+            "pendingCount": 1,
+            "runnableCount": 0,
+            "blockedCount": 0,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 1,
+          "failureExamples": [
+            {
+              "url": "https://www.moelln.de/fileadmin/Stadt_Moelln/Dateien/Amtliche_Bekanntmachungen/Gesamthaushalt_2026_Exemplar_Veroeffentlichung_neu.pdf",
+              "failure": "tdm_unavailable",
+              "checkedAt": "2026-10-10T21:42:06.020Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 234 documents, 0 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "moelln-council",
+          "kind": "council",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:06:10.869Z",
+          "documentCount": 0,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "blocked",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 1,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 1,
+          "failureExamples": [
+            {
+              "url": "https://www.moelln.sitzung-online.de/integration/si010",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T19:06:10.869Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier blocked: 0 documents, 0 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "moelln-participation",
+          "kind": "participation",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:55:50.469Z",
+          "documentCount": 4,
+          "publishedRecords": 1,
+          "quarantinedRecords": 27,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 4 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        },
+        {
+          "sourceId": "moelln-gazette",
+          "kind": "gazette",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T21:42:07.459Z",
+          "documentCount": 208,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "partial",
+            "pendingCount": 15,
+            "runnableCount": 14,
+            "blockedCount": 0,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 1,
+          "failureExamples": [
+            {
+              "url": "https://www.moelln.de/fileadmin/Stadt_Moelln/Dateien/Amtliche_Bekanntmachungen/Gesamthaushalt_2026_Exemplar_Veroeffentlichung_neu.pdf",
+              "failure": "tdm_unavailable",
+              "checkedAt": "2026-10-10T21:38:43.117Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 208 documents, 14 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "moelln-bob-sh",
+          "kind": "participation",
+          "registryState": "not_checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:06:14.130Z",
+          "documentCount": 1,
+          "publishedRecords": 0,
+          "quarantinedRecords": 1,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Endpoint discovery only: municipal procedure binding is not established; no statewide link expansion; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        }
+      ]
+    },
+    {
+      "id": "schwarzenbek",
+      "ags": "01053116",
+      "districtId": "herzogtum-lauenburg",
+      "selectedForSlice": true,
+      "status": "gated_records",
+      "documents": 28,
+      "publishedRecords": 1,
+      "datedStagedRecords": 1,
+      "quarantinedRecords": 7,
+      "extraction": {
+        "fetchedDocumentGroups": 28,
+        "attemptedDocumentGroups": 6,
+        "pendingDocumentGroups": 22,
+        "unavailableAttemptedDocumentGroups": 0
+      },
+      "sources": [
+        {
+          "sourceId": "schwarzenbek-website",
+          "kind": "website",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:06:21.404Z",
+          "documentCount": 1,
+          "publishedRecords": 0,
+          "quarantinedRecords": 1,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        },
+        {
+          "sourceId": "schwarzenbek-council",
+          "kind": "council",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:06:23.854Z",
+          "documentCount": 0,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "blocked",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 1,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 1,
+          "failureExamples": [
+            {
+              "url": "https://sessionnet.owl-it.de/schwarzenbek/bi/",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T19:06:23.854Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier blocked: 0 documents, 0 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "schwarzenbek-participation",
+          "kind": "participation",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:59:59.171Z",
+          "documentCount": 6,
+          "publishedRecords": 0,
+          "quarantinedRecords": 5,
+          "coverage": {
+            "state": "blocked",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 17,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 17,
+          "failureExamples": [
+            {
+              "url": "https://www.schwarzenbek.de/redirect.phtml?extlink=1&La=1&url_fid=3787.40.1",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T20:59:52.066Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.schwarzenbek.de/loadDocument.phtml?FID=3787.343.1&Ext=PDF",
+              "failure": "too_large",
+              "checkedAt": "2026-10-10T20:59:57.170Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.schwarzenbek.de/loadDocument.phtml?FID=3787.1301.1&Ext=PDF",
+              "failure": "too_large",
+              "checkedAt": "2026-10-10T20:59:59.156Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier blocked: 6 documents, 0 queued links, 17 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "schwarzenbek-gazette",
+          "kind": "gazette",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T21:01:44.532Z",
+          "documentCount": 20,
+          "publishedRecords": 1,
+          "quarantinedRecords": 1,
+          "coverage": {
+            "state": "blocked",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 14,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 14,
+          "failureExamples": [
+            {
+              "url": "https://www.schwarzenbek.de/output/download.php?fid=3787.274.1.PDF",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T21:01:44.476Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.schwarzenbek.de/output/download.php?fid=3787.275.1.PDF",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T21:01:44.509Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.schwarzenbek.de/output/download.php?fid=3787.276.1.PDF",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T21:01:44.511Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier blocked: 20 documents, 0 queued links, 14 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "schwarzenbek-bob-sh",
+          "kind": "participation",
+          "registryState": "not_checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:06:28.693Z",
+          "documentCount": 1,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Endpoint discovery only: municipal procedure binding is not established; no statewide link expansion; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        }
+      ]
+    },
+    {
+      "id": "ludwigslust",
+      "ags": "13076090",
+      "districtId": "ludwigslust-parchim",
+      "selectedForSlice": true,
+      "status": "gated_records",
+      "documents": 594,
+      "publishedRecords": 1,
+      "datedStagedRecords": 1,
+      "quarantinedRecords": 59,
+      "extraction": {
+        "fetchedDocumentGroups": 304,
+        "attemptedDocumentGroups": 6,
+        "pendingDocumentGroups": 298,
+        "unavailableAttemptedDocumentGroups": 0
+      },
+      "sources": [
+        {
+          "sourceId": "ludwigslust-website",
+          "kind": "website",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T21:42:09.851Z",
+          "documentCount": 299,
+          "publishedRecords": 1,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "partial",
+            "pendingCount": 89,
+            "runnableCount": 89,
+            "blockedCount": 5,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 5,
+          "failureExamples": [
+            {
+              "url": "https://www.ludwigslust.de/output/download.php?fid=3634.4595.1.PDF",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T21:00:28.602Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.4182.1&Ext=PDF",
+              "failure": "too_large",
+              "checkedAt": "2026-10-10T21:00:32.545Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ludwigslust.de/output/download.php?fid=3634.3802.1.PDF",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T21:03:20.969Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 299 documents, 89 queued links, 5 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "ludwigslust-council",
+          "kind": "council",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:06:39.192Z",
+          "documentCount": 1,
+          "publishedRecords": 0,
+          "quarantinedRecords": 1,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        },
+        {
+          "sourceId": "ludwigslust-participation",
+          "kind": "participation",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:56:26.308Z",
+          "documentCount": 1,
+          "publishedRecords": 0,
+          "quarantinedRecords": 2,
+          "coverage": {
+            "state": "partial",
+            "pendingCount": 1,
+            "runnableCount": 0,
+            "blockedCount": 1,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 2,
+          "failureExamples": [
+            {
+              "url": "https://www.gaia-mv.de/geoportalsearch/_ajax/search/?type=Bauleitplan&offset=0&n=100&crs=EPSG%3A25832&x_filter%5Bregionalschluessel%5D=130760090090",
+              "failure": "robots_unavailable",
+              "checkedAt": "2026-10-10T20:56:26.308Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.gaia-mv.de/geoportalsearch/_ajax/search/?type=Bauleitplan&offset=0&n=100&crs=EPSG%3A25832&x_filter%5Bregionalschluessel%5D=130760090090",
+              "failure": "robots_unavailable",
+              "checkedAt": "2026-10-10T21:00:34.774Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Observed API unavailable (robots_unavailable: Robots policy unavailable (policy HTTP 503); source existence is unknown); confirmed official-document fallback used without bypassing restrictions; ask municipality; Scoped frontier partial: 1 documents, 0 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "ludwigslust-gazette",
+          "kind": "gazette",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T21:41:55.255Z",
+          "documentCount": 293,
+          "publishedRecords": 1,
+          "quarantinedRecords": 56,
+          "coverage": {
+            "state": "partial",
+            "pendingCount": 93,
+            "runnableCount": 93,
+            "blockedCount": 5,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 5,
+          "failureExamples": [
+            {
+              "url": "https://www.ludwigslust.de/output/download.php?fid=3634.4595.1.PDF",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T20:56:32.160Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.4182.1&Ext=PDF",
+              "failure": "too_large",
+              "checkedAt": "2026-10-10T20:56:35.455Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.ludwigslust.de/output/download.php?fid=3634.3802.1.PDF",
+              "failure": "robots_blocked",
+              "checkedAt": "2026-10-10T21:02:08.474Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 293 documents, 93 queued links, 5 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        }
+      ]
+    },
+    {
+      "id": "parchim",
+      "ags": "13076108",
+      "districtId": "ludwigslust-parchim",
+      "selectedForSlice": true,
+      "status": "checked_no_gated_records",
+      "documents": 277,
+      "publishedRecords": 0,
+      "datedStagedRecords": 0,
+      "quarantinedRecords": 8,
+      "extraction": {
+        "fetchedDocumentGroups": 277,
+        "attemptedDocumentGroups": 6,
+        "pendingDocumentGroups": 271,
+        "unavailableAttemptedDocumentGroups": 0
+      },
+      "sources": [
+        {
+          "sourceId": "parchim-website",
+          "kind": "website",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T21:42:03.212Z",
+          "documentCount": 274,
+          "publishedRecords": 0,
+          "quarantinedRecords": 4,
+          "coverage": {
+            "state": "partial",
+            "pendingCount": 186,
+            "runnableCount": 186,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 274 documents, 186 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        },
+        {
+          "sourceId": "parchim-council",
+          "kind": "council",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:06:51.388Z",
+          "documentCount": 1,
+          "publishedRecords": 0,
+          "quarantinedRecords": 1,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        },
+        {
+          "sourceId": "parchim-participation",
+          "kind": "participation",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T21:00:56.570Z",
+          "documentCount": 0,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "blocked",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 1,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "robots_unavailable: Robots policy unavailable (policy HTTP 503); source existence is unknown; ask municipality"
+        },
+        {
+          "sourceId": "parchim-gazette",
+          "kind": "gazette",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:56:50.132Z",
+          "documentCount": 2,
+          "publishedRecords": 0,
+          "quarantinedRecords": 3,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 2 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        }
+      ]
+    },
+    {
+      "id": "hagenow",
+      "ags": "13076060",
+      "districtId": "ludwigslust-parchim",
+      "selectedForSlice": true,
+      "status": "gated_records",
+      "documents": 1,
+      "publishedRecords": 2,
+      "datedStagedRecords": 1,
+      "quarantinedRecords": 16,
+      "extraction": {
+        "fetchedDocumentGroups": 1,
+        "attemptedDocumentGroups": 1,
+        "pendingDocumentGroups": 0,
+        "unavailableAttemptedDocumentGroups": 0
+      },
+      "sources": [
+        {
+          "sourceId": "hagenow-publisher-gazette",
+          "kind": "gazette",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T21:50:09.207Z",
+          "documentCount": 1,
+          "publishedRecords": 2,
+          "quarantinedRecords": 16,
+          "coverage": {
+            "state": "complete",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 0
+          },
+          "failedLinkCount": 0,
+          "failureExamples": [],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 1ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+        },
+        {
+          "sourceId": "hagenow-website",
+          "kind": "website",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:56:55.866Z",
+          "documentCount": 0,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "partial",
+            "pendingCount": 1,
+            "runnableCount": 0,
+            "blockedCount": 0,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 1,
+          "failureExamples": [
+            {
+              "url": "https://www.hagenow.de/",
+              "failure": "tdm_unavailable",
+              "checkedAt": "2026-10-10T20:56:55.866Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 0 documents, 0 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "hagenow-council",
+          "kind": "council",
+          "registryState": "not_checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T19:06:58.343Z",
+          "documentCount": 0,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "blocked",
+            "pendingCount": 0,
+            "runnableCount": 0,
+            "blockedCount": 1,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 1,
+          "failureExamples": [
+            {
+              "url": "https://hagenow.sitzung-mv.de/ratsinfo/logon",
+              "failure": "access_barrier",
+              "checkedAt": "2026-10-10T19:06:58.343Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier blocked: 0 documents, 0 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "hagenow-participation",
+          "kind": "participation",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:56:55.963Z",
+          "documentCount": 0,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "partial",
+            "pendingCount": 2,
+            "runnableCount": 0,
+            "blockedCount": 1,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 3,
+          "failureExamples": [
+            {
+              "url": "https://www.hagenow.de/fileadmin/Stadtverwaltung/PDFs/2025/Bebauungspl%C3%A4ne/Bebauungsplan_Nr._39_Begr%C3%BCndung.pdf",
+              "failure": "tdm_unavailable",
+              "checkedAt": "2026-10-10T20:56:55.962Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.gaia-mv.de/geoportalsearch/_ajax/search/?type=Bauleitplan&offset=0&n=100&crs=EPSG%3A25832&x_filter%5Bregionalschluessel%5D=130760060060",
+              "failure": "robots_unavailable",
+              "checkedAt": "2026-10-10T20:56:55.963Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.gaia-mv.de/geoportalsearch/_ajax/search/?type=Bauleitplan&offset=0&n=100&crs=EPSG%3A25832&x_filter%5Bregionalschluessel%5D=130760060060",
+              "failure": "robots_unavailable",
+              "checkedAt": "2026-10-10T21:00:56.839Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Observed API unavailable (robots_unavailable: Robots policy unavailable (policy HTTP 503); source existence is unknown); confirmed official-document fallback used without bypassing restrictions; ask municipality; Scoped frontier partial: 0 documents, 0 queued links, 2 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        },
+        {
+          "sourceId": "hagenow-gazette",
+          "kind": "gazette",
+          "registryState": "checked",
+          "crawlState": "checked",
+          "checkedAt": "2026-10-10T20:56:56.007Z",
+          "documentCount": 0,
+          "publishedRecords": 0,
+          "quarantinedRecords": 0,
+          "coverage": {
+            "state": "partial",
+            "pendingCount": 1,
+            "runnableCount": 0,
+            "blockedCount": 0,
+            "action": "ask_municipality"
+          },
+          "failedLinkCount": 1,
+          "failureExamples": [
+            {
+              "url": "https://www.hagenow.de/service-fuer-buerger/downloadcenter/bekanntmachungen-und-sonstiges.html",
+              "failure": "tdm_unavailable",
+              "checkedAt": "2026-10-10T20:56:56.007Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 0 documents, 0 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+        }
+      ]
+    }
+  ],
+  "model": {
+    "provider": "openai-subscription",
+    "model": "gpt-6-luna",
+    "faithfulnessThreshold": 0.8
+  },
+  "extractionRun": {
+    "generatedAt": "2026-10-10T22:29:36.531Z",
+    "selection": "bounded_per_municipality",
+    "maxDocumentsPerMunicipality": 6,
+    "availableDocumentGroupsAtRunStart": 1822,
+    "attemptedDocumentGroups": 49,
+    "pendingDocumentGroupsAtRunStart": 1773
+  }
+}

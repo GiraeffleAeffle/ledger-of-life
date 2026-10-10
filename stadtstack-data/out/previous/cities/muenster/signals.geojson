@@ -5809,6 +5809,30 @@
             "snapshot": true,
             "licence": "unknown",
             "reuse": "facts_with_attribution"
+          },
+          {
+            "url": "https://oparl.stadt-muenster.de/bodies/0001/downloadfiles/00589703.pdf",
+            "snapshotUrl": "https://oparl.stadt-muenster.de/bodies/0001/downloadfiles/00589703.pdf",
+            "title": "Ratsvorlage PDF, Seite 1",
+            "publisher": "Münster",
+            "locator": "PDF Seite 1; Textauszug der Vorlage",
+            "retrievedAt": "2026-09-26T17:29:38.273Z",
+            "sha256": "595a0c27ee10e0f31a6bebef5beb4ff2e7f84deafa4f6a8e44d371082bef6950",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "facts_with_attribution"
+          },
+          {
+            "url": "https://oparl.stadt-muenster.de/bodies/0001/downloadfiles/00589703.pdf",
+            "snapshotUrl": "https://oparl.stadt-muenster.de/bodies/0001/downloadfiles/00589703.pdf",
+            "title": "Ratsvorlage PDF, Seite 1",
+            "publisher": "Münster",
+            "locator": "PDF Seite 1; Textauszug der Vorlage",
+            "retrievedAt": "2026-09-26T17:29:38.273Z",
+            "sha256": "595a0c27ee10e0f31a6bebef5beb4ff2e7f84deafa4f6a8e44d371082bef6950",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "facts_with_attribution"
           }
         ],
         "extraction": {
@@ -5816,7 +5840,7 @@
           "model": "codex:gpt-6-luna",
           "faithfulness": {
             "score": 1,
-            "reason": "The score is 1.00 because there are no contradictions listed, so the actual output aligns with the retrieval context.",
+            "reason": "The score is 1.00 because there are no listed contradictions, indicating the actual output aligns with the retrieval context.",
             "evaluator": "DeepEval FaithfulnessMetric / codex:gpt-6-luna",
             "threshold": 0.8
           }

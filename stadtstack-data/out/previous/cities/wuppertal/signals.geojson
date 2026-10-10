@@ -25330,6 +25330,30 @@
             "snapshot": true,
             "licence": "unknown",
             "reuse": "facts_with_attribution"
+          },
+          {
+            "url": "http://oparl.wuppertal.de/oparl/bodies/0001/downloadfiles/00370084.pdf",
+            "snapshotUrl": "http://oparl.wuppertal.de/oparl/bodies/0001/downloadfiles/00370084.pdf",
+            "title": "Ratsvorlage PDF, Seite 1",
+            "publisher": "Wuppertal",
+            "locator": "PDF Seite 1; Textauszug der Vorlage",
+            "retrievedAt": "2026-09-26T17:30:31.515Z",
+            "sha256": "1b500b57877939a9d1afed68326750bab4a72559d996b8b731f60a5070c34788",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "facts_with_attribution"
+          },
+          {
+            "url": "http://oparl.wuppertal.de/oparl/bodies/0001/downloadfiles/00370084.pdf",
+            "snapshotUrl": "http://oparl.wuppertal.de/oparl/bodies/0001/downloadfiles/00370084.pdf",
+            "title": "Ratsvorlage PDF, Seite 1",
+            "publisher": "Wuppertal",
+            "locator": "PDF Seite 1; Textauszug der Vorlage",
+            "retrievedAt": "2026-09-26T17:30:31.515Z",
+            "sha256": "1b500b57877939a9d1afed68326750bab4a72559d996b8b731f60a5070c34788",
+            "snapshot": true,
+            "licence": "unknown",
+            "reuse": "facts_with_attribution"
           }
         ],
         "extraction": {
@@ -25337,7 +25361,7 @@
           "model": "codex:gpt-6-luna",
           "faithfulness": {
             "score": 1,
-            "reason": "The score is 1.00 because no contradictions were identified; the actual output aligns with the retrieval context.",
+            "reason": "The score is 1.00 because no contradictions are listed, indicating the actual output aligns with the retrieval context.",
             "evaluator": "DeepEval FaithfulnessMetric / codex:gpt-6-luna",
             "threshold": 0.8
           }
