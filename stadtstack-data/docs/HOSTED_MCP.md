@@ -1,6 +1,6 @@
 # Protected hosted civic MCP: owner guide
 
-The protected endpoint is **https://mcp.stadtstack.eu/mcp**, upgraded to the 16-tool three-district release at 2026-10-10 23:18 UTC (11 October in Berlin). It exposes read-only civic tools; use MCP `tools/list` for the current inventory. Personal bearer access is required. Client-specific GUI interoperability is not implied by the exercised generic HTTP acceptance below.
+The protected endpoint is **https://mcp.stadtstack.eu/mcp**, upgraded to the 19-tool **0.3.0** release on 11 October 2026 at 10:15 UTC (12:15 Berlin). It exposes read-only civic tools; use MCP `tools/list` for the current inventory. Personal bearer access is required. Client-specific GUI interoperability is not implied by the exercised generic HTTP acceptance below.
 
 ## HTTP and security contract
 
@@ -13,7 +13,7 @@ The protected endpoint is **https://mcp.stadtstack.eu/mcp**, upgraded to the 16-
 
 ## Read-only tools and evidence
 
-The **16-tool three-district contract below is live as `civic-mcp-v0.2.1`**. Current and historical acceptance records are separated at the end of this guide. Use `tools/list` and `get_release_status` to identify the exact live inventory and whole-data release.
+The **19-tool contract below is live with literal Git tag, image tag and MCP version `0.3.0`**. Current and historical acceptance records are separated at the end of this guide. Use `tools/list` and `get_release_status` to identify the exact live inventory and whole-data release.
 
 | Tool | Purpose |
 | --- | --- |
@@ -33,6 +33,9 @@ The **16-tool three-district contract below is live as `civic-mcp-v0.2.1`**. Cur
 | `get_regional_topics` | Regional-evidence discovery by shared topic/municipality |
 | `compare_topic` | Source-backed topic/stage comparison across selected municipalities, with bounded milestone evidence and scoped coverage |
 | `similar` | Deterministic cross-city text/topic discovery, with scores and evidence—not a learned model or success claim |
+| `entity_search` | Source-quoted entity groups, identifiers and explicit identity uncertainty |
+| `graph_neighbors` | Typed quoted relationships with source evidence, modality and path eligibility |
+| `graph_path` | Bounded directed source-evidence paths; never causal, spending or success proof |
 
 Every record search returns `data.items`, `total`, `nextCursor` (null at the end), `fields` and explicit `withheld` diagnostics. Paging uses `cursor`, default `limit:20`, maximum 50; **offset is removed and rejected**, not silently accepted. Pass the returned cursor with the same tool, filters, limit and projection. Cursors are signed with a process-only random key (not bearer credentials), contain only the whole-data release ID, filter digest and final record key, and are invalid after a server restart or release change. Invalid/tampered cursors or changed filters produce explicit tool errors. Start a new traversal rather than editing a cursor. Consume pages sequentially and honor HTTP `Retry-After` (already supplied on 429); the per-city `feedUrl` listed in catalogue metadata is a relative immutable export path, not a claim that a public bulk-export endpoint exists. No tool executes commands, writes data, fetches URLs, updates the pipeline or asks an evaluator. Egress is denied by NetworkPolicy.
 
@@ -42,11 +45,11 @@ Hosted envelopes contain `source.release` (whole-data manifest ID), `releasedAt`
 
 Startup verifies every allowlisted whole-data release hash/size against `out/release-manifest.json`, including catalogue, quality report, regional evidence, each city's full/min/changes/feed exports and `knowledge/{registry,records,coverage}.json`. It hashes the exact parsed buffers, and changes are retained in the immutable startup snapshot. Individual knowledge source/model/date gates remain mandatory. Release acceptance needs qualifying evidence across all three districts, not every registered town: `recordCoverage` and full knowledge coverage explicitly distinguish `gated_records`, `checked_no_gated_records` and `not_checked`, with published/dated-stage counts. The separate selected-core checks remain. Whole-data identity changes with non-core data; requests never recollect or mix mutable release files.
 
-### Next candidate: source-bound graph tools (not yet live)
+### Live source-bound graph tools
 
-This branch adds three tools for a **19-tool candidate**; the v0.2.1 evidence below still describes the live 16-tool release. Do not advertise a graph rollout until its own image and public acceptance are recorded.
+These three tools are part of the live **19-tool 0.3.0** release. Their successful retrieval/acceptance does not establish added answer utility: the fixed seven graph comparisons measured no incremental benefit.
 
-The candidate version is **`0.3.0`**, taken from `stadtstack-data/package.json`: literal Git tag, image tag, OCI version/ref-name metadata and MCP `serverInfo.version` must agree. `get_release_status` returns `release: {version, dataManifestId}` alongside the full `dataManifest`; its ID must match `dataManifest.id`. The older v0.2.1 deployment incorrectly reported `serverInfo.version:0.3.0`, so that old value alone never proves a 19-tool rollout. The new smoke contract checks all identities together.
+The live version is **`0.3.0`**, taken from `stadtstack-data/package.json`: literal Git tag, image tag, OCI version/ref-name metadata and MCP `serverInfo.version` agree. `get_release_status` returns `release: {version, dataManifestId}` alongside the full `dataManifest`; its ID matches `dataManifest.id`. The older v0.2.1 deployment incorrectly reported `serverInfo.version:0.3.0`, so that old value alone never proved a 19-tool rollout. Local/governed image checks establish artifact provenance; public checks establish endpoint/version/data behavior. Running-image identity is evidenced separately by the governed ReadyPod imageID, not by the MCP response.
 
 | Tool | Arguments and evidence |
 | --- | --- |
@@ -56,7 +59,7 @@ The candidate version is **`0.3.0`**, taken from `stadtstack-data/package.json`:
 
 Graph pages also bind cursors to the release, exact record bytes, filters and budgets. They expose `complete`, `truncated`, explicit status and lower bounds rather than claiming an exhaustive empty result after a budget stop. Budgets are 10,000 searched nodes, 2,000 visited nodes, 10,000 examined edges, 100 paths and 20,000 path-enumeration steps. A zero-hop self-path is identity, not evidence of a municipal relationship; no path is not absence of activity. Types are `operates`, `funds`, `implements`, `plans`, `decides`, `approves`, `amends`, `located_in`, `cooperates_with` and `cites`. Paths admit asserted non-action relations, `decides/decided`, `approves/decided` and `implements/implemented`; `plans` never qualifies. Planned/proposed/conditional/negated/historical relations remain labelled in neighbors. Path responses expose the actual returned-edge `modalities` (empty for a zero-hop path) and `pathEligibility`, not the removed scalar `modality`. Name-based grouping is not independent legal-entity verification; paths establish neither causality, actual spending nor success.
 
-Candidate startup additionally requires `knowledge/graph.json`, bound to and recomputed from the exact admitted v2 record bytes. Facts and graph claims come from the same extraction pass with the original gates plus quoted relation/identity checks. Public coverage reports actual admitted provider/model identities and frozen input/prompt/schema bindings. There is no online graph construction, new crawling, external entity lookup or community detection in MCP.
+Startup additionally requires `knowledge/graph.json`, bound to and recomputed from the exact admitted v2 record bytes. Facts and graph claims come from the same extraction pass with the original gates plus quoted relation/identity checks. Public coverage reports actual admitted provider/model identities and frozen input/prompt/schema bindings. There is no online graph construction, new crawling, external entity lookup or community detection in MCP.
 
 ### Shared topic, comparison, filter and projection contract
 
@@ -74,7 +77,7 @@ Example first page:
 
 For the next page, send the identical arguments plus `"cursor":"<returned nextCursor>"`. A null cursor means that traversal is complete. Changing any filter/projection or switching tools starts a new traversal without the old cursor.
 
-`compare_topic({"topic":"haushalt","cityIds":["strausberg","moelln","ludwigslust"]})` returns normalized evidence counts, separately classified missing/rejected/withdrawn/candidate states, dated milestones and municipality-specific crawl/extraction coverage. This exact three-district query was exercised publicly; its current source-backed counts are 1 / 0 / 1. Mölln's zero means no matching released budget-topic record, not absence of municipal activity. Future milestones are not achieved progress. Each milestone includes at most five examples plus its full evidence count. This is not a ranking of government performance or completeness.
+`compare_topic({"topic":"haushalt","cityIds":["strausberg","moelln","ludwigslust"]})` returns normalized evidence counts, separately classified missing/rejected/withdrawn/candidate states, dated milestones and municipality-specific crawl/extraction coverage. This exact three-district query was exercised publicly in 0.3.0; its source-backed record counts were **1 / 12 / 19**. These are evidence records, not distinct projects or government-performance rankings. Future milestones are not achieved progress. Each milestone includes at most five examples plus its full evidence count; scoped coverage and gaps remain explicit.
 
 `similar` accepts a released record `id`, optional `cityIds`/`topic`/shared filters and limit. Its versioned score is **0.6 token Jaccard + 0.4 topic Jaccard**. Responses expose shared terms/topics and sources; `model:null` is intentional. No embedding/S2Vec, causal-transfer or observed-success claim is made. Zero matches is an honest result.
 
@@ -222,9 +225,9 @@ Do not advertise this endpoint as compatible with ChatGPT's native OAuth connect
 
 The tag-only workflow `.github/workflows/civic-mcp-image.yml` publishes `ghcr.io/giraeffleaeffle/stadtstack-mcp` for amd64/arm64 on literal stable numeric tags such as `0.3.0`; it does not deploy. It rejects tag/package-version mismatch and emits source/digest/version markers. Use the matching **tagged immutable digest** (`:0.3.0@sha256:…`), never a mutable tag alone. Image OCI version/ref-name/revision, chart version/appVersion and the required release version are checked. A security-reviewer pass is required before public deployment.
 
-For an independent diagnostic run, use `python3 deploy/mcp/smoke.py --release-version 0.3.0 --image ghcr.io/giraeffleaeffle/stadtstack-mcp:0.3.0@sha256:<published-digest> --knowledge-municipality <admitted-municipality-id> --evidence <private-evidence-path>` from the matching release repository. Local image mode generates a disposable in-memory bearer and mounts only its hash; it never gives the image a real owner's credential or hash manifest. It verifies registry tag-to-digest and OCI source/version metadata, starts the exact amd64 image as non-root/read-only, and checks identity, authentication, tool annotations, sourced facts, regional/council results and limits. It removes the container and temporary hash file afterward. Diagnostic JSON is not deployment authorization: the governed dispatcher exports the approved source's smoke code itself and executes it with Python isolation and assertions enabled in a fresh private directory before any Kubernetes mutation.
+For an independent diagnostic run, use `python3 deploy/mcp/smoke.py --release-version 0.3.0 --image ghcr.io/giraeffleaeffle/stadtstack-mcp:0.3.0@sha256:<published-digest> --knowledge-municipality ratzeburg --entity-query "Stadt Ratzeburg" --evidence <private-evidence-path>` from the matching release repository. Local image mode generates a disposable in-memory bearer and mounts only its hash; it never gives the image a real owner's credential or hash manifest. It verifies registry tag-to-digest and OCI source/version metadata, starts the exact amd64 image as non-root/read-only, and checks identity, authentication, tool annotations, sourced facts, regional/council results and limits. It removes the container and temporary hash file afterward. Diagnostic JSON is not deployment authorization: the governed dispatcher exports the approved source's smoke code itself and executes it with Python isolation and assertions enabled in a fresh private directory before any Kubernetes mutation.
 
-The candidate smoke contract expects **19 tools**, including source-bound graph lookup, neighbors and bounded paths; it must not be applied to the current 16-tool live image. Use the matching tagged smoke implementation when re-exercising v0.2.1. `--knowledge-municipality <id>` must select actual admitted knowledge in that exact candidate, not a fabricated fallback. The recorded v0.2.1 run selected `moelln` because `ratzeburg` had none; this does not predict next-release coverage. Only the disposable-token **local image** run deliberately reaches rate limits; live acceptance does not exhaust a real owner's quota.
+The live smoke contract expects **19 tools**, including source-bound graph lookup, neighbors and bounded paths. The exercised selector is `--knowledge-municipality ratzeburg --entity-query "Stadt Ratzeburg"`; it uses genuine released entity IDs and relationships, not fabricated fallback data. Historical v0.2.1 selected Mölln because Ratzeburg had no gated record then; that historical absence does not describe 0.3.0. Only the disposable-token **local image** run deliberately reaches rate limits; live acceptance does not exhaust a real owner's quota.
 
 Privileged work uses `deploy/mcp/session.sh`, preserving the existing governed bootstrap recovery checks, pinned WireGuard proxy, canonical identity lock and temporary credential cleanup. Never use a persistent/admin kubeconfig. Before the session, check `pgrep -fl wireproxy`, atomically acquire `/Users/max/.cache/cluster-ops/privileged-session.lock`, write the operator agent name/start time to its `owner`, and stop the filtered viewer through `/Users/max/.cache/cluster-ops/open-freelens-filtered-viewer.sh stop`. Coordinate a held lock; never remove another operator's lock.
 
@@ -238,7 +241,24 @@ The chart disables backend HAProxy access logging before redirect handling. Its 
 
 ## Rollout evidence
 
-### Current: v0.2.1, three districts
+### Current: 0.3.0, 19 tools and nine pilot towns
+
+- Deployed source: `4cdf3a0231cc1d07dc8a501be44f8463ff69aeb5`; literal Git tag and image tag: **`0.3.0`**. Both initialize `serverInfo.version` and release-status `release.version` returned exactly `0.3.0`.
+- Image: `ghcr.io/giraeffleaeffle/stadtstack-mcp:0.3.0@sha256:bfe96e50fa26f8424329bdae1cc8bd306530761e338cefb97cba8fa71cd7f0a6`.
+- [Successful amd64/arm64 publication](https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/38130058619); [source PR](https://github.com/GiraeffleAeffle/ledger-of-life/pull/4).
+- Data manifest: `f434203c14c82ea6b6814662e9b1e209d81d7921bee97aeefcd2269d83330415`. This release contains 14,621 records overall, including **228 dated admitted knowledge records across all nine pilot towns**, eight retained city snapshots, 170 entity groups and three admitted `operates` edges. Records are not unique projects, and the pilot is not exhaustive municipal coverage.
+- Parent verification supplied 318 passing tests plus TypeScript, four negative acceptance regressions and shell syntax checks. Final static release-security and reassessment reviews had no remaining findings. The frozen evaluation/replay reports remain unchanged.
+- Independent exact-image diagnostics passed under non-root/read-only-rootfs, one CPU and 1 GiB. Local cgroup peak was **310,136,832 bytes (about 296 MiB)**, including the short metrics-reader process; no OOM. This measurement is advisory and is neither deployment authorization nor a live-pod heap profile.
+- Crucially, the governed dispatcher independently exported and executed the **approved SHA's** smoke implementation into fresh private evidence before mutation. Its process exited 0; the source/script/receipt hashes, nonce and approved data-manifest identity matched. It did not trust the earlier diagnostic JSON.
+- Public HTTPS endpoint acceptance passed with all 19 tools listed read-only and version/data identity aligned. The main smoke plus a bounded supplemental run invoked all 19 tools. Spatial `along` truthfully returned zero matches for its sampled line; no positive result was invented.
+- The Ratzeburg graph query returned two entity groups, one eligible neighboring relation and a genuine one-hop source-asserted path. The three-district `haushalt` comparison returned **1 / 12 / 19** source-backed records for Strausberg/Mölln/Ludwigslust. These are retrieval results, not independent identity, present-operation, causal or success guarantees.
+- **Evidence scopes remain separate:** the public receipt is `public_endpoint_version_data`, with image-provenance/running-image flags false and only an unverified supplied-image hint. Separately obtained governed ReadyPod evidence reported the exact approved digest as `imageID`; the independent correlation receipt records that equality without changing the public receipt's scope.
+- Non-MCP resource identities/specs were unchanged. A foreign owner's session was neither contacted nor stopped: rollout waited for it to finish and rechecked before acquiring the lock. All three nodes and HAProxy replicas were Ready in filtered preflight; CRD inspection was forbidden by the filtered viewer and is not claimed. After rollout/acceptance, temporary governed credentials/tunnel were cleaned, the filtered viewer was restored and status-verified, and the shared lock was released.
+- Under `~/.cache/cluster-ops/`: `mcp-0.3.0-reviewed-source.json`, `mcp-0.3.0-advisory-smoke.json`, `mcp-0.3.0-memory.json`, `mcp-0.3.0-public-smoke.json`, `mcp-0.3.0-remaining-tools.json`, `mcp-0.3.0-identity-correlation.json`, and `mcp-release-4cdf3a0231cc-20261011T101422Z/` (including generated `runtime-smoke.json`, `smoke-execution.json`, workflow identity, render/dry-run, rollout and ReadyPod evidence).
+- The fixed 30-question assessment reports **1 complete, 10 partial and 19 abstaining answers**; all seven graph utility deltas are zero. More data improved coverage, but no incremental graph answer benefit is claimed. See [the frozen pilot report](../reports/PILOT_VALUE_REPORT.md).
+- Token paths, protection limits and OAuth/client caveats above are unchanged. Native Claude/Cursor/Desktop GUI sessions were not exercised. Use the exact release's clean source checkout for governed operations; later documentation commits do not change this deployed image.
+
+### Historical: v0.2.1, 16-tool three-district release
 
 - Deployed source: `ca92aa7ccda470d09564889db3edaeaea5e4f578`; tag: `civic-mcp-v0.2.1`.
 - Image: `ghcr.io/giraeffleaeffle/stadtstack-mcp@sha256:642ccd06c0e39221bf6314e66020600a3e12c6fab830516aa26e41c34c01688e`.
