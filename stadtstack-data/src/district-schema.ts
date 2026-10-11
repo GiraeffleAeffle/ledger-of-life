@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { getTopic } from './topic-vocabulary.ts';
 import { PROVIDER_CONFIGS } from './district-model-contract.ts';
 import { EntityMentionSchema, RelationClaimSchema, NormalizedEntitySchema, NormalizedRelationSchema, GRAPH_DETERMINISTIC_CHECKS, normalizeGraphClaims, normalizeRelationActions, RelationActionNormalizationSchema } from './district-graph-claims.ts';
-import { APPROVED_OWNER_ROBOTS_OVERRIDE, effectiveRobotsPermission, effectiveSourcePermission, ownerRobotsOverrideApplies } from './source-policy.ts';
-import { DocumentOriginSchema } from './document-origin.ts';
+import { APPROVED_OWNER_ROBOTS_OVERRIDE, effectiveRobotsPermission, effectiveSourcePermission, ownerRobotsOverrideApplies, isContentFreePolicyEvidence, isPolicyMetadataUrl, MAX_POLICY_METADATA_EVIDENCE } from './source-policy.ts';
+import { DocumentOriginSchema } from './document-origin-contract.ts'
 
 export const KNOWLEDGE_SCHEMA_VERSION = 'stadtstack-knowledge-v2';
 export const FAITHFULNESS_THRESHOLD = 0.8;
@@ -36,23 +36,40 @@ export const stageSchema = z.enum(['motion', 'draft', 'consultation', 'decision'
 export const caseKeyTypeSchema = z.enum(['diplan', 'bobsh', 'paper_reference', 'plan_number', 'source_document']);
 export const sourceTypeSchema = z.enum(['council', 'participation', 'gazette', 'website']);
 export const OwnerRobotsOverrideSchema = z.object({
-  host: z.string().min(1), reason: z.literal(APPROVED_OWNER_ROBOTS_OVERRIDE.reason),
+  host: z.string().min(1).max(253), reason: z.literal(APPROVED_OWNER_ROBOTS_OVERRIDE.reason),
   date: z.literal(APPROVED_OWNER_ROBOTS_OVERRIDE.date), approver: z.literal(APPROVED_OWNER_ROBOTS_OVERRIDE.approver), id: z.literal(APPROVED_OWNER_ROBOTS_OVERRIDE.id),
 }).strict().refine(value => ownerRobotsOverrideApplies(`https://${value.host}/`, value), 'Expected an exact public-host-bound owner decision');
+export const PolicyEvidenceSchema = z.object({
+  url: z.url().max(8192), locator: z.string().max(4096), value: z.string().max(64 * 1024),
+  sha256: hashSchema.optional(), checkedAt: z.iso.datetime().optional(),
+  valueSha256: hashSchema.optional(), valueBytes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+  locatorSha256: hashSchema.optional(), locatorBytes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+  itemCount: z.number().int().nonnegative().max(1_000_000).optional(),
+}).strict().superRefine((evidence, ctx) => {
+  if ((evidence.valueSha256 === undefined) !== (evidence.valueBytes === undefined) || (evidence.locatorSha256 === undefined) !== (evidence.locatorBytes === undefined)) ctx.addIssue({ code: 'custom', message: 'Policy evidence digest must retain its byte count' });
+});
 export const SourceAccessPolicySchema = z.object({
-  robots: z.object({ state: z.enum(['allowed', 'blocked', 'unavailable']), url: z.url(), sha256: hashSchema.optional(), checkedAt: z.iso.datetime().optional() }).strict(),
-  tdm: z.object({ state: z.enum(['reserved', 'not_reserved', 'not_declared', 'unavailable']), evidence: z.array(z.object({ url: z.url(), locator: z.string(), value: z.string(), sha256: hashSchema.optional(), checkedAt: z.iso.datetime().optional() }).strict()) }).strict(),
+  robots: z.object({ state: z.enum(['allowed', 'blocked', 'unavailable']), url: z.url().max(8192), sha256: hashSchema.optional(), checkedAt: z.iso.datetime().optional() }).strict(),
+  tdm: z.object({ state: z.enum(['reserved', 'not_reserved', 'not_declared', 'unavailable']), evidence: z.array(PolicyEvidenceSchema).max(256), referenceStatus: z.literal('unavailable').optional(), declarationStatus: z.literal('unavailable').optional() }).strict(),
   access: z.enum(['public', 'authentication', 'captcha', 'paywall']), legalClassification: z.literal('not_assessed'), publication: z.literal('facts_with_attribution_only'),
   ownerRobotsOverride: OwnerRobotsOverrideSchema.optional(), robotsStatus: z.enum(['allowed', 'disallowed', 'unavailable']).optional(), override: z.literal('owner-approved 2026-10-11').optional(),
   ownerTdmOverride: OwnerRobotsOverrideSchema.optional(), tdmOverride: z.literal('owner-approved 2026-10-11').optional(),
   documentOrigin: DocumentOriginSchema.optional(),
 }).strict().superRefine((policy, ctx) => {
+  if (policy.tdm.evidence.some(evidence => evidence.value === 'invalid_reservation_declaration') && policy.tdm.declarationStatus !== 'unavailable') ctx.addIssue({ code: 'custom', message: 'Invalid reservation declaration must remain unavailable' });
   if (policy.ownerRobotsOverride !== undefined || policy.robotsStatus !== undefined || policy.override !== undefined) {
     if (!effectiveRobotsPermission(policy, policy.robots.url)) ctx.addIssue({ code: 'custom', message: 'Owner robots audit requires an exact approved decision and honest declared robots evidence' });
   }
   if (policy.ownerTdmOverride !== undefined || policy.tdmOverride !== undefined) {
     if (policy.tdm.state !== 'reserved' || policy.tdmOverride !== 'owner-approved 2026-10-11' || !ownerRobotsOverrideApplies(policy.robots.url, policy.ownerTdmOverride)) ctx.addIssue({ code: 'custom', message: 'Owner TDM audit requires the exact approved host decision and retained reservation' });
   }
+});
+/** Only this schema may exempt policy observations from source-content purging. */
+export const ContentFreeSourcePolicySchema = SourceAccessPolicySchema.superRefine((policy, ctx) => {
+  const fail = (message: string) => ctx.addIssue({ code: 'custom', message });
+  if (!isPolicyMetadataUrl(policy.robots.url) || policy.tdm.evidence.length > MAX_POLICY_METADATA_EVIDENCE || policy.tdm.evidence.some(evidence => !isContentFreePolicyEvidence(evidence))) fail('Policy metadata contains unprojected or excessive source evidence');
+  if (policy.tdm.evidence.some(evidence => evidence.value === 'invalid_policy_reference') && policy.tdm.referenceStatus !== 'unavailable') fail('Invalid policy reference must remain unavailable');
+  if (policy.documentOrigin && (!isPolicyMetadataUrl(policy.documentOrigin.url) || !/^document-origin-rules-v\d{1,3}$/.test(policy.documentOrigin.classifierVersion) || policy.documentOrigin.evidence.some(evidence => !/^origin-rule-(?:digest|inventory)$/.test(evidence.locator) || !/^sha256:[a-f0-9]{64}$/.test(evidence.value)))) fail('Origin metadata contains unprojected source evidence');
 });
 export function assertSubscriptionSourcePolicy(input: unknown, document?: { mimeType: string; sha256: string; url: string }, registeredSource?: { url: string | null; ownerRobotsOverride?: unknown }) {
   const parsed = SourceAccessPolicySchema.safeParse(input);
@@ -129,12 +146,12 @@ export const DistrictKnowledgeRecordSchema = DistrictExtractionClaimsSchema.exte
   const provider = PROVIDER_CONFIGS[record.extraction.provider];
   if (record.extraction.model !== provider.model || record.extraction.tool !== provider.tool || record.extraction.modelIdentityBasis !== provider.modelIdentityBasis || record.verification.faithfulness.provider !== record.extraction.provider) fail('Provider/model evidence mismatch');
   try {
-    const normalized = normalizeGraphClaims(record, { municipalityId: record.municipalityId, sourceSha256: record.extraction.inputSha256 });
+    const normalized = normalizeGraphClaims(record, { municipalityId: record.municipalityId, sourceSha256: record.extraction.inputSha256, ags: record.ags });
     if (normalized.entities.some((entity, i) => entity.entityId !== record.entities[i].entityId || JSON.stringify(entity.identityBasis) !== JSON.stringify(record.entities[i].identityBasis)) || normalized.relations.some((relation, i) => relation.fromId !== record.relations[i].fromId || relation.toId !== record.relations[i].toId)) fail('Pipeline graph identity mismatch');
   } catch { fail('Invalid graph mention references'); }
   const actionNormalization = record.extraction.relationNormalization;
   // Frozen original contracts stay readable for reassessment; never relabel their generation.
-  if ((actionNormalization || record.extraction.promptVersion === 'district-claims-v8-action-relations') && normalizeRelationActions(record).normalization !== null) fail('Graph actions must be canonical before gating and judging');
+  if ((actionNormalization || record.extraction.promptVersion === 'district-claims-v8-action-relations' || record.extraction.promptVersion === 'district-claims-v9-civic-policy-facts') && normalizeRelationActions(record).normalization !== null) fail('Graph actions must be canonical before gating and judging');
   if (actionNormalization) {
     if (actionNormalization.sourceSha256 !== record.extraction.inputSha256 || actionNormalization.textSha256 !== record.extraction.textSha256 || actionNormalization.responseSha256 !== record.extraction.responseSha256) fail('Relation normalization source/response binding mismatch');
     const indexes = new Set<number>();

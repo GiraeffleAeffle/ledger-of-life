@@ -1,20 +1,25 @@
 import { constants } from 'node:fs';
 import { open, mkdir, lstat, realpath, link, unlink } from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
-import { join, dirname, basename } from 'node:path';
+import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { z } from 'zod';
 import { hashSchema, sha256 } from './district-schema.ts';
-import { assertPreparedSourcesActive, type PreparedSourceReference } from './district-prepared-document.ts';
-import { initializeManagedAcquisitionLane, recordManagedSourceContent, markManagedCacheInventoryComplete, withManagedSourceWrite } from './civic-opt-out.ts';
+import { assertPreparedSourcesActive, preparedSourceBindings, type PreparedSourceReference, type PreparedCacheContext } from './district-prepared-document.ts';
+import { initializeManagedAcquisitionLane, assertManagedSourceBindings, withManagedSourceScratch, withManagedSourceWrite, type CivicPolicyOptions, type ManagedSourceScratch } from './civic-opt-out.ts';
+import type { ExtractorProvider } from './district-model-contract.ts';
 
 // This is the existing response envelope, not a request log. Its field order and
 // digest intentionally remain compatible with answers from earlier extractors.
 const answerBodySchema = z.object({ binding: hashSchema, modelIdentitySha256: hashSchema, receivedAt: z.iso.datetime(), value: z.unknown(), responseSha256: hashSchema, returnedModel: z.string().nullable(), runtimeWarnings: z.array(z.string()) }).strict();
 const answerCacheSchema = answerBodySchema.extend({ cacheSha256: hashSchema }).strict();
 export type CachedAnswer = z.infer<typeof answerBodySchema>;
-type CacheOptions = { cacheRoot: string; binding: string; modelIdentitySha256: string; signal?: AbortSignal; waitMs?: number; sourceContext?: { decisionId: 'owner-2026-10-11-public-civic-sources'; references: PreparedSourceReference[]; receiptSha256: string; policyStateDir?: string } };
+/** Current caches bind both the actual model request and its prepared provenance. */
+export function modelAnswerCacheBinding(input: { provider: ExtractorProvider; modelIdentitySha256: string; system: string; input: unknown; schema: object; sourceContext: PreparedCacheContext }): string {
+  return sha256(JSON.stringify({ provider: input.provider, modelIdentitySha256: input.modelIdentitySha256, system: input.system, input: input.input, schema: input.schema, sourceContext: input.sourceContext }));
+}
+type CacheOptions = { cacheRoot: string; binding: string; modelIdentitySha256: string; signal?: AbortSignal; waitMs?: number; sourceContext: { decisionId: 'owner-2026-10-11-public-civic-sources'; references: PreparedSourceReference[]; receiptSha256: string; policy: CivicPolicyOptions } };
 type FileIdentity = { dev: number; ino: number };
 const WAIT_MS = 360_000; // Longer than the native call's readiness + 240-second generation deadline.
 const POLL_MS = 50;
@@ -29,21 +34,17 @@ async function removeOwned(path: string, owner: FileIdentity): Promise<void> {
 }
 async function readAnswer(path: string, options: CacheOptions, insideManagedWrite = false): Promise<CachedAnswer | undefined> {
   options.signal?.throwIfAborted();
-  if (options.sourceContext) await assertPreparedSourcesActive(options.sourceContext.references, { stateDir: options.sourceContext.policyStateDir });
+  await assertPreparedSourcesActive(options.sourceContext.references, options.sourceContext.policy);
   let file: FileHandle;
-  try { file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK); }
+  try { if (!insideManagedWrite) await assertManagedSourceBindings(path, preparedSourceBindings(options.sourceContext.references, options.sourceContext.receiptSha256), options.sourceContext.policy); file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined; throw error; }
   try {
     if (!(await file.stat()).isFile()) throw Error('Source model-response cache file type rejected');
     const bytes = await file.readFile({ encoding: 'utf8' }), cached = answerCacheSchema.parse(JSON.parse(bytes)), { cacheSha256, ...body } = cached;
     if (body.binding !== options.binding || body.modelIdentitySha256 !== options.modelIdentitySha256 || sha256(JSON.stringify(body)) !== cacheSha256) throw Error('Source model-response cache integrity mismatch');
     options.signal?.throwIfAborted();
-    if (options.sourceContext && !insideManagedWrite) {
-      const context = options.sourceContext, contentSha256 = sha256(bytes);
-      for (const reference of context.references) await recordManagedSourceContent(dirname(path), { relativePath: basename(path), contentSha256, sourceSha256: reference.sha256, url: reference.url, observationId: reference.id, receiptSha256: context.receiptSha256, independentAllowed: true }, { stateDir: context.policyStateDir });
-      await markManagedCacheInventoryComplete(dirname(path), { stateDir: context.policyStateDir });
-    }
-    if (options.sourceContext) await assertPreparedSourcesActive(options.sourceContext.references, { stateDir: options.sourceContext.policyStateDir });
+    if (!insideManagedWrite) await assertManagedSourceBindings(path, preparedSourceBindings(options.sourceContext.references, options.sourceContext.receiptSha256), options.sourceContext.policy);
+    await assertPreparedSourcesActive(options.sourceContext.references, options.sourceContext.policy);
     options.signal?.throwIfAborted();
     return body;
   } finally { await file.close(); }
@@ -75,11 +76,19 @@ export async function cachedModelAnswer(options: CacheOptions, generate: () => P
   options.signal?.throwIfAborted();
   hashSchema.parse(options.binding); hashSchema.parse(options.modelIdentitySha256);
   if (options.waitMs !== undefined && (!Number.isFinite(options.waitMs) || options.waitMs < 0 || options.waitMs > WAIT_MS)) throw Error('Source model-response cache wait bound invalid');
-  if (options.sourceContext) {
-    hashSchema.parse(options.sourceContext.receiptSha256);
-    if (!options.sourceContext.references.length) throw Error('Source model-response cache requires source references');
-    await assertPreparedSourcesActive(options.sourceContext.references, { stateDir: options.sourceContext.policyStateDir });
-  }
+  const context = options.sourceContext;
+  if (!context || !context.references.length) throw Error('Source model-response cache requires source references and authority');
+  hashSchema.parse(context.receiptSha256);
+  // A lock is content-free coordination metadata. Observe it before the
+  // asynchronous authority/source preflight, without reading any answer bytes.
+  // An observed producer ending during that preflight cannot make us its retry.
+  let producerObserved = false;
+  try {
+    const observed = await lstat(join(options.cacheRoot, options.binding + '.answer.lock'));
+    if (!observed.isFile()) throw Error('Source model-response cache lock type rejected');
+    producerObserved = true;
+  } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  await assertPreparedSourcesActive(context.references, context.policy);
   await mkdir(options.cacheRoot, { recursive: true, mode: 0o700 });
   // Refuse a symlink cache leaf, canonicalize parents (including macOS /var),
   // and create only digest-named children in this private directory.
@@ -87,12 +96,13 @@ export async function cachedModelAnswer(options: CacheOptions, generate: () => P
   let root: string;
   try {
     root = await realpath(options.cacheRoot);
-    if (options.sourceContext) await initializeManagedAcquisitionLane(root, { decisionId: options.sourceContext.decisionId, kind: 'artifacts', stateDir: options.sourceContext.policyStateDir });
+    await initializeManagedAcquisitionLane(root, { decisionId: context.decisionId, kind: 'artifacts', ...context.policy });
     await directory.chmod(0o700);
   } finally { await directory.close(); }
   const path = join(root, options.binding + '.answer.json'), lockPath = join(root, options.binding + '.answer.lock');
   const cached = await readAnswer(path, options);
   if (cached) return cached;
+  if (producerObserved) return waitForAnswer(path, lockPath, options);
   options.signal?.throwIfAborted();
   let lock: FileHandle;
   try { lock = await open(lockPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600); }
@@ -108,14 +118,17 @@ export async function cachedModelAnswer(options: CacheOptions, generate: () => P
     if (winner) return winner;
     await assertOwned(lockPath, owner);
     options.signal?.throwIfAborted();
-    if (options.sourceContext) await markManagedCacheInventoryComplete(root, { stateDir: options.sourceContext.policyStateDir });
+    await assertPreparedSourcesActive(context.references, context.policy);
     const body = answerBodySchema.parse(await generate());
     options.signal?.throwIfAborted();
     if (body.binding !== options.binding || body.modelIdentitySha256 !== options.modelIdentitySha256) throw Error('Source model-response cache binding mismatch');
     await assertOwned(lockPath, owner);
+    // An explicitly managed valid winner may have arrived while generation was in flight.
+    const completed = await readAnswer(path, options);
+    if (completed) return completed;
     const bytes = JSON.stringify({ ...body, cacheSha256: sha256(JSON.stringify(body)) }) + '\n', contentSha256 = sha256(bytes);
-    const publish = async () => {
-      const temporary = path + '.' + randomUUID() + '.tmp';
+    const publish = async (scope: ManagedSourceScratch) => {
+      const temporary = join(scope.directory, 'answer.json');
       const file = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
       const temporaryOwner = await file.stat();
       try {
@@ -139,9 +152,9 @@ export async function cachedModelAnswer(options: CacheOptions, generate: () => P
         finally { await file.close(); }
       }
     };
-    if (!options.sourceContext) return await publish();
-    const context = options.sourceContext, entries = context.references.map(reference => ({ relativePath: options.binding + '.answer.json', contentSha256, sourceSha256: reference.sha256, url: reference.url, observationId: reference.id, receiptSha256: context.receiptSha256, independentAllowed: true }));
-    return await withManagedSourceWrite(root, entries, publish, { stateDir: context.policyStateDir });
+    const entries = context.references.map(reference => ({ kind: 'prepared_source' as const, relativePath: options.binding + '.answer.json', contentSha256, sourceSha256: reference.sha256, url: reference.url, observationId: reference.id, receiptSha256: context.receiptSha256, independentAllowed: true }));
+    const bindings = context.references.map(reference => ({ kind: 'prepared_source' as const, sourceSha256: reference.sha256, url: reference.url, observationId: reference.id, receiptSha256: context.receiptSha256 }));
+    return await withManagedSourceScratch(root, bindings, async scope => withManagedSourceWrite(root, entries, () => publish(scope), context.policy), { decisionId: context.decisionId, kind: 'artifacts', purpose: 'artifact', ...context.policy });
   } finally {
     try { await removeOwned(lockPath, owner); }
     finally { await lock.close(); }

@@ -1,10 +1,10 @@
-import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
-import {dirname,resolve} from 'node:path';
+import {readFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {z} from 'zod';
-import {PoliteFetcher,PoliteFetchError,publicUrl} from './polite-fetch.ts';
+import {publicUrl} from './polite-fetch.ts';
 import {OwnerRobotsOverrideSchema} from './district-schema.ts';
-import {APPROVED_OWNER_ROBOTS_OVERRIDE,ownerRobotsOverrideApplies} from './source-policy.ts';
+import {ownerRobotsOverrideApplies} from './source-policy.ts';
 
 const url=z.string().url().refine(value=>{try{publicUrl(value);return true;}catch{return false;}},'Expected a public, credential-free HTTP URL');
 const timestamp=z.string().datetime({offset:true});
@@ -73,38 +73,13 @@ export const districtRegistrySchema=z.object({
 export type DistrictRegistry=z.infer<typeof districtRegistrySchema>;
 export async function loadDistrictRegistry(path='sources/district-registry.json'):Promise<DistrictRegistry>{return districtRegistrySchema.parse(JSON.parse(await readFile(path,'utf8')));}
 
-/** Refreshes configured endpoints only. It does not infer municipal absence from a failed request,
- * discover OParl by guessing paths, or turn registry reachability into extracted-fact approval. */
-export async function refreshDistrictRegistry(registry:DistrictRegistry,cacheDir='cache/registry-refresh/owner-policy-2026-10-11/raw'):Promise<DistrictRegistry>{
- const next=structuredClone(registry),fetcher=new PoliteFetcher({cacheDir,ownerPolicyLane:{decisionId:APPROVED_OWNER_ROBOTS_OVERRIDE.id}});
- for(const municipality of next.municipalities)for(const source of municipality.sources){
-  if(!source.url)continue;
-  try{
-   const observed=await fetcher.fetch(source.url,{ownerRobotsOverride:source.ownerRobotsOverride,registeredSourceUrl:source.url,hostProfile:source.hostProfile??'municipal'});
-   source.evidence=[...source.evidence.filter(e=>!e.locator.startsWith('Endpoint refresh:')),{
-    url:observed.url,locator:`Endpoint refresh: HTTP ${observed.status}; configured ${source.kind} endpoint retrieved; no content licence or extraction approval inferred`,sha256:observed.sha256,retrievedAt:observed.retrievedAt,
-   }];
-   source.checkedAt=observed.checkedAt;
-   // Reachability alone cannot establish a municipality's use of a generic portal
-   // or turn an ALLRIS login page into a public proceedings archive.
-   if(source.checkState==='checked')source.reason='Configured endpoint retrieved through robots-aware, bounded public fetch. Documentary evidence and source category remain separately attributed.';
-  }catch(error){
-   source.checkState='not_checked';source.checkedAt=new Date().toISOString();
-   source.reason=error instanceof PoliteFetchError?`Refresh inaccessible: ${error.failure}${error.status?` (HTTP ${error.status})`:''}; not evidence that the source does not exist`:'Refresh failed; prior discovery evidence retained, source existence not disproved';
-  }
- }
- next.generatedAt=new Date().toISOString();return districtRegistrySchema.parse(next);
+/** Local metadata validation only. Acquisition requires the governed crawl descriptor. */
+export async function districtRegistryMain(args:string[]=process.argv.slice(2)){
+ const values=[...args],command=values.shift()??'validate';
+ if(command!=='validate')throw Error('Usage: district-registry.ts validate [--registry PATH]; acquisition uses the governed crawl configuration');
+ let path:string|undefined;
+ while(values.length){const key=values.shift(),value=values.shift();if(key!=='--registry'||!value)throw Error('Invalid registry validation option');path=value;}
+ const registry=await loadDistrictRegistry(path);
+ console.log(JSON.stringify({schemaVersion:registry.schemaVersion,districts:registry.districts.length,municipalities:registry.municipalities.length,inventory:registry.inventory.length,sources:registry.municipalities.reduce((count,municipality)=>count+municipality.sources.length,0)}));
 }
-async function main(){
- const args=process.argv.slice(2),command=args.shift()??'validate';
- if(!['validate','refresh'].includes(command))throw Error('Usage: district-registry.ts validate|refresh [--registry PATH] [--out PATH] [--cache PATH]');
- const options:Record<string,string>={};
- while(args.length){const key=args.shift()!,value=args.shift();if(!['--registry','--out','--cache'].includes(key)||!value)throw Error('Invalid registry option');options[key]=value;}
- const registry=await loadDistrictRegistry(options['--registry']);
- if(command==='refresh'){
-  const refreshed=await refreshDistrictRegistry(registry,options['--cache']),target=resolve(options['--out']??'cache/registry-refresh/owner-policy-2026-10-11/registry.json');
-  await mkdir(dirname(target),{recursive:true});const temporary=target+`.${process.pid}.tmp`;await writeFile(temporary,JSON.stringify(refreshed,null,2)+'\n');await rename(temporary,target);
-  console.log(JSON.stringify({schemaVersion:refreshed.schemaVersion,municipalities:refreshed.municipalities.length,out:target}));
- }else console.log(JSON.stringify({schemaVersion:registry.schemaVersion,districts:registry.districts.length,municipalities:registry.municipalities.length,inventory:registry.inventory.length,sources:registry.municipalities.reduce((n,m)=>n+m.sources.length,0)}));
-}
-if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)main().catch(error=>{console.error(error instanceof z.ZodError?error.message:error instanceof Error?error.message:'Registry command failed');process.exitCode=1;});
+if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)districtRegistryMain().catch(()=>{console.error('Registry metadata validation failed; no acquisition or refresh was performed.');process.exitCode=1;});

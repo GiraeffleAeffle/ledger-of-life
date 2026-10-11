@@ -1,9 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {parseTdmRules,tdmRuleForUrl,inspectResourcePolicy,matchesPolicyPattern,ownerRobotsOverrideFor,ownerRobotsOverrideApplies,effectiveRobotsPermission,documentOriginExcludes,effectiveSourcePermission,type SourceAccessPolicy} from '../src/source-policy.ts';
-import {SourceAccessPolicySchema,assertSubscriptionSourcePolicy} from '../src/district-schema.ts';
+import {parseTdmRules,parseTdmReservation,tdmRuleForUrl,inspectResourcePolicy,matchesPolicyPattern,ownerRobotsOverrideFor,ownerRobotsOverrideApplies,effectiveRobotsPermission,documentOriginExcludes,effectiveSourcePermission,projectSourcePolicyMetadata,MAX_POLICY_METADATA_EVIDENCE,type SourceAccessPolicy} from '../src/source-policy.ts';
+import {SourceAccessPolicySchema,ContentFreeSourcePolicySchema,assertSubscriptionSourcePolicy,sha256} from '../src/district-schema.ts';
 import {districtSourceSchema,loadDistrictRegistry} from '../src/district-registry.ts';
-import {DOCUMENT_ORIGIN_CLASSIFIER_VERSION} from '../src/document-origin.ts';
+import { DOCUMENT_ORIGIN_CLASSIFIER_VERSION } from '../src/document-origin-contract.ts'
 import {frozenCorpusSchema,excludedCrawlDocumentSchema} from '../src/district-corpus.ts';
 
 test('TDMRep uses ordered specific rules and encoded path matching',()=>{
@@ -165,4 +165,80 @@ test('excluded acquisition rows preserve honest policy evidence but cannot enter
  const corpus=frozenCorpusSchema.parse({schemaVersion:'stadtstack-crawl-index-v1',documents:[],excludedDocuments:[excluded]});
  assert.equal(corpus.documents.length,0);assert.equal(corpus.excludedDocuments![0].policy.robots.state,'blocked');
  assert.equal(frozenCorpusSchema.safeParse({schemaVersion:'stadtstack-crawl-index-v1',documents:[{...excluded,localPath:'forged-cas-path'}]}).success,false);
+});
+
+test('policy metadata hashes source-controlled declarations instead of retaining source text',()=>{
+ const secret='FULL_SOURCE_TEXT_MUST_NOT_SURVIVE_IN_POLICY_METADATA_'.repeat(3000);
+ const inspected=inspectResourcePolicy(councilUrl,{'tdm-policy':secret,'x-robots-tag':'noai, '+secret},Buffer.from('<meta name="tdm-policy" content="'+secret+'"><meta name="tdm-reservation" content="1"><h1>Public source</h1>'),'text/html');
+ assert.equal(inspected.reservation,1);assert.equal(inspected.unavailable,true);
+ const safe=projectSourcePolicyMetadata({...councilPolicy(),tdm:{state:'reserved',referenceStatus:'unavailable',evidence:inspected.evidence}});
+ assert.equal(ContentFreeSourcePolicySchema.safeParse(safe).success,true);
+ assert.equal(JSON.stringify(safe).includes(secret),false);
+ const reference=safe.tdm.evidence.find(item=>item.locator==='HTTP TDM-Policy')!;
+ assert.equal(reference.value,'invalid_policy_reference');assert.equal(reference.valueSha256,sha256(secret));assert.equal(reference.valueBytes,Buffer.byteLength(secret));
+ assert.equal(safe.tdm.state,'reserved');assert.equal(safe.robots.state,'blocked');
+ assert.equal(effectiveSourcePermission(safe,{url:councilUrl,sha256:'b'.repeat(64)}),false);
+ assert.deepEqual(projectSourcePolicyMetadata(safe),safe);
+ const referenceUrl='https://stadt.de/tdm-policy';
+ const valid=inspectResourcePolicy(councilUrl,{'tdm-policy':referenceUrl},Buffer.from('public'),'text/plain');
+ assert.equal(valid.unavailable,false);assert.equal(valid.evidence[0].value,'policy_reference_present');assert.equal(valid.evidence[0].valueSha256,sha256(referenceUrl));
+ assert.equal(JSON.stringify(valid.evidence).includes(referenceUrl),false);
+});
+test('metadata exemptions reject arbitrary locators/origin text and preserve overflow declaration inventory',()=>{
+ const policy=councilPolicy(),raw={...policy,tdm:{state:'reserved' as const,evidence:[{url:councilUrl,locator:'SOURCE_BODY_IN_LOCATOR',value:'SOURCE_BODY_IN_VALUE'}]}};
+ assert.equal(SourceAccessPolicySchema.safeParse(raw).success,true);
+ assert.equal(ContentFreeSourcePolicySchema.safeParse(raw).success,false);
+ const projected=projectSourcePolicyMetadata(raw);
+ assert.equal(ContentFreeSourcePolicySchema.safeParse(projected).success,true);
+ assert.equal(projected.tdm.evidence[0].locatorSha256,sha256('SOURCE_BODY_IN_LOCATOR'));
+ assert.equal(JSON.stringify(projected).includes('SOURCE_BODY_IN_'),false);
+ const many={...policy,tdm:{state:'reserved' as const,evidence:Array.from({length:100},(_,index)=>({url:councilUrl,locator:'HTML meta[name=tdm-policy]',value:'https://stadt.de/policy/'+index}))}};
+ const bounded=projectSourcePolicyMetadata(many),inventory=bounded.tdm.evidence.at(-1)!;
+ assert.equal(bounded.tdm.evidence.length,MAX_POLICY_METADATA_EVIDENCE);
+ assert.equal(inventory.value,'policy_evidence_inventory');assert.equal(inventory.itemCount,100);assert.match(inventory.valueSha256!,/^[a-f0-9]{64}$/);
+ assert.equal(bounded.tdm.state,'reserved');assert.equal(ContentFreeSourcePolicySchema.safeParse(bounded).success,true);
+ assert.deepEqual(projectSourcePolicyMetadata(bounded),bounded);
+ assert.throws(()=>parseTdmRules([{location:'/','tdm-reservation':1,'tdm-policy':'unstructured source text'}]),/Invalid/);
+ assert.throws(()=>parseTdmRules([{location:'/','tdm-reservation':0,sourceBody:'must not bypass policy-resource validation'}]),/Invalid/);
+});
+test('old origin-rule authority cannot authorize a new restricted extraction',()=>{
+ const policy=councilPolicy(),old={...policy,documentOrigin:{...policy.documentOrigin!,classifierVersion:'document-origin-rules-v1'}};
+ assert.equal(SourceAccessPolicySchema.safeParse(old).success,true);
+ assert.equal(effectiveSourcePermission(old,{url:councilUrl,sha256:'b'.repeat(64)}),false);
+ assert.throws(()=>assertSubscriptionSourcePolicy(old,{url:councilUrl,sha256:'b'.repeat(64),mimeType:'text/html'}),/blocks extraction/);
+});
+test('bounded named source targets are registered without inventing fresh acquisition',async()=>{
+ const registry=await loadDistrictRegistry(new URL('../sources/district-registry.json',import.meta.url).pathname);
+ const hoppegarten=registry.municipalities.find(city=>city.id==='hoppegarten')!.sources.find(source=>source.id==='hoppegarten-website')!;
+ assert.ok(hoppegarten.crawlScope!.pageRoots.includes('https://www.gemeinde-hoppegarten.de/news/1/1240589/nachrichten/kommunale-w%C3%A4rmeplanung-in-hoppegarten.html'));
+ const ruedersdorf=registry.municipalities.find(city=>city.id==='ruedersdorf-bei-berlin')!.sources.find(source=>source.id==='ruedersdorf-bei-berlin-website')!;
+ assert.ok(ruedersdorf.crawlScope!.pageRoots.includes('https://www.ruedersdorf.de/meine-gemeinde/konzepte/kommunale-waermeplanung/'));
+ const seed=registry.municipalities.find(city=>city.id==='strausberg')!.seedDocuments.find(seed=>seed.url==='https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/e85e3cda-c72c-405f-9b66-bd1ac7d6c347')!;
+ assert.equal(seed.sourceId,'strausberg-participation');assert.equal(seed.documentDate,'2025-08-07');
+ assert.equal(seed.evidence[0].sha256,'6b3d0a467c73bac1617dbcc88a692d9cc3319ec2d17ca22dbd3e5d91c764ea55');
+ assert.equal(seed.evidence[0].retrievedAt,undefined);assert.match(seed.evidence[0].locator,/current managed reacquisition/);
+});
+
+test('present malformed reservation declarations are not absence and retain any explicit one',()=>{
+ assert.deepEqual(parseTdmReservation(undefined),{state:'absent',reservation:null});
+ for(const [value,reservation] of [['0',0],['1',1],[' 1 ',1]] as const)assert.deepEqual(parseTdmReservation(value),{state:'valid',reservation});
+ for(const [value,reservation] of [['1, 1',1],['1, 0',1],['0, 1',1],['garbage, 1',1],['0, 0',null],['',null],['   ',null],['PRIVATE-MALFORMED-DECLARATION',null]] as const){
+  assert.deepEqual(parseTdmReservation(value),{state:'invalid',reservation});
+  const inspected=inspectResourcePolicy(councilUrl,{'tdm-reservation':value},Buffer.from('Synthetic source'),'text/plain');
+  assert.equal(inspected.reservation,reservation);assert.equal(inspected.unavailable,true);assert.equal(inspected.declarationUnavailable,true);assert.equal(inspected.referenceUnavailable,false);
+  const marker=inspected.evidence.find(item=>item.value==='invalid_reservation_declaration')!;assert.equal(marker.valueSha256,sha256(value));assert.equal(marker.valueBytes,Buffer.byteLength(value));assert.equal(marker.locator,'HTTP TDM-Reservation');
+  const candidate:SourceAccessPolicy={...councilPolicy(),tdm:{state:reservation===1?'reserved':'unavailable',evidence:inspected.evidence},...(reservation===1?{ownerTdmOverride:decision,tdmOverride:'owner-approved 2026-10-11' as const}:{})},safe=projectSourcePolicyMetadata(candidate);
+  assert.equal(safe.tdm.declarationStatus,'unavailable');assert.equal(safe.tdm.referenceStatus,undefined);assert.equal(ContentFreeSourcePolicySchema.safeParse(safe).success,true);
+  assert.equal(effectiveSourcePermission(safe,{url:councilUrl,sha256:'b'.repeat(64)}),false);assert.throws(()=>assertSubscriptionSourcePolicy(safe,{url:councilUrl,sha256:'b'.repeat(64),mimeType:'text/plain'}));
+  const forged=structuredClone(safe);delete forged.tdm.declarationStatus;assert.equal(SourceAccessPolicySchema.safeParse(forged).success,false);
+  assert.equal(JSON.stringify(safe).includes('PRIVATE-MALFORMED-DECLARATION'),false);assert.deepEqual(projectSourcePolicyMetadata(safe),safe);
+ }
+});
+
+test('HTML reservation fields use the same fail-closed parser, including missing content and bounded evidence',()=>{
+ for(const html of ['<meta name="tdm-reservation">','<meta name="tdm-reservation" content="garbage">','<meta name="tdm-reservation" content="0, 0">']){
+  const result=inspectResourcePolicy(councilUrl,{},Buffer.from(html),'text/html');assert.equal(result.declarationUnavailable,true);assert.equal(result.reservation,null);assert.equal(result.evidence[0].value,'invalid_reservation_declaration');
+ }
+ const many='<meta name="tdm-reservation" content="0">'.repeat(MAX_POLICY_METADATA_EVIDENCE+10)+'<meta name="tdm-reservation" content="1, 1">';
+ const result=inspectResourcePolicy(councilUrl,{},Buffer.from(many),'text/html');assert.equal(result.reservation,1);assert.equal(result.declarationUnavailable,true);assert.equal(result.unavailable,true);assert.ok(result.evidence.length<=MAX_POLICY_METADATA_EVIDENCE);
 });

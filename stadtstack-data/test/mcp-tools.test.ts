@@ -3,10 +3,18 @@ import assert from 'node:assert/strict';
 import {z} from 'zod';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
-import {loadRelease,hostedServer} from '../src/mcp-tools.ts';
+import {loadRelease as loadSealedRelease,hostedServer} from '../src/mcp-tools.ts';
 import {server} from '../src/mcp.ts';
-import {changesSchema} from '../src/changes.ts';
+import {changesSchema,diff,knowledgeChangeRecord} from '../src/changes.ts';
+import {verifyDataRelease} from '../src/data-release.ts';
+import {governedReleaseDirectory} from '../src/governed-release-directory.ts';
+import {verifiedMask} from './fixtures/revocations.ts';
 import {MCP_RELEASE_VERSION} from '../src/mcp-version.ts';
+
+async function loadRelease(){
+  const directory=governedReleaseDirectory(),manifest=await verifyDataRelease(directory);
+  return loadSealedRelease(directory,{mode:'sealed',revocations:verifiedMask(manifest.id)});
+}
 
 const envelopeSchema=z.object({source:z.object({release:z.string()}),releasedAt:z.iso.datetime(),respondedAt:z.iso.datetime(),status:z.literal('candidate'),data:z.unknown()}).passthrough();
 const recordSchema=z.object({id:z.string(),cityId:z.string(),sourceIds:z.array(z.string())}).passthrough();
@@ -18,8 +26,8 @@ test('released MCP contract retains core evidence, separates times and fact/sour
   try {
     assert.equal(client.getServerVersion()?.version,MCP_RELEASE_VERSION);
     const tools=await client.listTools();
-    assert.equal(tools.tools.length,19);
-    for(const name of ['list_topics','get_source','compare_topic','similar','entity_search','graph_neighbors','graph_path'])assert.ok(tools.tools.some(tool=>tool.name===name));
+    assert.equal(tools.tools.length,20);
+    for(const name of ['list_topics','get_source','compare_topic','similar','entity_search','graph_neighbors','graph_path','export_records'])assert.ok(tools.tools.some(tool=>tool.name===name));
     const before=Date.now();
     const result=await client.callTool({name:'get_core_bundle',arguments:{}});
     const envelope=envelopeSchema.parse(result.structuredContent);
@@ -38,7 +46,7 @@ test('released MCP contract retains core evidence, separates times and fact/sour
     assert.equal(sources.id,fact.id);assert.deepEqual(sources.verification,fact.verification);assert.equal('source' in sources,false);
     assert.deepEqual(sources.sourceIds,record.sourceIds);
     const source=envelopeSchema.parse((await client.callTool({name:'get_source',arguments:{sourceId:record.sourceIds[0]}})).structuredContent);
-    assert.deepEqual(source.data,sources.sources[0]);
+    assert.deepEqual(source.data,{...sources.sources[0],administrativeView:release.index.administrativeView});
     assert.equal((await client.callTool({name:'get_sources',arguments:{id:record.sourceIds[0]}})).isError,true);
     assert.equal((await client.callTool({name:'get_source',arguments:{sourceId:fact.id}})).isError,true);
     const status=envelopeSchema.parse((await client.callTool({name:'get_release_status',arguments:{}})).structuredContent);
@@ -48,12 +56,22 @@ test('released MCP contract retains core evidence, separates times and fact/sour
 });
 
 test('get_changes uses the injected immutable release snapshot, not mutable output files',async()=>{
-  const loaded=await loadRelease(),cityId=loaded.catalogue.cities[0].id;
-  const changes={added:['test:synthetic-release-snapshot'],changed:[],removed:[],generatedAt:loaded.dataManifest.generatedAt};
-  const release={...loaded,changes:{...loaded.changes,[cityId]:changes}};
+  const cityId='hoppegarten',generatedAt='2026-10-11T00:00:00.000Z';
+  const record=knowledgeChangeRecord({id:'test:synthetic-release-snapshot',municipalityId:cityId,sources:[{url:'https://example.org/evidence',sha256:'1'.repeat(64)}],verification:{evidenceHash:'2'.repeat(64)}});
+  const changes=diff([],[record],generatedAt);
+  // Full sealed admission and a genuinely signed empty cohort; only feed dispatch is replaced.
+  const release={...await loadRelease(),changes:{[cityId]:changes}};
   const mcp=server({release}),client=new Client({name:'immutable-changes-test',version:'1'});
   const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();await mcp.connect(serverTransport);await client.connect(clientTransport);
-  try{assert.deepEqual(changesSchema.parse((await client.callTool({name:'get_changes',arguments:{cityId}})).structuredContent),changes);}
+  try{
+    const response=z.object({administrativeView:z.unknown()}).passthrough().parse((await client.callTool({name:'get_changes',arguments:{cityId}})).structuredContent);
+    const {administrativeView,...feed}=response;assert.ok(administrativeView);
+    assert.deepEqual(changesSchema.parse(feed),changes);
+    assert.equal((await client.callTool({name:'get_changes',arguments:{cityId:'unknown-city'}})).isError,true);
+    const tools=await client.listTools();
+    assert.match(tools.tools.find(tool=>tool.name==='get_changes')!.description!,/sealed release/);
+    assert.match(tools.tools.find(tool=>tool.name==='get_changes')!.description!,/never creates a civic/);
+  }
   finally{await client.close();await mcp.close();}
 });
 
@@ -94,7 +112,7 @@ test('normalized three-district release exposes qualifying and zero-gated towns 
     const compared=z.object({releaseId:z.string(),cities:z.array(z.object({cityId:z.string(),recordCount:z.number(),coverage:z.unknown()}))}).parse(comparison.data);
     assert.equal(compared.releaseId,release.dataManifest.id);assert.deepEqual(compared.cities.map(city=>city.cityId),cityIds);
     const similarity=envelopeSchema.parse((await client.callTool({name:'similar',arguments:{id:target.id,limit:50}})).structuredContent);
-    const similar=z.object({releaseId:z.string(),method:z.object({model:z.null(),version:z.literal('district-similarity-v1')}),items:z.array(recordSchema)}).parse(similarity.data);
+    const similar=z.object({releaseId:z.string(),method:z.object({model:z.null(),version:z.literal('district-similarity-v2')}),items:z.array(z.object({id:z.string(),cityId:z.string(),memberRecordIds:z.array(z.string()).min(1),sourceIds:z.array(z.string())}).passthrough())}).parse(similarity.data);
     assert.equal(similar.releaseId,release.dataManifest.id);assert.ok(similar.items.every(item=>item.cityId!==target.cityId));
     const source=envelopeSchema.parse((await client.callTool({name:'get_source',arguments:{sourceId:target.sourceIds[0]}})).structuredContent);
     assert.equal(z.object({registrySourceId:z.string()}).parse(source.data).registrySourceId.length>0,true);
@@ -107,6 +125,16 @@ test('graph MCP tools are read-only, source-bound and reject unbounded or ambigu
   await mcp.connect(serverTransport);await client.connect(clientTransport);
   try{
     const tools=await client.listTools();
+    const graphDescription=tools.tools.find(tool=>tool.name==='graph_neighbors')?.description??'';
+    assert.match(graphDescription,/member_of/);
+    assert.match(graphDescription,/Coverage is sparse/);
+    assert.match(graphDescription,/Edge IDs are release-specific output IDs/);
+    assert.deepEqual(graphDescription.match(/edge:[a-f0-9]{64}/g),[
+      'edge:7048119fc2453e41926d943f02578c605ef633634148f1401e7d3049d89cdf3c',
+      'edge:abe58d44b4927db8f59eeed36939f06b06d1b1ffe0b604c7d31377ca2c91b43d',
+      'edge:b19c051984380d89ea42f57e3375fa0b15757620d184fc1c725d17c92689bc42',
+    ]);
+    assert.match(tools.tools.find(tool=>tool.name==='entity_search')?.description??'',/AGS-scoped council body/);
     for(const name of ['entity_search','graph_neighbors','graph_path']){
       const definition=tools.tools.find(tool=>tool.name===name);assert.ok(definition);
       assert.equal(definition.annotations?.readOnlyHint,true);assert.equal(definition.annotations?.destructiveHint,false);
@@ -131,4 +159,45 @@ test('graph MCP tools are read-only, source-bound and reject unbounded or ambigu
       assert.equal('modality' in pathData,false);
     }
   }finally{await client.close();await mcp.close();}
+});
+
+test('0.3.1 heat comparisons, bulk export and quarantine coverage share the released evidence',async()=>{
+ const release=await loadRelease(),mcp=server({release}),client=new Client({name:'patch-031-regression',version:'1'});
+ const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();
+ await mcp.connect(serverTransport);await client.connect(clientTransport);
+ try{
+  const cityIds=['strausberg','hoppegarten','ruedersdorf-bei-berlin'],topic='waermeplanung';
+  const compared=z.object({method:z.object({version:z.literal('district-comparison-v2')}),cities:z.array(z.object({cityId:z.string(),sourceBackedRecordCount:z.number(),sourceBackedCaseCount:z.number(),cases:z.array(z.object({eligibleRecordIds:z.array(z.string()),furthestSupportedStage:z.string().nullable(),furthestSupportedDate:z.string().nullable()}).passthrough())}).passthrough())}).parse((await client.callTool({name:'compare_topic',arguments:{topic,cityIds}})).structuredContent);
+  for(const cityId of cityIds){
+   const page=z.object({items:z.array(z.object({id:z.string(),caseId:z.string(),comparisonEligible:z.literal(true)})),nextCursor:z.null()}).parse((await client.callTool({name:'search_topics',arguments:{topic,cityIds:[cityId],limit:50,fields:['id','caseId','comparisonEligible']}})).structuredContent);
+   assert.ok(page.items.length>0,`${cityId} heat evidence must not disappear`);
+   const comparison=compared.cities.find(city=>city.cityId===cityId)!;
+   assert.equal(comparison.sourceBackedRecordCount,page.items.length);
+   assert.equal(comparison.sourceBackedCaseCount,new Set(page.items.map(item=>item.caseId)).size);
+   const members=new Set(comparison.cases.flatMap(item=>item.eligibleRecordIds));
+   assert.ok(page.items.every(item=>members.has(item.id)));
+   assert.ok(comparison.cases.some(item=>item.furthestSupportedStage));
+   if(cityId==='hoppegarten'||cityId==='strausberg')assert.ok(comparison.cases.every(item=>item.furthestSupportedDate===null),'Unbound/publication dates are not stage dates');
+   if(cityId==='ruedersdorf-bei-berlin')assert.ok(comparison.cases.some(item=>item.furthestSupportedStage==='adopted'&&item.furthestSupportedDate==='2025-07-22'));
+  }
+  const exportPage=z.object({releaseId:z.string(),items:z.array(z.object({id:z.string(),caseId:z.string(),sourceIds:z.array(z.string()),originalRecord:z.unknown()}).passthrough()),sources:z.array(z.object({id:z.string(),url:z.string()}).passthrough()),totalRecords:z.number(),totalCases:z.number(),nextCursor:z.string().nullable()}).passthrough();
+  const first=exportPage.parse((await client.callTool({name:'export_records',arguments:{municipality:'strausberg',limit:1}})).structuredContent);
+  assert.equal(first.releaseId,release.dataManifest.id);assert.equal(first.items.length,1);assert.ok(first.items[0].originalRecord);
+  assert.ok(first.totalCases<=first.totalRecords);assert.ok(first.nextCursor);
+  assert.ok(first.items[0].sourceIds.every(id=>first.sources.some(source=>source.id===id)));
+  const next=exportPage.parse((await client.callTool({name:'export_records',arguments:{municipality:'strausberg',limit:1,cursor:first.nextCursor}})).structuredContent);
+  assert.notEqual(next.items[0].id,first.items[0].id);
+  assert.equal((await client.callTool({name:'export_records',arguments:{municipality:'hoppegarten',limit:1,cursor:first.nextCursor}})).isError,true);
+  assert.equal((await client.callTool({name:'export_records',arguments:{limit:51}})).isError,true);
+  assert.equal((await client.callTool({name:'export_records',arguments:{topic:'not-a-topic'}})).isError,true);
+  const coverage=z.object({accounting:z.object({registryMunicipalities:z.number(),attemptedMunicipalities:z.number()}),districts:z.array(z.object({id:z.string(),municipalitiesRegistered:z.number(),municipalitiesAttempted:z.number()}).passthrough()),municipalities:z.array(z.object({id:z.string(),publishedRecords:z.number(),quarantinedRecords:z.number(),quarantineReasons:z.object({categories:z.array(z.object({reason:z.string(),count:z.number()})),failedDeterministicChecks:z.array(z.object({id:z.string(),count:z.number()}))})}).passthrough())}).passthrough();
+  const status=z.object({knowledgeCoverage:coverage}).parse((await client.callTool({name:'get_release_status',arguments:{}})).structuredContent).knowledgeCoverage;
+  const cities=z.object({knowledgeCoverage:coverage}).parse((await client.callTool({name:'list_cities',arguments:{}})).structuredContent).knowledgeCoverage;
+  assert.deepEqual(status.accounting,cities.accounting);assert.equal(status.accounting.registryMunicipalities,319);assert.equal(status.accounting.attemptedMunicipalities,9);
+  const mol=status.districts.find(district=>district.id==='maerkisch-oderland')!;
+  assert.equal(mol.municipalitiesRegistered,45);assert.equal(mol.municipalitiesAttempted,3);
+  const strausberg=status.municipalities.find(city=>city.id==='strausberg')!;
+  assert.equal(strausberg.publishedRecords,39);assert.equal(strausberg.quarantinedRecords,384);
+  assert.ok(strausberg.quarantineReasons.categories.some(reason=>reason.reason==='missing_sourced_date'&&reason.count>0));
+ }finally{await client.close();await mcp.close();}
 });

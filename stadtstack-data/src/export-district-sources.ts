@@ -8,29 +8,38 @@ import type {DistrictRegistry} from './district-registry.ts';
 import {districtSourceAdapterKind} from './district-crawl.ts';
 import {publicUrl} from './polite-fetch.ts';
 import {publicUrlReason} from './publication-quality.ts';
-import {OwnerRobotsOverrideSchema} from './district-schema.ts';
+import {OwnerRobotsOverrideSchema,SourceAccessPolicySchema,hashSchema} from './district-schema.ts';
 import {ownerRobotsOverrideApplies} from './source-policy.ts';
-import {DocumentOriginSchema} from './document-origin.ts';
+import { DocumentOriginSchema } from './document-origin-contract.ts'
 import {excludedCrawlDocumentSchema} from './district-corpus.ts';
+import {assertCivicPolicyAuthority,assertManagedSourceReadable,assertManagedObservationReadable,CIVIC_POLICY_AUTHORITY,type CivicPolicyOptions} from './civic-opt-out.ts';
 
 const stamp=z.string().datetime({offset:true});
-const policySchema=z.object({robots:z.object({state:z.enum(['allowed','blocked','unavailable']),url:z.string().optional(),sha256:z.string().regex(/^[a-f0-9]{64}$/).optional(),checkedAt:stamp.optional()}),tdm:z.object({state:z.enum(['reserved','not_reserved','not_declared','unavailable'])}),ownerRobotsOverride:OwnerRobotsOverrideSchema.optional(),robotsStatus:z.enum(['disallowed','unavailable']).optional(),override:z.literal('owner-approved 2026-10-11').optional(),documentOrigin:DocumentOriginSchema.optional(),ownerTdmOverride:OwnerRobotsOverrideSchema.optional(),tdmOverride:z.literal('owner-approved 2026-10-11').optional()});
+const policySchema=z.object({robots:z.object({state:z.enum(['allowed','blocked','unavailable']),url:z.string().optional(),sha256:z.string().regex(/^[a-f0-9]{64}$/).optional(),checkedAt:stamp.optional()}),tdm:z.object({state:z.enum(['reserved','not_reserved','not_declared','unavailable']),referenceStatus:z.literal('unavailable').optional(),declarationStatus:z.literal('unavailable').optional()}),ownerRobotsOverride:OwnerRobotsOverrideSchema.optional(),robotsStatus:z.enum(['allowed','disallowed','unavailable']).optional(),override:z.literal('owner-approved 2026-10-11').optional(),documentOrigin:DocumentOriginSchema.optional(),ownerTdmOverride:OwnerRobotsOverrideSchema.optional(),tdmOverride:z.literal('owner-approved 2026-10-11').optional()});
+const targetScopeSchema=z.object({kind:z.enum(['page_roots','seed_documents']),urls:z.array(z.string().url()).min(1).max(200),state:z.enum(['complete','partial','blocked']),pendingCount:z.number().int().nonnegative(),runnableCount:z.number().int().nonnegative(),blockedCount:z.number().int().nonnegative()}).strict();
+const crawlCoverageSchema=z.object({state:z.enum(['complete','partial','blocked']),pendingCount:z.number().int().nonnegative().optional(),runnableCount:z.number().int().nonnegative().optional(),blockedCount:z.number().int().nonnegative().optional(),sourceCoverage:z.literal('not_assessed').optional(),targetScope:targetScopeSchema.optional()});
+const denialAuditSchema=z.object({policySha256:hashSchema,sourceHostSha256:hashSchema,robotsState:z.enum(['allowed','blocked','unavailable']),robotsStatus:z.enum(['allowed','disallowed','unavailable']),override:z.literal('owner-approved 2026-10-11').nullable(),tdmState:z.enum(['reserved','not_reserved','not_declared','unavailable']),tdmReferenceStatus:z.literal('unavailable').nullable(),tdmDeclarationStatus:z.literal('unavailable').nullable().optional(),access:SourceAccessPolicySchema.shape.access}).strict().refine(audit=>audit.robotsStatus===(audit.robotsState==='blocked'?'disallowed':audit.robotsState),'Denial audit declaration mismatch');
 const indexSchema=z.object({schemaVersion:z.literal('stadtstack-crawl-index-v1'),generatedAt:stamp,
  documents:z.array(z.object({municipalityId:z.string(),sourceId:z.string(),url:z.string(),sha256:z.string().optional(),adapter:z.string(),policy:policySchema.optional()})),excludedDocuments:z.array(excludedCrawlDocumentSchema).optional(),
- checks:z.array(z.object({municipalityId:z.string(),sourceId:z.string(),checkState:z.enum(['checked','not_found','not_checked']),checkedAt:stamp.nullable(),documentCount:z.number().int().nonnegative(),outcome:z.enum(['documents_collected','no_documents','partial','blocked','failed','not_checked','registry_not_found']).optional(),coverage:z.object({state:z.enum(['complete','partial','blocked'])}).optional(),blocked:z.array(z.object({url:z.string()})).optional()}))});
+ checks:z.array(z.object({municipalityId:z.string(),sourceId:z.string(),runId:z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9:._-]{0,299}$/).optional(),checkState:z.enum(['checked','not_found','not_checked']),checkedAt:stamp.nullable(),documentCount:z.number().int().nonnegative(),outcome:z.enum(['documents_collected','no_documents','partial','blocked','failed','not_checked','registry_not_found']).optional(),coverage:crawlCoverageSchema.optional(),blocked:z.array(z.object({url:z.string(),urlRole:z.literal('registered_source_context').optional(),targetUrlSha256:hashSchema.optional(),policyAudit:denialAuditSchema.optional()})).optional()}))});
 const observationSchema=z.object({url:z.string(),sha256:z.string().optional(),checkedAt:stamp,retrievedAt:stamp.nullable(),state:z.enum(['fetched','not_modified','redirected','failed','excluded']),status:z.number().int().optional(),failure:z.string().optional(),policy:policySchema.optional(),exclusion:excludedCrawlDocumentSchema.shape.exclusion.optional()});
 type Observation=z.infer<typeof observationSchema>;
+type CrawlObservation=z.infer<typeof indexSchema>['checks'][number];
 export interface SourceExportRow {
- formatVersion:'stadtstack-source-export-v2';rowType:'url_occurrence'|'source'|'fetch_observation'|'document'|'excluded_document';pointer:string;occurrence:number|null;role:string;url:string|null;
+ formatVersion:'stadtstack-source-export-v2';rowType:'url_occurrence'|'source'|'crawl_observation'|'fetch_observation'|'document'|'excluded_document';pointer:string;occurrence:number|null;role:string;url:string|null;
  districtId:string;municipalityId:string;ags:string;sourceId:string;configuredAdapter:string;registryCheck:string;registryCheckedAt:string;
  districtName:string;districtAgs:string;municipalityName:string;administrativeStatus:string;administrativeLabel:string;amtId:string;amtName:string;amtEvidenceLevel:string;
  sourceKind:string;sourceVendor:string;apiFormat:string;
  crawlCheck:string;crawlOutcome:string;crawlCheckedAt:string;coverage:string;documentCount:number|null;observedAdapters:string;
  robotsDiscovery:string;tdmRegistry:string;observationState:string;observationCheckedAt:string;httpStatus:number|null;failure:string;robotsPathState:string;tdmRuntimeState:string;
  robotsStatus:string;override:string;ownerRobotsOverride:string;robotsEvidence:string;documentOrigin:string;originClassification:string;tdmOverride:string;ownerTdmOverride:string;bodyState:string;exclusion:string;
+ tdmReferenceStatus?:'unavailable'|'';
+ tdmDeclarationStatus?:'unavailable'|'';
+ blockedAudit?:string;
+ runId?:string;coverageSelection?:'latest_broader_check'|'latest_target_check'|'latest_check_without_coverage'|'none'|'not_selected';sourceCoverage?:string;targetScope?:string;coveragePendingCount?:number|null;coverageRunnableCount?:number|null;coverageBlockedCount?:number|null;
 }
 export interface SourceExportResult {markdown:string;csv:string;rows:SourceExportRow[];counts:{municipalities:number;agsObjects:number;urlOccurrences:number;wholeStringUrlOccurrences:number;distinctUrls:number};}
-export interface SourceExportOptions {registry:string;crawlIndex:string;rawRoot:string;markdown:string;csv:string;}
+export interface SourceExportOptions {registry:string;crawlIndex:string;rawRoot:string;markdown:string;csv:string;policy?:CivicPolicyOptions}
 const compare=(a:string,b:string)=>a<b?-1:a>b?1:0;
 function safeUrl(value:string):string{
  try{publicUrl(value);if(publicUrlReason(value)||value.includes('#')&&/(?:token|secret|password|credential|authorization|api[-_]?key)\s*[=:]/i.test(decodeURIComponent(value.slice(value.indexOf('#')+1))))throw Error();}
@@ -72,13 +81,23 @@ function urlRole(parts:string[]):string{
  return 'unclassified_url';
 }
 function runtimeAudit(url:string,policy:z.infer<typeof policySchema>|undefined,sha256?:string){
- if(policy?.ownerRobotsOverride||policy?.override||policy?.robotsStatus){
+ if(policy?.robotsStatus&&policy.robotsStatus!==(policy.robots.state==='blocked'?'disallowed':policy.robots.state))throw Error('Invalid declared robots audit');
+ if(policy?.ownerRobotsOverride||policy?.override){
   if(!ownerRobotsOverrideApplies(url,policy.ownerRobotsOverride)||policy.override!=='owner-approved 2026-10-11'||policy.robotsStatus!==(policy.robots.state==='blocked'?'disallowed':'unavailable')||policy.robots.state==='allowed'||policy.robots.state==='blocked'&&!policy.robots.sha256||!policy.robots.checkedAt||policy.robots.url!==new URL('/robots.txt',url).href)throw Error('Invalid applied owner robots audit');
  }
  if(policy?.documentOrigin&&(policy.documentOrigin.url!==url||!sha256||policy.documentOrigin.sha256!==sha256))throw Error('Invalid document-origin binding');
  if(policy?.ownerTdmOverride||policy?.tdmOverride)if(policy.tdm.state!=='reserved'||policy.tdmOverride!=='owner-approved 2026-10-11'||!ownerRobotsOverrideApplies(url,policy.ownerTdmOverride)||policy.documentOrigin?.classification!=='official_work')throw Error('Invalid applied owner TDM audit');
  if(policy?.robots.url)safeUrl(policy.robots.url);
- return {robotsStatus:policy?.robots.state==='blocked'?'disallowed':policy?.robots.state??'unavailable',override:policy?.override??'',ownerRobotsOverride:policy?.ownerRobotsOverride?JSON.stringify(policy.ownerRobotsOverride):'',robotsEvidence:policy?JSON.stringify(policy.robots):'',documentOrigin:policy?.documentOrigin?JSON.stringify(policy.documentOrigin):'',originClassification:policy?.documentOrigin?.classification??'not_recorded',tdmOverride:policy?.tdmOverride??'',ownerTdmOverride:policy?.ownerTdmOverride?JSON.stringify(policy.ownerTdmOverride):''};
+ return {robotsStatus:policy?.robots.state==='blocked'?'disallowed':policy?.robots.state??'unavailable',override:policy?.override??'',ownerRobotsOverride:policy?.ownerRobotsOverride?JSON.stringify(policy.ownerRobotsOverride):'',robotsEvidence:policy?JSON.stringify(policy.robots):'',documentOrigin:policy?.documentOrigin?JSON.stringify(policy.documentOrigin):'',originClassification:policy?.documentOrigin?.classification??'not_recorded',tdmOverride:policy?.tdmOverride??'',ownerTdmOverride:policy?.ownerTdmOverride?JSON.stringify(policy.ownerTdmOverride):'',tdmReferenceStatus:policy?.tdm.referenceStatus??'' as const,tdmDeclarationStatus:policy?.tdm.declarationStatus??'' as const};
+}
+function crawlScopeProjection(check:CrawlObservation|undefined,selection:NonNullable<SourceExportRow['coverageSelection']>){
+ const coverage=check?.coverage,target=coverage?.targetScope;
+ if(target){
+  if(coverage?.state!=='partial'||coverage.sourceCoverage!=='not_assessed')throw Error('Target completion must not claim whole-source coverage');
+  for(const url of target.urls)safeUrl(url);
+ }
+ if(coverage?.sourceCoverage==='not_assessed'&&coverage.state==='complete')throw Error('Unassessed source cannot be complete');
+ return {runId:check?.runId??'',coverageSelection:selection,sourceCoverage:coverage?.sourceCoverage??'',targetScope:target?JSON.stringify(target):'',coveragePendingCount:coverage?.pendingCount??null,coverageRunnableCount:coverage?.runnableCount??null,coverageBlockedCount:coverage?.blockedCount??null,blockedAudit:check?.blocked?.some(failure=>failure.policyAudit||failure.targetUrlSha256)?JSON.stringify(check.blocked):''};
 }
 /** Pure rendering from raw registry JSON: unknown fields survive URL accounting, never object dumping. */
 export function renderDistrictSources(raw:unknown,crawlInput:unknown,observations:readonly unknown[]=[]):SourceExportResult{
@@ -88,11 +107,15 @@ export function renderDistrictSources(raw:unknown,crawlInput:unknown,observation
  const key=(municipalityId:string,sourceId:string)=>JSON.stringify([municipalityId,sourceId]);
  for(const city of registry.municipalities)for(const source of city.sources){
   const checks=index.checks.filter(c=>c.municipalityId===city.id&&c.sourceId===source.id);
-  if(checks.length>1)throw Error('Source export requires a single crawl snapshot check per source');
-  const check=checks[0],documents=index.documents.filter(d=>d.municipalityId===city.id&&d.sourceId===source.id);
+  const broader=checks.filter(check=>check.coverage&&!check.coverage.targetScope&&check.coverage.sourceCoverage!=='not_assessed'),targeted=checks.filter(check=>check.coverage?.targetScope);
+  const candidates=broader.length?broader:targeted.length?targeted:checks;
+  const check=[...candidates].sort((a,b)=>compare(b.checkedAt??'',a.checkedAt??'')||compare(JSON.stringify(a),JSON.stringify(b)))[0],documents=index.documents.filter(d=>d.municipalityId===city.id&&d.sourceId===source.id);
+  const selection:NonNullable<SourceExportRow['coverageSelection']>=broader.length?'latest_broader_check':targeted.length?'latest_target_check':checks.length?'latest_check_without_coverage':'none';
   const row:SourceExportRow={...emptyRow(),rowType:'source',role:'configured_source',url:source.url,districtId:city.districtId,municipalityId:city.id,ags:city.ags,sourceId:source.id,configuredAdapter:districtSourceAdapterKind(source),registryCheck:source.checkState,registryCheckedAt:source.checkedAt??'',crawlCheck:check?.checkState??'missing',crawlOutcome:check?.outcome??'unavailable',crawlCheckedAt:check?.checkedAt??'',coverage:check?.coverage?.state??'unavailable',documentCount:check?.documentCount??null,observedAdapters:[...new Set(documents.map(d=>d.adapter))].sort(compare).join('; '),robotsDiscovery:source.robots?.checkState??'unavailable',tdmRegistry:source.tdm?.status??'unavailable'};
   row.robotsStatus=source.robotsStatus??'unavailable';row.override=source.override??'';row.ownerRobotsOverride=source.ownerRobotsOverride?JSON.stringify(source.ownerRobotsOverride):'';row.robotsEvidence=source.robots?JSON.stringify({url:source.robots.url,checkedAt:source.robots.checkedAt,evidence:source.robots.evidence}):'';
+  Object.assign(row,crawlScopeProjection(check,selection));
   if(row.url)safeUrl(row.url);rows.push(row);sourceRows.set(key(city.id,source.id),row);
+  for(const observed of checks)rows.push({...row,rowType:'crawl_observation',role:'retained_crawl_check',crawlCheck:observed.checkState,crawlOutcome:observed.outcome??'unavailable',crawlCheckedAt:observed.checkedAt??'',coverage:observed.coverage?.state??'unavailable',documentCount:observed.documentCount,...crawlScopeProjection(observed,observed===check?selection:'not_selected')});
  }
  for(const check of index.checks)if(!sourceRows.has(key(check.municipalityId,check.sourceId)))throw Error('Source export found an unbound crawl check');
  let agsObjects=0,wholeStringUrlOccurrences=0;
@@ -161,7 +184,7 @@ export function renderDistrictSources(raw:unknown,crawlInput:unknown,observation
  rows.sort((a,b)=>compare(JSON.stringify(Object.values(a)),JSON.stringify(Object.values(b))));
  const occurrences=rows.filter(r=>r.rowType==='url_occurrence');
  const counts={municipalities:new Set(registry.inventory.map(m=>m.ags)).size,agsObjects,urlOccurrences:occurrences.length,wholeStringUrlOccurrences,distinctUrls:new Set(occurrences.map(r=>r.url)).size};
- const columns=Object.keys(emptyRow()) as (keyof SourceExportRow)[];
+ const columns=[...Object.keys(emptyRow()),'tdmReferenceStatus','tdmDeclarationStatus','blockedAudit','runId','coverageSelection','sourceCoverage','targetScope','coveragePendingCount','coverageRunnableCount','coverageBlockedCount'] as (keyof SourceExportRow)[];
  const csv=[columns.map(csvCell).join(','),...rows.map(row=>columns.map(column=>csvCell(row[column])).join(','))].join('\r\n')+'\r\n';
  const observationRows=rows.filter(row=>row.rowType==='fetch_observation');
  const lines=['# District source inventory','',`Registry snapshot: ${markdown(registry.generatedAt)}. Crawl snapshot: ${markdown(index.generatedAt)}.`, '',`${counts.municipalities} unique municipality identities; ${counts.agsObjects} AGS-bearing raw objects (includes duplicates and districts).`,`${counts.urlOccurrences} raw URL token occurrences; ${counts.wholeStringUrlOccurrences} whole-string URL occurrences; ${counts.distinctUrls} distinct exact URL tokens. Counts are computed, not a historical delta.`, '',
@@ -169,6 +192,7 @@ export function renderDistrictSources(raw:unknown,crawlInput:unknown,observation
  `CSV preserves every raw registry URL token and JSON pointer, including unknown fields and text references; repeated tokens retain an occurrence ordinal. A token ends at whitespace, quotes or angle brackets; punctuation is retained verbatim. Source rows additionally retain null endpoints. Only URL tokens from request forms or narratives are retained, never the surrounding fields/objects. Headers and source bodies are not exported. Retained observation input records: ${observations.length}; source-bound observation rows: ${observationRows.length}. Sources without matching retained observations have unavailable runtime policy evidence.`,
  'Configured primary dispatch is not an observed adapter success. Observed adapters come only from crawl document labels. Missing crawl checks/observations are unavailable, not no-documents or not-found. Registry robots discovery is not path permission; TDM none_detected/not_declared is not a grant of permission. Retained observation rows match exact URLs only (not method/form or bytes), can cover incomplete policy stages, and do not claim complete history. Coverage complete means only the configured frontier scope.',
  'Format stadtstack-source-export-v2 preserves per-document robots declarations, hashes/times and separate owner-approved 2026-10-11 audit. Owner approval is not municipal permission or a licence. Registry approval is configuration, not proof a fetched document used it; document and observation rows never inherit a source-level denial or override.',
+ 'Crawl observation rows retain every supplied run/check independently. Source rows choose the latest broader frontier check when available, otherwise the latest explicitly scoped target check. Frontier counts are never summed. A completed selected page/seed has partial, not-assessed source-wide coverage; broader pending work is not erased.',
  'Pilot Amt identities/status use administrative evidence. Inventory labels are unverified administrative labels, not canonical Amt identities; Amt ARS identifiers are not names and are retained only in administrativeLabel, not promoted to amtId. Missing labels remain unknown, never amtsfrei. Nonpilot administrativeStatus remains unknown even when an inventory label is supplied. Blank fields mean unavailable or no applicable binding; pilot amtsfrei status explicitly explains blank Amt identity fields. District inventory dates and evidence delimit the inventory claim. CSV escaping prefixes spreadsheet formula-like cells with an apostrophe; URL text is otherwise preserved.', '', '## District → administration → municipality',''];
  for(const district of [...registry.districts].sort((a,b)=>compare(a.id,b.id))){
   lines.push(`### ${markdown(district.name)} (${district.ags})`,'',`Inventory as of ${markdown(district.inventoryAsOf)}; declared complete: ${district.inventoryComplete}.`,...district.inventorySources.map(e=>`- Inventory evidence: ${markdown(e.url)}`),'');
@@ -193,6 +217,8 @@ export function renderDistrictSources(raw:unknown,crawlInput:unknown,observation
  lines.push('## Configured versus observed adapters','');
  for(const adapter of [...new Set([...sourceRows.values()].map(r=>r.configuredAdapter))].sort(compare))lines.push(`- Configured ${markdown(adapter)}: ${[...sourceRows.values()].filter(r=>r.configuredAdapter===adapter).length} sources.`);
  for(const adapter of [...new Set(index.documents.map(d=>d.adapter))].sort(compare))lines.push(`- Observed ${markdown(adapter)}: ${index.documents.filter(d=>d.adapter===adapter).length} documents.`);
+ const crawlRows=rows.filter(row=>row.rowType==='crawl_observation');
+ if(crawlRows.length){lines.push('','## Crawl scope observations','');for(const row of crawlRows)lines.push(`- ${markdown(row.municipalityId)}/${markdown(row.sourceId)}; run ${markdown(row.runId||'unrecorded')}; checked ${markdown(row.crawlCheckedAt||'not checked')}; source coverage ${row.coverage}${row.sourceCoverage?`/${row.sourceCoverage}`:''}; selection ${row.coverageSelection}; pending ${row.coveragePendingCount??'unknown'}; target ${markdown(row.targetScope||'no narrow target selection')}; blocked audit ${markdown(row.blockedAudit||'none')}`);}
  const auditedRows=rows.filter(row=>['document','excluded_document','fetch_observation'].includes(row.rowType)&&(row.override||row.tdmOverride||row.bodyState==='excluded'));
  if(auditedRows.length){lines.push('','## Applied owner robots decisions','');for(const row of auditedRows)lines.push(`- ${markdown(row.url!)}: robotsStatus ${row.robotsStatus}; override ${markdown(row.override||'none')}; decision ${markdown(row.ownerRobotsOverride||'none')}; declared evidence ${markdown(row.robotsEvidence)}; origin ${row.originClassification}; TDM ${row.tdmRuntimeState}/${markdown(row.tdmOverride||'none')}; TDM decision ${markdown(row.ownerTdmOverride||'none')}; raw ${row.bodyState}; exclusion ${markdown(row.exclusion||'none')}`);}
  return {markdown:lines.join('\n')+'\n',csv,rows,counts};
@@ -200,6 +226,10 @@ export function renderDistrictSources(raw:unknown,crawlInput:unknown,observation
 
 /** Reads only registry/index and retained observation JSON, never CAS bodies or mutable request pointers. */
 export async function exportDistrictSources(options:SourceExportOptions):Promise<SourceExportResult>{
+ const selected=options.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selected),policy={...selected,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
+ await assertManagedSourceReadable(options.crawlIndex,policy);
+ const crawlInput=JSON.parse(await readFile(options.crawlIndex,'utf8'));
+ await assertManagedSourceReadable(options.crawlIndex,policy);
  const rawRoot=await realpath(options.rawRoot),observations:Observation[]=[];
  let entries:string[]=[];
  const folder=join(rawRoot,'observations');
@@ -207,10 +237,12 @@ export async function exportDistrictSources(options:SourceExportOptions):Promise
  for(const name of entries.sort(compare)){
   if(!name.endsWith('.json'))continue;
   const path=await realpath(join(folder,name)),part=relative(rawRoot,path);
-  if(part.startsWith('..')||isAbsolute(part))throw Error('Source export observation escapes raw root');
-  const parsed=observationSchema.safeParse(JSON.parse(await readFile(path,'utf8')));if(!parsed.success)throw Error('Source export observation schema validation failed');observations.push(parsed.data);
+  if(path!==resolve(join(folder,name))||part.startsWith('..')||isAbsolute(part))throw Error('Source export observation escapes raw root or is linked');
+  await assertManagedObservationReadable(path,policy);
+  const parsed=observationSchema.safeParse(JSON.parse(await readFile(path,'utf8')));if(!parsed.success)throw Error('Source export observation schema validation failed');
+  await assertManagedObservationReadable(path,policy);observations.push(parsed.data);
  }
- const result=renderDistrictSources(JSON.parse(await readFile(options.registry,'utf8')),JSON.parse(await readFile(options.crawlIndex,'utf8')),observations);
+ const result=renderDistrictSources(JSON.parse(await readFile(options.registry,'utf8')),crawlInput,observations);
  const outputs=[resolve(options.markdown),resolve(options.csv)],inputs=await Promise.all([options.registry,options.crawlIndex].map(path=>realpath(path)));
  for(const path of outputs)await mkdir(dirname(path),{recursive:true});
  const canonicalOutputs=await Promise.all(outputs.map(async path=>join(await realpath(dirname(path)),basename(path))));

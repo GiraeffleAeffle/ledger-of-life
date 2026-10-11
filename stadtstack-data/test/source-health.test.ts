@@ -26,13 +26,13 @@ test('publication independently checks body name/id and zero-success claims',()=
  const diagnosed=sourceHealth(fixture().cities[0].sources[0],[]);assert.equal(diagnosed.status,'withheld');assert.equal(diagnosed.licence,'unknown');assert.equal(diagnosed.publishedRecordCount,0);
 });
 
-test('regional comparison withholds missing or impossible event dates without substituting release time',()=>{
+test('regional comparison withholds missing or impossible event dates without substituting release time',async()=>{
  const input={schemaVersion:'stadtstack-regional-topics-v1',generatedAt:'2026-10-10T00:00:00Z',asOf:'2026-09-27',coverage:{},topics:[{id:'waermeplanung',municipalities:[{municipalityId:'hoppegarten',items:[
   {title:'Dated fixture',url:'https://example.org/1',date:'2026-09-07',locator:'agenda'},
   {title:'Undated fixture',url:'https://example.org/2',date:null,locator:'page'},
   {title:'Impossible fixture',url:'https://example.org/3',date:'2026-02-30',locator:'page'},
  ]}]}]};
- const result=normalizeRegionalPublication(input);assert.equal(result.publishedRecords,1);assert.equal(result.quarantined.length,2);assert.equal(result.data.topics[0].municipalities[0].items[0].date,'2026-09-07');assert.equal(result.data.asOf,'2026-09-27');
+ const result=await normalizeRegionalPublication(input);assert.equal(result.publishedRecords,1);assert.equal(result.quarantined.length,2);assert.equal(result.data.topics[0].municipalities[0].items[0].date,'2026-09-07');assert.equal(result.data.asOf,'2026-09-27');
 });
 
 test('Retained city snapshots keep bound rows unchanged, quarantine foreign identity and never freshen dates',()=>{

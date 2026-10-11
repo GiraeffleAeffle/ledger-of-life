@@ -5,7 +5,8 @@ import { join, relative, isAbsolute } from 'node:path';
 import { z } from 'zod';
 import { extractDocumentText, runDocumentCommand, MAX_DOCUMENT_BYTES, type DocumentCommand } from './district-document.ts';
 import { SourceAccessPolicySchema, assertSubscriptionSourcePolicy, sha256, hashSchema } from './district-schema.ts';
-import { assertHostNotOptedOut, initializeManagedAcquisitionLane, withManagedSourceWrite } from './civic-opt-out.ts';
+import { assertHostNotOptedOut, assertCivicPolicyAuthority, assertManagedSourceBindings, initializeManagedAcquisitionLane, withManagedSourceWrite, CIVIC_POLICY_AUTHORITY, CIVIC_ACQUISITION_DECISION_ID, type CivicPolicyOptions, type ManagedAcquisitionLaneOptions, type ManagedSourceContext } from './civic-opt-out.ts';
+import type { SourceArtifactBinding } from './district-private-io.ts';
 const execute = promisify(execFile);
 export const PREPARED_DOCUMENT_VERSION = 'district-prepared-v1';
 export const PREPARED_VM_ROOT = '/home/max/civic-knowledge-slice/stadtstack-data/cache/districts/owner-policy-2026-10-11/prepared';
@@ -33,8 +34,16 @@ function checkedReferences(references: PreparedSourceReference[], sourceSha256: 
     return reference;
   }).sort((a, b) => canonical(a).localeCompare(canonical(b), 'en'));
 }
+/** Record locators may select spans; all other source identity/policy fields must
+ * belong to the actual prepared receipt, never a source inferred from payload JSON. */
+export function assertPreparedReferenceMembership(references: readonly PreparedSourceReference[], expected: readonly PreparedSourceReference[]): void {
+  const identity = (reference: PreparedSourceReference) => { const { locator: _locator, ...source } = ReferenceSchema.parse(reference); return canonical(source); };
+  const allowed = new Set(expected.map(identity));
+  if (references.some(reference => !allowed.has(identity(reference)))) throw Error('Source reference differs from authenticated prepared context');
+}
 /** Current objections are asynchronous state, not a property of a historical pinned receipt. */
-export async function assertPreparedSourcesActive(references: PreparedSourceReference[], options: { stateDir?: string } = {}): Promise<void> {
+export async function assertPreparedSourcesActive(references: PreparedSourceReference[], options: CivicPolicyOptions = CIVIC_POLICY_AUTHORITY): Promise<void> {
+  await assertCivicPolicyAuthority(options);
   const hosts = new Set<string>();
   for (const reference of references) {
     assertSubscriptionSourcePolicy(reference.policy, reference);
@@ -42,8 +51,30 @@ export async function assertPreparedSourcesActive(references: PreparedSourceRefe
     if (!hosts.has(host)) { await assertHostNotOptedOut(reference.url, options); hosts.add(host); }
   }
 }
+/** Same text alone is not the same authorized cache context. */
+export interface PreparedCacheContext { preparedReceiptSha256: string; references: Array<{ id: string; url: string; sha256: string }> }
+export function preparedCacheContext(receiptSha256: string, references: PreparedSourceReference[]): PreparedCacheContext {
+  hashSchema.parse(receiptSha256);
+  if (!references.length) throw Error('Prepared cache context requires source references');
+  const inventory = new Map<string, { id: string; url: string; sha256: string }>();
+  for (const reference of references) {
+    const source = { id: reference.id, url: reference.url, sha256: hashSchema.parse(reference.sha256) };
+    inventory.set(JSON.stringify([source.id, source.url, source.sha256]), source);
+  }
+  return { preparedReceiptSha256: receiptSha256, references: [...inventory].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0).map(([, source]) => source) };
+}
+/** Provenance projection only; callers must perform current source admission before use. */
+export function preparedSourceBindings(references: PreparedSourceReference[], receiptSha256: string): Extract<SourceArtifactBinding, { kind: 'prepared_source' }>[] {
+  hashSchema.parse(receiptSha256);
+  const bindings = new Map<string, Extract<SourceArtifactBinding, { kind: 'prepared_source' }>>();
+  for (const reference of references) {
+    const key = JSON.stringify([reference.id, reference.url, reference.sha256]);
+    if (!bindings.has(key)) bindings.set(key, { kind: 'prepared_source', url: reference.url, sourceSha256: reference.sha256, observationId: reference.id, receiptSha256, independentAllowed: true });
+  }
+  return [...bindings.values()];
+}
 export async function preparationExtractorSha256(): Promise<string> {
-  return sha256(canonical(await Promise.all(['district-document.ts', 'district-prepared-document.ts', 'district-schema.ts', 'source-policy.ts', 'document-origin.ts', 'civic-opt-out.ts'].map(async file => sha256(await readFile(new URL(file, import.meta.url)))))));
+  return sha256(canonical(await Promise.all(['district-document.ts', 'district-prepared-document.ts', 'district-preparation-run.ts', 'district-registry-config.ts', 'district-registry.ts', 'district-corpus.ts', 'source-observation.ts', 'district-private-io.ts', 'district-schema.ts', 'source-policy.ts', 'document-origin.ts', 'document-origin-rules.ts', 'document-origin-contract.ts', 'civic-opt-out.ts'].map(async file => sha256(await readFile(new URL(file, import.meta.url)))))));
 }
 export async function collectPreparationToolVersions(mimeType: string): Promise<Record<string, string>> {
   const tools = mimeType.split(';')[0] === 'application/pdf' ? ['pdfinfo', 'pdftotext', 'pdftoppm', 'tesseract'] : /zip/i.test(mimeType) ? ['python3'] : [];
@@ -69,7 +100,7 @@ export async function readAuthorizedSourceBytes(rawRoot: string, path: string, e
   if (bytes.byteLength > MAX_DOCUMENT_BYTES || sha256(bytes) !== expectedSha256) throw Error('Source bytes differ from frozen index');
   return bytes;
 }
-export async function prepareDocument(input: { bytes: Uint8Array; municipalityId: string; references: PreparedSourceReference[]; mimeType: string; extractorSha256: string; toolVersions: Record<string, string>; policyStateDir?: string }, command: DocumentCommand = runDocumentCommand): Promise<PreparedDocument> {
+export async function prepareDocument(input: { bytes: Uint8Array; municipalityId: string; references: PreparedSourceReference[]; mimeType: string; extractorSha256: string; toolVersions: Record<string, string>; managedRoot: string; policy: CivicPolicyOptions }, command: DocumentCommand = runDocumentCommand): Promise<PreparedDocument> {
   if (!input.bytes.byteLength || input.bytes.byteLength > MAX_DOCUMENT_BYTES) throw Error('Source byte limit exceeded');
   const sourceSha256 = sha256(input.bytes);
   const references = checkedReferences(input.references, sourceSha256, input.mimeType);
@@ -77,9 +108,10 @@ export async function prepareDocument(input: { bytes: Uint8Array; municipalityId
   const versions = ToolVersionsSchema.parse(input.toolVersions);
   const required = input.mimeType.split(';')[0] === 'application/pdf' ? ['node', 'pdfinfo', 'pdftotext', 'pdftoppm', 'tesseract'] : /zip/i.test(input.mimeType) ? ['node', 'python3'] : ['node'];
   if (required.some(tool => !versions[tool])) throw Error('Preparation tool version evidence missing');
-  await assertPreparedSourcesActive(references, { stateDir: input.policyStateDir });
-  const result = await extractDocumentText(input.bytes, input.mimeType, command);
-  await assertPreparedSourcesActive(references, { stateDir: input.policyStateDir });
+  await assertPreparedSourcesActive(references, input.policy);
+  const context: ManagedSourceContext = { root: input.managedRoot, kind: 'prepared', decisionId: CIVIC_ACQUISITION_DECISION_ID, ...input.policy, bindings: references.map(reference => ({ phase: 'preparation-input', url: reference.url, sourceSha256: reference.sha256 })) };
+  const result = await extractDocumentText(input.bytes, input.mimeType, context, command);
+  await assertPreparedSourcesActive(references, input.policy);
   const body = { version: PREPARED_DOCUMENT_VERSION, municipalityId: input.municipalityId, sourceSha256, sourceBytes: input.bytes.byteLength, mimeType: input.mimeType, references, extractorSha256: input.extractorSha256, toolVersions: versions, text: result.text, textSha256: sha256(result.text), offsetUnit: 'utf16_code_units' as const, textLength: result.text.length, method: result.method, ocrUsed: result.ocrUsed, limitations: result.limitations ?? [] };
   return PreparedDocumentSchema.parse({ ...body, receiptSha256: sha256(canonical(body)) });
 }
@@ -96,14 +128,14 @@ export function verifyPreparedDocument(raw: unknown, expected: PreparedExpectati
   if (bytes && (bytes.byteLength !== receipt.sourceBytes || sha256(bytes) !== receipt.sourceSha256)) throw Error('Prepared original source bytes differ');
   return receipt;
 }
-export async function cachePreparedDocument(root: string, receipt: PreparedDocument, options: { decisionId: 'owner-2026-10-11-public-civic-sources'; stateDir?: string }): Promise<string> {
+export async function cachePreparedDocument(root: string, receipt: PreparedDocument, options: ManagedAcquisitionLaneOptions): Promise<string> {
   const checked = verifyPreparedDocument(receipt, receipt);
   await assertPreparedSourcesActive(checked.references, options);
   await mkdir(root, { recursive: true, mode: 0o700 });
   const managedRoot = await realpath(root);
   await initializeManagedAcquisitionLane(managedRoot, { kind: 'prepared', ...options });
   const relativePath = `${checked.receiptSha256}.json`, path = join(managedRoot, relativePath), bytes = JSON.stringify(checked) + '\n', contentSha256 = sha256(bytes);
-  const entries = checked.references.map(reference => ({ relativePath, contentSha256, sourceSha256: reference.sha256, url: reference.url, observationId: reference.id, receiptSha256: checked.receiptSha256, independentAllowed: true }));
+  const entries = checked.references.map(reference => ({ kind: 'prepared_source' as const, relativePath, contentSha256, sourceSha256: reference.sha256, url: reference.url, observationId: reference.id, receiptSha256: checked.receiptSha256, independentAllowed: true }));
   return withManagedSourceWrite(managedRoot, entries, async () => {
     try { await writeFile(path, bytes, { flag: 'wx', mode: 0o600 }); }
     catch (error) {
@@ -113,15 +145,16 @@ export async function cachePreparedDocument(root: string, receipt: PreparedDocum
     return path;
   }, options);
 }
-export async function fetchPreparedDocument(expected: PreparedExpectation, options: { stateDir?: string } = {}): Promise<PreparedDocument> {
+/** Source text stays on the single provisioned VM authority; there is no SSH/Mac fallback. */
+export async function readPreparedDocument(expected: PreparedExpectation, options: CivicPolicyOptions = CIVIC_POLICY_AUTHORITY): Promise<PreparedDocument> {
   const hash = hashSchema.parse(expected.receiptSha256);
   await assertPreparedSourcesActive(expected.references, options);
-  let text: string;
-  try {
-    const result = await execute('/usr/bin/ssh', ['-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=15', 'codex-workstation', `cat -- ${PREPARED_VM_ROOT}/${hash}.json`], { timeout: 60_000, maxBuffer: MAX_PREPARED_BYTES, encoding: 'utf8' });
-    text = result.stdout;
-  } catch { throw Error('Authenticated prepared-document SSH transport failed'); }
-  // The pinned receipt digest must arrive from the trusted VM preparation plan, not from this payload itself.
+  if(process.platform !== 'linux') throw Error('Prepared source reads require the authoritative Codex VM');
+  const path = join(PREPARED_VM_ROOT, hash + '.json');
+  const bindings = preparedSourceBindings(expected.references, expected.receiptSha256);
+  await assertManagedSourceBindings(path, bindings, options);
+  const text = await readFile(path, 'utf8');
+  await assertManagedSourceBindings(path, bindings, options);
   await assertPreparedSourcesActive(expected.references, options);
   return verifyPreparedDocument(JSON.parse(text), expected);
 }

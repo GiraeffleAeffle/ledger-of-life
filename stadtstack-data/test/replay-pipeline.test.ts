@@ -1,11 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,writeFile,rm,symlink} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
+import {writeFile,symlink,lstat} from 'node:fs/promises';
 import {join} from 'node:path';
 import {hash,outDir} from '../src/common.ts';
-import {ReplayReceiptSchema,ReplayClocksSchema,verifyReplayAnswer,verifyGenerationArchive,verifyCachedGeneration,replayAnswerBinding,compareReplayRelease,readReplayPin,requiredReplayStaging} from '../src/replay-pipeline.ts';
-import type {HistoricalGeneration,ReplayReceipt} from '../src/replay-pipeline.ts';
+import {ReplayReceiptSchema,HistoricalReplayReceiptSchema,ReplayClocksSchema,verifyReplayAnswer,verifyGenerationArchive,verifyCachedGeneration,replayAnswerBinding,compareReplayRelease,readReplayPin,replayPipeline,assertReplayCompositionBindings,assertReplayClocks} from '../src/replay-pipeline.ts';
+import type {HistoricalGeneration,HistoricalReplayReceipt,ReplayReceipt} from '../src/replay-pipeline.ts';
 import type {ModelEvidence} from '../src/district-model-contract.ts';
 import type {DocumentResult} from '../src/district-inference.ts';
 import type {PreparedSourceReference} from '../src/district-prepared-document.ts';
@@ -17,6 +16,11 @@ import * as schema from '../src/district-schema.ts';
 import * as graph from '../src/district-graph-claims.ts';
 import * as vocabulary from '../src/topic-vocabulary.ts';
 import * as models from '../src/district-model-contract.ts';
+import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
+import {writeManagedSourceArtifact} from '../src/district-private-io.ts';
+import {recordHostOptOut} from '../src/civic-opt-out.ts';
+import type {KnowledgeSourcePin} from '../src/prepare-knowledge.ts';
+import type {PublicationPlan} from '../src/district-publication-plan.ts';
 
 // Entirely synthetic evidence. No private corpus, provider, readiness, external
 // document command, Git subprocess or network is needed by these unit tests.
@@ -33,7 +37,8 @@ function syntheticArchive(){
 async function noCaseFixture(text='Strausberg synthetic source with no supported case.'){
  const sourceSha256=hash(text);
  const reference:PreparedSourceReference={id:'synthetic-source',url:'https://example.org/synthetic-source',sha256:sourceSha256,retrievedAt:at,locator:'document-sha256:'+sourceSha256,mimeType:'text/plain',sourceType:'website',policy:{robots:{state:'allowed',url:'https://example.org/robots.txt'},tdm:{state:'not_declared',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}};
- const prepared=await prepareDocument({bytes:Buffer.from(text),municipalityId:'strausberg',references:[reference],mimeType:'text/plain',extractorSha256:hash('synthetic text preparation'),toolVersions:{node:'synthetic'}},async()=>{throw Error('A text fixture must not execute a document command');});
+ const authority=await createCivicPolicyTestContext();
+ const prepared=await prepareDocument({bytes:Buffer.from(text),municipalityId:'strausberg',references:[reference],mimeType:'text/plain',extractorSha256:hash('synthetic text preparation'),toolVersions:{node:'synthetic'},managedRoot:authority.managedRoot,policy:authority.policy},async()=>{throw Error('A text fixture must not execute a document command');}).finally(authority.dispose);
  const municipality={id:'strausberg',name:'Strausberg',ags:'12064472',districtId:'maerkisch-oderland'},archive=syntheticArchive();
  // Pure current modules supply schemas/chunking for this synthetic no-case test;
  // real replay loads and checks the pinned historical modules, never these labels.
@@ -54,7 +59,7 @@ async function admittedFixture(){
  const judgeBody={binding:replayAnswerBinding(identity,archive.judgeInstructions,{source:{text:chunk.text},candidate:restored.claims},archive.judgeSchema),modelIdentitySha256:identity.modelIdentitySha256,receivedAt:later,value:{score:0.91,reason:'Synthetic actual historical judgment',criticalUnsupported:false},responseSha256:hash('synthetic raw judge response'),returnedModel:identity.model,runtimeWarnings:[]},judge=verifyReplayAnswer({...judgeBody,cacheSha256:jsonHash(judgeBody)});
  const references=prepared.references.map(reference=>({...reference,locator:`text-sha256:${prepared.textSha256};chars:${chunk.start}-${chunk.end}`})),caseKey='source_document:'+prepared.sourceSha256;
  const cacheKey=claims.extractionCacheKey({provider:identity.provider,documentHash:prepared.sourceSha256,textHash:prepared.textSha256,extractorHash:archive.extractorSha256,modelIdentitySha256:identity.modelIdentitySha256,chunk:{index:chunk.index,start:chunk.start,end:chunk.end},municipalityId:municipality.id,sourceBinding:JSON.stringify(municipality)});
- const candidate={...restored.claims,...graph.normalizeGraphClaims(restored.claims,{municipalityId:municipality.id,sourceSha256:prepared.sourceSha256}),id:`knowledge:${municipality.id}:${hash(`${caseKey}\n${prepared.sourceSha256}\n${chunk.index}`).slice(0,24)}`,municipalityId:municipality.id,ags:municipality.ags,districtId:municipality.districtId,caseKey,sources:references,
+ const candidate={...restored.claims,...graph.normalizeGraphClaims(restored.claims,{municipalityId:municipality.id,sourceSha256:prepared.sourceSha256,ags:municipality.ags}),id:`knowledge:${municipality.id}:${hash(`${caseKey}\n${prepared.sourceSha256}\n${chunk.index}`).slice(0,24)}`,municipalityId:municipality.id,ags:municipality.ags,districtId:municipality.districtId,caseKey,sources:references,
   extraction:{extractorVersion:archive.extractorVersion,extractorSha256:archive.extractorSha256,...identity,returnedModel:answer.returnedModel,runtimeWarnings:answer.runtimeWarnings,quoteNormalization:restored.normalization,promptVersion:archive.promptVersion,promptSha256:archive.promptSha256,judgePromptVersion:archive.judgePromptVersion,judgePromptSha256:archive.judgePromptSha256,inputSha256:prepared.sourceSha256,textSha256:prepared.textSha256,responseSha256:answer.responseSha256,ocrUsed:prepared.ocrUsed,textMethod:prepared.method,documentLimitations:[...prepared.limitations,models.PROVIDER_CONFIGS[identity.provider].toolLimitation],cacheKey,extractedAt:answer.receivedAt,chunk:{index:chunk.index,count:chunk.count,start:chunk.start,end:chunk.end}},
   verification:{status:'auto-verified' as const,deterministic,faithfulness:{score:judgeBody.value.score,threshold:0.8,model:identity.model,provider:identity.provider,tool:identity.tool,toolVersion:identity.toolVersion,modelIdentitySha256:identity.modelIdentitySha256,returnedModel:judge.returnedModel,runtimeWarnings:judge.runtimeWarnings,reason:judgeBody.value.reason,evaluatedAt:judge.receivedAt,responseSha256:judge.responseSha256,sameModel:true as const,limitation:claims.LIMITATION},evidenceHash:''}};
  candidate.verification.evidenceHash=schema.knowledgeEvidenceHash(candidate);
@@ -148,26 +153,72 @@ test('release proof requires every member hash/size AND exact manifest bytes, no
  assert.throws(()=>compareReplayRelease(bytes,Buffer.from(JSON.stringify(manifest)),manifest),/manifest bytes/);
 });
 
-test('pinned input reader rejects changed bytes and target-output reuse including symlink aliases',async()=>{
- const directory=await mkdtemp(join(tmpdir(),'stadtstack-replay-pin-'));
- try{
-  const bytes='synthetic pinned evidence\n';await writeFile(join(directory,'input.json'),bytes);
-  assert.equal((await readReplayPin({path:'input.json',sha256:hash(bytes)},directory)).toString(),bytes);
-  await assert.rejects(readReplayPin({path:'input.json',sha256:hash('changed')},directory),/digest/);
-  // The released catalogue exists in the tracked checkout; it is never read by this test.
-  await symlink(join(outDir,'catalogue.json'),join(directory,'target-alias.json'));
-  await assert.rejects(readReplayPin({path:'target-alias.json',sha256:hash('unused')},directory),/forbids target/);
- }finally{await rm(directory,{recursive:true,force:true});}
+test('pinned source reader requires current managed authority and rejects changed bytes or target aliases',async t=>{
+ const {root,managedRoot,policy,decisionId}=await createCivicPolicyTestContext(t),bytes='synthetic pinned evidence\n',path=join(managedRoot,'input.json');
+ const binding={kind:'prepared_source' as const,url:'https://example.org/replay-input',sourceSha256:hash('synthetic original source'),observationId:'synthetic-replay-observation',receiptSha256:hash('synthetic preparation receipt'),independentAllowed:false};
+ await writeManagedSourceArtifact(managedRoot,path,bytes,[binding],{...policy,decisionId,kind:'artifacts'});
+ assert.equal((await readReplayPin({path,sha256:hash(bytes)},root,policy)).toString(),bytes);
+ await assert.rejects(readReplayPin({path,sha256:hash('changed')},root,policy),/digest/);
+ await writeFile(join(root,'unmanaged.json'),bytes);
+ await assert.rejects(readReplayPin({path:'unmanaged.json',sha256:hash(bytes)},root,policy));
+ await assert.rejects(readReplayPin({path:'missing.json',sha256:hash(bytes)},root,{...policy,stateDir:join(root,'missing-policy')}));
+ // Only the alias is inspected; frozen target bytes are never reconstruction input.
+ await symlink(join(outDir,'catalogue.json'),join(root,'target-alias.json'));
+ await assert.rejects(readReplayPin({path:'target-alias.json',sha256:hash('unused')},root,policy),/forbids target/);
+ await recordHostOptOut({host:'example.org',reason:'municipality_objection'},policy);
+ await assert.rejects(readReplayPin({path,sha256:hash(bytes)},root,policy));
+ await assert.rejects(lstat(path),{code:'ENOENT'});
 });
 
-test('receipt requires exact clocks, full private/public prerequisites and has no live execution option',()=>{
+test('historical v1 receipts remain strict audit data but cannot enter the executable v2 parser',()=>{
  const pin={path:'synthetic-input.json',sha256:hash('synthetic pin')};
- const receipt:ReplayReceipt={schemaVersion:'stadtstack-offline-replay-v1',corpusManifest:pin,rawRoot:'raw',registry:pin,index:pin,frozen:pin,deltas:[],generationContract:pin,answers:[],modelIdentities:[identity],extractionRun:pin,clocks,staging:[{...pin,destination:'catalogue.json'}],coreEvidence:[{path:'pdf/'+hash('synthetic PDF')+'.pdf',sha256:hash('synthetic PDF')}],priorRelease:{gitCommit:'a'.repeat(40),manifestSha256:hash('prior manifest'),releaseId:hash('prior release')},expectedRelease:pin,runtime:{node:'synthetic',icu:'synthetic',unicode:'synthetic',locale:'de-DE',timeZone:'Europe/Berlin',packageLockSha256:hash('lock'),sourceFiles:[pin]},workspace:'cache/synthetic-fresh-replay'};
+ const receipt:HistoricalReplayReceipt={schemaVersion:'stadtstack-offline-replay-v1',corpusManifest:pin,rawRoot:'raw',registry:pin,index:pin,frozen:pin,deltas:[],generationContract:pin,answers:[],modelIdentities:[identity],extractionRun:pin,clocks,staging:[{...pin,destination:'catalogue.json'}],coreEvidence:[{path:'pdf/'+hash('synthetic PDF')+'.pdf',sha256:hash('synthetic PDF')}],priorRelease:{gitCommit:'a'.repeat(40),manifestSha256:hash('prior manifest'),releaseId:hash('prior release')},expectedRelease:pin,runtime:{node:'synthetic',icu:'synthetic',unicode:'synthetic',locale:'de-DE',timeZone:'Europe/Berlin',packageLockSha256:hash('lock'),sourceFiles:[pin]},workspace:'cache/synthetic-fresh-replay'};
+ assert.deepEqual(HistoricalReplayReceiptSchema.parse(receipt),receipt);
+ assert.throws(()=>HistoricalReplayReceiptSchema.parse({...receipt,allowLiveModel:true}),/Unrecognized/);
+ assert.throws(()=>HistoricalReplayReceiptSchema.parse({...receipt,coreEvidence:[]}),/Too small/);
+ assert.throws(()=>HistoricalReplayReceiptSchema.parse({...receipt,priorRelease:undefined}),/Invalid/);
+ assert.throws(()=>HistoricalReplayReceiptSchema.parse({...receipt,staging:[{...pin,destination:'knowledge/records.json'}]}),/Invalid/);
+ assert.equal(ReplayReceiptSchema.safeParse(receipt).success,false);
+});
+
+test('v2 replay pins exactly the intake publication plan expected manifest and all derived clocks',()=>{
+ const pin={path:'synthetic-input.json',sha256:hash('synthetic pin')},receipt:ReplayReceipt={schemaVersion:'stadtstack-pipeline-replay-v2',knowledgeIntake:pin,publicationPlan:pin,expectedManifest:pin,clocks:{...clocks,coverageGeneratedAt:at}};
  assert.deepEqual(ReplayReceiptSchema.parse(receipt),receipt);
- assert.throws(()=>ReplayReceiptSchema.parse({...receipt,allowLiveModel:true}),/Unrecognized/);
- assert.throws(()=>ReplayReceiptSchema.parse({...receipt,coreEvidence:[]}),/Too small/);
- assert.throws(()=>ReplayReceiptSchema.parse({...receipt,priorRelease:undefined}),/Invalid/);
+ for(const key of ['knowledgeIntake','publicationPlan','expectedManifest','clocks'])assert.equal(ReplayReceiptSchema.safeParse({...receipt,[key]:undefined}).success,false);
+ for(const extra of [{allowLiveModel:true},{rawRoot:'legacy-cache'},{generationContract:pin},{priorRelease:{gitCommit:'a'.repeat(40)}},{workspace:'implicit-replay-output'}])assert.equal(ReplayReceiptSchema.safeParse({...receipt,...extra}).success,false);
  assert.throws(()=>ReplayClocksSchema.parse({...clocks,coverageGeneratedAt:'now'}),/Invalid/);
- assert.throws(()=>ReplayReceiptSchema.parse({...receipt,staging:[{...pin,destination:'knowledge/records.json'}]}),/Invalid/);
- assert.deepEqual(requiredReplayStaging(['b','a']),['catalogue.json','cities/a/feed.json','cities/a/signals.geojson','cities/b/feed.json','cities/b/signals.geojson','core/strausberg-facts.json','regions/brandenburg-mol/topics.json']);
+ const publicationClocks={qualityGeneratedAt:later,manifestGeneratedAt:later};
+ assertReplayClocks(receipt.clocks,at,publicationClocks);
+ for(const key of Object.keys(receipt.clocks) as (keyof typeof clocks)[])assert.throws(()=>assertReplayClocks({...receipt.clocks,[key]:'2026-10-12T12:00:00.000Z'},at,publicationClocks),/clocks differ/);
+});
+
+test('replay composition must exactly match all three staged source pins and its preparation audit pin',()=>{
+ const members=['knowledge/registry.json','knowledge/records.json','knowledge/coverage.json'] as const;
+ const outputs:KnowledgeSourcePin[]=members.map(member=>({path:'/synthetic/staging/'+member,sha256:hash(member),bytes:member.length,bindings:[{kind:'prepared_source',url:'https://example.org/replay-source',sourceSha256:hash('source'),observationId:'synthetic-observation',receiptSha256:hash('prepared'),independentAllowed:false}]}));
+ const preparationReceipt={path:'/synthetic/audit/knowledge-preparation-inputs.json',sha256:hash('preparation audit'),bytes:100};
+ const plan:Pick<PublicationPlan,'staging'|'knowledgePreparation'>={staging:outputs.map((pin,index)=>({...pin,memberPath:members[index]})),knowledgePreparation:preparationReceipt};
+ assertReplayCompositionBindings(outputs,preparationReceipt,plan);
+ assert.throws(()=>assertReplayCompositionBindings(outputs.slice(1),preparationReceipt,plan),/exactly three/);
+ assert.throws(()=>assertReplayCompositionBindings([outputs[0],outputs[0],outputs[2]],preparationReceipt,plan),/unique knowledge outputs/);
+ assert.throws(()=>assertReplayCompositionBindings(outputs,preparationReceipt,{...plan,staging:plan.staging.slice(1)}),/staging inventory/);
+ for(const field of ['path','sha256','bytes','bindings'] as const){
+  const changed=structuredClone(outputs);
+  if(field==='path')changed[0].path='/synthetic/elsewhere/registry.json';
+  else if(field==='sha256')changed[0].sha256=hash('different output');
+  else if(field==='bytes')changed[0].bytes++;
+  else {const binding=changed[0].bindings[0];assert.ok('sourceSha256' in binding);binding.sourceSha256=hash('unrelated source');}
+  assert.throws(()=>assertReplayCompositionBindings(changed,preparationReceipt,plan),/path mismatch|source pin differs/);
+ }
+ for(const changed of [{...preparationReceipt,path:'/synthetic/other-audit.json'},{...preparationReceipt,sha256:hash('unrelated receipt')},{...preparationReceipt,bytes:101}])assert.throws(()=>assertReplayCompositionBindings(outputs,changed,plan),/preparation receipt differs/);
+});
+
+test('executable replay rejects historical receipts and wrong pins before any intake publication or live fallback',async t=>{
+ const {root,managedRoot,policy}=await createCivicPolicyTestContext(t),path=join(root,'receipt.json');
+ const bytes=JSON.stringify({schemaVersion:'stadtstack-offline-replay-v1',generationContract:{path:'never-execute.ts',sha256:hash('not code')},workspace:managedRoot});
+ await writeFile(path,bytes);
+ const network=t.mock.method(globalThis,'fetch',async()=>{throw Error('Replay must not fetch');});
+ await assert.rejects(replayPipeline(path,hash(bytes),policy));
+ await assert.rejects(replayPipeline(path,hash('wrong bytes'),policy),/digest mismatch/);
+ await assert.rejects(lstat(managedRoot),{code:'ENOENT'});
+ assert.equal(network.mock.callCount(),0);
 });

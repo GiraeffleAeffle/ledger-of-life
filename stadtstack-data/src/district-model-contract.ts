@@ -1,3 +1,5 @@
+import type {ManagedSourceContext,CivicPolicyOptions} from './civic-opt-out.ts';
+
 export type ExtractorProvider = 'openai-subscription' | 'anthropic-subscription';
 export const PROVIDER_CONFIGS = Object.freeze({
   'openai-subscription': Object.freeze({ model: 'gpt-6-luna', tool: 'codex-cli', host: 'codex-workstation', binary: '/home/max/.local/bin/codex', modelIdentityBasis: 'configured-cli-model-and-tool-version', toolLimitation: 'Codex retains apply_patch availability; read-only sandbox blocks writes. Shell/browser/app/plugin features are disabled and any attempted tool use rejects the result. This is not a blanket tool-free CLI.' }),
@@ -11,7 +13,7 @@ export type ModelEvidence = {
 export type TokenCounts = { inputTokens?: number; outputTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number };
 export type ReportedUsage = { topLevel: TokenCounts | null; perModel: Record<string, TokenCounts & { cliEstimatedApiCostUsd?: number }>; cliEstimatedApiCostUsd: number | null };
 export type CallPurpose = 'extraction' | 'judge' | 'agreement' | 'synthetic_readiness';
-export type UsageContext = { purpose: CallPurpose; ledgerPath: string; pausePath: string; groupId?: string; signal?: AbortSignal };
+export type UsageContext = { purpose: CallPurpose; ledgerPath: string; pausePath: string; groupId?: string; signal?: AbortSignal; sourceContext?: ManagedSourceContext; policy?: CivicPolicyOptions };
 export type ModelAnswer = {
   value: unknown; responseSha256: string; returnedModel: string | null; runtimeWarnings: string[];
   evidence: ModelEvidence; requestedModel: string; reportedModels: string[]; usage: ReportedUsage;

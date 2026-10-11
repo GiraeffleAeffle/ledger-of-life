@@ -1,17 +1,20 @@
 # Governed wrapper creates namespace stadtstack-mcp and the Secret before install.
 # helm upgrade --install civic-mcp deploy/mcp/chart --namespace stadtstack-mcp \
-#   --set-string releaseVersion=0.3.0 \
+#   --set-string releaseVersion=0.3.1 \
 #   --set-string image.digest=sha256:<owner-approved digest from image workflow>
 # Tags never replace immutable digests. Version must match package, Git and image.
 releaseVersion: ""
 image:
   repository: ghcr.io/giraeffleaeffle/stadtstack-mcp
   digest: ""
-# Existing Secret must contain token-hashes.json: JSON array of {id, sha256}.
+# Existing Secret contains validated {id, sha256, limits?} records. Optional limits
+# contain requestsPerMinute (1..300) and maxConcurrent (1..8); absent means 60/4.
+# Authorized release requires existing max and buzz explicitly 300/8, others 60/4.
+# Keep existing digests: private CLI set-limits max 300 8; set-limits buzz 300 8.
 # sha256 is the lowercase SHA-256 of the bearer token; never store plaintext tokens.
 secretName: civic-mcp-token-hashes
-# Increment to roll the pod after rotating the existing Secret. No subPath mount:
-# Kubernetes can refresh the projected file if the server supports live reload.
+# The governed wrapper hashes the validated configuration into this revision.
+# Server loads once at startup: projected Secret updates alone do not activate it.
 tokenSecretRevision: "1"
 web:
   resources:

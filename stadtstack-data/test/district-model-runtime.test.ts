@@ -4,15 +4,19 @@ import { mkdtemp, rm, readFile, stat, writeFile, symlink, chmod } from 'node:fs/
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import childProcess, { type ChildProcessWithoutNullStreams, type SpawnOptions } from 'node:child_process';
+import childProcess from 'node:child_process';
+import type {ChildProcessWithoutNullStreams} from 'node:child_process';
 import { EventEmitter, getEventListeners } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { syncBuiltinESMExports } from 'node:module';
-import { PROVIDER_CONFIGS, SubscriptionRuntimeError, type ExtractorProvider, type ReportedUsage, type RuntimeFailureDiagnostic } from '../src/district-model-contract.ts';
+import { PROVIDER_CONFIGS, SubscriptionRuntimeError } from '../src/district-model-contract.ts';
+import type {ReportedUsage,RuntimeFailureDiagnostic} from '../src/district-model-contract.ts';
 import { assertClaudeSubscriptionAuth, claudeExecutionArgs, inspectClaudeEvents } from '../src/district-claude.ts';
-import { inspectCodexEvents, modelReadiness, subscriptionChat, subscriptionExecutionArgs } from '../src/district-model.ts';
+import { inspectCodexEvents, modelReadiness, subscriptionChat, subscriptionExecutionArgs, collectSubscriptionProcess, encodeSubscriptionInput } from '../src/district-model.ts';
 import { appendUsageEntry, readUsageLedger, hourlyUsage, recordExercisedReadinessProbe, usageEntry, writeOperatorPause, pauseProvider, isProviderStopped, COST_MEANING, appendFailureDiagnostic, failureDiagnosticPath, rejectRuntimeFailure } from '../src/district-model-usage.ts';
 import { classifyRuntimeFailure, failureDiagnostic, runtimeFailureReason, runtimeToolEvidence, RuntimeFailureDiagnosticSchema } from '../src/district-model-diagnostics.ts';
+import {CivicPolicyStateError} from '../src/civic-opt-out.ts';
+import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 const digest = (text: string) => createHash('sha256').update(text).digest('hex');
 function claudeResult(extra: Record<string, unknown> = {}) {
   return JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: { supported: true }, usage: { input_tokens: 2, output_tokens: 52, cache_read_input_tokens: 3, cache_creation_input_tokens: 923 }, modelUsage: { 'claude-haiku-5-5': { inputTokens: 2, outputTokens: 52, cacheReadInputTokens: 3, cacheCreationInputTokens: 923, costUSD: 0.008432 } }, total_cost_usd: 0.008432, ...extra });
@@ -272,34 +276,24 @@ test('failure persistence retains reported counts, unknown usage and safe diagno
     });
   } finally { await rm(root, { recursive: true, force: true }); }
 });
-test('runtime boundary records operator and context stops without invoking readiness or native models', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'district-runtime-boundary-'));
-  try {
-    const control = new AbortController();
-    control.abort();
-    for (const provider of ['openai-subscription', 'anthropic-subscription'] as const) {
-      const context = { purpose: 'extraction' as const, ledgerPath: join(root, `${provider}-usage`), pausePath: join(root, `${provider}-pause`), groupId: digest(provider), signal: control.signal };
-      await assert.rejects(subscriptionChat(provider, 'private-prompt', { source: 'private-source' }, {}, context), error => {
-        assert.ok(error instanceof SubscriptionRuntimeError);
-        assert.equal(error.diagnostic?.reason, 'operator_pause');
-        assert.equal(error.diagnostic?.attempted, false);
-        assert.equal(error.diagnostic?.exitCode, null);
-        return true;
-      });
-      const persisted = await readFile(failureDiagnosticPath(context.ledgerPath), 'utf8');
-      assert.doesNotMatch(persisted, /private-prompt|private-source/);
-      assert.equal(JSON.parse(persisted.trim()).groupId, context.groupId);
-      assert.deepEqual(await readUsageLedger(context.ledgerPath), []);
-    }
-    const context = { purpose: 'judge' as const, ledgerPath: join(root, 'context-usage'), pausePath: join(root, 'context-pause') };
-    await assert.rejects(subscriptionChat('openai-subscription', 'x'.repeat(8001), {}, {}, context), error => {
-      assert.ok(error instanceof SubscriptionRuntimeError);
-      assert.equal(error.diagnostic?.reason, 'context');
-      assert.equal(error.diagnostic?.attempted, false);
-      return true;
-    });
-    assert.equal(JSON.parse((await readFile(failureDiagnosticPath(context.ledgerPath), 'utf8')).trim()).reason, 'context');
-  } finally { await rm(root, { recursive: true, force: true }); }
+test('native runtime rejects fixture, missing and non-OpenAI authority before any executable starts',async t=>{
+ const fixture=await createCivicPolicyTestContext(t),platform=Object.getOwnPropertyDescriptor(process,'platform')!;
+ Object.defineProperty(process,'platform',{...platform,value:'linux'});t.after(()=>Object.defineProperty(process,'platform',platform));
+ const native=t.mock.method(childProcess,'spawn',()=>{throw Error('No native process is allowed for this fixture');});syncBuiltinESMExports();t.after(()=>{native.mock.restore();syncBuiltinESMExports();});
+ const sourceContext={root:fixture.managedRoot,kind:'artifacts' as const,decisionId:fixture.decisionId,...fixture.policy,bindings:[{kind:'prepared_source' as const,url:'https://council.test/source',sourceSha256:digest('source'),observationId:'fixture-observation',receiptSha256:digest('fixture-receipt')}]};
+ const context={purpose:'extraction' as const,ledgerPath:join(fixture.root,'usage.jsonl'),pausePath:join(fixture.root,'pause.json'),policy:fixture.policy,sourceContext};
+ for(const provider of ['openai-subscription','anthropic-subscription'] as const){
+  await assert.rejects(modelReadiness(provider,undefined,fixture.policy),CivicPolicyStateError);
+  await assert.rejects(subscriptionChat(provider,'private prompt',{source:'private source'},{},context),CivicPolicyStateError);
+ }
+ await assert.rejects(modelReadiness('openai-subscription',undefined,{...fixture.policy,stateDir:join(fixture.root,'missing')}),CivicPolicyStateError);
+ await assert.rejects(subscriptionChat('openai-subscription','prompt',{}, {},{purpose:'judge',ledgerPath:context.ledgerPath,pausePath:context.pausePath,policy:fixture.policy}),CivicPolicyStateError);
+ assert.equal(native.mock.callCount(),0);await assert.rejects(stat(fixture.managedRoot),{code:'ENOENT'});
+});
+test('context bounds are deterministic before any process creation or model input write',()=>{
+ assert.equal(encodeSubscriptionInput('fixed instructions',{source:'synthetic'}),'{"source":"synthetic"}');
+ assert.throws(()=>encodeSubscriptionInput('x'.repeat(8001),{}),/context byte limit/);
+ assert.throws(()=>encodeSubscriptionInput('fixed',{source:'x'.repeat(24000)}),/context byte limit/);
 });
 test('fatal Codex fixtures preserve controlled parser causes without retaining messages or request data', () => {
   const secret = 'private-request-source-header';
@@ -328,136 +322,35 @@ test('fatal Codex fixtures preserve controlled parser causes without retaining m
   assert.deepEqual(runtimeToolEvidence('anthropic-subscription', invalidFormatter).toolEvidence, [{ kind: 'tool_progress', activity: 'unknown' }]);
 });
 
-// Only in-memory subprocesses are used: no native CLI, credentials or model calls.
-function mockReadinessRuntime(t: TestContext, provider: ExtractorProvider = 'openai-subscription') {
-  const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
-  Object.defineProperty(process, 'platform', { ...platform, value: provider === 'openai-subscription' ? 'linux' : 'darwin' });
-  const started = [Promise.withResolvers<ChildProcessWithoutNullStreams>(), Promise.withResolvers<ChildProcessWithoutNullStreams>()];
-  const calls: Array<{ args: string[]; child: ChildProcessWithoutNullStreams; detached: boolean | undefined }> = [];
-  const kills: Array<{ pid: number; signal: NodeJS.Signals | number | undefined }> = [];
-  const spawn = t.mock.method(childProcess, 'spawn', (binary: string, args: string[], options: SpawnOptions) => {
-    assert.equal(binary, PROVIDER_CONFIGS[provider].binary);
-    const child = Object.assign(new EventEmitter(), {
-      pid: 700_000 + calls.length,
-      stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(),
-      kill: () => { assert.fail('Detached CLI must be terminated through its process group'); },
-    }) as unknown as ChildProcessWithoutNullStreams;
-    assert.ok(calls.length < started.length, 'No generation subprocess may start in a readiness test');
-    calls.push({ args: [...args], child, detached: options.detached });
-    started[calls.length - 1].resolve(child);
-    return child;
-  });
-  const kill = t.mock.method(process, 'kill', (pid: number, signal?: NodeJS.Signals | number) => {
-    kills.push({ pid, signal });
-    return true;
-  });
-  syncBuiltinESMExports();
-  t.after(() => {
-    spawn.mock.restore(); kill.mock.restore(); syncBuiltinESMExports();
-    Object.defineProperty(process, 'platform', platform);
-    for (const { child } of calls) { child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy(); }
-  });
-  return { started, calls, kills };
+// In-memory process collection exercises cancellation without granting native authority.
+function processFixture(t:TestContext){
+ const child=Object.assign(new EventEmitter(),{pid:700_001,stdin:new PassThrough(),stdout:new PassThrough(),stderr:new PassThrough(),kill:()=>{assert.fail('Expected owned detached group termination');}}) as unknown as ChildProcessWithoutNullStreams;
+ const kills:Array<{pid:number;signal:NodeJS.Signals|number|undefined}>=[];
+ t.mock.method(process,'kill',(pid:number,signal?:NodeJS.Signals|number)=>{kills.push({pid,signal});return true;});
+ t.after(()=>{child.stdin.destroy();child.stdout.destroy();child.stderr.destroy();});return {child,kills};
 }
-function finishReadinessChild(child: ChildProcessWithoutNullStreams, stdout: string, code = 0) {
-  child.stdout.emit('data', stdout);
-  child.emit('close', code);
+for(const args of [['--version'],['login','status'],['exec','--json']]){
+ test(`bounded process collector aborts ${args[0]} and waits for close`,async t=>{
+  t.mock.timers.enable({apis:['setTimeout']});const {child,kills}=processFixture(t),controller=new AbortController();
+  const pending=collectSubscriptionProcess(child,{args,input:'synthetic input',timeout:10000,signal:controller.signal});let settled=false;void pending.finally(()=>{settled=true;});
+  controller.abort();controller.abort();assert.deepEqual(kills,[{pid:-700_001,signal:'SIGKILL'}]);
+  child.emit('exit',null,'SIGKILL');await new Promise<void>(resolve=>setImmediate(resolve));assert.equal(settled,false);
+  child.emit('close',null);const result=await pending;assert.equal(result.failure,'operator_pause');assert.equal(getEventListeners(controller.signal,'abort').length,0);
+  t.mock.timers.tick(60000);assert.equal(kills.length,1);
+ });
 }
-
-for (const boundary of ['readiness', 'subscriptionChat'] as const) {
-  for (const stage of ['version', 'authentication'] as const) {
-    test(`${boundary} abort during ${stage} kills the detached group and awaits close before cleanup`, async t => {
-      const root = await mkdtemp(join(tmpdir(), 'district-readiness-cancel-'));
-      t.after(() => rm(root, { recursive: true, force: true }));
-      t.mock.timers.enable({ apis: ['setTimeout'] });
-      const runtime = mockReadinessRuntime(t), controller = new AbortController();
-      const context = { purpose: 'synthetic_readiness' as const, ledgerPath: join(root, 'usage.jsonl'), pausePath: join(root, 'pause.json'), signal: controller.signal };
-      const pending = boundary === 'readiness'
-        ? modelReadiness('openai-subscription', controller.signal)
-        : subscriptionChat('openai-subscription', 'synthetic cancellation fixture', {}, {}, context);
-      let settled = false;
-      void pending.then(() => { settled = true; }, () => { settled = true; });
-      const rejected = assert.rejects(pending, error => {
-        assert.ok(error instanceof SubscriptionRuntimeError);
-        assert.equal(error.failureCategory, 'operator_pause');
-        assert.equal(error.reason, 'operator_pause');
-        if (boundary === 'subscriptionChat') assert.equal(error.diagnostic?.attempted, false);
-        return true;
-      });
-      const version = await runtime.started[0].promise;
-      let child = version;
-      if (stage === 'authentication') {
-        finishReadinessChild(version, 'codex-cli 1.2.3\n');
-        child = await runtime.started[1].promise;
-      }
-      assert.deepEqual(runtime.calls.map(call => call.args), stage === 'version' ? [['--version']] : [['--version'], ['login', 'status']]);
-      assert.ok(runtime.calls.every(call => call.detached === true));
-      controller.abort(Error('synthetic worker cancellation'));
-      controller.abort(Error('repeated cancellation'));
-      assert.deepEqual(runtime.kills, [{ pid: -child.pid!, signal: 'SIGKILL' }]);
-      child.emit('exit', null, 'SIGKILL');
-      await new Promise<void>(resolve => setImmediate(resolve));
-      assert.equal(settled, false, 'exit is not close: inference cleanup must remain pending');
-      child.emit('close', null, 'SIGKILL');
-      await rejected;
-      assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
-      t.mock.timers.tick(60_000);
-      assert.equal(runtime.kills.length, 1, 'close removes the preflight deadline');
-      assert.equal(runtime.calls.length, stage === 'version' ? 1 : 2);
-      if (boundary === 'subscriptionChat') {
-        const diagnostic = JSON.parse((await readFile(failureDiagnosticPath(context.ledgerPath), 'utf8')).trim());
-        assert.equal(diagnostic.reason, 'operator_pause');
-        assert.equal(diagnostic.attempted, false);
-        assert.deepEqual(await readUsageLedger(context.ledgerPath), []);
-      }
-    });
-  }
-}
-
-test('already cancelled readiness never spawns a CLI', async t => {
-  const runtime = mockReadinessRuntime(t), controller = new AbortController();
-  controller.abort();
-  await assert.rejects(modelReadiness('openai-subscription', controller.signal), error => error instanceof SubscriptionRuntimeError && error.reason === 'operator_pause');
-  assert.equal(runtime.calls.length, 0);
-  assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+test('collector timeout and output bounds cannot turn into successful model output',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const {child,kills}=processFixture(t);
+ const pending=collectSubscriptionProcess(child,{args:['exec','--json'],input:'',timeout:1000});
+ child.stdout.emit('data','x'.repeat(512*1024+1));assert.deepEqual(kills,[{pid:-700_001,signal:'SIGKILL'}]);child.emit('close',null);
+ const result=await pending;assert.equal(result.failure,'output_bound');assert.equal(result.stdout,'');t.mock.timers.tick(1000);assert.equal(kills.length,1);
 });
-
-test('cancellation between completed version and auth does not spawn another CLI', async t => {
-  const runtime = mockReadinessRuntime(t), controller = new AbortController();
-  const pending = modelReadiness('openai-subscription', controller.signal);
-  const rejected = assert.rejects(pending, error => error instanceof SubscriptionRuntimeError && error.reason === 'operator_pause');
-  const version = await runtime.started[0].promise;
-  finishReadinessChild(version, 'codex-cli 1.2.3\n');
-  controller.abort();
-  await rejected;
-  assert.equal(runtime.calls.length, 1);
-  assert.deepEqual(runtime.kills, []);
-  assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+test('collector parses no generation events during metadata preflight and releases listeners after close',async t=>{
+ const {child,kills}=processFixture(t),controller=new AbortController();const pending=collectSubscriptionProcess(child,{args:['login','status'],input:'',timeout:10000,signal:controller.signal});
+ child.stdout.emit('data','Logged in using ChatGPT\\n');child.emit('close',0);
+ const result=await pending;assert.equal(result.failure,null);assert.match(result.stdout,/Logged in/);assert.equal(getEventListeners(controller.signal,'abort').length,0);controller.abort();assert.deepEqual(kills,[]);
 });
-
-for (const subscriptionType of ['max', 'pro'] as const) {
-  test(`cancellable readiness still parses multiline auth JSON as ordinary JSON (${subscriptionType})`, async t => {
-    t.mock.timers.enable({ apis: ['setTimeout'] });
-    const runtime = mockReadinessRuntime(t, 'anthropic-subscription'), controller = new AbortController();
-    const pending = modelReadiness('anthropic-subscription', controller.signal);
-    const rejected = subscriptionType === 'pro'
-      ? assert.rejects(pending, error => error instanceof SubscriptionRuntimeError && error.failureCategory === 'subscription_authentication')
-      : undefined;
-    finishReadinessChild(await runtime.started[0].promise, '1.2.3 (Claude Code)\n');
-    const login = await runtime.started[1].promise;
-    assert.deepEqual(runtime.calls[1].args, ['auth', 'status', '--json']);
-    const json = JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', subscriptionType }, null, 2) + '\n';
-    for (const line of json.split('\n').slice(0, -1)) login.stdout.emit('data', line + '\n');
-    assert.deepEqual(runtime.kills, [], 'auth JSON must never enter the generation-event parser');
-    login.emit('close', 0);
-    if (rejected) await rejected;
-    else {
-      const evidence = await pending;
-      assert.equal(evidence.toolVersion, '1.2.3');
-      assert.equal(evidence.model, PROVIDER_CONFIGS['anthropic-subscription'].model);
-    }
-    assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
-    controller.abort(); t.mock.timers.tick(60_000);
-    assert.deepEqual(runtime.kills, []);
-  });
-}
+test('historical multiline Claude authentication remains parseable without a live Claude path',()=>{
+ const historical=JSON.stringify({loggedIn:true,authMethod:'claude.ai',apiProvider:'firstParty',subscriptionType:'max'},null,2);
+ assert.doesNotThrow(()=>assertClaudeSubscriptionAuth(historical));assert.throws(()=>assertClaudeSubscriptionAuth(historical.replace('"max"','"pro"')),/authentication/);
+});

@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import { KnowledgeRecordsSchema, hashSchema, sha256 } from './district-schema.ts';
-import { EntityMentionSchema, IdentityBasisSchema, NormalizedRelationSchema, entityTypeSchema } from './district-graph-claims.ts';
-import { canonical } from './mcp-pagination.ts';
+import { EntityMentionSchema, IdentityBasisSchema, NormalizedRelationSchema, entityTypeSchema, ENTITY_TYPE_PRECEDENCE } from './district-graph-claims.ts';
+import { canonical } from './mcp-source-identity.ts';
 
-export const GRAPH_SCHEMA_VERSION = 'stadtstack-graph-v1';
+export const GRAPH_SCHEMA_VERSION = 'stadtstack-graph-v2';
 const evidenceSchema = z.object({
   recordId: z.string().min(1), municipalityId: z.string().min(1), evidenceHash: hashSchema,
   source: KnowledgeRecordsSchema.shape.records.element.shape.sources.element,
+  sources: KnowledgeRecordsSchema.shape.records.element.shape.sources,
   textSha256: hashSchema, chunk: KnowledgeRecordsSchema.shape.records.element.shape.extraction.shape.chunk,
   relationNormalization: KnowledgeRecordsSchema.shape.records.element.shape.extraction.shape.relationNormalization,
 }).strict();
@@ -35,7 +36,7 @@ export function buildKnowledgeGraph(recordsBytes: string | Uint8Array): Knowledg
     if (recordIds.has(record.id)) throw Error('Duplicate graph source record');
     recordIds.add(record.id);
     if (record.verification.status !== 'auto-verified') throw Error('Graph requires admitted records only');
-    const evidence = { recordId: record.id, municipalityId: record.municipalityId, evidenceHash: record.verification.evidenceHash, source: record.sources[0], textSha256: record.extraction.textSha256, chunk: record.extraction.chunk, ...(record.extraction.relationNormalization ? { relationNormalization: record.extraction.relationNormalization } : {}) };
+    const evidence = { recordId: record.id, municipalityId: record.municipalityId, evidenceHash: record.verification.evidenceHash, source: record.sources[0], sources: record.sources, textSha256: record.extraction.textSha256, chunk: record.extraction.chunk, ...(record.extraction.relationNormalization ? { relationNormalization: record.extraction.relationNormalization } : {}) };
     for (const entity of record.entities) {
       const { entityId, identityBasis, ...mention } = entity;
       let node = entities.get(entityId);
@@ -43,6 +44,7 @@ export function buildKnowledgeGraph(recordsBytes: string | Uint8Array): Knowledg
         node = { id: entityId, type: entity.type, names: [], identityBasis, mentions: [] };
         entities.set(entityId, node);
       }
+      if (ENTITY_TYPE_PRECEDENCE.indexOf(entity.type) < ENTITY_TYPE_PRECEDENCE.indexOf(node.type)) node.type = entity.type;
       if (!node.names.includes(entity.name)) node.names.push(entity.name);
       node.mentions.push({ ...mention, evidence });
     }

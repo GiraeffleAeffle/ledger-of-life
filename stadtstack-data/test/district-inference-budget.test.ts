@@ -1,8 +1,8 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
-import { mkdtemp, readdir, rm, realpath } from 'node:fs/promises';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inferPreparedDocument, jointExtractionContract } from '../src/district-inference.ts';
@@ -11,16 +11,19 @@ import { prepareDocument } from '../src/district-prepared-document.ts';
 import type { PreparedDocument, PreparedSourceReference } from '../src/district-prepared-document.ts';
 import { createWorkPlan, runWorkPlan } from '../src/district-work-plan.ts';
 import { sha256 } from '../src/district-schema.ts';
-import { recordHostOptOut } from '../src/civic-opt-out.ts';
+import { recordHostOptOut, CivicPolicyStateError } from '../src/civic-opt-out.ts';
+import { createCivicPolicyTestContext } from './fixtures/civic-policy.ts';
+const ordinaryFixture = await createCivicPolicyTestContext();
+after(ordinaryFixture.dispose);
 
-async function preparedText(text: string): Promise<PreparedDocument> {
+async function preparedText(text: string, fixture = ordinaryFixture): Promise<PreparedDocument> {
   const bytes = Buffer.from(text), sourceSha256 = sha256(bytes);
   const reference: PreparedSourceReference = {
     id: 'synthetic-source-' + sourceSha256, url: 'https://example.org/synthetic-budget-document', sha256: sourceSha256,
     retrievedAt: '2026-10-01T00:00:00.000Z', locator: 'document-sha256:' + sourceSha256, mimeType: 'text/plain', sourceType: 'website',
     policy: { robots: { state: 'allowed', url: 'https://example.org/robots.txt' }, tdm: { state: 'not_declared', evidence: [] }, access: 'public', legalClassification: 'not_assessed', publication: 'facts_with_attribution_only' },
   };
-  return prepareDocument({ bytes, municipalityId: 'strausberg', references: [reference], mimeType: 'text/plain', extractorSha256: sha256('synthetic preparation implementation'), toolVersions: { node: process.versions.node } }, async () => { assert.fail('plain text preparation must not execute commands'); });
+  return prepareDocument({ bytes, municipalityId: 'strausberg', references: [reference], mimeType: 'text/plain', extractorSha256: sha256('synthetic preparation implementation'), toolVersions: { node: process.versions.node }, managedRoot: fixture.managedRoot, policy: fixture.policy }, async () => { assert.fail('plain text preparation must not execute commands'); });
 }
 
 test('oversized prepared documents quarantine before readiness and do not pause remaining provider work', async context => {
@@ -39,7 +42,7 @@ test('oversized prepared documents quarantine before readiness and do not pause 
       const result = await inferPreparedDocument({
         taskId: task.id, groupId: task.groupId, purpose: task.purpose, provider: task.provider,
         municipality: { id: 'strausberg', name: 'Strausberg', ags: '12064472', districtId: 'maerkisch-oderland' },
-        prepared: document, expected: document, contract: pinnedContract, out: root,
+        prepared: document, expected: document, contract: pinnedContract, out: root, policy: ordinaryFixture.policy,
         usage: { ledgerPath: join(root, 'usage.jsonl'), pausePath: join(root, 'pause.json'), signal },
       });
       assert.deepEqual(result.records, []); assert.deepEqual(result.chunks, []);
@@ -63,17 +66,16 @@ test('oversized prepared documents quarantine before readiness and do not pause 
   } finally { spawnGuard.mock.restore(); syncBuiltinESMExports(); await rm(root, { recursive: true, force: true }); }
 });
 
-test('budget handling does not swallow cancellation, prepared integrity, or operational readiness failures', async context => {
+test('budget handling does not swallow cancellation, prepared integrity, or native authority failures', async context => {
   const root = await mkdtemp(join(tmpdir(), 'district-inference-budget-boundary-'));
-  const operationalFailure = Error('Synthetic readiness process failure');
-  const spawnGuard = context.mock.method(childProcess, 'spawn', () => { throw operationalFailure; });
+  const spawnGuard = context.mock.method(childProcess, 'spawn', () => { throw Error('Fixture authority must never start a native model'); });
   syncBuiltinESMExports();
   try {
     const prepared = await preparedText('x'.repeat(4800 * 81)), contract = await jointExtractionContract();
     const options = {
       taskId: sha256('synthetic task'), groupId: sha256('synthetic group'), purpose: 'production' as const, provider: 'openai-subscription' as const,
       municipality: { id: 'strausberg', name: 'Strausberg', ags: '12064472', districtId: 'maerkisch-oderland' },
-      prepared, expected: prepared, contract, out: root,
+      prepared, expected: prepared, contract, out: root, policy: ordinaryFixture.policy,
       usage: { ledgerPath: join(root, 'usage.jsonl'), pausePath: join(root, 'pause.json') },
     };
     const controller = new AbortController(), reason = Error('synthetic cancelled budget document'); controller.abort(reason);
@@ -81,23 +83,23 @@ test('budget handling does not swallow cancellation, prepared integrity, or oper
     await assert.rejects(inferPreparedDocument({ ...options, prepared: { ...prepared, textSha256: sha256('tampered') } }), /hash mismatch/);
     assert.equal(spawnGuard.mock.callCount(), 0);
     const small = await preparedText('Strausberg: synthetic document of sufficient length, with no native calls permitted.');
-    await assert.rejects(inferPreparedDocument({ ...options, prepared: small, expected: small }), error => process.platform === 'linux' ? error === operationalFailure : error instanceof Error && /authorized host/.test(error.message));
-    assert.equal(spawnGuard.mock.callCount(), process.platform === 'linux' ? 1 : 0);
+    await assert.rejects(inferPreparedDocument({ ...options, prepared: small, expected: small }), CivicPolicyStateError);
+    assert.equal(spawnGuard.mock.callCount(), 0);
     assert.deepEqual(await readdir(root), []);
   } finally { spawnGuard.mock.restore(); syncBuiltinESMExports(); await rm(root, { recursive: true, force: true }); }
 });
 
 test('recorded objection stops prepared inference before readiness or subscription transmission', async context => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'district-inference-opt-out-'))), stateDir = join(root, 'policy');
+  const fixture = await createCivicPolicyTestContext(), { root, policy } = fixture;
   const spawnGuard = context.mock.method(childProcess, 'spawn', () => { throw Error('Native calls forbidden after objection'); });
   syncBuiltinESMExports();
   try {
-    const prepared = await preparedText('Strausberg: synthetic source content long enough for normal document preparation.'), contract = await jointExtractionContract();
-    await recordHostOptOut({ host: 'example.org', reason: 'municipality_objection', reference: 'synthetic-inference-test' }, { stateDir });
+    const prepared = await preparedText('Strausberg: synthetic source content long enough for normal document preparation.', fixture), contract = await jointExtractionContract();
+    await recordHostOptOut({ host: 'example.org', reason: 'municipality_objection', reference: 'synthetic-inference-test' }, policy);
     await assert.rejects(inferPreparedDocument({
       taskId: sha256('synthetic task'), groupId: sha256('synthetic group'), purpose: 'production', provider: 'openai-subscription',
       municipality: { id: 'strausberg', name: 'Strausberg', ags: '12064472', districtId: 'maerkisch-oderland' },
-      prepared, expected: prepared, contract, out: join(root, 'results'), policyStateDir: stateDir,
+      prepared, expected: prepared, contract, out: join(root, 'results'), policy,
       usage: { ledgerPath: join(root, 'usage.jsonl'), pausePath: join(root, 'pause.json') },
     }), /objection/);
     assert.equal(spawnGuard.mock.callCount(), 0);

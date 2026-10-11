@@ -1,9 +1,7 @@
-import {readFile} from 'node:fs/promises';
-import {join} from 'node:path';
 import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs';
-import {cacheDir,hash} from './common.ts';
-import {coreBundleSchema,verificationSchema,faithfulnessGateSchema} from './core-schema.ts';
-import type {CoreFact,CoreBundle} from './core-schema.ts';
+import {hash} from './common.ts';
+import {coreBundleSchema,verificationSchema} from './core-schema.ts';
+import type {CoreFact} from './core-schema.ts';
 import type {FeatureCollection,Signal} from './schema.ts';
 export const extractorVersion='strausberg-core-pdf-v1';
 export const lakeUrl='https://www.stadt-strausberg.de/wp-content/uploads/2025/05/26-10-05_Stauhoehe-Straussee.pdf';
@@ -50,21 +48,6 @@ export function validateCore(input:unknown,collection:FeatureCollection){
  }
  if(bundle.version!==bundleVersion(bundle.facts))throw Error('Core bundle version mismatch');
  return bundle;
-}
-export async function validateCoreBytes(bundle:CoreBundle){
- const texts=new Map<string,string>();
- for(const fact of bundle.facts){
-  let text=texts.get(fact.source.sha256);
-  if(text===undefined){
-   const bytes=new Uint8Array(await readFile(join(cacheDir,'pdf',fact.source.sha256+'.pdf')));
-   if(hash(bytes)!==fact.source.sha256)throw Error(`Source bytes changed: ${fact.id}`);
-   text=await pageOne(bytes);texts.set(fact.source.sha256,text);
-  }
-  const checks=deterministic(text,fact.id);
-  if(JSON.stringify(checks)!==JSON.stringify(fact.verification.deterministic.checks)||hash(text)!==fact.verification.faithfulness.contextHash)throw Error(`Source gate stale: ${fact.id}`);
-  const evidence=JSON.parse(await readFile(join(cacheDir,'core-evidence',fact.verification.faithfulness.evidenceHash+'.json'),'utf8'));
-  if(JSON.stringify(faithfulnessGateSchema.parse(evidence))!==JSON.stringify(faithfulnessGateSchema.parse(fact.verification.faithfulness)))throw Error(`Judge evidence missing/changed: ${fact.id}`);
- }
 }
 export function coreSignal(f:CoreFact):Signal{
  const year=f.assertion.year,date=f.assertion.date;

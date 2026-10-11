@@ -1,12 +1,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,readFile,rm,symlink} from 'node:fs/promises';
+import {mkdtemp,writeFile,readFile,rm,symlink,realpath} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {renderDistrictSources,exportDistrictSources} from '../src/export-district-sources.ts';
 import {districtSourceAdapterKind} from '../src/district-crawl.ts';
 import type {DistrictRegistry} from '../src/district-registry.ts';
 import {ownerRobotsOverrideFor} from '../src/source-policy.ts';
+import {PoliteFetcher} from '../src/polite-fetch.ts';
+import {politeTestOptions} from './fixtures/polite-lane.ts';
 
 const date='2026-10-01T00:00:00.000Z',url='https://stadt.de/registry';
 function fixture():DistrictRegistry{
@@ -61,6 +63,13 @@ test('configured dispatch, observed document labels, crawl failures and incomple
  assert.match(result.markdown,/not a grant of permission/);assert.match(result.markdown,/not method\/form or bytes/);
 });
 
+test('unavailable TDM reference remains visible beside the actual reservation',()=>{
+ const result=renderDistrictSources(fixture(),crawl(),[{url:'https://stadt.de/council',checkedAt:date,retrievedAt:null,state:'failed',failure:'tdm_unavailable',policy:{robots:{state:'allowed'},tdm:{state:'reserved',referenceStatus:'unavailable',evidence:[{value:'PRIVATE-INVALID-POLICY-URI'}]}}}]);
+ const row=result.rows.find(value=>value.rowType==='fetch_observation')!;
+ assert.equal(row.tdmRuntimeState,'reserved');assert.equal(row.tdmReferenceStatus,'unavailable');
+ assert.ok(result.csv.includes('"tdmReferenceStatus"'));assert.ok(!result.csv.includes('PRIVATE-INVALID-POLICY-URI'));
+});
+
 test('output is deterministic and escapes Markdown, CSV and spreadsheet formulas',()=>{
  const raw=fixture();raw.inventory[0].name='<script>|[x]\n*Town*';raw.municipalities[0].sources[0].id='=SUM(1,2)';
  const first=renderDistrictSources(raw,crawl()),second=renderDistrictSources(raw,crawl());
@@ -82,17 +91,19 @@ test('observation ordering and object property insertion order do not affect ren
 });
 
 test('explicit local export reads retained observations only and writes requested deterministic outputs',async t=>{
- const root=await mkdtemp(join(tmpdir(),'source-export-'));t.after(()=>rm(root,{recursive:true,force:true}));
- const rawRoot=join(root,'raw');await mkdir(join(rawRoot,'observations'),{recursive:true});
- const registry=join(root,'registry.json'),crawlIndex=join(root,'index.json'),markdown=join(root,'reports','SOURCES.md'),csv=join(root,'reports','sources.csv');
- await writeFile(registry,JSON.stringify(fixture()));await writeFile(crawlIndex,JSON.stringify(crawl()));
- await writeFile(join(rawRoot,'observations','one.json'),JSON.stringify({url:'https://stadt.de/council',checkedAt:date,retrievedAt:null,state:'failed',failure:'timeout'}));
- const result=await exportDistrictSources({registry,crawlIndex,rawRoot,markdown,csv});
+ const root=await realpath(await mkdtemp(join(tmpdir(),'source-export-')));t.after(()=>rm(root,{recursive:true,force:true}));
+ const rawRoot=join(root,'raw'),options=await politeTestOptions({cacheDir:rawRoot}),fetcher=new PoliteFetcher(options);
+ const wire=fetcher as unknown as {wire(url:URL):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>};
+ t.mock.method(wire,'wire',async(target:URL)=>target.pathname==='/robots.txt'||target.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'application/json'},body:Buffer.from(JSON.stringify(crawl()))});
+ const fetched=await fetcher.fetch('https://stadt.de/fixture-index'),registry=join(root,'registry.json'),crawlIndex=fetched.localPath,markdown=join(root,'reports','SOURCES.md'),csv=join(root,'reports','sources.csv'),policy=options.ownerPolicyLane!;
+ await writeFile(registry,JSON.stringify(fixture()));
+ await writeFile(join(rawRoot,'observations','one.json'),JSON.stringify({url:'https://stadt.de/council',method:'GET',checkedAt:date,retrievedAt:null,state:'failed',failure:'timeout'}),{mode:0o600});
+ const result=await exportDistrictSources({registry,crawlIndex,rawRoot,markdown,csv,policy});
  assert.equal(await readFile(markdown,'utf8'),result.markdown);assert.equal(await readFile(csv,'utf8'),result.csv);
  assert.equal(result.rows.filter(r=>r.rowType==='fetch_observation').length,1);
- await assert.rejects(exportDistrictSources({registry,crawlIndex,rawRoot,markdown:registry,csv}),/collides/);
+ await assert.rejects(exportDistrictSources({registry,crawlIndex,rawRoot,markdown:registry,csv,policy}),/collides/);
  const outside=join(root,'outside.json');await writeFile(outside,'{}');await symlink(outside,join(rawRoot,'observations','outside.json'));
- await assert.rejects(exportDistrictSources({registry,crawlIndex,rawRoot,markdown,csv}),/escapes raw root/);
+ await assert.rejects(exportDistrictSources({registry,crawlIndex,rawRoot,markdown,csv,policy}),/escapes raw root/);
 });
 
 test('CSV carries honest hierarchy and source kind/vendor/API context across every row type',()=>{
@@ -156,4 +167,44 @@ test('excluded export rows retain origin and physical-disposition metadata witho
  assert.equal(row.bodyState,'excluded');assert.equal(row.originClassification,'unknown');assert.equal(row.robotsStatus,'disallowed');assert.equal(JSON.parse(row.exclusion).previousManagedCopy,'retained_independent');
  assert.equal(JSON.parse(row.documentOrigin).sha256,sha256);assert.equal(result.rows.find(row=>row.rowType==='source'&&row.sourceId==='council')?.robotsStatus,'unavailable');
  assert.ok(!result.csv.includes('/private/cache'));assert.match(result.markdown,/raw excluded/);
+});
+
+test('a declared allowed robots status is not fabricated into an applied override',()=>{
+ const policy={robots:{state:'allowed',url:'https://stadt.de/robots.txt'},tdm:{state:'not_declared'},robotsStatus:'allowed'};
+ const document={municipalityId:'town',sourceId:'council',url:'https://stadt.de/council/document',sha256:'b'.repeat(64),adapter:'official-html',policy};
+ const index={...crawl(),documents:[document]};
+ const exported=renderDistrictSources(fixture(),index),row=exported.rows.find(row=>row.rowType==='document')!;
+ assert.equal(row.robotsStatus,'allowed');assert.equal(row.override,'');assert.equal(row.ownerRobotsOverride,'');
+ assert.throws(()=>renderDistrictSources(fixture(),{...index,documents:[{...document,policy:{...policy,robotsStatus:'disallowed'}}]}),/declared robots audit/);
+});
+
+test('target completion is exported separately and cannot erase broader source pending work',()=>{
+ const raw=fixture(),target='https://stadt.de/heat';
+ raw.municipalities[0].sources[0].crawlScope={pageRoots:[target],followLinkedDocuments:true};
+ const broader={municipalityId:'town',sourceId:'council',runId:'older-broader-run',checkState:'checked',checkedAt:date,documentCount:2,outcome:'partial',coverage:{state:'partial',pendingCount:17,runnableCount:12,blockedCount:5}};
+ const narrow={municipalityId:'town',sourceId:'council',runId:'new-target-run',checkState:'checked',checkedAt:'2026-10-11T00:00:00.000Z',documentCount:1,outcome:'partial',coverage:{state:'partial',pendingCount:0,runnableCount:0,blockedCount:0,sourceCoverage:'not_assessed',targetScope:{kind:'page_roots',urls:[target],state:'complete',pendingCount:0,runnableCount:0,blockedCount:0}}};
+ const result=renderDistrictSources(raw,{...crawl(),checks:[narrow,broader]}),source=result.rows.find(row=>row.rowType==='source'&&row.sourceId==='council')!;
+ assert.equal(source.coverage,'partial');assert.equal(source.coverageSelection,'latest_broader_check');assert.equal(source.coveragePendingCount,17);assert.equal(source.runId,'older-broader-run');
+ const observations=result.rows.filter(row=>row.rowType==='crawl_observation'&&row.sourceId==='council');assert.equal(observations.length,2);
+ const targetRow=observations.find(row=>row.runId==='new-target-run')!;assert.equal(targetRow.sourceCoverage,'not_assessed');assert.equal(JSON.parse(targetRow.targetScope!).state,'complete');assert.equal(JSON.parse(targetRow.targetScope!).urls[0],target);
+ assert.match(result.markdown,/pending 17/);assert.ok(result.csv.includes('not_assessed'));
+ const targetOnly=renderDistrictSources(raw,{...crawl(),checks:[narrow]}).rows.find(row=>row.rowType==='source'&&row.sourceId==='council')!;
+ assert.equal(targetOnly.coverage,'partial');assert.equal(targetOnly.sourceCoverage,'not_assessed');assert.equal(targetOnly.coverageSelection,'latest_target_check');
+ assert.throws(()=>renderDistrictSources(raw,{...crawl(),checks:[{...narrow,coverage:{...narrow.coverage,state:'complete'}}]}),/whole-source/);
+ assert.throws(()=>renderDistrictSources(raw,{...crawl(),checks:[{...narrow,coverage:{...narrow.coverage,targetScope:{...narrow.coverage.targetScope,urls:['https://user:secret@stadt.de/']}}}]}),/unsafe public URL/);
+});
+
+test('hashed no-body denial audit remains distinct from configured source robots metadata',()=>{
+ const policyAudit={policySha256:'a'.repeat(64),sourceHostSha256:'b'.repeat(64),robotsState:'blocked',robotsStatus:'disallowed',override:null,tdmState:'unavailable',tdmReferenceStatus:'unavailable',access:'public'};
+ const index={...crawl(),checks:[{municipalityId:'town',sourceId:'council',checkState:'checked',checkedAt:date,documentCount:0,outcome:'blocked',blocked:[{url:'https://stadt.de/council',urlRole:'registered_source_context',targetUrlSha256:'c'.repeat(64),policyAudit,body:'PRIVATE-REJECTED-BODY'}]}]};
+ const result=renderDistrictSources(fixture(),index),row=result.rows.find(row=>row.rowType==='crawl_observation')!;
+ const audit=JSON.parse(row.blockedAudit!)[0];assert.equal(audit.policyAudit.robotsStatus,'disallowed');assert.equal(audit.urlRole,'registered_source_context');assert.equal(audit.targetUrlSha256,'c'.repeat(64));
+ assert.ok(result.csv.includes('"blockedAudit"'));assert.ok(result.markdown.includes('disallowed'));assert.equal(result.csv.includes('PRIVATE-REJECTED-BODY'),false);
+ const forged=structuredClone(index);forged.checks[0].blocked[0].policyAudit.robotsStatus='allowed';assert.throws(()=>renderDistrictSources(fixture(),forged),/schema/);
+});
+
+test('malformed reservation status is exported separately from policy-reference availability',()=>{
+ const result=renderDistrictSources(fixture(),crawl(),[{url:'https://stadt.de/council',checkedAt:date,retrievedAt:null,state:'failed',failure:'tdm_unavailable',policy:{robots:{state:'allowed'},tdm:{state:'reserved',declarationStatus:'unavailable'}}}]);
+ const row=result.rows.find(row=>row.rowType==='fetch_observation')!;
+ assert.equal(row.tdmRuntimeState,'reserved');assert.equal(row.tdmDeclarationStatus,'unavailable');assert.equal(row.tdmReferenceStatus,'');assert.ok(result.csv.includes('"tdmDeclarationStatus"'));
 });

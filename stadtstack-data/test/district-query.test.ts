@@ -4,7 +4,11 @@ import {QueryIndex,type KnowledgeQueryData,type Regional} from '../src/mcp-query
 import type {Catalogue} from '../src/schema.ts';
 import {knowledgeEvidenceHash,REQUIRED_DETERMINISTIC_CHECKS,type DistrictKnowledgeRecord} from '../src/district-schema.ts';
 import {matchesFilters} from '../src/district-query.ts';
+import {caseEvidence} from '../src/query-cases.ts';
 import {textMatches} from '../src/topics.ts';
+import {readFile} from 'node:fs/promises';
+import {join} from 'node:path';
+import {outDir} from '../src/common.ts';
 
 // Synthetic test evidence only; these fixtures are never written to the released corpus.
 const municipalities=['strausberg','hoppegarten','ruedersdorf-bei-berlin','ratzeburg','moelln','schwarzenbek','ludwigslust','parchim','hagenow'].map((id,index)=>({id,name:id,ags:`0000000${index}`,districtId:['maerkisch-oderland','herzogtum-lauenburg','ludwigslust-parchim'][Math.floor(index/3)],sources:[]}));
@@ -40,6 +44,8 @@ test('rejected withdrawn unknown candidate and undated evidence never become pos
  const query=index([rejected,withdrawn,unknown,candidate,undated,record(5,'adopted'),record(5,'draft',':other')]);
  const result=query.compareTopic('energie',municipalities.map(city=>city.id));
  assert.equal(result.cities[0].stageCounts.rejected,1);assert.equal(result.cities[1].stageCounts.withdrawn,1);
+ assert.equal(result.cities[0].unknownStageCount,0);assert.equal(result.cities[1].unknownStageCount,0);
+ assert.equal(result.cities[3].unknownStageCount,0);assert.equal(result.cities[4].unknownStageCount,0);
  for(const city of result.cities.slice(0,5))assert.equal(city.furthestPositiveMilestone,null);
  assert.equal(result.cities[2].unknownStageCount,1);assert.equal(result.cities[3].candidateCount,1);assert.equal(result.cities[4].latestSourceDate,null);assert.equal(result.cities[4].latestStageDate,null);
  assert.equal(result.cities[5].furthestPositiveMilestone?.stage,'adopted');assert.equal(result.cities[5].recordCount,2);
@@ -62,7 +68,7 @@ test('similarity is deterministic cross-city discovery with evidence and no inve
  const query=index(),id=query.records[0].id;
  const result=query.similar(id,{},50);
  assert.deepEqual(result,query.similar(id,{},50));assert.equal(result.items.length,8);
- assert.equal(result.method.model,null);assert.equal(result.method.version,'district-similarity-v1');
+ assert.equal(result.method.model,null);assert.equal(result.method.version,'district-similarity-v2');
  assert.ok(result.items.every(item=>item.cityId!==result.target.cityId&&item.score>0&&item.score<=1&&item.sharedTopics.includes('waermeplanung')&&item.sourceIds.length));
  assert.equal(new Set(result.items.map(item=>item.districtId)).size,3);
  assert.equal(query.similar(id,{cityIds:['ratzeburg']}).items[0].cityId,'ratzeburg');
@@ -91,7 +97,9 @@ test('future announcements are not achieved positive progress and date roles rem
  assert.equal(projected.recordType,'infrastructure');
  assert.equal(projected.eventDate,'2027-01-01');assert.equal(projected.documentDate,'2026-09-20');
  assert.notEqual(projected.asOf,query.releasedAt);
- assert.equal(query.compareTopic('waermeplanung',['strausberg']).cities[0].furthestPositiveMilestone,null);
+ const city=query.compareTopic('waermeplanung',['strausberg']).cities[0];
+ assert.equal(city.furthestPositiveMilestone,null);assert.equal(city.unknownStageCount,0);
+ assert.equal(city.stageCounts.in_force,1);assert.equal(city.latestStageDate,'2027-01-01');
 });
 test('comparison bounds milestone evidence and does not repeat whole-release coverage',()=>{
  const query=index(Array.from({length:12},(_,i)=>record(0,'adopted',`:${i}`)));
@@ -103,10 +111,11 @@ test('comparison bounds milestone evidence and does not repeat whole-release cov
  const scoped=coverage.sourceCoverage;assert.ok(scoped&&typeof scoped==='object'&&'id' in scoped);
  assert.equal(scoped.id,'strausberg');
 });
-test('unresolved source-document groups are not reported as identified civic cases',()=>{
+test('unresolved source-document groups are explicit record-scoped case fallbacks',()=>{
  const item=record(0);item.caseKeyType='source_document';item.caseKey=`source_document:${item.extraction.inputSha256}`;item.caseQuote=null;
  const city=index([item]).compareTopic('waermeplanung',['strausberg']).cities[0];
- assert.equal(city.recordCount,1);assert.equal(city.caseCount,0);assert.equal(city.sourceDocumentGroupCount,1);
+ assert.equal(city.recordCount,1);assert.equal(city.caseCount,1);assert.equal(city.identifiedCaseCount,0);assert.equal(city.unresolvedCaseCount,1);assert.equal(city.sourceDocumentGroupCount,1);
+ assert.equal(city.cases[0].identityStatus,'unresolved');
 });
 
 test('Municipality discovery projects identities and source summaries, not full registry payloads',()=>{
@@ -129,4 +138,165 @@ test('Checked towns without gated records remain explicit in topic and compariso
  const coverage=compared.coverage;assert.ok(coverage&&typeof coverage==='object'&&'sourceCoverage' in coverage);
  const source=coverage.sourceCoverage;assert.ok(source&&typeof source==='object'&&'status' in source);
  assert.equal(source.status,'checked_no_gated_records');
+});
+
+test('multi-record plans compare and rank once, preserving stage dates and source identity',()=>{
+ const draft=record(0,'draft',':draft'),adopted=record(0,'adopted',':adopted');
+ for(const item of [draft,adopted]){item.title=item.titleQuote='Bebauungsplan Nr. 68/23 Solarpark am Flugplatz';item.caseKey='68/23';item.caseQuote='Bebauungsplan Nr. 68/23';}
+ draft.stageQuote=draft.originalStatus='Entwurf';
+ adopted.stageQuote=adopted.originalStatus='Satzungsbeschluss';
+ adopted.stageDate='2026-09-21';
+ const other=record(1,'draft',':other'),duplicate={...other,id:other.id+':chunk'};
+ const query=index([draft,adopted,other,duplicate]);
+ const city=query.compareTopic('waermeplanung',['strausberg']).cities[0];
+ assert.equal(city.recordCount,2);assert.equal(city.caseCount,1);assert.equal(city.sourceBackedCaseCount,1);
+ assert.equal(city.cases[0].furthestSupportedStage,'adopted');assert.equal(city.cases[0].furthestSupportedDate,'2026-09-21');
+ assert.deepEqual(city.cases[0].memberRecordIds,[adopted.id,draft.id].sort());
+ assert.ok(city.cases[0].identityBasis.some(basis=>basis.value==='bplan:68/23'&&basis.quote.includes('68/23')&&basis.sourceIds.length));
+ const result=query.similar(draft.id);
+ assert.equal(result.totalCases,1);assert.equal(result.totalRecords,2);assert.equal(result.items[0].recordCount,2);
+ assert.deepEqual(query.similar(city.cases[0].id).items,result.items);
+ assert.equal(result.items[0].score,index([draft,adopted,other]).similar(draft.id).items[0].score);
+});
+
+test('legal instruments and amendments stay distinct unless explicitly bundled by source procedure',()=>{
+ const titles=['Bebauungsplan Nr. 68/23 Solarpark am Flugplatz','10. Änderung des Flächennutzungsplanes Solarpark am Flugplatz','11. Änderung des Flächennutzungsplanes Solarpark am Flugplatz','1. Änderung des Bebauungsplans Nr. 68/23 Solarpark am Flugplatz','Bebauungsplan Nr. 68/23 - 2. Änderung Solarpark am Flugplatz'];
+ const records=titles.map((title,i)=>{const item=record(0,i===0?'adopted':'draft',`:${i}`);item.title=item.titleQuote=title;item.caseKeyType='source_document';item.caseKey=`source_document:${i}`;item.caseQuote=null;return item;});
+ for(const item of records)item.stageQuote=item.originalStatus=item.stage==='adopted'?'Satzungsbeschluss':'Entwurf';
+ const separate=index(records).compareTopic('waermeplanung',['strausberg']).cities[0];
+ assert.equal(separate.caseCount,5);
+ assert.deepEqual(new Set(separate.cases.flatMap(item=>item.instruments.map(instrument=>instrument.identity.value))),new Set(['bplan:68/23','fnp:base:amendment:10','fnp:base:amendment:11','bplan:68/23:amendment:1','bplan:68/23:amendment:2']));
+ records[0].sources[0].url='https://bb.beteiligung.diplanung.de/file/shared-procedure/a';
+ records[1].sources[0].url='https://bb.beteiligung.diplanung.de/file/shared-procedure/b';
+ const bundled=index(records).compareTopic('waermeplanung',['strausberg']).cities[0];
+ assert.equal(bundled.caseCount,4);
+ const bundle=bundled.cases.find(item=>item.recordCount===2)!;
+ assert.equal(bundle.instruments.length,2);
+ assert.equal(bundle.instruments.find(item=>item.identity.value==='fnp:base:amendment:10')?.furthestPositiveMilestone?.stage,'draft');
+ assert.equal(bundle.instruments.find(item=>item.identity.value==='bplan:68/23')?.furthestPositiveMilestone?.stage,'adopted');
+});
+
+test('quoted paper references group records without conflating municipalities or title-only matches',()=>{
+ const a=record(0,'draft',':a'),b=record(0,'decision',':b'),other=record(1,'draft',':a');
+ for(const item of [a,b,other]){item.caseKeyType='paper_reference';item.caseKey='BV/2026/17';item.caseQuote='Vorlage BV/2026/17';}
+ const unknown=record(0,'draft',':unknown');unknown.caseKeyType='source_document';unknown.caseQuote=null;
+ const query=index([a,b,other,unknown]),city=query.compareTopic('waermeplanung',['strausberg']).cities[0];
+ assert.equal(city.caseCount,2);assert.equal(city.identifiedCaseCount,1);
+ assert.equal(query.similar(a.id).items[0].recordCount,1);
+});
+
+test('released Solarpark evidence joins sixteen records through explicit DiPlan publication paths',async()=>{
+ const envelope=JSON.parse(await readFile(join(outDir,'knowledge/records.json'),'utf8')) as {records:DistrictKnowledgeRecord[]};
+ const records=envelope.records.filter(record=>record.municipalityId==='strausberg'&&/Solarpark am Flugplatz|68\/23/i.test(record.title+' '+record.summary));
+ assert.equal(records.length,16);
+ const query=index(records),exported=query.exportRecords({municipality:'strausberg',limit:50});
+ assert.equal(exported.totalRecords,16);assert.equal(exported.totalCases,1);
+ const bundle=exported.cases[0];
+ assert.equal(bundle.memberRecordIds.length,16);
+ assert.ok(bundle.instruments.some(instrument=>instrument.identity.value==='bplan:68/23'));
+ assert.ok(bundle.instruments.some(instrument=>instrument.identity.value==='fnp:base:amendment:10'));
+ assert.ok(bundle.relationships.some(link=>link.type==='shared_published_procedure_evidence'&&link.recordId==='knowledge:strausberg:d2ac14b1fff59c7383f0454e'));
+ // The source's divergent 63/23 reference is retained, never silently corrected to 68/23.
+ assert.ok(bundle.instruments.some(instrument=>instrument.identity.value==='bplan:63/23'));
+ assert.equal(bundle.furthestSupportedStage,'draft');
+ assert.equal(bundle.furthestSupportedDate,'2025-08-07');
+ assert.equal(bundle.instruments.find(item=>item.identity.value==='bplan:68/23')?.furthestPositiveMilestone?.date,'2025-08-07');
+ assert.ok(exported.items.every(item=>item.originalRecord&&item.extraction&&item.verification));
+});
+
+test('unknown-stage cases exclude groups with known member or historical stages',()=>{
+ const unknown=record(0,'unknown',':unknown'),known=record(0,'withdrawn',':known'),history=record(1,'unknown',':history');
+ known.caseKey=unknown.caseKey;known.caseQuote=unknown.caseQuote;
+ history.stages=[{stage:'rejected',date:'2026-08-01',dateQuote:'01.08.2026',originalStatus:'abgelehnt',quote:'abgelehnt'}];
+ const query=index([unknown,known,history]);
+ const rows=query.compareTopic('waermeplanung',['strausberg','hoppegarten']).cities;
+ assert.equal(rows[0].caseCount,1);assert.equal(rows[0].unknownStageCount,0);
+ assert.equal(rows[0].furthestPositiveMilestone,null);
+ assert.equal(rows[1].unknownStageCount,0);assert.equal(rows[1].furthestPositiveMilestone,null);
+});
+
+test('filtered comparisons and export pages keep complete metric conflicts and source attribution',()=>{
+ const old=record(0,'draft',':area-a'),next=record(0,'draft',':area-b'),conflict=record(0,'consultation',':area-c'),metricless=record(0,'draft',':area-d');
+ for(const item of [old,next,conflict,metricless]){
+  item.title=item.titleQuote='10. Änderung des Flächennutzungsplans';
+  item.caseQuote='10. Änderung des Flächennutzungsplans';
+  item.stageQuote=item.originalStatus=item.stage==='draft'?'Entwurf':'Stellungnahme';
+ }
+ old.documentDate='2024-01-30';old.summaryQuote='Der Geltungsbereich hat eine Gesamtfläche von ca. 68,6 ha.';
+ next.documentDate='2025-08-07';next.summaryQuote='Der Geltungsbereich wurde von ca. 68,6 ha auf nunmehr ca. 41,5 ha reduziert.';
+ conflict.documentDate='2025-08-08';conflict.summaryQuote='Der Geltungsbereich wurde von ca. 68,6 ha auf nunmehr ca. 50 ha reduziert.';
+ const query=index([old,next,conflict,metricless]);
+ const filtered=query.compareTopic('waermeplanung',['strausberg'],{stage:'draft'}).cities[0].cases[0];
+ assert.equal(filtered.currentValues.length,0);assert.equal(filtered.history.length,3);
+ const page=query.exportRecords({municipality:'strausberg',limit:2});
+ assert.equal(page.items.length,2);assert.equal(page.cases[0].currentValues.length,0);assert.equal(page.cases[0].history.length,3);
+ const conflictSource=query.records.find(item=>item.id===conflict.id)!.sourceIds[0];
+ assert.ok(page.sources.some(source=>source.id===conflictSource));
+ const second=query.exportRecords({municipality:'strausberg',limit:2,cursor:page.nextCursor!});
+ assert.equal(second.cases[0].currentValues.length,0);assert.equal(second.cases[0].history.length,3);
+ const metriclessCase=caseEvidence([query.records.find(item=>item.id===metricless.id)!],date);
+ assert.equal(metriclessCase.history.length,3);assert.equal(metriclessCase.currentValues.length,0);
+});
+
+test('canonical stage filters accept released early/formal evidence without relabelling raw assertions',async()=>{
+ const envelope=JSON.parse(await readFile(join(outDir,'knowledge/records.json'),'utf8')) as {records:DistrictKnowledgeRecord[]};
+ const early=envelope.records.find(item=>item.stageQuote==='frühzeitige Beteiligung am Bebauungsplan (VEP) Nr. 68/23')!;
+ const formal=envelope.records.find(item=>item.stageQuote==='öffentliche Auslegung gem. § 3 Abs. 2 BauGB')!;
+ assert.ok(early);assert.ok(formal);
+ const generic=record(0,'consultation',':generic-phase');
+ generic.title=generic.titleQuote='Bebauungsplan Nr. 99/26';
+ generic.stageQuote=generic.originalStatus='Stellungnahme vom 19.09.2026';
+ const query=index([early,formal,generic]);
+ for(const [stage,item] of [['early_consultation',early],['formal_consultation',formal]] as const){
+  const page=query.page({stage,fields:['id','stage','canonicalStage','status']},'search_topics');
+  assert.equal(page.total,1);assert.equal(page.items[0].id,item.id);
+  assert.equal(page.items[0].stage,'consultation');assert.equal(page.items[0].canonicalStage,stage);
+  assert.equal(page.items[0].status,item.originalStatus);
+ }
+ const unresolved=query.page({stage:'consultation'},'search_topics');
+ assert.equal(unresolved.total,1);assert.equal(unresolved.items[0].id,generic.id);
+ assert.equal(caseEvidence([query.records.find(item=>item.id===generic.id)!],date).furthestPositiveMilestone,null);
+});
+
+test('preliminary drafts, approval and historical stage filters use one canonical vocabulary',()=>{
+ const preliminary=record(0,'draft',':pre'),draft=record(0,'draft',':draft'),approval=record(0,'decision',':approval');
+ for(const item of [preliminary,draft,approval]){item.title=item.titleQuote='Bebauungsplan Nr. 97/26';item.caseQuote='Bebauungsplan Nr. 97/26';}
+ preliminary.stageQuote=preliminary.originalStatus='Vorentwurf';
+ draft.stageQuote=draft.originalStatus='Entwurf';
+ draft.stages=[{stage:'consultation',date:'2026-08-01',dateQuote:'01.08.2026',originalStatus:'öffentliche Auslegung',quote:'öffentliche Auslegung gem. § 3 Abs. 2 BauGB'}];
+ approval.stageQuote=approval.originalStatus='Die Genehmigung wurde erteilt.';
+ const query=index([preliminary,draft,approval]);
+ assert.deepEqual(query.page({stage:'pre_draft',fields:['id']},'search_topics').items.map(item=>item.id),[preliminary.id]);
+ assert.deepEqual(query.page({stage:'draft',fields:['id']},'search_topics').items.map(item=>item.id),[draft.id]);
+ assert.deepEqual(query.page({stage:'approved',fields:['id']},'search_topics').items.map(item=>item.id),[approval.id]);
+ assert.deepEqual(query.page({stage:'formal_consultation',fields:['id']},'search_topics').items.map(item=>item.id),[draft.id]);
+ assert.equal(query.records.find(item=>item.id===preliminary.id)?.stage,'draft');
+ assert.equal(query.records.find(item=>item.id===preliminary.id)?.canonicalStage,'pre_draft');
+ const compared=query.compareTopic('waermeplanung',['strausberg']);
+ assert.equal(compared.cities[0].stageCounts.pre_draft,1);
+ assert.equal(compared.cities[0].stageCounts.draft,1);
+ assert.equal(compared.cities[0].stageCounts.approved,1);
+});
+
+test('stage and date filters bind the same historical assertion without changing original dates',()=>{
+ const item=record(0,'rejected',':historical-stage-date');
+ item.title=item.titleQuote='Bebauungsplan Nr. 96/26';
+ item.stageDate='2026-09-19';
+ item.stages=[
+  {stage:'draft',date:'2025-08-07',dateQuote:'Entwurf vom 07.08.2025',originalStatus:'Entwurf',quote:'Entwurf vom 07.08.2025'},
+  {stage:'consultation',date:'2025-09-07',dateQuote:'07.09.2025',originalStatus:'öffentliche Auslegung',quote:'öffentliche Auslegung gem. § 3 Abs. 2 BauGB'},
+ ];
+ const query=index([item]);
+ assert.equal(query.page({stage:'draft',dateFrom:'2025-08-07',dateTo:'2025-08-07'},'search_topics').total,1);
+ assert.equal(query.page({stage:'draft',dateFrom:'2026-09-19',dateTo:'2026-09-19'},'search_topics').total,0);
+ assert.equal(query.page({stage:'draft',dateFrom:'2025-09-07',dateTo:'2025-09-07'},'search_topics').total,0);
+ assert.equal(query.page({stage:'formal_consultation',dateFrom:'2025-09-07',dateTo:'2025-09-07'},'search_topics').total,1);
+ assert.equal(query.page({stage:'formal_consultation',dateFrom:'2025-08-07',dateTo:'2025-08-07'},'search_topics').total,0);
+ assert.equal(query.page({dateFrom:'2026-09-19',dateTo:'2026-09-19'},'search_topics').total,1);
+ assert.equal(query.records[0].stageDate,'2026-09-19');
+ assert.equal(query.records[0].eventDate,'2026-09-19');
+ item.stages[0].date=null;item.stages[0].dateQuote=null;
+ const undated=index([item]);
+ assert.equal(undated.page({stage:'draft'},'search_topics').total,1);
+ assert.equal(undated.page({stage:'draft',dateFrom:'2025-01-01'},'search_topics').total,0);
 });

@@ -1,12 +1,8 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 
+import {canonical} from './mcp-source-identity.ts';
 const cursorKey = randomBytes(32); // Process-local signing secret; restarts expire cursors.
-export function canonical(value: unknown): string {
-  if (Array.isArray(value)) return JSON.stringify(value.map(item => JSON.parse(canonical(item))));
-  if (value && typeof value === 'object') return JSON.stringify(Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, JSON.parse(canonical(v))])));
-  return JSON.stringify(value);
-}
 export function cursorBinding(value: unknown): string {
   return createHash('sha256').update(canonical(value)).digest('hex');
 }

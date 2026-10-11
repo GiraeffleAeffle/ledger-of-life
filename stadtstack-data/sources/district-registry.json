@@ -423,6 +423,19 @@
       ],
       "seedDocuments": [
         {
+          "url": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/e85e3cda-c72c-405f-9b66-bd1ac7d6c347",
+          "sourceId": "strausberg-participation",
+          "title": "Stadt Strausberg, 10. Änderung des Flächennutzungsplans – Entwurf",
+          "documentDate": "2025-08-07",
+          "evidence": [
+            {
+              "url": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/e85e3cda-c72c-405f-9b66-bd1ac7d6c347",
+              "locator": "Retained prepared evidence identifies the 10th FNP amendment and document-version quote 7. August 2025; source bytes carried SHA-256 6b3d0a467c73bac1617dbcc88a692d9cc3319ec2d17ca22dbd3e5d91c764ea55. Registered only as an exact bounded PDF target: current managed reacquisition and source/claim gates remain required. No fresh retrieval or publication receipt is claimed.",
+              "sha256": "6b3d0a467c73bac1617dbcc88a692d9cc3319ec2d17ca22dbd3e5d91c764ea55"
+            }
+          ]
+        },
+        {
           "url": "https://bb.beteiligung.diplanung.de/verfahren/altstadtquartier-srb/public/detail",
           "sourceId": "strausberg-participation",
           "title": "Bebauungsplan Nr. 67/22 Altstadt Quartier Strausberg",
@@ -501,7 +514,8 @@
           },
           "crawlScope": {
             "pageRoots": [
-              "https://www.gemeinde-hoppegarten.de/"
+              "https://www.gemeinde-hoppegarten.de/",
+              "https://www.gemeinde-hoppegarten.de/news/1/1240589/nachrichten/kommunale-w%C3%A4rmeplanung-in-hoppegarten.html"
             ],
             "followLinkedDocuments": true
           },
@@ -808,7 +822,8 @@
           },
           "crawlScope": {
             "pageRoots": [
-              "https://www.ruedersdorf.de/"
+              "https://www.ruedersdorf.de/",
+              "https://www.ruedersdorf.de/meine-gemeinde/konzepte/kommunale-waermeplanung/"
             ],
             "followLinkedDocuments": true
           },
@@ -9199,7 +9214,7 @@
     "BB DiPlan pilots are exact observed municipality procedures. BOB-SH https://bob-sh.de/ was reached, but three pilot-specific portal inventories/API bindings remain not_checked; their official municipal plan archives are separately checked.",
     "No OParl endpoint was invented or claimed absent. Observed council vendors: ALLRIS and SessionNet; Somacos is not separately asserted from a vendor product name. Hagenow municipal council link is an ALLRIS login, public archive not established.",
     "Robots and licences are per-source, not blanket permissions. Historical Gaia-MV robots research returned503; the global owner decision does not erase that evidence or bypass transport circuit breakers. Only citations, hashes and minimal administrative facts are published here, never document bodies.",
-    "Commands (from stadtstack-data): node --experimental-strip-types src/district-registry.ts validate --registry sources/district-registry.json ; node --experimental-strip-types src/district-registry.ts refresh --registry sources/district-registry.json . Default refresh raw cache/output use cache/registry-refresh/owner-policy-2026-10-11/{raw,registry.json}; public registry metadata is outside the managed raw root. Dated paths are organizational only: explicit owner-decision context and a verified acquisition-lane marker are required; nonempty unmarked roots are never adopted by acquisition. Fresh preparation/model lanes preserve historical frozen roots. Refresh does not mutate the curated registry by default; historical purge inventory review does not grant acquisition authorization.",
+    "Local validation (from stadtstack-data): node --experimental-strip-types src/district-registry.ts validate --registry sources/district-registry.json . The obsolete live registry refresh command/export is retired. Acquisition uses only the governed crawl with an authenticated operator_registry_config descriptor and explicitly managed output; source exports derive metadata from its actual pinned observations. Dated paths are organizational only, not authorization; nonempty unmarked roots and historical frozen roots are never silently adopted or rewritten.",
     "Cross-district owner-supplied partner context is not a municipal endorsement. No contacts, authentication attempts, deployment or cloud extraction were performed."
   ]
 }

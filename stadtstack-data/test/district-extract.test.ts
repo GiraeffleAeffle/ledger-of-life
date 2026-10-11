@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import { DistrictExtractionClaimsSchema, DistrictKnowledgeRecordSchema, QUOTE_NORMALIZATION_VERSION, assertSubscriptionSourcePolicy, knowledgeEvidenceHash, sha256, validateKnowledgeRelease, type DistrictKnowledgeRecord } from '../src/district-schema.ts';
-import { canonicalWhitespace, dateOccursInQuote, deterministicChecks, documentChunks, extractionCacheKey, summaryNumbersSupported, NoCaseCacheSchema, rebindSourceReferences, restoreSourceQuotes, stageEvidenceSupports, EXTRACTION_INSTRUCTIONS, JUDGE_INSTRUCTIONS, EXTRACTOR_VERSION, PROMPT_VERSION, JUDGE_PROMPT_VERSION, PROMPT_SHA256, JUDGE_PROMPT_SHA256, type ExtractionCacheBinding } from '../src/district-claims.ts';
+import { canonicalWhitespace, dateOccursInQuote, deterministicChecks, documentChunks, extractionCacheKey, summaryNumbersSupported, NoCaseCacheSchema, rebindSourceReferences, restoreSourceQuotes, EXTRACTION_INSTRUCTIONS, JUDGE_INSTRUCTIONS, EXTRACTOR_VERSION, PROMPT_VERSION, JUDGE_PROMPT_VERSION, PROMPT_SHA256, JUDGE_PROMPT_SHA256, type ExtractionCacheBinding } from '../src/district-claims.ts';
+import {stageEvidenceSupports} from '../src/district-stage-evidence.ts';
 import { codexResponseSchema, inspectCodexEvents, subscriptionExecutionArgs } from '../src/district-model.ts';
 import { extractDocumentText, htmlToDocumentText } from '../src/district-document.ts';
 import { TOPIC_VOCABULARY, getTopic, topicAncestors } from '../src/topic-vocabulary.ts';
@@ -10,7 +12,9 @@ import {groupCrawlDocuments,selectExtractionGroups} from '../src/district-corpus
 import {PROVIDER_CONFIGS} from '../src/district-model-contract.ts';
 import {normalizeGraphClaims} from '../src/district-graph-claims.ts';
 import {ownerRobotsOverrideFor} from '../src/source-policy.ts';
-import {DOCUMENT_ORIGIN_CLASSIFIER_VERSION} from '../src/document-origin.ts';
+import { DOCUMENT_ORIGIN_CLASSIFIER_VERSION } from '../src/document-origin-contract.ts'
+import type {CivicPolicyOptions, ManagedSourceContext} from '../src/civic-opt-out.ts';
+import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 const EXTRACTION_MODEL=PROVIDER_CONFIGS['openai-subscription'].model;
 
 test('Bounded extraction prioritizes grounded seeds, preserves same-byte references and gives municipalities fair turns',()=>{
@@ -47,9 +51,9 @@ test('shared extraction and judge instructions fit the native 8000-byte system b
 });
 
 test('action relation contract is versioned in shared extraction and faithfulness prompts', () => {
-  assert.equal(EXTRACTOR_VERSION, 'district-extractor-v9-action-relations');
-  assert.equal(PROMPT_VERSION, 'district-claims-v8-action-relations');
-  assert.equal(JUDGE_PROMPT_VERSION, 'district-faithfulness-v7-action-relations');
+  assert.equal(EXTRACTOR_VERSION, 'district-extractor-v10-civic-policy-facts');
+  assert.equal(PROMPT_VERSION, 'district-claims-v9-civic-policy-facts');
+  assert.equal(JUDGE_PROMPT_VERSION, 'district-faithfulness-v8-civic-policy-facts');
   for (const instructions of [EXTRACTION_INSTRUCTIONS, JUDGE_INSTRUCTIONS]) {
     assert.ok(instructions.includes('Joint graph in this SAME response'));
     assert.ok(instructions.includes('predicateQuote copies the COMPLETE relation verb/phrase'));
@@ -78,7 +82,7 @@ function claims() {
 function record(): DistrictKnowledgeRecord {
   const sourceHash = sha256(text);
   const value = {
-    ...claims(), ...normalizeGraphClaims(claims(),{municipalityId:'beispielstadt',sourceSha256:sourceHash}), id: 'knowledge:unit-test', municipalityId: 'beispielstadt', ags: '12064001', districtId: 'unit-district', caseKey: `source_document:${sourceHash}`,
+    ...claims(), ...normalizeGraphClaims(claims(),{municipalityId:'beispielstadt',sourceSha256:sourceHash,ags:'12064001'}), id: 'knowledge:unit-test', municipalityId: 'beispielstadt', ags: '12064001', districtId: 'unit-district', caseKey: `source_document:${sourceHash}`,
     sources: [{ id: 'unit-source', url: 'https://example.org/document', sha256: sourceHash, retrievedAt: now, locator: 'chars:0-160', mimeType: 'text/plain', sourceType: 'website', policy: { robots: { state: 'allowed', url: 'https://example.org/robots.txt' }, tdm: { state: 'not_declared', evidence: [] }, access: 'public', legalClassification: 'not_assessed', publication: 'facts_with_attribution_only' } }],
     extraction: { extractorVersion: 'unit-test', extractorSha256: sha256('extractor'), model: EXTRACTION_MODEL, provider: 'openai-subscription', tool: 'codex-cli', toolVersion: '0.162.1', modelIdentitySha256: sha256('synthetic configured model/tool identity'), modelIdentityBasis: 'configured-cli-model-and-tool-version', returnedModel: null, promptVersion: 'unit-test', promptSha256: PROMPT_SHA256, judgePromptVersion: 'unit-test', judgePromptSha256: JUDGE_PROMPT_SHA256, inputSha256: sourceHash, textSha256: sourceHash, responseSha256: sha256('synthetic extraction response'), ocrUsed: false, textMethod: 'text', cacheKey: sha256('unit cache'), extractedAt: now, chunk: { index: 0, count: 1, start: 0, end: text.length } },
     verification: { status: 'auto-verified', deterministic: deterministicChecks(claims(), text, 'Beispielstadt'), faithfulness: { score: 0.9, threshold: 0.8, model: EXTRACTION_MODEL, provider: 'openai-subscription', tool: 'codex-cli', toolVersion: '0.162.1', modelIdentitySha256: sha256('synthetic configured model/tool identity'), returnedModel: null, reason: 'Synthetic unit-test judge fixture, not actual model evidence', evaluatedAt: now, responseSha256: sha256('synthetic judge response'), sameModel: true, limitation: 'Same-model judgment is not independent verification.' }, evidenceHash: '' },
@@ -87,6 +91,12 @@ function record(): DistrictKnowledgeRecord {
   return DistrictKnowledgeRecordSchema.parse(value);
 }
 const registry = { municipalities: [{ id: 'beispielstadt', name: 'Beispielstadt', ags: '12064001', districtId: 'unit-district', sources: [{ id: 'unit-source', kind: 'website', url: 'https://example.org', checkState: 'checked' }] }] };
+
+function documentContext(authority: { managedRoot: string; decisionId: ManagedSourceContext['decisionId']; policy: CivicPolicyOptions }, bytes: Uint8Array): ManagedSourceContext {
+  const url = 'https://example.org/synthetic-document', sourceSha256 = sha256(bytes), observationId = `synthetic-document:${sourceSha256}`;
+  const receiptSha256 = sha256(JSON.stringify({ url, sourceSha256, observationId }));
+  return { root: authority.managedRoot, kind: 'artifacts', decisionId: authority.decisionId, ...authority.policy, bindings: [{ kind: 'prepared_source', url, sourceSha256, observationId, receiptSha256 }] };
+}
 
 test('hierarchy preserves all canonical regional leaves without duplicating vocabulary', () => {
   for (const topic of TOPICS) {
@@ -202,16 +212,34 @@ test('chunking covers entire long sources with bounded overlap and no silent tru
   const chunks = documentChunks(source);
   assert.equal(chunks[0].start, 0);
   assert.equal(chunks.at(-1)!.end, source.length);
-  assert.ok(chunks.every(chunk => chunk.text.length <= 4800 && source.slice(chunk.start, chunk.end) === chunk.text));
+  assert.ok(chunks.every(chunk => chunk.text.length <= 12000 && source.slice(chunk.start, chunk.end) === chunk.text));
   for (let index = 1; index < chunks.length; index++) assert.ok(chunks[index].start < chunks[index - 1].end);
   assert.throws(() => documentChunks('x'.repeat(4800 * 81)), /chunk limit/);
+  assert.equal(documentChunks('x'.repeat(320800)).at(-1)!.end,320800);
+  assert.throws(() => documentChunks('x'.repeat(320801)), /chunk limit/);
+});
+test('contiguous context retains a distant printed document date and explicit correction without borrowed evidence',async()=>{
+  const fixture=JSON.parse(await readFile(new URL('../reports/correction-solarpark-0.3.2.json',import.meta.url),'utf8'));
+  // Synthetic placement reproduces the known span distance; this is not the actual PDF/text snapshot.
+  const header='10. Änderung des Flächennutzungsplans\n7. August 2025\n';
+  const source=header+'x'.repeat(10604-header.length)+fixture.replacementEvidence.quote+'y'.repeat(20000);
+  const first=documentChunks(source)[0];
+  assert.equal(first.text,source.slice(first.start,first.end));
+  assert.ok(first.text.includes('7. August 2025'));
+  assert.ok(first.text.includes(fixture.replacementEvidence.quote));
+  assert.notEqual(sha256(source),fixture.replacementEvidence.expectedRetainedSourceSha256);
+  assert.match(EXTRACTION_INSTRUCTIONS,/both values, units, approximations/);
+  assert.match(JUDGE_INSTRUCTIONS,/proposed, conditional or denied change/);
+  assert.equal(EXTRACTION_INSTRUCTIONS.includes('68,6'),false);
+  assert.equal(EXTRACTION_INSTRUCTIONS.includes('41,5'),false);
 });
 test('HTML extraction removes active content and decodes source text', () => {
   assert.equal(htmlToDocumentText('<script>fake instructions</script><p>W&auml;rme &amp; &#246;ffentlich</p>'), 'Wärme & öffentlich');
 });
-test('PDF text layer precedes per-page OCR; sparse page uses German and English OCR', async () => {
+test('PDF text layer precedes per-page OCR; sparse page uses German and English OCR', async t => {
+  const authority = await createCivicPolicyTestContext(t), bytes = Buffer.from('%PDF-unit-test');
   const calls: Array<{ file: string; args: string[] }> = [];
-  const result = await extractDocumentText(Buffer.from('%PDF-unit-test'), 'application/pdf', async (file, args) => {
+  const result = await extractDocumentText(bytes, 'application/pdf', documentContext(authority, bytes), async (file, args) => {
     calls.push({ file, args });
     if (file === 'pdfinfo') return 'Pages: 2';
     if (file === 'pdftotext') { assert.equal(args.includes('-layout'),false); return `${text.repeat(2)}\f\f`; }
@@ -226,24 +254,27 @@ test('PDF text layer precedes per-page OCR; sparse page uses German and English 
   assert.ok(calls.find(call => call.file === 'tesseract')!.args.includes('deu+eng'));
   assert.match(result.text, /recovered/);
 });
-test('missing OCR and oversized page count are explicit failures, not fabricated text', async () => {
-  await assert.rejects(extractDocumentText(Buffer.from('%PDF-test'), 'application/pdf', async file => {
+test('missing OCR and oversized page count are explicit failures, not fabricated text', async t => {
+  const authority = await createCivicPolicyTestContext(t), bytes = Buffer.from('%PDF-test'), context = documentContext(authority, bytes);
+  await assert.rejects(extractDocumentText(bytes, 'application/pdf', context, async file => {
     if (file === 'pdfinfo') return 'Pages: 1';
     if (file === 'pdftotext' || file === 'pdftoppm') return '';
     throw Error('Missing document prerequisite: tesseract');
   }), /Missing document prerequisite: tesseract/);
-  await assert.rejects(extractDocumentText(Buffer.from('%PDF-test'), 'application/pdf', async () => 'Pages: 81'), /80-page limit/);
+  await assert.rejects(extractDocumentText(bytes, 'application/pdf', context, async () => 'Pages: 81'), /80-page limit/);
 });
 
-test('XML/GML remains source text without expanding external entities', async () => {
+test('XML/GML remains source text without expanding external entities', async t => {
+  const authority = await createCivicPolicyTestContext(t);
   const xml = '<Plan><name>Beispielstadt Wärmeplanung</name><datum>2026-10-10</datum></Plan>';
-  const result = await extractDocumentText(Buffer.from(xml), 'application/gml+xml');
+  const bytes = Buffer.from(xml), result = await extractDocumentText(bytes, 'application/gml+xml', documentContext(authority, bytes));
   assert.equal(result.text, xml);
   assert.equal(result.method, 'xml');
 });
-test('bounded ZIP reads recognized XML/GML only and discloses uninterpreted members', async () => {
+test('bounded ZIP reads recognized XML/GML only and discloses uninterpreted members', async t => {
+  const authority = await createCivicPolicyTestContext(t), bytes = Buffer.from('synthetic zip seam');
   const xml = '<Plan><name>Beispielstadt Wärmeplanung</name><datum>2026-10-10</datum></Plan>';
-  const result = await extractDocumentText(Buffer.from('synthetic zip seam'), 'application/zip', async (file, args) => {
+  const result = await extractDocumentText(bytes, 'application/zip', documentContext(authority, bytes), async (file, args) => {
     assert.equal(file, 'python3');
     assert.equal(args[0], '-c');
     assert.match(args[1], /archive\.read/);
@@ -252,7 +283,8 @@ test('bounded ZIP reads recognized XML/GML only and discloses uninterpreted memb
   assert.equal(result.text, xml);
   assert.equal(result.method, 'zip_xml');
   assert.match(result.limitations![0], /2 other archive members/);
-  await assert.rejects(extractDocumentText(Buffer.from('zip seam'), 'application/zip', async () => JSON.stringify({ error: 'Unsupported document ZIP: no XML/GML member' })), /no XML\/GML/);
+  const unsupported = Buffer.from('zip seam');
+  await assert.rejects(extractDocumentText(unsupported, 'application/zip', documentContext(authority, unsupported), async () => JSON.stringify({ error: 'Unsupported document ZIP: no XML/GML member' })), /no XML\/GML/);
 });
 
 test('missing, reserved or blocked source policy prevents subscription transmission and release', () => {
