@@ -69,6 +69,8 @@ Kein Login-Verzeichnis und keine Token-Datei gehört in dieses Paket oder nach G
 
 Diese Befehle laufen auf `codex-workstation`. Git-/Dependency-Vorbereitung ist von der anschließend netzgesperrten Verarbeitung getrennt. Bei leerem npm-Cache ist ein ausdrücklich vorbereitender `npm ci --ignore-scripts --no-audit --no-fund` nötig; während des Offline-Laufs gibt es keinen solchen Fallback.
 
+**Aktuelle Freigabe bleibt Voraussetzung:** Der historische Code-Pin kennt spätere Einwendungen nicht. Die Befehle dokumentieren den tatsächlich ausgeführten Nachweis, erteilen aber keine Erlaubnis, alte Volltext-/Antwortarchive an der heutigen Policy vorbei erneut zu lesen. Vor einer späteren Wiederholung müssen deren exakte Dateihashes und sämtliche Quellenbindungen ausdrücklich unter der provisionierten Workstation-Autorität inventarisiert und aktuell freigegeben sein. Fehlende Bindung oder ein aktueller Widerspruch sperrt den Lauf; alte Cache-Wurzeln werden nicht automatisch übernommen. Die neue Lane wird mit dieser technischen Sperre getrennt integriert und erst nach Prüfung für neue Läufe freigegeben. Der erhaltene historische Erfolgsbeleg wird dadurch nicht nachträglich umgeschrieben.
+
 ```sh
 set -euo pipefail
 umask 077
