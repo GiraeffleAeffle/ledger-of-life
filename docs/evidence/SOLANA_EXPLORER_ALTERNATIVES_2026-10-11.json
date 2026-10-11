@@ -1,0 +1,1086 @@
+{
+  "schemaVersion": "ledger-alternative-explorer-index-v1",
+  "createdAt": "2026-10-11T19:34:23.211Z",
+  "purpose": "Alternate explorer links alongside the existing original links, without rewriting dated evidence or its hashes.",
+  "originalAvailability": "ColosseumPrep reported a 429 Vercel checkpoint from Solana Explorer automation on 11 October 2026; that reported failure was not retried.",
+  "alternativeChecks": {
+    "date": "2026-10-11",
+    "transactionPage": "https://solscan.io/tx/3XT1Zmsig5i3NERT5z9YK7Yfnyr49e411aa4DKjggQwLqwtyU1VFRHHUxrkrdNc1MYRP8oNckTduzaMDxwW9ovSN?cluster=devnet",
+    "accountPage": "https://solscan.io/account/DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb?cluster=devnet",
+    "result": "Both returned readable Solscan HTML with the expected identifier/title and devnet navigation. This is route accessibility, not re-verification of every transaction or guaranteed future availability."
+  },
+  "entries": [
+    {
+      "solanaExplorer": "https://explorer.solana.com/address/97j5CWWKUALG2XRUBoZ1spqtN5YWJPVdTiRLNN5CWYkQ?cluster=devnet",
+      "solscan": "https://solscan.io/account/97j5CWWKUALG2XRUBoZ1spqtN5YWJPVdTiRLNN5CWYkQ?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "README.md",
+          "pointer": "For judges"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/address/CWUN8LKoKNEBJ6SQAVAqDFrb3rDP7vbVXMcf2EoAqjQM?cluster=devnet",
+      "solscan": "https://solscan.io/account/CWUN8LKoKNEBJ6SQAVAqDFrb3rDP7vbVXMcf2EoAqjQM?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "README.md",
+          "pointer": "For judges"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/address/DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb?cluster=devnet",
+      "solscan": "https://solscan.io/account/DuFehTh7HJVxTmBhdJiDxsDrd6xXMnQW35jzLPxBeDfb?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "README.md",
+          "pointer": "For judges"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/address/Ftuw5P9vm4n2Ui7NhDs4uv4KcsndZreJJAJbs3REeCjs?cluster=devnet",
+      "solscan": "https://solscan.io/account/Ftuw5P9vm4n2Ui7NhDs4uv4KcsndZreJJAJbs3REeCjs?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/finalView/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/finalView/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/1GxDszaErFfxwefauUj64qC46k2fzLMWEKWG43xNeWV5454xpajKCrw4wv2RyzEf7jajL86JiWhghyioiCcEKYd?cluster=devnet",
+      "solscan": "https://solscan.io/tx/1GxDszaErFfxwefauUj64qC46k2fzLMWEKWG43xNeWV5454xpajKCrw4wv2RyzEf7jajL86JiWhghyioiCcEKYd?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/abortedAttempts/3/receipts/0/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/abortedAttempts/3/proofs/0/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/273JyuFv34dNu13P28aNvDeqk1FhMJxdz7DQX2p3aTTBN4V7pGX1EBZcppqRNBJQW3bNc4DsS5cmd2b1th9axpQE?cluster=devnet",
+      "solscan": "https://solscan.io/tx/273JyuFv34dNu13P28aNvDeqk1FhMJxdz7DQX2p3aTTBN4V7pGX1EBZcppqRNBJQW3bNc4DsS5cmd2b1th9axpQE?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/rent/steps/7/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shotMetadata/0/receiptUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/captures/segments/2/receipt"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/rent/steps/7/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shotMetadata/0/receiptUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/29xxNBaTrCkkxQDkTJaukfyX23ZqTdTVaoEoSXqoRLvzUm3eBVWjHs8q77FhGPQvP5o8LCTsaLN6t3XfzzLRTUEN?cluster=devnet",
+      "solscan": "https://solscan.io/tx/29xxNBaTrCkkxQDkTJaukfyX23ZqTdTVaoEoSXqoRLvzUm3eBVWjHs8q77FhGPQvP5o8LCTsaLN6t3XfzzLRTUEN?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/fixtureFunding/transfers/2/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/2eWRTwamFBckFLPhVKCA5z72oQRpDv9xCG4TD2yrxfS6NQedRwd4wjg6nMb478QsannUgfU9FUqr8vmTqDKJobWr?cluster=devnet",
+      "solscan": "https://solscan.io/tx/2eWRTwamFBckFLPhVKCA5z72oQRpDv9xCG4TD2yrxfS6NQedRwd4wjg6nMb478QsannUgfU9FUqr8vmTqDKJobWr?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_CITY_AI_GROUNDING_2026-10-09.json",
+          "pointer": "/moneyRegression/explorer"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/2Hc1YknGWnP1jbMBfrvsA32QQhYS1sk9JGm1dMcMoWtRteL25kSNWGXpkXqjChWTnGDGjYitkkctuPDxPpnTBYCZ?cluster=devnet",
+      "solscan": "https://solscan.io/tx/2Hc1YknGWnP1jbMBfrvsA32QQhYS1sk9JGm1dMcMoWtRteL25kSNWGXpkXqjChWTnGDGjYitkkctuPDxPpnTBYCZ?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/5/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/5/receipt/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/2JEeZwixVPkyEuvV2ySHdDCY1CbYhTe8pDuY2BfrGTC2GkbE4DWaXbMT2eyKvbD8VWpaaQzLiUr931SRcgzgbdds?cluster=devnet",
+      "solscan": "https://solscan.io/tx/2JEeZwixVPkyEuvV2ySHdDCY1CbYhTe8pDuY2BfrGTC2GkbE4DWaXbMT2eyKvbD8VWpaaQzLiUr931SRcgzgbdds?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/10/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/11/observedBalances/0/receipts/2/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/11/observedBalances/1/receipts/2/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/11/observedBalances/2/receipts/2/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/10/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/11/observedBalances/0/receipts/2/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/11/observedBalances/1/receipts/2/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/11/observedBalances/2/receipts/2/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/2n8zrEHYiDRcJWGY6pdK6v6vDw3RogPqJMbN1vKn8yjj2EtXGjC5PjLF9WvhWviVnxqfT1pVHCbPC2nYkP2Pnz5H?cluster=devnet",
+      "solscan": "https://solscan.io/tx/2n8zrEHYiDRcJWGY6pdK6v6vDw3RogPqJMbN1vKn8yjj2EtXGjC5PjLF9WvhWviVnxqfT1pVHCbPC2nYkP2Pnz5H?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/claimAiFollowup/orderedHostedProofs/tinyHouseBuy/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/2PvzMyrWSLaQiPAfBsyP3TVGTP8WwEgKr7DdkXtvCcTcVegJW1rBrhg6W5S9ePwafvmQwtcaiU9G14YqdBBh1SUm?cluster=devnet",
+      "solscan": "https://solscan.io/tx/2PvzMyrWSLaQiPAfBsyP3TVGTP8WwEgKr7DdkXtvCcTcVegJW1rBrhg6W5S9ePwafvmQwtcaiU9G14YqdBBh1SUm?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "README.md",
+          "pointer": "For judges"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/2r6LhKhzKYdRDCbX3mUywHJM4ZxJCgoYXFxZmjLTU9KGiRceMJ4DkxeqjKJb4wfK2FwDUyKsdaKTHKPi1fuRQ3V?cluster=devnet",
+      "solscan": "https://solscan.io/tx/2r6LhKhzKYdRDCbX3mUywHJM4ZxJCgoYXFxZmjLTU9KGiRceMJ4DkxeqjKJb4wfK2FwDUyKsdaKTHKPi1fuRQ3V?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/proofs/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/proofs/1/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/2RpVfTyNEVxfqZc6ZZVFwEY9dsWAeZ1Y5kiFAVXU1bqXkoGCC1xu8rq1meFNakxTcbYL5tnVn7aKaw73AqXwacB9?cluster=devnet",
+      "solscan": "https://solscan.io/tx/2RpVfTyNEVxfqZc6ZZVFwEY9dsWAeZ1Y5kiFAVXU1bqXkoGCC1xu8rq1meFNakxTcbYL5tnVn7aKaw73AqXwacB9?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/aiRecoveryInvestigation/paidAnswer/approvalExplorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/2xPedTkq2GruUkR2YR3n4x7EDW8Fgr5gaA1XJuQemzt5octu6TXLjukb4xGgGBh3SDWxtC1fRLfwpkuSddbZXZex?cluster=devnet",
+      "solscan": "https://solscan.io/tx/2xPedTkq2GruUkR2YR3n4x7EDW8Fgr5gaA1XJuQemzt5octu6TXLjukb4xGgGBh3SDWxtC1fRLfwpkuSddbZXZex?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "README.md",
+          "pointer": "For judges"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/2XyYY61cXEQ1h7U8uuwdUhkMs8Zw5H6YBQgL9sNfjuDYAF3XQRzVZKTqpf4NEzcXUhMSrYvwfrcZ8qiKeDpcfNPH?cluster=devnet",
+      "solscan": "https://solscan.io/tx/2XyYY61cXEQ1h7U8uuwdUhkMs8Zw5H6YBQgL9sNfjuDYAF3XQRzVZKTqpf4NEzcXUhMSrYvwfrcZ8qiKeDpcfNPH?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "README.md",
+          "pointer": "For judges"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/3FbyCzi17GGCQigdEVZ8rRkmTgofoc18TaFrunKgpRMjNeuSvCvUkDbUZjBKWSz7shiMxyikHq3iuVJduptwuHJ?cluster=devnet",
+      "solscan": "https://solscan.io/tx/3FbyCzi17GGCQigdEVZ8rRkmTgofoc18TaFrunKgpRMjNeuSvCvUkDbUZjBKWSz7shiMxyikHq3iuVJduptwuHJ?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/11/observedBalances/0/receipts/0/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/11/observedBalances/1/receipts/0/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/11/observedBalances/2/receipts/0/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/steps/0/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/11/observedBalances/0/receipts/0/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/11/observedBalances/1/receipts/0/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/11/observedBalances/2/receipts/0/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/3HYGLEkEWRtdPzEitHQ4ywWAd7mphChiwUYRYUqbkMUpxG7tRg5zvZi122Xv9rdGEeJE6jumASAcviLwSfVbZw4g?cluster=devnet",
+      "solscan": "https://solscan.io/tx/3HYGLEkEWRtdPzEitHQ4ywWAd7mphChiwUYRYUqbkMUpxG7tRg5zvZi122Xv9rdGEeJE6jumASAcviLwSfVbZw4g?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/abortedAttempts/2/receipts/2/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/abortedAttempts/2/proofs/2/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/3ibZ5gHREcoq5GQrV24zRLsfwUg8Xf1oyREs1gVef5vujsKgNXEi3bBUGbkySaGMsjeTKUBp7Wwdmua6VSniFKdz?cluster=devnet",
+      "solscan": "https://solscan.io/tx/3ibZ5gHREcoq5GQrV24zRLsfwUg8Xf1oyREs1gVef5vujsKgNXEi3bBUGbkySaGMsjeTKUBp7Wwdmua6VSniFKdz?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/6/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/6/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/captures/segments/4/receipt"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/3JEnVcJ28xdLPi9rSn6tcX9CdckR2KbM7LVEJ3UrBURNBo5h6QdB9Dy3D9Nzd2YVBSWicwGcW2h13UWaLxgsLx81?cluster=devnet",
+      "solscan": "https://solscan.io/tx/3JEnVcJ28xdLPi9rSn6tcX9CdckR2KbM7LVEJ3UrBURNBo5h6QdB9Dy3D9Nzd2YVBSWicwGcW2h13UWaLxgsLx81?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/proofs/4/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/proofs/4/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/3KWHMjMwN3GUsmaWgG4S4n9Z6p6guBdYEiUjtBVBfQKerascd7XPMkLesbRfC5NWeh8mQC418YHYFcioqVGRvg2b?cluster=devnet",
+      "solscan": "https://solscan.io/tx/3KWHMjMwN3GUsmaWgG4S4n9Z6p6guBdYEiUjtBVBfQKerascd7XPMkLesbRfC5NWeh8mQC418YHYFcioqVGRvg2b?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/steps/13/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/exactReviews/4/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/steps/13/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/exactReviews/4/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/3mCh2HptrupxkSsZZy7pVYN8kFHLU3Ptueruss3U6FAieXz2NGGHJnRbVzrfiFcaRQvUKxXdHy65USQA7VBSYTD4?cluster=devnet",
+      "solscan": "https://solscan.io/tx/3mCh2HptrupxkSsZZy7pVYN8kFHLU3Ptueruss3U6FAieXz2NGGHJnRbVzrfiFcaRQvUKxXdHy65USQA7VBSYTD4?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/proofs/5/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/proofs/5/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/3pdWQSqyfaEkEkUi2mxrcqDnJRXwwxt1MNERg3VvVzZwfKnwXu7mhoevS5mdDjNfURyVJFAbU3BDzikqL1mGJ2wH?cluster=devnet",
+      "solscan": "https://solscan.io/tx/3pdWQSqyfaEkEkUi2mxrcqDnJRXwwxt1MNERg3VvVzZwfKnwXu7mhoevS5mdDjNfURyVJFAbU3BDzikqL1mGJ2wH?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/abortedAttempts/2/receipts/0/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/abortedAttempts/2/proofs/0/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/3txUAroRf3VQ3ogZHcAne8co5TKjgKxk3mQ5xDp2tS9ZwD8dPjZ51Ed6NZJiN8n8ESXJCAMY5pqBbdgX7yRDaQ52?cluster=devnet",
+      "solscan": "https://solscan.io/tx/3txUAroRf3VQ3ogZHcAne8co5TKjgKxk3mQ5xDp2tS9ZwD8dPjZ51Ed6NZJiN8n8ESXJCAMY5pqBbdgX7yRDaQ52?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "README.md",
+          "pointer": "For judges"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/3VxgXNAe5iyUW2FDqGCHmkuJ8pwUiKCWncmQ4MdHNL6Qn3zmaRFdmVC66X5aFzB3RRR42VMbneeHpU974isaVfUi?cluster=devnet",
+      "solscan": "https://solscan.io/tx/3VxgXNAe5iyUW2FDqGCHmkuJ8pwUiKCWncmQ4MdHNL6Qn3zmaRFdmVC66X5aFzB3RRR42VMbneeHpU974isaVfUi?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/steps/9/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/exactReviews/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/steps/9/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/exactReviews/1/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/3x3NoTgs1qzymEcM4oi2r1MSceMVRPEG47oSEFgy5j57toen8gVvyJdZza9DabaKNAWThvpRTq6MspmUoV9o3DKL?cluster=devnet",
+      "solscan": "https://solscan.io/tx/3x3NoTgs1qzymEcM4oi2r1MSceMVRPEG47oSEFgy5j57toen8gVvyJdZza9DabaKNAWThvpRTq6MspmUoV9o3DKL?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/rent/steps/5/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/captures/segments/1/receipt"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/rent/steps/5/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/3xvQYoEzsDCEE7HgDFyCZZ5bHCLPiiN8n59zof3dZZSz1EsDr3gnDuWV794DLjJAtsSpoRX2iZgifzvbkuGAxuy1?cluster=devnet",
+      "solscan": "https://solscan.io/tx/3xvQYoEzsDCEE7HgDFyCZZ5bHCLPiiN8n59zof3dZZSz1EsDr3gnDuWV794DLjJAtsSpoRX2iZgifzvbkuGAxuy1?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/claimAiFollowup/orderedHostedProofs/paidAiAnswer/approvalExplorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/44UpJ9FyPMDbsbCce472wiAbE6zbxwwETgb6iXPcyoAKxMXxqPSFwqnJipphgqvALWnb1mHSyB7XTXgj57bvZh2c?cluster=devnet",
+      "solscan": "https://solscan.io/tx/44UpJ9FyPMDbsbCce472wiAbE6zbxwwETgb6iXPcyoAKxMXxqPSFwqnJipphgqvALWnb1mHSyB7XTXgj57bvZh2c?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "README.md",
+          "pointer": "For judges"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/4aqDnZB83izzxXfmo15U2yxyv7wmf92iq12gStejEWDPWvpGCBaJHovj3Hgk3zD5nN9vXsrc3sDwFGjqKdZUy2Bq?cluster=devnet",
+      "solscan": "https://solscan.io/tx/4aqDnZB83izzxXfmo15U2yxyv7wmf92iq12gStejEWDPWvpGCBaJHovj3Hgk3zD5nN9vXsrc3sDwFGjqKdZUy2Bq?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/proofs/7/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/proofs/7/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/4H8kUxq97UaEmbyd5tK2sdGTbFqoPi6yd9gPbsso3XgLfNja6ecwhYQkkmkhhTvhi9PtyK4jnGEnVoXjLY1eunED?cluster=devnet",
+      "solscan": "https://solscan.io/tx/4H8kUxq97UaEmbyd5tK2sdGTbFqoPi6yd9gPbsso3XgLfNja6ecwhYQkkmkhhTvhi9PtyK4jnGEnVoXjLY1eunED?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_CORE_SOURCES_2026-10-10.json",
+          "pointer": "/moneyRegression/explorer"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/4NzCyfoFu4qoY5Tch9EQ47sVT9TiUYcQCyiz4cuA7s8VNayMPmMdD6Sdr3XNQM8GJAAnctks2QspuQA8iFsTNXCb?cluster=devnet",
+      "solscan": "https://solscan.io/tx/4NzCyfoFu4qoY5Tch9EQ47sVT9TiUYcQCyiz4cuA7s8VNayMPmMdD6Sdr3XNQM8GJAAnctks2QspuQA8iFsTNXCb?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/3/approvalReceipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/3/approvalReceipt/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/4TuMCkaqwTMLVB8D9VvFSCbiXrjGzp7JeKCjxLrRHRdSKTT4uaTrDqc1Amkpi2AhCP1MdgL9ukNnAUMH1LC25CrS?cluster=devnet",
+      "solscan": "https://solscan.io/tx/4TuMCkaqwTMLVB8D9VvFSCbiXrjGzp7JeKCjxLrRHRdSKTT4uaTrDqc1Amkpi2AhCP1MdgL9ukNnAUMH1LC25CrS?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/rent/steps/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/rent/steps/1/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/4w3obueqVVU8nbZP8iVhFVugPadAg9PNTjLbzJmPfzp5Y3Puzu7wa34bZx79KMUnavQrspHjVzsZdV9fLX8TU88x?cluster=devnet",
+      "solscan": "https://solscan.io/tx/4w3obueqVVU8nbZP8iVhFVugPadAg9PNTjLbzJmPfzp5Y3Puzu7wa34bZx79KMUnavQrspHjVzsZdV9fLX8TU88x?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/abortedAttempts/1/receipts/0/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/abortedAttempts/1/proofs/0/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/4yyeAacs8mBRPiwZMjzisFQm5nGSPJxoBSm2rbWGhRVDM82cvUgKsaf8uFhKphUR91qu1nCjzbMU7n8tdjrQFxr?cluster=devnet",
+      "solscan": "https://solscan.io/tx/4yyeAacs8mBRPiwZMjzisFQm5nGSPJxoBSm2rbWGhRVDM82cvUgKsaf8uFhKphUR91qu1nCjzbMU7n8tdjrQFxr?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/claimAiFollowup/orderedHostedProofs/houseClaim/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/4z1r2pXdanVbuvsREeobCYdXe3CuzqevQPC5RoV5eVU1rSSDzbKDZP2GW3EhNpVKYKD9Rkk5nn2YyMZsDoQgtvUo?cluster=devnet",
+      "solscan": "https://solscan.io/tx/4z1r2pXdanVbuvsREeobCYdXe3CuzqevQPC5RoV5eVU1rSSDzbKDZP2GW3EhNpVKYKD9Rkk5nn2YyMZsDoQgtvUo?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/steps/3/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/steps/3/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/51CCYaYRJpXer8ea3xdorcm1GGuYa4CdrFrivwT8Df5KtbKzx2zCgcw9r27Q9ZSfUG92monxubaYAfpAWe9b3jXY?cluster=devnet",
+      "solscan": "https://solscan.io/tx/51CCYaYRJpXer8ea3xdorcm1GGuYa4CdrFrivwT8Df5KtbKzx2zCgcw9r27Q9ZSfUG92monxubaYAfpAWe9b3jXY?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_AI_APP_PROOFS_2026-10-05.json",
+          "pointer": "/signatures/2/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/ai/signatures/2/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/54c8uK2KQBKftbmhqz62LKkpaT6VKM2aqqx93iLfQQtagSB58nM2V2EshAM94vKfZA3X5sLUWLcmXVHPC3GeSv9e?cluster=devnet",
+      "solscan": "https://solscan.io/tx/54c8uK2KQBKftbmhqz62LKkpaT6VKM2aqqx93iLfQQtagSB58nM2V2EshAM94vKfZA3X5sLUWLcmXVHPC3GeSv9e?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/steps/12/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/exactReviews/3/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/steps/12/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/exactReviews/3/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/55KWd4MCjv1iKyzThYS9wNayC82V5uYziJESYn9qYvhLRxqN8iTutaHezmhxXkkY1Vz5kWbY3Zcs1twQ6Jq76WJv?cluster=devnet",
+      "solscan": "https://solscan.io/tx/55KWd4MCjv1iKyzThYS9wNayC82V5uYziJESYn9qYvhLRxqN8iTutaHezmhxXkkY1Vz5kWbY3Zcs1twQ6Jq76WJv?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/7/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/7/receipt/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/5EHWEpXYPvoBQikUQ4zofDzpmeYxwsrupGEf2zo6TErUCC5FqirDWm1R3kTXuJ5zRuDBpBaYLT6HayGBMHSP2Vuo?cluster=devnet",
+      "solscan": "https://solscan.io/tx/5EHWEpXYPvoBQikUQ4zofDzpmeYxwsrupGEf2zo6TErUCC5FqirDWm1R3kTXuJ5zRuDBpBaYLT6HayGBMHSP2Vuo?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/proofs/0/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/proofs/0/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/5H7fz9raC67RVYZR8eNxiNYQdqygZFUfvrXNb9Kae48n3xXj65Cgdt3MZg59LwfaUnxkGPuqogjWCx8bNGjVnvKs?cluster=devnet",
+      "solscan": "https://solscan.io/tx/5H7fz9raC67RVYZR8eNxiNYQdqygZFUfvrXNb9Kae48n3xXj65Cgdt3MZg59LwfaUnxkGPuqogjWCx8bNGjVnvKs?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/abortedAttempts/2/receipts/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/abortedAttempts/2/proofs/1/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/5HQGApBLtoMfCeEeKC3BiWdBtqyf2z93fHBvhF2e7GreWiz5fDaCMg6PyXK9nW7Ayd8VpEyJHB2bANvvBwLfn8w7?cluster=devnet",
+      "solscan": "https://solscan.io/tx/5HQGApBLtoMfCeEeKC3BiWdBtqyf2z93fHBvhF2e7GreWiz5fDaCMg6PyXK9nW7Ayd8VpEyJHB2bANvvBwLfn8w7?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_AI_APP_PROOFS_2026-10-05.json",
+          "pointer": "/signatures/0/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/ai/signatures/0/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/5jAsUC9yPb5qaPq8Gkxqyg8cBYe4WTSvmHBFU1EGmcgECnivpCYDpR8T3hthLqzWvcn6EkYvQtQA8aNcmNZt2hkF?cluster=devnet",
+      "solscan": "https://solscan.io/tx/5jAsUC9yPb5qaPq8Gkxqyg8cBYe4WTSvmHBFU1EGmcgECnivpCYDpR8T3hthLqzWvcn6EkYvQtQA8aNcmNZt2hkF?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/4/receipts/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/4/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/4/receipts/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/4/receipt/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/5mwT6A5XEFC7Xq4V1cMiaado6o7pzQCy99tUJ6ehhpbH9jiT9DmvvAE6Agvqv7MPY7UFNd77EoxKcrcXP1avxZJX?cluster=devnet",
+      "solscan": "https://solscan.io/tx/5mwT6A5XEFC7Xq4V1cMiaado6o7pzQCy99tUJ6ehhpbH9jiT9DmvvAE6Agvqv7MPY7UFNd77EoxKcrcXP1avxZJX?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/0/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/11/observedBalances/0/receipts/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/11/observedBalances/1/receipts/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/11/observedBalances/2/receipts/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/0/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/11/observedBalances/0/receipts/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/11/observedBalances/1/receipts/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/11/observedBalances/2/receipts/1/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/5oa9yZFEYgT6NquLWA4NSx8mDg7HZKtjUxrYZhtMBGS8ugcpBgse9e1nJxruNqsBRtqkf2SFmf4VtUP9fUbWCe6j?cluster=devnet",
+      "solscan": "https://solscan.io/tx/5oa9yZFEYgT6NquLWA4NSx8mDg7HZKtjUxrYZhtMBGS8ugcpBgse9e1nJxruNqsBRtqkf2SFmf4VtUP9fUbWCe6j?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/steps/8/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/exactReviews/0/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/steps/8/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/exactReviews/0/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/5pqsV3K5tAoHtcfeHCeJHiuXaiSN23bB6fRCNK7yNbafTBqQw5n2rhoweCJWFsCbH9qn3A9r7vLqtxoZyKeGFmhB?cluster=devnet",
+      "solscan": "https://solscan.io/tx/5pqsV3K5tAoHtcfeHCeJHiuXaiSN23bB6fRCNK7yNbafTBqQw5n2rhoweCJWFsCbH9qn3A9r7vLqtxoZyKeGFmhB?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/8/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/8/receipt/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/5RtHDi7Y3a9dGJnzw5nNwNyP4mq9YA3xnq2KfqrcUFWAoqnpmWKgP1nyEQCYiJS9EHKgLRBZeM4To1LCdQtxVE8m?cluster=devnet",
+      "solscan": "https://solscan.io/tx/5RtHDi7Y3a9dGJnzw5nNwNyP4mq9YA3xnq2KfqrcUFWAoqnpmWKgP1nyEQCYiJS9EHKgLRBZeM4To1LCdQtxVE8m?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/steps/11/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/exactReviews/2/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/steps/11/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/exactReviews/2/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/5TBW4YsRGXVAxnXQ1TBwFFcXLzpSJ4r7sw8DFqJuAvupyiENce79eRztrsPBk1tc9HjiJjTeapwz587SXrm4Yc2M?cluster=devnet",
+      "solscan": "https://solscan.io/tx/5TBW4YsRGXVAxnXQ1TBwFFcXLzpSJ4r7sw8DFqJuAvupyiENce79eRztrsPBk1tc9HjiJjTeapwz587SXrm4Yc2M?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "README.md",
+          "pointer": "For judges"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/5UgYFgGyvJL1rkkZgmivQAZZXV428jPR3EjuPw2Myj8R9P3bHtdx2zaVEg9EtRifqcJz24T1bP9fMkZnGxRVdQrH?cluster=devnet",
+      "solscan": "https://solscan.io/tx/5UgYFgGyvJL1rkkZgmivQAZZXV428jPR3EjuPw2Myj8R9P3bHtdx2zaVEg9EtRifqcJz24T1bP9fMkZnGxRVdQrH?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/1/receipts/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/1/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/1/receipts/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/1/receipt/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/5wmLZVmQ8Y5KXynw1Sd3WHHHj2Df1nQNbtJw7sGbxdMaRZAm4xFACfi6N95w5f9EL2PeC6B1vBP2kKpFa5uXUu8F?cluster=devnet",
+      "solscan": "https://solscan.io/tx/5wmLZVmQ8Y5KXynw1Sd3WHHHj2Df1nQNbtJw7sGbxdMaRZAm4xFACfi6N95w5f9EL2PeC6B1vBP2kKpFa5uXUu8F?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/fixtureFunding/transfers/0/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/5xF4LTEHybeXcbVHH6ZrEf67nCJ8Q5pMrVEiGYfDzY22xcY21VK1wwtFm6SGwWaBr1C8o6BH7ibJs2y1BarCEaWx?cluster=devnet",
+      "solscan": "https://solscan.io/tx/5xF4LTEHybeXcbVHH6ZrEf67nCJ8Q5pMrVEiGYfDzY22xcY21VK1wwtFm6SGwWaBr1C8o6BH7ibJs2y1BarCEaWx?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_CITY_APP_2026-10-09.json",
+          "pointer": "/moneyRegression/explorer"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/5Yn6zru6hoa2EJmc7XSAumPMQv5oAPRpN5fK7ptjjW2M6uvRXFG2v4i4mQLV11VECfGZeVYLwkJXDZ5yTyzQKMds?cluster=devnet",
+      "solscan": "https://solscan.io/tx/5Yn6zru6hoa2EJmc7XSAumPMQv5oAPRpN5fK7ptjjW2M6uvRXFG2v4i4mQLV11VECfGZeVYLwkJXDZ5yTyzQKMds?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/abortedAttempts/2/receipts/3/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/abortedAttempts/2/proofs/3/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/bbf3hWMmGtwJMFtLdkTtp2RkQQkviAja6L7bZEHtDHFmaRGcqXdXxdDQ9w8TsZSS8dFJFio43Avm1ZyCenuixyJ?cluster=devnet",
+      "solscan": "https://solscan.io/tx/bbf3hWMmGtwJMFtLdkTtp2RkQQkviAja6L7bZEHtDHFmaRGcqXdXxdDQ9w8TsZSS8dFJFio43Avm1ZyCenuixyJ?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/11/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/11/observedBalances/0/receipts/3/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/11/observedBalances/1/receipts/3/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/11/observedBalances/2/receipts/3/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/11/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/11/observedBalances/0/receipts/3/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/11/observedBalances/1/receipts/3/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/11/observedBalances/2/receipts/3/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/captures/segments/3/receipt"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/cbysDTNaH1YUpsrvas4ybyjxpEE2Co9nKYEzQFEGg8GCrdUsFKqGvYYDX68jGM5nAHbEbkfwuwFGUiXojwGhZU2?cluster=devnet",
+      "solscan": "https://solscan.io/tx/cbysDTNaH1YUpsrvas4ybyjxpEE2Co9nKYEzQFEGg8GCrdUsFKqGvYYDX68jGM5nAHbEbkfwuwFGUiXojwGhZU2?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/abortedAttempts/0/receipts/0/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/abortedAttempts/0/proofs/0/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/jFefa9N5weD8Mj341ZsEWHLUHE6SAeM1G2DCkL8Q8D8vEct2mNJXxoVv7tu7BKKzvYcWyCo9RFcncxWQ7v7NZHW?cluster=devnet",
+      "solscan": "https://solscan.io/tx/jFefa9N5weD8Mj341ZsEWHLUHE6SAeM1G2DCkL8Q8D8vEct2mNJXxoVv7tu7BKKzvYcWyCo9RFcncxWQ7v7NZHW?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_LOYALTY_FEED_2026-10-10.json",
+          "pointer": "/moneyRegression/explorer"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/NN1UEE7MSSgGnbfTnf8sAWvvFfR5f8TFSEkBcMVFCQ6oQNkaztvkUa5NT6v7Q66Vboj1ZNqbRVFpqFBxvRg34mX?cluster=devnet",
+      "solscan": "https://solscan.io/tx/NN1UEE7MSSgGnbfTnf8sAWvvFfR5f8TFSEkBcMVFCQ6oQNkaztvkUa5NT6v7Q66Vboj1ZNqbRVFpqFBxvRg34mX?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/steps/14/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/shares/exactReviews/5/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/steps/14/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/shares/exactReviews/5/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/nn4B4L8hTJVG3iMPa6meMMe2WMUqHWgidKGDwrkcrgjh2uHneH42on1ZMRw3w1jLyc5LgKPZQWfm1kLmXst2m4H?cluster=devnet",
+      "solscan": "https://solscan.io/tx/nn4B4L8hTJVG3iMPa6meMMe2WMUqHWgidKGDwrkcrgjh2uHneH42on1ZMRw3w1jLyc5LgKPZQWfm1kLmXst2m4H?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/proofs/3/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/proofs/3/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/p2vwZiHEHMys84KqcqJAyRv2AYw4KAEuap8cz1sfBr7DUfL2981PCv3LfJyZXEZ6kXKmEURV6Ed4ganmcnQUnd8?cluster=devnet",
+      "solscan": "https://solscan.io/tx/p2vwZiHEHMys84KqcqJAyRv2AYw4KAEuap8cz1sfBr7DUfL2981PCv3LfJyZXEZ6kXKmEURV6Ed4ganmcnQUnd8?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/proofs/6/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/proofs/6/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/PKmLqEzpVocpASdMVxiPEL9QTDaErCTWPJikm9kGDmAG844jyxqookZWtvr2hVXz9HpUggPFdkYMToTEp3xJcsh?cluster=devnet",
+      "solscan": "https://solscan.io/tx/PKmLqEzpVocpASdMVxiPEL9QTDaErCTWPJikm9kGDmAG844jyxqookZWtvr2hVXz9HpUggPFdkYMToTEp3xJcsh?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/tenancies/evidence/rent/steps/2/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_TENANCIES_2026-10-05.json",
+          "pointer": "/rent/steps/2/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/PyK7DKz8GuYsoDkoR19JGqxovw23tWGrqc1Q7BL1aTsdC4FRqXVwKWmHMZ58hd6ZC9NCgRpehJbchu2PVQoTnnt?cluster=devnet",
+      "solscan": "https://solscan.io/tx/PyK7DKz8GuYsoDkoR19JGqxovw23tWGrqc1Q7BL1aTsdC4FRqXVwKWmHMZ58hd6ZC9NCgRpehJbchu2PVQoTnnt?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_LENDING_2026-10-05.json",
+          "pointer": "/steps/12/receipt/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/resident/evidence/steps/12/receipt/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/Q6wP5rrhosyYcVF1eu2Ei8FLhYpnvU22JbY6SWN9gvusYfASzSSJZWKsd3W8RiCjhtcNvwVnQUPmM1Eyzxk64C7?cluster=devnet",
+      "solscan": "https://solscan.io/tx/Q6wP5rrhosyYcVF1eu2Ei8FLhYpnvU22JbY6SWN9gvusYfASzSSJZWKsd3W8RiCjhtcNvwVnQUPmM1Eyzxk64C7?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_LOYALTY_TEST_LABELS_2026-10-10.json",
+          "pointer": "/moneyRegression/explorer"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/RFCYoEcDTS4NTrXU91hhKakQvRyubGDqXQJ335rvy63q8uBiY8dDxWimodLcxjyaHSHV11kvJ8LpELXRRm3bbi8?cluster=devnet",
+      "solscan": "https://solscan.io/tx/RFCYoEcDTS4NTrXU91hhKakQvRyubGDqXQJ335rvy63q8uBiY8dDxWimodLcxjyaHSHV11kvJ8LpELXRRm3bbi8?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/houseAndRent/proofs/2/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_HOUSE_RENT_APP_PROOFS_2026-10-05.json",
+          "pointer": "/proofs/2/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/uAwPqYez7vF8L7K4yxM9JkNLy1J4N8TPDwApd71jWd44BmLEhhtXC1W4P3HLuGkQ3WLyHDyEGLKu3Fu5NA7pnqy?cluster=devnet",
+      "solscan": "https://solscan.io/tx/uAwPqYez7vF8L7K4yxM9JkNLy1J4N8TPDwApd71jWd44BmLEhhtXC1W4P3HLuGkQ3WLyHDyEGLKu3Fu5NA7pnqy?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/fixtureFunding/transfers/1/explorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/ULJZPaxrHEhZfLyp339p9dE6ABfAgZfi4PG9WfPQDgQ1LFWj2Snw94wZq6ibsh7RUaGKR59BGjhA2QR5ZqNCEAf?cluster=devnet",
+      "solscan": "https://solscan.io/tx/ULJZPaxrHEhZfLyp339p9dE6ABfAgZfi4PG9WfPQDgQ1LFWj2Snw94wZq6ibsh7RUaGKR59BGjhA2QR5ZqNCEAf?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/claimAiFollowup/orderedHostedProofs/paidAiAnswer/settlementExplorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/xj1CYJHkynZ8v7EkDedmuvkzGZJ7c1NGsdmdRqkdZQG4Av66BHhnJGSKKXv96MSymjSXLp9j3ATaqx6rCBEFNRX?cluster=devnet",
+      "solscan": "https://solscan.io/tx/xj1CYJHkynZ8v7EkDedmuvkzGZJ7c1NGsdmdRqkdZQG4Av66BHhnJGSKKXv96MSymjSXLp9j3ATaqx6rCBEFNRX?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/HOSTED_SOLANA_RUN_2026-10-05.json",
+          "pointer": "/aiRecoveryInvestigation/paidAnswer/settlementExplorerUrl"
+        }
+      ]
+    },
+    {
+      "solanaExplorer": "https://explorer.solana.com/tx/YaZppQfuybdNiATDJ14ip2YRM9xNn1EdUyySjGRw2Y6fXgjmf7en1ZM8J1V4sPGGNY1oWJgW1xtESpqC8ioBMXT?cluster=devnet",
+      "solscan": "https://solscan.io/tx/YaZppQfuybdNiATDJ14ip2YRM9xNn1EdUyySjGRw2Y6fXgjmf7en1ZM8J1V4sPGGNY1oWJgW1xtESpqC8ioBMXT?cluster=devnet",
+      "cluster": "devnet",
+      "references": [
+        {
+          "file": "docs/evidence/SOLANA_AI_APP_PROOFS_2026-10-05.json",
+          "pointer": "/signatures/1/explorerUrl"
+        },
+        {
+          "file": "docs/evidence/SOLANA_APP_DEVNET_PROOFS_2026-10-05.json",
+          "pointer": "/ai/signatures/1/explorerUrl"
+        }
+      ]
+    }
+  ],
+  "templates": [
+    {
+      "file": "docs/evidence/HOSTED_CITY_STORY_ROBINHOOD_TESTNET_2026-10-02.json",
+      "pointer": "/networks/solana-devnet",
+      "solanaExplorerTransactionBase": "https://explorer.solana.com/tx/",
+      "solscanTransactionBase": "https://solscan.io/tx/",
+      "suffix": "?cluster=devnet"
+    }
+  ]
+}
