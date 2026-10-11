@@ -28,9 +28,9 @@
     "municipalityWithItems": 24,
     "warnings": [],
     "datedPublication": {
-      "inputRecords": 51,
+      "inputRecords": 44,
       "publishedRecords": 44,
-      "quarantinedRecords": 7,
+      "quarantinedRecords": 0,
       "municipalities": 18,
       "singleMunicipalityTopics": [
         "sport"

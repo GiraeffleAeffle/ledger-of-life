@@ -1,7 +1,9 @@
 # Governed wrapper creates namespace stadtstack-mcp and the Secret before install.
 # helm upgrade --install civic-mcp deploy/mcp/chart --namespace stadtstack-mcp \
+#   --set-string releaseVersion=0.3.0 \
 #   --set-string image.digest=sha256:<owner-approved digest from image workflow>
-# No tags or synthetic digest defaults are accepted.
+# Tags never replace immutable digests. Version must match package, Git and image.
+releaseVersion: ""
 image:
   repository: ghcr.io/giraeffleaeffle/stadtstack-mcp
   digest: ""

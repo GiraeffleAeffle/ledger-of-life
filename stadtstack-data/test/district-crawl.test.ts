@@ -59,6 +59,86 @@ test('DiPlan observed list protocol preserves API case identity without fabricat
  });
  const result=await crawlParticipationApi(fetcher,city,apiSource,{maxDocuments:2,maxPages:2,maxRequests:3});assert.equal(result.documents[0].metadata.caseKey,'case-1');assert.equal(result.documents[0].metadata.stage,undefined);assert.equal(result.documents[0].documentDate,null);
 });
+function bobInventory(rows:unknown[]):string {
+ const encoded=JSON.stringify(rows).replace(/[\s\S]/g,char=>'\\u'+char.charCodeAt(0).toString(16).padStart(4,'0'));
+ return `<script>var initialProcedures = JSON.parse('${encoded}');</script>`;
+}
+test('BOB binds exact AGS and ARS without names, isolates legacy roots and excludes neighboring procedures',async t=>{
+ const folder=await mkdtemp(join(tmpdir(),'district-bob-bound-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ const fetcher=new PoliteFetcher({cacheDir:folder}),seen:string[]=[],root='https://bob-sh.de/';
+ const bobSource:RegistrySource={...source,id:'schwarzenbek-bob-sh',url:root,crawlScope:{pageRoots:[],followLinkedDocuments:false},api:{url:root+'list/json',format:'bobsh-list',method:'POST',form:{municipalCode:'01053'}}};
+ const town:RegistryMunicipality={...city,id:'schwarzenbek',name:'Schwarzenbek',ags:'01053116',sources:[bobSource]};
+ const rows=[{id:'exact',municipalCode:town.ags,ars:'010530116116'},{id:'ars',ars:'010535373116'},{id:'neighbor',municipalCode:'01053021',ars:'010535373021'}];
+ const mapVars=rows.map(row=>({procedureId:row.id,procedureUrl:`/verfahren/${row.id}/public/detail`,externalName:row.id==='neighbor'?'Amt Schwarzenbek-Land':'Neutraler Planname'}));
+ const responseHtml=mapVars.map(row=>`<div class="c-procedurelist__item" data-procedure-id="${row.procedureId}">${row.externalName}</div>`).join('');
+ t.mock.method(fetcher,'fetch',async(url:string)=>{
+  seen.push(url);const api=url===bobSource.api!.url,pdf=url.endsWith('.pdf');
+  const body=Buffer.from(api?JSON.stringify({success:true,procedureCount:mapVars.length,mapVars,responseHtml}):pdf?'%PDF fixture':url===root?bobInventory(rows)+'<a href="/verfahren/neighbor/public/detail">Verfahren</a>':url.endsWith('/public/documents')?'<h1>Dokumente</h1><a href="/deep.pdf">Plan</a>':`<h1>Plan</h1><a href="/plan.pdf">Plan</a><a href="/verfahren/neighbor/public/detail">Nachbarverfahren</a><a href="/?search=beteiligung">Alle Beteiligungen</a><a href="/verfahren/exact/public/documents">Dokumente</a>`);
+  const localPath=join(folder,hash(body)),at=new Date().toISOString(),mimeType=api?'application/json':pdf?'application/pdf':'text/html';await writeFile(localPath,body);
+  return {url,sha256:hash(body),localPath,mimeType,retrievedAt:at,checkedAt:at,status:200,observationPath:join(folder,'observation.json'),policy:fixturePolicy(url,hash(body),at,mimeType)};
+ });
+ const legacy=await crawlHtmlSource(fetcher,town,{...bobSource,crawlScope:{pageRoots:[root],followLinkedDocuments:true}},{maxDocuments:1,maxPages:1,maxRequests:1});
+ assert.ok(legacy.documents.some(document=>document.url===root));assert.equal(legacy.coverage?.pendingCount,1);seen.length=0;
+ const result=await crawlParticipationApi(fetcher,town,bobSource,{maxDocuments:12,maxPages:8,maxRequests:12});
+ assert.notEqual(result.coverage?.frontierPath,legacy.coverage?.frontierPath);
+ assert.equal(seen.filter(url=>url===root).length,1);assert.ok(!seen.some(url=>url.includes('/neighbor/')||url.includes('?search=')));
+ assert.ok(!result.documents.some(document=>document.url===root));assert.equal(result.documents.filter(document=>document.mimeType==='application/pdf').length,2);
+ assert.ok(result.documents.some(document=>document.metadata.caseKey==='exact'));assert.ok(result.documents.some(document=>document.metadata.caseKey==='ars'));
+ assert.ok(result.documents.every(document=>document.sourceId===bobSource.id&&document.ags===town.ags));assert.equal(result.coverage?.state,'complete');
+});
+test('BOB missing, partial, malformed, conflicting and unjoined municipal identities fail closed',async t=>{
+ const cases=[
+  {name:'missing codes',rows:[{id:'p'}]},
+  {name:'county prefix is not an AGS',rows:[{id:'p',municipalCode:'01053'}]},
+  {name:'numeric AGS loses leading zero',rows:[{id:'p',municipalCode:1053116}]},
+  {name:'ARS is not the first eight digits',rows:[{id:'p',municipalCode:'01053537',ars:'010535373116'}]},
+  {name:'conflicting AGS and ARS',rows:[{id:'p',municipalCode:'01053116',ars:'010535373021'}]},
+  {name:'invalid supplied ARS',rows:[{id:'p',municipalCode:'01053116',ars:'01053'}]},
+  {name:'conflicting duplicate procedure',rows:[{id:'p',municipalCode:'01053116'},{id:'p',municipalCode:'01053021'}]},
+  {name:'API procedure missing from inventory',rows:[{id:'different',municipalCode:'01053116'}]}
+ ];
+ for(const scenario of cases)await t.test(scenario.name,async t=>{
+  const folder=await mkdtemp(join(tmpdir(),'district-bob-ambiguous-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+  const fetcher=new PoliteFetcher({cacheDir:folder}),seen:string[]=[],root='https://bob-sh.de/';
+  const bobSource:RegistrySource={...source,url:root,api:{url:root+'list/json',format:'bobsh-list'}};
+  t.mock.method(fetcher,'fetch',async(url:string)=>{
+   seen.push(url);const body=Buffer.from(url===root?bobInventory(scenario.rows):JSON.stringify({success:true,procedureCount:1,mapVars:[{procedureId:'p',procedureUrl:'/verfahren/p/public/detail',externalName:'Schwarzenbek'}],responseHtml:'<div class="c-procedurelist__item" data-procedure-id="p">Schwarzenbek</div>'})),localPath=join(folder,hash(body));await writeFile(localPath,body);
+   return {url,sha256:hash(body),localPath,mimeType:'text/html',retrievedAt:'2026-10-11T00:00:00.000Z',checkedAt:'2026-10-11T00:00:00.000Z',status:200,observationPath:join(folder,'observation.json')};
+  });
+  await assert.rejects(crawlParticipationApi(fetcher,{...city,ags:'01053116',name:'Schwarzenbek'},bobSource,{maxDocuments:5,maxPages:5,maxRequests:5}),/municipal code missing or conflicting/);
+  assert.deepEqual(seen,[root+'list/json',root]);
+ });
+});
+test('BOB scoped empty result is distinct from unsupported inventory and respects identity request budget',async t=>{
+ for(const mode of ['empty','unsupported','budget'] as const)await t.test(mode,async t=>{
+  const folder=await mkdtemp(join(tmpdir(),'district-bob-empty-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+  const fetcher=new PoliteFetcher({cacheDir:folder}),seen:string[]=[],root='https://bob-sh.de/';
+  const bobSource:RegistrySource={...source,url:root,api:{url:root+'list/json',format:'bobsh-list'}};
+  type Wire={wire(url:URL):Promise<{status:number;headers:Record<string,string>;body:Buffer}>};
+  t.mock.method(fetcher as unknown as Wire,'wire',async(url:URL)=>{
+   if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+   seen.push(url.href);return {status:200,headers:{'content-type':'text/html'},body:Buffer.from(url.href===root?(mode==='unsupported'?'<h1>No inventory</h1>':bobInventory([{id:'other',municipalCode:'01053021'}])):JSON.stringify({success:true,procedureCount:0,mapVars:[],responseHtml:''}))};
+  });
+  const pending=crawlParticipationApi(fetcher,{...city,ags:'01053116'},bobSource,{maxDocuments:5,maxPages:5,maxRequests:mode==='budget'?1:5});
+  if(mode==='unsupported'){await assert.rejects(pending,/inventory missing or ambiguous/);return;}
+  const result=await pending;assert.equal(result.documents.length,0);assert.equal(result.coverage?.state,mode==='budget'?'partial':'complete');
+  assert.equal(result.requests,mode==='budget'?1:2);assert.deepEqual(seen,mode==='budget'?[root+'list/json']:[root+'list/json',root]);
+  assert.match(result.notes.join(' '),mode==='budget'?/no empty-coverage inference/:/0 exact-bound procedures/);
+ });
+});
+test('BOB ambiguous identity never falls back to registry seeds through the district crawler',async t=>{
+ const folder=await mkdtemp(join(tmpdir(),'district-bob-no-fallback-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ const fetcher=new PoliteFetcher({cacheDir:folder}),seen:string[]=[],root='https://bob-sh.de/';
+ const bobSource:RegistrySource={...source,url:root,api:{url:root+'list/json',format:'bobsh-list'}};
+ t.mock.method(fetcher,'fetch',async(url:string)=>{
+  seen.push(url);const body=Buffer.from(url===root?bobInventory([{id:'p'}]):JSON.stringify({success:true,procedureCount:1,mapVars:[{procedureId:'p',procedureUrl:'/verfahren/p/public/detail',externalName:'Schwarzenbek'}],responseHtml:'<div class="c-procedurelist__item" data-procedure-id="p">Schwarzenbek</div>'})),localPath=join(folder,hash(body));await writeFile(localPath,body);
+  return {url,sha256:hash(body),localPath,mimeType:'text/html',retrievedAt:'2026-10-11T00:00:00.000Z',checkedAt:'2026-10-11T00:00:00.000Z',status:200,observationPath:join(folder,'observation.json')};
+ });
+ const registry={schemaVersion:'stadtstack-source-registry-v1' as const,municipalities:[{...city,ags:'01053116',name:'Schwarzenbek',sources:[bobSource],seedDocuments:[{sourceId:bobSource.id,url:root+'unbound.pdf'}]}]};
+ const result=await crawlDistrictRegistry(registry,fetcher,{maxDocuments:5,maxPages:5,maxRequests:5});
+ assert.equal(result.documents.length,0);assert.equal(result.checks[0].outcome,'blocked');assert.match(result.checks[0].reason!,/municipal code missing or conflicting/);
+ assert.deepEqual(seen,[root+'list/json',root]);assert.ok(!result.checks[0].reason?.includes('official-document fallback'));
+});
 test('failed public API retains confirmed official-document fallback within its request budget',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-fallback-'));t.after(()=>rm(folder,{recursive:true,force:true}));
  const fetcher=new PoliteFetcher({cacheDir:folder}),apiSource:RegistrySource={...source,api:{url:'https://api.stadt.de/plans',format:'mv-bauleitplan'}};

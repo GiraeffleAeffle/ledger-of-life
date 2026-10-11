@@ -4,7 +4,7 @@ name: Civic MCP image
 on:
   push:
     tags:
-      - 'civic-mcp-v*'
+      - '[0-9]*.[0-9]*.[0-9]*'
 
 permissions:
   contents: read
@@ -27,6 +27,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Validate the literal release version
+        id: release
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFileSync, appendFileSync} from 'node:fs';
+          const {version} = JSON.parse(readFileSync('stadtstack-data/package.json', 'utf8'));
+          if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(version) ||
+              process.env.GITHUB_REF_TYPE !== 'tag' || process.env.GITHUB_REF_NAME !== version) {
+            throw new Error('The literal Git tag must equal the canonical package release version');
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
+          NODE
       - uses: docker/setup-qemu-action@05340d1c670183e7caabdb33ae9f1c80fae3b0c2 # v3.6.0
         with:
           platforms: arm64
@@ -41,8 +53,7 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           tags: |
-            type=ref,event=tag
-            type=sha,format=long
+            type=raw,value=${{ steps.release.outputs.version }}
           flavor: latest=false
       - id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -53,6 +64,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            RELEASE_VERSION=${{ steps.release.outputs.version }}
+            SOURCE_REVISION=${{ github.sha }}
           provenance: mode=max
           sbom: true
           cache-from: type=gha,scope=civic-mcp
@@ -60,22 +74,24 @@ jobs:
       - name: Report the immutable release digest
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          VERSION: ${{ steps.release.outputs.version }}
         run: |
           if [[ ! "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
             echo "::error::Build did not return an immutable manifest digest."
             exit 1
           fi
-          printf 'CIVIC_MCP_SOURCE=%s\nCIVIC_MCP_DIGEST=%s\n' "$GITHUB_SHA" "$DIGEST"
+          printf 'CIVIC_MCP_SOURCE=%s\nCIVIC_MCP_DIGEST=%s\nCIVIC_MCP_VERSION=%s\n' "$GITHUB_SHA" "$DIGEST" "$VERSION"
           {
             echo '### Civic MCP image'
             echo
-            echo "Image: \`${IMAGE}@${DIGEST}\`"
+            echo "Image: \`${IMAGE}:${VERSION}@${DIGEST}\`"
             echo "Platforms: \`linux/amd64\`, \`linux/arm64\`"
-            echo "Release: \`${GITHUB_REF_NAME}\`"
+            echo "Git tag / image tag / MCP server version: \`${VERSION}\`"
             echo "Source commit: \`${GITHUB_SHA}\`"
             echo
             echo 'Pin this multiarchitecture manifest digest in the governed deployment values:'
             echo '```yaml'
+            echo "releaseVersion: \"${VERSION}\""
             echo 'image:'
             echo "  digest: ${DIGEST}"
             echo '```'

@@ -114,7 +114,11 @@ Usage: mcp-session.sh --diff-only | --release
 --release requires LIVE_MCP_ACK=release-civic-mcp-through-governed-wrapper-v1
 and CLUSTER_OPS_MCP_GO=protected-read-only-civic-mcp.
 Both require explicit MCP_RELEASE_REPO (canonical clean checkout),
-MCP_APPROVED_SHA and MCP_IMAGE_DIGEST. No repository-path fallback is used.
+MCP_APPROVED_SHA, MCP_IMAGE_DIGEST, MCP_RELEASE_VERSION (literal Git/image tag),
+and MCP_KNOWLEDGE_MUNICIPALITY for runtime acceptance.
+MCP_RELEASE_VERSION must equal the approved package version. No path/tag fallback.
+The dispatcher executes smoke.py exported from MCP_APPROVED_SHA into fresh private
+evidence before resource mutation. MCP_SMOKE_EVIDENCE is rejected, not trusted.
 Stop the filtered viewer first and restore it after this session cleans up.
 EOF
 }
@@ -172,13 +176,15 @@ case "${mode}" in
   -h | --help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
 esac
+[[ -z "${MCP_SMOKE_EVIDENCE+x}" ]] ||
+  fail 'MCP_SMOKE_EVIDENCE was removed; the dispatcher runs approved smoke itself'
 if [[ "${mode}" != '--diff-only' ]]; then
   [[ "${LIVE_MCP_ACK:-}" == "${expected_ack}" ]] ||
     fail "set LIVE_MCP_ACK=${expected_ack}"
 fi
 [[ -t 0 ]] || fail 'run it from an interactive terminal; changes need typed confirmations'
 
-for command_name in age git helm nc pgrep python3 tar; do require_command "${command_name}"; done
+for command_name in age docker gh git helm nc pgrep python3 tar; do require_command "${command_name}"; done
 : "${MCP_RELEASE_REPO:?Explicit isolated release checkout required}"
 release_repo="${MCP_RELEASE_REPO}"
 [[ "${release_repo}" == /* && -d "${release_repo}" && ! -L "${release_repo}" ]] ||
@@ -187,6 +193,17 @@ release_repo="${MCP_RELEASE_REPO}"
   fail 'release repository must be its canonical Git worktree root'
 [[ -z "$(git -C "${release_repo}" status --porcelain --untracked-files=no)" ]] ||
   fail 'release checkout has tracked modifications; use a fresh clone'
+: "${MCP_RELEASE_VERSION:?Explicit literal release version required}"
+: "${MCP_APPROVED_SHA:?Explicit approved pushed source required}"
+: "${MCP_KNOWLEDGE_MUNICIPALITY:?Released knowledge municipality required for runtime acceptance}"
+[[ "${MCP_KNOWLEDGE_MUNICIPALITY}" =~ ^[a-z0-9-]{1,80}$ ]] ||
+  fail 'invalid runtime acceptance municipality'
+[[ "${MCP_RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] ||
+  fail 'release version must be a literal stable numeric version, without a prefix'
+[[ "${MCP_APPROVED_SHA}" =~ ^[0-9a-f]{40}$ ]] || fail 'invalid approved source revision'
+git --no-replace-objects -C "${release_repo}" show "${MCP_APPROVED_SHA}:stadtstack-data/package.json" |
+  python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("version") == sys.argv[1] else 1)' "${MCP_RELEASE_VERSION}" ||
+  fail 'release version differs from the approved canonical package version'
 [[ "${wireproxy_sha256}" =~ ^[0-9a-f]{64}$ ]] || fail 'rootless wireproxy checksum is invalid'
 assert_owned_executable_digest "${wireproxy_bin}" "${wireproxy_sha256}" ||
   fail 'pinned rootless wireproxy is unavailable or differs'
@@ -335,7 +352,5 @@ other_wireproxy_running &&
 export KUBECONFIG="${tmp_dir}/kubeconfig" KUBECTL="${kubectl_bin}"
 export MCP_RELEASE_MODE="${mode}"
 : "${MCP_IMAGE_DIGEST:?Explicit approved immutable image digest required}"
-: "${MCP_APPROVED_SHA:?Explicit approved pushed source required}"
-[[ "${MCP_APPROVED_SHA}" =~ ^[0-9a-f]{40}$ ]] || fail 'invalid approved source revision'
-git -C "${release_repo}" show "${MCP_APPROVED_SHA}:deploy/mcp/deploy.py" >"${tmp_dir}/deploy.py"
-python3 "${tmp_dir}/deploy.py"
+git --no-replace-objects -C "${release_repo}" show "${MCP_APPROVED_SHA}:deploy/mcp/deploy.py" >"${tmp_dir}/deploy.py"
+python3 -I "${tmp_dir}/deploy.py"

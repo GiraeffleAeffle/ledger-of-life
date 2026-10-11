@@ -1,6 +1,6 @@
 # Stadtstack open-data snapshot
 
-As of: 2026-10-10T21:56:45.237Z. Publisher: Stadtstack (independent derived factual summaries). This export contains separately attributed derived facts, not municipal endorsement, complete inventories, current operating-status guarantees, or third-party PDF/image reproductions.
+As of: 2026-10-11T03:46:26.421Z. Publisher: Stadtstack (independent derived factual summaries). This export contains separately attributed derived facts, not municipal endorsement, complete inventories, current operating-status guarantees, or third-party PDF/image reproductions.
 
 ## Attribution and reuse
 

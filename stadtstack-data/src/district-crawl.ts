@@ -40,7 +40,7 @@ export async function crawlDistrictRegistry(registry:CrawlRegistry,fetcher:Polit
       result=source.vendor==='oparl'?await crawlOparlSource(fetcher,city,source,options):source.api?.format==='mv-bauleitplan'?await crawlMvPlanningApi(fetcher,city,source,options):source.api?await crawlParticipationApi(fetcher,city,source,options):await crawlHtmlSource(fetcher,city,source,options);
      }catch(error){
       const consumed=fetcher.requestCount-startedRequests,remaining=options.maxRequests-consumed;
-      if(!source.api||!seeds.length||remaining<1)throw error;
+      if(source.api?.format==='bobsh-list'||!source.api||!seeds.length||remaining<1)throw error;
       result=await crawlHtmlSource(fetcher,city,{...source,url:null},{...options,maxRequests:remaining},seeds);result.requests+=consumed;
       const failure:FrontierFailure={url:source.api.url,failure:error instanceof PoliteFetchError?error.failure:'api_error',reason:error instanceof Error?error.message:'API unavailable',checkedAt,...(error instanceof PoliteFetchError&&error.policy?{policy:error.policy}:{}),action:'ask_municipality'};
       (result.blocked??=[]).push(failure);

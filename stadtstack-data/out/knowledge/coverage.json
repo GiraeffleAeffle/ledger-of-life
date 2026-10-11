@@ -1,39 +1,39 @@
 {
-  "schemaVersion": "stadtstack-district-coverage-v1",
-  "generatedAt": "2026-10-10T22:50:17.081Z",
+  "schemaVersion": "stadtstack-district-coverage-v2",
+  "generatedAt": "2026-10-11T09:25:12.545Z",
   "districts": [
     {
       "id": "maerkisch-oderland",
       "ags": "12064",
       "municipalitiesRegistered": 45,
       "municipalitiesAttempted": 3,
-      "municipalitiesWithRecords": 2,
-      "municipalitiesWithDatedStages": 2,
+      "municipalitiesWithRecords": 3,
+      "municipalitiesWithDatedStages": 3,
       "documents": 752,
-      "publishedRecords": 4,
-      "quarantinedRecords": 41
+      "publishedRecords": 113,
+      "quarantinedRecords": 774
     },
     {
       "id": "herzogtum-lauenburg",
       "ags": "01053",
       "municipalitiesRegistered": 132,
       "municipalitiesAttempted": 3,
-      "municipalitiesWithRecords": 2,
-      "municipalitiesWithDatedStages": 2,
-      "documents": 1218,
-      "publishedRecords": 2,
-      "quarantinedRecords": 52
+      "municipalitiesWithRecords": 3,
+      "municipalitiesWithDatedStages": 3,
+      "documents": 1235,
+      "publishedRecords": 54,
+      "quarantinedRecords": 238
     },
     {
       "id": "ludwigslust-parchim",
       "ags": "13076",
       "municipalitiesRegistered": 142,
       "municipalitiesAttempted": 3,
-      "municipalitiesWithRecords": 2,
-      "municipalitiesWithDatedStages": 2,
-      "documents": 872,
-      "publishedRecords": 3,
-      "quarantinedRecords": 83
+      "municipalitiesWithRecords": 3,
+      "municipalitiesWithDatedStages": 3,
+      "documents": 3206,
+      "publishedRecords": 61,
+      "quarantinedRecords": 431
     }
   ],
   "municipalities": [
@@ -44,13 +44,13 @@
       "selectedForSlice": true,
       "status": "gated_records",
       "documents": 476,
-      "publishedRecords": 2,
-      "datedStagedRecords": 2,
-      "quarantinedRecords": 21,
+      "publishedRecords": 39,
+      "datedStagedRecords": 37,
+      "quarantinedRecords": 384,
       "extraction": {
         "fetchedDocumentGroups": 420,
-        "attemptedDocumentGroups": 6,
-        "pendingDocumentGroups": 414,
+        "attemptedDocumentGroups": 60,
+        "pendingDocumentGroups": 360,
         "unavailableAttemptedDocumentGroups": 0
       },
       "sources": [
@@ -61,8 +61,8 @@
           "crawlState": "checked",
           "checkedAt": "2026-10-10T20:47:29.390Z",
           "documentCount": 215,
-          "publishedRecords": 0,
-          "quarantinedRecords": 13,
+          "publishedRecords": 30,
+          "quarantinedRecords": 3,
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -146,8 +146,8 @@
           "crawlState": "checked",
           "checkedAt": "2026-10-10T20:58:54.485Z",
           "documentCount": 77,
-          "publishedRecords": 0,
-          "quarantinedRecords": 2,
+          "publishedRecords": 37,
+          "quarantinedRecords": 375,
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -214,13 +214,13 @@
       "selectedForSlice": true,
       "status": "gated_records",
       "documents": 19,
-      "publishedRecords": 2,
-      "datedStagedRecords": 2,
-      "quarantinedRecords": 8,
+      "publishedRecords": 37,
+      "datedStagedRecords": 37,
+      "quarantinedRecords": 76,
       "extraction": {
         "fetchedDocumentGroups": 18,
-        "attemptedDocumentGroups": 6,
-        "pendingDocumentGroups": 12,
+        "attemptedDocumentGroups": 18,
+        "pendingDocumentGroups": 0,
         "unavailableAttemptedDocumentGroups": 0
       },
       "sources": [
@@ -269,8 +269,8 @@
           "crawlState": "checked",
           "checkedAt": "2026-10-10T20:58:54.485Z",
           "documentCount": 13,
-          "publishedRecords": 2,
-          "quarantinedRecords": 5,
+          "publishedRecords": 37,
+          "quarantinedRecords": 63,
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -289,7 +289,7 @@
           "checkedAt": "2026-10-10T20:00:28.325Z",
           "documentCount": 4,
           "publishedRecords": 0,
-          "quarantinedRecords": 0,
+          "quarantinedRecords": 10,
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -307,15 +307,15 @@
       "ags": "12064428",
       "districtId": "maerkisch-oderland",
       "selectedForSlice": true,
-      "status": "checked_no_gated_records",
+      "status": "gated_records",
       "documents": 257,
-      "publishedRecords": 0,
-      "datedStagedRecords": 0,
-      "quarantinedRecords": 12,
+      "publishedRecords": 37,
+      "datedStagedRecords": 34,
+      "quarantinedRecords": 314,
       "extraction": {
         "fetchedDocumentGroups": 183,
-        "attemptedDocumentGroups": 6,
-        "pendingDocumentGroups": 177,
+        "attemptedDocumentGroups": 60,
+        "pendingDocumentGroups": 123,
         "unavailableAttemptedDocumentGroups": 0
       },
       "sources": [
@@ -327,7 +327,7 @@
           "checkedAt": "2026-10-10T20:52:28.701Z",
           "documentCount": 27,
           "publishedRecords": 0,
-          "quarantinedRecords": 8,
+          "quarantinedRecords": 0,
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -392,8 +392,8 @@
           "crawlState": "checked",
           "checkedAt": "2026-10-10T21:11:56.754Z",
           "documentCount": 209,
-          "publishedRecords": 0,
-          "quarantinedRecords": 4,
+          "publishedRecords": 37,
+          "quarantinedRecords": 314,
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -458,15 +458,15 @@
       "ags": "01053100",
       "districtId": "herzogtum-lauenburg",
       "selectedForSlice": true,
-      "status": "checked_no_gated_records",
+      "status": "gated_records",
       "documents": 743,
-      "publishedRecords": 0,
-      "datedStagedRecords": 0,
-      "quarantinedRecords": 13,
+      "publishedRecords": 14,
+      "datedStagedRecords": 12,
+      "quarantinedRecords": 124,
       "extraction": {
         "fetchedDocumentGroups": 336,
-        "attemptedDocumentGroups": 6,
-        "pendingDocumentGroups": 330,
+        "attemptedDocumentGroups": 60,
+        "pendingDocumentGroups": 276,
         "unavailableAttemptedDocumentGroups": 0
       },
       "sources": [
@@ -475,10 +475,10 @@
           "kind": "website",
           "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T21:38:12.333Z",
+          "checkedAt": "2026-10-11T04:02:48.873Z",
           "documentCount": 305,
-          "publishedRecords": 0,
-          "quarantinedRecords": 5,
+          "publishedRecords": 14,
+          "quarantinedRecords": 35,
           "coverage": {
             "state": "partial",
             "pendingCount": 14,
@@ -514,29 +514,37 @@
           "kind": "council",
           "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T19:05:51.170Z",
-          "documentCount": 1,
+          "checkedAt": "2026-10-11T04:04:01.207Z",
+          "documentCount": 2,
           "publishedRecords": 0,
-          "quarantinedRecords": 1,
+          "quarantinedRecords": 0,
           "coverage": {
-            "state": "complete",
+            "state": "blocked",
             "pendingCount": 0,
             "runnableCount": 0,
-            "blockedCount": 0
+            "blockedCount": 1,
+            "action": "ask_municipality"
           },
-          "failedLinkCount": 0,
-          "failureExamples": [],
-          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+          "failedLinkCount": 1,
+          "failureExamples": [
+            {
+              "url": "https://session.ratzeburg.de/ri/info.php",
+              "failure": "access_barrier",
+              "checkedAt": "2026-10-11T04:04:01.207Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier blocked: 2 documents, 0 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
         },
         {
           "sourceId": "ratzeburg-participation",
           "kind": "participation",
           "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T21:18:23.515Z",
+          "checkedAt": "2026-10-11T04:02:55.447Z",
           "documentCount": 133,
-          "publishedRecords": 0,
-          "quarantinedRecords": 6,
+          "publishedRecords": 1,
+          "quarantinedRecords": 0,
           "coverage": {
             "state": "partial",
             "pendingCount": 4,
@@ -572,10 +580,10 @@
           "kind": "gazette",
           "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T21:38:27.954Z",
+          "checkedAt": "2026-10-11T04:03:09.903Z",
           "documentCount": 303,
-          "publishedRecords": 0,
-          "quarantinedRecords": 0,
+          "publishedRecords": 14,
+          "quarantinedRecords": 89,
           "coverage": {
             "state": "partial",
             "pendingCount": 14,
@@ -609,12 +617,12 @@
         {
           "sourceId": "ratzeburg-bob-sh",
           "kind": "participation",
-          "registryState": "not_checked",
+          "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T19:05:56.474Z",
-          "documentCount": 1,
+          "checkedAt": "2026-10-11T04:21:19.737Z",
+          "documentCount": 0,
           "publishedRecords": 0,
-          "quarantinedRecords": 1,
+          "quarantinedRecords": 0,
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -623,7 +631,7 @@
           },
           "failedLinkCount": 0,
           "failureExamples": [],
-          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Endpoint discovery only: municipal procedure binding is not established; no statewide link expansion; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+          "reason": "Private receipt-derived discovery delta, not execution of the newly edited adapter. /list/json POST exact municipalCode returned success=true, code=100, procedureCount=0, mapVars=[]. County metadata matched root inventory IDs exactly. No municipal procedure/PDF URL admitted; statewide root/scripts/list metadata excluded from documents. See discovery.json for request form, hashes, policy receipts and unresolved statewide identities."
         }
       ]
     },
@@ -633,14 +641,14 @@
       "districtId": "herzogtum-lauenburg",
       "selectedForSlice": true,
       "status": "gated_records",
-      "documents": 447,
-      "publishedRecords": 1,
-      "datedStagedRecords": 1,
-      "quarantinedRecords": 32,
+      "documents": 465,
+      "publishedRecords": 28,
+      "datedStagedRecords": 23,
+      "quarantinedRecords": 80,
       "extraction": {
-        "fetchedDocumentGroups": 255,
-        "attemptedDocumentGroups": 6,
-        "pendingDocumentGroups": 249,
+        "fetchedDocumentGroups": 254,
+        "attemptedDocumentGroups": 60,
+        "pendingDocumentGroups": 194,
         "unavailableAttemptedDocumentGroups": 0
       },
       "sources": [
@@ -649,10 +657,10 @@
           "kind": "website",
           "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T21:42:06.020Z",
+          "checkedAt": "2026-10-11T04:03:22.266Z",
           "documentCount": 234,
-          "publishedRecords": 0,
-          "quarantinedRecords": 4,
+          "publishedRecords": 27,
+          "quarantinedRecords": 0,
           "coverage": {
             "state": "partial",
             "pendingCount": 1,
@@ -665,7 +673,7 @@
             {
               "url": "https://www.moelln.de/fileadmin/Stadt_Moelln/Dateien/Amtliche_Bekanntmachungen/Gesamthaushalt_2026_Exemplar_Veroeffentlichung_neu.pdf",
               "failure": "tdm_unavailable",
-              "checkedAt": "2026-10-10T21:42:06.020Z",
+              "checkedAt": "2026-10-11T04:03:22.266Z",
               "action": "ask_municipality"
             }
           ],
@@ -706,7 +714,7 @@
           "checkedAt": "2026-10-10T20:55:50.469Z",
           "documentCount": 4,
           "publishedRecords": 1,
-          "quarantinedRecords": 27,
+          "quarantinedRecords": 17,
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -722,14 +730,14 @@
           "kind": "gazette",
           "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T21:42:07.459Z",
-          "documentCount": 208,
-          "publishedRecords": 0,
-          "quarantinedRecords": 0,
+          "checkedAt": "2026-10-11T04:03:23.405Z",
+          "documentCount": 227,
+          "publishedRecords": 27,
+          "quarantinedRecords": 63,
           "coverage": {
             "state": "partial",
-            "pendingCount": 15,
-            "runnableCount": 14,
+            "pendingCount": 1,
+            "runnableCount": 0,
             "blockedCount": 0,
             "action": "ask_municipality"
           },
@@ -738,21 +746,21 @@
             {
               "url": "https://www.moelln.de/fileadmin/Stadt_Moelln/Dateien/Amtliche_Bekanntmachungen/Gesamthaushalt_2026_Exemplar_Veroeffentlichung_neu.pdf",
               "failure": "tdm_unavailable",
-              "checkedAt": "2026-10-10T21:38:43.117Z",
+              "checkedAt": "2026-10-11T04:03:23.405Z",
               "action": "ask_municipality"
             }
           ],
-          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 208 documents, 14 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 227 documents, 0 queued links, 1 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
         },
         {
           "sourceId": "moelln-bob-sh",
           "kind": "participation",
-          "registryState": "not_checked",
+          "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T19:06:14.130Z",
-          "documentCount": 1,
+          "checkedAt": "2026-10-11T04:21:21.721Z",
+          "documentCount": 0,
           "publishedRecords": 0,
-          "quarantinedRecords": 1,
+          "quarantinedRecords": 0,
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -761,7 +769,7 @@
           },
           "failedLinkCount": 0,
           "failureExamples": [],
-          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Endpoint discovery only: municipal procedure binding is not established; no statewide link expansion; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+          "reason": "Private receipt-derived discovery delta, not execution of the newly edited adapter. /list/json POST exact municipalCode returned success=true, code=100, procedureCount=0, mapVars=[]. County metadata matched root inventory IDs exactly. No municipal procedure/PDF URL admitted; statewide root/scripts/list metadata excluded from documents. See discovery.json for request form, hashes, policy receipts and unresolved statewide identities."
         }
       ]
     },
@@ -771,14 +779,14 @@
       "districtId": "herzogtum-lauenburg",
       "selectedForSlice": true,
       "status": "gated_records",
-      "documents": 28,
-      "publishedRecords": 1,
-      "datedStagedRecords": 1,
-      "quarantinedRecords": 7,
+      "documents": 27,
+      "publishedRecords": 12,
+      "datedStagedRecords": 11,
+      "quarantinedRecords": 34,
       "extraction": {
-        "fetchedDocumentGroups": 28,
-        "attemptedDocumentGroups": 6,
-        "pendingDocumentGroups": 22,
+        "fetchedDocumentGroups": 27,
+        "attemptedDocumentGroups": 27,
+        "pendingDocumentGroups": 0,
         "unavailableAttemptedDocumentGroups": 0
       },
       "sources": [
@@ -836,7 +844,7 @@
           "checkedAt": "2026-10-10T20:59:59.171Z",
           "documentCount": 6,
           "publishedRecords": 0,
-          "quarantinedRecords": 5,
+          "quarantinedRecords": 16,
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -874,8 +882,8 @@
           "crawlState": "checked",
           "checkedAt": "2026-10-10T21:01:44.532Z",
           "documentCount": 20,
-          "publishedRecords": 1,
-          "quarantinedRecords": 1,
+          "publishedRecords": 12,
+          "quarantinedRecords": 17,
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -909,10 +917,10 @@
         {
           "sourceId": "schwarzenbek-bob-sh",
           "kind": "participation",
-          "registryState": "not_checked",
+          "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T19:06:28.693Z",
-          "documentCount": 1,
+          "checkedAt": "2026-10-11T04:21:23.661Z",
+          "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
           "coverage": {
@@ -923,7 +931,7 @@
           },
           "failedLinkCount": 0,
           "failureExamples": [],
-          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Endpoint discovery only: municipal procedure binding is not established; no statewide link expansion; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+          "reason": "Private receipt-derived discovery delta, not execution of the newly edited adapter. /list/json POST exact municipalCode returned success=true, code=100, procedureCount=0, mapVars=[]. County metadata matched root inventory IDs exactly. No municipal procedure/PDF URL admitted; statewide root/scripts/list metadata excluded from documents. See discovery.json for request form, hashes, policy receipts and unresolved statewide identities."
         }
       ]
     },
@@ -934,13 +942,13 @@
       "selectedForSlice": true,
       "status": "gated_records",
       "documents": 594,
-      "publishedRecords": 1,
-      "datedStagedRecords": 1,
-      "quarantinedRecords": 59,
+      "publishedRecords": 35,
+      "datedStagedRecords": 35,
+      "quarantinedRecords": 111,
       "extraction": {
         "fetchedDocumentGroups": 304,
-        "attemptedDocumentGroups": 6,
-        "pendingDocumentGroups": 298,
+        "attemptedDocumentGroups": 60,
+        "pendingDocumentGroups": 244,
         "unavailableAttemptedDocumentGroups": 0
       },
       "sources": [
@@ -951,7 +959,7 @@
           "crawlState": "checked",
           "checkedAt": "2026-10-10T21:42:09.851Z",
           "documentCount": 299,
-          "publishedRecords": 1,
+          "publishedRecords": 34,
           "quarantinedRecords": 0,
           "coverage": {
             "state": "partial",
@@ -991,7 +999,7 @@
           "checkedAt": "2026-10-10T19:06:39.192Z",
           "documentCount": 1,
           "publishedRecords": 0,
-          "quarantinedRecords": 1,
+          "quarantinedRecords": 0,
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -1009,8 +1017,8 @@
           "crawlState": "checked",
           "checkedAt": "2026-10-10T20:56:26.308Z",
           "documentCount": 1,
-          "publishedRecords": 0,
-          "quarantinedRecords": 2,
+          "publishedRecords": 1,
+          "quarantinedRecords": 1,
           "coverage": {
             "state": "partial",
             "pendingCount": 1,
@@ -1042,8 +1050,8 @@
           "crawlState": "checked",
           "checkedAt": "2026-10-10T21:41:55.255Z",
           "documentCount": 293,
-          "publishedRecords": 1,
-          "quarantinedRecords": 56,
+          "publishedRecords": 34,
+          "quarantinedRecords": 110,
           "coverage": {
             "state": "partial",
             "pendingCount": 93,
@@ -1081,15 +1089,15 @@
       "ags": "13076108",
       "districtId": "ludwigslust-parchim",
       "selectedForSlice": true,
-      "status": "checked_no_gated_records",
-      "documents": 277,
-      "publishedRecords": 0,
-      "datedStagedRecords": 0,
-      "quarantinedRecords": 8,
+      "status": "gated_records",
+      "documents": 2600,
+      "publishedRecords": 18,
+      "datedStagedRecords": 17,
+      "quarantinedRecords": 87,
       "extraction": {
-        "fetchedDocumentGroups": 277,
-        "attemptedDocumentGroups": 6,
-        "pendingDocumentGroups": 271,
+        "fetchedDocumentGroups": 2565,
+        "attemptedDocumentGroups": 60,
+        "pendingDocumentGroups": 2505,
         "unavailableAttemptedDocumentGroups": 0
       },
       "sources": [
@@ -1098,45 +1106,85 @@
           "kind": "website",
           "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T21:42:03.212Z",
-          "documentCount": 274,
-          "publishedRecords": 0,
-          "quarantinedRecords": 4,
+          "checkedAt": "2026-10-11T04:24:54.681Z",
+          "documentCount": 1263,
+          "publishedRecords": 1,
+          "quarantinedRecords": 1,
           "coverage": {
             "state": "partial",
-            "pendingCount": 186,
-            "runnableCount": 186,
-            "blockedCount": 0
+            "pendingCount": 4,
+            "runnableCount": 0,
+            "blockedCount": 9,
+            "action": "ask_municipality"
           },
-          "failedLinkCount": 0,
-          "failureExamples": [],
-          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 274 documents, 186 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+          "failedLinkCount": 13,
+          "failureExamples": [
+            {
+              "url": "https://www.parchim.de/de/ortsrecht/bau-und-stadtentwicklung/flaechennutzungsplaene/stadt-parchim/15-aenderung-flaechennutzungsplan/2026-06-02-begruendung-mit-umweltbericht-zur-15.-aenderung-des-flaechennutzungsplans-ausgefertigt.pdf?cid=13yy",
+              "failure": "too_large",
+              "checkedAt": "2026-10-10T22:01:30.757Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.parchim.de/de/bekanntmachungen/2022/20221214-vermessungsbuero.jpg?cid=ny4.448p",
+              "failure": "representation_error",
+              "checkedAt": "2026-10-10T22:14:58.662Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://www.parchim.de/de/ortsrecht/bau-und-stadtentwicklung/bebauungsplaene/b-plan-nr-21-dammer-weg-i/b-plan-nr.-21-dammer-weg-l-planzeichnung.pdf?cid=hd",
+              "failure": "too_large",
+              "checkedAt": "2026-10-10T22:23:55.850Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier partial: 1263 documents, 0 queued links, 13 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed."
         },
         {
           "sourceId": "parchim-council",
           "kind": "council",
           "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T19:06:51.388Z",
-          "documentCount": 1,
-          "publishedRecords": 0,
-          "quarantinedRecords": 1,
+          "checkedAt": "2026-10-11T04:38:11.948Z",
+          "documentCount": 1335,
+          "publishedRecords": 17,
+          "quarantinedRecords": 85,
           "coverage": {
-            "state": "complete",
+            "state": "blocked",
             "pendingCount": 0,
             "runnableCount": 0,
-            "blockedCount": 0
+            "blockedCount": 4,
+            "action": "ask_municipality"
           },
-          "failedLinkCount": 0,
-          "failureExamples": [],
-          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+          "failedLinkCount": 4,
+          "failureExamples": [
+            {
+              "url": "https://parchim.sitzung-mv.de/public/wicket/resource/org.apache.wicket.Application/doc96260.pdf",
+              "failure": "too_large",
+              "checkedAt": "2026-10-11T04:17:59.494Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://parchim.sitzung-mv.de/public/wicket/resource/org.apache.wicket.Application/doc86312.pdf",
+              "failure": "too_large",
+              "checkedAt": "2026-10-11T04:19:59.721Z",
+              "action": "ask_municipality"
+            },
+            {
+              "url": "https://parchim.sitzung-mv.de/public/wicket/resource/org.apache.wicket.Application/doc86170.pdf",
+              "failure": "too_large",
+              "checkedAt": "2026-10-11T04:20:25.910Z",
+              "action": "ask_municipality"
+            }
+          ],
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier blocked: 1344 documents, 0 queued links, 4 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.; Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed.; Publicness review withheld 9 PDF representations containing unresolved nonpublic section headings; detailed evidence retained privately. Counts refer to reviewed completed v3 snapshot, not interrupted subsequent crawl."
         },
         {
           "sourceId": "parchim-participation",
           "kind": "participation",
           "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T21:00:56.570Z",
+          "checkedAt": "2026-10-11T04:28:36.657Z",
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
@@ -1159,7 +1207,7 @@
           "checkedAt": "2026-10-10T20:56:50.132Z",
           "documentCount": 2,
           "publishedRecords": 0,
-          "quarantinedRecords": 3,
+          "quarantinedRecords": 1,
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -1178,13 +1226,13 @@
       "districtId": "ludwigslust-parchim",
       "selectedForSlice": true,
       "status": "gated_records",
-      "documents": 1,
-      "publishedRecords": 2,
-      "datedStagedRecords": 1,
-      "quarantinedRecords": 16,
+      "documents": 12,
+      "publishedRecords": 8,
+      "datedStagedRecords": 7,
+      "quarantinedRecords": 233,
       "extraction": {
-        "fetchedDocumentGroups": 1,
-        "attemptedDocumentGroups": 1,
+        "fetchedDocumentGroups": 12,
+        "attemptedDocumentGroups": 12,
         "pendingDocumentGroups": 0,
         "unavailableAttemptedDocumentGroups": 0
       },
@@ -1194,10 +1242,10 @@
           "kind": "gazette",
           "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T21:50:09.207Z",
-          "documentCount": 1,
-          "publishedRecords": 2,
-          "quarantinedRecords": 16,
+          "checkedAt": "2026-10-11T04:01:07.374Z",
+          "documentCount": 12,
+          "publishedRecords": 8,
+          "quarantinedRecords": 233,
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -1206,14 +1254,14 @@
           },
           "failedLinkCount": 0,
           "failureExamples": [],
-          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 1 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 1ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
+          "reason": "Official HTML/document fallback: no observed public API configured; API availability is not inferred; Scoped frontier complete: 12 documents, 0 queued links, 0 inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.; Conditional rediscovery and policy revalidation TTL 86400000ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request."
         },
         {
           "sourceId": "hagenow-website",
           "kind": "website",
           "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T20:56:55.866Z",
+          "checkedAt": "2026-10-11T04:01:10.057Z",
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
@@ -1229,7 +1277,7 @@
             {
               "url": "https://www.hagenow.de/",
               "failure": "tdm_unavailable",
-              "checkedAt": "2026-10-10T20:56:55.866Z",
+              "checkedAt": "2026-10-11T04:01:10.057Z",
               "action": "ask_municipality"
             }
           ],
@@ -1267,7 +1315,7 @@
           "kind": "participation",
           "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T20:56:55.963Z",
+          "checkedAt": "2026-10-11T04:01:10.178Z",
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
@@ -1283,19 +1331,19 @@
             {
               "url": "https://www.hagenow.de/fileadmin/Stadtverwaltung/PDFs/2025/Bebauungspl%C3%A4ne/Bebauungsplan_Nr._39_Begr%C3%BCndung.pdf",
               "failure": "tdm_unavailable",
-              "checkedAt": "2026-10-10T20:56:55.962Z",
+              "checkedAt": "2026-10-11T04:01:10.175Z",
               "action": "ask_municipality"
             },
             {
               "url": "https://www.gaia-mv.de/geoportalsearch/_ajax/search/?type=Bauleitplan&offset=0&n=100&crs=EPSG%3A25832&x_filter%5Bregionalschluessel%5D=130760060060",
               "failure": "robots_unavailable",
-              "checkedAt": "2026-10-10T20:56:55.963Z",
+              "checkedAt": "2026-10-11T04:01:10.178Z",
               "action": "ask_municipality"
             },
             {
               "url": "https://www.gaia-mv.de/geoportalsearch/_ajax/search/?type=Bauleitplan&offset=0&n=100&crs=EPSG%3A25832&x_filter%5Bregionalschluessel%5D=130760060060",
               "failure": "robots_unavailable",
-              "checkedAt": "2026-10-10T21:00:56.839Z",
+              "checkedAt": "2026-10-11T04:01:10.069Z",
               "action": "ask_municipality"
             }
           ],
@@ -1306,7 +1354,7 @@
           "kind": "gazette",
           "registryState": "checked",
           "crawlState": "checked",
-          "checkedAt": "2026-10-10T20:56:56.007Z",
+          "checkedAt": "2026-10-11T04:01:10.183Z",
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
@@ -1322,7 +1370,7 @@
             {
               "url": "https://www.hagenow.de/service-fuer-buerger/downloadcenter/bekanntmachungen-und-sonstiges.html",
               "failure": "tdm_unavailable",
-              "checkedAt": "2026-10-10T20:56:56.007Z",
+              "checkedAt": "2026-10-11T04:01:10.183Z",
               "action": "ask_municipality"
             }
           ],
@@ -1331,17 +1379,39 @@
       ]
     }
   ],
-  "model": {
-    "provider": "openai-subscription",
-    "model": "gpt-6-luna",
-    "faithfulnessThreshold": 0.8
-  },
+  "models": [
+    {
+      "provider": "anthropic-subscription",
+      "model": "claude-haiku-5-5",
+      "tool": "claude-cli",
+      "toolVersion": "2.1.284",
+      "modelIdentitySha256": "6ae3029f7453e9d43b6063b78a71b0da9d005f0d153bf0bc37537fddf76f287d",
+      "modelIdentityBasis": "reported-cli-model-and-tool-version",
+      "faithfulnessThreshold": 0.8,
+      "publishedRecords": 160
+    },
+    {
+      "provider": "openai-subscription",
+      "model": "gpt-6-luna",
+      "tool": "codex-cli",
+      "toolVersion": "0.160.0",
+      "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+      "modelIdentityBasis": "configured-cli-model-and-tool-version",
+      "faithfulnessThreshold": 0.8,
+      "publishedRecords": 68
+    }
+  ],
   "extractionRun": {
-    "generatedAt": "2026-10-10T22:29:36.531Z",
+    "generatedAt": "2026-10-11T08:44:22.416Z",
+    "assignmentMode": "balanced",
+    "corpusSha256": "fb4e08eee8bf1a3bf036433893553b5ebb0e7ae4dec1fea6ce702a8f66642992",
+    "registrySha256": "9095c7a241fa5cc1a2d75030286d8690cc5bf6d3e05990c56f7a5199c304b554",
+    "promptContractSha256": "174d4f5bed4f51d77850a37736fd94ddfc47f3bb5aa2422540cdec66f4de250f",
+    "schemaSha256": "3934ef6806b70a6fccc1ba47e1dc462b3486831e3b9a19911721ea73958dbca9",
     "selection": "bounded_per_municipality",
-    "maxDocumentsPerMunicipality": 6,
-    "availableDocumentGroupsAtRunStart": 1822,
-    "attemptedDocumentGroups": 49,
-    "pendingDocumentGroupsAtRunStart": 1773
+    "maxDocumentsPerMunicipality": 60,
+    "availableDocumentGroupsAtRunStart": 4119,
+    "attemptedDocumentGroups": 417,
+    "pendingDocumentGroupsAtRunStart": 3702
   }
 }

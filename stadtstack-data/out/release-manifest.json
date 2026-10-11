@@ -1,12 +1,12 @@
 {
   "schemaVersion": "stadtstack-data-release-v1",
-  "id": "cdd0e350be842c040dc77d13cc73bf2267cd0b9ae9bbf0a471a267b47938b6f4",
-  "generatedAt": "2026-10-10T22:51:55.864Z",
+  "id": "f434203c14c82ea6b6814662e9b1e209d81d7921bee97aeefcd2269d83330415",
+  "generatedAt": "2026-10-11T09:25:14.460Z",
   "files": [
     {
       "path": "catalogue.json",
-      "sha256": "6aa5bfc3f01670454847e951d8645a411b33fb9a815facc97fa79838149cc668",
-      "bytes": 187013
+      "sha256": "67c591e235c45689fceba5322af47ce772344dc9631b2ec5963628c40eca7921",
+      "bytes": 183922
     },
     {
       "path": "cities/castrop-rauxel/changes.json",
@@ -185,35 +185,40 @@
     },
     {
       "path": "knowledge/coverage.json",
-      "sha256": "aa94e68e93840e58640fdfe35e82cda9abe6006f601b3dc9dc9a395c0a209ec1",
-      "bytes": 65790
+      "sha256": "8e1a513da7748e6b74b3931f645b8aee7d500dc691f44bdb1d738930a053ad8d",
+      "bytes": 69440
+    },
+    {
+      "path": "knowledge/graph.json",
+      "sha256": "9be6460ff6ea3a894d743783474c4b1f19403614a7013f7cb08a87c36bdb2b6f",
+      "bytes": 1364552
     },
     {
       "path": "knowledge/records.json",
-      "sha256": "d93d20bb9694e65688297483c1ec872e4640971c5e471d491fd98d279e4ab856",
-      "bytes": 112194
+      "sha256": "d93ebb1479ff7e6b7fd0eab5de2e53848f0345487c3ff6a51717af5f35c979db",
+      "bytes": 3372680
     },
     {
       "path": "knowledge/registry.json",
-      "sha256": "750bd5d58621661dd78934da541d559935cd5583b27f8fa54e5361683945840b",
-      "bytes": 292397
+      "sha256": "105e6a8e9d575523e02c51fad5d0940ba8fc824adf897736a41db1babee32ec1",
+      "bytes": 467952
     },
     {
       "path": "quality-report.json",
-      "sha256": "bfca149998871a724173594e71d8c2fac987221e14b57b350c81c548307246c1",
-      "bytes": 246747
+      "sha256": "36f956acc94f92685f0d25271892b74866e11b4a28112e894b6365cd89bd94c8",
+      "bytes": 140327
     },
     {
       "path": "regions/brandenburg-mol/topics.json",
-      "sha256": "92754508a6d887ebd89b78be50ade7813a031cc1e5a7e33cd61f8993944d1185",
+      "sha256": "a22c59c12c2a7a2a41d2b9644536cab84fe9e21797db1bea7c8c017bfce7c3be",
       "bytes": 54798
     }
   ],
   "quality": {
-    "publishedRecords": 14402,
-    "quarantinedRecords": 795,
+    "publishedRecords": 14621,
+    "quarantinedRecords": 1443,
     "cities": 8,
-    "knowledgeMunicipalities": 6,
+    "knowledgeMunicipalities": 9,
     "districts": 3
   }
 }

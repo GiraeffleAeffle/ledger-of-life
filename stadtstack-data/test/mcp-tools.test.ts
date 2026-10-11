@@ -6,6 +6,7 @@ import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {loadRelease,hostedServer} from '../src/mcp-tools.ts';
 import {server} from '../src/mcp.ts';
 import {changesSchema} from '../src/changes.ts';
+import {MCP_RELEASE_VERSION} from '../src/mcp-version.ts';
 
 const envelopeSchema=z.object({source:z.object({release:z.string()}),releasedAt:z.iso.datetime(),respondedAt:z.iso.datetime(),status:z.literal('candidate'),data:z.unknown()}).passthrough();
 const recordSchema=z.object({id:z.string(),cityId:z.string(),sourceIds:z.array(z.string())}).passthrough();
@@ -15,9 +16,10 @@ test('released MCP contract retains core evidence, separates times and fact/sour
   const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();
   await mcp.connect(serverTransport);await client.connect(clientTransport);
   try {
+    assert.equal(client.getServerVersion()?.version,MCP_RELEASE_VERSION);
     const tools=await client.listTools();
-    assert.equal(tools.tools.length,16);
-    for(const name of ['list_topics','get_source','compare_topic','similar'])assert.ok(tools.tools.some(tool=>tool.name===name));
+    assert.equal(tools.tools.length,19);
+    for(const name of ['list_topics','get_source','compare_topic','similar','entity_search','graph_neighbors','graph_path'])assert.ok(tools.tools.some(tool=>tool.name===name));
     const before=Date.now();
     const result=await client.callTool({name:'get_core_bundle',arguments:{}});
     const envelope=envelopeSchema.parse(result.structuredContent);
@@ -41,6 +43,7 @@ test('released MCP contract retains core evidence, separates times and fact/sour
     assert.equal((await client.callTool({name:'get_source',arguments:{sourceId:fact.id}})).isError,true);
     const status=envelopeSchema.parse((await client.callTool({name:'get_release_status',arguments:{}})).structuredContent);
     assert.deepEqual(z.object({dataManifest:z.unknown(),manifest:z.unknown()}).parse(status.data),{dataManifest:release.dataManifest,manifest:release.manifest});
+    assert.deepEqual(z.object({release:z.object({version:z.string(),dataManifestId:z.string()})}).parse(status.data).release,{version:MCP_RELEASE_VERSION,dataManifestId:release.dataManifest.id});
   } finally {await client.close();await mcp.close();}
 });
 
@@ -96,4 +99,36 @@ test('normalized three-district release exposes qualifying and zero-gated towns 
     const source=envelopeSchema.parse((await client.callTool({name:'get_source',arguments:{sourceId:target.sourceIds[0]}})).structuredContent);
     assert.equal(z.object({registrySourceId:z.string()}).parse(source.data).registrySourceId.length>0,true);
   } finally {await client.close();await mcp.close();}
+});
+
+test('graph MCP tools are read-only, source-bound and reject unbounded or ambiguous query input',async()=>{
+  const release=await loadRelease(),mcp=server({release}),client=new Client({name:'graph-contract-test',version:'1'});
+  const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();
+  await mcp.connect(serverTransport);await client.connect(clientTransport);
+  try{
+    const tools=await client.listTools();
+    for(const name of ['entity_search','graph_neighbors','graph_path']){
+      const definition=tools.tools.find(tool=>tool.name===name);assert.ok(definition);
+      assert.equal(definition.annotations?.readOnlyHint,true);assert.equal(definition.annotations?.destructiveHint,false);
+    }
+    const result=await client.callTool({name:'entity_search',arguments:{query:'a',limit:1}});
+    assert.equal(result.isError,undefined);
+    const page=z.object({releaseId:z.string(),recordsSha256:z.string(),items:z.array(z.object({id:z.string(),identityBasis:z.object({ambiguity:z.string()}).passthrough(),mentions:z.array(z.object({quote:z.string(),evidence:z.object({recordId:z.string(),source:z.object({url:z.string(),sha256:z.string()}).passthrough()}).passthrough()}).passthrough())}).passthrough()),truncated:z.boolean(),complete:z.boolean(),nextCursor:z.string().nullable()}).passthrough().parse(result.structuredContent);
+    assert.equal(page.releaseId,release.dataManifest.id);
+    assert.equal(page.recordsSha256,release.graph.recordsSha256);
+    assert.equal(page.complete,!page.truncated);
+    for(const [name,args] of [['entity_search',{query:'a',limit:51}],['entity_search',{query:'a',offset:1}],['entity_search',{query:'a',type:'person'}],['graph_neighbors',{id:'entity:'+ '0'.repeat(64),direction:'sideways'}],['graph_path',{fromId:'entity:'+ '0'.repeat(64),toId:'entity:'+ '1'.repeat(64),maxHops:6}]] as const)assert.equal((await client.callTool({name,arguments:args})).isError,true);
+    if(page.items[0]){
+      const item=page.items[0];
+      const neighbors=await client.callTool({name:'graph_neighbors',arguments:{id:item.id,limit:1}});
+      assert.equal(neighbors.isError,undefined);
+      const path=await client.callTool({name:'graph_path',arguments:{fromId:item.id,toId:item.id,maxHops:1,limit:1}});
+      assert.equal(path.isError,undefined);
+      const pathData=z.object({shortestHops:z.number(),modalities:z.array(z.string()),pathEligibility:z.object({eligibleModalities:z.array(z.string())})}).passthrough().parse(path.structuredContent);
+      assert.equal(pathData.shortestHops,0);
+      assert.deepEqual(pathData.modalities,[]);
+      assert.deepEqual(pathData.pathEligibility.eligibleModalities,['asserted','decided','implemented']);
+      assert.equal('modality' in pathData,false);
+    }
+  }finally{await client.close();await mcp.close();}
 });

@@ -1,0 +1,1134 @@
+{
+  "schemaVersion": "hoppegarten-count-trace-v1",
+  "snapshotAt": "2026-10-11T08:07:47.797799+00:00",
+  "scope": "Read-only local metadata/result/code analysis; no fetching, model calls, tests, builds, formatters, repo edits, raw-source dumps or private-person/contact examples. Live task status is not final publication.",
+  "pathsRelativeTo": "stadtstack-data",
+  "bindings": {
+    "oldLocalRecords": "out/knowledge/records.json",
+    "oldLocalRecordsGeneratedAt": "2026-10-11T03:44:07.145Z",
+    "oldLocalRecordsSha256": "a5608948bf85eda2e2a83d4f5e3ed21127cfa7ef91b2db362df93f842e523e18",
+    "oldPlanId": "c4090a67e5191fd7b6856e73c684668b3cc304b4fa59f10a886d05fd1e48c73a",
+    "currentPlanId": "76292636ed3afd28aa00f31364562944b04016bc421331ef948bbd94d8ce3099",
+    "currentPlanSnapshotSha256": "c7b6797bc61c928b7064a6898d63e96b439560ef287cd29e54d6b25cf690db8a",
+    "baseCorpusPath": "cache/districts/index.json",
+    "baseCorpusSha256": "fbcd03c8474e3fa3cb2a3db0b9a976e3793863a3a6e268b0ead21868516ec2c0",
+    "currentCorpusPath": "cache/pilot-coverage-completion/index-authorized.json",
+    "currentCorpusSha256": "fb4e08eee8bf1a3bf036433893553b5ebb0e7ae4dec1fea6ce702a8f66642992",
+    "currentPreparation": "cache/district-joint/preparation-4f98089a55ce3fcdd34b263bbb904935cd9f8006518a754215189854e2d49810.json"
+  },
+  "summary": {
+    "oldPublishedTotal": 86,
+    "oldHoppegartenDateEligible": 26,
+    "oldHoppegartenGatedBeforeDateFilter": 30,
+    "currentPrimaryTasks": 16,
+    "currentPrimaryCompleted": 14,
+    "currentPrimaryPending": 2,
+    "currentPrimaryRunning": 0,
+    "currentPrimaryGatedRecords": 37,
+    "currentPrimaryDateEligible": 36,
+    "currentPrimaryUndated": 1,
+    "oldEligibleRecordsInCurrentlyPendingDocs": 0,
+    "oldEligibleRecordsInCurrentlyRunningDocs": 0,
+    "oldEligibleRecordsInCurrentlyCompletedDocs": 26,
+    "completedDocNetDateEligibleChange": 10,
+    "oldEligibleSectionsStillDateEligible": 24,
+    "oldEligibleSectionsNowRejected": 2,
+    "newlyDateEligibleSections": 12,
+    "lostPreviouslyRepresentedSourceCaseKeys": 0,
+    "localoutReplaced": false
+  },
+  "earlier0752Status": {
+    "reportedDateEligible": 3,
+    "dateEligibleFromResultsCompletedBefore0752": 3,
+    "oldRecordsFromDocsNotCompletedBy0752": 25,
+    "oldRecordsFromDocsCompletedBy0752": 1,
+    "explanation": "Old24 Schulcampus PDF records were in a not-yet-completed document, and old1 participation notice record was in another not-yet-completed document. The three then available records were Reitschule PDF1 plus two newly admitted records from source beebf4c76bc3…. Exact pending-versus-running states at 07:52 cannot be recovered from the present mutable plan; incomplete attribution uses pinned result completion timestamps, not guessed historical task states.",
+    "laterCompletions": [
+      {
+        "taskId": "7adde803b0c624ac268c0bacce6ff2c09a38630913730de0793860d46ba0059b",
+        "sourceSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+        "oldDateEligible": 24,
+        "newDateEligible": 32,
+        "completedAt": "2026-10-11T08:03:06.184Z"
+      },
+      {
+        "taskId": "dd5874933f10423c701c86ffa68318108cb127c2503c3b62a4fa6f1345a2bb43",
+        "sourceSha256": "c52427012aa3a57dd6a3a45518e6b8f962e6cab9952525d44cd326590b8817f4",
+        "oldDateEligible": 1,
+        "newDateEligible": 1,
+        "completedAt": "2026-10-11T07:54:35.696Z"
+      }
+    ]
+  },
+  "corpusPreservation": {
+    "hoppegartenDocumentRowsBefore": 19,
+    "hoppegartenDocumentRowsAfter": 19,
+    "exactDocumentRowsEqual": true,
+    "uniqueSourceByteGroupsBefore": 18,
+    "uniqueSourceByteGroupsAfter": 18,
+    "hoppegartenChecksBefore": 4,
+    "hoppegartenChecksAfter": 4,
+    "exactCheckRowsEqual": true,
+    "preparedGroupsBefore": 16,
+    "preparedGroupsAfter": 16,
+    "exactPreparedGroupsEqual": true,
+    "preparedPlanGroupsAndHashesEqual": true,
+    "unchangedPreparationQuarantine": [
+      {
+        "documentId": "document-c5be865376cf39875e1a915b",
+        "municipalityId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "sourceSha256": "b1fca06604e1fae489392982526c746e8b0b89833891beec4fa0e742bc794bd3",
+        "chunk": null,
+        "reason": "PDF page count missing or exceeds 80-page limit"
+      },
+      {
+        "documentId": "document-dc42be0e2283747cafb347c6",
+        "municipalityId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "sourceSha256": "38ae5f64519204a355f87ab4f670c388206bf61c4d18a336e8410b7e63b05f5e",
+        "chunk": null,
+        "reason": "PDF page count missing or exceeds 80-page limit"
+      }
+    ],
+    "note": "18 corpus byte groups versus16 prepared tasks is the same pre-existing two PDF page-count exclusions in v7 and v8, not a new publicness or completion loss. The authoritative baseline is cache/districts/index.json (hash fbcd…); pilot-completion-existing-index.json has a different participation checkedAt and is not this pinned baseline."
+  },
+  "publicness": {
+    "withheldPDFRepresentations": 9,
+    "allNineSourceHashesBelongTo": "parchim",
+    "hoppegartenSourceHashesRemoved": 0,
+    "evidence": "cache/pilot-coverage-completion/publicness-quarantine-v3.json matched by sha256 against parchim-completed-v3.json documents; exact Hoppegarten corpus equality above."
+  },
+  "dateFilter": {
+    "rule": "documentDate != null OR stageDate != null OR any stages[].date != null",
+    "code": "src/prepare-knowledge.ts:26-30",
+    "oldUndatedHoppegartenExcluded": 4,
+    "currentCompletedUndatedHoppegartenExcluded": 1,
+    "currentUndatedSourceSha256": "c85920d0e96032241846bc8bfe283108d5f3027632b8d59060d98244d897b8dd",
+    "oldEligibleLostSolelyToCurrentDateFilter": 0
+  },
+  "duplicates": {
+    "unit": "Admitted chunk-derived source evidence records, not distinct projects or document count.",
+    "oldCountsBySource": [
+      {
+        "sourceSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+        "count": 24,
+        "cases": [
+          {
+            "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+            "caseKeyType": "source_document",
+            "count": 23
+          },
+          {
+            "caseKey": "DS 455/2023/19-24",
+            "caseKeyType": "paper_reference",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "sourceSha256": "c52427012aa3a57dd6a3a45518e6b8f962e6cab9952525d44cd326590b8817f4",
+        "count": 1,
+        "cases": [
+          {
+            "caseKey": "source_document:c52427012aa3a57dd6a3a45518e6b8f962e6cab9952525d44cd326590b8817f4",
+            "caseKeyType": "source_document",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "sourceSha256": "379789ae83bfdf1e8367caf4de4ac835af53839538a3eb81714d479693f9dfd2",
+        "count": 1,
+        "cases": [
+          {
+            "caseKey": "source_document:379789ae83bfdf1e8367caf4de4ac835af53839538a3eb81714d479693f9dfd2",
+            "caseKeyType": "source_document",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "oldDistinctSourceCaseKeys": 4,
+    "currentDateEligibleDistinctSourceCaseKeys": 5,
+    "code": [
+      "src/district-inference.ts:58,88-95",
+      "src/district-extract.ts:125-135",
+      "src/district-work-plan.ts:43-46,83"
+    ],
+    "interpretation": "Old24 Schulcampus PDF records contain23 identical source_document case keys and1 DS455/2023/19-24 key; they are not24 distinct municipal projects. New32 from that PDF contain30 source_document and2 DS455/2023/19-24 records. No concept-level dedup step explains26→3: aggregation appends primary records, with chunk-index identity. Agreement tasks are excluded from primary counts. Corpus representation grouping remains unchanged."
+  },
+  "modelPromptChange": {
+    "oldProvider": "openai-subscription",
+    "oldModel": "gpt-6-luna",
+    "currentProviders": [
+      "openai-subscription",
+      "anthropic-subscription"
+    ],
+    "currentModels": [
+      "gpt-6-luna",
+      "claude-haiku-5-5"
+    ],
+    "oldPlanPromptSha256": "f67852030756e631156aeb0af120b1858ecde71839229e30f5b2fd5939abecd7",
+    "newPlanPromptSha256": "174d4f5bed4f51d77850a37736fd94ddfc47f3bb5aa2422540cdec66f4de250f",
+    "oldExtractorSha256": "ec66d39261abc3dbe1c8e2aa43175acf0068fa2e527a99003139723f1f5a7203",
+    "newExtractorSha256": "c2eee8ff10c393914d6328fac93560527d615276824dfcb9b4a9057a24050c39",
+    "schemaSha256Unchanged": true,
+    "oldPromptVersion": "district-claims-v6-joint-graph",
+    "currentPromptVersion": "district-claims-v7-joint-graph",
+    "oldJudgeVersion": "district-faithfulness-v5-joint-graph",
+    "currentJudgeVersion": "district-faithfulness-v6-joint-graph",
+    "interpretation": "Same prepared documents and schema; changed extraction/judge prompts and extraction implementation identity, plus balanced provider assignment. Genuine section admission differences cannot be uniquely attributed to model versus prompt from these confounded observations."
+  },
+  "genuineCompletedSectionChanges": {
+    "lost": [
+      {
+        "sourceSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+        "chunk": 6,
+        "reason": "Faithfulness gate not passed",
+        "faithfulness": {
+          "score": 0.72,
+          "threshold": 0.8,
+          "reason": "Title, municipality, draft status and 2025-05-27 Stand date match the excerpt's printed \"Stand: Entwurf, 27. Mai 2025\". Location quotes (Lindenallee, Virchowstraße, Am Kleinbahnhof) are verbatim. No relations or identifiers are asserted. Weakness: both \"schule\" and \"sport\" topics cite \"Bildungs- und Sportstandort am S-Bahnhof Hoppegarten\", which the excerpt names as a separate Bebauungsplan, so that evidence comes from another case. Topics are not a critical field here, so no critical flag."
+        }
+      },
+      {
+        "sourceSha256": "379789ae83bfdf1e8367caf4de4ac835af53839538a3eb81714d479693f9dfd2",
+        "chunk": 2,
+        "reason": "Structured output/schema validation failed",
+        "faithfulness": null
+      }
+    ],
+    "gained": [
+      {
+        "sourceSha256": "beebf4c76bc3ac837a70818749e979a4049fcd11f00a5b1e3e92e6cab5937d2f",
+        "chunk": 0
+      },
+      {
+        "sourceSha256": "beebf4c76bc3ac837a70818749e979a4049fcd11f00a5b1e3e92e6cab5937d2f",
+        "chunk": 1
+      },
+      {
+        "sourceSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+        "chunk": 1
+      },
+      {
+        "sourceSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+        "chunk": 33
+      },
+      {
+        "sourceSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+        "chunk": 10
+      },
+      {
+        "sourceSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+        "chunk": 19
+      },
+      {
+        "sourceSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+        "chunk": 22
+      },
+      {
+        "sourceSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+        "chunk": 23
+      },
+      {
+        "sourceSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+        "chunk": 27
+      },
+      {
+        "sourceSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+        "chunk": 28
+      },
+      {
+        "sourceSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+        "chunk": 30
+      },
+      {
+        "sourceSha256": "379789ae83bfdf1e8367caf4de4ac835af53839538a3eb81714d479693f9dfd2",
+        "chunk": 5
+      }
+    ],
+    "note": "Comparison uses identical sourceSHA/preparedSHA and chunk index. Two previously eligible chunks now fail real gates, while12 previously ineligible chunks are now eligible. Reitschule source remains1 record but accepted chunk changes2→5. All four previously represented source/case keys remain. This is not proof each old individual assertion survived."
+  },
+  "primaryTasks": [
+    {
+      "sourceSha256": "9f989bf18a8aea35af68293514c98a7f6d4b4d5991fb4c6921db921cb2d6c622",
+      "preparedSha256": "f9f3827c433b12bfeebad0923173b216cf126ef35232fbbd517f0c4f4bbfc59d",
+      "oldTaskId": "2d0a75670aa7df86688a33091360aecb5f30fd9618bfafd77557337ed8ece61e",
+      "oldResultSha256": "ed3a49db82000ddff12674faf917d1e2d270d8718cd21a902585f56ff62c1963",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 0,
+      "oldEligibleCount": 0,
+      "oldEligiblePerCase": [],
+      "oldEligibleRecords": [],
+      "currentTaskId": "4af1f5a495b668d28958f084bbe03a299bcefdef3ab53ba4ad361ac4ec2ca3d2",
+      "provider": "openai-subscription",
+      "state": "completed",
+      "resultSha256": "6a9bc2f32c092c7170277561bb3e8990dc2deb04b40fc51ab33561fbf2829732",
+      "records": 0,
+      "dateEligible": 0,
+      "undated": 0,
+      "quarantineCauses": {
+        "No supported case in source excerpt": 3
+      },
+      "currentEligiblePerCase": [],
+      "resultGeneratedAt": "2026-10-11T05:04:47.394Z",
+      "resultPath": "cache/district-joint/results/4af1f5a495b668d28958f084bbe03a299bcefdef3ab53ba4ad361ac4ec2ca3d2.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [],
+      "dateEligibleChunkLost": [],
+      "dateEligibleChunkGained": []
+    },
+    {
+      "sourceSha256": "beebf4c76bc3ac837a70818749e979a4049fcd11f00a5b1e3e92e6cab5937d2f",
+      "preparedSha256": "b92e916c48e627550ea5ddc10df6dca0443f3c1de7b4b5c05fbd2ba07abb2875",
+      "oldTaskId": "ff1dad695148f805bbf84e4abf6b9c24ccd8ac8cd7bfd851bb5d0a880c2b7918",
+      "oldResultSha256": "0482842cdd3b4f0cdcddf604c79147ebee85d0b14c6c791723ffef9f81a3bea4",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 0,
+      "oldEligibleCount": 0,
+      "oldEligiblePerCase": [],
+      "oldEligibleRecords": [],
+      "currentTaskId": "c7832c8ed16d330a84d230ac6e7d17e3bb9af82a0f9b2692b208501dcb2bc510",
+      "provider": "anthropic-subscription",
+      "state": "completed",
+      "resultSha256": "f1bb37f37c8f859d982898f3febde367e0ab1bda61f4db85e50cc035d0a05992",
+      "records": 2,
+      "dateEligible": 2,
+      "undated": 0,
+      "quarantineCauses": {},
+      "currentEligiblePerCase": [
+        {
+          "caseKey": "source_document:beebf4c76bc3ac837a70818749e979a4049fcd11f00a5b1e3e92e6cab5937d2f",
+          "caseKeyType": "source_document",
+          "count": 2
+        }
+      ],
+      "resultGeneratedAt": "2026-10-11T06:55:16.132Z",
+      "resultPath": "cache/district-joint/results/c7832c8ed16d330a84d230ac6e7d17e3bb9af82a0f9b2692b208501dcb2bc510.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [],
+      "dateEligibleChunkLost": [],
+      "dateEligibleChunkGained": [
+        0,
+        1
+      ]
+    },
+    {
+      "sourceSha256": "0a1638b05af875024ffe1e6398c3bf313ed5996c8b63ad2b38da703f96035e30",
+      "preparedSha256": "b08569b247003a72425c5d86adea92900d41727d3ac8d9031d6cdebf0e9f4c4d",
+      "oldTaskId": "efb0ebc4ed2d1ddf74ef3c66011270be809d5af3a1b84f4aaef6bcdd0ef393da",
+      "oldResultSha256": "ea75ed0af80f1f9dd4810f465e396e738ebebf2ac3a7d3be7c1373cdabefa238",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 0,
+      "oldEligibleCount": 0,
+      "oldEligiblePerCase": [],
+      "oldEligibleRecords": [],
+      "currentTaskId": "039119eedfcf500f43dd9942cdb58209d5257f612892fdd40758e5f7ac582b85",
+      "provider": "anthropic-subscription",
+      "state": "completed",
+      "resultSha256": "4628d3e2e4f5e28fe2a92d3d8fbf87be617af2ce2af44bb79e0790caa3b06fe4",
+      "records": 0,
+      "dateEligible": 0,
+      "undated": 0,
+      "quarantineCauses": {
+        "No supported case in source excerpt": 1
+      },
+      "currentEligiblePerCase": [],
+      "resultGeneratedAt": "2026-10-11T07:08:13.187Z",
+      "resultPath": "cache/district-joint/results/039119eedfcf500f43dd9942cdb58209d5257f612892fdd40758e5f7ac582b85.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [],
+      "dateEligibleChunkLost": [],
+      "dateEligibleChunkGained": []
+    },
+    {
+      "sourceSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+      "preparedSha256": "324c78f38f0ae0818cbc03c51441628ce101013c60814746b3ee44abfa0907ba",
+      "oldTaskId": "dd96c3cdaf73266ece45a91c8acb8cef6971df18e3aef2ccf2dbc4a440f5fe68",
+      "oldResultSha256": "069129e339cc37d3692b635183075a13deadf6376e200319c50e060bf2c248ca",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 25,
+      "oldEligibleCount": 24,
+      "oldEligiblePerCase": [
+        {
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "count": 23
+        },
+        {
+          "caseKey": "DS 455/2023/19-24",
+          "caseKeyType": "paper_reference",
+          "count": 1
+        }
+      ],
+      "oldEligibleRecords": [
+        {
+          "id": "knowledge:hoppegarten:f9ef440e8be7bf75e20f48d3",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [],
+          "chunk": 0,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:ab3eb92d80ad06e40990acc0",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [],
+          "chunk": 2,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:64941bd66bd1d1410d54c9f4",
+          "caseKey": "DS 455/2023/19-24",
+          "caseKeyType": "paper_reference",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [
+            "2023-09-25",
+            "2025-05-27"
+          ],
+          "chunk": 3,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:3efbccd07cf04b8c01bec244",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": "2025-05-27",
+          "historicalStageDates": [],
+          "chunk": 5,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:d4beff24ea92cd30152cda34",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [],
+          "chunk": 6,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:32c6f5f602f526c48f1ca4de",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [],
+          "chunk": 7,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:043825a70df5334c97d0fd54",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": "2025-05-27",
+          "historicalStageDates": [],
+          "chunk": 8,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:081568db523417211c2bc74c",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": "2025-05-27",
+          "historicalStageDates": [],
+          "chunk": 9,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:8243d3a5802a1b20d43fdad8",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": "2025-05-27",
+          "historicalStageDates": [
+            "2025-05-27"
+          ],
+          "chunk": 11,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:0de22c309af5d9113933d5b4",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [
+            "2025-05-27"
+          ],
+          "chunk": 12,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:2061bdd2d90bcb19c23c3705",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [],
+          "chunk": 13,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:04e2291caf49ff703a5b3009",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [
+            "2025-05-27"
+          ],
+          "chunk": 14,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:dc5e84dd37bcb2f1759be205",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [],
+          "chunk": 15,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:755e7251d6be417da347315a",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": "2025-05-27",
+          "historicalStageDates": [],
+          "chunk": 16,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:2be4aec66e57500c990b3175",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [],
+          "chunk": 17,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:0e5fa5333e34b36bb8a2eec9",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [],
+          "chunk": 18,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:78d4e38ac1081006fe2279a1",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [],
+          "chunk": 20,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:9db2ce50fe6a6b30b219911d",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [],
+          "chunk": 21,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:5c580e52fd598bd3cb6f23ff",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": "2025-05-27",
+          "historicalStageDates": [
+            "2025-05-27"
+          ],
+          "chunk": 24,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:648d56939c91ac2a718ef577",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": "2025-05-27",
+          "historicalStageDates": [],
+          "chunk": 25,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:33bdb4ed24db70733750f3cf",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [],
+          "chunk": 26,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:20338cc41c61a0b255482e81",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": "2025-05-27",
+          "historicalStageDates": [],
+          "chunk": 29,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:3de080192c56f2eee146015c",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": null,
+          "historicalStageDates": [],
+          "chunk": 31,
+          "dateEligible": true
+        },
+        {
+          "id": "knowledge:hoppegarten:d3d2b19a42640b8e0a3d7fe7",
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan \"Schulcampus Lindenallee / Virchowstraße\"",
+          "documentDate": "2025-05-27",
+          "stageDate": "2025-05-27",
+          "historicalStageDates": [],
+          "chunk": 32,
+          "dateEligible": true
+        }
+      ],
+      "currentTaskId": "7adde803b0c624ac268c0bacce6ff2c09a38630913730de0793860d46ba0059b",
+      "provider": "anthropic-subscription",
+      "state": "completed",
+      "resultSha256": "b45cdf2966c39f97b33e7ad01a17972a840d83837b8789c96c0a86069d95f54e",
+      "records": 32,
+      "dateEligible": 32,
+      "undated": 0,
+      "quarantineCauses": {
+        "Faithfulness gate not passed": 2,
+        "No supported case in source excerpt": 1
+      },
+      "currentEligiblePerCase": [
+        {
+          "caseKey": "source_document:59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+          "caseKeyType": "source_document",
+          "count": 30
+        },
+        {
+          "caseKey": "DS 455/2023/19-24",
+          "caseKeyType": "paper_reference",
+          "count": 2
+        }
+      ],
+      "resultGeneratedAt": "2026-10-11T08:03:06.184Z",
+      "resultPath": "cache/district-joint/results/7adde803b0c624ac268c0bacce6ff2c09a38630913730de0793860d46ba0059b.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [
+        0,
+        2,
+        3,
+        5,
+        7,
+        8,
+        9,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        20,
+        21,
+        24,
+        25,
+        26,
+        29,
+        31,
+        32
+      ],
+      "dateEligibleChunkLost": [
+        6
+      ],
+      "dateEligibleChunkGained": [
+        1,
+        10,
+        19,
+        22,
+        23,
+        27,
+        28,
+        30,
+        33
+      ]
+    },
+    {
+      "sourceSha256": "f2573a51bcf979d4547ef81beb017c2486cadaa00c84b3a3cdfe8e309f72649b",
+      "preparedSha256": "0ad31c6ba99da5e61735bba3f934c587bbd879fe1c30805998c1651eb3816314",
+      "oldTaskId": "a0cd591251127a068a9e876add1a1c9e742bb3d74ef0f717bb162c88ab63e48f",
+      "oldResultSha256": "a4fd7118e31f5205c10be5181a8ded01be7500be68ecf285ebb5525b1cd3402b",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 0,
+      "oldEligibleCount": 0,
+      "oldEligiblePerCase": [],
+      "oldEligibleRecords": [],
+      "currentTaskId": "f3f9cde594c1c689e108ed8f48510ca04ff9ac937559110cb26f1b55d54708e1",
+      "provider": "openai-subscription",
+      "state": "completed",
+      "resultSha256": "86977ee3f64ccbeba1aa0397c1fffc6fb7973e7fdca4f8b61387103b3441e244",
+      "records": 0,
+      "dateEligible": 0,
+      "undated": 0,
+      "quarantineCauses": {
+        "No supported case in source excerpt": 2
+      },
+      "currentEligiblePerCase": [],
+      "resultGeneratedAt": "2026-10-11T05:44:34.031Z",
+      "resultPath": "cache/district-joint/results/f3f9cde594c1c689e108ed8f48510ca04ff9ac937559110cb26f1b55d54708e1.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [],
+      "dateEligibleChunkLost": [],
+      "dateEligibleChunkGained": []
+    },
+    {
+      "sourceSha256": "0bd3b6a548c0e86a7ea4c003c5ec412d8ef30c0905c8759d75cf6325fa8db1ad",
+      "preparedSha256": "23f50f4a49ccf35553db46d1bf2d2b237d5fb44cc59d140866e86c03e734623a",
+      "oldTaskId": "139ac62bfe6347c6726b3d5c63c693d610d1d73c0215d63695d77e08601ab6e1",
+      "oldResultSha256": "720977efe920a0cc4270075d415e56257630dd86c94d8a7372165b2302602e9b",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 0,
+      "oldEligibleCount": 0,
+      "oldEligiblePerCase": [],
+      "oldEligibleRecords": [],
+      "currentTaskId": "d01f9fc88aeede558a3ee5794fa2fe34aad107ea5bf602d84cf1b9c76c4620c1",
+      "provider": "openai-subscription",
+      "state": "completed",
+      "resultSha256": "2a7f27349b3bedff945ec1c2a56f65c4fce390e9bdd2bfb48d25394374585b34",
+      "records": 0,
+      "dateEligible": 0,
+      "undated": 0,
+      "quarantineCauses": {
+        "judge_critical_claims": 1
+      },
+      "currentEligiblePerCase": [],
+      "resultGeneratedAt": "2026-10-11T05:49:22.375Z",
+      "resultPath": "cache/district-joint/results/d01f9fc88aeede558a3ee5794fa2fe34aad107ea5bf602d84cf1b9c76c4620c1.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [],
+      "dateEligibleChunkLost": [],
+      "dateEligibleChunkGained": []
+    },
+    {
+      "sourceSha256": "a90f660c61909311ebdf993d40ad053b396e076a8cc25ca11c36f48187e476ac",
+      "preparedSha256": "1c771091d5abc9c31bd4e56f2c26c07d64260818f34783104d4c627d432f04ff",
+      "oldTaskId": "8adae4610ea10c957e76fffaedb60000a6784bd0b14fbf639106f4679366d473",
+      "oldResultSha256": "6477bc1fdb9db59b68f8d91761a69df93b95657c63c4fbd5c511073f5ac0a7ca",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 0,
+      "oldEligibleCount": 0,
+      "oldEligiblePerCase": [],
+      "oldEligibleRecords": [],
+      "currentTaskId": "1768302f73bef5d4b94c2b2f69f14bca16c8c7191351803a26d9f10380dc52f7",
+      "provider": "openai-subscription",
+      "state": "completed",
+      "resultSha256": "239c0bc2bcc138ad2b116b85536d66c29124c2fd789e1c83c17885f9d43deae3",
+      "records": 0,
+      "dateEligible": 0,
+      "undated": 0,
+      "quarantineCauses": {
+        "Structured output/schema validation failed": 1,
+        "title": 1
+      },
+      "currentEligiblePerCase": [],
+      "resultGeneratedAt": "2026-10-11T05:53:11.709Z",
+      "resultPath": "cache/district-joint/results/1768302f73bef5d4b94c2b2f69f14bca16c8c7191351803a26d9f10380dc52f7.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [],
+      "dateEligibleChunkLost": [],
+      "dateEligibleChunkGained": []
+    },
+    {
+      "sourceSha256": "c52427012aa3a57dd6a3a45518e6b8f962e6cab9952525d44cd326590b8817f4",
+      "preparedSha256": "578ddc7e91a6397c9c137c48c58989d2738b3e9ec5ba84d69dac3f9b7f8991d7",
+      "oldTaskId": "49036de3484511ecbe9b0040260d8ecf897588df1190ec7c6d66ceb01178b7f0",
+      "oldResultSha256": "1df13e5e989c01b9fe0b0261d616abef7c1c18281e426985480cf678b506d5ae",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 1,
+      "oldEligibleCount": 1,
+      "oldEligiblePerCase": [
+        {
+          "caseKey": "source_document:c52427012aa3a57dd6a3a45518e6b8f962e6cab9952525d44cd326590b8817f4",
+          "caseKeyType": "source_document",
+          "count": 1
+        }
+      ],
+      "oldEligibleRecords": [
+        {
+          "id": "knowledge:hoppegarten:d8b8c1ccecb789ff791ee47d",
+          "caseKey": "source_document:c52427012aa3a57dd6a3a45518e6b8f962e6cab9952525d44cd326590b8817f4",
+          "caseKeyType": "source_document",
+          "title": "Bebauungsplan „Schulcampus Lindenallee / Virchowstraße“",
+          "documentDate": "2025-06-18",
+          "stageDate": "2025-06-02",
+          "historicalStageDates": [
+            "2025-06-02"
+          ],
+          "chunk": 0,
+          "dateEligible": true
+        }
+      ],
+      "currentTaskId": "dd5874933f10423c701c86ffa68318108cb127c2503c3b62a4fa6f1345a2bb43",
+      "provider": "anthropic-subscription",
+      "state": "completed",
+      "resultSha256": "3da56b7dddc9d6123062ca24815f80a17520e706d08162f426618affdf0f98c6",
+      "records": 1,
+      "dateEligible": 1,
+      "undated": 0,
+      "quarantineCauses": {},
+      "currentEligiblePerCase": [
+        {
+          "caseKey": "source_document:c52427012aa3a57dd6a3a45518e6b8f962e6cab9952525d44cd326590b8817f4",
+          "caseKeyType": "source_document",
+          "count": 1
+        }
+      ],
+      "resultGeneratedAt": "2026-10-11T07:54:35.696Z",
+      "resultPath": "cache/district-joint/results/dd5874933f10423c701c86ffa68318108cb127c2503c3b62a4fa6f1345a2bb43.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [
+        0
+      ],
+      "dateEligibleChunkLost": [],
+      "dateEligibleChunkGained": []
+    },
+    {
+      "sourceSha256": "c85920d0e96032241846bc8bfe283108d5f3027632b8d59060d98244d897b8dd",
+      "preparedSha256": "095ddd0dceeb85d1b3c858d2727df871485142b5bf6457d11aeb47cc05330a72",
+      "oldTaskId": "09d6503992f30af244fb9a6f4cb7800f31cb2175c084b577e7e6003c26f8565a",
+      "oldResultSha256": "6aa7ec1ce2edfb3b58227c095a63bc30b5b0fbf72fe77c13e361f9ecb2d72b9a",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 2,
+      "oldEligibleCount": 0,
+      "oldEligiblePerCase": [],
+      "oldEligibleRecords": [],
+      "currentTaskId": "e7dad3af2e62812e2219f8520e12a184ca0e917469033ed5ee0f3e0fd52c8cd1",
+      "provider": "openai-subscription",
+      "state": "completed",
+      "resultSha256": "ef569ff1aba065a0d22153a5e8648d5626f5dbaddaa40a4bbd1215427c375f6f",
+      "records": 1,
+      "dateEligible": 0,
+      "undated": 1,
+      "quarantineCauses": {
+        "Structured output/schema validation failed": 1,
+        "No supported case in source excerpt": 22,
+        "graph_relations": 1,
+        "exact_quotes": 3,
+        "exact_quotes, location_labels": 1,
+        "summary_numbers": 1,
+        "municipality": 3,
+        "exact_quotes, municipality": 1
+      },
+      "currentEligiblePerCase": [],
+      "resultGeneratedAt": "2026-10-11T06:08:55.037Z",
+      "resultPath": "cache/district-joint/results/e7dad3af2e62812e2219f8520e12a184ca0e917469033ed5ee0f3e0fd52c8cd1.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [],
+      "dateEligibleChunkLost": [],
+      "dateEligibleChunkGained": []
+    },
+    {
+      "sourceSha256": "b3e368d6e4425c5ba27a5f84c7093597099e0b911ac2e60d8e0627d5da0af6a4",
+      "preparedSha256": "286679635edb25a7c0c8b9b7eab5f427a516a385d2c624c1c0f30f546e578c4e",
+      "oldTaskId": "99a0963f7be9435872b8ba9cc830036f1969811a3ea34be79c74d6dfe5cac624",
+      "oldResultSha256": "77b867bc1b1c3fd1de96422c884324fc514c5aeee9eb2a44632728a2ca300288",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 0,
+      "oldEligibleCount": 0,
+      "oldEligiblePerCase": [],
+      "oldEligibleRecords": [],
+      "currentTaskId": "d2701f1279ffd79caa54b499e5f6dc30e75248a3eb0a9ca42e51a2c6c809927e",
+      "provider": "anthropic-subscription",
+      "state": "completed",
+      "resultSha256": "69dd331963868e73a30158f6488505bc6628e947a0dc769d5097d8d1e1ed961c",
+      "records": 0,
+      "dateEligible": 0,
+      "undated": 0,
+      "quarantineCauses": {
+        "No supported case in source excerpt": 2
+      },
+      "currentEligiblePerCase": [],
+      "resultGeneratedAt": "2026-10-11T07:55:06.408Z",
+      "resultPath": "cache/district-joint/results/d2701f1279ffd79caa54b499e5f6dc30e75248a3eb0a9ca42e51a2c6c809927e.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [],
+      "dateEligibleChunkLost": [],
+      "dateEligibleChunkGained": []
+    },
+    {
+      "sourceSha256": "9c083d018f6d9534023d75847bda40974d3b61e4cc7b921ef79c771da71b7c9a",
+      "preparedSha256": "f63a65af21db98c32b512d7f793f9867cf3a72492514b646a7aa56c2a363b4b9",
+      "oldTaskId": "7a924203a399b282ee6719e9faa2c35a53c00718f8733a80db072e1f3faf0769",
+      "oldResultSha256": "71e062ff53ba6099c8b0e26279b10564a624467a0ad1660b3a6e8cd72bb0f284",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 1,
+      "oldEligibleCount": 0,
+      "oldEligiblePerCase": [],
+      "oldEligibleRecords": [],
+      "currentTaskId": "e92bd54d6e5b17688480df9f57901751e2c0fb30e7bd4e9c4b57ae0ab60dd51d",
+      "provider": "anthropic-subscription",
+      "state": "pending",
+      "resultSha256": null,
+      "records": null,
+      "dateEligible": null,
+      "undated": null,
+      "quarantineCauses": null,
+      "currentEligiblePerCase": null,
+      "resultGeneratedAt": null,
+      "resultPath": null
+    },
+    {
+      "sourceSha256": "379789ae83bfdf1e8367caf4de4ac835af53839538a3eb81714d479693f9dfd2",
+      "preparedSha256": "9e13f037bc0d4192477d6b91341c5a33fd8818767132a9f22ba049e1e2f90f98",
+      "oldTaskId": "4f90e6c023b5a1b1e002d804f2d295f5185fe6a56d700397d1993f8ced4f129c",
+      "oldResultSha256": "1dcd509fbf9eb5a3209bf57b43a32e72221928da5c64a0256cb59bddb069b7a3",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 1,
+      "oldEligibleCount": 1,
+      "oldEligiblePerCase": [
+        {
+          "caseKey": "source_document:379789ae83bfdf1e8367caf4de4ac835af53839538a3eb81714d479693f9dfd2",
+          "caseKeyType": "source_document",
+          "count": 1
+        }
+      ],
+      "oldEligibleRecords": [
+        {
+          "id": "knowledge:hoppegarten:6b1ba17e1dfd866713333ac2",
+          "caseKey": "source_document:379789ae83bfdf1e8367caf4de4ac835af53839538a3eb81714d479693f9dfd2",
+          "caseKeyType": "source_document",
+          "title": "vorhabenbezogener Bebauungsplan „Reitschule Mönchsheimer Weg“, Begründung",
+          "documentDate": "2022-11-16",
+          "stageDate": null,
+          "historicalStageDates": [],
+          "chunk": 2,
+          "dateEligible": true
+        }
+      ],
+      "currentTaskId": "4ac96ece5774c24d73d96ffbc666e5f37d17d7033f47f91d20f624a8781e964b",
+      "provider": "openai-subscription",
+      "state": "completed",
+      "resultSha256": "d7b06110083b6834033c7591dd4a86bed5d0d7b34172bf244b77b1941697ebcf",
+      "records": 1,
+      "dateEligible": 1,
+      "undated": 0,
+      "quarantineCauses": {
+        "title, entity_labels, graph_mentions": 1,
+        "exact_quotes, graph_mentions": 2,
+        "Structured output/schema validation failed": 2,
+        "title, stage": 1,
+        "judge_critical_claims": 2,
+        "municipality, entity_labels, graph_mentions": 1,
+        "No supported case in source excerpt": 2,
+        "municipality": 1,
+        "title": 1,
+        "exact_quotes": 2,
+        "exact_quotes, entity_labels, graph_mentions": 1
+      },
+      "currentEligiblePerCase": [
+        {
+          "caseKey": "source_document:379789ae83bfdf1e8367caf4de4ac835af53839538a3eb81714d479693f9dfd2",
+          "caseKeyType": "source_document",
+          "count": 1
+        }
+      ],
+      "resultGeneratedAt": "2026-10-11T06:47:00.927Z",
+      "resultPath": "cache/district-joint/results/4ac96ece5774c24d73d96ffbc666e5f37d17d7033f47f91d20f624a8781e964b.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [],
+      "dateEligibleChunkLost": [
+        2
+      ],
+      "dateEligibleChunkGained": [
+        5
+      ]
+    },
+    {
+      "sourceSha256": "4deb809f3b630df9597dbdd7895b14ebcf4a1531c8d1fd18d3c3abfad1b84c8a",
+      "preparedSha256": "bcede3fd466da4d46702b011873d617ddca53fa9e48bdc677aadbf16a4bf78b9",
+      "oldTaskId": "a622482a1f1c3f9cefaf0f1cf1f8d230deff32e701c14d22ee9be705c081c3a1",
+      "oldResultSha256": "b1b7e375c27fd46c0dd0fa264f585d38ace8cd61513bca680e9622c70d34664d",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 0,
+      "oldEligibleCount": 0,
+      "oldEligiblePerCase": [],
+      "oldEligibleRecords": [],
+      "currentTaskId": "a5769e257cb5fa45d9ae141422bdefd8e894a92b5fbca809e4ad5ef29e9433b4",
+      "provider": "openai-subscription",
+      "state": "completed",
+      "resultSha256": "eedd5087c49044dd0d2686662f1b9624341ad550cf241f6a3f027407f8a41105",
+      "records": 0,
+      "dateEligible": 0,
+      "undated": 0,
+      "quarantineCauses": {
+        "No supported case in source excerpt": 4
+      },
+      "currentEligiblePerCase": [],
+      "resultGeneratedAt": "2026-10-11T07:01:40.191Z",
+      "resultPath": "cache/district-joint/results/a5769e257cb5fa45d9ae141422bdefd8e894a92b5fbca809e4ad5ef29e9433b4.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [],
+      "dateEligibleChunkLost": [],
+      "dateEligibleChunkGained": []
+    },
+    {
+      "sourceSha256": "b4873fb0106d6a253d61cf707d01e4622cb7a5669fb36988278378cfaf0d8ad8",
+      "preparedSha256": "c0b395936740984378a6bbd026ba9ebf93d5850124c91b8fd4dcb905b8750593",
+      "oldTaskId": "4344ba88e4e267524ac7eb91e3b864d0dbdc15a853018877386f4a1cc2a466fd",
+      "oldResultSha256": "2e21c0a0fd9c6b71d0346d960ee2ca447d9164e8c2917c8e33365e44759ed28d",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 0,
+      "oldEligibleCount": 0,
+      "oldEligiblePerCase": [],
+      "oldEligibleRecords": [],
+      "currentTaskId": "4aa0bd9af1ab7765d29e9c9d4cec79080f24c05d55d48de41dde03f8f814d873",
+      "provider": "openai-subscription",
+      "state": "completed",
+      "resultSha256": "910eef7045cdb825b5efabf55cd6d5dd306c36875aa82242bf8b99b1a03ec2eb",
+      "records": 0,
+      "dateEligible": 0,
+      "undated": 0,
+      "quarantineCauses": {
+        "judge_critical_claims": 1
+      },
+      "currentEligiblePerCase": [],
+      "resultGeneratedAt": "2026-10-11T07:11:39.079Z",
+      "resultPath": "cache/district-joint/results/4aa0bd9af1ab7765d29e9c9d4cec79080f24c05d55d48de41dde03f8f814d873.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [],
+      "dateEligibleChunkLost": [],
+      "dateEligibleChunkGained": []
+    },
+    {
+      "sourceSha256": "badbec7cc5e2cca04885bce7d36cbc40ea57895691f07ed4c861b0fb768eda4a",
+      "preparedSha256": "f27dfe32ce772bd85b0885be529a13cb98df5b8f81b4a57bad4960a619338ef2",
+      "oldTaskId": "0c057231d83844488917effa264c62403659cb4c017c16cffe7473a14ea45831",
+      "oldResultSha256": "0b9f94a249d97d8cca6442354523ff3ae25f33bfd33daa8c047b2f4c2f67becc",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 0,
+      "oldEligibleCount": 0,
+      "oldEligiblePerCase": [],
+      "oldEligibleRecords": [],
+      "currentTaskId": "a9f92fc51cdfd4b558f30604027b9c92f46df709d15439c8eb09d1408e9bce63",
+      "provider": "anthropic-subscription",
+      "state": "pending",
+      "resultSha256": null,
+      "records": null,
+      "dateEligible": null,
+      "undated": null,
+      "quarantineCauses": null,
+      "currentEligiblePerCase": null,
+      "resultGeneratedAt": null,
+      "resultPath": null
+    },
+    {
+      "sourceSha256": "d49a69371b6c5e5204b116d34e2fb7c449184d10527c15a6d4a4f9997b387879",
+      "preparedSha256": "8b253f587e5b2c2497e1362c4618c16236e8960389226eeed3ea6e7e50c36794",
+      "oldTaskId": "e83f2f85fadf410be036a0c10cbdfff0d78153d118145f51c4cc259af0a982ea",
+      "oldResultSha256": "1e9ec16501bdf9889c5b8043bbbc72cae3a143cf672940c1a25e505fc732b3fb",
+      "oldResultPinMatches": true,
+      "oldGatedBeforeDateFilter": 0,
+      "oldEligibleCount": 0,
+      "oldEligiblePerCase": [],
+      "oldEligibleRecords": [],
+      "currentTaskId": "0820684c57c38ae9c8e702d9c002f8297ea1de4f5c0c70caa60e231b2ca0024b",
+      "provider": "openai-subscription",
+      "state": "completed",
+      "resultSha256": "271b712ed6aeee24bc78b2bb40ca15404cac39ba972369b60ea42050fb6b2c05",
+      "records": 0,
+      "dateEligible": 0,
+      "undated": 0,
+      "quarantineCauses": {
+        "No supported case in source excerpt": 1
+      },
+      "currentEligiblePerCase": [],
+      "resultGeneratedAt": "2026-10-11T07:21:24.381Z",
+      "resultPath": "cache/district-joint/results/0820684c57c38ae9c8e702d9c002f8297ea1de4f5c0c70caa60e231b2ca0024b.json",
+      "resultPinMatches": true,
+      "dateEligibleChunkRetained": [],
+      "dateEligibleChunkLost": [],
+      "dateEligibleChunkGained": []
+    }
+  ],
+  "agreementTasksExcludedFromCounts": [
+    {
+      "taskId": "ccc4cd8f898680c760bfa71412f229971fee29de6cec5c62e1d54ae652cb089f",
+      "sourceSha256": "9f989bf18a8aea35af68293514c98a7f6d4b4d5991fb4c6921db921cb2d6c622",
+      "provider": "anthropic-subscription",
+      "state": "completed",
+      "resultSha256": "d6678abac47ee524b462df10619ebf8f147faf70eea3bf2c0023dcda727ee222"
+    },
+    {
+      "taskId": "25f8423e23b5a4cceaaa0a6580586450ffb227c26ab336ec0bd171d059b93847",
+      "sourceSha256": "0bd3b6a548c0e86a7ea4c003c5ec412d8ef30c0905c8759d75cf6325fa8db1ad",
+      "provider": "anthropic-subscription",
+      "state": "completed",
+      "resultSha256": "7a2e0955f4260a3c15c5c58e5232875738c563c71e56068492dbfe13ce3f4c9f"
+    },
+    {
+      "taskId": "fd5087bd441aa84c63ac7f1bfcb74e57e2a050f52619e264ced29665015df9a6",
+      "sourceSha256": "d49a69371b6c5e5204b116d34e2fb7c449184d10527c15a6d4a4f9997b387879",
+      "provider": "anthropic-subscription",
+      "state": "pending",
+      "resultSha256": null
+    }
+  ],
+  "bugAssessment": {
+    "confirmedPublicEvidenceRemovalBug": false,
+    "minimalCodeFix": null,
+    "reason": "No corpus removal or count-aggregation bug established.26→3 compared final v7 publication with unfinished v8 completed-primary subset. Current snapshot36 dated candidates is not a new publication and does not promise all old records return. Two old chunks fail the existing faithful/schema gates; do not bypass them. Parent owns any eventual code/docs changes."
+  }
+}

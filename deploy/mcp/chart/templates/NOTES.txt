@@ -1,5 +1,7 @@
 Civic MCP: https://mcp.stadtstack.eu/mcp
 Image: {{ include "civicMcp.image" . }}
+Git tag / image tag / MCP server version: {{ .Values.releaseVersion }}
+The immutable digest remains authoritative; the version must match package and Git tag.
 
 This chart never creates a Namespace or Secret. The governed wrapper must provision
 namespace stadtstack-mcp and Secret {{ .Values.secretName }} containing the key

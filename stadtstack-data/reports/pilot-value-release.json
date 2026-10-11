@@ -1,0 +1,578 @@
+{
+  "schemaVersion": "pilot-value-release-report-v1",
+  "generatedAt": "2026-10-11T09:45:21.686Z",
+  "release": {
+    "version": "0.3.0",
+    "dataManifestId": "f434203c14c82ea6b6814662e9b1e209d81d7921bee97aeefcd2269d83330415",
+    "state": "validated_local_candidate",
+    "tools": 19,
+    "knowledgeRecords": 228,
+    "knowledgeMunicipalities": 9,
+    "totalPublishedRecords": 14621
+  },
+  "inputs": {
+    "baseCorpus": {
+      "representations": 2842,
+      "sha256": "fbcd03c8474e3fa3cb2a3db0b9a976e3793863a3a6e268b0ead21868516ec2c0"
+    },
+    "completedPilotCorpus": {
+      "representations": 5193,
+      "documentGroups": 4119,
+      "sha256": "fb4e08eee8bf1a3bf036433893553b5ebb0e7ae4dec1fea6ce702a8f66642992"
+    },
+    "registrySha256": "9095c7a241fa5cc1a2d75030286d8690cc5bf6d3e05990c56f7a5199c304b554",
+    "preparationPlanSha256": "4f98089a55ce3fcdd34b263bbb904935cd9f8006518a754215189854e2d49810",
+    "workPlanId": "76292636ed3afd28aa00f31364562944b04016bc421331ef948bbd94d8ce3099",
+    "promptContractSha256": "174d4f5bed4f51d77850a37736fd94ddfc47f3bb5aa2422540cdec66f4de250f",
+    "schemaSha256": "3934ef6806b70a6fccc1ba47e1dc462b3486831e3b9a19911721ea73958dbca9"
+  },
+  "processing": {
+    "selectedGroups": 417,
+    "preparedGroups": 376,
+    "preparationHeldGroups": 41,
+    "pendingAvailableGroups": 3702,
+    "originalAdmittedCandidates": 430,
+    "afterReassessment": 429,
+    "dateQualifiedBeforeUrlPolicy": 229,
+    "publishedAfterAllGates": 228,
+    "publicationUrlHeldRecords": 1,
+    "quarantinedCases": 1443,
+    "providers": [
+      {
+        "provider": "openai-subscription",
+        "model": "gpt-6-luna",
+        "tool": "codex-cli",
+        "state": "ready",
+        "assignedGroups": 197,
+        "completedGroups": 197,
+        "agreementCompleted": 7,
+        "publishedCandidates": 172,
+        "failures": []
+      },
+      {
+        "provider": "anthropic-subscription",
+        "model": "claude-haiku-5-5",
+        "tool": "claude-cli",
+        "state": "ready",
+        "assignedGroups": 179,
+        "completedGroups": 179,
+        "agreementCompleted": 14,
+        "publishedCandidates": 258,
+        "failures": []
+      }
+    ],
+    "admittedModels": [
+      {
+        "provider": "anthropic-subscription",
+        "model": "claude-haiku-5-5",
+        "tool": "claude-cli",
+        "toolVersion": "2.1.284",
+        "modelIdentitySha256": "6ae3029f7453e9d43b6063b78a71b0da9d005f0d153bf0bc37537fddf76f287d",
+        "modelIdentityBasis": "reported-cli-model-and-tool-version",
+        "faithfulnessThreshold": 0.8,
+        "publishedRecords": 160
+      },
+      {
+        "provider": "openai-subscription",
+        "model": "gpt-6-luna",
+        "tool": "codex-cli",
+        "toolVersion": "0.160.0",
+        "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+        "modelIdentityBasis": "configured-cli-model-and-tool-version",
+        "faithfulnessThreshold": 0.8,
+        "publishedRecords": 68
+      }
+    ]
+  },
+  "towns": [
+    {
+      "id": "strausberg",
+      "records": 39,
+      "datedStagedRecords": 37,
+      "sourceByteGroups": 26,
+      "authorityCaseKeys": 10,
+      "fallbackSourceDocuments": 12,
+      "quarantinedRecords": 384
+    },
+    {
+      "id": "hoppegarten",
+      "records": 37,
+      "datedStagedRecords": 37,
+      "sourceByteGroups": 5,
+      "authorityCaseKeys": 1,
+      "fallbackSourceDocuments": 5,
+      "quarantinedRecords": 76
+    },
+    {
+      "id": "ruedersdorf-bei-berlin",
+      "records": 37,
+      "datedStagedRecords": 34,
+      "sourceByteGroups": 26,
+      "authorityCaseKeys": 17,
+      "fallbackSourceDocuments": 9,
+      "quarantinedRecords": 314
+    },
+    {
+      "id": "ratzeburg",
+      "records": 14,
+      "datedStagedRecords": 12,
+      "sourceByteGroups": 14,
+      "authorityCaseKeys": 0,
+      "fallbackSourceDocuments": 14,
+      "quarantinedRecords": 124
+    },
+    {
+      "id": "moelln",
+      "records": 28,
+      "datedStagedRecords": 23,
+      "sourceByteGroups": 25,
+      "authorityCaseKeys": 1,
+      "fallbackSourceDocuments": 24,
+      "quarantinedRecords": 80
+    },
+    {
+      "id": "schwarzenbek",
+      "records": 12,
+      "datedStagedRecords": 11,
+      "sourceByteGroups": 12,
+      "authorityCaseKeys": 0,
+      "fallbackSourceDocuments": 12,
+      "quarantinedRecords": 34
+    },
+    {
+      "id": "ludwigslust",
+      "records": 35,
+      "datedStagedRecords": 35,
+      "sourceByteGroups": 25,
+      "authorityCaseKeys": 4,
+      "fallbackSourceDocuments": 21,
+      "quarantinedRecords": 111
+    },
+    {
+      "id": "parchim",
+      "records": 18,
+      "datedStagedRecords": 17,
+      "sourceByteGroups": 18,
+      "authorityCaseKeys": 17,
+      "fallbackSourceDocuments": 1,
+      "quarantinedRecords": 87
+    },
+    {
+      "id": "hagenow",
+      "records": 8,
+      "datedStagedRecords": 7,
+      "sourceByteGroups": 4,
+      "authorityCaseKeys": 2,
+      "fallbackSourceDocuments": 4,
+      "quarantinedRecords": 233
+    }
+  ],
+  "units": {
+    "records": "Source-bound evidence records, not distinct projects; multiple chunks may describe one case.",
+    "sourceByteGroups": "Distinct source SHA256 values cited by published town records.",
+    "authorityCaseKeys": "Distinct (caseKeyType,caseKey) supported by authority identifiers; not independently verified real-world project identities.",
+    "fallbackSourceDocuments": "Distinct source documents used by source_document case fallbacks; may overlap authority-identified documents."
+  },
+  "agreement": {
+    "requested": 21,
+    "completed": 21,
+    "alignedCases": [
+      {
+        "key": "chunk:0:paper_reference:DS/2025/193",
+        "differentFields": [
+          "topics",
+          "entities"
+        ]
+      },
+      {
+        "key": "chunk:0:paper_reference:DS/2026/286",
+        "differentFields": [
+          "entities"
+        ]
+      }
+    ],
+    "primaryAdmitted": 8,
+    "secondaryAdmitted": 14,
+    "primaryOnly": 6,
+    "secondaryOnly": 12,
+    "limitation": "Cross-model agreement on one source is not independent source corroboration; same-provider self-judgment scores are not interchangeable calibrated quality measurements."
+  },
+  "graph": {
+    "entities": 170,
+    "relations": 3,
+    "admittedByType": {
+      "operates": 3,
+      "funds": 0,
+      "implements": 0,
+      "plans": 0,
+      "decides": 0,
+      "approves": 0,
+      "amends": 0,
+      "located_in": 0,
+      "cooperates_with": 0,
+      "cites": 0
+    },
+    "admittedByModality": {
+      "asserted": 3
+    },
+    "reassessment": {
+      "materializedCandidates": 28,
+      "additionalUnmaterializedCandidatesAudited": 4,
+      "additionalUnmaterializedCandidatesPassing": 0,
+      "reusedUnchanged": 2,
+      "normalized": 4,
+      "deterministicNewlyPassed": 1,
+      "judgeCalls": 0,
+      "judgePasses": 0,
+      "judgeFails": 0,
+      "dateEligible": 18,
+      "stillWithheld": 26,
+      "newExtractionCalls": 0,
+      "newJudgeCalls": 0,
+      "originalReportSha256": "7ff5dfe1c9d1a31c425fea5065412aa605c77b3d91ff0c3ef60d190f7141a5de",
+      "reviewedReplayReportSha256": "a9e27a5456f72fe11e7ba4af011901214a512fa02e08c0ef020411a35639fdf7",
+      "reviewedAssessor": {
+        "version": "district-relation-reassessment-v1",
+        "judgePromptVersion": "district-faithfulness-v7-action-relations",
+        "judgePromptSha256": "48401b831e697f2455e61949ae5d72aa87920e69748ba8a021568bdb3ccde411",
+        "judgeSchemaSha256": "d75bd7306e616511c6f26fa2d3dc20d6b38b577d6bff2bde9f09ce2e3c3b62a7",
+        "assessorSha256": "09962433ba2af3d12c8987ebeb37bff4f91410e0ae7123b69be2fcd41f5a1747",
+        "threshold": 0.8
+      },
+      "byteIdenticalAfterRuntimeReview": {
+        "records": "2211c02e45c97fb258ffa9ce816f7a30c6e88c7bae6b6c0dbbd7e4ee6f9fd547",
+        "quarantine": "50ac9d769d498dccf15f12e6d76a9278f4357b4eecbcf8e5bb8a30fe872c8372"
+      },
+      "planningExample": {
+        "recordId": "knowledge:strausberg:2d284782326353cc67a8d509",
+        "normalizedType": "plans",
+        "modality": "planned",
+        "deterministicPassed": true,
+        "publicationHold": "missing_sourced_date",
+        "judgeCalled": false
+      }
+    },
+    "limitation": "Three source-dated operation edges are not a current-operator guarantee. No demonstrated graph usefulness gain on the fixed seven pairs."
+  },
+  "evaluation": {
+    "questionBankSha256": "2e74ab25477c83ed58a34e1a57ae76c16ed7f524fe7e6865106bfcc32bad18cc",
+    "mcpCalls": 784,
+    "retrievedRecords": 230,
+    "review": "AI-assisted source-grounded review, not human/municipal approval or adjudicated gold labels",
+    "summary": {
+      "questions": 30,
+      "reviewed": 30,
+      "substantive": 1,
+      "partial": 10,
+      "abstentions": 19,
+      "correctAbstentions": 19,
+      "usefulSubstantive": 11,
+      "dataMissing": 29,
+      "correctnessPoints": 60,
+      "sourcingPoints": 46,
+      "usefulnessPoints": 12,
+      "maximumPoints": 60,
+      "graphUnavailable": 0,
+      "graphReviewed": 7
+    },
+    "comparison": {
+      "baselineRelease": "cdd0e350be842c040dc77d13cc73bf2267cd0b9ae9bbf0a471a267b47938b6f4",
+      "currentRelease": "f434203c14c82ea6b6814662e9b1e209d81d7921bee97aeefcd2269d83330415",
+      "interpretation": "Release-to-release change combines corpus and extraction changes. Only within-release paired reviews estimate graph contribution; neither proves causal effectiveness.",
+      "questions": [
+        {
+          "id": "W01",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "W02",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "W03",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": 0,
+          "graphRationale": "Zusätzliche Suche und Nachbarschaftsnavigation, aber keine neue einschlägige Evidenz zur Förderung der drei gefragten Kommunen; kein Kausalnachweis."
+        },
+        {
+          "id": "W04",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": 0,
+          "graphRationale": "Zusätzliche Entitäts- und Pfadnavigation, aber kein neuer einschlägiger Betreiber-, Betriebs- oder Identitätsbeleg; der vorhandene Planungsdatensatz bleibt unverändert und belegt keine Kausalität."
+        },
+        {
+          "id": "W05",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "E01",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "E02",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "E03",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": 0,
+          "graphRationale": "Die Graphabfragen erweitern lediglich die Suche; sie liefern keine Treffer, keine zusätzlichen Datensätze und keine neue sachliche Evidenz zur Betreiberidentität."
+        },
+        {
+          "id": "E04",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "E05",
+          "withoutGraphUsefulnessDelta": 1,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "B01",
+          "withoutGraphUsefulnessDelta": 1,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "B02",
+          "withoutGraphUsefulnessDelta": 1,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "B03",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": 0,
+          "graphRationale": "Der Graph ergänzt Such- und Nachbarschaftsnavigation, aber keine neue einschlägige Evidenz für die drei Zielstädte; daraus entsteht kein Beziehungs- oder Kausalitätsnachweis."
+        },
+        {
+          "id": "B04",
+          "withoutGraphUsefulnessDelta": 1,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "B05",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "K01",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "K02",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "K03",
+          "withoutGraphUsefulnessDelta": 1,
+          "withinReleaseGraphUsefulnessDelta": 0,
+          "graphRationale": "Die Graphsuchen 489 und 490 ergänzen nur die Suchprüfung: Beide liefern keine Treffer und keine zusätzlichen Datensätze. Es entsteht weder neue Sachbelege noch ein Nachweis von Betreiberidentität oder Kausalität."
+        },
+        {
+          "id": "K04",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "K05",
+          "withoutGraphUsefulnessDelta": 1,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "M01",
+          "withoutGraphUsefulnessDelta": 1,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "M02",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "M03",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": 0,
+          "graphRationale": "Die Graphabfragen liefern nur zusätzliche Navigation: Aufruf 605 findet eine Projektentität in Schwarzenbek außerhalb der drei Zielstädte; 606 liefert keine Entität und 607 keine Nachbarbeziehung. Es kommen keine zusätzlichen Datensätze und keine neuen Förderbelege hinzu. Weder Programmidentität noch Kausalität wird dadurch belegt."
+        },
+        {
+          "id": "M04",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "M05",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "H01",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "H02",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "H03",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": 0,
+          "graphRationale": "Die Aufrufe 711 und 712 ergänzen lediglich eine erfolglose Suchnavigation: Beide melden keine Treffer, und es kommen keine Datensätze hinzu. Neue Sachbelege oder kausale Aussagen entstehen dadurch nicht."
+        },
+        {
+          "id": "H04",
+          "withoutGraphUsefulnessDelta": 1,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        },
+        {
+          "id": "H05",
+          "withoutGraphUsefulnessDelta": 0,
+          "withinReleaseGraphUsefulnessDelta": null,
+          "graphRationale": "Graph unavailable or not requested; no contribution estimated."
+        }
+      ]
+    },
+    "sourceScoreContractCorrections": [
+      {
+        "id": "W03",
+        "lane": "withoutGraph",
+        "from": 2,
+        "to": 0,
+        "reason": "No citations cannot earn source points under the evaluator contract."
+      },
+      {
+        "id": "W03",
+        "lane": "withGraph",
+        "from": 2,
+        "to": 0,
+        "reason": "No citations cannot earn source points under the evaluator contract."
+      },
+      {
+        "id": "E02",
+        "lane": "withoutGraph",
+        "from": 2,
+        "to": 0,
+        "reason": "No citations cannot earn source points under the evaluator contract."
+      },
+      {
+        "id": "E03",
+        "lane": "withoutGraph",
+        "from": 2,
+        "to": 0,
+        "reason": "No citations cannot earn source points under the evaluator contract."
+      },
+      {
+        "id": "E03",
+        "lane": "withGraph",
+        "from": 2,
+        "to": 0,
+        "reason": "No citations cannot earn source points under the evaluator contract."
+      },
+      {
+        "id": "E04",
+        "lane": "withoutGraph",
+        "from": 2,
+        "to": 0,
+        "reason": "No citations cannot earn source points under the evaluator contract."
+      },
+      {
+        "id": "B03",
+        "lane": "withoutGraph",
+        "from": 2,
+        "to": 0,
+        "reason": "No citations cannot earn source points under the evaluator contract."
+      },
+      {
+        "id": "B03",
+        "lane": "withGraph",
+        "from": 2,
+        "to": 0,
+        "reason": "No citations cannot earn source points under the evaluator contract."
+      },
+      {
+        "id": "H02",
+        "lane": "withoutGraph",
+        "from": 2,
+        "to": 0,
+        "reason": "No citations cannot earn source points under the evaluator contract."
+      },
+      {
+        "id": "H05",
+        "lane": "withoutGraph",
+        "from": 2,
+        "to": 0,
+        "reason": "No citations cannot earn source points under the evaluator contract."
+      }
+    ],
+    "baselineSummary": {
+      "questions": 30,
+      "reviewed": 30,
+      "substantive": 0,
+      "partial": 4,
+      "abstentions": 26,
+      "correctAbstentions": 26,
+      "usefulSubstantive": 4,
+      "dataMissing": 30,
+      "correctnessPoints": 60,
+      "sourcingPoints": 23,
+      "usefulnessPoints": 4,
+      "maximumPoints": 60,
+      "graphUnavailable": 7,
+      "graphReviewed": 0
+    }
+  },
+  "verification": {
+    "typescript": "npx tsc --noEmit passed",
+    "tests": {
+      "command": "npm test",
+      "passed": 318,
+      "failed": 0
+    },
+    "releaseBoundaryTests": {
+      "command": "python3 -B -m unittest discover -s deploy/mcp -p 'test_release_acceptance.py'",
+      "passed": 4,
+      "failed": 0
+    },
+    "shellSyntax": "bash -n deploy/mcp/session.sh passed",
+    "securityReview": "No actionable findings in final read-only release-boundary review",
+    "runtimeReview": "Two reported budget/cancellation issues fixed; final delta review found no remaining actionable issue",
+    "knownWarning": "PDF font warning TT: undefined function: 21 was observed, not suppressed"
+  },
+  "followOnOrder": [
+    "Release 0.3.0 through governed CivicMCP operator and capture exact-image/public-endpoint evidence separately",
+    "Generate requested source export and complete corpus manifest; propose encrypted off-workstation backup with cost and owner approval before spending; fresh-clone offline replay and one-town live re-crawl proof",
+    "Pipeline rebuild after value-test report: Jev/Decisions triage, span-grounded evidence, batch APIs, incremental processing, code-only runner",
+    "Concentric municipal expansion and graph communities",
+    "Braid import"
+  ]
+}

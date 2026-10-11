@@ -1,16 +1,18 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { getTopic } from './topic-vocabulary.ts';
+import { PROVIDER_CONFIGS } from './district-model-contract.ts';
+import { EntityMentionSchema, RelationClaimSchema, NormalizedEntitySchema, NormalizedRelationSchema, GRAPH_DETERMINISTIC_CHECKS, normalizeGraphClaims, normalizeRelationActions, RelationActionNormalizationSchema } from './district-graph-claims.ts';
 
-export const KNOWLEDGE_SCHEMA_VERSION = 'stadtstack-knowledge-v1';
+export const KNOWLEDGE_SCHEMA_VERSION = 'stadtstack-knowledge-v2';
 export const FAITHFULNESS_THRESHOLD = 0.8;
 export const sha256 = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex');
 export const hashSchema = z.string().regex(/^[a-f0-9]{64}$/);
-export const QUOTE_NORMALIZATION_VERSION = 'whitespace-spans-v1';
+export const QUOTE_NORMALIZATION_VERSION = 'whitespace-spans-v2-graph';
 export const QuoteNormalizationSchema = z.object({
   version: z.literal(QUOTE_NORMALIZATION_VERSION), offsetUnit: z.literal('utf16_code_units'),
   restorations: z.array(z.object({
-    field: z.string().regex(/^(?:titleQuote|summaryQuote|municipalityQuote|caseQuote|documentDateQuote|stageDateQuote|stageQuote|originalStatus|(?:topics|entities|locations)\[\d+\]\.quote|stages\[\d+\]\.(?:quote|dateQuote|originalStatus))$/),
+    field: z.string().regex(/^(?:titleQuote|summaryQuote|municipalityQuote|caseQuote|documentDateQuote|stageDateQuote|stageQuote|originalStatus|(?:topics|entities|locations)\[\d+\]\.quote|entities\[\d+\]\.identifiers\[\d+\]\.quote|relations\[\d+\]\.(?:quote|predicateQuote|conditions|time\.(?:quote|text))|stages\[\d+\]\.(?:quote|dateQuote|originalStatus))$/),
     proposedSha256: hashSchema, restoredSha256: hashSchema,
     start: z.number().int().nonnegative(), end: z.number().int().positive(),
   }).strict()).max(160),
@@ -63,7 +65,8 @@ export const DistrictExtractionClaimsSchema = z.object({
   stage: stageSchema, stageDate: daySchema.nullable(), stageDateQuote: quote.nullable(),
   stageDateReason: z.string().min(1).max(500).nullable(), originalStatus: z.string().max(1800), stageQuote: z.string().max(1800),
   stages: z.array(stageEventSchema).max(20),
-  entities: z.array(z.object({ name: z.string().min(1).max(300), type: z.enum(['municipality', 'authority', 'organization', 'place']), quote }).strict()).max(30),
+  entities: z.array(EntityMentionSchema).max(30),
+  relations: z.array(RelationClaimSchema).max(60),
   locations: z.array(z.object({ label: z.string().min(1).max(300), quote, geometry: geometry.nullable(), precision: z.enum(['none', 'approximate', 'exact']) }).strict()).max(20),
 }).strict();
 export type DistrictExtractionClaims = z.infer<typeof DistrictExtractionClaimsSchema>;
@@ -71,21 +74,23 @@ export const deterministicCheckSchema = z.object({ id: z.string().min(1), passed
 export const REQUIRED_DETERMINISTIC_CHECKS = ['schema', 'exact_quotes', 'municipality', 'title', 'case_identity', 'document_date', 'stage_date', 'stage', 'stage_history', 'critical_stage_promotion', 'critical_budget_spending', 'topic_hierarchy', 'entity_labels', 'location_labels', 'geometry', 'summary_numbers', 'no_contacts'] as const;
 export const DistrictKnowledgeRecordSchema = DistrictExtractionClaimsSchema.extend({
   id: z.string().min(1), municipalityId: z.string().min(1), ags: z.string().regex(/^\d{8}$/), districtId: z.string().min(1),
+  entities: z.array(NormalizedEntitySchema).max(30), relations: z.array(NormalizedRelationSchema).max(60),
   caseKey: z.string().min(1),
   sources: z.array(z.object({ id: z.string().min(1), url: z.url(), sha256: hashSchema, retrievedAt: z.iso.datetime(), locator: z.string().min(1), mimeType: z.string().min(1), sourceType: sourceTypeSchema, policy: SourceAccessPolicySchema }).strict()).min(1),
   extraction: z.object({
     extractorVersion: z.string().min(1), extractorSha256: hashSchema, model: z.string().min(1),
-    provider: z.literal('openai-subscription'), tool: z.enum(['codex-cli', 'omp-cli']), toolVersion: z.string().min(1),
-    modelIdentitySha256: hashSchema, modelIdentityBasis: z.literal('configured-cli-model-and-tool-version'), returnedModel: z.string().min(1).nullable(),
+    provider: z.enum(['openai-subscription', 'anthropic-subscription']), tool: z.enum(['codex-cli', 'claude-cli']), toolVersion: z.string().min(1),
+    modelIdentitySha256: hashSchema, modelIdentityBasis: z.enum(['configured-cli-model-and-tool-version', 'reported-cli-model-and-tool-version']), returnedModel: z.string().min(1).nullable(),
     runtimeWarnings: z.array(z.string().min(1)).optional(),
     quoteNormalization: QuoteNormalizationSchema.optional(),
+    relationNormalization: RelationActionNormalizationSchema.extend({ sourceSha256: hashSchema, textSha256: hashSchema, responseSha256: hashSchema }).strict().optional(),
     promptVersion: z.string().min(1), promptSha256: hashSchema, judgePromptVersion: z.string().min(1), judgePromptSha256: hashSchema,
     inputSha256: hashSchema, textSha256: hashSchema, responseSha256: hashSchema, ocrUsed: z.boolean(), textMethod: z.enum(['pdf_text', 'pdf_ocr', 'html', 'text', 'json', 'xml', 'zip_xml']), documentLimitations: z.array(z.string().min(1)).optional(),
     cacheKey: hashSchema, extractedAt: z.iso.datetime(), chunk: z.object({ index: z.number().int().nonnegative(), count: z.number().int().positive(), start: z.number().int().nonnegative(), end: z.number().int().positive() }).strict(),
   }).strict(),
   verification: z.object({
     status: z.enum(['candidate', 'auto-verified']), deterministic: z.object({ passed: z.boolean(), checks: z.array(deterministicCheckSchema).min(1) }).strict(),
-    faithfulness: z.object({ score: z.number().min(0).max(1).nullable(), threshold: z.literal(0.8), model: z.string().min(1), provider: z.literal('openai-subscription'), tool: z.enum(['codex-cli', 'omp-cli']), toolVersion: z.string().min(1), modelIdentitySha256: hashSchema, returnedModel: z.string().min(1).nullable(), runtimeWarnings: z.array(z.string().min(1)).optional(), reason: z.string().min(1), evaluatedAt: z.iso.datetime().nullable(), responseSha256: hashSchema.nullable(), sameModel: z.literal(true), limitation: z.literal('Same-model judgment is not independent verification.') }).strict(),
+    faithfulness: z.object({ score: z.number().min(0).max(1).nullable(), threshold: z.literal(0.8), model: z.string().min(1), provider: z.enum(['openai-subscription', 'anthropic-subscription']), tool: z.enum(['codex-cli', 'claude-cli']), toolVersion: z.string().min(1), modelIdentitySha256: hashSchema, returnedModel: z.string().min(1).nullable(), runtimeWarnings: z.array(z.string().min(1)).optional(), reason: z.string().min(1), evaluatedAt: z.iso.datetime().nullable(), responseSha256: hashSchema.nullable(), sameModel: z.literal(true), limitation: z.literal('Same-model judgment is not independent verification.') }).strict(),
     evidenceHash: hashSchema, reason: z.string().optional(),
   }).strict(),
 }).strict().superRefine((record, ctx) => {
@@ -101,6 +106,32 @@ export const DistrictKnowledgeRecordSchema = DistrictExtractionClaimsSchema.exte
   for (const event of record.stages) if (event.date !== null && !event.dateQuote) fail('Stage history date needs quotation');
   if (record.verification.deterministic.passed !== record.verification.deterministic.checks.every(check => check.passed)) fail('Deterministic gate mismatch');
   if (!REQUIRED_DETERMINISTIC_CHECKS.every(id => record.verification.deterministic.checks.some(check => check.id === id))) fail('Required deterministic evidence missing');
+  if (!GRAPH_DETERMINISTIC_CHECKS.every(id => record.verification.deterministic.checks.some(check => check.id === id))) fail('Required graph grounding evidence missing');
+  const provider = PROVIDER_CONFIGS[record.extraction.provider];
+  if (record.extraction.model !== provider.model || record.extraction.tool !== provider.tool || record.extraction.modelIdentityBasis !== provider.modelIdentityBasis || record.verification.faithfulness.provider !== record.extraction.provider) fail('Provider/model evidence mismatch');
+  try {
+    const normalized = normalizeGraphClaims(record, { municipalityId: record.municipalityId, sourceSha256: record.extraction.inputSha256 });
+    if (normalized.entities.some((entity, i) => entity.entityId !== record.entities[i].entityId || JSON.stringify(entity.identityBasis) !== JSON.stringify(record.entities[i].identityBasis)) || normalized.relations.some((relation, i) => relation.fromId !== record.relations[i].fromId || relation.toId !== record.relations[i].toId)) fail('Pipeline graph identity mismatch');
+  } catch { fail('Invalid graph mention references'); }
+  const actionNormalization = record.extraction.relationNormalization;
+  // Frozen original contracts stay readable for reassessment; never relabel their generation.
+  if ((actionNormalization || record.extraction.promptVersion === 'district-claims-v8-action-relations') && normalizeRelationActions(record).normalization !== null) fail('Graph actions must be canonical before gating and judging');
+  if (actionNormalization) {
+    if (actionNormalization.sourceSha256 !== record.extraction.inputSha256 || actionNormalization.textSha256 !== record.extraction.textSha256 || actionNormalization.responseSha256 !== record.extraction.responseSha256) fail('Relation normalization source/response binding mismatch');
+    const indexes = new Set<number>();
+    const originalRelations = record.relations.map(relation => ({ ...relation }));
+    for (const mapping of actionNormalization.mappings) {
+      const relation = record.relations[mapping.index];
+      if (indexes.has(mapping.index) || !relation || relation.type !== mapping.type || relation.modality !== mapping.modality || sha256(relation.quote) !== mapping.quoteSha256 || sha256(relation.predicateQuote) !== mapping.predicateQuoteSha256) {
+        fail('Relation normalization mapping does not bind record evidence');
+        continue;
+      }
+      indexes.add(mapping.index);
+      originalRelations[mapping.index] = { ...relation, type: mapping.originalType, modality: mapping.originalModality };
+    }
+    const replayed = normalizeRelationActions({ ...record, relations: originalRelations });
+    if (JSON.stringify(replayed.normalization) !== JSON.stringify({ version: actionNormalization.version, mappings: actionNormalization.mappings }) || replayed.claims.relations.some((relation, index) => relation.type !== record.relations[index].type || relation.modality !== record.relations[index].modality)) fail('Relation normalization is not a reproducible exact-predicate mapping');
+  }
   if (new Set(record.verification.deterministic.checks.map(check => check.id)).size !== record.verification.deterministic.checks.length) fail('Duplicate deterministic evidence');
   if (record.extraction.model !== record.verification.faithfulness.model || record.extraction.modelIdentitySha256 !== record.verification.faithfulness.modelIdentitySha256 || record.extraction.tool !== record.verification.faithfulness.tool || record.extraction.toolVersion !== record.verification.faithfulness.toolVersion) fail('Same-model judge identity mismatch');
   if (record.caseKeyType === 'source_document' && record.caseKey !== `source_document:${record.extraction.inputSha256}`) fail('Source-document fallback identity mismatch');

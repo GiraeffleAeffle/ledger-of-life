@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
 import {loadDistrictRegistry} from '../src/district-registry.ts';
-import {buildDistrictCoverage,validateDistrictCoverage,assertKnowledgeSlice,type KnowledgeSliceEvidence} from '../src/district-publication.ts';
+import {buildDistrictCoverage,validateDistrictCoverage,assertKnowledgeSlice,knowledgePublicationHold,type KnowledgeSliceEvidence,type DistrictCoverageRecord} from '../src/district-publication.ts';
+import {PROVIDER_CONFIGS,type ExtractorProvider} from '../src/district-model-contract.ts';
 
 // Synthetic observations exercise counting only; these are not municipal facts.
 const registry=await loadDistrictRegistry(fileURLToPath(new URL('../sources/district-registry.json',import.meta.url)));
@@ -14,22 +15,24 @@ const crawl={schemaVersion:'stadtstack-crawl-index-v1',generatedAt:at,documents:
  {id:'new',municipalityId:city.id,sourceId:city.sources[0].id,sha256:newer}
 ],checks:[]};
 const quarantine={schemaVersion:'stadtstack-quarantine-v1',cases:[first,withdrawn].map(sourceSha256=>({municipalityId:city.id,sourceId:city.sources[0].id,sourceSha256,reason:'Synthetic unsupported case'}))};
-const run={schemaVersion:'stadtstack-extraction-run-v1',generatedAt:at,scope:'all_fetched_documents',maxDocumentsPerMunicipality:null,availableDocumentGroups:2,attemptedDocumentGroups:2,pendingDocumentGroups:0};
+const run={schemaVersion:'stadtstack-extraction-run-v2',generatedAt:at,assignmentMode:'balanced',corpusSha256:'4'.repeat(64),registrySha256:'5'.repeat(64),promptContractSha256:'6'.repeat(64),schemaSha256:'7'.repeat(64),scope:'all_fetched_documents',maxDocumentsPerMunicipality:null,availableDocumentGroups:2,attemptedDocumentGroups:2,pendingDocumentGroups:0};
 
 test('Coverage separates representations, attempted byte groups, new pending input and withdrawn input',()=>{
- const coverage=buildDistrictCoverage(registry,crawl,[],quarantine,'gpt-6-luna',run);
+ const coverage=buildDistrictCoverage(registry,crawl,[],quarantine,run);
  const observed=coverage.municipalities.find(item=>item.id===city.id)!;
  assert.equal(observed.documents,3);
  assert.deepEqual(observed.extraction,{fetchedDocumentGroups:2,attemptedDocumentGroups:1,pendingDocumentGroups:1,unavailableAttemptedDocumentGroups:1});
  assert.equal(coverage.extractionRun.selection,'all_at_run_start');
  assert.equal(coverage.extractionRun.pendingDocumentGroupsAtRunStart,0);
+ assert.equal(coverage.extractionRun.corpusSha256,run.corpusSha256);
+ assert.equal(coverage.extractionRun.promptContractSha256,run.promptContractSha256);
 });
 
 test('Coverage rejects invented attempted totals, missing pending input and concealed extraction caps',()=>{
- assert.throws(()=>buildDistrictCoverage(registry,crawl,[],quarantine,'gpt-6-luna',{...run,attemptedDocumentGroups:3}),/counts/);
- assert.throws(()=>buildDistrictCoverage(registry,crawl,[],quarantine,'gpt-6-luna',{...run,scope:'bounded_per_municipality'}),/selection policy/);
- assert.throws(()=>buildDistrictCoverage(registry,crawl,[],quarantine,'gpt-6-luna',{...run,scope:'bounded_per_municipality',maxDocumentsPerMunicipality:1}),/budget exceeded/);
- const coverage=buildDistrictCoverage(registry,crawl,[],quarantine,'gpt-6-luna',run);
+ assert.throws(()=>buildDistrictCoverage(registry,crawl,[],quarantine,{...run,attemptedDocumentGroups:3}),/counts/);
+ assert.throws(()=>buildDistrictCoverage(registry,crawl,[],quarantine,{...run,scope:'bounded_per_municipality'}),/selection policy/);
+ assert.throws(()=>buildDistrictCoverage(registry,crawl,[],quarantine,{...run,scope:'bounded_per_municipality',maxDocumentsPerMunicipality:1}),/budget exceeded/);
+ const coverage=buildDistrictCoverage(registry,crawl,[],quarantine,run);
  coverage.municipalities[0].extraction.pendingDocumentGroups=0;
  assert.throws(()=>validateDistrictCoverage(coverage,registry,[]),/Extraction coverage mismatch/);
 });
@@ -37,7 +40,7 @@ test('Coverage rejects invented attempted totals, missing pending input and conc
 test('Public source barriers retain full counts but only three safe examples',()=>{
  const blocked=Array.from({length:500},(_,i)=>({url:i===0?'http://127.0.0.1/private':`https://example.org/blocked/${i}`,failure:'robots_blocked',checkedAt:at}));
  const observed={...crawl,checks:[{municipalityId:city.id,sourceId:city.sources[0].id,checkState:'checked',checkedAt:at,documentCount:2,coverage:{state:'blocked',pendingCount:0,runnableCount:0,blockedCount:500,action:'ask_municipality'},blocked}]};
- const coverage=buildDistrictCoverage(registry,observed,[],quarantine,'gpt-6-luna',run);
+ const coverage=buildDistrictCoverage(registry,observed,[],quarantine,run);
  const source=coverage.municipalities[0].sources[0];
  assert.equal(source.failedLinkCount,500);assert.equal(source.failureExamples.length,3);
  assert.equal(source.failureExamples[0].url,null);assert.equal(source.coverage.blockedCount,500);
@@ -54,10 +57,44 @@ test('District slice acceptance is separate from unchanged individual date gates
 });
 
 test('Every registered town exposes checked-without-gated-records versus not-checked explicitly',()=>{
- const coverage=buildDistrictCoverage(registry,crawl,[],quarantine,'gpt-6-luna',run);
+ const coverage=buildDistrictCoverage(registry,crawl,[],quarantine,run);
  assert.equal(coverage.municipalities[0].status,'checked_no_gated_records');
  assert.equal(coverage.municipalities[0].datedStagedRecords,0);
  assert.equal(coverage.municipalities[1].status,'not_checked');
  coverage.municipalities[0].status='gated_records';
  assert.throws(()=>validateDistrictCoverage(coverage,registry,[]),/admission coverage mismatch/);
+});
+
+test('Coverage reports only actual per-provider admitted identities and counts',()=>{
+ const projection=(provider:ExtractorProvider,inputSha256:string):DistrictCoverageRecord=>{
+  const config=PROVIDER_CONFIGS[provider];
+  return {municipalityId:city.id,documentDate:'2026-10-10',stageDate:null,stage:'draft',stages:[],sources:[{id:city.sources[0].id}],extraction:{provider,model:config.model,tool:config.tool,toolVersion:'1.0.0',modelIdentitySha256:provider==='openai-subscription'?'8'.repeat(64):'9'.repeat(64),modelIdentityBasis:config.modelIdentityBasis,inputSha256}};
+ };
+ const records=[projection('openai-subscription',first),projection('openai-subscription',first),projection('anthropic-subscription',newer)];
+ const coverage=buildDistrictCoverage(registry,crawl,records,{schemaVersion:'stadtstack-quarantine-v1',cases:[]},run);
+ assert.deepEqual(Object.fromEntries(coverage.models.map(model=>[model.provider,model.publishedRecords])),{'openai-subscription':2,'anthropic-subscription':1});
+ const wrongCount=structuredClone(coverage);wrongCount.models[0].publishedRecords++;
+ assert.throws(()=>validateDistrictCoverage(wrongCount,registry,records),/model provenance/);
+ const missingProvider=structuredClone(coverage);missingProvider.models.pop();
+ assert.throws(()=>validateDistrictCoverage(missingProvider,registry,records),/Missing admitted model/);
+ const substitutedModel=structuredClone(coverage);substitutedModel.models[0].model='different-model';
+ assert.throws(()=>validateDistrictCoverage(substitutedModel,registry,records),/model provenance/);
+ const falseMode=structuredClone(coverage);falseMode.extractionRun.assignmentMode='codex-only';
+ assert.throws(()=>validateDistrictCoverage(falseMode,registry,records),/Codex-only assignment/);
+});
+
+test('publication withholds a malformed or nonpublic quoted URL without repairing source evidence',()=>{
+ const record={documentDate:'2026-10-10',stageDate:null,stages:[],summaryQuote:'Synthetic quotation: httos://www.beispiel.de/ and https://internal/'};
+ const original=structuredClone(record),hold=knowledgePublicationHold(record);
+ assert.deepEqual(hold?.reasons,['nonpublic_evidence_url']);
+ assert.deepEqual(hold?.urlIssues,[{path:'summaryQuote',reason:'nonpublic_scheme'},{path:'summaryQuote',reason:'nonpublic_hostname'}]);
+ assert.deepEqual(record,original);
+ assert.equal(knowledgePublicationHold({...record,summaryQuote:'Synthetic quotation: https://www.beispiel.de/'}),null);
+});
+
+test('publication retains independent date and URL holds without admitting or counting a record twice',()=>{
+ const record={documentDate:null,stageDate:null,stages:[],summaryQuote:'Synthetic quotation: file:///synthetic/source'};
+ assert.deepEqual(knowledgePublicationHold(record)?.reasons,['missing_sourced_date','nonpublic_evidence_url']);
+ assert.deepEqual(knowledgePublicationHold({...record,summaryQuote:'Synthetic source text.'})?.reasons,['missing_sourced_date']);
+ assert.equal(knowledgePublicationHold({...record,stageDate:'2026-10-10',summaryQuote:'Synthetic source text.'}),null);
 });

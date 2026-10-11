@@ -1,4 +1,5 @@
-import {createHash,createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
+import {createHash} from 'node:crypto';
+import {canonical,readCursor,writeCursor} from './mcp-pagination.ts';
 import {z} from 'zod';
 import type {Catalogue,Signal} from './schema.ts';
 import {isPublicUrl,publicUrlReason} from './publication-quality.ts';
@@ -16,19 +17,13 @@ export type MunicipalityRecordCoverage=z.infer<typeof municipalityRecordCoverage
 
 export const regionalSchema=z.object({schemaVersion:z.literal('stadtstack-regional-topics-v1'),generatedAt:z.string(),asOf:z.string(),region:z.object({id:z.string(),name:z.string()}).passthrough(),municipalities:z.array(z.object({id:z.string(),name:z.string(),ags:z.string().optional()}).passthrough()),topics:z.array(z.object({id:z.string(),label:z.string(),municipalities:z.array(z.object({municipalityId:z.string(),stage:z.string(),items:z.array(z.object({title:z.string(),url:z.url(),date:z.string().nullable(),sourceType:z.string(),locator:z.string(),stage:z.string()}).passthrough())}))}))});
 export type Regional=z.infer<typeof regionalSchema>;
-export const queryFields=['id','cityId','recordType','title','statement','topics','eventDate','endDate','dateSemantics','status','stage','asOf','sourceIds','sourceTypes','comparisonEligible','comparisonReason','geometry','category','nextStep','unknowns','verification','assertion','reviewState','geometryPrecision','origin','districtId','ags','caseKey','caseKeyType','documentDate','stageDate','originalStatus','stageQuote','entities','locations','extraction','stages','documentDateReason','stageDateReason','documentDateQuote','stageDateQuote','titleQuote','summaryQuote','municipalityQuote','caseQuote'] as const;
+export const queryFields=['id','cityId','recordType','title','statement','topics','eventDate','endDate','dateSemantics','status','stage','asOf','sourceIds','sourceTypes','comparisonEligible','comparisonReason','geometry','category','nextStep','unknowns','verification','assertion','reviewState','geometryPrecision','origin','districtId','ags','caseKey','caseKeyType','documentDate','stageDate','originalStatus','stageQuote','entities','relations','locations','extraction','stages','documentDateReason','stageDateReason','documentDateQuote','stageDateQuote','titleQuote','summaryQuote','municipalityQuote','caseQuote'] as const;
 export const defaultFields=['id','cityId','recordType','title','topics','eventDate','documentDate','stageDate','dateSemantics','status','asOf','sourceIds','comparisonEligible'] as const;
 export const cityIdSchema=z.string().regex(/^[a-z0-9-]{1,80}$/);
 export const queryShape={query:z.string().trim().min(1).max(200).optional(),topic:z.string().trim().min(1).max(80).optional(),recordTypes:z.array(z.enum(['planning','construction','infrastructure','roadworks','council_paper','council_meeting','budget','consultation','place','measurement','regional_item','unknown'])).min(1).max(12).optional(),sourceTypes:z.array(z.string().min(1).max(80)).min(1).max(20).optional(),stage:z.string().min(1).max(80).optional(),dateFrom:z.iso.date().optional(),dateTo:z.iso.date().optional(),excludePlaces:z.boolean().default(false),excludeOSM:z.boolean().default(false),cursor:z.string().min(1).max(2048).optional(),limit:z.number().int().min(1).max(50).default(20),fields:z.array(z.enum(queryFields)).min(1).max(queryFields.length).optional()};
 export const querySchema=z.object({...queryShape,cityIds:z.array(cityIdSchema).min(1).max(50).optional()}).strict();
 export type QueryOptions=z.infer<typeof querySchema>;
-export type QueryRecord={id:string;cityId:string;recordType:string;title:string;statement:string;topics:TopicTag[];eventDate:string|null;endDate:string|null;dateSemantics:'source_event'|'source_document'|'observation'|'unknown';status:string;stage:string|null;asOf:string;sourceIds:string[];sourceTypes:string[];comparisonEligible:boolean;comparisonReason:string|null;geometry:Signal['geometry'];origin:'city'|'regional'|'knowledge';category:string;nextStep?:string;unknowns?:string[];verification?:Signal['properties']['verification']|DistrictKnowledgeRecord['verification'];assertion?:Signal['properties']['assertion'];reviewState?:string;geometryPrecision?:string;districtId?:string;ags?:string;caseKey?:string;caseKeyType?:string;documentDate?:string|null;stageDate?:string|null;originalStatus?:string;stageQuote?:string;entities?:DistrictKnowledgeRecord['entities'];locations?:DistrictKnowledgeRecord['locations'];extraction?:DistrictKnowledgeRecord['extraction']} & Partial<Pick<DistrictKnowledgeRecord,'stages'|'documentDateReason'|'stageDateReason'|'documentDateQuote'|'stageDateQuote'|'titleQuote'|'summaryQuote'|'municipalityQuote'|'caseQuote'>>;
-const cursorKey=randomBytes(32); // Process-only signing key, never an owner token; restart expires cursors.
-function canonical(value:unknown):string {
-  if(Array.isArray(value))return JSON.stringify(value.map(item=>JSON.parse(canonical(item))));
-  if(value&&typeof value==='object')return JSON.stringify(Object.fromEntries(Object.entries(value).filter(([,v])=>v!==undefined).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,JSON.parse(canonical(v))])));
-  return JSON.stringify(value);
-}
+export type QueryRecord={id:string;cityId:string;recordType:string;title:string;statement:string;topics:TopicTag[];eventDate:string|null;endDate:string|null;dateSemantics:'source_event'|'source_document'|'observation'|'unknown';status:string;stage:string|null;asOf:string;sourceIds:string[];sourceTypes:string[];comparisonEligible:boolean;comparisonReason:string|null;geometry:Signal['geometry'];origin:'city'|'regional'|'knowledge';category:string;nextStep?:string;unknowns?:string[];verification?:Signal['properties']['verification']|DistrictKnowledgeRecord['verification'];assertion?:Signal['properties']['assertion'];reviewState?:string;geometryPrecision?:string;districtId?:string;ags?:string;caseKey?:string;caseKeyType?:string;documentDate?:string|null;stageDate?:string|null;originalStatus?:string;stageQuote?:string;entities?:DistrictKnowledgeRecord['entities'];relations?:DistrictKnowledgeRecord['relations'];locations?:DistrictKnowledgeRecord['locations'];extraction?:DistrictKnowledgeRecord['extraction']} & Partial<Pick<DistrictKnowledgeRecord,'stages'|'documentDateReason'|'stageDateReason'|'documentDateQuote'|'stageDateQuote'|'titleQuote'|'summaryQuote'|'municipalityQuote'|'caseQuote'>>;
 export function publicData(value:unknown,field=''):unknown {
   if(Array.isArray(value))return value.map(item=>publicData(item,field));
   const relativeExport=(field==='feedUrl'||field==='minUrl')&&typeof value==='string'&&/^cities\/[a-z0-9-]+\/(?:feed\.json|signals\.min\.geojson)$/.test(value);
@@ -116,7 +111,7 @@ export class QueryIndex {
       // Infrastructure is a case type, not proof construction started; unknown stays unknown.
       const recordType=record.caseType;
       const observedAt=record.sources.map(source=>source.retrievedAt).sort().at(-1)!;
-      this.records.push({id:record.id,cityId:record.municipalityId,ags:record.ags,districtId:record.districtId,recordType,title:record.title,statement:record.summary,topics:record.topics.map(topic=>({...topic,assignment:topic.provenance,ruleId:topic.provenance==='rule'?`${topicRegistryVersion}:${topic.id}`:record.extraction.promptVersion,evidence:topic.quote,sourceIds})),eventDate:record.stageDate,endDate:null,dateSemantics:record.stageDate?'source_event':record.documentDate?'source_document':'unknown',documentDate:record.documentDate,stageDate:record.stageDate,status:record.originalStatus,originalStatus:record.originalStatus,stage:record.stage,stageQuote:record.stageQuote,caseKey:record.caseKey,caseKeyType:record.caseKeyType,asOf:observedAt,sourceIds,sourceTypes,comparisonEligible:comparisonReason===null,comparisonReason,geometry:null,origin:'knowledge',category:record.topics.map(topic=>topic.id).join(', '),verification,entities:record.entities,locations:record.locations,extraction:record.extraction,geometryPrecision:'none',stages:record.stages,documentDateReason:record.documentDateReason,stageDateReason:record.stageDateReason,documentDateQuote:record.documentDateQuote,stageDateQuote:record.stageDateQuote,titleQuote:record.titleQuote,summaryQuote:record.summaryQuote,municipalityQuote:record.municipalityQuote,caseQuote:record.caseQuote});
+      this.records.push({id:record.id,cityId:record.municipalityId,ags:record.ags,districtId:record.districtId,recordType,title:record.title,statement:record.summary,topics:record.topics.map(topic=>({...topic,assignment:topic.provenance,ruleId:topic.provenance==='rule'?`${topicRegistryVersion}:${topic.id}`:record.extraction.promptVersion,evidence:topic.quote,sourceIds})),eventDate:record.stageDate,endDate:null,dateSemantics:record.stageDate?'source_event':record.documentDate?'source_document':'unknown',documentDate:record.documentDate,stageDate:record.stageDate,status:record.originalStatus,originalStatus:record.originalStatus,stage:record.stage,stageQuote:record.stageQuote,caseKey:record.caseKey,caseKeyType:record.caseKeyType,asOf:observedAt,sourceIds,sourceTypes,comparisonEligible:comparisonReason===null,comparisonReason,geometry:null,origin:'knowledge',category:record.topics.map(topic=>topic.id).join(', '),verification,entities:record.entities,relations:record.relations,locations:record.locations,extraction:record.extraction,geometryPrecision:'none',stages:record.stages,documentDateReason:record.documentDateReason,stageDateReason:record.stageDateReason,documentDateQuote:record.documentDateQuote,stageDateQuote:record.stageDateQuote,titleQuote:record.titleQuote,summaryQuote:record.summaryQuote,municipalityQuote:record.municipalityQuote,caseQuote:record.caseQuote});
     }
     for(const record of this.records){
       for(const type of record.sourceTypes)this.sourceTypeSet.add(type);
@@ -182,27 +177,14 @@ export class QueryIndex {
     const fields=[...new Set(options.fields??defaultFields)].sort();
     const {cursor,...filters}=options;
     const binding=createHash('sha256').update(canonical({scope,filters:{...filters,fields,cityIds:options.cityIds?[...new Set(options.cityIds)].sort():undefined,recordTypes:options.recordTypes?[...new Set(options.recordTypes)].sort():undefined,sourceTypes:options.sourceTypes?[...new Set(options.sourceTypes)].sort():undefined,limit,excludePlaces:options.excludePlaces??false},extra,includeWithheld})).digest('hex');
-    let after:string|undefined;
-    if(cursor) {
-      const parts=cursor.split('.');
-      if(parts.length!==2||!parts.every(part=>/^[A-Za-z0-9_-]+$/.test(part)))throw Error('Invalid cursor');
-      const signature=createHmac('sha256',cursorKey).update(parts[0]).digest();
-      const supplied=Buffer.from(parts[1],'base64url');
-      if(supplied.toString('base64url')!==parts[1]||signature.length!==supplied.length||!timingSafeEqual(signature,supplied))throw Error('Invalid or expired cursor');
-      let decoded:unknown;try{decoded=JSON.parse(Buffer.from(parts[0],'base64url').toString('utf8'));}catch{throw Error('Invalid cursor');}
-      const payload=z.object({v:z.literal(1),release:z.string(),binding:z.string(),after:z.string()}).strict().safeParse(decoded);
-      if(!payload.success)throw Error('Invalid cursor');
-      if(payload.data.release!==this.releaseId||payload.data.binding!==binding)throw Error('Cursor release or filters mismatch');
-      after=payload.data.after;
-    }
+    const after=readCursor(cursor,this.releaseId,binding);
     const matches=eligible.filter(record=>(includeWithheld||record.comparisonEligible)&&matchesFilters(record,options));
     let start=0;
     if(after!==undefined){const index=matches.findIndex(record=>this.recordKey(record)===after);if(index<0)throw Error('Cursor record not found in released query');start=index+1;}
     const records=matches.slice(start,start+limit);
     let nextCursor:string|null=null;
     if(start+limit<matches.length) {
-      const payload=Buffer.from(JSON.stringify({v:1,release:this.releaseId,binding,after:this.recordKey(records[records.length-1])})).toString('base64url');
-      nextCursor=`${payload}.${createHmac('sha256',cursorKey).update(payload).digest('base64url')}`;
+      nextCursor=writeCursor(this.releaseId,binding,this.recordKey(records[records.length-1]));
     }
     return {items:records.map(record=>Object.fromEntries(fields.map(field=>[field,record[field]]))),total:matches.length,nextCursor,withheld:{count:eligible.filter(record=>!record.comparisonEligible&&matchesFilters(record,options)).length,meaning:includeWithheld?'Discovery includes explicitly ineligible evidence; never compare these items as dated progress':'Missing required dates/status or failed verification gates withheld from comparison; get_regional_topics includes regional and normalized discovery evidence'},fields};
   }

@@ -1,0 +1,295 @@
+{
+  "schemaVersion": "stadtstack-relation-rejection-evidence-v1",
+  "snapshotAt": "2026-10-11T08:06:03.186545+00:00",
+  "contract": {
+    "implemented": true,
+    "code": "src/district-graph-claims.ts:82-102,107; src/district-claims.ts:21,144-145",
+    "coMention": "Both distinct endpoint mentionIds must exist. The exact contiguous relation.quote must contain both endpoint names (case-sensitive substring after whitespace collapse) and predicateQuote. Co-mention alone is not sufficient.",
+    "lexicalGate": "predicateQuote must match the type-specific regular expression. Current implements alternatives include realisiert, realisieren, errichtet, errichten, umgesetzt, umsetzen, setzt...um, durchgeführt, durchführen, führt...durch, implements/implement/implemented. Nominal Realisierung and plant den Ausbau are not listed.",
+    "nestedEvidence": "time.quote must be exact source text inside relation.quote and contain time.text; conditions, when non-null, must occur inside relation.quote. General exact_quotes checks all supporting quotes against the excerpt.",
+    "modalityTimeGates": [
+      "Recognized ab/am/zum/bis/seit/im Jahr/in date-year expressions require non-null quoted time.",
+      "A recognized year later than documentDate year (except bis) cannot have asserted modality.",
+      "Negation words require negated; checked before condition/future checks.",
+      "Conditional words or non-null conditions require conditional and non-null conditions.",
+      "Prospective words/phrases require planned or proposed.",
+      "Historical words or lowercase standalone betrieb predicate require historical and quoted time.",
+      "Otherwise negated is rejected and historical requires time."
+    ],
+    "otherGates": "graph_mentions requires unique local IDs, exact entity quotes with whitespace-equivalent names, and non-person mentions. graph_identifiers requires entity name/value/namespace/issuer together and rejects conflicting IDs within a namespace. These selected examples passed both.",
+    "semanticJudge": "Direction, actor/endpoint roles, identity, predicate, modality, time and conditions require source-faithfulness judgment after deterministic checks. These three candidates never reached the judge. Unsupported graph claims are critical at judgment; lexical matching alone does not establish roles.",
+    "errichtenChange": "Current source includes errichten/errichtet and explicitly treats named-builder intent as planned implements, not completed works. No schema relaxation is visible in RelationClaimSchema; these words do not fix any of the three selected failures."
+  },
+  "examples": [
+    {
+      "municipality": "hoppegarten",
+      "title": "Artenschutzrechtlicher Fachbeitrag zum B-Plan „Schulcampus Lindenallee / Virchowstraße“",
+      "sourceURL": "https://bb.beteiligung.diplanung.de/file/eb568622-04ec-41e7-8069-fd8204fa88d8/d9fc08f0-745a-44de-8f7a-a103b05fca42",
+      "sourceSha256": "c85920d0e96032241846bc8bfe283108d5f3027632b8d59060d98244d897b8dd",
+      "chunk": 2,
+      "recordId": "knowledge:hoppegarten:898f0ccb7e3ab05c9d2ee62d",
+      "extractorVersion": "district-extractor-v8-joint-graph",
+      "model": "gpt-6-luna",
+      "actualShortQuote": "in der\nGemeinde Hoppegarten sollen die planungsrechtlichen Voraussetzungen für die\nRealisierung eines Schulcampus geschaffen werden",
+      "from": {
+        "mentionId": "hoppegarten",
+        "name": "Gemeinde Hoppegarten",
+        "type": "municipality",
+        "entityId": "entity:755bf99921b6052dd30ad74ef3edff3f679b0419b80908f97346f1b3166f6753"
+      },
+      "to": {
+        "mentionId": "schulcampus",
+        "name": "Schulcampus Lindenallee / Virchowstraße",
+        "type": "project",
+        "entityId": "entity:9e5df6863388f9d4b217d527038446f9af3b78f4d00b107db504d15c9aede1c6"
+      },
+      "claimedType": "implements",
+      "direction": "hoppegarten -> schulcampus",
+      "modality": "planned",
+      "predicateQuote": "Realisierung",
+      "time": null,
+      "conditions": null,
+      "failedGateIds": [
+        "graph_relations"
+      ],
+      "storedFailedChecks": [
+        {
+          "id": "graph_relations",
+          "passed": false,
+          "reason": "Both named endpoints and an explicit typed predicate occur in one contiguous quotation; time and conditions are quoted, not metadata-derived."
+        }
+      ],
+      "storedFaithfulnessReason": "Not evaluated: deterministic gate failed",
+      "judgeCalled": false,
+      "faithfulnessScore": null,
+      "supportingPassedGates": [
+        "schema",
+        "exact_quotes",
+        "municipality",
+        "title",
+        "case_identity",
+        "document_date",
+        "stage_date",
+        "stage",
+        "stage_history",
+        "critical_stage_promotion",
+        "critical_budget_spending",
+        "topic_hierarchy",
+        "entity_labels",
+        "location_labels",
+        "geometry",
+        "summary_numbers",
+        "no_contacts",
+        "graph_mentions",
+        "graph_identifiers",
+        "graph_modality"
+      ],
+      "specificReason": {
+        "missingEndpointNames": [
+          "Schulcampus Lindenallee / Virchowstraße"
+        ],
+        "predicateFailure": "Realisierung is not a supported implements lexical form; the quote contains only generic eines Schulcampus, not the named target.",
+        "roleAssessment": "The quoted statement concerns creating planning-law prerequisites in the municipality; it does not explicitly name the municipality as the builder/implementer.",
+        "assessment": "Unsupported submitted edge under the contract, not proof that the public project evidence is false or lost. Adding errichten/errichtet does not repair this candidate."
+      },
+      "timeModalityAssessment": "graph_modality passed. time and conditions are null; no missing-time failure was recorded.",
+      "resultPath": "cache/district-joint/results/e7dad3af2e62812e2219f8520e12a184ca0e917469033ed5ee0f3e0fd52c8cd1.json",
+      "sourceLocator": "text-sha256:f8747f4470463d41424a4fe9b0f4a3761cf73b93139f0bedc7b1ddff644f3f91;chars:7951-12611",
+      "taskId": "e7dad3af2e62812e2219f8520e12a184ca0e917469033ed5ee0f3e0fd52c8cd1"
+    },
+    {
+      "municipality": "ruedersdorf-bei-berlin",
+      "title": "Bebauungsplan Nr. 53 „Biomassezentrum Hennickendorf“",
+      "sourceURL": "https://bb.beteiligung.diplanung.de/file/bplan53biomassezentrum/e6faed08-e753-4817-b275-3ba37c937150",
+      "sourceSha256": "13c1dbe60a835158067d0c43fb475c9bdaafde08e56a5f76fa20acc3ce6585d5",
+      "chunk": 0,
+      "recordId": "knowledge:ruedersdorf-bei-berlin:a81b5f46f310ffdace163098",
+      "extractorVersion": "district-extractor-v8-joint-graph",
+      "model": "gpt-6-luna",
+      "actualShortQuote": "die Berliner\nStadtreinigungsbetriebe AöR (BSR) die Kompostier- und Biogasanlage Hennickendorf",
+      "from": {
+        "mentionId": "company",
+        "name": "Berliner Stadtreinigungsbetriebe AöR",
+        "type": "company",
+        "entityId": "entity:f19a277f69f8ecdad60714dbea4556413c8c7c96672d1d86f653fee4f47ddbe3"
+      },
+      "to": {
+        "mentionId": "project",
+        "name": "Biomassezentrum Hennickendorf",
+        "type": "project",
+        "entityId": "entity:3f784bac38551ea4677f1d6922f34ebba8678d49cbc3b76ac0690413b86abbe2"
+      },
+      "claimedType": "operates",
+      "direction": "company -> project",
+      "modality": "asserted",
+      "predicateQuote": "betreiben",
+      "time": null,
+      "conditions": null,
+      "failedGateIds": [
+        "graph_relations"
+      ],
+      "storedFailedChecks": [
+        {
+          "id": "graph_relations",
+          "passed": false,
+          "reason": "Both named endpoints and an explicit typed predicate occur in one contiguous quotation; time and conditions are quoted, not metadata-derived."
+        }
+      ],
+      "storedFaithfulnessReason": "Not evaluated: deterministic gate failed",
+      "judgeCalled": false,
+      "faithfulnessScore": null,
+      "supportingPassedGates": [
+        "schema",
+        "exact_quotes",
+        "municipality",
+        "title",
+        "case_identity",
+        "document_date",
+        "stage_date",
+        "stage",
+        "stage_history",
+        "critical_stage_promotion",
+        "critical_budget_spending",
+        "topic_hierarchy",
+        "entity_labels",
+        "location_labels",
+        "geometry",
+        "summary_numbers",
+        "no_contacts",
+        "graph_mentions",
+        "graph_identifiers",
+        "graph_modality"
+      ],
+      "specificReason": {
+        "missingEndpointNames": [
+          "Biomassezentrum Hennickendorf"
+        ],
+        "predicateFailure": "predicateQuote betreiben is absent from relation.quote (although exact_quotes passed, so it occurs somewhere in the source excerpt).",
+        "roleAssessment": "The quote names Kompostier- und Biogasanlage Hennickendorf instead of the claimed target; any identity equivalence would require evidence, not assumption.",
+        "assessment": "A model quotation/endpoint contract failure. This does not establish that the underlying operator relationship is false."
+      },
+      "timeModalityAssessment": "graph_modality passed. time and conditions are null; no missing-time failure was recorded.",
+      "resultPath": "cache/district-joint/results/ae7126c7add80484c92abde6ecde1d299c09a087cfd5de8397afd037e5b10d7e.json",
+      "sourceLocator": "text-sha256:eb79b73ba8b662fa6e79b6457f31bbad6110d04c4ddd7ef4fa46efbfabba57f7;chars:0-4798",
+      "taskId": "ae7126c7add80484c92abde6ecde1d299c09a087cfd5de8397afd037e5b10d7e"
+    },
+    {
+      "municipality": "strausberg",
+      "title": "Bebauungsplan Nr. 66/21 „Hegermühlenstraße Ost“",
+      "sourceURL": "https://bb.beteiligung.diplanung.de/file/strausberg-hegermuehlenstrasse-ost/cca2b6b6-728b-47f2-8543-04cb4ecaa52b",
+      "sourceSha256": "cd2dd4d16f48579b2a751bc16fa51b01b258b0060a5d3d3239c3c005a7a7d6c7",
+      "chunk": 39,
+      "recordId": "knowledge:strausberg:2d284782326353cc67a8d509",
+      "extractorVersion": "district-extractor-v8-joint-graph",
+      "model": "gpt-6-luna",
+      "actualShortQuote": "Die Stadt Strausberg plant den Ausbau der Hegermühlenstraße mit der Anlage beidseitiger Geh- und\nRadwege",
+      "from": {
+        "mentionId": "strausberg",
+        "name": "Stadt Strausberg",
+        "type": "municipality",
+        "entityId": "entity:8b91b66e5a58e29fc114c6027c5079b714caee82ed1db7a79ee2126c72c4c365"
+      },
+      "to": {
+        "mentionId": "hegermuehlenstrasse",
+        "name": "Hegermühlenstraße",
+        "type": "place",
+        "entityId": "entity:4677a7f6e900c6bdad97b3583fc5404fb27ea6ff7876cda3852d14ce416afd49"
+      },
+      "claimedType": "implements",
+      "direction": "strausberg -> hegermuehlenstrasse",
+      "modality": "planned",
+      "predicateQuote": "plant den Ausbau",
+      "time": null,
+      "conditions": null,
+      "failedGateIds": [
+        "graph_relations"
+      ],
+      "storedFailedChecks": [
+        {
+          "id": "graph_relations",
+          "passed": false,
+          "reason": "Both named endpoints and an explicit typed predicate occur in one contiguous quotation; time and conditions are quoted, not metadata-derived."
+        }
+      ],
+      "storedFaithfulnessReason": "Not evaluated: deterministic gate failed",
+      "judgeCalled": false,
+      "faithfulnessScore": null,
+      "supportingPassedGates": [
+        "schema",
+        "exact_quotes",
+        "municipality",
+        "title",
+        "case_identity",
+        "document_date",
+        "stage_date",
+        "stage",
+        "stage_history",
+        "critical_stage_promotion",
+        "critical_budget_spending",
+        "topic_hierarchy",
+        "entity_labels",
+        "location_labels",
+        "geometry",
+        "summary_numbers",
+        "no_contacts",
+        "graph_mentions",
+        "graph_identifiers",
+        "graph_modality"
+      ],
+      "specificReason": {
+        "missingEndpointNames": [],
+        "predicateFailure": "plant den Ausbau occurs verbatim in the quote but matches none of the implements lexical alternatives.",
+        "roleAssessment": "The public quote explicitly attributes planning the road expansion to Stadt Strausberg; planned modality is preserved. Whether planning an expansion qualifies semantically as planned implements has not been judged.",
+        "assessment": "Plausible lexical false negative at the precheck, not a judged model error. Both endpoint names and an explicit action are present. Adding errichten/errichtet alone does not admit this wording; do not claim automatic salvage."
+      },
+      "timeModalityAssessment": "graph_modality passed. time and conditions are null; no missing-time failure was recorded.",
+      "resultPath": "cache/district-joint/results/7586506ef884ed4f98ec7915075eea4134b442b0c4cca45a1b01e41a2abdf214.json",
+      "sourceLocator": "text-sha256:7c6b36526738c719bc908498367cc73e8537c51a59d287feb40f3244547abcaa;chars:152641-157253",
+      "taskId": "7586506ef884ed4f98ec7915075eea4134b442b0c4cca45a1b01e41a2abdf214"
+    }
+  ],
+  "limitations": [
+    "Selected quotes are stored source-quoted public evidence fields; exact_quotes passed for each candidate. No original source documents were fetched.",
+    "A quarantine candidate is not proof the underlying public case is false. Failures can be endpoint/quotation extraction errors or lexical coverage limits.",
+    "No claim of network benefit, no automatic salvage, and no claim of final v8 data loss."
+  ],
+  "update": {
+    "at": "2026-10-11T08:11:12.982Z",
+    "rawAdmittedRelationRecords": 2,
+    "dateEligibleRelationRecords": 1,
+    "records": [
+      {
+        "id": "knowledge:strausberg:5e291958a1a65ae9466fb724",
+        "municipalityId": "strausberg",
+        "stage": "unknown",
+        "documentDate": null,
+        "stageDate": null,
+        "historyDates": [],
+        "dateEligible": false,
+        "relations": [
+          {
+            "type": "implements",
+            "modality": "planned"
+          }
+        ]
+      },
+      {
+        "id": "knowledge:ratzeburg:32963b51e0a673f6f072d92e",
+        "municipalityId": "ratzeburg",
+        "stage": "decision",
+        "documentDate": null,
+        "stageDate": "2021-03-29",
+        "historyDates": [
+          "2021-03-29"
+        ],
+        "dateEligible": true,
+        "relations": [
+          {
+            "type": "operates",
+            "modality": "asserted"
+          }
+        ]
+      }
+    ]
+  }
+}

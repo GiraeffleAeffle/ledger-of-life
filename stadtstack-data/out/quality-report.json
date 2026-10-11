@@ -1,6 +1,6 @@
 {
   "schemaVersion": "stadtstack-publication-quality-v1",
-  "generatedAt": "2026-10-10T22:51:52.401Z",
+  "generatedAt": "2026-10-11T09:25:14.000Z",
   "policy": {
     "publicUrls": "required",
     "councilBodyBinding": "required",
@@ -11,1361 +11,10 @@
   "cities": [
     {
       "cityId": "koeln",
-      "input": 5483,
-      "deduplicated": 5483,
+      "input": 5213,
+      "deduplicated": 5213,
       "published": 5213,
-      "quarantined": [
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35774",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35775",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35776",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35777",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35778",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35779",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35781",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35782",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35783",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35784",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35785",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35786",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35787",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35788",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35789",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35790",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35791",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35792",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35793",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35794",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35795",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35796",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35797",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35798",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35799",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35800",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35801",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35802",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35803",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35804",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35805",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35806",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35807",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35808",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35809",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35810",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35811",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35812",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35814",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35815",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35816",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35817",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35818",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35819",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35820",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35821",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35822",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35823",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35824",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35825",
-          "cityId": "koeln",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "koeln-bplan:1428",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1429",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1430",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1431",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1432",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1433",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1434",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1435",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1436",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1437",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1438",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1439",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1440",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1441",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1442",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1443",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1444",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1445",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1446",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1447",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1448",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1449",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1450",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1451",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1452",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1453",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1454",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1455",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1456",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1457",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1458",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1459",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1460",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1461",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1462",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1463",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1464",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1465",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1466",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1467",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1468",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1469",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1470",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1471",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1472",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1473",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1474",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1475",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1476",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1477",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1478",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1479",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1480",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1481",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1482",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1483",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1484",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1485",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1486",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1487",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1488",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1489",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1490",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1491",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1492",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1493",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1494",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1495",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1496",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1497",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1498",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1499",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1500",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1501",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1502",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1503",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1504",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1505",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1506",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1507",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1508",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1509",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1510",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1511",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1512",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1513",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1514",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1515",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1516",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1517",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1518",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1519",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1520",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1521",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1522",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1523",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1524",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1525",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1526",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1527",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1528",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1529",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1530",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1531",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1532",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1533",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1534",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1535",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1536",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1537",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1538",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1539",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1540",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1541",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1542",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1543",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1544",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1545",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1546",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1547",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1548",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1549",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1550",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1551",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1552",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1553",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1554",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1555",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1556",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1557",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1558",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1559",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1560",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1561",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1562",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1563",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1564",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1565",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1566",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1567",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1568",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1569",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1570",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1571",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1572",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1573",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1574",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1575",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1576",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1577",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1578",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1579",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1580",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1581",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1582",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1583",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1584",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1585",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1586",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1587",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1588",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1589",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1590",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1591",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1592",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1593",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1594",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1595",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1596",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1597",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1598",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1599",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1600",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1601",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1602",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1603",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1604",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1605",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1606",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1607",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1608",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1609",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1610",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1611",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1612",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1613",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1614",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1615",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1616",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1617",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1618",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1619",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1620",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1621",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1622",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1623",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1624",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1625",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1626",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1627",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1628",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1629",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1630",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1631",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1632",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1633",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1634",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1635",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1636",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1637",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1638",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1639",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1640",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1641",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1642",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1643",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1644",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1645",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1646",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "koeln-bplan:1647",
-          "cityId": "koeln",
-          "reason": "missing_sourced_start_date"
-        }
-      ],
+      "quarantined": [],
       "sources": [
         {
           "id": "nominatim",
@@ -1684,16 +333,16 @@
         },
         {
           "id": "ccf-meeting",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 50,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2026-10-07T16:00:00+02:00",
-            "observedEnd": "2027-12-07T17:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:02:29.527Z",
-            "state": "partial",
+            "state": "not_checked",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licence": "unknown",
@@ -1726,16 +375,16 @@
         },
         {
           "id": "oparl-meeting-0",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 50,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2026-10-07T16:00:00+02:00",
-            "observedEnd": "2027-12-07T17:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:02:33.256Z",
-            "state": "partial",
+            "state": "not_checked",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licence": "unknown",
@@ -1747,16 +396,16 @@
         },
         {
           "id": "oparl-meeting-1",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 50,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2026-10-07T16:00:00+02:00",
-            "observedEnd": "2027-12-07T17:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:02:33.477Z",
-            "state": "partial",
+            "state": "not_checked",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licence": "unknown",
@@ -2106,176 +755,10 @@
     },
     {
       "cityId": "muenster",
-      "input": 1977,
-      "deduplicated": 1977,
+      "input": 1944,
+      "deduplicated": 1944,
       "published": 1944,
-      "quarantined": [
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14560",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14561",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14562",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14563",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14564",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14565",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14566",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14567",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14568",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14569",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14570",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14571",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14572",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14573",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14574",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14575",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14576",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14577",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14578",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14579",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14580",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14581",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14582",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14585",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14591",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14627",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14629",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14631",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14633",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14635",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14868",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14869",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14870",
-          "cityId": "muenster",
-          "reason": "end_before_start"
-        }
-      ],
+      "quarantined": [],
       "sources": [
         {
           "id": "nominatim",
@@ -2433,7 +916,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-09-10T17:00:00+02:00",
-            "observedEnd": "2027-12-15T16:15:00+01:00",
+            "observedEnd": "2026-09-10T17:00:00+02:00",
             "checkedAt": "2026-09-27T10:02:41.911Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
@@ -2475,7 +958,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-09-10T17:00:00+02:00",
-            "observedEnd": "2027-12-15T16:15:00+01:00",
+            "observedEnd": "2026-09-10T17:00:00+02:00",
             "checkedAt": "2026-09-27T10:02:47.522Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
@@ -2496,7 +979,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-09-10T17:00:00+02:00",
-            "observedEnd": "2027-12-15T16:15:00+01:00",
+            "observedEnd": "2026-09-10T17:00:00+02:00",
             "checkedAt": "2026-09-27T10:02:48.029Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
@@ -2659,976 +1142,10 @@
     },
     {
       "cityId": "wuppertal",
-      "input": 1541,
-      "deduplicated": 1541,
+      "input": 1348,
+      "deduplicated": 1348,
       "published": 1348,
-      "quarantined": [
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25300",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25301",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25302",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25303",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25304",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25305",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25306",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25307",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25308",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25309",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25310",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25311",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25312",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25313",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25337",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25338",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25339",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25340",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25341",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25342",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25343",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25345",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25346",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25347",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25348",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25349",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25350",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25351",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25352",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25353",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25354",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25355",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25356",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25357",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25358",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25359",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25369",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25370",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25371",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25372",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25373",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25374",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25375",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25376",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25377",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25378",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25379",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25380",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25381",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25382",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25383",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25384",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25385",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25386",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25387",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25388",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25389",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25390",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25434",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25435",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25436",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25437",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25438",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25445",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25446",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25447",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25448",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25449",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25450",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25451",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25452",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25453",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25454",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25455",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25456",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25457",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25458",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25459",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25460",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25461",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25467",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25468",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25469",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25470",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25471",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25472",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25473",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25474",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25475",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25476",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25477",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25478",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25479",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25480",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25481",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25482",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25483",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25484",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25485",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25486",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25487",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25488",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25489",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25490",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25491",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25536",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25537",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25538",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25539",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25540",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25541",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25551",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25552",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25553",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25554",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25555",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25556",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25576",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25609",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25610",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25611",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25612",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25613",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25614",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25616",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25617",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25621",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25622",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25623",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25624",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25625",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25661",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25662",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25663",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25664",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25665",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25666",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25667",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25668",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25669",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25670",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25671",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25672",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25673",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25674",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25675",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25676",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25677",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25678",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25679",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25680",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25681",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25682",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25683",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25684",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25685",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25686",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25687",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25688",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25689",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25690",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25691",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25692",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25693",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25694",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25695",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25696",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25697",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25698",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25699",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25700",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25701",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25702",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25703",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25704",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25705",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25706",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25707",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25708",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25709",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25710",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25711",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25712",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25713",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25714",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25715",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25716",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25717",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25718",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25719",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25741",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25753",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25766",
-          "cityId": "wuppertal",
-          "reason": "end_before_start"
-        }
-      ],
+      "quarantined": [],
       "sources": [
         {
           "id": "nominatim",
@@ -3779,16 +1296,16 @@
         },
         {
           "id": "ccf-meeting",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 60,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2029-04-24T16:00:00+02:00",
-            "observedEnd": "2030-09-09T16:00:00+02:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:02:55.125Z",
-            "state": "partial",
+            "state": "not_checked",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licence": "unknown",
@@ -3828,7 +1345,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-09-07T16:05:00+02:00",
-            "observedEnd": "2030-09-09T16:00:00+02:00",
+            "observedEnd": "2026-10-01T16:30:00+02:00",
             "checkedAt": "2026-09-27T10:03:02.240Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
@@ -3849,7 +1366,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-09-07T16:05:00+02:00",
-            "observedEnd": "2030-09-09T16:00:00+02:00",
+            "observedEnd": "2026-10-01T16:30:00+02:00",
             "checkedAt": "2026-09-27T10:03:03.224Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
@@ -3907,121 +1424,10 @@
     },
     {
       "cityId": "castrop-rauxel",
-      "input": 317,
-      "deduplicated": 317,
+      "input": 295,
+      "deduplicated": 295,
       "published": 295,
-      "quarantined": [
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-ABES-12",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-ACI-3",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-AGID-12",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-AGID-13",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-AKUM-3",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-AKUM-4",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-AuWi-61",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-AuWi-62",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-B1-134",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-B1-135",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-B2-132",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-B2-133",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-B3-129",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-B3-130",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-HFA-139",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-HFA-140",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-JHA-111",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-JHA-113",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-RAT-164",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-RAT-165",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-RAT-166",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-RPA-52",
-          "cityId": "castrop-rauxel",
-          "reason": "end_before_start"
-        }
-      ],
+      "quarantined": [],
       "sources": [
         {
           "id": "nominatim",
@@ -4214,17 +1620,17 @@
         },
         {
           "id": "ccf-meeting",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 24,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2026-09-10T17:00:00+02:00",
-            "observedEnd": "2026-12-03T17:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:04:55.392Z",
-            "state": "partial",
-            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 2 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licence": "unknown",
           "licenceEvidence": {
@@ -4245,7 +1651,7 @@
             "observedEnd": null,
             "checkedAt": "2026-09-27T10:04:55.443Z",
             "state": "not_checked",
-            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 2 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licence": "unknown",
           "licenceEvidence": {
@@ -4298,17 +1704,17 @@
         },
         {
           "id": "oparl-meeting-0",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 22,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2026-09-10T17:00:00+02:00",
-            "observedEnd": "2026-12-03T17:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:05:01.875Z",
-            "state": "partial",
-            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 2 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licence": "unknown",
           "licenceEvidence": {
@@ -4319,17 +1725,17 @@
         },
         {
           "id": "oparl-meeting-1",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 22,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2026-09-10T17:00:00+02:00",
-            "observedEnd": "2026-12-03T17:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:05:06.015Z",
-            "state": "partial",
-            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 2 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licence": "unknown",
           "licenceEvidence": {
@@ -4350,7 +1756,7 @@
             "observedEnd": null,
             "checkedAt": "2026-09-27T10:05:06.490Z",
             "state": "not_checked",
-            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 2 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licence": "unknown",
           "licenceEvidence": {
@@ -4855,111 +2261,10 @@
     },
     {
       "cityId": "dresden",
-      "input": 2296,
-      "deduplicated": 2296,
+      "input": 2276,
+      "deduplicated": 2276,
       "published": 2276,
-      "quarantined": [
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17012",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17013",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17014",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17015",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17016",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17017",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17018",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17019",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17020",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17021",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17022",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17023",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17024",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17025",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17026",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17027",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17028",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17029",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17030",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17031",
-          "cityId": "dresden",
-          "reason": "end_before_start"
-        }
-      ],
+      "quarantined": [],
       "sources": [
         {
           "id": "nominatim",
@@ -5110,16 +2415,16 @@
         },
         {
           "id": "oparl-meeting-0",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 20,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2027-01-25T16:00:00+01:00",
-            "observedEnd": "2027-12-06T16:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:06:20.797Z",
-            "state": "partial",
+            "state": "not_checked",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licence": "unknown",
@@ -5131,16 +2436,16 @@
         },
         {
           "id": "oparl-meeting-1",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 20,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2027-01-25T16:00:00+01:00",
-            "observedEnd": "2027-12-06T16:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:06:21.049Z",
-            "state": "partial",
+            "state": "not_checked",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licence": "unknown",
@@ -5196,321 +2501,10 @@
     },
     {
       "cityId": "freiburg",
-      "input": 1126,
-      "deduplicated": 1126,
+      "input": 1064,
+      "deduplicated": 1064,
       "published": 1064,
-      "quarantined": [
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2022-BehB-26",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-ASW-151",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-AWW-17",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-AWW-18",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-73",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-74",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-75",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-76",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BehB-25",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-300",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-301",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-302",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-303",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-304",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-305",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-120",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-121",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-122",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-123",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-KA-168",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-KJHA-155",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-KJHA-156",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-MIA-26",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-MIA-27",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Mobi-26",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Mobi-27",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-116",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-117",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-118",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-119",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_HD-251",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_HD-252",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_HD-253",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-112",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-113",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-114",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-115",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_LE-138",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_LE-139",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_LE-140",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_MU-121",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_MU-122",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_MU-123",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_OPF-127",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_OPF-128",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_OPF-129",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-144",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-145",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-146",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-147",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-123",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-124",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-125",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-126",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-SO-211",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-SO-212",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-SP-105",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Strat-36",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Strat-37",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-The-90",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-UKA-42",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        },
-        {
-          "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-UKA-43",
-          "cityId": "freiburg",
-          "reason": "end_before_start"
-        }
-      ],
+      "quarantined": [],
       "sources": [
         {
           "id": "nominatim",
@@ -5626,7 +2620,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-08-18T19:00:00+02:00",
-            "observedEnd": "2026-12-10T16:00:00+01:00",
+            "observedEnd": "2026-09-23T18:30:00+02:00",
             "checkedAt": "2026-09-27T10:06:45.153Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
@@ -5647,7 +2641,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-08-18T19:00:00+02:00",
-            "observedEnd": "2026-12-10T16:00:00+01:00",
+            "observedEnd": "2026-09-23T18:30:00+02:00",
             "checkedAt": "2026-09-27T10:06:54.691Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
@@ -5684,71 +2678,10 @@
     },
     {
       "cityId": "strausberg",
-      "input": 159,
-      "deduplicated": 159,
+      "input": 147,
+      "deduplicated": 147,
       "published": 147,
-      "quarantined": [
-        {
-          "id": "atlas:biotop",
-          "cityId": "strausberg",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "atlas:fischerkietz",
-          "cityId": "strausberg",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "atlas:garzauer-bruecke",
-          "cityId": "strausberg",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "atlas:gleise",
-          "cityId": "strausberg",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "atlas:grosse-strasse",
-          "cityId": "strausberg",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "atlas:hubertusallee",
-          "cityId": "strausberg",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "atlas:klosterdorfer",
-          "cityId": "strausberg",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "atlas:lustgarten",
-          "cityId": "strausberg",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "atlas:ringstrasse",
-          "cityId": "strausberg",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "atlas:schulcampus",
-          "cityId": "strausberg",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "atlas:stadtmauer",
-          "cityId": "strausberg",
-          "reason": "missing_sourced_start_date"
-        },
-        {
-          "id": "atlas:tausendfuessler",
-          "cityId": "strausberg",
-          "reason": "missing_sourced_start_date"
-        }
-      ],
+      "quarantined": [],
       "sources": [
         {
           "id": "nominatim",
@@ -6027,91 +2960,82 @@
     }
   ],
   "regional": {
-    "input": 51,
+    "input": 44,
     "published": 44,
-    "quarantined": [
-      {
-        "id": "regional:solarpark:seelow:cde3ff41b35ae2b9",
-        "cityId": "seelow",
-        "reason": "source_event_date_missing_or_invalid"
-      },
-      {
-        "id": "regional:solarpark:wriezen:4c55598cf042c85c",
-        "cityId": "wriezen",
-        "reason": "source_event_date_missing_or_invalid"
-      },
-      {
-        "id": "regional:waermeplanung:fredersdorf-vogelsdorf:8a531bc4368eacc4",
-        "cityId": "fredersdorf-vogelsdorf",
-        "reason": "source_event_date_missing_or_invalid"
-      },
-      {
-        "id": "regional:gewerbe:fredersdorf-vogelsdorf:64a675c8fe6384c8",
-        "cityId": "fredersdorf-vogelsdorf",
-        "reason": "source_event_date_missing_or_invalid"
-      },
-      {
-        "id": "regional:gewerbe:wriezen:a3b987fcf1f8f7f2",
-        "cityId": "wriezen",
-        "reason": "source_event_date_missing_or_invalid"
-      },
-      {
-        "id": "regional:schule:fredersdorf-vogelsdorf:3db49d550a716668",
-        "cityId": "fredersdorf-vogelsdorf",
-        "reason": "source_event_date_missing_or_invalid"
-      },
-      {
-        "id": "regional:sport:fredersdorf-vogelsdorf:32589e20e56505f1",
-        "cityId": "fredersdorf-vogelsdorf",
-        "reason": "source_event_date_missing_or_invalid"
-      }
-    ]
+    "quarantined": []
   },
   "knowledge": {
-    "published": 9,
-    "municipalities": 6,
+    "published": 228,
+    "municipalities": 9,
     "districts": [
       {
         "id": "maerkisch-oderland",
         "ags": "12064",
         "municipalitiesRegistered": 45,
         "municipalitiesAttempted": 3,
-        "municipalitiesWithRecords": 2,
-        "municipalitiesWithDatedStages": 2,
+        "municipalitiesWithRecords": 3,
+        "municipalitiesWithDatedStages": 3,
         "documents": 752,
-        "publishedRecords": 4,
-        "quarantinedRecords": 41
+        "publishedRecords": 113,
+        "quarantinedRecords": 774
       },
       {
         "id": "herzogtum-lauenburg",
         "ags": "01053",
         "municipalitiesRegistered": 132,
         "municipalitiesAttempted": 3,
-        "municipalitiesWithRecords": 2,
-        "municipalitiesWithDatedStages": 2,
-        "documents": 1218,
-        "publishedRecords": 2,
-        "quarantinedRecords": 52
+        "municipalitiesWithRecords": 3,
+        "municipalitiesWithDatedStages": 3,
+        "documents": 1235,
+        "publishedRecords": 54,
+        "quarantinedRecords": 238
       },
       {
         "id": "ludwigslust-parchim",
         "ags": "13076",
         "municipalitiesRegistered": 142,
         "municipalitiesAttempted": 3,
-        "municipalitiesWithRecords": 2,
-        "municipalitiesWithDatedStages": 2,
-        "documents": 872,
-        "publishedRecords": 3,
-        "quarantinedRecords": 83
+        "municipalitiesWithRecords": 3,
+        "municipalitiesWithDatedStages": 3,
+        "documents": 3206,
+        "publishedRecords": 61,
+        "quarantinedRecords": 431
       }
     ],
-    "policy": "Actual subscription extraction plus deterministic, source-policy, faithfulness and sourced-date publication gates; discovery coverage is not full municipal coverage."
+    "models": [
+      {
+        "provider": "anthropic-subscription",
+        "model": "claude-haiku-5-5",
+        "tool": "claude-cli",
+        "toolVersion": "2.1.284",
+        "modelIdentitySha256": "6ae3029f7453e9d43b6063b78a71b0da9d005f0d153bf0bc37537fddf76f287d",
+        "modelIdentityBasis": "reported-cli-model-and-tool-version",
+        "faithfulnessThreshold": 0.8,
+        "publishedRecords": 160
+      },
+      {
+        "provider": "openai-subscription",
+        "model": "gpt-6-luna",
+        "tool": "codex-cli",
+        "toolVersion": "0.160.0",
+        "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+        "modelIdentityBasis": "configured-cli-model-and-tool-version",
+        "faithfulnessThreshold": 0.8,
+        "publishedRecords": 68
+      }
+    ],
+    "graph": {
+      "entities": 170,
+      "edges": 3,
+      "recordsSha256": "d93ebb1479ff7e6b7fd0eab5de2e53848f0345487c3ff6a51717af5f35c979db"
+    },
+    "policy": "Same-pass subscription fact/entity/relation extraction with deterministic, source-policy, actual faithfulness and sourced-date gates; graph links are not causal, success or independent identity verification."
   },
   "summary": {
-    "publishedRecords": 14402,
-    "quarantinedRecords": 795,
+    "publishedRecords": 14621,
+    "quarantinedRecords": 1443,
     "cities": 8,
-    "knowledgeMunicipalities": 6,
+    "knowledgeMunicipalities": 9,
     "districts": 3
   }
 }

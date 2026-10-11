@@ -4,6 +4,8 @@ kind: Deployment
 metadata:
   name: civic-mcp
   namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/version: {{ .Values.releaseVersion | quote }}
 spec:
   # Per-token rate limits are process-local: never overlap instances or add HPA.
   replicas: 1
@@ -16,6 +18,7 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: civic-mcp
+        app.kubernetes.io/version: {{ .Values.releaseVersion | quote }}
       annotations:
         civic-mcp.stadtstack.eu/token-secret-revision: {{ .Values.tokenSecretRevision | quote }}
     spec:

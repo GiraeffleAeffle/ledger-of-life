@@ -1,29 +1,51 @@
 import {z} from 'zod';
 import type {DistrictRegistry} from './district-registry.ts';
 import type {DistrictKnowledgeRecord} from './district-schema.ts';
-import {isPublicUrl} from './publication-quality.ts';
+import {isPublicUrl,publicUrlIssues,type PublicUrlIssue} from './publication-quality.ts';
+import {PROVIDER_CONFIGS,type ModelEvidence} from './district-model-contract.ts';
 
 const count=z.number().int().nonnegative();
+const inputBindings={corpusSha256:z.string().regex(/^[a-f0-9]{64}$/),registrySha256:z.string().regex(/^[a-f0-9]{64}$/),promptContractSha256:z.string().regex(/^[a-f0-9]{64}$/),schemaSha256:z.string().regex(/^[a-f0-9]{64}$/)};
+const admittedModelSchema=z.object({provider:z.enum(['openai-subscription','anthropic-subscription']),model:z.string().min(1),tool:z.enum(['codex-cli','claude-cli']),toolVersion:z.string().min(1),modelIdentitySha256:z.string().regex(/^[a-f0-9]{64}$/),modelIdentityBasis:z.enum(['configured-cli-model-and-tool-version','reported-cli-model-and-tool-version']),faithfulnessThreshold:z.literal(0.8),publishedRecords:count}).strict();
+function modelKey(model:ModelEvidence):string{return JSON.stringify([model.provider,model.model,model.tool,model.toolVersion,model.modelIdentitySha256,model.modelIdentityBasis]);}
 const checkState=z.enum(['checked','not_found','not_checked']);
 const crawlCoverage=z.object({state:z.enum(['complete','partial','blocked','not_checked']),pendingCount:count,runnableCount:count,blockedCount:count,action:z.literal('ask_municipality').optional()}).strict();
 const blockedEvidence=z.object({url:z.string().url().nullable(),failure:z.string(),checkedAt:z.string().datetime({offset:true}),action:z.literal('ask_municipality')}).strict();
 const sourceCoverage=z.object({sourceId:z.string(),kind:z.string(),registryState:checkState,crawlState:checkState,checkedAt:z.string().datetime({offset:true}).nullable(),documentCount:count,publishedRecords:count,quarantinedRecords:count,coverage:crawlCoverage,failedLinkCount:count,failureExamples:z.array(blockedEvidence).max(3),reason:z.string().optional()}).strict().refine(value=>value.failureExamples.length<=value.failedLinkCount,'Failure examples exceed observed failure count');
 const extractionCounts=z.object({fetchedDocumentGroups:count,attemptedDocumentGroups:count,pendingDocumentGroups:count,unavailableAttemptedDocumentGroups:count}).strict();
-const extractionRunSchema=z.object({schemaVersion:z.literal('stadtstack-extraction-run-v1'),generatedAt:z.string().datetime({offset:true}),scope:z.enum(['all_fetched_documents','bounded_per_municipality']),maxDocumentsPerMunicipality:count.nullable(),availableDocumentGroups:count,attemptedDocumentGroups:count,pendingDocumentGroups:count}).passthrough();
+const extractionRunSchema=z.object({schemaVersion:z.literal('stadtstack-extraction-run-v2'),generatedAt:z.string().datetime({offset:true}),assignmentMode:z.enum(['balanced','codex-only']),...inputBindings,scope:z.enum(['all_fetched_documents','bounded_per_municipality']),maxDocumentsPerMunicipality:count.nullable(),availableDocumentGroups:count,attemptedDocumentGroups:count,pendingDocumentGroups:count}).passthrough();
 export const districtCoverageSchema=z.object({
- schemaVersion:z.literal('stadtstack-district-coverage-v1'),generatedAt:z.string().datetime({offset:true}),
+ schemaVersion:z.literal('stadtstack-district-coverage-v2'),generatedAt:z.string().datetime({offset:true}),
  districts:z.array(z.object({id:z.string(),ags:z.string().regex(/^\d{5}$/),municipalitiesRegistered:count,municipalitiesAttempted:count,municipalitiesWithRecords:count,municipalitiesWithDatedStages:count,documents:count,publishedRecords:count,quarantinedRecords:count}).strict()),
  municipalities:z.array(z.object({id:z.string(),ags:z.string().regex(/^\d{8}$/),districtId:z.string(),selectedForSlice:z.boolean(),status:z.enum(['gated_records','checked_no_gated_records','not_checked']),documents:count,publishedRecords:count,datedStagedRecords:count,quarantinedRecords:count,extraction:extractionCounts,sources:z.array(sourceCoverage)}).strict()),
- model:z.object({provider:z.literal('openai-subscription'),model:z.string().min(1),faithfulnessThreshold:z.literal(0.8)}).strict(),
- extractionRun:z.object({generatedAt:z.string().datetime({offset:true}),selection:z.enum(['all_at_run_start','bounded_per_municipality']),maxDocumentsPerMunicipality:count.nullable(),availableDocumentGroupsAtRunStart:count,attemptedDocumentGroups:count,pendingDocumentGroupsAtRunStart:count}).strict(),
+ models:z.array(admittedModelSchema),
+ extractionRun:z.object({generatedAt:z.string().datetime({offset:true}),assignmentMode:z.enum(['balanced','codex-only']),...inputBindings,selection:z.enum(['all_at_run_start','bounded_per_municipality']),maxDocumentsPerMunicipality:count.nullable(),availableDocumentGroupsAtRunStart:count,attemptedDocumentGroups:count,pendingDocumentGroupsAtRunStart:count}).strict(),
 }).strict();
 export type DistrictCoverage=z.infer<typeof districtCoverageSchema>;
+export type DistrictCoverageRecord=Pick<DistrictKnowledgeRecord,'municipalityId'|'documentDate'|'stageDate'|'stage'|'stages'>&{extraction:ModelEvidence&{inputSha256:string};sources:{id:string}[]};
 export const crawlSummarySchema=z.object({schemaVersion:z.literal('stadtstack-crawl-index-v1'),generatedAt:z.string(),documents:z.array(z.object({id:z.string(),municipalityId:z.string(),sourceId:z.string(),sha256:z.string().regex(/^[a-f0-9]{64}$/)}).passthrough()),checks:z.array(z.object({municipalityId:z.string(),sourceId:z.string(),checkState,checkedAt:z.string().nullable(),documentCount:count,reason:z.string().optional(),coverage:z.object({state:z.enum(['complete','partial','blocked']),pendingCount:count,runnableCount:count,blockedCount:count,action:z.literal('ask_municipality').optional()}).passthrough().optional(),blocked:z.array(z.object({url:z.string(),failure:z.string(),checkedAt:z.string()}).passthrough()).optional()}).passthrough())}).passthrough();
 const quarantineSummarySchema=z.object({schemaVersion:z.literal('stadtstack-quarantine-v1'),cases:z.array(z.object({municipalityId:z.string(),sourceId:z.string(),sourceSha256:z.string().regex(/^[a-f0-9]{64}$/),reason:z.string()}).passthrough())}).passthrough();
 
+export type KnowledgePublicationHoldReason='missing_sourced_date'|'nonpublic_evidence_url';
+export type KnowledgePublicationHold={reasons:KnowledgePublicationHoldReason[];urlIssues:PublicUrlIssue[]};
+/** Reject evidence as a whole; never repair or strip words from a source quotation. */
+export function knowledgePublicationHold<T extends Pick<DistrictKnowledgeRecord,'documentDate'|'stageDate'|'stages'>>(record:T):KnowledgePublicationHold|null{
+ const reasons:KnowledgePublicationHoldReason[]=[];
+ if(record.documentDate===null&&record.stageDate===null&&!record.stages.some(event=>event.date!==null))reasons.push('missing_sourced_date');
+ const urlIssues=publicUrlIssues(record);
+ if(urlIssues.length)reasons.push('nonpublic_evidence_url');
+ return reasons.length?{reasons,urlIssues}:null;
+}
+
 /** Public counts only: raw documents, failed model output, paths and credentials never enter this projection. */
-export function buildDistrictCoverage(registry:DistrictRegistry,crawlInput:unknown,records:DistrictKnowledgeRecord[],quarantineInput:unknown,model:string,extractionInput:unknown):DistrictCoverage{
+export function buildDistrictCoverage(registry:DistrictRegistry,crawlInput:unknown,records:DistrictCoverageRecord[],quarantineInput:unknown,extractionInput:unknown):DistrictCoverage{
  const crawl=crawlSummarySchema.parse(crawlInput),quarantine=quarantineSummarySchema.parse(quarantineInput),run=extractionRunSchema.parse(extractionInput);
+ const models=new Map<string,z.infer<typeof admittedModelSchema>>();
+ for(const record of records){
+  const {provider,model,tool,toolVersion,modelIdentitySha256,modelIdentityBasis}=record.extraction,key=modelKey(record.extraction),existing=models.get(key);
+  if(existing)existing.publishedRecords++;
+  else models.set(key,{provider,model,tool,toolVersion,modelIdentitySha256,modelIdentityBasis,faithfulnessThreshold:0.8,publishedRecords:1});
+ }
  const municipalities=registry.municipalities.map(city=>{
   const documents=crawl.documents.filter(doc=>doc.municipalityId===city.id),published=records.filter(record=>record.municipalityId===city.id),withheld=quarantine.cases.filter(item=>item.municipalityId===city.id);
   const checks=crawl.checks.filter(check=>check.municipalityId===city.id);
@@ -46,12 +68,19 @@ export function buildDistrictCoverage(registry:DistrictRegistry,crawlInput:unkno
   const selected=municipalities.filter(city=>city.districtId===district.id);
   return {id:district.id,ags:district.ags,municipalitiesRegistered:registry.inventory.filter(city=>city.districtId===district.id).length,municipalitiesAttempted:selected.filter(city=>city.selectedForSlice).length,municipalitiesWithRecords:selected.filter(city=>city.publishedRecords>0).length,municipalitiesWithDatedStages:selected.filter(city=>city.datedStagedRecords>0).length,documents:selected.reduce((n,city)=>n+city.documents,0),publishedRecords:selected.reduce((n,city)=>n+city.publishedRecords,0),quarantinedRecords:selected.reduce((n,city)=>n+city.quarantinedRecords,0)};
  });
- const coverage=districtCoverageSchema.parse({schemaVersion:'stadtstack-district-coverage-v1',generatedAt:new Date().toISOString(),districts,municipalities,model:{provider:'openai-subscription',model,faithfulnessThreshold:0.8},extractionRun:{generatedAt:run.generatedAt,selection:run.scope==='all_fetched_documents'?'all_at_run_start':'bounded_per_municipality',maxDocumentsPerMunicipality:run.maxDocumentsPerMunicipality,availableDocumentGroupsAtRunStart:run.availableDocumentGroups,attemptedDocumentGroups:run.attemptedDocumentGroups,pendingDocumentGroupsAtRunStart:run.pendingDocumentGroups}});
+ const coverage=districtCoverageSchema.parse({schemaVersion:'stadtstack-district-coverage-v2',generatedAt:new Date().toISOString(),districts,municipalities,models:[...models.values()].sort((a,b)=>modelKey(a).localeCompare(modelKey(b))),extractionRun:{generatedAt:run.generatedAt,assignmentMode:run.assignmentMode,corpusSha256:run.corpusSha256,registrySha256:run.registrySha256,promptContractSha256:run.promptContractSha256,schemaSha256:run.schemaSha256,selection:run.scope==='all_fetched_documents'?'all_at_run_start':'bounded_per_municipality',maxDocumentsPerMunicipality:run.maxDocumentsPerMunicipality,availableDocumentGroupsAtRunStart:run.availableDocumentGroups,attemptedDocumentGroups:run.attemptedDocumentGroups,pendingDocumentGroupsAtRunStart:run.pendingDocumentGroups}});
  validateDistrictCoverage(coverage,registry,records);return coverage;
 }
-export function validateDistrictCoverage(coverage:DistrictCoverage,registry:DistrictRegistry,records:DistrictKnowledgeRecord[]){
+export function validateDistrictCoverage(coverage:DistrictCoverage,registry:DistrictRegistry,records:DistrictCoverageRecord[]){
  if(coverage.municipalities.length!==registry.municipalities.length||new Set(coverage.municipalities.map(city=>city.id)).size!==coverage.municipalities.length)throw Error('District coverage municipality inventory mismatch');
- for(const record of records)if(record.extraction.provider!==coverage.model.provider||record.extraction.model!==coverage.model.model)throw Error('District coverage model provenance mismatch');
+ const admitted=new Map(coverage.models.map(model=>[modelKey(model),model]));
+ if(coverage.extractionRun.assignmentMode==='codex-only'&&records.some(record=>record.extraction.provider!=='openai-subscription'))throw Error('Codex-only assignment cannot claim another provider');
+ if(admitted.size!==coverage.models.length)throw Error('Duplicate admitted model identity');
+ for(const model of coverage.models){
+  const configured=PROVIDER_CONFIGS[model.provider],actual=records.filter(record=>modelKey(record.extraction)===modelKey(model)).length;
+  if(model.model!==configured.model||model.tool!==configured.tool||model.modelIdentityBasis!==configured.modelIdentityBasis||model.publishedRecords!==actual||actual===0)throw Error('District coverage model provenance mismatch');
+ }
+ for(const record of records)if(!admitted.has(modelKey(record.extraction)))throw Error('Missing admitted model provenance');
  const run=coverage.extractionRun,totalAttempted=coverage.municipalities.reduce((n,city)=>n+city.extraction.attemptedDocumentGroups+city.extraction.unavailableAttemptedDocumentGroups,0);
  if(run.attemptedDocumentGroups!==totalAttempted||run.availableDocumentGroupsAtRunStart!==run.attemptedDocumentGroups+run.pendingDocumentGroupsAtRunStart)throw Error('Extraction run counts do not bind to actual source-bound outputs');
  if((run.selection==='bounded_per_municipality')!==(run.maxDocumentsPerMunicipality!==null)||run.maxDocumentsPerMunicipality===0)throw Error('Extraction selection policy mismatch');

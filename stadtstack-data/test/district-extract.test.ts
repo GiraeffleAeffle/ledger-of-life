@@ -1,11 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DistrictExtractionClaimsSchema, DistrictKnowledgeRecordSchema, assertSubscriptionSourcePolicy, knowledgeEvidenceHash, sha256, validateKnowledgeRelease, type DistrictKnowledgeRecord } from '../src/district-schema.ts';
-import { canonicalWhitespace, dateOccursInQuote, deterministicChecks, documentChunks, extractionCacheKey, groupCrawlDocuments, selectExtractionGroups, summaryNumbersSupported, NoCaseCacheSchema, rebindSourceReferences, restoreSourceQuotes, stageEvidenceSupports, PROMPT_SHA256, JUDGE_PROMPT_SHA256 } from '../src/district-extract.ts';
-import { EXTRACTION_MODEL, codexResponseSchema, inspectCodexEvents, subscriptionExecutionArgs } from '../src/district-model.ts';
+import { DistrictExtractionClaimsSchema, DistrictKnowledgeRecordSchema, QUOTE_NORMALIZATION_VERSION, assertSubscriptionSourcePolicy, knowledgeEvidenceHash, sha256, validateKnowledgeRelease, type DistrictKnowledgeRecord } from '../src/district-schema.ts';
+import { canonicalWhitespace, dateOccursInQuote, deterministicChecks, documentChunks, extractionCacheKey, summaryNumbersSupported, NoCaseCacheSchema, rebindSourceReferences, restoreSourceQuotes, stageEvidenceSupports, EXTRACTION_INSTRUCTIONS, JUDGE_INSTRUCTIONS, EXTRACTOR_VERSION, PROMPT_VERSION, JUDGE_PROMPT_VERSION, PROMPT_SHA256, JUDGE_PROMPT_SHA256, type ExtractionCacheBinding } from '../src/district-claims.ts';
+import { codexResponseSchema, inspectCodexEvents, subscriptionExecutionArgs } from '../src/district-model.ts';
 import { extractDocumentText, htmlToDocumentText } from '../src/district-document.ts';
 import { TOPIC_VOCABULARY, getTopic, topicAncestors } from '../src/topic-vocabulary.ts';
 import { TOPICS } from '../regional/taxonomy.mjs';
+import {groupCrawlDocuments,selectExtractionGroups} from '../src/district-corpus.ts';
+import {PROVIDER_CONFIGS} from '../src/district-model-contract.ts';
+import {normalizeGraphClaims} from '../src/district-graph-claims.ts';
+const EXTRACTION_MODEL=PROVIDER_CONFIGS['openai-subscription'].model;
 
 test('Bounded extraction prioritizes grounded seeds, preserves same-byte references and gives municipalities fair turns',()=>{
   const documents=[
@@ -32,6 +36,27 @@ test('Summary dates allow exact calendar equivalence without borrowing date digi
   assert.equal(summaryNumbersSupported('Bebauungsplan 67/22 liegt aus.','Der Entwurf liegt aus.'),false);
   assert.equal(summaryNumbersSupported('Beginn 2026-02-30.','Beginn am 28. Februar 2026.'),false);
   assert.equal(summaryNumbersSupported('Beginn 2026-10-09.','Beginn 09.10.26.'),false);
+  assert.equal(summaryNumbersSupported('Die 1. Änderung wurde beschlossen.', 'Die Änderung wurde beschlossen.'), false);
+});
+
+test('shared extraction and judge instructions fit the native 8000-byte system bound', () => {
+  assert.ok(Buffer.byteLength(EXTRACTION_INSTRUCTIONS, 'utf8') <= 8000);
+  assert.ok(Buffer.byteLength(JUDGE_INSTRUCTIONS, 'utf8') <= 8000);
+});
+
+test('action relation contract is versioned in shared extraction and faithfulness prompts', () => {
+  assert.equal(EXTRACTOR_VERSION, 'district-extractor-v9-action-relations');
+  assert.equal(PROMPT_VERSION, 'district-claims-v8-action-relations');
+  assert.equal(JUDGE_PROMPT_VERSION, 'district-faithfulness-v7-action-relations');
+  for (const instructions of [EXTRACTION_INSTRUCTIONS, JUDGE_INSTRUCTIONS]) {
+    assert.ok(instructions.includes('Joint graph in this SAME response'));
+    assert.ok(instructions.includes('predicateQuote copies the COMPLETE relation verb/phrase'));
+    assert.ok(instructions.includes('plans/planned, never implements/planned or implements/implemented.'));
+    assert.ok(instructions.includes('decides/decided or approves/decided, NOT construction'));
+    assert.ok(instructions.includes('conditional/negated/historical qualifiers override factual modalities'));
+    assert.ok(instructions.includes('not just lexical matches'));
+  }
+  assert.ok(JUDGE_INSTRUCTIONS.includes('criticalUnsupported=true and score below 0.8'));
 });
 // Synthetic unit-test material only; never a municipal record or production model evidence.
 const text = 'Stadt Beispielstadt\nWärmeplanung\nDer Entwurf der Wärmeplanung wurde am 09.10.2026 veröffentlicht.\nStand: 10.10.2026';
@@ -45,13 +70,13 @@ function claims() {
     topics: [{ id: 'waermeplanung', parentId: 'energie', provenance: 'model', confidence: 0.9, quote: 'Wärmeplanung' }],
     stage: 'draft', stageDate: '2026-10-09', stageDateQuote: 'Der Entwurf der Wärmeplanung wurde am 09.10.2026 veröffentlicht.', stageDateReason: null,
     originalStatus: 'Entwurf', stageQuote: 'Der Entwurf der Wärmeplanung wurde am 09.10.2026 veröffentlicht.', stages: [],
-    entities: [{ name: 'Beispielstadt', type: 'municipality', quote: 'Stadt Beispielstadt' }], locations: [],
+    entities: [{ mentionId:'municipality', name: 'Beispielstadt', type: 'municipality', quote: 'Stadt Beispielstadt', identifiers:[] }], relations:[], locations: [],
   });
 }
 function record(): DistrictKnowledgeRecord {
   const sourceHash = sha256(text);
   const value = {
-    ...claims(), id: 'knowledge:unit-test', municipalityId: 'beispielstadt', ags: '12064001', districtId: 'unit-district', caseKey: `source_document:${sourceHash}`,
+    ...claims(), ...normalizeGraphClaims(claims(),{municipalityId:'beispielstadt',sourceSha256:sourceHash}), id: 'knowledge:unit-test', municipalityId: 'beispielstadt', ags: '12064001', districtId: 'unit-district', caseKey: `source_document:${sourceHash}`,
     sources: [{ id: 'unit-source', url: 'https://example.org/document', sha256: sourceHash, retrievedAt: now, locator: 'chars:0-160', mimeType: 'text/plain', sourceType: 'website', policy: { robots: { state: 'allowed', url: 'https://example.org/robots.txt' }, tdm: { state: 'not_declared', evidence: [] }, access: 'public', legalClassification: 'not_assessed', publication: 'facts_with_attribution_only' } }],
     extraction: { extractorVersion: 'unit-test', extractorSha256: sha256('extractor'), model: EXTRACTION_MODEL, provider: 'openai-subscription', tool: 'codex-cli', toolVersion: '0.162.1', modelIdentitySha256: sha256('synthetic configured model/tool identity'), modelIdentityBasis: 'configured-cli-model-and-tool-version', returnedModel: null, promptVersion: 'unit-test', promptSha256: PROMPT_SHA256, judgePromptVersion: 'unit-test', judgePromptSha256: JUDGE_PROMPT_SHA256, inputSha256: sourceHash, textSha256: sourceHash, responseSha256: sha256('synthetic extraction response'), ocrUsed: false, textMethod: 'text', cacheKey: sha256('unit cache'), extractedAt: now, chunk: { index: 0, count: 1, start: 0, end: text.length } },
     verification: { status: 'auto-verified', deterministic: deterministicChecks(claims(), text, 'Beispielstadt'), faithfulness: { score: 0.9, threshold: 0.8, model: EXTRACTION_MODEL, provider: 'openai-subscription', tool: 'codex-cli', toolVersion: '0.162.1', modelIdentitySha256: sha256('synthetic configured model/tool identity'), returnedModel: null, reason: 'Synthetic unit-test judge fixture, not actual model evidence', evaluatedAt: now, responseSha256: sha256('synthetic judge response'), sameModel: true, limitation: 'Same-model judgment is not independent verification.' }, evidenceHash: '' },
@@ -106,7 +131,7 @@ test('source-only location geometry does not permit inferred pins', () => {
 });
 test('release requires actual-shaped judge evidence, all deterministic checks and identity binding', () => {
   const good = record();
-  const envelope = { schemaVersion: 'stadtstack-knowledge-v1', generatedAt: now, records: [good] };
+  const envelope = { schemaVersion: 'stadtstack-knowledge-v2', generatedAt: now, records: [good] };
   assert.equal(validateKnowledgeRelease(envelope, registry).records.length, 1);
   for (const score of [null, 0.79]) {
     const bad = structuredClone(good);
@@ -133,13 +158,14 @@ test('evidence hash is stable under JSON property order, but bound to all claims
   assert.notEqual(knowledgeEvidenceHash(value), knowledgeEvidenceHash(reordered));
 });
 test('cache separates model, extractor, document, municipality and chunk', () => {
-  const args = [sha256('doc'), sha256('extractor'), sha256('model'), { index: 0, start: 0, end: 20 }, 'beispielstadt'] as const;
-  const key = extractionCacheKey(...args);
-  assert.equal(key, extractionCacheKey(...args));
-  assert.notEqual(key, extractionCacheKey(sha256('other'), ...args.slice(1) as [string, string, typeof args[3], string]));
-  assert.notEqual(key, extractionCacheKey(args[0], sha256('new extractor'), args[2], args[3], args[4]));
-  assert.notEqual(key, extractionCacheKey(args[0], args[1], sha256('new model'), args[3], args[4]));
-  assert.notEqual(key, extractionCacheKey(args[0], args[1], args[2], args[3], 'another'));
+  const args:ExtractionCacheBinding={provider:'openai-subscription',documentHash:sha256('doc'),textHash:sha256('text'),extractorHash:sha256('extractor'),modelIdentitySha256:sha256('model'),chunk:{index:0,start:0,end:20},municipalityId:'beispielstadt',sourceBinding:'fixture'};
+  const key=extractionCacheKey(args);
+  assert.equal(key,extractionCacheKey(args));
+  assert.notEqual(key,extractionCacheKey({...args,documentHash:sha256('other')}));
+  assert.notEqual(key,extractionCacheKey({...args,extractorHash:sha256('new extractor')}));
+  assert.notEqual(key,extractionCacheKey({...args,modelIdentitySha256:sha256('new model')}));
+  assert.notEqual(key,extractionCacheKey({...args,municipalityId:'another'}));
+  assert.notEqual(key,extractionCacheKey({...args,provider:'anthropic-subscription'}));
 });
 test('subscription runtime disables exposed execution features and uses only existing ChatGPT auth', () => {
   const args = subscriptionExecutionArgs('/tmp/unit', '/tmp/unit/schema.json', '/tmp/unit/answer.json', 'Synthetic extraction instructions');
@@ -268,7 +294,7 @@ test('identical document claims retain every current bound source without claimi
   assert.match(rebound.extraction.documentLimitations!.join(' '), /not independent corroboration/);
   const reboundRegistry = structuredClone(registry);
   reboundRegistry.municipalities[0].sources.push({ id: 'gazette-source', kind: 'gazette', url: 'https://example.org', checkState: 'checked' });
-  assert.equal(validateKnowledgeRelease({ schemaVersion: 'stadtstack-knowledge-v1', generatedAt: now, records: [rebound] }, reboundRegistry).records.length, 1);
+  assert.equal(validateKnowledgeRelease({ schemaVersion: 'stadtstack-knowledge-v2', generatedAt: now, records: [rebound] }, reboundRegistry).records.length, 1);
 });
 
 test('cached actual no-case responses retain evidence without manufacturing a record or judge score', () => {
@@ -315,7 +341,7 @@ test('Codex nonfatal error items retain evidence but cannot manufacture completi
 });
 
 test('Codex wire schema adapts tuple encoding while keeping strict post-generation coordinate validation', () => {
-  const wire = codexResponseSchema({ type: 'array', prefixItems: [{ type: 'number', minimum: -180, maximum: 180 }, { type: 'number', minimum: -90, maximum: 90 }] });
+  const wire = codexResponseSchema({ type: 'array', items: [{ type: 'number', minimum: -180, maximum: 180 }, { type: 'number', minimum: -90, maximum: 90 }], additionalItems: false });
   assert.deepEqual(wire, { type: 'array', items: { anyOf: [{ type: 'number', minimum: -180, maximum: 180 }, { type: 'number', minimum: -90, maximum: 90 }] }, minItems: 2, maxItems: 2 });
   const invalid = claims();
   invalid.locations = [{ label: 'Beispielstadt', quote: 'Beispielstadt', geometry: { type: 'Point', coordinates: [13, 100] }, precision: 'exact' }];
@@ -381,10 +407,39 @@ test('quoted paper references are vendor-neutral and never imply OParl protocol'
   assert.equal(DistrictExtractionClaimsSchema.safeParse({ ...value, caseKeyType: 'oparl_reference' }).success, false);
 });
 
+test('stage and history status bind exact event wording including source typos', () => {
+  const value = claims();
+  const quote = 'Die frühzeitige Beteilgung der Öffentlichkeit ist vorgesehen.';
+  const source = `${text}\n${quote}\nBeteiligung der Öffentlichkeit`;
+  value.stage = 'consultation'; value.originalStatus = 'Beteiligung der Öffentlichkeit'; value.stageQuote = quote;
+  value.stageDate = null; value.stageDateQuote = null; value.stageDateReason = 'Kein vollständiges Datum im Ereignistext.';
+  value.stages = [{ stage: 'consultation', originalStatus: value.originalStatus, quote, date: null, dateQuote: null }];
+  const rejected = deterministicChecks(value, source, 'Beispielstadt');
+  assert.equal(rejected.checks.find(check => check.id === 'stage')?.passed, false);
+  assert.equal(rejected.checks.find(check => check.id === 'stage_history')?.passed, false);
+  value.originalStatus = 'Beteilgung der Öffentlichkeit';
+  value.stages[0].originalStatus = value.originalStatus;
+  assert.equal(deterministicChecks(value, source, 'Beispielstadt').passed, true);
+});
+
+test('operative clauses and economic-plan votes do not establish final legal effect or adoption', () => {
+  for (const quote of ['Der Bebauungsplan tritt mit Ablauf des Tages dieser Bekanntmachung in Kraft.', 'Die Stadtverordnetenversammlung beschließt den Wirtschaftsplan 2026.']) {
+    const value = claims();
+    value.stage = quote.includes('tritt') ? 'in_force' : 'adopted';
+    value.stageQuote = quote; value.originalStatus = quote;
+    value.stageDate = null; value.stageDateQuote = null; value.stageDateReason = 'Kein vollständiges Datum im Ereignistext.';
+    assert.equal(deterministicChecks(value, `${text}\n${quote}`, 'Beispielstadt').checks.find(check => check.id === 'critical_stage_promotion')?.passed, false);
+    if (quote.includes('Wirtschaftsplan')) {
+      value.stage = 'decision';
+      assert.equal(deterministicChecks(value, `${text}\n${quote}`, 'Beispielstadt').passed, true);
+    }
+  }
+});
+
 test('whitespace-equivalent proposals restore exact contiguous source spans with hashes and offsets', () => {
   const value = claims();
   value.title = 'Wärmeplanung\n Beispielstadt'; value.titleQuote = 'Wärmeplanung Beispielstadt';
-  value.entities.push({ name: 'Amt\nBeispielstadt', type: 'authority', quote: 'Amt Beispielstadt' });
+  value.entities.push({ mentionId:'authority', name: 'Amt\nBeispielstadt', type: 'authority', quote: 'Amt Beispielstadt', identifiers:[] });
   value.locations = [{ label: 'Straße A', quote: 'Straße A', geometry: null, precision: 'none' }];
   const source = text + '\nWärmeplanung\n    Beispielstadt\nAmt \t Beispielstadt\nStraße\n  A';
   const result = restoreSourceQuotes(value, source, 100);
@@ -392,7 +447,7 @@ test('whitespace-equivalent proposals restore exact contiguous source spans with
   assert.equal(result.claims.titleQuote, 'Wärmeplanung\n    Beispielstadt');
   assert.equal(result.claims.entities[1].name, 'Amt Beispielstadt');
   assert.equal(result.claims.locations[0].quote, 'Straße\n  A');
-  assert.equal(result.normalization.version, 'whitespace-spans-v1');
+  assert.equal(result.normalization.version, QUOTE_NORMALIZATION_VERSION);
   assert.ok(result.normalization.displayFields.includes('title'));
   for (const restored of result.normalization.restorations) {
     assert.equal(sha256(source.slice(restored.start - 100, restored.end - 100)), restored.restoredSha256);
@@ -419,7 +474,7 @@ test('whitespace restoration cannot stitch missing words, change case or invent 
 test('release binds quote restoration hashes and source chunk offsets', () => {
   const value = record();
   const start = text.indexOf(value.titleQuote);
-  value.extraction.quoteNormalization = { version: 'whitespace-spans-v1', offsetUnit: 'utf16_code_units', restorations: [{ field: 'titleQuote', proposedSha256: sha256(value.titleQuote), restoredSha256: sha256(value.titleQuote), start, end: start + value.titleQuote.length }], displayFields: [] };
+  value.extraction.quoteNormalization = { version: QUOTE_NORMALIZATION_VERSION, offsetUnit: 'utf16_code_units', restorations: [{ field: 'titleQuote', proposedSha256: sha256(value.titleQuote), restoredSha256: sha256(value.titleQuote), start, end: start + value.titleQuote.length }], displayFields: [] };
   value.verification.evidenceHash = knowledgeEvidenceHash(value);
   assert.equal(DistrictKnowledgeRecordSchema.parse(value).extraction.responseSha256, value.extraction.responseSha256);
   value.extraction.quoteNormalization.restorations[0].restoredSha256 = sha256('not the quote');
@@ -429,4 +484,55 @@ test('release binds quote restoration hashes and source chunk offsets', () => {
   value.extraction.quoteNormalization.restorations[0].end = text.length + 1;
   value.verification.evidenceHash = knowledgeEvidenceHash(value);
   assert.throws(() => DistrictKnowledgeRecordSchema.parse(value), /escapes source chunk/);
+});
+
+test('nested graph time restoration offsets stay inside the relation even when its date repeats earlier', () => {
+  const value = claims();
+  const timeQuote = 'seit 1.\n Januar 2020';
+  const relationQuote = `Netzbetrieb Beispiel GmbH betreibt Wärmenetz Beispiel ${timeQuote}.`;
+  const source = `${text}\nFrüherer Hinweis: ${timeQuote}.\n${relationQuote}`;
+  value.entities = [
+    { mentionId: 'operator', name: 'Netzbetrieb Beispiel GmbH', type: 'company', quote: relationQuote, identifiers: [] },
+    { mentionId: 'network', name: 'Wärmenetz Beispiel', type: 'facility', quote: relationQuote, identifiers: [] },
+  ];
+  value.relations = [{ fromMention: 'operator', toMention: 'network', type: 'operates', quote: relationQuote, predicateQuote: 'betreibt', modality: 'asserted', time: { text: '1. Januar 2020', quote: 'seit 1. Januar 2020' }, conditions: null }];
+  const sourceOffset = 500;
+  const restored = restoreSourceQuotes(value, source, sourceOffset);
+  assert.equal(restored.claims.relations[0].time?.text, '1.\n Januar 2020');
+  assert.equal(restored.claims.relations[0].time?.quote, timeQuote);
+  const relationStart = sourceOffset + source.indexOf(relationQuote);
+  for (const field of ['relations[0].time.quote', 'relations[0].time.text']) {
+    const entry = restored.normalization.restorations.find(item => item.field === field);
+    assert.ok(entry);
+    const span = field.endsWith('.text') ? '1.\n Januar 2020' : timeQuote;
+    assert.equal(entry.start, relationStart + relationQuote.indexOf(span));
+    assert.equal(entry.end, entry.start + span.length);
+    assert.ok(entry.end <= relationStart + relationQuote.length);
+    assert.equal(entry.proposedSha256, sha256(field.endsWith('.text') ? '1. Januar 2020' : 'seit 1. Januar 2020'));
+    assert.equal(entry.restoredSha256, sha256(source.slice(entry.start - sourceOffset, entry.end - sourceOffset)));
+  }
+  assert.equal(deterministicChecks(restored.claims, source, 'Beispielstadt').passed, true);
+  const unsupported = structuredClone(value);
+  unsupported.relations[0].time = { text: '2. Januar 2020', quote: 'seit 2.\n Januar 2020' };
+  const outsideSource = `${source}\nseit 2.\n Januar 2020`;
+  const rejected = restoreSourceQuotes(unsupported, outsideSource, sourceOffset);
+  assert.equal(rejected.claims.relations[0].time?.text, '2. Januar 2020');
+  assert.equal(rejected.normalization.restorations.some(item => item.field === 'relations[0].time.text'), false);
+  assert.equal(deterministicChecks(rejected.claims, outsideSource, 'Beispielstadt').checks.find(check => check.id === 'graph_relations')?.passed, false);
+});
+
+test('contact details inside an optional relation quote still fail the privacy gate', () => {
+  const value = claims();
+  const quote = 'Netzbetrieb Beispiel GmbH betreibt Wärmenetz Beispiel. Kontakt: info@example.org';
+  const source = `${text}\n${quote}`;
+  value.entities = [
+    { mentionId: 'operator', name: 'Netzbetrieb Beispiel GmbH', type: 'company', quote: 'Netzbetrieb Beispiel GmbH', identifiers: [] },
+    { mentionId: 'network', name: 'Wärmenetz Beispiel', type: 'facility', quote: 'Wärmenetz Beispiel', identifiers: [] },
+  ];
+  value.relations = [{ fromMention: 'operator', toMention: 'network', type: 'operates', quote, predicateQuote: 'betreibt', modality: 'asserted', time: null, conditions: null }];
+  assert.equal(deterministicChecks(value, source, 'Beispielstadt').checks.find(check => check.id === 'no_contacts')?.passed, false);
+  value.relations[0].quote = 'Netzbetrieb Beispiel GmbH betreibt Wärmenetz Beispiel.';
+  assert.equal(deterministicChecks(value, source, 'Beispielstadt').passed, true);
+  value.relations = [];
+  assert.equal(deterministicChecks(value, source, 'Beispielstadt').passed, true);
 });

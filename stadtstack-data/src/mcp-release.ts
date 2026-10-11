@@ -9,8 +9,9 @@ import {validateKnowledgeRelease} from './district-schema.ts';
 import {districtRegistrySchema} from './district-registry.ts';
 import {districtCoverageSchema,validateDistrictCoverage,assertKnowledgeSlice} from './district-publication.ts';
 import {changesSchema,type Changes} from './changes.ts';
+import {GraphIndex} from './district-graph-query.ts';
 
-export type ReleasedData={bundle:CoreBundle;manifest:Record<string,unknown>;dataManifest:DataRelease;catalogue:Catalogue;features:Signal[];changes:Record<string,Changes>;regional:Regional;index:QueryIndex};
+export type ReleasedData={bundle:CoreBundle;manifest:Record<string,unknown>;dataManifest:DataRelease;catalogue:Catalogue;features:Signal[];changes:Record<string,Changes>;regional:Regional;index:QueryIndex;graph:GraphIndex};
 let release:ReleasedData|undefined;
 let loading:Promise<ReleasedData>|undefined;
 export async function loadRelease(directory=outDir):Promise<ReleasedData> {
@@ -34,14 +35,16 @@ export async function loadRelease(directory=outDir):Promise<ReleasedData> {
     features.push(...collection.features);
   }
   const regional=regionalSchema.parse(JSON.parse((await readReleaseFile(directory,dataManifest,'regions/brandenburg-mol/topics.json')).toString('utf8')));
-  requireReleaseFiles(dataManifest,['knowledge/registry.json','knowledge/records.json','knowledge/coverage.json']);
+  requireReleaseFiles(dataManifest,['knowledge/registry.json','knowledge/records.json','knowledge/coverage.json','knowledge/graph.json']);
   const registry=districtRegistrySchema.parse(JSON.parse((await readReleaseFile(directory,dataManifest,'knowledge/registry.json')).toString('utf8')));
-  const knowledge=validateKnowledgeRelease(JSON.parse((await readReleaseFile(directory,dataManifest,'knowledge/records.json')).toString('utf8')),registry);
+  const knowledgeBytes=await readReleaseFile(directory,dataManifest,'knowledge/records.json');
+  const knowledge=validateKnowledgeRelease(JSON.parse(knowledgeBytes.toString('utf8')),registry);
   const coverage=districtCoverageSchema.parse(JSON.parse((await readReleaseFile(directory,dataManifest,'knowledge/coverage.json')).toString('utf8')));
   validateDistrictCoverage(coverage,registry,knowledge.records);
   assertKnowledgeSlice(registry,knowledge.records);
+  const graph=new GraphIndex(dataManifest.id,JSON.parse((await readReleaseFile(directory,dataManifest,'knowledge/graph.json')).toString('utf8')),knowledgeBytes);
   const index=new QueryIndex(dataManifest.id,dataManifest.generatedAt,features,regional,catalogue,{records:knowledge.records,municipalities:registry.municipalities,coverage});
-  release={bundle,manifest,dataManifest,catalogue,features,changes,regional,index};
+  release={bundle,manifest,dataManifest,catalogue,features,changes,regional,index,graph};
   return release;
 }
 export function loadedRelease():ReleasedData {

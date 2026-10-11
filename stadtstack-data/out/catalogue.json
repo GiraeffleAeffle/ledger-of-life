@@ -1,6 +1,6 @@
 {
   "schemaVersion": "stadtstack-signals-v1",
-  "generatedAt": "2026-10-10T21:56:45.237Z",
+  "generatedAt": "2026-10-11T03:46:26.421Z",
   "publisher": "Stadtstack (independent derived factual summaries)",
   "coreBundle": {
     "path": "core/strausberg-facts.json",
@@ -421,26 +421,17 @@
           "licence": "unknown",
           "reuse": "facts_with_attribution",
           "retrievedAt": "2026-09-27T10:02:29.527Z",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 50,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2026-10-07T16:00:00+02:00",
-            "observedEnd": "2027-12-07T17:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:02:29.527Z",
-            "state": "partial",
+            "state": "not_checked",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
-          },
-          "bodyBinding": {
-            "id": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln",
-            "name": "Stadt Köln, kreisfreie Stadt",
-            "cityId": "koeln",
-            "matched": true,
-            "expectedNames": [
-              "Stadt Köln, kreisfreie Stadt"
-            ]
           },
           "licenceEvidence": {
             "url": "https://github.com/komma-systems/ccf",
@@ -491,26 +482,17 @@
           "licence": "unknown",
           "reuse": "facts_with_attribution",
           "retrievedAt": "2026-09-27T10:02:33.256Z",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 50,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2026-10-07T16:00:00+02:00",
-            "observedEnd": "2027-12-07T17:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:02:33.256Z",
-            "state": "partial",
+            "state": "not_checked",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
-          },
-          "bodyBinding": {
-            "id": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln",
-            "name": "Stadt Köln, kreisfreie Stadt",
-            "cityId": "koeln",
-            "matched": true,
-            "expectedNames": [
-              "Stadt Köln, kreisfreie Stadt"
-            ]
           },
           "licenceEvidence": {
             "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/meetings",
@@ -526,26 +508,17 @@
           "licence": "unknown",
           "reuse": "facts_with_attribution",
           "retrievedAt": "2026-09-27T10:02:33.477Z",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 50,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2026-10-07T16:00:00+02:00",
-            "observedEnd": "2027-12-07T17:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:02:33.477Z",
-            "state": "partial",
+            "state": "not_checked",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
-          },
-          "bodyBinding": {
-            "id": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln",
-            "name": "Stadt Köln, kreisfreie Stadt",
-            "cityId": "koeln",
-            "matched": true,
-            "expectedNames": [
-              "Stadt Köln, kreisfreie Stadt"
-            ]
           },
           "licenceEvidence": {
             "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/meetings?page=2",
@@ -1211,7 +1184,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-09-10T17:00:00+02:00",
-            "observedEnd": "2027-12-15T16:15:00+01:00",
+            "observedEnd": "2026-09-10T17:00:00+02:00",
             "checkedAt": "2026-09-27T10:02:41.911Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
@@ -1281,7 +1254,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-09-10T17:00:00+02:00",
-            "observedEnd": "2027-12-15T16:15:00+01:00",
+            "observedEnd": "2026-09-10T17:00:00+02:00",
             "checkedAt": "2026-09-27T10:02:47.522Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
@@ -1316,7 +1289,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-09-10T17:00:00+02:00",
-            "observedEnd": "2027-12-15T16:15:00+01:00",
+            "observedEnd": "2026-09-10T17:00:00+02:00",
             "checkedAt": "2026-09-27T10:02:48.029Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
@@ -1753,26 +1726,17 @@
           "licence": "unknown",
           "reuse": "facts_with_attribution",
           "retrievedAt": "2026-09-27T10:02:55.125Z",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 60,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2029-04-24T16:00:00+02:00",
-            "observedEnd": "2030-09-09T16:00:00+02:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:02:55.125Z",
-            "state": "partial",
+            "state": "not_checked",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
-          },
-          "bodyBinding": {
-            "id": "https://oparl.wuppertal.de/oparl/bodies/0001",
-            "name": "Instance 0001",
-            "cityId": "wuppertal",
-            "matched": true,
-            "expectedNames": [
-              "Instance 0001"
-            ]
           },
           "licenceEvidence": {
             "url": "https://github.com/komma-systems/ccf",
@@ -1830,7 +1794,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-09-07T16:05:00+02:00",
-            "observedEnd": "2030-09-09T16:00:00+02:00",
+            "observedEnd": "2026-10-01T16:30:00+02:00",
             "checkedAt": "2026-09-27T10:03:02.240Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
@@ -1865,7 +1829,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-09-07T16:05:00+02:00",
-            "observedEnd": "2030-09-09T16:00:00+02:00",
+            "observedEnd": "2026-10-01T16:30:00+02:00",
             "checkedAt": "2026-09-27T10:03:03.224Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
@@ -2224,26 +2188,17 @@
           "licence": "unknown",
           "reuse": "facts_with_attribution",
           "retrievedAt": "2026-09-27T10:04:55.392Z",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 24,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2026-09-10T17:00:00+02:00",
-            "observedEnd": "2026-12-03T17:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:04:55.392Z",
-            "state": "partial",
-            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 2 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
-          },
-          "bodyBinding": {
-            "id": "https://castroprauxel.gremien.info/oparl/body/CAS",
-            "name": "Stadt Castrop-Rauxel",
-            "cityId": "castrop-rauxel",
-            "matched": true,
-            "expectedNames": [
-              "Stadt Castrop-Rauxel"
-            ]
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licenceEvidence": {
             "url": "https://github.com/komma-systems/ccf",
@@ -2269,7 +2224,7 @@
             "observedEnd": null,
             "checkedAt": "2026-09-27T10:04:55.443Z",
             "state": "not_checked",
-            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 2 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licenceEvidence": {
             "url": "https://github.com/komma-systems/ccf",
@@ -2337,26 +2292,17 @@
           "licence": "unknown",
           "reuse": "facts_with_attribution",
           "retrievedAt": "2026-09-27T10:05:01.875Z",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 22,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2026-09-10T17:00:00+02:00",
-            "observedEnd": "2026-12-03T17:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:05:01.875Z",
-            "state": "partial",
-            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 2 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
-          },
-          "bodyBinding": {
-            "id": "https://castroprauxel.gremien.info/oparl/body/CAS",
-            "name": "Stadt Castrop-Rauxel",
-            "cityId": "castrop-rauxel",
-            "matched": true,
-            "expectedNames": [
-              "Stadt Castrop-Rauxel"
-            ]
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licenceEvidence": {
             "url": "https://castroprauxel.gremien.info/oparl/body/CAS/meeting",
@@ -2372,26 +2318,17 @@
           "licence": "unknown",
           "reuse": "facts_with_attribution",
           "retrievedAt": "2026-09-27T10:05:06.015Z",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 22,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2026-09-10T17:00:00+02:00",
-            "observedEnd": "2026-12-03T17:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:05:06.015Z",
-            "state": "partial",
-            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 2 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
-          },
-          "bodyBinding": {
-            "id": "https://castroprauxel.gremien.info/oparl/body/CAS",
-            "name": "Stadt Castrop-Rauxel",
-            "cityId": "castrop-rauxel",
-            "matched": true,
-            "expectedNames": [
-              "Stadt Castrop-Rauxel"
-            ]
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licenceEvidence": {
             "url": "https://castroprauxel.gremien.info/oparl/body/CAS/meeting/page/2",
@@ -2417,7 +2354,7 @@
             "observedEnd": null,
             "checkedAt": "2026-09-27T10:05:06.490Z",
             "state": "not_checked",
-            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 2 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
           },
           "licenceEvidence": {
             "url": "https://castroprauxel.gremien.info/oparl/body/CAS/paper",
@@ -3267,26 +3204,17 @@
           "licence": "unknown",
           "reuse": "facts_with_attribution",
           "retrievedAt": "2026-09-27T10:06:20.797Z",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 20,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2027-01-25T16:00:00+01:00",
-            "observedEnd": "2027-12-06T16:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:06:20.797Z",
-            "state": "partial",
+            "state": "not_checked",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
-          },
-          "bodyBinding": {
-            "id": "https://oparl.dresden.de/bodies/0001",
-            "name": "Instance 0001",
-            "cityId": "dresden",
-            "matched": true,
-            "expectedNames": [
-              "Instance 0001"
-            ]
           },
           "licenceEvidence": {
             "url": "http://oparl.dresden.de/bodies/0001/meetings",
@@ -3302,26 +3230,17 @@
           "licence": "unknown",
           "reuse": "facts_with_attribution",
           "retrievedAt": "2026-09-27T10:06:21.049Z",
-          "status": "partial",
+          "status": "not_checked",
           "recordCount": 20,
           "publishedRecordCount": 0,
           "coverage": {
             "requestedStart": null,
             "requestedEnd": null,
-            "observedStart": "2027-01-25T16:00:00+01:00",
-            "observedEnd": "2027-12-06T16:00:00+01:00",
+            "observedStart": null,
+            "observedEnd": null,
             "checkedAt": "2026-09-27T10:06:21.049Z",
-            "state": "partial",
+            "state": "not_checked",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
-          },
-          "bodyBinding": {
-            "id": "https://oparl.dresden.de/bodies/0001",
-            "name": "Instance 0001",
-            "cityId": "dresden",
-            "matched": true,
-            "expectedNames": [
-              "Instance 0001"
-            ]
           },
           "licenceEvidence": {
             "url": "http://oparl.dresden.de/bodies/0001/meetings?page=2",
@@ -3571,7 +3490,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-08-18T19:00:00+02:00",
-            "observedEnd": "2026-12-10T16:00:00+01:00",
+            "observedEnd": "2026-09-23T18:30:00+02:00",
             "checkedAt": "2026-09-27T10:06:45.153Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
@@ -3606,7 +3525,7 @@
             "requestedStart": null,
             "requestedEnd": null,
             "observedStart": "2026-08-18T19:00:00+02:00",
-            "observedEnd": "2026-12-10T16:00:00+01:00",
+            "observedEnd": "2026-09-23T18:30:00+02:00",
             "checkedAt": "2026-09-27T10:06:54.691Z",
             "state": "partial",
             "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."

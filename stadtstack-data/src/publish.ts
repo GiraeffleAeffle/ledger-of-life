@@ -15,6 +15,7 @@ import {publishDataRelease} from './data-release.ts';
 import {districtRegistrySchema} from './district-registry.ts';
 import {validateKnowledgeRelease} from './district-schema.ts';
 import {districtCoverageSchema,validateDistrictCoverage,assertKnowledgeSlice} from './district-publication.ts';
+import {buildKnowledgeGraph} from './district-graph.ts';
 if(process.argv.length>2)throw Error('publish takes no options; every release is validated as one complete dataset');
 const catalogue=await jsonFile<Catalogue>(join(cacheDir,'staging','catalogue.json'));
 if(!catalogue)throw Error('Run collection or quality refresh first');
@@ -36,15 +37,17 @@ const knowledge=validateKnowledgeRelease(await jsonFile(join(cacheDir,'staging',
 const knowledgeCoverage=districtCoverageSchema.parse(await jsonFile(join(cacheDir,'staging','knowledge','coverage.json'))??await jsonFile(join(outDir,'knowledge','coverage.json')));
 validateDistrictCoverage(knowledgeCoverage,knowledgeRegistry,knowledge.records);
 assertKnowledgeSlice(knowledgeRegistry,knowledge.records);
+const knowledgeBytes=JSON.stringify(knowledge,null,2)+'\n';
+const knowledgeGraph=buildKnowledgeGraph(knowledgeBytes);
 const validated=validatePublication(catalogue,collections);
 const validatedFeeds:Record<string,CityFeed>=Object.fromEntries(Object.entries(feeds).map(([id,feed])=>[id,cityFeedSchema.parse(feed)]));
 for(const city of catalogue.cities)if(validatedFeeds[city.id].cityId!==city.id)throw Error(`Wrong feed city for ${city.id}`);
 assertSourceHealth(validated.catalogue,validated.collections);
-assertPublicUrls({catalogue:validated.catalogue,collections:validated.collections,feeds:validatedFeeds,regional:regional.data,knowledgeRegistry,knowledge,knowledgeCoverage});
+assertPublicUrls({catalogue:validated.catalogue,collections:validated.collections,feeds:validatedFeeds,regional:regional.data,knowledgeRegistry,knowledge,knowledgeCoverage,knowledgeGraph});
 const qualityReport={schemaVersion:'stadtstack-publication-quality-v1',generatedAt:new Date().toISOString(),
  policy:{publicUrls:'required',councilBodyBinding:'required',emptySuccess:'forbidden',sourceEventDates:'required; unresolved comparison records quarantined',placeDates:'observation only; no invented event date'},
  cities:cityQuality,regional:{input:regional.inputRecords,published:regional.publishedRecords,quarantined:regional.quarantined},
- knowledge:{published:knowledge.records.length,municipalities:knowledgeCoverage.municipalities.filter(city=>city.publishedRecords>0).length,districts:knowledgeCoverage.districts,policy:'Actual subscription extraction plus deterministic, source-policy, faithfulness and sourced-date publication gates; discovery coverage is not full municipal coverage.'},
+ knowledge:{published:knowledge.records.length,municipalities:knowledgeCoverage.municipalities.filter(city=>city.publishedRecords>0).length,districts:knowledgeCoverage.districts,models:knowledgeCoverage.models,graph:{entities:knowledgeGraph.entities.length,edges:knowledgeGraph.edges.length,recordsSha256:knowledgeGraph.recordsSha256},policy:'Same-pass subscription fact/entity/relation extraction with deterministic, source-policy, actual faithfulness and sourced-date gates; graph links are not causal, success or independent identity verification.'},
  summary:{publishedRecords:cityQuality.reduce((n,c)=>n+c.published,0)+regional.publishedRecords+knowledge.records.length,quarantinedRecords:cityQuality.reduce((n,c)=>n+c.quarantined.length,0)+regional.quarantined.length+knowledgeCoverage.municipalities.reduce((n,city)=>n+city.quarantinedRecords,0),cities:catalogue.cities.length,knowledgeMunicipalities:knowledgeCoverage.municipalities.filter(city=>city.publishedRecords>0).length,districts:knowledgeCoverage.districts.length}};
 // All required gates are validated before the first public output is replaced.
 let core:CoreBundle|undefined;
@@ -85,9 +88,10 @@ if(core){
  await save(join(outDir,'core','handover-draft.json'),JSON.stringify({schemaVersion:'stadtstack-handover-draft-v1',label:'DRAFT — not sent; no municipality handover or receipt',status:'not-sent',recipient:'Stadt Strausberg (draft only)',bundleVersion:core.version,bundleSha256,facts:manifest.facts,request:'Bitte die verlinkten Originalquellen und gegebenenfalls neuere Veröffentlichungen prüfen.',pollResults:null,councilReceipt:null},null,2)+'\n');
 }
 await save(join(outDir,'regions','brandenburg-mol','topics.json'),JSON.stringify(regional.data,null,2)+'\n');
-for(const [name,data] of [['registry',knowledgeRegistry],['records',knowledge],['coverage',knowledgeCoverage]] as const)await save(join(outDir,'knowledge',name+'.json'),JSON.stringify(data,null,2)+'\n');
+await save(join(outDir,'knowledge','records.json'),knowledgeBytes);
+for(const [name,data] of [['registry',knowledgeRegistry],['coverage',knowledgeCoverage],['graph',knowledgeGraph]] as const)await save(join(outDir,'knowledge',name+'.json'),JSON.stringify(data,null,2)+'\n');
 await save(join(outDir,'quality-report.json'),JSON.stringify(qualityReport,null,2)+'\n');
-const releasePaths=['catalogue.json','quality-report.json','regions/brandenburg-mol/topics.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json','knowledge/registry.json','knowledge/records.json','knowledge/coverage.json',
+const releasePaths=['catalogue.json','quality-report.json','regions/brandenburg-mol/topics.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json','knowledge/registry.json','knowledge/records.json','knowledge/coverage.json','knowledge/graph.json',
  ...catalogue.cities.flatMap(city=>['signals.geojson','signals.min.geojson','feed.json','changes.json'].map(file=>`cities/${city.id}/${file}`))];
 const dataRelease=await publishDataRelease(outDir,releasePaths,qualityReport.summary);
 console.log('data release',dataRelease.id,qualityReport.summary);

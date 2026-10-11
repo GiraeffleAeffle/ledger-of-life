@@ -1,0 +1,871 @@
+{
+  "schemaVersion": "stadtstack-pilot-coverage-completion-v1",
+  "generatedAt": "2026-10-11T04:48:22.943Z",
+  "authorization": {
+    "purpose": "pilot coverage completion",
+    "municipalityIds": [
+      "hagenow",
+      "parchim",
+      "schwarzenbek",
+      "ratzeburg",
+      "moelln"
+    ],
+    "newMunicipalities": false,
+    "newSourceProviders": false,
+    "sourceIdentities": 41,
+    "otherFourMunicipalities": "Original registry entries, document rows and source checks preserved exactly."
+  },
+  "inputs": {
+    "baseCorpusSha256": "fbcd03c8474e3fa3cb2a3db0b9a976e3793863a3a6e268b0ead21868516ec2c0",
+    "baseRegistrySha256": "a0432c3eb849a6cd45e8fa78eca236bf4e341847c3c98ec52154310396cfb6b1",
+    "completedCorpusSha256": "fb4e08eee8bf1a3bf036433893553b5ebb0e7ae4dec1fea6ce702a8f66642992",
+    "completedRegistrySha256": "9095c7a241fa5cc1a2d75030286d8690cc5bf6d3e05990c56f7a5199c304b554",
+    "municipalIndexes": [
+      {
+        "municipalityId": "hagenow",
+        "file": "hagenow.json",
+        "sha256": "a6e6a1d81eb98bf0c32f1b1c5b8bdf8629fe883ca61493d0e1a24804cc9e5a86"
+      },
+      {
+        "municipalityId": "parchim",
+        "file": "parchim-publicness-filtered-v3.json",
+        "sha256": "475196b2c4114c9d3caf655104e2c4563666062255a60e312a5435a4f75a500c"
+      },
+      {
+        "municipalityId": "schwarzenbek",
+        "file": "schwarzenbek.json",
+        "sha256": "3cd5de002c10b6eedae0f4808fdc54c8a68f23e45b22f1f0b4e52b13ace3aaaa"
+      },
+      {
+        "municipalityId": "ratzeburg",
+        "file": "ratzeburg.json",
+        "sha256": "3d1b475f67edad067d23bc0f3f3278a1900f69a6f8bfe5ce50ecdf1d74002904"
+      },
+      {
+        "municipalityId": "moelln",
+        "file": "moelln.json",
+        "sha256": "682b371b5a69cb095fee8b8a8b78ffaf2a14153972a7ed38bcbe12b409b9dd10"
+      }
+    ],
+    "bobDiscoveryIndexSha256": "cab2f4b9c78dd477a8a5ebf81e758231b9026101067d6f67c2c77dcc41023fcc",
+    "publicnessReviewReportSha256": "aa65c9825746aabea30cc04e5b2a491949dcd7d64299f8cfddcd13342e21aad7"
+  },
+  "counts": {
+    "before": {
+      "representations": 2842,
+      "municipalityByteGroups": 1822,
+      "pdfRepresentations": 2390
+    },
+    "after": {
+      "representations": 5193,
+      "municipalityByteGroups": 4119,
+      "pdfRepresentations": 3990
+    }
+  },
+  "municipalities": [
+    {
+      "id": "strausberg",
+      "ags": "12064472",
+      "completionAuthorized": false,
+      "before": {
+        "representations": 476,
+        "municipalityByteGroups": 420,
+        "pdfRepresentations": 457
+      },
+      "previousCached": null,
+      "after": {
+        "representations": 476,
+        "municipalityByteGroups": 420,
+        "pdfRepresentations": 457
+      },
+      "sources": [
+        {
+          "sourceId": "strausberg-planning",
+          "before": {
+            "representations": 215,
+            "municipalityByteGroups": 215,
+            "pdfRepresentations": 209
+          },
+          "after": {
+            "representations": 215,
+            "municipalityByteGroups": 215,
+            "pdfRepresentations": 209
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "strausberg-website",
+          "before": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "outcome": "documents_collected"
+        },
+        {
+          "sourceId": "strausberg-council",
+          "before": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "strausberg-participation",
+          "before": {
+            "representations": 77,
+            "municipalityByteGroups": 68,
+            "pdfRepresentations": 66
+          },
+          "after": {
+            "representations": 77,
+            "municipalityByteGroups": 68,
+            "pdfRepresentations": 66
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "strausberg-gazette",
+          "before": {
+            "representations": 183,
+            "municipalityByteGroups": 183,
+            "pdfRepresentations": 182
+          },
+          "after": {
+            "representations": 183,
+            "municipalityByteGroups": 183,
+            "pdfRepresentations": 182
+          },
+          "outcome": "partial"
+        }
+      ]
+    },
+    {
+      "id": "hoppegarten",
+      "ags": "12064227",
+      "completionAuthorized": false,
+      "before": {
+        "representations": 19,
+        "municipalityByteGroups": 18,
+        "pdfRepresentations": 11
+      },
+      "previousCached": null,
+      "after": {
+        "representations": 19,
+        "municipalityByteGroups": 18,
+        "pdfRepresentations": 11
+      },
+      "sources": [
+        {
+          "sourceId": "hoppegarten-website",
+          "before": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "outcome": "documents_collected"
+        },
+        {
+          "sourceId": "hoppegarten-council",
+          "before": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "outcome": "documents_collected"
+        },
+        {
+          "sourceId": "hoppegarten-participation",
+          "before": {
+            "representations": 13,
+            "municipalityByteGroups": 12,
+            "pdfRepresentations": 11
+          },
+          "after": {
+            "representations": 13,
+            "municipalityByteGroups": 12,
+            "pdfRepresentations": 11
+          },
+          "outcome": "documents_collected"
+        },
+        {
+          "sourceId": "hoppegarten-gazette",
+          "before": {
+            "representations": 4,
+            "municipalityByteGroups": 4,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 4,
+            "municipalityByteGroups": 4,
+            "pdfRepresentations": 0
+          },
+          "outcome": "documents_collected"
+        }
+      ]
+    },
+    {
+      "id": "ruedersdorf-bei-berlin",
+      "ags": "12064428",
+      "completionAuthorized": false,
+      "before": {
+        "representations": 257,
+        "municipalityByteGroups": 183,
+        "pdfRepresentations": 197
+      },
+      "previousCached": null,
+      "after": {
+        "representations": 257,
+        "municipalityByteGroups": 183,
+        "pdfRepresentations": 197
+      },
+      "sources": [
+        {
+          "sourceId": "ruedersdorf-bei-berlin-website",
+          "before": {
+            "representations": 27,
+            "municipalityByteGroups": 23,
+            "pdfRepresentations": 6
+          },
+          "after": {
+            "representations": 27,
+            "municipalityByteGroups": 23,
+            "pdfRepresentations": 6
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "ruedersdorf-bei-berlin-council",
+          "before": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "ruedersdorf-bei-berlin-participation",
+          "before": {
+            "representations": 209,
+            "municipalityByteGroups": 154,
+            "pdfRepresentations": 185
+          },
+          "after": {
+            "representations": 209,
+            "municipalityByteGroups": 154,
+            "pdfRepresentations": 185
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "ruedersdorf-bei-berlin-gazette",
+          "before": {
+            "representations": 21,
+            "municipalityByteGroups": 17,
+            "pdfRepresentations": 6
+          },
+          "after": {
+            "representations": 21,
+            "municipalityByteGroups": 17,
+            "pdfRepresentations": 6
+          },
+          "outcome": "blocked"
+        }
+      ]
+    },
+    {
+      "id": "ratzeburg",
+      "ags": "01053100",
+      "completionAuthorized": true,
+      "before": {
+        "representations": 743,
+        "municipalityByteGroups": 336,
+        "pdfRepresentations": 650
+      },
+      "previousCached": {
+        "representations": 743,
+        "distinctBytes": 336,
+        "pdfs": 650
+      },
+      "after": {
+        "representations": 743,
+        "municipalityByteGroups": 336,
+        "pdfRepresentations": 650
+      },
+      "sources": [
+        {
+          "sourceId": "ratzeburg-website",
+          "before": {
+            "representations": 305,
+            "municipalityByteGroups": 303,
+            "pdfRepresentations": 265
+          },
+          "after": {
+            "representations": 305,
+            "municipalityByteGroups": 303,
+            "pdfRepresentations": 265
+          },
+          "outcome": "partial"
+        },
+        {
+          "sourceId": "ratzeburg-council",
+          "before": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 2,
+            "municipalityByteGroups": 2,
+            "pdfRepresentations": 0
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "ratzeburg-participation",
+          "before": {
+            "representations": 133,
+            "municipalityByteGroups": 133,
+            "pdfRepresentations": 121
+          },
+          "after": {
+            "representations": 133,
+            "municipalityByteGroups": 133,
+            "pdfRepresentations": 121
+          },
+          "outcome": "partial"
+        },
+        {
+          "sourceId": "ratzeburg-gazette",
+          "before": {
+            "representations": 303,
+            "municipalityByteGroups": 301,
+            "pdfRepresentations": 264
+          },
+          "after": {
+            "representations": 303,
+            "municipalityByteGroups": 301,
+            "pdfRepresentations": 264
+          },
+          "outcome": "partial"
+        },
+        {
+          "sourceId": "ratzeburg-bob-sh",
+          "before": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "outcome": "no_documents"
+        }
+      ]
+    },
+    {
+      "id": "moelln",
+      "ags": "01053090",
+      "completionAuthorized": true,
+      "before": {
+        "representations": 447,
+        "municipalityByteGroups": 255,
+        "pdfRepresentations": 231
+      },
+      "previousCached": {
+        "representations": 466,
+        "distinctBytes": 255,
+        "pdfs": 244
+      },
+      "after": {
+        "representations": 465,
+        "municipalityByteGroups": 254,
+        "pdfRepresentations": 244
+      },
+      "sources": [
+        {
+          "sourceId": "moelln-website",
+          "before": {
+            "representations": 234,
+            "municipalityByteGroups": 233,
+            "pdfRepresentations": 121
+          },
+          "after": {
+            "representations": 234,
+            "municipalityByteGroups": 233,
+            "pdfRepresentations": 121
+          },
+          "outcome": "partial"
+        },
+        {
+          "sourceId": "moelln-council",
+          "before": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "moelln-participation",
+          "before": {
+            "representations": 4,
+            "municipalityByteGroups": 4,
+            "pdfRepresentations": 3
+          },
+          "after": {
+            "representations": 4,
+            "municipalityByteGroups": 4,
+            "pdfRepresentations": 3
+          },
+          "outcome": "documents_collected"
+        },
+        {
+          "sourceId": "moelln-gazette",
+          "before": {
+            "representations": 208,
+            "municipalityByteGroups": 207,
+            "pdfRepresentations": 107
+          },
+          "after": {
+            "representations": 227,
+            "municipalityByteGroups": 226,
+            "pdfRepresentations": 120
+          },
+          "outcome": "partial"
+        },
+        {
+          "sourceId": "moelln-bob-sh",
+          "before": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "outcome": "no_documents"
+        }
+      ]
+    },
+    {
+      "id": "schwarzenbek",
+      "ags": "01053116",
+      "completionAuthorized": true,
+      "before": {
+        "representations": 28,
+        "municipalityByteGroups": 28,
+        "pdfRepresentations": 19
+      },
+      "previousCached": {
+        "representations": 28,
+        "distinctBytes": 28,
+        "pdfs": 19
+      },
+      "after": {
+        "representations": 27,
+        "municipalityByteGroups": 27,
+        "pdfRepresentations": 19
+      },
+      "sources": [
+        {
+          "sourceId": "schwarzenbek-website",
+          "before": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "outcome": "documents_collected"
+        },
+        {
+          "sourceId": "schwarzenbek-council",
+          "before": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "schwarzenbek-participation",
+          "before": {
+            "representations": 6,
+            "municipalityByteGroups": 6,
+            "pdfRepresentations": 1
+          },
+          "after": {
+            "representations": 6,
+            "municipalityByteGroups": 6,
+            "pdfRepresentations": 1
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "schwarzenbek-gazette",
+          "before": {
+            "representations": 20,
+            "municipalityByteGroups": 20,
+            "pdfRepresentations": 18
+          },
+          "after": {
+            "representations": 20,
+            "municipalityByteGroups": 20,
+            "pdfRepresentations": 18
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "schwarzenbek-bob-sh",
+          "before": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "outcome": "no_documents"
+        }
+      ]
+    },
+    {
+      "id": "ludwigslust",
+      "ags": "13076090",
+      "completionAuthorized": false,
+      "before": {
+        "representations": 594,
+        "municipalityByteGroups": 304,
+        "pdfRepresentations": 568
+      },
+      "previousCached": null,
+      "after": {
+        "representations": 594,
+        "municipalityByteGroups": 304,
+        "pdfRepresentations": 568
+      },
+      "sources": [
+        {
+          "sourceId": "ludwigslust-website",
+          "before": {
+            "representations": 299,
+            "municipalityByteGroups": 294,
+            "pdfRepresentations": 284
+          },
+          "after": {
+            "representations": 299,
+            "municipalityByteGroups": 294,
+            "pdfRepresentations": 284
+          },
+          "outcome": "partial"
+        },
+        {
+          "sourceId": "ludwigslust-council",
+          "before": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "outcome": "documents_collected"
+        },
+        {
+          "sourceId": "ludwigslust-participation",
+          "before": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 1
+          },
+          "after": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 1
+          },
+          "outcome": "partial"
+        },
+        {
+          "sourceId": "ludwigslust-gazette",
+          "before": {
+            "representations": 293,
+            "municipalityByteGroups": 288,
+            "pdfRepresentations": 283
+          },
+          "after": {
+            "representations": 293,
+            "municipalityByteGroups": 288,
+            "pdfRepresentations": 283
+          },
+          "outcome": "partial"
+        }
+      ]
+    },
+    {
+      "id": "parchim",
+      "ags": "13076108",
+      "completionAuthorized": true,
+      "before": {
+        "representations": 277,
+        "municipalityByteGroups": 277,
+        "pdfRepresentations": 256
+      },
+      "previousCached": {
+        "representations": 1266,
+        "distinctBytes": 1239,
+        "pdfs": 1170
+      },
+      "after": {
+        "representations": 2600,
+        "municipalityByteGroups": 2565,
+        "pdfRepresentations": 1832
+      },
+      "sources": [
+        {
+          "sourceId": "parchim-website",
+          "before": {
+            "representations": 274,
+            "municipalityByteGroups": 274,
+            "pdfRepresentations": 255
+          },
+          "after": {
+            "representations": 1263,
+            "municipalityByteGroups": 1237,
+            "pdfRepresentations": 1169
+          },
+          "outcome": "partial"
+        },
+        {
+          "sourceId": "parchim-council",
+          "before": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 1335,
+            "municipalityByteGroups": 1328,
+            "pdfRepresentations": 662
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "parchim-participation",
+          "before": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "parchim-gazette",
+          "before": {
+            "representations": 2,
+            "municipalityByteGroups": 2,
+            "pdfRepresentations": 1
+          },
+          "after": {
+            "representations": 2,
+            "municipalityByteGroups": 2,
+            "pdfRepresentations": 1
+          },
+          "outcome": "documents_collected"
+        }
+      ]
+    },
+    {
+      "id": "hagenow",
+      "ags": "13076060",
+      "completionAuthorized": true,
+      "before": {
+        "representations": 1,
+        "municipalityByteGroups": 1,
+        "pdfRepresentations": 1
+      },
+      "previousCached": {
+        "representations": 1,
+        "distinctBytes": 1,
+        "pdfs": 1
+      },
+      "after": {
+        "representations": 12,
+        "municipalityByteGroups": 12,
+        "pdfRepresentations": 12
+      },
+      "sources": [
+        {
+          "sourceId": "hagenow-publisher-gazette",
+          "before": {
+            "representations": 1,
+            "municipalityByteGroups": 1,
+            "pdfRepresentations": 1
+          },
+          "after": {
+            "representations": 12,
+            "municipalityByteGroups": 12,
+            "pdfRepresentations": 12
+          },
+          "outcome": "documents_collected"
+        },
+        {
+          "sourceId": "hagenow-website",
+          "before": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "outcome": "partial"
+        },
+        {
+          "sourceId": "hagenow-council",
+          "before": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "outcome": "blocked"
+        },
+        {
+          "sourceId": "hagenow-participation",
+          "before": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "outcome": "partial"
+        },
+        {
+          "sourceId": "hagenow-gazette",
+          "before": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "after": {
+            "representations": 0,
+            "municipalityByteGroups": 0,
+            "pdfRepresentations": 0
+          },
+          "outcome": "partial"
+        }
+      ]
+    }
+  ],
+  "publicness": {
+    "htmlRepresentationsReviewed": 673,
+    "proposalRepresentationsExplicitlyPublic": 326,
+    "proposalRepresentationsExplicitlyNonpublic": 0,
+    "pdfRepresentationsReviewed": 671,
+    "publicNotices": 32,
+    "filteredPdfV2ProofCount": 662,
+    "limitation": "Text/metadata review and source public status, not permission to publish raw materials; actual admission still requires normal extraction/faithfulness/date/legal gates.",
+    "withheldPdfRepresentations": 9,
+    "withheldBytesAbsent": true,
+    "interpretation": "Conservative exclusion of mixed or ambiguous substantive PDFs; not a claim of confirmed leaks. Public notices listing closed agenda sections were distinguished. Raw and excluded content remains private."
+  },
+  "findings": [
+    {
+      "source": "hagenow-publisher-gazette",
+      "result": "Twelve actual original-publisher issue PDFs, versus one in the frozen slice; discovered via publisher archive and actual saveCompleteUrl links.",
+      "url": "https://www.wittich.de/produkte/zeitungen/archiv/3446-hagenower-blaetter"
+    },
+    {
+      "source": "parchim-council",
+      "result": "Normal public anonymous form/AJAX workflow succeeds. Earlier bare-loader HTTP500 was missing request context, not source inaccessibility. Completed v3 and its direct links are the bound; interrupted v4 is excluded.",
+      "deferredRecords": 21,
+      "sourceByteLimitFailures": 4
+    },
+    {
+      "source": "bob-sh",
+      "result": "Successful exact-AGS scoped empty for Ratzeburg/Mölln/Schwarzenbek. Three statewide discovery roots removed from municipal document counts; metadata retained as discovery evidence.",
+      "publicInventoryRows": 1111,
+      "countyScopedRows": 74,
+      "missingStatewideCodes": 95,
+      "conflictingStatewideCodes": 3,
+      "municipalMatches": {
+        "ratzeburg": 0,
+        "moelln": 0,
+        "schwarzenbek": 0
+      }
+    },
+    {
+      "source": "schwarzenbek-council",
+      "result": "Registered council robots restriction remains respected; no alternate-path or authentication bypass."
+    }
+  ],
+  "limitations": [
+    "Counts distinguish source representations, municipality/byte groups and PDF representations; they are not admitted facts, independent corroborations or solved projects.",
+    "This is bounded completion of five already-registered pilot source scopes, not all historical or municipal documents.",
+    "Parchim publicness review does not grant republication rights. Every model/publication record still requires the unchanged source, quote, date, privacy, legal and faithfulness gates.",
+    "No new source provider, municipality, private authenticated content, partner contact or policy bypass was used."
+  ]
+}

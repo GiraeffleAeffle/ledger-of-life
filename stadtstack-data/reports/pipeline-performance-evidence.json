@@ -1,0 +1,517 @@
+{
+  "schemaVersion": "stadtstack-pipeline-performance-evidence-v1",
+  "measuredSnapshotAt": "2026-10-11T06:50:11.458232+00:00",
+  "updatedBacklog": {
+    "at": "2026-10-11T07:11:47.730Z",
+    "planId": "76292636ed3afd28aa00f31364562944b04016bc421331ef948bbd94d8ce3099",
+    "providers": [
+      {
+        "provider": "openai-subscription",
+        "primaryAssigned": 197,
+        "primaryComplete": 172,
+        "agreementAssigned": 7,
+        "agreementComplete": 6,
+        "remainingTasks": 26,
+        "remainingChunksWholeRunningGroup": 92,
+        "state": "ready"
+      },
+      {
+        "provider": "anthropic-subscription",
+        "primaryAssigned": 179,
+        "primaryComplete": 27,
+        "agreementAssigned": 14,
+        "agreementComplete": 1,
+        "remainingTasks": 165,
+        "remainingChunksWholeRunningGroup": 664,
+        "state": "ready"
+      }
+    ],
+    "haikuCompletedCalls": 123,
+    "haikuStatuses": {
+      "success": 123
+    }
+  },
+  "measured": {
+    "currentRun": {
+      "planId": "76292636ed3afd28aa00f31364562944b04016bc421331ef948bbd94d8ce3099",
+      "assignmentMode": "balanced",
+      "operatorReportedStartApprox": "2026-10-11T06:38:00Z",
+      "firstRealHaikuCallAt": "2026-10-11T06:38:44.354Z",
+      "latestFinishedHaikuCallAt": "2026-10-11T06:50:01.571Z",
+      "measuredCallWindowSeconds": 677.217,
+      "providerState": {
+        "openai-subscription": "ready",
+        "anthropic-subscription": "ready"
+      },
+      "taskCounts": [
+        {
+          "provider": "openai-subscription",
+          "purpose": "production",
+          "assigned": 197,
+          "completed": 137,
+          "pending": 59,
+          "running": 1,
+          "failed": 0,
+          "assignedChunks": 921,
+          "remainingChunksIncludingWholeRunningGroup": 268
+        },
+        {
+          "provider": "openai-subscription",
+          "purpose": "agreement",
+          "assigned": 7,
+          "completed": 5,
+          "pending": 2,
+          "running": 0,
+          "failed": 0,
+          "assignedChunks": 19,
+          "remainingChunksIncludingWholeRunningGroup": 4
+        },
+        {
+          "provider": "anthropic-subscription",
+          "purpose": "production",
+          "assigned": 179,
+          "completed": 5,
+          "pending": 173,
+          "running": 1,
+          "failed": 0,
+          "assignedChunks": 709,
+          "remainingChunksIncludingWholeRunningGroup": 684
+        },
+        {
+          "provider": "anthropic-subscription",
+          "purpose": "agreement",
+          "assigned": 14,
+          "completed": 1,
+          "pending": 13,
+          "running": 0,
+          "failed": 0,
+          "assignedChunks": 39,
+          "remainingChunksIncludingWholeRunningGroup": 36
+        }
+      ],
+      "totalPrimaryGroups": 376,
+      "totalAgreementGroups": 21,
+      "totalTasks": 397,
+      "totalTaskChunks": 1688,
+      "primaryGroupChunkSum": 1630,
+      "completedGroupChunkSum": 696,
+      "remainingGroupChunkSum": 992
+    },
+    "haiku": {
+      "calls": 44,
+      "purposes": {
+        "extraction": 25,
+        "judge": 16,
+        "agreement": 3
+      },
+      "reportedTokens": {
+        "inputTokens": {
+          "sum": 88,
+          "reportingCalls": 44
+        },
+        "outputTokens": {
+          "sum": 162203,
+          "reportingCalls": 44
+        },
+        "cacheReadTokens": {
+          "sum": 195084,
+          "reportingCalls": 44
+        },
+        "cacheCreationTokens": {
+          "sum": 217187,
+          "reportingCalls": 44
+        }
+      },
+      "latencySeconds": {
+        "n": 44,
+        "sum": 674.287,
+        "min": 2.86,
+        "median": 8.150500000000001,
+        "p90": 31.2896,
+        "p95": 36.32455,
+        "max": 61.089,
+        "mean": 15.324704545454546
+      },
+      "cliEstimatedApiCostUsd": 5.0209248,
+      "primaryGroupAverage": {
+        "denominator": 5,
+        "callsPerGroup": 8.2,
+        "extractionCallsPerGroup": 5,
+        "judgeCallsPerGroup": 3.2,
+        "topLevelTokensPerGroup": {
+          "inputTokens": 16.4,
+          "outputTokens": 32318.6,
+          "cacheReadTokens": 35430.6,
+          "cacheCreationTokens": 40138.2
+        },
+        "perModelTokensPerGroup": {
+          "claude-haiku-5-5": {
+            "inputTokens": 16.4,
+            "outputTokens": 32318.6,
+            "cacheReadTokens": 35430.6,
+            "cacheCreationTokens": 40138.2
+          }
+        }
+      },
+      "interpretation": "inputTokens is uncached reported input; cacheCreationTokens and cacheReadTokens are separate input buckets. Top-level and per-model are duplicate accounting views, never sum the views. CLI cost is API-price estimate, not subscription billing or quota."
+    },
+    "codex": {
+      "completedTaskResults": 142,
+      "preexistingCompletedTaskResults": 104,
+      "newlyMaterializedTaskResults": 38,
+      "newlyMaterializedPrimary": 33,
+      "newlyMaterializedAgreement": 5,
+      "newlyMaterializedChunkResponses": {
+        "newSuccessfulExtractionAnswerCacheEntries": 96,
+        "preexistingResponseCacheReuses": 15
+      },
+      "currentWindowNewSuccessfulAnswerCacheEntries": 120,
+      "currentWindowAnswerKindCounts": {
+        "extraction": 96,
+        "judge": 24
+      },
+      "usageTokens": null,
+      "perCallLatencySeconds": null,
+      "reason": "2455 answer caches inspected for schema, none retain usage or token fields; answer schema retains receivedAt but not start/duration. Later safe timestamp snapshot has2465 entries; filter receivedAt<=snapshotAt gives current-window120 successful response caches. Failed/uncached/interrupted calls not covered. returnedModel null in all inspected Codex answers; configured gpt-6-luna is not reported token usage.",
+      "nativeCallInterpretation": "Each cache entry is written only after successful subscriptionChat on a cache miss; cachedAnswer receivedAt is preserved on reuse. New timestamped responses are successful-call lower-bound; count no legacy cache hit as new call.",
+      "offlineTokenEstimate": null
+    },
+    "preparation": {
+      "selectedGroups": 417,
+      "preparedGroups": 376,
+      "heldGroups": 41,
+      "methodCounts": {
+        "html": 73,
+        "pdf_text": 206,
+        "pdf_ocr": 97
+      },
+      "sourceBytes": {
+        "n": 376,
+        "sum": 404819050,
+        "min": 641,
+        "median": 250670.5,
+        "p90": 2852613,
+        "p95": 6229864.25,
+        "max": 14559242,
+        "mean": 1076646.4095744682
+      },
+      "textUtf16": {
+        "n": 376,
+        "sum": 5888420,
+        "min": 40,
+        "median": 4647.5,
+        "p90": 49987,
+        "p95": 86866.75,
+        "max": 228349,
+        "mean": 15660.691489361701
+      },
+      "chunks": {
+        "n": 376,
+        "sum": 1630,
+        "min": 1,
+        "median": 1,
+        "p90": 13,
+        "p95": 22,
+        "max": 59,
+        "mean": 4.335106382978723
+      }
+    },
+    "historicalGates": {
+      "groups": 209,
+      "chunks": 802,
+      "admitted": 165,
+      "noCase": 280,
+      "rejected": 357,
+      "datedPublished": 86
+    },
+    "weakLabels": {
+      "historicalComplete209": {
+        "primaryGroups": 209,
+        "labels": {
+          "other_quarantine_or_mixed_no_case_not_irrelevant_negative": 120,
+          "gated_positive_any_admitted_record": 65,
+          "all_chunks_no_case_candidate_negative_not_gold": 24
+        },
+        "dateEligibleRecordCount": 86,
+        "admittedRecordCount": 165,
+        "selectedGroups": 227,
+        "technicalPolicyPreparationHeldGroups": 18,
+        "unselectedOriginalCorpusGroups": 1595
+      },
+      "currentCompleted142": {
+        "primaryGroups": 142,
+        "labels": {
+          "gated_positive_any_admitted_record": 49,
+          "all_chunks_no_case_candidate_negative_not_gold": 13,
+          "other_quarantine_or_mixed_no_case_not_irrelevant_negative": 80
+        }
+      },
+      "currentSelected417": {
+        "technicalPolicyPreparationHeldGroups": 41,
+        "preparedUncompletedPrimaryGroupsIncludingRunning": 234,
+        "completedPrimaryGroups": 142
+      },
+      "currentCorpus4119": {
+        "unselectedGroups": 3702,
+        "selectedGroups": 417
+      },
+      "labelCaveat": "Weak operational outcome labels, not relevance gold. Gate failures, critical unsupported claims, invalid schema, page cap, and undated publication are NOT irrelevant-negative labels. Positive means gated record, including undated. All-chunks-no-case still needs source-grounded manual review. No classifier, embedding, training, or triage inference executed.",
+      "parentDesignHandoff": "Preserve high recall; borderline route to extraction; estimate precision/recall on adjudicated doc-level labels and randomly audit rejected docs each run."
+    },
+    "hardware": {
+      "mac": {
+        "cpu": "Apple M4",
+        "logicalCpus": 10,
+        "ramBytes": 17179869184,
+        "architecture": "arm64",
+        "gpu": "not measured"
+      },
+      "vm": {
+        "architecture": "x86_64",
+        "logicalCpus": 4,
+        "ramMiB": 7941,
+        "availableMiBAtMeasurement": 5787,
+        "usedMiBAtMeasurement": 2153,
+        "swapMiB": 0,
+        "gpu": "not measured"
+      },
+      "implication": "Observed one model-call lane/provider is software scheduling, not demonstrated hardware saturation. OCR shares a4-vCPU/~7.75GiB VM; no measured scaling curve or GPU acceleration evidence."
+    },
+    "stageWalltimes": [
+      {
+        "run": "bg738",
+        "stage": "small text preparation",
+        "seconds": 42.4,
+        "count": 16,
+        "notes": "production preparation; warm/cold mix unknown",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg739",
+        "stage": "v7 diagnostic model run",
+        "seconds": 197.45,
+        "count": 10,
+        "notes": "development diagnostic; Haiku preflight paused",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg747",
+        "stage": "v7 corrected small extraction",
+        "seconds": 236.18,
+        "count": 10,
+        "notes": "corrected rerun; new vs cached calls unknown",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg746",
+        "stage": "30/town text preparation",
+        "seconds": 966.28,
+        "count": 209,
+        "notes": "production preparation209/18held",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg749",
+        "stage": "balanced Codex half",
+        "seconds": 2746.84,
+        "count": 112,
+        "notes": "108primary+4agreement; response reuse present",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg754",
+        "stage": "temporary Codex-only",
+        "seconds": 2195.84,
+        "count": 127,
+        "notes": "127/209 paused on model failure; result reuse possible",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg758",
+        "stage": "explicit resume",
+        "seconds": 1009.42,
+        "count": 209,
+        "notes": "final209/209;127 pre-resume completed; incremental completed groups82",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg755",
+        "stage": "60/town text preparation",
+        "seconds": 877.28,
+        "count": 365,
+        "notes": "production prep365/42held; warm/cold mix unknown",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg761",
+        "stage": "old60 model run",
+        "seconds": 1465.98,
+        "count": 127,
+        "notes": "127/365 paused on tool attempt; reuse possible",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg780",
+        "stage": "v8 completed-corpus text preparation",
+        "seconds": 253.32,
+        "count": 376,
+        "notes": "prepared376/41held; warm cache, not cold OCR cost",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg781",
+        "stage": "v8 Codex-only",
+        "seconds": 5878.15,
+        "count": 185,
+        "notes": "manually paused06:38:07UTC;185/376 task-results,163 admitted candidates; includes reuse",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg760",
+        "stage": "publication86",
+        "seconds": 2.71,
+        "count": 86,
+        "notes": "production publication; excludes human review",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg762",
+        "stage": "230 tests plus tsc",
+        "seconds": 7.14,
+        "count": 230,
+        "notes": "development verification, not production inference",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg776",
+        "stage": "104 targeted tests plus tsc",
+        "seconds": 2.98,
+        "count": 104,
+        "notes": "development verification, not production inference",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      },
+      {
+        "run": "bg763",
+        "stage": "actual30Q MCP collection86",
+        "seconds": 1.51,
+        "count": 30,
+        "notes": "value evaluation collection, not extraction",
+        "provenance": "Owner-provided observed tool walltime in delegated task context, not re-executed"
+      }
+    ],
+    "reuse": {
+      "completedTaskReferencesAcross7Plans": 801,
+      "distinctCompletedTaskIds": 504,
+      "distinctCompletedGroupIds": 331,
+      "duplicateCompletedTaskReferences": 297,
+      "interpretation": "Duplicate references show cross-plan reuse; not new inference. Different task IDs can reflect purpose/provider/prepared/prompt changes. Counting changed-contract plan work as ordinary production throughput inflates runtime. Only one historical209-group plan shows an explicit task attempts=2; plan attempts do not expose model-call retries."
+    },
+    "attribution": {
+      "windowStart": "2026-10-11T01:00:42.883Z",
+      "windowEnd": "2026-10-11T06:50:11.458Z",
+      "windowSeconds": 20968.575,
+      "coveredProcessingSeconds": 15442.784,
+      "coveredWindowFraction": 0.736472745525149,
+      "unattributedWindowFraction": 0.26352725447485104,
+      "meaning": "Wall-clock coverage by recorded data-bearing jobs, including diagnostic/changed-contract runs; NOT exclusive development-vs-production effort. Source crawl durations unsegmented; development/reviews may overlap."
+    }
+  },
+  "sourceEvidence": {
+    "planId": "76292636ed3afd28aa00f31364562944b04016bc421331ef948bbd94d8ce3099",
+    "corpusSha256": "fb4e08eee8bf1a3bf036433893553b5ebb0e7ae4dec1fea6ce702a8f66642992",
+    "registrySha256": "9095c7a241fa5cc1a2d75030286d8690cc5bf6d3e05990c56f7a5199c304b554",
+    "rawReceipts": "Private content-addressed prepared/results/model-usage receipts; no raw document or account metadata reproduced here.",
+    "previousImageWorkflow": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/38094316300",
+    "previousImageJobSeconds": 147,
+    "previousImageBuildPushSeconds": 118
+  },
+  "scenario": {
+    "label": "Explicit assumptions, not measured319-town forecast",
+    "assumptions": {
+      "towns": 319,
+      "keep": 0.7,
+      "residual": 0.2,
+      "strongAmongResidual": 0.1,
+      "triageInput": 2000,
+      "spanInput": 8000,
+      "residualBatchCost": 0.00125,
+      "strongBatchCost": 0.015
+    },
+    "costPerRawDocument": {
+      "jev": 0.0007042000000000001,
+      "openaiDecisions": 0.001145
+    },
+    "rows": [
+      {
+        "initialDocsPerTown": 100,
+        "weeklyDocsPerTown": 2,
+        "initialDocs": 31900,
+        "weeklyDocs": 638,
+        "jevInitialPerTown": 0.07042000000000001,
+        "jevInitialTotal": 22.463980000000003,
+        "jevWeeklyTotal": 0.44927960000000006,
+        "decisionsInitialPerTown": 0.11449999999999999,
+        "decisionsInitialTotal": 36.5255,
+        "decisionsWeeklyTotal": 0.73051
+      },
+      {
+        "initialDocsPerTown": 250,
+        "weeklyDocsPerTown": 5,
+        "initialDocs": 79750,
+        "weeklyDocs": 1595,
+        "jevInitialPerTown": 0.17605,
+        "jevInitialTotal": 56.15995000000001,
+        "jevWeeklyTotal": 1.123199,
+        "decisionsInitialPerTown": 0.28625,
+        "decisionsInitialTotal": 91.31375,
+        "decisionsWeeklyTotal": 1.8262749999999999
+      },
+      {
+        "initialDocsPerTown": 1000,
+        "weeklyDocsPerTown": 20,
+        "initialDocs": 319000,
+        "weeklyDocs": 6380,
+        "jevInitialPerTown": 0.7042,
+        "jevInitialTotal": 224.63980000000004,
+        "jevWeeklyTotal": 4.492796,
+        "decisionsInitialPerTown": 1.145,
+        "decisionsInitialTotal": 365.255,
+        "decisionsWeeklyTotal": 7.3050999999999995
+      }
+    ]
+  },
+  "references": {
+    "openai_pricing": "https://developers.openai.com/api/docs/pricing",
+    "openai_luna": "https://developers.openai.com/api/docs/models/gpt-6-luna",
+    "openai_batch": "https://developers.openai.com/api/docs/guides/batch",
+    "openai_cache": "https://developers.openai.com/api/docs/guides/prompt-caching",
+    "openai_retention": "https://developers.openai.com/api/docs/guides/your-data",
+    "openai_billing": "https://help.openai.com/en/articles/9039756",
+    "anthropic_pricing": "https://platform.claude.com/docs/en/about-claude/pricing",
+    "anthropic_models": "https://platform.claude.com/docs/en/models/overview",
+    "anthropic_batch": "https://platform.claude.com/docs/en/build-with-claude/batch-processing",
+    "anthropic_limits": "https://platform.claude.com/docs/en/api/rate-limits",
+    "anthropic_cache": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
+    "anthropic_retention": "https://platform.claude.com/docs/en/manage-claude/api-and-data-retention",
+    "anthropic_conditional_api_credits": "https://support.claude.com/en/articles/17154008-monthly-api-credits-for-max-and-team-plans",
+    "openai_decisions_guide": "https://developers.openai.com/api/docs/guides/decisions",
+    "openai_decisions_reference": "https://developers.openai.com/api/reference/resources/decisions",
+    "openai_batch_guide": "https://developers.openai.com/api/docs/guides/batch",
+    "openai_batch_reference": "https://developers.openai.com/api/reference/resources/batches/methods/create",
+    "jev_launch": "https://typesafe.ai/blog/introducing-system-one-models-and-jev",
+    "jev_api": "https://docs.typesafe.ai/api",
+    "jev_models": "https://docs.typesafe.ai/models",
+    "jev_quickstart": "https://docs.typesafe.ai/introduction/quickstart",
+    "jev_confidence": "https://docs.typesafe.ai/confidence",
+    "jev_limitations": "https://docs.typesafe.ai/model-jaggedness/jev-1.13",
+    "jev_legal": "https://docs.typesafe.ai/legal",
+    "jev_dpa": "https://typesafe.ai/legal/data-processing"
+  },
+  "limitations": [
+    "Codex input/output tokens and true per-call latency were not retained; no substitution from Haiku.",
+    "Top-level/per-model Haiku usage describes the same calls, not additive counters.",
+    "Classifier precision/recall and decision-API corpus latency have not been measured; authorization/access and adjudicated labels are prerequisites.",
+    "Processing interval coverage is not an exclusive development/production time split.",
+    "Four-worker performance is not inferred as a measured fourfold speedup."
+  ]
+}

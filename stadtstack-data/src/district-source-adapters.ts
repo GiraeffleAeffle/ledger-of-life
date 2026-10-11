@@ -58,9 +58,10 @@ export function discoverDocumentLinks(html:string,base:string):DiscoveredLink[]{
 export function sourceDocument(response:FetchedDocument,municipality:RegistryMunicipality,source:RegistrySource,adapter:string,metadata:CrawlDocument['metadata']={},documentDate:string|null=null):CrawlDocument {
  return {...response,id:'document-'+hash(municipality.id+'\n'+source.id+'\n'+response.url).slice(0,24),municipalityId:municipality.id,ags:municipality.ags,districtId:municipality.districtId,sourceId:source.id,documentDate,adapter,metadata:{sourceType:source.kind,...metadata}};
 }
-export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:RegistryMunicipality,source:RegistrySource,options:AdapterOptions,seeds:SourceSeed[]=municipality.seedDocuments?.filter(seed=>seed.sourceId===source.id)??[]):Promise<AdapterResult>{
+export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:RegistryMunicipality,source:RegistrySource,options:AdapterOptions,seeds:SourceSeed[]=municipality.seedDocuments?.filter(seed=>seed.sourceId===source.id)??[],boundProcedureRoots?:string[]):Promise<AdapterResult>{
  const folder=join(fetcher.cacheDir,'frontiers');await mkdir(folder,{recursive:true});
- const frontierPath=join(folder,hash(municipality.id+'\n'+source.id)+'.json'),ttl=options.revalidateAfterMs??DEFAULT_SOURCE_REVALIDATE_MS;
+ const boundRoots=boundProcedureRoots?.map(value=>publicUrl(value)),scopeKey=boundRoots?'\nbound-procedures-v1\n'+JSON.stringify(boundRoots.map(url=>url.href).sort()):'';
+ const frontierPath=join(folder,hash(municipality.id+'\n'+source.id+scopeKey)+'.json'),ttl=options.revalidateAfterMs??DEFAULT_SOURCE_REVALIDATE_MS;
  if(!Number.isFinite(ttl)||ttl<=0)throw Error('Source revalidation TTL must be positive');
  let frontier:SourceFrontier;
  try{frontier=JSON.parse(await readFile(frontierPath,'utf8')) as SourceFrontier;if(frontier.schemaVersion!==1||frontier.municipalityId!==municipality.id||frontier.sourceId!==source.id)throw Error('Frontier identity mismatch');}
@@ -80,7 +81,7 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
   frontier.visited=frontier.visited.filter(url=>!changedUrls.has(url));
  }
  const queued=new Set(frontier.queue.map(item=>item.url)),visited=new Set(frontier.visited),failed=new Set(frontier.failures.map(item=>item.url)),now=Date.now();
- const roots=[...new Set([...frontier.roots,...source.crawlScope?.pageRoots??[],...(source.url?[source.url]:[])].map(value=>publicUrl(value).href))];frontier.roots=roots;
+ const roots=boundRoots?[]:[...new Set([...frontier.roots,...source.crawlScope?.pageRoots??[],...(source.url?[source.url]:[])].map(value=>publicUrl(value).href))];frontier.roots=roots;
  const rootSet=new Set(roots),documentsById=new Map(frontier.documents.map(document=>[document.id,document]));
  const scheduledDocumentIds=new Set<string>();
  for(const root of roots)if(visited.has(root)&&!frontier.checkedUrls[root])visited.delete(root);
@@ -118,7 +119,7 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
  const persist=async()=>{frontier.visited=[...visited];await writeFile(frontierPath+'.tmp',JSON.stringify(frontier));await rename(frontierPath+'.tmp',frontierPath);};
  await persist();
  let requests=0,processedDocuments=0,htmlPages=0;const notes:string[]=[];
- const discoveryOnly=source.crawlScope?.pageRoots.length===0&&source.crawlScope.followLinkedDocuments===false;
+ const discoveryOnly=!boundRoots&&source.crawlScope?.pageRoots.length===0&&source.crawlScope.followLinkedDocuments===false;
  if(discoveryOnly)notes.push('Endpoint discovery only: municipal procedure binding is not established; no statewide link expansion');
  while(frontier.queue.length&&requests<options.maxRequests&&processedDocuments<options.maxDocuments&&htmlPages<options.maxPages){
   const item=frontier.queue[0];if(visited.has(item.url)&&!item.revalidate){frontier.queue.shift();await persist();continue;}requests++;
@@ -138,7 +139,11 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
    if(html&&!discoveryOnly){
     htmlPages++;
     for(const link of discoverDocumentLinks(html,response.url)){
-     if(source.crawlScope?.followLinkedDocuments===false&&(link.pdf||link.structured))continue;
+     if(boundRoots&&!link.pdf&&!link.structured&&!/\/(?:loadDocument|download)\.(?:php|phtml)(?:\?|$)/i.test(link.url)){
+      const candidate=new URL(link.url);
+      if(!boundRoots.some(root=>candidate.origin===root.origin&&(candidate.pathname===root.pathname||candidate.pathname.startsWith(root.pathname.slice(0,root.pathname.lastIndexOf('/')+1)))))continue;
+     }
+     if(!boundRoots&&source.crawlScope?.followLinkedDocuments===false&&(link.pdf||link.structured))continue;
      if(visited.has(link.url)||queued.has(link.url)||failed.has(link.url))continue;
      frontier.queue.push({url:link.url,title:link.title,sourceId:source.id,depth:item.depth+1,from:response.url});queued.add(link.url);
     }
@@ -157,7 +162,7 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
  notes.push(`Scoped frontier ${state}: ${frontier.documents.length} documents, ${frontier.queue.length} queued links, ${frontier.failures.length} inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.`);
  notes.push(`Conditional rediscovery and policy revalidation TTL ${ttl}ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.`);
  if(frontier.failures.length)notes.push('Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed.');
- return {documents:frontier.documents,notes,requests,checkedAt:frontier.lastCheckedAt??null,coverage:{state,pendingCount,runnableCount:frontier.queue.length,blockedCount,frontierPath,scope:'Observed roots, relevant same-origin planning/archive pages and all their linked public document files',...(frontier.failures.length?{action:'ask_municipality' as const}:{})},blocked:frontier.failures};
+ return {documents:frontier.documents,notes,requests,checkedAt:frontier.lastCheckedAt??null,coverage:{state,pendingCount,runnableCount:frontier.queue.length,blockedCount,frontierPath,scope:boundRoots?'Exactly bound procedure pages and their actual linked document downloads; no statewide roots or other procedures':'Observed roots, relevant same-origin planning/archive pages and all their linked public document files',...(frontier.failures.length?{action:'ask_municipality' as const}:{})},blocked:frontier.failures};
 }
 const apiResponses=new WeakMap<PoliteFetcher,Map<string,{requestedAt:number;response:Promise<FetchedDocument>}>>();
 async function observedApiResponse(fetcher:PoliteFetcher,source:RegistrySource,ttl:number):Promise<FetchedDocument>{
@@ -171,22 +176,54 @@ async function observedApiResponse(fetcher:PoliteFetcher,source:RegistrySource,t
 /** API URLs/form fields must be observed in registry, never inferred from vendor names. */
 export async function crawlParticipationApi(fetcher:PoliteFetcher,municipality:RegistryMunicipality,source:RegistrySource,options:AdapterOptions):Promise<AdapterResult>{
  if(!source.api)throw Error('No observed public API configured');
- const before=fetcher.requestCount,response=await observedApiResponse(fetcher,source,options.revalidateAfterMs??DEFAULT_SOURCE_REVALIDATE_MS),apiRequests=fetcher.requestCount-before;
+ const before=fetcher.requestCount,ttl=options.revalidateAfterMs??DEFAULT_SOURCE_REVALIDATE_MS,response=await observedApiResponse(fetcher,source,ttl);
  const data=JSON.parse(await readFile(response.localPath,'utf8')) as {success?:boolean;mapVars?:{procedureId:string;procedureUrl:string;externalName:string;publicParticipationStartDate?:string}[];responseHtml?:string;procedureCount?:number};
  if(data.success!==true||!Array.isArray(data.mapVars)||typeof data.responseHtml!=='string'||data.mapVars.length!==data.procedureCount)throw Error('Unexpected public participation list envelope; no empty-coverage inference');
  const $=load(data.responseHtml),names=new Map<string,string>();
  $('.c-procedurelist__item[data-procedure-id]').each((_,element)=>{const row=$(element);names.set(row.attr('data-procedure-id')!,row.text().replace(/\s+/g,' '));});
  const normalizedName=municipality.name.toLocaleLowerCase('de'),seeds:SourceSeed[]=[];
+ const bob=source.api.format==='bobsh-list',bindings=new Map<string,string|null>();let inventory:FetchedDocument|undefined;
+ if(bob){
+  if(!source.url||!/^\d{8}$/.test(municipality.ags))throw Error('BOB discovery requires a registered inventory root and exact eight-digit AGS');
+  if(fetcher.requestCount-before>=options.maxRequests)return {documents:[],notes:['BOB municipal identity inventory deferred by request budget; no empty-coverage inference'],requests:fetcher.requestCount-before,checkedAt:response.checkedAt,coverage:{state:'partial',pendingCount:1,runnableCount:1,blockedCount:0,scope:'Public BOB inventory and exact municipal-code bindings'}};
+  inventory=await observedApiResponse(fetcher,{...source,api:{url:source.url,format:'bobsh-list'}},ttl);
+  const root=load(await readFile(inventory.localPath,'utf8'));
+  const literals=root('script:not([src])').toArray().flatMap(element=>[...root(element).text().matchAll(/\bvar\s+initialProcedures\s*=\s*JSON\.parse\('((?:\\.|[^'\\])*)'\)/g)]);
+  if(literals.length!==1)throw Error('BOB initialProcedures inventory missing or ambiguous; no empty-coverage inference');
+  // Decode only the observed JSON string literal, never execute upstream JavaScript.
+  const rows:unknown=JSON.parse(JSON.parse('"'+literals[0][1].replace(/"/g,'\\"')+'"'));
+  if(!Array.isArray(rows))throw Error('Unexpected BOB municipal identity inventory');
+  for(const row of rows){
+   if(!row||typeof row!=='object'||typeof row.id!=='string')throw Error('Malformed BOB procedure identity');
+   const code=row.municipalCode,ars=row.ars,hasCode=code!==undefined&&code!==null&&code!=='',hasArs=ars!==undefined&&ars!==null&&ars!=='';
+   const ags=typeof code==='string'&&/^\d{8}$/.test(code)?code:null;
+   // ARS is Land(2), Kreis(3), Gemeindeverband(4), Gemeinde(3), not an AGS prefix.
+   const arsAgs=typeof ars==='string'&&/^\d{12}$/.test(ars)?ars.slice(0,5)+ars.slice(9):null;
+   const binding=hasCode&&!ags||hasArs&&!arsAgs||ags&&arsAgs&&ags!==arsAgs?null:ags??arsAgs;
+   bindings.set(row.id,bindings.has(row.id)&&bindings.get(row.id)!==binding?null:binding);
+  }
+ }
  for(const procedure of data.mapVars){
-  const card=names.get(procedure.procedureId);if(!card||typeof procedure.externalName!=='string'||typeof procedure.procedureUrl!=='string')continue;
-  // This is source discovery, not an identity gate: extraction must still bind exact municipal evidence.
-  if(!(card+' '+procedure.externalName).toLocaleLowerCase('de').includes(normalizedName))continue;
+  const card=names.get(procedure.procedureId);
+  if(bob){
+   const binding=bindings.get(procedure.procedureId);
+   if(!binding)throw Error(`BOB municipal code missing or conflicting for procedure ${procedure.procedureId}; no empty-coverage inference`);
+   if(binding!==municipality.ags)continue;
+   if(!card||typeof procedure.externalName!=='string'||typeof procedure.procedureUrl!=='string')throw Error('Incomplete exact-bound BOB procedure; no empty-coverage inference');
+  }else{
+   if(!card||typeof procedure.externalName!=='string'||typeof procedure.procedureUrl!=='string')continue;
+   // DiPlan discovery retains its existing name-based behavior; extraction still binds exact evidence.
+   if(!(card+' '+procedure.externalName).toLocaleLowerCase('de').includes(normalizedName))continue;
+  }
   // A consultation start is not the document's publication or decision date.
   seeds.push({url:new URL(procedure.procedureUrl,response.url).href,title:procedure.externalName,sourceId:source.id,documentDate:null});
  }
- const result=await crawlHtmlSource(fetcher,municipality,source,{...options,maxRequests:Math.max(0,options.maxRequests-apiRequests)},[...seeds,...municipality.seedDocuments?.filter(seed=>seed.sourceId===source.id)??[]]);
+ const apiRequests=fetcher.requestCount-before;
+ const result=await crawlHtmlSource(fetcher,municipality,source,{...options,maxRequests:Math.max(0,options.maxRequests-apiRequests)},bob?seeds:[...seeds,...municipality.seedDocuments?.filter(seed=>seed.sourceId===source.id)??[]],bob?seeds.map(seed=>seed.url):undefined);
  for(const document of result.documents){document.adapter=source.api.format;const seed=seeds.find(item=>item.url===document.url||item.url===document.metadata.discoveredFrom);const procedure=data.mapVars.find(item=>new URL(item.procedureUrl,response.url).href===seed?.url);if(procedure){document.metadata.caseKey=procedure.procedureId;document.metadata.caseKeyType=source.api.format==='diplan-list'?'diplan':'bobsh';}}
- result.requests+=apiRequests;result.checkedAt=[result.checkedAt,response.checkedAt].filter((value):value is string=>!!value).sort().at(-1)??null;result.notes.unshift(`Observed ${source.api.format} public list ${response.url}; sha256 ${response.sha256}; all ${data.procedureCount} listed procedures considered for municipal discovery`);return result;
+ result.requests+=apiRequests;result.checkedAt=[result.checkedAt,response.checkedAt,inventory?.checkedAt].filter((value):value is string=>!!value).sort().at(-1)??null;result.notes.unshift(`Observed ${source.api.format} public list ${response.url}; sha256 ${response.sha256}; all ${data.procedureCount} listed procedures considered for municipal discovery`);
+ if(inventory)result.notes.push(`BOB exact municipalCode/ARS binding against ${inventory.url}; sha256 ${inventory.sha256}; ${seeds.length} exact-bound procedures. Empty means this public scoped list only, never absence of municipal activity or unlisted procedures.`);
+ return result;
 }
 /** MV Bauportal's documented geoportalsearch interface, scoped by exact official AGS. */
 export async function crawlMvPlanningApi(fetcher:PoliteFetcher,municipality:RegistryMunicipality,source:RegistrySource,options:AdapterOptions):Promise<AdapterResult>{

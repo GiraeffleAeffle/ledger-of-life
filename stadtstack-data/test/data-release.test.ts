@@ -14,7 +14,7 @@ test('whole-data identity changes beyond the unchanged three core facts',()=>{
 
 test('manifest validates bytes and inventory, not merely core bundle identity',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'stadtstack-release-fixture-'));
- const paths=['catalogue.json','quality-report.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json','regions/brandenburg-mol/topics.json','knowledge/registry.json','knowledge/records.json','knowledge/coverage.json'];
+ const paths=['catalogue.json','quality-report.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json','regions/brandenburg-mol/topics.json','knowledge/registry.json','knowledge/records.json','knowledge/coverage.json','knowledge/graph.json'];
  try{
   // Explicit integrity fixtures, not civic evidence or a real publication.
   for(const path of paths){await mkdir(dirname(join(directory,path)),{recursive:true});await writeFile(join(directory,path),JSON.stringify({fixture:path}));}
