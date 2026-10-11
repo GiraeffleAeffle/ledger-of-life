@@ -38,7 +38,7 @@ export function knowledgePublicationHold<T extends Pick<DistrictKnowledgeRecord,
 }
 
 /** Public counts only: raw documents, failed model output, paths and credentials never enter this projection. */
-export function buildDistrictCoverage(registry:DistrictRegistry,crawlInput:unknown,records:DistrictCoverageRecord[],quarantineInput:unknown,extractionInput:unknown):DistrictCoverage{
+export function buildDistrictCoverage(registry:DistrictRegistry,crawlInput:unknown,records:DistrictCoverageRecord[],quarantineInput:unknown,extractionInput:unknown,generatedAt=new Date().toISOString()):DistrictCoverage{
  const crawl=crawlSummarySchema.parse(crawlInput),quarantine=quarantineSummarySchema.parse(quarantineInput),run=extractionRunSchema.parse(extractionInput);
  const models=new Map<string,z.infer<typeof admittedModelSchema>>();
  for(const record of records){
@@ -68,7 +68,7 @@ export function buildDistrictCoverage(registry:DistrictRegistry,crawlInput:unkno
   const selected=municipalities.filter(city=>city.districtId===district.id);
   return {id:district.id,ags:district.ags,municipalitiesRegistered:registry.inventory.filter(city=>city.districtId===district.id).length,municipalitiesAttempted:selected.filter(city=>city.selectedForSlice).length,municipalitiesWithRecords:selected.filter(city=>city.publishedRecords>0).length,municipalitiesWithDatedStages:selected.filter(city=>city.datedStagedRecords>0).length,documents:selected.reduce((n,city)=>n+city.documents,0),publishedRecords:selected.reduce((n,city)=>n+city.publishedRecords,0),quarantinedRecords:selected.reduce((n,city)=>n+city.quarantinedRecords,0)};
  });
- const coverage=districtCoverageSchema.parse({schemaVersion:'stadtstack-district-coverage-v2',generatedAt:new Date().toISOString(),districts,municipalities,models:[...models.values()].sort((a,b)=>modelKey(a).localeCompare(modelKey(b))),extractionRun:{generatedAt:run.generatedAt,assignmentMode:run.assignmentMode,corpusSha256:run.corpusSha256,registrySha256:run.registrySha256,promptContractSha256:run.promptContractSha256,schemaSha256:run.schemaSha256,selection:run.scope==='all_fetched_documents'?'all_at_run_start':'bounded_per_municipality',maxDocumentsPerMunicipality:run.maxDocumentsPerMunicipality,availableDocumentGroupsAtRunStart:run.availableDocumentGroups,attemptedDocumentGroups:run.attemptedDocumentGroups,pendingDocumentGroupsAtRunStart:run.pendingDocumentGroups}});
+ const coverage=districtCoverageSchema.parse({schemaVersion:'stadtstack-district-coverage-v2',generatedAt,districts,municipalities,models:[...models.values()].sort((a,b)=>modelKey(a).localeCompare(modelKey(b))),extractionRun:{generatedAt:run.generatedAt,assignmentMode:run.assignmentMode,corpusSha256:run.corpusSha256,registrySha256:run.registrySha256,promptContractSha256:run.promptContractSha256,schemaSha256:run.schemaSha256,selection:run.scope==='all_fetched_documents'?'all_at_run_start':'bounded_per_municipality',maxDocumentsPerMunicipality:run.maxDocumentsPerMunicipality,availableDocumentGroupsAtRunStart:run.availableDocumentGroups,attemptedDocumentGroups:run.attemptedDocumentGroups,pendingDocumentGroupsAtRunStart:run.pendingDocumentGroups}});
  validateDistrictCoverage(coverage,registry,records);return coverage;
 }
 export function validateDistrictCoverage(coverage:DistrictCoverage,registry:DistrictRegistry,records:DistrictCoverageRecord[]){

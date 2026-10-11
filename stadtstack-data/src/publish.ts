@@ -1,7 +1,7 @@
-import {join} from 'node:path';
-import {readFile} from 'node:fs/promises';
+import {join,resolve} from 'node:path';
+import {readFile,realpath} from 'node:fs/promises';
 import {diff} from './changes.ts';
-import {cacheDir,outDir,jsonFile,save} from './common.ts';
+import {cacheDir,outDir as defaultOutDir,jsonFile,save} from './common.ts';
 import {validatePublication,cityFeedSchema,collectionSchema} from './schema.ts';
 import {compactCollection} from './min.ts';
 import type {Catalogue,FeatureCollection,CityFeed} from './schema.ts';
@@ -16,25 +16,37 @@ import {districtRegistrySchema} from './district-registry.ts';
 import {validateKnowledgeRelease} from './district-schema.ts';
 import {districtCoverageSchema,validateDistrictCoverage,assertKnowledgeSlice} from './district-publication.ts';
 import {buildKnowledgeGraph} from './district-graph.ts';
-if(process.argv.length>2)throw Error('publish takes no options; every release is validated as one complete dataset');
-const catalogue=await jsonFile<Catalogue>(join(cacheDir,'staging','catalogue.json'));
+import {pathToFileURL} from 'node:url';
+import {z} from 'zod';
+
+export const ReplayPublicationOptionsSchema=z.object({stagingDir:z.string().min(1),outDir:z.string().min(1),priorCityRoot:z.string().min(1),qualityGeneratedAt:z.iso.datetime(),manifestGeneratedAt:z.iso.datetime()}).strict();
+export type ReplayPublicationOptions=z.infer<typeof ReplayPublicationOptionsSchema>;
+/** Replay deliberately has no fallback to any target release member. */
+export async function publicationInput(path:string,replay:ReplayPublicationOptions|undefined,fallback=false):Promise<unknown>{
+ if(replay)return JSON.parse(await readFile(join(replay.stagingDir,path),'utf8'));
+ return await jsonFile(join(cacheDir,'staging',path))??(fallback?await jsonFile(join(defaultOutDir,path)):undefined);
+}
+export async function publish(replayInput?:ReplayPublicationOptions){
+const replay=replayInput===undefined?undefined:ReplayPublicationOptionsSchema.parse(replayInput),outDir=replay?.outDir??defaultOutDir;
+if(replay&&[replay.outDir,replay.priorCityRoot,replay.stagingDir].some(path=>resolve(path)===resolve(defaultOutDir)))throw Error('Replay cannot use the target output as an input or destination');
+const catalogue=await publicationInput('catalogue.json',replay) as Catalogue|undefined;
 if(!catalogue)throw Error('Run collection or quality refresh first');
 const collections:Record<string,FeatureCollection>={},feeds:Record<string,unknown>={};
 const cityQuality=[];
 for(const city of catalogue.cities){
- const original=collectionSchema.parse(await jsonFile(join(cacheDir,'staging','cities',city.id,'signals.geojson')));
+ const original=collectionSchema.parse(await publicationInput(join('cities',city.id,'signals.geojson'),replay));
  const normalized=normalizePublicationSignals(original.features);
  collections[city.id]={type:'FeatureCollection',features:normalized.features};
  city.sources=city.sources.map(source=>sourceHealth(source,normalized.features));
  city.temporalCoverage=cityTemporalCoverage(normalized.features);
  cityQuality.push({cityId:city.id,...normalized.counts,quarantined:normalized.quarantined,sources:city.sources.map(source=>({id:source.id,status:source.status,recordCount:source.recordCount,publishedRecordCount:source.publishedRecordCount,coverage:source.coverage,licence:source.licence,licenceEvidence:source.licenceEvidence}))});
- feeds[city.id]=await jsonFile(join(cacheDir,'staging','cities',city.id,'feed.json'));
+ feeds[city.id]=await publicationInput(join('cities',city.id,'feed.json'),replay);
 }
-const regionalInput=await jsonFile(join(cacheDir,'staging','regions','brandenburg-mol','topics.json'))??await jsonFile(join(outDir,'regions','brandenburg-mol','topics.json'));
+const regionalInput=await publicationInput('regions/brandenburg-mol/topics.json',replay,true);
 const regional=normalizeRegionalPublication(regionalInput);
-const knowledgeRegistry=districtRegistrySchema.parse(await jsonFile(join(cacheDir,'staging','knowledge','registry.json'))??await jsonFile(join(outDir,'knowledge','registry.json')));
-const knowledge=validateKnowledgeRelease(await jsonFile(join(cacheDir,'staging','knowledge','records.json'))??await jsonFile(join(outDir,'knowledge','records.json')),knowledgeRegistry);
-const knowledgeCoverage=districtCoverageSchema.parse(await jsonFile(join(cacheDir,'staging','knowledge','coverage.json'))??await jsonFile(join(outDir,'knowledge','coverage.json')));
+const knowledgeRegistry=districtRegistrySchema.parse(await publicationInput('knowledge/registry.json',replay,true));
+const knowledge=validateKnowledgeRelease(await publicationInput('knowledge/records.json',replay,true),knowledgeRegistry);
+const knowledgeCoverage=districtCoverageSchema.parse(await publicationInput('knowledge/coverage.json',replay,true));
 validateDistrictCoverage(knowledgeCoverage,knowledgeRegistry,knowledge.records);
 assertKnowledgeSlice(knowledgeRegistry,knowledge.records);
 const knowledgeBytes=JSON.stringify(knowledge,null,2)+'\n';
@@ -44,7 +56,7 @@ const validatedFeeds:Record<string,CityFeed>=Object.fromEntries(Object.entries(f
 for(const city of catalogue.cities)if(validatedFeeds[city.id].cityId!==city.id)throw Error(`Wrong feed city for ${city.id}`);
 assertSourceHealth(validated.catalogue,validated.collections);
 assertPublicUrls({catalogue:validated.catalogue,collections:validated.collections,feeds:validatedFeeds,regional:regional.data,knowledgeRegistry,knowledge,knowledgeCoverage,knowledgeGraph});
-const qualityReport={schemaVersion:'stadtstack-publication-quality-v1',generatedAt:new Date().toISOString(),
+const qualityReport={schemaVersion:'stadtstack-publication-quality-v1',generatedAt:replay?.qualityGeneratedAt??new Date().toISOString(),
  policy:{publicUrls:'required',councilBodyBinding:'required',emptySuccess:'forbidden',sourceEventDates:'required; unresolved comparison records quarantined',placeDates:'observation only; no invented event date'},
  cities:cityQuality,regional:{input:regional.inputRecords,published:regional.publishedRecords,quarantined:regional.quarantined},
  knowledge:{published:knowledge.records.length,municipalities:knowledgeCoverage.municipalities.filter(city=>city.publishedRecords>0).length,districts:knowledgeCoverage.districts,models:knowledgeCoverage.models,graph:{entities:knowledgeGraph.entities.length,edges:knowledgeGraph.edges.length,recordsSha256:knowledgeGraph.recordsSha256},policy:'Same-pass subscription fact/entity/relation extraction with deterministic, source-policy, actual faithfulness and sourced-date gates; graph links are not causal, success or independent identity verification.'},
@@ -52,7 +64,7 @@ const qualityReport={schemaVersion:'stadtstack-publication-quality-v1',generated
 // All required gates are validated before the first public output is replaced.
 let core:CoreBundle|undefined;
 if(validated.collections.strausberg){
- core=validateCore(await jsonFile(join(cacheDir,'staging','core','strausberg-facts.json')),validated.collections.strausberg);
+ core=validateCore(await publicationInput('core/strausberg-facts.json',replay),validated.collections.strausberg);
  await validateCoreBytes(core);
  if(validated.catalogue.coreBundle?.version!==core.version)throw Error('Catalogue/core release binding mismatch');
 }
@@ -67,17 +79,22 @@ const prepared=validated.catalogue.cities.map(city=>{
 for(const {city,collection,full,min} of prepared){
  const directory=join(outDir,'cities',city.id),fullPath=join(directory,'signals.geojson'),changesPath=join(directory,'changes.json');
  let priorText:string|undefined;
- try{priorText=await readFile(fullPath,'utf8');}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
+ if(replay)priorText=await readFile(join(replay.priorCityRoot,'cities',city.id,'signals.geojson'),'utf8');
+ else try{priorText=await readFile(fullPath,'utf8');}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
  if(priorText!==full){
   const prior=priorText?JSON.parse(priorText) as FeatureCollection:undefined;
   if(priorText)await save(join(outDir,'previous','cities',city.id,'signals.geojson'),priorText);
   await save(fullPath,full);
   const changes={...diff(prior?.features??[],collection.features),generatedAt:catalogue.generatedAt};
   await save(changesPath,JSON.stringify(changes,null,2)+'\n');
+ }else if(replay){
+  const changes=await readFile(join(replay.priorCityRoot,'cities',city.id,'changes.json'),'utf8');
+  if(!JSON.parse(changes))throw Error(`Missing prior change manifest for ${city.id}`);
+  await save(fullPath,full);await save(changesPath,changes);
  }else if(!await jsonFile(changesPath))throw Error(`Missing change manifest for ${city.id}`);
  await save(join(directory,'signals.min.geojson'),min);
  const feed=validatedFeeds[city.id];await save(join(directory,'feed.json'),JSON.stringify(feed,null,2)+'\n');
- console.log(city.id,collection.features.length,city.fullBytes,city.minBytes);
+ if(!replay)console.log(city.id,collection.features.length,city.fullBytes,city.minBytes);
 }
 await save(join(outDir,'catalogue.json'),JSON.stringify(validated.catalogue,null,2)+'\n');
 if(core){
@@ -93,8 +110,8 @@ for(const [name,data] of [['registry',knowledgeRegistry],['coverage',knowledgeCo
 await save(join(outDir,'quality-report.json'),JSON.stringify(qualityReport,null,2)+'\n');
 const releasePaths=['catalogue.json','quality-report.json','regions/brandenburg-mol/topics.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json','knowledge/registry.json','knowledge/records.json','knowledge/coverage.json','knowledge/graph.json',
  ...catalogue.cities.flatMap(city=>['signals.geojson','signals.min.geojson','feed.json','changes.json'].map(file=>`cities/${city.id}/${file}`))];
-const dataRelease=await publishDataRelease(outDir,releasePaths,qualityReport.summary);
-console.log('data release',dataRelease.id,qualityReport.summary);
+const dataRelease=await publishDataRelease(outDir,releasePaths,qualityReport.summary,replay?.manifestGeneratedAt);
+if(!replay)console.log('data release',dataRelease.id,qualityReport.summary);
 const summary=[
  '# Stadtstack open-data snapshot',
  '',
@@ -122,3 +139,9 @@ const summary=[
  'Pilot-city coverage is source-specific. Council collection requests 24 months and records complete/partial/empty/failed coverage and body identity; it is not a claim of all proceedings. Missing source dates are quarantined from comparisons, not replaced by retrieval time. Highway information includes a ~25 km commuter margin; OSM places remain unverified observations. quality-report.json records withheld counts/reasons; release-manifest.json binds every public data file, including regional records, to one release identity. No private location or profile enters these public files.'
 ];
 await save(join(outDir,'README.md'),summary.join('\n')+'\n');
+return dataRelease;
+}
+if(process.argv[1]&&await realpath(process.argv[1]).then(entry=>import.meta.url===pathToFileURL(entry).href,()=>false)){
+ if(process.argv.length>2)throw Error('publish takes no options; every release is validated as one complete dataset');
+ await publish();
+}

@@ -1,0 +1,510 @@
+{
+  "schemaVersion": "stadtstack-offline-replay-v1",
+  "corpusManifest": {
+    "path": "corpus-manifest.jsonl",
+    "sha256": "9ac5c25357065637516485ccd0a16027e5e4451f09817b64c2925a5acc7cc829"
+  },
+  "rawRoot": "../cache/raw",
+  "registry": {
+    "path": "../sources/district-registry.json",
+    "sha256": "9095c7a241fa5cc1a2d75030286d8690cc5bf6d3e05990c56f7a5199c304b554"
+  },
+  "index": {
+    "path": "../cache/replay-input/pins/authorized-index.json",
+    "sha256": "fb4e08eee8bf1a3bf036433893553b5ebb0e7ae4dec1fea6ce702a8f66642992"
+  },
+  "frozen": {
+    "path": "../cache/replay-input/pins/frozen.json",
+    "sha256": "d5acfbebed1401bd18638b42106b994c4c6dbdcd9b3ca10fe3ab94e0e14a7d23"
+  },
+  "deltas": [],
+  "generationContract": {
+    "path": "../cache/replay-input/contracts/generation-v8.json",
+    "sha256": "1c4e61106682ccc2a27cd4a5af51ff5ec4d7ff7aaa6a07c768956fdf74357043"
+  },
+  "answers": [],
+  "modelIdentities": [
+    {
+      "provider": "anthropic-subscription",
+      "tool": "claude-cli",
+      "toolVersion": "2.1.284",
+      "model": "claude-haiku-5-5",
+      "modelIdentitySha256": "6ae3029f7453e9d43b6063b78a71b0da9d005f0d153bf0bc37537fddf76f287d",
+      "modelIdentityBasis": "reported-cli-model-and-tool-version"
+    },
+    {
+      "provider": "openai-subscription",
+      "tool": "codex-cli",
+      "toolVersion": "0.160.0",
+      "model": "gpt-6-luna",
+      "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+      "modelIdentityBasis": "configured-cli-model-and-tool-version"
+    }
+  ],
+  "extractionRun": {
+    "path": "../cache/replay-input/pins/extraction-run.json",
+    "sha256": "ffef5ab16fb65914261c1ca5f1adbc5dbdec7d51ba56fe4d8750d559114d7930"
+  },
+  "clocks": {
+    "recordsGeneratedAt": "2026-10-11T09:13:01.721Z",
+    "quarantineGeneratedAt": "2026-10-11T09:13:01.721Z",
+    "coverageGeneratedAt": "2026-10-11T09:25:12.545Z",
+    "qualityGeneratedAt": "2026-10-11T09:25:14.000Z",
+    "manifestGeneratedAt": "2026-10-11T09:25:14.460Z"
+  },
+  "staging": [
+    {
+      "path": "../cache/replay-input/staging/catalogue.json",
+      "sha256": "34e6182a2d1999101dea06fac2c31e5069570d1ab51e5c4b2b2a15ca42990a44",
+      "destination": "catalogue.json"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/castrop-rauxel/feed.json",
+      "sha256": "bb48fa82d518f7fecd667e1b01b0c7b0b846088164608cff04e944b289896555",
+      "destination": "cities/castrop-rauxel/feed.json"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/castrop-rauxel/signals.geojson",
+      "sha256": "1aa1f361b7f71c03776ec14ddaedb285d70287cab57fe518668e7898f4330a37",
+      "destination": "cities/castrop-rauxel/signals.geojson"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/dresden/feed.json",
+      "sha256": "940a50e8da9b8432274845f9d808a71e3c4f3e13fed407eabe63195fd73cf153",
+      "destination": "cities/dresden/feed.json"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/dresden/signals.geojson",
+      "sha256": "17641893b75b5030228507c7236540fb04bf6a3642196558589077c259a3e5e9",
+      "destination": "cities/dresden/signals.geojson"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/duesseldorf/feed.json",
+      "sha256": "39542f25a7d4a76f8f51584c06b470cbf0feea02c598bb1c9f397affa30daf69",
+      "destination": "cities/duesseldorf/feed.json"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/duesseldorf/signals.geojson",
+      "sha256": "ff09927901a1e6fdfd687a5c821ae60f8ba1c3b4c2f177e7efaf8be1d4837fa6",
+      "destination": "cities/duesseldorf/signals.geojson"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/freiburg/feed.json",
+      "sha256": "b259e5c32e5458f60204db44a01900acb9f1d23714f2f8e1937eee93860434ad",
+      "destination": "cities/freiburg/feed.json"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/freiburg/signals.geojson",
+      "sha256": "92d24ccb68e31053a2a1377b9cc410c40912bb7c101da9ec0737bccb58e4b3b0",
+      "destination": "cities/freiburg/signals.geojson"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/koeln/feed.json",
+      "sha256": "3a34ae91595410388527aa176b8adbbcee20779c62b650b2e45366db1f9718bc",
+      "destination": "cities/koeln/feed.json"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/koeln/signals.geojson",
+      "sha256": "df9261e1fe193a7acec4a6656f6437c9511d9377b785307d00d57686d7ba72b2",
+      "destination": "cities/koeln/signals.geojson"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/muenster/feed.json",
+      "sha256": "066245bb2ed0cbcc4ca5817325dbdd3f6afc5cdd6ff2db370be5bbd897327364",
+      "destination": "cities/muenster/feed.json"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/muenster/signals.geojson",
+      "sha256": "294f223ec6108973873ee1c78d92a77b4b26b0f8f76aef194315f475f3594c51",
+      "destination": "cities/muenster/signals.geojson"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/strausberg/feed.json",
+      "sha256": "653ab823b3c9426a703ae8414017a3e3265cae98795f6ce820d1bdfcdb54acb8",
+      "destination": "cities/strausberg/feed.json"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/strausberg/signals.geojson",
+      "sha256": "039df4e2bfe07041221d430a7b250f302d896c0b23774bdf5cf954a0b98c061b",
+      "destination": "cities/strausberg/signals.geojson"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/wuppertal/feed.json",
+      "sha256": "a735c82e50e9bff2907a95f1c9cdeea6ae1727e0b31a5bfb27066d9256a65dad",
+      "destination": "cities/wuppertal/feed.json"
+    },
+    {
+      "path": "../cache/replay-input/staging/cities/wuppertal/signals.geojson",
+      "sha256": "6204ab18df6a254fba5c0b0122d00d36a3af07517aef64c31827eeb821c68bd2",
+      "destination": "cities/wuppertal/signals.geojson"
+    },
+    {
+      "path": "../cache/replay-input/staging/core/strausberg-facts.json",
+      "sha256": "ff2cc11e26322a30663f1f62ad39873056cfb4f9ff34c44684b36453f70e3c75",
+      "destination": "core/strausberg-facts.json"
+    },
+    {
+      "path": "../cache/replay-input/staging/regions/brandenburg-mol/topics.json",
+      "sha256": "92754508a6d887ebd89b78be50ade7813a031cc1e5a7e33cd61f8993944d1185",
+      "destination": "regions/brandenburg-mol/topics.json"
+    }
+  ],
+  "coreEvidence": [
+    {
+      "path": "core-evidence/628889f1aa4e4bdd2201d5eb0c77b1332755a3ea913cde10fd3b9cb451bb73c4.json",
+      "sha256": "9e920a68e25a48cb8ef7816ddcccf07f3e0b7c5ad603a8150df730dcfe899e0b"
+    },
+    {
+      "path": "core-evidence/dd3f5c406a4681ceff21f548527f9c198a14e31fe6b4f3cd7b1d84122387f03f.json",
+      "sha256": "d2653b5ea802d9614f188beb318103aa0b7d3ca822b155db0c2f7f88aa9b7012"
+    },
+    {
+      "path": "core-evidence/e8951e39cc35591fb15ad1be5672987a67a0a2f5436aa08f18b81175c944622b.json",
+      "sha256": "03ec2ba5fc7814e96c3f5071f16997a1020beae78c2c38205ab687a8a00cf1d5"
+    },
+    {
+      "path": "pdf/11b2d8b03c0d615e056e9aa399bb47ce1665b5f99ac9a79c41dae067e81214b4.pdf",
+      "sha256": "11b2d8b03c0d615e056e9aa399bb47ce1665b5f99ac9a79c41dae067e81214b4"
+    },
+    {
+      "path": "pdf/721b47b826a1913cee55054d1251857b2c2a6cf4a7f7319a8124110d16332315.pdf",
+      "sha256": "721b47b826a1913cee55054d1251857b2c2a6cf4a7f7319a8124110d16332315"
+    }
+  ],
+  "priorRelease": {
+    "gitCommit": "ca92aa7ccda470d09564889db3edaeaea5e4f578",
+    "manifestSha256": "044fbec009659a95de84d63bd268ebf8776bda2b1565c66b1690bffc32d4eaf3",
+    "releaseId": "cdd0e350be842c040dc77d13cc73bf2267cd0b9ae9bbf0a471a267b47938b6f4"
+  },
+  "expectedRelease": {
+    "path": "../out/release-manifest.json",
+    "sha256": "fbac3ebfd040b50c666afaaaa3d42ccc15a64336e6ec8111024bf20abc1ad633"
+  },
+  "runtime": {
+    "node": "24.21.0",
+    "icu": "78.3",
+    "unicode": "17.0",
+    "locale": "de-DE",
+    "timeZone": "Europe/Berlin",
+    "packageLockSha256": "92a0641411bd3b6c8f3e899f62c22c67550a2005b6b78e879ff15afe1f9ea4ec",
+    "sourceFiles": [
+      {
+        "path": "package.json",
+        "sha256": "a8b26bc416259761a4a8c6ee26a459d33df055ac441a3e4f84f056316ee04483"
+      },
+      {
+        "path": "regional/taxonomy.mjs",
+        "sha256": "14604ded471a2abf298487356515b57353c1739adbd1e773fae5bcc6ba6aeebb"
+      },
+      {
+        "path": "src/atlas.ts",
+        "sha256": "0fcbe39eeaf5788b07b26c0cd71ff86e0790f52989b9088fb0865065a62cb8de"
+      },
+      {
+        "path": "src/autobahn.ts",
+        "sha256": "ddc42cbaa82e7ba7b6f499c2030dec231f9cefb3bf8370ba76e97bef4bdf4ea4"
+      },
+      {
+        "path": "src/changes.ts",
+        "sha256": "0588d1214734fab3e6de871826e8406e0ebf43d4d80d0bf7ff048e301b7c6bd4"
+      },
+      {
+        "path": "src/cities.ts",
+        "sha256": "39fb8b9a7a08cf187203061958c0446e9bcb98697ce3659e0b69ac84b478f7c8"
+      },
+      {
+        "path": "src/collect.ts",
+        "sha256": "8df4355c0893d877b1f84b5135d27d2a8bdf72a215766cca692f6fe7abc3bd60"
+      },
+      {
+        "path": "src/common.ts",
+        "sha256": "a77bb1ddd372d499f6d804747b10748073f3b457d367d0aae773a5129c04d515"
+      },
+      {
+        "path": "src/core-schema.ts",
+        "sha256": "11fc23eaf391cfc3a1ff9169ce85df563a80dae7aded0e47d612c75b645d6c96"
+      },
+      {
+        "path": "src/core.ts",
+        "sha256": "0308475ade70b5dbb72fdfd1ee7c487e4f8129a4ff9e8f95dfeff35bd76d52ee"
+      },
+      {
+        "path": "src/corpus-manifest.ts",
+        "sha256": "0da311b0f40374730444127612a8d42a2377ff310b1cf46a08b72f91940ee0f0"
+      },
+      {
+        "path": "src/council-cache.ts",
+        "sha256": "65f73d565a7874f9220ab80f46af357e8c79353f0f03737889692c850b1a3bbd"
+      },
+      {
+        "path": "src/council-collect.ts",
+        "sha256": "3b79456538a43dd4c8dba2a6d2c027aef0aab39dc5b651cb1877d6a60143c806"
+      },
+      {
+        "path": "src/council-oparl.ts",
+        "sha256": "f6b939474e7673021f1cea0ff66bb75e7f76fcfe78648a3dbe09af5ed7895868"
+      },
+      {
+        "path": "src/council.ts",
+        "sha256": "6469f55f125d1dab67bf5d6f35a8ac3f9d82f12c33fe1d21cd1165087012f606"
+      },
+      {
+        "path": "src/data-release.ts",
+        "sha256": "64db89ba91532052749f0901c382c090d57c2f0e87b3ded012c32a8e13da748d"
+      },
+      {
+        "path": "src/dedupe.ts",
+        "sha256": "f2afedb85341741a13bf7e0178ebbc5c55e1eaa871c6f20bf8223ed9b415a849"
+      },
+      {
+        "path": "src/district-agreement.ts",
+        "sha256": "9ea7b828d04e0256378807ca53cbed3364f61f59d7dae8b8a7f30a2dd240a4b8"
+      },
+      {
+        "path": "src/district-answer-cache.ts",
+        "sha256": "aa0056206a428de02b96830332dfcb4a229ffed51cb98c4f896314b070a8785a"
+      },
+      {
+        "path": "src/district-claims.ts",
+        "sha256": "1491f995e625d67d767e57c6ecb71d6928235fef0b5ae29efb3263fae0734e23"
+      },
+      {
+        "path": "src/district-claude.ts",
+        "sha256": "1bc8fccdef733fdcb8caf60402147082d297d19c0ca6c2a3145bf03e0e7d9705"
+      },
+      {
+        "path": "src/district-corpus.ts",
+        "sha256": "1a0a9dd0b984d22e3602f7a0ba9e4ac5a66936d7a49101f2131dc954df522e90"
+      },
+      {
+        "path": "src/district-crawl.ts",
+        "sha256": "69a3dc94ea79cbade6bfeae91aae63ff446c12c9a250fce46983b0b3205820b6"
+      },
+      {
+        "path": "src/district-document.ts",
+        "sha256": "995658a482c61f52ca7cf14753f8a87ac4e3eced96eca47b51af7922b533fd76"
+      },
+      {
+        "path": "src/district-extract.ts",
+        "sha256": "ef1f6617076d4dca74dbe2fb4ce5f12e59460918b50ec344cca02ed34a1d6995"
+      },
+      {
+        "path": "src/district-graph-claims.ts",
+        "sha256": "7d77d916e7fabbab2db35e6c696a749aad447d95064d27458848a045ad6ff048"
+      },
+      {
+        "path": "src/district-graph-query.ts",
+        "sha256": "824d415da77a8eaa2cbfb3c8fb80bed7ba7c479a1cc0409468e8e47a5c03139b"
+      },
+      {
+        "path": "src/district-graph.ts",
+        "sha256": "117fd81e990e217fd3f412a2ea82f804e7e997e6dd56bfcf1bde98476e52cac3"
+      },
+      {
+        "path": "src/district-inference.ts",
+        "sha256": "de95d1be8079acda55aa1160d56693dd2b7619571c85894bb80771a10524d116"
+      },
+      {
+        "path": "src/district-model-contract.ts",
+        "sha256": "23f0632727267ba9cca03481f9855224cd1244374f28664fc29705122dac2060"
+      },
+      {
+        "path": "src/district-model-diagnostics.ts",
+        "sha256": "88a5e3ac7220b58f1ebddc1a64596dc19cdae880cca1e82dd43ee36367e87b88"
+      },
+      {
+        "path": "src/district-model-usage.ts",
+        "sha256": "a643287c67786ff22260cc79f1b2505134e52bf7bd127798624782e81366a13f"
+      },
+      {
+        "path": "src/district-model.ts",
+        "sha256": "a9f182a8907c1a68037ed56d68cb8bf7a35ff3b4bfb439f9902b321146f3ade2"
+      },
+      {
+        "path": "src/district-preparation-run.ts",
+        "sha256": "a9145ac94fc868a1abf81f8a6a5648cc2a20a99fdb0b10fc302dbf865dd0dfa5"
+      },
+      {
+        "path": "src/district-prepared-document.ts",
+        "sha256": "1efb0fd9979878be35ab91000a9537dfe55d6160d0d407b145b8a85600822b2a"
+      },
+      {
+        "path": "src/district-private-io.ts",
+        "sha256": "f252caae9efe5f7ab7b6a7ce47f65f4214102aba95b0d23ce218340331f55f0c"
+      },
+      {
+        "path": "src/district-publication.ts",
+        "sha256": "09afb84e455250aa6421f5cc16a398ea16987d4dd0ec29b07b5d2ef247f197d2"
+      },
+      {
+        "path": "src/district-query.ts",
+        "sha256": "8843222b0904fa0b43c57047133cbd2aeca3faa72c2834ebc449231783257e98"
+      },
+      {
+        "path": "src/district-reassess-relations.ts",
+        "sha256": "49a0943f52845dfca9a53ff26c3ceac3e6dc2d142c05a0fa63692d25589c91c0"
+      },
+      {
+        "path": "src/district-registry.ts",
+        "sha256": "8c0dfaf8dc6bdb2d6c416a68569a44c1c702d912587b7c05f50df943e932a179"
+      },
+      {
+        "path": "src/district-schema.ts",
+        "sha256": "6520a0e57859df79cf85719b78297f55d860aa33d0aea4f8188ae203ae3a08fd"
+      },
+      {
+        "path": "src/district-source-adapters.ts",
+        "sha256": "6445fcc543b91def035ec1c49f2e2fb749eabb78724ad44f8a008cf09c471e58"
+      },
+      {
+        "path": "src/district-work-plan.ts",
+        "sha256": "ec53e4e2c57b821a477adeb6ae8e7f5267ce6dbc90b87a74b3f005e8b9fcfdc2"
+      },
+      {
+        "path": "src/district-worker-lease.ts",
+        "sha256": "cd4aa1c841b4a3f416e82fb2eaf5c2be1ca2004c70eb47e1e19200c5acf07c4f"
+      },
+      {
+        "path": "src/district-worker-quota.ts",
+        "sha256": "fd93669a9cd8407608eef008999bd56ca59c999656c83ac9ae6e4a0371fb7f3a"
+      },
+      {
+        "path": "src/evaluate-core.ts",
+        "sha256": "a51f550ec6bce47debd4e742baa30fb83be8aab610760ff74258c18c62d66e1b"
+      },
+      {
+        "path": "src/evaluate-pilot-value.ts",
+        "sha256": "b654183561fed8631fef871d5e380074380397b487671d044296fe3abe816f53"
+      },
+      {
+        "path": "src/evaluate.ts",
+        "sha256": "5488283b2f35e428847e6871913b6b3782b7a316f3105b7581c08a7d8c251de4"
+      },
+      {
+        "path": "src/event-venues.ts",
+        "sha256": "73ec8f4c5be67693be982f410c81866d74bd3340ba312a5c128303baaae0eb85"
+      },
+      {
+        "path": "src/export-district-sources.ts",
+        "sha256": "7c2f67483777fa6f02598ccd6e598a8913c04bdd021a0ff17a7ea05ec89f5ed2"
+      },
+      {
+        "path": "src/feeds.ts",
+        "sha256": "69c82ac30d5734ded3aa52111fde9d255e952fe2f33ab121df91271330b54886"
+      },
+      {
+        "path": "src/geodata-registry.ts",
+        "sha256": "b5123898048a95aa7451a773f5f5c0f92f7c69e36a7c3d812f76c604e94a373d"
+      },
+      {
+        "path": "src/geodata.ts",
+        "sha256": "3f67ac829ce6f9d184a1c4d8e4fe5c5f37eb983d8414f27425a68c6b593f0f36"
+      },
+      {
+        "path": "src/jev-check.ts",
+        "sha256": "025f0657dfc80e8d6872da2338e39ca2fd227cd6438a48d780614135e371d853"
+      },
+      {
+        "path": "src/mcp-hosted.ts",
+        "sha256": "66ec82bb678f494bd0f5eba5dbfe34ef7191788b309a7aebee3e82f924e474c5"
+      },
+      {
+        "path": "src/mcp-pagination.ts",
+        "sha256": "ea35b18962444b4de3bdf6663c3e5593e312bdcdc6f76ea0c400602405cb4e93"
+      },
+      {
+        "path": "src/mcp-query.ts",
+        "sha256": "c607d087dba54eb619121c42998820638e31fa2d337a4c96bb0ebddde46060db"
+      },
+      {
+        "path": "src/mcp-release.ts",
+        "sha256": "cfdd71f72af9264e18e2d9966d4066486d92a7f145ce280576415f655678bb7d"
+      },
+      {
+        "path": "src/mcp-tools.ts",
+        "sha256": "0673b1a19e96325ed24496c975e70ec26515e90c584c4ccafd89ebddce5ec1bc"
+      },
+      {
+        "path": "src/mcp-version.ts",
+        "sha256": "bfe410b1498c52464935cc6b7076e17c8729a4f3819c1c12e7b486e309a47d05"
+      },
+      {
+        "path": "src/mcp.ts",
+        "sha256": "4423220a467f65aacc91d917f8caacb523c89fba29ca978eebb8ae77c0451676"
+      },
+      {
+        "path": "src/min.ts",
+        "sha256": "41f02866a80a202d16a57351e1ad2385c23f4bb9590a68b29fab92b050f42eaf"
+      },
+      {
+        "path": "src/osm.ts",
+        "sha256": "2638f2724d1fc16489e9cd5292db1e3127764c23edf526867a8f11175c42bf11"
+      },
+      {
+        "path": "src/pdf-tdm-policy-worker.ts",
+        "sha256": "10982a937661e42f696f7e18ce32bd1b56ef355b30177e6c542b3fe22f6be43e"
+      },
+      {
+        "path": "src/pdf-tdm-policy.ts",
+        "sha256": "42c4b1f7f894ddc8f87d6067236d7eae0586f1e943e733def05c95f0d96fdaf7"
+      },
+      {
+        "path": "src/polite-fetch.ts",
+        "sha256": "ca231ee349c5c952350e90893bb2cd83080a975aed0b6411e2e2c78c6ce59a59"
+      },
+      {
+        "path": "src/prepare-knowledge.ts",
+        "sha256": "dd2ca4125ed174807045f49b5f14936897c0a68b9ff89f8c489e5008c0ec0dde"
+      },
+      {
+        "path": "src/provider.ts",
+        "sha256": "0816dc89255f5d1bc359d8e62cc6aafeb895a1802252a5c2259736093642d44a"
+      },
+      {
+        "path": "src/public-address.ts",
+        "sha256": "9f077b90cb02e2add23266a16ef4201dca5e9c777bbf17e2cb5c838f0868f9bd"
+      },
+      {
+        "path": "src/publication-quality.ts",
+        "sha256": "eb8579bdfe9d6b27825de40c7a4528aaf2be22e668b05c72329bcf823727015f"
+      },
+      {
+        "path": "src/publish.ts",
+        "sha256": "44d75dff986f7699278f38f6e283604f69d5d1d8b9e8814c04654548a9fdd145"
+      },
+      {
+        "path": "src/quality-refresh.ts",
+        "sha256": "d6d0d3fbd7c87668d89546dfffa38de67fcae0bb7d22f448c11b03cbcedcb397"
+      },
+      {
+        "path": "src/regional-quality.ts",
+        "sha256": "bcfb014c62511b82d3afcdee8dd520efec24e922a263c9f3d6909f9fa9d86207"
+      },
+      {
+        "path": "src/replay-pipeline.ts",
+        "sha256": "eaed077f893ecbad84650225952e438ed2c4b9b8fc6bd7a6642577a2fa1c304e"
+      },
+      {
+        "path": "src/schema.ts",
+        "sha256": "026a24e707ec4fb4e6cae9f3e85012bb0c6f748172e5907d276be48b328705e6"
+      },
+      {
+        "path": "src/source-health.ts",
+        "sha256": "a28b2da4425b97ab3a1b717eaf23b195834639f07f99be42934c1943622e4722"
+      },
+      {
+        "path": "src/source-policy.ts",
+        "sha256": "5cec17be4357345082705d0d802462f53c29d27830f240d213ec9e8aed143561"
+      },
+      {
+        "path": "src/topic-vocabulary.ts",
+        "sha256": "0aa01495c7995b9a644c24be019d6474c46957f9d7e2e76c0ba273092ed17407"
+      },
+      {
+        "path": "src/topics.ts",
+        "sha256": "9675aab2ad109b4bee0a2ac58e6d0a81f54a1c17f38e056d957c46198b668aac"
+      }
+    ]
+  },
+  "workspace": "../cache/offline-replay-0.3.0"
+}
