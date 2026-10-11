@@ -1,6 +1,6 @@
 # MCP 0.3.1: konkrete Analysten-Korrekturen
 
-Dieser Bericht beschreibt die lokal geprüfte Patch-Fassung. Der tatsächliche Rollout und die getrennten Image-/Pod-/HTTPS-Nachweise stehen im [Hosting-Leitfaden](../docs/HOSTED_MCP.md). Die eingefrorene 0.3.0-Wertstudie bleibt unverändert; ihre Ergebnisse werden nicht nachträglich der Patch-Fassung zugeschrieben.
+**0.3.1 ist live.** Die konkreten Korrekturen wurden lokal und anschließend am öffentlichen Endpoint abgenommen. [Live-Provenienz](live-release-0.3.1.json) und [Hosting-Leitfaden](../docs/HOSTED_MCP.md) halten Image-/Pod-/HTTPS-Nachweise getrennt. Die eingefrorene 0.3.0-Wertstudie und die ursprüngliche lokale Patch-Evidenz bleiben unverändert; Ergebnisse werden nicht rückwirkend umetikettiert.
 
 - Version: `0.3.1`, **20 schreibgeschützte MCP-Tools**.
 - Datenmanifest: `25d99c9382ccbfeb3fbdef8541409950c8e4adc96852922f151e661d25c90eaf`.
