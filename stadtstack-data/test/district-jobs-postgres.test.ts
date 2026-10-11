@@ -1,0 +1,248 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {Pool} from 'pg';
+import {canonicalJson,digest} from '../src/district-adapter-contract.ts';
+import {DistrictCas} from '../src/district-cas.ts';
+import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,runDistrictJobs,deliverDistrictOwnerNotifications,artifactVerificationHandler,type AuthorizationInput,type ClaimedJob,type DistrictJobSpec,type JobHandler,type OwnerNotification,type NotificationAcknowledgement} from '../src/district-jobs.ts';
+import {CANONICALIZATION_VERSION,STEP_RECEIPT_VERSION,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
+
+// Real Postgres only. The connection must be local and its role must have CREATEDB.
+// Run: DISTRICT_TEST_DATABASE_URL=postgresql://localhost/postgres node --experimental-strip-types --test test/district-jobs-postgres.test.ts
+// Each invocation creates/drops its own randomly named database; no existing schema is cleared.
+const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
+function jobSpec(name:string,step='verify_artifacts',hashes:string[]=[]):DistrictJobSpec {
+  return {step,lane:'cpu',semanticContractSha256:digest('integration-contract-v1'),inputArtifactHashes:hashes,sourceScope:{publisherId:'synthetic-publisher',sourceId:'synthetic-'+name,municipalityId:'strausberg',ags:'12064472',tenant:null,observationWindow:'2026-10-11'},selector:{scenario:name,nonce:randomUUID()},policyProofSha256:null};
+}
+function receiptFor(job:ClaimedJob):StepReceipt {
+  return {version:STEP_RECEIPT_VERSION,canonicalizationVersion:CANONICALIZATION_VERSION,id:randomUUID(),runId:job.runId,jobKey:job.jobKey,step:job.spec.step,lane:job.spec.lane,sourceId:job.spec.sourceScope.sourceId,municipalityId:job.spec.sourceScope.municipalityId,attempt:job.attempt,leaseToken:job.fencingToken,category:job.category,dependencyReceiptIds:job.dependencyReceiptIds,enqueuedAt:job.enqueuedAt,startedAt:job.startedAt,finishedAt:new Date().toISOString(),queueWaitMs:Math.max(0,Date.parse(job.startedAt)-Date.parse(job.enqueuedAt)),elapsedMs:0,cpuUserMicros:null,cpuSystemMicros:null,outcome:'succeeded',reasonCode:'completed',inputHashes:job.spec.inputArtifactHashes,outputHashes:[],policyProofSha256:job.spec.policyProofSha256,originProofSha256:null,versions:{test:'postgres-integration-v1'},cache:{disposition:'not_applicable',originalGenerationReceiptId:null},provider:null,counts:{...unknownReceiptCounts}};
+}
+
+test('durable R1 queue against isolated local Postgres', {skip:!connectionString,timeout:120000},async t=>{
+  let url:URL;try{url=new URL(connectionString!);}catch{throw Error('DISTRICT_TEST_DATABASE_URL must be a local Postgres URL');}
+  if(!['postgres:','postgresql:'].includes(url.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(url.hostname))throw Error('Integration test refuses a non-local Postgres endpoint');
+  const host=url.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Integration test refuses non-local host override');
+  const admin=new Pool({connectionString,max:2,connectionTimeoutMillis:5000,statement_timeout:10000});
+  const database='district_r1_test_'+randomUUID().replaceAll('-','');
+  const resources:{created:boolean;pool?:Pool;directory?:string}={created:false};
+  t.after(async()=>{
+    try{await resources.pool?.end();if(resources.created)await admin.query('DROP DATABASE "'+database+'" WITH (FORCE)');}
+    finally{await admin.end();if(resources.directory)await rm(resources.directory,{recursive:true,force:true});}
+  });
+  await admin.query('CREATE DATABASE "'+database+'"');
+  resources.created=true;
+  const isolated=new URL(url);isolated.pathname='/'+database;
+  const pool=new Pool({connectionString:isolated.href,max:8,connectionTimeoutMillis:5000,statement_timeout:10000});
+  resources.pool=pool;
+  const directory=await mkdtemp(join(tmpdir(),'district-pg-cas-'));
+  resources.directory=directory;
+  const store=new DistrictJobStore(pool),cas=new DistrictCas(join(directory,'cas'));
+  const handlers:Record<string,JobHandler>={verify_artifacts:artifactVerificationHandler};
+  const authorize=async (jobKeys:string[],overrides:Partial<AuthorizationInput>={})=>store.authorize({approvalSha256:digest(randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys,ags:['12064472'],maxJobs:jobKeys.length,maxElapsedMs:60000,category:'development',...overrides});
+  const run=async (authorizationId:string,maxJobs:number,registry:Readonly<Record<string,JobHandler>>=handlers,maxElapsedMs=60000)=>runDistrictJobs({store,cas,handlers:registry,authorizationId,ownerPresent:true,maxJobs,maxElapsedMs});
+
+  await t.test('migration applies atomically, pins exact bytes and contains every plan entity',async()=>{
+    await migrateDistrictJobs(pool);await migrateDistrictJobs(pool);
+    const expected=['source_snapshots','representations','policy_decisions','artifacts','jobs','job_dependencies','step_receipts','host_lanes','provider_budgets','case_identities','entity_identities','identity_assertions','release_candidates','release_files','active_release','preauthorizations','owner_notifications'];
+    const tables=await pool.query<{table_name:string}>(`SELECT table_name FROM information_schema.tables WHERE table_schema='district_pipeline'`);
+    for(const name of expected)assert.ok(tables.rows.some(row=>row.table_name===name),name);
+    const original=await pool.query<{sha256:string}>('SELECT sha256 FROM district_pipeline.schema_migrations WHERE version=1');
+    await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=1',[digest('wrong')]);
+    await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
+    await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=1',[original.rows[0].sha256]);
+  });
+
+  await t.test('committed predecessor receipts release dependencies; CAS outputs, identities and receipt hashes stay durable',async()=>{
+    const input=await cas.put(Buffer.from('Synthetic source rows'),{kind:'derived',mimeType:'text/plain'});await store.addArtifact(input);
+    const parent=jobSpec('dag-parent','parse_fixture',[input.sha256]),child=jobSpec('dag-child');
+    const parentKey=await store.enqueue(parent),childKey=await store.enqueue(child,{dependencies:[{jobKey:parentKey}],priority:100});
+    assert.equal(await store.enqueue(parent),parentKey);
+    const order:string[]=[];
+    const authorizationId=await authorize([parentKey,childKey]);
+    const result=await run(authorizationId,2,{...handlers,parse_fixture:async context=>{
+      order.push('parent');assert.deepEqual(await context.cas.read(input.sha256),Buffer.from('Synthetic source rows'));
+      const output=await context.cas.put(Buffer.from('{"fixtureRows":1}'),{kind:'parser_output',mimeType:'application/json'});
+      return {outcome:'succeeded',reasonCode:'completed',outputs:[output],counts:{rows:1},versions:{parser:'fixture-v1'}};
+    },verify_artifacts:async context=>{order.push('child');assert.equal(context.job.dependencyReceiptIds.length,1);return artifactVerificationHandler(context);}});
+    assert.equal(result.state,'completed');assert.deepEqual(order,['parent','child']);assert.equal(result.receiptIds.length,2);
+    const receipts=await pool.query<{receipt:StepReceipt;receipt_sha256:string}>(`SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE run_id=$1 ORDER BY committed_at`,[result.runId]);
+    assert.equal(receipts.rows[0].receipt.counts.rows,1);assert.equal(receipts.rows[1].receipt.dependencyReceiptIds[0],receipts.rows[0].receipt.id);
+    for(const row of receipts.rows)assert.equal(row.receipt_sha256,digest(canonicalJson(row.receipt)));
+    const bindings=await pool.query('SELECT * FROM district_pipeline.step_receipt_dependencies WHERE receipt_id=$1',[receipts.rows[1].receipt.id]);assert.equal(bindings.rowCount,1);
+    const outputs=await pool.query<{artifact_sha256:string}>('SELECT artifact_sha256 FROM district_pipeline.job_output_artifacts WHERE receipt_id=$1',[receipts.rows[0].receipt.id]);assert.equal(outputs.rowCount,1);await cas.verify(outputs.rows[0].artifact_sha256);
+    await assert.rejects(pool.query('DELETE FROM district_pipeline.job_output_artifacts WHERE receipt_id=$1',[receipts.rows[0].receipt.id]),/Immutable/);
+    await assert.rejects(pool.query('INSERT INTO district_pipeline.job_output_artifacts(receipt_id,artifact_sha256) VALUES($1,$2)',[receipts.rows[0].receipt.id,input.sha256]),/not in immutable receipt/);
+    await assert.rejects(pool.query(`UPDATE district_pipeline.step_receipts SET outcome='failed_execution' WHERE id=$1`,[receipts.rows[0].receipt.id]),/Immutable/);
+    await assert.rejects(pool.query('UPDATE district_pipeline.preauthorizations SET max_jobs=max_jobs+1 WHERE id=$1',[authorizationId]),/immutable/);
+    await assert.rejects(store.enqueue(child),/incompatible/);
+    const wrongPin=await store.enqueue(jobSpec('wrong-receipt'),{dependencies:[{jobKey:parentKey,expectedReceiptSha256:digest('not-the-receipt')}]});
+    const pinned=await run(await authorize([wrongPin]),1);assert.equal(pinned.jobsStarted,0);assert.equal(pinned.state,'held');assert.equal(pinned.reasonCode,'dependency_uncommitted');
+  });
+
+  await t.test('receipt commit failure rolls back job state and cannot release dependencies',async()=>{
+    const key=await store.enqueue(jobSpec('rollback'));
+    const authorizationId=await authorize([key]);const bounds=await store.beginRun(authorizationId,1,60000),claim=await store.claim(bounds,30000);assert.equal(claim.kind,'job');if(claim.kind!=='job')return;
+    const receipt={...receiptFor(claim.job),outputHashes:[digest('missing-output-artifact')]};
+    await assert.rejects(store.finish(bounds,claim.job,receipt),/foreign key/);
+    const row=await pool.query<{state:string}>('SELECT state FROM district_pipeline.jobs WHERE job_key=$1',[key]);assert.equal(row.rows[0].state,'leased');
+    const receipts=await pool.query('SELECT id FROM district_pipeline.step_receipts WHERE job_id=$1',[claim.job.id]);assert.equal(receipts.rowCount,0);
+    await store.hold(claim.job,'execution_exception',receiptFor(claim.job));await store.endRun(bounds.runId,'held','execution_exception');
+  });
+
+  await t.test('expired/crashed leases become explicit holds and stale fencing tokens cannot commit accepted effects',async()=>{
+    const key=await store.enqueue(jobSpec('crash-fence'));
+    const authorizationId=await authorize([key],{maxJobs:2});const oldRun=await store.beginRun(authorizationId,2,60000),oldClaim=await store.claim(oldRun,30000);assert.equal(oldClaim.kind,'job');if(oldClaim.kind!=='job')return;
+    await pool.query(`UPDATE district_pipeline.jobs SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1`,[oldClaim.job.id]);
+    await assert.rejects(store.finish(oldRun,oldClaim.job,receiptFor(oldClaim.job)),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='lease_lost');
+    const recovery=await run(authorizationId,1);assert.equal(recovery.jobsStarted,0);
+    const held=await pool.query<{state:string;reason_code:string;fencing_token:string}>('SELECT state,reason_code,fencing_token FROM district_pipeline.jobs WHERE job_key=$1',[key]);assert.equal(held.rows[0].state,'held_execution');assert.equal(held.rows[0].reason_code,'lease_expired');assert.ok(BigInt(held.rows[0].fencing_token)>BigInt(oldClaim.job.fencingToken));
+    const crashReceipt=await pool.query<{receipt:StepReceipt}>('SELECT receipt FROM district_pipeline.step_receipts WHERE job_id=$1',[oldClaim.job.id]);assert.equal(crashReceipt.rows[0].receipt.elapsedMs,null);assert.equal(crashReceipt.rows[0].receipt.cpuUserMicros,null);
+    await store.resume(key);const resumed=await run(authorizationId,1);assert.equal(resumed.jobsStarted,1);
+    await assert.rejects(store.finish(oldRun,oldClaim.job,receiptFor(oldClaim.job)),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='lease_lost');
+    const accepted=await pool.query(`SELECT id FROM district_pipeline.step_receipts WHERE job_id=$1 AND outcome='succeeded'`,[oldClaim.job.id]);assert.equal(accepted.rowCount,1);
+    assert.equal(await store.enqueue(oldClaim.job.spec),key);
+  });
+
+  await t.test('preauthorization expiration aborts active work, records its hold and never runs the dependent job',async()=>{
+    const first=await store.enqueue(jobSpec('expires','await_abort')),second=await store.enqueue(jobSpec('expiry-dependent'),{dependencies:[{jobKey:first}]});
+    const authorizationId=await authorize([first,second],{expiresAt:new Date(Date.now()+1000).toISOString()});let calls=0;
+    const result=await run(authorizationId,2,{...handlers,await_abort:async ({signal})=>{calls++;await new Promise<void>((_,reject)=>{if(signal.aborted)reject(signal.reason);else signal.addEventListener('abort',()=>reject(signal.reason),{once:true});});return {outcome:'succeeded',reasonCode:'completed'};}});
+    assert.equal(result.state,'held');assert.equal(result.reasonCode,'authorization_expired');assert.equal(calls,1);
+    const receipts=await pool.query<{receipt:StepReceipt}>('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId]);assert.equal(receipts.rowCount,1);assert.equal(receipts.rows[0].receipt.outcome,'held_execution');assert.equal(receipts.rows[0].receipt.reasonCode,'authorization_expired');
+    const child=await pool.query<{attempt:number}>('SELECT attempt FROM district_pipeline.jobs WHERE job_key=$1',[second]);assert.equal(child.rows[0].attempt,0);
+  });
+
+  await t.test('maximum jobs and elapsed time stay bounded across explicit resumptions',async()=>{
+    const one=await store.enqueue(jobSpec('job-bound-one')),two=await store.enqueue(jobSpec('job-bound-two'));
+    const authorizationId=await authorize([one,two],{maxJobs:1});const first=await run(authorizationId,1);assert.equal(first.jobsStarted,1);assert.equal(first.reasonCode,'max_jobs_reached');
+    await assert.rejects(run(authorizationId,1),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='authorization_jobs_exhausted');
+    const sleeping=await store.enqueue(jobSpec('time-bound','await_abort'));
+    const bounded=await authorize([sleeping],{maxElapsedMs:100});
+    const result=await run(bounded,1,{await_abort:async ({signal})=>{await new Promise<void>((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));return {outcome:'succeeded',reasonCode:'completed'};}},100);
+    assert.equal(result.state,'held');assert.equal(result.reasonCode,'max_time_reached');
+    // Node fake clocks cannot advance Postgres: wait to the persisted authorization deadline.
+    await pool.query(`SELECT pg_sleep(GREATEST(0,extract(epoch FROM(first_started_at+max_elapsed_ms*interval '1 millisecond'-clock_timestamp())))) FROM district_pipeline.preauthorizations WHERE id=$1`,[bounded]);
+    await assert.rejects(store.beginRun(bounded,1,100),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='authorization_time_exhausted');
+  });
+
+  await t.test('exceptions, unknown handlers, cancellation and owner absence fail closed without exception contents',async()=>{
+    const secret='synthetic-secret-must-not-enter-receipts';
+    const failure=await store.enqueue(jobSpec('exception','throws'));
+    const failed=await run(await authorize([failure]),1,{throws:async()=>{throw Error(secret);}});assert.equal(failed.reasonCode,'execution_exception');
+    const receipt=await pool.query<{receipt:StepReceipt}>('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[failed.runId]);assert.doesNotMatch(JSON.stringify(receipt.rows[0].receipt),new RegExp(secret));
+    const missing=await store.enqueue(jobSpec('missing','not_a_registered_handler'));
+    assert.equal((await run(await authorize([missing]),1)).reasonCode,'handler_missing');
+    const cancelled=await store.enqueue(jobSpec('cancelled'));await store.cancel(cancelled);const cancelledRun=await run(await authorize([cancelled]),1);assert.equal(cancelledRun.jobsStarted,0);
+    await assert.rejects(store.resume(cancelled),/cannot be resumed/);
+    const unattended=await store.enqueue(jobSpec('absent-owner'));const authorizationId=await authorize([unattended]);
+    await assert.rejects(runDistrictJobs({store,cas,handlers,authorizationId,maxJobs:1,maxElapsedMs:60000}),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='owner_absent');
+    await assert.rejects(runDistrictJobs({store,cas,handlers,authorizationId,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000}),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='notification_unavailable');
+  });
+
+  await t.test('one global R1 executor admits no sibling process while a handler is running',async()=>{
+    const started=Promise.withResolvers<void>(),release=Promise.withResolvers<void>();
+    const key=await store.enqueue(jobSpec('exclusive','wait_for_release')),other=await store.enqueue(jobSpec('exclusive-other'));
+    const first=run(await authorize([key]),1,{wait_for_release:async()=>{started.resolve();await release.promise;return {outcome:'succeeded',reasonCode:'completed'};}});
+    await started.promise;
+    try{await assert.rejects(run(await authorize([other]),1),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='executor_busy');}finally{release.resolve();}
+    assert.equal((await first).state,'completed');
+  });
+
+  await t.test('shared host lanes enforce one in-flight request, start delays, paused access and explicit resumption',async()=>{
+    const lane='portal-'+randomUUID();await pool.query(`INSERT INTO district_pipeline.host_lanes(lane_key,normalized_host,shared_service_group) VALUES($1,'example.org','synthetic-shared-service')`,[lane]);
+    const first=await store.enqueue(jobSpec('host-town-a'),{hostLaneKey:lane}),second=await store.enqueue(jobSpec('host-town-b'),{hostLaneKey:lane});const authorizationId=await authorize([first,second]);
+    const result=await run(authorizationId,2);assert.equal(result.jobsStarted,1);assert.equal(result.reasonCode,'host_delay');
+    const leases=await pool.query('SELECT * FROM district_pipeline.host_lane_leases WHERE lane_key=$1',[lane]);assert.equal(leases.rowCount,0);
+    const spacing=await pool.query<{spacing:string}>(`SELECT extract(epoch FROM(next_start_at-last_started_at))*1000 AS spacing FROM district_pipeline.host_lanes WHERE lane_key=$1`,[lane]);assert.ok(Number(spacing.rows[0].spacing)>=2000);
+    await pool.query(`UPDATE district_pipeline.host_lanes SET next_start_at=clock_timestamp()-interval '1 second' WHERE lane_key=$1`,[lane]);
+    const deferred=await pool.query<{job_key:string}>(`SELECT job_key FROM district_pipeline.jobs WHERE job_key=ANY($1) AND state='deferred'`,[[first,second]]);await store.resume(deferred.rows[0].job_key);
+    assert.equal((await run(authorizationId,1)).jobsStarted,1);
+    const blocked=await store.enqueue(jobSpec('host-paused'),{hostLaneKey:lane});await pool.query(`UPDATE district_pipeline.host_lanes SET paused_reason='host_access_blocked' WHERE lane_key=$1`,[lane]);
+    const paused=await run(await authorize([blocked]),1);assert.equal(paused.jobsStarted,0);assert.equal(paused.reasonCode,'host_paused');
+  });
+
+  await t.test('current policy proof is required even for artifact cache reuse and representation admission binds bytes',async()=>{
+    const bytes=Buffer.from('Synthetic admitted municipal bytes'),hash=digest(bytes),snapshot=randomUUID(),policy=randomUUID(),proof=digest(randomUUID());
+    const fetchedAt=new Date(Date.now()-120000).toISOString();
+    await pool.query(`INSERT INTO district_pipeline.source_snapshots(id,publisher_id,source_id,municipality_id,ags,resource_identity,request_method,request_selector_sha256,observation_window,retrieved_at,scope_sha256) VALUES($1,'test-publisher','test-source','strausberg','12064472','https://example.org/tenant?body=1','GET',$2,'2026-10-11',$4,$3)`,[snapshot,digest('request'),digest(snapshot),fetchedAt]);
+    await pool.query(`INSERT INTO district_pipeline.policy_decisions(id,source_snapshot_id,proof_sha256,source_sha256,receipt_json,state,observed_robots,owner_robots_override,opt_out_version,policy_version,checked_at,expires_at,reason_code) VALUES($1,$2,$3,$4,$5,'allowed','disallowed',true,'v1','v1',clock_timestamp()-interval '1 minute',clock_timestamp()+interval '1 hour','completed')`,[policy,snapshot,proof,hash,{fixture:'immutable-policy-storage',sourceSha256:hash}]);
+    const original=await cas.put(bytes,{kind:'source_original',mimeType:'text/plain',admission:{state:'allowed',sourceSha256:hash,policyProofSha256:proof,checkedAt:new Date(Date.now()-60000).toISOString(),expiresAt:new Date(Date.now()+60000).toISOString()}});await store.addArtifact(original);
+    await pool.query(`INSERT INTO district_pipeline.representations(id,source_snapshot_id,artifact_sha256,policy_decision_id,final_url,redirect_chain,fetched_at,admitted_at,mime_type,admission) VALUES($1,$2,$3,$4,'https://example.org/tenant?body=1','[]',$5,(SELECT checked_at FROM district_pipeline.policy_decisions WHERE id=$4),'text/plain','admitted')`,[randomUUID(),snapshot,hash,policy,fetchedAt]);
+    const representation=await pool.query<{fetched_at:Date;admitted_at:Date}>(`SELECT fetched_at,admitted_at FROM district_pipeline.representations WHERE source_snapshot_id=$1`,[snapshot]);
+    assert.equal(representation.rows[0].fetched_at.toISOString(),fetchedAt);assert.ok(representation.rows[0].admitted_at>representation.rows[0].fetched_at);
+    await assert.rejects(pool.query(`INSERT INTO district_pipeline.representations(id,source_snapshot_id,artifact_sha256,policy_decision_id,final_url,redirect_chain,fetched_at,admitted_at,mime_type,admission) SELECT $1,$2,$3,p.id,'https://example.org/tenant?body=1','[]',$5,p.checked_at-interval '1 second','text/plain','admitted' FROM district_pipeline.policy_decisions p WHERE p.id=$4`,[randomUUID(),snapshot,hash,policy,fetchedAt]),/byte-bound/);
+    await assert.rejects(pool.query(`INSERT INTO district_pipeline.representations(id,source_snapshot_id,artifact_sha256,policy_decision_id,final_url,redirect_chain,fetched_at,admitted_at,mime_type,admission) SELECT $1,$2,$3,p.id,'https://example.org/tenant?body=1','[]',$5,p.expires_at,'text/plain','admitted' FROM district_pipeline.policy_decisions p WHERE p.id=$4`,[randomUUID(),snapshot,hash,policy,fetchedAt]),/byte-bound/);
+    await assert.rejects(pool.query(`INSERT INTO district_pipeline.representations(id,source_snapshot_id,artifact_sha256,policy_decision_id,final_url,redirect_chain,fetched_at,admitted_at,mime_type,admission) SELECT $1,$2,$3,p.id,'https://example.org/tenant?body=1','[]',p.checked_at+interval '1 second',p.checked_at,'text/plain','admitted' FROM district_pipeline.policy_decisions p WHERE p.id=$4`,[randomUUID(),snapshot,hash,policy]),/byte-bound/);
+    const different=await cas.put(Buffer.from('different bytes'),{kind:'derived',mimeType:'text/plain'});await store.addArtifact(different);
+    await assert.rejects(pool.query(`INSERT INTO district_pipeline.representations(id,source_snapshot_id,artifact_sha256,policy_decision_id,final_url,redirect_chain,fetched_at,admitted_at,mime_type,admission) VALUES($1,$2,$3,$4,'https://example.org/','[]',$5,(SELECT checked_at FROM district_pipeline.policy_decisions WHERE id=$4),'text/plain','admitted')`,[randomUUID(),snapshot,different.sha256,policy,fetchedAt]),/byte-bound/);
+    const spec=jobSpec('policy-cache','verify_artifacts',[hash]);spec.policyProofSha256=proof;spec.sourceScope={...spec.sourceScope,publisherId:'test-publisher',sourceId:'test-source'};
+    const admitted=await store.enqueue(spec);assert.equal((await run(await authorize([admitted]),1)).jobsStarted,1);
+    const wrongTown=await store.enqueue({...spec,selector:{fixture:'other-municipality'},sourceScope:{...spec.sourceScope,municipalityId:'hoppegarten',ags:'12064227'}});
+    const rejectedTown=await run(await authorize([wrongTown],{ags:['12064227']}),1);assert.equal(rejectedTown.reasonCode,'policy_excluded');
+    await assert.rejects(pool.query(`UPDATE district_pipeline.policy_decisions SET receipt_json='{\"tampered\":true}' WHERE id=$1`,[policy]),/immutable/);
+    const expiredProof=digest(randomUUID());
+    await pool.query(`INSERT INTO district_pipeline.policy_decisions(id,source_snapshot_id,proof_sha256,source_sha256,receipt_json,state,observed_robots,owner_robots_override,opt_out_version,policy_version,checked_at,expires_at,reason_code) VALUES($1,$2,$3,$4,$5,'allowed','disallowed',true,'v1','v1',clock_timestamp()-interval '2 hours',clock_timestamp()-interval '1 hour','completed')`,[randomUUID(),snapshot,expiredProof,hash,{fixture:'expired-policy-storage',sourceSha256:hash}]);
+    const key=await store.enqueue({...spec,selector:{fixture:'expired-cache'},policyProofSha256:expiredProof});
+    let calls=0;const result=await run(await authorize([key]),1,{verify_artifacts:async context=>{calls++;return artifactVerificationHandler(context);}});assert.equal(calls,0);assert.equal(result.reasonCode,'policy_expired');
+    await pool.query(`UPDATE district_pipeline.policy_decisions SET state='excluded' WHERE id=$1`,[policy]);
+    await assert.rejects(pool.query(`UPDATE district_pipeline.policy_decisions SET state='allowed' WHERE id=$1`,[policy]),/new proof required/);
+    const revoked=await store.enqueue({...spec,selector:{fixture:'revoked-cache'}});assert.equal((await run(await authorize([revoked]),1)).reasonCode,'policy_excluded');
+    assert.equal((await cas.read(hash)).length,bytes.length);
+  });
+
+  await t.test('budget reservations are atomic, unknown usage stays reserved, 80%/hard caps hold and R1 paid execution is prohibited',async()=>{
+    const key=await store.enqueue(jobSpec('budget-accounting'));const authorizationId=await authorize([key]);const bounds=await store.beginRun(authorizationId,1,60000),claim=await store.claim(bounds,30000);assert.equal(claim.kind,'job');if(claim.kind!=='job')return;
+    const budget=randomUUID();await pool.query(`INSERT INTO district_pipeline.provider_budgets(id,provider,currency,owner_approval_sha256,cap_micro_usd,expires_at) VALUES($1,'openai','USD',$2,1000000,clock_timestamp()+interval '1 hour')`,[budget,digest('synthetic-budget-approval')]);
+    const reservation=await store.reserveProviderBudget(budget,claim.job.id,claim.job.fencingToken,500000,digest('submission-intent'));
+    await store.recordProviderSubmission(reservation,'synthetic-request-id',null);await store.settleProviderReservation(reservation,null);
+    let accounting=await pool.query<{reserved_micro_usd:string;spent_micro_usd:string}>('SELECT reserved_micro_usd,spent_micro_usd FROM district_pipeline.provider_budgets WHERE id=$1',[budget]);assert.equal(accounting.rows[0].reserved_micro_usd,'500000');assert.equal(accounting.rows[0].spent_micro_usd,'0');
+    await assert.rejects(store.reserveProviderBudget(budget,claim.job.id,claim.job.fencingToken,400000,digest('second-intent')),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='budget_paused');
+    await assert.rejects(store.reserveProviderBudget(budget,claim.job.id,claim.job.fencingToken,600000,digest('third-intent')),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='budget_exhausted');
+    await store.settleProviderReservation(reservation,400000);await store.settleProviderReservation(reservation,400000);
+    accounting=await pool.query('SELECT reserved_micro_usd,spent_micro_usd FROM district_pipeline.provider_budgets WHERE id=$1',[budget]);assert.equal(accounting.rows[0].reserved_micro_usd,'0');assert.equal(accounting.rows[0].spent_micro_usd,'400000');
+    await assert.rejects(store.settleProviderReservation(reservation,300000),/cannot change/);
+    await store.hold(claim.job,'owner_stopped',receiptFor(claim.job));await store.endRun(bounds.runId,'held','owner_stopped');
+    const paid=await store.enqueue(jobSpec('paid-prohibited'),{budgetId:budget,reservedMicroUsd:1});let paidCalls=0;
+    const result=await run(await authorize([paid]),1,{verify_artifacts:async context=>{paidCalls++;return artifactVerificationHandler(context);}});assert.equal(result.reasonCode,'paid_not_authorized');assert.equal(paidCalls,0);
+  });
+
+  await t.test('bounded unattended mode proves approved channel readiness before work and stores real acknowledgement identities',async()=>{
+    const approval=digest('approved-notification-route'),destination=digest('synthetic-approved-destination'),provider='ntfy',key=await store.enqueue(jobSpec('bounded-approved'));
+    const identity={notificationApprovalSha256:approval,notificationDestinationSha256:destination,notificationProvider:provider};
+    const acknowledge=async (notification:OwnerNotification):Promise<NotificationAcknowledgement>=>({provider,messageId:randomUUID(),notificationId:notification.id,payloadSha256:digest(canonicalJson(notification)),destinationSha256:notification.destinationSha256,acknowledgedAt:new Date().toISOString()});
+    await assert.rejects(authorize([key],{mode:'bounded_unattended'}),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='notification_unavailable');
+    const authorizationId=await authorize([key],{mode:'bounded_unattended',...identity});
+    await assert.rejects(run(authorizationId,1),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='authorization_mode_mismatch');
+    await assert.rejects(runDistrictJobs({store,cas,handlers,authorizationId,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000,...identity,notificationDestinationSha256:digest('wrong-route'),notifyOwner:acknowledge}),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='notification_unavailable');
+    const notifications:OwnerNotification[]=[];
+    const result=await runDistrictJobs({store,cas,handlers:{verify_artifacts:async context=>{
+      const startup=await pool.query<{state:string}>(`SELECT state FROM district_pipeline.owner_notifications WHERE run_id=$1 AND phase='startup'`,[context.job.runId]);
+      assert.equal(startup.rows[0].state,'delivered');assert.equal(notifications.length,1);return artifactVerificationHandler(context);
+    }},authorizationId,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000,...identity,notifyOwner:async notification=>{
+      const durable=await pool.query<{state:string;payload:OwnerNotification}>('SELECT state,payload FROM district_pipeline.owner_notifications WHERE id=$1',[notification.id]);
+      assert.equal(durable.rows[0].state,'pending');assert.deepEqual(durable.rows[0].payload,notification);notifications.push(notification);return acknowledge(notification);
+    }});
+    assert.equal(result.state,'completed');assert.deepEqual(notifications.map(item=>item.phase),['startup','disposition']);assert.equal(notifications[0].runId,result.runId);
+    const runs=await pool.query<{owner_present:boolean;execution_mode:string}>('SELECT owner_present,execution_mode FROM district_pipeline.executor_runs WHERE id=$1',[result.runId]);
+    assert.equal(runs.rows[0].owner_present,false);assert.equal(runs.rows[0].execution_mode,'bounded_unattended');
+    const outbox=await pool.query<{state:string;provider_message_id:string;provider:string}>('SELECT state,provider_message_id,provider FROM district_pipeline.owner_notifications WHERE run_id=$1',[result.runId]);
+    assert.equal(outbox.rowCount,2);for(const row of outbox.rows){assert.equal(row.state,'delivered');assert.ok(row.provider_message_id);assert.equal(row.provider,provider);}
+    const replayKey=await store.enqueue(jobSpec('notification-ack-replay')),replayAuthorization=await authorize([replayKey],{mode:'bounded_unattended',...identity});
+    const replay=await runDistrictJobs({store,cas,handlers,authorizationId:replayAuthorization,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000,...identity,notifyOwner:async notification=>({...await acknowledge(notification),messageId:outbox.rows[0].provider_message_id})});
+    assert.equal(replay.reasonCode,'notification_failed');assert.equal(replay.jobsStarted,0);
+    await deliverDistrictOwnerNotifications(store,{notificationApprovalSha256:approval,destinationSha256:destination,provider,notifyOwner:acknowledge});
+    const noAck=await store.enqueue(jobSpec('notification-no-op')),noAckAuthorization=await authorize([noAck],{mode:'bounded_unattended',...identity});
+    const noOp=await runDistrictJobs({store,cas,handlers,authorizationId:noAckAuthorization,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000,...identity,notifyOwner:async()=>undefined as unknown as NotificationAcknowledgement});
+    assert.equal(noOp.reasonCode,'notification_failed');assert.equal(noOp.jobsStarted,0);
+    await deliverDistrictOwnerNotifications(store,{notificationApprovalSha256:approval,destinationSha256:destination,provider,notifyOwner:acknowledge});
+    const failure=await store.enqueue(jobSpec('notification-failure')),failureAuthorization=await authorize([failure],{mode:'bounded_unattended',...identity});let calls=0;
+    const failed=await runDistrictJobs({store,cas,handlers:{verify_artifacts:async context=>{calls++;return artifactVerificationHandler(context);}},authorizationId:failureAuthorization,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000,...identity,notifyOwner:async()=>{throw Error('private-notification-destination');}});
+    assert.equal(failed.state,'held');assert.equal(failed.reasonCode,'notification_failed');assert.equal(failed.jobsStarted,0);assert.equal(calls,0);
+    const pending=await store.pendingNotifications();assert.equal(pending.length,2);assert.ok(pending.some(item=>item.phase==='disposition'&&item.reasonCode==='notification_failed'));assert.doesNotMatch(JSON.stringify(pending),/private-notification-destination/);
+    const failedRun=await pool.query<{state:string;reason_code:string}>('SELECT state,reason_code FROM district_pipeline.executor_runs WHERE id=$1',[failed.runId]);
+    assert.equal(failedRun.rows[0].state,'held');assert.equal(failedRun.rows[0].reason_code,'notification_failed');
+  });
+});
