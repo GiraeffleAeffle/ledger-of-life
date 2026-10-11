@@ -139,6 +139,8 @@ Kair/Braid is a possible **later inbound authorized-bundle source**, not an outb
 
 `knowledge:replay -- RECEIPT_JSON RECEIPT_SHA256` is cache-only: original generation/judge contracts and answers, completed primary results, source references, publication holds, private core evidence, non-knowledge staging and the authentic prior city baseline are pinned. It never invokes model readiness or generation on a miss. Explicit historical clocks reproduce the original snapshot while separate proof timestamps record the actual replay; acceptance compares every release member and exact manifest bytes, not counts alone. A fresh workspace is mandatory. Normal publication retains its real current timestamps.
 
+The replay baseline reader uses Git's package-relative `REV:./out/PATH` syntax from `stadtstack-data`, not a repository-root `out/` path. A fresh clone must retain the pinned earlier commit locally; lazy network fetching is forbidden. Network-denied execution must still allow local subprocess IPC (`socketpair`) for local Git reads; deny new `socket`/`connect` calls rather than falsely treating local pipes as external traffic.
+
 **Off-site backup: deferred by owner.** The raw corpus remains on the workstation; no storage purchase or upload has been made. Reproducibility uses the existing corpus/cache independently of an external backup.
 
 ## Public files
