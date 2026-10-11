@@ -5,7 +5,7 @@ import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {signal,sourceFrom,hash} from '../src/common.ts';
 import {QueryIndex,type Regional,type KnowledgeQueryData} from '../src/mcp-query.ts';
 import type {Catalogue,Signal} from '../src/schema.ts';
-import type {CoreBundle} from '../src/core-schema.ts';
+import {coreBundleSchema,gatePolicy,type CoreBundle,type CoreFact} from '../src/core-schema.ts';
 import {server} from '../src/mcp.ts';
 import {prepareReleaseReadView,type ReleasedData} from '../src/mcp-release.ts';
 import {GraphIndex} from '../src/district-graph-query.ts';
@@ -16,11 +16,16 @@ import {diff,signalChangeRecord,type Changes} from '../src/changes.ts';
 import {knowledgeEvidenceHash,REQUIRED_DETERMINISTIC_CHECKS,type DistrictKnowledgeRecord} from '../src/district-schema.ts';
 import type {RevocationTarget,VerifiedRevocations} from '../src/civic-revocations.ts';
 import {verifiedMask} from './fixtures/revocations.ts';
+import {dataReleaseId,type DataRelease} from '../src/data-release.ts';
+import {sealPublicationInputs,type PublicationInputs} from '../src/district-publication-inputs.ts';
 
-const releaseId='a'.repeat(64),date='2026-10-10T12:00:00Z',city='strausberg';
+const date='2026-10-10T12:00:00Z',city='strausberg';
+const emptyKnowledgeBytes=new TextEncoder().encode(JSON.stringify({schemaVersion:'stadtstack-knowledge-v2',generatedAt:date,records:[]}));
+const fixtureFiles:DataRelease['files']=[{path:'knowledge/records.json',sha256:hash(emptyKnowledgeBytes),bytes:emptyKnowledgeBytes.byteLength}];
+const releaseId=dataReleaseId(fixtureFiles);
 function feature(id:string,host='allowed.example'):Signal {
  const bytes=new TextEncoder().encode(id);
- return signal({id:`test:${id}`,cityId:city,kind:'council_paper',category:'planning',title:`Solarpark Plan 68/23 ${id}`,statement:`Solarpark Plan 68/23 ${id}`,status:'draft',startDate:'2026-09-01',endDate:null,nextStep:'Source evidence',unknowns:[],scale:'city',geometryPrecision:'exact',sources:[sourceFrom({body:bytes,sha256:hash(bytes),retrievedAt:date,url:`https://${host}/${id}`},id,'Publisher',`Plan 68/23 ${id}`)],extraction:{method:'structured'},reviewState:'candidate',asOf:date},{type:'Point',coordinates:[13.88,52.58]});
+ return signal({id:`test:${id}`,cityId:city,kind:'council_paper',category:'planning',title:`Solarpark Plan 68/23 ${id}`,statement:`Solarpark Plan 68/23 ${id}`,status:'draft',startDate:'2026-09-01',endDate:null,nextStep:'Source evidence',unknowns:[],scale:'city',geometryPrecision:'exact',sources:[sourceFrom({body:bytes,sha256:hash(bytes),retrievedAt:date,url:`https://${host}/${id}`},id,'Stadt Strausberg',`Plan 68/23 ${id}`)],extraction:{method:'structured'},reviewState:'candidate',asOf:date},{type:'Point',coordinates:[13.88,52.58]});
 }
 const allowed=feature('allowed'),blocked=feature('BLOCKED_CANARY','blocked.example'),second=feature('second');
 const catalogue:Catalogue={schemaVersion:'stadtstack-signals-v1',generatedAt:date,publisher:'Test',coreBundle:{path:'core/strausberg-facts.json',version:releaseId,manifestPath:'core/release-manifest.json'},cities:[{id:city,name:'Strausberg',state:'Brandenburg',center:[13.88,52.58],bbox:[13,52,14,53],feedUrl:'cities/strausberg/feed.json',minUrl:'cities/strausberg/signals.min.geojson',fullBytes:100,minBytes:50,sources:[allowed,blocked].map(feature=>({id:feature.properties.id,kind:'website',publisher:'Publisher',url:feature.properties.sources[0].url,licence:'unknown',reuse:'facts_with_attribution',retrievedAt:date,recordCount:99,publishedRecordCount:99,error:feature.properties.title}))}]};
@@ -28,12 +33,27 @@ const item={title:'Solarpark REGIONAL_CANARY',url:'https://regional.example/evid
 const regional:Regional={schemaVersion:'stadtstack-regional-topics-v1',generatedAt:date,asOf:'2026-10-10',region:{id:'region',name:'Region'},municipalities:[{id:city,name:'Strausberg'}],topics:[{id:'solarpark',label:'Solarpark',municipalities:[{municipalityId:city,stage:'draft',items:[item]}]}]};
 function query(mask?:VerifiedRevocations,features=[allowed,blocked,second],knowledge?:KnowledgeQueryData){return new QueryIndex(releaseId,date,features,regional,catalogue,knowledge,mask);}
 function bundle():CoreBundle {
- // Core admission is tested separately; the read-view contract needs the original fact/source identities.
- return {schemaVersion:'stadtstack-core-facts-v1',cityId:city,version:releaseId,generatedAt:date,facts:[{id:blocked.properties.id,version:releaseId,topic:'budget',statement:blocked.properties.statement,source:{...blocked.properties.sources[0],sha256:hash('core'),publisher:'Stadt Strausberg',documentDate:'2026-09-01'},assertion:{value:1,unit:'EUR'}}]} as CoreBundle;
+ // Synthetic schema-valid gate metadata, not model evaluation or core admission evidence.
+ const source={url:blocked.properties.sources[0].url,sha256:blocked.properties.sources[0].sha256!,retrievedAt:date,publisher:'Stadt Strausberg' as const,documentDate:'2026-09-01',locator:blocked.properties.sources[0].locator,title:'Synthetic core fixture'};
+ const facts:CoreFact[]=Array.from({length:3},(_,index)=>{
+  const id=index===0?blocked.properties.id:`${blocked.properties.id}:core-${index}`,statement=`Synthetic core assertion ${index}`,assertion={value:index+1,unit:'EUR' as const};
+  const assertionHash=hash(JSON.stringify({id,statement,assertion})),extractorVersion='synthetic-core-fixture';
+  const version=hash(JSON.stringify({assertionHash,sourceSha256:source.sha256,extractorVersion}));
+  const faithfulness={score:1,threshold:0.8 as const,reason:'Synthetic fixture gate metadata',evaluator:'synthetic-fixture',model:'codex:gpt-6-luna' as const,actual:true as const,evaluatedAt:date,statementHash:hash(statement),contextHash:source.sha256};
+  return {id,statement,assertion,source,version,topic:'budget',verification:{status:'auto-verified',meaning:'Passed named automated gates; not human review or independent truth certification.',evidenceBasis:'single-primary-source; no independent corroboration',policy:gatePolicy,extractorVersion,assertionHash,sourceSha256:source.sha256,deterministic:{passed:true,checks:['synthetic-fixture']},faithfulness:{...faithfulness,evidenceHash:hash(JSON.stringify(faithfulness))}}};
+ });
+ return coreBundleSchema.parse({schemaVersion:'stadtstack-core-facts-v1',cityId:city,version:hash(JSON.stringify(facts.map(({id,version})=>({id,version})))),generatedAt:date,facts});
+}
+function publicationInputs():PublicationInputs {
+ const dependencies:PublicationInputs['dependencies']=(['registry','candidate_records','candidate_quarantine','policy_receipts','publication_contract','graph_contract','schema_contract'] as const).map(role=>({role,sha256:hash(`synthetic ${role} dependency`)}));
+ const priorSignals=new TextEncoder().encode(JSON.stringify({type:'FeatureCollection',schemaVersion:'stadtstack-signals-v1',generatedAt:date,features:[allowed,blocked,second]}));
+ const priorMembers=[{path:'cities/strausberg/signals.geojson',sha256:hash(priorSignals),bytes:priorSignals.byteLength},...fixtureFiles];
+ const priorManifest:DataRelease={schemaVersion:'stadtstack-data-release-v1',id:dataReleaseId(priorMembers),generatedAt:date,files:priorMembers,quality:{publishedRecords:3,quarantinedRecords:0,cities:1}};
+ return sealPublicationInputs({asOf:'2026-10-10',policy:{snapshotSha256:hash(JSON.stringify({records:[]})),receipts:[]},dependencies,staging:new Map([['knowledge/records.json',emptyKnowledgeBytes]]),priorRelease:{gitCommit:'349a89b57430e6809f26b8eeed42ef5af99df273',manifestSha256:hash(JSON.stringify(priorManifest)),releaseId:priorManifest.id,members:priorMembers}});
 }
 function release(mask:VerifiedRevocations):ReleasedData {
- const bytes=JSON.stringify({schemaVersion:'stadtstack-knowledge-v2',generatedAt:date,records:[]});
- return {mode:'sealed',revocations:mask,dataManifest:{id:releaseId,generatedAt:date},manifest:{bundleSha256:hash('core'),bundleVersion:releaseId},bundle:bundle(),catalogue,features:[allowed,blocked,second],regional,index:query(),graph:new GraphIndex(releaseId,buildKnowledgeGraph(bytes),bytes,undefined,mask),changes:{[city]:diff([],[allowed,blocked,second].map(signalChangeRecord),date)}} as ReleasedData;
+ const core=bundle();
+ return {mode:'sealed',revocations:mask,dataManifest:{schemaVersion:'stadtstack-data-release-v1',id:releaseId,generatedAt:date,files:fixtureFiles,quality:{publishedRecords:3,quarantinedRecords:0,cities:1}},publicationInputs:publicationInputs(),manifest:{bundleSha256:hash(JSON.stringify(core)),bundleVersion:core.version},bundle:core,catalogue,features:[allowed,blocked,second],regional,index:query(),graph:new GraphIndex(releaseId,buildKnowledgeGraph(emptyKnowledgeBytes),emptyKnowledgeBytes,undefined,mask),changes:{[city]:diff([],[allowed,blocked,second].map(signalChangeRecord),date)}};
 }
 
 test('record, host and exact MCP attribution targets filter contributors before every derived query view',()=>{
@@ -109,7 +129,10 @@ test('registry IDs are municipality scoped and every contributor withholds the c
   for(const output of [exported,index.compareTopic('solarpark',[city]),index.similar(safe.id),index.listTopics(),index.knowledge]){const json=JSON.stringify(output);assert.equal(json.includes('KNOWLEDGE_CANARY'),false);assert.equal(json.includes('MULTI_CANARY'),false);}
   assert.equal(index.municipalities.get(city)?.recordCoverage,null);
   assert.equal(index.municipalities.get(city)?.sources?.some(source=>source.id===registryId),false);
-  assert.equal(JSON.stringify(index.knowledge?.coverage).includes('99'),false);
+  // Hashes in administrativeView may contain "99"; assert the actual coverage projection.
+  const coverage=index.knowledge!.coverage;
+  assert.ok(coverage&&typeof coverage==='object'&&'municipalities' in coverage);
+  assert.deepEqual(coverage.municipalities,[{id:city,publishedRecords:1,datedStagedRecords:1},{id:'other-town',publishedRecords:1,datedStagedRecords:1}]);
  }
 });
 
@@ -120,7 +143,14 @@ test('all seventeen nongraph MCP routes share the materialized verified view, in
   const sourceId=mcpSourceId(allowed.properties.sources[0]);
   const calls:[string,Record<string,unknown>][]=[['export_records',{}],['compare_topic',{topic:'solarpark',cityIds:[city]}],['similar',{id:allowed.properties.id}],['list_cities',{}],['list_topics',{}],['get_core_bundle',{}],['get_release_status',{}],['search_signals',{cityId:city}],['search_topics',{}],['get_council_items',{cityId:city}],['get_regional_topics',{}],['search_signals_near',{cityId:city,lon:13.88,lat:52.58,radius_m:500}],['search_signals_along',{cityId:city,line:[[13.87,52.58],[13.89,52.58]],buffer_m:100}],['get_signal',{id:allowed.properties.id}],['get_sources',{id:allowed.properties.id}],['get_source',{sourceId}],['get_changes',{cityId:city}]];
   assert.equal(calls.length,17);
-  for(const [name,args] of calls){const response=await client.callTool({name,arguments:args});assert.notEqual(response.isError,true,name);const output=response.structuredContent!;assert.equal(JSON.stringify(output).includes('BLOCKED_CANARY'),false,name);assert.deepEqual(output.administrativeView,input.graph.administrativeView,name);assert.equal(JSON.stringify(output).includes('ed25519:'),false,name);assert.equal(Object.hasOwn(output,'targets'),false,name);if(name==='get_core_bundle'){assert.equal(Object.hasOwn(output,'manifest'),false);assert.equal(Object.hasOwn(output.bundle as object,'version'),false);}if(name==='get_changes'){assert.equal(Object.hasOwn(output,'snapshots'),false);assert.ok(output.sealedSnapshots);}}
+  for(const [name,args] of calls){
+   const response=await client.callTool({name,arguments:args});assert.notEqual(response.isError,true,name);
+   const output=response.structuredContent;assert.ok(output&&typeof output==='object'&&'administrativeView' in output,name);
+   assert.equal(JSON.stringify(output).includes('BLOCKED_CANARY'),false,name);assert.deepEqual(output.administrativeView,input.graph.administrativeView,name);
+   assert.equal(JSON.stringify(output).includes('ed25519:'),false,name);assert.equal(Object.hasOwn(output,'targets'),false,name);
+   if(name==='get_core_bundle'){assert.equal(Object.hasOwn(output,'manifest'),false);assert.ok('bundle' in output&&output.bundle&&typeof output.bundle==='object');assert.equal(Object.hasOwn(output.bundle,'version'),false);}
+   if(name==='get_changes'){assert.equal(Object.hasOwn(output,'snapshots'),false);assert.ok('sealedSnapshots' in output&&output.sealedSnapshots);}
+  }
   for(const [name,args] of [['get_signal',{id:blocked.properties.id}],['get_sources',{id:blocked.properties.id}],['get_source',{sourceId:mcpSourceId(blocked.properties.sources[0])}]] as const)assert.equal((await client.callTool({name,arguments:args})).isError,true);
  }finally{await client.close();await mcp.close();}
 });
@@ -131,7 +161,7 @@ test('auxiliary provenance URLs cannot leak through source objects, original rec
  assert.equal(query(mask,[cityRecord]).records.some(record=>record.id===cityRecord.properties.id),false);
  const regionalInput={...regional,topics:[{...regional.topics[0],municipalities:[{municipalityId:city,stage:'draft',items:[{...item,locator:'Source mirror https://auxiliary.example/evidence'}]}]}]};
  assert.equal(new QueryIndex(releaseId,date,[],regionalInput,catalogue,undefined,mask).records.length,0);
- const core=bundle();core.facts[0].source.locator='Quote provenance https://auxiliary.example/core';
+ const core=bundle();for(const fact of core.facts)fact.source.locator='Quote provenance https://auxiliary.example/core';
  assert.equal(visibleCore(core,[],mask).facts.length,0);
  const record=knowledgeRecord(city,'auxiliary-knowledge','registry');record.sources[0].policy.robots.url='https://auxiliary.example/robots.txt';
  const knowledge={records:[record],municipalities:[{id:city,name:city,ags:'12064472',districtId:'maerkisch-oderland',sources:[]}],coverage:{municipalities:[]}};
