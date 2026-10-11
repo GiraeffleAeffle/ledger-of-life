@@ -1,0 +1,1685 @@
+{
+  "schemaVersion": "civic-patch-evidence-v1",
+  "generatedAt": "2026-10-11T13:22:09.552Z",
+  "phase": "validated-local-candidate",
+  "version": "0.3.1",
+  "dataManifestId": "25d99c9382ccbfeb3fbdef8541409950c8e4adc96852922f151e661d25c90eaf",
+  "toolCount": 20,
+  "heat": [
+    {
+      "cityId": "strausberg",
+      "eligibleSearchRecords": [
+        {
+          "caseId": "case:02fd792d50c976f9ef953f22acc666547d4f5df3aefa59e279cdd90562bbbe6d",
+          "comparisonEligible": true,
+          "eventDate": "2026-04-12",
+          "id": "regional:ad48b7df8133bdc616ea1615c2e17e086ea56ff826da7f551bb4952f9507d57f",
+          "stage": "draft"
+        }
+      ],
+      "comparisonRecordCount": 1,
+      "comparisonCaseCount": 1,
+      "furthestPositiveMilestone": {
+        "stage": "draft",
+        "date": null,
+        "dateSemantics": "unknown",
+        "evidenceCount": 1,
+        "evidence": [
+          {
+            "id": "regional:ad48b7df8133bdc616ea1615c2e17e086ea56ff826da7f551bb4952f9507d57f",
+            "stage": "draft",
+            "sourceIds": [
+              "source:a569d641a52a4f3f0653b35a6b23d509ebdf31dfe7587d1084a54e7390cb289e"
+            ],
+            "milestone": {
+              "stage": "draft",
+              "date": null,
+              "quote": "Abschnitt „Öffentlichkeitsbeteiligung abgeschlossen“, Abschlussbericht und geplanter Beschluss",
+              "dateSemantics": "unknown",
+              "evidenceBasis": "released_structured_stage"
+            }
+          }
+        ],
+        "meaning": "Furthest source-supported milestone as of release, not current status, overall legal completion, or construction; dates retain their source role."
+      },
+      "cases": [
+        {
+          "id": "case:02fd792d50c976f9ef953f22acc666547d4f5df3aefa59e279cdd90562bbbe6d",
+          "memberRecordIds": [
+            "regional:ad48b7df8133bdc616ea1615c2e17e086ea56ff826da7f551bb4952f9507d57f"
+          ],
+          "eligibleRecordIds": [
+            "regional:ad48b7df8133bdc616ea1615c2e17e086ea56ff826da7f551bb4952f9507d57f"
+          ],
+          "furthestSupportedStage": "draft",
+          "furthestSupportedDate": null
+        }
+      ]
+    },
+    {
+      "cityId": "hoppegarten",
+      "eligibleSearchRecords": [
+        {
+          "caseId": "case:8bfafe525b94ee5f4d5fddcf8f3d96a76995e876afe1edcab37dcb27ca924125",
+          "comparisonEligible": true,
+          "eventDate": null,
+          "id": "regional:26bd248421caab004682d44dcfb0703dbc9d8dc2f6203e1dd2e04940c0d22bc8",
+          "stage": "planning"
+        }
+      ],
+      "comparisonRecordCount": 1,
+      "comparisonCaseCount": 1,
+      "furthestPositiveMilestone": {
+        "stage": "planning",
+        "date": null,
+        "dateSemantics": "unknown",
+        "evidenceCount": 1,
+        "evidence": [
+          {
+            "id": "regional:26bd248421caab004682d44dcfb0703dbc9d8dc2f6203e1dd2e04940c0d22bc8",
+            "stage": "planning",
+            "sourceIds": [
+              "source:7eaaef469048c4d441a16102497b3dc878c997119d91a9e205872b0e65e2f439"
+            ],
+            "milestone": {
+              "stage": "planning",
+              "date": null,
+              "quote": "Abschnitt zum Planungsverbund; „Veröffentlichung“",
+              "dateSemantics": "unknown",
+              "evidenceBasis": "released_structured_stage"
+            }
+          }
+        ],
+        "meaning": "Furthest source-supported milestone as of release, not current status, overall legal completion, or construction; dates retain their source role."
+      },
+      "cases": [
+        {
+          "id": "case:8bfafe525b94ee5f4d5fddcf8f3d96a76995e876afe1edcab37dcb27ca924125",
+          "memberRecordIds": [
+            "regional:26bd248421caab004682d44dcfb0703dbc9d8dc2f6203e1dd2e04940c0d22bc8"
+          ],
+          "eligibleRecordIds": [
+            "regional:26bd248421caab004682d44dcfb0703dbc9d8dc2f6203e1dd2e04940c0d22bc8"
+          ],
+          "furthestSupportedStage": "planning",
+          "furthestSupportedDate": null
+        }
+      ]
+    },
+    {
+      "cityId": "ruedersdorf-bei-berlin",
+      "eligibleSearchRecords": [
+        {
+          "caseId": "case:fcfd342b6a870fc05bc544f4de4091a31855f1be3c582486479a23fdd6eb43c6",
+          "comparisonEligible": true,
+          "eventDate": "2025-07-22",
+          "id": "regional:e558e93efeff276827e01d254ecd45785dafd92a454d00c80c23c6a72d0bf7b1",
+          "stage": "adopted"
+        }
+      ],
+      "comparisonRecordCount": 1,
+      "comparisonCaseCount": 1,
+      "furthestPositiveMilestone": {
+        "stage": "adopted",
+        "date": "2025-07-22",
+        "dateSemantics": "source_stage",
+        "evidenceCount": 1,
+        "evidence": [
+          {
+            "id": "regional:e558e93efeff276827e01d254ecd45785dafd92a454d00c80c23c6a72d0bf7b1",
+            "stage": "adopted",
+            "sourceIds": [
+              "source:4a21d892b5bd4e9024b22188145d14e17872740511157e2dac865854302810c0"
+            ],
+            "milestone": {
+              "stage": "adopted",
+              "date": "2025-07-22",
+              "quote": "Abschnitt „Wärmeplan beschlossen“, erster Absatz",
+              "dateSemantics": "source_stage",
+              "evidenceBasis": "released_structured_stage"
+            }
+          }
+        ],
+        "meaning": "Furthest source-supported milestone as of release, not current status, overall legal completion, or construction; dates retain their source role."
+      },
+      "cases": [
+        {
+          "id": "case:fcfd342b6a870fc05bc544f4de4091a31855f1be3c582486479a23fdd6eb43c6",
+          "memberRecordIds": [
+            "regional:e558e93efeff276827e01d254ecd45785dafd92a454d00c80c23c6a72d0bf7b1"
+          ],
+          "eligibleRecordIds": [
+            "regional:e558e93efeff276827e01d254ecd45785dafd92a454d00c80c23c6a72d0bf7b1"
+          ],
+          "furthestSupportedStage": "adopted",
+          "furthestSupportedDate": "2025-07-22"
+        }
+      ]
+    }
+  ],
+  "solar": [
+    {
+      "cityId": "strausberg",
+      "records": 18,
+      "cases": 1,
+      "identifiedCases": 1,
+      "items": [
+        {
+          "id": "case:09219735cfdc139d69ba803dc122cea40c8a92e83c7b4415093705566ea8a43e",
+          "memberRecordIds": [
+            "atlas:solarpark-flugplatz",
+            "knowledge:strausberg:027c1ea340173a5051062eee",
+            "knowledge:strausberg:29fb4abbae47419803bdaf69",
+            "knowledge:strausberg:31712b30155fb9b3e730c54c",
+            "knowledge:strausberg:4a70d161eeb991b4b9858300",
+            "knowledge:strausberg:4bac1ac639d4dd2530875bcf",
+            "knowledge:strausberg:51f9d0fb5df4a7977f266621",
+            "knowledge:strausberg:64d60c6a427bbcc0264faf12",
+            "knowledge:strausberg:671d8ecf1eaf47c70c974aba",
+            "knowledge:strausberg:94b035b3f030423675d91b42",
+            "knowledge:strausberg:9d90158c83b6f3451a595188",
+            "knowledge:strausberg:b9e52c65e62ef99e67448f5d",
+            "knowledge:strausberg:bd2d804001e86081bd71373c",
+            "knowledge:strausberg:c9488edcf108a472cb883bf9",
+            "knowledge:strausberg:cc50ddbe50c55e47621863ec",
+            "knowledge:strausberg:d2ac14b1fff59c7383f0454e",
+            "knowledge:strausberg:f630447a157d64a11dfb1d83",
+            "regional:3ef51dc9945f38c0dfc9b91ec368571ef24867b267e097a84af7d7f611e80aa1"
+          ],
+          "identityBasis": [
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/verfahren/solarpark-flugplatz/public/detail",
+              "recordId": "atlas:solarpark-flugplatz",
+              "sourceIds": [
+                "source:d6e19f800bcd1fe16c69e015fb52a0e134244accafc68bb06502ea74d917f3ee"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "bplan:68/23",
+              "quote": "Bebauungsplan Nr. 68/23",
+              "recordId": "knowledge:strausberg:027c1ea340173a5051062eee",
+              "sourceIds": [
+                "source:d6039e3ffce0dd6c0e5a6c0fa63bd447ba3325cc9a6736bab5505f81e5821e63",
+                "source:64dbbbc20b1f0fd9af6ed4f7868e6b0e5d05b018aa91db9d16813dccd1ceb8a3"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/b42d0c40-e18c-400f-b38e-f14530976eba",
+              "recordId": "knowledge:strausberg:027c1ea340173a5051062eee",
+              "sourceIds": [
+                "source:d6039e3ffce0dd6c0e5a6c0fa63bd447ba3325cc9a6736bab5505f81e5821e63"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "fnp:base:amendment:10",
+              "quote": "10. Änderung des Flächennutzungsplans",
+              "recordId": "knowledge:strausberg:29fb4abbae47419803bdaf69",
+              "sourceIds": [
+                "source:c32063bbc07b63b9dd1adfaf75c7c86c149cc40773360a4425fc0b834a952c14",
+                "source:e9a79c5fd1903046b9b770476295ab0508b360ff483a27ee3f37d0b66014d7e6"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:fnp-solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/bc9e8412-fd38-4142-9b1f-15e35c1f1f2b",
+              "recordId": "knowledge:strausberg:29fb4abbae47419803bdaf69",
+              "sourceIds": [
+                "source:c32063bbc07b63b9dd1adfaf75c7c86c149cc40773360a4425fc0b834a952c14"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "bplan:68/23",
+              "quote": "Vorhabenbezogener Bebauungsplan Nr. 68/23",
+              "recordId": "knowledge:strausberg:31712b30155fb9b3e730c54c",
+              "sourceIds": [
+                "source:a6cb0294f34bf2cff77459747bc627510a7534dd9d39cb7d12072c66bff3394a",
+                "source:99d55d89876f321e019185a5ea0adabde27478794024da5acb4d715ae73b22c3"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/ca4f7aa2-d45c-4b60-b7a2-fbb5dab28abc",
+              "recordId": "knowledge:strausberg:31712b30155fb9b3e730c54c",
+              "sourceIds": [
+                "source:a6cb0294f34bf2cff77459747bc627510a7534dd9d39cb7d12072c66bff3394a"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "bplan:68/23",
+              "quote": "Vorhabenbezogener Bebauungsplan Nr. 68/23",
+              "recordId": "knowledge:strausberg:4a70d161eeb991b4b9858300",
+              "sourceIds": [
+                "source:95e187110ee095dcda00be42dc0eb802174443763f8ae21866e76e78200d6242",
+                "source:24e9c0d5ebfbd08a27a90502a9d5df8151eac1e05d87718d6cd7f9402d788e9b"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/ca4f7aa2-d45c-4b60-b7a2-fbb5dab28abc",
+              "recordId": "knowledge:strausberg:4a70d161eeb991b4b9858300",
+              "sourceIds": [
+                "source:95e187110ee095dcda00be42dc0eb802174443763f8ae21866e76e78200d6242"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "bplan:68/23",
+              "quote": "Bebauungsplan (BP) Nr. 68/23",
+              "recordId": "knowledge:strausberg:4bac1ac639d4dd2530875bcf",
+              "sourceIds": [
+                "source:d340287b64a708b1989485f4cb353ce7478830fc2752428e9633448e6ff7cb4a",
+                "source:d8a6eb408b340e40f3d9f738f9251bd3c39d5dc9163e67bf9220e8bb1504ace4"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/b7fae33a-6bab-4ada-918b-32e30283d146",
+              "recordId": "knowledge:strausberg:4bac1ac639d4dd2530875bcf",
+              "sourceIds": [
+                "source:d340287b64a708b1989485f4cb353ce7478830fc2752428e9633448e6ff7cb4a"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "bplan:68/23",
+              "quote": "Vorhabenbezogener Bebauungsplan Nr. 68/23",
+              "recordId": "knowledge:strausberg:51f9d0fb5df4a7977f266621",
+              "sourceIds": [
+                "source:3cddffd6a6c3b16963349a85d988a643a7d3f15c386d0cdb961f6a0c4e5fe21e",
+                "source:91c3d1d6b7c9ad9934df8865fbb884fe83bf830000f21f0d7b60037a81657167"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/ca4f7aa2-d45c-4b60-b7a2-fbb5dab28abc",
+              "recordId": "knowledge:strausberg:51f9d0fb5df4a7977f266621",
+              "sourceIds": [
+                "source:3cddffd6a6c3b16963349a85d988a643a7d3f15c386d0cdb961f6a0c4e5fe21e"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "bplan:68/23",
+              "quote": "Vorhabenbezogener Bebauungsplan Nr. 68/23",
+              "recordId": "knowledge:strausberg:64d60c6a427bbcc0264faf12",
+              "sourceIds": [
+                "source:9e2ff3fe95b7ec6072be89e7ece2fa68d5f14510e3271bb03716f7ebb60e9e29",
+                "source:57fd1ce0f216a723455ec4fad8dd4185f0d08a2724bf88518389c93843340e55"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/ca4f7aa2-d45c-4b60-b7a2-fbb5dab28abc",
+              "recordId": "knowledge:strausberg:64d60c6a427bbcc0264faf12",
+              "sourceIds": [
+                "source:9e2ff3fe95b7ec6072be89e7ece2fa68d5f14510e3271bb03716f7ebb60e9e29"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "fnp:base:amendment:10",
+              "quote": "10. Änderung des Flächennutzungsplans",
+              "recordId": "knowledge:strausberg:671d8ecf1eaf47c70c974aba",
+              "sourceIds": [
+                "source:a4fc81d91c4bfd48ea8e910e956be5de4b9db6eed923c2c52262607f29044a8d"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:fnp-solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/a36f977e-f709-47d1-ab73-909fa1b15aec",
+              "recordId": "knowledge:strausberg:671d8ecf1eaf47c70c974aba",
+              "sourceIds": [
+                "source:a4fc81d91c4bfd48ea8e910e956be5de4b9db6eed923c2c52262607f29044a8d"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "4121-50180/02744lf/2024",
+              "quote": "Gesch-Z.: 4121-50180/02744LF/2024",
+              "recordId": "knowledge:strausberg:671d8ecf1eaf47c70c974aba",
+              "sourceIds": [
+                "source:a4fc81d91c4bfd48ea8e910e956be5de4b9db6eed923c2c52262607f29044a8d"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "bplan:68/23",
+              "quote": "Vorhabenbezogener Bebauungsplan Nr. 68/23",
+              "recordId": "knowledge:strausberg:94b035b3f030423675d91b42",
+              "sourceIds": [
+                "source:201a327361612c1e2be2025a34230462a812782712a96075e46f9bde5d6943ec",
+                "source:fc8524531436ce9fbd418d72a5d74808ec0fe809fa931b617a49eff2122c21cb"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/ca4f7aa2-d45c-4b60-b7a2-fbb5dab28abc",
+              "recordId": "knowledge:strausberg:94b035b3f030423675d91b42",
+              "sourceIds": [
+                "source:201a327361612c1e2be2025a34230462a812782712a96075e46f9bde5d6943ec"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "bplan:68/23",
+              "quote": "Vorhabenbezogener Bebauungsplan Nr. 68/23",
+              "recordId": "knowledge:strausberg:9d90158c83b6f3451a595188",
+              "sourceIds": [
+                "source:8c98ca91785f40b9a4ab8691be1c8fbfea0e52b876c7946e273f3c88277d3e6a",
+                "source:a554e3e47d7205b10a027e8de7900eb52e0ddd96f9eedf303fbcae1c8d100b77"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/ca4f7aa2-d45c-4b60-b7a2-fbb5dab28abc",
+              "recordId": "knowledge:strausberg:9d90158c83b6f3451a595188",
+              "sourceIds": [
+                "source:8c98ca91785f40b9a4ab8691be1c8fbfea0e52b876c7946e273f3c88277d3e6a"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "fnp:base:amendment:10",
+              "quote": "10. Änderung des Flächennutzungsplanes",
+              "recordId": "knowledge:strausberg:b9e52c65e62ef99e67448f5d",
+              "sourceIds": [
+                "source:83732027baf895a310cf149918f2b0ee7d67a71a9a08070b987fb4b3c90f851e"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:fnp-solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/e7923e88-bb12-44ca-9158-2b51e2dbec26",
+              "recordId": "knowledge:strausberg:b9e52c65e62ef99e67448f5d",
+              "sourceIds": [
+                "source:83732027baf895a310cf149918f2b0ee7d67a71a9a08070b987fb4b3c90f851e"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "bplan:68/23",
+              "quote": "Bebauungsplan (VEP) Nr.68/23",
+              "recordId": "knowledge:strausberg:bd2d804001e86081bd71373c",
+              "sourceIds": [
+                "source:59725a8baa75b0f993b09ad6b34e9ff1c9a3c58e064163ae881040ce63307f8e",
+                "source:9f1d582f05ab8be7c8ffad22ba528e97481ee3155982a167d781b7b6d4e40e00"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/c41b6447-c748-48e4-b095-9891c2e209cc",
+              "recordId": "knowledge:strausberg:bd2d804001e86081bd71373c",
+              "sourceIds": [
+                "source:59725a8baa75b0f993b09ad6b34e9ff1c9a3c58e064163ae881040ce63307f8e"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "bplan:68/23",
+              "quote": "B-Plan Nr. 68/23",
+              "recordId": "knowledge:strausberg:c9488edcf108a472cb883bf9",
+              "sourceIds": [
+                "source:fc416ccaa1bfae5a9f49b1aaec6d0e5b2a2ca875f8c427582ef78bf225bcc27c",
+                "source:19cfa98679c14ee8f1acbd897d5bc0268e2353ec10e5560ed9fd8f695c761d64"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/cc309207-0c19-41d6-a513-b3995b6c2862",
+              "recordId": "knowledge:strausberg:c9488edcf108a472cb883bf9",
+              "sourceIds": [
+                "source:fc416ccaa1bfae5a9f49b1aaec6d0e5b2a2ca875f8c427582ef78bf225bcc27c"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "untyped:68/23",
+              "quote": "Nr. 68/23 „Solarpark am Flugplatz“",
+              "recordId": "knowledge:strausberg:cc50ddbe50c55e47621863ec",
+              "sourceIds": [
+                "source:1192d9f2ca04e2f7e69e8962afc71eb6b0a4c8ef1371cfd62121dcfbdc2d580e",
+                "source:3e5070f860b992177e5a8412418453de139c6e385f5405f5cba3658c66a4dce8"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/f8f6007e-4792-449a-93cd-eca484b94d16",
+              "recordId": "knowledge:strausberg:cc50ddbe50c55e47621863ec",
+              "sourceIds": [
+                "source:1192d9f2ca04e2f7e69e8962afc71eb6b0a4c8ef1371cfd62121dcfbdc2d580e"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "bplan:63/23",
+              "quote": "Bebauungsplan Nr. 63/23",
+              "recordId": "knowledge:strausberg:d2ac14b1fff59c7383f0454e",
+              "sourceIds": [
+                "source:3c671ab40eadce0f38e084e0bcb5076d83c2426a157213a26f379cd37ba8a836",
+                "source:011c2477382be0bd41f6f04ec97624501d0bc7fa1e80381ed4f1125a7b0747fa",
+                "source:23821a8b5148f91683fe778921705a0c31848158aeaebbd12e002b40bcb523b6"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:fnp-solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/cccd3c82-144b-4341-8f05-30af69288419",
+              "recordId": "knowledge:strausberg:d2ac14b1fff59c7383f0454e",
+              "sourceIds": [
+                "source:3c671ab40eadce0f38e084e0bcb5076d83c2426a157213a26f379cd37ba8a836"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/c901023d-6ee0-4546-8bf6-0fab410807a7",
+              "recordId": "knowledge:strausberg:d2ac14b1fff59c7383f0454e",
+              "sourceIds": [
+                "source:011c2477382be0bd41f6f04ec97624501d0bc7fa1e80381ed4f1125a7b0747fa"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "bplan:68/23",
+              "quote": "B-Plan Nr. 68/23",
+              "recordId": "knowledge:strausberg:f630447a157d64a11dfb1d83",
+              "sourceIds": [
+                "source:70437002aac473885c5c336ea31887bfe78c38d57ad18a45e78f114ac0129ba8",
+                "source:6aef6a8808ba976cbae6249d95ac10569c6e6703c6e13fd4b4caa4afe1ba4143"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/b1b9d507-4af8-4056-a0ea-43ebaf8644db",
+              "recordId": "knowledge:strausberg:f630447a157d64a11dfb1d83",
+              "sourceIds": [
+                "source:70437002aac473885c5c336ea31887bfe78c38d57ad18a45e78f114ac0129ba8"
+              ]
+            },
+            {
+              "type": "plan_number",
+              "value": "bplan:68/23",
+              "quote": "Bebauungsplan Nr. 68/23",
+              "recordId": "regional:3ef51dc9945f38c0dfc9b91ec368571ef24867b267e097a84af7d7f611e80aa1",
+              "sourceIds": [
+                "source:107e324570791f2f0df152cf37a1b504e367310e40a1dc4a600086ed5501dbff"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:solarpark-flugplatz",
+              "quote": "https://bb.beteiligung.diplanung.de/verfahren/solarpark-flugplatz/public/detail",
+              "recordId": "regional:3ef51dc9945f38c0dfc9b91ec368571ef24867b267e097a84af7d7f611e80aa1",
+              "sourceIds": [
+                "source:107e324570791f2f0df152cf37a1b504e367310e40a1dc4a600086ed5501dbff"
+              ]
+            },
+            {
+              "type": "diplan",
+              "value": "bb.beteiligung.diplanung.de:f3d226ee-4f6b-4149-905a-c04fc2f82415",
+              "quote": "DiPlan mapVars[procedureId=f3d226ee-4f6b-4149-905a-c04fc2f82415]: externalName, publicParticipationStartDate 2025-11-24, publicParticipationEndDate 2026-01-12, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Strausberg“, operator „Stadtverwaltung Strausberg“",
+              "recordId": "regional:3ef51dc9945f38c0dfc9b91ec368571ef24867b267e097a84af7d7f611e80aa1",
+              "sourceIds": [
+                "source:107e324570791f2f0df152cf37a1b504e367310e40a1dc4a600086ed5501dbff"
+              ]
+            }
+          ],
+          "instruments": [
+            {
+              "identity": {
+                "type": "plan_number",
+                "value": "bplan:68/23",
+                "quote": "Bebauungsplan Nr. 68/23",
+                "recordId": "knowledge:strausberg:027c1ea340173a5051062eee",
+                "sourceIds": [
+                  "source:d6039e3ffce0dd6c0e5a6c0fa63bd447ba3325cc9a6736bab5505f81e5821e63",
+                  "source:64dbbbc20b1f0fd9af6ed4f7868e6b0e5d05b018aa91db9d16813dccd1ceb8a3"
+                ]
+              },
+              "memberRecordIds": [
+                "knowledge:strausberg:027c1ea340173a5051062eee",
+                "knowledge:strausberg:31712b30155fb9b3e730c54c",
+                "knowledge:strausberg:4a70d161eeb991b4b9858300",
+                "knowledge:strausberg:4bac1ac639d4dd2530875bcf",
+                "knowledge:strausberg:51f9d0fb5df4a7977f266621",
+                "knowledge:strausberg:64d60c6a427bbcc0264faf12",
+                "knowledge:strausberg:94b035b3f030423675d91b42",
+                "knowledge:strausberg:9d90158c83b6f3451a595188",
+                "knowledge:strausberg:bd2d804001e86081bd71373c",
+                "knowledge:strausberg:c9488edcf108a472cb883bf9",
+                "knowledge:strausberg:f630447a157d64a11dfb1d83",
+                "regional:3ef51dc9945f38c0dfc9b91ec368571ef24867b267e097a84af7d7f611e80aa1"
+              ],
+              "furthestPositiveMilestone": {
+                "stage": "consultation_closed",
+                "date": "2026-01-12",
+                "dateSemantics": "source_stage",
+                "evidenceCount": 1,
+                "evidence": [
+                  {
+                    "id": "regional:3ef51dc9945f38c0dfc9b91ec368571ef24867b267e097a84af7d7f611e80aa1",
+                    "stage": "consultation_closed",
+                    "sourceIds": [
+                      "source:107e324570791f2f0df152cf37a1b504e367310e40a1dc4a600086ed5501dbff"
+                    ],
+                    "milestone": {
+                      "stage": "consultation_closed",
+                      "date": "2026-01-12",
+                      "quote": "DiPlan mapVars[procedureId=f3d226ee-4f6b-4149-905a-c04fc2f82415]: externalName, publicParticipationStartDate 2025-11-24, publicParticipationEndDate 2026-01-12, publicParticipationPhaseName „Beteiligung Öffentlichkeit“; list municipality „Strausberg“, operator „Stadtverwaltung Strausberg“",
+                      "dateSemantics": "source_stage",
+                      "evidenceBasis": "released_structured_stage"
+                    }
+                  }
+                ],
+                "meaning": "Furthest source-supported milestone as of release, not current status, overall legal completion, or construction; dates retain their source role."
+              }
+            },
+            {
+              "identity": {
+                "type": "plan_number",
+                "value": "fnp:base:amendment:10",
+                "quote": "10. Änderung des Flächennutzungsplans",
+                "recordId": "knowledge:strausberg:29fb4abbae47419803bdaf69",
+                "sourceIds": [
+                  "source:c32063bbc07b63b9dd1adfaf75c7c86c149cc40773360a4425fc0b834a952c14",
+                  "source:e9a79c5fd1903046b9b770476295ab0508b360ff483a27ee3f37d0b66014d7e6"
+                ]
+              },
+              "memberRecordIds": [
+                "knowledge:strausberg:29fb4abbae47419803bdaf69",
+                "knowledge:strausberg:671d8ecf1eaf47c70c974aba",
+                "knowledge:strausberg:b9e52c65e62ef99e67448f5d"
+              ],
+              "furthestPositiveMilestone": {
+                "stage": "consultation",
+                "date": null,
+                "dateSemantics": "unknown",
+                "evidenceCount": 4,
+                "evidence": [
+                  {
+                    "id": "knowledge:strausberg:29fb4abbae47419803bdaf69",
+                    "stage": "consultation",
+                    "sourceIds": [
+                      "source:c32063bbc07b63b9dd1adfaf75c7c86c149cc40773360a4425fc0b834a952c14",
+                      "source:e9a79c5fd1903046b9b770476295ab0508b360ff483a27ee3f37d0b66014d7e6"
+                    ],
+                    "milestone": {
+                      "stage": "consultation",
+                      "date": null,
+                      "quote": "frühzeitige Beteiligung gem. § 3 Abs. 1 und § 4 Abs. 1 BauGB",
+                      "dateSemantics": "unknown",
+                      "evidenceBasis": "quoted_claim"
+                    }
+                  },
+                  {
+                    "id": "knowledge:strausberg:671d8ecf1eaf47c70c974aba",
+                    "stage": "consultation",
+                    "sourceIds": [
+                      "source:a4fc81d91c4bfd48ea8e910e956be5de4b9db6eed923c2c52262607f29044a8d"
+                    ],
+                    "milestone": {
+                      "stage": "consultation",
+                      "date": null,
+                      "quote": "Hier: frühzeitige Beteiligung der Behörden und sonstigen Träger öffentlicher Belange;",
+                      "dateSemantics": "unknown",
+                      "evidenceBasis": "quoted_claim"
+                    }
+                  },
+                  {
+                    "id": "knowledge:strausberg:b9e52c65e62ef99e67448f5d",
+                    "stage": "consultation",
+                    "sourceIds": [
+                      "source:83732027baf895a310cf149918f2b0ee7d67a71a9a08070b987fb4b3c90f851e"
+                    ],
+                    "milestone": {
+                      "stage": "consultation",
+                      "date": null,
+                      "quote": "Beteiligung der Träger öffentlicher Belange bei der Festlegung des Untersuchungsumfangs",
+                      "dateSemantics": "unknown",
+                      "evidenceBasis": "quoted_claim"
+                    }
+                  },
+                  {
+                    "id": "knowledge:strausberg:b9e52c65e62ef99e67448f5d",
+                    "stage": "consultation",
+                    "sourceIds": [
+                      "source:83732027baf895a310cf149918f2b0ee7d67a71a9a08070b987fb4b3c90f851e"
+                    ],
+                    "milestone": {
+                      "stage": "consultation",
+                      "date": null,
+                      "quote": "Beteiligung der Träger öffentlicher Belange bei der Festlegung des Untersuchungsumfangs",
+                      "dateSemantics": "unknown",
+                      "evidenceBasis": "quoted_claim"
+                    }
+                  }
+                ],
+                "meaning": "Furthest source-supported milestone as of release, not current status, overall legal completion, or construction; dates retain their source role."
+              }
+            },
+            {
+              "identity": {
+                "type": "plan_number",
+                "value": "untyped:68/23",
+                "quote": "Nr. 68/23 „Solarpark am Flugplatz“",
+                "recordId": "knowledge:strausberg:cc50ddbe50c55e47621863ec",
+                "sourceIds": [
+                  "source:1192d9f2ca04e2f7e69e8962afc71eb6b0a4c8ef1371cfd62121dcfbdc2d580e",
+                  "source:3e5070f860b992177e5a8412418453de139c6e385f5405f5cba3658c66a4dce8"
+                ]
+              },
+              "memberRecordIds": [
+                "knowledge:strausberg:cc50ddbe50c55e47621863ec"
+              ],
+              "furthestPositiveMilestone": {
+                "stage": "consultation",
+                "date": null,
+                "dateSemantics": "unknown",
+                "evidenceCount": 2,
+                "evidence": [
+                  {
+                    "id": "knowledge:strausberg:cc50ddbe50c55e47621863ec",
+                    "stage": "consultation",
+                    "sourceIds": [
+                      "source:1192d9f2ca04e2f7e69e8962afc71eb6b0a4c8ef1371cfd62121dcfbdc2d580e",
+                      "source:3e5070f860b992177e5a8412418453de139c6e385f5405f5cba3658c66a4dce8"
+                    ],
+                    "milestone": {
+                      "stage": "consultation",
+                      "date": null,
+                      "quote": "Beteiligung Behörden und Träger öffentlicher Belange",
+                      "dateSemantics": "unknown",
+                      "evidenceBasis": "quoted_claim"
+                    }
+                  },
+                  {
+                    "id": "knowledge:strausberg:cc50ddbe50c55e47621863ec",
+                    "stage": "consultation",
+                    "sourceIds": [
+                      "source:1192d9f2ca04e2f7e69e8962afc71eb6b0a4c8ef1371cfd62121dcfbdc2d580e",
+                      "source:3e5070f860b992177e5a8412418453de139c6e385f5405f5cba3658c66a4dce8"
+                    ],
+                    "milestone": {
+                      "stage": "consultation",
+                      "date": null,
+                      "quote": "Beteiligung Behörden und Träger öffentlicher Belange",
+                      "dateSemantics": "unknown",
+                      "evidenceBasis": "quoted_claim"
+                    }
+                  }
+                ],
+                "meaning": "Furthest source-supported milestone as of release, not current status, overall legal completion, or construction; dates retain their source role."
+              }
+            },
+            {
+              "identity": {
+                "type": "plan_number",
+                "value": "bplan:63/23",
+                "quote": "Bebauungsplan Nr. 63/23",
+                "recordId": "knowledge:strausberg:d2ac14b1fff59c7383f0454e",
+                "sourceIds": [
+                  "source:3c671ab40eadce0f38e084e0bcb5076d83c2426a157213a26f379cd37ba8a836",
+                  "source:011c2477382be0bd41f6f04ec97624501d0bc7fa1e80381ed4f1125a7b0747fa",
+                  "source:23821a8b5148f91683fe778921705a0c31848158aeaebbd12e002b40bcb523b6"
+                ]
+              },
+              "memberRecordIds": [
+                "knowledge:strausberg:d2ac14b1fff59c7383f0454e"
+              ],
+              "furthestPositiveMilestone": {
+                "stage": "consultation",
+                "date": "2024-02-16",
+                "dateSemantics": "source_stage",
+                "evidenceCount": 2,
+                "evidence": [
+                  {
+                    "id": "knowledge:strausberg:d2ac14b1fff59c7383f0454e",
+                    "stage": "consultation",
+                    "sourceIds": [
+                      "source:3c671ab40eadce0f38e084e0bcb5076d83c2426a157213a26f379cd37ba8a836",
+                      "source:011c2477382be0bd41f6f04ec97624501d0bc7fa1e80381ed4f1125a7b0747fa",
+                      "source:23821a8b5148f91683fe778921705a0c31848158aeaebbd12e002b40bcb523b6"
+                    ],
+                    "milestone": {
+                      "stage": "consultation",
+                      "date": "2024-02-16",
+                      "quote": "Stellungnahme der o.g. Naturschutzverbände zum Bebauungsplan Nr. 63/23",
+                      "dateSemantics": "source_stage",
+                      "evidenceBasis": "quoted_claim"
+                    }
+                  },
+                  {
+                    "id": "knowledge:strausberg:d2ac14b1fff59c7383f0454e",
+                    "stage": "consultation",
+                    "sourceIds": [
+                      "source:3c671ab40eadce0f38e084e0bcb5076d83c2426a157213a26f379cd37ba8a836",
+                      "source:011c2477382be0bd41f6f04ec97624501d0bc7fa1e80381ed4f1125a7b0747fa",
+                      "source:23821a8b5148f91683fe778921705a0c31848158aeaebbd12e002b40bcb523b6"
+                    ],
+                    "milestone": {
+                      "stage": "consultation",
+                      "date": "2024-02-16",
+                      "quote": "Stellungnahme der o.g. Naturschutzverbände zum Bebauungsplan Nr. 63/23",
+                      "dateSemantics": "source_stage",
+                      "evidenceBasis": "quoted_claim"
+                    }
+                  }
+                ],
+                "meaning": "Furthest source-supported milestone as of release, not current status, overall legal completion, or construction; dates retain their source role."
+              }
+            }
+          ],
+          "furthestSupportedStage": "consultation_closed",
+          "furthestSupportedDate": "2026-01-12"
+        }
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "id": "entity:a119800b45bcf84c63269624dd6f78bc2b45e7b1d468bbe31863a4454a6bf0c4",
+      "type": "company",
+      "names": [
+        "Stadtwerke Strausberg"
+      ],
+      "originalTypes": [
+        "company",
+        "organization"
+      ],
+      "mentions": 3
+    }
+  ],
+  "bulk": {
+    "pageRecords": 1,
+    "pageSources": 3,
+    "totalRecords": 189,
+    "totalCases": 152,
+    "hasNextCursor": true,
+    "originalRecordPresent": true
+  },
+  "coverage": {
+    "accounting": {
+      "registryMunicipalities": 319,
+      "configuredMunicipalities": 9,
+      "checkedMunicipalities": 9,
+      "runSelectedMunicipalities": 9,
+      "preparedMunicipalities": 9,
+      "attemptedMunicipalities": 9,
+      "publishedMunicipalities": 9,
+      "checkedWithoutPublishedMunicipalities": 0,
+      "unvisitedMunicipalities": 310
+    },
+    "districts": [
+      {
+        "id": "maerkisch-oderland",
+        "ags": "12064",
+        "municipalitiesRegistered": 45,
+        "municipalitiesConfigured": 3,
+        "municipalitiesChecked": 3,
+        "municipalitiesAttempted": 3,
+        "municipalitiesWithRecords": 3,
+        "municipalitiesWithDatedStages": 3,
+        "documents": 752,
+        "publishedRecords": 113,
+        "quarantinedRecords": 774
+      },
+      {
+        "id": "herzogtum-lauenburg",
+        "ags": "01053",
+        "municipalitiesRegistered": 132,
+        "municipalitiesConfigured": 3,
+        "municipalitiesChecked": 3,
+        "municipalitiesAttempted": 3,
+        "municipalitiesWithRecords": 3,
+        "municipalitiesWithDatedStages": 3,
+        "documents": 1235,
+        "publishedRecords": 54,
+        "quarantinedRecords": 238
+      },
+      {
+        "id": "ludwigslust-parchim",
+        "ags": "13076",
+        "municipalitiesRegistered": 142,
+        "municipalitiesConfigured": 3,
+        "municipalitiesChecked": 3,
+        "municipalitiesAttempted": 3,
+        "municipalitiesWithRecords": 3,
+        "municipalitiesWithDatedStages": 3,
+        "documents": 3206,
+        "publishedRecords": 61,
+        "quarantinedRecords": 431
+      }
+    ],
+    "municipalities": [
+      {
+        "id": "strausberg",
+        "status": "gated_records",
+        "checked": true,
+        "publishedRecords": 39,
+        "datedStagedRecords": 37,
+        "quarantinedRecords": 384,
+        "quarantineReasons": {
+          "categories": [
+            {
+              "reason": "deterministic_gate_failed",
+              "count": 142
+            },
+            {
+              "reason": "faithfulness_gate_failed",
+              "count": 8
+            },
+            {
+              "reason": "invalid_structured_output",
+              "count": 55
+            },
+            {
+              "reason": "missing_sourced_date",
+              "count": 87
+            },
+            {
+              "reason": "no_supported_case",
+              "count": 90
+            },
+            {
+              "reason": "preparation_failed",
+              "count": 3
+            }
+          ],
+          "failedDeterministicChecks": [
+            {
+              "id": "case_identity",
+              "count": 1
+            },
+            {
+              "id": "critical_stage_promotion",
+              "count": 3
+            },
+            {
+              "id": "document_date",
+              "count": 3
+            },
+            {
+              "id": "entity_labels",
+              "count": 21
+            },
+            {
+              "id": "exact_quotes",
+              "count": 52
+            },
+            {
+              "id": "graph_mentions",
+              "count": 39
+            },
+            {
+              "id": "graph_modality",
+              "count": 2
+            },
+            {
+              "id": "graph_relations",
+              "count": 5
+            },
+            {
+              "id": "judge_critical_claims",
+              "count": 26
+            },
+            {
+              "id": "location_labels",
+              "count": 6
+            },
+            {
+              "id": "municipality",
+              "count": 27
+            },
+            {
+              "id": "stage",
+              "count": 9
+            },
+            {
+              "id": "stage_date",
+              "count": 2
+            },
+            {
+              "id": "stage_history",
+              "count": 5
+            },
+            {
+              "id": "summary_numbers",
+              "count": 21
+            },
+            {
+              "id": "title",
+              "count": 13
+            }
+          ]
+        },
+        "extraction": {
+          "fetchedDocumentGroups": 420,
+          "runSelectedDocumentGroups": 60,
+          "preparedDocumentGroups": 57,
+          "attemptedDocumentGroups": 60,
+          "pendingDocumentGroups": 360,
+          "unavailableAttemptedDocumentGroups": 0
+        }
+      },
+      {
+        "id": "hoppegarten",
+        "status": "gated_records",
+        "checked": true,
+        "publishedRecords": 37,
+        "datedStagedRecords": 37,
+        "quarantinedRecords": 76,
+        "quarantineReasons": {
+          "categories": [
+            {
+              "reason": "deterministic_gate_failed",
+              "count": 25
+            },
+            {
+              "reason": "faithfulness_gate_failed",
+              "count": 2
+            },
+            {
+              "reason": "invalid_structured_output",
+              "count": 5
+            },
+            {
+              "reason": "missing_sourced_date",
+              "count": 2
+            },
+            {
+              "reason": "no_supported_case",
+              "count": 40
+            },
+            {
+              "reason": "preparation_failed",
+              "count": 2
+            }
+          ],
+          "failedDeterministicChecks": [
+            {
+              "id": "entity_labels",
+              "count": 3
+            },
+            {
+              "id": "exact_quotes",
+              "count": 10
+            },
+            {
+              "id": "graph_mentions",
+              "count": 5
+            },
+            {
+              "id": "graph_modality",
+              "count": 1
+            },
+            {
+              "id": "graph_relations",
+              "count": 1
+            },
+            {
+              "id": "judge_critical_claims",
+              "count": 4
+            },
+            {
+              "id": "location_labels",
+              "count": 1
+            },
+            {
+              "id": "municipality",
+              "count": 6
+            },
+            {
+              "id": "stage",
+              "count": 1
+            },
+            {
+              "id": "summary_numbers",
+              "count": 1
+            },
+            {
+              "id": "title",
+              "count": 4
+            }
+          ]
+        },
+        "extraction": {
+          "fetchedDocumentGroups": 18,
+          "runSelectedDocumentGroups": 18,
+          "preparedDocumentGroups": 16,
+          "attemptedDocumentGroups": 18,
+          "pendingDocumentGroups": 0,
+          "unavailableAttemptedDocumentGroups": 0
+        }
+      },
+      {
+        "id": "ruedersdorf-bei-berlin",
+        "status": "gated_records",
+        "checked": true,
+        "publishedRecords": 37,
+        "datedStagedRecords": 34,
+        "quarantinedRecords": 314,
+        "quarantineReasons": {
+          "categories": [
+            {
+              "reason": "deterministic_gate_failed",
+              "count": 78
+            },
+            {
+              "reason": "faithfulness_gate_failed",
+              "count": 1
+            },
+            {
+              "reason": "invalid_structured_output",
+              "count": 56
+            },
+            {
+              "reason": "missing_sourced_date",
+              "count": 74
+            },
+            {
+              "reason": "no_supported_case",
+              "count": 101
+            },
+            {
+              "reason": "nonpublic_evidence_url",
+              "count": 1
+            },
+            {
+              "reason": "preparation_failed",
+              "count": 3
+            }
+          ],
+          "failedDeterministicChecks": [
+            {
+              "id": "critical_stage_promotion",
+              "count": 2
+            },
+            {
+              "id": "document_date",
+              "count": 22
+            },
+            {
+              "id": "entity_labels",
+              "count": 5
+            },
+            {
+              "id": "exact_quotes",
+              "count": 11
+            },
+            {
+              "id": "graph_mentions",
+              "count": 6
+            },
+            {
+              "id": "graph_modality",
+              "count": 2
+            },
+            {
+              "id": "graph_relations",
+              "count": 4
+            },
+            {
+              "id": "judge_critical_claims",
+              "count": 3
+            },
+            {
+              "id": "municipality",
+              "count": 32
+            },
+            {
+              "id": "stage",
+              "count": 3
+            },
+            {
+              "id": "stage_date",
+              "count": 1
+            },
+            {
+              "id": "stage_history",
+              "count": 2
+            },
+            {
+              "id": "summary_numbers",
+              "count": 8
+            },
+            {
+              "id": "title",
+              "count": 8
+            }
+          ]
+        },
+        "extraction": {
+          "fetchedDocumentGroups": 183,
+          "runSelectedDocumentGroups": 60,
+          "preparedDocumentGroups": 57,
+          "attemptedDocumentGroups": 60,
+          "pendingDocumentGroups": 123,
+          "unavailableAttemptedDocumentGroups": 0
+        }
+      },
+      {
+        "id": "ratzeburg",
+        "status": "gated_records",
+        "checked": true,
+        "publishedRecords": 14,
+        "datedStagedRecords": 12,
+        "quarantinedRecords": 124,
+        "quarantineReasons": {
+          "categories": [
+            {
+              "reason": "deterministic_gate_failed",
+              "count": 19
+            },
+            {
+              "reason": "invalid_structured_output",
+              "count": 24
+            },
+            {
+              "reason": "missing_sourced_date",
+              "count": 2
+            },
+            {
+              "reason": "no_supported_case",
+              "count": 46
+            },
+            {
+              "reason": "preparation_failed",
+              "count": 33
+            }
+          ],
+          "failedDeterministicChecks": [
+            {
+              "id": "critical_stage_promotion",
+              "count": 3
+            },
+            {
+              "id": "entity_labels",
+              "count": 3
+            },
+            {
+              "id": "exact_quotes",
+              "count": 6
+            },
+            {
+              "id": "graph_mentions",
+              "count": 7
+            },
+            {
+              "id": "judge_critical_claims",
+              "count": 3
+            },
+            {
+              "id": "location_labels",
+              "count": 1
+            },
+            {
+              "id": "stage_history",
+              "count": 1
+            },
+            {
+              "id": "summary_numbers",
+              "count": 4
+            },
+            {
+              "id": "title",
+              "count": 6
+            }
+          ]
+        },
+        "extraction": {
+          "fetchedDocumentGroups": 336,
+          "runSelectedDocumentGroups": 60,
+          "preparedDocumentGroups": 27,
+          "attemptedDocumentGroups": 60,
+          "pendingDocumentGroups": 276,
+          "unavailableAttemptedDocumentGroups": 0
+        }
+      },
+      {
+        "id": "moelln",
+        "status": "gated_records",
+        "checked": true,
+        "publishedRecords": 28,
+        "datedStagedRecords": 23,
+        "quarantinedRecords": 80,
+        "quarantineReasons": {
+          "categories": [
+            {
+              "reason": "deterministic_gate_failed",
+              "count": 31
+            },
+            {
+              "reason": "invalid_structured_output",
+              "count": 25
+            },
+            {
+              "reason": "missing_sourced_date",
+              "count": 10
+            },
+            {
+              "reason": "no_supported_case",
+              "count": 14
+            }
+          ],
+          "failedDeterministicChecks": [
+            {
+              "id": "critical_stage_promotion",
+              "count": 9
+            },
+            {
+              "id": "document_date",
+              "count": 1
+            },
+            {
+              "id": "entity_labels",
+              "count": 6
+            },
+            {
+              "id": "exact_quotes",
+              "count": 5
+            },
+            {
+              "id": "graph_mentions",
+              "count": 9
+            },
+            {
+              "id": "graph_relations",
+              "count": 2
+            },
+            {
+              "id": "judge_critical_claims",
+              "count": 4
+            },
+            {
+              "id": "location_labels",
+              "count": 1
+            },
+            {
+              "id": "stage",
+              "count": 1
+            },
+            {
+              "id": "stage_history",
+              "count": 3
+            },
+            {
+              "id": "summary_numbers",
+              "count": 6
+            },
+            {
+              "id": "title",
+              "count": 5
+            }
+          ]
+        },
+        "extraction": {
+          "fetchedDocumentGroups": 254,
+          "runSelectedDocumentGroups": 60,
+          "preparedDocumentGroups": 60,
+          "attemptedDocumentGroups": 60,
+          "pendingDocumentGroups": 194,
+          "unavailableAttemptedDocumentGroups": 0
+        }
+      },
+      {
+        "id": "schwarzenbek",
+        "status": "gated_records",
+        "checked": true,
+        "publishedRecords": 12,
+        "datedStagedRecords": 11,
+        "quarantinedRecords": 34,
+        "quarantineReasons": {
+          "categories": [
+            {
+              "reason": "deterministic_gate_failed",
+              "count": 7
+            },
+            {
+              "reason": "invalid_structured_output",
+              "count": 4
+            },
+            {
+              "reason": "no_supported_case",
+              "count": 23
+            }
+          ],
+          "failedDeterministicChecks": [
+            {
+              "id": "entity_labels",
+              "count": 1
+            },
+            {
+              "id": "exact_quotes",
+              "count": 2
+            },
+            {
+              "id": "graph_mentions",
+              "count": 2
+            },
+            {
+              "id": "judge_critical_claims",
+              "count": 2
+            },
+            {
+              "id": "municipality",
+              "count": 1
+            },
+            {
+              "id": "stage",
+              "count": 1
+            },
+            {
+              "id": "stage_date",
+              "count": 1
+            },
+            {
+              "id": "stage_history",
+              "count": 1
+            },
+            {
+              "id": "summary_numbers",
+              "count": 1
+            },
+            {
+              "id": "title",
+              "count": 1
+            }
+          ]
+        },
+        "extraction": {
+          "fetchedDocumentGroups": 27,
+          "runSelectedDocumentGroups": 27,
+          "preparedDocumentGroups": 27,
+          "attemptedDocumentGroups": 27,
+          "pendingDocumentGroups": 0,
+          "unavailableAttemptedDocumentGroups": 0
+        }
+      },
+      {
+        "id": "ludwigslust",
+        "status": "gated_records",
+        "checked": true,
+        "publishedRecords": 35,
+        "datedStagedRecords": 35,
+        "quarantinedRecords": 111,
+        "quarantineReasons": {
+          "categories": [
+            {
+              "reason": "deterministic_gate_failed",
+              "count": 37
+            },
+            {
+              "reason": "faithfulness_gate_failed",
+              "count": 2
+            },
+            {
+              "reason": "invalid_structured_output",
+              "count": 24
+            },
+            {
+              "reason": "missing_sourced_date",
+              "count": 8
+            },
+            {
+              "reason": "no_supported_case",
+              "count": 40
+            }
+          ],
+          "failedDeterministicChecks": [
+            {
+              "id": "critical_stage_promotion",
+              "count": 19
+            },
+            {
+              "id": "document_date",
+              "count": 2
+            },
+            {
+              "id": "entity_labels",
+              "count": 4
+            },
+            {
+              "id": "exact_quotes",
+              "count": 4
+            },
+            {
+              "id": "graph_mentions",
+              "count": 6
+            },
+            {
+              "id": "graph_relations",
+              "count": 1
+            },
+            {
+              "id": "judge_critical_claims",
+              "count": 6
+            },
+            {
+              "id": "municipality",
+              "count": 2
+            },
+            {
+              "id": "stage_history",
+              "count": 1
+            },
+            {
+              "id": "summary_numbers",
+              "count": 5
+            },
+            {
+              "id": "title",
+              "count": 3
+            }
+          ]
+        },
+        "extraction": {
+          "fetchedDocumentGroups": 304,
+          "runSelectedDocumentGroups": 60,
+          "preparedDocumentGroups": 60,
+          "attemptedDocumentGroups": 60,
+          "pendingDocumentGroups": 244,
+          "unavailableAttemptedDocumentGroups": 0
+        }
+      },
+      {
+        "id": "parchim",
+        "status": "gated_records",
+        "checked": true,
+        "publishedRecords": 18,
+        "datedStagedRecords": 17,
+        "quarantinedRecords": 87,
+        "quarantineReasons": {
+          "categories": [
+            {
+              "reason": "deterministic_gate_failed",
+              "count": 35
+            },
+            {
+              "reason": "invalid_structured_output",
+              "count": 19
+            },
+            {
+              "reason": "missing_sourced_date",
+              "count": 18
+            },
+            {
+              "reason": "no_supported_case",
+              "count": 15
+            }
+          ],
+          "failedDeterministicChecks": [
+            {
+              "id": "critical_stage_promotion",
+              "count": 1
+            },
+            {
+              "id": "entity_labels",
+              "count": 7
+            },
+            {
+              "id": "exact_quotes",
+              "count": 9
+            },
+            {
+              "id": "graph_mentions",
+              "count": 9
+            },
+            {
+              "id": "graph_modality",
+              "count": 1
+            },
+            {
+              "id": "graph_relations",
+              "count": 3
+            },
+            {
+              "id": "judge_critical_claims",
+              "count": 9
+            },
+            {
+              "id": "stage",
+              "count": 1
+            },
+            {
+              "id": "stage_history",
+              "count": 2
+            },
+            {
+              "id": "summary_numbers",
+              "count": 8
+            },
+            {
+              "id": "title",
+              "count": 2
+            }
+          ]
+        },
+        "extraction": {
+          "fetchedDocumentGroups": 2565,
+          "runSelectedDocumentGroups": 60,
+          "preparedDocumentGroups": 60,
+          "attemptedDocumentGroups": 60,
+          "pendingDocumentGroups": 2505,
+          "unavailableAttemptedDocumentGroups": 0
+        }
+      },
+      {
+        "id": "hagenow",
+        "status": "gated_records",
+        "checked": true,
+        "publishedRecords": 8,
+        "datedStagedRecords": 7,
+        "quarantinedRecords": 233,
+        "quarantineReasons": {
+          "categories": [
+            {
+              "reason": "deterministic_gate_failed",
+              "count": 15
+            },
+            {
+              "reason": "invalid_structured_output",
+              "count": 8
+            },
+            {
+              "reason": "no_supported_case",
+              "count": 210
+            }
+          ],
+          "failedDeterministicChecks": [
+            {
+              "id": "critical_stage_promotion",
+              "count": 3
+            },
+            {
+              "id": "entity_labels",
+              "count": 1
+            },
+            {
+              "id": "exact_quotes",
+              "count": 6
+            },
+            {
+              "id": "graph_mentions",
+              "count": 3
+            },
+            {
+              "id": "graph_modality",
+              "count": 1
+            },
+            {
+              "id": "graph_relations",
+              "count": 5
+            },
+            {
+              "id": "judge_critical_claims",
+              "count": 2
+            },
+            {
+              "id": "municipality",
+              "count": 3
+            },
+            {
+              "id": "stage_date",
+              "count": 1
+            },
+            {
+              "id": "summary_numbers",
+              "count": 2
+            },
+            {
+              "id": "title",
+              "count": 2
+            }
+          ]
+        },
+        "extraction": {
+          "fetchedDocumentGroups": 12,
+          "runSelectedDocumentGroups": 12,
+          "preparedDocumentGroups": 12,
+          "attemptedDocumentGroups": 12,
+          "pendingDocumentGroups": 0,
+          "unavailableAttemptedDocumentGroups": 0
+        }
+      }
+    ]
+  },
+  "graph": {
+    "schemaVersion": "stadtstack-graph-v2",
+    "entities": 169,
+    "edges": 3
+  },
+  "identityMigration": {
+    "version": "municipality-name-v2",
+    "candidates": 831,
+    "factsUnchanged": true,
+    "modelCalls": 0,
+    "auditSha256": "1693e188eeb4ea81a05937e64f08bce004918cb404c93d89bee0cb7f423b7b5f"
+  },
+  "verification": {
+    "nodeTests": 400,
+    "typescriptPassed": true,
+    "releaseBoundaryTests": 8
+  },
+  "acquisitionPolicy": "Global owner robots/origin/opt-out policy is isolated to0.3.2/rebuild, not this patch."
+}

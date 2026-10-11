@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DistrictKnowledgeRecordSchema, KNOWLEDGE_SCHEMA_VERSION, REQUIRED_DETERMINISTIC_CHECKS, knowledgeEvidenceHash, sha256 } from '../src/district-schema.ts';
-import { EntityMentionSchema, graphGroundingChecks, normalizeGraphClaims, normalizeRelationActions, relationPathEligible, relationTypeSchema, type GraphClaims } from '../src/district-graph-claims.ts';
+import { EntityMentionSchema, ENTITY_TYPE_PRECEDENCE, graphGroundingChecks, normalizeGraphClaims, normalizeRelationActions, relationPathEligible, relationTypeSchema, type GraphClaims } from '../src/district-graph-claims.ts';
 import { buildKnowledgeGraph, validateKnowledgeGraph } from '../src/district-graph.ts';
 import { GraphIndex, graphNeighborsSchema } from '../src/district-graph-query.ts';
 import { PROVIDER_CONFIGS } from '../src/district-model-contract.ts';
@@ -78,15 +78,112 @@ test('identifier-based cross-town programme and operator identity requires the e
   assert.match(graph.entities[0].identityBasis.ambiguity, /not independent/);
 });
 
-test('qualified names link across towns with explicit uncertainty while local projects link only within jurisdiction',()=>{
-  const input={entities:[mention('operator','Klarer Netzbetrieb GmbH','company'),mention('programme','Förderprogramm Kommunale Wärmenetze','funding_programme'),mention('generic','Stadtwerke GmbH & Co. KG','company'),mention('school','Schulcampus Lindenallee','facility')],relations:[]};
-  const a=normalizeGraphClaims(input,{municipalityId:'one',sourceSha256:sha256('first')});
-  const b=normalizeGraphClaims(input,{municipalityId:'two',sourceSha256:sha256('second')});
-  const later=normalizeGraphClaims(input,{municipalityId:'one',sourceSha256:sha256('later')});
-  for(const index of [0,1]){assert.equal(a.entities[index].entityId,b.entities[index].entityId);assert.equal(a.entities[index].identityBasis.kind,'qualified_name_match');assert.match(a.entities[index].identityBasis.ambiguity,/not independent/);}
-  assert.notEqual(a.entities[2].entityId,b.entities[2].entityId);
-  assert.notEqual(a.entities[3].entityId,b.entities[3].entityId);
-  assert.equal(a.entities[3].entityId,later.entities[3].entityId);
+test('name-only identity never crosses municipality boundaries, including formerly qualified names', () => {
+  const input = { entities: [mention('operator', 'Klarer Netzbetrieb GmbH', 'company'), mention('programme', 'Förderprogramm Kommunale Wärmenetze', 'funding_programme'), mention('generic', 'Stadtwerke GmbH & Co. KG', 'company'), mention('school', 'Schulcampus Lindenallee', 'facility')], relations: [] };
+  const first = normalizeGraphClaims(input, { municipalityId: 'one', sourceSha256: sha256('first') });
+  const elsewhere = normalizeGraphClaims(input, { municipalityId: 'two', sourceSha256: sha256('second') });
+  const later = normalizeGraphClaims(input, { municipalityId: 'one', sourceSha256: sha256('later') });
+  first.entities.forEach((entity, index) => {
+    assert.notEqual(entity.entityId, elsewhere.entities[index].entityId);
+    assert.equal(entity.entityId, later.entities[index].entityId);
+    assert.equal(entity.identityBasis.kind, 'municipality_scoped_name');
+    assert.match(entity.identityBasis.ambiguity, /not independent/);
+  });
+});
+
+test('identical normalized names share identity across every type without changing the original mentions', () => {
+  for (const name of ['Stadtwerke Strausberg', 'Schulcampus Lindenallee', 'Hauptsatzung Beispielstadt']) {
+    const entities = ENTITY_TYPE_PRECEDENCE.map((type, index) => mention(`alias-${index}`, index % 2 ? `  ${name.toLocaleUpperCase('de').replaceAll(' ', '   ')}  ` : name, type));
+    const first = normalizeGraphClaims({ entities, relations: [] }, { municipalityId: 'one', sourceSha256: sha256('first') });
+    const later = normalizeGraphClaims({ entities: [...entities].reverse(), relations: [] }, { municipalityId: 'one', sourceSha256: sha256('second') });
+    assert.equal(new Set(first.entities.map(entity => entity.entityId)).size, 1);
+    assert.equal(first.entities[0].entityId, later.entities[0].entityId);
+    assert.deepEqual(first.entities.map(({ entityId, identityBasis, ...original }) => original), entities);
+    const record = fixture({ entities: [...ENTITY_TYPE_PRECEDENCE].reverse().map((type, index) => mention(`alias-${index}`, name, type)), relations: [] });
+    const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records: [record] });
+    const node = buildKnowledgeGraph(bytes).entities[0];
+    assert.equal(node.type, 'municipality');
+    assert.equal(node.mentions.length, ENTITY_TYPE_PRECEDENCE.length);
+  }
+});
+
+test('cross-type grouping does not erase legal forms, amendments or conflicting complete identifier sets', () => {
+  const identifier = { value: '123', namespace: 'HRB', issuer: 'Amtsgericht Test', quote: 'Test GmbH HRB 123 Amtsgericht Test' };
+  const identified = { ...mention('company', 'Test GmbH', 'company'), identifiers: [identifier] };
+  const claims = { entities: [
+    identified,
+    { ...identified, mentionId: 'organization', type: 'organization' as const },
+    { ...identified, mentionId: 'other-value', identifiers: [{ ...identifier, value: '124' }] },
+    { ...identified, mentionId: 'other-issuer', identifiers: [{ ...identifier, issuer: 'Other Issuer' }] },
+    { ...identified, mentionId: 'other-namespace', identifiers: [{ ...identifier, namespace: 'Other Register' }] },
+    { ...identified, mentionId: 'extra-identifier', identifiers: [identifier, { ...identifier, namespace: 'Other Register' }] },
+    { ...identified, mentionId: 'other-legal-form', name: 'Test AG' },
+    mention('unidentified', 'Test GmbH', 'organization'),
+    mention('amendment-one', '1. Änderung Hauptsatzung Beispielstadt', 'law'),
+    mention('amendment-two', '2. Änderung Hauptsatzung Beispielstadt', 'organization'),
+  ], relations: [] };
+  const normalized = normalizeGraphClaims(claims, { municipalityId: 'one', sourceSha256: sha256('first') });
+  assert.equal(normalized.entities[0].entityId, normalized.entities[1].entityId);
+  assert.equal(new Set(normalized.entities.map(entity => entity.entityId)).size, claims.entities.length - 1);
+  const reordered = normalizeGraphClaims({ entities: [{ ...claims.entities[5], identifiers: [...claims.entities[5].identifiers].reverse() }], relations: [] }, { municipalityId: 'one', sourceSha256: sha256('second') });
+  assert.equal(normalized.entities[5].entityId, reordered.entities[0].entityId);
+});
+
+test('company and organization aliases retain every source and record while neighbors and paths use one entity', () => {
+  const council = mention('council', 'Rat Beispielstadt', 'authority');
+  const organization = mention('organization', 'Stadtwerke Strausberg', 'organization');
+  const company = mention('company', 'STADTWERKE  STRAUSBERG', 'company');
+  const facility = mention('facility', 'Hallenbad Lindenallee', 'facility');
+  const first = fixture({ entities: [council, organization], relations: [relation(council, organization)] }, 'one', 'record-a');
+  const second = fixture({ entities: [company, facility], relations: [relation(company, facility)] }, 'one', 'record-b');
+  second.sources.push({ ...second.sources[0], id: 'synthetic-source-alias', url: 'https://example.org/graph-source-alias' });
+  second.verification.evidenceHash = knowledgeEvidenceHash(second);
+  const records = [first, second];
+  const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records });
+  const graph = buildKnowledgeGraph(bytes);
+  const index = new GraphIndex('synthetic-release', graph, bytes);
+  const mergedId = first.entities[1].entityId;
+  assert.equal(mergedId, second.entities[0].entityId);
+  assert.equal(graph.entities.length, 3);
+  const merged = graph.entities.find(entity => entity.id === mergedId)!;
+  assert.equal(merged.type, 'company');
+  assert.deepEqual(merged.names, [company.name, organization.name].sort());
+  assert.deepEqual(merged.mentions.map(({ evidence, ...original }) => original), [organization, company]);
+  assert.deepEqual(merged.mentions.map(mention => mention.evidence.recordId), records.map(record => record.id));
+  assert.deepEqual(merged.mentions.map(mention => mention.evidence.sources), records.map(record => record.sources));
+  assert.deepEqual(merged.mentions.map(mention => mention.evidence.evidenceHash), records.map(record => record.verification.evidenceHash));
+  for (const type of ['company', 'organization'] as const) {
+    const result = index.entitySearch({ query: 'Stadtwerke', type });
+    assert.equal(result.total, 1);
+    assert.equal(result.items[0].id, mergedId);
+    assert.equal(result.items[0].type, 'company');
+  }
+  const neighbors = index.neighbors({ id: mergedId, limit: 1 });
+  assert.equal(neighbors.total, 2);
+  assert.ok(neighbors.nextCursor);
+  const next = index.neighbors({ id: mergedId, limit: 1, cursor: neighbors.nextCursor });
+  assert.notEqual(neighbors.items[0].edge.id, next.items[0].edge.id);
+  for (const { edge, from, to } of [...neighbors.items, ...next.items]) {
+    assert.equal(edge.fromId, from?.id);
+    assert.equal(edge.toId, to?.id);
+    assert.deepEqual(edge.evidence.sources, records.find(record => record.id === edge.evidence.recordId)!.sources);
+  }
+  const path = index.path({ fromId: first.entities[0].entityId, toId: second.entities[1].entityId, maxHops: 2 });
+  assert.equal(path.status, 'found');
+  assert.equal(path.shortestHops, 2);
+  assert.equal(path.items[0].entities[1].id, mergedId);
+  assert.deepEqual(path.items[0].edges.map(edge => edge.evidence.recordId), ['record-a', 'record-b']);
+  const reversedBytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records: [...records].reverse() });
+  const reversedGraph = buildKnowledgeGraph(reversedBytes);
+  assert.deepEqual(reversedGraph.entities, graph.entities);
+  assert.deepEqual(reversedGraph.edges, graph.edges);
+  assert.throws(() => new GraphIndex('synthetic-release', reversedGraph, reversedBytes).neighbors({ id: mergedId, limit: 1, cursor: neighbors.nextCursor }), /mismatch/);
+  const omittedAlias = structuredClone(graph);
+  omittedAlias.entities.find(entity => entity.id === mergedId)!.mentions.pop();
+  assert.throws(() => validateKnowledgeGraph(omittedAlias, bytes), /does not match/);
+  const omittedSource = structuredClone(graph);
+  omittedSource.entities.find(entity => entity.id === mergedId)!.mentions[1].evidence.sources.pop();
+  assert.throws(() => validateKnowledgeGraph(omittedSource, bytes), /does not match/);
 });
 
 test('multiword functional municipal bodies stay municipality-scoped rather than globally grouped', () => {
@@ -120,6 +217,62 @@ test('ordinal amendment labels are source-scoped even within the same municipali
     assert.notEqual(entity.entityId, later.entities[index].entityId);
   });
   assert.equal(new Set(first.entities.map(entity => entity.entityId)).size, entities.length);
+});
+
+test('anonymous object labels remain source-scoped without depending on their mention type', () => {
+  for (const name of ['Projekt', 'Schule', 'Anlage', '1. Änderung']) {
+    const entities = ENTITY_TYPE_PRECEDENCE.map((type, index) => mention(`alias-${index}`, name, type));
+    const first = normalizeGraphClaims({ entities, relations: [] }, { municipalityId: 'one', sourceSha256: sha256('first') });
+    const later = normalizeGraphClaims({ entities, relations: [] }, { municipalityId: 'one', sourceSha256: sha256('second') });
+    assert.equal(new Set(first.entities.map(entity => entity.entityId)).size, 1);
+    assert.ok(first.entities.every(entity => entity.identityBasis.kind === 'source_scoped_name'));
+    assert.notEqual(first.entities[0].entityId, later.entities[0].entityId);
+  }
+});
+
+test('identity cutover migrates record IDs and endpoints together without relabelling generation or gate evidence', () => {
+  const company = mention('company', 'Stadtwerke Strausberg', 'company');
+  const facility = mention('facility', 'Hallenbad Lindenallee', 'facility');
+  const current = fixture({ entities: [company, facility], relations: [relation(company, facility)] }, 'one');
+  const legacy = structuredClone(current);
+  for (const entity of legacy.entities) {
+    const key = JSON.stringify([entity.type, entity.name.toLocaleLowerCase('de'), legacy.municipalityId]);
+    entity.entityId = `entity:${sha256(key)}`;
+    entity.identityBasis.key = key;
+  }
+  legacy.relations[0].fromId = legacy.entities[0].entityId;
+  legacy.relations[0].toId = legacy.entities[1].entityId;
+  legacy.verification.evidenceHash = knowledgeEvidenceHash(legacy);
+  assert.throws(() => DistrictKnowledgeRecordSchema.parse(legacy), /identity mismatch/);
+  const migrated = { ...legacy, ...normalizeGraphClaims(legacy, { municipalityId: legacy.municipalityId, sourceSha256: legacy.extraction.inputSha256 }), verification: { ...legacy.verification } };
+  assert.throws(() => DistrictKnowledgeRecordSchema.parse(migrated), /[Ee]vidence hash/);
+  migrated.verification.evidenceHash = knowledgeEvidenceHash(migrated);
+  assert.deepEqual(DistrictKnowledgeRecordSchema.parse(migrated), current);
+  assert.deepEqual(migrated.extraction, legacy.extraction);
+  assert.deepEqual(migrated.verification.faithfulness, legacy.verification.faithfulness);
+  assert.deepEqual(migrated.verification.deterministic, legacy.verification.deterministic);
+  const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records: [migrated] });
+  const index = new GraphIndex('migrated-release', buildKnowledgeGraph(bytes), bytes);
+  assert.throws(() => index.neighbors({ id: legacy.entities[0].entityId }), /Unknown graph entity/);
+  assert.equal(index.neighbors({ id: migrated.entities[0].entityId }).items[0].to?.id, migrated.entities[1].entityId);
+});
+
+test('coalesced endpoint aliases retain self-loop evidence without multiplying neighbors or paths', () => {
+  const company = mention('company', 'Stadtwerke Strausberg', 'company');
+  const organization = mention('organization', 'STADTWERKE STRAUSBERG', 'organization');
+  const { index, record, graph } = release({ entities: [company, organization], relations: [relation(company, organization)] });
+  assert.equal(graph.entities.length, 1);
+  assert.equal(graph.edges.length, 1);
+  assert.equal(graph.edges[0].fromId, graph.edges[0].toId);
+  const id = record.entities[0].entityId;
+  const neighbors = index.neighbors({ id });
+  assert.equal(neighbors.total, 1);
+  assert.equal(neighbors.items[0].from?.id, id);
+  assert.equal(neighbors.items[0].to?.id, id);
+  const path = index.path({ fromId: id, toId: id, maxHops: 5 });
+  assert.equal(path.total, 1);
+  assert.equal(path.shortestHops, 0);
+  assert.equal(path.items[0].edges.length, 0);
 });
 
 test('grounding rejects co-occurrence, unsupported roles/endpoints/identifiers and private-person types', () => {

@@ -5,25 +5,28 @@ import {pathToFileURL} from 'node:url';
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {hostedServer, loadRelease} from './mcp-tools.ts';
+import {DEFAULT_TOKEN_LIMITS,validateTokenRecords,type TokenLimits} from './mcp-token-config.mjs';
 
-export const limits = Object.freeze({requestsPerMinute:60, concurrentPerToken:4, bodyBytes:32768, deadlineMs:30000, concurrentTotal:32});
-type Token = {id:string; digest:Buffer; window:number; requests:number; active:number};
-export async function loadTokens(path:string):Promise<Token[]> {
-  const records:unknown = JSON.parse(await readFile(path,'utf8'));
-  if (!Array.isArray(records) || records.length===0 || records.length>1000) throw Error('Invalid token hash configuration');
-  const ids=new Set<string>(), hashes=new Set<string>();
-  return records.map((record) => {
-    if (!record || typeof record.id!=='string' || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(record.id) || typeof record.sha256!=='string' || !/^[a-f0-9]{64}$/.test(record.sha256) || ids.has(record.id) || hashes.has(record.sha256)) throw Error('Invalid token hash configuration');
-    ids.add(record.id); hashes.add(record.sha256);
-    return {id:record.id,digest:Buffer.from(record.sha256,'hex'),window:0,requests:0,active:0};
-  });
+export const limits = Object.freeze({requestsPerMinute:DEFAULT_TOKEN_LIMITS.requestsPerMinute, concurrentPerToken:DEFAULT_TOKEN_LIMITS.maxConcurrent, bodyBytes:32768, deadlineMs:30000, concurrentTotal:32});
+export interface TokenState {
+  readonly id:string;
+  readonly digest:Buffer;
+  readonly limits:Readonly<TokenLimits>;
+  window:number;
+  requests:number;
+  active:number;
 }
-function reply(res:ServerResponse,status:number,headers:Record<string,string>={}) {
+export async function loadTokens(path:string):Promise<TokenState[]> {
+  const records=validateTokenRecords(JSON.parse(await readFile(path,'utf8')));
+  // Configuration is a startup snapshot. Secret changes require a controlled restart.
+  return records.map(record=>({
+    id:record.id,digest:Buffer.from(record.sha256,'hex'),
+    limits:Object.freeze(record.limits??DEFAULT_TOKEN_LIMITS),window:0,requests:0,active:0,
+  }));
+}
+function reply(res:ServerResponse,status:number,headers:Record<string,string>={},payload:unknown={ok:status===200}) {
   if (res.headersSent) {res.destroy();return;}
   res.writeHead(status,{'content-type':'application/json','cache-control':'no-store','x-content-type-options':'nosniff','connection':'close',...headers});
-  const payload=status===429
-    ? {ok:false,error:'rate_limited',retryAfterSeconds:Number(headers['retry-after']),limits:{requestsPerMinute:limits.requestsPerMinute,maxConcurrent:limits.concurrentPerToken}}
-    : {ok:status===200};
   res.end(JSON.stringify(payload));
 }
 async function body(req:IncomingMessage):Promise<unknown> {
@@ -36,7 +39,7 @@ async function body(req:IncomingMessage):Promise<unknown> {
   try {return JSON.parse(Buffer.concat(chunks).toString('utf8'));}
   catch {throw Object.assign(Error('invalid JSON'),{status:400});}
 }
-export function createHostedHttp(tokens:Token[], factory=hostedServer, origin='https://mcp.stadtstack.eu') {
+export function createHostedHttp(tokens:TokenState[], factory=hostedServer, origin='https://mcp.stadtstack.eu', now:()=>number=Date.now) {
   const publicUrl=new URL(origin);
   if(publicUrl.protocol!=='https:' || publicUrl.pathname!=='/' || publicUrl.search || publicUrl.hash) throw Error('HTTPS public origin required');
   let active=0;
@@ -45,22 +48,33 @@ export function createHostedHttp(tokens:Token[], factory=hostedServer, origin='h
     counts.requests++;
     res.setHeader('cache-control','no-store');
     res.setHeader('x-content-type-options','nosniff');
+    const authorization=req.headers.authorization;
+    let token:TokenState|undefined;
+    if(authorization && /^Bearer [A-Za-z0-9_-]{43}$/.test(authorization)) {
+      const digest=createHash('sha256').update(authorization.slice(7)).digest();
+      for(const candidate of tokens) if(timingSafeEqual(digest,candidate.digest)) token=candidate;
+    }
+    if(token) {
+      const nowMs=now(),minute=Math.floor(nowMs/60000);
+      if(token.window!==minute) {token.window=minute;token.requests=0;}
+      // Count authenticated HTTP requests, not just useful tool calls. Invalid
+      // routes, protocol messages and concurrency rejections consume the budget.
+      const rateExceeded=token.requests>=token.limits.requestsPerMinute;
+      if(!rateExceeded)token.requests++;
+      if(rateExceeded || token.active>=token.limits.maxConcurrent) {
+        counts.limited++;
+        const retryAfterSeconds=token.requests>=token.limits.requestsPerMinute ? 60-Math.floor(nowMs/1000)%60 : 1;
+        reply(res,429,{'retry-after':String(retryAfterSeconds)},{ok:false,error:'rate_limited',retryAfterSeconds,limits:token.limits});
+        return;
+      }
+    }
     if(req.url==='/health' && req.method==='GET') {reply(res,200);return;}
     if(req.url!=='/mcp') {reply(res,404);return;}
     // Query-string credentials, arbitrary browser origins and forwarded host trust are deliberately unsupported.
     if(req.headers.origin && req.headers.origin!==publicUrl.origin) {reply(res,403);return;}
     const host=req.headers.host??'';
     if(host!==publicUrl.host && !/^127\.0\.0\.1(?::\d+)?$/.test(host) && !/^localhost(?::\d+)?$/.test(host)) {reply(res,403);return;}
-    const authorization=req.headers.authorization;
-    if(!authorization || !/^Bearer [A-Za-z0-9_-]{43}$/.test(authorization)) {counts.unauthorized++;reply(res,401,{'www-authenticate':'Bearer realm="stadtstack-mcp"'});return;}
-    const digest=createHash('sha256').update(authorization.slice(7)).digest();
-    let token:Token|undefined;
-    for(const candidate of tokens) if(timingSafeEqual(digest,candidate.digest)) token=candidate;
     if(!token) {counts.unauthorized++;reply(res,401,{'www-authenticate':'Bearer realm="stadtstack-mcp"'});return;}
-    const minute=Math.floor(Date.now()/60000);
-    if(token.window!==minute) {token.window=minute;token.requests=0;}
-    if(token.requests>=limits.requestsPerMinute || token.active>=limits.concurrentPerToken) {counts.limited++;reply(res,429,{'retry-after':String(60-Math.floor(Date.now()/1000)%60)});return;}
-    token.requests++;
     if(req.method!=='POST') {reply(res,405,{'allow':'POST'});return;}
     if(active>=limits.concurrentTotal) {counts.limited++;reply(res,503,{'retry-after':'1'});return;}
     if(!/^application\/json(?:\s*;.*)?$/i.test(req.headers['content-type']??'') || req.headers['content-encoding']) {reply(res,415);return;}
@@ -80,7 +94,7 @@ export function createHostedHttp(tokens:Token[], factory=hostedServer, origin='h
     try {
       const parsed=await body(req);
       if(res.destroyed || released)return;
-      // One operation per request keeps token accounting equal to tool-call accounting.
+      // Batches are disallowed; the quota counts each authenticated HTTP request.
       if(Array.isArray(parsed)) {reply(res,400);return;}
       instance=factory();
       transport=new StreamableHTTPServerTransport({sessionIdGenerator:undefined,enableJsonResponse:true});

@@ -7,7 +7,7 @@ if not __debug__:
 
 p=argparse.ArgumentParser()
 p.add_argument('--image',required=True)
-p.add_argument('--release-version',required=True,help='Literal package/Git/image version, for example 0.3.0')
+p.add_argument('--release-version',required=True,help='Literal package/Git/image version, for example 0.3.1')
 p.add_argument('--evidence',required=True)
 p.add_argument('--url',help='Use the live HTTPS origin instead of starting Docker')
 p.add_argument('--person',default='max')
@@ -38,6 +38,9 @@ private=pathlib.Path.home()/'.config/stadtstack/mcp-tokens'
 # live only in memory and are never accepted by the deployed Secret.
 token=(private/(args.person+'.token')).read_text().strip() if args.url else secrets.token_urlsafe(32)
 if not re.fullmatch(r'[A-Za-z0-9_-]{43}',token): raise RuntimeError('Invalid private token file')
+default_limits={'requestsPerMinute':60,'maxConcurrent':4}
+elevated_limits={'requestsPerMinute':300,'maxConcurrent':8}
+disposable_tokens={name:secrets.token_urlsafe(32) for name in ('max','buzz','isolated','activation')} if not args.url else {}
 container=None
 # Home is shared by desktop Docker/Colima; macOS system temp folders may not be.
 hash_mount=tempfile.TemporaryDirectory(prefix='.mcp-smoke-hashes-',dir=scratch_dir)
@@ -54,9 +57,9 @@ def command(argv):
     if result.returncode: raise RuntimeError('Container operation failed (output withheld)')
     return result.stdout.strip()
 
-def request(path='/mcp',data=None,auth=True,extra=None,method=None):
+def request(path='/mcp',data=None,auth=True,extra=None,method=None,bearer=None,limits=None):
     headers={'Content-Type':'application/json','Accept':'application/json, text/event-stream'}
-    if auth: headers['Authorization']='Bearer '+token
+    if auth: headers['Authorization']='Bearer '+(token if bearer is None else bearer)
     if extra: headers.update(extra)
     body=data.encode() if isinstance(data,str) else json.dumps(data).encode() if data is not None else None
     req=urllib.request.Request(origin+path,data=body,headers=headers,method=method)
@@ -68,8 +71,14 @@ def request(path='/mcp',data=None,auth=True,extra=None,method=None):
             retry_after=error.headers.get('Retry-After','')
             assert retry_after.isdecimal() and 1<=int(retry_after)<=60, 'Invalid rate-limit Retry-After'
             guidance=json.loads(error.read())
-            assert guidance=={'ok':False,'error':'rate_limited','retryAfterSeconds':int(retry_after),'limits':{'requestsPerMinute':60,'maxConcurrent':4}}, 'Rate-limit JSON/header guidance differs'
+            actual=guidance.get('limits',{})
+            assert set(actual)=={'requestsPerMinute','maxConcurrent'}
+            assert type(actual['requestsPerMinute']) is int and 1<=actual['requestsPerMinute']<=300
+            assert type(actual['maxConcurrent']) is int and 1<=actual['maxConcurrent']<=8
+            if limits is not None: assert actual==limits, '429 does not report the authenticated token policy'
+            assert guidance=={'ok':False,'error':'rate_limited','retryAfterSeconds':int(retry_after),'limits':actual}, 'Rate-limit JSON/header guidance differs'
             checks['retryAfterSeconds']=int(retry_after)
+            return error.code,guidance
         return error.code,None
 
 def call(name,arguments={}):
@@ -157,6 +166,48 @@ def graph_edge(edge):
     assert 'time' in edge and 'conditions' in edge
     if edge['time'] is not None: assert edge['time']['text'] and edge['time']['quote']
     graph_evidence(edge['evidence'])
+def ready():
+    for _ in range(30):
+        try:
+            if request('/health',auth=False)[0]==200: return
+        except (urllib.error.URLError,TimeoutError,ConnectionError): pass
+        time.sleep(1)
+    raise RuntimeError('Health did not become ready within 30 seconds')
+
+def disposable_configuration(elevated=False):
+    records=[{'id':'smoke','sha256':hashlib.sha256(token.encode()).hexdigest()}]
+    for name,value in disposable_tokens.items():
+        record={'id':name,'sha256':hashlib.sha256(value.encode()).hexdigest()}
+        if elevated and name in ('max','buzz'): record['limits']=elevated_limits
+        if elevated and name=='activation': record['limits']={'requestsPerMinute':2,'maxConcurrent':1}
+        records.append(record)
+    if hashfile.exists(): hashfile.chmod(0o600)
+    hashfile.write_text(json.dumps(records));hashfile.chmod(0o444)
+
+def probe_policy(name,limits,require_saturation):
+    # Every authenticated HTTP/RPC attempt counts, including malformed requests.
+    # A fixed-minute boundary may occur during the probe. Allow two budgets and
+    # report aggregate attempts, never claim an exact-window transport test.
+    started=time.monotonic()
+    accepted=0
+    observed=None
+    for index in range(2*limits['requestsPerMinute']+1):
+        if time.monotonic()-started>=50: break
+        payload=None if index%3==0 else '{' if index%3==1 else {'jsonrpc':'2.0','id':index+1,'method':'ping'}
+        status,value=request(data=payload,bearer=disposable_tokens[name],limits=limits)
+        if status==429:
+            observed=value
+            break
+        assert status==(405 if index%3==0 else 400 if index%3==1 else 200)
+        accepted+=1
+    elapsed=time.monotonic()-started
+    if require_saturation:
+        assert observed is not None, 'Default policy saturation was not observed within the bounded probe'
+    else:
+        assert accepted>60, 'Too few representative requests to exercise elevation'
+        if observed is None:
+            assert elapsed>=50, 'Two configured minute budgets completed without rate limiting'
+    return {'id':name,'configuredLimits':limits,'reportedLimits':observed['limits'] if observed else None,'acceptedAuthenticatedRequests':accepted,'elapsedSeconds':round(elapsed,3),'saturationExercised':observed is not None,'retryAfterSeconds':observed['retryAfterSeconds'] if observed else None,'scope':'disposable local credentials; aggregate wall-clock attempts, exact windows/concurrency require transport tests'}
 
 try:
     if args.url:
@@ -169,7 +220,7 @@ try:
         command(['docker','pull','--platform','linux/amd64',args.image])
         # Only hashes are copied; parent directory remains 0700 on the host.
         hashfile=pathlib.Path(hash_mount.name)/'token-hashes.json'
-        hashfile.write_text(json.dumps([{'id':'smoke','sha256':hashlib.sha256(token.encode()).hexdigest()}]));hashfile.chmod(0o444)
+        disposable_configuration()
         container=command(['docker','run','--detach','--name','civic-mcp-smoke-'+acceptance_run_id,'--platform','linux/amd64','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges:true','--memory','1g','--cpus','1','--publish','127.0.0.1::4318','--mount','type=bind,source='+str(hashfile)+',target=/run/secrets/mcp/token-hashes.json,readonly',args.image])
         port=command(['docker','port',container,'4318/tcp']).split(':')[-1]
         origin='http://127.0.0.1:'+port
@@ -193,12 +244,7 @@ try:
         checks['imageRefName']=labels['org.opencontainers.image.ref.name']
         checks['imageRevision']=image_revision
         checks['nonrootReadOnlyExactImage']=True
-    for _ in range(30):
-        try:
-            if request('/health',auth=False)[0]==200: break
-        except (urllib.error.URLError,TimeoutError,ConnectionError): pass
-        time.sleep(1)
-    else: raise RuntimeError('Health did not become ready within 30 seconds')
+    ready()
     checks['health']=True
     assert request(auth=False)[0]==401
     assert request(extra={'Authorization':'Bearer '+'x'*43})[0]==401
@@ -213,7 +259,7 @@ try:
     status,listing=request(data={'jsonrpc':'2.0','id':2,'method':'tools/list'})
     assert status==200
     tools=listing['result']['tools'];names=[t['name'] for t in tools]
-    expected=['list_cities','list_topics','get_core_bundle','search_signals','search_signals_near','search_signals_along','get_signal','get_sources','get_source','get_changes','search_topics','get_council_items','get_regional_topics','get_release_status','compare_topic','similar','entity_search','graph_neighbors','graph_path']
+    expected=['list_cities','list_topics','get_core_bundle','search_signals','search_signals_near','search_signals_along','get_signal','get_sources','get_source','get_changes','search_topics','get_council_items','get_regional_topics','get_release_status','compare_topic','similar','entity_search','graph_neighbors','graph_path','export_records']
     assert sorted(names)==sorted(expected)
     assert all(t['annotations']['readOnlyHint'] and not t['annotations']['destructiveHint'] for t in tools)
     checks['readOnlyTools']=names
@@ -250,6 +296,24 @@ try:
     assert release['release']['dataManifestId']==release['dataManifest']['id'], 'Status release points to a different data manifest'
     checks['statusReleaseVersion']=release['release']['version']
     checks['statusDataManifestId']=release['release']['dataManifestId']
+    coverage=release['knowledgeCoverage']
+    accounting=coverage['accounting']
+    for field in ('registryMunicipalities','configuredMunicipalities','checkedMunicipalities','attemptedMunicipalities','publishedMunicipalities','checkedWithoutPublishedMunicipalities','unvisitedMunicipalities'):
+        assert type(accounting[field]) is int and accounting[field]>=0
+    for field in ('runSelectedMunicipalities','preparedMunicipalities'):
+        assert accounting[field] is None or type(accounting[field]) is int and 0<=accounting[field]<=accounting['configuredMunicipalities']
+    assert accounting['registryMunicipalities']>=accounting['configuredMunicipalities']>=accounting['checkedMunicipalities']>=accounting['publishedMunicipalities']
+    assert accounting['checkedMunicipalities']+accounting['unvisitedMunicipalities']==accounting['registryMunicipalities']
+    assert accounting['publishedMunicipalities']+accounting['checkedWithoutPublishedMunicipalities']==accounting['checkedMunicipalities']
+    assert len(coverage['municipalities'])==accounting['configuredMunicipalities']
+    assert sum(row['municipalitiesRegistered'] for row in coverage['districts'])==accounting['registryMunicipalities']
+    assert sum(row['municipalitiesAttempted'] for row in coverage['districts'])==accounting['attemptedMunicipalities']
+    for row in coverage['municipalities']:
+        assert type(row['checked']) is bool and row['status']==('gated_records' if row['publishedRecords'] else 'checked_no_gated_records' if row['checked'] else 'not_checked')
+        assert 0<=row['datedStagedRecords']<=row['publishedRecords'] and row['quarantinedRecords']>=0
+        for field,key in (('categories','reason'),('failedDeterministicChecks','id')):
+            assert all(item[key] and type(item['count']) is int and 0<item['count']<=row['quarantinedRecords'] for item in row['quarantineReasons'][field])
+    checks['coverageAccounting']=accounting
     encoded_cursor=first['nextCursor'].split('.')[0]
     cursor_payload=json.loads(base64.urlsafe_b64decode(encoded_cursor+'='*(-len(encoded_cursor)%4)))
     assert cursor_payload['release']==release['dataManifest']['id']
@@ -263,14 +327,43 @@ try:
     topic=target['topics'][0]['id'] if target['topics'] else topics[0]['id']
     comparison_cities=list(dict.fromkeys([target['cityId'],fact['cityId']]))
     comparison=call('compare_topic',{'topic':topic,'cityIds':comparison_cities})
-    assert comparison['releaseId']==checks['envelopeRelease'] and comparison['method']['method']=='source-evidenced-stage-summary'
+    assert comparison['releaseId']==checks['envelopeRelease'] and comparison['method']['method']=='source-evidenced-case-summary'
+    assert comparison['method']['version']=='district-comparison-v2'
     assert {city['cityId'] for city in comparison['cities']}==set(comparison_cities)
-    assert all(city['coverage'] and 0<=city['sourceBackedRecordCount']<=city['recordCount'] for city in comparison['cities'])
+    for city in comparison['cities']:
+        assert city['coverage'] and 0<=city['sourceBackedRecordCount']<=city['recordCount']
+        assert 0<=city['sourceBackedCaseCount']<=city['caseCount']<=city['recordCount']
+        assert city['identifiedCaseCount']+city['unresolvedCaseCount']==city['caseCount']
     similar=call('similar',{'id':target['id'],'limit':3})
     assert similar['releaseId']==checks['envelopeRelease'] and similar['method']['method']=='weighted-token-topic-jaccard'
-    assert similar['target']['id']==target['id'] and similar['total']>=len(similar['items']) and len(similar['items'])<=3
-    assert all(item['cityId']!=target['cityId'] and 0<item['score']<=1 and item['sourceIds'] and item['verification'] and isinstance(item['sharedTerms'],list) and isinstance(item['sharedTopics'],list) for item in similar['items'])
-    checks['comparisonAndSimilarity']={'municipality':target['cityId'],'targetId':target['id'],'crossCityMatches':similar['total']}
+    assert similar['method']['version']=='district-similarity-v2'
+    assert target['id'] in similar['target']['memberRecordIds'] and similar['target']['id']==similar['target']['caseId']
+    assert similar['total']==similar['totalCases']>=len(similar['items']) and similar['totalRecords']>=similar['totalCases'] and len(similar['items'])<=3
+    assert all(item['cityId']!=target['cityId'] and 0<item['score']<=1 and item['sourceIds'] and item['memberRecordIds'] and item['identityStatus'] in ('source_identified','unresolved') and isinstance(item['sharedTerms'],list) and isinstance(item['sharedTopics'],list) for item in similar['items'])
+    checks['comparisonAndSimilarity']={'municipality':target['cityId'],'targetRecordId':target['id'],'targetCaseId':similar['target']['caseId'],'crossCityCases':similar['totalCases'],'crossCityRecords':similar['totalRecords']}
+    exported=call('export_records',{'municipality':target['cityId'],'limit':1})
+    def export_page(page,municipality=None,limit=20):
+        assert page['releaseId']==checks['envelopeRelease'] and page['totalRecords']>=page['totalCases']>=0
+        assert 0<=page['identifiedCaseCount']<=page['totalCases'] and page['caseCountMeaning']
+        assert page['items'] and len(page['items'])<=limit and (page['nextCursor'] is None or isinstance(page['nextCursor'],str))
+        for item in page['items']:
+            assert (municipality is None or item['cityId']==municipality) and isinstance(item['originalRecord'],dict) and item['originalRecord']
+            assert {'id','cityId','recordType','title','statement','topics','eventDate','dateSemantics','sourceIds','comparisonEligible','comparisonReason','origin'}<=set(item)
+            if not item['comparisonEligible']: assert item['comparisonReason']
+        assert {source['id'] for source in page['sources']}=={source_id for item in page['items'] for source_id in item['sourceIds']}, 'Export sources must describe this page only'
+        assert all((source['url'] or source.get('urlWithheldReason')) and (source.get('retrievedAt') or source.get('retrievalNote')) for source in page['sources'])
+    export_page(exported,target['cityId'],1)
+    default_export=call('export_records')
+    export_page(default_export)
+    assert len(default_export['items'])==min(20,default_export['totalRecords']), 'Export default page limit differs'
+    export_checks={'municipality':target['cityId'],'totalRecords':exported['totalRecords'],'totalCases':exported['totalCases'],'firstRecordId':exported['items'][0]['id'],'defaultPageRecords':len(default_export['items']),'paginationExercised':False}
+    if exported['nextCursor'] is not None:
+        exported_next=call('export_records',{'municipality':target['cityId'],'limit':1,'cursor':exported['nextCursor']})
+        export_page(exported_next,target['cityId'],1)
+        assert exported_next['totalRecords']==exported['totalRecords'] and exported_next['totalCases']==exported['totalCases']
+        assert exported_next['items'][0]['id']!=exported['items'][0]['id']
+        export_checks['paginationExercised']=True
+    checks['exportRecords']=export_checks
     # Only IDs/edges returned by the admitted release are used. Empty or bounded
     # discovery is recorded explicitly; inventing an entity or a self-path is not acceptance.
     bound_files={item['path']:item for item in release['dataManifest']['files']}
@@ -286,7 +379,7 @@ try:
     for entity in search['items']:
         assert re.fullmatch(r'entity:[0-9a-f]{64}',entity['id']) and entity['names'] and entity['mentions']
         assert entity['type'] in ['municipality','authority','organization','project','facility','funding_programme','law','place','company']
-        assert entity['identityBasis']['kind'] in ['explicit_identifier','qualified_name_match','municipality_scoped_name','source_scoped_name']
+        assert entity['identityBasis']['kind'] in ['explicit_identifier','municipality_scoped_name','source_scoped_name']
         assert entity['identityBasis']['ambiguity']
         for mention in entity['mentions']:
             assert mention['quote'] and mention['name']
@@ -334,15 +427,23 @@ try:
     assert request(data='x'*32769)[0]==413
     assert request(data='['+json.dumps({'jsonrpc':'2.0','id':1,'method':'ping'})+']')[0]==400
     checks['sizeAndBatchLimits']=True
-    # Only the disposable local token is stressed. Never exhaust a real user's
-    # production quota; live checks rely on the exact-image local rate evidence.
+    # Never stress live credentials, even when the selected real token is elevated.
     checks['rateLimitExercised']=not bool(args.url)
     if not args.url:
-        for _ in range(65):
-            if request()[0]==429: break
-        else: raise RuntimeError('Per-token rate limit not enforced')
+        defaults=[probe_policy(name,default_limits,True) for name in ('max','buzz')]
+        assert request(bearer=disposable_tokens['isolated'],limits=default_limits)[0]==405
+        disposable_configuration(elevated=True)
+        for _ in range(3):
+            assert request(bearer=disposable_tokens['activation'],limits=default_limits)[0]==405, 'File change activated policy without restart'
+        command(['docker','restart',container])
+        port=command(['docker','port',container,'4318/tcp']).split(':')[-1]
+        origin='http://127.0.0.1:'+port
+        ready()
+        activation=probe_policy('activation',{'requestsPerMinute':2,'maxConcurrent':1},True)
+        elevated=[probe_policy(name,elevated_limits,False) for name in ('max','buzz')]
+        assert request(bearer=disposable_tokens['isolated'],limits=default_limits)[0]==405
+        checks['tokenPolicies']={'defaultNamedProfiles':defaults,'explicitProfilesAfterRestart':elevated,'activationProfileAfterRestart':activation,'isolatedTokenUnaffected':True,'startupActivationOnly':True,'concurrencySaturationExercised':False}
         checks['rateLimit']=True
-        assert 'retryAfterSeconds' in checks
     evidence={'passed':True,'runId':acceptance_run_id,'releaseVersion':checks['serverVersion'],'dataManifestId':checks['statusDataManifestId'],'origin':origin,'checks':checks,'timestamp':datetime.datetime.now(datetime.timezone.utc).isoformat()}
     if args.url:
         evidence.update(acceptanceScope='public_endpoint_version_data',imageProvenanceVerified=False,runningImageIdentityVerified=False,suppliedImageReference=args.image,imageIdentityNote='Caller-supplied reference is unverified. Endpoint/version/data acceptance does not identify the running image; correlate separately with governed rollout and ReadyPod evidence.')
@@ -352,5 +453,7 @@ try:
     destination.write_text(json.dumps(evidence,indent=2)+'\n')
     print(str(destination))
 finally:
-    if container: command(['docker','rm','--force',container])
-    hash_mount.cleanup()
+    try:
+        if container: command(['docker','rm','--force',container])
+    finally:
+        hash_mount.cleanup()

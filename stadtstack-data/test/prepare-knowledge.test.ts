@@ -4,6 +4,7 @@ import {mkdtemp,readFile,writeFile,rm,lstat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {prepareKnowledge} from '../src/prepare-knowledge.ts';
+import {knowledgePublicationHold,knowledgePublicationQuarantineCase,quarantineReasonHistogram} from '../src/district-publication.ts';
 import {PILOT_COMPLETION_CORPUS_SHA256} from '../src/district-corpus.ts';
 import {root,hash} from '../src/common.ts';
 
@@ -21,4 +22,23 @@ test('a replay clock never substitutes for the original frozen corpus binding or
   await assert.rejects(prepareKnowledge({registry,index:join(directory,'index.json'),records:join(directory,'records.json'),quarantine:join(directory,'quarantine.json'),extractionRun:join(directory,'run.json'),coverageGeneratedAt:'2026-10-11T09:25:12.545Z',stagingDir,publicationQuarantinePath}),/not bound to the frozen corpus\/registry bytes/);
   await assert.rejects(lstat(stagingDir),{code:'ENOENT'});await assert.rejects(lstat(publicationQuarantinePath),{code:'ENOENT'});
  }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('preparation carries structured date and URL holds into one source-bound quarantine entry',()=>{
+ const record={id:'synthetic-held-record',municipalityId:'synthetic-town',sources:[{id:'synthetic-source'}],extraction:{inputSha256:'1'.repeat(64)},documentDate:null,stageDate:null,stages:[],summaryQuote:'Withheld source evidence file:///private/1998-04-03'};
+ const original=structuredClone(record),hold=knowledgePublicationHold(record)!;
+ const item=knowledgePublicationQuarantineCase(record,hold);
+ assert.equal(item.recordId,record.id);
+ assert.equal(item.municipalityId,record.municipalityId);
+ assert.equal(item.sourceId,record.sources[0].id);
+ assert.equal(item.sourceSha256,record.extraction.inputSha256);
+ assert.deepEqual(item.publicationReasons,['missing_sourced_date','nonpublic_evidence_url']);
+ assert.deepEqual(quarantineReasonHistogram([item]),{categories:[{reason:'missing_sourced_date',count:1},{reason:'nonpublic_evidence_url',count:1}],failedDeterministicChecks:[]});
+ assert.equal(JSON.stringify(item).includes('file:///'),false);
+ assert.equal(JSON.stringify(item).includes('1998-04-03'),false);
+ assert.deepEqual(record,original);
+ const dated={...record,documentDate:'1998-04-03'};
+ const datedItem=knowledgePublicationQuarantineCase(dated,knowledgePublicationHold(dated)!);
+ assert.deepEqual(quarantineReasonHistogram([datedItem]).categories,[{reason:'nonpublic_evidence_url',count:1}]);
+ assert.equal(JSON.stringify(datedItem).includes('1998-04-03'),false);
 });

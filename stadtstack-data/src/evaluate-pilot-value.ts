@@ -120,7 +120,7 @@ export function decodeTool(result:unknown):JsonObject {
   const text=content.find(item=>item.type==='text')?.text;if(!text)throw Error('MCP response has no structured evidence');
   return objectSchema.parse(JSON.parse(text));
 }
-export async function collect(options:{serverRoot:string;releaseId:string;toolCount:16|19;bankPath:string}):Promise<Report>{
+export async function collect(options:{serverRoot:string;releaseId:string;toolCount:16|19|20;bankPath:string}):Promise<Report>{
   sha.parse(options.releaseId);
   const root=await realpath(options.serverRoot),bankBytes=await readFile(options.bankPath),bank=bankSchema.parse(JSON.parse(bankBytes.toString('utf8')));
   const identity=await sourceIdentity(root);
@@ -151,7 +151,7 @@ export async function collect(options:{serverRoot:string;releaseId:string;toolCo
     if(listed.nextCursor||report.server.tools.length!==options.toolCount)throw Error('Unexpected release tool inventory');
     const requiredGraph=['entity_search','graph_neighbors','graph_path'];
     const graphAvailable=requiredGraph.every(name=>report.server.tools.includes(name));
-    if(graphAvailable!==(options.toolCount===19))throw Error('Graph inventory does not match selected release');
+    if(graphAvailable!==(options.toolCount>=19))throw Error('Graph inventory does not match selected release');
     report.releaseStatus=(await call('get_release_status',{})).data;
     if(objectSchema.parse(report.releaseStatus.dataManifest).id!==options.releaseId)throw Error('Wrong immutable release');
     report.coverage=(await call('list_cities',{})).data;
@@ -250,7 +250,7 @@ async function main(){
   const required=(name:string)=>{const value=options.get(name);if(!value)throw Error('Required evaluation option missing');return value;};
   const load=async(path:string)=>JSON.parse(await readFile(path,'utf8')) as Report;
   if(mode==='collect'){
-    const toolCount=Number(required('tools'));if(toolCount!==16&&toolCount!==19)throw Error('Expected 16 or 19 tools');
+    const toolCount=Number(required('tools'));if(toolCount!==16&&toolCount!==19&&toolCount!==20)throw Error('Expected 16, 19 or 20 tools');
     const report=await collect({serverRoot:required('server-root'),releaseId:required('release'),toolCount,bankPath:options.get('bank')??new URL('../evaluation/pilot-questions.json',import.meta.url).pathname});
     const reuse=options.get('reuse-review');if(reuse){const prior=await load(reuse);validateReport(prior);if(prior.questionBankSha256!==report.questionBankSha256||prior.server.releaseId!==report.server.releaseId)throw Error('Review identity mismatch');for(const row of report.evaluations){const old=prior.evaluations.find(item=>item.question.id===row.question.id);if(!old||old.evidenceSha256!==row.evidenceSha256)throw Error('Cannot reuse review after evidence change');row.review=old.review;}validateReport(report);report.status='reviewed';report.summary=summarize(report.evaluations);}
     await save(required('output'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({status:report.status,questions:report.evaluations.length,tools:toolCount,releaseId:report.server.releaseId}));
