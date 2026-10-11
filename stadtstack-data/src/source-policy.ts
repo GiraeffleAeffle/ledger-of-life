@@ -1,4 +1,31 @@
 import {load} from 'cheerio';
+import {isIP} from 'node:net';
+import {isPublicAddress} from './public-address.ts';
+import {DocumentOriginSchema,type DocumentOriginClassification} from './document-origin.ts';
+
+/** Owner operational decision only: not municipal permission, a licence, or an access-barrier exemption. */
+export const APPROVED_OWNER_ROBOTS_OVERRIDE=Object.freeze({
+ reason:'public civic sources, owner decision',
+ date:'2026-10-11',
+ approver:'owner',
+ id:'owner-2026-10-11-public-civic-sources',
+} as const);
+export type OwnerRobotsOverride=typeof APPROVED_OWNER_ROBOTS_OVERRIDE&{readonly host:string};
+/** Bind the global decision to one public target; callers must separately establish registered-source context. */
+export function ownerRobotsOverrideFor(url:string):OwnerRobotsOverride|null {
+ try{
+  const target=new URL(url),host=target.hostname.replace(/^\[|\]$/g,'').toLowerCase();
+  if(!['https:','http:'].includes(target.protocol)||target.username||target.password||target.port&&!['80','443'].includes(target.port)||host.endsWith('.')||!host.includes('.')&&!isIP(host)||/\.(?:localhost|local|internal|test|invalid|example|onion)$/.test(host)||isIP(host)&&!isPublicAddress(host))return null;
+  for(const key of target.searchParams.keys())if(/^(?:token|access_token|api_key|apikey|password|secret|authorization|sessionid|phpsessid)$/i.test(key))return null;
+  return Object.freeze({...APPROVED_OWNER_ROBOTS_OVERRIDE,host:target.hostname});
+ }catch{return null;}
+}
+export function ownerRobotsOverrideApplies(url:string,supplied:unknown):boolean {
+ const approved=ownerRobotsOverrideFor(url);
+ if(!approved||!supplied||typeof supplied!=='object'||Array.isArray(supplied))return false;
+ const value=supplied as Record<string,unknown>,keys=Object.keys(approved) as (keyof OwnerRobotsOverride)[];
+ return Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key)&&value[key]===approved[key]);
+}
 
 export interface PolicyEvidence {url:string;locator:string;value:string;sha256?:string;checkedAt?:string}
 export interface SourceAccessPolicy {
@@ -7,8 +34,40 @@ export interface SourceAccessPolicy {
  access:'public'|'authentication'|'captcha'|'paywall';
  legalClassification:'not_assessed';
  publication:'facts_with_attribution_only';
+ ownerRobotsOverride?:OwnerRobotsOverride;
+ robotsStatus?:'allowed'|'disallowed'|'unavailable';
+ override?:'owner-approved 2026-10-11';
+ ownerTdmOverride?:OwnerRobotsOverride;
+ tdmOverride?:'owner-approved 2026-10-11';
+ documentOrigin?:DocumentOriginClassification;
 }
 export interface TdmRule {location:string;'tdm-reservation':0|1;'tdm-policy'?:string}
+
+/** Evaluate robots only. Access, TDM (including PDF metadata), DNS and source binding remain separate gates. */
+export function effectiveRobotsPermission(policy:SourceAccessPolicy,documentUrl:string):boolean {
+ if(policy.robots.state==='allowed')return policy.ownerRobotsOverride===undefined&&policy.override===undefined&&(policy.robotsStatus===undefined||policy.robotsStatus==='allowed');
+ if(!ownerRobotsOverrideApplies(documentUrl,policy.ownerRobotsOverride)||policy.robotsStatus!==(policy.robots.state==='blocked'?'disallowed':'unavailable')||policy.override!=='owner-approved 2026-10-11')return false;
+ if(!policy.robots.checkedAt||!Number.isFinite(Date.parse(policy.robots.checkedAt)))return false;
+ if(policy.robots.state==='blocked'&&(!policy.robots.sha256||!/^[a-f0-9]{64}$/.test(policy.robots.sha256)))return false;
+ try{
+  const document=new URL(documentUrl),robots=new URL(policy.robots.url);
+  return ownerRobotsOverrideApplies(robots.href,policy.ownerRobotsOverride)&&robots.origin===document.origin&&robots.pathname==='/robots.txt'&&!robots.search&&!robots.hash;
+ }catch{return false;}
+}
+
+/** Unknown is never promoted to official; legacy ordinary policies may omit classification. */
+export function documentOriginExcludes(policy:SourceAccessPolicy,document:{url:string;sha256:string}):boolean {
+ if(!policy.documentOrigin)return Boolean(policy.ownerRobotsOverride||policy.ownerTdmOverride||policy.robots.state==='blocked'||policy.tdm.state==='reserved');
+ const parsed=DocumentOriginSchema.safeParse(policy.documentOrigin);
+ if(!parsed.success||parsed.data.url!==document.url||parsed.data.sha256!==document.sha256)return true;
+ return parsed.data.classification!=='official_work'&&(policy.robots.state==='blocked'||policy.tdm.state==='reserved');
+}
+/** Shared pre-CAS/pre-model admission; PDF metadata completeness is additionally checked by the schema gate. */
+export function effectiveSourcePermission(policy:SourceAccessPolicy,document:{url:string;sha256:string}):boolean {
+ if(!effectiveRobotsPermission(policy,document.url)||policy.access!=='public'||policy.tdm.state==='unavailable'||documentOriginExcludes(policy,document))return false;
+ if(policy.tdm.state==='reserved')return policy.documentOrigin?.classification==='official_work'&&policy.tdmOverride==='owner-approved 2026-10-11'&&ownerRobotsOverrideApplies(document.url,policy.ownerTdmOverride);
+ return policy.ownerTdmOverride===undefined&&policy.tdmOverride===undefined;
+}
 
 /** Prefix glob with '*' and optional trailing '$'; never compile remote patterns as regex. */
 export function matchesPolicyPattern(pattern:string,value:string):boolean {

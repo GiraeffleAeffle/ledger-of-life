@@ -3,15 +3,16 @@ import {resolve,join,dirname,relative,isAbsolute} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {PoliteFetcher,PoliteFetchError} from './polite-fetch.ts';
-import {crawlHtmlSource,crawlOparlSource,crawlParticipationApi,crawlMvPlanningApi} from './district-source-adapters.ts';
-import type {RegistryMunicipality,CrawlDocument,AdapterOptions,AdapterResult,CrawlCoverage,FrontierFailure} from './district-source-adapters.ts';
+import {crawlHtmlSource,crawlOparlSource,crawlParticipationApi,crawlMvPlanningApi,sourceDocument} from './district-source-adapters.ts';
+import type {RegistryMunicipality,CrawlDocument,CrawlExcludedDocument,AdapterOptions,AdapterResult,CrawlCoverage,FrontierFailure} from './district-source-adapters.ts';
 import {loadDistrictRegistry} from './district-registry.ts';
+import {APPROVED_OWNER_ROBOTS_OVERRIDE} from './source-policy.ts';
 
 export interface CrawlCheck {
  municipalityId:string;sourceId:string;checkState:'checked'|'not_found'|'not_checked';checkedAt:string|null;
- httpStatus?:number;reason?:string;documentCount:number;outcome?:'documents_collected'|'no_documents'|'partial'|'blocked'|'failed'|'not_checked'|'registry_not_found';requests?:number;rounds?:number;coverage?:CrawlCoverage;blocked?:FrontierFailure[];
+ httpStatus?:number;reason?:string;retryAfter?:string;documentCount:number;outcome?:'documents_collected'|'no_documents'|'partial'|'blocked'|'failed'|'not_checked'|'registry_not_found';requests?:number;rounds?:number;coverage?:CrawlCoverage;blocked?:FrontierFailure[];
 }
-export interface DistrictCrawlIndex {schemaVersion:'stadtstack-crawl-index-v1';generatedAt:string;documents:CrawlDocument[];checks:CrawlCheck[]}
+export interface DistrictCrawlIndex {schemaVersion:'stadtstack-crawl-index-v1';generatedAt:string;documents:CrawlDocument[];excludedDocuments?:CrawlExcludedDocument[];checks:CrawlCheck[]}
 export interface CrawlRegistry {schemaVersion:'stadtstack-source-registry-v1';municipalities:RegistryMunicipality[]}
 /** Configured primary dispatch only; fallbacks and document adapter labels are separate evidence. */
 export function districtSourceAdapterKind(source:RegistryMunicipality['sources'][number]):'oparl'|'mv-bauleitplan'|'participation-api'|'html'{
@@ -19,7 +20,8 @@ export function districtSourceAdapterKind(source:RegistryMunicipality['sources']
 }
 export async function crawlDistrictRegistry(registry:CrawlRegistry,fetcher:PoliteFetcher,options:AdapterOptions&{municipality?:string;maxRounds?:number;onSource?:(index:DistrictCrawlIndex)=>Promise<void>}):Promise<DistrictCrawlIndex>{
  if(options.municipality&&!registry.municipalities.some(city=>city.id===options.municipality))throw Error('Requested municipality is not in the registry');
- const index:DistrictCrawlIndex={schemaVersion:'stadtstack-crawl-index-v1',generatedAt:new Date().toISOString(),documents:[],checks:[]};
+ await fetcher.initialize();
+ const index:DistrictCrawlIndex={schemaVersion:'stadtstack-crawl-index-v1',generatedAt:new Date().toISOString(),documents:[],excludedDocuments:[],checks:[]};
  const work:Array<{city:RegistryMunicipality;source:RegistryMunicipality['sources'][number];checkIndex:number;totalRequests:number;done:boolean}>=[];
  for(const city of registry.municipalities){
   for(const source of city.sources){
@@ -44,9 +46,10 @@ export async function crawlDistrictRegistry(registry:CrawlRegistry,fetcher:Polit
       const adapter=districtSourceAdapterKind(source);
       result=adapter==='oparl'?await crawlOparlSource(fetcher,city,source,options):adapter==='mv-bauleitplan'?await crawlMvPlanningApi(fetcher,city,source,options):adapter==='participation-api'?await crawlParticipationApi(fetcher,city,source,options):await crawlHtmlSource(fetcher,city,source,options);
      }catch(error){
+      if(error instanceof PoliteFetchError&&(error.status===403||error.status===429||error.failure.startsWith('host_')||error.excludedDocument))throw error;
       const consumed=fetcher.requestCount-startedRequests,remaining=options.maxRequests-consumed;
       if(source.api?.format==='bobsh-list'||!source.api||!seeds.length||remaining<1)throw error;
-      result=await crawlHtmlSource(fetcher,city,{...source,url:null},{...options,maxRequests:remaining},seeds);result.requests+=consumed;
+      result=await crawlHtmlSource(fetcher,city,{...source,registeredSourceUrl:source.registeredSourceUrl??source.url??source.api.url,url:null},{...options,maxRequests:remaining},seeds);result.requests+=consumed;
       const failure:FrontierFailure={url:source.api.url,failure:error instanceof PoliteFetchError?error.failure:'api_error',reason:error instanceof Error?error.message:'API unavailable',checkedAt,...(error instanceof PoliteFetchError&&error.policy?{policy:error.policy}:{}),action:'ask_municipality'};
       (result.blocked??=[]).push(failure);
       if(result.coverage){result.coverage.blockedCount++;result.coverage.action='ask_municipality';if(result.coverage.state==='complete')result.coverage.state='blocked';}
@@ -54,14 +57,19 @@ export async function crawlDistrictRegistry(registry:CrawlRegistry,fetcher:Polit
      }
      item.totalRequests+=result.requests;
      index.documents=index.documents.filter(document=>document.municipalityId!==city.id||document.sourceId!==source.id);index.documents.push(...result.documents);
+     index.excludedDocuments=index.excludedDocuments!.filter(document=>document.municipalityId!==city.id||document.sourceId!==source.id);index.excludedDocuments.push(...result.excludedDocuments??[]);
      const outcome=result.coverage?.state==='partial'?'partial':result.coverage?.state==='blocked'?'blocked':result.documents.length?'documents_collected':'no_documents';
      index.checks[checkIndex]={...base,checkState:'checked',checkedAt:result.checkedAt??null,documentCount:result.documents.length,requests:item.totalRequests,rounds:round,outcome,coverage:result.coverage,blocked:result.blocked,reason:[!source.api&&source.vendor!=='oparl'?'Official HTML/document fallback: no observed public API configured; API availability is not inferred':null,...result.notes].filter(Boolean).join('; ')};
      index.generatedAt=new Date().toISOString();await options.onSource?.(index);
      // Continue budgets automatically; zero work means retries are deferred or a prerequisite is inaccessible.
      if(result.coverage?.state!=='partial'||result.requests===0||result.coverage.runnableCount===0)item.done=true;
     }catch(error){
+     if(error instanceof PoliteFetchError&&error.excludedDocument){
+      index.excludedDocuments!.push(sourceDocument(error.excludedDocument,city,source,districtSourceAdapterKind(source)));
+      index.documents=index.documents.filter(document=>document.municipalityId!==city.id||document.sourceId!==source.id||document.url!==error.excludedDocument!.url);
+     }
      const reason=error instanceof PoliteFetchError?`${error.failure}: ${error.message}; ask municipality`:(error instanceof Error?error.message:'Source adapter failed');
-     index.checks[checkIndex]={...base,checkState:'checked',checkedAt,rounds:round,outcome:'blocked',reason,coverage:{state:'blocked',pendingCount:0,runnableCount:0,blockedCount:1,scope:'Configured source endpoint',action:'ask_municipality'},...(error instanceof PoliteFetchError&&error.status?{httpStatus:error.status}:{})};
+     index.checks[checkIndex]={...base,checkState:'checked',checkedAt,rounds:round,outcome:'blocked',reason,coverage:{state:'blocked',pendingCount:0,runnableCount:0,blockedCount:1,scope:'Configured source endpoint',action:'ask_municipality'},...(error instanceof PoliteFetchError&&error.status?{httpStatus:error.status}:{}),...(error instanceof PoliteFetchError&&error.retryAfter?{retryAfter:error.retryAfter}:{})};
      index.generatedAt=new Date().toISOString();await options.onSource?.(index);item.done=true;
     }
   }
@@ -70,7 +78,7 @@ export async function crawlDistrictRegistry(registry:CrawlRegistry,fetcher:Polit
  index.generatedAt=new Date().toISOString();return index;
 }
 async function main(){
- const {values}=parseArgs({options:{registry:{type:'string',default:'sources/district-registry.json'},out:{type:'string',default:'cache/districts/index.json'},cache:{type:'string',default:'cache/districts/raw'},municipality:{type:'string'},'max-documents':{type:'string',default:'8'},'max-pages':{type:'string',default:'3'},'max-requests':{type:'string',default:'24'},'max-rounds':{type:'string',default:'1000'},'revalidate-after-hours':{type:'string',default:'24'}}});
+ const {values}=parseArgs({options:{registry:{type:'string',default:'sources/district-registry.json'},out:{type:'string',default:'cache/districts/owner-policy-2026-10-11/index.json'},cache:{type:'string',default:'cache/districts/owner-policy-2026-10-11/raw'},municipality:{type:'string'},'max-documents':{type:'string',default:'8'},'max-pages':{type:'string',default:'3'},'max-requests':{type:'string',default:'24'},'max-rounds':{type:'string',default:'1000'},'revalidate-after-hours':{type:'string',default:'24'}}});
  const options:AdapterOptions={maxDocuments:Number(values['max-documents']),maxPages:Number(values['max-pages']),maxRequests:Number(values['max-requests'])};
  for(const [key,value] of Object.entries(options))if(!Number.isInteger(value)||value<1||value>200)throw Error(`${key} must be an integer from 1 to 200`);
  const maxRounds=Number(values['max-rounds']);if(!Number.isInteger(maxRounds)||maxRounds<1||maxRounds>10000)throw Error('max-rounds must be an integer from 1 to 10000; a stopped frontier remains explicitly partial');
@@ -87,9 +95,9 @@ async function main(){
  try{
   await handle.writeFile(JSON.stringify({pid:process.pid,startedAt:new Date().toISOString()})+'\n');await handle.close();
   const persist=async(index:DistrictCrawlIndex)=>{await writeFile(out+'.tmp',JSON.stringify(index,null,2)+'\n');await rename(out+'.tmp',out);};
-  const index=await crawlDistrictRegistry(registry,new PoliteFetcher({cacheDir:cache,policyTtlMs:Math.min(revalidateAfterMs,60*60_000)}),{...options,revalidateAfterMs,maxRounds,municipality:values.municipality,onSource:persist});
+  const index=await crawlDistrictRegistry(registry,new PoliteFetcher({cacheDir:cache,ownerPolicyLane:{decisionId:APPROVED_OWNER_ROBOTS_OVERRIDE.id},policyTtlMs:Math.min(revalidateAfterMs,60*60_000)}),{...options,revalidateAfterMs,maxRounds,municipality:values.municipality,onSource:persist});
   await persist(index);
-  console.log(JSON.stringify({index:out,documents:index.documents.length,municipalitiesWithDocuments:new Set(index.documents.map(document=>document.municipalityId)).size,checks:index.checks.map(check=>({municipalityId:check.municipalityId,sourceId:check.sourceId,outcome:check.outcome,coverage:check.coverage,documentCount:check.documentCount}))}));
+  console.log(JSON.stringify({index:out,documents:index.documents.length,excludedDocuments:index.excludedDocuments?.length??0,municipalitiesWithDocuments:new Set(index.documents.map(document=>document.municipalityId)).size,checks:index.checks.map(check=>({municipalityId:check.municipalityId,sourceId:check.sourceId,outcome:check.outcome,coverage:check.coverage,documentCount:check.documentCount}))}));
  }finally{await handle.close().catch(()=>{});await unlink(lock);}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)main().catch(error=>{console.error(error instanceof Error?error.message:'District crawl failed');process.exitCode=1;});

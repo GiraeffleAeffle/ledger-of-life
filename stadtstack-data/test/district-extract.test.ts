@@ -9,6 +9,8 @@ import { TOPICS } from '../regional/taxonomy.mjs';
 import {groupCrawlDocuments,selectExtractionGroups} from '../src/district-corpus.ts';
 import {PROVIDER_CONFIGS} from '../src/district-model-contract.ts';
 import {normalizeGraphClaims} from '../src/district-graph-claims.ts';
+import {ownerRobotsOverrideFor} from '../src/source-policy.ts';
+import {DOCUMENT_ORIGIN_CLASSIFIER_VERSION} from '../src/document-origin.ts';
 const EXTRACTION_MODEL=PROVIDER_CONFIGS['openai-subscription'].model;
 
 test('Bounded extraction prioritizes grounded seeds, preserves same-byte references and gives municipalities fair turns',()=>{
@@ -265,6 +267,35 @@ test('missing, reserved or blocked source policy prevents subscription transmiss
   ]) assert.throws(() => assertSubscriptionSourcePolicy(blocked), /ask_municipality/);
   const cached = record();
   assert.throws(() => rebindSourceReferences(cached, [{ ...cached.sources[0], policy: { ...cached.sources[0].policy, access: 'captcha' } }]), /ask_municipality/);
+});
+test('record and cache source rebinding retain the blocked owner decision without weakening other release gates', () => {
+  const original = record(), url = 'https://strausberg.allris.cloud/public/si010';
+  const source: DistrictKnowledgeRecord['sources'][number] = {
+    ...original.sources[0], id: 'strausberg-council', url, sourceType: 'council',
+    policy: { ...original.sources[0].policy, robots: { state: 'blocked', url: new URL('/robots.txt', url).href, sha256: sha256('synthetic robots denial'), checkedAt: '2026-10-11T12:00:00.000Z' }, ownerRobotsOverride: ownerRobotsOverrideFor(url)!, robotsStatus: 'disallowed', override: 'owner-approved 2026-10-11', documentOrigin: { classification: 'official_work', method: 'rules', classifierVersion: DOCUMENT_ORIGIN_CLASSIFIER_VERSION, url, sha256: original.sources[0].sha256, classifiedAt: '2026-10-11T12:00:00.000Z', evidence: [{ locator: 'synthetic fixture', value: 'administrative authorship and formal work fixture' }] } },
+  };
+  const rebound = rebindSourceReferences(original, [source]);
+  const retained = DistrictKnowledgeRecordSchema.parse(rebound).sources.find(item => item.id === source.id)!;
+  assert.deepEqual(retained.policy, source.policy);
+  assert.equal(retained.policy.robots.state, 'blocked');
+  assert.notEqual(rebound.verification.evidenceHash, original.verification.evidenceHash);
+  for (const mutate of [
+    (item: typeof source) => { item.url = 'https://other.allris.cloud/public/si010'; },
+    (item: typeof source) => { delete item.policy.ownerRobotsOverride; },
+    (item: typeof source) => { item.policy.robots.state = 'unavailable'; },
+    (item: typeof source) => { item.policy.access = 'captcha'; },
+    (item: typeof source) => { item.policy.tdm.state = 'reserved'; },
+    (item: typeof source) => { item.mimeType = 'application/pdf'; },
+  ]) {
+    const changed = structuredClone(rebound);
+    mutate(changed.sources.find(item => item.id === source.id)!);
+    changed.verification.evidenceHash = knowledgeEvidenceHash(changed);
+    assert.equal(DistrictKnowledgeRecordSchema.safeParse(changed).success, false);
+  }
+  const failedGates = structuredClone(rebound);
+  failedGates.verification.faithfulness.score = 0;
+  failedGates.verification.evidenceHash = knowledgeEvidenceHash(failedGates);
+  assert.equal(DistrictKnowledgeRecordSchema.safeParse(failedGates).success, false);
 });
 
 test('source-category duplicates group once per municipality and bytes, without merging municipalities', () => {

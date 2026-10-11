@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, writeFile, readdir, rm, stat, symlink, unlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, readdir, rm, stat, symlink, unlink, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -8,6 +8,9 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { cachedModelAnswer } from '../src/district-answer-cache.ts';
 import type { CachedAnswer } from '../src/district-answer-cache.ts';
 import { sha256 } from '../src/district-schema.ts';
+import { recordHostOptOut } from '../src/civic-opt-out.ts';
+import type { PreparedSourceReference } from '../src/district-prepared-document.ts';
+import { APPROVED_OWNER_ROBOTS_OVERRIDE } from '../src/source-policy.ts';
 
 const binding = sha256('synthetic exact provider/model/system/input/schema binding');
 const modelIdentitySha256 = sha256('synthetic model identity');
@@ -231,5 +234,33 @@ test('a replaced producer lock is never released or used to authorize publicatio
     }), /owner changed/);
     assert.equal(await readFile(lockPath, 'utf8'), 'replacement owner\n');
     await absent(join(root, binding + '.answer.json'));
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('source-bound model answers enroll for purge and objections block hits and generation', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'district-answer-opt-out-'))), stateDir = join(root, 'policy'), cacheRoot = join(root, 'cache');
+  const reference: PreparedSourceReference = { id: 'synthetic-source', url: 'https://stadt.de/source', sha256: sha256('synthetic source'), retrievedAt: '2026-10-11T12:00:00.000Z', locator: 'synthetic fixture', mimeType: 'text/plain', sourceType: 'website', policy: { robots: { state: 'allowed', url: 'https://stadt.de/robots.txt' }, tdm: { state: 'not_declared', evidence: [] }, access: 'public', legalClassification: 'not_assessed', publication: 'facts_with_attribution_only' } };
+  const options = { cacheRoot, binding, modelIdentitySha256, sourceContext: { decisionId: APPROVED_OWNER_ROBOTS_OVERRIDE.id, references: [reference], receiptSha256: sha256('synthetic prepared receipt'), policyStateDir: stateDir } } satisfies Parameters<typeof cachedModelAnswer>[0];
+  let calls = 0;
+  try {
+    assert.deepEqual(await cachedModelAnswer(options, async () => { calls++; return answer(); }), answer());
+    assert.deepEqual(await cachedModelAnswer(options, async () => { assert.fail('must reuse managed answer'); }), answer());
+    const objection = await recordHostOptOut({ host: 'stadt.de', reason: 'rights_holder_objection', reference: 'synthetic-answer-test' }, { stateDir });
+    assert.equal(objection.purge.status, 'purged');
+    await absent(join(cacheRoot, binding + '.answer.json'));
+    await assert.rejects(cachedModelAnswer(options, async () => { calls++; return answer(); }), /objection/);
+    assert.equal(calls, 1);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('source-bound answer generation refuses an incomplete legacy artifact inventory before model work', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'district-answer-incomplete-'))), cacheRoot = join(root, 'cache'), stateDir = join(root, 'policy');
+  const reference: PreparedSourceReference = { id: 'synthetic-source', url: 'https://stadt.de/source', sha256: sha256('synthetic source'), retrievedAt: '2026-10-11T12:00:00.000Z', locator: 'synthetic fixture', mimeType: 'text/plain', sourceType: 'website', policy: { robots: { state: 'allowed', url: 'https://stadt.de/robots.txt' }, tdm: { state: 'not_declared', evidence: [] }, access: 'public', legalClassification: 'not_assessed', publication: 'facts_with_attribution_only' } };
+  let calls = 0;
+  try {
+    await mkdir(cacheRoot, { mode: 0o700 }); await writeFile(join(cacheRoot, 'unbound-legacy.txt'), 'synthetic unbound raw artifact', { mode: 0o600 });
+    await assert.rejects(cachedModelAnswer({ cacheRoot, binding, modelIdentitySha256, sourceContext: { decisionId: APPROVED_OWNER_ROBOTS_OVERRIDE.id, references: [reference], receiptSha256: sha256('synthetic receipt'), policyStateDir: stateDir } }, async () => { calls++; return answer(); }), /policy state/);
+    assert.equal(calls, 0);
+    assert.equal(await readFile(join(cacheRoot, 'unbound-legacy.txt'), 'utf8'), 'synthetic unbound raw artifact');
   } finally { await rm(root, { recursive: true, force: true }); }
 });

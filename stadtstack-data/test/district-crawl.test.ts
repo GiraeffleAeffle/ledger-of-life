@@ -4,13 +4,26 @@ import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {hash} from '../src/common.ts';
-import {PoliteFetcher,PoliteFetchError} from '../src/polite-fetch.ts';
+import {PoliteFetcher as BasePoliteFetcher,PoliteFetchError} from '../src/polite-fetch.ts';
 import {crawlDistrictRegistry} from '../src/district-crawl.ts';
-import {discoverDocumentLinks,crawlHtmlSource,crawlMvPlanningApi,crawlParticipationApi,crawlOparlSource,createPoliteCouncilLoader} from '../src/district-source-adapters.ts';
+import {discoverDocumentLinks,crawlHtmlSource,crawlMvPlanningApi,crawlParticipationApi,crawlOparlSource} from '../src/district-source-adapters.ts';
+import {createPoliteCouncilLoader} from '../src/council-cache.ts';
 import type {RegistryMunicipality,RegistrySource} from '../src/district-source-adapters.ts';
 import {metadataPdf} from './fixtures/tdm-pdf.ts';
 import {PDF_TDM_POLICY_VERSION} from '../src/pdf-tdm-policy.ts';
 import type {SourceAccessPolicy} from '../src/source-policy.ts';
+import {ownerRobotsOverrideFor} from '../src/source-policy.ts';
+import type {PoliteFetcherOptions,SourceContentBinding} from '../src/polite-fetch.ts';
+import {politeTestOptions} from './fixtures/polite-lane.ts';
+import {writePrivateJson} from '../src/district-private-io.ts';
+
+/** Adapter-unit upstream doubles keep fixture bytes outside the real empty lane; lifecycle is tested separately. */
+class PoliteFetcher extends BasePoliteFetcher {
+ constructor(options:PoliteFetcherOptions){super(politeTestOptions({...options,cacheDir:join(options.cacheDir,'managed')}));}
+ override async persistDerivedJson(path:string,value:unknown,_bindings:SourceContentBinding[]):Promise<void>{
+  await this.initialize();await writePrivateJson(path,value);
+ }
+}
 
 // Synthetic upstream policy for frontier tests; PDF parsing itself uses complete PDF fixtures.
 function fixturePolicy(url:string,sha256:string,checkedAt:string,mimeType:string):SourceAccessPolicy {
@@ -287,4 +300,43 @@ test('fresh cached PDF with v1 proof is withheld and revalidated despite a long 
  const legacy=JSON.parse(await readFile(frontierPath,'utf8'));legacy.documents[0].policy.tdm.evidence[0].locator='PDF.js fixture XMP metadata (pdf-tdm-v1)';await writeFile(frontierPath,JSON.stringify(legacy));
  const withheld=await crawlHtmlSource(fetcher,city,direct,{...options,maxRequests:0});assert.equal(withheld.documents.length,0);assert.equal(withheld.coverage?.state,'partial');assert.equal(withheld.coverage?.runnableCount,1);assert.equal(calls,1);
  const refreshed=await crawlHtmlSource(fetcher,city,direct,options);assert.equal(calls,2);assert.equal(refreshed.documents.length,1);assert.equal(refreshed.documents[0].sha256,first.documents[0].sha256);assert.ok(refreshed.documents[0].policy!.tdm.evidence[0].locator.endsWith(`(${PDF_TDM_POLICY_VERSION})`));
+});
+
+test('source adapter passes explicit owner decision and stops the frontier immediately on 403/429',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'district-owner-stop-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const configured={...source,ownerRobotsOverride:ownerRobotsOverrideFor(source.url!)!};
+ for(const status of [403,429]){
+  const fetcher=new PoliteFetcher({cacheDir:join(root,String(status))});let calls=0;
+  const retryAfter='2026-10-12T00:00:00.000Z';
+  t.mock.method(fetcher,'fetch',async(_url,options)=>{
+   calls++;assert.deepEqual(options?.ownerRobotsOverride,configured.ownerRobotsOverride);assert.equal(options?.hostProfile,'municipal');assert.equal(options?.registeredSourceUrl,configured.url);
+   throw new PoliteFetchError(status===403?'access_barrier':'http_error',`HTTP ${status}`,status,undefined,retryAfter);
+  });
+  const result=await crawlHtmlSource(fetcher,city,configured,{maxDocuments:10,maxPages:10,maxRequests:10},[{sourceId:source.id,url:'https://stadt.de/a'},{sourceId:source.id,url:'https://stadt.de/b'}]);
+  assert.equal(calls,1);assert.equal(result.coverage?.runnableCount,0);assert.equal(result.blocked?.[0].status,status);assert.equal(result.blocked?.[0].retryAfter,retryAfter);
+ }
+});
+test('API access stops cannot trigger document fallback',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'district-owner-api-stop-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const configured:RegistrySource={...source,api:{url:'https://stadt.de/api',format:'diplan-list'}},fetcher=new PoliteFetcher({cacheDir:root});let calls=0;
+ t.mock.method(fetcher,'fetch',async()=>{calls++;throw new PoliteFetchError('http_error','HTTP 429',429,undefined,'2026-10-12T00:00:00.000Z');});
+ const registry={schemaVersion:'stadtstack-source-registry-v1' as const,municipalities:[{...city,sources:[configured],seedDocuments:[{sourceId:source.id,url:'https://stadt.de/document'}]}]};
+ const result=await crawlDistrictRegistry(registry,fetcher,{maxDocuments:10,maxPages:10,maxRequests:10});
+ assert.equal(calls,1);assert.equal(result.checks[0].httpStatus,429);assert.equal(result.checks[0].retryAfter,'2026-10-12T00:00:00.000Z');
+});
+
+test('excluded representations survive the crawl index without parsed links or raw document rows',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'district-excluded-index-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const configured:RegistrySource={...source,ownerRobotsOverride:ownerRobotsOverrideFor(source.url!)!},fetcher=new PoliteFetcher({cacheDir:root}),seen:string[]=[];
+ const wire=fetcher as unknown as {wire(url:URL):Promise<{status:number;headers:Record<string,string>;body:Buffer}>};
+ t.mock.method(wire,'wire',async(url:URL)=>{
+  seen.push(url.href);
+  if(url.pathname==='/robots.txt')return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('User-agent: *\nDisallow: /')};
+  if(url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  return {status:200,headers:{'content-type':'text/html'},body:Buffer.from('<h1>Gutachten</h1><p>Verfasser: Ingenieurbüro Beispiel GmbH</p><p>Externe Untersuchung zur Verkehrsentwicklung des Quartiers.</p><a href="/must-not-follow.pdf">Anlage</a>')};
+ });
+ const index=await crawlDistrictRegistry({schemaVersion:'stadtstack-source-registry-v1',municipalities:[{...city,sources:[configured]}]},fetcher,{maxDocuments:10,maxPages:10,maxRequests:10});
+ assert.equal(index.documents.length,0);assert.equal(index.excludedDocuments?.length,1);
+ const excluded=index.excludedDocuments![0];assert.equal(excluded.policy.documentOrigin?.classification,'third_party');assert.equal('localPath' in excluded,false);assert.equal(excluded.municipalityId,city.id);
+ assert.ok(!seen.some(url=>url.includes('must-not-follow')));assert.equal(index.checks[0].blocked?.[0].failure,'document_excluded');
 });

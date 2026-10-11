@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { getTopic } from './topic-vocabulary.ts';
 import { PROVIDER_CONFIGS } from './district-model-contract.ts';
 import { EntityMentionSchema, RelationClaimSchema, NormalizedEntitySchema, NormalizedRelationSchema, GRAPH_DETERMINISTIC_CHECKS, normalizeGraphClaims, normalizeRelationActions, RelationActionNormalizationSchema } from './district-graph-claims.ts';
+import { APPROVED_OWNER_ROBOTS_OVERRIDE, effectiveRobotsPermission, effectiveSourcePermission, ownerRobotsOverrideApplies } from './source-policy.ts';
+import { DocumentOriginSchema } from './document-origin.ts';
 
 export const KNOWLEDGE_SCHEMA_VERSION = 'stadtstack-knowledge-v2';
 export const FAITHFULNESS_THRESHOLD = 0.8;
@@ -33,19 +35,36 @@ const geometry = z.discriminatedUnion('type', [
 export const stageSchema = z.enum(['motion', 'draft', 'consultation', 'decision', 'adopted', 'in_force', 'implemented', 'rejected', 'withdrawn', 'unknown']);
 export const caseKeyTypeSchema = z.enum(['diplan', 'bobsh', 'paper_reference', 'plan_number', 'source_document']);
 export const sourceTypeSchema = z.enum(['council', 'participation', 'gazette', 'website']);
+export const OwnerRobotsOverrideSchema = z.object({
+  host: z.string().min(1), reason: z.literal(APPROVED_OWNER_ROBOTS_OVERRIDE.reason),
+  date: z.literal(APPROVED_OWNER_ROBOTS_OVERRIDE.date), approver: z.literal(APPROVED_OWNER_ROBOTS_OVERRIDE.approver), id: z.literal(APPROVED_OWNER_ROBOTS_OVERRIDE.id),
+}).strict().refine(value => ownerRobotsOverrideApplies(`https://${value.host}/`, value), 'Expected an exact public-host-bound owner decision');
 export const SourceAccessPolicySchema = z.object({
   robots: z.object({ state: z.enum(['allowed', 'blocked', 'unavailable']), url: z.url(), sha256: hashSchema.optional(), checkedAt: z.iso.datetime().optional() }).strict(),
   tdm: z.object({ state: z.enum(['reserved', 'not_reserved', 'not_declared', 'unavailable']), evidence: z.array(z.object({ url: z.url(), locator: z.string(), value: z.string(), sha256: hashSchema.optional(), checkedAt: z.iso.datetime().optional() }).strict()) }).strict(),
   access: z.enum(['public', 'authentication', 'captcha', 'paywall']), legalClassification: z.literal('not_assessed'), publication: z.literal('facts_with_attribution_only'),
-}).strict();
-export function assertSubscriptionSourcePolicy(input: unknown, document?: { mimeType: string; sha256: string; url: string }) {
+  ownerRobotsOverride: OwnerRobotsOverrideSchema.optional(), robotsStatus: z.enum(['allowed', 'disallowed', 'unavailable']).optional(), override: z.literal('owner-approved 2026-10-11').optional(),
+  ownerTdmOverride: OwnerRobotsOverrideSchema.optional(), tdmOverride: z.literal('owner-approved 2026-10-11').optional(),
+  documentOrigin: DocumentOriginSchema.optional(),
+}).strict().superRefine((policy, ctx) => {
+  if (policy.ownerRobotsOverride !== undefined || policy.robotsStatus !== undefined || policy.override !== undefined) {
+    if (!effectiveRobotsPermission(policy, policy.robots.url)) ctx.addIssue({ code: 'custom', message: 'Owner robots audit requires an exact approved decision and honest declared robots evidence' });
+  }
+  if (policy.ownerTdmOverride !== undefined || policy.tdmOverride !== undefined) {
+    if (policy.tdm.state !== 'reserved' || policy.tdmOverride !== 'owner-approved 2026-10-11' || !ownerRobotsOverrideApplies(policy.robots.url, policy.ownerTdmOverride)) ctx.addIssue({ code: 'custom', message: 'Owner TDM audit requires the exact approved host decision and retained reservation' });
+  }
+});
+export function assertSubscriptionSourcePolicy(input: unknown, document?: { mimeType: string; sha256: string; url: string }, registeredSource?: { url: string | null; ownerRobotsOverride?: unknown }) {
   const parsed = SourceAccessPolicySchema.safeParse(input);
   if (!parsed.success) throw Error('Source policy evidence missing or invalid; recollect before subscription extraction');
-  if (parsed.data.robots.state !== 'allowed' || !['not_reserved', 'not_declared'].includes(parsed.data.tdm.state) || parsed.data.access !== 'public') throw Error('Source policy blocks extraction; ask_municipality');
+  // Never substitute the robots URL for a missing document URL on the exception path.
+  if (!effectiveSourcePermission(parsed.data, document ?? { url: '', sha256: '' })) throw Error('Source policy blocks extraction; ask_municipality');
+  if ((parsed.data.ownerRobotsOverride || parsed.data.ownerTdmOverride) && registeredSource && (!registeredSource.url || !ownerRobotsOverrideApplies(registeredSource.url, registeredSource.ownerRobotsOverride))) throw Error('Source policy exception is not bound to the registered source; ask_municipality');
   if (document && document.mimeType.split(';', 1)[0].trim().toLowerCase() === 'application/pdf') {
     const evidence = parsed.data.tdm.evidence.filter(item => /^PDF\.js \S+ XMP metadata \(pdf-tdm-v2\)$/.test(item.locator) && item.sha256 === document.sha256 && item.url === document.url && Boolean(item.checkedAt));
-    if (evidence.some(item => item.value === '1')) throw Error('Source PDF parsed metadata reserves TDM; ask_municipality');
-    if (!evidence.some(item => item.value === '0' || item.value === 'no_tdm_reservation_field')) throw Error('Source PDF parsed metadata evidence missing or not byte-bound; recollect before subscription extraction');
+    const reservedOverride = parsed.data.tdm.state === 'reserved' && parsed.data.documentOrigin?.classification === 'official_work' && parsed.data.tdmOverride === 'owner-approved 2026-10-11' && ownerRobotsOverrideApplies(document.url, parsed.data.ownerTdmOverride);
+    if (evidence.some(item => item.value === '1') && !reservedOverride) throw Error('Source PDF parsed metadata reserves TDM; ask_municipality');
+    if (!evidence.some(item => item.value === '0' || item.value === 'no_tdm_reservation_field' || item.value === '1' && reservedOverride)) throw Error('Source PDF parsed metadata evidence missing or not byte-bound; recollect before subscription extraction');
   }
   return parsed.data;
 }

@@ -2,13 +2,20 @@ import {strict as assert} from 'node:assert';
 import {test} from 'node:test';
 import {cities} from '../src/cities.ts';
 import {canonicalOparlUrl,councilId} from '../src/dedupe.ts';
-import {traverseCouncilList,loadCouncilJson} from '../src/council-cache.ts';
+import {traverseCouncilList,createCouncilAcquisition} from '../src/council-cache.ts';
 import {CouncilBindingError,bodyIdMatchesCity,bodyMatchesCity,councilCoverage,councilEventDate,councilLicence,councilWindow,inCouncilWindow,mergeCouncilRecords,parseOparlList,recordMatchesBody,selectCouncilBody} from '../src/council-oparl.ts';
 import type {CouncilLoader,CouncilSegment,CouncilStorage} from '../src/council-cache.ts';
 import type {CouncilCheckpoint,OparlBody,OparlRecord,StoredCouncilRecord} from '../src/council-oparl.ts';
-import {councilBindingFailure} from '../src/council.ts';
-import {setImmediate as nextTurn} from 'node:timers/promises';
+import {councilBindingFailure,collectOparl,collectRetainedCcf} from '../src/council.ts';
 import {PoliteFetcher,PoliteFetchError} from '../src/polite-fetch.ts';
+import type {FetchOptions} from '../src/polite-fetch.ts';
+import {mkdtemp,realpath,readFile,writeFile,mkdir,rm,stat} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {hash} from '../src/common.ts';
+import {recordHostOptOut} from '../src/civic-opt-out.ts';
+import childProcess from 'node:child_process';
+import {syncBuiltinESMExports} from 'node:module';
 
 const at='2026-10-10T12:00:00.000Z';
 const body:OparlBody={id:'https://council.example/body/1',name:'Example',type:'https://schema.oparl.org/1.1/Body',paper:'https://council.example/body/1/paper'};
@@ -22,22 +29,23 @@ function pageLoader(pages:Record<string,unknown>,requests:string[]=[]):CouncilLo
  return async url=>{requests.push(url);assert.ok(Object.hasOwn(pages,url),`Unexpected source URL ${url}`);return {...evidence,url,data:pages[url]};};
 }
 
-test('Interrupted public GETs back off twice, then preserve the failure for durable resume',async t=>{
+test('Scoped public GET failures remain durable-resume failures without a hidden reconnect loop',async t=>{
+ const root=await realpath(await mkdtemp(join(tmpdir(),'council-loader-failure-')));t.after(()=>rm(root,{recursive:true,force:true}));
+ const city=cities.find(city=>city.id==='koeln')!,acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),stateDir:join(root,'policy')});
  let requests=0;
- t.mock.method(PoliteFetcher.prototype,'fetch',async()=>{requests++;throw new PoliteFetchError('network_error','Public request failed');});
- t.mock.timers.enable({apis:['setTimeout']});
- const failed=assert.rejects(loadCouncilJson(body.paper!),/Public request failed/);
- await nextTurn();assert.equal(requests,1);
- t.mock.timers.tick(14_999);await nextTurn();assert.equal(requests,1);
- t.mock.timers.tick(1);await nextTurn();assert.equal(requests,2);
- t.mock.timers.tick(30_000);await failed;assert.equal(requests,3);
+ t.mock.method(acquisition.fetcher,'fetch',async()=>{requests++;throw new PoliteFetchError('network_error','Public request failed');});
+ await assert.rejects(acquisition.loadJson(city.endpoint!),/Public request failed/);
+ assert.equal(requests,1);
+ assert.ok((await readFile(join(root,'raw','.civic-acquisition-lane.json'))).length);
 });
 
-test('Policy, HTTP and integrity failures are never retried as connection failures',{timeout:1000},async t=>{
+test('Scoped council loader never retries policy, HTTP or integrity failures',async t=>{
+ const root=await realpath(await mkdtemp(join(tmpdir(),'council-loader-policy-')));t.after(()=>rm(root,{recursive:true,force:true}));
+ const city=cities.find(city=>city.id==='koeln')!,acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),stateDir:join(root,'policy')});
  let failure:Error=new PoliteFetchError('robots_blocked','Blocked'),requests=0;
- t.mock.method(PoliteFetcher.prototype,'fetch',async()=>{requests++;throw failure;});
+ t.mock.method(acquisition.fetcher,'fetch',async()=>{requests++;throw failure;});
  for(const error of [failure,new PoliteFetchError('tdm_reserved','Reserved'),new PoliteFetchError('http_error','HTTP 429',429),new Error('Council source cache digest mismatch')]){
-  failure=error;const before=requests;await assert.rejects(loadCouncilJson(body.paper!),error);assert.equal(requests,before+1);
+  failure=error;const before=requests;await assert.rejects(acquisition.loadJson(city.endpoint!),error);assert.equal(requests,before+1);
  }
 });
 
@@ -202,7 +210,7 @@ test('Incremental pagination resumes after network failure and advances watermar
 
 test('Rejected municipality becomes release-checkable failed binding metadata, not an empty successful source',()=>{
  const city=cities.find(city=>city.id==='duesseldorf')!,wrong={id:'https://ris-oparl.itk-rheinland.de/Oparl/bodies/0009',name:'Stadt Neuss'};
- const result=councilBindingFailure(city,new CouncilBindingError(city,[wrong]),'oparl');
+ const result=councilBindingFailure(city,new CouncilBindingError(city,[wrong]));
  assert.equal(result.features.length,0);assert.equal(result.sources[0].status,'failed');assert.equal(result.sources[0].recordCount,0);
  assert.equal(result.sources[0].bodyBinding.id,wrong.id);assert.equal(result.sources[0].bodyBinding.name,wrong.name);assert.equal(result.sources[0].bodyBinding.matched,false);
  assert.equal(result.sources[0].coverage.state,'failed');assert.match(result.sources[0].coverage.reason,/Stadt Neuss/);
@@ -251,4 +259,90 @@ test('Duplicate full-list rows cannot conceal missing IDs or authorize withdrawa
   const completed=await traverseCouncilList(body,'paper',storage,pageLoader({[body.paper!]:{data:[paper('a'),paper('b')],pagination:{totalElements:2}}}),{now:at});
   assert.equal(completed.state.active,null);assert.equal(completed.records.size,2);
  }
+});
+
+interface CouncilWireSeam {wire(url:URL):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
+test('registered council discovery and traversal retain managed provenance and stop cache reuse on objection',async t=>{
+ const root=await realpath(await mkdtemp(join(tmpdir(),'council-managed-live-')));t.after(()=>rm(root,{recursive:true,force:true}));
+ const city=cities.find(city=>city.id==='koeln')!,cacheRoot=join(root,'raw'),stateDir=join(root,'policy'),acquisition=createCouncilAcquisition(city,{cacheRoot,stateDir});
+ const selectedBody:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body',paper:city.councilBodyId+'/paper',meeting:city.councilBodyId+'/meeting'},bodiesUrl=new URL('/oparl/bodies',city.endpoint).href;
+ const record:OparlRecord={id:selectedBody.paper+'/1',body:selectedBody.id,type:'https://schema.oparl.org/1.1/Paper',name:'Synthetic municipal council submission',date:'2026-09-01',modified:'2026-09-02T00:00:00Z'};
+ let wireCalls=0;
+ t.mock.method(acquisition.fetcher as unknown as CouncilWireSeam,'wire',async(url:URL)=>{
+  wireCalls++;
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  const data=url.href===city.endpoint?{id:city.endpoint,type:'https://schema.oparl.org/1.1/System',body:bodiesUrl,license:'https://www.govdata.de/dl-de/zero-2-0'}:url.href===bodiesUrl?{data:[selectedBody]}:url.href===selectedBody.paper?{data:[record]}:url.href===selectedBody.meeting?{data:[]}:undefined;
+  assert.ok(data,`Unexpected synthetic URL ${url.href}`);
+  return {status:200,headers:{'content-type':'application/json'},body:Buffer.from(JSON.stringify(data))};
+ });
+ const collection=await collectOparl(city,{acquisition,maxPages:5,geocodeBudget:0,now:new Date(at)});
+ assert.equal(collection.features.length,1);assert.equal(collection.features[0].properties.kind,'council_paper');
+ const storage=acquisition.storage(selectedBody.id,'paper'),checkpoint=await storage.load();assert.equal(checkpoint?.backfillComplete,true);
+ const segment=await storage.readSegment(0),path=join(cacheRoot,'oparl',hash(canonicalOparlUrl(selectedBody.id)),'paper','page-0.json'),persisted=JSON.parse(await readFile(path,'utf8'));
+ assert.equal(persisted.sourceBindings.length,1);assert.equal(persisted.sourceBindings[0].sha256,segment.evidence.sha256);
+ assert.ok((await readFile(join(cacheRoot,'sha256',segment.evidence.sha256))).length);
+ const before=wireCalls,objection=await recordHostOptOut({host:new URL(city.endpoint!).hostname,reason:'municipality_objection',reference:'synthetic-council-test'},{stateDir});
+ assert.equal(objection.purge.status,'purged');
+ await assert.rejects(stat(path),{code:'ENOENT'});
+ await assert.rejects(storage.load(),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_opted_out');
+ await assert.rejects(storage.readSegment(0),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_opted_out');
+ await assert.rejects(acquisition.loadJson(city.endpoint!),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_opted_out');
+ assert.equal(wireCalls,before);
+});
+
+test('council live context rejects forged registration and never adopts a named historical cache',async t=>{
+ const root=await realpath(await mkdtemp(join(tmpdir(),'council-registration-')));t.after(()=>rm(root,{recursive:true,force:true}));
+ const city=cities.find(city=>city.id==='koeln')!,cacheRoot=join(root,'owner-policy-2026-10-11'),stateDir=join(root,'policy');
+ assert.throws(()=>createCouncilAcquisition({...city,endpoint:'https://other-council.de/system'},{cacheRoot,stateDir}),/registered City endpoint/);
+ assert.throws(()=>createCouncilAcquisition({...city,id:'unregistered-city'},{cacheRoot,stateDir}),/registered City endpoint/);
+ await mkdir(cacheRoot);await writeFile(join(cacheRoot,'frozen.json'),'retained historical snapshot');
+ const acquisition=createCouncilAcquisition(city,{cacheRoot,stateDir});let calls=0;
+ t.mock.method(acquisition.fetcher,'fetch',async()=>{calls++;throw Error('Unmarked root must fail first');});
+ await assert.rejects(acquisition.loadJson(city.endpoint!),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_state_unsafe');
+ assert.equal(calls,0);assert.equal(await readFile(join(cacheRoot,'frozen.json'),'utf8'),'retained historical snapshot');
+ await assert.rejects(stat(join(cacheRoot,'.civic-acquisition-lane.json')),{code:'ENOENT'});
+ await assert.rejects(stat(stateDir),{code:'ENOENT'});
+ assert.throws(()=>acquisition.storage('https://other-council.de/body/1','paper'),/registered City/);
+});
+
+test('retained CCF import preserves original timestamps without Git, live discovery or geocoding',async t=>{
+ const root=await realpath(await mkdtemp(join(tmpdir(),'council-retained-')));t.after(()=>rm(root,{recursive:true,force:true}));
+ const city=cities.find(city=>city.id==='koeln')!,snapshotRoot=join(root,'snapshot'),stampPath=join(root,'ccf-fetched.json'),stateDir=join(root,'policy'),retrievedAt='2026-10-01T00:00:00.000Z';
+ const git=t.mock.method(childProcess,'spawnSync',()=>{throw Error('Retained import must not execute Git');});syncBuiltinESMExports();
+ t.after(()=>{git.mock.restore();syncBuiltinESMExports();});
+ const live=t.mock.method(PoliteFetcher.prototype,'fetch',async()=>{throw Error('Retained import must not discover live sources');});
+ const network=t.mock.method(globalThis,'fetch',async()=>{throw Error('Retained import must not geocode or fetch');});
+ for(const kind of ['meeting','paper'])await mkdir(join(snapshotRoot,'data','de',city.id,kind),{recursive:true});
+ const record:OparlRecord={id:city.councilBodyId+'/paper/retained',body:city.councilBodyId,type:'https://schema.oparl.org/1.1/Paper',name:'Planung Beispielstraße',date:'2026-09-01',modified:'2026-09-02T00:00:00Z'};
+ const source=JSON.stringify({source_id:record.id,record_type:'paper',modified_at:record.modified,data:record}),path=join(snapshotRoot,'data','de',city.id,'paper','retained.json');
+ await writeFile(path,source);await writeFile(stampPath,JSON.stringify({at:retrievedAt}));
+ const result=await collectRetainedCcf(city,{snapshotRoot,stampPath,stateDir,now:new Date(at)});
+ assert.equal(result.features.length,1);assert.equal(result.features[0].properties.sources[0].retrievedAt,retrievedAt);
+ assert.equal(result.features[0].properties.sources[0].sha256,hash(Buffer.from(source)));
+ assert.ok(result.sources.every(source=>source.retrievedAt===retrievedAt&&source.coverage?.checkedAt===retrievedAt));
+ assert.ok(result.sources.every(source=>source.id.startsWith('ccf-retained-')&&/Retained CCF snapshot/.test(source.coverage!.reason!)));
+ assert.equal(await readFile(path,'utf8'),source);
+ await assert.rejects(stat(join(snapshotRoot,'.civic-acquisition-lane.json')),{code:'ENOENT'});
+ await assert.rejects(stat(stateDir),{code:'ENOENT'});
+ await assert.rejects(collectRetainedCcf(city,{snapshotRoot,stampPath:join(root,'missing-stamp.json'),stateDir}),/retrieval stamp/);
+ await rm(join(snapshotRoot,'data','de',city.id,'meeting'),{recursive:true});
+ await assert.rejects(collectRetainedCcf(city,{snapshotRoot,stampPath,stateDir}),/snapshot missing/);
+ assert.equal(git.mock.callCount(),0);assert.equal(live.mock.callCount(),0);assert.equal(network.mock.callCount(),0);
+});
+
+test('licence-page acquisition keeps its own origin assessment instead of inheriting OParl Body authorship',async t=>{
+ const root=await realpath(await mkdtemp(join(tmpdir(),'council-licence-scope-')));t.after(()=>rm(root,{recursive:true,force:true}));
+ const city=cities.find(city=>city.id==='koeln')!,acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),stateDir:join(root,'policy')}),bytes=Buffer.from('{"data":[]}'),localPath=join(root,'synthetic-response.json');
+ await writeFile(localPath,bytes);
+ const selected:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body'};
+ acquisition.bindBody(selected);
+ const seen:Array<{registeredSourceUrl?:string;originEvidence:FetchOptions['administrativeOriginEvidence']}>= [];
+ t.mock.method(acquisition.fetcher,'fetch',async(url:string,options:FetchOptions={})=>{
+  seen.push({registeredSourceUrl:options.registeredSourceUrl,originEvidence:options.administrativeOriginEvidence});
+  return {url,sha256:hash(bytes),localPath,mimeType:'application/json',retrievedAt:at,checkedAt:at,status:200,observationPath:join(root,'synthetic-observation.json')};
+ });
+ await acquisition.loadJson(city.endpoint!);
+ await acquisition.loadText('https://www.stadt-koeln.de/impressum');
+ assert.equal(seen[0].originEvidence,selected.name);assert.equal(seen[1].originEvidence,undefined);
+ assert.ok(seen.every(item=>item.registeredSourceUrl===city.endpoint));
 });

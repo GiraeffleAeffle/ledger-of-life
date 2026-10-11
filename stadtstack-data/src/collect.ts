@@ -4,7 +4,8 @@ import {cacheDir,cachedJson,jsonFile,save,sourceStatus,staleFetches} from './com
 import {collectAtlas,ATLAS_PUBLIC_PROVENANCE_URL} from './atlas.ts';
 import {collectOsm} from './osm.ts';
 import {collectAutobahn} from './autobahn.ts';
-import {collectCcf,collectOparl} from './council.ts';
+import {collectRetainedCcf,collectOparl} from './council.ts';
+import {createCouncilAcquisition} from './council-cache.ts';
 import {collectGeodata} from './geodata.ts';
 import {geoFeeds} from './geodata-registry.ts';
 import {deduplicateCitySignals,duplicateStats} from './dedupe.ts';
@@ -26,8 +27,11 @@ for(const city of selected){await collectFeeds(city);let features:Signal[]=[],so
  const adapters:[string,()=>Promise<{features:Signal[];sources:Catalogue['cities'][number]['sources']}>][]=[];
  if(city.id==='strausberg')adapters.push(['atlas',()=>collectAtlas(city)]);
  adapters.push(['osm',()=>collectOsm(city)],['autobahn',()=>collectAutobahn(city)]);
- // Live body binding and tombstones constrain the archive; archive presence cannot confer city identity.
- if(city.endpoint)adapters.push(['oparl',()=>collectOparl(city)],['ccf',()=>collectCcf(city)]);
+ // Current bound OParl tombstones constrain a separately retained, never auto-refreshed archive.
+ if(city.endpoint){
+  const acquisition=createCouncilAcquisition(city);
+  adapters.push(['oparl',()=>collectOparl(city,{acquisition})],['ccf-retained',()=>collectRetainedCcf(city,{liveAcquisition:acquisition})]);
+ }
  if(geoFeeds.some(f=>f.cityId===city.id&&f.sourceType==='wfs'))adapters.push(['wfs',()=>collectGeodata(city,'wfs')]);
  if(geoFeeds.some(f=>f.cityId===city.id&&f.sourceType==='arcgis-rest'))adapters.push(['arcgis-rest',()=>collectGeodata(city,'arcgis-rest')]);
  for(const [id,run] of adapters){
@@ -36,20 +40,20 @@ for(const city of selected){await collectFeeds(city);let features:Signal[]=[],so
    const result=await run();
    features.push(...result.features);
    sources.push(...result.sources);
-   if(id!=='ccf'&&id!=='oparl'&&result.sources.some(s=>s.status==='failed')){
+   if(id!=='ccf-retained'&&id!=='oparl'&&result.sources.some(s=>s.status==='failed')){
     const previous=await jsonFile<FeatureCollection>(join(cacheDir,'staging','cities',city.id,'signals.geojson'));
     const currentIds=new Set(result.features.map(f=>f.properties.id));
-    const prefixes=id==='ccf'||id==='oparl'?['council:',`${id}:`]:id==='wfs'||id==='arcgis-rest'?geoFeeds.filter(f=>f.cityId===city.id&&f.sourceType===id).map(f=>`${f.id}:`):[`${id}:`];
+    const prefixes=id==='ccf-retained'||id==='oparl'?['council:',`${id}:`]:id==='wfs'||id==='arcgis-rest'?geoFeeds.filter(f=>f.cityId===city.id&&f.sourceType===id).map(f=>`${f.id}:`):[`${id}:`];
     if(previous)features.push(...previous.features.filter(f=>prefixes.some(prefix=>f.properties.id.startsWith(prefix))&&!currentIds.has(f.properties.id)));
    }
    console.log(`${city.id}/${id}: ${result.features.length}`);
   }catch(error){
    console.error(`${city.id}/${id}: ${String(error)}`);
-   const url=id==='atlas'?ATLAS_PUBLIC_PROVENANCE_URL:id==='osm'?'https://overpass-api.de/api/interpreter':id==='autobahn'?'https://verkehr.autobahn.de/o/autobahn/':id==='ccf'?'https://github.com/komma-systems/ccf':id==='wfs'||id==='arcgis-rest'?geoFeeds.find(f=>f.cityId===city.id&&f.sourceType===id)?.url??'https://oparl.org/':city.endpoint??'https://oparl.org/';
+   const url=id==='atlas'?ATLAS_PUBLIC_PROVENANCE_URL:id==='osm'?'https://overpass-api.de/api/interpreter':id==='autobahn'?'https://verkehr.autobahn.de/o/autobahn/':id==='ccf-retained'?'https://github.com/komma-systems/ccf':id==='wfs'||id==='arcgis-rest'?geoFeeds.find(f=>f.cityId===city.id&&f.sourceType===id)?.url??'https://oparl.org/':city.endpoint??'https://oparl.org/';
    sources.push(sourceStatus(id,id,id,url,id==='osm'||id==='wfs'||id==='arcgis-rest'?'open_licence':id==='autobahn'?'unknown':'facts_with_attribution',new Date().toISOString(),'failed',id==='atlas'?'Atlas collection unavailable; retained primary-source records require publication gates.':String(error)));
    const previous=await jsonFile<FeatureCollection>(join(cacheDir,'staging','cities',city.id,'signals.geojson'));
-   const prefixes=id==='ccf'||id==='oparl'?['council:',`${id}:`]:id==='wfs'||id==='arcgis-rest'?geoFeeds.filter(f=>f.cityId===city.id&&f.sourceType===id).map(f=>`${f.id}:`):[`${id}:`];
-   if(previous&&id!=='ccf'&&id!=='oparl')features.push(...previous.features.filter(f=>prefixes.some(prefix=>f.properties.id.startsWith(prefix))));
+   const prefixes=id==='ccf-retained'||id==='oparl'?['council:',`${id}:`]:id==='wfs'||id==='arcgis-rest'?geoFeeds.filter(f=>f.cityId===city.id&&f.sourceType===id).map(f=>`${f.id}:`):[`${id}:`];
+   if(previous&&id!=='ccf-retained'&&id!=='oparl')features.push(...previous.features.filter(f=>prefixes.some(prefix=>f.properties.id.startsWith(prefix))));
   }
   for(const failure of staleFetches.slice(staleOffset))sources.push(sourceStatus(`stale-${id}`,id,id,id==='atlas'?ATLAS_PUBLIC_PROVENANCE_URL:failure.url,'unknown',new Date().toISOString(),'stale',id==='atlas'?'Local atlas collection unavailable; last-good snapshot retained.':failure.error));
  }

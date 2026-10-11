@@ -6,6 +6,7 @@ import {tmpdir} from 'node:os';
 import {buildCorpusManifest,verifyCorpusManifest,CorpusManifestRecordSchema,type CorpusManifestOptions} from '../src/corpus-manifest.ts';
 import {sha256,knowledgeEvidenceHash,DistrictKnowledgeRecordSchema,type DistrictKnowledgeRecord} from '../src/district-schema.ts';
 import {districtRegistrySchema} from '../src/district-registry.ts';
+import {ownerRobotsOverrideFor} from '../src/source-policy.ts';
 import {createWorkPlan} from '../src/district-work-plan.ts';
 import {documentResultSchema} from '../src/district-inference.ts';
 import {deterministicChecks} from '../src/district-claims.ts';
@@ -91,7 +92,7 @@ test('hash-pinned union preserves versions, observation contexts and exact citat
   assert.equal(verified.records.find(row=>row.url.endsWith('/unselected'))!.extraction.status,'not_selected');
   const encoded=await readFile(f.config.out,'utf8');
   const lines=encoded.trimEnd().split('\n'),header=JSON.parse(lines[0]);
-  assert.deepEqual(header,{schemaVersion:'stadtstack-corpus-manifest-header-v1',type:'metadata',inputs:verified.inputs});
+  assert.deepEqual(header,{schemaVersion:'stadtstack-corpus-manifest-header-v2',type:'metadata',inputs:verified.inputs});
   assert.equal(lines.length,verified.recordCount+1);
   for(const line of lines.slice(1))assert.equal(CorpusManifestRecordSchema.safeParse(JSON.parse(line)).success,true);
   for(const privateValue of [text,'PRIVATE-','MUTABLE-NOT-EVIDENCE','/old/private',f.root,'authorization'])assert.equal(encoded.includes(privateValue),false);
@@ -197,12 +198,52 @@ test('JSONL rejects blank or malformed rows, missing or misplaced metadata, and 
    [lines[0],lines[0],...lines.slice(1)].join('\n'),
    [...lines.slice(1),lines[0]].join('\n'),
    lines.slice(1).join('\n'),
-   JSON.stringify({schemaVersion:'stadtstack-corpus-manifest-v1',inputs:header.inputs,records}),
+   JSON.stringify({schemaVersion:'stadtstack-corpus-manifest-v2',inputs:header.inputs,records}),
   ]){
    await writeFile(f.config.out,malformed);
    await assert.rejects(verifyCorpusManifest(f.config.out,f.rawRoot));
   }
   await writeFile(f.config.out,encoded.slice(0,-1));
   assert.equal((await verifyCorpusManifest(f.config.out,f.rawRoot)).recordCount,records.length);
+ }finally{await rm(f.root,{recursive:true,force:true});}
+});
+
+test('manifest v2 exposes declaration evidence and rejects forged or unbound owner audit',async()=>{
+ const f=await fixture();try{
+  await buildCorpusManifest(f.config);const lines=(await readFile(f.config.out,'utf8')).trimEnd().split('\n'),record=JSON.parse(lines[1]);
+  assert.ok(Object.hasOwn(record,'robots'));assert.ok(Object.hasOwn(record,'ownerRobotsOverride'));assert.equal(record.override,null);
+  const target='https://strausberg.allris.cloud/document',decision=ownerRobotsOverrideFor(target)!;
+  const bound={...record,url:target,documentOrigin:{classification:'official_work',method:'rules',classifierVersion:'document-origin-rules-v1',url:target,sha256:record.sha256,classifiedAt:at,evidence:[]},robots:{state:'blocked',url:'https://strausberg.allris.cloud/robots.txt',sha256:'a'.repeat(64),checkedAt:at},robotsStatus:'disallowed',override:'owner-approved 2026-10-11',ownerRobotsOverride:decision,http:{status:200,etag:null,lastModified:null,observationSha256:'b'.repeat(64),observationState:'fetched',bindingStatus:'bound',missingReason:null},checkedAt:at};
+  assert.equal(CorpusManifestRecordSchema.safeParse(bound).success,true);
+  for(const change of [
+   {robots:{...bound.robots,state:'allowed'}},
+   {robots:{...bound.robots,sha256:undefined}},
+   {ownerRobotsOverride:{...decision,host:'other.stadt.de'}},
+   {robotsStatus:'allowed'},
+   {http:{...bound.http,status:null,observationState:null,bindingStatus:'missing',missingReason:'not_recorded'}},
+   {schemaVersion:'stadtstack-corpus-manifest-v1'},
+  ])assert.equal(CorpusManifestRecordSchema.safeParse({...bound,...change}).success,false);
+  lines[0]=JSON.stringify({...JSON.parse(lines[0]),schemaVersion:'stadtstack-corpus-manifest-header-v1'});
+  await writeFile(f.config.out,lines.join('\n')+'\n');await assert.rejects(verifyCorpusManifest(f.config.out,f.rawRoot));
+ }finally{await rm(f.root,{recursive:true,force:true});}
+});
+
+test('excluded manifest rows verify their tombstone observation, explicitly skipping absent raw bytes',async()=>{
+ const f=await fixture();try{
+  await buildCorpusManifest(f.config);const lines=(await readFile(f.config.out,'utf8')).trimEnd().split('\n'),base=JSON.parse(lines[1]);
+  const target='https://stadt.de/excluded',sourceSha256=sha256('Excluded bytes are deliberately not retained'),decision=ownerRobotsOverrideFor(target)!;
+  const documentOrigin={classification:'unknown',method:'rules',classifierVersion:'document-origin-rules-v1',url:target,sha256:sourceSha256,classifiedAt:later,evidence:[]};
+  const robots={state:'blocked',url:'https://stadt.de/robots.txt',sha256:sha256('Synthetic actual robots denial'),checkedAt:later};
+  const exclusion={reason:'non_official_restricted',excludedAt:later,previousManagedCopy:'not_managed'};
+  const observedPolicy={robots,tdm:{state:'not_declared',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only',documentOrigin,ownerRobotsOverride:decision,override:'owner-approved 2026-10-11',robotsStatus:'disallowed'};
+  const observation={url:target,method:'GET',checkedAt:later,retrievedAt:later,state:'excluded',status:200,sha256:sourceSha256,bytes:123,mimeType:'text/html',policy:observedPolicy,exclusion};
+  const observationBytes=JSON.stringify(observation)+'\n';await writeFile(join(f.rawRoot,'observations','excluded.json'),observationBytes);
+  const excluded={...base,id:sha256('excluded representation'),url:target,fetchedAt:later,checkedAt:later,sha256:sourceSha256,sizeBytes:123,contentType:'text/html',casPath:null,bodyState:'excluded',exclusion,robots,robotsStatus:'disallowed',override:'owner-approved 2026-10-11',ownerRobotsOverride:decision,documentOrigin,tdmState:'not_declared',tdmOverride:null,ownerTdmOverride:null,http:{status:200,etag:null,lastModified:null,observationSha256:sha256(observationBytes),observationState:'excluded',bindingStatus:'bound',missingReason:null},extraction:{...base.extraction,status:'source_excluded',preparationStatus:'not_selected',taskStates:[],chunkCounts:{admitted:0,rejected:0,no_case:0,quarantined:0},referenceIncluded:false},releasedRecords:[]};
+  assert.equal(CorpusManifestRecordSchema.safeParse(excluded).success,true);
+  await writeFile(f.config.out,[...lines,JSON.stringify(excluded)].join('\n')+'\n');
+  const verified=await verifyCorpusManifest(f.config.out,f.rawRoot);assert.equal(verified.skippedBodyVerifications,1);assert.equal(verified.distinctBodies,5);assert.equal(verified.records.at(-1)?.bodyState,'excluded');
+  await assert.rejects(readFile(join(f.rawRoot,'sha256',sourceSha256)),{code:'ENOENT'});
+  await writeFile(join(f.rawRoot,'observations','excluded.json'),JSON.stringify({...observation,policy:{...observedPolicy,documentOrigin:{...documentOrigin,classification:'official_work'}}}));
+  await assert.rejects(verifyCorpusManifest(f.config.out,f.rawRoot),/observation missing/);
  }finally{await rm(f.root,{recursive:true,force:true});}
 });

@@ -1,14 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, realpath, stat, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sha256 } from '../src/district-schema.ts';
-import { prepareDocument, verifyPreparedDocument, cachePreparedDocument, readAuthorizedSourceBytes, type PreparedSourceReference } from '../src/district-prepared-document.ts';
+import { prepareDocument, verifyPreparedDocument, cachePreparedDocument, fetchPreparedDocument, assertPreparedSourcesActive, readAuthorizedSourceBytes, PREPARED_VM_ROOT, type PreparedSourceReference } from '../src/district-prepared-document.ts';
 import { createWorkPlan, restoreWorkPlan, resumeWorkPlan, runWorkPlan, modelCacheKey, classifyWorkFailure, RemoteWorkFailure, type WorkGroup, type WorkPlan } from '../src/district-work-plan.ts';
 import { PILOT_BASE_CORPUS_SHA256, PILOT_COMPLETION_CORPUS_SHA256, authorizedPilotCorpusSchema, loadFrozenCorpus } from '../src/district-corpus.ts';
-import { preparationPlanSchema } from '../src/district-preparation-run.ts';
+import { preparationPlanSchema, VM_RESULT_ROOT } from '../src/district-preparation-run.ts';
 import { readPinnedJson } from '../src/district-private-io.ts';
+import { ownerRobotsOverrideFor, APPROVED_OWNER_ROBOTS_OVERRIDE } from '../src/source-policy.ts';
+import { DOCUMENT_ORIGIN_CLASSIFIER_VERSION } from '../src/document-origin.ts';
+import { recordHostOptOut } from '../src/civic-opt-out.ts';
 const sourceText = 'Die Stadt beschließt ein neues Wärmenetz. Quelle und Beschluss bleiben überprüfbar. 😀';
 const bytes = Buffer.from(sourceText);
 function reference(): PreparedSourceReference {
@@ -32,6 +35,28 @@ test('prepared receipts bind bytes, policy, source references, tools, exact text
   await assert.rejects(prepareDocument({ ...preparation(), references: [{ ...reference(), policy: { ...reference().policy, access: 'captcha' } }] }), /blocks extraction/);
   await assert.rejects(prepareDocument({ ...preparation(), toolVersions: {} }), /tool version evidence/);
 });
+test('prepared text keeps source-bound blocked robots exception and rejects transferred approval', async () => {
+  const url = 'https://strausberg.allris.cloud/public/si010';
+  const source: PreparedSourceReference = {
+    ...reference(), id: 'strausberg-council', sourceType: 'council', url,
+    policy: { ...reference().policy, robots: { state: 'blocked', url: new URL('/robots.txt', url).href, sha256: sha256('synthetic denied robots'), checkedAt: '2026-10-11T12:00:00.000Z' }, ownerRobotsOverride: ownerRobotsOverrideFor(url)!, robotsStatus: 'disallowed', override: 'owner-approved 2026-10-11', documentOrigin: { classification: 'official_work', method: 'rules', classifierVersion: DOCUMENT_ORIGIN_CLASSIFIER_VERSION, url, sha256: sha256(bytes), classifiedAt: '2026-10-11T12:00:00.000Z', evidence: [{ locator: 'synthetic fixture', value: 'administrative authorship and formal work fixture' }] } },
+  };
+  const receipt = await prepareDocument({ ...preparation(), references: [source] });
+  const checked = verifyPreparedDocument(receipt, receipt, bytes);
+  assert.deepEqual(checked.references[0].policy, source.policy);
+  assert.equal(checked.references[0].policy.robots.state, 'blocked');
+  assert.equal(checked.text, sourceText);
+  for (const changed of [
+    { ...source, url: 'https://other.allris.cloud/public/si010' },
+    { ...source, policy: { ...source.policy, robots: { ...source.policy.robots, state: 'unavailable' as const } } },
+    { ...source, policy: { ...source.policy, access: 'authentication' as const } },
+    { ...source, policy: { ...source.policy, tdm: { state: 'reserved' as const, evidence: [] } } },
+  ]) await assert.rejects(prepareDocument({ ...preparation(), references: [changed] }));
+  const pdf = { ...source, mimeType: 'application/pdf' };
+  let calls = 0;
+  await assert.rejects(prepareDocument({ ...preparation(), references: [pdf], mimeType: pdf.mimeType }, async () => { calls++; throw Error('must not run'); }), /parsed metadata evidence/);
+  assert.equal(calls, 0);
+});
 test('PDF preparation policy requires byte-bound parsed metadata before invoking tools', async () => {
   let calls = 0;
   const input = preparation();
@@ -39,18 +64,34 @@ test('PDF preparation policy requires byte-bound parsed metadata before invoking
   assert.equal(calls, 0);
 });
 test('private prepared cache rejects tampering and raw reads enforce containment and hashes', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'district-prepared-test-'));
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'district-prepared-test-'))), stateDir = join(root, 'policy'), cacheRoot = join(root, 'prepared');
   try {
-    const receipt = await prepareDocument(preparation());
-    const path = await cachePreparedDocument(root, receipt);
-    assert.equal(await cachePreparedDocument(root, receipt), path);
+    const receipt = await prepareDocument({ ...preparation(), policyStateDir: stateDir });
+    const path = await cachePreparedDocument(cacheRoot, receipt, { decisionId: APPROVED_OWNER_ROBOTS_OVERRIDE.id, stateDir });
+    assert.equal(await cachePreparedDocument(cacheRoot, receipt, { decisionId: APPROVED_OWNER_ROBOTS_OVERRIDE.id, stateDir }), path);
     await writeFile(path, JSON.stringify({ ...receipt, textSha256: sha256('tamper') }));
-    await assert.rejects(cachePreparedDocument(root, receipt), /hash/);
+    await assert.rejects(cachePreparedDocument(cacheRoot, receipt, { decisionId: APPROVED_OWNER_ROBOTS_OVERRIDE.id, stateDir }), /hash|policy state/);
     const raw = join(root, 'source.txt');
     await writeFile(raw, bytes);
     assert.deepEqual(await readAuthorizedSourceBytes(root, raw, sha256(bytes)), bytes);
     await assert.rejects(readAuthorizedSourceBytes(root, raw, sha256('wrong')), /frozen index/);
     await assert.rejects(readAuthorizedSourceBytes(join(root, 'source.txt'), raw, sha256(bytes)), /escapes/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+test('recorded host objection stops prepared cache, extraction and transfer before native commands', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'district-prepared-opt-out-'))), stateDir = join(root, 'policy'), cacheRoot = join(root, 'prepared');
+  try {
+    const receipt = await prepareDocument({ ...preparation(), policyStateDir: stateDir });
+    const path = await cachePreparedDocument(cacheRoot, receipt, { decisionId: APPROVED_OWNER_ROBOTS_OVERRIDE.id, stateDir });
+    const objection = await recordHostOptOut({ host: 'example.org', reason: 'municipality_objection', reference: 'synthetic-preparation-test' }, { stateDir });
+    assert.equal(objection.purge.status, 'purged');
+    await assert.rejects(stat(path), { code: 'ENOENT' });
+    await assert.rejects(assertPreparedSourcesActive(receipt.references, { stateDir }), /objection/);
+    await assert.rejects(cachePreparedDocument(cacheRoot, receipt, { decisionId: APPROVED_OWNER_ROBOTS_OVERRIDE.id, stateDir }), /objection/);
+    await assert.rejects(fetchPreparedDocument(receipt, { stateDir }), /objection/);
+    let commands = 0;
+    await assert.rejects(prepareDocument({ ...preparation(), policyStateDir: stateDir }, async () => { commands++; throw Error('must not run'); }), /objection/);
+    assert.equal(commands, 0);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 function groups(count: number): WorkGroup[] {
@@ -195,4 +236,23 @@ test('provider failures persist only allowlisted categories and message digests 
     assert.equal(task.failureCategory, 'tool'); assert.equal(task.errorMessageSha256, sha256('private-source-payload'));
   }
   assert.ok(plan.tasks.some(task => task.state === 'pending'));
+});
+
+test('global owner-policy preparation and model defaults do not enroll historical frozen roots', () => {
+  assert.equal(PREPARED_VM_ROOT, '/home/max/civic-knowledge-slice/stadtstack-data/cache/districts/owner-policy-2026-10-11/prepared');
+  assert.equal(VM_RESULT_ROOT, '/home/max/civic-knowledge-slice/stadtstack-data/cache/district-joint/owner-policy-2026-10-11/results');
+});
+
+test('a dated directory name cannot authorize a populated unmarked prepared cache', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'district-prepared-unmarked-'))), stateDir = join(root, 'policy'), cacheRoot = join(root, 'owner-policy-2026-10-11', 'prepared');
+  try {
+    const receipt = await prepareDocument({ ...preparation(), policyStateDir: stateDir }), body = JSON.stringify(receipt) + '\n';
+    await mkdir(cacheRoot, { recursive: true, mode: 0o700 });
+    const path = join(cacheRoot, receipt.receiptSha256 + '.json');
+    await writeFile(path, body, { mode: 0o600 });
+    await assert.rejects(cachePreparedDocument(cacheRoot, receipt, { decisionId: APPROVED_OWNER_ROBOTS_OVERRIDE.id, stateDir }), /policy state/);
+    assert.equal(await readFile(path, 'utf8'), body);
+    await assert.rejects(stat(join(cacheRoot, '.civic-acquisition-lane.json')), { code: 'ENOENT' });
+    await assert.rejects(stat(stateDir), { code: 'ENOENT' });
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

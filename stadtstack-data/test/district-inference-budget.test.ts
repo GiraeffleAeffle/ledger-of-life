@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inferPreparedDocument, jointExtractionContract } from '../src/district-inference.ts';
@@ -11,6 +11,7 @@ import { prepareDocument } from '../src/district-prepared-document.ts';
 import type { PreparedDocument, PreparedSourceReference } from '../src/district-prepared-document.ts';
 import { createWorkPlan, runWorkPlan } from '../src/district-work-plan.ts';
 import { sha256 } from '../src/district-schema.ts';
+import { recordHostOptOut } from '../src/civic-opt-out.ts';
 
 async function preparedText(text: string): Promise<PreparedDocument> {
   const bytes = Buffer.from(text), sourceSha256 = sha256(bytes);
@@ -83,5 +84,22 @@ test('budget handling does not swallow cancellation, prepared integrity, or oper
     await assert.rejects(inferPreparedDocument({ ...options, prepared: small, expected: small }), error => process.platform === 'linux' ? error === operationalFailure : error instanceof Error && /authorized host/.test(error.message));
     assert.equal(spawnGuard.mock.callCount(), process.platform === 'linux' ? 1 : 0);
     assert.deepEqual(await readdir(root), []);
+  } finally { spawnGuard.mock.restore(); syncBuiltinESMExports(); await rm(root, { recursive: true, force: true }); }
+});
+
+test('recorded objection stops prepared inference before readiness or subscription transmission', async context => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'district-inference-opt-out-'))), stateDir = join(root, 'policy');
+  const spawnGuard = context.mock.method(childProcess, 'spawn', () => { throw Error('Native calls forbidden after objection'); });
+  syncBuiltinESMExports();
+  try {
+    const prepared = await preparedText('Strausberg: synthetic source content long enough for normal document preparation.'), contract = await jointExtractionContract();
+    await recordHostOptOut({ host: 'example.org', reason: 'municipality_objection', reference: 'synthetic-inference-test' }, { stateDir });
+    await assert.rejects(inferPreparedDocument({
+      taskId: sha256('synthetic task'), groupId: sha256('synthetic group'), purpose: 'production', provider: 'openai-subscription',
+      municipality: { id: 'strausberg', name: 'Strausberg', ags: '12064472', districtId: 'maerkisch-oderland' },
+      prepared, expected: prepared, contract, out: join(root, 'results'), policyStateDir: stateDir,
+      usage: { ledgerPath: join(root, 'usage.jsonl'), pausePath: join(root, 'pause.json') },
+    }), /objection/);
+    assert.equal(spawnGuard.mock.callCount(), 0);
   } finally { spawnGuard.mock.restore(); syncBuiltinESMExports(); await rm(root, { recursive: true, force: true }); }
 });

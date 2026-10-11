@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {renderDistrictSources,exportDistrictSources} from '../src/export-district-sources.ts';
 import {districtSourceAdapterKind} from '../src/district-crawl.ts';
 import type {DistrictRegistry} from '../src/district-registry.ts';
+import {ownerRobotsOverrideFor} from '../src/source-policy.ts';
 
 const date='2026-10-01T00:00:00.000Z',url='https://stadt.de/registry';
 function fixture():DistrictRegistry{
@@ -123,4 +124,36 @@ test('explicit pilot Amt identity is retained without promoting inventory labels
   assert.equal(row.administrativeStatus,'amtsangehoerig');assert.equal(row.amtId,'verified-amt');assert.equal(row.amtName,'Verified Amt');assert.equal(row.amtEvidenceLevel,'pilot_administrative_evidence');
  }
  assert.match(result.markdown,/Amt Verified Amt/);
+});
+
+test('public export preserves applied document denial and exact decision without inheriting registry audit',()=>{
+ const raw=fixture(),source=raw.municipalities[0].sources[0],decision=ownerRobotsOverrideFor(source.url!)!;
+ Object.assign(source,{ownerRobotsOverride:decision,override:'owner-approved 2026-10-11',robotsStatus:'disallowed',robots:{url:'https://stadt.de/robots.txt',checkState:'checked',checkedAt:date,evidence:[{url:'https://stadt.de/robots.txt',locator:'Actual denied group',sha256:'a'.repeat(64),retrievedAt:date}]}});
+ const policy={robots:{state:'blocked',url:'https://stadt.de/robots.txt',sha256:'a'.repeat(64),checkedAt:date},tdm:{state:'not_declared'},ownerRobotsOverride:decision,override:'owner-approved 2026-10-11',robotsStatus:'disallowed'};
+ const document={municipalityId:'town',sourceId:'council',url:'https://stadt.de/document',adapter:'official-html',policy};
+ const observation={url:document.url,checkedAt:date,retrievedAt:date,state:'fetched',policy};
+ const result=renderDistrictSources(raw,{...crawl(),documents:[document]},[observation,{...observation,policy:{robots:{state:'allowed'},tdm:{state:'not_declared'}}}]);
+ const row=result.rows.find(row=>row.rowType==='document')!;
+ assert.equal(row.formatVersion,'stadtstack-source-export-v2');assert.equal(row.robotsPathState,'blocked');assert.equal(row.robotsStatus,'disallowed');assert.equal(row.override,'owner-approved 2026-10-11');assert.deepEqual(JSON.parse(row.ownerRobotsOverride),decision);
+ assert.equal(JSON.parse(row.robotsEvidence).sha256,'a'.repeat(64));
+ const allowed=result.rows.find(row=>row.rowType==='fetch_observation'&&row.robotsPathState==='allowed')!;
+ assert.equal(allowed.robotsStatus,'allowed');assert.equal(allowed.override,'');assert.equal(allowed.ownerRobotsOverride,'');
+ assert.match(result.markdown,/Applied owner robots decisions/);
+ for(const mutated of [{...policy,robots:{...policy.robots,state:'allowed'}},{...policy,robots:{...policy.robots,sha256:undefined}},{...policy,ownerRobotsOverride:{...decision,host:'different.stadt.de'}}]){
+  assert.throws(()=>renderDistrictSources(raw,{...crawl(),documents:[{...document,policy:mutated}]}),/audit|schema/);
+ }
+});
+
+test('excluded export rows retain origin and physical-disposition metadata without claiming stored raw',()=>{
+ const raw=fixture(),source=raw.municipalities[0].sources[0],decision=ownerRobotsOverrideFor(source.url!)!;
+ Object.assign(source,{ownerRobotsOverride:decision,override:'owner-approved 2026-10-11'});
+ const target='https://stadt.de/external',sha256='b'.repeat(64),documentOrigin={classification:'unknown',method:'rules',classifierVersion:'document-origin-rules-v1',url:target,sha256,classifiedAt:date,evidence:[]};
+ const policy={robots:{state:'blocked',url:'https://stadt.de/robots.txt',sha256:'a'.repeat(64),checkedAt:date},tdm:{state:'not_declared',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only',documentOrigin,ownerRobotsOverride:decision,override:'owner-approved 2026-10-11',robotsStatus:'disallowed'};
+ const exclusion={reason:'non_official_restricted',excludedAt:date,previousManagedCopy:'retained_independent'};
+ const document={id:'excluded',municipalityId:'town',ags:'13076090',districtId:'district',sourceId:'council',url:target,sha256,mimeType:'text/html',retrievedAt:date,checkedAt:date,status:200,observationPath:'/private/cache/observations/excluded.json',policy,sizeBytes:123,exclusion,documentDate:null,adapter:'excluded-source',metadata:{}};
+ const result=renderDistrictSources(raw,{...crawl(),excludedDocuments:[document]},[{url:target,sha256,checkedAt:date,retrievedAt:date,state:'excluded',status:200,policy,exclusion}]);
+ const row=result.rows.find(row=>row.rowType==='excluded_document')!;
+ assert.equal(row.bodyState,'excluded');assert.equal(row.originClassification,'unknown');assert.equal(row.robotsStatus,'disallowed');assert.equal(JSON.parse(row.exclusion).previousManagedCopy,'retained_independent');
+ assert.equal(JSON.parse(row.documentOrigin).sha256,sha256);assert.equal(result.rows.find(row=>row.rowType==='source'&&row.sourceId==='council')?.robotsStatus,'unavailable');
+ assert.ok(!result.csv.includes('/private/cache'));assert.match(result.markdown,/raw excluded/);
 });

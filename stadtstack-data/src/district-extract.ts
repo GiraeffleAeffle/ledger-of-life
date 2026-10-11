@@ -9,7 +9,7 @@ import {loadDistrictRegistry} from './district-registry.ts';
 import {KnowledgeRecordsSchema,validateKnowledgeRelease,hashSchema,sha256,type DistrictKnowledgeRecord} from './district-schema.ts';
 import {modelReadiness} from './district-model.ts';
 import {PROVIDER_CONFIGS,type ExtractorProvider} from './district-model-contract.ts';
-import {PREPARED_VM_ROOT,fetchPreparedDocument,verifyPreparedDocument} from './district-prepared-document.ts';
+import {PREPARED_VM_ROOT,fetchPreparedDocument,verifyPreparedDocument,assertPreparedSourcesActive} from './district-prepared-document.ts';
 import {prepareFrozenCorpus,preparationPlanSchema,VM_PROJECT,VM_NODE,VM_RESULT_ROOT,type PreparationPlan,type PreparationGroup} from './district-preparation-run.ts';
 import {createWorkPlan,restoreWorkPlan,resumeWorkPlanProviders,runWorkPlan,workerCapacity,WorkPlanSchema,WorkFailureSchema,AssignmentModeSchema,classifyWorkFailure,RemoteWorkFailure,type WorkPlan,type WorkTask,type AssignmentMode,type WorkerCapacity} from './district-work-plan.ts';
 import {inferPreparedDocument,jointExtractionContract,documentResultSchema,type DocumentResult,type QuarantineCase} from './district-inference.ts';
@@ -78,8 +78,10 @@ export async function runRemoteDocumentWorker():Promise<void>{
   if(sha256(await readFile(join(VM_PROJECT,'sources','district-registry.json')))!==preparation.registrySha256)throw Error('Worker registry differs from preparation');
   const contract=await jointExtractionContract(),plan=createWorkPlan(preparation.groups.map(group=>({municipalityId:group.expected.municipalityId,sourceSha256:group.expected.sourceSha256,preparedSha256:group.expected.receiptSha256})),contract,request.assignmentMode);
   const task=plan.tasks.find(task=>task.id===request.taskId);if(!task||task.provider!=='openai-subscription')throw Error('Invalid native Codex task assignment');
-  const group=groupFor(preparation,task),prepared=verifyPreparedDocument(JSON.parse(await readFile(join(PREPARED_VM_ROOT,group.expected.receiptSha256+'.json'),'utf8')),group.expected);
-  const out=join(VM_PROJECT,'cache','district-joint');lease.signal.throwIfAborted();
+  const group=groupFor(preparation,task);
+  await assertPreparedSourcesActive(group.expected.references);
+  const prepared=verifyPreparedDocument(JSON.parse(await readFile(join(PREPARED_VM_ROOT,group.expected.receiptSha256+'.json'),'utf8')),group.expected);
+  const out=join(VM_PROJECT,'cache','district-joint','owner-policy-2026-10-11');lease.signal.throwIfAborted();
   releaseLock=await acquirePrivateRunLock(join(out,'openai-worker.lock'),'source-bound Codex document inference');
   const result=await inferPreparedDocument({taskId:task.id,groupId:task.groupId,purpose:task.purpose,provider:task.provider,municipality:group.municipality,prepared,expected:group.expected,contract,out,usage:{ledgerPath:join(out,'anthropic-usage.jsonl'),pausePath:join(out,'operator-pause.json'),signal:lease.signal}});
   lease.signal.throwIfAborted();
@@ -210,7 +212,7 @@ async function main(){
  const command=process.argv[2];
  if(command==='worker'){await runRemoteDocumentWorker();return;}
  if(command==='local-worker'){await runLocalDocumentWorker();return;}
- const {values}=parseArgs({args:process.argv.slice(3),options:{index:{type:'string'},'corpus-sha256':{type:'string'},registry:{type:'string',default:join(root,'sources','district-registry.json')},'raw-root':{type:'string'},'prepared-plan':{type:'string'},'prepared-sha256':{type:'string'},out:{type:'string',default:join(cacheDir,'district-joint')},'max-documents-per-municipality':{type:'string'},provider:{type:'string'},action:{type:'string'},'assignment-mode':{type:'string',default:'balanced'},'resume-provider':{type:'string',multiple:true},'anthropic-workers':{type:'string',default:'1'},'owner-watches-quota':{type:'boolean',default:false},'after-seconds':{type:'string'}}});
+ const {values}=parseArgs({args:process.argv.slice(3),options:{index:{type:'string'},'corpus-sha256':{type:'string'},registry:{type:'string',default:join(root,'sources','district-registry.json')},'raw-root':{type:'string'},'prepared-plan':{type:'string'},'prepared-sha256':{type:'string'},out:{type:'string',default:join(cacheDir,'district-joint','owner-policy-2026-10-11')},'max-documents-per-municipality':{type:'string'},provider:{type:'string'},action:{type:'string'},'assignment-mode':{type:'string',default:'balanced'},'resume-provider':{type:'string',multiple:true},'anthropic-workers':{type:'string',default:'1'},'owner-watches-quota':{type:'boolean',default:false},'after-seconds':{type:'string'}}});
  const out=resolve(values.out!);
  if(command==='readiness'){console.log(JSON.stringify(await modelReadiness(providerSchema.parse(values.provider))));return;}
  if(command==='usage'){

@@ -192,7 +192,7 @@ export function rebindSourceReferences(record: DistrictKnowledgeRecord, sources:
   return DistrictKnowledgeRecordSchema.parse(rebound);
 }
 export async function extractorHash():Promise<string>{
-  const files=['district-claims.ts','district-inference.ts','district-answer-cache.ts','district-model.ts','district-claude.ts','district-model-contract.ts','district-model-usage.ts','district-model-diagnostics.ts','district-schema.ts','district-graph-claims.ts','topic-vocabulary.ts','../regional/taxonomy.mjs'];
+  const files=['district-claims.ts','district-inference.ts','district-answer-cache.ts','district-model.ts','district-claude.ts','district-model-contract.ts','district-model-usage.ts','district-model-diagnostics.ts','district-schema.ts','source-policy.ts','document-origin.ts','civic-opt-out.ts','district-graph-claims.ts','topic-vocabulary.ts','../regional/taxonomy.mjs'];
   const hashes: string[] = [];
   for (const file of files) hashes.push(sha256(await readFile(new URL(file, import.meta.url))));
   return sha256(JSON.stringify({ version: EXTRACTOR_VERSION, hashes }));

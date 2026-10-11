@@ -4,12 +4,12 @@ import {load} from 'cheerio';
 import {hash} from './common.ts';
 import {parseOparlList,selectCouncilBody,councilEventDate} from './council-oparl.ts';
 import type {OparlBody,CouncilCheckpoint} from './council-oparl.ts';
-import {traverseCouncilList} from './council-cache.ts';
-import type {CouncilStorage,CouncilSegment,CouncilLoader} from './council-cache.ts';
+import {traverseCouncilList,createPoliteCouncilLoader} from './council-cache.ts';
+import type {CouncilStorage,CouncilSegment} from './council-cache.ts';
 import type {City} from './cities.ts';
-import {publicUrl,PoliteFetcher,PoliteFetchError} from './polite-fetch.ts';
-import type {FetchedDocument} from './polite-fetch.ts';
-import type {SourceAccessPolicy} from './source-policy.ts';
+import {publicUrl,PoliteFetcher,PoliteFetchError,sourceContentBinding} from './polite-fetch.ts';
+import type {FetchedDocument,ExcludedDocument,FetchOptions,SourceContentBinding} from './polite-fetch.ts';
+import type {SourceAccessPolicy,OwnerRobotsOverride} from './source-policy.ts';
 import {PDF_TDM_POLICY_VERSION} from './pdf-tdm-policy.ts';
 
 export interface RegistrySource {
@@ -19,7 +19,14 @@ export interface RegistrySource {
  councilBodyId?:string;councilBodyAliases?:string[];
  crawlScope?:{pageRoots:string[];followLinkedDocuments:boolean};
  knownMachinePolicyUrls?:string[];
+ ownerRobotsOverride?:OwnerRobotsOverride;robotsStatus?:'disallowed'|'unavailable';override?:'owner-approved 2026-10-11';hostProfile?:'municipal'|'default';
+ /** Original configured URL retained when an adapter suppresses root discovery. */
+ registeredSourceUrl?:string;
  legalBasis?:{classification:'section_5_official_act_candidate'|'section_44b_tdm_candidate'|'unassessed';reason?:string};
+}
+function sourceFetchOptions(source:RegistrySource):FetchOptions {
+ const registeredSourceUrl=source.registeredSourceUrl??source.url??source.api?.url;
+ return {registeredSourceUrl,ownerRobotsOverride:source.ownerRobotsOverride,machinePolicyUrls:source.knownMachinePolicyUrls,hostProfile:source.hostProfile??'municipal'};
 }
 export interface SourceSeed {url:string;title?:string;documentDate?:string|null;sourceId:string;adapter?:string;metadata?:CrawlDocument['metadata']}
 export interface RegistryMunicipality {id:string;name:string;ags:string;districtId:string;sources:RegistrySource[];seedDocuments?:SourceSeed[]}
@@ -27,14 +34,15 @@ export interface CrawlDocument extends FetchedDocument {
  id:string;municipalityId:string;ags:string;districtId:string;sourceId:string;documentDate:string|null;adapter:string;
  metadata:{title?:string;caseKey?:string;caseKeyType?:string;stage?:string;stageDate?:string;sourceType?:string;discoveredFrom?:string;oparlRecordId?:string;sourceVersion?:string;legalBasis?:string};
 }
+export type CrawlExcludedDocument=ExcludedDocument&Pick<CrawlDocument,'id'|'municipalityId'|'ags'|'districtId'|'sourceId'|'documentDate'|'adapter'|'metadata'>;
 export interface CrawlCoverage {state:'complete'|'partial'|'blocked';pendingCount:number;runnableCount:number;blockedCount:number;frontierPath?:string;scope:string;action?:'ask_municipality'}
-export interface AdapterResult {documents:CrawlDocument[];notes:string[];requests:number;checkedAt?:string|null;coverage?:CrawlCoverage;blocked?:FrontierFailure[]}
+export interface AdapterResult {documents:CrawlDocument[];excludedDocuments?:CrawlExcludedDocument[];notes:string[];requests:number;checkedAt?:string|null;coverage?:CrawlCoverage;blocked?:FrontierFailure[]}
 export const DEFAULT_SOURCE_REVALIDATE_MS=24*60*60_000;
 export interface AdapterOptions {maxDocuments:number;maxPages:number;maxRequests:number;activeOparlRecordIds?:Set<string>;revalidateAfterMs?:number}
 export interface DiscoveredLink {url:string;title:string;pdf:boolean;structured:boolean}
 interface FrontierEntry extends SourceSeed {from:string;depth:number;revalidate?:boolean;previous?:CrawlDocument}
 export interface FrontierFailure {url:string;failure:string;reason:string;checkedAt:string;status?:number;policy?:SourceAccessPolicy;retryAfter?:string;action:'ask_municipality'}
-interface SourceFrontier {schemaVersion:1;municipalityId:string;sourceId:string;queue:FrontierEntry[];visited:string[];documents:CrawlDocument[];failures:FrontierFailure[];roots:string[];checkedUrls?:Record<string,{checkedAt:string;documentId:string}>;lastCheckedAt?:string|null}
+interface SourceFrontier {schemaVersion:1;municipalityId:string;sourceId:string;queue:FrontierEntry[];visited:string[];documents:CrawlDocument[];excludedDocuments?:CrawlExcludedDocument[];failures:FrontierFailure[];roots:string[];checkedUrls?:Record<string,{checkedAt:string;documentId:string}>;lastCheckedAt?:string|null}
 export function discoverDocumentLinks(html:string,base:string):DiscoveredLink[]{
  const $=load(html),links=new Map<string,DiscoveredLink>();
  $('a[href],link[rel=alternate][href],iframe[src],object[data]').each((_,element)=>{
@@ -55,10 +63,11 @@ export function discoverDocumentLinks(html:string,base:string):DiscoveredLink[]{
  });
  return [...links.values()].sort((a,b)=>(b.structured?2:b.pdf?1:0)-(a.structured?2:a.pdf?1:0));
 }
-export function sourceDocument(response:FetchedDocument,municipality:RegistryMunicipality,source:RegistrySource,adapter:string,metadata:CrawlDocument['metadata']={},documentDate:string|null=null):CrawlDocument {
+export function sourceDocument<T extends FetchedDocument|ExcludedDocument>(response:T,municipality:RegistryMunicipality,source:RegistrySource,adapter:string,metadata:CrawlDocument['metadata']={},documentDate:string|null=null):T&Pick<CrawlDocument,'id'|'municipalityId'|'ags'|'districtId'|'sourceId'|'documentDate'|'adapter'|'metadata'> {
  return {...response,id:'document-'+hash(municipality.id+'\n'+source.id+'\n'+response.url).slice(0,24),municipalityId:municipality.id,ags:municipality.ags,districtId:municipality.districtId,sourceId:source.id,documentDate,adapter,metadata:{sourceType:source.kind,...metadata}};
 }
 export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:RegistryMunicipality,source:RegistrySource,options:AdapterOptions,seeds:SourceSeed[]=municipality.seedDocuments?.filter(seed=>seed.sourceId===source.id)??[],boundProcedureRoots?:string[]):Promise<AdapterResult>{
+ await fetcher.initialize();
  const folder=join(fetcher.cacheDir,'frontiers');await mkdir(folder,{recursive:true});
  const boundRoots=boundProcedureRoots?.map(value=>publicUrl(value)),scopeKey=boundRoots?'\nbound-procedures-v1\n'+JSON.stringify(boundRoots.map(url=>url.href).sort()):'';
  const frontierPath=join(folder,hash(municipality.id+'\n'+source.id+scopeKey)+'.json'),ttl=options.revalidateAfterMs??DEFAULT_SOURCE_REVALIDATE_MS;
@@ -67,6 +76,7 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
  try{frontier=JSON.parse(await readFile(frontierPath,'utf8')) as SourceFrontier;if(frontier.schemaVersion!==1||frontier.municipalityId!==municipality.id||frontier.sourceId!==source.id)throw Error('Frontier identity mismatch');}
  catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;frontier={schemaVersion:1,municipalityId:municipality.id,sourceId:source.id,queue:[],visited:[],documents:[],failures:[],roots:[]};}
  frontier.checkedUrls??={};
+ frontier.excludedDocuments??=[];
  for(const document of frontier.documents)frontier.checkedUrls[document.url]??={checkedAt:document.checkedAt,documentId:document.id};
  frontier.lastCheckedAt??=[...frontier.documents.map(document=>document.checkedAt),...frontier.failures.map(failure=>failure.checkedAt)].filter(value=>Number.isFinite(Date.parse(value))).sort().at(-1)??null;
  if(options.activeOparlRecordIds){
@@ -91,8 +101,9 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
  for(const [url,observation] of Object.entries(frontier.checkedUrls).sort(([a],[b])=>Number(rootSet.has(b))-Number(rootSet.has(a)))){
   if(!rootSet.has(url)&&documentsById.get(observation.documentId)?.url!==url)continue;
   const previous=documentsById.get(observation.documentId);
-  const obsoletePdfPolicy=previous?.mimeType==='application/pdf'&&!previous.policy?.tdm.evidence.some(evidence=>evidence.url===previous.url&&evidence.sha256===previous.sha256&&evidence.locator.startsWith('PDF.js ')&&evidence.locator.endsWith(` XMP metadata (${PDF_TDM_POLICY_VERSION})`)&&['0','no_tdm_reservation_field'].includes(evidence.value)&&!!evidence.checkedAt&&Number.isFinite(Date.parse(evidence.checkedAt)));
-  const due=obsoletePdfPolicy||!Number.isFinite(Date.parse(observation.checkedAt))||now-Date.parse(observation.checkedAt)>=ttl;
+  const obsoletePdfPolicy=previous?.mimeType==='application/pdf'&&!previous.policy?.tdm.evidence.some(evidence=>evidence.url===previous.url&&evidence.sha256===previous.sha256&&evidence.locator.startsWith('PDF.js ')&&evidence.locator.endsWith(` XMP metadata (${PDF_TDM_POLICY_VERSION})`)&&(['0','no_tdm_reservation_field'].includes(evidence.value)||evidence.value==='1'&&previous.policy?.tdmOverride==='owner-approved 2026-10-11')&&!!evidence.checkedAt&&Number.isFinite(Date.parse(evidence.checkedAt)));
+  const obsoleteOrigin=source.ownerRobotsOverride&&previous&&!previous.policy?.documentOrigin;
+  const due=obsoletePdfPolicy||obsoleteOrigin||!Number.isFinite(Date.parse(observation.checkedAt))||now-Date.parse(observation.checkedAt)>=ttl;
   if(!due)continue;
   if(previous)expiredIds.add(previous.id);
   visited.delete(url);if(previous)visited.delete(previous.url);
@@ -118,13 +129,13 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
  frontier.failures=frontier.failures.filter(item=>!deferred.includes(item));
  const persist=async()=>{frontier.visited=[...visited];await writeFile(frontierPath+'.tmp',JSON.stringify(frontier));await rename(frontierPath+'.tmp',frontierPath);};
  await persist();
- let requests=0,processedDocuments=0,htmlPages=0;const notes:string[]=[];
+ let requests=0,processedDocuments=0,htmlPages=0,hostStopped=false;const notes:string[]=[];
  const discoveryOnly=!boundRoots&&source.crawlScope?.pageRoots.length===0&&source.crawlScope.followLinkedDocuments===false;
  if(discoveryOnly)notes.push('Endpoint discovery only: municipal procedure binding is not established; no statewide link expansion');
  while(frontier.queue.length&&requests<options.maxRequests&&processedDocuments<options.maxDocuments&&htmlPages<options.maxPages){
   const item=frontier.queue[0];if(visited.has(item.url)&&!item.revalidate){frontier.queue.shift();await persist();continue;}requests++;
   try{
-   const response=await fetcher.fetch(item.url,{machinePolicyUrls:source.knownMachinePolicyUrls}),isHtml=/^(?:text\/html|application\/xhtml\+xml)$/.test(response.mimeType),isPdf=response.mimeType==='application/pdf';
+   const response=await fetcher.fetch(item.url,{...sourceFetchOptions(source),title:item.title,linkText:item.title,municipalityName:municipality.name}),isHtml=/^(?:text\/html|application\/xhtml\+xml)$/.test(response.mimeType),isPdf=response.mimeType==='application/pdf';
    const isStructured=/xml|gml|zip/.test(response.mimeType)||/\.(?:xml|gml|zip)(?:$|[?])/i.test(response.url);
    if(!isHtml&&!isPdf&&!isStructured&&!response.mimeType.startsWith('text/')&&!response.mimeType.includes('json'))throw Error(`Unsupported representation ${response.mimeType}`);
    const html=isHtml?await readFile(response.localPath,'utf8'):null,sameBytes=item.previous?.sha256===response.sha256;
@@ -149,29 +160,40 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
     }
    }
   }catch(error){
+   if(error instanceof PoliteFetchError&&error.excludedDocument){
+    const excluded=sourceDocument(error.excludedDocument,municipality,source,item.adapter??'excluded-source',item.metadata,item.documentDate??null);
+    frontier.excludedDocuments=frontier.excludedDocuments.filter(document=>document.url!==excluded.url||document.sha256!==excluded.sha256);frontier.excludedDocuments.push(excluded);
+    frontier.documents=frontier.documents.filter(document=>document.url!==item.url&&document.url!==excluded.url);delete frontier.checkedUrls[item.url];delete frontier.checkedUrls[excluded.url];
+   }
    const failure=error instanceof PoliteFetchError?error.failure:'representation_error',status=error instanceof PoliteFetchError?error.status:undefined,checkedAt=new Date().toISOString();
-   const transient=['timeout','network_error','dns_error','robots_unavailable','tdm_unavailable'].includes(failure)||status===429||status!==undefined&&status>=500;
-   frontier.failures.push({url:item.url,failure,reason:error instanceof Error?error.message:'Source request failed',checkedAt,...(status?{status}:{}),...(error instanceof PoliteFetchError&&error.policy?{policy:error.policy}:{}),...(transient?{retryAfter:new Date(Date.now()+15*60_000).toISOString()}:{}),action:'ask_municipality'});
+   const transient=['timeout','network_error','dns_error','robots_unavailable','tdm_unavailable','host_cooldown','host_busy'].includes(failure)||status===429||status!==undefined&&status>=500;
+   const retryAfter=error instanceof PoliteFetchError?error.retryAfter:undefined;
+   frontier.failures.push({url:item.url,failure,reason:error instanceof Error?error.message:'Source request failed',checkedAt,...(status?{status}:{}),...(error instanceof PoliteFetchError&&error.policy?{policy:error.policy}:{}),...(retryAfter?{retryAfter}:transient?{retryAfter:new Date(Date.now()+15*60_000).toISOString()}:{}),action:'ask_municipality'});
+   hostStopped=status===403||status===429||failure.startsWith('host_');
    if(item.previous)frontier.documents=frontier.documents.filter(document=>document.id!==item.previous!.id);
    frontier.lastCheckedAt=checkedAt;failed.add(item.url);frontier.queue.shift();
   }
   await persist();
+  if(hostStopped)break;
  }
  const pendingCount=frontier.queue.length+frontier.failures.filter(item=>item.retryAfter).length,blockedCount=frontier.failures.filter(item=>!item.retryAfter).length;
  const state=pendingCount?'partial':blockedCount?'blocked':'complete';
  notes.push(`Scoped frontier ${state}: ${frontier.documents.length} documents, ${frontier.queue.length} queued links, ${frontier.failures.length} inaccessible links. Completion refers only to discovered scoped links, never all municipal documents.`);
  notes.push(`Conditional rediscovery and policy revalidation TTL ${ttl}ms; expired documents are withheld until checked; cached source checkedAt is not advanced without a request.`);
- if(frontier.failures.length)notes.push('Inaccessible/reserved resources: ask municipality; no contact was sent and no access restriction bypassed.');
- return {documents:frontier.documents,notes,requests,checkedAt:frontier.lastCheckedAt??null,coverage:{state,pendingCount,runnableCount:frontier.queue.length,blockedCount,frontierPath,scope:boundRoots?'Exactly bound procedure pages and their actual linked document downloads; no statewide roots or other procedures':'Observed roots, relevant same-origin planning/archive pages and all their linked public document files',...(frontier.failures.length?{action:'ask_municipality' as const}:{})},blocked:frontier.failures};
+ if(frontier.failures.length)notes.push('Inaccessible, excluded or reserved resources retain explicit policy evidence; no contact or access-barrier bypass occurred.');
+ for(const document of frontier.documents)await fetcher.assertHostAllowed(document.url);
+ return {documents:frontier.documents,excludedDocuments:frontier.excludedDocuments,notes,requests,checkedAt:frontier.lastCheckedAt??null,coverage:{state,pendingCount,runnableCount:hostStopped?0:frontier.queue.length,blockedCount,frontierPath,scope:boundRoots?'Exactly bound procedure pages and their actual linked document downloads; no statewide roots or other procedures':'Observed roots, relevant same-origin planning/archive pages and all their linked public document files',...(frontier.failures.length?{action:'ask_municipality' as const}:{})},blocked:frontier.failures};
 }
 const apiResponses=new WeakMap<PoliteFetcher,Map<string,{requestedAt:number;response:Promise<FetchedDocument>}>>();
 async function observedApiResponse(fetcher:PoliteFetcher,source:RegistrySource,ttl:number):Promise<FetchedDocument>{
  if(!source.api)throw Error('No observed API descriptor');
+ await fetcher.initialize();
+ await fetcher.assertHostAllowed(source.api.url);
  let responses=apiResponses.get(fetcher);if(!responses){responses=new Map();apiResponses.set(fetcher,responses);}
- const body=source.api.method==='POST'?new URLSearchParams(source.api.form??{}).toString():undefined,key=JSON.stringify([source.api.url,source.api.method??'GET',body]);
+ const body=source.api.method==='POST'?new URLSearchParams(source.api.form??{}).toString():undefined,key=JSON.stringify([source.api.url,source.api.method??'GET',body,source.ownerRobotsOverride??null,source.knownMachinePolicyUrls??[]]);
  let entry=responses.get(key);
- if(!entry||Date.now()-entry.requestedAt>=ttl){entry={requestedAt:Date.now(),response:fetcher.fetch(source.api.url,{method:source.api.method??'GET',body,machinePolicyUrls:source.knownMachinePolicyUrls})};responses.set(key,entry);}
- return entry.response;
+ if(!entry||Date.now()-entry.requestedAt>=ttl){entry={requestedAt:Date.now(),response:fetcher.fetch(source.api.url,{...sourceFetchOptions(source),method:source.api.method??'GET',body})};responses.set(key,entry);}
+ const response=await entry.response;await fetcher.assertHostAllowed(response.url);return response;
 }
 /** API URLs/form fields must be observed in registry, never inferred from vendor names. */
 export async function crawlParticipationApi(fetcher:PoliteFetcher,municipality:RegistryMunicipality,source:RegistrySource,options:AdapterOptions):Promise<AdapterResult>{
@@ -228,21 +250,24 @@ export async function crawlParticipationApi(fetcher:PoliteFetcher,municipality:R
 /** MV Bauportal's documented geoportalsearch interface, scoped by exact official AGS. */
 export async function crawlMvPlanningApi(fetcher:PoliteFetcher,municipality:RegistryMunicipality,source:RegistrySource,options:AdapterOptions):Promise<AdapterResult>{
  if(!source.api||source.api.format!=='mv-bauleitplan')throw Error('No observed MV Bauportal API configured');
+ await fetcher.initialize();
+ await fetcher.assertHostAllowed(source.api.url);
  const folder=join(fetcher.cacheDir,'api-frontiers');await mkdir(folder,{recursive:true});const statePath=join(folder,hash(municipality.id+'\n'+source.id)+'-mv.json');
- interface ApiState {url:string;offset:number;total:number|null;complete:boolean;seeds:SourceSeed[];metadata:Record<string,{title:string;caseKey:string}>;evidence:{url:string;sha256:string;checkedAt:string}[]}
+ interface ApiState {url:string;offset:number;total:number|null;complete:boolean;seeds:SourceSeed[];metadata:Record<string,{title:string;caseKey:string}>;evidence:{url:string;sha256:string;checkedAt:string}[];sourceBindings:SourceContentBinding[]}
  let state:ApiState;
- try{state=JSON.parse(await readFile(statePath,'utf8')) as ApiState;if(state.url!==source.api.url)throw Error('MV API frontier binding changed');}
- catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;state={url:source.api.url,offset:0,total:null,complete:false,seeds:[],metadata:{},evidence:[]};}
+ try{state=JSON.parse(await readFile(statePath,'utf8')) as ApiState;if(state.url!==source.api.url||!Array.isArray(state.sourceBindings))throw new PoliteFetchError('cache_missing','MV API cache requires managed provenance; use a fresh acquisition lane');for(const binding of state.sourceBindings)await fetcher.assertHostAllowed(binding.url);}
+ catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;state={url:source.api.url,offset:0,total:null,complete:false,seeds:[],metadata:{},evidence:[],sourceBindings:[]};}
  const priorApiCheck=state.evidence.at(-1)?.checkedAt;
  if(state.complete&&(!priorApiCheck||!Number.isFinite(Date.parse(priorApiCheck))||Date.now()-Date.parse(priorApiCheck)>=(options.revalidateAfterMs??DEFAULT_SOURCE_REVALIDATE_MS))){state.offset=0;state.total=null;state.complete=false;}
  const notes:string[]=[];let requests=0;
  for(let page=0;!state.complete&&page<options.maxPages&&requests<options.maxRequests;page++){
   const url=new URL(source.api.url);url.searchParams.set('offset',String(state.offset));url.searchParams.set('n','100');
-  const response=await fetcher.fetch(url.href,{machinePolicyUrls:source.knownMachinePolicyUrls});requests++;
+  const response=await fetcher.fetch(url.href,sourceFetchOptions(source));requests++;
   const data=JSON.parse(await readFile(response.localPath,'utf8')) as {success?:boolean;total?:number;hits?:number;results?:unknown[][]};
   if(data.success!==true||!Number.isInteger(data.total)||!Array.isArray(data.results)||data.results.some(group=>!Array.isArray(group)))throw Error('Unexpected MV Bauportal response; no empty-coverage inference');
   const records=data.results.flat() as {title?:string;_resourceLinkId?:string;x_GKZ?:string[];x_dokumentURL?:string[]}[];state.total=data.total!;
   state.evidence.push({url:response.url,sha256:response.sha256,checkedAt:response.checkedAt});
+  state.sourceBindings.push(sourceContentBinding(response));
   for(const record of records){
    if(!Array.isArray(record.x_GKZ)||!record.x_GKZ.includes(municipality.ags)||typeof record.title!=='string'||typeof record._resourceLinkId!=='string'||!Array.isArray(record.x_dokumentURL))continue;
    for(const link of record.x_dokumentURL){
@@ -252,7 +277,7 @@ export async function crawlMvPlanningApi(fetcher:PoliteFetcher,municipality:Regi
   }
   if(!records.length&&state.offset<state.total)throw Error('MV API returned an incomplete empty page; cursor retained');
   state.offset+=records.length;state.complete=state.offset>=state.total;
-  await writeFile(statePath+'.tmp',JSON.stringify(state));await rename(statePath+'.tmp',statePath);
+  await fetcher.persistDerivedJson(statePath,state,state.sourceBindings);
  }
  notes.push(`MV Bauportal durable API frontier: ${state.offset}/${state.total??'unknown'} records; ${state.complete?'complete':'partial'}; evidence ${state.evidence.map(item=>item.sha256).join(',')}`);
  const result=await crawlHtmlSource(fetcher,municipality,source,{...options,maxRequests:Math.max(0,options.maxRequests-requests)},[...state.seeds,...municipality.seedDocuments?.filter(seed=>seed.sourceId===source.id)??[]]);
@@ -260,49 +285,60 @@ export async function crawlMvPlanningApi(fetcher:PoliteFetcher,municipality:Regi
  if(!state.complete&&result.coverage){result.coverage.state='partial';result.coverage.runnableCount=(result.coverage.runnableCount??0)+1;result.coverage.pendingCount+=Math.max(1,(state.total??state.offset+1)-state.offset);notes.push('API cursor remains resumable; no completeness assertion');}
  result.requests+=requests;result.checkedAt=[result.checkedAt,state.evidence.at(-1)?.checkedAt].filter((value):value is string=>!!value).sort().at(-1)??null;result.notes.unshift(...notes);return result;
 }
-/** Shared Phase A loader: no stale fallback, fresh 304 validation, and an optional evidence lifecycle callback. */
-export function createPoliteCouncilLoader(fetcher:PoliteFetcher,options:{maxRequests:number;onDocument?:(document:FetchedDocument)=>void|Promise<void>}):CouncilLoader {
- const startedRequests=fetcher.requestCount;
- return async url=>{
-  if(fetcher.requestCount-startedRequests>=options.maxRequests)throw Error('OParl request budget exhausted');
-  const response=await fetcher.fetch(url),data:unknown=JSON.parse(await readFile(response.localPath,'utf8'));
-  await options.onDocument?.(response);
-  return {url:response.url,sha256:response.sha256,retrievedAt:response.retrievedAt,checkedAt:response.checkedAt,data};
- };
-}
 export async function crawlOparlSource(fetcher:PoliteFetcher,municipality:RegistryMunicipality,source:RegistrySource,options:AdapterOptions):Promise<AdapterResult>{
  if(!source.url)throw Error('No OParl endpoint');const startedRequests=fetcher.requestCount;
- let lastApiCheck:string|null=null;const loader=createPoliteCouncilLoader(fetcher,{maxRequests:options.maxRequests,onDocument:document=>{lastApiCheck=document.checkedAt;}});
+ await fetcher.initialize();
+ const observed=new Map<string,SourceContentBinding>(),excludedDocuments:CrawlExcludedDocument[]=[];
+ let lastApiCheck:string|null=null;
+ const loaderOptions:Parameters<typeof createPoliteCouncilLoader>[1]={...sourceFetchOptions(source),municipalityName:municipality.name,maxRequests:options.maxRequests,onDocument:document=>{lastApiCheck=document.checkedAt;observed.set(document.url+'\n'+document.sha256,sourceContentBinding(document));},onExcluded:document=>{lastApiCheck=document.checkedAt;excludedDocuments.push(sourceDocument(document,municipality,source,'oparl'));}};
+ const loader=createPoliteCouncilLoader(fetcher,loaderOptions);
  const system=await loader(source.url),value=system.data as {type?:string;body?:string};let bodies:OparlBody[]=[];
  if(/\/Body$/.test(value.type??''))bodies=[system.data as OparlBody];
  else{
   if(!/^https?:\/\/schema\.oparl\.org\/1\.[01]\/System$/.test(value.type??'')||typeof value.body!=='string')throw Error('Invalid OParl System');
   const folder=join(fetcher.cacheDir,'oparl-bodies');await mkdir(folder,{recursive:true});const path=join(folder,hash(source.url)+'.json');
-  let inventory:{base:string;next:string|null;bodies:OparlBody[];visited:string[];checkedAt?:string};
-  try{inventory=JSON.parse(await readFile(path,'utf8'));if(inventory.base!==value.body)throw Error('OParl Body inventory binding changed');}
-  catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;inventory={base:value.body,next:value.body,bodies:[],visited:[]};}
-  if(!inventory.next&&(!inventory.checkedAt||!Number.isFinite(Date.parse(inventory.checkedAt))||Date.now()-Date.parse(inventory.checkedAt)>=(options.revalidateAfterMs??DEFAULT_SOURCE_REVALIDATE_MS)))inventory={base:value.body,next:value.body,bodies:[],visited:[]};
+  let inventory:{base:string;next:string|null;bodies:OparlBody[];visited:string[];checkedAt?:string;sourceBindings:SourceContentBinding[]};
+  try{inventory=JSON.parse(await readFile(path,'utf8'));if(inventory.base!==value.body||!Array.isArray(inventory.sourceBindings))throw new PoliteFetchError('cache_missing','OParl Body inventory requires managed provenance');for(const binding of inventory.sourceBindings)await fetcher.assertHostAllowed(binding.url);}
+  catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;inventory={base:value.body,next:value.body,bodies:[],visited:[],sourceBindings:[]};}
+  if(!inventory.next&&(!inventory.checkedAt||!Number.isFinite(Date.parse(inventory.checkedAt))||Date.now()-Date.parse(inventory.checkedAt)>=(options.revalidateAfterMs??DEFAULT_SOURCE_REVALIDATE_MS)))inventory={base:value.body,next:value.body,bodies:[],visited:[],sourceBindings:[]};
   for(let page=0;inventory.next&&page<options.maxPages&&fetcher.requestCount-startedRequests<options.maxRequests;page++){
    const next=inventory.next;if(inventory.visited.includes(next)||new URL(next).origin!==new URL(source.url).origin)throw Error('Unsafe OParl Body pagination');
    const response=await loader(next),parsed=parseOparlList<OparlBody>(response.data,next,'Body');inventory.bodies.push(...parsed.records);inventory.visited.push(next);inventory.next=parsed.next;inventory.checkedAt=response.checkedAt??response.retrievedAt;
-   await writeFile(path+'.tmp',JSON.stringify(inventory));await rename(path+'.tmp',path);
+   const binding=observed.get(response.url+'\n'+response.sha256);if(!binding)throw new PoliteFetchError('cache_missing','OParl Body page has no immutable observation');inventory.sourceBindings.push(binding);
+   await fetcher.persistDerivedJson(path,inventory,inventory.sourceBindings);
   }
   if(inventory.next)return {documents:[],notes:['OParl Body inventory incomplete; durable cursor retained, municipal binding withheld'],requests:fetcher.requestCount-startedRequests,checkedAt:lastApiCheck,coverage:{state:'partial',pendingCount:1,runnableCount:1,blockedCount:0,frontierPath:path,scope:'Observed OParl Body inventory'}};
   bodies=inventory.bodies;
  }
  // The shared selector only reads identity fields; geometry is intentionally absent, not fabricated.
  const body=selectCouncilBody(bodies,{id:municipality.id,name:municipality.name,councilBodyId:source.councilBodyId,councilBodyAliases:source.councilBodyAliases} as City);
+ // Actual selected Body publisher context belongs only to its structured API,
+ // never to independently fetched third-party attachments.
+ loaderOptions.administrativeOriginEvidence=body.name;
  const seeds:SourceSeed[]=[],notes:string[]=[],activeOparlRecordIds=new Set<string>();let incompleteLists=0;
  for(const kind of ['paper','meeting'] as const){
   if(!body[kind])continue;
+  await fetcher.assertHostAllowed(body[kind]!);
   const folder=join(fetcher.cacheDir,'oparl',hash(body.id),kind);await mkdir(folder,{recursive:true});
   const storage:CouncilStorage={
    async load(){try{return JSON.parse(await readFile(join(folder,'checkpoint.json'),'utf8')) as CouncilCheckpoint;}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return undefined;throw error;}},
-   async readSegment(index){return JSON.parse(await readFile(join(folder,`page-${index}.json`),'utf8')) as CouncilSegment;},
-   async checkpoint(state,segment){if(segment)await writeFile(join(folder,`page-${state.segments-1}.json`),JSON.stringify(segment));await writeFile(join(folder,'checkpoint.tmp'),JSON.stringify(state));await rename(join(folder,'checkpoint.tmp'),join(folder,'checkpoint.json'));},
+   async readSegment(index){
+    const segment=JSON.parse(await readFile(join(folder,`page-${index}.json`),'utf8')) as CouncilSegment&{sourceBindings?:SourceContentBinding[]};
+    if(!segment.sourceBindings?.length)throw new PoliteFetchError('cache_missing','OParl segment lacks managed provenance');
+    for(const binding of segment.sourceBindings)await fetcher.assertHostAllowed(binding.url);return segment;
+   },
+   async checkpoint(state,segment){
+    if(segment){
+     const binding=observed.get(segment.evidence.url+'\n'+segment.evidence.sha256);if(!binding)throw new PoliteFetchError('cache_missing','OParl segment has no immutable source observation');
+     await fetcher.persistDerivedJson(join(folder,`page-${state.segments-1}.json`),{...segment,sourceBindings:[binding]},[binding]);
+    }
+    await writeFile(join(folder,'checkpoint.tmp'),JSON.stringify(state));await rename(join(folder,'checkpoint.tmp'),join(folder,'checkpoint.json'));
+   },
   };
+  const excludedBefore=excludedDocuments.length;
   const traversal=await traverseCouncilList(body,kind,storage,loader,{maxPages:options.maxPages,reuseCompleteMs:options.revalidateAfterMs??DEFAULT_SOURCE_REVALIDATE_MS});
   if(traversal.state.error)notes.push(traversal.state.error);if(traversal.state.active){incompleteLists++;notes.push(`OParl ${kind} traversal incomplete; durable cursor retained`);}
+  if(excludedDocuments.length>excludedBefore)continue;
   for(const {record} of traversal.records.values()){
    if(record.deleted)continue;activeOparlRecordIds.add(record.id);
    const metadata:CrawlDocument['metadata']={title:record.name??record.title,caseKey:record.reference??record.id,caseKeyType:'paper_reference',oparlRecordId:record.id,sourceVersion:record.modified};
@@ -312,7 +348,8 @@ export async function crawlOparlSource(fetcher:PoliteFetcher,municipality:Regist
   }
  }
  const consumed=fetcher.requestCount-startedRequests;
- const result=await crawlHtmlSource(fetcher,municipality,{...source,url:null,crawlScope:{pageRoots:[],followLinkedDocuments:true}},{...options,maxRequests:Math.max(0,options.maxRequests-consumed),activeOparlRecordIds},seeds);
+ const result=await crawlHtmlSource(fetcher,municipality,{...source,registeredSourceUrl:source.registeredSourceUrl??source.url,url:null,crawlScope:{pageRoots:[],followLinkedDocuments:true}},{...options,maxRequests:Math.max(0,options.maxRequests-consumed),activeOparlRecordIds},seeds);
+ result.excludedDocuments=[...result.excludedDocuments??[],...excludedDocuments];
  for(const document of result.documents)if(document.metadata.oparlRecordId)document.metadata.caseKeyType='paper_reference';
  if(incompleteLists&&result.coverage){result.coverage.state='partial';result.coverage.runnableCount=(result.coverage.runnableCount??0)+incompleteLists;result.coverage.pendingCount+=incompleteLists;}
  result.requests+=consumed;result.checkedAt=[result.checkedAt,lastApiCheck].filter((value):value is string=>!!value).sort().at(-1)??null;result.notes.unshift(...notes);return result;

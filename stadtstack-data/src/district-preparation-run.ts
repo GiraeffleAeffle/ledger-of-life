@@ -8,10 +8,12 @@ import {safeFailure} from './district-claims.ts';
 import {PreparedDocumentSchema,PREPARED_VM_ROOT,prepareDocument,verifyPreparedDocument,readAuthorizedSourceBytes,collectPreparationToolVersions,preparationExtractorSha256,cachePreparedDocument,type PreparedSourceReference} from './district-prepared-document.ts';
 import {municipalityBindingSchema,quarantineCaseSchema,type QuarantineCase} from './district-inference.ts';
 import {writePrivateJson} from './district-private-io.ts';
+import {assertHostNotOptedOut,initializeManagedAcquisitionLane} from './civic-opt-out.ts';
+import {APPROVED_OWNER_ROBOTS_OVERRIDE} from './source-policy.ts';
 
 export const VM_PROJECT='/home/max/civic-knowledge-slice/stadtstack-data';
 export const VM_NODE='/home/max/.local/share/mise/installs/node/24.21.0/bin/node';
-export const VM_RESULT_ROOT=VM_PROJECT+'/cache/district-joint/results';
+export const VM_RESULT_ROOT=VM_PROJECT+'/cache/district-joint/owner-policy-2026-10-11/results';
 export const preparedExpectationSchema=PreparedDocumentSchema.pick({receiptSha256:true,municipalityId:true,sourceSha256:true,extractorSha256:true,references:true,toolVersions:true}).strict();
 export const preparationGroupSchema=z.object({municipality:municipalityBindingSchema,documentIds:z.array(z.string()).min(1),expected:preparedExpectationSchema,referenceWarnings:z.array(z.object({documentId:z.string(),sourceId:z.string(),reason:z.string()}).strict())}).strict();
 export const preparationPlanSchema=z.object({schemaVersion:z.literal('stadtstack-preparation-plan-v1'),generatedAt:z.iso.datetime(),corpusSha256:authorizedPilotCorpusSchema,registrySha256:hashSchema,extractorSha256:hashSchema,maxDocumentsPerMunicipality:z.number().int().positive().nullable(),availableDocumentGroups:z.number().int().nonnegative(),selectedDocumentGroups:z.number().int().nonnegative(),selectedRepresentations:z.number().int().nonnegative(),municipalities:z.array(municipalityBindingSchema.extend({availableDocumentGroups:z.number().int().nonnegative(),selectedDocumentGroups:z.number().int().nonnegative(),selectedRepresentations:z.number().int().nonnegative()})),groups:z.array(preparationGroupSchema),quarantine:z.array(quarantineCaseSchema)}).strict();
@@ -23,6 +25,7 @@ export async function prepareFrozenCorpus(options:{index:string;expectedIndexSha
  const available=groupCrawlDocuments(corpus.documents),seeds=registry.municipalities.flatMap(municipality=>municipality.seedDocuments.map(seed=>({municipalityId:municipality.id,sourceId:seed.sourceId,url:seed.url})));
  const selected=selectExtractionGroups(corpus.documents,seeds,options.maxDocumentsPerMunicipality),extractorSha256=await preparationExtractorSha256();
  const groups:PreparationGroup[]=[],quarantine:QuarantineCase[]=[],toolVersions=new Map<string,Record<string,string>>();
+ await initializeManagedAcquisitionLane(PREPARED_VM_ROOT,{decisionId:APPROVED_OWNER_ROBOTS_OVERRIDE.id,kind:'prepared'});
  await mkdir(join(PREPARED_VM_ROOT,'indexes'),{recursive:true,mode:0o700});
  for(const documents of selected){
   const first=documents[0],municipality=registry.municipalities.find(item=>item.id===first.municipalityId),references:PreparedSourceReference[]=[],warnings:PreparationGroup['referenceWarnings']=[];
@@ -31,7 +34,8 @@ export async function prepareFrozenCorpus(options:{index:string;expectedIndexSha
    try{
     const source=municipality?.sources.find(item=>item.id===document.sourceId);
     if(!municipality||municipality.ags!==document.ags||municipality.districtId!==document.districtId||!source||source.checkState!=='checked'||!source.url)throw Error('Unbound source or municipality identity');
-    const policy=assertSubscriptionSourcePolicy(document.policy,document);
+    const policy=assertSubscriptionSourcePolicy(document.policy,document,source);
+    await assertHostNotOptedOut(document.url);
     if(mimeType&&mimeType!==document.mimeType)throw Error('Source MIME conflict within identical-byte group');
     references.push({id:source.id,url:document.url,sha256:document.sha256,retrievedAt:document.retrievedAt,locator:`document-sha256:${document.sha256}`,mimeType:document.mimeType,sourceType:source.kind,policy});
     sourcePath??=resolve(dirname(resolve(options.index)),document.localPath);mimeType??=document.mimeType;
@@ -47,7 +51,7 @@ export async function prepareFrozenCorpus(options:{index:string;expectedIndexSha
     const pointer=z.object({receiptSha256:hashSchema}).strict().parse(JSON.parse(await readFile(indexPath,'utf8')));
     receipt=verifyPreparedDocument(JSON.parse(await readFile(join(PREPARED_VM_ROOT,pointer.receiptSha256+'.json'),'utf8')),{...pointer,municipalityId:municipality.id,sourceSha256:first.sha256,extractorSha256,references,toolVersions:versions},bytes);
    }catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
-   if(!receipt){receipt=await prepareDocument({bytes,municipalityId:municipality.id,references,mimeType,extractorSha256,toolVersions:versions});await cachePreparedDocument(PREPARED_VM_ROOT,receipt);await writePrivateJson(indexPath,{receiptSha256:receipt.receiptSha256});}
+   if(!receipt){receipt=await prepareDocument({bytes,municipalityId:municipality.id,references,mimeType,extractorSha256,toolVersions:versions});await cachePreparedDocument(PREPARED_VM_ROOT,receipt,{decisionId:APPROVED_OWNER_ROBOTS_OVERRIDE.id});await writePrivateJson(indexPath,{receiptSha256:receipt.receiptSha256});}
    const expected={receiptSha256:receipt.receiptSha256,municipalityId:receipt.municipalityId,sourceSha256:receipt.sourceSha256,extractorSha256:receipt.extractorSha256,references:receipt.references,toolVersions:receipt.toolVersions};
    groups.push({municipality:{id:municipality.id,name:municipality.name,ags:municipality.ags,districtId:municipality.districtId},documentIds:documents.map(document=>document.id),expected,referenceWarnings:warnings});
   }catch(error){quarantine.push({documentId:first.id,municipalityId:first.municipalityId,sourceId:first.sourceId,sourceSha256:first.sha256,chunk:null,reason:safeFailure(error)});}

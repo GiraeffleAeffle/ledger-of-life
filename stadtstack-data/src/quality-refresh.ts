@@ -3,7 +3,7 @@ import {join} from 'node:path';
 import {parseArgs} from 'node:util';
 import {cities} from './cities.ts';
 import {collectOparl} from './council.ts';
-import {councilStorage} from './council-cache.ts';
+import {createCouncilAcquisition} from './council-cache.ts';
 import {collectGeodata} from './geodata.ts';
 import {geoFeeds} from './geodata-registry.ts';
 import {normalizeRetainedAtlasSignals,publicAtlasCatalogueSources,ATLAS_PUBLIC_PROVENANCE_URL} from './atlas.ts';
@@ -41,10 +41,11 @@ for(const city of catalogue.cities){
   if(configured.endpoint&&!options['retain-city-snapshot']){
    // Traverse the full inventory, not one interactive page budget. Every page is
    // checkpointed; interrupted runs resume and recently completed lists are reused.
-   const council=await collectOparl(configured,{maxPages:10_000,geocodeBudget:0,reuseCompleteMs:6*60*60_000});
+   const acquisition=createCouncilAcquisition(configured);
+   const council=await collectOparl(configured,{maxPages:10_000,geocodeBudget:0,reuseCompleteMs:6*60*60_000,acquisition});
    // Never carry misbound old council rows through a refresh failure.
    if(council.sources.some(source=>source.status==='failed'||source.status==='not_checked')||!configured.councilBodyId)throw Error(`Council refresh incomplete for ${city.id}; inspect public cache/source diagnostics and resume`);
-   const checkpoints=await Promise.all((['meeting','paper'] as const).map(kind=>councilStorage(configured.councilBodyId!,kind).load()));
+   const checkpoints=await Promise.all((['meeting','paper'] as const).map(kind=>acquisition.storage(configured.councilBodyId!,kind).load()));
    if(checkpoints.some(state=>!state||!state.backfillComplete||state.active||state.error))throw Error(`Council inventory traversal incomplete for ${city.id}; durable cursors retained for the next run`);
    collection.features=collection.features.filter(f=>!['council_paper','council_meeting'].includes(f.properties.kind));
    collection.features.push(...council.features);
