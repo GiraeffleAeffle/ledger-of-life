@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "civic-live-release-evidence-v1",
+  "version": "0.3.1",
+  "sourceCommit": "47083b92ad18613763536ea79d4db1aaccaa6eea",
+  "gitTag": "0.3.1",
+  "imageTag": "0.3.1",
+  "image": "ghcr.io/giraeffleaeffle/stadtstack-mcp:0.3.1@sha256:5efca884f0bcc453a9a9df0b8a543526ce42c74da82bb56a26a88fffe1dd7d98",
+  "dataManifestId": "25d99c9382ccbfeb3fbdef8541409950c8e4adc96852922f151e661d25c90eaf",
+  "endpoint": "https://mcp.stadtstack.eu",
+  "publicAcceptedAt": "2026-10-11T13:41:23.668006+00:00",
+  "governedCorrelation": {
+    "runtimeReceiptHashMatched": true,
+    "readyPodDigestMatched": true,
+    "literalVersionAlignment": true,
+    "endpointDataIdentityMatched": true,
+    "identityDigestsPreserved": true,
+    "maxAndBuzzLimits": {
+      "requestsPerMinute": 300,
+      "maxConcurrent": 8
+    },
+    "otherTokenLimits": {
+      "requestsPerMinute": 60,
+      "maxConcurrent": 4
+    },
+    "nonMcpBoundaryUnchanged": true
+  },
+  "publicEndpoint": {
+    "passed": true,
+    "acceptanceScope": "public_endpoint_version_data",
+    "imageProvenanceVerified": false,
+    "runningImageIdentityVerified": false
+  },
+  "semanticAcceptance": {
+    "passed": true,
+    "acceptanceScope": "public_endpoint_version_data",
+    "timestamp": "2026-10-11T13:50:13.159219+00:00"
+  },
+  "tokenPolicy": {
+    "identityDigestsPreserved": true,
+    "activation": "startup load through tokenSecretRevision rollout; no hot reload",
+    "analysisProfiles": [
+      {
+        "id": "max",
+        "limits": {
+          "requestsPerMinute": 300,
+          "maxConcurrent": 8
+        },
+        "explicit": true
+      },
+      {
+        "id": "buzz",
+        "limits": {
+          "requestsPerMinute": 300,
+          "maxConcurrent": 8
+        },
+        "explicit": true
+      }
+    ],
+    "otherDefaultProfileCount": 1
+  },
+  "memory": {
+    "scope": "Final advisory container cgroup reading; smoke restarts the container, so this is not asserted as the maximum across earlier cgroups.",
+    "authorizesDeployment": false,
+    "kernelPeakBytes": 320958464,
+    "memoryLimitBytes": 1073741824,
+    "cpuLimit": 1,
+    "oomKilled": false,
+    "peakIncludesShortMetricsReaderProcess": true
+  },
+  "operatorEvidencePins": [
+    {
+      "name": "mcp-0.3.1-public-smoke.json",
+      "sha256": "2cac44910a5da843c385b1ac6558bd93ecd9cfc3034a6c973fe304c9c5c0c293"
+    },
+    {
+      "name": "mcp-0.3.1-public-semantics.json",
+      "sha256": "933514b8f21bbea462d031d6fbba51a0415e0ad2ebc5bbd4bba31ec9869d3fc9"
+    },
+    {
+      "name": "mcp-0.3.1-identity-correlation.json",
+      "sha256": "0b35a6e6a47fd9fca96eb4bb7d0718b2461d6586a3b20ad15f1e01fa3915c96e"
+    },
+    {
+      "name": "mcp-0.3.1-memory.json",
+      "sha256": "66e049d95248f50faa045d2c911646afa3b1c4f9b9962a1ad8ba852556913d9d"
+    }
+  ],
+  "scopeNote": "HTTPS verifies endpoint semantics/version/data; running image identity is independently correlated through governed exact-image producer and Ready-pod evidence. No bearer values, token digests or protocol requests are published.",
+  "acquisitionPolicy": "Global owner robots/origin/opt-out policy is a separate0.3.2/rebuild lane, not enabled by this patch."
+}
