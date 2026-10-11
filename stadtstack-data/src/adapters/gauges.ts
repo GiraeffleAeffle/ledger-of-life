@@ -1,0 +1,63 @@
+import {load} from 'cheerio';
+import {z} from 'zod';
+import {assertSnapshot,ScopeSchema,observation,semanticHash} from '../district-adapter-contract.ts';
+import type {AdmittedSnapshot,AdapterScope,AdapterCoverage,StructuredAdapter,StructuredLocator,StructuredObservation,ResourceReference} from '../district-adapter-contract.ts';
+
+export const GAUGES_MAPPING_VERSION='gauges-native-v1';
+const LIMIT=4*1024*1024;
+const pilots:Record<string,true>={'12064472':true,'12064227':true,'12064428':true,'01053100':true,'01053090':true,'01053116':true,'13076090':true,'13076108':true,'13076060':true};
+const caveats=['Gauge context only: no project or parcel flood-risk assertion.','No source AGS; municipality assignment remains unknown without a separately evidenced spatial join.','Unverified raw data; source classification is not measurement quality certification.','API availability is last 31 days, default 10 days; not a retention permission for private copies.'];
+const timestamp=z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/).refine(v=>Number.isFinite(Date.parse(v)));
+const measurement=z.object({timestamp,value:z.number().finite().nullable(),stateMnwMhw:z.string().optional(),stateNswHsw:z.string().optional()}).passthrough();
+const series=z.object({shortname:z.string().min(1),longname:z.string().optional(),unit:z.string().min(1),equidistance:z.number().nonnegative().optional(),gaugeZero:z.object({unit:z.string(),value:z.number().finite(),validFrom:z.string().regex(/^\d{4}-\d{2}-\d{2}$/)}).passthrough().optional(),currentMeasurement:measurement.optional(),comment:z.object({shortDescription:z.string().optional(),longDescription:z.string().optional()}).passthrough().optional()}).passthrough();
+const station=z.object({uuid:z.string().uuid(),number:z.string().min(1),shortname:z.string().min(1),longname:z.string().optional(),water:z.object({shortname:z.string().min(1),longname:z.string().optional()}).passthrough(),longitude:z.number().min(-180).max(180).optional(),latitude:z.number().min(-90).max(90).optional(),timeseries:z.array(series).max(100).optional()}).passthrough();
+type Station=z.infer<typeof station>;
+const schemaHash=semanticHash({station:['uuid','number','shortname','water','timeseries'],series:['shortname','unit','equidistance','gaugeZero','currentMeasurement','comment'],measurement:['timestamp','value','stateMnwMhw','stateNswHsw']});
+function coverage(snapshot:AdmittedSnapshot,scope:AdapterScope,state:AdapterCoverage['state'],reason:string,rows=0,nextCursor:string|null=null):AdapterCoverage{return {state,scope:`${scope.sourceId}:${scope.ags}:${scope.observationWindow}`,reason,checkedAt:snapshot.retrievedAt,nextCursor,observedRows:rows,limitations:caveats};}
+function prepare(snapshot:AdmittedSnapshot,scope:AdapterScope):void {assertSnapshot(snapshot);ScopeSchema.parse(scope);if(snapshot.bytes.byteLength>LIMIT)throw Error('Gauge snapshot exceeds byte bound');}
+function readStations(snapshot:AdmittedSnapshot):Station[]{const raw:unknown=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(snapshot.bytes));return z.array(station).max(10000).parse(Array.isArray(raw)?raw:[raw]);}
+function locator(snapshot:AdmittedSnapshot,id:string,path:string,value:string|number|null):StructuredLocator{return {sourceSha256:snapshot.sourceSha256,format:'json',nativeId:id,path,sheet:null,rowKey:id,cells:[],rawValue:value,schemaHash,mappingVersion:GAUGES_MAPPING_VERSION};}
+function emit(snapshot:AdmittedSnapshot,scope:AdapterScope,id:string,kind:string,predicate:string,value:string|number|null,path:string,unit:string|null=null,date:string|null=null,extra:StructuredLocator[]=[]):StructuredObservation{
+ const evidence=[locator(snapshot,id,path,value)];
+ const supportingEvidence:StructuredObservation['supportingEvidence']=[];
+ for(const item of extra){if(item.sourceSha256===snapshot.sourceSha256)evidence.push(item);else supportingEvidence.push({role:'source_metadata',locator:item});}
+ return observation({publisherId:scope.publisherId,sourceId:scope.sourceId,nativeId:id,nativeVersion:snapshot.sourceVersion,kind,subject:`${scope.publisherId}:${scope.sourceId}:${id}`,predicate,value,unit,date,dateRole:date?'measurement_time':null,financialRole:'none',geography:{ags:null,basis:'unknown',role:'unknown'},sourceReferenceDate:date,publishedAt:null,retrievedAt:snapshot.retrievedAt,evidence,supportingEvidence,limitations:caveats});
+}
+/** Optional metadata is another original admitted API snapshot, never a normalized record. */
+export function createGaugesAdapter(options:{stationSnapshot?:AdmittedSnapshot;pageSize?:number}={}):StructuredAdapter {
+ const pageSize=options.pageSize??100;if(!Number.isInteger(pageSize)||pageSize<1||pageSize>500)throw Error('Invalid gauge discovery bound');
+ return {id:'pegelonline',version:GAUGES_MAPPING_VERSION,
+ discover(snapshot,scope,cursor){prepare(snapshot,scope);if(scope.sourceId!=='pegelonline'||!pilots[scope.ags])return {resources:[],coverage:coverage(snapshot,scope,'not_applicable','Outside the nine-pilot PEGELONLINE scope')};try {const rows=readStations(snapshot);const start=cursor===null?0:Number(cursor);if(!Number.isSafeInteger(start)||start<0||start>rows.length||cursor!==null&&String(start)!==cursor)throw Error('Invalid local inventory cursor');const end=Math.min(rows.length,start+pageSize);const resources:ResourceReference[]=rows.slice(start,end).map(row=>({url:`https://m.pegelonline.wsv.de/webservices/rest-api/v2/stations/${encodeURIComponent(row.uuid)}.json?includeTimeseries=true&includeCurrentMeasurement=true`,nativeId:row.uuid,parentId:null,method:'GET',body:null,format:'json'}));const next=end<rows.length?String(end):null;return {resources,coverage:coverage(snapshot,scope,rows.length?'partial':'empty',rows.length?'Local inventory pagination only; national stations are not verified pilot gauges':'Empty native station inventory; not station withdrawal',rows.length,next)};}catch{return {resources:[],coverage:coverage(snapshot,scope,'held_quality','Native station schema or cursor changed; inventory not treated as empty')};}},
+ parse(snapshot,scope){prepare(snapshot,scope);if(scope.sourceId!=='pegelonline'||!pilots[scope.ags])return {observations:[],coverage:coverage(snapshot,scope,'not_applicable','Outside the nine-pilot PEGELONLINE scope')};try {const url=new URL(snapshot.url);const observations:StructuredObservation[]=[];const match=url.pathname.match(/\/stations\/([^/]+)\/([^/]+)\/(?:measurements|currentmeasurement)\.json$/);let count=0;
+ if(match){
+  if(!options.stationSnapshot)return {observations:[],coverage:coverage(snapshot,scope,'held_quality','Standalone measurement lacks original station/unit/datum metadata')};
+  prepare(options.stationSnapshot,scope);
+  const metadata=options.stationSnapshot;
+  const stations=readStations(metadata);
+  const index=stations.findIndex(s=>s.uuid===decodeURIComponent(match[1]!));
+  const s=stations[index];
+  const tsIndex=s?.timeseries?.findIndex(t=>t.shortname===decodeURIComponent(match[2]!))??-1;
+  const ts=s?.timeseries?.[tsIndex];
+  if(!s||!ts||!['W','Q','WT'].includes(ts.shortname))throw Error('Unknown or non-measured series');
+  const raw:unknown=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(snapshot.bytes));
+  const values=z.array(measurement).max(100000).parse(Array.isArray(raw)?raw:[raw]);
+  const metadataRaw:unknown=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(metadata.bytes));
+  const metadataRoot=(Array.isArray(metadataRaw)?`$[${index}]`:'$')+`.timeseries[${tsIndex}]`;
+  for(const [i,m] of values.entries()){
+   const id=`${s.uuid}:${ts.shortname}:${m.timestamp}`;
+   const extra=[locator(metadata,s.uuid,metadataRoot+'.unit',ts.unit)];
+   if(ts.gaugeZero)extra.push(locator(metadata,s.uuid,metadataRoot+'.gaugeZero.value',ts.gaugeZero.value),locator(metadata,s.uuid,metadataRoot+'.gaugeZero.unit',ts.gaugeZero.unit),locator(metadata,s.uuid,metadataRoot+'.gaugeZero.validFrom',ts.gaugeZero.validFrom));
+   observations.push(emit(snapshot,scope,id,'Measurement','measured_value',m.value,Array.isArray(raw)?`$[${i}].value`:'$.value',ts.unit,m.timestamp,[locator(snapshot,id,Array.isArray(raw)?`$[${i}].timestamp`:'$.timestamp',m.timestamp),...extra]));
+   for(const key of ['stateMnwMhw','stateNswHsw'] as const)if(m[key]!==undefined)observations.push(emit(snapshot,scope,id,'Measurement',key,m[key]!,Array.isArray(raw)?`$[${i}].${key}`:`$.${key}`,null,m.timestamp));
+  }
+  count=values.length;
+ }else {const raw:unknown=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(snapshot.bytes));const stations=readStations(snapshot);count=stations.length;for(const [i,s] of stations.entries()){const root=Array.isArray(raw)?`$[${i}]`:'$';for(const [key,value] of [['number',s.number],['shortname',s.shortname],['longitude',s.longitude],['latitude',s.latitude]] as const)if(value!==undefined)observations.push(emit(snapshot,scope,s.uuid,'Gauge',key,value,`${root}.${key}`));observations.push(emit(snapshot,scope,s.uuid,'Gauge','on_waterbody',s.water.shortname,`${root}.water.shortname`));for(const [j,ts] of (s.timeseries??[]).entries()){if(!['W','Q','WT'].includes(ts.shortname))continue;const id=`${s.uuid}:${ts.shortname}`;const p=`${root}.timeseries[${j}]`;observations.push(emit(snapshot,scope,id,'Timeseries','unit',ts.unit,p+'.unit'));if(ts.equidistance!==undefined)observations.push(emit(snapshot,scope,id,'Timeseries','equidistance',ts.equidistance,p+'.equidistance','min'));if(ts.gaugeZero){observations.push(emit(snapshot,scope,id,'GaugeDatum','gauge_zero',ts.gaugeZero.value,p+'.gaugeZero.value',ts.gaugeZero.unit,null,[locator(snapshot,id,p+'.gaugeZero.validFrom',ts.gaugeZero.validFrom)]));}for(const key of ['shortDescription','longDescription'] as const)if(ts.comment?.[key]!==undefined)observations.push(emit(snapshot,scope,id,'Timeseries','source_comment',ts.comment[key]!,p+`.comment.${key}`));const m=ts.currentMeasurement;if(m){const mid=`${id}:${m.timestamp}`;const extra=[locator(snapshot,id,p+'.unit',ts.unit),locator(snapshot,mid,p+'.currentMeasurement.timestamp',m.timestamp)];observations.push(emit(snapshot,scope,mid,'Measurement','measured_value',m.value,p+'.currentMeasurement.value',ts.unit,m.timestamp,extra));for(const key of ['stateMnwMhw','stateNswHsw'] as const)if(m[key]!==undefined)observations.push(emit(snapshot,scope,mid,'Measurement',key,m[key]!,p+`.currentMeasurement.${key}`,null,m.timestamp));}}}}
+ return {observations,coverage:coverage(snapshot,scope,count?'partial':'empty',count?'Native snapshot parsed; pilot spatial coverage and historical completeness not established':'Empty native response; not evidence of withdrawal',count)};
+ }catch{return {observations:[],coverage:coverage(snapshot,scope,'held_quality','Native gauge schema or metadata changed; no inferred values')};}}};
+}
+export const gaugesAdapter=createGaugesAdapter();
+export const stateGaugeSources={ 'state-gauges-bb':'pegelportal.brandenburg.de','state-gauges-sh':'hsi-sh.de','state-gauges-mv':'pegelportal-mv.de'} as const;
+/** State HTML stays separate from the federal licence. Discovery is not processing admission. */
+export const stateGaugesAdapter:StructuredAdapter={id:'state-gauges',version:GAUGES_MAPPING_VERSION,
+ discover(snapshot,scope,cursor){prepare(snapshot,scope);const host=stateGaugeSources[scope.sourceId as keyof typeof stateGaugeSources];if(!host||!pilots[scope.ags])return {resources:[],coverage:coverage(snapshot,scope,'not_applicable','Outside state gauge pilot scope')};if(cursor!==null)return {resources:[],coverage:coverage(snapshot,scope,'held_quality','State HTML pagination is not verified')};if(new URL(snapshot.url).hostname!==host)return {resources:[],coverage:coverage(snapshot,scope,'held_origin','State issuer host mismatch')};const $=load(new TextDecoder('utf-8',{fatal:true}).decode(snapshot.bytes));const resources:ResourceReference[]=[];$('a[href]').each((_,element)=>{if(resources.length>=100)return;const href=$(element).attr('href')!;const url=new URL(href,snapshot.url);if(url.hostname!==host)return;const id=scope.sourceId==='state-gauges-bb'?url.searchParams.get('pkz'):url.pathname.match(/\/(\d+(?:\.\d+)?)\.html$/)?.[1];if(id&&!resources.some(r=>r.nativeId===id))resources.push({url:url.href,nativeId:id,parentId:null,method:'GET',body:null,format:'html'});});return {resources,coverage:coverage(snapshot,scope,'held_origin','Public HTML links only; distribution-specific rights and numeric schema remain unverified',resources.length)};},
+ parse(snapshot,scope){prepare(snapshot,scope);return {observations:[],coverage:coverage(snapshot,scope,'held_origin','State HTML has no established distribution licence; PEGELONLINE licence must not be inherited')};}};

@@ -1,0 +1,74 @@
+{
+  "family": 9,
+  "module": "procurement.ts",
+  "mappingVersion": "procurement-native-v1",
+  "exports": ["procurementAdapter", "createProcurementAdapter", "procurementCapabilityReceipt", "procurementTedReferences", "PROCUREMENT_MAPPING_VERSION"],
+  "catalogSources": ["procurement-bkms-opendata", "procurement-ted"],
+  "capabilityState": "fixture_implemented_live_distribution_not_checked",
+  "collectionAuthorized": false,
+  "sources": [
+    {
+      "id": "procurement-bkms-opendata",
+      "role": "primary",
+      "endpoint": "https://oeffentlichevergabe.de/api/notice-exports",
+      "documentation": "https://oeffentlichevergabe.de/documentation/api/opendata",
+      "documentationVersion": "1.0.0",
+      "method": "GET",
+      "formats": ["ocds.zip", "eforms.zip", "csv.zip"],
+      "discoverySeed": "Admitted native OpenAPI JSON with /api/notice-exports capability",
+      "scopeWindow": "YYYY-MM-DD or inclusive YYYY-MM-DD/YYYY-MM-DD; cursor is next completed day",
+      "temporalSemantics": "Europe/Berlin midnight ranges; days earlier than the admitted snapshot retrieval day only; earliest 2022-12-01; never today/future",
+      "rights": "held_origin: catalog CC0 publication-policy indexing is not document-level admission; tender attachments excluded",
+      "liveExport": "not_checked"
+    },
+    {
+      "id": "procurement-ted",
+      "role": "EU cross-reference only",
+      "endpoint": "https://api.ted.europa.eu/v3/notices/search",
+      "documentation": "https://api.ted.europa.eu/api-v3.yaml",
+      "documentationVersion": "3.0.0",
+      "method": "POST",
+      "fields": ["notice-identifier", "notice-version", "procedure-identifier", "publication-number", "publication-date"],
+      "pagination": "ITERATION; opaque iterationNextToken; ALL scope; onlyLatestVersions false; timeout or unmatched total stays partial",
+      "discoverySeed": "Admitted native search response; continuation requires factory tedQuery bound by executor to the original query",
+      "initialSearch": "procurementTedReferences builds POST resource references from native BT-701 fields, never descriptions/names",
+      "rights": "held_origin until notice-specific admission; EU notice reuse and website/editorial/attachment rights are distinct",
+      "liveSearch": "not_checked"
+    }
+  ],
+  "nativeFormats": {
+    "ocds": {
+      "standard": "1.1 release package or individual release",
+      "identity": "publisher + ocid identifies procedure; release id is notice version; tender, lot, award, contract and party IDs separately scoped to procedure",
+      "fields": ["ocid", "id", "date", "tag", "tender.id/title/status/value/lots", "buyer.id", "parties.identifier", "awards.id/status/date/value/relatedLots/suppliers", "contracts.id/awardID/dateSigned/status"],
+      "awardRelationshipGate": "awards.status exactly active; pending/cancelled retain status but no awarded_to",
+      "ocidEquivalence": "No inferred equivalence to eForms UUIDs or TED publication number"
+    },
+    "eforms": {
+      "standard": "Original UBL eForms XML; exact canonical cbc/cac/ext/efext/efac SDK selectors",
+      "sdkSelectorEvidence": "https://github.com/OP-TED/eForms-SDK/blob/main/fields/fields.json",
+      "identity": "BT-701 notice ID + BT-757 version; BT-04 procedure; documented Lot IDs stay procedure-scoped, while ORG/RES/TEN/CON/TPA technical IDs and references are notice+version scoped and never merged solely through a shared procedure",
+      "awardRelationshipGate": "LotResult TenderResultCode selec-w plus explicit LotTender -> TenderingParty -> Tenderer references; every chain field retained as structured evidence",
+      "dates": "IssueDate is dispatch, SettledContract AwardDate is award decision, SettledContract IssueDate is contract conclusion; never inferred actual publication. Zone-qualified xsd:date values (YYYY-MM-DDZ or YYYY-MM-DD+01:00) normalize to their validated local calendar day; exact original offset lexeme remains in evidence. Offset range <=14:00; calendar-invalid values hold.",
+      "unsupported": "Alternative namespace prefix bindings/multiple extension containers are held rather than loose descendant matching; this is a mapped-field parser, not full SDK validation"
+    },
+    "csv": {
+      "standard": "RFC4180 original notice.csv plus native 1:n tables; no invented normalized JSON input",
+      "codebook": "https://oeffentlichevergabe.de/documentation/api/opendata/Documentation%20Bekanntmachungsservice%20CSV%20Format.ods",
+      "identity": "noticeIdentifier + noticeVersion foreign key; procedureIdentifier BT-04; documented lot IDs stay procedure-scoped; result/tender/contract identities are notice+version scoped; empty lot key means procedure-level",
+      "mappedTables": ["notice.csv", "purpose.csv", "lot.csv", "procedureLotResult.csv", "tender.csv", "contract.csv", "placeOfPerformance.csv"],
+      "schemaEvolution": "Added columns/tables tolerated; missing identity columns, dangling notice/version references and duplicate notice/version rows held",
+      "dates": "notice publicationDate is BT-738 preferred publication date, not proof of actual publication",
+      "limitations": "Unmapped original columns/tables do not become claims; winnerChosen is a status, never a guessed contractor relation"
+    }
+  },
+  "crossFormatVersionIdentity": "BT-757 numeric versions canonicalize decimal leading zeros for notice keys (XML/CSV 02 equals TED integer 2), while nativeVersion/raw evidence preserves the original value. Unknown/non-numeric version syntax is held. This applies only to explicit European notice identifiers, never OCDS release IDs.",
+  "evidence": "Original admitted archive byte hash + member name + JSON pointer/XML selector/CSV row and cells + scalar rawValue + mapping/schema hash; no synthesized prose or model receipt",
+  "geography": "AGS remains null unless an independent verified geography join is supplied downstream. Scope AGS is never projected onto national notices. NUTS/postcode/city evidence retains performance-location role, not project location or buyer seat.",
+  "financialSemantics": "Estimated value=plan; OCDS award value=approval only when award.status is exactly active, otherwise none; native tender value has no payment/actual role. Contract dates and notices do not prove paid invoices or constructed/delivered output.",
+  "withdrawals": "Explicit cancelled/unsuccessful native status retained with notice version; absence from partial page or empty export is not withdrawal/deletion",
+  "bounds": "Shared readZip: 16 MiB input, 64 MiB expansion, 16 MiB/member, 512 members, expansion ratio 200; CRC, traversal, symlink, encryption rejection; no ZIP64/multidisk; parser input 64 MiB; 10000 OCDS releases and 50000 observations per representation; TED 250 rows max",
+  "integration": ["Register procurementAdapter for both catalog IDs", "Admit exact original bytes and policy receipt via shared acquisition owner; unresolved rights stay held upstream", "Run parser only in credential-free network-denied executor; no direct parser fetches", "Bind POST query/body hash to source representation; factory tedQuery must match admitted continuation response selector", "Preserve archive original and member evidence; structured-tables.ts readZip/readCsv dependency supplied by FundingAdapter", "Keep typed observations as source assertions; no inference to permit/completion/payment/current validity"],
+  "fixtureCoverage": ["positive OCDS/eForms/CSV/TED", "empty package/ZIP/TED", "completed-day discovery pagination", "TED iteration pagination and timeout", "missing/changed identity schema", "explicit cancelled award", "non-active award values never approval", "blocked HTML access", "byte mismatch", "XML DTD rejection", "zone-qualified XML dates and invalid calendars/offsets", "reused notice-local technical IDs across same-procedure notices/versions", "version and lot separation", "no title equality", "no payout/finalization from tender or award"],
+  "verification": "not_run_by_worker"
+}

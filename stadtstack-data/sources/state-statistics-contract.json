@@ -1,0 +1,35 @@
+{
+  "adapterId": "state-statistics",
+  "mappingVersion": "state-statistics-native-v1",
+  "familyRank": 6,
+  "collectionAuthorized": false,
+  "rightsDefault": "held_origin",
+  "formats": ["xlsx", "csv"],
+  "parser": "shared structured-tables.ts native bounded OOXML/CSV",
+  "discovery": "Already acquired native HTML anchors only; explicit bounded offset cursor; no hidden network or invented API",
+  "capabilityReceipt": {
+    "observed": ["Catalog advertises BB, SH and MV spreadsheet links", "Catalog distinguishes quarterly cash statistics from annual statistical accounts", "SH landing explicitly lists municipal tax rates and core-budget debt; older whole-finance series suspended"],
+    "implementedNotExecuted": ["Native CSV/XLSX parsing with raw cell evidence", "Municipal AGS exact string matching", "District rows excluded without distributing totals", "Tax/debt/cumulative cash period semantics", "Core/special/consolidated scope differentiation", "Positive, empty, pagination, schema-change, withdrawn and blocked fixtures"],
+    "unverified": ["Publisher workbook layouts and merged-column semantics", "Actual fiscal municipal coverage for every pilot", "Resource-specific licensing", "Native positive XLSX fixture execution", "Publication dates and administrative boundary vintages"],
+    "operational": false
+  },
+  "sources": [
+    {"sourceId":"statistics-berlin-brandenburg-finance","statePrefix":"12","pilotAgs":["12064472","12064227","12064428"],"district":"12064","series":["LII2 cash","LII3 annual core results","LII6 tax rates","LII7 real-tax comparison","LIII1 debt"],"landing":"https://www.statistik-berlin-brandenburg.de/gesellschaft/staat/oeffentliche-finanzen","rights":"unknown","municipalCoverage":"not_checked"},
+    {"sourceId":"statistics-nord-schleswig-holstein-finance","statePrefix":"01","pilotAgs":["01053100","01053090","01053116"],"district":"01053","series":["Realsteuerhebesätze municipal table","Schulden der kommunalen Kernhaushalte municipal table","LII7 real-tax comparison","Meine Region CSV where advertised"],"landing":"https://www.statistik-nord.de/zahlen-fakten/steuern-finanzen-oeffentlicher-dienst/finanzen","rights":"unknown","municipalCoverage":"not_checked","historicalLimit":"Cash report suspended from 2009 and annual-account series from 2006; never claim current whole-finance coverage"},
+    {"sourceId":"statistics-mv-laiv-finance","statePrefix":"13","pilotAgs":["13076090","13076108","13076060"],"district":"13076","series":["L223 cumulative cash quarters","L233 annual receipts/payments","L273 real-tax comparison"],"landing":"https://www.laiv-mv.de/Statistik/Zahlen-und-Fakten/Gesellschaft-%26-Staat/Oeffentliche-Finanzen-und-Personal/","rights":"unknown","municipalCoverage":"not_checked","accessLimit":"Catalog L233 2024 PDF request returned 503; XLSX alternative advertised, unverified"}
+  ],
+  "mappingRules": {
+    "identity": "Exact eight-digit source AGS only; no zero-padding or name-based municipal join. Five-digit district identifiers remain district observations and are excluded from town values.",
+    "evidence": "Exact original raw cell lexemes, sheet, coordinates, source hash, source key, schema hash, mapping version; only this column's own header chain and table-title cells support semantics.",
+    "dates": "Single explicit column/header year or unambiguous one-cell table-title year; annual December 31 statistical period end, debt stock reference date. Cash requires one explicit numbered quarter and represents January-through-quarter-end cumulative period. Missing or ambiguous year/quarter holds.",
+    "units": "Explicit percent, EUR, 1000 EUR or EUR per inhabitant. Own column labels take priority, otherwise only an unambiguous one-cell table title supplies units. Conflicting labels or absent units hold the column; sibling columns never supply dimensions. German CSV numeric lexemes differ from native OOXML number lexemes. Numeric OOXML percentage-style tax-rate cells are scaled by 100 using the shared exact-decimal helper; style evidence and original raw lexemes remain attached. Plain numeric percentage columns are never rescaled from their magnitude or headers alone.",
+    "scope": "Explicit core/special/consolidated labels from this column, otherwise an unambiguous one-cell title. Multiple conflicting scope labels hold the column. Tax series labelled tax_statistics only when no explicit scope exists, never guessed from sibling columns.",
+    "suppression": "Empty, dot, ellipsis, slash, x and dash excluded, never zero-filled.",
+    "financialRole": "none: statistics do not assert appropriation, project payment or municipal actual-account document.",
+    "coverage": "Parsed supported cells remain partial because live resource completeness has not been established. Unrecognized schema held_quality, captured access wall blocked_access, explicit withdrawal partial without inferred deletion, unknown rights held_origin. Empty native snapshot empty."
+  },
+  "nonClaims": ["Not product or investment appropriation", "Not the town full annual account", "Not project expenditure or subsidy payment", "Not measured project impact", "No statewide coverage or current-year completeness"],
+  "fixtureProvenance": "Constructed native CSV/HTML, valid sparse OOXML ZIP with original cell coordinates and malformed OOXML bytes; not downloaded publisher observations and not evidence of publisher schema compatibility",
+  "checksToRunByMain": ["Repository TypeScript check", "test/state-statistics-adapter.test.ts", "Shared structured-tables native OOXML fixtures"],
+  "changelog": [{"date":"2026-10-11","change":"Implement conservative native state-finance context adapter; preserve rights holds and unverified publisher layouts/coverage."},{"date":"2026-10-11","change":"Isolate per-column units and budget scopes; add mixed-unit, mixed-budget, unknown/conflicting dimension and title-fallback regression fixtures."},{"date":"2026-10-11","change":"Preserve native OOXML percentage-style semantics and original raw cell/style evidence for tax rates, with bounded styled/unstyled native fixtures."}]
+}
