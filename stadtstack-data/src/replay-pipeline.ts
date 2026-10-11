@@ -184,19 +184,19 @@ export function compareReplayRelease(expectedBytes:Uint8Array,actualBytes:Uint8A
  return {releaseId:actual.id,manifestSha256:hash(actualBytes),files:actual.files};
 }
 export function requiredReplayStaging(cities:string[]):string[]{return ['catalogue.json','regions/brandenburg-mol/topics.json','core/strausberg-facts.json',...cities.flatMap(id=>[`cities/${id}/signals.geojson`,`cities/${id}/feed.json`])].sort();}
-async function gitBytes(commit:string,path:string):Promise<Buffer>{
- try{return (await execute('git',['--no-replace-objects','show',`${commit}:out/${path}`],{cwd:root,encoding:'buffer',maxBuffer:512*1024*1024,env:{...process.env,GIT_NO_LAZY_FETCH:'1',GIT_TERMINAL_PROMPT:'0'}})).stdout;}
+export async function readCommittedReleaseFile(commit:string,path:string):Promise<Buffer>{
+ try{return (await execute('git',['--no-replace-objects','show',`${commit}:./out/${path}`],{cwd:root,encoding:'buffer',maxBuffer:512*1024*1024,env:{...process.env,GIT_NO_LAZY_FETCH:'1',GIT_TERMINAL_PROMPT:'0'}})).stdout;}
  catch{throw Error('Replay prior committed release object missing; network fetch is forbidden');}
 }
 async function stagePriorRelease(receipt:ReplayReceipt,expected:DataRelease,cities:string[],directory:string){
- const prior=receipt.priorRelease,bytes=await gitBytes(prior.gitCommit,'release-manifest.json');
+ const prior=receipt.priorRelease,bytes=await readCommittedReleaseFile(prior.gitCommit,'release-manifest.json');
  if(hash(bytes)!==prior.manifestSha256)throw Error('Replay prior committed manifest digest mismatch');
  const manifest=dataReleaseSchema.parse(JSON.parse(bytes.toString('utf8')));
  if(manifest.id!==prior.releaseId||dataReleaseId(manifest.files)!==manifest.id||manifest.id===expected.id||Date.parse(manifest.generatedAt)>=Date.parse(expected.generatedAt)||new Set(manifest.files.map(file=>file.path)).size!==manifest.files.length)throw Error('Replay requires an authentic earlier city baseline, not the target release');
  for(const city of cities)for(const name of ['signals.geojson','changes.json']){
   const path=`cities/${city}/${name}`,file=manifest.files.find(file=>file.path===path);
   if(!file)throw Error('Replay prior city baseline member missing');
-  const body=await gitBytes(prior.gitCommit,path);
+  const body=await readCommittedReleaseFile(prior.gitCommit,path);
   if(hash(body)!==file.sha256||body.length!==file.bytes)throw Error('Replay prior committed city member binding mismatch');
   await privateFile(join(directory,path),body);
  }

@@ -4,7 +4,7 @@ import {mkdtemp,writeFile,rm,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {hash,outDir} from '../src/common.ts';
-import {ReplayReceiptSchema,ReplayClocksSchema,verifyReplayAnswer,verifyGenerationArchive,verifyCachedGeneration,replayAnswerBinding,compareReplayRelease,readReplayPin,requiredReplayStaging} from '../src/replay-pipeline.ts';
+import {ReplayReceiptSchema,ReplayClocksSchema,verifyReplayAnswer,verifyGenerationArchive,verifyCachedGeneration,replayAnswerBinding,compareReplayRelease,readReplayPin,requiredReplayStaging,readCommittedReleaseFile} from '../src/replay-pipeline.ts';
 import type {HistoricalGeneration,ReplayReceipt} from '../src/replay-pipeline.ts';
 import type {ModelEvidence} from '../src/district-model-contract.ts';
 import type {DocumentResult} from '../src/district-inference.ts';
@@ -170,4 +170,12 @@ test('receipt requires exact clocks, full private/public prerequisites and has n
  assert.throws(()=>ReplayClocksSchema.parse({...clocks,coverageGeneratedAt:'now'}),/Invalid/);
  assert.throws(()=>ReplayReceiptSchema.parse({...receipt,staging:[{...pin,destination:'knowledge/records.json'}]}),/Invalid/);
  assert.deepEqual(requiredReplayStaging(['b','a']),['catalogue.json','cities/a/feed.json','cities/a/signals.geojson','cities/b/feed.json','cities/b/signals.geojson','core/strausberg-facts.json','regions/brandenburg-mol/topics.json']);
+});
+
+test('prior release Git paths resolve from the nested data package, not repository root',async()=>{
+ const bytes=await readCommittedReleaseFile('HEAD','release-manifest.json');
+ const manifest=JSON.parse(bytes.toString('utf8')) as DataRelease;
+ assert.match(manifest.id,/^[a-f0-9]{64}$/);
+ assert.equal(dataReleaseId(manifest.files),manifest.id);
+ assert.ok(manifest.files.some(file=>file.path==='knowledge/records.json'));
 });

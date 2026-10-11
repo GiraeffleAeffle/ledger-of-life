@@ -5,13 +5,21 @@ The immutable digest remains authoritative; the version must match package and G
 
 This chart never creates a Namespace or Secret. The governed wrapper must provision
 namespace stadtstack-mcp and Secret {{ .Values.secretName }} containing the key
-token-hashes.json as a JSON array of {"id": "...", "sha256": "..."}. Store only
-lowercase SHA-256 bearer-token hashes. Never pass plaintext tokens through Helm,
-container build arguments, workflow inputs, command arguments, or logs.
+token-hashes.json as a JSON array of {"id": "...", "sha256": "...", "limits":
+{"requestsPerMinute": 300, "maxConcurrent": 8}}. Limits may be omitted for 60/4.
+The approved shared validator enforces unique IDs/digests and limits of 1..300/1..8.
+For this release, existing max and buzz must explicitly have 300/8; all other
+entries retain 60/4. Token names never elevate. Use private CLI set-limits max 300 8
+and set-limits buzz 300 8 before release; preserve existing digests, never create
+missing tokens automatically. Store only lowercase SHA-256 bearer-token hashes.
+Never pass plaintext tokens through Helm, build/workflow inputs, arguments or logs.
 
-The pod reads /run/secrets/mcp/token-hashes.json and bundled /app/out. Run one
-replica with Recreate because per-token limits are process-local. Rotate the
-existing Secret and increment tokenSecretRevision to force a controlled restart.
+The pod reads /run/secrets/mcp/token-hashes.json once at startup and bundled
+/app/out. Run one replica with Recreate because per-token limits are process-local.
+The wrapper validates before Namespace/Secret mutation, applies the existing hash
+configuration and hashes it into tokenSecretRevision to force a controlled restart.
+There is no hot reload or request-driven budget reset. token-profiles.json records
+nonsecret effective profiles; no token hashes are included in that evidence.
 
 The image runs as UID/GID 1000 with a read-only root filesystem, no capabilities,
 no service-account token and no writable volumes. GET /health is a kubelet probe;

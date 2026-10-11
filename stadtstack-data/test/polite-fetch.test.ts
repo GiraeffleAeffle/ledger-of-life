@@ -7,6 +7,7 @@ import {PoliteFetcher,PoliteFetchError,parseRobots,robotsAllows,publicUrl} from 
 import {isPublicAddress} from '../src/public-address.ts';
 import type {FetchObservation} from '../src/polite-fetch.ts';
 import {metadataPdf,reservedXmp} from './fixtures/tdm-pdf.ts';
+import {crawlOparlSource} from '../src/district-source-adapters.ts';
 
 test('robots selects longest matching agent, combines groups and preserves allow ties',()=>{
  const policy=parseRobots('User-agent: *\nDisallow: /\nCrawl-delay: 100\n\nUser-agent: Stadtstack\nDisallow: /short\n\nUser-agent: StadtstackData\nUser-agent: AnotherBot\nDisallow: /private\nAllow: /private/public\nCrawl-delay: 2.5\n\nUser-agent: StadtstackData\nAllow: /same\nDisallow: /same\n');
@@ -140,5 +141,24 @@ test('long-lived fetchers revalidate expired robots and machine policies before 
   await fetcher.fetch('https://stadt.de/data.txt');changed=true;t.mock.timers.tick(2*60*60_000);
   await assert.rejects(fetcher.fetch('https://stadt.de/data.txt'),(error:unknown)=>error instanceof PoliteFetchError&&error.failure===(kind==='robots'?'robots_blocked':'tdm_reserved'));
   assert.equal(seen.filter(path=>path==='/data.txt').length,1);assert.equal(seen.filter(path=>path==='/robots.txt').length,2);
+ }
+});
+
+test('Strausberg wildcard denial stops content and TDM; selecting OParl cannot bypass robots',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-council-denial-'));t.after(()=>rm(cache,{recursive:true,force:true}));
+ const knownCalendar='https://strausberg.allris.cloud/public/si010';
+ const policyText='User-agent: *\nDisallow: /\n';
+ assert.equal(robotsAllows(parseRobots(policyText),knownCalendar),false);
+ for(const mode of ['known-calendar','synthetic-oparl'] as const){
+  const fetcher=new PoliteFetcher({cacheDir:join(cache,mode)}),seen:string[]=[];
+  t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>{
+   seen.push(url.href);assert.equal(url.pathname,'/robots.txt','Neither target content nor TDM may be requested after robots denial');
+   return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from(policyText)};
+  });
+  // The OParl URL is synthetic test-only data, not a discovered Strausberg endpoint.
+  const source={id:'synthetic-council',kind:'council' as const,url:'https://oparl.example.org/system',vendor:'oparl',checkState:'checked' as const,checkedAt:'2026-10-11T00:00:00.000Z',evidence:[{url:'https://oparl.example.org/system',locator:'Synthetic fixture only'}]};
+  const operation=mode==='known-calendar'?fetcher.fetch(knownCalendar):crawlOparlSource(fetcher,{id:'synthetic-town',name:'Synthetic town',ags:'12064472',districtId:'maerkisch-oderland',sources:[source]},source,{maxDocuments:1,maxPages:1,maxRequests:3});
+  await assert.rejects(operation,(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='robots_blocked');
+  assert.deepEqual(seen,[mode==='known-calendar'?'https://strausberg.allris.cloud/robots.txt':'https://oparl.example.org/robots.txt']);
  }
 });

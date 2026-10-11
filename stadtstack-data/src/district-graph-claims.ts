@@ -16,7 +16,7 @@ export const RelationClaimSchema = z.object({
   time: z.object({ text: quote, quote }).strict().nullable(), conditions: quote.nullable(),
 }).strict();
 export const IdentityBasisSchema = z.object({
-  kind: z.enum(['explicit_identifier', 'qualified_name_match', 'municipality_scoped_name', 'source_scoped_name']),
+  kind: z.enum(['explicit_identifier', 'municipality_scoped_name', 'source_scoped_name']),
   key: z.string().min(1), scope: z.string().min(1).nullable(),
   ambiguity: z.literal('Source-grounded identity grouping, not independent legal-entity verification.'),
 }).strict();
@@ -36,33 +36,33 @@ export const RelationActionNormalizationSchema = z.object({
 export type RelationActionNormalization = z.infer<typeof RelationActionNormalizationSchema>;
 export type GraphContext = { municipalityId: string; sourceSha256: string };
 export const GRAPH_DETERMINISTIC_CHECKS = ['graph_mentions', 'graph_identifiers', 'graph_relations', 'graph_modality'] as const;
+export const GRAPH_IDENTITY_VERSION = 'municipality-name-v2';
+/**
+ * First observed type in this precedence is the graph's display type, never a
+ * legal classification. Mention types remain unchanged and do not key identity.
+ */
+export const ENTITY_TYPE_PRECEDENCE = ['municipality', 'authority', 'company', 'organization', 'funding_programme', 'project', 'facility', 'law', 'place'] as const satisfies readonly z.infer<typeof entityTypeSchema>[];
 const ambiguity = 'Source-grounded identity grouping, not independent legal-entity verification.' as const;
-const genericNames:Record<string,true>={stadt:true,gemeinde:true,amt:true,verwaltung:true,stadtverwaltung:true,gemeindeverwaltung:true,stadtvertretung:true,gemeindevertretung:true,stadtverordnetenversammlung:true,stadtwerke:true,bürgermeister:true,bürgermeisterin:true,bauamt:true,hauptausschuss:true,ministerium:true,betreiber:true,vorhabenträger:true,projekt:true,vorhaben:true,schulneubau:true,schule:true,kita:true,kindertagesstätte:true,solarpark:true,windpark:true,anlage:true,bebauungsplan:true,flächennutzungsplan:true,hauptsatzung:true,satzung:true,gesetz:true,förderprogramm:true,förderung:true,kommunalrichtlinie:true};
+const sourceScopedNames: Record<string, true> = { projekt: true, vorhaben: true, schulneubau: true, schule: true, kita: true, kindertagesstätte: true, solarpark: true, windpark: true, anlage: true, bebauungsplan: true, flächennutzungsplan: true, hauptsatzung: true, satzung: true, gesetz: true };
 const nameForm=(value:string)=>value.normalize('NFKC').toLocaleLowerCase('de').replace(/[„“”]/gu,'\"').replace(/[‐‑–—]/gu,'-').replace(/\s+/gu,' ').trim();
-function genericName(name:string):boolean{
+function sourceScopedName(name:string):boolean{
   const plain=nameForm(name).replace(/\b(?:der|die|das|des|den|ein|eine|und|co|gmbh|ag|kg|aör|eg|ev|ltd)\b/gu,' ').replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/gu,' ');
-  return !plain||Object.hasOwn(genericNames,plain)||/^(?:änderung|aenderung|projekt|vorhaben|plan)\s*\d*$/u.test(plain)||/^(?:\d+|erste|zweite|dritte|vierte|fünfte|sechste|siebte|achte|neunte|zehnte)\s+(?:änderung|aenderung)(?:\s+(?:satzung|hauptsatzung|gesetz|bebauungsplan|flächennutzungsplan))?$/u.test(plain);
-}
-function qualifiedGlobalName(entity:z.infer<typeof EntityMentionSchema>):boolean{
-  if(!['organization','company','funding_programme','authority'].includes(entity.type)||genericName(entity.name))return false;
-  // Generic functional bodies are not qualified organisations merely because their remit has several words.
-  if(/^(?:ausschuss|beirat|kommission|arbeitsgruppe|stadtrat|gemeinderat|stadtvertretung|gemeindevertretung|stadtverordnetenversammlung|verwaltung|ministerium)\b/u.test(nameForm(entity.name)))return false;
-  const words=nameForm(entity.name).match(/[\p{L}\p{N}]+/gu)??[];
-  const meaningful=words.filter(word=>/\p{L}/u.test(word)&&!Object.hasOwn(genericNames,word)&&!['der','die','das','des','den','für','und','co','gmbh','ag','kg','aör','eg','ev','ltd'].includes(word));
-  return meaningful.length>=2||meaningful.length>=1&&(/\b(?:gmbh|ag|kg|aör|eg|ltd)\b/iu.test(entity.name)||entity.type==='funding_programme'&&/\d/u.test(entity.name));
+  return !plain||Object.hasOwn(sourceScopedNames,plain)||/^(?:änderung|aenderung|projekt|vorhaben|plan)\s*\d*$/u.test(plain)||/^(?:\d+|erste|zweite|dritte|vierte|fünfte|sechste|siebte|achte|neunte|zehnte)\s+(?:änderung|aenderung)(?:\s+(?:satzung|hauptsatzung|gesetz|bebauungsplan|flächennutzungsplan))?$/u.test(plain);
 }
 /** Labels may collapse whitespace, while supporting quotations remain exact source spans. */
 function quotedName(quote:string,name:string):boolean{return quote.replace(/\s+/gu,' ').includes(name.replace(/\s+/gu,' ').trim());}
 
 export function normalizeGraphClaims(claims: GraphClaims, context: GraphContext) {
   const entities = claims.entities.map(entity => {
-    // Keep identifier spelling, issuer and namespace exact. Never union on a subset of conflicting IDs.
+    // Exact complete identifier sets never bridge conflicting or unidentified mentions.
+    // Keep the whole normalized name, including legal forms, even for identifiers.
+    // Name alone is never a cross-municipality identity assertion.
     const identifiers = [...new Set(entity.identifiers.map(id => JSON.stringify([id.namespace, id.issuer, id.value])))].sort();
-    const nameMatched=!identifiers.length&&qualifiedGlobalName(entity);
-    const sourceScoped=!identifiers.length&&!nameMatched&&genericName(entity.name)&&['project','facility','place','law'].includes(entity.type);
-    const scope=identifiers.length||nameMatched?null:sourceScoped?`${context.municipalityId}:${context.sourceSha256}`:context.municipalityId;
-    const kind=identifiers.length?'explicit_identifier' as const:nameMatched?'qualified_name_match' as const:sourceScoped?'source_scoped_name' as const:'municipality_scoped_name' as const;
-    const key=JSON.stringify([entity.type,identifiers.length?identifiers:nameForm(entity.name),scope]);
+    // Ambiguous object/amendment labels stay source-scoped regardless of mention type.
+    const sourceScoped = !identifiers.length && sourceScopedName(entity.name);
+    const scope = identifiers.length ? null : sourceScoped ? `${context.municipalityId}:${context.sourceSha256}` : context.municipalityId;
+    const kind = identifiers.length ? 'explicit_identifier' as const : sourceScoped ? 'source_scoped_name' as const : 'municipality_scoped_name' as const;
+    const key = JSON.stringify([GRAPH_IDENTITY_VERSION, nameForm(entity.name), identifiers, scope]);
     return { ...entity, entityId: `entity:${createHash('sha256').update(key).digest('hex')}`, identityBasis: { kind, key, scope, ambiguity } };
   });
   const byMention = new Map(entities.map(entity => [entity.mentionId, entity]));

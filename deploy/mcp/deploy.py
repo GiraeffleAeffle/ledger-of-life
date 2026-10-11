@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Run only from session.sh's temporary governed credential environment."""
-import datetime, hashlib, json, os, pathlib, re, secrets, shutil, signal, subprocess, sys
+import base64, datetime, hashlib, json, os, pathlib, re, secrets, shutil, signal, subprocess, sys
 from stat import S_ISREG
 
 os.umask(0o077)
@@ -29,7 +29,7 @@ mode = os.environ.get('MCP_RELEASE_MODE')
 if mode not in ('--diff-only', '--release'): raise RuntimeError('Explicit mode required')
 if not re.fullmatch(r'sha256:[0-9a-f]{64}', digest) or digest == 'sha256:'+'0'*64: raise RuntimeError('Immutable published digest required')
 if not re.fullmatch(r'[0-9a-f]{40}', revision): raise RuntimeError('Approved pushed source required')
-if not re.fullmatch(version_pattern, release_version): raise RuntimeError('Explicit literal release version required (for example 0.3.0)')
+if not re.fullmatch(version_pattern, release_version): raise RuntimeError('Explicit literal release version required (for example 0.3.1)')
 knowledge_municipality=os.environ.get('MCP_KNOWLEDGE_MUNICIPALITY','')
 if not re.fullmatch(r'[a-z0-9-]{1,80}',knowledge_municipality): raise RuntimeError('Released knowledge municipality required for runtime acceptance')
 entity_query=os.environ.get('MCP_GRAPH_ENTITY_QUERY')
@@ -179,20 +179,77 @@ else:
     (E/'client-dry-run.txt').write_text(kub(['apply','--dry-run=client','-f',str(E/'rendered.yaml')]).stdout)
 if mode == '--diff-only':
     print('Read-only render complete: '+str(E));raise SystemExit(0)
+# Validate the existing configuration with the approved server's dependency-free
+# policy, before any Namespace or Secret mutation. Never rewrite identity/digests.
+policy_export=subprocess.run(['git','-C',str(ROOT),'show',revision+':stadtstack-data/src/mcp-token-config.mjs'],capture_output=True,timeout=60)
+if policy_export.returncode: raise RuntimeError('Cannot export approved token policy')
+policy_source=policy_export.stdout
+policy_path=E/'approved-mcp-token-config.mjs'
+with policy_path.open('xb') as handle: handle.write(policy_source)
+policy_path.chmod(0o400)
+# Read only the named hash key and concurrency identity, never a whole Secret.
+# A missing Secret is an operator prerequisite, not permission to create tokens.
+secret_snapshot=kub(['-n',NS,'get','secret','civic-mcp-token-hashes','-o=jsonpath={.metadata.uid}{"\\n"}{.metadata.resourceVersion}{"\\n"}{.data.token-hashes\\.json}{"\\n"}'],check=False)
+if secret_snapshot.returncode:
+    raise RuntimeError('Existing governed auth Secret is required for a limit-only rollout; named hash-key read failed (output withheld)')
+snapshot_fields=secret_snapshot.stdout.splitlines()
+if len(snapshot_fields)!=3 or not all(snapshot_fields): raise RuntimeError('Existing auth Secret identity and token-hashes.json key are required')
+secret_uid,secret_resource_version,current_hash_base64=snapshot_fields
+try:
+    current_hash_configuration=base64.b64decode(current_hash_base64,validate=True).decode('utf8')
+except (ValueError,UnicodeError):
+    raise RuntimeError('Existing auth Secret hash configuration is malformed') from None
+hashpath=pathlib.Path.home()/'.config/stadtstack/mcp-tokens/token-hashes.json'
+stat=hashpath.lstat()
+if hashpath.is_symlink() or not S_ISREG(stat.st_mode) or stat.st_uid!=os.getuid() or stat.st_mode & 0o077 or stat.st_nlink!=1: raise RuntimeError('Unsafe token hash file')
+hash_configuration=hashpath.read_text()
+profile_check=r"""
+import { pathToFileURL } from 'node:url';
+const { validateTokenRecords, DEFAULT_TOKEN_LIMITS, MAX_TOKEN_LIMITS } = await import(pathToFileURL(process.argv[1]).href);
+let input = '';
+for await (const chunk of process.stdin) input += chunk;
+try {
+  const supplied = JSON.parse(input);
+  const current = validateTokenRecords(JSON.parse(supplied.current));
+  const records = validateTokenRecords(JSON.parse(supplied.desired));
+  const existing = new Map(current.map(({id, sha256}) => [id, sha256]));
+  if (existing.size !== records.length || records.some(({id, sha256}) => existing.get(id) !== sha256)) throw new Error();
+  const elevated = new Set(['max', 'buzz']);
+  for (const record of records) {
+    const expected = elevated.has(record.id) ? MAX_TOKEN_LIMITS : DEFAULT_TOKEN_LIMITS;
+    const actual = record.limits ?? DEFAULT_TOKEN_LIMITS;
+    if ((elevated.has(record.id) && !record.limits) ||
+        actual.requestsPerMinute !== expected.requestsPerMinute ||
+        actual.maxConcurrent !== expected.maxConcurrent) throw new Error();
+    elevated.delete(record.id);
+  }
+  if (elevated.size) throw new Error();
+  process.stdout.write(JSON.stringify(records.map(({id, limits}) => ({id, limits: limits ?? DEFAULT_TOKEN_LIMITS, explicit: limits !== undefined}))));
+} catch {
+  process.stderr.write('Invalid token policy or changed existing credential identities/digests\n');
+  process.exitCode = 1;
+}
+"""
+profiles=json.loads(cmd(['node','--input-type=module','--eval',profile_check,str(policy_path)],json.dumps({'current':current_hash_configuration,'desired':hash_configuration})).stdout)
+records=json.loads(hash_configuration)
+token_revision=hashlib.sha256(json.dumps(records,sort_keys=True).encode()).hexdigest()[:16]
+token_policy={'source':revision,'validatorSha256':hashlib.sha256(policy_source).hexdigest(),'profiles':profiles,'identityDigestsPreserved':True,'secretUid':secret_uid,'activation':'startup load through tokenSecretRevision rollout; no hot reload','tokenSecretRevision':token_revision}
+(E/'token-profiles.json').write_text(json.dumps(token_policy,indent=2))
 phrase='release-mcp-'+revision[:12]
 if input('Type '+phrase+' to deploy the protected civic MCP: ').strip()!=phrase: raise RuntimeError('Approval not supplied')
 ns={'apiVersion':'v1','kind':'Namespace','metadata':{'name':NS,'labels':{'app.kubernetes.io/part-of':'stadtstack-mcp','pod-security.kubernetes.io/enforce':'restricted','pod-security.kubernetes.io/audit':'restricted','pod-security.kubernetes.io/warn':'restricted'}}}
 kub(['apply','-f','-'],json.dumps(ns))
-# Validate and send only salted-independent random-token SHA-256 values, never plaintext.
-hashpath=pathlib.Path.home()/'.config/stadtstack/mcp-tokens/token-hashes.json'
-stat=hashpath.lstat()
-if hashpath.is_symlink() or not hashpath.is_file() or stat.st_uid!=os.getuid() or stat.st_mode & 0o077 or stat.st_nlink!=1: raise RuntimeError('Unsafe token hash file')
-records=json.loads(hashpath.read_text())
-if not isinstance(records,list) or not records or any(not isinstance(x,dict) or set(x)!= {'id','sha256'} or not re.fullmatch(r'[a-z][a-z0-9_-]{0,63}',x['id']) or not re.fullmatch(r'[0-9a-f]{64}',x['sha256']) for x in records): raise RuntimeError('Malformed token hash file')
-secret={'apiVersion':'v1','kind':'Secret','metadata':{'name':'civic-mcp-token-hashes','namespace':NS},'type':'Opaque','stringData':{'token-hashes.json':json.dumps(records)}}
-kub(['apply','-f','-'],json.dumps(secret))
-# Hash revision rolls one replica so limits cannot be bypassed by round-robin pods.
-args+=['--set-string','tokenSecretRevision='+hashlib.sha256(json.dumps(records,sort_keys=True).encode()).hexdigest()[:16]]
+# Atomically test the observed identity/version before replacing only the named
+# hash key. Conflict or deletion fails closed; never create a missing auth Secret.
+# Payload stays on stdin, never command arguments, logs or evidence artifacts.
+secret_patch=[
+    {'op':'test','path':'/metadata/uid','value':secret_uid},
+    {'op':'test','path':'/metadata/resourceVersion','value':secret_resource_version},
+    {'op':'replace','path':'/data/token-hashes.json','value':base64.b64encode(json.dumps(records).encode()).decode('ascii')},
+]
+kub(['-n',NS,'patch','secret','civic-mcp-token-hashes','--type=json','--patch-file=/dev/stdin'],json.dumps(secret_patch))
+# A config-derived revision restarts the single replica; limits load at startup.
+args+=['--set-string','tokenSecretRevision='+token_revision]
 (E/'server-dry-run.txt').write_text(kub(['apply','--dry-run=server','-f',str(E/'rendered.yaml')]).stdout)
 (E/'helm-release.txt').write_text(cmd(['helm','upgrade','--install',*args,'--wait','--timeout','10m']).stdout)
 (E/'rollout.txt').write_text(kub(['-n',NS,'rollout','status','deployment/civic-mcp','--timeout=120s']).stdout)
@@ -202,5 +259,5 @@ pods=json.loads(kub(['-n',NS,'get','pods','-l','app.kubernetes.io/name=civic-mcp
 summary=[{'name':p['metadata']['name'],'version':p['metadata'].get('labels',{}).get('app.kubernetes.io/version'),'phase':p.get('status',{}).get('phase'),'images':[c['image'] for c in p['spec']['containers']],'containers':[{'name':c['name'],'ready':c.get('ready'),'imageID':c.get('imageID')} for c in p.get('status',{}).get('containerStatuses',[])]} for p in pods]
 (E/'pods.json').write_text(json.dumps(summary,indent=2))
 if len(summary)!=1 or summary[0]['images']!=[image] or summary[0]['version']!=release_version or not summary[0]['containers'] or not all(c['ready'] and c['imageID'] for c in summary[0]['containers']): raise RuntimeError('Exact versioned deployment not Ready')
-(E/'result.json').write_text(json.dumps({'source':revision,'version':release_version,'gitTag':release_version,'imageTag':release_version,'imageTagReference':image_tag,'image':image,'imageIdentityScope':'approved desired reference; observed ReadyPod imageIDs are recorded separately in pods.json','runtimeAcceptance':runtime_acceptance,'namespace':NS,'protectedBoundaryUnchanged':True,'timestamp':datetime.datetime.now(datetime.timezone.utc).isoformat()},indent=2))
+(E/'result.json').write_text(json.dumps({'source':revision,'version':release_version,'gitTag':release_version,'imageTag':release_version,'imageTagReference':image_tag,'image':image,'imageIdentityScope':'approved desired reference; observed ReadyPod imageIDs are recorded separately in pods.json','runtimeAcceptance':runtime_acceptance,'tokenPolicy':token_policy,'namespace':NS,'protectedBoundaryUnchanged':True,'timestamp':datetime.datetime.now(datetime.timezone.utc).isoformat()},indent=2))
 print('Civic MCP Ready; public HTTPS acceptance remains required. Evidence: '+str(E))
