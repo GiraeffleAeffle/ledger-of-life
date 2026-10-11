@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "civic-live-release-evidence-v1",
+  "version": "0.3.0",
+  "sourceCommit": "4cdf3a0231cc1d07dc8a501be44f8463ff69aeb5",
+  "gitTag": "0.3.0",
+  "imageTag": "0.3.0",
+  "image": "ghcr.io/giraeffleaeffle/stadtstack-mcp:0.3.0@sha256:bfe96e50fa26f8424329bdae1cc8bd306530761e338cefb97cba8fa71cd7f0a6",
+  "dataManifestId": "f434203c14c82ea6b6814662e9b1e209d81d7921bee97aeefcd2269d83330415",
+  "workflow": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/38130058619",
+  "endpoint": "https://mcp.stadtstack.eu",
+  "publicAcceptedAt": "2026-10-11T10:15:08.824786+00:00",
+  "governedCorrelation": {
+    "runtimeEvidenceHashMatched": true,
+    "readyPodImageDigestMatched": true,
+    "literalVersionAlignment": true,
+    "endpointDataIdentityMatched": true,
+    "nonMcpBoundaryUnchanged": true
+  },
+  "publicEndpoint": {
+    "passed": true,
+    "acceptanceScope": "public_endpoint_version_data",
+    "imageProvenanceVerified": false,
+    "runningImageIdentityVerified": false
+  },
+  "memory": {
+    "acceptanceScope": "advisory_local_resource_measurement",
+    "authorizesDeployment": false,
+    "kernelPeakBytes": 310136832,
+    "memoryLimitBytes": 1073741824,
+    "cpuLimit": 1,
+    "oomKilled": false,
+    "peakIncludesShortMetricsReaderProcess": true
+  },
+  "operatorEvidencePins": [
+    {
+      "name": "mcp-0.3.0-public-smoke.json",
+      "sha256": "ccdd6e8a47054a46b0a7445b194f3d012316ce7a43465c712b044fb2a89a1a51"
+    },
+    {
+      "name": "mcp-0.3.0-identity-correlation.json",
+      "sha256": "c8361ef5cd495939698ab94dc84e88b53edd4f9796c640d343d2f7c78eb529af"
+    },
+    {
+      "name": "mcp-0.3.0-remaining-tools.json",
+      "sha256": "76051884ffdd2b84ff0c6926f5e2856e79e1aaa8aaaa3ae92ca84bd8e0ce8447"
+    },
+    {
+      "name": "mcp-0.3.0-memory.json",
+      "sha256": "0407ae5621f56f99e854ac827e8750403f71c27230fd81dd3d7be52006a64647"
+    }
+  ],
+  "scopeNote": "Public HTTPS evidence proves endpoint version/data/tool behavior, not its running image. Fresh approved-producer evidence and independent Ready-pod digest correlation establish the governed image binding separately. Full private receipts remain with the owner; no credentials or protocol requests are exported.",
+  "rawCorpusBackup": "off-site backup: deferred by owner"
+}

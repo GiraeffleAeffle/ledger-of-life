@@ -1,7 +1,7 @@
 {
   "schemaVersion": "stadtstack-data-release-v1",
-  "id": "f434203c14c82ea6b6814662e9b1e209d81d7921bee97aeefcd2269d83330415",
-  "generatedAt": "2026-10-11T09:25:14.460Z",
+  "id": "25d99c9382ccbfeb3fbdef8541409950c8e4adc96852922f151e661d25c90eaf",
+  "generatedAt": "2026-10-11T12:13:06.369Z",
   "files": [
     {
       "path": "catalogue.json",
@@ -185,18 +185,18 @@
     },
     {
       "path": "knowledge/coverage.json",
-      "sha256": "8e1a513da7748e6b74b3931f645b8aee7d500dc691f44bdb1d738930a053ad8d",
-      "bytes": 69440
+      "sha256": "2427caca4b0e63a3756dbb227b624eaa5ef31cb0a91cf9af454045aa3f3f7dfc",
+      "bytes": 108188
     },
     {
       "path": "knowledge/graph.json",
-      "sha256": "9be6460ff6ea3a894d743783474c4b1f19403614a7013f7cb08a87c36bdb2b6f",
-      "bytes": 1364552
+      "sha256": "c16642d1022db66e49b50ba05d2c7464c6ddb152945a9fecc78a2ff866e12578",
+      "bytes": 2887023
     },
     {
       "path": "knowledge/records.json",
-      "sha256": "d93ebb1479ff7e6b7fd0eab5de2e53848f0345487c3ff6a51717af5f35c979db",
-      "bytes": 3372680
+      "sha256": "b2e94b2ee9b7ec9d805c6587a61d6f02bb56b769abbb3787ce5dac57e7a60d1c",
+      "bytes": 3380500
     },
     {
       "path": "knowledge/registry.json",
@@ -205,8 +205,8 @@
     },
     {
       "path": "quality-report.json",
-      "sha256": "36f956acc94f92685f0d25271892b74866e11b4a28112e894b6365cd89bd94c8",
-      "bytes": 140327
+      "sha256": "485be3b701868775e957631a7abf725515735fdaacbe6fc25440006008c29cab",
+      "bytes": 140552
     },
     {
       "path": "regions/brandenburg-mol/topics.json",

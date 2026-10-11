@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "stadtstack-corpus-manifest-v1",
+  "manifestSha256": "9ac5c25357065637516485ccd0a16027e5e4451f09817b64c2925a5acc7cc829",
+  "inputs": {
+    "indexes": [
+      {
+        "name": "authorized-completion",
+        "sha256": "fb4e08eee8bf1a3bf036433893553b5ebb0e7ae4dec1fea6ce702a8f66642992"
+      },
+      {
+        "name": "baseline-frozen",
+        "sha256": "fbcd03c8474e3fa3cb2a3db0b9a976e3793863a3a6e268b0ead21868516ec2c0"
+      },
+      {
+        "name": "cached-representations",
+        "sha256": "03b82720bc9c3447722db52487be29cca7e8089e268d605a20240cff27996d9e"
+      }
+    ],
+    "registrySha256": "9095c7a241fa5cc1a2d75030286d8690cc5bf6d3e05990c56f7a5199c304b554",
+    "preparationPlanSha256": "4f98089a55ce3fcdd34b263bbb904935cd9f8006518a754215189854e2d49810",
+    "workPlanSha256": "abb426aec5cf2f9af11a22384ce1121332496833cd159925c640ca8a5cf0d743",
+    "workPlanId": "76292636ed3afd28aa00f31364562944b04016bc421331ef948bbd94d8ce3099",
+    "releaseId": "f434203c14c82ea6b6814662e9b1e209d81d7921bee97aeefcd2269d83330415",
+    "releaseManifestSha256": "fbac3ebfd040b50c666afaaaa3d42ccc15a64336e6ec8111024bf20abc1ad633"
+  },
+  "recordCount": 8969,
+  "distinctBodies": 5167,
+  "totalBodyBytes": 4372394220,
+  "boundObservations": 8969,
+  "unboundObservations": 0,
+  "releasedCitations": 346,
+  "limitations": [
+    "Content type is normalized/sniffed; original wire Content-Type and Content-Length are not retained. Size is decoded CAS bytes.",
+    "Historical observations do not establish a complete redirect chain or request history; mutable request pointers are not used.",
+    "Chunk counts describe the pinned production result before final reassessment/publication; released citations are joined separately.",
+    "Verification of this export requires a trusted external manifest digest; self-contained metadata is not independent proof of index, plan or release provenance."
+  ]
+}

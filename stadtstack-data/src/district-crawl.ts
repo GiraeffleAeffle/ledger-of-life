@@ -13,6 +13,10 @@ export interface CrawlCheck {
 }
 export interface DistrictCrawlIndex {schemaVersion:'stadtstack-crawl-index-v1';generatedAt:string;documents:CrawlDocument[];checks:CrawlCheck[]}
 export interface CrawlRegistry {schemaVersion:'stadtstack-source-registry-v1';municipalities:RegistryMunicipality[]}
+/** Configured primary dispatch only; fallbacks and document adapter labels are separate evidence. */
+export function districtSourceAdapterKind(source:RegistryMunicipality['sources'][number]):'oparl'|'mv-bauleitplan'|'participation-api'|'html'{
+ return source.vendor==='oparl'?'oparl':source.api?.format==='mv-bauleitplan'?'mv-bauleitplan':source.api?'participation-api':'html';
+}
 export async function crawlDistrictRegistry(registry:CrawlRegistry,fetcher:PoliteFetcher,options:AdapterOptions&{municipality?:string;maxRounds?:number;onSource?:(index:DistrictCrawlIndex)=>Promise<void>}):Promise<DistrictCrawlIndex>{
  if(options.municipality&&!registry.municipalities.some(city=>city.id===options.municipality))throw Error('Requested municipality is not in the registry');
  const index:DistrictCrawlIndex={schemaVersion:'stadtstack-crawl-index-v1',generatedAt:new Date().toISOString(),documents:[],checks:[]};
@@ -37,7 +41,8 @@ export async function crawlDistrictRegistry(registry:CrawlRegistry,fetcher:Polit
     try{
      const startedRequests=fetcher.requestCount;let result:AdapterResult;
      try{
-      result=source.vendor==='oparl'?await crawlOparlSource(fetcher,city,source,options):source.api?.format==='mv-bauleitplan'?await crawlMvPlanningApi(fetcher,city,source,options):source.api?await crawlParticipationApi(fetcher,city,source,options):await crawlHtmlSource(fetcher,city,source,options);
+      const adapter=districtSourceAdapterKind(source);
+      result=adapter==='oparl'?await crawlOparlSource(fetcher,city,source,options):adapter==='mv-bauleitplan'?await crawlMvPlanningApi(fetcher,city,source,options):adapter==='participation-api'?await crawlParticipationApi(fetcher,city,source,options):await crawlHtmlSource(fetcher,city,source,options);
      }catch(error){
       const consumed=fetcher.requestCount-startedRequests,remaining=options.maxRequests-consumed;
       if(source.api?.format==='bobsh-list'||!source.api||!seeds.length||remaining<1)throw error;

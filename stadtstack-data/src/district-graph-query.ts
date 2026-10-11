@@ -10,7 +10,7 @@ export const graphNeighborsSchema = z.object({ id: entityId, relationTypes: z.ar
 export const graphPathSchema = z.object({ fromId: entityId, toId: entityId, maxHops: z.number().int().min(1).max(5), ...pageShape }).strict();
 export const GRAPH_QUERY_BUDGETS = Object.freeze({ searchNodes: 10000, visitedNodes: 2000, examinedEdges: 10000, paths: 100, pathSteps: 20000 });
 export type GraphQueryBudgets = { [K in keyof typeof GRAPH_QUERY_BUDGETS]: number };
-const scope = 'Only explicit source-grounded relations in admitted records. Identity grouping is not independent legal-entity verification. Missing evidence is not absence of activity; paths establish neither causality nor success.';
+const scope = 'Only explicit source-grounded relations in admitted records. Name-only identities are municipality-scoped; ambiguous object labels remain source-scoped. Canonical type follows documented precedence; entity_search type matches canonical or original mention types. Original names, types and all source references remain in mention evidence. Identity grouping is not independent legal-entity verification. Missing evidence is not absence of activity; paths establish neither causality nor success.';
 const pathEligibility = { eligibleModalities: ['asserted', 'decided', 'implemented'] as const, rules: { asserted: 'Non-action factual relations only.', decided: 'decides and approves only; not construction or spending.', implemented: 'implements only; only the execution explicitly quoted, not inferred completion or success.' }, excludedModalities: ['planned', 'proposed', 'conditional', 'negated', 'historical'] as const, note: 'plans never participates. Every eligible edge must also be admitted with quoted typed roles and original deterministic and model gates.' };
 
 export class GraphIndex {
@@ -51,7 +51,7 @@ export class GraphIndex {
     for (const entity of this.orderedEntities) {
       if (examinedNodes >= this.budgets.searchNodes) break;
       examinedNodes++;
-      if ((!options.type || options.type === entity.type) && (entity.names.some(name => name.normalize('NFC').toLocaleLowerCase('de').includes(query)) || entity.mentions.some(mention => mention.identifiers.some(identifier => identifier.value.toLocaleLowerCase('de').includes(query))))) matches.push(entity);
+      if ((!options.type || options.type === entity.type || entity.mentions.some(mention => mention.type === options.type)) && (entity.names.some(name => name.normalize('NFC').toLocaleLowerCase('de').includes(query)) || entity.mentions.some(mention => mention.identifiers.some(identifier => identifier.value.toLocaleLowerCase('de').includes(query))))) matches.push(entity);
     }
     const truncated = examinedNodes < this.orderedEntities.length;
     const page = boundPage(matches, entity => entity.id, options, this.releaseId, binding);

@@ -3,6 +3,7 @@ import { constants as C, lstatSync, mkdirSync, openSync, closeSync, fstatSync, r
 import { randomBytes, createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join, resolve, parse } from 'node:path';
+import { MAX_TOKEN_LIMITS, validateTokenRecords } from '../src/mcp-token-config.mjs';
 
 const uid = process.getuid?.();
 const personPattern = /^[a-z][a-z0-9_-]{0,63}$/;
@@ -55,17 +56,8 @@ function readState() {
     let state;
     try { state = JSON.parse(readFileSync(descriptor, 'utf8')); }
     catch { fail('Malformed hash state; refusing to change it.'); }
-    const ids = new Set();
-    const digests = new Set();
-    if (!Array.isArray(state) || state.some((entry) => {
-      if (!entry || typeof entry !== 'object' || Array.isArray(entry) ||
-          Object.keys(entry).sort().join(',') !== 'id,sha256' ||
-          typeof entry.id !== 'string' || !personPattern.test(entry.id) ||
-          typeof entry.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(entry.sha256) ||
-          ids.has(entry.id) || digests.has(entry.sha256)) return true;
-      ids.add(entry.id); digests.add(entry.sha256); return false;
-    })) fail('Malformed hash state; refusing to change it.');
-    return state;
+    try { return validateTokenRecords(state, { allowEmpty: true }); }
+    catch { fail('Malformed hash state; refusing to change it.'); }
   } catch (error) {
     if (error.code === 'ENOENT' && descriptor === undefined) return [];
     throw error;
@@ -73,6 +65,7 @@ function readState() {
 }
 
 function saveState(state) {
+  validateTokenRecords(state, { allowEmpty: true });
   const temporary = join(directory, `.hashes-${randomBytes(16).toString('hex')}.tmp`);
   let descriptor;
   let created = false;
@@ -99,9 +92,23 @@ let locked = false;
 const lock = join(directory, '.token-lock');
 try {
   if (uid === undefined || !C.O_NOFOLLOW || !C.O_DIRECTORY) fail('A POSIX platform with no-follow support is required.');
-  if (extra.length || !['issue', 'revoke', 'hashes'].includes(command) ||
-      (command === 'hashes' ? person !== undefined : !personPattern.test(person ?? ''))) {
-    fail('Usage: mcp-token.mjs issue <person> | revoke <person> | hashes; person: lowercase letter then up to 63 lowercase letters, digits, _ or -.');
+  const validPerson = command === 'set-limits'
+    ? /^[a-z0-9][a-z0-9_-]{0,63}$/.test(person ?? '')
+    : personPattern.test(person ?? '');
+  if (!['issue', 'revoke', 'hashes', 'set-limits'].includes(command) ||
+      (command === 'set-limits' ? extra.length !== 2 : extra.length !== 0) ||
+      (command === 'hashes' ? person !== undefined : !validPerson)) {
+    fail('Usage: mcp-token.mjs issue <person> | revoke <person> | hashes | set-limits <person> <requestsPerMinute> <maxConcurrent>.');
+  }
+  let limits;
+  if (command === 'set-limits') {
+    const [requestsPerMinute, maxConcurrent] = extra.map(Number);
+    if (!extra.every((value) => /^[1-9][0-9]*$/.test(value)) ||
+        !Number.isSafeInteger(requestsPerMinute) || requestsPerMinute > MAX_TOKEN_LIMITS.requestsPerMinute ||
+        !Number.isSafeInteger(maxConcurrent) || maxConcurrent > MAX_TOKEN_LIMITS.maxConcurrent) {
+      fail('Limits must be positive decimal integers: requestsPerMinute 1..300, maxConcurrent 1..8.');
+    }
+    limits = { requestsPerMinute, maxConcurrent };
   }
   process.umask(0o077);
   prepareDirectory();
@@ -127,6 +134,12 @@ try {
   } else if (command === 'revoke') {
     // Do not touch the plaintext file, even when it has been removed or replaced.
     saveState(state.filter((entry) => entry.id !== person));
+    console.log(hashes);
+  } else if (command === 'set-limits') {
+    const record = state.find((entry) => entry.id === person);
+    if (!record) fail('Person has no active token.');
+    record.limits = limits;
+    saveState(state);
     console.log(hashes);
   } else {
     // Create an empty, validated manifest on first use, never print its contents.

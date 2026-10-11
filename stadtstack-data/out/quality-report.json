@@ -1,6 +1,6 @@
 {
   "schemaVersion": "stadtstack-publication-quality-v1",
-  "generatedAt": "2026-10-11T09:25:14.000Z",
+  "generatedAt": "2026-10-11T12:13:05.959Z",
   "policy": {
     "publicUrls": "required",
     "councilBodyBinding": "required",
@@ -2972,6 +2972,8 @@
         "id": "maerkisch-oderland",
         "ags": "12064",
         "municipalitiesRegistered": 45,
+        "municipalitiesConfigured": 3,
+        "municipalitiesChecked": 3,
         "municipalitiesAttempted": 3,
         "municipalitiesWithRecords": 3,
         "municipalitiesWithDatedStages": 3,
@@ -2983,6 +2985,8 @@
         "id": "herzogtum-lauenburg",
         "ags": "01053",
         "municipalitiesRegistered": 132,
+        "municipalitiesConfigured": 3,
+        "municipalitiesChecked": 3,
         "municipalitiesAttempted": 3,
         "municipalitiesWithRecords": 3,
         "municipalitiesWithDatedStages": 3,
@@ -2994,6 +2998,8 @@
         "id": "ludwigslust-parchim",
         "ags": "13076",
         "municipalitiesRegistered": 142,
+        "municipalitiesConfigured": 3,
+        "municipalitiesChecked": 3,
         "municipalitiesAttempted": 3,
         "municipalitiesWithRecords": 3,
         "municipalitiesWithDatedStages": 3,
@@ -3025,9 +3031,9 @@
       }
     ],
     "graph": {
-      "entities": 170,
+      "entities": 169,
       "edges": 3,
-      "recordsSha256": "d93ebb1479ff7e6b7fd0eab5de2e53848f0345487c3ff6a51717af5f35c979db"
+      "recordsSha256": "b2e94b2ee9b7ec9d805c6587a61d6f02bb56b769abbb3787ce5dac57e7a60d1c"
     },
     "policy": "Same-pass subscription fact/entity/relation extraction with deterministic, source-policy, actual faithfulness and sourced-date gates; graph links are not causal, success or independent identity verification."
   },
