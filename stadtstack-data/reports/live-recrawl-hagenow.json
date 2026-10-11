@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "stadtstack-live-recrawl-proof-v1",
+  "codeCommit": "3ab007661d13c20a78fceef5cdad346f5b7ced6b",
+  "host": "codex-workstation",
+  "freshClone": true,
+  "municipality": "hagenow",
+  "generatedAt": "2026-10-11T11:55:51.254Z",
+  "beforeManifestSha256": "9ac5c25357065637516485ccd0a16027e5e4451f09817b64c2925a5acc7cc829",
+  "afterIndexSha256": "0dae4ef1a242ab7c14b81777eed5444f48924f14def10376aa9f94dbcad4e679",
+  "bounds": {
+    "maxDocumentsPerSource": 2,
+    "maxPagesPerSource": 1,
+    "maxRequestsPerSourceRound": 8,
+    "maxRounds": 1
+  },
+  "beforeRepresentationContexts": 12,
+  "beforeSourceUrls": 12,
+  "observedDocuments": 2,
+  "documents": [
+    {
+      "sourceId": "hagenow-publisher-gazette",
+      "url": "https://epaper.wittich.de/frontend/catalogs/549986/1/pdf/complete.pdf",
+      "sha256": "620fd6d63a123f24816f3cddb802562758e108212ef6a5baa1a0273a51620f76",
+      "fetchedAt": "2026-10-11T11:55:42.427Z",
+      "checkedAt": "2026-10-11T11:55:42.427Z",
+      "httpStatus": 200,
+      "difference": "unchanged_known_bytes",
+      "robots": "allowed",
+      "tdm": "not_declared",
+      "access": "public"
+    },
+    {
+      "sourceId": "hagenow-publisher-gazette",
+      "url": "https://epaper.wittich.de/frontend/catalogs/545197/1/pdf/complete.pdf",
+      "sha256": "5c32a3a4919b4ba4b579cc945d784c4c22ee497d42ba708e57e01dc7e230d3b4",
+      "fetchedAt": "2026-10-11T11:55:45.807Z",
+      "checkedAt": "2026-10-11T11:55:45.807Z",
+      "httpStatus": 200,
+      "difference": "unchanged_known_bytes",
+      "robots": "allowed",
+      "tdm": "not_declared",
+      "access": "public"
+    }
+  ],
+  "notRevisitedSourceUrls": 10,
+  "checks": [
+    {
+      "sourceId": "hagenow-publisher-gazette",
+      "state": "checked",
+      "outcome": "partial",
+      "documents": 2,
+      "coverage": {
+        "state": "partial",
+        "pendingCount": 10,
+        "runnableCount": 10,
+        "blockedCount": 0
+      }
+    },
+    {
+      "sourceId": "hagenow-website",
+      "state": "checked",
+      "outcome": "partial",
+      "documents": 0,
+      "coverage": {
+        "state": "partial",
+        "pendingCount": 1,
+        "runnableCount": 0,
+        "blockedCount": 0
+      }
+    },
+    {
+      "sourceId": "hagenow-council",
+      "state": "checked",
+      "outcome": "blocked",
+      "documents": 0,
+      "coverage": {
+        "state": "blocked",
+        "pendingCount": 0,
+        "runnableCount": 0,
+        "blockedCount": 1
+      }
+    },
+    {
+      "sourceId": "hagenow-participation",
+      "state": "checked",
+      "outcome": "partial",
+      "documents": 0,
+      "coverage": {
+        "state": "partial",
+        "pendingCount": 2,
+        "runnableCount": 0,
+        "blockedCount": 1
+      }
+    },
+    {
+      "sourceId": "hagenow-gazette",
+      "state": "checked",
+      "outcome": "partial",
+      "documents": 0,
+      "coverage": {
+        "state": "partial",
+        "pendingCount": 1,
+        "runnableCount": 0,
+        "blockedCount": 0
+      }
+    }
+  ],
+  "modelCalls": 0,
+  "limitations": [
+    "Bounded live observation, not a complete town recrawl. Unvisited URLs are not removals or municipal inactivity.",
+    "Executed with the original0.3-era policy; the later global owner override is a separate acquisition lane."
+  ]
+}

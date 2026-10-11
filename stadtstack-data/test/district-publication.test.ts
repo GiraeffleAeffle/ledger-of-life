@@ -28,6 +28,15 @@ test('Coverage separates representations, attempted byte groups, new pending inp
  assert.equal(coverage.extractionRun.promptContractSha256,run.promptContractSha256);
 });
 
+test('replay coverage clock is explicit while original extraction and source clocks remain unchanged',()=>{
+ const historical='2026-10-11T09:25:12.545Z',coverage=buildDistrictCoverage(registry,crawl,[],quarantine,run,historical);
+ assert.equal(coverage.generatedAt,historical);assert.equal(coverage.extractionRun.generatedAt,at);
+ assert.equal(crawl.generatedAt,at);assert.equal(run.generatedAt,at);
+ assert.throws(()=>buildDistrictCoverage(registry,crawl,[],quarantine,run,'not-a-clock'));
+ const before=Date.now(),normal=buildDistrictCoverage(registry,crawl,[],quarantine,run);
+ assert.ok(Date.parse(normal.generatedAt)>=before&&Date.parse(normal.generatedAt)<=Date.now());
+});
+
 test('Coverage rejects invented attempted totals, missing pending input and concealed extraction caps',()=>{
  assert.throws(()=>buildDistrictCoverage(registry,crawl,[],quarantine,{...run,attemptedDocumentGroups:3}),/counts/);
  assert.throws(()=>buildDistrictCoverage(registry,crawl,[],quarantine,{...run,scope:'bounded_per_municipality'}),/selection policy/);
