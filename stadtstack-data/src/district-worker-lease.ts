@@ -102,7 +102,7 @@ export function startWorkerHeartbeat(output: Writable, control: unknown, failed:
 // The pipe lease also cancels inference if the coordinator dies without cleanup.
 export async function captureLocalDocumentWorker(control: unknown, signal: AbortSignal): Promise<string> {
   signal.throwIfAborted();
-  const child = spawn(process.execPath, [fileURLToPath(new URL('./district-extract.ts', import.meta.url)), 'local-worker'], { stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [fileURLToPath(new URL('./district-extract.ts', import.meta.url)), 'worker'], { stdio: ['pipe', 'pipe', 'pipe'] });
   const result = Promise.withResolvers<string>(), chunks: Buffer[] = [];
   let bytes = 0, failure: unknown, killTimer: NodeJS.Timeout | undefined;
   const stop = (error: unknown) => {

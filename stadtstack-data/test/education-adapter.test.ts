@@ -17,13 +17,13 @@ const facility=(id:string,name='Kita Entdeckerland')=>`<div class="btgrid"><div 
 const card=`<div class="integration-card"><h2><a class="sd-organisation--name-link" href="https://www.ruedersdorf.de/strukturierte-daten/organisationen/kitas/kita-zwergenschloss/">Kita Zwergenschloss</a></h2><div class="integration-card__postal-address-wrapper"><address>Hans-Schröer-Straße 34, Herzfelde, 15378 Rüdersdorf bei Berlin</address></div><p class="sd-contact--name">DO_NOT_IMPORT_PERSON</p><a href="mailto:DO_NOT_IMPORT_EMAIL">DO_NOT_IMPORT_EMAIL</a></div>`;
 function crc32(bytes:Uint8Array):number {let crc=0xffffffff;for(const byte of bytes){crc^=byte;for(let i=0;i<8;i++)crc=(crc&1)?(crc>>>1)^0xedb88320:crc>>>1;}return (crc^0xffffffff)>>>0;}
 /** Native uncompressed OOXML container builder; no production parser duplication. */
-function workbook(sheet:string,rows:string[][],style?:{address:string;numFmtId:number;formatCode?:string}):Uint8Array {
+function workbook(sheet:string,rows:string[][],style?:{address:string;numFmtId:number;formatCode?:string;inherit?:'row'|'column';explicitGeneral?:boolean}):Uint8Array {
  const xml=(s:string)=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
  const members:Record<string,string>={
   '[Content_Types].xml':'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/></Types>',
   'xl/workbook.xml':`<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xml(sheet)}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
   'xl/_rels/workbook.xml.rels':'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
-  'xl/worksheets/sheet1.xml':`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows.map((row,r)=>`<row r="${r+1}">${row.map((value,c)=>{const address=String.fromCharCode(65+c)+(r+1);return style?.address===address?`<c r="${address}" s="1"><v>${xml(value)}</v></c>`:`<c r="${address}" t="inlineStr"><is><t>${xml(value)}</t></is></c>`;}).join('')}</row>`).join('')}</sheetData></worksheet>`,
+  'xl/worksheets/sheet1.xml':`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${style?.inherit==='column'?`<cols><col min="${style.address.charCodeAt(0)-64}" max="${style.address.charCodeAt(0)-64}" style="1"/></cols>`:''}<sheetData>${rows.map((row,r)=>`<row r="${r+1}"${style?.inherit==='row'&&Number(style.address.slice(1))===r+1?' s="1" customFormat="1"':''}>${row.map((value,c)=>{const address=String.fromCharCode(65+c)+(r+1);return style?.address===address?`<c r="${address}"${style.explicitGeneral?' s="0"':style.inherit?'':' s="1"'}><v>${xml(value)}</v></c>`:`<c r="${address}" t="inlineStr"><is><t>${xml(value)}</t></is></c>`;}).join('')}</row>`).join('')}</sheetData></worksheet>`,
  };
  if(style)members['xl/styles.xml']=`<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${style.formatCode?`<numFmts count="1"><numFmt numFmtId="${style.numFmtId}" formatCode="${xml(style.formatCode)}"/></numFmts>`:''}<cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="${style.numFmtId}"/></cellXfs></styleSheet>`;
  const local:Buffer[]=[],central:Buffer[]=[];let offset=0;
@@ -173,4 +173,16 @@ test('school count cells hold percent/date styles and do not infer percentages f
  }
  const unstyled=adapter.parse(snapshot(workbook(r.sheet,[[r.title],r.rows[0],['Märkisch-Oderland','1']],{address:'B3',numFmtId:0}),r.source),sc);
  assert.equal(unstyled.coverage.state,'partial');assert.equal(unstyled.observations[0].value,1);assert.equal(unstyled.observations[0].unit,'schools');
+});
+
+test('school counts reject inherited row/column percent and date formats while explicit General wins',()=>{
+ const r=reports[0],sc=scope(r.source,r.ags),rows=[[r.title],r.rows[0],['Märkisch-Oderland','70']];
+ for(const inherit of ['row','column'] as const){
+  for(const numFmtId of [9,14]){
+   const held=adapter.parse(snapshot(workbook(r.sheet,rows,{address:'B3',numFmtId,inherit}),r.source),sc);
+   assert.equal(held.coverage.state,'held_quality');assert.equal(held.observations.length,0);
+   const general=adapter.parse(snapshot(workbook(r.sheet,rows,{address:'B3',numFmtId,inherit,explicitGeneral:true}),r.source),sc);
+   assert.equal(general.coverage.state,'partial');assert.equal(general.observations[0].value,70);
+  }
+ }
 });

@@ -7,9 +7,12 @@ import {catalogueSchema,collectionSchema,type Catalogue,type Signal} from '../sr
 import {QueryIndex,regionalSchema,querySchema,queryFields,publicData,exportRecordsSchema,type Regional} from '../src/mcp-query.ts';
 import {assignTopics,assertTopic} from '../src/topics.ts';
 import {searchText} from '../src/mcp.ts';
+import {createHash} from 'node:crypto';
 
 const catalogue:Catalogue={schemaVersion:'stadtstack-signals-v1',generatedAt:'2026-10-10T12:00:00Z',publisher:'Test',cities:[{id:'strausberg',name:'Strausberg',state:'Brandenburg',center:[13.88,52.58],bbox:[13,52,14,53],sources:[]}]};
 const regional:Regional={schemaVersion:'stadtstack-regional-topics-v1',generatedAt:'2026-10-09T12:00:00Z',asOf:'2026-10-09',region:{id:'brandenburg-mol',name:'Märkisch-Oderland'},municipalities:[{id:'hoppegarten',name:'Hoppegarten',ags:'12064227'},{id:'strausberg',name:'Strausberg',ags:'12064472'}],topics:[{id:'waermeplanung',label:'Kommunale Wärmeplanung',municipalities:[{municipalityId:'hoppegarten',stage:'planning',items:[{title:'Kommunale Wärmeplanung in Hoppegarten',url:'https://www.gemeinde-hoppegarten.de/news/1/1240589/nachrichten/kommunale-w%C3%A4rmeplanung-in-hoppegarten.html',date:'2026-05-27',sourceType:'cityWebsite',locator:'Veröffentlichung: 27. Mai 2026',stage:'planning'},{title:'Wärmeplanung und Wärmenetz: Datum offen',url:'https://www.gemeinde-hoppegarten.de/seite/864034/kommunale-w%C3%A4rmeplanung.html',date:null,sourceType:'cityWebsite',locator:'Planung; kein dokumentiertes Datum',stage:'planning'}]}]}]};
+// Synthetic source excerpts; hashes bind these fixture bytes, never fetched publisher documents.
+function excerpt(quote:string){return {statement:quote,statementEvidence:[{quote,sourceSha256:createHash('sha256').update(quote).digest('hex'),textNormalization:'html-whitespace-v1' as const}]};}
 function feature(id:string,title:string,kind:Signal['properties']['kind']='planning',date:string|null='2026-09-01') {
   const bytes=new Uint8Array([1]);
   return signal({id:`test:${id}`,cityId:'strausberg',kind,category:'Verkehr & Infrastruktur',title,statement:title,status:'Quelle prüfen',startDate:date,endDate:null,nextStep:'Quelle prüfen',unknowns:[],scale:'city',geometryPrecision:'none',sources:[sourceFrom({body:bytes,sha256:hash(bytes),retrievedAt:'2026-10-09',url:'https://example.org/source'},'Document','Publisher',`item ${id}`)],extraction:{method:'structured'},reviewState:'candidate',asOf:'2026-10-09'},null);
@@ -106,11 +109,11 @@ test('released JSON supports known subjects and Hoppegarten in shared search',as
 
 test('Strausberg Hoppegarten and adopted Rüdersdorf heat evidence share search and comparison eligibility',()=>{
  const towns=[
-  {id:'strausberg',name:'Strausberg',stage:'draft',date:'2026-04-12',title:'Kommunale Wärmeplanung: Abschlussbericht zur Beratung',url:'https://www.stadt-strausberg.de/stadtentwicklung-2/kommunale-waermeplanung/',locator:'Abschnitt Öffentlichkeitsbeteiligung abgeschlossen'},
-  {id:'hoppegarten',name:'Hoppegarten',stage:'planning',date:'2026-05-27',title:'Kommunale Wärmeplanung in Hoppegarten',url:'https://www.gemeinde-hoppegarten.de/news/1/1240589/nachrichten/kommunale-w%C3%A4rmeplanung-in-hoppegarten.html',locator:'Abschnitt zum Planungsverbund; Veröffentlichung'},
-  {id:'ruedersdorf-bei-berlin',name:'Rüdersdorf bei Berlin',stage:'adopted',date:'2025-07-22',title:'Kommunale Wärmeplanung: Wärmeplan beschlossen',url:'https://www.ruedersdorf.de/meine-gemeinde/konzepte/kommunale-waermeplanung/',locator:'Abschnitt Wärmeplan beschlossen, erster Absatz'},
+  {id:'strausberg',name:'Strausberg',stage:'draft',date:'2026-04-12',title:'Kommunale Wärmeplanung: Abschlussbericht zur Beratung',statement:'Der Abschlussbericht der kommunalen Wärmeplanung liegt als Entwurf zur Beratung vor.',url:'https://www.stadt-strausberg.de/stadtentwicklung-2/kommunale-waermeplanung/',locator:'Abschnitt Öffentlichkeitsbeteiligung abgeschlossen'},
+  {id:'hoppegarten',name:'Hoppegarten',stage:'planning',date:'2026-05-27',title:'Kommunale Wärmeplanung in Hoppegarten',statement:'Die Gemeinden erarbeiten eine kommunale Wärmeplanung im Planungsverbund.',url:'https://www.gemeinde-hoppegarten.de/news/1/1240589/nachrichten/kommunale-w%C3%A4rmeplanung-in-hoppegarten.html',locator:'Abschnitt zum Planungsverbund; Veröffentlichung'},
+  {id:'ruedersdorf-bei-berlin',name:'Rüdersdorf bei Berlin',stage:'adopted',date:'2025-07-22',title:'Kommunale Wärmeplanung: Wärmeplan beschlossen',statement:'Der Wärmeplan wurde am 22. Juli 2025 beschlossen.',url:'https://www.ruedersdorf.de/meine-gemeinde/konzepte/kommunale-waermeplanung/',locator:'Abschnitt Wärmeplan beschlossen, erster Absatz'},
  ];
- const evidence:Regional={...regional,municipalities:towns.map(({id,name})=>({id,name})),topics:[{id:'waermeplanung',label:'Kommunale Wärmeplanung',municipalities:towns.map(town=>({municipalityId:town.id,stage:town.stage,items:[{title:town.title,url:town.url,date:town.date,stage:town.stage,sourceType:'cityWebsite',locator:town.locator}]}))}]};
+ const evidence:Regional={...regional,municipalities:towns.map(({id,name})=>({id,name})),topics:[{id:'waermeplanung',label:'Kommunale Wärmeplanung',municipalities:towns.map(town=>({municipalityId:town.id,stage:town.stage,items:[{title:town.title,url:town.url,date:town.date,stage:town.stage,sourceType:'cityWebsite',locator:town.locator,...excerpt(town.statement)}]}))}]};
  const query=new QueryIndex('a'.repeat(64),catalogue.generatedAt,[feature('heat','Fernwärmeleitung')],evidence,catalogue);
  const search=query.page({topic:'waermeplanung',fields:['id','cityId','comparisonEligible','caseId']},'search_topics');
  const comparison=query.compareTopic('waermeplanung',towns.map(town=>town.id));
@@ -131,14 +134,14 @@ test('Strausberg Hoppegarten and adopted Rüdersdorf heat evidence share search 
  assert.equal(exported.items[0].documentDate,'2026-05-27');assert.equal(exported.items[0].eventDate,null);assert.equal(exported.items[0].stageDate,null);
  assert.equal(exported.items[0].dateSemantics,'source_document');assert.equal(exported.items[0].comparisonEligible,true);
  assert.equal(exported.cases[0].furthestSupportedDate,null);
- assert.equal(query.similar(exported.items[0].id).target.furthestSupportedDate,null);
+ const similarTarget=query.similar(exported.items[0].id).target;assert.equal(similarTarget.kind,'case');if(similarTarget.kind!=='case')assert.fail('Expected source-publication case');assert.equal(similarTarget.furthestSupportedDate,null);
  assert.equal(query.similar(query.records.find(record=>record.cityId==='hoppegarten')!.id).totalCases,3);
 });
 
 test('export includes complete evidence and only page source metadata with signed filter-bound cursors',()=>{
  const query=index(),first=query.exportRecords({limit:1});
  assert.equal(first.totalRecords,query.records.length);
- assert.ok(first.items[0].originalRecord);assert.ok(first.items[0].statement);assert.ok(first.items[0].caseIdentity);
+ assert.ok(first.items[0].originalRecord);assert.equal(typeof first.items[0].statement,'string');if(!first.items[0].statement)assert.equal(first.items[0].statementStatus,'not_extracted');assert.ok(first.items[0].caseIdentity);
  assert.deepEqual(first.sources.map(source=>source.id).sort(),first.items[0].sourceIds.slice().sort());
  assert.ok(first.nextCursor);
  assert.throws(()=>query.exportRecords({limit:2,cursor:first.nextCursor!}),/mismatch/);
@@ -161,7 +164,7 @@ test('export includes complete evidence and only page source metadata with signe
 
 test('city and regional plan records join via source numbers, not their common title',()=>{
  const plan=feature('plan','Bebauungsplan Nr. 68/23 Solarpark am Flugplatz');
- const item={title:'Bebauungsplan Nr. 68/23 Solarpark am Flugplatz',url:'https://bb.beteiligung.diplanung.de/verfahren/solarpark-flugplatz/public/detail',date:'2026-09-01',stage:'consultation',sourceType:'planningProcedure',locator:'DiPlan mapVars[procedureId=procedure-68]: externalName, publicParticipationStartDate 2026-09-01'};
+ const item={title:'Bebauungsplan Nr. 68/23 Solarpark am Flugplatz',url:'https://bb.beteiligung.diplanung.de/verfahren/solarpark-flugplatz/public/detail',date:'2026-09-01',stage:'consultation',sourceType:'planningProcedure',locator:'DiPlan mapVars[procedureId=procedure-68]: phase Frühzeitige Beteiligung nach § 3 Abs. 1 BauGB; publicParticipationStartDate 2026-09-01',...excerpt('Frühzeitige Beteiligung nach § 3 Abs. 1 BauGB zum Bebauungsplan Nr. 68/23.')};
  const evidence:Regional={...regional,topics:[{id:'solarpark',label:'Solarpark',municipalities:[{municipalityId:'strausberg',stage:'consultation',items:[item]}]}]};
  const query=new QueryIndex('a'.repeat(64),catalogue.generatedAt,[plan,feature('unknown','Solarpark am Flugplatz')],evidence,catalogue);
  const compared=query.compareTopic('solarpark',['strausberg']).cities[0];
@@ -169,7 +172,7 @@ test('city and regional plan records join via source numbers, not their common t
  const identified=compared.cases.find(row=>row.identityStatus==='source_identified')!;
  assert.equal(identified.recordCount,2);
  assert.ok(identified.identityBasis.some(basis=>basis.type==='diplan'&&basis.value.endsWith(':procedure-68')));
- assert.equal(identified.furthestSupportedStage,'consultation');
+ assert.equal(identified.furthestSupportedStage,'early_consultation');
  assert.equal(identified.furthestSupportedDate,'2026-09-01');
  assert.equal(compared.cases.find(row=>row.identityStatus==='unresolved')!.furthestSupportedStage,null);
 });
@@ -202,11 +205,11 @@ test('city and regional council records share an explicit paper reference',()=>{
 });
 
 test('regional consultation milestones use their own date roles, never publication or unrelated start dates',()=>{
- const base={title:'Bebauungsplan Nr. 68/23 Solarpark am Flugplatz',date:'2025-11-24',sourceType:'planningProcedure',locator:'DiPlan mapVars[procedureId=procedure-68]: publicParticipationStartDate 2025-11-24, publicParticipationEndDate 2026-01-12',participationEnd:'2026-01-12'};
+ const base={title:'Bebauungsplan Nr. 68/23 Solarpark am Flugplatz',date:'2025-11-24',sourceType:'planningProcedure',locator:'DiPlan mapVars[procedureId=procedure-68]: phase Öffentliche Auslegung des Entwurfs nach § 3 Abs. 2 BauGB; publicParticipationStartDate 2025-11-24, publicParticipationEndDate 2026-01-12',participationEnd:'2026-01-12',...excerpt('Öffentliche Auslegung des Entwurfs nach § 3 Abs. 2 BauGB.')};
  const items=[
   {...base,url:'https://example.org/closed',stage:'consultation_closed'},
   {...base,title:'Bebauungsplan Nr. 69/23 Solarpark',url:'https://example.org/open',stage:'consultation'},
-  {...base,title:'Bebauungsplan Nr. 70/23 Solarpark',url:'https://example.org/evaluation',stage:'evaluation'},
+  {...base,title:'Bebauungsplan Nr. 70/23 Solarpark',url:'https://example.org/evaluation',stage:'evaluation',...excerpt('Die Stellungnahmen werden ausgewertet.')},
   {...base,title:'Bebauungsplan Nr. 71/23 Solarpark',url:'https://example.org/missing-end',stage:'consultation_closed',participationEnd:undefined},
  ];
  const evidence:Regional={...regional,topics:[{id:'solarpark',label:'Solarpark',municipalities:[{municipalityId:'strausberg',stage:'evaluation',items}]}]};
@@ -223,12 +226,12 @@ test('regional consultation milestones use their own date roles, never publicati
  assert.equal(evaluation.eventDate,'2025-11-24');assert.equal(evaluation.stageDate,null);
  assert.equal(missingEnd.stageDate,null);assert.equal(missingEnd.comparisonEligible,true);
  const city=query.compareTopic('solarpark',['strausberg']).cities[0];
- assert.equal(city.latestStageDate,'2026-01-12');assert.equal(city.unknownStageCount,0);
+ assert.equal(city.latestStageDate,'2026-01-12');assert.equal(city.unknownStageCount,1,'A generic evaluation label without a bound legal decision remains unresolved');
  assert.equal(city.cases.find(row=>row.memberRecordIds.includes(closed.id))!.furthestSupportedDate,'2026-01-12');
  assert.equal(city.cases.find(row=>row.memberRecordIds.includes(evaluation.id))!.furthestSupportedDate,null);
  assert.equal(city.cases.find(row=>row.memberRecordIds.includes(missingEnd.id))!.furthestSupportedDate,null);
- assert.equal(query.compareTopic('solarpark',['strausberg'],{stage:'consultation_closed',dateFrom:'2026-01-12',dateTo:'2026-01-12'}).cities[0].recordCount,1);
- assert.equal(query.similar(closed.id).target.furthestSupportedDate,'2026-01-12');
+ assert.equal(query.compareTopic('solarpark',['strausberg'],{stage:'formal_consultation',dateFrom:'2026-01-12',dateTo:'2026-01-12'}).cities[0].recordCount,1);
+ const similarTarget=query.similar(closed.id).target;assert.equal(similarTarget.kind,'case');if(similarTarget.kind!=='case')assert.fail('Expected source-publication case');assert.equal(similarTarget.furthestSupportedDate,'2026-01-12');
 });
 
 test('a city event date without stage-specific evidence does not become a milestone date',()=>{
@@ -238,4 +241,16 @@ test('a city event date without stage-specific evidence does not become a milest
  const city=query.compareTopic('waermeplanung',['strausberg']).cities[0];
  assert.equal(city.furthestPositiveMilestone?.stage,'draft');assert.equal(city.furthestPositiveMilestone?.date,null);
  assert.equal(city.latestStageDate,null);assert.equal(city.unknownStageCount,0);
+});
+
+test('regional statements require source-bound excerpts and never present locators as substantive facts',()=>{
+ const item={title:'Kommunale Wärmeplanung',url:'https://example.org/heat',date:'2026-05-27',stage:'planning',sourceType:'cityWebsite',locator:'Abschnitt 2, erste Tabelle'};
+ const make=(items:Regional['topics'][number]['municipalities'][number]['items'])=>new QueryIndex('a'.repeat(64),catalogue.generatedAt,[],{...regional,topics:[{id:'waermeplanung',label:'Wärmeplanung',municipalities:[{municipalityId:'hoppegarten',stage:'planning',items}]}]},catalogue);
+ const legacy=make([item]).exportRecords().items[0];assert.equal(legacy.statement,'');assert.equal(legacy.statementStatus,'not_extracted');assert.equal(legacy.locator,item.locator);assert.deepEqual(legacy.statementEvidence,[]);
+ assert.equal(legacy.stageQuote,item.locator);
+ assert.equal(make([item]).compareTopic('waermeplanung',['hoppegarten']).cities[0].furthestPositiveMilestone?.evidence[0].milestone.evidenceBasis,'released_structured_stage');
+ const source=excerpt('Die kommunale Wärmeplanung begann im Januar 2024.');
+ const query=make([{...item,...source}]),record=query.exportRecords().items[0];assert.equal(record.statement,source.statement);assert.equal(record.locator,item.locator);assert.equal(record.statementStatus,'source_backed');assert.deepEqual(record.statementEvidence,source.statementEvidence);
+ assert.equal(query.sources.get(record.sourceIds[0])!.sha256,source.statementEvidence[0].sourceSha256);
+ assert.throws(()=>make([{...item,...source,statement:'Eine andere, nicht belegte Aussage.'}]),/Regional statement/);
 });

@@ -4,6 +4,8 @@ import {DistrictExtractionClaimsSchema,DistrictKnowledgeRecordSchema,QUOTE_NORMA
 import {TOPIC_VOCABULARY,TOPIC_VOCABULARY_VERSION,getTopic} from './topic-vocabulary.ts';
 import {PROVIDER_CONFIGS,type ExtractorProvider} from './district-model-contract.ts';
 import {graphGroundingChecks,graphPromptInstructions} from './district-graph-claims.ts';
+import {PUBLIC_CONTACT_PATTERN} from './district-public-fields.ts';
+import {stageEvidenceSupports} from './district-stage-evidence.ts';
 
 export const EXTRACTOR_VERSION='district-extractor-v9-action-relations';
 export const PROMPT_VERSION='district-claims-v8-action-relations';
@@ -67,16 +69,6 @@ export function summaryNumbersSupported(summary:string,quote:string):boolean {
   const numbers=(value:string)=>value.match(/(?<![\p{L}\d])\d+(?:[.,]\d+)*(?![\p{L}\d])/gu)??[];
   const evidence=new Set(numbers(stripDates(quote,false)));
   return numbers(stripDates(summary,true)).every(number=>evidence.has(number))&&supported;
-}
-export function stageEvidenceSupports(stage: DistrictExtractionClaims['stage'], quote: string): boolean {
-  if (!['adopted', 'in_force', 'implemented'].includes(stage)) return true;
-  const finalAction = '(?:Satzungsbeschluss|Feststellungsbeschluss|als Satzung beschlossen|endgültig beschlossen|abschließend beschlossen|in Kraft getreten|rechtsverbindlich|rechtskräftig|wirksam geworden|fertiggestellt|abgeschlossen|in Betrieb genommen|eröffnet|umgesetzt|abgenommen)';
-  if (new RegExp(`(?:soll(?:en)?|wird|werden|voraussichtlich|geplant|beabsichtigt|künftig|noch nicht|nicht)[^!?]{0,140}${finalAction}`, 'iu').test(quote)) return false;
-  if (/(?:Entwurf|Vorlage|Vorschlag)[^!?]{0,40}(?:Satzungsbeschluss|Feststellungsbeschluss)|(?:Satzungsbeschluss|Feststellungsbeschluss)[^!?]{0,40}(?:soll|ist geplant|ist vorgesehen|wird[^!?]{0,20}gefasst)/iu.test(quote)) return false;
-  if (stage === 'adopted') return /Satzungsbeschluss|Feststellungsbeschluss|als Satzung beschlossen|endgültig beschlossen|abschließend beschlossen/iu.test(quote);
-  if (stage === 'in_force') return /in Kraft getreten|rechtsverbindlich|rechtskräftig|wirksam geworden/iu.test(quote);
-  if (/(?:Beteiligung|Auslegung|Planverfahren|Planung|Vergabe|Ausschreibung|Beratung)[^!?]{0,60}(?:abgeschlossen|beendet)/iu.test(quote)) return false;
-  return /fertiggestellt|abgeschlossen|in Betrieb genommen|eröffnet|umgesetzt|abgenommen/iu.test(quote);
 }
 export function canonicalWhitespace(value: string): string {
   return value.replace(/\s+/gu, ' ').trim();
@@ -166,7 +158,7 @@ export function deterministicChecks(claims: DistrictExtractionClaims, text: stri
   check('geometry', claims.locations.every(location => location.geometry === null || location.quote.includes(JSON.stringify(location.geometry))), 'Geometry requires exact explicit GeoJSON in source; no inferred coordinates');
   check('summary_numbers', summaryNumbersSupported(claims.summary,claims.summaryQuote), 'Every non-date numeric token is literal source evidence; valid calendar dates may use equivalent ISO, numeric or German month spelling');
   // Public knowledge is facts, not a contact directory; model output containing contact data is quarantined.
-  check('no_contacts', !/[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:tel(?:efon)?|fax|mobil)\s*[:.]?\s*\+?\d[\d\s/()-]{5,}/iu.test(JSON.stringify(claims)), 'No extracted email/phone contact details');
+  check('no_contacts', !PUBLIC_CONTACT_PATTERN.test(JSON.stringify(claims)), 'No extracted email/phone contact details');
   checks.push(...graphGroundingChecks(claims,text));
   return { passed: checks.every(item => item.passed), checks };
 }
@@ -191,10 +183,10 @@ export function rebindSourceReferences(record: DistrictKnowledgeRecord, sources:
   rebound.verification.evidenceHash = knowledgeEvidenceHash(rebound);
   return DistrictKnowledgeRecordSchema.parse(rebound);
 }
+export const EXTRACTOR_SOURCE_FILES=['district-claims.ts','district-stage-evidence.ts','district-public-fields.ts','district-inference.ts','district-answer-cache.ts','district-model.ts','district-claude.ts','district-model-contract.ts','district-model-usage.ts','district-model-diagnostics.ts','district-schema.ts','district-graph-claims.ts','topic-vocabulary.ts','../regional/taxonomy.mjs'] as const;
 export async function extractorHash():Promise<string>{
-  const files=['district-claims.ts','district-inference.ts','district-answer-cache.ts','district-model.ts','district-claude.ts','district-model-contract.ts','district-model-usage.ts','district-model-diagnostics.ts','district-schema.ts','district-graph-claims.ts','topic-vocabulary.ts','../regional/taxonomy.mjs'];
   const hashes: string[] = [];
-  for (const file of files) hashes.push(sha256(await readFile(new URL(file, import.meta.url))));
+  for (const file of EXTRACTOR_SOURCE_FILES) hashes.push(sha256(await readFile(new URL(file, import.meta.url))));
   return sha256(JSON.stringify({ version: EXTRACTOR_VERSION, hashes }));
 }
 export const safeFailure=(error:unknown):string=>error instanceof z.ZodError?'Structured output/schema validation failed':error instanceof Error&&/^(Missing document prerequisite:|Document command failed:|Document exceeds|Document has|PDF |Unsupported document|Subscription CLI |Source |Unbound |Document path|No supported case|Prepared |Frozen )/.test(error.message)?error.message:'Extraction failed; see source-bound quarantine identity';

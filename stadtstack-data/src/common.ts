@@ -5,7 +5,7 @@ import type {Signal} from './schema.ts';
 export const root = new URL('../',import.meta.url).pathname;
 export const cacheDir=join(root,'cache');
 export const outDir=join(root,'out');
-export const ua='StadtstackData/0.1 (public-data research; https://github.com/komma-systems/ccf; contact: data@stadtstack.org)';
+export const ua='StadtstackData (civic public-data research; contact: https://stadtstack.eu/kontakt)';
 export const hash=(data:string|Uint8Array)=>createHash('sha256').update(data).digest('hex');
 export async function save(path:string,content:string|Uint8Array){await mkdir(dirname(path),{recursive:true});await writeFile(path,content);}
 export async function jsonFile<T>(path:string):Promise<T|undefined>{try{return JSON.parse(await readFile(path,'utf8')) as T;}catch{return undefined;}}

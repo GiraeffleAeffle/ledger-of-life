@@ -22,11 +22,12 @@ function zip(entries:Record<string,string>):Uint8Array {
  }const dir=Buffer.concat(central),e=Buffer.alloc(22);e.writeUInt32LE(0x06054b50);e.writeUInt16LE(Object.keys(entries).length,8);e.writeUInt16LE(Object.keys(entries).length,10);e.writeUInt32LE(dir.length,12);e.writeUInt32LE(offset,16);return Buffer.concat([...local,dir,e]);
 }
 function escape(raw:string):string {return raw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function xlsx(rows:Array<Array<string|number>>,codes=false,settings:{styles?:Record<string,number>;customFormats?:Record<string,string>;date1904?:boolean}={}):Uint8Array {
- const formatIds=[...new Set([0,...Object.values(settings.styles??{})])];
- const sheet=(rows:Array<Array<string|number>>)=>'<worksheet><sheetData>'+rows.map((row,ri)=>`<row r="${ri+1}">`+row.map((v,ci)=>{const address=columnName(ci)+(ri+1),format=settings.styles?.[address],style=format===undefined?'':` s="${formatIds.indexOf(format)}"`;return typeof v==='number'?`<c r="${address}"${style}><v>${v}</v></c>`:`<c r="${address}"${style} t="inlineStr"><is><t>${escape(v)}</t></is></c>`;}).join('')+'</row>').join('')+'</sheetData></worksheet>';
+function xlsx(rows:Array<Array<string|number>>,codes=false,settings:{styles?:Record<string,number>;customFormats?:Record<string,string>;date1904?:boolean;columnDefaults?:Array<{min:number;max:number;format:number}>;rowDefaults?:Record<number,number>}={}):Uint8Array {
+ const formatIds=[...new Set([0,...Object.values(settings.styles??{}),...(settings.columnDefaults??[]).map(c=>c.format),...Object.values(settings.rowDefaults??{})])];
+ const cols=settings.columnDefaults?'<cols>'+settings.columnDefaults.map(c=>`<col min="${c.min}" max="${c.max}" style="${formatIds.indexOf(c.format)}"/>`).join('')+'</cols>':'';
+ const sheet=(rows:Array<Array<string|number>>)=>'<worksheet>'+cols+'<sheetData>'+rows.map((row,ri)=>{const rowFormat=settings.rowDefaults?.[ri+1],rowStyle=rowFormat===undefined?'':` s="${formatIds.indexOf(rowFormat)}" customFormat="1"`;return `<row r="${ri+1}"${rowStyle}>`+row.map((v,ci)=>{const address=columnName(ci)+(ri+1),format=settings.styles?.[address],style=format===undefined?'':` s="${formatIds.indexOf(format)}"`;return typeof v==='number'?`<c r="${address}"${style}><v>${v}</v></c>`:`<c r="${address}"${style} t="inlineStr"><is><t>${escape(v)}</t></is></c>`;}).join('')+'</row>';}).join('')+'</sheetData></worksheet>';
  const entries:Record<string,string>={'[Content_Types].xml':'<Types/>','xl/workbook.xml':`<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${settings.date1904?'<workbookPr date1904="1"/>':''}<sheets><sheet name="Vorhaben" r:id="rId1"/>${codes?'<sheet name="Codes" r:id="rId2"/>':''}</sheets></workbook>`,'xl/_rels/workbook.xml.rels':`<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/>${codes?'<Relationship Id="rId2" Target="worksheets/sheet2.xml"/>':''}</Relationships>`,'xl/worksheets/sheet1.xml':sheet(rows)};
- if(settings.styles)entries['xl/styles.xml']='<styleSheet><numFmts>'+Object.entries(settings.customFormats??{}).map(([id,code])=>`<numFmt numFmtId="${id}" formatCode="${escape(code)}"/>`).join('')+'</numFmts><cellXfs>'+formatIds.map(id=>`<xf numFmtId="${id}"/>`).join('')+'</cellXfs></styleSheet>';
+ if(settings.styles||settings.columnDefaults||settings.rowDefaults)entries['xl/styles.xml']='<styleSheet><numFmts>'+Object.entries(settings.customFormats??{}).map(([id,code])=>`<numFmt numFmtId="${id}" formatCode="${escape(code)}"/>`).join('')+'</numFmts><cellXfs>'+formatIds.map(id=>`<xf numFmtId="${id}"/>`).join('')+'</cellXfs></styleSheet>';
  if(codes)entries['xl/worksheets/sheet2.xml']=sheet([['Code','Bezeichnung'],['001','Fixture Interventionskategorie']]);return zip(entries);
 }
 function operationSnapshot(sourceId:string,rows:string[][]=[headers,values]):AdmittedSnapshot {
@@ -136,4 +137,30 @@ test('numeric date columns require true native date style and bind workbook epoc
  row[6]=1;const r=parseFundingOperations(snapshot(xlsx([headers,row],false,{styles:{G2:14},date1904:true}),url,'application/zip'),scope(sourceId)),date=r.observations.find(o=>o.predicate==='operation_start')!;
  assert.equal(date.date,'1904-01-02');assert.ok(date.supportingEvidence.some(e=>e.locator.path.endsWith('/@date1904')&&e.locator.rawValue==='1'));assert.ok(date.supportingEvidence.some(e=>e.locator.path.endsWith('/@numFmtId')&&e.locator.rawValue==='14'));
  row[4]=0.6;assert.equal(parseFundingOperations(snapshot(xlsx([headers,row],false,{styles:{G2:14,E2:9}}),url,'application/zip'),scope(sourceId)).observations.length,0);
+});
+test('funding inherits native row/column percent and date styles with whole-archive selection receipts',()=>{
+ const sourceId='funding-bb-efre-jtf-beneficiaries',url=FUNDING_DISTRIBUTIONS[sourceId].landing,row:Array<string|number>=[...values];row[5]=0.6;
+ for(const settings of [{columnDefaults:[{min:6,max:6,format:9}]},{rowDefaults:{2:9}}]){
+  const bytes=xlsx([headers,row],false,settings),r=parseFundingOperations(snapshot(bytes,url,'application/zip'),scope(sourceId)),rate=r.observations.find(o=>o.predicate==='eu_cofinancing_rate')!;
+  assert.equal(rate.value,'60');assert.equal(rate.unit,'percent');assert.ok(rate.evidence.some(e=>e.rawValue==='0.6'));assert.ok(rate.supportingEvidence.every(e=>e.locator.sourceSha256===digest(bytes)));
+  assert.ok(rate.supportingEvidence.some(e=>e.locator.path.includes('/cols/col[')||e.locator.path.endsWith('/@customFormat')));assert.equal(fundingCapabilityReceipt().nativeNumberFormatVersion,'native-number-format-v2');
+ }
+ row[6]=1;row[7]=61;const bytes=xlsx([headers,row],false,{columnDefaults:[{min:6,max:6,format:9},{min:7,max:8,format:14}]}),r=parseFundingOperations(snapshot(bytes,url,'application/zip'),scope(sourceId)),start=r.observations.find(o=>o.predicate==='operation_start')!;
+ assert.equal(start.date,'1900-01-01');assert.ok(start.supportingEvidence.some(e=>e.locator.path.includes('/cols/col[2]/@style')));assert.ok(start.supportingEvidence.some(e=>e.locator.path.endsWith('/@date1904')));
+ const explicitGeneral=parseFundingOperations(snapshot(xlsx([headers,row],false,{styles:{G2:0},columnDefaults:[{min:7,max:8,format:14}]}),url,'application/zip'),scope(sourceId));assert.equal(explicitGeneral.coverage.state,'held_quality');assert.equal(explicitGeneral.observations.length,0);
+});
+test('independently held rows yield honest partial coverage while retaining fully proven municipal operation rows',()=>{
+ const unqualified=[...values];unqualified[0]='00043';unqualified[1]='PRIVATE RECIPIENT';unqualified[12]='natürliche Person';
+ const s=operationSnapshot('funding-sh-efre-beneficiaries',[headers,values,unqualified]),r=parseFundingOperations(s,scope());
+ assert.equal(r.coverage.state,'partial');assert.equal(r.coverage.observedRows,2);assert.match(r.coverage.reason,/1 row\(s\) held/);assert.ok(r.coverage.limitations.some(l=>l.includes('Independently held rows: 1')));assert.ok(r.observations.length>0);
+ assert.ok(r.observations.every(o=>o.nativeId==='00042'&&o.evidence.every(e=>e.sourceSha256===s.sourceSha256)));assert.ok(!JSON.stringify(r).includes('PRIVATE RECIPIENT'));assert.ok(!r.observations.some(o=>o.nativeId==='00043'));
+ assert.deepEqual(r.observations.find(o=>o.predicate==='approved_eligible_cost')!.geography,{ags:'01053100',basis:'source_explicit',role:'project_location'});assert.equal(r.observations.find(o=>o.predicate==='approved_eligible_cost')!.financialRole,'approval');assert.ok(r.observations.some(o=>o.predicate==='awarded_to'));assert.ok(r.observations.every(o=>o.financialRole!=='payment'));
+});
+test('duplicate native keys hold every ambiguous occurrence without withholding independent valid rows',()=>{
+ const other=[...values];other[0]='00044';const r=parseFundingOperations(operationSnapshot('funding-sh-efre-beneficiaries',[headers,values,[...values],other]),scope());
+ assert.equal(r.coverage.state,'partial');assert.match(r.coverage.reason,/2 row\(s\) held/);assert.ok(r.observations.length>0);assert.ok(r.observations.every(o=>o.nativeId==='00044'));
+});
+test('whole-file schema ambiguity still holds every row rather than partially admitting earlier data',()=>{
+ const ambiguousHeaders=[...headers,'Vorhaben-ID'];const r=parseFundingOperations(operationSnapshot('funding-sh-efre-beneficiaries',[ambiguousHeaders,[...values,'00042']]),scope());
+ assert.equal(r.coverage.state,'held_quality');assert.equal(r.observations.length,0);assert.match(r.coverage.reason,/Ambiguous duplicate semantic column/);
 });

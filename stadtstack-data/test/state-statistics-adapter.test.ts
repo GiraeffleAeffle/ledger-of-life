@@ -10,7 +10,7 @@ describe('state finance native snapshots',()=>{
  it('preserves leading-zero AGS, raw cells, debt stock date and core scope',()=>{
   const result=adapter.parse(snapshot('Gemeindeschlüssel;Schulden Kernhaushalte 2025 EUR\n01053100;1234\n01053;9876\n'),scope);
   assert.equal(result.observations.length,1);const value=result.observations[0];
-  assert.equal(value.geography.ags,'01053100');assert.equal(value.date,'2025-12-31');assert.equal(value.dateRole,'stock_reference_date');assert.ok(value.subject.endsWith(':core'));assert.equal(value.value,1234);assert.equal(value.financialRole,'none');assert.equal(value.evidence.at(-1)?.rawValue,'1234');assert.equal(result.coverage.state,'partial');
+  assert.equal(value.geography.ags,'01053100');assert.equal(value.date,'2025');assert.equal(value.datePrecision,'year');assert.equal(value.sourceReferenceDate,'2025');assert.equal(value.dateRole,'stock_reference_date');assert.ok(value.subject.endsWith(':core'));assert.equal(value.value,1234);assert.equal(value.financialRole,'none');assert.equal(value.evidence.at(-1)?.rawValue,'1234');assert.equal(result.coverage.state,'partial');
  });
  it('maps BB tax rates, not appropriations',()=>{
   const bb={...scope,sourceId:'statistics-berlin-brandenburg-finance',ags:'12064227'};
@@ -20,7 +20,7 @@ describe('state finance native snapshots',()=>{
  it('distinguishes MV cumulative cash quarters from annual accounts',()=>{
   const mv={...scope,sourceId:'statistics-mv-laiv-finance',ags:'13076060'};
   const result=adapter.parse(snapshot('L223 Kassenstatistik Kernhaushalte 2025 2. Quartal\nGemeindeschlüssel;Einzahlungen EUR\n13076060;12,5\n'),mv);
-  assert.equal(result.observations[0]?.date,'2025-06-30');assert.equal(result.observations[0]?.dateRole,'cumulative_cash_period_end');assert.equal(result.observations[0]?.value,12.5);
+  assert.equal(result.observations[0]?.date,'2025-Q1:Q2');assert.equal(result.observations[0]?.datePrecision,'period');assert.equal(result.observations[0]?.dateRole,'cumulative_cash_period');assert.equal(result.observations[0]?.value,12.5);
  });
  it('keeps special and consolidated scopes explicit',()=>{
   for(const budget of ['Sondervermögen','konsolidierter Gesamthaushalt']){
@@ -43,6 +43,31 @@ describe('state finance native snapshots',()=>{
  });
  it('never distributes district totals or repairs truncated IDs',()=>{
   assert.deepEqual(adapter.parse(snapshot('Gemeindeschlüssel;Schulden Kernhaushalte 2025 EUR\n01053;1234\n1053100;5678\n'),scope).observations,[]);
+ });
+ it('assigns municipal geography only from the explicitly labelled key column',()=>{
+  const input=snapshot('Schulden Kernhaushalte 2025 EUR;Gemeindeschlüssel;Auszahlungen Kernhaushalte 2025 EUR\n12064472;12064227;100\n');
+  const strausberg={...scope,sourceId:'statistics-berlin-brandenburg-finance',ags:'12064472'},hoppegarten={...strausberg,ags:'12064227'};
+  assert.deepEqual(adapter.parse(input,strausberg).observations,[]);
+  const parsed=adapter.parse(input,hoppegarten);assert.deepEqual(parsed.observations.map(value=>value.value),[12064472,100]);assert.ok(parsed.observations.every(value=>value.geography.ags==='12064227'));
+  for(const header of ['Value;Value','AGS;Gemeindeschlüssel'])assert.deepEqual(adapter.parse(snapshot(`${header}\n01053100;01053100\n`),scope).observations,[]);
+ });
+ it('preserves full native dates and rejects conflicting or invalid dates',()=>{
+  for(const date of ['30.06.2025','2025-06-30']){
+   const result=adapter.parse(snapshot(`Gemeindeschlüssel;Schulden Kernhaushalte zum ${date} EUR\n01053100;12\n`),scope);
+   assert.equal(result.observations[0]?.date,'2025-06-30');assert.equal(result.observations[0]?.sourceReferenceDate,'2025-06-30');assert.equal(result.observations[0]?.datePrecision,'day');
+  }
+  for(const date of ['31.02.2025','30.06.2025 und 31.12.2025'])assert.equal(adapter.parse(snapshot(`Gemeindeschlüssel;Schulden Kernhaushalte ${date} EUR\n01053100;12\n`),scope).coverage.state,'held_quality');
+ });
+ it('preserves complete native million/thousand units, never bare EUR substrings',()=>{
+  for(const [label,unit] of [['Mio. EUR','1000000 EUR'],['Millionen EUR','1000000 EUR'],['Tausend EUR','1000 EUR']]){
+   const result=adapter.parse(snapshot(`Gemeindeschlüssel;Schulden Kernhaushalte 2025 ${label}\n01053100;1,5\n`),scope);
+   assert.equal(result.observations[0]?.unit,unit);assert.equal(result.observations[0]?.value,1.5);
+  }
+  assert.equal(adapter.parse(snapshot('Gemeindeschlüssel;Schulden Kernhaushalte 2025 Mrd. EUR\n01053100;1,5\n'),scope).coverage.state,'held_quality');
+ });
+ it('keeps standardized tax capacity distinct from tax receipts',()=>{
+  const result=adapter.parse(snapshot('Gemeindeschlüssel;Steuereinnahmekraft 2025 EUR;Steuereinnahmen 2025 EUR\n01053100;100;90\n'),scope);
+  assert.deepEqual(result.observations.map(value=>value.predicate),['statistical_tax_revenue_capacity','statistical_tax_receipts']);
  });
  it('holds changed schemas, missing or ambiguous dates/scopes, and suppression',()=>{
   for(const header of ['Unknown metric 2025 EUR','Schulden Kernhaushalte EUR','Schulden 2025 EUR','Schulden Kernhaushalte 2024 2025 EUR'])assert.equal(adapter.parse(snapshot(`Gemeindeschlüssel;${header}\n01053100;12\n`),scope).coverage.state,'held_quality');
@@ -92,4 +117,17 @@ it('scales only native percent-styled numeric tax-rate cells and preserves raw v
 it('holds native percent-formatted amount columns rather than publishing a wrong monetary unit',()=>{
  const input=workbookSnapshot('<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Gemeindeschlüssel</t></is></c><c r="B1" t="inlineStr"><is><t>Schulden Kernhaushalte 2025 EUR</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>01053100</t></is></c><c r="B2" s="1"><v>0.5</v></c></row></sheetData></worksheet>','<styleSheet><cellXfs><xf numFmtId="0"/><xf numFmtId="9"/></cellXfs></styleSheet>');
  const parsed=adapter.parse(input,scope);assert.deepEqual(parsed.observations,[]);assert.equal(parsed.coverage.state,'held_quality');
+});
+it('holds numeric date/time styles on money and tax-rate dimensions',()=>{
+ for(const header of ['Schulden Kernhaushalte 2025 EUR','Gewerbesteuer Hebesatz 2025 %']){
+  const input=workbookSnapshot(`<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Gemeindeschlüssel</t></is></c><c r="B1" t="inlineStr"><is><t>${header}</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>01053100</t></is></c><c r="B2" s="1"><v>46265</v></c></row></sheetData></worksheet>`,'<styleSheet><cellXfs><xf numFmtId="0"/><xf numFmtId="14"/></cellXfs></styleSheet>');
+  const parsed=adapter.parse(input,scope);assert.deepEqual(parsed.observations,[]);assert.equal(parsed.coverage.state,'held_quality');
+ }
+});
+it('respects inherited row and column percentage styles with native metadata receipts',()=>{
+ for(const [columns,rowAttributes] of [['<cols><col min="2" max="2" style="1"/></cols>',''],['',' s="1" customFormat="1"']]){
+  const input=workbookSnapshot(`<worksheet>${columns}<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Gemeindeschlüssel</t></is></c><c r="B1" t="inlineStr"><is><t>Gewerbesteuer Hebesatz 2025 %</t></is></c></row><row r="2"${rowAttributes}><c r="A2" t="inlineStr"><is><t>01053100</t></is></c><c r="B2"><v>0.6</v></c></row></sheetData></worksheet>`,'<styleSheet><cellXfs><xf numFmtId="0"/><xf numFmtId="9"/></cellXfs></styleSheet>');
+  const parsed=adapter.parse(input,scope);assert.equal(parsed.observations[0]?.value,60);assert.equal(parsed.observations[0]?.evidence.at(-1)?.rawValue,'0.6');
+  assert.ok(parsed.observations[0]?.supportingEvidence.some(item=>item.locator.path.includes(columns?'col':'row')));
+ }
 });

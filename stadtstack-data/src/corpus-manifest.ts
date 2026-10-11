@@ -193,11 +193,17 @@ export async function buildCorpusManifest(options:CorpusManifestOptions):Promise
  }
  for(const id of groups.keys())if(!tasks.has(id))throw Error('Prepared group missing primary task');
  const bodies=new Map<string,number>(),rows=new Map<string,CorpusManifestRecord>(),citations=new Map<string,CorpusManifestRecord['releasedRecords']>(),seenCitations=new Set<string>();
- for(const record of released.records)for(const source of record.sources){
-  publicUrl.parse(source.url);
-  const id=citationKey(record.municipalityId,source.id,source.url,source.sha256),list=citations.get(id)??[];
-  const citation={id:record.id,releaseId:release.id,sourceLocator:source.locator,evidenceHash:record.verification.evidenceHash};
-  if(!list.some(item=>JSON.stringify(item)===JSON.stringify(citation)))list.push(citation);citations.set(id,list);
+ for(const record of released.records){
+  const sources=record.kind==='text_model'?record.sources:[
+   {...record.source,locator:JSON.stringify(record.observation.evidence.map(({rawValue:_rawValue,...locator})=>locator))},
+   ...record.supportingSources.map(source=>({...source,locator:JSON.stringify(record.observation.supportingEvidence.filter(evidence=>evidence.role===source.role&&evidence.locator.sourceSha256===source.sha256).map(({locator:{rawValue:_rawValue,...locator}})=>locator))})),
+  ];
+  for(const source of sources){
+   publicUrl.parse(source.url);
+   const id=citationKey(record.municipalityId,source.id,source.url,source.sha256),list=citations.get(id)??[];
+   const citation={id:record.id,releaseId:release.id,sourceLocator:source.locator,evidenceHash:record.verification.evidenceHash};
+   if(!list.some(item=>JSON.stringify(item)===JSON.stringify(citation)))list.push(citation);citations.set(id,list);
+  }
  }
  for(const index of [...config.indexes].sort((a,b)=>compare(a.name,b.name))){
   const corpus=IndexSchema.parse(await pinnedJson(index));

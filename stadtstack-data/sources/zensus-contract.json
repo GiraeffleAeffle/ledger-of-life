@@ -1,7 +1,7 @@
 {
   "sourceId": "zensus2022-municipal-baseline",
   "familyRank": 3,
-  "contractVersion": "zensus-native-v2",
+  "contractVersion": "zensus-native-v3",
   "module": "src/adapters/zensus.ts",
   "exports": ["createZensusAdapter", "zensusAdapter", "discover", "parse", "ZENSUS_REFERENCE_DATE", "ZENSUS_PILOT_AGS", "ZENSUS_SH_TITLES"],
   "referenceDate": "2022-05-15",
@@ -31,6 +31,7 @@
     "denominators": "Original total cells travel as evidence. SH housing percentages use dwellings in buildings with residential space; heating preserves separate building and dwelling totals. MV sex-specific percentage denominators use male/female totals, not overall population.",
     "percentageRepresentation": "Shared nativePercentValue applies exact x100 display scaling only to numeric source cells with an active OOXML percentage number-format section. General numerics, inline strings, quoted/escaped percent signs and disclosure markers remain unscaled. No <=1 heuristic or header-based scale inference. Original raw lexeme and original number-format metadata are separately evidenced.",
     "evidenceRoles": "Primary evidence contains the original value cell only. ARS locators use municipality_join supporting evidence. Titles, denominator/header cells and actual OOXML number-format style paths use source_metadata supporting evidence. Style locators carry sheet:null,rowKey:null,cells:[] and the shared style mapping version.",
+    "numericFormatCompatibility": "Both SH numeric dimensions and BB/MV emission reject native date-typed cells, date-style serials and date-number-format metadata for all census numeric units; non-percent counts/years additionally reject percent-styled cells. Contradictions produce held_quality with zero observations, never relabeled counts/rates. Accepted count and rate cells preserve original raw value and all available number-format source_metadata locators.",
     "confidentiality": "Cell-Key perturbation and source disclosure/quality markers retained verbatim. Parenthesized values and dash/slash/dot/blank markers are null, never coerced to zero or reconstructed. Percentages are not recomputed and totals are not forcibly reconciled.",
     "populationTotals": "SH Insgesamt nachrichtlich and Insgesamta are separate source roles; source note reports incomplete processing in 163 municipalities nationally, without assuming any pilot affected.",
     "heating": "Solar-/Geothermie, Wärmepumpen remains a grouped category, not a heat-pump-only count. Fernwärme is census-reported energy context, not operator, adoption or present supply evidence.",
@@ -39,6 +40,7 @@
     "notEvidenceOf": ["current occupancy", "current vacancy", "heat-plan adoption", "municipal heat supply promises", "project completion", "measured project impact"]
   },
   "fixtures": {"path": "test/zensus-adapter.test.ts", "cases": ["SH native population", "SH native housing positive/empty", "SH native energy carriers", "confidentiality markers", "changed schema/reference date", "withdrawn-looking incomplete landing without tombstone", "blocked access", "unknown-rights hold before decoding", "byte-bound discovery pagination", "BB native matrix shape with explicitly synthetic bounded numbers", "MV native population subset and Deckblatt ARS", "cross-state and byte-tamper rejection", "numeric OOXML percent scaling with original styles and lexemes", "above-one styled percent vs small general numeric vs literal quoted percent"], "status": "written_not_run", "fixtureBasis": "In-memory original-format OOXML subsets. SH/MV selected published values transcribed from reader research; BB and number-format structural fixture values intentionally synthetic, not municipal facts."},
+  "numericFormatRegressionFixtures": ["SH percent-style dwelling count", "SH date-style count", "SH date-style rate", "SH native ISO date count", "BB percent/date-style building count", "MV percent/date-style population count", "MV date-style rate", "MV native ISO date rate", "accepted general count raw/style evidence"],
   "primaryReferences": [
     "https://www.statistik-nord.de/zahlen-fakten/zensus/ergebnisse-zensus-2022/ergebnisse-fuer-schleswig-holstein",
     "https://www.statistik-nord.de/fileadmin/Dokumente/Tabellen%2C_Tabellenb%C3%A4nde%2C_Brosch%C3%BCren/Zensus_2022/Schleswig-Holstein/Bev%C3%B6lkerung/Zensus2022_Bev%C3%B6lkerung_1.1_SH.xlsx",
@@ -52,5 +54,5 @@
     "https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Bevoelkerung/Zensus2022/Methoden/geheimhaltung.html",
     "https://ergebnisse.zensus2022.de/datenbank/online/statistic/1000A/table/1000A-0001"
   ],
-  "changelog": [{"date": "2026-10-11", "change": "Added offline native census distribution adapter, typed cell evidence, nine-pilot rights-held coverage and bounded original-format fixtures. Preserved native OOXML percentage display semantics without guessing numeric scale. No current/outcome interpretation or live collection."}]
+  "changelog": [{"date": "2026-10-11", "change": "Added offline native census distribution adapter, typed cell evidence, nine-pilot rights-held coverage and bounded original-format fixtures. Preserved native OOXML percentage display semantics without guessing numeric scale. v3 rejects native date/count/rate and percentage/count style contradictions in SH and BB/MV conversion, retaining raw/style metadata for admitted numeric cells. No current/outcome interpretation or live collection."}]
 }

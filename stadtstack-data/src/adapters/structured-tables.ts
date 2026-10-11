@@ -5,7 +5,7 @@ import {load} from 'cheerio';
 export interface NativeFormatField {path:string;rawValue:string|number|null}
 export interface NativeNumberFormat {styleIndex:number|null;numFmtId:string|null;formatCode:string|null;percentStyle:boolean;dateStyle:boolean;mappingVersion:string;evidence:NativeFormatField[]}
 export interface NativeCell {address:string;raw:string;type:'string'|'number'|'boolean'|'date';dateStyle:boolean;numberFormat?:NativeNumberFormat}
-export const NATIVE_NUMBER_FORMAT_VERSION='native-number-format-v1';
+export const NATIVE_NUMBER_FORMAT_VERSION='native-number-format-v2';
 export interface NativeTable {format:'csv'|'xlsx'|'xls';sheet:string|null;rows:NativeCell[][];date1904:boolean}
 export const TABLE_LIMITS=Object.freeze({inputBytes:16*1024*1024,totalBytes:64*1024*1024,memberBytes:16*1024*1024,members:512,ratio:200,rows:100000,columns:512,cells:2000000});
 export interface ZipLimits {inputBytes:number;totalBytes:number;memberBytes:number;members:number;ratio:number}
@@ -114,7 +114,23 @@ export function readXlsx(bytes:Uint8Array):NativeTable[] {
  const date1904=['1','true'].includes(nativeDate1904??'');const tables:NativeTable[]=[];let count=0;
  book('sheets > sheet').each((_,el)=>{const name=book(el).attr('name'),id=book(el).attr('r:id'),target=id?targets.get(id):null;if(!name||!target||tables.some(t=>t.sheet===name)||!/^xl\/worksheets\/[^/]+\.xml$/.test(target))throw Error('Invalid worksheet relationship');
   const $=xml(zip.get(target)),rows:NativeCell[][]=[];const seen=new Set<string>();
-  $('sheetData > row').each((_,row)=>{const rowNo=Number($(row).attr('r'));if(!Number.isInteger(rowNo)||rowNo<1||rowNo>TABLE_LIMITS.rows||rows[rowNo-1])throw Error('Worksheet row bounds/duplicates');const cells:NativeCell[]=[];
+  if($('worksheet > cols').length>1)throw Error('Multiple OOXML column-default containers');
+  const columnDefaults:Array<{styleIndex:number;evidence:NativeFormatField[]}|undefined>=[],columnConflicts=new Set<number>();
+  let declaredColumns=0;
+  $('worksheet > cols > col').each((ordinal,el)=>{
+   if(++declaredColumns>16384)throw Error('OOXML column-default record bound');
+   const e=$(el),minRaw=e.attr('min')??'',maxRaw=e.attr('max')??'',style=e.attr('style');
+   if(!/^\d+$/.test(minRaw)||!/^\d+$/.test(maxRaw)||Number(minRaw)<1||Number(minRaw)>Number(maxRaw)||Number(maxRaw)>16384)throw Error('Invalid OOXML column-default range');
+   if(style===undefined)return;if(!/^\d+$/.test(style)||styles[Number(style)]===undefined)throw Error('Invalid OOXML column-default style');
+   const path=`${target}/worksheet/cols/col[${ordinal+1}]`,entry={styleIndex:Number(style),evidence:[{path:path+'/@min',rawValue:minRaw},{path:path+'/@max',rawValue:maxRaw},{path:path+'/@style',rawValue:style}]};
+   // Resolve only the admitted reader width; broad native A:XFD declarations never allocate 16384 cells.
+   for(let column=Number(minRaw)-1;column<Math.min(Number(maxRaw),TABLE_LIMITS.columns);column++){const previous=columnDefaults[column];if(previous){if(previous.styleIndex!==entry.styleIndex)columnConflicts.add(column);}else columnDefaults[column]=entry;}
+  });
+  $('sheetData > row').each((_,row)=>{const rowElement=$(row),rowRaw=rowElement.attr('r')??'',rowNo=Number(rowRaw);if(!/^\d+$/.test(rowRaw)||!Number.isInteger(rowNo)||rowNo<1||rowNo>TABLE_LIMITS.rows||rows[rowNo-1])throw Error('Worksheet row bounds/duplicates');const cells:NativeCell[]=[];
+   const rowPath=`${target}/worksheet/sheetData/row[@r='${rowRaw}']`,rowStyle=rowElement.attr('s'),customFormat=rowElement.attr('customFormat');
+   if(rowStyle!==undefined&&(!/^\d+$/.test(rowStyle)||styles[Number(rowStyle)]===undefined))throw Error('Invalid OOXML row-default style');
+   if(customFormat!==undefined&&!['0','1','true','false'].includes(customFormat))throw Error('Invalid OOXML row customFormat');
+   const rowStyleActive=customFormat==='1'||customFormat==='true';if(rowStyleActive&&rowStyle===undefined)throw Error('Active OOXML row-default style lacks native index');
    $(row).children('c').each((_,el)=>{const e=$(el),address=e.attr('r')??'',match=/^([A-Z]+)([1-9]\d*)$/.exec(address);if(!match||+match[2]!==rowNo||seen.has(address)||++count>TABLE_LIMITS.cells)throw Error('Worksheet cell bounds/duplicates');seen.add(address);let col=0;for(const c of match[1])col=col*26+c.charCodeAt(0)-64;col--;if(col>=TABLE_LIMITS.columns)throw Error('Worksheet column limit');
     if(e.children('f').length)throw Error('Formula cells require separate checked interpretation');const type=e.attr('t')??'n',value=e.children('v').text();let raw=value,kind:NativeCell['type']='number';
     if(type==='s'){if(!/^\d+$/.test(value)||strings[+value]===undefined)throw Error('Shared string reference invalid');raw=strings[+value];kind='string';}
@@ -122,9 +138,18 @@ export function readXlsx(bytes:Uint8Array):NativeTable[] {
     else if(type==='str')kind='string';else if(type==='b'){if(!['0','1'].includes(raw))throw Error('Invalid boolean');kind='boolean';}
     else if(type==='d'){if(!/^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(raw))throw Error('Invalid ISO cell date');kind='date';}
     else if(type!=='n'||(raw&&!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?$/.test(raw)))throw Error('Unsupported/error cell type');
-    const style=e.attr('s');if(style!==undefined&&(!/^\d+$/.test(style)||styles[+style]===undefined))throw Error('Invalid cell style');
-    const base=styles[Number(style??0)]??IMPLICIT_OOXML_NUMBER_FORMAT;
-    const numberFormat:NativeNumberFormat={...base,evidence:[{path:`${target}/worksheet/sheetData/row[@r='${rowNo}']/c[@r='${address}']/@s`,rawValue:style??null},...base.evidence,...(base.dateStyle?[{path:'xl/workbook.xml/workbook/workbookPr/@date1904',rawValue:nativeDate1904??null}]:[])]};
+    const style=e.attr('s');if(style!==undefined&&(!/^\d+$/.test(style)||styles[Number(style)]===undefined))throw Error('Invalid cell style');
+    const columnDefault=columnDefaults[col],selection:NativeFormatField[]=[{path:`${rowPath}/c[@r='${address}']/@s`,rawValue:style??null}];let effectiveStyle:number;
+    if(style!==undefined)effectiveStyle=Number(style);
+    else {
+     if(rowStyle!==undefined||customFormat!==undefined)selection.push({path:rowPath+'/@s',rawValue:rowStyle??null},{path:rowPath+'/@customFormat',rawValue:customFormat??null});
+     if(rowStyleActive)effectiveStyle=Number(rowStyle);
+     else if(columnDefault){if(columnConflicts.has(col))throw Error('Conflicting overlapping OOXML column-default styles');effectiveStyle=columnDefault.styleIndex;selection.push(...columnDefault.evidence);}
+     else effectiveStyle=0;
+    }
+    const base=styles[effectiveStyle]??IMPLICIT_OOXML_NUMBER_FORMAT;
+    if(kind==='number'&&base.formatCode===null)throw Error('Unsupported effective OOXML number format '+base.numFmtId);
+    const numberFormat:NativeNumberFormat={...base,evidence:[...selection,...base.evidence,...(base.dateStyle?[{path:'xl/workbook.xml/workbook/workbookPr/@date1904',rawValue:nativeDate1904??null}]:[])]};
     cells[col]={...cell(address,raw,kind,numberFormat.dateStyle),numberFormat};
    });rows[rowNo-1]=cells;
   });tables.push({format:'xlsx',sheet:name,rows,date1904});

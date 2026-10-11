@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os';
 import {Pool} from 'pg';
 import {canonicalJson,digest} from '../src/district-adapter-contract.ts';
 import {DistrictCas} from '../src/district-cas.ts';
-import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,runDistrictJobs,deliverDistrictOwnerNotifications,artifactVerificationHandler,type AuthorizationInput,type ClaimedJob,type DistrictJobSpec,type JobHandler,type OwnerNotification,type NotificationAcknowledgement} from '../src/district-jobs.ts';
+import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,insertR1MetadataSnapshot,runDistrictJobs,deliverDistrictOwnerNotifications,artifactVerificationHandler,type AuthorizationInput,type ClaimedJob,type DistrictJobSpec,type JobHandler,type OwnerNotification,type NotificationAcknowledgement} from '../src/district-jobs.ts';
 import {CANONICALIZATION_VERSION,STEP_RECEIPT_VERSION,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
 
 // Real Postgres only. The connection must be local and its role must have CREATEDB.
@@ -46,13 +46,91 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
 
   await t.test('migration applies atomically, pins exact bytes and contains every plan entity',async()=>{
     await migrateDistrictJobs(pool);await migrateDistrictJobs(pool);
-    const expected=['source_snapshots','representations','policy_decisions','artifacts','jobs','job_dependencies','step_receipts','host_lanes','provider_budgets','case_identities','entity_identities','identity_assertions','release_candidates','release_files','active_release','preauthorizations','owner_notifications'];
+    const expected=['source_snapshots','representations','policy_decisions','artifacts','jobs','job_dependencies','step_receipts','host_lanes','provider_budgets','case_identities','entity_identities','identity_assertions','release_candidates','release_files','active_release','preauthorizations','owner_notifications','r1_metadata_snapshots'];
+    expected.push('assessment_bridge_leases','assessment_bridge_submission_intents','assessment_bridge_purge_acknowledgements','assessment_bridge_submissions','assessment_bridge_events');
     const tables=await pool.query<{table_name:string}>(`SELECT table_name FROM information_schema.tables WHERE table_schema='district_pipeline'`);
     for(const name of expected)assert.ok(tables.rows.some(row=>row.table_name===name),name);
     const original=await pool.query<{sha256:string}>('SELECT sha256 FROM district_pipeline.schema_migrations WHERE version=1');
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=1',[digest('wrong')]);
     await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=1',[original.rows[0].sha256]);
+    const migrations=await pool.query<{version:number;sha256:string}>('SELECT version,sha256 FROM district_pipeline.schema_migrations ORDER BY version');
+    assert.deepEqual(migrations.rows.map(row=>row.version),[1,2,3]);
+    await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=2',[digest('wrong-002')]);
+    await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
+    assert.equal((await pool.query<{sha256:string}>('SELECT sha256 FROM district_pipeline.schema_migrations WHERE version=1')).rows[0].sha256,original.rows[0].sha256);
+    await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=2',[migrations.rows[1].sha256]);
+    await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=3',[digest('wrong-003')]);
+    await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
+    const earlier=await pool.query<{version:number;sha256:string}>('SELECT version,sha256 FROM district_pipeline.schema_migrations WHERE version<=2 ORDER BY version');
+    assert.deepEqual(earlier.rows,migrations.rows.slice(0,2));
+    await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=3',[migrations.rows[2].sha256]);
+  });
+
+  await t.test('immutable artifact audits omit private quotes/errors while full payload remains purgeable CAS',async()=>{
+    const quote='SYNTHETIC_PRIVATE_QUOTE_NOT_PG',error='SYNTHETIC_PRIVATE_ERROR_FRAGMENT_NOT_PG';
+    const fullPayload={records:[{rawValue:quote}],errors:[error]},fullBytes=Buffer.from(canonicalJson(fullPayload)),contentSha256=digest(fullBytes);
+    // Projection/storage fixture; the operator owns the actual closed audit validator.
+    const payload={artifact:{sha256:contentSha256,byteLength:fullBytes.length,mimeType:'application/json',kind:'derived'},sourceBindings:[{sourceSha256:digest('synthetic-source'),policyReceiptSha256:digest('synthetic-policy'),httpObservationId:'synthetic-http-source-id',httpObservationSha256:digest('synthetic-http-source-bytes')}],counts:{records:1,errors:1}};
+    const sha256=await insertR1MetadataSnapshot(pool,{kind:'records',payload});
+    assert.equal(sha256,digest(canonicalJson(payload)));assert.notEqual(sha256,contentSha256);
+    assert.equal(await insertR1MetadataSnapshot(pool,{kind:'records',payload}),sha256);
+    const content=await cas.put(fullBytes,{kind:'derived',mimeType:'application/json'});
+    assert.equal(content.sha256,contentSha256);
+    const privateBytes=(await cas.read(contentSha256)).toString('utf8');assert.ok(privateBytes.includes(quote));assert.ok(privateBytes.includes(error));
+    const duplicate=await cas.put(Buffer.from(canonicalJson(payload)),{kind:'derived',mimeType:'application/json'});
+    assert.equal(duplicate.sha256,sha256);
+    const persisted=await pool.query<{kind:string;payload_json:unknown}>('SELECT kind,payload_json FROM district_pipeline.r1_metadata_snapshots WHERE sha256=$1',[sha256]);
+    assert.equal(persisted.rows[0].kind,'records');assert.deepEqual(persisted.rows[0].payload_json,payload);
+    const encoded=canonicalJson(persisted.rows[0].payload_json);assert.equal(digest(encoded),sha256);
+    assert.equal(encoded.includes(quote),false);assert.equal(encoded.includes(error),false);
+    await rm(join(cas.root,content.storageKey));await rm(join(cas.root,duplicate.storageKey));
+    await assert.rejects(cas.read(contentSha256));await assert.rejects(cas.read(sha256));
+    assert.deepEqual((await pool.query<{payload_json:unknown}>('SELECT payload_json FROM district_pipeline.r1_metadata_snapshots WHERE sha256=$1',[sha256])).rows[0].payload_json,payload);
+    await assert.rejects(pool.query(`UPDATE district_pipeline.r1_metadata_snapshots SET payload_json='{}' WHERE sha256=$1`,[sha256]),/Immutable/);
+    await assert.rejects(pool.query('DELETE FROM district_pipeline.r1_metadata_snapshots WHERE sha256=$1',[sha256]),/Immutable/);
+    await assert.rejects(insertR1MetadataSnapshot(pool,{kind:'coverage',payload}),/identity conflict/);
+    await assert.rejects(insertR1MetadataSnapshot(pool,{kind:'records',payload:'not-safe-metadata'}),/object or array/);
+    await assert.rejects(pool.query(`INSERT INTO district_pipeline.r1_metadata_snapshots(sha256,kind,payload_json) VALUES($1,'records','"scalar"')`,[digest('scalar')]),/check constraint/);
+    const array=[{registrySha256:digest('synthetic-registry')}],arraySha=await insertR1MetadataSnapshot(pool,{kind:'registry',payload:array});
+    assert.equal(arraySha,digest(canonicalJson(array)));
+  });
+
+  await t.test('dedicated HTTP observation metadata preserves its original content-free UTF8 audit bytes',async()=>{
+    // Storage-only fixture; the operator validates the canonical SourceObservation schema.
+    const rawUtf8='{"id":"synthetic-http-observation","status":200,"source":"Mölln"}\n';
+    const payload={observation:JSON.parse(rawUtf8),rawUtf8,observationId:'synthetic-http-observation',observationSha256:digest(Buffer.from(rawUtf8,'utf8'))};
+    const sha256=await insertR1MetadataSnapshot(pool,{kind:'http_observation',payload});
+    const duplicate=await cas.put(Buffer.from(canonicalJson(payload)),{kind:'derived',mimeType:'application/json'});
+    assert.equal(duplicate.sha256,sha256);await rm(join(cas.root,duplicate.storageKey));
+    const stored=await pool.query<{kind:string;payload_json:typeof payload}>('SELECT kind,payload_json FROM district_pipeline.r1_metadata_snapshots WHERE sha256=$1',[sha256]);
+    assert.equal(stored.rows[0].kind,'http_observation');assert.deepEqual(stored.rows[0].payload_json,payload);
+    assert.deepEqual(Buffer.from(stored.rows[0].payload_json.rawUtf8,'utf8'),Buffer.from(rawUtf8,'utf8'));
+    assert.equal(digest(Buffer.from(stored.rows[0].payload_json.rawUtf8,'utf8')),stored.rows[0].payload_json.observationSha256);
+    assert.equal(JSON.parse(stored.rows[0].payload_json.rawUtf8).id,stored.rows[0].payload_json.observationId);
+    await assert.rejects(cas.read(sha256));
+    await assert.rejects(pool.query(`INSERT INTO district_pipeline.r1_metadata_snapshots(sha256,kind,payload_json) VALUES($1,'http_trace','{}')`,[digest('unsupported-http-kind')]),/check constraint/);
+  });
+
+  await t.test('content-free replay artifact and proof audits survive removal of their managed CAS bytes',async()=>{
+    const artifact=await cas.put(Buffer.from('{"syntheticReplay":true}'),{kind:'derived',mimeType:'application/json'});
+    const inputBindingSha256=digest('synthetic-authenticated-replay-inputs');
+    const artifactPayload={sha256:artifact.sha256,byteLength:artifact.byteLength,mimeType:artifact.mimeType,kind:artifact.kind,storageKey:artifact.storageKey,inputBindingSha256};
+    const artifactAuditSha256=await insertR1MetadataSnapshot(pool,{kind:'replay_artifact',payload:artifactPayload});
+    const proofPayload={clocks:{sourceEvaluationAt:'2026-10-11T00:00:00.000Z',graphAsOf:'2026-10-01T00:00:00.000Z'},comparison:{expectedManifestSha256:digest('synthetic-release'),actualManifestSha256:digest('synthetic-release')},artifactPins:[{sha256:artifact.sha256,auditSha256:artifactAuditSha256}],inputBindingSha256};
+    const proofAuditSha256=await insertR1MetadataSnapshot(pool,{kind:'replay_proof',payload:proofPayload});
+    const artifactDuplicate=await cas.put(Buffer.from(canonicalJson(artifactPayload)),{kind:'derived',mimeType:'application/json'});
+    const proofDuplicate=await cas.put(Buffer.from(canonicalJson(proofPayload)),{kind:'derived',mimeType:'application/json'});
+    assert.equal(artifactDuplicate.sha256,artifactAuditSha256);assert.equal(proofDuplicate.sha256,proofAuditSha256);
+    for(const object of [artifact,artifactDuplicate,proofDuplicate])await rm(join(cas.root,object.storageKey));
+    const stored=await pool.query<{sha256:string;kind:string;payload_json:unknown}>(`SELECT sha256,kind,payload_json FROM district_pipeline.r1_metadata_snapshots WHERE sha256=ANY($1::text[])`,[[artifactAuditSha256,proofAuditSha256]]);
+    assert.equal(stored.rowCount,2);
+    for(const row of stored.rows)assert.equal(digest(canonicalJson(row.payload_json)),row.sha256);
+    assert.deepEqual(stored.rows.find(row=>row.kind==='replay_artifact')?.payload_json,artifactPayload);
+    assert.deepEqual(stored.rows.find(row=>row.kind==='replay_proof')?.payload_json,proofPayload);
+    assert.equal(Object.hasOwn(artifactPayload,'body'),false);assert.equal(Object.hasOwn(proofPayload,'body'),false);
+    await assert.rejects(cas.read(artifact.sha256));
+    await assert.rejects(cas.read(artifactAuditSha256));await assert.rejects(cas.read(proofAuditSha256));
   });
 
   await t.test('committed predecessor receipts release dependencies; CAS outputs, identities and receipt hashes stay durable',async()=>{
@@ -90,6 +168,56 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     const row=await pool.query<{state:string}>('SELECT state FROM district_pipeline.jobs WHERE job_key=$1',[key]);assert.equal(row.rows[0].state,'leased');
     const receipts=await pool.query('SELECT id FROM district_pipeline.step_receipts WHERE job_id=$1',[claim.job.id]);assert.equal(receipts.rowCount,0);
     await store.hold(claim.job,'execution_exception',receiptFor(claim.job));await store.endRun(bounds.runId,'held','execution_exception');
+  });
+
+  await t.test('late holds, crash recovery and reservations lock authority before dependent job rows', {timeout:30000},async()=>{
+    for(const operation of ['hold','recovery','reservation'] as const){
+      const key=await store.enqueue(jobSpec('authority-order-'+operation)),authorizationId=await authorize([key]);
+      const bounds=await store.beginRun(authorizationId,1,60000),claim=await store.claim(bounds,30000);
+      assert.equal(claim.kind,'job');if(claim.kind!=='job')return;
+      const workPool=new Pool({connectionString:isolated.href,max:1,connectionTimeoutMillis:5000,statement_timeout:15000}),workStore=new DistrictJobStore(workPool);
+      const observer=await workPool.connect(),pid=(await observer.query<{pid:number}>('SELECT pg_backend_pid() AS pid')).rows[0].pid;observer.release();
+      const authority=await pool.connect(),serviceLock=operation==='recovery'?await pool.connect():null;
+      let guardOpen=false,settled=false;
+      let completion:Promise<{ok:boolean;value?:unknown;error?:unknown}>|undefined;
+      try{
+        await authority.query('BEGIN');guardOpen=true;
+        await authority.query('SELECT id FROM district_pipeline.executor_runs WHERE id=$1 FOR UPDATE',[bounds.runId]);
+        await authority.query('SELECT id FROM district_pipeline.preauthorizations WHERE id=$1 FOR UPDATE',[authorizationId]);
+        let action:Promise<unknown>;
+        if(operation==='recovery'){
+          await serviceLock!.query('SELECT pg_advisory_lock(18441,2)');
+          action=workStore.holdAbandonedRuns(serviceLock!);
+        }else if(operation==='reservation'){
+          const budgetId=randomUUID();
+          await pool.query(`INSERT INTO district_pipeline.provider_budgets(id,provider,currency,owner_approval_sha256,cap_micro_usd,expires_at) VALUES($1,'openai','USD',$2,1000,clock_timestamp()+interval '1 hour')`,[budgetId,digest('synthetic-lock-order-budget')]);
+          action=workStore.reserveProviderBudget(budgetId,claim.job.id,claim.job.fencingToken,1,digest('synthetic-lock-order-intent'));
+        }else action=workStore.hold(claim.job,'owner_stopped',receiptFor(claim.job));
+        completion=action.then(value=>{settled=true;return {ok:true,value};},error=>{settled=true;return {ok:false,error};});
+        // Real Postgres row-lock observation, not a guessed sleep or mocked clock.
+        const deadline=Date.now()+10000;
+        for(;;){
+          const activity=await pool.query<{wait_event_type:string|null}>('SELECT wait_event_type FROM pg_stat_activity WHERE pid=$1',[pid]);
+          if(activity.rows[0]?.wait_event_type==='Lock')break;
+          assert.equal(settled,false,'Operation bypassed the locked authority row');
+          assert.ok(Date.now()<deadline,'Operation did not reach the authority lock');
+        }
+        // A job-first implementation would hold this row while awaiting the run,
+        // causing NOWAIT to fail and exposing the broker/runner lock inversion.
+        await authority.query('SELECT id FROM district_pipeline.jobs WHERE id=$1 FOR UPDATE NOWAIT',[claim.job.id]);
+        await authority.query('COMMIT');guardOpen=false;
+        const outcome=await completion;assert.equal(outcome.ok,true);
+        if(operation==='reservation'){
+          assert.equal(typeof outcome.value,'string');await store.settleProviderReservation(outcome.value as string,0);
+          await store.hold(claim.job,'owner_stopped',receiptFor(claim.job));
+        }
+      }finally{
+        if(guardOpen)await authority.query('ROLLBACK');authority.release();
+        await completion;
+        if(serviceLock){await serviceLock.query('SELECT pg_advisory_unlock(18441,2)');serviceLock.release();}
+        await workPool.end();await store.endRun(bounds.runId,'held','owner_stopped');
+      }
+    }
   });
 
   await t.test('expired/crashed leases become explicit holds and stale fencing tokens cannot commit accepted effects',async()=>{
@@ -207,6 +335,33 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     await store.hold(claim.job,'owner_stopped',receiptFor(claim.job));await store.endRun(bounds.runId,'held','owner_stopped');
     const paid=await store.enqueue(jobSpec('paid-prohibited'),{budgetId:budget,reservedMicroUsd:1});let paidCalls=0;
     const result=await run(await authorize([paid]),1,{verify_artifacts:async context=>{paidCalls++;return artifactVerificationHandler(context);}});assert.equal(result.reasonCode,'paid_not_authorized');assert.equal(paidCalls,0);
+  });
+
+  await t.test('subscription API-equivalent estimates remain estimates while paid routes and charges are held',async()=>{
+    // Synthetic receipt fixtures only: no provider process, endpoint or billing operation runs.
+    const receipt:NonNullable<StepReceipt['provider']>={provider:'openai-subscription',endpoint:'subscription-cli',requestedModel:'synthetic-pinned-model',returnedModel:null,requestId:null,responseId:null,requestSha256:digest('synthetic-request'),responseSha256:null,batchId:null,customId:null,submissionIntentSha256:digest('synthetic-intent'),tokens:{standardInput:null,cacheWriteInput:null,cacheReadInput:null,output:null},actualBilledUsd:null,estimatedApiUsd:1.25,currency:'USD',rateCardDate:null,rateCardSha256:null,reservedMicroUsd:0,subscriptionUsage:{availability:'unavailable',units:null}};
+    for(const provider of ['openai-subscription','anthropic-subscription']){
+      const key=await store.enqueue(jobSpec('subscription-estimate-'+provider,'provider_fixture'));
+      const result=await run(await authorize([key]),1,{provider_fixture:async()=>({outcome:'succeeded',reasonCode:'completed',provider:{...receipt,provider}})});
+      assert.equal(result.state,'completed');assert.equal(result.jobsStarted,1);
+      const persisted=await pool.query<{receipt:StepReceipt}>('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId]);
+      assert.equal(persisted.rows[0].receipt.provider?.provider,provider);
+      assert.equal(persisted.rows[0].receipt.provider?.estimatedApiUsd,1.25);
+      assert.equal(persisted.rows[0].receipt.provider?.actualBilledUsd,null);
+      assert.equal(persisted.rows[0].receipt.provider?.subscriptionUsage.units,null);
+    }
+    for(const provider of [
+      {...receipt,provider:'openai',endpoint:'/v1/responses',actualBilledUsd:null},
+      {...receipt,provider:'anthropic-api',endpoint:'/v1/messages',estimatedApiUsd:0,actualBilledUsd:0},
+      {...receipt,actualBilledUsd:0.01},
+      {...receipt,reservedMicroUsd:1},
+    ]){
+      const key=await store.enqueue(jobSpec('paid-receipt-'+randomUUID(),'provider_fixture'));
+      const result=await run(await authorize([key]),1,{provider_fixture:async()=>({outcome:'succeeded',reasonCode:'completed',provider})});
+      assert.equal(result.state,'held');assert.equal(result.reasonCode,'paid_not_authorized');
+      const persisted=await pool.query<{outcome:string}>(`SELECT outcome FROM district_pipeline.step_receipts WHERE run_id=$1`,[result.runId]);
+      assert.equal(persisted.rows[0].outcome,'held_execution');
+    }
   });
 
   await t.test('bounded unattended mode proves approved channel readiness before work and stores real acknowledgement identities',async()=>{

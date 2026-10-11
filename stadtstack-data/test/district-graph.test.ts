@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DistrictKnowledgeRecordSchema, KNOWLEDGE_SCHEMA_VERSION, REQUIRED_DETERMINISTIC_CHECKS, knowledgeEvidenceHash, sha256 } from '../src/district-schema.ts';
-import { EntityMentionSchema, ENTITY_TYPE_PRECEDENCE, graphGroundingChecks, normalizeGraphClaims, normalizeRelationActions, relationPathEligible, relationTypeSchema, type GraphClaims } from '../src/district-graph-claims.ts';
+import { EntityMentionSchema, ENTITY_TYPE_PRECEDENCE, councilBodyIdentity, graphGroundingChecks, normalizeGraphClaims, normalizeRelationActions, relationPathEligible, relationTypeSchema, type GraphClaims } from '../src/district-graph-claims.ts';
 import { buildKnowledgeGraph, validateKnowledgeGraph } from '../src/district-graph.ts';
 import { GraphIndex, graphNeighborsSchema } from '../src/district-graph-query.ts';
 import { PROVIDER_CONFIGS } from '../src/district-model-contract.ts';
 import { readCursor, writeCursor, cursorBinding } from '../src/mcp-pagination.ts';
+import { observation, semanticHash, type AdapterScope, type StructuredObservation } from '../src/district-adapter-contract.ts';
+import { nativeStructuredIdentityGraph } from '../src/district-entity-resolution.ts';
+import { StructuredKnowledgeRecordSchema, STRUCTURED_VERIFICATION_VERSION } from '../src/district-structured-record.ts';
 
 const now = '2026-10-10T12:00:00.000Z';
 // Synthetic test source/gates only; never actual municipality or model evidence.
@@ -25,22 +28,28 @@ function fixture(claims: GraphClaims, municipalityId = 'synthetic-town', id = 's
   const checks = [...REQUIRED_DETERMINISTIC_CHECKS.map(id => ({ id, passed: true, reason: 'Synthetic non-graph fixture gate; no model executed' })), ...graphGroundingChecks(claims, text)];
   assert.ok(checks.every(check => check.passed), JSON.stringify(checks.filter(check => !check.passed)));
   const record = {
+    kind: 'text_model' as const,
     title: 'Synthetic town', titleQuote: 'Synthetic town', summary: 'Synthetic town', summaryQuote: 'Synthetic town', municipalityQuote: 'Synthetic town',
     caseKeyType: 'source_document', caseKey: `source_document:${sourceSha256}`, caseQuote: null, caseType: 'unknown',
     documentDate: null, documentDateQuote: null, documentDateReason: 'Synthetic source has no date', topics: [], stage: 'unknown', stageDate: null, stageDateQuote: null, stageDateReason: 'No event date', originalStatus: '', stageQuote: '', stages: [], locations: [],
-    ...normalizeGraphClaims(claims, { municipalityId, sourceSha256 }), id, municipalityId, ags: '12064001', districtId: 'synthetic-district',
+    ...normalizeGraphClaims(claims, { municipalityId, sourceSha256, ags: '12064001' }), id, municipalityId, ags: '12064001', districtId: 'synthetic-district',
     sources: [{ id: 'synthetic-source', url: 'https://example.org/graph-source', sha256: sourceSha256, retrievedAt: now, locator: `chars:0-${text.length}`, mimeType: 'text/plain', sourceType: 'website', policy: { robots: { state: 'allowed', url: 'https://example.org/robots.txt' }, tdm: { state: 'not_declared', evidence: [] }, access: 'public', legalClassification: 'not_assessed', publication: 'facts_with_attribution_only' } }],
     extraction: { extractorVersion: 'synthetic', extractorSha256: sha256('synthetic extractor'), model: config.model, provider: 'openai-subscription', tool: config.tool, toolVersion: 'synthetic', modelIdentitySha256: sha256('synthetic model identity'), modelIdentityBasis: config.modelIdentityBasis, returnedModel: null, promptVersion: 'synthetic', promptSha256: sha256('synthetic prompt'), judgePromptVersion: 'synthetic', judgePromptSha256: sha256('synthetic judge prompt'), inputSha256: sourceSha256, textSha256: sourceSha256, responseSha256: sha256('synthetic response'), ocrUsed: false, textMethod: 'text', cacheKey: sha256('synthetic cache'), extractedAt: now, chunk: { index: 0, count: 1, start: 0, end: text.length } },
-    verification: { status: 'auto-verified', deterministic: { passed: true, checks }, faithfulness: { score: 0.9, threshold: 0.8, model: config.model, provider: 'openai-subscription', tool: config.tool, toolVersion: 'synthetic', modelIdentitySha256: sha256('synthetic model identity'), returnedModel: null, reason: 'Synthetic fixture only; no actual model judgment', evaluatedAt: now, responseSha256: sha256('synthetic judge response'), sameModel: true, limitation: 'Same-model judgment is not independent verification.' }, evidenceHash: '' },
+    verification: { kind: 'text_model' as const, status: 'auto-verified', deterministic: { passed: true, checks }, faithfulness: { score: 0.9, threshold: 0.8, model: config.model, provider: 'openai-subscription', tool: config.tool, toolVersion: 'synthetic', modelIdentitySha256: sha256('synthetic model identity'), returnedModel: null, reason: 'Synthetic fixture only; no actual model judgment', evaluatedAt: now, responseSha256: sha256('synthetic judge response'), sameModel: true, limitation: 'Same-model judgment is not independent verification.' }, evidenceHash: '' },
   };
   if (actionResult.normalization) Object.assign(record.extraction, { relationNormalization: { ...actionResult.normalization, sourceSha256, textSha256: sourceSha256, responseSha256: record.extraction.responseSha256 } });
   record.verification.evidenceHash = knowledgeEvidenceHash(record);
   return DistrictKnowledgeRecordSchema.parse(record);
 }
 function release(claims: GraphClaims, budgets: ConstructorParameters<typeof GraphIndex>[3] = {}) {
-  const record = fixture(claims);
-  const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records: [record] });
-  const graph = buildKnowledgeGraph(bytes);
+  const datedClaims = { ...claims, relations: claims.relations.map(edge => {
+    if (edge.time || !['asserted', 'decided', 'implemented'].includes(edge.modality)) return edge;
+    const text = ['implements', 'decides', 'approves', 'amends'].includes(edge.type) ? 'am 2026-10-01' : '2020-01-01 bis 2030-12-31';
+    return { ...edge, quote: `${edge.quote} ${text}`, time: { text, quote: text } };
+  }) };
+  const record = fixture(datedClaims);
+  const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, identityAssertions: [], identityAdmissions: [], records: [record] });
+  const graph = buildKnowledgeGraph(bytes, { asOf: now.slice(0, 10) });
   return { record, bytes, graph, index: new GraphIndex('synthetic-release', graph, bytes, budgets) };
 }
 
@@ -50,7 +59,7 @@ test('conservative identity preserves homonyms, legal forms, source-scoped proje
   const b = normalizeGraphClaims(input, { municipalityId: 'two', sourceSha256: sha256('a') });
   for (let i = 0; i < a.entities.length; i++) assert.notEqual(a.entities[i].entityId, b.entities[i].entityId);
   const revised = normalizeGraphClaims(input, { municipalityId: 'one', sourceSha256: sha256('b') });
-  assert.equal(a.entities[0].entityId, revised.entities[0].entityId);
+  assert.notEqual(a.entities[0].entityId, revised.entities[0].entityId);
   assert.notEqual(a.entities[2].entityId, revised.entities[2].entityId);
   assert.notEqual(a.entities[3].entityId, revised.entities[3].entityId);
   const legal = normalizeGraphClaims({ entities: [mention('gmbh', 'Test GmbH', 'company'), mention('ag', 'Test AG', 'company')], relations: [] }, { municipalityId: 'one', sourceSha256: sha256('a') });
@@ -69,8 +78,8 @@ test('identifier-based cross-town programme and operator identity requires the e
   for (const entity of entities) entity.identifiers = [{ value: entity.mentionId, namespace: 'Register', issuer: 'Test Issuer', quote: `${entity.name} Register ${entity.mentionId} Test Issuer` }];
   const claims = { entities, relations: [] };
   const first = fixture(claims, 'one', 'record-one'), second = fixture(claims, 'two', 'record-two');
-  const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records: [first, second] });
-  const graph = buildKnowledgeGraph(bytes);
+  const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, identityAssertions: [], identityAdmissions: [], records: [first, second] });
+  const graph = buildKnowledgeGraph(bytes, { asOf: now.slice(0, 10) });
   assert.equal(graph.entities.length, 2);
   assert.ok(graph.entities.every(entity => entity.mentions.length === 2 && entity.identityBasis.kind === 'explicit_identifier'));
   const otherIssuer = normalizeGraphClaims({ entities: entities.map(entity => ({ ...entity, identifiers: entity.identifiers.map(id => ({ ...id, issuer: 'Other Issuer' })) })), relations: [] }, { municipalityId: 'two', sourceSha256: sha256('b') });
@@ -85,26 +94,20 @@ test('name-only identity never crosses municipality boundaries, including former
   const later = normalizeGraphClaims(input, { municipalityId: 'one', sourceSha256: sha256('later') });
   first.entities.forEach((entity, index) => {
     assert.notEqual(entity.entityId, elsewhere.entities[index].entityId);
-    assert.equal(entity.entityId, later.entities[index].entityId);
-    assert.equal(entity.identityBasis.kind, 'municipality_scoped_name');
+    assert.notEqual(entity.entityId, later.entities[index].entityId);
+    assert.equal(entity.identityBasis.kind, 'source_scoped_mention');
     assert.match(entity.identityBasis.ambiguity, /not independent/);
   });
 });
 
-test('identical normalized names share identity across every type without changing the original mentions', () => {
-  for (const name of ['Stadtwerke Strausberg', 'Schulcampus Lindenallee', 'Hauptsatzung Beispielstadt']) {
-    const entities = ENTITY_TYPE_PRECEDENCE.map((type, index) => mention(`alias-${index}`, index % 2 ? `  ${name.toLocaleUpperCase('de').replaceAll(' ', '   ')}  ` : name, type));
-    const first = normalizeGraphClaims({ entities, relations: [] }, { municipalityId: 'one', sourceSha256: sha256('first') });
-    const later = normalizeGraphClaims({ entities: [...entities].reverse(), relations: [] }, { municipalityId: 'one', sourceSha256: sha256('second') });
-    assert.equal(new Set(first.entities.map(entity => entity.entityId)).size, 1);
-    assert.equal(first.entities[0].entityId, later.entities[0].entityId);
-    assert.deepEqual(first.entities.map(({ entityId, identityBasis, ...original }) => original), entities);
-    const record = fixture({ entities: [...ENTITY_TYPE_PRECEDENCE].reverse().map((type, index) => mention(`alias-${index}`, name, type)), relations: [] });
-    const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records: [record] });
-    const node = buildKnowledgeGraph(bytes).entities[0];
-    assert.equal(node.type, 'municipality');
-    assert.equal(node.mentions.length, ENTITY_TYPE_PRECEDENCE.length);
-  }
+test('names and heterogeneous mention types do not authorize a source identity merge', () => {
+  const entities = ENTITY_TYPE_PRECEDENCE.map((type, index) => mention(`alias-${index}`, 'Synthetic Shared Label', type));
+  const normalized = normalizeGraphClaims({ entities, relations: [] }, { municipalityId: 'one', sourceSha256: sha256('first') });
+  assert.equal(new Set(normalized.entities.map(entity => entity.entityId)).size, entities.length);
+  assert.deepEqual(normalized.entities.map(({ entityId, identityBasis, ...original }) => original), entities);
+  const record = fixture({ entities, relations: [] });
+  const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, identityAssertions: [], identityAdmissions: [], records: [record] });
+  assert.equal(buildKnowledgeGraph(bytes, { asOf: now.slice(0, 10) }).entities.length, entities.length);
 });
 
 test('cross-type grouping does not erase legal forms, amendments or conflicting complete identifier sets', () => {
@@ -124,66 +127,33 @@ test('cross-type grouping does not erase legal forms, amendments or conflicting 
   ], relations: [] };
   const normalized = normalizeGraphClaims(claims, { municipalityId: 'one', sourceSha256: sha256('first') });
   assert.equal(normalized.entities[0].entityId, normalized.entities[1].entityId);
-  assert.equal(new Set(normalized.entities.map(entity => entity.entityId)).size, claims.entities.length - 1);
+  assert.equal(new Set(normalized.entities.map(entity => entity.entityId)).size, claims.entities.length - 2);
   const reordered = normalizeGraphClaims({ entities: [{ ...claims.entities[5], identifiers: [...claims.entities[5].identifiers].reverse() }], relations: [] }, { municipalityId: 'one', sourceSha256: sha256('second') });
   assert.equal(normalized.entities[5].entityId, reordered.entities[0].entityId);
 });
 
-test('company and organization aliases retain every source and record while neighbors and paths use one entity', () => {
-  const council = mention('council', 'Rat Beispielstadt', 'authority');
-  const organization = mention('organization', 'Stadtwerke Strausberg', 'organization');
-  const company = mention('company', 'STADTWERKE  STRAUSBERG', 'company');
-  const facility = mention('facility', 'Hallenbad Lindenallee', 'facility');
+test('strong company/organization aliases retain every source but unknown identity validity is not a current path', () => {
+  const organization = mention('organization', 'Synthetic Utility GmbH', 'organization');
+  const company = mention('company', 'Renamed Utility GmbH', 'company');
+  for (const entity of [organization, company]) entity.identifiers = [{ namespace: 'HRB', issuer: 'Synthetic Court', value: '000123', quote: `${entity.name} HRB 000123 Synthetic Court` }];
+  const council = mention('council', 'Synthetic Council', 'authority'), facility = mention('facility', 'Synthetic Facility', 'facility');
   const first = fixture({ entities: [council, organization], relations: [relation(council, organization)] }, 'one', 'record-a');
-  const second = fixture({ entities: [company, facility], relations: [relation(company, facility)] }, 'one', 'record-b');
+  const second = fixture({ entities: [company, facility], relations: [relation(company, facility)] }, 'two', 'record-b');
   second.sources.push({ ...second.sources[0], id: 'synthetic-source-alias', url: 'https://example.org/graph-source-alias' });
   second.verification.evidenceHash = knowledgeEvidenceHash(second);
-  const records = [first, second];
-  const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records });
-  const graph = buildKnowledgeGraph(bytes);
-  const index = new GraphIndex('synthetic-release', graph, bytes);
-  const mergedId = first.entities[1].entityId;
-  assert.equal(mergedId, second.entities[0].entityId);
-  assert.equal(graph.entities.length, 3);
-  const merged = graph.entities.find(entity => entity.id === mergedId)!;
-  assert.equal(merged.type, 'company');
-  assert.deepEqual(merged.names, [company.name, organization.name].sort());
-  assert.deepEqual(merged.mentions.map(({ evidence, ...original }) => original), [organization, company]);
-  assert.deepEqual(merged.mentions.map(mention => mention.evidence.recordId), records.map(record => record.id));
-  assert.deepEqual(merged.mentions.map(mention => mention.evidence.sources), records.map(record => record.sources));
-  assert.deepEqual(merged.mentions.map(mention => mention.evidence.evidenceHash), records.map(record => record.verification.evidenceHash));
-  for (const type of ['company', 'organization'] as const) {
-    const result = index.entitySearch({ query: 'Stadtwerke', type });
-    assert.equal(result.total, 1);
-    assert.equal(result.items[0].id, mergedId);
-    assert.equal(result.items[0].type, 'company');
-  }
-  const neighbors = index.neighbors({ id: mergedId, limit: 1 });
-  assert.equal(neighbors.total, 2);
-  assert.ok(neighbors.nextCursor);
-  const next = index.neighbors({ id: mergedId, limit: 1, cursor: neighbors.nextCursor });
-  assert.notEqual(neighbors.items[0].edge.id, next.items[0].edge.id);
-  for (const { edge, from, to } of [...neighbors.items, ...next.items]) {
-    assert.equal(edge.fromId, from?.id);
-    assert.equal(edge.toId, to?.id);
-    assert.deepEqual(edge.evidence.sources, records.find(record => record.id === edge.evidence.recordId)!.sources);
-  }
-  const path = index.path({ fromId: first.entities[0].entityId, toId: second.entities[1].entityId, maxHops: 2 });
-  assert.equal(path.status, 'found');
-  assert.equal(path.shortestHops, 2);
-  assert.equal(path.items[0].entities[1].id, mergedId);
-  assert.deepEqual(path.items[0].edges.map(edge => edge.evidence.recordId), ['record-a', 'record-b']);
-  const reversedBytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records: [...records].reverse() });
-  const reversedGraph = buildKnowledgeGraph(reversedBytes);
-  assert.deepEqual(reversedGraph.entities, graph.entities);
-  assert.deepEqual(reversedGraph.edges, graph.edges);
-  assert.throws(() => new GraphIndex('synthetic-release', reversedGraph, reversedBytes).neighbors({ id: mergedId, limit: 1, cursor: neighbors.nextCursor }), /mismatch/);
-  const omittedAlias = structuredClone(graph);
-  omittedAlias.entities.find(entity => entity.id === mergedId)!.mentions.pop();
-  assert.throws(() => validateKnowledgeGraph(omittedAlias, bytes), /does not match/);
-  const omittedSource = structuredClone(graph);
-  omittedSource.entities.find(entity => entity.id === mergedId)!.mentions[1].evidence.sources.pop();
-  assert.throws(() => validateKnowledgeGraph(omittedSource, bytes), /does not match/);
+  const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, identityAssertions: [], identityAdmissions: [], records: [first, second] });
+  const graph = buildKnowledgeGraph(bytes, { asOf: now.slice(0, 10) }), index = new GraphIndex('synthetic-release', graph, bytes);
+  const merged = graph.entities.find(entity => entity.names.includes(organization.name))!;
+  assert.equal(merged.mentions.length, 2); assert.equal(merged.type, 'company');
+  assert.equal(merged.identityAssertionIds.length, 1);
+  assert.ok(merged.mentions.some(mention => mention.evidence.some(evidence => evidence.kind === 'text_model' && evidence.sources.length === 2)));
+  const options = { fromId: first.entities[0].entityId, toId: second.entities[1].entityId, maxHops: 2 };
+  assert.equal(index.path(options).status, 'not_found_within_hops');
+  const path = index.path({ ...options, mode: 'historical' });
+  assert.equal(path.status, 'found'); assert.equal(path.items[0].entities[1].id, merged.id);
+  assert.equal(path.qualification, 'attributed_historical_claims_not_confirmed_current');
+  const omitted = structuredClone(graph); omitted.entities.find(entity => entity.id === merged.id)!.mentions.pop();
+  assert.throws(() => validateKnowledgeGraph(omitted, bytes), /does not match/);
 });
 
 test('multiword functional municipal bodies stay municipality-scoped rather than globally grouped', () => {
@@ -197,10 +167,10 @@ test('multiword functional municipal bodies stay municipality-scoped rather than
   const elsewhere = normalizeGraphClaims(input, { municipalityId: 'two', sourceSha256: sha256('first') });
   const later = normalizeGraphClaims(input, { municipalityId: 'one', sourceSha256: sha256('later') });
   first.entities.forEach((entity, index) => {
-    assert.equal(entity.identityBasis.kind, 'municipality_scoped_name');
-    assert.equal(entity.identityBasis.scope, 'one');
+    assert.equal(entity.identityBasis.kind, 'source_scoped_mention');
+    assert.equal(entity.identityBasis.scope, `one:${sha256('first')}`);
     assert.notEqual(entity.entityId, elsewhere.entities[index].entityId);
-    assert.equal(entity.entityId, later.entities[index].entityId);
+    assert.notEqual(entity.entityId, later.entities[index].entityId);
   });
 });
 
@@ -211,7 +181,7 @@ test('ordinal amendment labels are source-scoped even within the same municipali
   const repeated = normalizeGraphClaims(input, { municipalityId: 'one', sourceSha256: sha256('first') });
   const later = normalizeGraphClaims(input, { municipalityId: 'one', sourceSha256: sha256('later') });
   first.entities.forEach((entity, index) => {
-    assert.equal(entity.identityBasis.kind, 'source_scoped_name');
+    assert.equal(entity.identityBasis.kind, 'source_scoped_mention');
     assert.equal(entity.identityBasis.scope, `one:${sha256('first')}`);
     assert.equal(entity.entityId, repeated.entities[index].entityId);
     assert.notEqual(entity.entityId, later.entities[index].entityId);
@@ -224,8 +194,8 @@ test('anonymous object labels remain source-scoped without depending on their me
     const entities = ENTITY_TYPE_PRECEDENCE.map((type, index) => mention(`alias-${index}`, name, type));
     const first = normalizeGraphClaims({ entities, relations: [] }, { municipalityId: 'one', sourceSha256: sha256('first') });
     const later = normalizeGraphClaims({ entities, relations: [] }, { municipalityId: 'one', sourceSha256: sha256('second') });
-    assert.equal(new Set(first.entities.map(entity => entity.entityId)).size, 1);
-    assert.ok(first.entities.every(entity => entity.identityBasis.kind === 'source_scoped_name'));
+    assert.equal(new Set(first.entities.map(entity => entity.entityId)).size, entities.length);
+    assert.ok(first.entities.every(entity => entity.identityBasis.kind === 'source_scoped_mention'));
     assert.notEqual(first.entities[0].entityId, later.entities[0].entityId);
   }
 });
@@ -251,28 +221,18 @@ test('identity cutover migrates record IDs and endpoints together without relabe
   assert.deepEqual(migrated.extraction, legacy.extraction);
   assert.deepEqual(migrated.verification.faithfulness, legacy.verification.faithfulness);
   assert.deepEqual(migrated.verification.deterministic, legacy.verification.deterministic);
-  const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records: [migrated] });
-  const index = new GraphIndex('migrated-release', buildKnowledgeGraph(bytes), bytes);
+  const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, identityAssertions: [], identityAdmissions: [], records: [migrated] });
+  const index = new GraphIndex('migrated-release', buildKnowledgeGraph(bytes, { asOf: now.slice(0, 10) }), bytes);
   assert.throws(() => index.neighbors({ id: legacy.entities[0].entityId }), /Unknown graph entity/);
   assert.equal(index.neighbors({ id: migrated.entities[0].entityId }).items[0].to?.id, migrated.entities[1].entityId);
 });
 
-test('coalesced endpoint aliases retain self-loop evidence without multiplying neighbors or paths', () => {
-  const company = mention('company', 'Stadtwerke Strausberg', 'company');
-  const organization = mention('organization', 'STADTWERKE STRAUSBERG', 'organization');
+test('same-name company and organization mentions stay separate without a strong identifier', () => {
+  const company = mention('company', 'Synthetic Utility', 'company'), organization = mention('organization', 'Synthetic Utility', 'organization');
   const { index, record, graph } = release({ entities: [company, organization], relations: [relation(company, organization)] });
-  assert.equal(graph.entities.length, 1);
-  assert.equal(graph.edges.length, 1);
-  assert.equal(graph.edges[0].fromId, graph.edges[0].toId);
-  const id = record.entities[0].entityId;
-  const neighbors = index.neighbors({ id });
-  assert.equal(neighbors.total, 1);
-  assert.equal(neighbors.items[0].from?.id, id);
-  assert.equal(neighbors.items[0].to?.id, id);
-  const path = index.path({ fromId: id, toId: id, maxHops: 5 });
-  assert.equal(path.total, 1);
-  assert.equal(path.shortestHops, 0);
-  assert.equal(path.items[0].edges.length, 0);
+  assert.equal(graph.entities.length, 2);
+  assert.notEqual(graph.edges[0].fromId, graph.edges[0].toId);
+  assert.equal(index.neighbors({ id: record.entities[0].entityId }).items.length, 1);
 });
 
 test('grounding rejects co-occurrence, unsupported roles/endpoints/identifiers and private-person types', () => {
@@ -316,7 +276,7 @@ test('graph artifact and index bind exact admitted record bytes and all source e
   assert.equal(graph.edges[0].evidence.recordId, record.id);
   assert.equal(graph.edges[0].evidence.source.sha256, record.extraction.inputSha256);
   const candidate = structuredClone(record); candidate.verification.status = 'candidate'; candidate.verification.evidenceHash = knowledgeEvidenceHash(candidate);
-  assert.throws(() => buildKnowledgeGraph(JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records: [candidate] })), /admitted/);
+  assert.throws(() => buildKnowledgeGraph(JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, identityAssertions: [], identityAdmissions: [], records: [candidate] }), { asOf: now.slice(0, 10) }), /admitted/);
   const missingGate = structuredClone(record); missingGate.verification.deterministic.checks = missingGate.verification.deterministic.checks.filter(check => check.id !== 'graph_relations'); missingGate.verification.evidenceHash = knowledgeEvidenceHash(missingGate);
   assert.throws(() => DistrictKnowledgeRecordSchema.parse(missingGate), /graph grounding/);
 });
@@ -329,7 +289,7 @@ test('graph cursors are signed and bound to release, tool, filters, limit and gr
   for (const changed of [{ query: 'Test', limit: 2 }, { query: 'Other', limit: 1 }, { query: 'Test', limit: 1, type: 'company' }]) assert.throws(() => index.entitySearch({ ...changed, cursor: first.nextCursor }), /mismatch/);
   assert.throws(() => new GraphIndex('other-release', graph, bytes).entitySearch({ query: 'Test', limit: 1, cursor: first.nextCursor }), /mismatch/);
   const changedBytes = `${bytes}\n`;
-  assert.throws(() => new GraphIndex('synthetic-release', buildKnowledgeGraph(changedBytes), changedBytes).entitySearch({ query: 'Test', limit: 1, cursor: first.nextCursor }), /mismatch/);
+  assert.throws(() => new GraphIndex('synthetic-release', buildKnowledgeGraph(changedBytes, { asOf: now.slice(0, 10) }), changedBytes).entitySearch({ query: 'Test', limit: 1, cursor: first.nextCursor }), /mismatch/);
   assert.throws(() => index.neighbors({ id: record.entities[0].entityId, limit: 1, cursor: first.nextCursor }), /mismatch/);
   const [payload, signature] = first.nextCursor.split('.');
   assert.throws(() => index.entitySearch({ query: 'Test', limit: 1, cursor: `${payload}.${signature[0] === 'A' ? 'B' : 'A'}${signature.slice(1)}` }), /Invalid/);
@@ -526,7 +486,9 @@ test('actual decision approval and implementation remain distinct in paths and r
     const edge = { ...relation(a, b), type: 'implements' as const, predicateQuote, quote: `${a.name} ${predicateQuote} ${b.name}.` };
     const { record, index, graph } = release({ entities: [a, b], relations: [edge] });
     assert.equal(record.relations[0].type, type); assert.equal(record.relations[0].modality, modality);
-    assert.equal(graph.edges[0].evidence.relationNormalization?.mappings[0].originalType, 'implements');
+    const evidence = graph.edges[0].evidence;
+    assert.equal(evidence.kind, 'text_model');
+    assert.equal(evidence.kind === 'text_model' ? evidence.relationNormalization?.mappings[0].originalType : null, 'implements');
     const path = index.path({ fromId: record.entities[0].entityId, toId: record.entities[1].entityId, maxHops: 1 });
     assert.equal(path.status, 'found'); assert.deepEqual(path.modalities, [modality]);
     assert.deepEqual(path.pathEligibility.eligibleModalities, ['asserted', 'decided', 'implemented']);
@@ -556,7 +518,7 @@ test('future proposal condition negation and history never become actual decisio
   }
   const future: GraphClaims = { entities: [a, b], relations: [{ ...relation(a, b), type: 'decides', modality: 'decided', predicateQuote: 'beschließen', quote: `${a.name} wird ${b.name} beschließen.` }] };
   assert.equal(graphGroundingChecks(future, future.relations[0].quote).find(check => check.id === 'graph_modality')?.passed, false);
-  assert.equal(graphNeighborsSchema.parse({ id: `entity:${sha256('entity')}`, relationTypes: relationTypeSchema.options }).relationTypes?.length, 10);
+  assert.equal(graphNeighborsSchema.parse({ id: `entity:${sha256('entity')}`, relationTypes: relationTypeSchema.options }).relationTypes?.length, 12);
   for (const type of ['plans', 'decides', 'approves'] as const) assert.equal(relationPathEligible({ type, modality: 'implemented' }), false);
 });
 
@@ -573,4 +535,195 @@ test('frozen legacy action records remain readable without relabelling their gen
   legacy.extraction.promptVersion = 'district-claims-v8-action-relations';
   legacy.verification.evidenceHash = knowledgeEvidenceHash(legacy);
   assert.throws(() => DistrictKnowledgeRecordSchema.parse(legacy), /canonical/);
+});
+
+test('unknown ongoing validity stays historical despite a recent fetch and asserted modality', () => {
+  const a = mention('a'), b = mention('b');
+  const record = fixture({ entities: [a, b], relations: [relation(a, b)] });
+  const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, identityAssertions: [], identityAdmissions: [], records: [record] });
+  const graph = buildKnowledgeGraph(bytes, { asOf: '2026-10-10' }), index = new GraphIndex('temporal-release', graph, bytes);
+  const options = { fromId: record.entities[0].entityId, toId: record.entities[1].entityId, maxHops: 1 };
+  assert.equal(index.path(options).status, 'not_found_within_hops');
+  assert.equal(index.path({ ...options, mode: 'historical' }).status, 'found');
+  assert.equal(index.neighbors({ id: options.fromId }).items[0].pathEligible, false);
+  assert.equal(graph.cases[0].identity.kind, 'document_bucket');
+  assert.equal(graph.cases[0].identity.countedProject, false);
+  assert.equal(graph.identitySha256.length, 64);
+});
+
+test('expired and disjoint operator intervals cannot form a contemporaneous path', () => {
+  const [a, b, c] = ['a', 'b', 'c'].map(id => mention(id));
+  const during = (from: GraphClaims['entities'][number], to: GraphClaims['entities'][number], start: string, end: string) => {
+    const text = `${start} bis ${end}`, base = relation(from, to);
+    return { ...base, quote: `${base.quote} ${text}`, time: { text, quote: text } };
+  };
+  const { index, record } = release({ entities: [a, b, c], relations: [during(a, b, '2020-01-01', '2023-12-31'), during(b, c, '2024-01-01', '2027-12-31')] });
+  const options = { fromId: record.entities[0].entityId, toId: record.entities[2].entityId, maxHops: 2 };
+  for (const asOf of ['2022-01-01', '2025-01-01']) assert.equal(index.path({ ...options, asOf }).status, 'not_found_within_hops');
+  assert.equal(index.path({ ...options, mode: 'historical' }).status, 'found');
+});
+
+test('pinned asOf and explicit override are returned and bound into all graph cursors', () => {
+  const [a, b, c, d] = ['a', 'b', 'c', 'd'].map(id => mention(id));
+  const { index, record, bytes } = release({ entities: [a, b, c, d], relations: [relation(a, b), relation(a, c), relation(b, d), relation(c, d)] });
+  const first = index.entitySearch({ query: 'Test', limit: 1 });
+  assert.equal(first.releaseAsOf, '2026-10-10'); assert.equal(first.asOf, '2026-10-10');
+  assert.throws(() => index.entitySearch({ query: 'Test', limit: 1, asOf: '2026-10-09', cursor: first.nextCursor }), /mismatch/);
+  const options = { fromId: record.entities[0].entityId, toId: record.entities[3].entityId, maxHops: 3, limit: 1 };
+  const path = index.path(options); assert.ok(path.nextCursor);
+  assert.throws(() => index.path({ ...options, asOf: '2026-10-09', cursor: path.nextCursor }), /mismatch/);
+  assert.throws(() => index.path({ ...options, mode: 'historical', cursor: path.nextCursor }), /mismatch/);
+  assert.equal(index.path({ ...options, asOf: '2026-10-09' }).asOf, '2026-10-09');
+  assert.deepEqual(buildKnowledgeGraph(bytes, { asOf: '2026-10-10' }), buildKnowledgeGraph(bytes, { asOf: '2026-10-10' }));
+  assert.notDeepEqual(buildKnowledgeGraph(bytes, { asOf: '2026-10-10' }), buildKnowledgeGraph(bytes, { asOf: '2026-10-09' }));
+});
+
+test('legal events preserve chronological dates rather than requiring simultaneous approval and execution', () => {
+  const [a, b, c] = ['authority', 'case', 'execution'].map(id => mention(id));
+  const approval = { ...relation(a, b), type: 'approves' as const, modality: 'decided' as const, quote: `${a.name} genehmigt ${b.name} am 2023-06-01.`, predicateQuote: 'genehmigt', time: { text: 'am 2023-06-01', quote: 'am 2023-06-01' } };
+  const implementation = { ...relation(b, c), type: 'implements' as const, modality: 'implemented' as const, quote: `${b.name} realisiert ${c.name} am 2025-06-01.`, predicateQuote: 'realisiert', time: { text: 'am 2025-06-01', quote: 'am 2025-06-01' } };
+  const { index, record, graph } = release({ entities: [a, b, c], relations: [approval, implementation] });
+  const options = { fromId: record.entities[0].entityId, toId: record.entities[2].entityId, maxHops: 2, mode: 'chronological' };
+  const result = index.path(options);
+  assert.equal(result.status, 'found');
+  assert.deepEqual(result.items[0].edges.map(edge => edge.temporal.eventDate), ['2023-06-01', '2025-06-01']);
+  assert.deepEqual(graph.edges.map(edge => edge.id).sort(), [...new Set(graph.edges.map(edge => edge.id))].sort());
+  assert.equal(index.path({ ...options, asOf: '2024-01-01' }).status, 'not_found_within_hops');
+});
+
+test('root identity assertion retraction is manifest-bound and reverses the actual graph merge', () => {
+  const a = mention('a', 'Synthetic Utility GmbH', 'company'), b = mention('b', 'Renamed Utility GmbH', 'organization');
+  for (const entity of [a, b]) entity.identifiers = [{ namespace: 'HRB', issuer: 'Synthetic Court', value: '000123', quote: `${entity.name} HRB 000123 Synthetic Court` }];
+  const records = [fixture({ entities: [a], relations: [] }, 'one', 'record-a'), fixture({ entities: [b], relations: [] }, 'two', 'record-b')];
+  const envelope = { schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, identityAssertions: [], identityAdmissions: [], records };
+  const first = buildKnowledgeGraph(JSON.stringify(envelope), { asOf: '2026-10-10' });
+  assert.equal(first.entities.length, 1);
+  const accepted = first.identity.assertions[0], retracted = { ...accepted, version: 2, status: 'retracted' as const };
+  const bytes = JSON.stringify({ ...envelope, identityAssertions: [accepted, retracted] });
+  const corrected = buildKnowledgeGraph(bytes, { asOf: '2026-10-10' });
+  assert.equal(corrected.entities.length, 2);
+  assert.equal(corrected.identity.assertions[0].status, 'retracted');
+  assert.notEqual(corrected.identitySha256, first.identitySha256);
+  assert.deepEqual(corrected.identity.mentions.map(mention => mention.id), first.identity.mentions.map(mention => mention.id));
+  const forged = structuredClone(corrected); forged.identity.assertions[0].status = 'accepted';
+  assert.throws(() => validateKnowledgeGraph(forged, bytes), /does not match/);
+});
+
+test('corporate succession is a dated relation, never erasure of predecessor identity', () => {
+  const successor = mention('successor', 'Synthetic Successor GmbH', 'company'), predecessor = mention('predecessor', 'Synthetic Predecessor GmbH', 'company');
+  for (const [entity, value] of [[successor, '200'], [predecessor, '100']] as const) entity.identifiers = [{ namespace: 'HRB', issuer: 'Synthetic Court', value, quote: `${entity.name} HRB ${value} Synthetic Court` }];
+  const quote = `${successor.name} ist Rechtsnachfolger von ${predecessor.name} am 2025-01-01.`;
+  const edge = { ...relation(successor, predecessor), type: 'succeeds' as const, quote, predicateQuote: 'ist Rechtsnachfolger von', time: { text: 'am 2025-01-01', quote: 'am 2025-01-01' } };
+  const { graph, index, record } = release({ entities: [successor, predecessor], relations: [edge] });
+  assert.equal(graph.entities.length, 2);
+  assert.notEqual(graph.edges[0].fromId, graph.edges[0].toId);
+  assert.equal(graph.edges[0].temporal.eventDateRole, 'succeeds');
+  assert.equal(index.path({ fromId: record.entities[0].entityId, toId: record.entities[1].entityId, maxHops: 1, mode: 'chronological' }).status, 'found');
+  assert.equal(graphGroundingChecks({ entities: [successor, predecessor], relations: [{ ...edge, time: null }] }, quote).find(check => check.id === 'graph_relations')?.passed, false);
+  predecessor.identifiers = [{ ...predecessor.identifiers[0], value: '200', quote: `${predecessor.name} HRB 200 Synthetic Court` }];
+  const conflicted = release({ entities: [successor, predecessor], relations: [edge] });
+  assert.equal(conflicted.graph.entities.length, 2);
+  assert.ok(conflicted.graph.identity.assertions.some(assertion => assertion.status === 'contested'));
+});
+
+test('canonical council aliases reuse the exact AGS body helper without inventing native identifiers', () => {
+  const short = mention('short', 'Stadtvertretung Parchim', 'authority'), full = mention('full', 'Stadtvertretung der Stadt Parchim', 'organization');
+  const basis = councilBodyIdentity(short.name, '13076108')!;
+  assert.deepEqual(basis, councilBodyIdentity(full.name, '13076108'));
+  assert.equal(councilBodyIdentity(full.name, '13076'), null);
+  const claims = { entities: [short, full], relations: [] };
+  const normalized = normalizeGraphClaims(claims, { municipalityId: 'parchim', sourceSha256: sha256('synthetic body source'), ags: '13076108' });
+  assert.equal(normalized.entities[0].entityId, `entity:${sha256(basis.key)}`);
+  assert.equal(normalized.entities[0].entityId, normalized.entities[1].entityId);
+  assert.ok(normalized.entities.every(value => value.identifiers.length === 0 && value.identityBasis.kind === 'ags_scoped_council_body'));
+  assert.notEqual(normalized.entities[0].entityId, normalizeGraphClaims(claims, { municipalityId: 'other', sourceSha256: sha256('other body source'), ags: '13076090' }).entities[0].entityId);
+});
+
+test('member_of preserves canonical source direction, planned/passive semantics and temporal current gates', () => {
+  const member = mention('member', 'Synthetic Municipality', 'municipality'), association = mention('association', 'Synthetic Association', 'organization');
+  const quote = `${member.name} ist Mitglied des ${association.name} von 1. Januar 2020 bis 31. Dezember 2030.`;
+  const edge = { ...relation(member, association), type: 'member_of' as const, predicateQuote: 'ist Mitglied des', quote, time: { text: 'von 1. Januar 2020 bis 31. Dezember 2030', quote: 'von 1. Januar 2020 bis 31. Dezember 2030' } };
+  const { index, record } = release({ entities: [member, association], relations: [edge] });
+  assert.equal(index.path({ fromId: record.entities[0].entityId, toId: record.entities[1].entityId, maxHops: 1 }).status, 'found');
+  const planned = { ...edge, quote: `${member.name} wird Mitglied des ${association.name}.`, time: null };
+  assert.equal(graphGroundingChecks({ entities: [member, association], relations: [planned] }, planned.quote).find(value => value.id === 'graph_modality')?.passed, false);
+  const passive = { ...edge, quote: `${member.name} wird als Mitglied des ${association.name} geführt.`, predicateQuote: 'Mitglied des', time: null };
+  assert.equal(graphGroundingChecks({ entities: [member, association], relations: [passive] }, passive.quote).find(value => value.id === 'graph_modality')?.passed, true);
+});
+
+test('role-level negation and explicitly ended history block current paths, not historical evidence', () => {
+  const a = mention('operator'), b = mention('facility', 'Synthetic Facility', 'facility');
+  const interval = '2020-01-01 bis 2030-12-31', base = relation(a, b);
+  const active = { ...base, quote: `${base.quote} ${interval}`, time: { text: interval, quote: interval } };
+  const negative = { ...base, quote: `${a.name} betreibt nicht ${b.name} 2024-01-01 bis 2028-12-31.`, modality: 'negated' as const, time: { text: '2024-01-01 bis 2028-12-31', quote: '2024-01-01 bis 2028-12-31' } };
+  const { index, record } = release({ entities: [a, b], relations: [active, negative] });
+  const options = { fromId: record.entities[0].entityId, toId: record.entities[1].entityId, maxHops: 1 };
+  assert.equal(index.path(options).status, 'not_found_within_hops');
+  assert.equal(index.path({ ...options, asOf: '2022-01-01' }).status, 'found');
+  assert.equal(index.path({ ...options, mode: 'historical' }).status, 'found');
+  assert.ok(index.neighbors({ id: options.fromId }).items.some(item => item.blockingEvidence.length === 1 && !item.pathEligible));
+  const untimed = { ...negative, quote: `${a.name} betreibt nicht ${b.name}.`, time: null };
+  const unknown = release({ entities: [a, b], relations: [active, untimed] });
+  assert.equal(unknown.index.path({ fromId: unknown.record.entities[0].entityId, toId: unknown.record.entities[1].entityId, maxHops: 1 }).status, 'not_found_within_hops');
+  const ended = { ...base, quote: `${a.name} betrieb früher ${b.name} bis 2023-12-31.`, predicateQuote: 'betrieb', modality: 'historical' as const, time: { text: 'bis 2023-12-31', quote: 'bis 2023-12-31' } };
+  const historical = release({ entities: [a, b], relations: [active, ended] });
+  const historicalOptions = { fromId: historical.record.entities[0].entityId, toId: historical.record.entities[1].entityId, maxHops: 1 };
+  assert.equal(historical.index.path(historicalOptions).status, 'not_found_within_hops');
+  const restartText = '2024-01-01 bis 2030-12-31';
+  const restarted = release({ entities: [a, b], relations: [{ ...active, quote: `${base.quote} ${restartText}`, time: { text: restartText, quote: restartText } }, ended] });
+  assert.equal(restarted.index.path({ fromId: restarted.record.entities[0].entityId, toId: restarted.record.entities[1].entityId, maxHops: 1 }).status, 'found');
+});
+
+// Entirely synthetic admission inputs: no actual source policy, parser, model or assessment is asserted by this fixture.
+function nativeGraphRecord(native: StructuredObservation, scope: AdapterScope) {
+  const sourceSha256 = native.evidence[0].sourceSha256, policyReceiptSha256 = sha256('synthetic policy receipt');
+  const claims = { kind: 'structured' as const, id: `structured:${native.id}`, municipalityId: scope.municipalityId, ags: scope.ags, districtId: 'synthetic-district', scope, observation: native,
+    source: { id: scope.sourceId, url: 'https://example.org/native', sha256: sourceSha256, mimeType: 'application/json', retrievedAt: now, policyReceiptSha256 }, supportingSources: [], graph: nativeStructuredIdentityGraph(native, scope) };
+  const gates = { kind: 'structured' as const, status: 'auto-verified' as const, version: STRUCTURED_VERIFICATION_VERSION, adapterId: 'synthetic-native', mappingVersion: 'procurement-native-v1', adapterContractSha256: sha256('synthetic mapping contract'),
+    sourceSha256, policyReceiptSha256, scopeSha256: semanticHash(scope), locators: native.evidence, deterministic: { passed: true as const, checks: [{ id: 'synthetic_fixture', passed: true as const, reason: 'Synthetic admitted input only; no actual verification was run.' }] } };
+  return StructuredKnowledgeRecordSchema.parse({ ...claims, verification: { ...gates, evidenceHash: semanticHash({ ...claims, verification: gates }) } });
+}
+
+test('native procurement action dates join only exact subject/version/source/scope and expose actual date evidence', () => {
+  const scope: AdapterScope = { publisherId: 'synthetic', sourceId: 'procurement-bkms-opendata', municipalityId: 'synthetic-town', ags: '12064001', tenant: null, observationWindow: '2026-10-10' };
+  const sourceSha256 = sha256('synthetic native procurement input'), subject = 'procurement:synthetic:ocid-1:award:award-1';
+  const emit = (predicate: string, value: string, options: { subject?: string; version?: string; source?: string; date?: string; role?: string } = {}) => observation({
+    publisherId: scope.publisherId, sourceId: scope.sourceId, nativeId: 'ocid-1', nativeVersion: options.version ?? 'release-1', kind: 'Award', subject: options.subject ?? subject, predicate, value, unit: null,
+    date: options.date ?? null, dateRole: options.role ?? null, financialRole: 'none', geography: { ags: scope.ags, basis: 'source_explicit', role: 'project_location' }, sourceReferenceDate: '2026-10-10', publishedAt: now, retrievedAt: now,
+    evidence: [{ sourceSha256: options.source ?? sourceSha256, format: 'json', nativeId: 'ocid-1', path: `/awards/0/${predicate}`, sheet: null, rowKey: 'award-1', cells: [], rawValue: value, schemaHash: sha256('synthetic schema'), mappingVersion: 'procurement-native-v1' }], limitations: ['Synthetic fixture only.'],
+  });
+  const award = emit('awarded_to', 'procurement:synthetic:ocid-1:party:party-1'), date = emit('decision_date', '2023-06-01', { date: '2023-06-01', role: 'award_decision' });
+  const build = (dates: StructuredObservation[]) => {
+    const records = [award, ...dates].map(value => nativeGraphRecord(value, scope));
+    const bytes = JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records, identityAssertions: [], identityAdmissions: [] });
+    return { bytes, graph: buildKnowledgeGraph(bytes, { asOf: '2026-10-10' }) };
+  };
+  const matched = build([date]);
+  assert.equal(matched.graph.edges[0].temporal.eventDate, '2023-06-01');
+  assert.equal(matched.graph.edges[0].temporal.eventDateRole, 'award_decision');
+  assert.equal(matched.graph.edges[0].eventEvidence[0].recordId, `structured:${date.id}`);
+  assert.equal(matched.graph.edges[0].quote, null);
+  assert.equal(new GraphIndex('native-release', matched.graph, matched.bytes).path({ fromId: matched.graph.edges[0].fromId, toId: matched.graph.edges[0].toId, maxHops: 1, mode: 'chronological' }).status, 'found');
+  for (const unrelated of [
+    emit('decision_date', '2023-06-01', { date: '2023-06-01', role: 'award_decision', version: 'release-2' }),
+    emit('decision_date', '2023-06-01', { date: '2023-06-01', role: 'award_decision', subject: 'procurement:synthetic:ocid-1:award:award-2' }),
+    emit('decision_date', '2023-06-01', { date: '2023-06-01', role: 'award_decision', source: sha256('different source bytes') }),
+    emit('published_at', '2023-06-01', { date: '2023-06-01', role: 'publication' }),
+  ]) assert.equal(build([unrelated]).graph.edges[0].temporal.eventDate, null);
+  const conflicted = build([date, emit('decision_date', '2023-06-02', { date: '2023-06-02', role: 'award_decision' })]);
+  assert.equal(conflicted.graph.edges[0].temporal.unresolvedContradiction, true);
+});
+
+test('canonical council alias assertions retract reversibly while retaining original scope and source mentions', () => {
+  const short = mention('short', 'Stadtvertretung Parchim', 'authority'), full = mention('full', 'Stadtvertretung der Stadt Parchim', 'organization');
+  const records = [fixture({ entities: [short], relations: [] }, 'synthetic-town', 'short-record'), fixture({ entities: [full], relations: [] }, 'synthetic-town', 'full-record')];
+  const envelope = { schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records, identityAssertions: [], identityAdmissions: [] };
+  const original = buildKnowledgeGraph(JSON.stringify(envelope), { asOf: '2026-10-10' });
+  assert.equal(original.entities.length, 1);
+  const assertion = original.identity.assertions.find(value => value.method === 'council_body_alias')!;
+  assert.ok(assertion); assert.equal(original.entities[0].identityBasis.kind, 'ags_scoped_council_body');
+  const corrected = buildKnowledgeGraph(JSON.stringify({ ...envelope, identityAssertions: [{ ...assertion, version: 2, status: 'retracted' }] }), { asOf: '2026-10-10' });
+  assert.equal(corrected.entities.length, 2);
+  assert.deepEqual(corrected.identity.mentions.map(value => value.name), original.identity.mentions.map(value => value.name));
+  assert.ok(corrected.identity.mentions.every(value => value.identifiers.length === 0));
 });

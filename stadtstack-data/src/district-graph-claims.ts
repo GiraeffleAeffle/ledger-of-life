@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import { semanticHash, canonicalJson } from './district-adapter-contract.ts';
+import { CouncilBodyIdentitySchema, resolveIdentityMentions, unknownValidity, legalFormFromName, type IdentityMention } from './district-entity-resolution.ts';
 
 const quote = z.string().min(1).max(1800);
 const localId = z.string().regex(/^[a-zA-Z0-9_-]{1,60}$/);
 export const entityTypeSchema = z.enum(['municipality', 'authority', 'organization', 'project', 'facility', 'funding_programme', 'law', 'place', 'company']);
-export const relationTypeSchema = z.enum(['operates', 'funds', 'implements', 'plans', 'decides', 'approves', 'amends', 'located_in', 'cooperates_with', 'cites']);
+export const relationTypeSchema = z.enum(['operates', 'funds', 'implements', 'plans', 'decides', 'approves', 'amends', 'located_in', 'cooperates_with', 'member_of', 'cites', 'succeeds']);
 export const relationModalitySchema = z.enum(['asserted', 'planned', 'decided', 'implemented', 'proposed', 'conditional', 'negated', 'historical']);
 export const EntityMentionSchema = z.object({
   mentionId: localId, name: z.string().min(1).max(300), type: entityTypeSchema, quote,
@@ -16,7 +18,7 @@ export const RelationClaimSchema = z.object({
   time: z.object({ text: quote, quote }).strict().nullable(), conditions: quote.nullable(),
 }).strict();
 export const IdentityBasisSchema = z.object({
-  kind: z.enum(['explicit_identifier', 'municipality_scoped_name', 'source_scoped_name']),
+  kind: z.enum(['explicit_identifier', 'ags_scoped_council_body', 'source_scoped_mention']),
   key: z.string().min(1), scope: z.string().min(1).nullable(),
   ambiguity: z.literal('Source-grounded identity grouping, not independent legal-entity verification.'),
 }).strict();
@@ -34,36 +36,47 @@ export const RelationActionNormalizationSchema = z.object({
   }).strict()).min(1).max(60),
 }).strict();
 export type RelationActionNormalization = z.infer<typeof RelationActionNormalizationSchema>;
-export type GraphContext = { municipalityId: string; sourceSha256: string };
+export type GraphContext = { municipalityId: string; sourceSha256: string; ags?: string };
 export const GRAPH_DETERMINISTIC_CHECKS = ['graph_mentions', 'graph_identifiers', 'graph_relations', 'graph_modality'] as const;
-export const GRAPH_IDENTITY_VERSION = 'municipality-name-v2';
+export const GRAPH_IDENTITY_VERSION = 'scoped-identifier-assertions-v1';
+export const COUNCIL_BODY_IDENTITY_VERSION = 'ags-council-body-v1';
 /**
  * First observed type in this precedence is the graph's display type, never a
  * legal classification. Mention types remain unchanged and do not key identity.
  */
 export const ENTITY_TYPE_PRECEDENCE = ['municipality', 'authority', 'company', 'organization', 'funding_programme', 'project', 'facility', 'law', 'place'] as const satisfies readonly z.infer<typeof entityTypeSchema>[];
 const ambiguity = 'Source-grounded identity grouping, not independent legal-entity verification.' as const;
-const sourceScopedNames: Record<string, true> = { projekt: true, vorhaben: true, schulneubau: true, schule: true, kita: true, kindertagesstätte: true, solarpark: true, windpark: true, anlage: true, bebauungsplan: true, flächennutzungsplan: true, hauptsatzung: true, satzung: true, gesetz: true };
 const nameForm=(value:string)=>value.normalize('NFKC').toLocaleLowerCase('de').replace(/[„“”]/gu,'\"').replace(/[‐‑–—]/gu,'-').replace(/\s+/gu,' ').trim();
-function sourceScopedName(name:string):boolean{
-  const plain=nameForm(name).replace(/\b(?:der|die|das|des|den|ein|eine|und|co|gmbh|ag|kg|aör|eg|ev|ltd)\b/gu,' ').replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/gu,' ');
-  return !plain||Object.hasOwn(sourceScopedNames,plain)||/^(?:änderung|aenderung|projekt|vorhaben|plan)\s*\d*$/u.test(plain)||/^(?:\d+|erste|zweite|dritte|vierte|fünfte|sechste|siebte|achte|neunte|zehnte)\s+(?:änderung|aenderung)(?:\s+(?:satzung|hauptsatzung|gesetz|bebauungsplan|flächennutzungsplan))?$/u.test(plain);
-}
 /** Labels may collapse whitespace, while supporting quotations remain exact source spans. */
 function quotedName(quote:string,name:string):boolean{return quote.replace(/\s+/gu,' ').includes(name.replace(/\s+/gu,' ').trim());}
 
+/** Exact body-label aliases only; neither a municipality identity nor an inferred legal identifier. */
+export function councilBodyIdentity(name: string, ags: string): z.infer<typeof IdentityBasisSchema> | null {
+  if (!/^\d{8}$/.test(ags)) return null;
+  const match = /^stadtvertretung (?:der stadt )?([\p{L}][\p{L}\p{M} .()/-]*)$/u.exec(nameForm(name));
+  if (!match) return null;
+  const scope = `ags:${ags}`;
+  return { kind: 'ags_scoped_council_body', key: JSON.stringify([COUNCIL_BODY_IDENTITY_VERSION, `stadtvertretung ${match[1]}`, scope]), scope, ambiguity };
+}
+
+export function graphIdentityMention(entity: z.infer<typeof EntityMentionSchema>, context: GraphContext): IdentityMention {
+  const legalForm = ['organization', 'company'].includes(entity.type) ? legalFormFromName(entity.name) : null;
+  const council = !entity.identifiers.length && context.ags ? councilBodyIdentity(entity.name, context.ags) : null;
+  return {
+    id: `mention:${semanticHash([context.municipalityId, context.sourceSha256, entity.mentionId, entity.quote])}`,
+    type: entity.type, name: entity.name, municipalityId: context.municipalityId, sourceSha256: context.sourceSha256,
+    identifiers: entity.identifiers.map(value => ({ namespace: value.namespace, issuer: value.issuer, value: value.value, evidenceHashes: [semanticHash([context.sourceSha256, value.quote])] })),
+    legalForm, period: null, validity: unknownValidity(), evidenceHashes: [semanticHash([context.sourceSha256, entity.quote])],
+    councilBodyIdentity: council ? CouncilBodyIdentitySchema.parse(council) : null,
+  };
+}
+
 export function normalizeGraphClaims(claims: GraphClaims, context: GraphContext) {
   const entities = claims.entities.map(entity => {
-    // Exact complete identifier sets never bridge conflicting or unidentified mentions.
-    // Keep the whole normalized name, including legal forms, even for identifiers.
-    // Name alone is never a cross-municipality identity assertion.
-    const identifiers = [...new Set(entity.identifiers.map(id => JSON.stringify([id.namespace, id.issuer, id.value])))].sort();
-    // Ambiguous object/amendment labels stay source-scoped regardless of mention type.
-    const sourceScoped = !identifiers.length && sourceScopedName(entity.name);
-    const scope = identifiers.length ? null : sourceScoped ? `${context.municipalityId}:${context.sourceSha256}` : context.municipalityId;
-    const kind = identifiers.length ? 'explicit_identifier' as const : sourceScoped ? 'source_scoped_name' as const : 'municipality_scoped_name' as const;
-    const key = JSON.stringify([GRAPH_IDENTITY_VERSION, nameForm(entity.name), identifiers, scope]);
-    return { ...entity, entityId: `entity:${createHash('sha256').update(key).digest('hex')}`, identityBasis: { kind, key, scope, ambiguity } };
+    const mention = graphIdentityMention(entity, context), cluster = resolveIdentityMentions([mention]).clusters[0];
+    const scope = entity.identifiers.length ? null : `${context.municipalityId}:${context.sourceSha256}`;
+    const identityBasis = mention.councilBodyIdentity ?? { kind: entity.identifiers.length ? 'explicit_identifier' as const : 'source_scoped_mention' as const, key: canonicalJson({ version: GRAPH_IDENTITY_VERSION, id: cluster.id }), scope, ambiguity };
+    return { ...entity, entityId: cluster.id, identityBasis };
   });
   const byMention = new Map(entities.map(entity => [entity.mentionId, entity]));
   if (byMention.size !== entities.length) throw Error('Duplicate graph mention ID');
@@ -87,10 +100,13 @@ const predicates: Record<z.infer<typeof relationTypeSchema>, RegExp> = {
   amends: /(?<![\p{L}\p{N}])(?:ändert|ändern|geändert|Änderung|amends?|amended)(?![\p{L}\p{N}])/iu,
   located_in: /\b(?:liegt|liegen|befindet|befinden|gelegen|Standort|located|situated)\b/iu,
   cooperates_with: /\b(?:kooperiert|kooperieren|Kooperation|zusammenarbeitet|Zusammenarbeit|cooperates?|cooperation)\b/iu,
+  member_of: /(?<![\p{L}\p{N}])(?:Mitglied(?:er)?|members?\s+of|gehört[^.!?]{0,120}\ban|gehören[^.!?]{0,120}\ban|besteht\s+aus|zusammengeschlossen)(?![\p{L}\p{N}])/iu,
   cites: /(?<![\p{L}\p{N}])(?:gemäß|nach|laut|auf Grundlage|verweist|Bezug|cites?|pursuant)(?![\p{L}\p{N}])/iu,
+  succeeds: /\b(?:Rechtsnachfolger(?:in)?|Rechtsnachfolge|succeeds?|legal successor)\b/iu,
 };
 const negative = /\b(?:nicht|kein(?:e[rmns]?)?|weder|not|never|no)\b/iu;
 const prospective = /\b(?:soll(?:en|te|ten)?|plant|planen|geplant|vorgesehen|beabsichtigt|künftig|zukünftig|voraussichtlich|Entwurf|Vorschlag|beantragt|will|planned|proposed)\b|\b(?:wird|werden)\b[^.!?]{0,160}(?<![\p{L}\p{N}])(?:betreiben|fördern|finanzieren|errichten|umsetzen|ändern|kooperieren|beschließen|entscheiden|genehmigen|bewilligen|billigen|zustimmen)(?![\p{L}\p{N}])/iu;
+const prospectiveMembership = /\b(?:wird|werden)\s+Mitglied(?:er)?\b|\b(?:wird|werden)\b[^.!?]{0,160}\b(?:beitreten|angehören)\b/iu;
 const conditional = /\b(?:wenn|falls|sofern|vorbehaltlich|unter der Bedingung|if|subject to)\b/iu;
 const historical = /\b(?:ehemalig(?:e[rmns]?)?|früher|damals|formerly|previously)\b/iu;
 const dated = /\b(ab|am|zum|bis|seit|im Jahr|in)\s+(?:\d{1,2}\.\s*\d{1,2}\.\s*)?((?:19|20)\d{2})(?:-\d{2}-\d{2})?\b/giu;
@@ -147,6 +163,7 @@ export function graphGroundingChecks(claims: GraphClaims, text: string) {
     { id: 'graph_identifiers', passed: claims.entities.every(entity => entity.identifiers.every(id => exact(id.quote) && quotedName(id.quote,entity.name) && [id.value,id.namespace,id.issuer].every(value=>quotedName(id.quote,value))) && new Set(entity.identifiers.map(id => JSON.stringify([id.namespace, id.issuer]))).size === entity.identifiers.length), reason: 'Identifier, namespace, issuer and named entity share a source quote; conflicting identifiers within one namespace are rejected.' },
     { id: 'graph_relations', passed: claims.relations.every(relation => {
       const from = mentions.get(relation.fromMention), to = mentions.get(relation.toMention);
+      if (relation.type === 'succeeds' && !relation.time) return false;
       return from && to && from.mentionId !== to.mentionId && exact(relation.quote) && quotedName(relation.quote,from.name) && quotedName(relation.quote,to.name) && relation.quote.includes(relation.predicateQuote) && (relation.type === 'plans' ? planningPredicate(relation) : predicates[relation.type].test(relation.predicateQuote)) && (!relation.time || exact(relation.time.quote) && relation.quote.includes(relation.time.quote) && relation.time.quote.includes(relation.time.text)) && (relation.conditions === null || relation.quote.includes(relation.conditions));
     }), reason: 'Both named endpoints and an explicit typed predicate occur in one contiguous quotation; time and conditions are quoted, not metadata-derived.' },
     { id: 'graph_modality', passed: claims.relations.every(relation => {
@@ -161,7 +178,7 @@ export function graphGroundingChecks(claims: GraphClaims, text: string) {
       if (documentYear !== null && dates.some(date => date.marker !== 'bis' && date.year > documentYear) && ['asserted', 'decided', 'implemented'].includes(relation.modality)) return false;
       if (negative.test(relation.quote)) return relation.modality === 'negated';
       if (conditional.test(relation.quote) || relation.conditions !== null) return relation.modality === 'conditional' && relation.conditions !== null;
-      if (prospective.test(relation.quote)) return ['planned', 'proposed'].includes(relation.modality);
+      if (prospective.test(relation.quote) || relation.type === 'member_of' && prospectiveMembership.test(relation.quote)) return ['planned', 'proposed'].includes(relation.modality);
       if (historical.test(relation.quote) || /(?:^|\s)betrieb(?:\s|$)/u.test(relation.predicateQuote)) return relation.modality === 'historical' && relation.time !== null;
       return relation.modality !== 'negated' && (relation.modality !== 'historical' || relation.time !== null);
     }), reason: 'Explicit planning, decision and implementation remain distinct. Negation, future/proposal and conditions cannot enter factual paths; historical claims retain quoted time. Typed lexical support is not a role or success judgment.' },
@@ -169,4 +186,4 @@ export function graphGroundingChecks(claims: GraphClaims, text: string) {
   return checks;
 }
 
-export const graphPromptInstructions = ` Joint graph in this SAME response: entities use local mentionIds, not global IDs. Copy source name/type/quote; no people. Preserve legal forms and distinct laws/amendments. identifiers=[] unless ONE identifier.quote contains entity name AND literal value, namespace and issuer; a printed plan number supplies neither namespace nor issuer. relations=[] if unsupported. Both distinct endpoint mentionIds must exist; ONE relation.quote contains BOTH names and explicit action. predicateQuote copies the COMPLETE relation verb/phrase, not an endpoint or truncated verb: operates ("betreibt"), funds ("finanziert"), implements ("umgesetzt"), plans ("plant den Ausbau"), decides ("beschließt"), approves ("genehmigt"), amends ("ändert"), located_in ("liegt"), cooperates_with ("kooperiert"), cites ("gemäß"). Explicit planning and quoted intent to construct are plans/planned, never implements/planned or implements/implemented. Actual decisions/approvals are decides/decided or approves/decided, NOT construction, operation or spending. Actual execution is implements/implemented, describing only quoted execution, not inferred completion or success. Non-action facts retain asserted. Future/proposed actions retain planned/proposed; conditional/negated/historical qualifiers override factual modalities. Words alone do not prove roles: "beschließt den Wirtschaftsplan" is NOT operates, "Erhalt des Zuschlages" NOT implements, "als Satzung beschlossen" NOT cites, "der Stadt" NOT located_in. Decisions/approvals need the named decision-maker/approver and object in the correct direction, not merely passive wording. Never force headings, ownership or co-occurrence into a type. Omit edges needing pronouns, absent endpoints, metadata or unsupported predicates; never invent linking words. predicateQuote/conditions/time.quote occur inside relation.quote; time.text inside time.quote. time/conditions are null only when absent; otherwise copy exact spans. Keep dates/intervals and asserted/planned/decided/implemented/proposed/conditional/negated/historical modality. Planned funding is not spending; proposals are not operation. Future starts are not factual assertions; a future "bis" end alone is not a future start. Conditional edges need quoted conditions; historical edges quoted time. Judge identity, issuer, endpoints, predicate, direction, modality, time and conditions against their own quotes, not just lexical matches. Paths prove neither causality nor success.`;
+export const graphPromptInstructions = ` Joint graph in this SAME response: entities use local mentionIds, not global IDs. Copy source name/type/quote; no people. Preserve legal forms and distinct laws/amendments. identifiers=[] unless ONE identifier.quote contains entity name AND literal value, namespace and issuer; a printed plan number supplies neither namespace nor issuer. relations=[] if unsupported. Both distinct endpoint mentionIds must exist; ONE relation.quote contains BOTH names and an explicit relation. predicateQuote copies the COMPLETE relation verb/phrase, not an endpoint or truncated verb: operates ("betreibt"), funds ("finanziert"), implements ("umgesetzt"), plans ("plant den Ausbau"), decides ("beschließt"), approves ("genehmigt"), amends ("ändert"), located_in ("liegt"), cooperates_with ("kooperiert"), member_of ("Mitglied des", "besteht aus", "zusammengeschlossen"), cites ("gemäß"). member_of points from the named member to the named association/body, never the reverse. For an explicit membership list, extract EVERY named member whose membership is supported, not just the source municipality; all members may share the same bounded contiguous quote containing their names, the association and membership predicate. Do not infer membership from cooperation, commissioning a contractor, shared plans or mere co-occurrence; membership does not imply operation, funding or execution. Explicit planning and quoted intent to construct are plans/planned, never implements/planned or implements/implemented. Actual decisions/approvals are decides/decided or approves/decided, NOT construction, operation or spending. Actual execution is implements/implemented, describing only quoted execution, not inferred completion or success. Non-action facts including current membership retain asserted. Future/proposed actions retain planned/proposed; conditional/negated/historical qualifiers override factual modalities. Words alone do not prove roles: "beschließt den Wirtschaftsplan" is NOT operates, "Erhalt des Zuschlages" NOT implements, "als Satzung beschlossen" NOT cites, "der Stadt" NOT located_in. Decisions/approvals need the named decision-maker/approver and object in the correct direction, not merely passive wording. Never force headings, ownership or co-occurrence into a type. Omit edges needing pronouns, absent endpoints, metadata or unsupported predicates; never invent linking words. predicateQuote/conditions/time.quote occur inside relation.quote; time.text inside time.quote. time/conditions are null only when absent; otherwise copy exact spans. Keep dates/intervals and asserted/planned/decided/implemented/proposed/conditional/negated/historical modality. Planned funding is not spending; proposals are not operation. Future starts are not factual assertions; a future "bis" end alone is not a future start. Conditional edges need quoted conditions; historical edges quoted time. Judge identity, issuer, endpoints, predicate, direction, modality, time and conditions against their own quotes, not just lexical matches. Paths prove neither causality nor success.` + ' Corporate succession is a dated succeeds relation from the successor to the predecessor, never a same_identity merge or deletion of the old legal entity. Require an explicit source statement naming both legal entities and its date; omit if unsupported.' + ' Current/as-of serving additionally requires supported effective intervals; unknown present validity is not current, even for asserted membership.'

@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { provisionCivicPolicyAuthority, initializeManagedAcquisitionLane, withManagedSourceWrite, CIVIC_ACQUISITION_DECISION_ID } from '../src/civic-opt-out.ts';
 import { sha256 } from '../src/district-schema.ts';
-import { prepareDocument, verifyPreparedDocument, cachePreparedDocument, readAuthorizedSourceBytes, type PreparedSourceReference } from '../src/district-prepared-document.ts';
+import { prepareDocument, verifyPreparedDocument, cachePreparedDocument, readAuthorizedSourceBytes, type PreparedSourceReference, type ManagedPreparationInput } from '../src/district-prepared-document.ts';
 import { createWorkPlan, restoreWorkPlan, resumeWorkPlan, runWorkPlan, modelCacheKey, classifyWorkFailure, RemoteWorkFailure, type WorkGroup, type WorkPlan } from '../src/district-work-plan.ts';
 import { PILOT_BASE_CORPUS_SHA256, PILOT_COMPLETION_CORPUS_SHA256, authorizedPilotCorpusSchema, loadFrozenCorpus } from '../src/district-corpus.ts';
 import { preparationPlanSchema } from '../src/district-preparation-run.ts';
@@ -15,8 +17,9 @@ function reference(): PreparedSourceReference {
   return { id: 'public-source', url: 'https://example.org/document', sha256: sha256(bytes), retrievedAt: '2026-10-01T00:00:00.000Z', locator: 'document-sha256:' + sha256(bytes), mimeType: 'text/plain', sourceType: 'website', policy: { robots: { state: 'allowed', url: 'https://example.org/robots.txt' }, tdm: { state: 'not_declared', evidence: [] }, access: 'public', legalClassification: 'not_assessed', publication: 'facts_with_attribution_only' } };
 }
 const preparation = () => ({ bytes, municipalityId: 'strausberg', references: [reference()], mimeType: 'text/plain', extractorSha256: sha256('extractor'), toolVersions: { node: process.versions.node } });
+const fixtureCommand = async () => { throw Error('Pure synthetic text fixture must not execute parser commands'); };
 test('prepared receipts bind bytes, policy, source references, tools, exact text and UTF16 offsets', async () => {
-  const receipt = await prepareDocument(preparation());
+  const receipt = await prepareDocument(preparation(), fixtureCommand);
   const checked = verifyPreparedDocument(receipt, receipt, bytes);
   assert.equal(checked.text, sourceText);
   assert.equal(checked.textLength, sourceText.length);
@@ -26,12 +29,19 @@ test('prepared receipts bind bytes, policy, source references, tools, exact text
   assert.throws(() => verifyPreparedDocument(receipt, receipt, Buffer.from('tampered source')), /source bytes/);
   assert.throws(() => verifyPreparedDocument(receipt, { ...receipt, toolVersions: { node: 'different' } }), /tool versions/);
   assert.throws(() => verifyPreparedDocument(receipt, { ...receipt, references: [{ ...reference(), retrievedAt: '2026-10-02T00:00:00.000Z' }] }), /references/);
-  const rehashed = await prepareDocument({ ...preparation(), bytes: Buffer.from(sourceText + 'changed'), references: [{ ...reference(), sha256: sha256(sourceText + 'changed') }] });
+  const rehashed = await prepareDocument({ ...preparation(), bytes: Buffer.from(sourceText + 'changed'), references: [{ ...reference(), sha256: sha256(sourceText + 'changed') }] }, fixtureCommand);
   assert.throws(() => verifyPreparedDocument(rehashed, receipt), /receipt hash/);
-  await assert.rejects(prepareDocument({ ...preparation(), bytes: Buffer.from(sourceText + 'changed') }), /source reference/);
-  await assert.rejects(prepareDocument({ ...preparation(), references: [{ ...reference(), policy: { ...reference().policy, access: 'captcha' } }] }), /blocks extraction/);
-  await assert.rejects(prepareDocument({ ...preparation(), toolVersions: {} }), /tool version evidence/);
+  await assert.rejects(prepareDocument({ ...preparation(), bytes: Buffer.from(sourceText + 'changed') }, fixtureCommand), /source reference/);
+  await assert.rejects(prepareDocument({ ...preparation(), references: [{ ...reference(), policy: { ...reference().policy, access: 'captcha' } }] }, fixtureCommand), /blocks extraction/);
+  await assert.rejects(prepareDocument({ ...preparation(), toolVersions: {} }, fixtureCommand), /tool version evidence/);
 });
+test('ordinary preparation requires authentic original source bindings before parser execution', async () => {
+  const input: ManagedPreparationInput = { ...preparation(), managedRoot: '/unused-before-admission', policy: {}, sourceBindings: [] };
+  await assert.rejects(prepareDocument(input), /authenticated managed source bindings/);
+  const mismatch: ManagedPreparationInput = { ...input, sourceBindings: [{ kind: 'http_observation', url: 'https://example.org/unrelated-source', sourceSha256: sha256(bytes), observationId: 'synthetic-unrelated-source', receiptSha256: sha256('synthetic unrelated source receipt') }] };
+  await assert.rejects(prepareDocument(mismatch, fixtureCommand), /bindings differ/);
+});
+
 test('PDF preparation policy requires byte-bound parsed metadata before invoking tools', async () => {
   let calls = 0;
   const input = preparation();
@@ -39,19 +49,23 @@ test('PDF preparation policy requires byte-bound parsed metadata before invoking
   assert.equal(calls, 0);
 });
 test('private prepared cache rejects tampering and raw reads enforce containment and hashes', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'district-prepared-test-'));
+  const base = await realpath(await mkdtemp(join(tmpdir(), 'district-prepared-test-'))), root = join(base, 'prepared');
   try {
-    const receipt = await prepareDocument(preparation());
-    const path = await cachePreparedDocument(root, receipt);
-    assert.equal(await cachePreparedDocument(root, receipt), path);
+    const stateDir = join(base, 'policy-state');
+    const authority = await provisionCivicPolicyAuthority({ stateDir, authorityId: 'fixture:' + randomUUID() });
+    const options = { stateDir, authorityId: authority.authorityId, authoritySha256: authority.authoritySha256, decisionId: CIVIC_ACQUISITION_DECISION_ID, kind: 'prepared' as const };
+    const receipt = await prepareDocument(preparation(), fixtureCommand);
+    const path = await cachePreparedDocument(root, receipt, options);
+    assert.equal(await cachePreparedDocument(root, receipt, options), path);
     await writeFile(path, JSON.stringify({ ...receipt, textSha256: sha256('tamper') }));
-    await assert.rejects(cachePreparedDocument(root, receipt), /hash/);
-    const raw = join(root, 'source.txt');
-    await writeFile(raw, bytes);
-    assert.deepEqual(await readAuthorizedSourceBytes(root, raw, sha256(bytes)), bytes);
-    await assert.rejects(readAuthorizedSourceBytes(root, raw, sha256('wrong')), /frozen index/);
-    await assert.rejects(readAuthorizedSourceBytes(join(root, 'source.txt'), raw, sha256(bytes)), /escapes/);
-  } finally { await rm(root, { recursive: true, force: true }); }
+    await assert.rejects(cachePreparedDocument(root, receipt, options), /hash|policy state requires operator review/i);
+    const rawRoot = join(base, 'raw-artifacts'), raw = join(rawRoot, 'source.txt');
+    await initializeManagedAcquisitionLane(rawRoot, { ...options, kind: 'artifacts' });
+    await withManagedSourceWrite(rawRoot, [{ kind: 'http_observation', relativePath: 'source.txt', contentSha256: sha256(bytes), sourceSha256: sha256(bytes), url: reference().url, observationId: 'synthetic-raw-fixture', receiptSha256: sha256('synthetic raw fixture receipt'), independentAllowed: true }], () => writeFile(raw, bytes, { mode: 0o600 }), options);
+    assert.deepEqual(await readAuthorizedSourceBytes(rawRoot, raw, sha256(bytes), options), bytes);
+    await assert.rejects(readAuthorizedSourceBytes(rawRoot, raw, sha256('wrong'), options), /frozen index/);
+    await assert.rejects(readAuthorizedSourceBytes(raw, raw, sha256(bytes), options), /escapes/);
+  } finally { await rm(base, { recursive: true, force: true }); }
 });
 function groups(count: number): WorkGroup[] {
   return Array.from({ length: count }, (_, index) => ({ municipalityId: index % 2 ? 'strausberg' : 'hoppegarten', sourceSha256: sha256(`source-${index}`), preparedSha256: sha256(`prepared-${index}`) }));

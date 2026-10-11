@@ -4,7 +4,9 @@ import {createServer, type IncomingMessage, type ServerResponse} from 'node:http
 import {pathToFileURL} from 'node:url';
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import {hostedServer, loadRelease} from './mcp-tools.ts';
+import {hostedServer} from './mcp-tools.ts';
+import {loadRelease} from './mcp-release.ts';
+import {governedReleaseDirectory} from './governed-release-directory.ts';
 import {DEFAULT_TOKEN_LIMITS,validateTokenRecords,type TokenLimits} from './mcp-token-config.mjs';
 
 export const limits = Object.freeze({requestsPerMinute:DEFAULT_TOKEN_LIMITS.requestsPerMinute, concurrentPerToken:DEFAULT_TOKEN_LIMITS.maxConcurrent, bodyBytes:32768, deadlineMs:30000, concurrentTotal:32});
@@ -118,7 +120,7 @@ export function createHostedHttp(tokens:TokenState[], factory=hostedServer, orig
 
 if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   try {
-    await loadRelease();
+    await loadRelease(governedReleaseDirectory(),{mode:'sealed'});
     const tokens=await loadTokens(process.env.MCP_TOKEN_HASH_FILE??'/run/secrets/mcp/token-hashes.json');
     const http=createHostedHttp(tokens,hostedServer,process.env.MCP_PUBLIC_ORIGIN);
     http.listen(Number(process.env.STADTSTACK_MCP_PORT??4318),'0.0.0.0');

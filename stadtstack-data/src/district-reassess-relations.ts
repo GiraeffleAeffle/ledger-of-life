@@ -1,23 +1,27 @@
-import {readFile, readdir, lstat, mkdir} from 'node:fs/promises';
-import {join, resolve} from 'node:path';
+import {readFile, lstat} from 'node:fs/promises';
+import {join, resolve, dirname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {z} from 'zod';
 import {DistrictKnowledgeRecordSchema, DistrictExtractionClaimsSchema, hashSchema, sha256, knowledgeEvidenceHash, REQUIRED_DETERMINISTIC_CHECKS, type DistrictKnowledgeRecord, type DistrictExtractionClaims} from './district-schema.ts';
 import {normalizeRelationActions, normalizeGraphClaims, GRAPH_DETERMINISTIC_CHECKS, type RelationActionNormalization} from './district-graph-claims.ts';
-import {documentChunks, restoreSourceQuotes, deterministicChecks, extractionOutputSchema, judgeSchema, judgeJSONSchema, JUDGE_INSTRUCTIONS, JUDGE_PROMPT_VERSION, JUDGE_PROMPT_SHA256, LIMITATION, type DocumentChunk} from './district-claims.ts';
+import {restoreSourceQuotes, deterministicChecks, extractionOutputSchema, judgeSchema, judgeJSONSchema, JUDGE_INSTRUCTIONS, JUDGE_PROMPT_VERSION, JUDGE_PROMPT_SHA256, LIMITATION, type DocumentChunk} from './district-claims.ts';
 import {documentResultSchema, type DocumentResult} from './district-inference.ts';
 import {preparationPlanSchema, type PreparationPlan} from './district-preparation-run.ts';
 import {WorkPlanSchema, restoreWorkPlan, classifyWorkFailure, WorkFailureSchema, type WorkPlan, type WorkTask} from './district-work-plan.ts';
-import {verifyPreparedDocument, fetchPreparedDocument, type PreparedDocument} from './district-prepared-document.ts';
-import {writePrivateJson, readPinnedJson, acquirePrivateRunLock} from './district-private-io.ts';
+import {verifyPreparedDocument, readPreparedDocument, assertPreparedSourcesActive, assertPreparedReferenceMembership, preparedSourceBindings, preparedCacheContext, type PreparedDocument, type PreparedSourceReference} from './district-prepared-document.ts';
+import {writeManagedSourceJson, writeManagedSourceArtifact, readPinnedJson, acquirePrivateRunLock} from './district-private-io.ts';
 import {modelReadiness, subscriptionChat} from './district-model.ts';
 import {isProviderStopped} from './district-model-usage.ts';
-import {PROVIDER_CONFIGS, SubscriptionRuntimeError, type ExtractorProvider, type ModelEvidence, type ModelAnswer, type UsageContext} from './district-model-contract.ts';
+import {PROVIDER_CONFIGS, ModelEvidenceSchema, assertModelEvidenceIdentity, SubscriptionRuntimeError, type ExtractorProvider, type ModelEvidence, type ModelAnswer, type UsageContext} from './district-model-contract.ts';
+import {CIVIC_POLICY_AUTHORITY,CIVIC_ACQUISITION_DECISION_ID,assertCivicPolicyAuthority,assertHostNotOptedOut,assertManagedSourceBindings,parseContentFreePreparationPlan,initializeManagedAcquisitionLane,HostOptedOutError,CivicPolicyStateError,type CivicPolicyOptions,type ManagedSourceContext} from './civic-opt-out.ts';
+import {modelAnswerCacheBinding} from './district-answer-cache.ts';
+import {knowledgePreparedSourcePinSchema,knowledgeHttpObservationBindingSchema,type KnowledgePreparedSourcePin} from './prepare-knowledge.ts';
+import {operatorRegistryConfigBindingSchema} from './district-registry-config.ts';
 
 // These artifacts are private replay evidence, not public source-text exports.
-export const REASSESSMENT_VERSION = 'district-relation-reassessment-v1';
+export const REASSESSMENT_VERSION = 'district-relation-reassessment-v2';
 const Provider = z.enum(['openai-subscription', 'anthropic-subscription']);
-const Identity = z.object({provider:Provider, tool:z.enum(['codex-cli','claude-cli']), toolVersion:z.string().min(1), model:z.string().min(1), modelIdentitySha256:hashSchema, modelIdentityBasis:z.enum(['configured-cli-model-and-tool-version','reported-cli-model-and-tool-version'])}).strict();
+const Identity = ModelEvidenceSchema;
 const Blob = z.object({sha256:hashSchema, bytes:z.string()}).strict();
 type Blob = z.infer<typeof Blob>;
 const AnswerBody = z.object({binding:hashSchema, modelIdentitySha256:hashSchema, receivedAt:z.iso.datetime(), value:z.unknown(), responseSha256:hashSchema, returnedModel:z.string().nullable(), runtimeWarnings:z.array(z.string())}).strict();
@@ -25,12 +29,16 @@ export const ReassessmentAnswerSchema = AnswerBody.extend({cacheSha256:hashSchem
 type Answer = z.infer<typeof ReassessmentAnswerSchema>;
 const Contract = z.object({version:z.literal(REASSESSMENT_VERSION), judgePromptVersion:z.string(), judgePromptSha256:hashSchema, judgeSchemaSha256:hashSchema, assessorSha256:hashSchema, threshold:z.literal(0.8)}).strict();
 export type ReassessmentContract = z.infer<typeof Contract>;
-export const FrozenReassessmentSchema = z.object({
-  version:z.literal(REASSESSMENT_VERSION), frozenAt:z.iso.datetime(), contract:Contract,
-  workPlan:Blob, preparationPlan:Blob,
-  documents:z.array(z.object({taskId:hashSchema, result:Blob, prepared:Blob}).strict()),
-  answers:z.array(Blob),
+const FrozenBodySchema = z.object({
+  frozenAt:z.iso.datetime(),workPlan:Blob,preparationPlan:Blob,
+  documents:z.array(z.object({taskId:hashSchema,result:Blob,prepared:Blob}).strict()),answers:z.array(Blob),
 }).strict();
+/** Pure historical codec only; never accepted by current filesystem/model entrypoints. */
+export const HistoricalFrozenReassessmentSchema=FrozenBodySchema.extend({version:z.literal('district-relation-reassessment-v1'),contract:Contract.extend({version:z.literal('district-relation-reassessment-v1')})}).strict();
+export const reassessmentArtifactPinSchema=z.object({path:z.string().min(1),sha256:hashSchema,bytes:z.number().int().nonnegative().max(512*1024*1024),bindings:z.array(z.union([knowledgePreparedSourcePinSchema.shape.bindings.element,knowledgeHttpObservationBindingSchema,operatorRegistryConfigBindingSchema])).min(1)}).strict();
+export type ReassessmentArtifactPin=z.infer<typeof reassessmentArtifactPinSchema>;
+const ControlBindingsSchema=z.object({workPlan:z.array(reassessmentArtifactPinSchema.shape.bindings.element).max(100_000),preparationPlan:z.array(reassessmentArtifactPinSchema.shape.bindings.element).max(100_000)}).strict();
+export const FrozenReassessmentSchema=FrozenBodySchema.extend({version:z.literal(REASSESSMENT_VERSION),contract:Contract,controlBindings:ControlBindingsSchema}).strict();
 export type FrozenReassessment = z.infer<typeof FrozenReassessmentSchema>;
 const JudgeEvidence = z.object({contract:Contract, inputSha256:hashSchema, identity:Identity, answer:ReassessmentAnswerSchema, origin:z.enum(['cache','new'])}).strict();
 export type ReassessmentJudgeEvidence = z.infer<typeof JudgeEvidence>;
@@ -42,13 +50,19 @@ export const ReassessmentDeltaSchema = z.object({
 }).strict();
 export type ReassessmentDelta = z.infer<typeof ReassessmentDeltaSchema>;
 const Pin = z.object({path:z.string().min(1), sha256:hashSchema}).strict();
+const MetadataEncodingSchema=z.object({indent:z.number().int().min(0).max(8),trailingNewlines:z.number().int().min(0).max(2)}).strict();
+const ControlMetadataPinSchema=Pin.extend({bytes:z.number().int().nonnegative().max(16*1024*1024),metadata:z.object({role:z.enum(['work_plan_metadata','preparation_plan_metadata']),encoding:MetadataEncodingSchema,value:z.unknown()}).strict()}).strict();
+export type ReassessmentControlPin=z.infer<typeof ControlMetadataPinSchema>|ReassessmentArtifactPin;
+type ControlPlanRole=z.infer<typeof ControlMetadataPinSchema>['metadata']['role'];
+const PolicyOptions=z.object({stateDir:z.string().min(1).optional(),authorityId:z.string().min(1).optional(),authoritySha256:hashSchema.optional()}).strict();
 export const FreezeReassessmentOptionsSchema = z.object({
-  workPlan:Pin, preparationPlan:Pin, resultRoot:z.string().min(1),
-  // null uses the existing authenticated, hash-pinned VM receipt transport.
-  preparedRoot:z.string().min(1).nullable(), cacheRoots:z.array(z.string().min(1)), out:z.string().min(1),
+  workPlan:z.union([ControlMetadataPinSchema.extend({metadata:ControlMetadataPinSchema.shape.metadata.extend({role:z.literal('work_plan_metadata')}).strict()}),reassessmentArtifactPinSchema]),
+  preparationPlan:z.union([ControlMetadataPinSchema.extend({metadata:ControlMetadataPinSchema.shape.metadata.extend({role:z.literal('preparation_plan_metadata')}).strict()}),reassessmentArtifactPinSchema]),resultRoot:z.string().min(1),
+  // null reads the existing managed receipt on the authoritative VM; never SSH/Mac.
+  preparedRoot:z.string().min(1).nullable(),answers:z.array(knowledgePreparedSourcePinSchema),out:z.string().min(1),policy:PolicyOptions.optional(),
 }).strict();
-export const JudgePassOptionsSchema = z.object({frozen:Pin, provider:Provider, out:z.string().min(1), ledgerPath:z.string().min(1), pausePath:z.string().min(1)}).strict();
-export const MergeReassessmentOptionsSchema = z.object({frozen:Pin, deltas:z.array(Pin), out:z.string().min(1)}).strict();
+export const JudgePassOptionsSchema = z.object({frozen:reassessmentArtifactPinSchema,provider:z.literal('openai-subscription'),out:z.string().min(1),ledgerPath:z.string().min(1),pausePath:z.string().min(1),policy:PolicyOptions.optional()}).strict();
+export const MergeReassessmentOptionsSchema = z.object({frozen:reassessmentArtifactPinSchema,deltas:z.array(reassessmentArtifactPinSchema),out:z.string().min(1),policy:PolicyOptions.optional()}).strict();
 
 const jsonHash = (value:unknown) => sha256(JSON.stringify(value));
 const equal = (a:unknown,b:unknown) => canonical(a) === canonical(b);
@@ -75,25 +89,55 @@ function identityOf(record:DistrictKnowledgeRecord):ModelEvidence {
   return {provider,tool,toolVersion,model,modelIdentitySha256,modelIdentityBasis};
 }
 function checkIdentity(identity:ModelEvidence) {
-  const {modelIdentitySha256,...body}=identity, config=PROVIDER_CONFIGS[identity.provider];
-  if(!config||identity.model!==config.model||identity.tool!==config.tool||identity.modelIdentityBasis!==config.modelIdentityBasis||modelIdentitySha256!==jsonHash(body))throw Error('Reassessment model identity binding mismatch');
+  try { assertModelEvidenceIdentity(identity); }
+  catch { throw Error('Reassessment model identity binding mismatch'); }
 }
 export function assertNativeReassessmentHost(provider:ExtractorProvider, platform:NodeJS.Platform=process.platform) {
-  if(platform!==(provider==='openai-subscription'?'linux':'darwin'))throw Error('Reassessment judge must run on its authorized native host');
+  if(provider!=='openai-subscription'||platform!=='linux')throw Error('Reassessment judge requires the authoritative native Codex-only VM');
 }
 export async function currentReassessmentContract():Promise<ReassessmentContract> {
-  const files=['district-reassess-relations.ts','district-claims.ts','district-schema.ts','district-graph-claims.ts','district-model.ts','district-model-contract.ts','district-claude.ts','district-model-usage.ts','district-model-diagnostics.ts','district-private-io.ts','district-prepared-document.ts'];
+  const files=['district-reassess-relations.ts','district-work-plan.ts','district-preparation-run.ts','prepare-knowledge.ts','district-claims.ts','district-schema.ts','source-policy.ts','document-origin.ts','document-origin-rules.ts','document-origin-contract.ts','civic-opt-out.ts','district-answer-cache.ts','district-graph-claims.ts','district-model.ts','district-model-contract.ts','district-claude.ts','district-model-usage.ts','district-model-diagnostics.ts','district-private-io.ts','district-prepared-document.ts'];
   const hashes=await Promise.all(files.map(async name=>({name,sha256:sha256(await readFile(new URL(name,import.meta.url)))})));
   return {version:REASSESSMENT_VERSION,judgePromptVersion:JUDGE_PROMPT_VERSION,judgePromptSha256:JUDGE_PROMPT_SHA256,judgeSchemaSha256:jsonHash(judgeJSONSchema),assessorSha256:jsonHash(hashes),threshold:0.8};
 }
 function checkContract(contract:ReassessmentContract, current:ReassessmentContract) {
   if(!equal(contract,current)||contract.judgePromptVersion!==JUDGE_PROMPT_VERSION||contract.judgePromptSha256!==JUDGE_PROMPT_SHA256||contract.judgeSchemaSha256!==jsonHash(judgeJSONSchema))throw Error('Reassessment current fact judge contract mismatch');
 }
-async function pinnedBlob(pin:z.infer<typeof Pin>):Promise<Blob> {
-  await readPinnedJson(pin.path,pin.sha256,512*1024*1024);
-  const bytes=await readFile(pin.path,'utf8');
-  if(sha256(bytes)!==pin.sha256)throw Error('Reassessment pinned file changed during read');
-  return {sha256:pin.sha256,bytes};
+async function pinnedBlob(pin:z.infer<typeof Pin>,expectedBytes?:number):Promise<Blob> {
+  const metadata=await lstat(pin.path);
+  if(!metadata.isFile()||metadata.size>512*1024*1024||expectedBytes!==undefined&&metadata.size!==expectedBytes)throw Error('Reassessment pinned file type or length mismatch');
+  const raw=await readFile(pin.path);
+  if(sha256(raw)!==pin.sha256||expectedBytes!==undefined&&raw.length!==expectedBytes)throw Error('Reassessment pinned file changed during read');
+  return {sha256:pin.sha256,bytes:new TextDecoder('utf-8',{fatal:true}).decode(raw)};
+}
+async function reassessmentArtifactBlob(pin:ReassessmentArtifactPin,policy:CivicPolicyOptions):Promise<Blob>{
+  reassessmentArtifactPinSchema.parse(pin);
+  await assertManagedSourceBindings(pin.path,pin.bindings,policy);
+  const blob=await pinnedBlob(pin,pin.bytes);
+  await assertManagedSourceBindings(pin.path,pin.bindings,policy);
+  return blob;
+}
+async function validateControlMetadata(value:unknown,role:ControlPlanRole):Promise<void>{
+ if(role==='preparation_plan_metadata'){await parseContentFreePreparationPlan(value);return;}
+ const parsed=WorkPlanSchema.parse(value);
+ if(parsed.tasks.length>100_000||!equal(value,parsed))throw Error('Work-plan metadata contains unknown or normalized fields');
+}
+async function readControlPlan(pin:ReassessmentControlPin,role:ControlPlanRole,policy:CivicPolicyOptions):Promise<{blob:Blob;bindings:ReassessmentArtifactPin['bindings']}>{
+ if('bindings' in pin)return {blob:await reassessmentArtifactBlob(pin,policy),bindings:pin.bindings};
+ const metadata=ControlMetadataPinSchema.parse(pin);
+ if(metadata.metadata.role!==role)throw Error('Reassessment control metadata role mismatch');
+ const {encoding,value}=metadata.metadata,bytes=JSON.stringify(value,null,encoding.indent)+'\n'.repeat(encoding.trailingNewlines);
+ if(Buffer.byteLength(bytes)!==metadata.bytes||sha256(bytes)!==metadata.sha256)throw Error('Reassessment control metadata byte binding mismatch');
+ await validateControlMetadata(value,role);
+ // The original locator is provenance only: no untyped control-plan file is opened.
+ return {blob:{bytes,sha256:metadata.sha256},bindings:[]};
+}
+function bindingSet(bindings:KnowledgePreparedSourcePin['bindings']):string {
+  return canonical([...new Set(bindings.map(binding=>canonical(binding)))].sort());
+}
+async function writeReassessmentArtifact(root:string,path:string,value:unknown,bindings:ReassessmentArtifactPin['bindings'],policy:CivicPolicyOptions):Promise<ReassessmentArtifactPin>{
+  const content=JSON.stringify(value,null,2)+'\n',bytes=Buffer.byteLength(content),digest=await writeManagedSourceArtifact(root,path,content,bindings,{decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+  return reassessmentArtifactPinSchema.parse({path,sha256:digest,bytes,bindings});
 }
 async function fileBlob(path:string):Promise<Blob> {
   const metadata=await lstat(path);
@@ -113,9 +157,21 @@ function checkResult(result:DocumentResult,task:WorkTask,plan:WorkPlan) {
   if(result.purpose!=='production'||task.purpose!=='production'||result.taskId!==task.id||result.groupId!==task.groupId||result.provider!==task.provider||result.municipalityId!==task.group.municipalityId||result.sourceSha256!==task.group.sourceSha256||result.preparedSha256!==task.group.preparedSha256||result.promptSha256!==plan.promptSha256||result.schemaSha256!==plan.schemaSha256)throw Error('Reassessment completed primary result binding mismatch');
 }
 type Validated = {frozen:FrozenReassessment; plan:WorkPlan; preparation:PreparationPlan; documents:Array<{task:WorkTask; result:DocumentResult; prepared:PreparedDocument}>; answers:Answer[]};
+/** Historical candidates carry their original source-bound span. Reassessment
+ * does not rerun today's window algorithm against yesterday's chunk indices.
+ * Complete generation coverage is proved separately by the archived generation
+ * codec, including its original whole-document budget rule. */
+function recordedSourceChunk(record:DistrictKnowledgeRecord,prepared:PreparedDocument):DocumentChunk|null {
+  const span=record.extraction.chunk;
+  if(record.extraction.inputSha256!==prepared.sourceSha256||record.extraction.textSha256!==prepared.textSha256||
+    ![span.index,span.count,span.start,span.end].every(Number.isSafeInteger)||span.index<0||span.count<1||span.index>=span.count||
+    span.start<0||span.end<=span.start||span.end>prepared.text.length)return null;
+  return {...span,text:prepared.text.slice(span.start,span.end)};
+}
 export function validateFrozenReassessment(input:unknown,current:ReassessmentContract):Validated {
   const frozen=FrozenReassessmentSchema.parse(input);checkContract(frozen.contract,current);
   const plan=WorkPlanSchema.parse(decode(frozen.workPlan)),preparation=preparationPlanSchema.parse(decode(frozen.preparationPlan));
+  for(const item of preparation.quarantine)if(item.candidate)for(const source of item.candidate.sources)if(!frozen.controlBindings.preparationPlan.some(binding=>binding.url===source.url&&binding.sourceSha256===source.sha256&&binding.observationId===source.id))throw Error('Preparation quarantine candidate lacks an actual control-source receipt');
   if(plan.tasks.some(task=>task.state==='running'))throw Error('Reassessment requires a stopped frozen work plan');
   restoreWorkPlan(plan); // Validate derived assignments without rewriting the frozen plan.
   const tasks=plan.tasks.filter(task=>task.purpose==='production'&&task.state==='completed');
@@ -125,51 +181,88 @@ export function validateFrozenReassessment(input:unknown,current:ReassessmentCon
     if(!task||task.resultSha256!==item.result.sha256)throw Error('Reassessment completed result receipt mismatch');
     const result=documentResultSchema.parse(decode(item.result));checkResult(result,task,plan);
     const prepared=verifyPreparedDocument(decode(item.prepared),taskGroup(preparation,task).expected);
-    let chunks:DocumentChunk[];
-    try { chunks=documentChunks(prepared.text); }
-    catch(error) {
-      if(!(error instanceof Error)||error.message!=='Document exceeds model chunk limit')throw error;
-      const expected={documentId:'document:'+prepared.sourceSha256,municipalityId:prepared.municipalityId,sourceId:prepared.references[0].id,sourceSha256:prepared.sourceSha256,chunk:null,reason:'Document exceeds model chunk limit; entire document quarantined before model readiness (no truncation or model calls)'};
-      if(result.records.length||result.chunks.length||!equal(result.quarantine,[expected]))throw Error('Reassessment whole-document budget evidence mismatch');
-      return {task,result,prepared};
+    const candidates=[...result.records,...result.quarantine.flatMap(item=>item.candidate?[item.candidate]:[])];
+    assertPreparedReferenceMembership(candidates.flatMap(record=>record.sources),prepared.references);
+    if(result.chunks.some((chunk,index)=>chunk.index!==index)||new Set(result.chunks.map(chunk=>chunk.index)).size!==result.chunks.length)throw Error('Reassessment original chunk coverage mismatch');
+    for(const record of candidates){
+      const chunk=recordedSourceChunk(record,prepared);
+      if(!chunk||chunk.count!==result.chunks.length||!result.chunks.some(outcome=>outcome.index===chunk.index&&outcome.recordId===record.id&&outcome.responseSha256===record.extraction.responseSha256))throw Error('Reassessment original source-span binding mismatch');
     }
-    if(result.chunks.length!==chunks.length||new Set(result.chunks.map(chunk=>chunk.index)).size!==chunks.length||result.chunks.some(chunk=>!chunks.some(source=>source.index===chunk.index)))throw Error('Reassessment original chunk coverage mismatch');
+    if(!result.chunks.length&&result.quarantine.some(item=>item.reason==='Document exceeds model chunk limit; entire document quarantined before model readiness (no truncation or model calls)')){
+      const expected={documentId:'document:'+prepared.sourceSha256,municipalityId:prepared.municipalityId,sourceId:prepared.references[0].id,sourceSha256:prepared.sourceSha256,chunk:null,reason:'Document exceeds model chunk limit; entire document quarantined before model readiness (no truncation or model calls)'};
+      if(result.records.length||!equal(result.quarantine,[expected]))throw Error('Reassessment whole-document budget evidence mismatch');
+    }
     return {task,result,prepared};
   });
   const answers=frozen.answers.map(blob=>checkedAnswer(decode(blob)));
   if(new Set(answers.map(answer=>answer.binding)).size!==answers.length)throw Error('Reassessment duplicate answer binding');
   return {frozen,plan,preparation,documents,answers};
 }
-export async function freezeReassessment(raw:unknown):Promise<{path:string;sha256:string}> {
-  const options=FreezeReassessmentOptionsSchema.parse(raw);await fresh(options.out);
-  const workPlan=await pinnedBlob(options.workPlan),preparationPlan=await pinnedBlob(options.preparationPlan);
+function reassessmentReferences(validated:Validated):PreparedSourceReference[]{
+ return [...validated.preparation.groups.flatMap(group=>group.expected.references),...validated.documents.flatMap(item=>[...item.prepared.references,...item.result.records.flatMap(record=>record.sources),...item.result.quarantine.flatMap(entry=>entry.candidate?.sources??[])]),...validated.preparation.quarantine.flatMap(item=>item.candidate?.sources??[])];
+}
+function reassessmentBindings(validated:Validated):ReassessmentArtifactPin['bindings']{
+ const inventory=new Map<string,ReassessmentArtifactPin['bindings'][number]>();
+ for(const binding of [...validated.frozen.controlBindings.workPlan,...validated.frozen.controlBindings.preparationPlan,...validated.documents.flatMap(item=>preparedSourceBindings(item.prepared.references,item.prepared.receiptSha256))]){
+  const {independentAllowed,...proof}=binding,key=canonical(proof),prior=inventory.get(key);
+  if(prior)prior.independentAllowed=prior.independentAllowed&&independentAllowed;
+  else inventory.set(key,{...binding});
+ }
+ return [...inventory].sort(([left],[right])=>left<right?-1:left>right?1:0).map(([,binding])=>binding);
+}
+export async function assertFrozenReassessmentActive(input:unknown,current:ReassessmentContract,policy:CivicPolicyOptions=CIVIC_POLICY_AUTHORITY):Promise<Validated>{
+ await assertCivicPolicyAuthority(policy);
+ const validated=validateFrozenReassessment(input,current);
+ if(!validated.frozen.controlBindings.workPlan.length)await validateControlMetadata(decode(validated.frozen.workPlan),'work_plan_metadata');
+ if(!validated.frozen.controlBindings.preparationPlan.length)await validateControlMetadata(decode(validated.frozen.preparationPlan),'preparation_plan_metadata');
+ for(const binding of reassessmentBindings(validated))await assertHostNotOptedOut(binding.url,policy);
+ await assertPreparedSourcesActive(reassessmentReferences(validated),policy);return validated;
+}
+async function readValidatedFrozen(pin:ReassessmentArtifactPin,contract:ReassessmentContract,policy:CivicPolicyOptions):Promise<Validated>{
+ const blob=await reassessmentArtifactBlob(pin,policy),validated=await assertFrozenReassessmentActive(decode(blob),contract,policy);
+ await assertManagedSourceBindings(pin.path,reassessmentBindings(validated),policy);
+ return validated;
+}
+export async function freezeReassessment(raw:unknown):Promise<ReassessmentArtifactPin> {
+  const options=FreezeReassessmentOptionsSchema.parse(raw),selectedPolicy=options.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selectedPolicy),policy={...selectedPolicy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
+  if(authority.mode!=='isolated-fixture'&&process.platform!=='linux')throw Error('Source freezing requires the authoritative Codex VM');
+  await fresh(options.out);
+  const work=await readControlPlan(options.workPlan,'work_plan_metadata',policy),preparationInput=await readControlPlan(options.preparationPlan,'preparation_plan_metadata',policy),workPlan=work.blob,preparationPlan=preparationInput.blob;
   const plan=WorkPlanSchema.parse(decode(workPlan)),preparation=preparationPlanSchema.parse(decode(preparationPlan));
   if(plan.tasks.some(task=>task.state==='running'))throw Error('Reassessment cannot freeze an active work plan');
   restoreWorkPlan(plan);
-  const documents:FrozenReassessment['documents']=[],responses=new Set<string>();
+  await assertPreparedSourcesActive(preparation.groups.flatMap(group=>group.expected.references),policy);
+  const documents:FrozenReassessment['documents']=[],responses=new Set<string>(),contexts=new Set<string>();
   for(const task of plan.tasks.filter(task=>task.purpose==='production'&&task.state==='completed')) {
     if(!task.resultSha256)throw Error('Reassessment completed task lacks a result hash');
-    const result=await pinnedBlob({path:join(options.resultRoot,task.id+'.json'),sha256:task.resultSha256});
-    const parsed=documentResultSchema.parse(decode(result));checkResult(parsed,task,plan);
-    for(const chunk of parsed.chunks)if(chunk.responseSha256)responses.add(chunk.responseSha256);
-    const expected=taskGroup(preparation,task).expected;
+    const expected=taskGroup(preparation,task).expected,resultPath=join(options.resultRoot,task.id+'.json'),bindings=preparedSourceBindings(expected.references,expected.receiptSha256),contextKey=bindingSet(bindings);
+    contexts.add(contextKey);
+    await assertPreparedSourcesActive(expected.references,policy);await assertManagedSourceBindings(resultPath,bindings,policy);
+    const result=await pinnedBlob({path:resultPath,sha256:task.resultSha256}),parsed=documentResultSchema.parse(decode(result));checkResult(parsed,task,plan);
+    await assertManagedSourceBindings(resultPath,bindings,policy);
+    assertPreparedReferenceMembership([...parsed.records.flatMap(record=>record.sources),...parsed.quarantine.flatMap(item=>item.candidate?.sources??[])],expected.references);
+    await assertPreparedSourcesActive(expected.references,policy);
+    for(const chunk of parsed.chunks)if(chunk.responseSha256)responses.add(jsonHash({responseSha256:chunk.responseSha256,contextKey}));
+    for(const record of [...parsed.records,...parsed.quarantine.flatMap(item=>item.candidate?[item.candidate]:[])])if(record.verification.faithfulness.responseSha256)responses.add(jsonHash({responseSha256:record.verification.faithfulness.responseSha256,contextKey}));
     let prepared:Blob;
-    if(options.preparedRoot)prepared=await fileBlob(join(options.preparedRoot,expected.receiptSha256+'.json'));
-    else {const receipt=await fetchPreparedDocument(expected),bytes=JSON.stringify(receipt);prepared={bytes,sha256:sha256(bytes)};}
-    verifyPreparedDocument(decode(prepared),expected);documents.push({taskId:task.id,result,prepared});
+    if(options.preparedRoot){const path=join(options.preparedRoot,expected.receiptSha256+'.json');await assertManagedSourceBindings(path,bindings,policy);prepared=await fileBlob(path);await assertManagedSourceBindings(path,bindings,policy);}
+    else {const receipt=await readPreparedDocument(expected,policy),bytes=JSON.stringify(receipt);prepared={bytes,sha256:sha256(bytes)};}
+    const checked=verifyPreparedDocument(decode(prepared),expected);await assertPreparedSourcesActive(checked.references,policy);documents.push({taskId:task.id,result,prepared});
   }
-  const answers=new Map<string,Blob>();
-  for(const root of options.cacheRoots)for(const entry of await readdir(root,{withFileTypes:true})) {
-    if(!entry.isFile()||!entry.name.endsWith('.answer.json'))continue;
-    const blob=await fileBlob(join(root,entry.name)),answer=checkedAnswer(decode(blob));
-    if(!responses.has(answer.responseSha256)&&!judgeSchema.safeParse(answer.value).success)continue;
+  const answers=new Map<string,Blob>(),found=new Set<string>();
+  for(const pin of options.answers){
+    const contextKey=bindingSet(pin.bindings);
+    if(!contexts.has(contextKey))throw Error('Reassessment answer pin differs from every selected prepared context');
+    const blob=await reassessmentArtifactBlob(pin,policy),answer=checkedAnswer(decode(blob)),responseKey=jsonHash({responseSha256:answer.responseSha256,contextKey});
+    if(!responses.has(responseKey))throw Error('Reassessment answer does not belong to its selected prepared-result receipt');
     const previous=answers.get(answer.binding);
     if(previous&&!equal(decode(previous),decode(blob)))throw Error('Reassessment conflicting original answer cache');
-    answers.set(answer.binding,blob);
+    answers.set(answer.binding,blob);found.add(responseKey);
   }
-  const frozen:FrozenReassessment={version:REASSESSMENT_VERSION,frozenAt:new Date().toISOString(),contract:await currentReassessmentContract(),workPlan,preparationPlan,documents,answers:[...answers.values()]};
-  validateFrozenReassessment(frozen,frozen.contract);
-  return {path:options.out,sha256:await writePrivateJson(options.out,frozen)};
+  if([...responses].some(response=>!found.has(response)))throw Error('Reassessment requires every selected original answer receipt; no cache-directory scan or live fallback');
+  const frozen:FrozenReassessment={version:REASSESSMENT_VERSION,frozenAt:new Date().toISOString(),contract:await currentReassessmentContract(),workPlan,preparationPlan,controlBindings:{workPlan:work.bindings,preparationPlan:preparationInput.bindings},documents,answers:[...answers.values()]};
+  const validated=await assertFrozenReassessmentActive(frozen,frozen.contract,policy);
+  return writeReassessmentArtifact(dirname(resolve(options.out)),options.out,frozen,reassessmentBindings(validated),policy);
 }
 
 export function relationDateEligible(claims:Pick<DistrictExtractionClaims,'documentDate'|'stageDate'|'stages'>):boolean {
@@ -182,7 +275,7 @@ type Located = {key:string; task:WorkTask; result:DocumentResult; prepared:Prepa
 export type RelationAssessment = {
   key:string; original:DistrictKnowledgeRecord; claims:DistrictExtractionClaims|null;
   normalization:RelationActionNormalization|null; quoteNormalization:DistrictKnowledgeRecord['extraction']['quoteNormalization'];
-  deterministic:ReturnType<typeof deterministicChecks>|null; changed:boolean; newlyPassed:boolean;
+  deterministic:DistrictKnowledgeRecord['verification']['deterministic']|null; changed:boolean; newlyPassed:boolean;
   dateEligible:boolean; needsJudge:boolean; hold:string|null; judgeInput:unknown|null; judgeBinding:string|null; claimsSha256:string|null;
 };
 function locatedRecords(validated:Validated):Located[] {
@@ -199,16 +292,16 @@ function locatedRecords(validated:Validated):Located[] {
   }
   return located;
 }
-export function reassessmentJudgeBinding(provider:ExtractorProvider,identity:ModelEvidence,input:unknown):string {
-  return jsonHash({provider,modelIdentitySha256:identity.modelIdentitySha256,system:JUDGE_INSTRUCTIONS,input,schema:judgeJSONSchema});
+export function reassessmentJudgeBinding(provider:ExtractorProvider,identity:ModelEvidence,input:unknown,prepared:PreparedDocument):string {
+  return modelAnswerCacheBinding({provider,modelIdentitySha256:identity.modelIdentitySha256,system:JUDGE_INSTRUCTIONS,input,schema:judgeJSONSchema,sourceContext:preparedCacheContext(prepared.receiptSha256,prepared.references)});
 }
 export function assessExistingRelation(input:{key:string;record:DistrictKnowledgeRecord;prepared:PreparedDocument;municipalityName:string;answers:Answer[]}):RelationAssessment {
   const {record,prepared}=input;
   const base:RelationAssessment={key:input.key,original:record,claims:null,normalization:null,quoteNormalization:record.extraction.quoteNormalization,deterministic:null,changed:false,newlyPassed:false,dateEligible:false,needsJudge:false,hold:null,judgeInput:null,judgeBinding:null,claimsSha256:null};
   const hold=(reason:string)=>({...base,hold:reason});
   if(record.extraction.inputSha256!==prepared.sourceSha256||record.extraction.textSha256!==prepared.textSha256||record.municipalityId!==prepared.municipalityId)return hold('source_binding_unknown');
-  const chunk=documentChunks(prepared.text).find(chunk=>chunk.index===record.extraction.chunk.index);
-  if(!chunk||!equal(record.extraction.chunk,{index:chunk.index,count:chunk.count,start:chunk.start,end:chunk.end}))return hold('source_chunk_binding_unknown');
+  const chunk=recordedSourceChunk(record,prepared);
+  if(!chunk)return hold('source_chunk_binding_unknown');
   const expectedReferences=prepared.references.map(reference=>({...reference,locator:`text-sha256:${prepared.textSha256};chars:${chunk.start}-${chunk.end}`}));
   if(!equal(record.sources,expectedReferences))return hold('source_reference_binding_unknown');
   const rawAnswers=input.answers.filter(answer=>answer.responseSha256===record.extraction.responseSha256&&answer.modelIdentitySha256===record.extraction.modelIdentitySha256&&answer.receivedAt===record.extraction.extractedAt);
@@ -228,7 +321,7 @@ export function assessExistingRelation(input:{key:string;record:DistrictKnowledg
   return {...base,claims,normalization:normalized.normalization,quoteNormalization:restored.normalization,deterministic,changed,newlyPassed,dateEligible,
     needsJudge:deterministic.passed&&dateEligible&&(changed||newlyPassed),
     hold:!deterministic.passed?'deterministic_gate_failed':!dateEligible?'date_missing':!changed&&!newlyPassed&&record.verification.status!=='auto-verified'?'previous_judge_failed_or_unknown':null,
-    judgeInput,judgeBinding:reassessmentJudgeBinding(record.extraction.provider,identityOf(record),judgeInput),claimsSha256:jsonHash(claims)};
+    judgeInput,judgeBinding:reassessmentJudgeBinding(record.extraction.provider,identityOf(record),judgeInput,prepared),claimsSha256:jsonHash(claims)};
 }
 function assessLocated(item:Located,answers:Answer[]):RelationAssessment {
   const chunk=item.result.chunks.find(chunk=>chunk.index===item.record.extraction.chunk.index);
@@ -252,43 +345,53 @@ function cachedJudge(assessment:RelationAssessment,answers:Answer[],contract:Rea
   checkJudge(evidence,assessment,contract);return evidence;
 }
 export type JudgeOnlyRuntime = {
-  readiness:(provider:ExtractorProvider,signal?:AbortSignal)=>Promise<ModelEvidence>;
+  readiness:(provider:ExtractorProvider,signal?:AbortSignal,policy?:CivicPolicyOptions)=>Promise<ModelEvidence>;
   judge:(provider:ExtractorProvider,system:string,input:unknown,schema:unknown,usage:UsageContext)=>Promise<ModelAnswer>;
   stopped:(path:string,provider:ExtractorProvider)=>Promise<boolean>;
 };
 const nativeRuntime:JudgeOnlyRuntime={readiness:modelReadiness,judge:subscriptionChat,stopped:isProviderStopped};
-export async function executeReassessmentPass(options:{frozen:unknown;frozenSha256:string;contract:ReassessmentContract;provider:ExtractorProvider;usage:Omit<UsageContext,'purpose'>;platform?:NodeJS.Platform;runtime?:JudgeOnlyRuntime;load?:(key:string)=>Promise<ReassessmentJudgeEvidence|null>;save?:(key:string,evidence:ReassessmentJudgeEvidence)=>Promise<void>}):Promise<ReassessmentDelta> {
+export async function executeReassessmentPass(options:{frozen:unknown;frozenSha256:string;contract:ReassessmentContract;provider:ExtractorProvider;usage:Omit<UsageContext,'purpose'>;managedRoot:string;policy?:CivicPolicyOptions;platform?:NodeJS.Platform;runtime?:JudgeOnlyRuntime;load?:(key:string)=>Promise<ReassessmentJudgeEvidence|null>;save?:(key:string,evidence:ReassessmentJudgeEvidence)=>Promise<void>}):Promise<ReassessmentDelta> {
   assertNativeReassessmentHost(options.provider,options.platform);hashSchema.parse(options.frozenSha256);
-  const validated=validateFrozenReassessment(options.frozen,options.contract),runtime=options.runtime??nativeRuntime;
+  const selectedPolicy=options.policy??options.usage.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selectedPolicy),policy={...selectedPolicy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
+  const validated=await assertFrozenReassessmentActive(options.frozen,options.contract,policy),runtime=options.runtime??nativeRuntime;
+  await initializeManagedAcquisitionLane(options.managedRoot,{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...policy});
   const entries:ReassessmentDelta['entries']=[];
   let identity:ModelEvidence|null=null,stopped=false;
   for(const item of locatedRecords(validated).filter(item=>item.task.provider===options.provider)) {
+    await assertPreparedSourcesActive([...item.prepared.references,...item.record.sources],policy);
     const assessment=assessLocated(item,validated.answers);
     const entry:z.infer<typeof PassEntry>={key:item.key,oldEvidenceHash:item.record.verification.evidenceHash,claimsSha256:assessment.claimsSha256,judge:null,judgeAttempted:false,failure:null};
     entries.push(entry);
     if(!assessment.needsJudge||stopped)continue;
     entry.judge=cachedJudge(assessment,validated.answers,options.contract);
     if(entry.judge)continue;
+    await assertPreparedSourcesActive([...item.prepared.references,...item.record.sources],policy);
     const saved=await options.load?.(item.key);
     if(saved){checkJudge(saved,assessment,options.contract);entry.judge=saved;entry.judgeAttempted=saved.origin==='new';continue;}
     try {
       options.usage.signal?.throwIfAborted();
       if(await runtime.stopped(options.usage.pausePath,options.provider))throw Object.assign(Error('Reassessment operator paused'),{failureCategory:'operator_pause'});
-      identity??=await runtime.readiness(options.provider,options.usage.signal);checkIdentity(identity);
+      await assertPreparedSourcesActive([...item.prepared.references,...item.record.sources],policy);
+      identity??=await runtime.readiness(options.provider,options.usage.signal,policy);checkIdentity(identity);
       options.usage.signal?.throwIfAborted();
       if(!equal(identity,identityOf(item.record)))throw Object.assign(Error('Reassessment native model identity mismatch'),{failureCategory:'model_identity_mismatch'});
       entry.judgeAttempted=true;
-      const answer=await runtime.judge(options.provider,JUDGE_INSTRUCTIONS,assessment.judgeInput,judgeJSONSchema,{...options.usage,purpose:'judge',groupId:item.task.groupId});
+      await assertPreparedSourcesActive([...item.prepared.references,...item.record.sources],policy);
+      const sourceContext:ManagedSourceContext={root:options.managedRoot,kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy,bindings:preparedSourceBindings(item.prepared.references,item.prepared.receiptSha256).map(({independentAllowed:_independent,...binding})=>binding)};
+      const answer=await runtime.judge(options.provider,JUDGE_INSTRUCTIONS,assessment.judgeInput,judgeJSONSchema,{...options.usage,purpose:'judge',groupId:item.task.groupId,policy,sourceContext});
       if(!equal(answer.evidence,identity)||answer.requestedModel!==identity.model||answer.returnedModel!==null&&answer.returnedModel!==identity.model||answer.reportedModels.some(model=>model!==identity!.model))throw Object.assign(Error('Reassessment returned model identity mismatch'),{failureCategory:'model_identity_mismatch'});
       const body=AnswerBody.parse({binding:assessment.judgeBinding,modelIdentitySha256:identity.modelIdentitySha256,receivedAt:new Date().toISOString(),value:answer.value,responseSha256:answer.responseSha256,returnedModel:answer.returnedModel,runtimeWarnings:answer.runtimeWarnings});
       entry.judge={contract:options.contract,inputSha256:jsonHash(assessment.judgeInput),identity,answer:sealAnswer(body),origin:'new'};
       checkJudge(entry.judge,assessment,options.contract);
+      await assertPreparedSourcesActive([...item.prepared.references,...item.record.sources],policy);
       await options.save?.(item.key,entry.judge);
     }catch(error){
+      if(error instanceof HostOptedOutError||error instanceof CivicPolicyStateError)throw error;
       if(error instanceof SubscriptionRuntimeError&&error.diagnostic)entry.judgeAttempted=error.diagnostic.attempted;
       entry.judge=null;entry.failure=classifyWorkFailure(error);stopped=true;
     }
   }
+  await assertPreparedSourcesActive(reassessmentReferences(validated),policy);
   const body={version:REASSESSMENT_VERSION as typeof REASSESSMENT_VERSION,frozenSha256:options.frozenSha256,contract:options.contract,provider:options.provider,host:PROVIDER_CONFIGS[options.provider].host,generatedAt:new Date().toISOString(),entries};
   return ReassessmentDeltaSchema.parse({...body,deltaSha256:reassessmentDeltaHash(body)});
 }
@@ -297,7 +400,8 @@ function heldRecord(record:DistrictKnowledgeRecord,reason:string):DistrictKnowle
   const result={...record,verification:{...record.verification,status:'candidate' as const,reason,evidenceHash:''}};
   result.verification.evidenceHash=knowledgeEvidenceHash(result);return DistrictKnowledgeRecordSchema.parse(result);
 }
-export function materializeReassessment(assessment:RelationAssessment,evidence:ReassessmentJudgeEvidence|null,contract:ReassessmentContract):{record:DistrictKnowledgeRecord;admitted:boolean;hold:string|null;judgePassed:boolean|null} {
+export type MaterializedReassessment={record:DistrictKnowledgeRecord;admitted:boolean;hold:string|null;judgePassed:boolean|null};
+export function materializeReassessment(assessment:RelationAssessment,evidence:ReassessmentJudgeEvidence|null,contract:ReassessmentContract):MaterializedReassessment {
   const original=assessment.original;
   if(!assessment.claims||!assessment.deterministic)return {record:heldRecord(original,assessment.hold??'reassessment_unknown'),admitted:false,hold:assessment.hold??'reassessment_unknown',judgePassed:null};
   let hold=assessment.hold,judgePassed:boolean|null=null;
@@ -318,13 +422,13 @@ export function materializeReassessment(assessment:RelationAssessment,evidence:R
   // Scores on a changed claim cannot inherit the old candidate's judgment.
   if(assessment.changed&&!evidence)faithfulness={...original.verification.faithfulness,threshold:0.8,score:null,returnedModel:null,reason:'Not evaluated: reassessed claim requires an actual current judgment',evaluatedAt:null,responseSha256:null,sameModel:true,limitation:LIMITATION};
   const claims=assessment.claims;
-  let graph:ReturnType<typeof normalizeGraphClaims>;
-  try{graph=normalizeGraphClaims(claims,{municipalityId:original.municipalityId,sourceSha256:original.extraction.inputSha256});}
+  let graph:Pick<DistrictKnowledgeRecord,'entities'|'relations'>;
+  try{graph=normalizeGraphClaims(claims,{municipalityId:original.municipalityId,sourceSha256:original.extraction.inputSha256,ags:original.ags});}
   catch{return {record:heldRecord(original,'graph_identity_unknown'),admitted:false,hold:'graph_identity_unknown',judgePassed};}
   const admitted=!hold&&deterministic.passed&&assessment.dateEligible&&(!assessment.needsJudge||judgePassed===true);
   const candidate={...original,...claims,...graph,caseKey:original.caseKey,
     extraction:{...original.extraction,quoteNormalization:assessment.quoteNormalization,...(assessment.normalization?{relationNormalization:{...assessment.normalization,sourceSha256:original.extraction.inputSha256,textSha256:original.extraction.textSha256,responseSha256:original.extraction.responseSha256}}:{})},
-    verification:{status:admitted?'auto-verified' as const:'candidate' as const,deterministic,faithfulness,evidenceHash:'',...(!admitted?{reason:hold??'reassessment_withheld'}:{})}};
+    verification:{kind:'text_model' as const,status:admitted?'auto-verified' as const:'candidate' as const,deterministic,faithfulness,evidenceHash:'',...(!admitted?{reason:hold??'reassessment_withheld'}:{})}};
   candidate.verification.evidenceHash=knowledgeEvidenceHash(candidate);
   return {record:DistrictKnowledgeRecordSchema.parse(candidate),admitted,hold:admitted?null:hold??'reassessment_withheld',judgePassed};
 }
@@ -352,7 +456,7 @@ export function mergeReassessmentDeltas(options:{frozen:unknown;frozenSha256:str
   const results=new Map(validated.documents.map(item=>[item.task.id,structuredClone(item.result)]));
   const totals=counts(),byTypeModality:Record<string,CountRow>={},provenance:unknown[]=[];
   // Replace by identity only after collecting decisions, so original quarantine indices stay stable.
-  const decisions=new Map<string,ReturnType<typeof materializeReassessment>>();
+  const decisions=new Map<string,MaterializedReassessment>();
   for(const item of located) {
     const assessment=assessLocated(item,validated.answers),entry=entries.get(item.key);
     const evidence=entry?.judge??cachedJudge(assessment,validated.answers,options.contract);
@@ -407,33 +511,44 @@ export function mergeReassessmentDeltas(options:{frozen:unknown;frozenSha256:str
 
 export async function judgeReassessmentPass(raw:unknown) {
   const options=JudgePassOptionsSchema.parse(raw);assertNativeReassessmentHost(options.provider);
-  const frozen=await readPinnedJson(options.frozen.path,options.frozen.sha256,512*1024*1024),contract=await currentReassessmentContract();
-  const out=resolve(options.out);await mkdir(out,{recursive:true,mode:0o700});
-  const release=await acquirePrivateRunLock(join(out,'judge-pass.lock'),'native judge-only cached relation reassessment');
+  const selectedPolicy=options.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selectedPolicy),policy={...selectedPolicy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
+  const contract=await currentReassessmentContract(),validated=await readValidatedFrozen(options.frozen,contract,policy),frozen=validated.frozen;
+  const out=resolve(options.out),contentRoot=join(out,'source-content'),bindings=reassessmentBindings(validated);
+  const judgeBindings=new Map(locatedRecords(validated).map(item=>[item.key,bindings]));
+  await initializeManagedAcquisitionLane(contentRoot,{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...policy});
+  const release=await acquirePrivateRunLock(join(out,'judge-pass.lock'),'authoritative Codex judge-only reassessment');
   const controller=new AbortController(),interrupt=()=>controller.abort(Object.assign(Error('Reassessment operator pause'),{failureCategory:'operator_pause'}));
   process.on('SIGINT',interrupt);process.on('SIGTERM',interrupt);
   try {
-    const delta=await executeReassessmentPass({frozen,frozenSha256:options.frozen.sha256,contract,provider:options.provider,usage:{ledgerPath:options.ledgerPath,pausePath:options.pausePath,signal:controller.signal},
-      load:async key=>{try{return JudgeEvidence.parse(JSON.parse(await readFile(join(out,key+'.judge.json'),'utf8')));}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return null;throw error;}},
-      save:async(key,evidence)=>{await writePrivateJson(join(out,key+'.judge.json'),evidence);}});
-    const path=join(out,'delta.json');return {path,sha256:await writePrivateJson(path,delta),deltaSha256:delta.deltaSha256};
+    const delta=await executeReassessmentPass({frozen,frozenSha256:options.frozen.sha256,contract,provider:options.provider,managedRoot:contentRoot,policy,usage:{ledgerPath:options.ledgerPath,pausePath:options.pausePath,signal:controller.signal,policy},
+      load:async key=>{const path=join(contentRoot,key+'.judge.json'),sourceBindings=judgeBindings.get(key);if(!sourceBindings)throw Error('Judge cache lacks its exact prepared context');try{await assertManagedSourceBindings(path,sourceBindings,policy);const evidence=JudgeEvidence.parse(JSON.parse(await readFile(path,'utf8')));await assertManagedSourceBindings(path,sourceBindings,policy);return evidence;}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return null;throw error;}},
+      save:async(key,evidence)=>{const sourceBindings=judgeBindings.get(key);if(!sourceBindings)throw Error('Judge cache lacks its exact prepared context');await assertPreparedSourcesActive(reassessmentReferences(validated),policy);await writeManagedSourceJson(contentRoot,join(contentRoot,key+'.judge.json'),evidence,sourceBindings,{decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});}});
+    await assertPreparedSourcesActive(reassessmentReferences(validated),policy);
+    const path=join(contentRoot,'delta.json');return {...await writeReassessmentArtifact(contentRoot,path,delta,bindings,policy),deltaSha256:delta.deltaSha256};
   }finally{process.off('SIGINT',interrupt);process.off('SIGTERM',interrupt);await release();}
 }
 export async function mergeReassessment(raw:unknown) {
-  const options=MergeReassessmentOptionsSchema.parse(raw);await fresh(options.out);
-  const frozen=await readPinnedJson(options.frozen.path,options.frozen.sha256,512*1024*1024),contract=await currentReassessmentContract();
-  const deltas=await Promise.all(options.deltas.map(pin=>readPinnedJson(pin.path,pin.sha256,512*1024*1024)));
-  const merged=mergeReassessmentDeltas({frozen,frozenSha256:options.frozen.sha256,contract,deltas});
-  await mkdir(options.out,{recursive:false,mode:0o700});
-  const artifacts=[];
-  for(const result of merged.results){const path=join(options.out,'results',result.taskId+'.json');artifacts.push({path,sha256:await writePrivateJson(path,result)});}
-  for(const name of ['records','quarantine','provenance'] as const){const path=join(options.out,name+'.json');artifacts.push({path,sha256:await writePrivateJson(path,merged[name])});}
-  const path=join(options.out,'report.json'),sha256=await writePrivateJson(path,{...merged.report,artifacts});return {path,sha256,artifacts};
+  const options=MergeReassessmentOptionsSchema.parse(raw),selectedPolicy=options.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selectedPolicy),policy={...selectedPolicy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
+  if(authority.mode!=='isolated-fixture'&&process.platform!=='linux')throw Error('Source reassessment merge requires the authoritative Codex VM');
+  await fresh(options.out);
+  const contract=await currentReassessmentContract(),validated=await readValidatedFrozen(options.frozen,contract,policy),frozen=validated.frozen,bindings=reassessmentBindings(validated);
+  const deltas=[];
+  for(const pin of options.deltas){await assertPreparedSourcesActive(reassessmentReferences(validated),policy);await assertManagedSourceBindings(pin.path,bindings,policy);const blob=await reassessmentArtifactBlob(pin,policy);await assertManagedSourceBindings(pin.path,bindings,policy);deltas.push(decode(blob));}
+  const merged=mergeReassessmentDeltas({frozen,frozenSha256:options.frozen.sha256,contract,deltas}),contentRoot=resolve(options.out);
+  await initializeManagedAcquisitionLane(contentRoot,{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...policy});
+  const artifacts:ReassessmentArtifactPin[]=[];
+  for(const result of merged.results){await assertPreparedSourcesActive(reassessmentReferences(validated),policy);artifacts.push(await writeReassessmentArtifact(contentRoot,join(contentRoot,'results',result.taskId+'.json'),result,bindings,policy));}
+  for(const name of ['records','quarantine','provenance'] as const){await assertPreparedSourcesActive(reassessmentReferences(validated),policy);artifacts.push(await writeReassessmentArtifact(contentRoot,join(contentRoot,name+'.json'),merged[name],bindings,policy));}
+  return {...await writeReassessmentArtifact(contentRoot,join(contentRoot,'report.json'),{...merged.report,artifacts},bindings,policy),artifacts};
 }
 export async function reassessmentMain(argv:string[]) {
   const [command,configPath,configSha256,...extra]=argv;
   if(!['freeze','judge-pass','merge'].includes(command)||!configPath||!configSha256||extra.length)throw Error('Usage: district-reassess-relations.ts freeze|judge-pass|merge CONFIG_JSON CONFIG_SHA256');
+  if(process.platform!=='linux')throw Error('Reassessment CLI requires the authoritative Codex VM');
   const config=await readPinnedJson(configPath,configSha256);
+  const selected=z.object({policy:PolicyOptions.optional()}).passthrough().parse(config).policy??CIVIC_POLICY_AUTHORITY;
+  const authority=await assertCivicPolicyAuthority(selected);
+  if(authority.mode!=='codex-workstation-local')throw Error('Reassessment CLI forbids fixture authority');
   const result=command==='freeze'?await freezeReassessment(config):command==='judge-pass'?await judgeReassessmentPass(config):await mergeReassessment(config);
   console.log(JSON.stringify(result));
 }

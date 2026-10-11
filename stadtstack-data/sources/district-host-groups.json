@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "district-host-groups-v1",
+  "serviceGroups": [
+    {
+      "id": "r1-public-acquisition",
+      "groupingBasis": "conservative_capacity_pool_not_publisher_equivalence",
+      "scope": "all_registered_public_sources_and_observed_redirect_hosts",
+      "minStartIntervalMs": 2500,
+      "maxInFlight": 1
+    }
+  ]
+}

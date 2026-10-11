@@ -3,15 +3,20 @@ import {dirname,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {z} from 'zod';
 import {PoliteFetcher,PoliteFetchError,publicUrl} from './polite-fetch.ts';
+import {OwnerRobotsOverrideSchema} from './district-schema.ts';
+import {APPROVED_OWNER_ROBOTS_OVERRIDE,ownerRobotsOverrideApplies} from './source-policy.ts';
+import {CIVIC_POLICY_AUTHORITY} from './civic-opt-out.ts';
 
 const url=z.string().url().refine(value=>{try{publicUrl(value);return true;}catch{return false;}},'Expected a public, credential-free HTTP URL');
 const timestamp=z.string().datetime({offset:true});
 const evidenceSchema=z.object({url,locator:z.string().min(1),sha256:z.string().regex(/^[a-f0-9]{64}$/).optional(),retrievedAt:timestamp.optional()});
 const checkState=z.enum(['checked','not_found','not_checked']);
-const kind=z.enum(['council','participation','gazette','website']);
+const kind=z.enum(['council','participation','gazette','website','structured']);
 export const districtSourceSchema=z.object({
  id:z.string().min(1),kind,url:url.nullable(),vendor:z.enum(['oparl','allris','sessionnet','somacos','other','unknown']),
  checkState,checkedAt:timestamp.nullable(),evidence:z.array(evidenceSchema),reason:z.string().optional(),
+ ownerRobotsOverride:OwnerRobotsOverrideSchema.optional(),robotsStatus:z.enum(['allowed','disallowed','unavailable']).optional(),override:z.literal('owner-approved 2026-10-11').optional(),
+ hostProfile:z.enum(['municipal','default']).optional(),
  api:z.object({url,method:z.enum(['GET','POST']).optional(),form:z.record(z.string(),z.string()).optional(),format:z.enum(['diplan-list','bobsh-list','mv-bauleitplan'])}).optional(),
  rights:z.object({licence:z.string(),reuse:z.literal('facts_with_attribution'),checkState,checkedAt:timestamp.nullable(),evidence:z.array(evidenceSchema),reason:z.string().optional()}).optional(),
  robots:z.object({url,checkState,checkedAt:timestamp.nullable(),evidence:z.array(evidenceSchema),reason:z.string().optional()}).optional(),
@@ -24,6 +29,10 @@ export const districtSourceSchema=z.object({
  if(source.checkState==='checked'&&(!source.url||!source.checkedAt||!source.evidence.length))ctx.addIssue({code:'custom',message:'Checked sources require URL, timestamp and evidence'});
  if(source.checkState==='not_found'&&(!source.checkedAt||!source.reason||!source.evidence.length))ctx.addIssue({code:'custom',message:'Not-found requires a scoped search reason and evidence; fetch failures are not absence'});
  if(source.checkState==='not_checked'&&!source.reason)ctx.addIssue({code:'custom',message:'Unchecked sources require a reason'});
+ if(source.ownerRobotsOverride||source.override||source.robotsStatus){
+  if(!source.url||!ownerRobotsOverrideApplies(source.url,source.ownerRobotsOverride)||source.override!=='owner-approved 2026-10-11')ctx.addIssue({code:'custom',message:'Owner robots exception requires an exact approved decision bound to the registered public source host'});
+  if(source.robotsStatus==='disallowed'&&(!source.robots||source.robots.checkState!=='checked'||!source.robots.checkedAt||!source.url||source.robots.url!==new URL('/robots.txt',source.url).href||!source.robots.evidence.some(item=>item.url===source.robots!.url&&item.sha256&&item.retrievedAt)))ctx.addIssue({code:'custom',message:'Disallowed registry status requires retained robots evidence, not an inferred or unavailable policy'});
+ }
 });
 const municipalitySchema=z.object({
  id:z.string().min(1),name:z.string().min(1),ags:z.string().regex(/^\d{8}$/),districtId:z.string().min(1),districtAgs:z.string().regex(/^\d{5}$/),
@@ -37,7 +46,7 @@ const municipalitySchema=z.object({
  if((m.amt===null)!==(m.administrativeStatus==='amtsfrei'))ctx.addIssue({code:'custom',message:'Amt membership contradicts administrative status'});
  const ids=new Set(m.sources.map(s=>s.id));
  if(ids.size!==m.sources.length)ctx.addIssue({code:'custom',message:'Duplicate source ID'});
- for(const k of kind.options)if(!m.sources.some(s=>s.kind===k))ctx.addIssue({code:'custom',message:`Missing explicit ${k} source category`});
+ for(const k of ['council','participation','gazette','website'] as const)if(!m.sources.some(s=>s.kind===k))ctx.addIssue({code:'custom',message:`Missing explicit ${k} source category`});
  for(const seed of m.seedDocuments){
   if(!ids.has(seed.sourceId))ctx.addIssue({code:'custom',message:`Unbound seed ${seed.sourceId}`});
   if(seed.documentDate===null&&!seed.dateReason)ctx.addIssue({code:'custom',message:'Unknown document dates need a reason; retrieval time is not document time'});
@@ -67,12 +76,13 @@ export async function loadDistrictRegistry(path='sources/district-registry.json'
 
 /** Refreshes configured endpoints only. It does not infer municipal absence from a failed request,
  * discover OParl by guessing paths, or turn registry reachability into extracted-fact approval. */
-export async function refreshDistrictRegistry(registry:DistrictRegistry,cacheDir='cache/registry-refresh'):Promise<DistrictRegistry>{
- const next=structuredClone(registry),fetcher=new PoliteFetcher({cacheDir});
+export async function refreshDistrictRegistry(registry:DistrictRegistry,cacheDir='cache/registry-refresh/owner-policy-2026-10-11/raw'):Promise<DistrictRegistry>{
+ const next=structuredClone(registry),fetcher=new PoliteFetcher({cacheDir,ownerPolicyLane:{decisionId:APPROVED_OWNER_ROBOTS_OVERRIDE.id,...CIVIC_POLICY_AUTHORITY}});
+ await fetcher.initialize();
  for(const municipality of next.municipalities)for(const source of municipality.sources){
   if(!source.url)continue;
   try{
-   const observed=await fetcher.fetch(source.url);
+   const observed=await fetcher.fetch(source.url,{ownerRobotsOverride:source.ownerRobotsOverride,registeredSourceUrl:source.url,hostProfile:source.hostProfile??'municipal'});
    source.evidence=[...source.evidence.filter(e=>!e.locator.startsWith('Endpoint refresh:')),{
     url:observed.url,locator:`Endpoint refresh: HTTP ${observed.status}; configured ${source.kind} endpoint retrieved; no content licence or extraction approval inferred`,sha256:observed.sha256,retrievedAt:observed.retrievedAt,
    }];

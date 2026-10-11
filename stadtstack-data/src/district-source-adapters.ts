@@ -13,7 +13,7 @@ import type {SourceAccessPolicy} from './source-policy.ts';
 import {PDF_TDM_POLICY_VERSION} from './pdf-tdm-policy.ts';
 
 export interface RegistrySource {
- id:string;kind:'council'|'participation'|'gazette'|'website';url:string|null;vendor:string;
+ id:string;kind:'council'|'participation'|'gazette'|'website'|'structured';url:string|null;vendor:string;
  checkState:'checked'|'not_found'|'not_checked';checkedAt:string|null;reason?:string;evidence:{url:string;locator:string}[];
  api?:{url:string;method?:'GET'|'POST';form?:Record<string,string>;format:'diplan-list'|'bobsh-list'|'mv-bauleitplan'};
  councilBodyId?:string;councilBodyAliases?:string[];

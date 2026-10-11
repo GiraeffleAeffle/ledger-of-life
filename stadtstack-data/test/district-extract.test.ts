@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DistrictExtractionClaimsSchema, DistrictKnowledgeRecordSchema, QUOTE_NORMALIZATION_VERSION, assertSubscriptionSourcePolicy, knowledgeEvidenceHash, sha256, validateKnowledgeRelease, type DistrictKnowledgeRecord } from '../src/district-schema.ts';
-import { canonicalWhitespace, dateOccursInQuote, deterministicChecks, documentChunks, extractionCacheKey, summaryNumbersSupported, NoCaseCacheSchema, rebindSourceReferences, restoreSourceQuotes, stageEvidenceSupports, EXTRACTION_INSTRUCTIONS, JUDGE_INSTRUCTIONS, EXTRACTOR_VERSION, PROMPT_VERSION, JUDGE_PROMPT_VERSION, PROMPT_SHA256, JUDGE_PROMPT_SHA256, type ExtractionCacheBinding } from '../src/district-claims.ts';
+import { KNOWLEDGE_SCHEMA_VERSION, DistrictExtractionClaimsSchema, DistrictKnowledgeRecordSchema, QUOTE_NORMALIZATION_VERSION, assertSubscriptionSourcePolicy, knowledgeEvidenceHash, sha256, validateKnowledgeRelease, type DistrictKnowledgeRecord } from '../src/district-schema.ts';
+import { canonicalWhitespace, dateOccursInQuote, deterministicChecks, documentChunks, extractionCacheKey, summaryNumbersSupported, NoCaseCacheSchema, rebindSourceReferences, restoreSourceQuotes, EXTRACTION_INSTRUCTIONS, JUDGE_INSTRUCTIONS, EXTRACTOR_VERSION, PROMPT_VERSION, JUDGE_PROMPT_VERSION, PROMPT_SHA256, JUDGE_PROMPT_SHA256, type ExtractionCacheBinding } from '../src/district-claims.ts';
+import {stageEvidenceSupports} from '../src/district-stage-evidence.ts';
 import { codexResponseSchema, inspectCodexEvents, subscriptionExecutionArgs } from '../src/district-model.ts';
 import { extractDocumentText, htmlToDocumentText } from '../src/district-document.ts';
 import { TOPIC_VOCABULARY, getTopic, topicAncestors } from '../src/topic-vocabulary.ts';
 import { TOPICS } from '../regional/taxonomy.mjs';
 import {groupCrawlDocuments,selectExtractionGroups} from '../src/district-corpus.ts';
-import {PROVIDER_CONFIGS} from '../src/district-model-contract.ts';
+import {PROVIDER_CONFIGS,modelIdentitySha256} from '../src/district-model-contract.ts';
 import {normalizeGraphClaims} from '../src/district-graph-claims.ts';
 const EXTRACTION_MODEL=PROVIDER_CONFIGS['openai-subscription'].model;
 
@@ -76,14 +77,40 @@ function claims() {
 function record(): DistrictKnowledgeRecord {
   const sourceHash = sha256(text);
   const value = {
-    ...claims(), ...normalizeGraphClaims(claims(),{municipalityId:'beispielstadt',sourceSha256:sourceHash}), id: 'knowledge:unit-test', municipalityId: 'beispielstadt', ags: '12064001', districtId: 'unit-district', caseKey: `source_document:${sourceHash}`,
+    kind: 'text_model',
+    ...claims(), ...normalizeGraphClaims(claims(),{municipalityId:'beispielstadt',sourceSha256:sourceHash,ags:'12064001'}), id: 'knowledge:unit-test', municipalityId: 'beispielstadt', ags: '12064001', districtId: 'unit-district', caseKey: `source_document:${sourceHash}`,
     sources: [{ id: 'unit-source', url: 'https://example.org/document', sha256: sourceHash, retrievedAt: now, locator: 'chars:0-160', mimeType: 'text/plain', sourceType: 'website', policy: { robots: { state: 'allowed', url: 'https://example.org/robots.txt' }, tdm: { state: 'not_declared', evidence: [] }, access: 'public', legalClassification: 'not_assessed', publication: 'facts_with_attribution_only' } }],
     extraction: { extractorVersion: 'unit-test', extractorSha256: sha256('extractor'), model: EXTRACTION_MODEL, provider: 'openai-subscription', tool: 'codex-cli', toolVersion: '0.162.1', modelIdentitySha256: sha256('synthetic configured model/tool identity'), modelIdentityBasis: 'configured-cli-model-and-tool-version', returnedModel: null, promptVersion: 'unit-test', promptSha256: PROMPT_SHA256, judgePromptVersion: 'unit-test', judgePromptSha256: JUDGE_PROMPT_SHA256, inputSha256: sourceHash, textSha256: sourceHash, responseSha256: sha256('synthetic extraction response'), ocrUsed: false, textMethod: 'text', cacheKey: sha256('unit cache'), extractedAt: now, chunk: { index: 0, count: 1, start: 0, end: text.length } },
-    verification: { status: 'auto-verified', deterministic: deterministicChecks(claims(), text, 'Beispielstadt'), faithfulness: { score: 0.9, threshold: 0.8, model: EXTRACTION_MODEL, provider: 'openai-subscription', tool: 'codex-cli', toolVersion: '0.162.1', modelIdentitySha256: sha256('synthetic configured model/tool identity'), returnedModel: null, reason: 'Synthetic unit-test judge fixture, not actual model evidence', evaluatedAt: now, responseSha256: sha256('synthetic judge response'), sameModel: true, limitation: 'Same-model judgment is not independent verification.' }, evidenceHash: '' },
+    verification: { kind: 'text_model', status: 'auto-verified', deterministic: deterministicChecks(claims(), text, 'Beispielstadt'), faithfulness: { score: 0.9, threshold: 0.8, model: EXTRACTION_MODEL, provider: 'openai-subscription', tool: 'codex-cli', toolVersion: '0.162.1', modelIdentitySha256: sha256('synthetic configured model/tool identity'), returnedModel: null, reason: 'Synthetic unit-test judge fixture, not actual model evidence', evaluatedAt: now, responseSha256: sha256('synthetic judge response'), sameModel: true, limitation: 'Same-model judgment is not independent verification.' }, evidenceHash: '' },
   };
   value.verification.evidenceHash = knowledgeEvidenceHash(value);
   return DistrictKnowledgeRecordSchema.parse(value);
 }
+test('synthetic omp records retain actual route identity and reject mixed generation/judge provenance', () => {
+  const historical = record(), before = JSON.stringify(historical);
+  const fresh = structuredClone(historical);
+  const identity = { provider: 'anthropic-subscription' as const, tool: 'omp-cli' as const,
+    model: 'claude-haiku-5-5', toolVersion: '0.0.0-synthetic-omp',
+    modelIdentityBasis: 'reported-cli-model-and-tool-version' as const };
+  const evidence = { ...identity, modelIdentitySha256: modelIdentitySha256(identity) };
+  Object.assign(fresh.extraction, evidence, { returnedModel: identity.model });
+  const { modelIdentityBasis: _basis, ...judgeIdentity } = evidence;
+  Object.assign(fresh.verification.faithfulness, judgeIdentity, { returnedModel: identity.model });
+  fresh.verification.evidenceHash = knowledgeEvidenceHash(fresh);
+  assert.deepEqual(DistrictKnowledgeRecordSchema.parse(fresh), fresh);
+  assert.equal(JSON.stringify(historical), before);
+  for (const patch of [{ provider: 'openai-subscription' }, { model: 'gpt-6-luna' }, { tool: 'codex-cli' },
+    { modelIdentityBasis: 'configured-cli-model-and-tool-version' }]) {
+    const mixed = structuredClone(fresh);
+    Object.assign(mixed.extraction, patch);
+    mixed.verification.evidenceHash = knowledgeEvidenceHash(mixed);
+    assert.equal(DistrictKnowledgeRecordSchema.safeParse(mixed).success, false);
+  }
+  const changedJudge = structuredClone(fresh);
+  changedJudge.verification.faithfulness.tool = 'claude-cli';
+  changedJudge.verification.evidenceHash = knowledgeEvidenceHash(changedJudge);
+  assert.equal(DistrictKnowledgeRecordSchema.safeParse(changedJudge).success, false);
+});
 const registry = { municipalities: [{ id: 'beispielstadt', name: 'Beispielstadt', ags: '12064001', districtId: 'unit-district', sources: [{ id: 'unit-source', kind: 'website', url: 'https://example.org', checkState: 'checked' }] }] };
 
 test('hierarchy preserves all canonical regional leaves without duplicating vocabulary', () => {
@@ -131,7 +158,7 @@ test('source-only location geometry does not permit inferred pins', () => {
 });
 test('release requires actual-shaped judge evidence, all deterministic checks and identity binding', () => {
   const good = record();
-  const envelope = { schemaVersion: 'stadtstack-knowledge-v2', generatedAt: now, records: [good] };
+  const envelope = { schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records: [good], identityAssertions: [], identityAdmissions: [] };
   assert.equal(validateKnowledgeRelease(envelope, registry).records.length, 1);
   for (const score of [null, 0.79]) {
     const bad = structuredClone(good);
@@ -209,7 +236,7 @@ test('HTML extraction removes active content and decodes source text', () => {
 });
 test('PDF text layer precedes per-page OCR; sparse page uses German and English OCR', async () => {
   const calls: Array<{ file: string; args: string[] }> = [];
-  const result = await extractDocumentText(Buffer.from('%PDF-unit-test'), 'application/pdf', async (file, args) => {
+  const result = await extractDocumentText(Buffer.from('%PDF-unit-test'), 'application/pdf', undefined, async (file, args) => {
     calls.push({ file, args });
     if (file === 'pdfinfo') return 'Pages: 2';
     if (file === 'pdftotext') { assert.equal(args.includes('-layout'),false); return `${text.repeat(2)}\f\f`; }
@@ -225,23 +252,23 @@ test('PDF text layer precedes per-page OCR; sparse page uses German and English 
   assert.match(result.text, /recovered/);
 });
 test('missing OCR and oversized page count are explicit failures, not fabricated text', async () => {
-  await assert.rejects(extractDocumentText(Buffer.from('%PDF-test'), 'application/pdf', async file => {
+  await assert.rejects(extractDocumentText(Buffer.from('%PDF-test'), 'application/pdf', undefined, async file => {
     if (file === 'pdfinfo') return 'Pages: 1';
     if (file === 'pdftotext' || file === 'pdftoppm') return '';
     throw Error('Missing document prerequisite: tesseract');
   }), /Missing document prerequisite: tesseract/);
-  await assert.rejects(extractDocumentText(Buffer.from('%PDF-test'), 'application/pdf', async () => 'Pages: 81'), /80-page limit/);
+  await assert.rejects(extractDocumentText(Buffer.from('%PDF-test'), 'application/pdf', undefined, async () => 'Pages: 81'), /80-page limit/);
 });
 
 test('XML/GML remains source text without expanding external entities', async () => {
   const xml = '<Plan><name>Beispielstadt Wärmeplanung</name><datum>2026-10-10</datum></Plan>';
-  const result = await extractDocumentText(Buffer.from(xml), 'application/gml+xml');
+  const result = await extractDocumentText(Buffer.from(xml), 'application/gml+xml', undefined, async () => { throw Error('Synthetic XML fixture must not execute parser commands'); });
   assert.equal(result.text, xml);
   assert.equal(result.method, 'xml');
 });
 test('bounded ZIP reads recognized XML/GML only and discloses uninterpreted members', async () => {
   const xml = '<Plan><name>Beispielstadt Wärmeplanung</name><datum>2026-10-10</datum></Plan>';
-  const result = await extractDocumentText(Buffer.from('synthetic zip seam'), 'application/zip', async (file, args) => {
+  const result = await extractDocumentText(Buffer.from('synthetic zip seam'), 'application/zip', undefined, async (file, args) => {
     assert.equal(file, 'python3');
     assert.equal(args[0], '-c');
     assert.match(args[1], /archive\.read/);
@@ -250,7 +277,7 @@ test('bounded ZIP reads recognized XML/GML only and discloses uninterpreted memb
   assert.equal(result.text, xml);
   assert.equal(result.method, 'zip_xml');
   assert.match(result.limitations![0], /2 other archive members/);
-  await assert.rejects(extractDocumentText(Buffer.from('zip seam'), 'application/zip', async () => JSON.stringify({ error: 'Unsupported document ZIP: no XML/GML member' })), /no XML\/GML/);
+  await assert.rejects(extractDocumentText(Buffer.from('zip seam'), 'application/zip', undefined, async () => JSON.stringify({ error: 'Unsupported document ZIP: no XML/GML member' })), /no XML\/GML/);
 });
 
 test('missing, reserved or blocked source policy prevents subscription transmission and release', () => {
@@ -294,7 +321,7 @@ test('identical document claims retain every current bound source without claimi
   assert.match(rebound.extraction.documentLimitations!.join(' '), /not independent corroboration/);
   const reboundRegistry = structuredClone(registry);
   reboundRegistry.municipalities[0].sources.push({ id: 'gazette-source', kind: 'gazette', url: 'https://example.org', checkState: 'checked' });
-  assert.equal(validateKnowledgeRelease({ schemaVersion: 'stadtstack-knowledge-v2', generatedAt: now, records: [rebound] }, reboundRegistry).records.length, 1);
+  assert.equal(validateKnowledgeRelease({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records: [rebound], identityAssertions: [], identityAdmissions: [] }, reboundRegistry).records.length, 1);
 });
 
 test('cached actual no-case responses retain evidence without manufacturing a record or judge score', () => {

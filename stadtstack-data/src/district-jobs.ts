@@ -46,18 +46,54 @@ export function canonicalResourceIdentity(raw:string):string {
   url.hash='';return url.href;
 }
 
+/** Explicit ordered migrations, each committed independently and byte-hash pinned.
+ * A failure in 002 cannot roll back already-applied 001 or silently rewrite it.
+ */
 export async function migrateDistrictJobs(pool:Pool):Promise<void> {
-  const bytes=await readFile(new URL('../migrations/001_district_jobs.sql',import.meta.url));
-  const hash=digest(bytes),client=await pool.connect();
+  const migrations=[
+    {version:1,file:new URL('../migrations/001_district_jobs.sql',import.meta.url)},
+    {version:2,file:new URL('../migrations/002_r1_metadata.sql',import.meta.url)},
+    {version:3,file:new URL('../migrations/003_assessment_bridge.sql',import.meta.url)},
+  ];
+  const client=await pool.connect();
   try {
-    await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(18441,1)');
-    await client.query('CREATE SCHEMA IF NOT EXISTS district_pipeline');
-    await client.query('CREATE TABLE IF NOT EXISTS district_pipeline.schema_migrations (version integer PRIMARY KEY, sha256 text NOT NULL, applied_at timestamptz NOT NULL DEFAULT clock_timestamp())');
-    const previous=await client.query<{sha256:string}>('SELECT sha256 FROM district_pipeline.schema_migrations WHERE version=1');
-    if(previous.rowCount){if(previous.rows[0].sha256!==hash)throw Error('Applied migration byte hash changed');}
-    else {await client.query(bytes.toString('utf8'));await client.query('INSERT INTO district_pipeline.schema_migrations(version,sha256) VALUES(1,$1)',[hash]);}
-    await client.query('COMMIT');
-  } catch(error) {await client.query('ROLLBACK');throw error;} finally {client.release();}
+    for(const migration of migrations){
+      const bytes=await readFile(migration.file),hash=digest(bytes);
+      await client.query('BEGIN');
+      try {
+        await client.query('SELECT pg_advisory_xact_lock(18441,1)');
+        await client.query('CREATE SCHEMA IF NOT EXISTS district_pipeline');
+        await client.query('CREATE TABLE IF NOT EXISTS district_pipeline.schema_migrations (version integer PRIMARY KEY, sha256 text NOT NULL, applied_at timestamptz NOT NULL DEFAULT clock_timestamp())');
+        const future=await client.query('SELECT version FROM district_pipeline.schema_migrations WHERE version>$1 LIMIT 1',[migrations[migrations.length-1].version]);
+        if(future.rowCount)throw Error('Database migration is newer than this runner');
+        const previous=await client.query<{sha256:string}>('SELECT sha256 FROM district_pipeline.schema_migrations WHERE version=$1',[migration.version]);
+        if(previous.rowCount){if(previous.rows[0].sha256!==hash)throw Error('Applied migration byte hash changed');}
+        else {await client.query(bytes.toString('utf8'));await client.query('INSERT INTO district_pipeline.schema_migrations(version,sha256) VALUES($1,$2)',[migration.version,hash]);}
+        await client.query('COMMIT');
+      } catch(error) {await client.query('ROLLBACK');throw error;}
+    }
+  } finally {client.release();}
+}
+
+const R1MetadataKindSchema=z.enum(['structured_run','records','coverage','registry','routes','acquisition_descriptor','http_observation','replay_artifact','replay_proof']);
+export type R1MetadataKind=z.infer<typeof R1MetadataKindSchema>;
+export interface R1MetadataSnapshotInput {kind:R1MetadataKind;payload:unknown}
+/** Callers validate a closed, content-free kind-specific audit schema. The
+ * structured_run/records/coverage kinds store only artifact/source/proof pins
+ * and fixed numeric counts, never raw locators, quotes, errors or full payloads.
+ * Persist audits PG-first; full private payloads remain source-bound purgeable
+ * CAS. The returned audit SHA is distinct from the private content SHA.
+ */
+export async function insertR1MetadataSnapshot(pool:Pool,input:R1MetadataSnapshotInput):Promise<string> {
+  const kind=R1MetadataKindSchema.parse(input.kind),payload=input.payload;
+  if(!Array.isArray(payload)&&(payload===null||typeof payload!=='object'||Object.getPrototypeOf(payload)!==Object.prototype))throw Error('Safe metadata payload must be an object or array');
+  const bytes=canonicalJson(payload),sha256=digest(bytes);
+  const inserted=await pool.query<{sha256:string}>(`INSERT INTO district_pipeline.r1_metadata_snapshots(sha256,kind,payload_json) VALUES($1,$2,$3::jsonb) ON CONFLICT(sha256) DO NOTHING RETURNING sha256`,[sha256,kind,bytes]);
+  if(!inserted.rowCount){
+    const existing=await pool.query<{kind:R1MetadataKind;payload_json:unknown}>('SELECT kind,payload_json FROM district_pipeline.r1_metadata_snapshots WHERE sha256=$1',[sha256]);
+    if(!existing.rowCount||existing.rows[0].kind!==kind||canonicalJson(existing.rows[0].payload_json)!==bytes)throw Error('Safe metadata snapshot identity conflict');
+  }
+  return sha256;
 }
 
 export class DistrictJobStore {
@@ -141,6 +177,15 @@ export class DistrictJobStore {
       const deadlineReason:ReasonCode=deadlineAt.getTime()===auth.expires_at.getTime()?'authorization_expired':deadlineAt.getTime()===authorizedEnd?'authorization_time_exhausted':'max_time_reached';
       return {runId,authorizationId,maxJobs,maxElapsedMs,startedAt,deadlineAt,deadlineReason};
     });
+  }
+  /** Lock existing authority rows before any job or dependent row, including
+   * late hold/reconciliation paths that intentionally permit expired authority.
+   */
+  private async lockRunAuthority(client:PoolClient,runId:string):Promise<boolean> {
+    const runs=await client.query<{authorization_id:string}>('SELECT authorization_id FROM district_pipeline.executor_runs WHERE id=$1 FOR UPDATE',[runId]);
+    if(!runs.rowCount)return false;
+    const authorizations=await client.query('SELECT id FROM district_pipeline.preauthorizations WHERE id=$1 FOR UPDATE',[runs.rows[0].authorization_id]);
+    return authorizations.rowCount===1;
   }
   private async assertRun(client:PoolClient,run:RunBounds):Promise<AuthorizationRow> {
     const result=await client.query<{state:string;now:Date}>('SELECT state,clock_timestamp() AS now FROM district_pipeline.executor_runs WHERE id=$1 FOR UPDATE',[run.runId]);
@@ -270,6 +315,7 @@ export class DistrictJobStore {
    */
   async hold(job:ClaimedJob,reasonCode:ReasonCode,receipt:StepReceipt):Promise<boolean> {
     return this.transaction(async client=>{
+      if(!await this.lockRunAuthority(client,job.runId))return false;
       const current=await client.query(`SELECT id FROM district_pipeline.jobs WHERE id=$1 AND lease_owner=$2 AND fencing_token=$3 AND state='leased' FOR UPDATE`,[job.id,job.runId,job.fencingToken]);
       if(!current.rowCount)return false;
       const held={...receipt,outcome:'held_execution' as const,reasonCode,outputHashes:[]};
@@ -291,7 +337,12 @@ export class DistrictJobStore {
     await client.query(`INSERT INTO district_pipeline.owner_notifications(id,run_id,phase,notification_approval_sha256,destination_sha256,expected_provider,payload,payload_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,[payload.id,payload.runId,payload.phase,payload.notificationApprovalSha256,payload.destinationSha256,payload.provider,payload,digest(canonicalJson(payload))]);
   }
   private async endRunTransaction(client:PoolClient,runId:string,state:'completed'|'held',reasonCode:ReasonCode):Promise<void> {
-    const runs=await client.query<{authorization_id:string;execution_mode:ExecutionMode;notification_approval_sha256:string|null;notification_destination_sha256:string|null;notification_provider:string|null}>(`SELECT r.authorization_id,r.execution_mode,a.notification_approval_sha256,a.notification_destination_sha256,a.notification_provider FROM district_pipeline.executor_runs r JOIN district_pipeline.preauthorizations a ON a.id=r.authorization_id WHERE r.id=$1 AND r.state='running' FOR UPDATE OF r`,[runId]);
+    if(!await this.lockRunAuthority(client,runId))return;
+    await this.endLockedRun(client,runId,state,reasonCode);
+  }
+  /** Caller already holds this run and authorization through COMMIT. */
+  private async endLockedRun(client:PoolClient,runId:string,state:'completed'|'held',reasonCode:ReasonCode):Promise<void> {
+    const runs=await client.query<{authorization_id:string;execution_mode:ExecutionMode;notification_approval_sha256:string|null;notification_destination_sha256:string|null;notification_provider:string|null}>(`SELECT r.authorization_id,r.execution_mode,a.notification_approval_sha256,a.notification_destination_sha256,a.notification_provider FROM district_pipeline.executor_runs r JOIN district_pipeline.preauthorizations a ON a.id=r.authorization_id WHERE r.id=$1 AND r.state='running'`,[runId]);
     if(!runs.rowCount)return;
     await client.query(`UPDATE district_pipeline.executor_runs SET state=$2,reason_code=$3,finished_at=clock_timestamp() WHERE id=$1`,[runId,state,reasonCode]);
     const row=runs.rows[0];
@@ -310,9 +361,11 @@ export class DistrictJobStore {
   async recordNotificationDelivery(id:string,acknowledgement:NotificationAcknowledgement|null):Promise<void> {
     const ack=acknowledgement===null?null:NotificationAcknowledgementSchema.parse(acknowledgement);
     await this.transaction(async client=>{
+      const notification=await client.query<{run_id:string}>('SELECT run_id FROM district_pipeline.owner_notifications WHERE id=$1',[id]);
+      if(!notification.rowCount||!await this.lockRunAuthority(client,notification.rows[0].run_id))throw new DistrictExecutionHold('lease_lost');
       const result=await client.query<{run_id:string}>(`UPDATE district_pipeline.owner_notifications SET state=$2,attempts=attempts+1,delivered_at=CASE WHEN $2='delivered' THEN clock_timestamp() ELSE NULL END,provider=$3,provider_message_id=$4,acknowledged_at=$5 WHERE id=$1 AND state<>'delivered' AND ($2='failed' OR (expected_provider=$3 AND destination_sha256=$6 AND payload_sha256=$7 AND id=$8::uuid)) RETURNING run_id`,[id,ack?'delivered':'failed',ack?.provider??null,ack?.messageId??null,ack?.acknowledgedAt??null,ack?.destinationSha256??null,ack?.payloadSha256??null,ack?.notificationId??null]);
       if(!ack&&result.rowCount){
-        await this.endRunTransaction(client,result.rows[0].run_id,'held','notification_failed');
+        await this.endLockedRun(client,result.rows[0].run_id,'held','notification_failed');
         await client.query(`UPDATE district_pipeline.executor_runs SET state='held',reason_code='notification_failed',finished_at=clock_timestamp() WHERE id=$1`,[result.rows[0].run_id]);
       }
       if(ack&&!result.rowCount)throw new DistrictExecutionHold('notification_failed');
@@ -325,7 +378,12 @@ export class DistrictJobStore {
     const owned=await lock.query<{owned:boolean}>(`SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND pid=pg_backend_pid() AND classid=18441 AND objid=2 AND granted) AS owned`);
     if(!owned.rows[0].owned)throw new DistrictExecutionHold('executor_busy');
     await this.transaction(async client=>{
-      const abandoned=await client.query<JobRow & {category:ClaimedJob['category'];now:Date}>(`SELECT j.*,a.category,clock_timestamp() AS now FROM district_pipeline.jobs j JOIN district_pipeline.executor_runs r ON r.id=j.lease_owner JOIN district_pipeline.preauthorizations a ON a.id=r.authorization_id WHERE j.state='leased' FOR UPDATE OF j`);
+      // Acquire all run rows before any shared authorization: two old runs may
+      // share one authorization while a broker operates on either run.
+      const authorities=await client.query<{id:string;authorization_id:string}>(`SELECT r.id,r.authorization_id FROM district_pipeline.executor_runs r WHERE r.state='running' OR EXISTS(SELECT 1 FROM district_pipeline.jobs j WHERE j.lease_owner=r.id AND j.state='leased') ORDER BY r.id FOR UPDATE OF r`);
+      const authorizationIds=[...new Set(authorities.rows.map(row=>row.authorization_id))].sort();
+      if(authorizationIds.length)await client.query('SELECT id FROM district_pipeline.preauthorizations WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',[authorizationIds]);
+      const abandoned=await client.query<JobRow & {category:ClaimedJob['category'];now:Date}>(`SELECT j.*,a.category,clock_timestamp() AS now FROM district_pipeline.jobs j JOIN district_pipeline.executor_runs r ON r.id=j.lease_owner JOIN district_pipeline.preauthorizations a ON a.id=r.authorization_id WHERE j.state='leased' AND r.id=ANY($1::uuid[]) ORDER BY j.id FOR UPDATE OF j`,[authorities.rows.map(row=>row.id)]);
       for(const row of abandoned.rows){
         const job:ClaimedJob={id:row.id,jobKey:row.job_key,spec:row.spec,attempt:row.attempt,fencingToken:row.fencing_token,runId:row.lease_owner,enqueuedAt:row.created_at.toISOString(),startedAt:row.attempt_started_at.toISOString(),leaseExpiresAt:row.lease_expires_at.toISOString(),dependencyReceiptIds:row.claimed_dependency_receipt_ids,category:row.category};
         const reason:ReasonCode=row.lease_expires_at<=row.now?'lease_expired':'lease_lost';
@@ -335,8 +393,7 @@ export class DistrictJobStore {
         await client.query('DELETE FROM district_pipeline.host_lane_leases WHERE job_id=$1',[row.id]);
         await client.query(`UPDATE district_pipeline.provider_reservations SET state='held_uncertain' WHERE job_id=$1 AND state='reserved'`,[row.id]);
       }
-      const runs=await client.query<{id:string}>(`SELECT id FROM district_pipeline.executor_runs WHERE state='running' ORDER BY id`);
-      for(const row of runs.rows)await this.endRunTransaction(client,row.id,'held','lease_lost');
+      for(const row of authorities.rows)await this.endLockedRun(client,row.id,'held','lease_lost');
     });
   }
   /** Shared budget reservations are also usable by later dependent provider waves.
@@ -345,7 +402,9 @@ export class DistrictJobStore {
   async reserveProviderBudget(budgetId:string,jobId:string,fencingToken:string,microUsd:number,submissionIntentSha256:string):Promise<string> {
     if(!Number.isSafeInteger(microUsd)||microUsd<=0)throw Error('Worst-case spend reservation required');HashSchema.parse(submissionIntentSha256);
     return this.transaction(async client=>{
-      const current=await client.query(`SELECT j.id FROM district_pipeline.jobs j JOIN district_pipeline.executor_runs r ON r.id=j.lease_owner JOIN district_pipeline.preauthorizations a ON a.id=r.authorization_id WHERE j.id=$1 AND j.state='leased' AND j.fencing_token=$2 AND j.lease_expires_at>clock_timestamp() AND NOT j.cancellation_requested AND r.state='running' AND a.state='approved' AND a.expires_at>clock_timestamp() AND a.first_started_at+a.max_elapsed_ms*interval '1 millisecond'>clock_timestamp() AND r.started_at+r.max_elapsed_ms*interval '1 millisecond'>clock_timestamp() FOR UPDATE OF j`,[jobId,fencingToken]);if(!current.rowCount)throw new DistrictExecutionHold('lease_lost');
+      const owner=await client.query<{lease_owner:string}>('SELECT lease_owner FROM district_pipeline.jobs WHERE id=$1 AND state=$2 AND fencing_token=$3',[jobId,'leased',fencingToken]);
+      if(!owner.rowCount||!await this.lockRunAuthority(client,owner.rows[0].lease_owner))throw new DistrictExecutionHold('lease_lost');
+      const current=await client.query(`SELECT j.id FROM district_pipeline.jobs j JOIN district_pipeline.executor_runs r ON r.id=j.lease_owner JOIN district_pipeline.preauthorizations a ON a.id=r.authorization_id WHERE j.id=$1 AND j.state='leased' AND j.fencing_token=$2 AND j.lease_owner=$3 AND j.lease_expires_at>clock_timestamp() AND NOT j.cancellation_requested AND r.state='running' AND a.state='approved' AND a.expires_at>clock_timestamp() AND a.first_started_at+a.max_elapsed_ms*interval '1 millisecond'>clock_timestamp() AND r.started_at+r.max_elapsed_ms*interval '1 millisecond'>clock_timestamp() FOR UPDATE OF j`,[jobId,fencingToken,owner.rows[0].lease_owner]);if(!current.rowCount)throw new DistrictExecutionHold('lease_lost');
       const budget=await client.query<{cap_micro_usd:string;spent_micro_usd:string;reserved_micro_usd:string;pause_fraction:string;expires_at:Date;paused_reason:string|null;now:Date}>('SELECT *,clock_timestamp() AS now FROM district_pipeline.provider_budgets WHERE id=$1 FOR UPDATE',[budgetId]);
       if(!budget.rowCount)throw new DistrictExecutionHold('budget_exhausted');const row=budget.rows[0];
       if(row.expires_at<=row.now)throw new DistrictExecutionHold('budget_expired');if(row.paused_reason)throw new DistrictExecutionHold('budget_paused');
@@ -440,7 +499,12 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
         const aborted=new Promise<never>((_,reject)=>{rejectAbort=reject;});
         const result=await Promise.race([Promise.resolve().then(()=>handler({job,signal:controller.signal,cas:options.cas,acquireHostLane:laneKey=>options.store.acquireHostLane(run!,job,laneKey)})),aborted]);
         if(controller.signal.aborted)throw controller.signal.reason;
-        if(result.provider&&(result.provider.reservedMicroUsd>0||(result.provider.actualBilledUsd??0)>0||(result.provider.estimatedApiUsd??0)>0))throw new DistrictExecutionHold('paid_not_authorized');
+        if(result.provider){
+          const provider=result.provider;
+          const subscription=provider.provider==='openai-subscription'||provider.provider==='anthropic-subscription';
+          // Subscription CLI API-equivalent estimates are not paid invoices.
+          if(!subscription||(provider.actualBilledUsd!==null&&provider.actualBilledUsd>0)||provider.reservedMicroUsd>0)throw new DistrictExecutionHold('paid_not_authorized');
+        }
         for(const output of result.outputs??[]){controller.signal.throwIfAborted();await options.cas.verify(output.sha256);await options.store.addArtifact(output);}
         receipt=makeReceipt(job,result,performance.now()-start,process.cpuUsage(cpu));
         await options.store.finish(run,job,receipt);receiptIds.push(receipt.id);

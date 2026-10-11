@@ -1,14 +1,23 @@
 import {readFile} from 'node:fs/promises';
 import {z} from 'zod';
-import {daySchema,hashSchema,sha256} from './district-schema.ts';
+import {daySchema,hashSchema,sha256,SourceAccessPolicySchema} from './district-schema.ts';
+import {documentOriginExcludes} from './source-policy.ts';
 
 export const PILOT_BASE_CORPUS_SHA256='fbcd03c8474e3fa3cb2a3db0b9a976e3793863a3a6e268b0ead21868516ec2c0';
 export const PILOT_COMPLETION_CORPUS_SHA256='fb4e08eee8bf1a3bf036433893553b5ebb0e7ae4dec1fea6ce702a8f66642992';
 // Exact owner-authorized snapshots; a caller-selected checksum cannot extend scope.
 export const authorizedPilotCorpusSchema=z.enum([PILOT_BASE_CORPUS_SHA256,PILOT_COMPLETION_CORPUS_SHA256]);
-export const crawlDocumentSchema=z.object({id:z.string(),municipalityId:z.string(),ags:z.string().regex(/^\d{8}$/),districtId:z.string(),sourceId:z.string(),url:z.url(),sha256:hashSchema,mimeType:z.string(),retrievedAt:z.iso.datetime(),documentDate:daySchema.nullable(),localPath:z.string(),adapter:z.string(),metadata:z.record(z.string(),z.unknown()),policy:z.unknown().optional()});
+export const crawlDocumentSchema=z.object({id:z.string(),municipalityId:z.string(),ags:z.string().regex(/^\d{8}$/),districtId:z.string(),sourceId:z.string(),url:z.url(),sha256:hashSchema,mimeType:z.string(),retrievedAt:z.iso.datetime(),checkedAt:z.iso.datetime().optional(),status:z.number().int().min(100).max(599).optional(),observationPath:z.string().min(1).optional(),documentDate:daySchema.nullable(),localPath:z.string(),adapter:z.string(),metadata:z.record(z.string(),z.unknown()),policy:z.unknown().optional(),exclusion:z.never().optional()});
 export type CrawlDocument=z.infer<typeof crawlDocumentSchema>;
-export const frozenCorpusSchema=z.object({schemaVersion:z.literal('stadtstack-crawl-index-v1'),documents:z.array(crawlDocumentSchema)}).passthrough();
+export const excludedCrawlDocumentSchema=crawlDocumentSchema.omit({localPath:true,policy:true,exclusion:true}).extend({
+ checkedAt:z.iso.datetime(),status:z.number().int(),observationPath:z.string().min(1),policy:SourceAccessPolicySchema,sizeBytes:z.number().int().nonnegative(),
+ exclusion:z.object({reason:z.literal('non_official_restricted'),excludedAt:z.iso.datetime(),previousManagedCopy:z.enum(['removed','retained_independent','not_managed','partial'])}).strict(),
+}).strict().superRefine((document,ctx)=>{
+ const origin=document.policy.documentOrigin;
+ if(!origin||origin.url!==document.url||origin.sha256!==document.sha256||!documentOriginExcludes(document.policy,document))ctx.addIssue({code:'custom',message:'Excluded acquisition requires bound origin classification and an actual restriction'});
+});
+export type ExcludedCrawlDocument=z.infer<typeof excludedCrawlDocumentSchema>;
+export const frozenCorpusSchema=z.object({schemaVersion:z.literal('stadtstack-crawl-index-v1'),documents:z.array(crawlDocumentSchema),excludedDocuments:z.array(excludedCrawlDocumentSchema).optional()}).passthrough();
 export async function loadFrozenCorpus(path:string,expectedSha256:string){
  authorizedPilotCorpusSchema.parse(expectedSha256);
  const bytes=await readFile(path);

@@ -86,3 +86,33 @@ test('benign external hyperlinks are ignored, external workbook resources and DT
  assert.throws(()=>readXlsx(workbook(sheet,[{...hyper,text:hyper.text.replace('/hyperlink','/externalLinkPath')}])),/External/);
  assert.throws(()=>readXlsx(workbook('<!DOCTYPE worksheet [<!ENTITY hidden SYSTEM "https://example.invalid/">]><worksheet/>',[hyper])),/DTD/);
 });
+test('OOXML cell overrides active row defaults, which override column defaults, with native selection evidence',()=>{
+ const sheet='<worksheet><cols><col min="1" max="2" style="1"/><col min="3" max="3" style="2"/></cols><sheetData><row r="1"><c r="A1"><v>0.6</v></c><c r="B1" s="0"><v>0.6</v></c><c r="C1"><v>1</v></c></row><row r="2" s="3" customFormat="1"><c r="A2"><v>0.6</v></c><c r="B2" s="0"><v>0.6</v></c><c r="C2"><v>1</v></c></row><row r="3" s="0" customFormat="true"><c r="A3"><v>0.6</v></c></row><row r="4" s="3" customFormat="false"><c r="C4"><v>1</v></c></row><row r="5" s="3"><c r="C5"><v>1</v></c></row></sheetData></worksheet>';
+ const styles='<styleSheet><numFmts><numFmt numFmtId="164" formatCode="0.000%"/></numFmts><cellXfs><xf numFmtId="0"/><xf numFmtId="9"/><xf numFmtId="14"/><xf numFmtId="164"/></cellXfs></styleSheet>',table=readXlsx(workbook(sheet,[{name:'xl/styles.xml',text:styles}]))[0];
+ assert.equal(nativePercentValue(table.rows[0][0]),'60');assert.equal(nativePercentValue(table.rows[0][1]),'0.6');assert.equal(table.rows[0][2].dateStyle,true);
+ assert.equal(table.rows[1][0].numberFormat!.numFmtId,'164');assert.equal(nativePercentValue(table.rows[1][1]),'0.6');assert.equal(table.rows[1][2].dateStyle,false);assert.equal(nativePercentValue(table.rows[2][0]),'0.6');
+ assert.equal(table.rows[3][2].numberFormat!.numFmtId,'14');assert.equal(table.rows[4][2].numberFormat!.numFmtId,'14');
+ const column=table.rows[0][0].numberFormat!.evidence;assert.ok(column.some(e=>e.path.includes('/cols/col[1]/@min')&&e.rawValue==='1'));assert.ok(column.some(e=>e.path.includes('/cols/col[1]/@max')&&e.rawValue==='2'));assert.ok(column.some(e=>e.path.endsWith('/cols/col[1]/@style')&&e.rawValue==='1'));
+ const row=table.rows[1][0].numberFormat!.evidence;assert.ok(row.some(e=>e.path.includes("row[@r='2']/@s")&&e.rawValue==='3'));assert.ok(row.some(e=>e.path.includes("row[@r='2']/@customFormat")&&e.rawValue==='1'));
+ assert.ok(!table.rows[1][1].numberFormat!.evidence.some(e=>e.path.includes('/cols/')||e.path.endsWith('/@customFormat')));
+});
+test('OOXML conflicting overlaps hold inherited cells but valid explicit cell/row overrides remain authoritative',()=>{
+ const styles='<styleSheet><cellXfs><xf numFmtId="0"/><xf numFmtId="9"/><xf numFmtId="14"/></cellXfs></styleSheet>';
+ const cols='<cols><col min="1" max="3" style="1"/><col min="2" max="2" style="2"/></cols>';
+ const native=(row:string)=>workbook('<worksheet>'+cols+'<sheetData>'+row+'</sheetData></worksheet>',[{name:'xl/styles.xml',text:styles}]);
+ const unaffected=readXlsx(native('<row r="1"><c r="A1"><v>0.6</v></c><c r="C1"><v>0.6</v></c></row>'))[0].rows[0];assert.equal(nativePercentValue(unaffected[0]),'60');assert.equal(nativePercentValue(unaffected[2]),'60');
+ assert.throws(()=>readXlsx(native('<row r="1"><c r="B1"><v>0.6</v></c></row>')),/Conflicting overlapping/);
+ assert.equal(nativePercentValue(readXlsx(native('<row r="1"><c r="B1" s="0"><v>0.6</v></c></row>'))[0].rows[0][1]),'0.6');
+ assert.equal(nativePercentValue(readXlsx(native('<row r="1" s="1" customFormat="1"><c r="B1"><v>0.6</v></c></row>'))[0].rows[0][1]),'60');
+});
+test('OOXML default-format references/ranges/activation and unsupported effective formats fail closed',()=>{
+ const styles='<styleSheet><cellXfs><xf numFmtId="0"/><xf numFmtId="9"/><xf numFmtId="30"/></cellXfs></styleSheet>';
+ for(const cols of ['<col min="0" max="1" style="1"/>','<col min="2" max="1" style="1"/>','<col min="1" max="16385" style="1"/>','<col min="1" max="1" style="99"/>']){
+  assert.throws(()=>readXlsx(workbook('<worksheet><cols>'+cols+'</cols><sheetData><row r="1"><c r="A1"><v>0.6</v></c></row></sheetData></worksheet>',[{name:'xl/styles.xml',text:styles}])),/column-default/);
+ }
+ for(const rowAttrs of ['s="99" customFormat="1"','s="1" customFormat="2"','customFormat="1"']){
+  assert.throws(()=>readXlsx(workbook('<worksheet><sheetData><row r="1" '+rowAttrs+'><c r="A1"><v>0.6</v></c></row></sheetData></worksheet>',[{name:'xl/styles.xml',text:styles}])),/row/);
+ }
+ assert.throws(()=>readXlsx(workbook('<worksheet><cols><col min="1" max="1" style="2"/></cols><sheetData><row r="1"><c r="A1"><v>0.6</v></c></row></sheetData></worksheet>',[{name:'xl/styles.xml',text:styles}])),/Unsupported effective/);
+ const wide=readXlsx(workbook('<worksheet><cols><col min="1" max="16384" style="1"/></cols><sheetData><row r="1"><c r="A1"><v>0.6</v></c></row></sheetData></worksheet>',[{name:'xl/styles.xml',text:styles}]))[0];assert.equal(nativePercentValue(wide.rows[0][0]),'60');assert.ok(wide.rows[0][0].numberFormat!.evidence.some(e=>e.path.endsWith('/@max')&&e.rawValue==='16384'));
+});
