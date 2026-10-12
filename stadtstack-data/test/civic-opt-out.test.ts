@@ -250,6 +250,34 @@ test('bounded metadata-only frontier and checkpoint formats remain, while interr
  const receipt=await recordHostOptOut({host:'council.test',reason:'municipality_objection'}, fixturePolicy(stateDir));assert.equal(receipt.purge.status,'partial');assert.equal(receipt.purge.deletedFiles,1);assert.equal((await lstat(frontier)).isFile(),true);assert.equal((await lstat(checkpoint)).isFile(),true);assert.equal(await readFile(partialPath,'utf8'),'partial raw source bytes');
 });
 
+test('content-free frontiers promote to inventoried source content without adopting unbound payloads',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),relativePath='frontiers/'+hash('promotion')+'.json',path=join(root,relativePath),url='https://council.test/planning';
+ await initializeManagedAcquisitionLane(root,{decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});await mkdir(dirname(path),{mode:0o700});
+ const metadata={schemaVersion:1,municipalityId:'synthetic',sourceId:'council',queue:[{url,sourceId:'council',from:url,depth:0}],visited:[],documents:[],failures:[],roots:[url]};
+ await writeFile(path,JSON.stringify(metadata),{mode:0o600});await assertManagedSourceReadable(path,policy);
+ const bytes=JSON.stringify({...metadata,queue:[{...metadata.queue[0],title:'Synthetic source-bearing planning title'}]}),entry={...rawEntry(bytes,url),relativePath,sourceSha256:hash('source document')};
+ await withManagedSourceWrite(root,[entry],()=>writeFile(path,bytes,{mode:0o600}),policy);await assertManagedSourceReadable(path,policy);
+ await markManagedCacheInventoryComplete(root,policy);
+ const receipt=await recordHostOptOut({host:'council.test',reason:'municipality_objection'},policy);
+ assert.equal(receipt.purge.status,'purged');assert.equal(receipt.purge.deletedFiles,1);await assert.rejects(lstat(path),{code:'ENOENT'});
+ await assert.rejects(assertManagedSourceReadable(path,policy),HostOptedOutError);
+});
+
+test('frontier promotion rejects payloads, foreign paths, unsafe files and withdrawn metadata ancestors before writing',async t=>{
+ for(const disposition of ['payload','foreign_path','hardlink','permissions','withdrawn_ancestor'] as const){
+  const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),folder=disposition==='foreign_path'?'oparl-bodies':'frontiers',relativePath=folder+'/'+hash(disposition)+'.json',path=join(root,relativePath),url='https://council.test/planning';
+  await initializeManagedAcquisitionLane(root,{decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});await mkdir(dirname(path),{mode:0o700});
+  const metadata={schemaVersion:1,municipalityId:'synthetic',sourceId:'council',queue:[{url,sourceId:'council',from:url,depth:0}],visited:[],documents:[],failures:[],roots:[url]};
+  await writeFile(path,JSON.stringify({...metadata,...(disposition==='payload'?{sourceBody:'Unbound private source text'}:{})}),{mode:0o600});
+  if(disposition==='hardlink')await link(path,join(root,'frontiers',hash('hardlink-alias')+'.json'));
+  if(disposition==='permissions')await chmod(path,0o620);
+  if(disposition==='withdrawn_ancestor')await recordHostOptOut({host:'council.test',reason:'municipality_objection'},policy);
+  const bytes='new source-bearing frontier',entry={...rawEntry(bytes,'https://independent.test/source'),relativePath,sourceSha256:hash('source')},before=await readFile(path);let called=false;
+  await assert.rejects(withManagedSourceWrite(root,[entry],async()=>{called=true;await writeFile(path,bytes);},policy),disposition==='withdrawn_ancestor'?HostOptedOutError:CivicPolicyStateError);
+  assert.equal(called,false);assert.deepEqual(await readFile(path),before);
+ }
+});
+
 test('malformed opt-out metadata fails closed and does not leak tampered source text in audit',async t=>{
  const {root,stateDir}=await sandbox(t);await registerManagedCacheRoot(root, {kind: 'fetch', ...fixturePolicy(stateDir)});await recordHostOptOut({host:'council.test',reason:'municipality_objection'}, fixturePolicy(stateDir));
  const marker=join(stateDir,'hosts',hash('council.test')+'.json'),value=JSON.parse(await readFile(marker,'utf8'));value.purgeDueAt='2099-01-01T00:00:00.000Z';await writeFile(marker,JSON.stringify(value),{mode:0o600});
@@ -425,7 +453,8 @@ test('private records, result caches, quarantines, frozen archives and materiali
  for(const relativePath of paths){const bytes=JSON.stringify({quote:'synthetic verbatim private source',rejectedCandidate:true,relativePath}),entry={...rawEntry(bytes),sourceSha256:hash('original source'),relativePath};await publish(root,entry,bytes,stateDir);await assertManagedSourceReadable(join(root,relativePath),policy);}
  const audit=join(base,'content-free-audit.json');await writeFile(audit,JSON.stringify({sourceSha256:hash('original source'),outputHashes:paths.map(hash)}),{mode:0o600});
  const receipt=await recordHostOptOut({host:'council.test',reason:'municipality_objection'},policy);assert.equal(receipt.purge.deletedFiles,paths.length);assert.equal(receipt.purge.status,'purged');
- for(const relativePath of paths){await assert.rejects(lstat(join(root,relativePath)),{code:'ENOENT'});await assert.rejects(assertManagedSourceReadable(join(root,relativePath),policy),CivicPolicyStateError);}
+ for(const relativePath of paths){await assert.rejects(lstat(join(root,relativePath)),{code:'ENOENT'});await assert.rejects(assertManagedSourceReadable(join(root,relativePath),policy),HostOptedOutError);}
+ await assert.rejects(assertManagedSourceReadable(join(root,paths[0]),{...policy,authoritySha256:hash('foreign authority')}),CivicPolicyStateError);
  assert.equal((await lstat(audit)).isFile(),true);
 });
 

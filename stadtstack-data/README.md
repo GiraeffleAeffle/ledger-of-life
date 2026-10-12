@@ -142,6 +142,8 @@ Host objections stop acquisition, cached/model reuse, preparation, reassessment,
 
 Observation/request/frontier policy metadata uses a closed content-free projection: bounded known tokens, validated URLs and hashes/counts instead of arbitrary HTML attribute bodies, raw TDM policy values or copied origin prose. Source-bearing titles, candidates, frozen responses and other payloads belong in managed artifacts, not metadata exemptions. Current roots include `cache/districts/owner-policy-2026-10-11/raw`, its `prepared` sibling, `cache/district-joint/owner-policy-2026-10-11/source-content` and the managed publication root above. Original legacy inputs remain untouched unless separately inventoried under an explicit owner operation.
 
+A discovery-only HTML frontier may become source-bearing after its first immutable observation: the inventory-locked write validates the exact prior bytes against the closed metadata format and checks every recorded host before enrolling its replacement. Arbitrary unbound payloads, unsafe files and withdrawn ancestors remain rejected. Purge tombstones still enforce their host objections before reporting absent content; missing or foreign authority continues to fail closed before either read.
+
 Synthetic tests use `createCivicPolicyTestContext(t)` and its actual isolated `fixture:<UUID>` authority, then the same initialization, enrollment, receipt and objection code as production. They pass the full policy context explicitly. No behavior depends on detecting mocks or a directory name; fixture authority cannot authorize live HTTP or native model execution. Historical source/model receipts are never replaced with invented success evidence.
 
 ### Fact and native-model gates
