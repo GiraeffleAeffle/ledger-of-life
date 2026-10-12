@@ -1,6 +1,6 @@
 import {constants} from 'node:fs';
 import {open,lstat,realpath,mkdir,rename,readFile} from 'node:fs/promises';
-import {dirname,join,resolve,basename} from 'node:path';
+import {dirname,join,resolve,basename,relative,isAbsolute} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import {setTimeout as waitBeforeDispatch} from 'node:timers/promises';
@@ -15,7 +15,7 @@ import type {AdapterScope} from './district-adapter-contract.ts';
 import {districtRegistrySchema} from './district-registry.ts';
 import type {DistrictRegistry} from './district-registry.ts';
 import {registerStructuredCatalog} from './district-structured-registry.ts';
-import {readOperatorRegistryInputPin,operatorRegistryInputPinSchema,parseOperatorRegistryConfiguration} from './district-registry-config.ts';
+import {buildOperatorRegistryConfigDescriptor,readOperatorRegistryInputPin,operatorRegistryInputPinSchema,parseOperatorRegistryConfiguration} from './district-registry-config.ts';
 import type {AdmittedOperatorRegistryConfiguration} from './district-registry-config.ts';
 import {StructuredWorkerRequestSchema,StructuredSnapshotMetadataSchema} from './district-structured-parser-worker.ts';
 import {StructuredJobResultSchema,structuredJobHandlers} from './district-structured-jobs.ts';
@@ -338,6 +338,15 @@ async function exportRun(store:DistrictJobStore,cas:DistrictCas,registry:Distric
 
 export async function districtR1Cli(argv=process.argv.slice(2)){
  const [command,...rawArgs]=argv;
+ if(command==='registry-descriptor'){
+  if(rawArgs.length!==4||rawArgs[0]!=='--commit'||rawArgs[2]!=='--output'||!rawArgs[1]||!rawArgs[3])throw Error('registry-descriptor requires exactly --commit <oid> --output <dir>');
+  const output=resolve(rawArgs[3]),root=resolve(OPERATOR_ROOT),part=relative(root,output);
+  if(part===''||part==='..'||part.startsWith(`..${process.platform==='win32'?'\\\\':'/'}`)||isAbsolute(part))throw Error('Registry descriptor output must be a new directory under the R1 operator cache');
+  await mkdir(root,{recursive:true,mode:0o700});
+  try{await lstat(output);throw Error('Registry descriptor output directory already exists');}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
+  const built=await buildOperatorRegistryConfigDescriptor({repository:REPO,commit:rawArgs[1],outputDirectory:output});
+  process.stdout.write(canonicalJson({descriptorPath:built.descriptorPath,descriptorSha256:built.descriptorSha256,configurationSha256:built.descriptor.sha256,gitCommit:built.descriptor.code.gitCommit})+'\\n');return;
+ }
  if(command==='migrate'){
   if(rawArgs.length)throw Error('Migration accepts no registry or execution arguments');
   if(!process.env.DATABASE_URL)throw Error('Database configuration required');

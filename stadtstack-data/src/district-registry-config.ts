@@ -1,5 +1,9 @@
+import {createHash} from 'node:crypto';
+import {execFile} from 'node:child_process';
 import {constants} from 'node:fs';
-import {readFile,open,realpath,lstat} from 'node:fs/promises';
+import {chmod,mkdir,readFile,open,realpath,lstat,writeFile} from 'node:fs/promises';
+import {promisify} from 'node:util';
+
 import {dirname,isAbsolute,join,relative,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {z} from 'zod';
@@ -32,6 +36,42 @@ export const operatorRegistryConfigSourcePinSchema=pinSchema.extend({bindings:z.
  if(pin.bindings.some(binding=>binding.configurationSha256!==pin.sha256||binding.code.bytes!==pin.bytes))ctx.addIssue({code:'custom',message:'Operator registry source pin does not contain the approved exact configuration'});
 });
 export type OperatorRegistryConfigSourcePin=z.infer<typeof operatorRegistryConfigSourcePinSchema>;
+const execFileAsync=promisify(execFile);
+const OPERATOR_REGISTRY_CODE_PATH='stadtstack-data/sources/district-registry.json';
+/** Build immutable Git-backed operator evidence from a committed registry, never from the checkout. */
+export async function buildOperatorRegistryConfigDescriptor(input:{repository:string;commit:string;outputDirectory:string}){
+ const {repository,commit:requestedCommit,outputDirectory}=input;
+ const env:NodeJS.ProcessEnv=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.startsWith('GIT_')));
+ Object.assign(env,{GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_CONFIG_SYSTEM:'/dev/null',GIT_ATTR_NOSYSTEM:'1',GIT_TERMINAL_PROMPT:'0'});
+ const git=async(args:string[])=>{const result=await execFileAsync('/usr/bin/git',['-c','core.hooksPath=/dev/null','-c','core.attributesFile=/dev/null','-c','commit.gpgSign=false',...args],{cwd:repository,env,encoding:'buffer',maxBuffer:16*1024*1024});return result.stdout as Buffer;};
+ const gitCommit=(await git(['rev-parse','--verify',`${requestedCommit}^{commit}`])).toString('ascii').trim();
+ if(!/^[a-f0-9]{40}$/.test(gitCommit))throw Error('Registry commit must resolve to a full SHA-1 commit');
+ const body=await git(['cat-file','blob',`${gitCommit}:${OPERATOR_REGISTRY_CODE_PATH}`]);
+ const blobOid=(await git(['rev-parse',`${gitCommit}:${OPERATOR_REGISTRY_CODE_PATH}`])).toString('ascii').trim();
+ if(!/^[a-f0-9]{40}$/.test(blobOid))throw Error('Registry blob must use a full SHA-1 object ID');
+ let value:unknown;try{value=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(body));}catch{throw Error('Operator registry configuration JSON invalid');}
+ const registry=parseOperatorRegistryConfiguration(value),root=resolve(outputDirectory);
+ await mkdir(root,{recursive:true,mode:0o700});
+ await chmod(root,0o700);
+ const writePinned=async(name:string,bytes:Buffer,oid?:string)=>{
+  if(oid){const type=name.startsWith('commit-')?'commit':'tree',actual=createHash('sha1').update(`${type} ${bytes.length}\0`).update(bytes).digest('hex');if(actual!==oid)throw Error(`Git ${type} bytes do not authenticate their OID`);}
+  const path=join(root,name);await writeFile(path,bytes,{mode:0o600,flag:'wx'});
+  return {path,sha256:sha256(bytes),bytes:bytes.length,...(oid?{oid}:{})};
+ };
+ const actualBlob=createHash('sha1').update(`blob ${body.length}\0`).update(body).digest('hex');
+ if(actualBlob!==blobOid)throw Error('Git blob bytes do not authenticate their OID');
+ const commitBytes=await git(['cat-file','commit',gitCommit]),commitPin=await writePinned(`commit-${gitCommit}.bin`,commitBytes,gitCommit);
+ const treePins=[];
+ for(const revision of [`${gitCommit}:stadtstack-data/sources`,`${gitCommit}:stadtstack-data`,`${gitCommit}^{tree}`]){
+  const oid=(await git(['rev-parse',revision])).toString('ascii').trim();if(!/^[a-f0-9]{40}$/.test(oid))throw Error('Registry tree must use a full SHA-1 object ID');
+  const bytes=await git(['cat-file','tree',oid]);treePins.push(await writePinned(`tree-${oid}.bin`,bytes,oid));
+ }
+ const descriptor=operatorRegistryConfigSchema.parse({kind:'operator_registry_config',path:code.path,sha256:code.sha256,bytes:code.bytes,schemaContractSha256:await operatorRegistryConfigContractSha256(),code:{gitCommit,path:OPERATOR_REGISTRY_CODE_PATH,blobOid,sha256:code.sha256,bytes:code.bytes},commit:commitPin,trees:treePins,approval:{role:'district_source_registry',approver:'owner',decisionId:CIVIC_ACQUISITION_DECISION_ID,date:'2026-10-11',configurationSha256:code.sha256,gitCommit},declaredEndpoints:operatorRegistryEndpoints(registry)});
+ const descriptorBytes=Buffer.from(JSON.stringify(descriptor)+'\n'),descriptorPath=join(root,'operator-registry-config.json');
+ await writeFile(descriptorPath,descriptorBytes,{mode:0o600,flag:'wx'});
+ return {descriptorPath,descriptorSha256:sha256(descriptorBytes),descriptor};
+}
+
 
 /** Bind the actual bounded codec, registry schema and URL/provenance validators, not an unversioned promise. */
 export async function operatorRegistryConfigContractSha256(){

@@ -1,3 +1,5 @@
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import test from 'node:test';
 import type {TestContext} from 'node:test';
 import assert from 'node:assert/strict';
@@ -6,10 +8,11 @@ import {syncBuiltinESMExports} from 'node:module';
 import {join} from 'node:path';
 import {sha256} from '../src/district-schema.ts';
 import {CIVIC_ACQUISITION_DECISION_ID,recordHostOptOut,HostOptedOutError,CivicPolicyStateError,withManagedSourceScratch,assertManagedSourceBindings} from '../src/civic-opt-out.ts';
-import {operatorRegistryConfigSchema,operatorRegistryConfigBindingSchema,readOperatorRegistryConfig,importOperatorRegistryConfig,readOperatorRegistryConfigSourcePin,parseOperatorRegistryConfiguration,operatorRegistryInputPinSchema,readOperatorRegistryInputPin} from '../src/district-registry-config.ts';
+import {buildOperatorRegistryConfigDescriptor,operatorRegistryConfigSchema,operatorRegistryConfigBindingSchema,readOperatorRegistryConfig,importOperatorRegistryConfig,readOperatorRegistryConfigSourcePin,parseOperatorRegistryConfiguration,operatorRegistryInputPinSchema,readOperatorRegistryInputPin} from '../src/district-registry-config.ts';
+import {districtR1Cli} from '../src/district-r1.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {createOperatorRegistryFixture,operatorRegistryFixtureValue,registryDescriptor,writeOperatorRegistryInputPin} from './helpers/operator-registry-fixture.ts';
-
+const execFileAsync=promisify(execFile);
 async function rawFixture(t:TestContext,value:unknown=operatorRegistryFixtureValue()){
  const context=await createCivicPolicyTestContext(t),input=await registryDescriptor(context,value);
  return {...context,input,value,body:Buffer.from(JSON.stringify(value)+'\n'),managedRoot:join(context.root,'managed-config')};
@@ -177,4 +180,26 @@ test('forged managed configuration bindings reject before decoding registry data
  t.mock.method(JSON,'parse',(...args:unknown[])=>{if(args[0]===body)registryDecodes++;return Reflect.apply(nativeParse,JSON,args);});
  await assert.rejects(readOperatorRegistryInputPin(descriptor,f.policy),error=>error instanceof CivicPolicyStateError&&error.code==='CONTENT_PROVENANCE_MISMATCH');
  assert.equal(registryDecodes,0);assert.deepEqual(await readFile(f.sourcePin.path),f.body);
+});
+test('canonical builder pins committed bytes and admits its schema-valid descriptor under fixture authority',async t=>{
+ const f=await rawFixture(t),repository=join(f.root,'registry-code','repository'),commit=f.input.code.gitCommit,output=join(f.root,'canonical-builder');
+ const built=await buildOperatorRegistryConfigDescriptor({repository,commit,outputDirectory:output});
+ assert.deepEqual(operatorRegistryConfigSchema.parse(built.descriptor),built.descriptor);
+ assert.deepEqual((await readOperatorRegistryConfig(built.descriptor,f.policy)).bytes,f.body);
+ await writeFile(join(repository,'stadtstack-data/sources/district-registry.json'),Buffer.from('{"worktree":"changed"}\n'));
+ const after=await buildOperatorRegistryConfigDescriptor({repository,commit,outputDirectory:join(f.root,'after-worktree-change')});
+ assert.equal(after.descriptor.sha256,built.descriptor.sha256);assert.deepEqual(await readFile(after.descriptor.path),f.body);
+ await assert.rejects(buildOperatorRegistryConfigDescriptor({repository,commit,outputDirectory:output}));
+ const tampered=structuredClone(built.descriptor);await writeFile(tampered.commit.path,Buffer.from('tampered'));
+ await assert.rejects(readOperatorRegistryConfig(tampered,f.policy));
+ await execFileAsync('/usr/bin/git',['-c','user.name=Fixture','-c','user.email=fixture@example.test','checkout','--orphan','without-registry'],{cwd:repository});
+ await execFileAsync('/usr/bin/git',['-c','user.name=Fixture','-c','user.email=fixture@example.test','commit','--allow-empty','-m','No registry path'],{cwd:repository});
+ const missing=(await execFileAsync('/usr/bin/git',['rev-parse','HEAD'],{cwd:repository})).stdout.trim();
+ await assert.rejects(buildOperatorRegistryConfigDescriptor({repository,commit:missing,outputDirectory:join(f.root,'missing-registry-path')}));
+});
+
+test('registry-descriptor CLI validates flags and confines output to the operator cache',async()=>{
+ for(const args of [[],['--commit','abc'],['--commit','a','--output','x','--commit','b'],['--commit','a','--output','x','--other']])
+  await assert.rejects(districtR1Cli(['registry-descriptor',...args]));
+ await assert.rejects(districtR1Cli(['registry-descriptor','--commit','a'.repeat(40),'--output','/tmp/out']));
 });
