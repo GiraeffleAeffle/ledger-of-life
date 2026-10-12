@@ -399,7 +399,7 @@ test('reviewed isolated worker classifies compressed PDF authorship and malforme
   [Buffer.from('%PDF-invalid'),'unknown'],
  ];
  for(const [bytes,classification] of fixtures){
-  const result=await classifyOrigin({url,mimeType:'application/pdf',bytes},{scratch:{root,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',purpose:'classification',bindings:[{phase:'pre-admission',url,sourceSha256:digest(bytes)}]}});
+  const result=await classifyOrigin({url,mimeType:'application/pdf',bytes},{scratch:{root,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',bindings:[{phase:'pre-admission',url,sourceSha256:digest(bytes)}]}});
   assert.equal(result.classification,classification);
   for(const privateValue of ['Private Person','private@example.org','Plan GmbH','Microsoft Word'])assert.equal(JSON.stringify(result.evidence).includes(privateValue),false);
  }

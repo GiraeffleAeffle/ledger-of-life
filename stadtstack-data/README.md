@@ -32,6 +32,8 @@ The ignored `cache/` contains explicitly governed source bytes, prepared text, m
 
 Live serving requires `STADTSTACK_MCP_RELEASE_DIR` to name an **absolute**, separately sealed release directory. The shared `governedReleaseDirectory` selector rejects the tracked historical `out/` tree and has no fallback. Both stdio and hosted entrypoints then authenticate the complete immutable release and publication-input cohort; selecting a path is not source admission or deployment authorization.
 
+For source and test compilation only, run `./scripts/r1-verify.sh typecheck` from this project directory. It pins TypeScript to CPUs 0–3 and reports `tsc=0` or the failure log path; it does not start PostgreSQL or run tests. Compilation is not runtime, security or release acceptance. Model-answer cache fixtures use explicitly provisioned isolated authorities, computed synthetic prepared-document receipts and managed writes, while retaining the acquisition marker and provenance gates. The retired unmanaged `src/evaluate.ts` council sampler is not restored by type-fix integration.
+
 ## Required Strausberg core release
 
 The retained historical core records name their original evaluator/version policy; R1 does not rerun or substitute that historical evaluation.

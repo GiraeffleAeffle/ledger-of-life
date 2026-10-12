@@ -66,7 +66,6 @@ export async function buildOperatorRegistryConfigDescriptor(input:{repository:st
   const oid=(await git(['rev-parse',revision])).toString('ascii').trim();if(!/^[a-f0-9]{40}$/.test(oid))throw Error('Registry tree must use a full SHA-1 object ID');
   const bytes=await git(['cat-file','tree',oid]);treePins.push(await writePinned(`tree-${oid}.bin`,bytes,oid));
  }
- const code=await writePinned('district-registry.json',body);
  const descriptor=operatorRegistryConfigSchema.parse({kind:'operator_registry_config',path:code.path,sha256:code.sha256,bytes:code.bytes,schemaContractSha256:await operatorRegistryConfigContractSha256(),code:{gitCommit,path:OPERATOR_REGISTRY_CODE_PATH,blobOid,sha256:code.sha256,bytes:code.bytes},commit:commitPin,trees:treePins,approval:{role:'district_source_registry',approver:'owner',decisionId:CIVIC_ACQUISITION_DECISION_ID,date:'2026-10-11',configurationSha256:code.sha256,gitCommit},declaredEndpoints:operatorRegistryEndpoints(registry)});
  const descriptorBytes=Buffer.from(JSON.stringify(descriptor)+'\n'),descriptorPath=join(root,'operator-registry-config.json');
  await writeFile(descriptorPath,descriptorBytes,{mode:0o600,flag:'wx'});

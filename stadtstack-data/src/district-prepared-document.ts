@@ -116,6 +116,7 @@ export async function readAuthorizedSourceBytes(rawRoot: string, path: string, e
   } finally { await handle.close(); }
 }
 export function prepareDocument(input: ManagedPreparationInput): Promise<PreparedDocument>;
+export function prepareDocument(input: ManagedPreparationInput, command: DocumentCommand): Promise<PreparedDocument>;
 export function prepareDocument(input: PreparationInput, command: DocumentCommand): Promise<PreparedDocument>;
 export async function prepareDocument(input: PreparationInput & Partial<ManagedPreparationInput>, command: DocumentCommand = runDocumentCommand): Promise<PreparedDocument> {
   if (!input.bytes.byteLength || input.bytes.byteLength > MAX_DOCUMENT_BYTES) throw Error('Source byte limit exceeded');

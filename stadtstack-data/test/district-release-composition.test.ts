@@ -27,14 +27,14 @@ function recordFixture(id: string, provider: ExtractorProvider = 'openai-subscri
     relations: [{ fromMention: 'company', toMention: 'facility', type: 'operates', quote: 'Synthetische Stadtwerke betreibt Synthetisches Hallenbad.', predicateQuote: 'betreibt', modality: 'asserted', time: null, conditions: null }],
   }, { municipalityId, sourceSha256: sourceHash, ags: '12064001' });
   const record: DistrictKnowledgeRecord = {
-    id, municipalityId, ags: '12064001', districtId: 'synthetic-district',
+    kind:'text_model',id, municipalityId, ags: '12064001', districtId: 'synthetic-district',
     title: 'Synthetic evidence title', titleQuote: 'Synthetic evidence title', summary: 'Synthetic evidence summary', summaryQuote: 'Synthetic evidence summary', municipalityQuote: 'Synthetic town',
     caseKeyType: 'source_document', caseKey: `source_document:${sourceHash}`, caseQuote: null, caseType: 'unknown',
     documentDate: '2026-10-01', documentDateQuote: '2026-10-01', documentDateReason: null,
     stage: 'unknown', stageDate: null, stageDateQuote: null, stageDateReason: 'Synthetic source has no event date', originalStatus: '', stageQuote: '', stages: [], topics: [], locations: [], ...graph,
     sources: [{ id: sourceId, url: 'https://example.org/synthetic-source', sha256: sourceHash, retrievedAt: earlier, locator: 'chars:0-500', mimeType: 'text/plain', sourceType: 'website', policy: { robots: { state: 'allowed', url: 'https://example.org/robots.txt' }, tdm: { state: 'not_declared', evidence: [] }, access: 'public', legalClassification: 'not_assessed', publication: 'facts_with_attribution_only' } }],
     extraction: { extractorVersion: 'synthetic-extractor', extractorSha256: sha256('synthetic-extractor'), model: config.model, provider, tool: config.tool, toolVersion: 'synthetic-tool', modelIdentitySha256, modelIdentityBasis: config.modelIdentityBasis, returnedModel: provider === 'anthropic-subscription' ? config.model : null, runtimeWarnings: ['Synthetic retained runtime warning'], promptVersion: 'synthetic-prompt', promptSha256: sha256('synthetic-prompt'), judgePromptVersion: 'synthetic-judge-prompt', judgePromptSha256: sha256('synthetic-judge-prompt'), inputSha256: sourceHash, textSha256: sha256('synthetic-text'), responseSha256: sha256(`synthetic-response:${id}:${provider}`), ocrUsed: false, textMethod: 'text', cacheKey: sha256(`synthetic-cache:${id}:${provider}`), extractedAt: earlier, chunk: { index: 0, count: 1, start: 0, end: 500 } },
-    verification: { status: 'auto-verified', deterministic: { passed: true, checks: [...REQUIRED_DETERMINISTIC_CHECKS, ...GRAPH_DETERMINISTIC_CHECKS].map(id => ({ id, passed: true, reason: 'Synthetic fixture check only' })) }, faithfulness: { score: 0.9, threshold: 0.8, model: config.model, provider, tool: config.tool, toolVersion: 'synthetic-tool', modelIdentitySha256, returnedModel: provider === 'anthropic-subscription' ? config.model : null, reason: 'Synthetic fixture only, not an actual judgment', evaluatedAt: earlier, responseSha256: sha256(`synthetic-judge:${id}:${provider}`), sameModel: true, limitation: 'Same-model judgment is not independent verification.' }, evidenceHash: '' },
+    verification: { kind:'text_model',status: 'auto-verified', deterministic: { passed: true, checks: [...REQUIRED_DETERMINISTIC_CHECKS, ...GRAPH_DETERMINISTIC_CHECKS].map(id => ({ id, passed: true, reason: 'Synthetic fixture check only' })) }, faithfulness: { score: 0.9, threshold: 0.8, model: config.model, provider, tool: config.tool, toolVersion: 'synthetic-tool', modelIdentitySha256, returnedModel: provider === 'anthropic-subscription' ? config.model : null, reason: 'Synthetic fixture only, not an actual judgment', evaluatedAt: earlier, responseSha256: sha256(`synthetic-judge:${id}:${provider}`), sameModel: true, limitation: 'Same-model judgment is not independent verification.' }, evidenceHash: '' },
   };
   record.verification.evidenceHash = knowledgeEvidenceHash(record);
   return DistrictKnowledgeRecordSchema.parse(record);
@@ -278,11 +278,11 @@ test('old full-artifact retained contributions remain audit-readable but cannot 
 });
 
 test('identity projection rejects foreign record discriminators without stripping or relabelling originals', () => {
-  for (const kind of ['text_model', 'structured', 'unknown']) {
+  for (const kind of ['structured', 'unknown']) {
     const original = { ...legacyIdentity(recordFixture('foreign-record-kind')), kind };
     original.verification.evidenceHash = knowledgeEvidenceHash(original);
     const unchanged = structuredClone(original);
-    assert.throws(() => projectDistrictRecordIdentity(original), /Unrecognized key/);
+    assert.throws(() => projectDistrictRecordIdentity(DistrictKnowledgeRecordSchema.parse(original)), /Invalid input/);
     assert.deepEqual(original, unchanged);
   }
 });

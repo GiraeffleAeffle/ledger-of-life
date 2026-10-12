@@ -117,7 +117,7 @@ test('original registry/corpus and preparation metadata are not replaced by curr
 
 test('identity projection binds both hashes while preserving every original generation receipt',()=>{
  const a=record('one',pdf,'anthropic-subscription');
- a.entities=[{mentionId:'council',name:'Synthetic council',type:'authority',quote:'Synthetic council',identifiers:[],entityId:`entity:${sha256('old identity')}`,identityBasis:{kind:'municipality_scoped_name',key:'old key',scope:'town',ambiguity:'Source-grounded identity grouping, not independent legal-entity verification.'}}];
+ a.entities=[{mentionId:'council',name:'Synthetic council',type:'authority',quote:'Synthetic council',identifiers:[],entityId:`entity:${sha256('old identity')}`,identityBasis:{kind:'source_scoped_mention',key:'old key',scope:'town',ambiguity:'Source-grounded identity grouping, not independent legal-entity verification.'}}];
  a.verification.evidenceHash=knowledgeEvidenceHash(a);
  const run=contribution([a],'balanced'),selected=selection(run,a);
  selected.projectedRecord.entities[0].entityId=`entity:${sha256('current identity')}`;
@@ -181,7 +181,7 @@ test('artifact clocks remain independent while native output totals bind the ori
 function retainedContribution(native:TextRunContribution,records:DistrictKnowledgeRecord[]):Extract<TextRunContribution,{sourceArtifactKind:'retained_publication'}>{
  const run=readTextLineageArtifact(native.artifacts.extractionRun) as Record<string,any>,generatedAt='2026-10-11T09:13:01.721Z';
  const recordsArtifact=artifact({schemaVersion:'stadtstack-knowledge-v2',generatedAt,records});
- const models=new Map<string,{provider:ExtractorProvider;model:string;tool:'codex-cli'|'claude-cli';toolVersion:string;modelIdentitySha256:string;modelIdentityBasis:'configured-cli-model-and-tool-version'|'reported-cli-model-and-tool-version';publishedRecords:number;faithfulnessThreshold:0.8}>();
+ const models=new Map<string,Pick<DistrictKnowledgeRecord['extraction'],'provider'|'model'|'tool'|'toolVersion'|'modelIdentitySha256'|'modelIdentityBasis'>&{publishedRecords:number;faithfulnessThreshold:0.8}>();
  for(const record of records){
   const {provider,model,tool,toolVersion,modelIdentitySha256,modelIdentityBasis}=record.extraction,key=modelIdentitySha256,previous=models.get(key);
   if(previous)previous.publishedRecords++;
