@@ -127,7 +127,7 @@ export interface CouncilTraversalResult {state:CouncilCheckpoint;records:Map<str
 export function isCouncilPermissionFailure(error:unknown):boolean {
  if(error instanceof HostOptedOutError||error instanceof CivicPolicyStateError)return true;
  if(error instanceof AggregateError)return error.errors.some(isCouncilPermissionFailure);
- return error instanceof PoliteFetchError&&(['robots_blocked','robots_unavailable','tdm_reserved','tdm_unavailable','access_barrier','document_excluded','host_opted_out','host_state_unsafe','unsafe_url'].includes(error.failure)||error.status===401||error.status===403);
+ return error instanceof PoliteFetchError&&(['robots_blocked','robots_unavailable','tdm_reserved','tdm_unavailable','access_barrier','document_excluded','host_opted_out','host_state_unsafe','unsafe_url','cross_host_redirect'].includes(error.failure)||error.status===401||error.status===403);
 }
 export async function traverseCouncilList(body:OparlBody,kind:CouncilKind,storage:CouncilStorage,loader:CouncilLoader,options:{maxPages?:number;now?:string;reuseCompleteMs?:number}={}):Promise<CouncilTraversalResult> {
  const base=body[kind];if(!base)throw Error(`Missing ${kind} list for ${body.id}`);

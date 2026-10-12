@@ -5,6 +5,7 @@ import {parseArgs} from 'node:util';
 import {z} from 'zod';
 import {districtRegistrySchema} from './district-registry.ts';
 import type {DistrictRegistry} from './district-registry.ts';
+import {readOperatorRegistryInputPin,type OperatorRegistryInputPin} from './district-registry-config.ts';
 import {districtSourceAdapterKind} from './district-crawl.ts';
 import {publicUrl} from './polite-fetch.ts';
 import {publicUrlReason} from './publication-quality.ts';
@@ -12,7 +13,7 @@ import {OwnerRobotsOverrideSchema,SourceAccessPolicySchema,hashSchema} from './d
 import {ownerRobotsOverrideApplies} from './source-policy.ts';
 import { DocumentOriginSchema } from './document-origin-contract.ts'
 import {excludedCrawlDocumentSchema} from './district-corpus.ts';
-import {assertCivicPolicyAuthority,assertManagedSourceReadable,assertManagedObservationReadable,CIVIC_POLICY_AUTHORITY,type CivicPolicyOptions} from './civic-opt-out.ts';
+import {assertCivicPolicyAuthority,assertManagedSourceReadable,assertManagedSourceBindings,assertManagedObservationReadable,CIVIC_POLICY_AUTHORITY,type CivicPolicyOptions} from './civic-opt-out.ts';
 
 const stamp=z.string().datetime({offset:true});
 const policySchema=z.object({robots:z.object({state:z.enum(['allowed','blocked','unavailable']),url:z.string().optional(),sha256:z.string().regex(/^[a-f0-9]{64}$/).optional(),checkedAt:stamp.optional()}),tdm:z.object({state:z.enum(['reserved','not_reserved','not_declared','unavailable']),referenceStatus:z.literal('unavailable').optional(),declarationStatus:z.literal('unavailable').optional()}),ownerRobotsOverride:OwnerRobotsOverrideSchema.optional(),robotsStatus:z.enum(['allowed','disallowed','unavailable']).optional(),override:z.literal('owner-approved 2026-10-11').optional(),documentOrigin:DocumentOriginSchema.optional(),ownerTdmOverride:OwnerRobotsOverrideSchema.optional(),tdmOverride:z.literal('owner-approved 2026-10-11').optional()});
@@ -39,7 +40,7 @@ export interface SourceExportRow {
  runId?:string;coverageSelection?:'latest_broader_check'|'latest_target_check'|'latest_check_without_coverage'|'none'|'not_selected';sourceCoverage?:string;targetScope?:string;coveragePendingCount?:number|null;coverageRunnableCount?:number|null;coverageBlockedCount?:number|null;
 }
 export interface SourceExportResult {markdown:string;csv:string;rows:SourceExportRow[];counts:{municipalities:number;agsObjects:number;urlOccurrences:number;wholeStringUrlOccurrences:number;distinctUrls:number};}
-export interface SourceExportOptions {registry:string;crawlIndex:string;rawRoot:string;markdown:string;csv:string;policy?:CivicPolicyOptions}
+export interface SourceExportOptions {registry:OperatorRegistryInputPin;crawlIndex:string;rawRoot:string;markdown:string;csv:string;policy?:CivicPolicyOptions}
 const compare=(a:string,b:string)=>a<b?-1:a>b?1:0;
 function safeUrl(value:string):string{
  try{publicUrl(value);if(publicUrlReason(value)||value.includes('#')&&/(?:token|secret|password|credential|authorization|api[-_]?key)\s*[=:]/i.test(decodeURIComponent(value.slice(value.indexOf('#')+1))))throw Error();}
@@ -227,6 +228,8 @@ export function renderDistrictSources(raw:unknown,crawlInput:unknown,observation
 /** Reads only registry/index and retained observation JSON, never CAS bodies or mutable request pointers. */
 export async function exportDistrictSources(options:SourceExportOptions):Promise<SourceExportResult>{
  const selected=options.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selected),policy={...selected,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
+ const admittedRegistry=await readOperatorRegistryInputPin(options.registry,policy);
+ await assertManagedSourceBindings(options.crawlIndex,admittedRegistry.bindings,policy,'operator_registry_config');
  await assertManagedSourceReadable(options.crawlIndex,policy);
  const crawlInput=JSON.parse(await readFile(options.crawlIndex,'utf8'));
  await assertManagedSourceReadable(options.crawlIndex,policy);
@@ -242,8 +245,10 @@ export async function exportDistrictSources(options:SourceExportOptions):Promise
   const parsed=observationSchema.safeParse(JSON.parse(await readFile(path,'utf8')));if(!parsed.success)throw Error('Source export observation schema validation failed');
   await assertManagedObservationReadable(path,policy);observations.push(parsed.data);
  }
- const result=renderDistrictSources(JSON.parse(await readFile(options.registry,'utf8')),crawlInput,observations);
- const outputs=[resolve(options.markdown),resolve(options.csv)],inputs=await Promise.all([options.registry,options.crawlIndex].map(path=>realpath(path)));
+ const result=renderDistrictSources(JSON.parse(admittedRegistry.bytes.toString('utf8')),crawlInput,observations);
+ await readOperatorRegistryInputPin(options.registry,policy);
+ await assertManagedSourceBindings(options.crawlIndex,admittedRegistry.bindings,policy,'operator_registry_config');
+ const outputs=[resolve(options.markdown),resolve(options.csv)],inputs=await Promise.all([options.registry.path,admittedRegistry.path,options.crawlIndex].map(path=>realpath(path)));
  for(const path of outputs)await mkdir(dirname(path),{recursive:true});
  const canonicalOutputs=await Promise.all(outputs.map(async path=>join(await realpath(dirname(path)),basename(path))));
  if(canonicalOutputs[0]===canonicalOutputs[1]||canonicalOutputs.some(path=>inputs.includes(path)||!relative(rawRoot,path).startsWith('..')&&!isAbsolute(relative(rawRoot,path))))throw Error('Source export output collides with an input');
@@ -254,9 +259,9 @@ export async function exportDistrictSources(options:SourceExportOptions):Promise
  await writeFile(outputs[0],result.markdown);await writeFile(outputs[1],result.csv);return result;
 }
 async function main(){
- const {values}=parseArgs({options:{registry:{type:'string'},'crawl-index':{type:'string'},'raw-root':{type:'string'},markdown:{type:'string'},csv:{type:'string'}}});
- if(!values.registry||!values['crawl-index']||!values['raw-root']||!values.markdown||!values.csv)throw Error('All five source export paths are required');
- const result=await exportDistrictSources({registry:values.registry,crawlIndex:values['crawl-index'],rawRoot:values['raw-root'],markdown:values.markdown,csv:values.csv});
+ const {values}=parseArgs({options:{'registry-config':{type:'string'},'registry-config-sha256':{type:'string'},'crawl-index':{type:'string'},'raw-root':{type:'string'},markdown:{type:'string'},csv:{type:'string'}}});
+ if(!values['registry-config']||!values['registry-config-sha256']||!values['crawl-index']||!values['raw-root']||!values.markdown||!values.csv)throw Error('Pinned registry configuration and all source export paths are required');
+ const result=await exportDistrictSources({registry:{path:values['registry-config'],sha256:values['registry-config-sha256']},crawlIndex:values['crawl-index'],rawRoot:values['raw-root'],markdown:values.markdown,csv:values.csv});
  console.log(JSON.stringify(result.counts));
 }
 if(process.argv[1]&&await realpath(process.argv[1]).then(entry=>import.meta.url===pathToFileURL(entry).href,()=>false))main().catch(()=>{console.error('Source export failed; input validation or local file operation rejected (details withheld)');process.exitCode=1;});
