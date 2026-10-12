@@ -69,7 +69,8 @@ async function assembleKnowledge(options:PrepareKnowledgeOptions,provenance:Auth
   retainedPublication=composition.retainedPublication;
   const supplied=knowledge.records.filter(record=>record.kind==='text_model');
   if(canonicalJson(supplied)!==canonicalJson(composition.knowledge.records))throw Error('Candidate text rows differ from authenticated ordered composition');
-  dependencies.push(...composition.dependencies.filter(dependency=>dependency.role!=='text_composition'),...(dependencies.some(dependency=>dependency.role==='text_composition')?[]:[{role:'text_composition',sha256:hash(inputBytes)}]));
+  dependencies.push(...composition.dependencies.filter(dependency=>dependency.role!=='text_composition'));
+  if(!dependencies.some(dependency=>dependency.role==='text_composition'))dependencies.push({role:'text_composition',sha256:hash(inputBytes)});
  }
  const structuredBytes=options.structuredRun?await provenance.read(options.structuredRun):undefined,structured=structuredBytes?structuredRunSchema.parse(JSON.parse(structuredBytes.toString('utf8'))):undefined;
  if(structured){

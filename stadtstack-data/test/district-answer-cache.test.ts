@@ -11,7 +11,7 @@ import { cachedModelAnswer, modelAnswerCacheBinding } from '../src/district-answ
 import type { CachedAnswer } from '../src/district-answer-cache.ts';
 import { sha256 } from '../src/district-schema.ts';
 import {recordHostOptOut,initializeManagedAcquisitionLane,withManagedSourceWrite,CivicPolicyStateError} from '../src/civic-opt-out.ts';
-import {preparedCacheContext,type PreparedSourceReference,type PreparedCacheContext} from '../src/district-prepared-document.ts';
+import {prepareDocument,preparedSourceBindings,preparedCacheContext,type PreparedSourceReference,type PreparedCacheContext} from '../src/district-prepared-document.ts';
 import {extractionCacheKey} from '../src/district-claims.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 
@@ -29,13 +29,15 @@ async function absent(path: string) {
 
 async function cacheFixture(t:TestContext,initialize=true) {
   const fixture=await createCivicPolicyTestContext(t),root=fixture.managedRoot;
-  const reference:PreparedSourceReference={id:'synthetic-source',url:'https://stadt.de/source',sha256:sha256('synthetic source'),retrievedAt:'2026-10-11T12:00:00.000Z',locator:'synthetic fixture',mimeType:'text/plain',sourceType:'website',policy:{robots:{state:'allowed',url:'https://stadt.de/robots.txt'},tdm:{state:'not_declared',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}};
-  const sourceContext={decisionId:fixture.decisionId,references:[reference],receiptSha256:sha256('synthetic prepared receipt'),policy:fixture.policy};
+  const bytes=Buffer.from('Synthetic cache source; no civic facts or provider execution.');
+  const reference:PreparedSourceReference={id:'synthetic-source',url:'https://stadt.de/source',sha256:sha256(bytes),retrievedAt:'2026-10-11T12:00:00.000Z',locator:'synthetic fixture',mimeType:'text/plain',sourceType:'website',policy:{robots:{state:'allowed',url:'https://stadt.de/robots.txt'},tdm:{state:'not_declared',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}};
+  const prepared=await prepareDocument({bytes,municipalityId:'strausberg',references:[reference],mimeType:'text/plain',extractorSha256:sha256('synthetic cache extractor'),toolVersions:{node:process.versions.node}},async()=>{throw Error('Synthetic text must not launch a parser');});
+  const sourceContext={decisionId:fixture.decisionId,references:prepared.references,receiptSha256:prepared.receiptSha256,policy:fixture.policy};
   const options={cacheRoot:root,binding,modelIdentitySha256,sourceContext};
   if(initialize)await initializeManagedAcquisitionLane(root,{decisionId:fixture.decisionId,kind:'artifacts',...fixture.policy});
   const enroll=async(bytes:string)=>{
     const relativePath=binding+'.answer.json';
-    await withManagedSourceWrite(root,[{kind:'prepared_source',relativePath,contentSha256:sha256(bytes),sourceSha256:reference.sha256,url:reference.url,observationId:reference.id,receiptSha256:sourceContext.receiptSha256,independentAllowed:true}],()=>writeFile(join(root,relativePath),bytes,{mode:0o600}),fixture.policy);
+    await withManagedSourceWrite(root,preparedSourceBindings(sourceContext.references,sourceContext.receiptSha256).map(binding=>({...binding,relativePath,contentSha256:sha256(bytes),independentAllowed:false})),()=>writeFile(join(root,relativePath),bytes,{mode:0o600}),fixture.policy);
   };
   return {root,baseRoot:fixture.root,policy:fixture.policy,sourceContext,options,enroll};
 }

@@ -13,7 +13,7 @@ const versions=new Map<string,Promise<string>>();
 /** Source-only metadata inspection in the reviewed credential-free job, never host PDF.js. */
 export async function inspectPdfTdmPolicy(bytes:Buffer,sha256:string,cacheRoot:string,context:ParserSourceContext):Promise<PdfTdmPolicyResult>{
  if(!/^[a-f0-9]{64}$/.test(sha256)||digest(bytes)!==sha256)throw Error('Invalid PDF metadata cache digest');
- if(context.purpose!=='classification'||!context.bindings.some(binding=>binding.sourceSha256===sha256))throw Error('PDF metadata inspection requires a source-only classification binding');
+ if(context.purpose!=='classification'||!context.bindings.some(binding=>'sourceSha256' in binding&&binding.sourceSha256===sha256))throw Error('PDF metadata inspection requires a source-only classification binding');
  context.signal?.throwIfAborted();
  // Host-only active permission is not part of the minimal parser-image dependency closure.
  const {assertCivicPolicyAuthority,assertHostNotOptedOut}=await import('./civic-opt-out.ts');

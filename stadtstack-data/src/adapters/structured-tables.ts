@@ -12,7 +12,7 @@ export interface ZipLimits {inputBytes:number;totalBytes:number;memberBytes:numb
 export interface CsvLimits {inputBytes:number;rows:number;columns:number;cells:number}
 const HARD_LIMITS:Record<string,number>={inputBytes:128*1024*1024,totalBytes:512*1024*1024,memberBytes:128*1024*1024,members:2048,ratio:200,rows:2000000,columns:4096,cells:8000000};
 function checkedLimits<T extends ZipLimits|CsvLimits>(defaults:T,overrides:Partial<T>):T {
- const limits={...defaults,...overrides};for(const [key,value] of Object.entries(limits))if(!Object.hasOwn(defaults,key)||!Number.isSafeInteger(value)||value<1||value>HARD_LIMITS[key])throw Error('Invalid/hard resource limit '+key);return limits;
+ const limits={...defaults,...overrides};for(const [key,value] of Object.entries(limits))if(!Object.hasOwn(defaults,key)||typeof value!=='number'||!Number.isSafeInteger(value)||value<1||value>HARD_LIMITS[key])throw Error('Invalid/hard resource limit '+key);return limits;
 }
 const decoder=new TextDecoder('utf-8',{fatal:true});
 export function columnName(index:number):string {let name='';for(let n=index+1;n>0;n=Math.floor((n-1)/26))name=String.fromCharCode(65+(n-1)%26)+name;return name;}

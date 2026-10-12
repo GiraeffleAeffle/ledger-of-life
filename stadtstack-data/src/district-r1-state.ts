@@ -21,7 +21,7 @@ export async function persistR1Representation(store:DistrictJobStore,cas:Distric
  const binding=authenticatedHttpBinding(originalObservation,{url:receipt.source.url,sha256:sourceSha256,mimeType:receipt.source.mimeType,retrievedAt:input.retrievedAt,fetchedAt:input.fetchedAt});
  const observed=HttpObservationSchema.parse(JSON.parse(originalObservation.bytes));if(observed.bytes!==input.bytes.byteLength)throw Error('Original observation size mismatch');
  const requestSelectorSha256=semanticHash({method:input.request.method,body:input.request.body,contentType:input.request.contentType}),scopeSha256=semanticHash(receipt.scope);
- const client=await store.pool.connect();let snapshotId=randomUUID(),policyDecisionId=randomUUID();
+ const client=await store.pool.connect();let snapshotId:string=randomUUID(),policyDecisionId:string=randomUUID();
  try{
   await client.query('BEGIN');
   await client.query(`INSERT INTO district_pipeline.source_snapshots(id,publisher_id,source_id,municipality_id,ags,tenant,resource_identity,request_method,request_selector_sha256,observation_window,source_version,retrieved_at,scope_sha256) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT DO NOTHING`,[snapshotId,receipt.scope.publisherId,receipt.scope.sourceId,receipt.scope.municipalityId,receipt.scope.ags,receipt.scope.tenant,input.request.url,input.request.method,requestSelectorSha256,receipt.scope.observationWindow,input.sourceVersion,input.retrievedAt,scopeSha256]);

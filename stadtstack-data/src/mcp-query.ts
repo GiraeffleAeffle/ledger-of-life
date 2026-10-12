@@ -191,8 +191,8 @@ export class QueryIndex {
     const sourceDescriptorsByRecord=new Map<string,readonly RevocationSourceDescriptor[]>(),visibleRecordIds=new Set<string>(),withheldSourceIds=new Set<string>();
     for(const feature of this.originalFeatures)sourceDescriptorsByRecord.set(feature.properties.id,signalSourceDescriptors(feature));
     for(const topic of this.regional.topics)for(const municipality of topic.municipalities)for(const item of municipality.items){
-      const source=regionalSource(item,this.regional.asOf);
-      sourceDescriptorsByRecord.set(regionalRecordId(municipality.municipalityId,item),[{mcpSourceId:mcpSourceId(source),municipalityId:municipality.municipalityId,url:item.url},...sourceMetadataUrls(item).filter(url=>url!==item.url).map(url=>({municipalityId:municipality.municipalityId,url}))]);
+      const source=regionalSource(item,this.regional.asOf),descriptors:RevocationSourceDescriptor[]=[{mcpSourceId:mcpSourceId(source),municipalityId:municipality.municipalityId,url:item.url},...sourceMetadataUrls(item).filter(url=>url!==item.url).map(url=>({municipalityId:municipality.municipalityId,url}))];
+      sourceDescriptorsByRecord.set(regionalRecordId(municipality.municipalityId,item),descriptors);
     }
     for(const record of this.knowledge?.records??[])sourceDescriptorsByRecord.set(record.id,knowledgeSourceDescriptors(record));
     for(const record of this.records){
@@ -273,7 +273,7 @@ export class QueryIndex {
       const {nativeSearchText,...projection}=record;
       return {...projection,originalRecord:publicData(this.originalRecords.get(record.id))};
     });
-    return {releaseId:this.releaseId,items,sources:sourceIds.map(id=>this.sources.get(id)!),cases:pageCases,nativeCases:scopedCases(records),totalRecords:page.total,totalCases:cases.length,totalNativeCases:nativeCases.length,observationCount:matching.filter(record=>record.caseIdentity?.status==='not_applicable').length,identifiedCaseCount:nativeCases.length,identifiedProjectCount:0,nextCursor:page.nextCursor,caseCountMeaning:'cases/totalCases describe source-publication bundle discovery, not canonical identity or project counts. nativeCases/totalNativeCases group admitted scoped procedure/event IDs, excluding document buckets and native context observations. Membership lists are page-local; current metric/history state and its source attribution retain complete case context across filters/pages. Exact nativeRecordContext is retrieval-only, never a counted project or inferred relation.',withheld:page.withheld};
+    return {releaseId:this.releaseId,administrativeView:page.administrativeView,items,sources:sourceIds.map(id=>this.sources.get(id)!),cases:pageCases,nativeCases:scopedCases(records),totalRecords:page.total,totalCases:cases.length,totalNativeCases:nativeCases.length,observationCount:matching.filter(record=>record.caseIdentity?.status==='not_applicable').length,identifiedCaseCount:nativeCases.length,identifiedProjectCount:0,nextCursor:page.nextCursor,caseCountMeaning:'cases/totalCases describe source-publication bundle discovery, not canonical identity or project counts. nativeCases/totalNativeCases group admitted scoped procedure/event IDs, excluding document buckets and native context observations. Membership lists are page-local; current metric/history state and its source attribution retain complete case context across filters/pages. Exact nativeRecordContext is retrieval-only, never a counted project or inferred relation.',withheld:page.withheld};
   }
   page(options:Partial<QueryOptions>,scope:string,eligible=this.records,extra:unknown=null,includeWithheld=false) {
     this.validateFilters(options);

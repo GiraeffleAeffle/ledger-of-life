@@ -13,7 +13,7 @@ async function fixture(held=false,multiplePairs=false,temporal=false){
  const quote='Synthetic Organization A, Synthetic Organization B and Synthetic Organization C are the same organization.'+(temporal?' '+expression:'');
  const admitted=await admittedAssessmentFixture(quote),sourceSha256=admitted.source.originalSha256;
  const evidenceHash=semanticHash([sourceSha256,quote]);
- const mentions:IdentityMention[]=['A','B','C'].map(label=>({id:'synthetic-mention-'+label,type:'organization',name:'Synthetic Organization '+label,municipalityId:'strausberg',sourceSha256,identifiers:[],legalForm:null,period:null,validity:unknownValidity(),evidenceHashes:[evidenceHash]}));
+ const mentions:IdentityMention[]=['A','B','C'].map(label=>({id:'synthetic-mention-'+label,type:'organization',name:'Synthetic Organization '+label,municipalityId:'strausberg',sourceSha256,identifiers:[],legalForm:null,period:null,councilBodyIdentity:null,validity:unknownValidity(),evidenceHashes:[evidenceHash]}));
  const assertion=identityAssertion({version:1,leftMentionId:mentions[0].id,rightMentionId:mentions[1].id,decision:'same_identity',status:'accepted',method:'authoritative_review',ruleVersion:'synthetic-rule-v1',author:'synthetic-author',adjudicator:'synthetic-adjudicator',evidenceHashes:[evidenceHash],reviewReceiptSha256:'1'.repeat(64),validity:temporal?effectiveIntervalFromExpression(expression,[evidenceHash]):unknownValidity()});
  const claim={claimId:assertion.id,sourceId:admitted.source.sourceId,locatorId:'page1',quote,subjectId:assertion.leftMentionId,objectId:assertion.rightMentionId,unit:null,value:'same_identity',date:null,dateRole:null,financialRole:'none' as const,stage:null,modality:'confirmed' as const};
  const {id,...fields}=assertion;

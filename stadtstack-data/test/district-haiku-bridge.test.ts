@@ -28,7 +28,7 @@ function syntheticEvidence(): ModelEvidence {
   return { ...identity, modelIdentitySha256: createHash('sha256').update(JSON.stringify(identity)).digest('hex') };
 }
 function leaseFixture(extra: Partial<BridgeLease> = {}): BridgeLease {
-  const body = { version: ASSESSMENT_BRIDGE_VERSION, leaseId: '12345678-1234-4123-8123-123456789abc', jobKey: JOB,
+  const body:Omit<BridgeLease,'inputSha256'> = { version: ASSESSMENT_BRIDGE_VERSION, leaseId: '12345678-1234-4123-8123-123456789abc', jobKey: JOB,
     authorityId: 'vm-only-owner-policy', authoritySha256: AUTH, policySnapshotSha256: POLICY,
     expiresAt: new Date(NOW + BRIDGE_LIMITS.leaseMs).toISOString(), role: 'B' as const, provider: 'anthropic-subscription' as const,
     requestedModel: 'claude-haiku-5-5' as const, system: PROMPTS.B, data: { original: SOURCE }, outputSchema: z.toJSONSchema(assessmentOutputSchema),

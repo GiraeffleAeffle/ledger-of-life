@@ -158,7 +158,9 @@ export async function withParserSandbox<T>(artifact: string | Uint8Array | null,
         if (typeof artifact === 'string') {
           // Host-only authority code is deliberately absent from the credential-free image.
           const { assertManagedSourceReadable } = await import('./civic-opt-out.ts');
-          for (const binding of sourceContext!.bindings) await assertManagedSourceReadable(artifact, { ...sourceContext, sourceUrl: binding.url });
+          if (!sourceContext) throw new ParserIsolationError('request_rejected');
+          const { purpose: _purpose, ...readContext } = sourceContext;
+          for (const binding of sourceContext.bindings) await assertManagedSourceReadable(artifact, { ...readContext, sourceUrl: binding.url });
           const handle = await open(artifact, constants.O_RDONLY | constants.O_NOFOLLOW);
           try {
             const metadata = await handle.stat();
@@ -179,7 +181,7 @@ export async function withParserSandbox<T>(artifact: string | Uint8Array | null,
         selected = join(jobRoot, 'document');
         if (!scope) throw new ParserIsolationError('request_rejected');
         const contentSha256 = digest(bytes);
-        if (sourceContext!.bindings.some(binding => binding.sourceSha256 === contentSha256)) {
+        if (sourceContext?.bindings.some(binding => 'sourceSha256' in binding && binding.sourceSha256 === contentSha256)) {
           await scope.writeSource('document', bytes);
         } else {
           // Derived bundles retain ALL original scope bindings; never label their digest as an original.

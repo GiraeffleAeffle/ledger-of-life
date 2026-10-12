@@ -104,15 +104,16 @@ export type KnowledgePublicationHold={reasons:KnowledgePublicationHoldReason[];u
 /** Reject evidence as a whole; never repair or strip words from a source quotation. */
 export function knowledgePublicationHold<T extends Pick<DistrictKnowledgeRecord,'documentDate'|'stageDate'|'stages'>|StructuredKnowledgeRecord>(record:T):KnowledgePublicationHold|null{
  const reasons:KnowledgePublicationHoldReason[]=[];
- if('kind' in record&&record.kind==='structured'?!structuredRecordHasSourcedDate(record):record.documentDate===null&&record.stageDate===null&&!record.stages.some(event=>event.date!==null))reasons.push('missing_sourced_date');
+ if('documentDate' in record?record.documentDate===null&&record.stageDate===null&&!record.stages.some(event=>event.date!==null):!structuredRecordHasSourcedDate(record))reasons.push('missing_sourced_date');
  const urlIssues=publicUrlIssues(record);
  if(urlIssues.length)reasons.push('nonpublic_evidence_url');
  return reasons.length?{reasons,urlIssues}:null;
 }
 /** Retain structured publication reasons privately so public counts never need to parse evidence text. */
 export function knowledgePublicationQuarantineCase(record:(Pick<DistrictKnowledgeRecord,'id'|'municipalityId'>&{sources:{id:string}[];extraction:{inputSha256:string}})|StructuredKnowledgeRecord,hold:KnowledgePublicationHold){
- const structured='kind' in record&&record.kind==='structured';
- return {kind:structured?'structured' as const:'text_model' as const,municipalityId:record.municipalityId,sourceId:structured?record.source.id:record.sources[0].id,sourceSha256:structured?record.source.sha256:record.extraction.inputSha256,reason:`Publication withheld: ${hold.reasons.join(', ')}`,publicationReasons:hold.reasons,recordId:record.id};
+ const sourceId='sources' in record?record.sources[0].id:record.source.id;
+ const sourceSha256='extraction' in record?record.extraction.inputSha256:record.source.sha256;
+ return {kind:'sources' in record?'text_model' as const:'structured' as const,municipalityId:record.municipalityId,sourceId,sourceSha256,reason:`Publication withheld: ${hold.reasons.join(', ')}`,publicationReasons:hold.reasons,recordId:record.id};
 }
 
 export function knowledgeRecordHasSourcedAction(record:Pick<DistrictKnowledgeRecord,'kind'|'stage'|'documentDate'|'stageDate'|'stages'>|StructuredKnowledgeRecord):boolean{

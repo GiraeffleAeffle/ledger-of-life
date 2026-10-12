@@ -99,7 +99,7 @@ export function buildR1TextCompositionContext(input:DistrictReleaseCompositionIn
  }
  const records=composition.records.records;
  if(records.some(record=>record.kind!=='text_model'||record.verification.kind!=='text_model'))throw Error('R1 text composition requires explicit knowledge-v3 text markers; historical v2 needs an approved schemaProjection');
- const knowledge={schemaVersion:KNOWLEDGE_SCHEMA_VERSION,generatedAt:input.generatedAt,records,identityAssertions:[...assertions.values()],identityAdmissions:[...admissions.values()]};
+ const knowledge:R1TextCompositionContext['knowledge']={schemaVersion:KNOWLEDGE_SCHEMA_VERSION,generatedAt:input.generatedAt,records,identityAssertions:[...assertions.values()],identityAdmissions:[...admissions.values()]};
  const replayPayload={
   generatedAt:input.generatedAt,
   approvedRunOrder:[...input.approvedRunOrder],
