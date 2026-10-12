@@ -2,6 +2,15 @@
 
 Handoff requested by Main on **12 October 2026, Berlin**. This file and its containing Git commit are the resume checkpoint. **WIP: R1 is not integrated, verified, value-accepted or released. Do not start source/model batches from this tree yet.** Main explicitly authorized committing incomplete integration so coordination can move from the Mac to the VM.
 
+### VM lead checkpoint — 12 October 2026
+
+- Owner Max prioritizes the first genuine bounded live batch (step 7) by **Wednesday 14 October**, before Thursday travel. This is a target, not permission to relax source, isolation, assessment or publication gates.
+- Vikunja **task 68**, **In Arbeit (Agent)**, due 14 October: `R1: erster Live-Batch (Ziel Mi 14.10.)`. Step 1 completed on the VM: clean `rebuild-r1` received at `7922b9210b03dc69e8fe12aa2359ffcc8590ffff`; fetch/fast-forward reported already up to date. This brief and the complete approved plan were read; plan/catalog/question-bank SHA256 values match section 2.
+- **Resource hold:** `/home/max/stadtstack-ops/state/0.3.2-heavy-done` was absent at resume. Until it exists, only code work for steps 1–4; no typecheck, tests, PostgreSQL operations, parser image or heavy jobs. After release, at most approximately four concurrent cores. No R1 source/model job or new verification has run.
+- Step 2 donor investigation: fetched `council-owner-override` at `f942905aca2206402939d39d695d45d7876f16b2`. Main's read-only operations handoff reports a green source gate and four reviews; its current status reports the root-retirement fix reviewed and gate12 898/898. These are **donor results, not R1 verification**. Integration must retain R1 native/v3/v5/parser/OMP overlays; donor production corpus approvals and deployment work are not R1 execution authorization.
+- No changes to `/home/max/civic-0.3.2-resume`, hosted MCP, cluster or Main's `HANDOFF_UPDATES.md`. No cluster commands. Subagents, if used, must use the owner-approved OpenAI models; Haiku remains limited to the separately gated VM-B assessment route.
+- Actual resume milestone sent to ntfy `pipeline`, acknowledgement `W5BqmtSJdanL`; evidence appended to Vikunja task 68. This notification is coordination, **not** a bounded executor startup ACK.
+
 ## 1. Locations, ownership and observed state
 
 - Repository: `GiraeffleAeffle/ledger-of-life`, branch `rebuild-r1`, draft PR <https://github.com/GiraeffleAeffle/ledger-of-life/pull/7>.
