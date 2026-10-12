@@ -89,6 +89,33 @@ def revocation_cohort(trust_file,artifact_file,artifact_sha256,manifest_id):
     # using the shared implementation, never a second Python signature verifier.
     return {'directory':str(cohort_dir),'revocationArtifactSha256':artifact_sha256,'revocationTrustSha256':hashlib.sha256(trust_bytes).hexdigest(),'payload':artifact['payload']}
 
+def build_revocation_projection(cohort, scratch_parent):
+    """Build the root-owned atomic-writer layout consumed by the image."""
+    if os.geteuid()!=0:
+        raise RuntimeError('Exact-image revocation projection must be prepared as root')
+    source=pathlib.Path(cohort['directory'])
+    projection=pathlib.Path(scratch_parent)/'revocation-projection'
+    projection.mkdir(mode=0o700)
+    revision=projection/('..'+datetime.datetime.now(datetime.timezone.utc).strftime('%Y_%m_%d_%H_%M_%S.%f'))
+    revision.mkdir(mode=0o700)
+    os.chown(revision,0,1000);revision.chmod(0o2755)
+    for name,expected in (('trust.json',cohort['revocationTrustSha256']),('revocations.json',cohort['revocationArtifactSha256'])):
+        value=(source/name).read_bytes()
+        if hashlib.sha256(value).hexdigest()!=expected:
+            raise ValueError('Frozen public revocation cohort changed before projection')
+        destination=revision/name
+        destination.write_bytes(value)
+        os.chown(destination,0,1000);destination.chmod(0o444)
+        copied=destination.read_bytes()
+        if copied!=value or hashlib.sha256(copied).hexdigest()!=expected:
+            raise ValueError('Projected revocation cohort differs from frozen public bytes')
+    os.symlink(revision.name,projection/'..data');os.lchown(projection/'..data',0,1000)
+    for name in ('trust.json','revocations.json'):
+        os.symlink('..data/'+name,projection/name);os.lchown(projection/name,0,1000)
+    os.chown(projection,0,1000);projection.chmod(0o3777)
+    return str(projection)
+
+
 cohort_values=(args.revocation_trust_file,args.revocations_file,args.revocation_artifact_sha256,args.data_manifest_id)
 if any(value is not None for value in cohort_values) and not all(value is not None for value in cohort_values):
     p.error('Revocation trust/artifact files, artifact SHA256 and data manifest ID must be supplied together')
@@ -305,9 +332,11 @@ try:
         hashfile=pathlib.Path(hash_mount.name)/'token-hashes.json'
         disposable_configuration()
         cohort_options=[]
+        projection=None
         if cohort is not None:
             assert revocation_cohort(*cohort_values)==cohort, 'Frozen public cohort changed before image startup'
-            cohort_options=['--mount','type=bind,source='+cohort['directory']+',target=/run/config/mcp-revocations,readonly','--env','STADTSTACK_MCP_RELEASE_DIR=/app/release','--env','STADTSTACK_MCP_REVOCATION_TRUST_FILE=/run/config/mcp-revocations/trust.json','--env','STADTSTACK_MCP_REVOCATIONS_FILE=/run/config/mcp-revocations/revocations.json']
+            projection=build_revocation_projection(cohort,hash_mount.name)
+            cohort_options=['--mount','type=bind,source='+projection+',target=/run/config/mcp-revocations,readonly','--env','STADTSTACK_MCP_RELEASE_DIR=/app/release','--env','STADTSTACK_MCP_REVOCATION_TRUST_FILE=/run/config/mcp-revocations/trust.json','--env','STADTSTACK_MCP_REVOCATIONS_FILE=/run/config/mcp-revocations/revocations.json']
         container=command(['docker','run','--detach','--name','civic-mcp-smoke-'+acceptance_run_id,'--platform','linux/amd64','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges:true','--memory','1g','--cpus','1','--publish','127.0.0.1::4318','--mount','type=bind,source='+str(hashfile)+',target=/run/secrets/mcp/token-hashes.json,readonly',*cohort_options,args.image])
         port=command(['docker','port',container,'4318/tcp']).split(':')[-1]
         origin='http://127.0.0.1:'+port
@@ -316,7 +345,7 @@ try:
         assert details['HostConfig']['ReadonlyRootfs'] and details['HostConfig']['CapDrop']==['ALL']
         if cohort is not None:
             mount=next(mount for mount in details['Mounts'] if mount['Destination']=='/run/config/mcp-revocations')
-            assert mount['Type']=='bind' and mount['Source']==cohort['directory'] and mount['RW'] is False
+            assert mount['Type']=='bind' and mount['Source']==projection and mount['RW'] is False
             assert set(cohort_options[3::2])<=set(details['Config']['Env'])
             checks['readOnlyRevocationCohort']=True
         labels=details['Config'].get('Labels') or {}

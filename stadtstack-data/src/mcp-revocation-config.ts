@@ -1,5 +1,5 @@
 import {constants} from 'node:fs';
-import {open,lstat,realpath} from 'node:fs/promises';
+import {open,lstat,realpath,readlink} from 'node:fs/promises';
 import {dirname,isAbsolute,relative,resolve,join,sep} from 'node:path';
 import {MAX_REVOCATION_BYTES,RevocationTrustSchema,verifyRevocations,type RevocationTrust,type VerifiedRevocations} from './civic-revocations.ts';
 
@@ -32,8 +32,35 @@ async function governedDirectoryChain(root:string,cohort:string):Promise<void>{
  for(const component of cohort.split(sep).filter(Boolean)){
   current=join(current,component);const metadata=await lstat(current);
   const stickyAncestor=(metadata.mode&0o1000)!==0&&current!==root&&!inside(root,current);
-  if(!metadata.isDirectory()||metadata.isSymbolicLink()||metadata.uid!==0&&metadata.uid!==uid||(metadata.mode&0o022)!==0&&!stickyAncestor)throw new GovernedRevocationConfigError();
+  const unsafeWrite=(metadata.mode&0o022)!==0&&!stickyAncestor&&!(current===root&&(metadata.mode&0o1000)!==0);
+  if(!metadata.isDirectory()||metadata.isSymbolicLink()||metadata.uid!==0&&metadata.uid!==uid||unsafeWrite)throw new GovernedRevocationConfigError();
  }
+}
+async function governedConfigFile(root:string,name:string):Promise<string>{
+ const uid=process.getuid?.();if(uid===undefined)throw new GovernedRevocationConfigError();
+ const initial=relative(root,name);if(!inside(root,name))throw new GovernedRevocationConfigError();
+ let pending=initial.split(sep).filter(Boolean),current=root,hops=0;
+ while(pending.length){
+  const component=pending.shift()!;
+  if(component==='.'||component==='')continue;
+  if(component==='..'){
+   current=dirname(current);if(current!==root&&!inside(root,current))throw new GovernedRevocationConfigError();
+   continue;
+  }
+  const candidate=join(current,component),metadata=await lstat(candidate);
+  if(metadata.uid!==0&&metadata.uid!==uid)throw new GovernedRevocationConfigError();
+  if(metadata.isSymbolicLink()){
+   if(++hops>4)throw new GovernedRevocationConfigError();
+   const target=await readlink(candidate);if(isAbsolute(target))throw new GovernedRevocationConfigError();
+   pending=[...target.split(sep).filter(Boolean),...pending];current=dirname(candidate);
+  }else{
+   if(pending.length&&!metadata.isDirectory())throw new GovernedRevocationConfigError();
+   if(!pending.length&&!metadata.isFile())throw new GovernedRevocationConfigError();
+   current=candidate;
+  }
+ }
+ if(!inside(root,current))throw new GovernedRevocationConfigError();
+ return current;
 }
 async function boundedConfigFile(path:string,maxBytes:number):Promise<Uint8Array>{
  const file=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
@@ -59,9 +86,10 @@ async function loadRevocationCohort(expectedReleaseId:string,env:NodeJS.ProcessE
  try{
   const trustPath=configuredPath(env.STADTSTACK_MCP_REVOCATION_TRUST_FILE),artifactPath=configuredPath(env.STADTSTACK_MCP_REVOCATIONS_FILE);
   if(trustPath===artifactPath||dirname(trustPath)!==dirname(artifactPath))throw new GovernedRevocationConfigError();
-  const root=await realpath(dirname(trustPath)),trustReal=await realpath(trustPath),artifactReal=await realpath(artifactPath);
-  // Kubernetes projected config files may be symlinks into one immutable revision.
-  if(!inside(root,trustReal)||!inside(root,artifactReal)||dirname(trustReal)!==dirname(artifactReal))throw new GovernedRevocationConfigError();
+  const root=await realpath(dirname(trustPath));
+  await governedDirectoryChain(root,root);
+  const [trustReal,artifactReal]=await Promise.all([governedConfigFile(root,join(root,relative(dirname(trustPath),trustPath))),governedConfigFile(root,join(root,relative(dirname(trustPath),artifactPath)))]);
+  if(dirname(trustReal)!==dirname(artifactReal))throw new GovernedRevocationConfigError();
   await governedDirectoryChain(root,dirname(trustReal));
   const [trustBytes,artifactBytes]=await Promise.all([boundedConfigFile(trustReal,MAX_TRUST_BYTES),boundedConfigFile(artifactReal,MAX_REVOCATION_BYTES)]);
   if(await realpath(trustPath)!==trustReal||await realpath(artifactPath)!==artifactReal)throw new GovernedRevocationConfigError();

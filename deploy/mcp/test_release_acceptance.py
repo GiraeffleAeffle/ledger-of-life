@@ -34,7 +34,7 @@ def smoke_namespace(*names, **values):
     nodes = [node for node in module.body if isinstance(node, ast.FunctionDef) and node.name in names]
     if len(nodes) != len(names):
         raise AssertionError('Smoke function boundary changed')
-    namespace = {'os': os, 'pathlib': pathlib, 'hashlib': hashlib, 'json': json, 're': re, 'base64': base64, 'S_ISDIR': S_ISDIR, 'S_ISREG': S_ISREG, **values}
+    namespace = {'os': os, 'pathlib': pathlib, 'hashlib': hashlib, 'json': json, 're': re, 'base64': base64, 'datetime': datetime, 'S_ISDIR': S_ISDIR, 'S_ISREG': S_ISREG, **values}
     exec(compile(ast.Module(body=nodes, type_ignores=[]), '<smoke-functions>', 'exec'), namespace)
     return namespace
 
@@ -302,30 +302,43 @@ class RevocationCohortTests(unittest.TestCase):
             self.assertEqual(value['revocationTrustSha256'], hashlib.sha256(fixture.trust_path.read_bytes()).hexdigest())
             self.assertEqual(value['payload'], fixture.artifact['payload'])
 
-    def test_local_image_mounts_only_frozen_cohort_readonly_with_exact_env(self):
+    def test_local_image_mounts_projected_cohort_readonly_with_exact_env(self):
         module = ast.parse((ROOT / 'smoke.py').read_text())
         startup = next(node for node in module.body if isinstance(node, ast.Try) and node.body and isinstance(node.body[0], ast.If) and isinstance(node.body[0].test, ast.Attribute) and node.body[0].test.attr == 'url')
         local = startup.body[0].orelse
         first = next(index for index, node in enumerate(local) if assigned_name(node) == 'cohort_options')
         last = next(index for index, node in enumerate(local) if assigned_name(node) == 'container')
         block = compile(ast.Module(body=local[first:last + 1], type_ignores=[]), '<local-cohort-mount>', 'exec')
-        with synthetic_cohort() as fixture:
+        with synthetic_cohort() as fixture, tempfile.TemporaryDirectory() as scratch:
             cohort_values = (str(fixture.trust_path), str(fixture.artifact_path), fixture.artifact_sha, fixture.manifest)
-            namespace = smoke_namespace('revocation_cohort')
+            namespace = smoke_namespace('revocation_cohort', 'build_revocation_projection')
             calls = []
             def command(arguments):
                 calls.append(arguments)
                 return 'synthetic-container'
             image = 'ghcr.io/giraeffleaeffle/stadtstack-mcp:0.3.2@sha256:' + 'b' * 64
-            namespace.update(cohort=namespace['revocation_cohort'](*cohort_values), cohort_values=cohort_values, args=types.SimpleNamespace(image=image), command=command, hashfile=pathlib.Path('/synthetic/token-hashes.json'), acceptance_run_id='f' * 32)
-            exec(block, namespace)
+            namespace.update(cohort=namespace['revocation_cohort'](*cohort_values), cohort_values=cohort_values, args=types.SimpleNamespace(image=image), command=command, hashfile=pathlib.Path('/synthetic/token-hashes.json'), hash_mount=types.SimpleNamespace(name=scratch), acceptance_run_id='f' * 32)
+            with mock.patch.object(os, 'geteuid', return_value=0), mock.patch.object(os, 'chown') as chown, mock.patch.object(os, 'lchown') as lchown:
+                exec(block, namespace)
             self.assertEqual(len(calls), 1)
             arguments = calls[0]
             self.assertEqual(arguments[:3], ['docker', 'run', '--detach'])
             self.assertEqual(arguments[-1], image)
-            self.assertIn('type=bind,source=' + str(fixture.directory) + ',target=/run/config/mcp-revocations,readonly', arguments)
+            projection = pathlib.Path(namespace['projection'])
+            self.assertNotEqual(str(projection), str(fixture.directory))
+            self.assertIn('type=bind,source=' + str(projection) + ',target=/run/config/mcp-revocations,readonly', arguments)
             for variable in ('STADTSTACK_MCP_RELEASE_DIR=/app/release', 'STADTSTACK_MCP_REVOCATION_TRUST_FILE=/run/config/mcp-revocations/trust.json', 'STADTSTACK_MCP_REVOCATIONS_FILE=/run/config/mcp-revocations/revocations.json'):
                 self.assertEqual(arguments[arguments.index(variable) - 1], '--env')
+            revision = next(path for path in projection.iterdir() if path.name.startswith('..20'))
+            self.assertEqual(projection.lstat().st_mode & 0o7777, 0o3777)
+            self.assertEqual(revision.lstat().st_mode & 0o7777, 0o2755)
+            for name in ('trust.json', 'revocations.json'):
+                self.assertEqual((revision / name).stat().st_mode & 0o7777, 0o444)
+                self.assertEqual((revision / name).read_bytes(), (fixture.directory / name).read_bytes())
+                self.assertEqual(os.readlink(projection / name), '..data/' + name)
+            self.assertEqual(os.readlink(projection / '..data'), revision.name)
+            self.assertEqual(len(chown.call_args_list), 4)
+            self.assertEqual(len(lchown.call_args_list), 3)
 
     def test_changed_file_metadata_is_rejected(self):
         validator = smoke_namespace('revocation_cohort')['revocation_cohort']
