@@ -5,8 +5,12 @@ import {documentOriginExcludes} from './source-policy.ts';
 
 export const PILOT_BASE_CORPUS_SHA256='fbcd03c8474e3fa3cb2a3db0b9a976e3793863a3a6e268b0ead21868516ec2c0';
 export const PILOT_COMPLETION_CORPUS_SHA256='fb4e08eee8bf1a3bf036433893553b5ebb0e7ae4dec1fea6ce702a8f66642992';
+// 0.3.2 bounded targets (owner scope decision 2026-10-11, recorded by the VM lead 2026-10-12): exact crawl index bytes.
+export const PATCH_032_STRAUSBERG_SOLARPARK_CORPUS_SHA256='98a2432a6e423d9cfc0ac7263f8f38e66e03d3a04cf8be5990aec806e9e55d6f';
+export const PATCH_032_RUEDERSDORF_HEAT_CORPUS_SHA256='7b95020ed73079db0990986c5139c283841f525f3e3b77f12d7d182ed6ef4478';
+export const PATCH_032_HOPPEGARTEN_HEAT_CORPUS_SHA256='2dd6731e63d03e1928ef9d09f2854139a9296f934fc05e06c98c8220565821d0';
 // Exact owner-authorized snapshots; a caller-selected checksum cannot extend scope.
-export const authorizedPilotCorpusSchema=z.enum([PILOT_BASE_CORPUS_SHA256,PILOT_COMPLETION_CORPUS_SHA256]);
+export const authorizedPilotCorpusSchema=z.enum([PILOT_BASE_CORPUS_SHA256,PILOT_COMPLETION_CORPUS_SHA256,PATCH_032_STRAUSBERG_SOLARPARK_CORPUS_SHA256,PATCH_032_RUEDERSDORF_HEAT_CORPUS_SHA256,PATCH_032_HOPPEGARTEN_HEAT_CORPUS_SHA256]);
 export const crawlDocumentSchema=z.object({id:z.string(),municipalityId:z.string(),ags:z.string().regex(/^\d{8}$/),districtId:z.string(),sourceId:z.string(),url:z.url(),sha256:hashSchema,mimeType:z.string(),retrievedAt:z.iso.datetime(),checkedAt:z.iso.datetime().optional(),status:z.number().int().min(100).max(599).optional(),observationPath:z.string().min(1).optional(),documentDate:daySchema.nullable(),localPath:z.string(),adapter:z.string(),metadata:z.record(z.string(),z.unknown()),policy:z.unknown().optional(),exclusion:z.never().optional()});
 export type CrawlDocument=z.infer<typeof crawlDocumentSchema>;
 export const excludedCrawlDocumentSchema=crawlDocumentSchema.omit({localPath:true,policy:true,exclusion:true}).extend({
