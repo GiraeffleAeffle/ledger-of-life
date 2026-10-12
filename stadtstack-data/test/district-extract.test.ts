@@ -244,6 +244,32 @@ test('release requires actual-shaped judge evidence, all deterministic checks an
   good.title = 'Mutated after judging';
   assert.throws(() => DistrictKnowledgeRecordSchema.parse(good), /evidence hash/);
 });
+test('current sol and retained luna record models preserve strict same-model and provider evidence', () => {
+  assert.equal(PROVIDER_CONFIGS['openai-subscription'].model, 'gpt-6.1-sol');
+  assert.deepEqual(PROVIDER_CONFIGS['openai-subscription'].historicalModels, ['gpt-6-luna']);
+  assert.deepEqual(PROVIDER_CONFIGS['anthropic-subscription'].historicalModels, []);
+  for (const model of ['gpt-6.1-sol', 'gpt-6-luna']) {
+    const value = record();
+    value.extraction.model = model; value.verification.faithfulness.model = model;
+    const identityHash = sha256(`Synthetic model identity for ${model}`);
+    value.extraction.modelIdentitySha256 = identityHash; value.verification.faithfulness.modelIdentitySha256 = identityHash;
+    value.verification.evidenceHash = knowledgeEvidenceHash(value);
+    assert.deepEqual(DistrictKnowledgeRecordSchema.parse(value), value);
+    const mismatch = structuredClone(value);
+    mismatch.verification.faithfulness.model = model === 'gpt-6-luna' ? 'gpt-6.1-sol' : 'gpt-6-luna';
+    mismatch.verification.evidenceHash = knowledgeEvidenceHash(mismatch);
+    assert.throws(() => DistrictKnowledgeRecordSchema.parse(mismatch), /Same-model judge identity mismatch/);
+    const wrongTool = structuredClone(value);
+    wrongTool.extraction.tool = 'claude-cli'; wrongTool.verification.faithfulness.tool = 'claude-cli';
+    wrongTool.verification.evidenceHash = knowledgeEvidenceHash(wrongTool);
+    assert.throws(() => DistrictKnowledgeRecordSchema.parse(wrongTool), /Provider\/model evidence mismatch/);
+  }
+  const unknown = record();
+  unknown.extraction.model = 'gpt-x'; unknown.verification.faithfulness.model = 'gpt-x';
+  unknown.verification.evidenceHash = knowledgeEvidenceHash(unknown);
+  assert.throws(() => DistrictKnowledgeRecordSchema.parse(unknown), /Provider\/model evidence mismatch/);
+});
+
 test('evidence hash is stable under JSON property order, but bound to all claims', () => {
   const value = record();
   const reordered = Object.fromEntries(Object.entries(value).reverse()) as DistrictKnowledgeRecord;

@@ -2,8 +2,8 @@ import type {ManagedSourceContext,CivicPolicyOptions} from './civic-opt-out.ts';
 
 export type ExtractorProvider = 'openai-subscription' | 'anthropic-subscription';
 export const PROVIDER_CONFIGS = Object.freeze({
-  'openai-subscription': Object.freeze({ model: 'gpt-6-luna', tool: 'codex-cli', host: 'codex-workstation', binary: '/home/max/.local/bin/codex', modelIdentityBasis: 'configured-cli-model-and-tool-version', toolLimitation: 'Codex retains apply_patch availability; read-only sandbox blocks writes. Shell/browser/app/plugin features are disabled and any attempted tool use rejects the result. This is not a blanket tool-free CLI.' }),
-  'anthropic-subscription': Object.freeze({ model: 'claude-haiku-5-5', tool: 'claude-cli', host: 'Mac', binary: '/Users/max/.local/bin/claude', modelIdentityBasis: 'reported-cli-model-and-tool-version', toolLimitation: 'Native Claude safe/restricted mode, no operational tools or MCP servers. Only its built-in StructuredOutput return formatter is allowed, with linked call/result IDs; every other tool declaration or attempt rejects the result. Existing first-party Max authentication only.' }),
+  'openai-subscription': Object.freeze({ model: 'gpt-6.1-sol', historicalModels: Object.freeze(['gpt-6-luna'] as const), tool: 'codex-cli', host: 'codex-workstation', binary: '/home/max/.local/bin/codex', modelIdentityBasis: 'configured-cli-model-and-tool-version', toolLimitation: 'Codex retains apply_patch availability; read-only sandbox blocks writes. Shell/browser/app/plugin features are disabled and any attempted tool use rejects the result. This is not a blanket tool-free CLI.' }),
+  'anthropic-subscription': Object.freeze({ model: 'claude-haiku-5-5', historicalModels: Object.freeze([] as const), tool: 'claude-cli', host: 'Mac', binary: '/Users/max/.local/bin/claude', modelIdentityBasis: 'reported-cli-model-and-tool-version', toolLimitation: 'Native Claude safe/restricted mode, no operational tools or MCP servers. Only its built-in StructuredOutput return formatter is allowed, with linked call/result IDs; every other tool declaration or attempt rejects the result. Existing first-party Max authentication only.' }),
 } as const);
 export type ModelEvidence = {
   provider: ExtractorProvider; tool: 'codex-cli' | 'claude-cli'; toolVersion: string;
@@ -24,7 +24,7 @@ export const RUNTIME_TOOL_KINDS = ['item:command_execution', 'item:file_change',
 export type RuntimeToolEvidence = { activity: 'declaration' | 'attempt' | 'unknown' } & ({ kind: typeof RUNTIME_TOOL_KINDS[number]; kindSha256?: never } | { kindSha256: string; kind?: never });
 export type RuntimeFailureDiagnostic = {
   version: 1; callId: string; groupId: string | null; groupIdSha256: string | null;
-  provider: ExtractorProvider; requestedModel: typeof PROVIDER_CONFIGS[ExtractorProvider]['model'];
+  provider: ExtractorProvider; requestedModel: typeof PROVIDER_CONFIGS[ExtractorProvider]['model'] | typeof PROVIDER_CONFIGS[ExtractorProvider]['historicalModels'][number];
   startedAt: string; failedAt: string; attempted: boolean; exitCode: number | null;
   failureCategory: SubscriptionFailureCategory; reason: RuntimeFailureReason;
   parserFailureCategory: string | null; toolEvidence: RuntimeToolEvidence[]; toolEvidenceTruncated: boolean;

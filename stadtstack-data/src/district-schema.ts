@@ -144,7 +144,7 @@ export const DistrictKnowledgeRecordSchema = DistrictExtractionClaimsSchema.exte
   if (!REQUIRED_DETERMINISTIC_CHECKS.every(id => record.verification.deterministic.checks.some(check => check.id === id))) fail('Required deterministic evidence missing');
   if (!GRAPH_DETERMINISTIC_CHECKS.every(id => record.verification.deterministic.checks.some(check => check.id === id))) fail('Required graph grounding evidence missing');
   const provider = PROVIDER_CONFIGS[record.extraction.provider];
-  if (record.extraction.model !== provider.model || record.extraction.tool !== provider.tool || record.extraction.modelIdentityBasis !== provider.modelIdentityBasis || record.verification.faithfulness.provider !== record.extraction.provider) fail('Provider/model evidence mismatch');
+  if ((record.extraction.model !== provider.model && !(provider.historicalModels as readonly string[]).includes(record.extraction.model)) || record.extraction.tool !== provider.tool || record.extraction.modelIdentityBasis !== provider.modelIdentityBasis || record.verification.faithfulness.provider !== record.extraction.provider) fail('Provider/model evidence mismatch');
   try {
     const normalized = normalizeGraphClaims(record, { municipalityId: record.municipalityId, sourceSha256: record.extraction.inputSha256, ags: record.ags });
     if (normalized.entities.some((entity, i) => entity.entityId !== record.entities[i].entityId || JSON.stringify(entity.identityBasis) !== JSON.stringify(record.entities[i].identityBasis)) || normalized.relations.some((relation, i) => relation.fromId !== record.relations[i].fromId || relation.toId !== record.relations[i].toId)) fail('Pipeline graph identity mismatch');

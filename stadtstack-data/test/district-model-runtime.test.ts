@@ -40,6 +40,8 @@ test('provider arguments isolate tools and never enable API-key or fallback mode
   for (const flag of ['--bare', '--fallback-model', '--dangerously-skip-permissions']) assert.ok(!args.includes(flag));
   const codex = subscriptionExecutionArgs('/tmp/unit', '/tmp/unit/schema.json', '/tmp/unit/answer.json', 'fixed instructions');
   assert.ok(codex.includes(PROVIDER_CONFIGS['openai-subscription'].model));
+  assert.equal(PROVIDER_CONFIGS['openai-subscription'].model, 'gpt-6.1-sol');
+  assert.ok(codex.includes('model_reasoning_effort="medium"'));
   assert.ok(codex.includes('forced_login_method="chatgpt"'));
   assert.ok(codex.includes('read-only'));
 });
@@ -79,8 +81,14 @@ test('reported tool availability and attempts reject even otherwise successful o
     assert.equal(inspectClaudeEvents(JSON.stringify(event) + '\n' + claudeResult()).toolAttempted, true);
   }
   assert.equal(inspectCodexEvents('{"type":"item.started","item":{"type":"command_execution"}}').toolAttempted, true);
-  assert.throws(() => inspectCodexEvents('{"type":"session.started","model":"wrong"}\n{"type":"session.started","model":"gpt-6-luna"}'), /different model/);
+  assert.throws(() => inspectCodexEvents(`{"type":"session.started","model":"wrong"}\n{"type":"session.started","model":"${PROVIDER_CONFIGS['openai-subscription'].model}"}`), /different model/);
 });
+test('live Codex model validation does not accept historical models as a fallback', () => {
+  const event = (model: string) => JSON.stringify({ type: 'session.started', model });
+  assert.equal(inspectCodexEvents(event('gpt-6.1-sol')).returnedModel, 'gpt-6.1-sol');
+  for (const model of ['gpt-6-luna', 'gpt-x']) assert.throws(() => inspectCodexEvents(event(model)), /different model/);
+});
+
 test('hourly ledger separates scopes, missing reports, failures and API estimates from subscription charges', async () => {
   const root = await mkdtemp(join(tmpdir(), 'district-usage-test-'));
   try {
@@ -212,6 +220,12 @@ test('failure diagnostics project only controlled fields and do not fabricate ex
   assert.throws(() => RuntimeFailureDiagnosticSchema.parse({ ...diagnostic, parserFailureCategory: secret }));
   assert.throws(() => RuntimeFailureDiagnosticSchema.parse({ ...diagnostic, toolEvidence: [{ activity: 'attempt', kind: secret }] }));
   assert.throws(() => RuntimeFailureDiagnosticSchema.parse({ ...diagnostic, requestedModel: 'claude-haiku-5-5' }));
+  assert.equal(diagnostic.requestedModel, 'gpt-6.1-sol');
+  assert.equal(RuntimeFailureDiagnosticSchema.parse({ ...diagnostic, requestedModel: 'gpt-6-luna' }).requestedModel, 'gpt-6-luna');
+  for (const requestedModel of ['gpt-6.1-sol', 'gpt-6-luna']) {
+    assert.equal(RuntimeFailureDiagnosticSchema.safeParse({ ...diagnostic, provider: 'anthropic-subscription', requestedModel }).success, false);
+  }
+  assert.equal(RuntimeFailureDiagnosticSchema.safeParse({ ...diagnostic, requestedModel: 'gpt-x' }).success, false);
   for (const stream of ['null', '[]', '{"type":']) {
     assert.throws(() => inspectCodexEvents(stream), error => error instanceof SubscriptionRuntimeError && error.reason === 'event_stream');
   }
