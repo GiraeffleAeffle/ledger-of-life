@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-first-live-batch-2026-10-12",
+  "recordedAt": "2026-10-12T22:05:00Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session; mirrored as comments on Vikunja tasks 73, 74 and 75",
+  "ownerStatementsVerbatim": [
+    "Ok please continue with your recommendations and keep on working autonomously as before with the updates you sent in ntfy",
+    "I don't think I turned it on. The normal subscription usage should be enough"
+  ],
+  "approvedRecommendations": {
+    "dockerAccess": "Vikunja 73 option A: add max to group docker (executed 2026-10-12; no new privilege, max already has sudo NOPASSWD).",
+    "registry": {
+      "task": "Vikunja 75 item 1",
+      "scope": "Exactly one structured catalog route: regionalstatistik-genesis for municipality strausberg (AGS 12064472). PEGELONLINE (K2) deliberately not included.",
+      "gitCommit": "ae49124d132539650feb183aa2246bde4ee51581",
+      "path": "stadtstack-data/sources/district-registry.json",
+      "configurationSha256": "3fcc7e5543b6792ec4fe35f8cf11856bfbf49aed394422b7a50ba8aab1ebef00",
+      "catalogSha256": "c19460dddf97c1e4ac2ef85d5bb34a9feff9482af2e8399d06c5b20001d05e40"
+    },
+    "sourceAdmission": {
+      "task": "Vikunja 75 item 2",
+      "source": "regionalstatistik-genesis (Regionaldatenbank Deutschland GENESIS REST data/table, documented public guest access GAST)",
+      "municipality": "strausberg",
+      "ags": "12064472",
+      "table": "12411-02-03",
+      "year": 2024,
+      "yearSelection": "Operator choice within the approved 'exactly one table and one year'; most recent full reference year (31.12.2024). A rejected or unavailable year is held, never substituted.",
+      "requests": "At most one data/table POST for this batch.",
+      "permissionKind": "facts_with_attribution",
+      "licenceAsDeclaredByPortal": "Datenlizenz Deutschland - Namensnennung - Version 2.0 (catalog declaration; no licence-terms bytes were fetched or verified, hence no distribution_licence permission is claimed)",
+      "retention": "Original response bytes kept privately in the managed CAS until opt-out or purge.",
+      "publication": "Facts with attribution only; no republication of the dataset.",
+      "constraints": "Honest user agent with https://stadtstack.eu/kontakt; one request in flight per host with at least 2.5 s spacing; no login, captcha or paywall bypass."
+    },
+    "batchAuthorization": {
+      "task": "Vikunja 75 item 3",
+      "mode": "attended",
+      "ownerPresence": "Max present at the terminal during the run",
+      "maxJobs": 5,
+      "maxElapsedMs": 600000,
+      "expiresAt": "2026-10-14T21:59:59Z",
+      "category": "production"
+    },
+    "assessmentB": {
+      "task": "Vikunja 74",
+      "resolver": "Option A approved: trusted parent obtains an OAuth access bearer via stock omp 18.9.2 token --account for exactly one stored Anthropic OAuth account; isolated child only.",
+      "extraUsage": "Owner believes Claude Max extra usage is not enabled; only normal subscription usage is approved. No paid execution and no cost cap approved. Usage-limit errors hold; no wait-for-reset, retry on another transport or model fallback."
+    }
+  },
+  "notApproved": [
+    "PEGELONLINE or any other source",
+    "bounded_unattended execution for this batch",
+    "paid API execution or overage spending"
+  ]
+}
