@@ -102,6 +102,18 @@ const predicates: Record<z.infer<typeof relationTypeSchema>, RegExp> = {
   cites: /(?<![\p{L}\p{N}])(?:gemäß|nach|laut|auf Grundlage|verweist|Bezug|cites?|pursuant)(?![\p{L}\p{N}])/iu,
 };
 const negative = /\b(?:nicht|kein(?:e[rmns]?)?|weder|not|never|no)\b/iu;
+/** A negated contrast preamble does not negate a uniquely quoted action after "sondern". */
+function relationNegated(relation: GraphClaims['relations'][number]): boolean {
+  if (!negative.test(relation.quote)) return false;
+  const predicateStart = relation.quote.indexOf(relation.predicateQuote);
+  if (predicateStart < 0 || relation.quote.indexOf(relation.predicateQuote, predicateStart + 1) >= 0) return true;
+  let actionStart = 0;
+  for (const contrast of relation.quote.matchAll(/,\s*sondern\b/giu)) {
+    const end = contrast.index + contrast[0].length;
+    if (end <= predicateStart) actionStart = end;
+  }
+  return actionStart === 0 || negative.test(relation.quote.slice(actionStart));
+}
 const prospective = /\b(?:soll(?:en|te|ten)?|plant|planen|geplant|vorgesehen|beabsichtigt|künftig|zukünftig|voraussichtlich|Entwurf|Vorschlag|beantragt|will|planned|proposed)\b|\b(?:wird|werden)\b[^.!?]{0,160}(?<![\p{L}\p{N}])(?:betreiben|fördern|finanzieren|errichten|umsetzen|ändern|kooperieren|beschließen|entscheiden|genehmigen|bewilligen|billigen|zustimmen)(?![\p{L}\p{N}])/iu;
 const prospectiveMembership = /\b(?:wird|werden)\s+Mitglied(?:er)?\b|\b(?:wird|werden)\b[^.!?]{0,160}\b(?:beitreten|angehören)\b/iu;
 const conditional = /\b(?:wenn|falls|sofern|vorbehaltlich|unter der Bedingung|if|subject to)\b/iu;
@@ -129,7 +141,7 @@ export function normalizeRelationActions<T extends GraphClaims>(claims: T): { cl
     // A correctly typed non-action relation is not displaced by an embedded action.
     if (!['plans', 'decides', 'approves', 'implements'].includes(relation.type) && predicates[relation.type].test(relation.predicateQuote)) return relation;
     let modality = relation.modality;
-    const qualified = negative.test(relation.quote) || conditional.test(relation.quote) || relation.conditions !== null || historical.test(relation.quote);
+    const qualified = relationNegated(relation) || conditional.test(relation.quote) || relation.conditions !== null || historical.test(relation.quote);
     if (!qualified && !['proposed', 'conditional', 'negated', 'historical'].includes(modality)) {
       if (type === 'plans') modality = 'planned';
       else if (!prospective.test(relation.quote) && modality === 'asserted') {
@@ -172,7 +184,7 @@ export function graphGroundingChecks(claims: GraphClaims, text: string) {
       if (dates.length && relation.time === null) return false;
       const documentYear = claims.documentDate ? Number(claims.documentDate.slice(0, 4)) : null;
       if (documentYear !== null && dates.some(date => date.marker !== 'bis' && date.year > documentYear) && ['asserted', 'decided', 'implemented'].includes(relation.modality)) return false;
-      if (negative.test(relation.quote)) return relation.modality === 'negated';
+      if (relationNegated(relation)) return relation.modality === 'negated';
       if (conditional.test(relation.quote) || relation.conditions !== null) return relation.modality === 'conditional' && relation.conditions !== null;
       if (prospective.test(relation.quote) || relation.type === 'member_of' && prospectiveMembership.test(relation.quote)) return ['planned', 'proposed'].includes(relation.modality);
       if (historical.test(relation.quote) || /(?:^|\s)betrieb(?:\s|$)/u.test(relation.predicateQuote)) return relation.modality === 'historical' && relation.time !== null;
