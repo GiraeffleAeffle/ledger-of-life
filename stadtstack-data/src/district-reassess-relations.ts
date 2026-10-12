@@ -10,7 +10,7 @@ import {preparationPlanSchema, type PreparationPlan} from './district-preparatio
 import {WorkPlanSchema, restoreWorkPlan, classifyWorkFailure, WorkFailureSchema, type WorkPlan, type WorkTask} from './district-work-plan.ts';
 import {verifyPreparedDocument, readPreparedDocument, assertPreparedSourcesActive, assertPreparedReferenceMembership, preparedSourceBindings, preparedCacheContext, type PreparedDocument, type PreparedSourceReference} from './district-prepared-document.ts';
 import {writeManagedSourceJson, writeManagedSourceArtifact, readPinnedJson, acquirePrivateRunLock} from './district-private-io.ts';
-import {modelReadiness, subscriptionChat} from './district-model.ts';
+import {modelReadiness, subscriptionChat, subscriptionInputWithinBound, MODEL_INPUT_BOUND_REASON} from './district-model.ts';
 import {isProviderStopped} from './district-model-usage.ts';
 import {PROVIDER_CONFIGS, SubscriptionRuntimeError, type ExtractorProvider, type ModelEvidence, type ModelAnswer, type UsageContext} from './district-model-contract.ts';
 import {CIVIC_POLICY_AUTHORITY,CIVIC_ACQUISITION_DECISION_ID,assertCivicPolicyAuthority,assertHostNotOptedOut,assertManagedSourceBindings,parseContentFreePreparationPlan,initializeManagedAcquisitionLane,HostOptedOutError,CivicPolicyStateError,type CivicPolicyOptions,type ManagedSourceContext} from './civic-opt-out.ts';
@@ -318,9 +318,10 @@ export function assessExistingRelation(input:{key:string;record:DistrictKnowledg
   const originalDeterministicPassed=[...REQUIRED_DETERMINISTIC_CHECKS,...GRAPH_DETERMINISTIC_CHECKS].every(id=>record.verification.deterministic.checks.some(check=>check.id===id&&check.passed));
   const newlyPassed=deterministic.passed&&!originalDeterministicPassed;
   const judgeInput={source:{text:chunk.text},candidate:claims};
+  const needsJudge=deterministic.passed&&dateEligible&&(changed||newlyPassed),oversized=needsJudge&&!subscriptionInputWithinBound(judgeInput);
   return {...base,claims,normalization:normalized.normalization,quoteNormalization:restored.normalization,deterministic,changed,newlyPassed,dateEligible,
-    needsJudge:deterministic.passed&&dateEligible&&(changed||newlyPassed),
-    hold:!deterministic.passed?'deterministic_gate_failed':!dateEligible?'date_missing':!changed&&!newlyPassed&&record.verification.status!=='auto-verified'?'previous_judge_failed_or_unknown':null,
+    needsJudge:needsJudge&&!oversized,
+    hold:oversized?MODEL_INPUT_BOUND_REASON:!deterministic.passed?'deterministic_gate_failed':!dateEligible?'date_missing':!changed&&!newlyPassed&&record.verification.status!=='auto-verified'?'previous_judge_failed_or_unknown':null,
     judgeInput,judgeBinding:reassessmentJudgeBinding(record.extraction.provider,identityOf(record),judgeInput,prepared),claimsSha256:jsonHash(claims)};
 }
 function assessLocated(item:Located,answers:Answer[]):RelationAssessment {

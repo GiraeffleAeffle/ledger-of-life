@@ -13,6 +13,9 @@ import { createWorkPlan, runWorkPlan } from '../src/district-work-plan.ts';
 import { sha256 } from '../src/district-schema.ts';
 import { recordHostOptOut, CivicPolicyStateError } from '../src/civic-opt-out.ts';
 import { createCivicPolicyTestContext } from './fixtures/civic-policy.ts';
+import {MODEL_INPUT_BOUND_REASON,MAX_SUBSCRIPTION_INPUT_BYTES} from '../src/district-model.ts';
+import {documentChunks} from '../src/district-claims.ts';
+import {isProviderStopped} from '../src/district-model-usage.ts';
 const ordinaryFixture = await createCivicPolicyTestContext();
 after(ordinaryFixture.dispose);
 
@@ -64,6 +67,39 @@ test('oversized prepared documents quarantine before readiness and do not pause 
     assert.equal(spawnGuard.mock.callCount(), 0);
     assert.deepEqual(await readdir(root), []); // No readiness, usage, answer or record side effects.
   } finally { spawnGuard.mock.restore(); syncBuiltinESMExports(); await rm(root, { recursive: true, force: true }); }
+});
+
+test('oversize serialized chunk inputs quarantine without readiness, provider calls or a paused lane', async context => {
+  const root=await mkdtemp(join(tmpdir(),'district-inference-input-budget-'));
+  const spawnGuard=context.mock.method(childProcess,'spawn',()=>{throw Error('Native calls forbidden for deterministic oversize input');});
+  syncBuiltinESMExports();
+  try {
+    const prepared=await Promise.all([preparedText('\u0001'.repeat(12000)),preparedText('\u0002'.repeat(23200))]);
+    const contract=await jointExtractionContract(),pausePath=join(root,'pause.json');
+    const plan=createWorkPlan(prepared.map(document=>({municipalityId:document.municipalityId,sourceSha256:document.sourceSha256,preparedSha256:document.receiptSha256})),contract,'codex-only');
+    let completed=0;
+    await runWorkPlan(plan,async(task,pinnedContract,signal)=>{
+      const document=prepared.find(document=>document.sourceSha256===task.group.sourceSha256)!;
+      const expectedChunks=documentChunks(document.text);
+      assert.ok(expectedChunks.every(chunk=>Buffer.byteLength(JSON.stringify({source:{text:chunk.text}}))>MAX_SUBSCRIPTION_INPUT_BYTES));
+      const result=await inferPreparedDocument({
+        taskId:task.id,groupId:task.groupId,purpose:task.purpose,provider:task.provider,
+        municipality:{id:'strausberg',name:'Strausberg',ags:'12064472',districtId:'maerkisch-oderland'},
+        prepared:document,expected:document,contract:pinnedContract,out:root,policy:ordinaryFixture.policy,
+        usage:{ledgerPath:join(root,'usage.jsonl'),pausePath,signal},
+      });
+      assert.deepEqual(result.records,[]);
+      assert.deepEqual(result.chunks,expectedChunks.map(chunk=>({index:chunk.index,outcome:'rejected',responseSha256:null,recordId:null})));
+      assert.deepEqual(result.quarantine.map(item=>({chunk:item.chunk,reason:item.reason})),expectedChunks.map(chunk=>({chunk:chunk.index,reason:MODEL_INPUT_BOUND_REASON})));
+      assert.ok(result.quarantine.every(item=>!item.candidate&&item.sourceSha256===document.sourceSha256));
+      completed++;
+      return {resultSha256:sha256(JSON.stringify(result)),preparedSha256:result.preparedSha256,promptSha256:result.promptSha256,schemaSha256:result.schemaSha256};
+    },async()=>{},async()=>false);
+    assert.equal(completed,2);assert.ok(plan.tasks.every(task=>task.state==='completed'&&task.attempts===1));
+    assert.equal(plan.providers['openai-subscription'],'ready');
+    assert.equal(await isProviderStopped(pausePath,'openai-subscription'),false);
+    assert.equal(spawnGuard.mock.callCount(),0);assert.deepEqual(await readdir(root),[]);
+  } finally {spawnGuard.mock.restore();syncBuiltinESMExports();await rm(root,{recursive:true,force:true});}
 });
 
 test('budget handling does not swallow cancellation, prepared integrity, or native authority failures', async context => {
