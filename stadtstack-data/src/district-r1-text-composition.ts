@@ -121,7 +121,7 @@ export function buildR1TextCompositionContext(input:DistrictReleaseCompositionIn
  const retainedRecords=retainedPublication?.selectedRecordOrigins.map(origin=>{const index=retainedPublication.baseline.recordIndexes.indexOf(origin.outputRecordIndex);if(index<0)throw Error('Retained origin references an absent output record');return projectKnowledgeRecordIdentity(retainedPublication.baseline.records[index],retainedPublication.baseline.input.schemaProjection);})??[];
  const recordById=new Map<string,DistrictKnowledgeRecord>();
  for(const record of [...retainedRecords,...nativeRecords])recordById.set(record.id,record);
- const knowledge={schemaVersion:KNOWLEDGE_SCHEMA_VERSION,generatedAt:input.generatedAt,records:[...recordById.values()],identityAssertions:[...assertions.values()],identityAdmissions:[...admissions.values()]};
+ const knowledge:R1TextCompositionContext['knowledge']={schemaVersion:KNOWLEDGE_SCHEMA_VERSION,generatedAt:input.generatedAt,records:[...recordById.values()],identityAssertions:[...assertions.values()],identityAdmissions:[...admissions.values()]};
  const replayPayload={
   generatedAt:input.generatedAt,
   approvedRunOrder:[...input.approvedRunOrder],

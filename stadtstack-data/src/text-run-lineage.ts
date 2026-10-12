@@ -310,7 +310,8 @@ export function authenticateTextRunContribution(input:TextRunContribution):Authe
  return authenticated;
 }
 
-function projectionInvariant(record:DistrictKnowledgeRecord):unknown{
+type ProjectionRecord=Omit<DistrictKnowledgeRecord,'kind'|'verification'>&{kind?:'text_model';verification:Omit<DistrictKnowledgeRecord['verification'],'kind'>&{kind?:'text_model'}};
+function projectionInvariant(record:ProjectionRecord):unknown{
  const {evidenceHash:_hash,...verification}=record.verification;
  return {...record,verification,entities:record.entities.map(({entityId:_id,identityBasis:_basis,...claims})=>claims),relations:record.relations.map(({fromId:_from,toId:_to,...claims})=>claims)};
 }
@@ -334,11 +335,11 @@ export function buildAuthenticatedTextRunLineage(runs:readonly AuthenticatedText
   if(recordIds.has(selection.recordId))throw Error('Duplicate selected record origin');recordIds.add(selection.recordId);
   if(selection.originalEvidenceHash!==original.verification.evidenceHash||projected.id!==original.id||projected.verification.evidenceHash!==knowledgeEvidenceHash(projected))throw Error('Selected record evidence hash binding mismatch');
   const schemaProjection=selection.schemaProjection===undefined?null:textSchemaProjectionSchema.parse(selection.schemaProjection);
-  let comparable=projected;
+  let comparable:ProjectionRecord=projected;
   if(schemaProjection!==null){
    if(run.recordsSchemaVersion!=='stadtstack-knowledge-v2'||Object.hasOwn(original,'kind')||Object.hasOwn(original.verification,'kind'))throw Error('Text schema projection requires an unmarked authenticated knowledge-v2 record');
-   const {kind,...claims}=projected as DistrictKnowledgeRecord&{kind?:unknown};
-   const {kind:verificationKind,...verification}=projected.verification as DistrictKnowledgeRecord['verification']&{kind?:unknown};
+   const {kind,...claims}=projected;
+   const {kind:verificationKind,...verification}=projected.verification;
    if(kind!=='text_model'||verificationKind!=='text_model')throw Error('Text schema projection requires both explicit text_model markers');
    comparable={...claims,verification};
   }

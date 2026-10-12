@@ -191,7 +191,7 @@ export class QueryIndex {
       return visible;
     });
     const regional={...this.regional,topics:this.regional.topics.map(topic=>({...topic,municipalities:topic.municipalities.map(municipality=>({...municipality,items:municipality.items.filter(item=>{
-      const id=regionalRecordId(municipality.municipalityId,item),source=regionalSource(item,this.regional.asOf),descriptors=[{mcpSourceId:mcpSourceId(source),municipalityId:municipality.municipalityId,url:item.url},...sourceMetadataUrls(item).filter(url=>url!==item.url).map(url=>({municipalityId:municipality.municipalityId,url}))];
+      const id=regionalRecordId(municipality.municipalityId,item),source=regionalSource(item,this.regional.asOf),descriptors:RevocationSourceDescriptor[]=[{mcpSourceId:mcpSourceId(source),municipalityId:municipality.municipalityId,url:item.url},...sourceMetadataUrls(item).filter(url=>url!==item.url).map(url=>({municipalityId:municipality.municipalityId,url}))];
       sourceDescriptorsByRecord.set(id,descriptors);
       const visible=!isRecordRevoked(mask,{recordId:id,municipalityId:municipality.municipalityId,sources:descriptors});
       if(visible)visibleRecordIds.add(id);else for(const descriptor of descriptors)if(descriptor.mcpSourceId)withheldSourceIds.add(descriptor.mcpSourceId);

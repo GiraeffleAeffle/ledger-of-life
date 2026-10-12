@@ -171,7 +171,7 @@ function recordedSourceChunk(record:DistrictKnowledgeRecord,prepared:PreparedDoc
 export function validateFrozenReassessment(input:unknown,current:ReassessmentContract):Validated {
   const frozen=FrozenReassessmentSchema.parse(input);checkContract(frozen.contract,current);
   const plan=WorkPlanSchema.parse(decode(frozen.workPlan)),preparation=preparationPlanSchema.parse(decode(frozen.preparationPlan));
-  for(const item of preparation.quarantine)if(item.candidate)for(const source of item.candidate.sources)if(!frozen.controlBindings.preparationPlan.some(binding=>binding.url===source.url&&binding.sourceSha256===source.sha256&&binding.observationId===source.id))throw Error('Preparation quarantine candidate lacks an actual control-source receipt');
+  for(const item of preparation.quarantine)if(item.candidate)for(const source of item.candidate.sources)if(!frozen.controlBindings.preparationPlan.some(binding=>(binding.kind==='http_observation'||binding.kind==='prepared_source')&&binding.url===source.url&&binding.sourceSha256===source.sha256&&binding.observationId===source.id))throw Error('Preparation quarantine candidate lacks an actual control-source receipt');
   if(plan.tasks.some(task=>task.state==='running'))throw Error('Reassessment requires a stopped frozen work plan');
   restoreWorkPlan(plan); // Validate derived assignments without rewriting the frozen plan.
   const tasks=plan.tasks.filter(task=>task.purpose==='production'&&task.state==='completed');

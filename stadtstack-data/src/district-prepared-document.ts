@@ -127,7 +127,7 @@ export async function prepareDocument(input: PreparationInput & Partial<ManagedP
   let sourceContext: ParserSourceContext | undefined;
   if (command === runDocumentCommand || input.managedRoot !== undefined) {
     if (!input.managedRoot || !input.policy || !input.sourceBindings?.length) throw Error('Preparation requires authenticated managed source bindings');
-    if (input.sourceBindings.some(binding => binding.sourceSha256 !== sourceSha256 || !references.some(reference => reference.url === binding.url)) ||
+    if (input.sourceBindings.some(binding => !('sourceSha256' in binding) || binding.sourceSha256 !== sourceSha256 || !references.some(reference => reference.url === binding.url)) ||
         references.some(reference => !input.sourceBindings!.some(binding => binding.url === reference.url))) throw Error('Preparation source bindings differ from original references');
     // Load host lifecycle only here; parser images do not contain authority state or its module closure.
     const { CIVIC_ACQUISITION_DECISION_ID } = await import('./civic-opt-out.ts');

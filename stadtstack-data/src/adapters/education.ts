@@ -149,8 +149,8 @@ export function createEducationAdapter(options: EducationOptions={}): Structured
   } else if(scope.sourceId==='kita-hoppegarten'){
    $('#content .template-page-effect a[href]').each((_,el)=>{const href=$(el).attr('href')!,url=new URL(href,s.url);if(url.pathname==='/verzeichnis/visitenkarte.php'&&url.searchParams.has('mandat'))resources.push(resource(href,s,`mandat:${url.searchParams.get('mandat')}`));else if(/Kindereinrichtungenflyer.*\.pdf$/i.test(url.pathname))resources.push(resource(href,s,url.pathname,'pdf'));});
   } else {
-   const root=scope.sourceId==='school-stats-sh'?$('#c4631'):scope.sourceId==='school-stats-mv'?$('#page'):$.root();
-   root.find('a[href]').each((_,el)=>{const href=$(el).attr('href')!,url=new URL(href,s.url),path=decodeURIComponent(url.pathname);if(/Schulverzeichnis|SVExportEINR|Verzeichn/i.test(path))return;
+   const anchors=scope.sourceId==='school-stats-sh'?$('#c4631').find('a[href]'):scope.sourceId==='school-stats-mv'?$('#page').find('a[href]'):$.root().find('a[href]');
+   anchors.each((_,el)=>{const href=$(el).attr('href')!,url=new URL(href,s.url),path=decodeURIComponent(url.pathname);if(/Schulverzeichnis|SVExportEINR|Verzeichn/i.test(path))return;
     if(/\.xlsx$/i.test(path)&& (scope.sourceId!=='school-stats-mv'||/B1131 /.test(path)))resources.push(resource(href,s,path,'xlsx'));
     else if(scope.sourceId==='school-stats-bb'&&/^\/b-i-\d+-j\/?$/.test(path))resources.push(resource(href,s,path));
     else if(scope.sourceId==='school-stats-sh'&&path.includes('/product/4631/'))resources.push(resource(href,s,path));

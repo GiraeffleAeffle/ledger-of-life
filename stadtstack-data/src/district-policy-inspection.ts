@@ -9,7 +9,7 @@ const resultSchema=z.object({reservation:z.union([z.literal(0),z.literal(1),z.nu
 /** Reuse the canonical rules inside the fixed worker; this host boundary never parses downloaded HTML. */
 export async function inspectResourcePolicySandbox(url:string,headers:Record<string,string|undefined>,body:Buffer,mimeType:string,context:ParserSourceContext):Promise<ResourcePolicyInspection>{
  const sourceSha256=digest(body);
- if(context.purpose!=='classification'||!context.bindings.some(binding=>binding.url===url&&binding.sourceSha256===sourceSha256))throw Error('Resource policy inspection requires source-only binding');
+ if(context.purpose!=='classification'||!context.bindings.some(binding=>binding.url===url&&'sourceSha256' in binding&&binding.sourceSha256===sourceSha256))throw Error('Resource policy inspection requires source-only binding');
  const selected:Record<string,string>={};
  for(const name of ['tdm-reservation','tdm-policy','x-robots-tag'])if(headers[name]!==undefined)selected[name]=headers[name]!;
  return withParserSandbox(body,async sandbox=>{

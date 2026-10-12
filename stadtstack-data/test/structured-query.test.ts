@@ -79,7 +79,7 @@ test('native filters and full evidence pagination remain projection/tool/release
  assert.equal(querySchema.safeParse({financialRole:'paid'}).success,false);assert.equal(querySchema.safeParse({kinds:['model']}).success,false);
  assert.equal(exportRecordsSchema.safeParse({kinds:['structured'],observationKinds:['Payment'],financialRole:'payment'}).success,true);
  const first=index.exportRecords({kinds:['structured'],limit:1});assert.ok(first.nextCursor);
- for(const change of [{kinds:['text_model'] as const},{observationKinds:['Payment']},{financialRole:'payment' as const},{dateRole:'payment_date'}])assert.throws(()=>index.exportRecords({limit:1,cursor:first.nextCursor!,...change,kinds:'kinds' in change?[...change.kinds]:['structured']}),/mismatch/);
+ for(const change of [{kinds:['text_model'] as const},{observationKinds:['Payment']},{financialRole:'payment' as const},{dateRole:'payment_date'}])assert.throws(()=>index.exportRecords({limit:1,cursor:first.nextCursor!,...change,kinds:change.kinds?[...change.kinds]:['structured']}),/mismatch/);
  const seen:string[]=[];let cursor:string|undefined;
  do{const page=index.exportRecords({kinds:['structured'],limit:1,cursor});seen.push(...page.items.map(record=>record.id));assert.deepEqual(page.sources.map(source=>source.id),page.items[0].sourceIds);cursor=page.nextCursor??undefined;}while(cursor);
  assert.equal(new Set(seen).size,6);assert.equal(seen.length,6);

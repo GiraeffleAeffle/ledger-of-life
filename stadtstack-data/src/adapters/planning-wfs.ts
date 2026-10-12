@@ -35,7 +35,7 @@ export function readPlanningXml(snapshot:AdmittedSnapshot):CheerioAPI {
  if(XMLValidator.validate(text)!==true)throw Error('Malformed planning XML');
  return load(text,{xml:true});
 }
-function elements($:CheerioAPI,name:string){return $('*').filter((_i,node)=>planningXmlLocalName(node.name)===name);}
+function elements($:CheerioAPI,name:string){return $('*').filter((_i,node)=>'name' in node&&planningXmlLocalName(node.name)===name);}
 function namespace($:CheerioAPI,node:AnyNode,prefix:string):string|null {
  let current=$(node);
  while(current.length){const uri=current.attr(prefix?'xmlns:'+prefix:'xmlns');if(uri)return uri;current=current.parent();}

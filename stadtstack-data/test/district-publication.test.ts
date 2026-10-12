@@ -95,7 +95,7 @@ test('Public source barriers retain full counts but only three safe examples',()
 
 test('District slice acceptance is separate from unchanged individual date gates',()=>{
  // Acceptance-only projections; not model receipts or releasable knowledge records.
- const records=registry.districts.map<KnowledgeSliceEvidence>(district=>({kind:'text_model',id:'test:'+district.id,districtId:district.id,municipalityId:registry.municipalities.find(city=>city.districtId===district.id)!.id,documentDate:'2026-10-10',stageDate:null,stage:'draft',stages:[]}));
+ const records=registry.districts.map<Extract<KnowledgeSliceEvidence,{kind:'text_model'}>>(district=>({kind:'text_model',id:'test:'+district.id,districtId:district.id,municipalityId:registry.municipalities.find(city=>city.districtId===district.id)!.id,documentDate:'2026-10-10',stageDate:null,stage:'draft',stages:[]}));
  assert.doesNotThrow(()=>assertKnowledgeSlice(registry,records));
  assert.throws(()=>assertKnowledgeSlice(registry,records,3),/1\/3/);
  assert.throws(()=>assertKnowledgeSlice(registry,[{...records[0],documentDate:null},...records.slice(1)]),/Undated knowledge withheld/);

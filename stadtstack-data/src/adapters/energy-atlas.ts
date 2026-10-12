@@ -62,7 +62,7 @@ export function createEnergyAtlasAdapter(layers:readonly AtlasLayerContract[]=ob
     const resources:ResourceReference[]=candidates.slice(start,start+1).map(layer=>{
      const params=object(layer.params);const url=new URL(String(layer.url));if(url.href!=='https://energieatlas-mv.de/fis/index.php'||params.export_format!=='GeoJSON'||params.epsg!==4326)throw Error('MV export configuration changed');
      if(!object(layer.layerAttributes)[String(layer.infoAttribute)])throw Error('MV native identity schema changed');
-     return {url:url.href,nativeId:String(params.selected_layer_id),parentId:null,method:'POST',body:new URLSearchParams(Object.entries(params).map(([key,value])=>[key,String(value)])).toString(),format:'json'};
+     return {url:url.href,nativeId:String(params.selected_layer_id),parentId:null,method:'POST',body:new URLSearchParams(Object.entries(params).map(([key,value]):[string,string]=>[key,String(value)])).toString(),format:'json'};
     });
     return {resources,coverage:coverage(snapshot,scope,resources.length?'partial':'empty','Native MV configured layers; export population and per-layer rights remain unverified',resources.length,start+1<candidates.length?String(start+1):null)};
    }
@@ -123,7 +123,7 @@ function discoverWfs(snapshot:AdmittedSnapshot,scope:AdapterScope,_body:string,c
  if(rootName==='schema'){
   const id=layerUrl(snapshot);const contract=id?contracts.get(`${scope.sourceId}:${id}`):undefined;
   if(!contract||!contract.agsField)throw Error('No mapped native feature schema');
-  const fields:Record<string,string>={};$('*').each((_index,node)=>{if(planningXmlLocalName(node.name)==='element'){const name=$(node).attr('name');const type=$(node).attr('type');if(name&&type)fields[name]=type.split(':').pop()!;}});
+  const fields:Record<string,string>={};$('*').each((_index,node)=>{if('name' in node&&planningXmlLocalName(node.name)==='element'){const name=$(node).attr('name');const type=$(node).attr('type');if(name&&type)fields[name]=type.split(':').pop()!;}});
   for(const [name,type] of Object.entries(contract.propertySchema)){if(!fields[name]||(type==='number'?!['decimal','double','float','int','integer'].includes(fields[name]!):fields[name]!==type))throw Error('DescribeFeatureType schema changed');}
   const url=new URL(snapshot.url);url.search='';const params={service:'WFS',version:'2.0.0',request:'GetFeature',typeNames:id!,outputFormat:'application/json',srsName:'EPSG:4326',count:'1000',startIndex:'0',CQL_FILTER:`${contract.agsField}='${scope.ags}'`};for(const [key,value] of Object.entries(params))url.searchParams.set(key,value);
   return {resources:[{url:url.href,nativeId:id!,parentId:id!,method:'GET',body:null,format:'json'}],coverage:coverage(snapshot,scope,'held_origin','Native schema inspected; proposed feature request remains subject to per-layer rights admission',0)};
@@ -131,7 +131,7 @@ function discoverWfs(snapshot:AdmittedSnapshot,scope:AdapterScope,_body:string,c
  if(rootName!=='WFS_Capabilities')throw Error('Expected native WFS capabilities or DescribeFeatureType');
  const version=root.attr('version');if(!version||!['2.0.0','1.1.0','1.0.0'].includes(version))throw Error('Unknown WFS version');
  const names:string[]=[];
- $('*').each((_index,node)=>{if(planningXmlLocalName(node.name)==='FeatureType'){$(node).children().each((_child,element)=>{if(planningXmlLocalName(element.name)==='Name')names.push($(element).text().trim());});}});
+ $('*').each((_index,node)=>{if('name' in node&&planningXmlLocalName(node.name)==='FeatureType'){$(node).children().each((_child,element)=>{if(planningXmlLocalName(element.name)==='Name')names.push($(element).text().trim());});}});
  if(names.length>1000||names.some(name=>!/^[\w.:-]+$/.test(name)))throw Error('Invalid feature type names');
  const start=Number(cursor??0);if(!Number.isSafeInteger(start)||start>names.length)throw Error('Invalid cursor');
  const resources=names.slice(start,start+20).map(name=>{const url=new URL(snapshot.url);url.search='';url.searchParams.set('service','WFS');url.searchParams.set('version',version);url.searchParams.set('request','DescribeFeatureType');url.searchParams.set(version==='2.0.0'?'typeNames':'typeName',name!);return {url:url.href,nativeId:name!,parentId:null,method:'GET' as const,body:null,format:'xml'};});
