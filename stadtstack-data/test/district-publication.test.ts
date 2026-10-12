@@ -316,8 +316,9 @@ function sealedRetained(records:DistrictKnowledgeRecord[],coverage:unknown,recor
  const files=(['records','coverage','registry'] as const).map(kind=>({path:`knowledge/${kind}.json`,sha256:members[kind].sha256,bytes:Buffer.byteLength(members[kind].bytes)}));
  return {recordIds,artifacts:{...members,manifest:artifact({schemaVersion:'stadtstack-data-release-v1',id:dataReleaseId(files),generatedAt:oldPublicationClock,files,quality:{publishedRecords:records.length,quarantinedRecords:0,cities:1}})}};
 }
-function oldBaseline(recordCount=228){
+function oldBaseline(recordCount=228,adjust:(records:DistrictKnowledgeRecord[])=>void=()=>{}){
  const records=Array.from({length:recordCount},(_,i)=>retainedRecord(`synthetic-retained-${i}`,i<Math.min(160,recordCount)?'anthropic-subscription':'openai-subscription'));
+ adjust(records);
  const observed={...crawl,documents:[crawl.documents[0]],checks:[{municipalityId:city.id,sourceId:city.sources[0].id,checkState:'checked',checkedAt:oldModelClock,documentCount:5193,coverage:{state:'partial',pendingCount:7,runnableCount:5,blockedCount:2}}]};
  const current=coverageFor(registry,observed,records,{schemaVersion:'stadtstack-quarantine-v1',cases:[]},{...run,availableDocumentGroups:1,attemptedDocumentGroups:1},oldPublicationClock);
  const {textLineage:_lineage,retainedPublication:_retained,historicalCoverage:_history,coverageScope:_scope,...legacy}=current;
@@ -400,4 +401,17 @@ test('retained coverage rejects counts, source host, member proofs, origins and 
  assert.throws(()=>buildDistrictCoverage(registry,{...crawl,documents:[crawl.documents[0]],checks:[]},records,composition.quarantine,split,at,composition.retainedPublication),/Split publication provenance/);
  const badInput=structuredClone(baseline.input);badInput.artifacts.coverage.bytes+=' ';
  assert.throws(()=>authenticateRetainedKnowledgePublication(badInput),/member binding|artifact hash/);
+});
+
+test('retained coverage admits alias URLs of one document under one registry source ID',()=>{
+ const baseline=oldBaseline(2,records=>{
+  const aliased=structuredClone(records[1]);aliased.sources.push({...aliased.sources[0],url:new URL('/alias-of-same-document',aliased.sources[0].url).href});
+  aliased.verification.evidenceHash=knowledgeEvidenceHash(aliased);records[1]=DistrictKnowledgeRecordSchema.parse(aliased);
+ });
+ const composition=retainedComposition(baseline.input),records=composition.records.records,id=baseline.records[1].id;
+ const coverage=buildDistrictCoverage(registry,composition.crawl,records,composition.quarantine,null,at,composition.retainedPublication);
+ const index=coverage.retainedPublication!.selectedRecordOrigins.findIndex(item=>item.recordId===id);
+ assert.deepEqual(coverage.retainedPublication!.selectedRecordOrigins[index].sourceIds,[city.sources[0].id,city.sources[0].id]);
+ const collapsed=structuredClone(coverage);collapsed.retainedPublication!.selectedRecordOrigins[index].sourceIds=[city.sources[0].id];
+ assert.throws(()=>validateDistrictCoverage(collapsed,registry,records),/record\/source\/model binding/);
 });
