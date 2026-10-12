@@ -69,6 +69,7 @@ const scratchSchema=z.object({
 const inventorySchema=z.object({schemaVersion:z.literal(1),inventoryId:z.string().uuid(),roots:z.array(rootSchema).max(10_000),entries:z.array(entrySchema).max(MAX_INVENTORY_RECORDS),scratch:z.array(scratchSchema).max(MAX_INVENTORY_RECORDS).default([])}).strict();
 const issueSchema=z.object({code:z.enum(['no_managed_roots','inventory_incomplete','unsafe_root','content_changed','unsafe_content','shared_derived_requires_rebuild','inventory_unavailable','operation_failed','inventory_busy','active_scratch','unsafe_scratch','scratch_processes_active','daemon_resource_pending']),rootId:hex.optional(),contentId:hex.optional()}).strict();
 const purgeSchema=z.object({host:z.string(),receivedAt:timestamp,purgeDueAt:timestamp,attemptedAt:timestamp,status:z.enum(['purged','partial','error']),deletedFiles:z.number().int().nonnegative(),deletedBytes:z.number().int().nonnegative(),removedReferences:z.number().int().nonnegative(),retainedSharedFiles:z.number().int().nonnegative(),retainedSharedBytes:z.number().int().nonnegative(),missingFiles:z.number().int().nonnegative(),issues:z.array(issueSchema),scope:z.literal('registered_managed_roots')}).strict();
+export const RetireReceiptSchema=z.object({schemaVersion:z.literal('civic-root-retirement-v1'),authorityId:opaque,authoritySha256:hex,rootId:hex,rootPath:z.string(),reason:z.string().trim().min(1).max(1800),attemptedAt:timestamp,status:z.enum(['retired','partial']),deletedFiles:z.number().int().nonnegative(),deletedBytes:z.number().int().nonnegative(),missingFiles:z.number().int().nonnegative(),removedEntries:z.number().int().nonnegative(),removedScratchLeases:z.number().int().nonnegative(),issues:z.array(issueSchema)}).strict();
 const observationSchema=z.object({
  url:z.string().url().max(8192),method:z.enum(['GET','POST']),checkedAt:timestamp,retrievedAt:timestamp.nullable(),
  state:z.enum(['fetched','not_modified','redirected','failed','excluded']),status:z.number().int().optional(),
@@ -129,6 +130,7 @@ type Issue=z.infer<typeof issueSchema>;
 type ScratchLease=z.infer<typeof scratchSchema>;
 export interface CivicPolicyAuthorityReceipt {schemaVersion:'civic-policy-authority-v1';authorityId:string;authoritySha256:string;mode:'codex-workstation-local'|'isolated-fixture';provisionedAt:string}
 export type PurgeReceipt=z.infer<typeof purgeSchema>;
+export type RetireReceipt=z.infer<typeof RetireReceiptSchema>;
 export type OptOutReceipt=Objection&{purge:PurgeReceipt};
 export interface CivicPolicyOptions {stateDir?:string;authorityId?:string;authoritySha256?:string}
 export interface CivicOptOutSnapshot {
@@ -515,7 +517,7 @@ function accountObservationCopy(root:Root,inventory:Inventory,path:string,bytes:
 }
 // Registration is explicit: this never searches home, other worktrees or remote
 // machines. Known formats are inventoried only inside the supplied managed root.
-async function reconcile(root:Root,inventory:Inventory):Promise<boolean>{
+async function reconcile(root:Root,inventory:Inventory,retiring=false):Promise<boolean>{
  await verifyRoot(root);let complete=true,count=0;const paths=new Set<string>(),requests:string[]=[],receipts=new Map<string,{observationId:string;receiptSha256:string}>();
  const visit=async(folder:string):Promise<void>=>{
   for await(const child of await opendir(join(root.path,folder))){if(++count>MAX_FILES)throw new CivicPolicyStateError();const path=folder?folder+'/'+child.name:child.name,stat=await lstat(join(root.path,path));
@@ -523,7 +525,11 @@ async function reconcile(root:Root,inventory:Inventory):Promise<boolean>{
    if(stat.isDirectory()){
     if(folder==='scratch'){
      const lease=inventory.scratch.find(item=>item.rootId===root.id&&item.directory===path);
-     if(!lease||lease.state==='closed'||lease.state==='purged'){complete=false;continue;}
+     if(!lease){complete=false;continue;}
+     if(lease.state==='closed'||lease.state==='purged'){
+      if(!retiring){complete=false;continue;}
+      try{const tree=await inspectScratchTree(root,lease);if(tree?.files.length)complete=false;}catch{complete=false;}continue;
+     }
      try{await inspectScratchTree(root,lease);}catch{complete=false;}continue;
     }
     const allowed=path==='scratch'||(root.kind==='fetch'?/^(?:sha256|observations|requests|pdf-tdm-policy|oparl-bodies|api-frontiers|frontiers|collections|oparl(?:\/[a-f0-9]{64}(?:\/(?:paper|meeting))?)?)$/.test(path):root.kind==='prepared'?/^(?:indexes|plans)$/.test(path):path.startsWith('sha256')?/^sha256(?:\/[a-f0-9]{2})?$/.test(path):path.split('/').length<=12&&path.split('/').every(part=>/^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/.test(part)&&!/^(?:credentials?|secrets?|auth|tokens?|id_rsa|id_ed25519)(?:[._-]|$)/i.test(part)));
@@ -533,6 +539,9 @@ async function reconcile(root:Root,inventory:Inventory):Promise<boolean>{
    if(!folder&&child.name===LANE_MARKER){
     try{await readAcquisitionLaneMarker(root.path,root.kind);}catch{complete=false;}continue;
    }
+   // Retirement accepts only already inventoried bytes, not metadata that
+   // normal reconciliation can discover or deliberately retain.
+   if(retiring){paths.add(path);continue;}
    if(root.kind==='fetch'&&/^observations\/[A-Za-z0-9._-]+\.json$/.test(path)){
     try{const {bytes}=await fileBytes(join(root.path,path),MAX_STATE),observation=observationSchema.parse(JSON.parse(bytes.toString('utf8')));
      const receipt={observationId:basename(path),receiptSha256:digest(bytes)};
@@ -1012,6 +1021,84 @@ export async function recoverManagedSourceScratch(options:CivicPolicyOptions={})
   await atomicJson(join(state,'attempts','scratch-'+randomUUID()+'.json'),receipt,true);return receipt;
  });
 }
+/** Removes one explicitly enrolled root. Inventory ownership survives every
+ * interrupted filesystem step until the final atomic inventory replacement.
+ */
+export async function retireManagedRoot(rootPath:string,input:{reason:string},options:CivicPolicyOptions):Promise<RetireReceipt>{
+ const authority=await assertCivicPolicyAuthority(options),policy={...options,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},state=statePath(policy);
+ if(!isAbsolute(rootPath)||rootPath!==resolve(rootPath))throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');
+ const path=managedRootPath(rootPath,state),reason=RetireReceiptSchema.shape.reason.parse(input.reason);
+ return locked(policy,async()=>{
+  const inventory=await loadInventory(state),root=inventory.roots.find(item=>item.path===path);
+  if(!root||inventory.roots.some(item=>item.id!==root.id&&(contained(item.path,path)||contained(path,item.path))))throw new CivicPolicyStateError('MANAGED_ROOT_UNSAFE');
+  const leases=inventory.scratch.filter(lease=>lease.rootId===root.id);
+  if(leases.some(lease=>lease.state!=='closed'&&lease.state!=='purged'))throw new CivicPolicyStateError('MANAGED_ROOT_ACTIVE_SCRATCH');
+  const receipt:RetireReceipt={schemaVersion:'civic-root-retirement-v1',authorityId:authority.authorityId,authoritySha256:authority.authoritySha256,rootId:root.id,rootPath:path,reason,attemptedAt:new Date().toISOString(),status:'partial',deletedFiles:0,deletedBytes:0,missingFiles:0,removedEntries:0,removedScratchLeases:0,issues:[]};
+  const files:Array<{path:string;actual:{sha256:string;stat:Stats}}>=[],folders:Array<{path:string;stat:Stats}>=[],seen=new Set<string>();
+  let marker:{path:string;actual:{sha256:string;stat:Stats}}|undefined,absent=false;
+  // A missing root is the last possible pre-commit crash state. Check every
+  // remaining ancestor without creating anything before finishing that state.
+  try{await verifyRoot(root);}catch(error){if(!missing(error))throw error;await directory(dirname(path));absent=true;}
+  if(!absent){
+   if(!await reconcile(root,inventory,true))throw new CivicPolicyStateError('MANAGED_INVENTORY_INCOMPLETE');
+   const visit=async(folder:string):Promise<void>=>{
+    const absolute=join(path,folder),stat=await directory(absolute);
+    for await(const child of await opendir(absolute)){
+     const candidate=folder?folder+'/'+child.name:child.name,current=await lstat(join(path,candidate));
+     if(current.isDirectory()&&!current.isSymbolicLink()){await visit(candidate);continue;}
+     const actual=await fileDigest(join(path,candidate));
+     if(candidate===LANE_MARKER){await readAcquisitionLaneMarker(path,root.kind,authority);marker={path:candidate,actual};}
+     else{
+      if(!entriesAt(inventory,root.id,candidate).some(entry=>entry.contentSha256===actual.sha256))throw new CivicPolicyStateError('MANAGED_INVENTORY_INCOMPLETE');
+      files.push({path:candidate,actual});seen.add(candidate);
+     }
+    }
+    folders.push({path:absolute,stat});
+   };
+   await visit('');
+  }
+  const managedPaths=new Set<string>();let entryCount=0;
+  for(const entry of inventory.entries)if(entry.rootId===root.id){managedPaths.add(entry.relativePath);entryCount++;}
+  for(const candidate of managedPaths)if(!seen.has(candidate))receipt.missingFiles++;
+  await assertCivicPolicyAuthority(policy);
+  try{
+   if(marker)files.push(marker);
+   for(const file of files){
+    const actual=await fileDigest(join(path,file.path));
+    if(actual.sha256!==file.actual.sha256||!sameIdentity(actual.stat,file.actual.stat))throw new CivicPolicyStateError('MANAGED_CONTENT_CHANGED');
+    await unlinkManagedFile(root,file.path,actual);receipt.deletedFiles++;receipt.deletedBytes+=actual.stat.size;
+   }
+   for(const folder of folders){
+    await directory(dirname(folder.path));const current=await directory(folder.path);
+    if(!sameIdentity(current,folder.stat))throw new CivicPolicyStateError('MANAGED_ROOT_UNSAFE');
+    await rmdir(folder.path);
+   }
+   await assertCivicPolicyAuthority(policy);
+   receipt.removedEntries=entryCount;receipt.removedScratchLeases=leases.length;
+   inventory.roots=inventory.roots.filter(item=>item.id!==root.id);inventory.entries=inventory.entries.filter(entry=>entry.rootId!==root.id);inventory.scratch=inventory.scratch.filter(lease=>lease.rootId!==root.id);
+   try{await saveInventory(state,inventory);}catch(error){
+    // Atomic replacement can commit before its parent fsync/temporary cleanup
+    // fails. Read the authoritative name under this same lock, not our mutated
+    // in-memory inventory, before deciding whether a retry still owns the root.
+    const committed=await loadInventory(state);
+    if(committed.inventoryId!==inventory.inventoryId||committed.roots.some(item=>item.id===root.id)||committed.entries.some(entry=>entry.rootId===root.id)||committed.scratch.some(lease=>lease.rootId===root.id))throw error;
+    receipt.issues.push({code:'operation_failed',rootId:root.id});
+   }
+   receipt.status='retired';
+  }catch{
+   // A failed pre-commit save leaves original ownership and missing paths for
+   // retry; a confirmed replacement above reports the actual committed counts.
+   receipt.removedEntries=0;receipt.removedScratchLeases=0;receipt.issues.push({code:'operation_failed',rootId:root.id});
+  }
+  await atomicJson(join(state,'attempts','retire-'+root.id+'-'+randomUUID()+'.json'),RetireReceiptSchema.parse(receipt),true);
+  return receipt;
+ });
+}
+async function unlinkManagedFile(root:Root,path:string,actual:{sha256:string;stat:Stats}):Promise<void>{
+ await verifyRoot(root);await directory(dirname(join(root.path,path)));const now=await lstat(join(root.path,path));
+ if(!now.isFile()||now.isSymbolicLink()||now.nlink!==1||now.uid!==process.getuid?.()||(now.mode&0o022)!==0||!sameIdentity(now,actual.stat)||now.size!==actual.stat.size||now.mtimeMs!==actual.stat.mtimeMs||now.ctimeMs!==actual.stat.ctimeMs)throw new CivicPolicyStateError();
+ await unlink(join(root.path,path));
+}
 function emptyReceipt(objection:Objection):PurgeReceipt{return {host:objection.host,receivedAt:objection.receivedAt,purgeDueAt:objection.purgeDueAt,attemptedAt:new Date().toISOString(),status:'purged',deletedFiles:0,deletedBytes:0,removedReferences:0,retainedSharedFiles:0,retainedSharedBytes:0,missingFiles:0,issues:[],scope:'registered_managed_roots'};}
 async function saveAttempt(state:string,receipt:PurgeReceipt):Promise<void>{
  const objection=await readObjection(state,receipt.host);
@@ -1053,9 +1140,7 @@ async function withdraw(state:string,inventory:Inventory,selected:Entry[],receip
    // Digest and inode are rechecked immediately before a nonrecursive unlink.
    // Owner-only state/root components exclude other users from the rename race;
    // participating producers are serialized by the shared inventory lock.
-   await verifyRoot(root);await directory(dirname(join(root.path,first.relativePath)));const now=await lstat(join(root.path,first.relativePath));
-   if(!now.isFile()||now.isSymbolicLink()||now.nlink!==1||!sameIdentity(now,actual.stat)||now.size!==actual.stat.size||now.mtimeMs!==actual.stat.mtimeMs||now.ctimeMs!==actual.stat.ctimeMs)throw new CivicPolicyStateError();
-   await unlink(join(root.path,first.relativePath));receipt.deletedFiles++;receipt.deletedBytes+=actual.stat.size;
+   await unlinkManagedFile(root,first.relativePath,actual);receipt.deletedFiles++;receipt.deletedBytes+=actual.stat.size;
    for(const entry of entriesAt(inventory,root.id,first.relativePath)){if(selected.has(entry)&&entry.state==='active')receipt.removedReferences++;entry.state='deleted';}
   }catch{issue('unsafe_content');}
  }
@@ -1119,11 +1204,12 @@ export async function relinquishManagedSourceContent(input:string,source:{url:st
  * Exit 2 means partial/error; a deadline is never evidence of completed purge.
  */
 export async function civicOptOutMain(args:string[]=process.argv.slice(2)):Promise<void>{
- const command=args[0],{values}=parseArgs({args:args.slice(1),options:{host:{type:'string'},reason:{type:'string'},reference:{type:'string'},'received-at':{type:'string'},'state-dir':{type:'string'},'authority-id':{type:'string'},'authority-sha256':{type:'string'}},strict:true});
+ const command=args[0],{values}=parseArgs({args:args.slice(1),options:{host:{type:'string'},root:{type:'string'},reason:{type:'string'},reference:{type:'string'},'received-at':{type:'string'},'state-dir':{type:'string'},'authority-id':{type:'string'},'authority-sha256':{type:'string'}},strict:true});
  const options={stateDir:values['state-dir'],authorityId:values['authority-id'],authoritySha256:values['authority-sha256']};
  if(options.authorityId!==undefined&&options.authorityId!==CIVIC_POLICY_AUTHORITY_ID||statePath(options)!==CIVIC_POLICY_STATE_DIR)throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_FOREIGN');
  if(command==='provision'){console.log(JSON.stringify(await provisionCivicPolicyAuthority(options)));return;}
  if(command==='recover-scratch'){const receipt=await recoverManagedSourceScratch(options);console.log(JSON.stringify(receipt));if(receipt.status!=='complete')process.exitCode=2;return;}
+ if(command==='retire-root'){if(!values.root||!values.reason)throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');const receipt=await retireManagedRoot(values.root,{reason:values.reason},options);console.log(JSON.stringify(receipt));if(receipt.status!=='retired')process.exitCode=2;return;}
  if(!values.host||!['register','purge'].includes(command))throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');
  const receipt=command==='register'?await recordHostOptOut({host:values.host,reason:reasonSchema.parse(values.reason),reference:values.reference,receivedAt:values['received-at']},options):await purgeOptedOutHost(values.host,options);
  console.log(JSON.stringify(receipt));const purge='purge' in receipt?receipt.purge:receipt;if(purge.status!=='purged')process.exitCode=2;

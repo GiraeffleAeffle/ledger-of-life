@@ -5,11 +5,12 @@ import {mkdtemp,realpath,mkdir,writeFile,readFile,rm,lstat,readdir,symlink,link,
 import {watch,promises as fsPromises} from 'node:fs';
 import {syncBuiltinESMExports} from 'node:module';
 import {join,dirname} from 'node:path';
-import {tmpdir} from 'node:os';
+import {tmpdir,homedir} from 'node:os';
 import {createHash,randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {assertCivicPolicyAuthority,provisionCivicPolicyAuthority,CIVIC_POLICY_AUTHORITY_ID,assertManagedSourceReadable,withManagedSourceScratch,recoverManagedSourceScratch,assertHostNotOptedOut,readCivicOptOutSnapshot,registerManagedCacheRoot,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,recordHostOptOut,purgeOptedOutHost,recordManagedSourceContent,withManagedSourceWrite,markManagedCacheInventoryComplete,relinquishManagedSourceContent,HostOptedOutError,CivicPolicyStateError,civicOptOutMain} from '../src/civic-opt-out.ts';
 import {assertManagedSourceBindings,assertManagedRawSourceBinding,assertManagedObservationReadable,ManagedSourceBindingSchema,parseContentFreePreparationPlan,assertSourceHostsNotOptedOut} from '../src/civic-opt-out.ts';
+import {retireManagedRoot,RetireReceiptSchema} from '../src/civic-opt-out.ts';
 import {projectSourcePolicyMetadata} from '../src/source-policy.ts';
 import type {SourceAccessPolicy} from '../src/source-policy.ts';
 import type {ManagedSourceContent,ManagedSourceBinding,CivicPolicyOptions} from '../src/civic-opt-out.ts';
@@ -862,4 +863,116 @@ test('batched shared paths still validate every content hash and revoked referen
  await assert.rejects(withManagedSourceWrite(root,[first,{...second,contentSha256:hash('different')}],async()=>{},policy),CivicPolicyStateError);
  await recordHostOptOut({host:'council.test',reason:'municipality_objection'},policy);
  await assert.rejects(withManagedSourceWrite(root,[second],async()=>{},policy),CivicPolicyStateError);
+});
+
+async function closedRetirementLease(root:string,stateDir:string){
+ await withManagedSourceScratch(root,[{phase:'pre-admission',url:'https://scratch.test/source',sourceSha256:hash('scratch source')}],async()=>{},{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'fetch',purpose:'classification',...fixturePolicy(stateDir)});
+}
+
+test('retirement removes populated root and closed leases while preserving another root, then purge and recovery still work',async t=>{
+ const {base,root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),other=join(base,'other'),bytes='shared bytes in distinct root-local CAS files',entry=rawEntry(bytes),otherEntry=rawEntry(bytes,'https://other.test/source',true);
+ for(const lane of [root,other])await registerManagedCacheRoot(lane,{kind:'fetch',...policy});
+ await publish(root,entry,bytes,stateDir);await publish(root,rawEntry(bytes,'https://second.test/source'),bytes,stateDir);await publish(other,otherEntry,bytes,stateDir);
+ await closedRetirementLease(root,stateDir);await closedRetirementLease(other,stateDir);
+ const before=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8')),rootId=hash(root),marker=await readFile(join(root,'.civic-acquisition-lane.json')),otherFile=await lstat(join(other,otherEntry.relativePath));
+ const receipt=await retireManagedRoot(root,{reason:'obsolete publication'},policy);
+ assert.equal(receipt.schemaVersion,'civic-root-retirement-v1');assert.equal(receipt.authorityId,policy.authorityId);assert.equal(receipt.authoritySha256,policy.authoritySha256);assert.equal(receipt.rootId,rootId);assert.equal(receipt.rootPath,root);assert.equal(receipt.reason,'obsolete publication');
+ assert.equal(receipt.status,'retired');assert.equal(receipt.deletedFiles,2);assert.equal(receipt.deletedBytes,Buffer.byteLength(bytes)+marker.length);assert.equal(receipt.missingFiles,0);assert.equal(receipt.removedEntries,2);assert.equal(receipt.removedScratchLeases,1);assert.deepEqual(receipt.issues,[]);
+ await assert.rejects(lstat(root),{code:'ENOENT'});
+ const after=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));
+ assert.equal(after.schemaVersion,1);assert.equal(after.inventoryId,before.inventoryId);
+ assert.equal(JSON.stringify(after.roots),JSON.stringify(before.roots.filter((item:{id:string})=>item.id!==rootId)));
+ assert.equal(JSON.stringify(after.entries),JSON.stringify(before.entries.filter((item:{rootId:string})=>item.rootId!==rootId)));
+ assert.equal(JSON.stringify(after.scratch),JSON.stringify(before.scratch.filter((item:{rootId:string})=>item.rootId!==rootId)));
+ assert.equal(await readFile(join(other,otherEntry.relativePath),'utf8'),bytes);assert.equal((await lstat(join(other,otherEntry.relativePath))).ino,otherFile.ino);
+ const attempts=await readdir(join(stateDir,'attempts'));assert.equal(attempts.length,1);assert.deepEqual(JSON.parse(await readFile(join(stateDir,'attempts',attempts[0]),'utf8')),receipt);
+ assert.deepEqual(RetireReceiptSchema.parse(receipt),receipt);assert.throws(()=>RetireReceiptSchema.parse({...receipt,extra:true}));
+ assert.equal((await recordHostOptOut({host:'other.test',reason:'municipality_objection'},policy)).purge.status,'purged');
+ assert.equal((await purgeOptedOutHost('other.test',policy)).status,'purged');assert.equal((await recoverManagedSourceScratch(policy)).status,'complete');
+});
+
+for(const state of ['planned','active','closing','partial'] as const)test('retirement refuses '+state+' scratch lease without changes',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),entry=rawEntry('managed source');
+ await registerManagedCacheRoot(root,{kind:'fetch',...policy});await publish(root,entry,'managed source',stateDir);await closedRetirementLease(root,stateDir);
+ const inventoryPath=join(stateDir,'inventory.json'),inventory=JSON.parse(await readFile(inventoryPath,'utf8'));inventory.scratch[0].state=state;await writeFile(inventoryPath,JSON.stringify(inventory)+'\n',{mode:0o600});
+ const before=await readFile(inventoryPath);
+ await assert.rejects(retireManagedRoot(root,{reason:'must refuse'},policy),CivicPolicyStateError);
+ assert.deepEqual(await readFile(inventoryPath),before);assert.equal(await readFile(join(root,entry.relativePath),'utf8'),'managed source');assert.deepEqual(await readdir(join(stateDir,'attempts')),[]);
+});
+
+for(const fault of ['unknown','modified','symlink','hardlink','mode','directory-mode'] as const)test('retirement preflight refuses '+fault+' content without changes',async t=>{
+ const {base,root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),entry=rawEntry('original bytes');
+ await registerManagedCacheRoot(root,{kind:'fetch',...policy});await publish(root,entry,'original bytes',stateDir);
+ const path=join(root,entry.relativePath);
+ if(fault==='unknown')await writeFile(join(root,'extra.txt'),'unknown',{mode:0o600});
+ if(fault==='modified')await writeFile(path,'modified bytes',{mode:0o600});
+ if(fault==='symlink'){await rm(path);await symlink(join(base,'outside'),path);}
+ if(fault==='hardlink')await link(path,join(base,'outside'));
+ if(fault==='mode')await chmod(path,0o666);
+ if(fault==='directory-mode')await chmod(join(root,'sha256'),0o777);
+ const before=await readFile(join(stateDir,'inventory.json')),names=await readdir(root),identity=await lstat(path);
+ await assert.rejects(retireManagedRoot(root,{reason:'must refuse'},policy),CivicPolicyStateError);
+ assert.deepEqual(await readFile(join(stateDir,'inventory.json')),before);assert.deepEqual(await readdir(root),names);assert.equal((await lstat(path)).ino,identity.ino);assert.deepEqual(await readdir(join(stateDir,'attempts')),[]);
+});
+
+test('retirement refuses non-enrolled, ancestor, state, home and symlink-alias paths without changes',async t=>{
+ const {base,root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),entry=rawEntry('safe bytes');
+ await registerManagedCacheRoot(root,{kind:'fetch',...policy});await publish(root,entry,'safe bytes',stateDir);await symlink(root,join(base,'alias'));
+ const before=await readFile(join(stateDir,'inventory.json'));
+ for(const path of [join(base,'not-enrolled'),base,stateDir,homedir(),join(base,'.git'),join(base,'.ssh'),join(base,'.secrets'),join(base,'alias'),'relative-root',root+'/../fetch'])await assert.rejects(retireManagedRoot(path,{reason:'must refuse'},policy),CivicPolicyStateError);
+ assert.deepEqual(await readFile(join(stateDir,'inventory.json')),before);assert.equal(await readFile(join(root,entry.relativePath),'utf8'),'safe bytes');assert.deepEqual(await readdir(join(stateDir,'attempts')),[]);
+});
+
+test('retirement resumes missing managed files and missing lane marker without keeping tombstone entries',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),first=rawEntry('first'),second=rawEntry('second');
+ await registerManagedCacheRoot(root,{kind:'fetch',...policy});await publish(root,first,'first',stateDir);await publish(root,second,'second',stateDir);await closedRetirementLease(root,stateDir);
+ await rm(join(root,first.relativePath));await rm(join(root,'.civic-acquisition-lane.json'));
+ const receipt=await retireManagedRoot(root,{reason:'resume interrupted retirement'},policy);
+ assert.equal(receipt.status,'retired');assert.equal(receipt.missingFiles,1);assert.equal(receipt.deletedFiles,1);assert.equal(receipt.deletedBytes,6);assert.equal(receipt.removedEntries,2);assert.equal(receipt.removedScratchLeases,1);
+ await assert.rejects(lstat(root),{code:'ENOENT'});const inventory=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));assert.deepEqual(inventory.roots,[]);assert.deepEqual(inventory.entries,[]);assert.deepEqual(inventory.scratch,[]);
+});
+
+test('retirement resumes after root directory was removed before inventory commit',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),entry=rawEntry('already deleted');
+ await registerManagedCacheRoot(root,{kind:'fetch',...policy});await publish(root,entry,'already deleted',stateDir);await closedRetirementLease(root,stateDir);await rm(root,{recursive:true});
+ const receipt=await retireManagedRoot(root,{reason:'resume final filesystem step'},policy);
+ assert.equal(receipt.status,'retired');assert.equal(receipt.missingFiles,1);assert.equal(receipt.deletedFiles,0);assert.equal(receipt.removedEntries,1);assert.equal(receipt.removedScratchLeases,1);
+ const inventory=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));assert.deepEqual(inventory.roots,[]);assert.deepEqual(inventory.entries,[]);assert.deepEqual(inventory.scratch,[]);
+});
+
+test('retirement records a partial unlink failure without changing inventory and retry completes',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),entry=rawEntry('managed body');
+ await registerManagedCacheRoot(root,{kind:'fetch',...policy});await publish(root,entry,'managed body',stateDir);
+ const before=await readFile(join(stateDir,'inventory.json')),originalUnlink=fsPromises.unlink;
+ t.mock.method(fsPromises,'unlink',async(path:Parameters<typeof fsPromises.unlink>[0])=>{if(String(path)===join(root,'.civic-acquisition-lane.json'))throw Object.assign(new Error('synthetic interruption'),{code:'EIO'});return originalUnlink(path);});syncBuiltinESMExports();
+ try{
+  const receipt=await retireManagedRoot(root,{reason:'interrupted'},policy);assert.equal(receipt.status,'partial');assert.equal(receipt.deletedFiles,1);assert.equal(receipt.removedEntries,0);assert.equal(receipt.removedScratchLeases,0);assert.equal(receipt.issues[0].code,'operation_failed');assert.deepEqual(await readFile(join(stateDir,'inventory.json')),before);
+ }finally{t.mock.restoreAll();syncBuiltinESMExports();}
+ const receipt=await retireManagedRoot(root,{reason:'retry'},policy);assert.equal(receipt.status,'retired');assert.equal(receipt.missingFiles,1);assert.equal(receipt.deletedFiles,1);assert.equal(receipt.removedEntries,1);await assert.rejects(lstat(root),{code:'ENOENT'});
+});
+
+test('retirement reports committed counts when inventory parent sync fails after replacement',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),entry=rawEntry('committed body');
+ await registerManagedCacheRoot(root,{kind:'fetch',...policy});await publish(root,entry,'committed body',stateDir);await closedRetirementLease(root,stateDir);
+ const inventoryPath=join(stateDir,'inventory.json'),originalRename=fsPromises.rename,originalOpen=fsPromises.open;let replaced=false,injected=false;
+ t.mock.method(fsPromises,'rename',async(...args:Parameters<typeof fsPromises.rename>)=>{await originalRename(...args);if(String(args[1])===inventoryPath)replaced=true;});
+ t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+  if(replaced&&!injected&&String(args[0])===stateDir){injected=true;throw Object.assign(new Error('synthetic post-commit sync failure'),{code:'EIO'});}
+  return originalOpen(...args);
+ });syncBuiltinESMExports();
+ try{
+  const receipt=await retireManagedRoot(root,{reason:'commit warning'},policy);
+  assert.equal(injected,true);assert.equal(receipt.status,'retired');assert.equal(receipt.deletedFiles,2);assert.equal(receipt.removedEntries,1);assert.equal(receipt.removedScratchLeases,1);assert.deepEqual(receipt.issues,[{code:'operation_failed',rootId:hash(root)}]);
+  await assert.rejects(lstat(root),{code:'ENOENT'});const inventory=JSON.parse(await readFile(inventoryPath,'utf8'));assert.deepEqual(inventory.roots,[]);assert.deepEqual(inventory.entries,[]);assert.deepEqual(inventory.scratch,[]);
+  const attempts=await readdir(join(stateDir,'attempts'));assert.equal(attempts.length,1);assert.deepEqual(JSON.parse(await readFile(join(stateDir,'attempts',attempts[0]),'utf8')),receipt);
+  await assert.rejects(retireManagedRoot(root,{reason:'already committed'},policy),CivicPolicyStateError);
+ }finally{t.mock.restoreAll();syncBuiltinESMExports();}
+});
+
+test('retire-root CLI continues rejecting fixture authorities without printing a receipt',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),outputs:string[]=[];
+ await initializeManagedAcquisitionLane(root,{decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});const before=await readFile(join(stateDir,'inventory.json'));
+ t.mock.method(console,'log',(value:string)=>{outputs.push(value);});
+ await assert.rejects(civicOptOutMain(['retire-root','--root',root,'--reason','fixture must remain API-only','--authority-id',policy.authorityId,'--state-dir',stateDir,'--authority-sha256',policy.authoritySha256]),CivicPolicyStateError);
+ assert.deepEqual(outputs,[]);assert.deepEqual(await readFile(join(stateDir,'inventory.json')),before);await lstat(root);
 });

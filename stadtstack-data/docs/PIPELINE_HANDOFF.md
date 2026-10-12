@@ -117,6 +117,21 @@ node --experimental-strip-types src/civic-opt-out.ts recover-scratch \
   --authority-sha256 "$AUTHORITY_SHA256"
 ```
 
+Obsolete managed roots must be retired through the policy inventory, never removed with `rm -rf`:
+
+```sh
+node --experimental-strip-types src/civic-opt-out.ts retire-root \
+  --authority-id owner-2026-10-11-codex-workstation \
+  --state-dir /home/max/.local/state/stadtstack-data/civic-policy \
+  --authority-sha256 "$AUTHORITY_SHA256" \
+  --root "$ABSOLUTE_ENROLLED_ROOT" --reason "obsolete publication root"
+```
+
+Retirement refuses non-closed/non-purged scratch leases, unknown files, changed managed bytes and unsafe filesystem identities before deleting anything. It removes only the exactly enrolled root and atomically removes its entries and closed/purged leases from inventory v1; other roots remain unchanged. CAS references are root-local, and hardlinks are refused. The JSON receipt is retained under `attempts/`; file/byte deletion counts include the lane marker, while `missingFiles` counts distinct missing inventoried paths. A partial receipt leaves inventory ownership intact. If interrupted before inventory commit, rerun the same command: missing files (or an already removed root directory) are counted, not recreated. An abruptly killed process may leave the inventory lock; resolve a stale lock only after confirming its recorded owner is dead. Completed roots are no longer enrolled, so a fresh invocation after success is refused.
+
+If inventory replacement committed but its subsequent directory sync or temporary cleanup failed, retirement re-reads the authoritative inventory under the lock and reports `retired` with the actual removed counts and an `operation_failed` issue. This is a committed warning, not a resumable partial retirement.
+
+
 ## 6. Exact remaining 0.3.2 production steps
 
 1. **Source gates and review** above, including retained-only intake/publication/replay and signed revocation read surfaces. No current green seal exists.
