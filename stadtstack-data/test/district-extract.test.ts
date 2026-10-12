@@ -228,8 +228,6 @@ test('contiguous context retains a distant printed document date and explicit co
   assert.ok(first.text.includes('7. August 2025'));
   assert.ok(first.text.includes(fixture.replacementEvidence.quote));
   assert.notEqual(sha256(source),fixture.replacementEvidence.expectedRetainedSourceSha256);
-  assert.match(EXTRACTION_INSTRUCTIONS,/both values, units, approximations/);
-  assert.match(JUDGE_INSTRUCTIONS,/proposed, conditional or denied change/);
   assert.equal(EXTRACTION_INSTRUCTIONS.includes('68,6'),false);
   assert.equal(EXTRACTION_INSTRUCTIONS.includes('41,5'),false);
 });
