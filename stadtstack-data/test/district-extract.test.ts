@@ -64,6 +64,24 @@ test('action relation contract is versioned in shared extraction and faithfulnes
   }
   assert.ok(JUDGE_INSTRUCTIONS.includes('criticalUnsupported=true and score below 0.8'));
 });
+
+test('same-case consecutive substantive facts share one bounded literal summary quote', () => {
+  for (const instructions of [EXTRACTION_INSTRUCTIONS, JUDGE_INSTRUCTIONS]) {
+    assert.ok(instructions.includes('Same-case facts in consecutive sentences'));
+    assert.ok(instructions.includes('ONE contiguous summaryQuote (max 1800 characters)'));
+    assert.ok(instructions.includes('entity only: NO relation unless a listed predicate is literally supported'));
+    assert.ok(instructions.includes('means member_of, NEVER cooperates_with'));
+  }
+  const facts = 'Die Wärmeplanung begann im Januar 2024 und dauert etwa 18 Monate. Beispiel Netz GmbH wurde beauftragt. Es gibt zwei Eignungsgebiete. In fünf Jahren sollen mindestens fünf Maßnahmen umgesetzt werden.';
+  const source = `${text}\n${facts}`, value = claims();
+  value.summary = facts; value.summaryQuote = facts;
+  value.entities.push({ mentionId: 'contractor', name: 'Beispiel Netz GmbH', type: 'company', quote: 'Beispiel Netz GmbH wurde beauftragt.', identifiers: [] });
+  assert.equal(DistrictExtractionClaimsSchema.safeParse(value).success, true);
+  assert.equal(deterministicChecks(value, source, 'Beispielstadt').passed, true);
+  assert.equal(DistrictExtractionClaimsSchema.safeParse({ ...value, summaryQuote: 'x'.repeat(1801) }).success, false);
+  value.summaryQuote = facts.replace('Beispiel Netz GmbH wurde beauftragt. ', '');
+  assert.equal(deterministicChecks(value, source, 'Beispielstadt').checks.find(check => check.id === 'exact_quotes')?.passed, false);
+});
 // Synthetic unit-test material only; never a municipal record or production model evidence.
 const text = 'Stadt Beispielstadt\nWärmeplanung\nDer Entwurf der Wärmeplanung wurde am 09.10.2026 veröffentlicht.\nStand: 10.10.2026';
 const now = '2026-10-10T12:00:00.000Z';
