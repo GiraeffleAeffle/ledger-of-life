@@ -183,6 +183,7 @@ test('declared source pins cannot relabel or add provenance beyond the authorita
  assert.equal(original.kind,'prepared_source');
  if(original.kind!=='prepared_source')throw Error('Synthetic fixture requires prepared provenance');
  const forgeries:KnowledgeSourcePin['bindings'][]=[
+  [{...original,url:'https://never-enrolled.test/source'}],
   [{...original,sourceSha256:sha256('unrelated source')}],
   [{...original,receiptSha256:sha256('fabricated prepared receipt')}],
   [original,{...original,observationId:'unobserved-source'}],

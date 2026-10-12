@@ -12,7 +12,7 @@ import {authenticateRetainedKnowledgePublication} from './retained-knowledge-lin
 import type {RetainedKnowledgePublicationInput,AuthenticatedRetainedKnowledgePublication} from './retained-knowledge-lineage.ts';
 import {composeDistrictRelease} from './district-release-composition.ts';
 import type {DistrictRunAdmission,DistrictReleaseComposition} from './district-release-composition.ts';
-import {assertCivicPolicyAuthority,assertHostNotOptedOut,assertManagedSourceReadable,assertManagedSourceBindings,CIVIC_POLICY_AUTHORITY,CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
+import {assertCivicPolicyAuthority,assertHostNotOptedOut,assertSourceHostsNotOptedOut,assertManagedSourceBindings,CIVIC_POLICY_AUTHORITY,CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
 import type {CivicPolicyOptions,RetainedPublicationBinding} from './civic-opt-out.ts';
 import {PreparedDocumentSchema,verifyPreparedDocument,assertPreparedSourcesActive,preparedSourceBindings} from './district-prepared-document.ts';
 import type {PreparedDocument} from './district-prepared-document.ts';
@@ -61,14 +61,16 @@ function contained(root:string,path:string){const part=relative(resolve(root),re
 async function readPin(pin:KnowledgeAuditPin,policy:CivicPolicyOptions,source?:KnowledgeSourcePin):Promise<TextLineageArtifact>{
  await assertCivicPolicyAuthority(policy);
  if(source){
-  for(const binding of source.bindings){await assertHostNotOptedOut(binding.url,policy);await assertManagedSourceReadable(pin.path,{...policy,sourceUrl:binding.url});}
+  await assertSourceHostsNotOptedOut(source.bindings.map(binding=>binding.url),policy);
+  // Exact bindings check current bytes, all active ancestors and every declared
+  // URL's enrolled provenance; no per-URL inventory reload is necessary.
   await assertManagedSourceBindings(pin.path,source.bindings,policy);
  }
  const metadata=await lstat(pin.path);
  if(!metadata.isFile()||metadata.isSymbolicLink()||metadata.size!==pin.bytes)throw Error('Knowledge input file type/length differs from explicit pin');
  const bytes=await readFile(pin.path);
  if(bytes.byteLength!==pin.bytes||sha256(bytes)!==pin.sha256)throw Error('Knowledge input byte hash differs from explicit pin');
- if(source){await assertManagedSourceReadable(pin.path,policy);await assertManagedSourceBindings(pin.path,source.bindings,policy);}
+ if(source)await assertManagedSourceBindings(pin.path,source.bindings,policy);
  return {sha256:pin.sha256,bytes:new TextDecoder('utf-8',{fatal:true}).decode(bytes)};
 }
 function decoded(artifact:TextLineageArtifact):unknown{return JSON.parse(typeof artifact.bytes==='string'?artifact.bytes:new TextDecoder('utf-8',{fatal:true}).decode(artifact.bytes));}

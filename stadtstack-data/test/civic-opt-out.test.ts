@@ -484,6 +484,22 @@ test('managed scratch is enrolled before bytes and nested atomic artifact public
  const inventory=await readFile(join(stateDir,'inventory.json'),'utf8');assert.equal(inventory.includes('synthetic scratch source'),false);assert.equal(inventory.includes('synthetic OCR pixels'),false);assert.equal(JSON.parse(inventory).scratch[0].state,'closed');
 });
 
+test('artifact scratch accepts 100,000 sources and rejects a lease above that cap before its callback',async t=>{
+ const {base,stateDir}=await sandbox(t),root=join(base,'large-scratch'),policy=fixturePolicy(stateDir);
+ const bindings=Array.from({length:100_000},(_,i)=>({kind:'prepared_source' as const,url:'https://council.test/source/'+i,sourceSha256:hash('source'),observationId:'source-observation',receiptSha256:hash('source-receipt')}));
+ const options={decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts' as const,purpose:'artifact' as const,...policy};
+ await withManagedSourceScratch(root,bindings,async scope=>{
+  const inventory=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));
+  assert.equal(inventory.scratch[0].sources.length,100_000);assert.equal(inventory.scratch[0].state,'active');
+  await scope.assertActive();
+ },options);
+ let called=false;
+ await assert.rejects(withManagedSourceScratch(root,[...bindings,bindings[0]],async()=>{called=true;},options),error=>error instanceof Error&&error.name==='ZodError');
+ assert.equal(called,false);
+ const inventory=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));
+ assert.equal(inventory.scratch.length,1);assert.equal(inventory.scratch[0].state,'closed');
+});
+
 test('scratch pre-admission provenance is classification-only and unsafe paths never delete unrelated files',async t=>{
  const {base,stateDir}=await sandbox(t),root=join(base,'scratch-content'),policy=fixturePolicy(stateDir),bytes=Buffer.from('input'),binding={phase:'pre-admission' as const,url:'https://council.test/source',sourceSha256:hash(bytes)};
  let called=false;await assert.rejects(withManagedSourceScratch(root,[binding],async()=>{called=true;},{decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'openai',...policy}),CivicPolicyStateError);assert.equal(called,false);await assert.rejects(lstat(root),{code:'ENOENT'});
@@ -805,29 +821,29 @@ test('council collection paths are source-bound outputs, never exempt metadata',
  await assert.rejects(markManagedCacheInventoryComplete(root,policy),CivicPolicyStateError);
 });
 
-test('inventory larger than 16 MiB loads and saves unchanged v1 format; 256 MiB still fails closed',async t=>{
+test('inventory beyond 100,000 entries loads and saves unchanged v1 format; 480 MiB still fails closed',async t=>{
  const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),entry=rawEntry('large inventory');
  await initializeManagedAcquisitionLane(root,{decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
  await publish(root,entry,'large inventory',stateDir);
  const path=join(stateDir,'inventory.json'),inventory=JSON.parse(await readFile(path,'utf8')),original=inventory.entries[0];
  // Unique source identities sharing one CAS object exercise same-path indexing
  // without making thousands of filesystem/source-content fixtures.
- inventory.entries=Array.from({length:30_000},(_,i)=>{
+ inventory.entries=Array.from({length:100_001},(_,i)=>{
   const value={...original,urlSha256:hash('large-inventory-url-'+i)};
   value.id=hash(JSON.stringify([value.rootId,value.relativePath,value.contentSha256,value.kind,value.sourceSha256,value.host,value.urlSha256,value.observationId??null,value.receiptSha256??null,null,null,null,null,null,null,null,value.independentAllowed]));
   return value;
  });
- const serialized=JSON.stringify(inventory)+'\n';assert.ok(Buffer.byteLength(serialized)>16*1024*1024);assert.ok(Buffer.byteLength(serialized)<256*1024*1024);
+ const serialized=JSON.stringify(inventory)+'\n';assert.ok(Buffer.byteLength(serialized)>16*1024*1024);assert.ok(Buffer.byteLength(serialized)<480*1024*1024);
  await writeFile(path,serialized,{mode:0o600});
  await recordManagedSourceContent(root,entry,policy);
  const saved=JSON.parse(await readFile(path,'utf8'));
  assert.deepEqual(Object.keys(saved),['schemaVersion','inventoryId','roots','entries','scratch']);
- assert.equal(saved.schemaVersion,1);assert.deepEqual(saved.entries.slice(0,30_000),inventory.entries);assert.equal(saved.entries.length,30_001);
+ assert.equal(saved.schemaVersion,1);assert.deepEqual(saved.entries.slice(0,100_001),inventory.entries);assert.equal(saved.entries.length,100_002);
  await assertManagedSourceReadable(join(root,entry.relativePath),policy);
- const handle=await fsPromises.open(path,'r+');try{await handle.truncate(256*1024*1024+1);}finally{await handle.close();}
+ const handle=await fsPromises.open(path,'r+');try{await handle.truncate(480*1024*1024+1);}finally{await handle.close();}
  let called=false;
  await assert.rejects(withManagedSourceWrite(root,[entry],async()=>{called=true;},policy),CivicPolicyStateError);
- assert.equal(called,false);assert.equal((await lstat(path)).size,256*1024*1024+1);
+ assert.equal(called,false);assert.equal((await lstat(path)).size,480*1024*1024+1);
 });
 
 test('bulk host gates canonicalize every URL and do not cache between live boundaries',async t=>{

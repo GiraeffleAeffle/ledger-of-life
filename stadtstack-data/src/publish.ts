@@ -23,7 +23,7 @@ import {readPublicationAuditPin,readPublicationSourcePin,admitPublicationKnowled
 import {readAuthenticatedGitSnapshotSourcePin} from './district-git-snapshot-import.ts';
 import {readBoundSourceObservation} from './source-observation.ts';
 import {verifyCorpusManifest} from './corpus-manifest.ts';
-import {assertCivicPolicyAuthority,assertHostNotOptedOut,readCivicOptOutSnapshot,initializeManagedAcquisitionLane,CIVIC_POLICY_AUTHORITY,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions} from './civic-opt-out.ts';
+import {assertCivicPolicyAuthority,assertSourceHostsNotOptedOut,readCivicOptOutSnapshot,initializeManagedAcquisitionLane,CIVIC_POLICY_AUTHORITY,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {readPinnedJson,writeManagedSourceArtifact,type SourceArtifactBinding} from './district-private-io.ts';
 import type {KnowledgeSourcePin} from './prepare-knowledge.ts';
 
@@ -177,7 +177,7 @@ export async function publish(input:{plan:PublicationPlan;policy:CivicPolicyOpti
  for(const name of ['registry','records','coverage'])put(`knowledge/${name}.json`,stage(`knowledge/${name}.json`).bytes,bindings(stage(`knowledge/${name}.json`).pin.bindings,admitted.bindings));
  put('knowledge/graph.json',encoded(graph),bindings(stage('knowledge/records.json').pin.bindings,admitted.bindings));put('knowledge/changes.json',knowledgeChangeBytes,bindings(prior.get('knowledge/records.json').bindings,stage('knowledge/records.json').pin.bindings,admitted.bindings));put('knowledge/publication-inputs.json',encoded(publicationInputs),allBindings);put('quality-report.json',encoded(qualityReport),allBindings);
  const files=[...outputs].map(([path,value])=>({path,sha256:sha256(value.bytes),bytes:value.bytes.byteLength})).sort((a,b)=>a.path.localeCompare(b.path)),release=dataReleaseSchema.parse({schemaVersion:'stadtstack-data-release-v1',id:dataReleaseId(files),generatedAt:plan.clocks.manifestGeneratedAt,files,quality:qualityReport.summary});
- const assertCurrent=async()=>{if((await readCivicOptOutSnapshot(policy)).sha256!==admitted.receipts.snapshotSha256)throw Error('Current source objection state differs from publication admission');for(const binding of allBindings)await assertHostNotOptedOut(binding.url,policy);};
+ const assertCurrent=async()=>{if((await readCivicOptOutSnapshot(policy)).sha256!==admitted.receipts.snapshotSha256)throw Error('Current source objection state differs from publication admission');await assertSourceHostsNotOptedOut(allBindings.map(binding=>binding.url),policy);};
  await assertCurrent();await initializeManagedAcquisitionLane(plan.output.managedRoot,{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...policy});
  for(const [path,value] of outputs){await assertCurrent();await writeManagedSourceArtifact(plan.output.managedRoot,join(plan.output.releaseDir,path),value.bytes,value.bindings,{decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});}
  await assertCurrent();await writeManagedSourceArtifact(plan.output.managedRoot,join(plan.output.releaseDir,'release-manifest.json'),encoded(release),allBindings,{decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});

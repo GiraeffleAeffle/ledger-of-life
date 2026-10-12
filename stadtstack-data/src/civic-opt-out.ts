@@ -17,11 +17,12 @@ import {effectiveSourcePermission} from './source-policy.ts';
 import {DockerParserResourceSchema,canonicalDockerSocket,dockerDaemonIdentity,dockerConfigSha256,createDockerParser,attachDockerParser,startDockerParser,waitDockerParser,removeDockerParser} from './civic-docker.ts';
 import type {DockerParserResource,DockerAttach} from './civic-docker.ts';
 
-// 0.3.1 retained members contribute 13,945 URL tuples per destination tree.
-// At the production sample's 1,921 bytes/entry, two baseline destinations plus
-// existing non-retained entries and three crawls/native runs project ~38,658
-// entries / 70.8 MiB. Cap at 256 MiB (3.6x headroom), still fail-closed.
-const WEEK=7*24*60*60*1000,MAX_STATE=256*1024*1024,MAX_CONTENT=512*1024*1024,MAX_FILES=100_000,MAX_SCRATCH_FILES=512;
+// The crashed 0.3.2 publication had 89,296 entries, 403 closed leases holding
+// 95,332 sources and a 138.7 MB inventory. Publication and fresh-root replay
+// each add ~101k entries; the projected inventory is ~425 MB.
+// MAX_STATE must stay below V8's maximum string length (~512 MiB): inventory
+// loading decodes the bounded file as one string before JSON.parse.
+const WEEK=7*24*60*60*1000,MAX_STATE=480*1024*1024,MAX_CONTENT=512*1024*1024,MAX_FILES=100_000,MAX_INVENTORY_RECORDS=500_000,MAX_SCRATCH_SOURCES=100_000,MAX_SCRATCH_FILES=512;
 const digest=(bytes:string|Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const hex=z.string().regex(/^[a-f0-9]{64}$/),opaque=z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/);
 const timestamp=z.string().datetime({offset:true}),kindSchema=z.enum(['fetch','prepared','artifacts']);
@@ -60,12 +61,12 @@ const scratchSourceSchema=z.object({host:z.string(),urlSha256:hex,kind:z.enum(['
 });
 const scratchSchema=z.object({
  id:z.string().uuid(),rootId:hex,directory:z.string(),purpose:z.enum(['document','classification','openai','artifact']),createdAt:timestamp,ownerPid:z.number().int().positive(),
- identity:identitySchema.nullable(),state:z.enum(['planned','active','closing','closed','purged','partial']),sources:z.array(scratchSourceSchema).min(1).max(10_000),
+ identity:identitySchema.nullable(),state:z.enum(['planned','active','closing','closed','purged','partial']),sources:z.array(scratchSourceSchema).min(1).max(MAX_SCRATCH_SOURCES),
  groups:z.array(z.object({pid:z.number().int().positive(),settled:z.boolean()}).strict()).max(256),
  resources:z.array(DockerParserResourceSchema).max(16).default([]),
  tombstones:z.array(z.object({pathSha256:hex,contentSha256:hex,bytes:z.number().int().nonnegative()}).strict()).max(MAX_SCRATCH_FILES),
 }).strict();
-const inventorySchema=z.object({schemaVersion:z.literal(1),inventoryId:z.string().uuid(),roots:z.array(rootSchema).max(10_000),entries:z.array(entrySchema).max(MAX_FILES),scratch:z.array(scratchSchema).max(MAX_FILES).default([])}).strict();
+const inventorySchema=z.object({schemaVersion:z.literal(1),inventoryId:z.string().uuid(),roots:z.array(rootSchema).max(10_000),entries:z.array(entrySchema).max(MAX_INVENTORY_RECORDS),scratch:z.array(scratchSchema).max(MAX_INVENTORY_RECORDS).default([])}).strict();
 const issueSchema=z.object({code:z.enum(['no_managed_roots','inventory_incomplete','unsafe_root','content_changed','unsafe_content','shared_derived_requires_rebuild','inventory_unavailable','operation_failed','inventory_busy','active_scratch','unsafe_scratch','scratch_processes_active','daemon_resource_pending']),rootId:hex.optional(),contentId:hex.optional()}).strict();
 const purgeSchema=z.object({host:z.string(),receivedAt:timestamp,purgeDueAt:timestamp,attemptedAt:timestamp,status:z.enum(['purged','partial','error']),deletedFiles:z.number().int().nonnegative(),deletedBytes:z.number().int().nonnegative(),removedReferences:z.number().int().nonnegative(),retainedSharedFiles:z.number().int().nonnegative(),retainedSharedBytes:z.number().int().nonnegative(),missingFiles:z.number().int().nonnegative(),issues:z.array(issueSchema),scope:z.literal('registered_managed_roots')}).strict();
 const observationSchema=z.object({
