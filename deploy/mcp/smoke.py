@@ -375,7 +375,10 @@ try:
     assert attribution['sources'] and attribution['sourceIds']==fact['sourceIds'] and 'source' not in attribution
     source=call('get_source',{'sourceId':fact['sourceIds'][0]})
     assert source['id']==fact['sourceIds'][0] and (source['url'] or source.get('urlWithheldReason')) and (source.get('retrievedAt') or source.get('retrievalNote'))
-    assert source in attribution['sources']
+    # administrativeView marks the top-level response envelope, so a single get_source carries it while
+    # nested get_sources entries do not; both responses must name the same view.
+    assert source.get('administrativeView')==attribution.get('administrativeView')
+    assert {key:value for key,value in source.items() if key!='administrativeView'} in attribution['sources']
     topics=call('list_topics')['topics']
     assert topics
     assert call('search_topics',{'limit':5} if filtered else {'query':'Straussee','limit':5})['items']
@@ -418,10 +421,14 @@ try:
             assert type(accounting[field]) is int and accounting[field]>=0
         for field in ('runSelectedMunicipalities','preparedMunicipalities'):
             assert accounting[field] is None or type(accounting[field]) is int and 0<=accounting[field]<=accounting['configuredMunicipalities']
-        assert accounting['registryMunicipalities']>=accounting['configuredMunicipalities']>=accounting['checkedMunicipalities']>=accounting['publishedMunicipalities']
+        assert accounting['registryMunicipalities']>=accounting['configuredMunicipalities']>=max(accounting['checkedMunicipalities'],accounting['publishedMunicipalities'])
         assert accounting['checkedMunicipalities']+accounting['unvisitedMunicipalities']==accounting['registryMunicipalities']
-        assert accounting['publishedMunicipalities']+accounting['checkedWithoutPublishedMunicipalities']==accounting['checkedMunicipalities']
         assert len(coverage['municipalities'])==accounting['configuredMunicipalities']
+        # Retained publications can publish municipalities this release did not check, so derive counts per row.
+        rows=coverage['municipalities']
+        assert accounting['checkedMunicipalities']==sum(1 for row in rows if row['checked'])
+        assert accounting['publishedMunicipalities']==sum(1 for row in rows if row['publishedRecords']>0)
+        assert accounting['checkedWithoutPublishedMunicipalities']==sum(1 for row in rows if row['checked'] and row['publishedRecords']==0)
         assert sum(row['municipalitiesRegistered'] for row in coverage['districts'])==accounting['registryMunicipalities']
         assert sum(row['municipalitiesAttempted'] for row in coverage['districts'])==accounting['attemptedMunicipalities']
         for row in coverage['municipalities']:
