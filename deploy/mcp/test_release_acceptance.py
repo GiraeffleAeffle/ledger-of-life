@@ -330,7 +330,7 @@ class RevocationCohortTests(unittest.TestCase):
             for variable in ('STADTSTACK_MCP_RELEASE_DIR=/app/release', 'STADTSTACK_MCP_REVOCATION_TRUST_FILE=/run/config/mcp-revocations/trust.json', 'STADTSTACK_MCP_REVOCATIONS_FILE=/run/config/mcp-revocations/revocations.json'):
                 self.assertEqual(arguments[arguments.index(variable) - 1], '--env')
             revision = next(path for path in projection.iterdir() if path.name.startswith('..20'))
-            self.assertEqual(projection.lstat().st_mode & 0o7777, 0o3777)
+            self.assertEqual(projection.lstat().st_mode & 0o7777, 0o2777)
             self.assertEqual(revision.lstat().st_mode & 0o7777, 0o2755)
             for name in ('trust.json', 'revocations.json'):
                 self.assertEqual((revision / name).stat().st_mode & 0o7777, 0o444)

@@ -112,7 +112,7 @@ def build_revocation_projection(cohort, scratch_parent):
     os.symlink(revision.name,projection/'..data');os.lchown(projection/'..data',0,1000)
     for name in ('trust.json','revocations.json'):
         os.symlink('..data/'+name,projection/name);os.lchown(projection/name,0,1000)
-    os.chown(projection,0,1000);projection.chmod(0o3777)
+    os.chown(projection,0,1000);projection.chmod(0o2777)
     return str(projection)
 
 

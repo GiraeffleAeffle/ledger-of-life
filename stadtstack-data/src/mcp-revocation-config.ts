@@ -26,15 +26,41 @@ function configuredPath(value:string|undefined):string {
 function inside(root:string,path:string):boolean {
  const child=relative(root,path);return child!==''&&!isAbsolute(child)&&child!=='..'&&!child.startsWith('..'+sep);
 }
-async function governedDirectoryChain(root:string,cohort:string):Promise<void>{
+async function governedDirectoryChain(root:string,cohort:string,readOnlyMountRoot=false):Promise<void>{
  const uid=process.getuid?.();if(uid===undefined)throw new GovernedRevocationConfigError();
  let current:string=sep;
  for(const component of cohort.split(sep).filter(Boolean)){
   current=join(current,component);const metadata=await lstat(current);
   const stickyAncestor=(metadata.mode&0o1000)!==0&&current!==root&&!inside(root,current);
-  const unsafeWrite=(metadata.mode&0o022)!==0&&!stickyAncestor&&!(current===root&&(metadata.mode&0o1000)!==0);
+  const safeWritableRoot=current===root&&((metadata.mode&0o1000)!==0||readOnlyMountRoot);
+  const unsafeWrite=(metadata.mode&0o022)!==0&&!stickyAncestor&&!safeWritableRoot;
   if(!metadata.isDirectory()||metadata.isSymbolicLink()||metadata.uid!==0&&metadata.uid!==uid||unsafeWrite)throw new GovernedRevocationConfigError();
  }
+}
+const MAX_MOUNTINFO_BYTES=1024*1024;
+async function readMountInfo():Promise<string>{
+ const file=await open('/proc/self/mountinfo',constants.O_RDONLY|constants.O_NONBLOCK);
+ try{
+  const bytes=Buffer.alloc(MAX_MOUNTINFO_BYTES+1);let length=0;
+  while(length<bytes.length){const read=await file.read(bytes,length,bytes.length-length,null);if(read.bytesRead===0)break;length+=read.bytesRead;}
+  if(length>MAX_MOUNTINFO_BYTES)throw new GovernedRevocationConfigError();
+  return new TextDecoder('utf-8',{fatal:true}).decode(bytes.subarray(0,length));
+ }finally{await file.close();}
+}
+function readOnlyMountPoint(mountInfo:string,target:string):boolean{
+ if(mountInfo.length===0||Buffer.byteLength(mountInfo,'utf8')>MAX_MOUNTINFO_BYTES)throw new GovernedRevocationConfigError();
+ const lines=mountInfo.split('\n');if(lines[lines.length-1]==='')lines.pop();if(lines.length===0)throw new GovernedRevocationConfigError();
+ let found=false,readOnly=false;
+ for(const line of lines){
+  if(line==='')throw new GovernedRevocationConfigError();
+  const fields=line.split(' '),separator=fields.indexOf('-');
+  if(separator<6||fields.length<separator+4||!/^\d+$/.test(fields[0])||!/^\d+$/.test(fields[1])||!/^\d+:\d+$/.test(fields[2])||!fields[5])throw new GovernedRevocationConfigError();
+  const encoded=fields[4];if(/\\(?![0-7]{3})/.test(encoded))throw new GovernedRevocationConfigError();
+  const mountPoint=encoded.replace(/\\([0-7]{3})/g,(_,digits:string)=>{const code=parseInt(digits,8);if(code>255)throw new GovernedRevocationConfigError();return String.fromCharCode(code);});
+  if(!isAbsolute(mountPoint))throw new GovernedRevocationConfigError();
+  if(mountPoint===target){found=true;readOnly=fields[5].split(',').includes('ro');}
+ }
+ return found&&readOnly;
 }
 async function governedConfigFile(root:string,name:string):Promise<string>{
  const uid=process.getuid?.();if(uid===undefined)throw new GovernedRevocationConfigError();
@@ -78,19 +104,21 @@ async function boundedConfigFile(path:string,maxBytes:number):Promise<Uint8Array
 export async function loadGovernedRevocations(expectedReleaseId:string,env:NodeJS.ProcessEnv=process.env):Promise<VerifiedRevocations>{
  return loadRevocationCohort(expectedReleaseId,env,GOVERNED_REVOCATION_SIGNER_PINS);
 }
-/** Explicit synthetic-cohort injection for tests only; hosted startup never calls this path or selects pins from env. */
-export async function loadGovernedRevocationsForTesting(expectedReleaseId:string,env:NodeJS.ProcessEnv,pins:Readonly<RevocationTrust['keys']>):Promise<VerifiedRevocations>{
- return loadRevocationCohort(expectedReleaseId,env,pins);
+/** Explicit synthetic-cohort and mountinfo injection for tests only. */
+export async function loadGovernedRevocationsForTesting(expectedReleaseId:string,env:NodeJS.ProcessEnv,pins:Readonly<RevocationTrust['keys']>,mountInfoSource?:()=>Promise<string>):Promise<VerifiedRevocations>{
+ return loadRevocationCohort(expectedReleaseId,env,pins,mountInfoSource);
 }
-async function loadRevocationCohort(expectedReleaseId:string,env:NodeJS.ProcessEnv,pins:Readonly<RevocationTrust['keys']>):Promise<VerifiedRevocations>{
+async function loadRevocationCohort(expectedReleaseId:string,env:NodeJS.ProcessEnv,pins:Readonly<RevocationTrust['keys']>,mountInfoSource?:()=>Promise<string>):Promise<VerifiedRevocations>{
  try{
   const trustPath=configuredPath(env.STADTSTACK_MCP_REVOCATION_TRUST_FILE),artifactPath=configuredPath(env.STADTSTACK_MCP_REVOCATIONS_FILE);
   if(trustPath===artifactPath||dirname(trustPath)!==dirname(artifactPath))throw new GovernedRevocationConfigError();
-  const root=await realpath(dirname(trustPath));
-  await governedDirectoryChain(root,root);
+  const root=await realpath(dirname(trustPath)),rootMetadata=await lstat(root);
+  const needsReadOnlyMount=(rootMetadata.mode&0o022)!==0&&(rootMetadata.mode&0o1000)===0;
+  const readOnlyMountRoot=needsReadOnlyMount&&readOnlyMountPoint(await (mountInfoSource??readMountInfo)(),root);
+  await governedDirectoryChain(root,root,readOnlyMountRoot);
   const [trustReal,artifactReal]=await Promise.all([governedConfigFile(root,join(root,relative(dirname(trustPath),trustPath))),governedConfigFile(root,join(root,relative(dirname(trustPath),artifactPath)))]);
   if(dirname(trustReal)!==dirname(artifactReal))throw new GovernedRevocationConfigError();
-  await governedDirectoryChain(root,dirname(trustReal));
+  await governedDirectoryChain(root,dirname(trustReal),readOnlyMountRoot);
   const [trustBytes,artifactBytes]=await Promise.all([boundedConfigFile(trustReal,MAX_TRUST_BYTES),boundedConfigFile(artifactReal,MAX_REVOCATION_BYTES)]);
   if(await realpath(trustPath)!==trustReal||await realpath(artifactPath)!==artifactReal)throw new GovernedRevocationConfigError();
   const trust=RevocationTrustSchema.parse(JSON.parse(new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(trustBytes)));

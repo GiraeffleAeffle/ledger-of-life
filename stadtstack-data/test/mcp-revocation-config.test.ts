@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,createHash,createPublicKey} from 'node:crypto';
-import {mkdtemp,mkdir,writeFile,symlink,unlink,rm,chmod} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,symlink,unlink,rm,chmod,rename} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {signRevocations,revocationKeyId,isRecordRevoked,type RevocationPayload} from '../src/civic-revocations.ts';
@@ -10,7 +10,7 @@ import {loadGovernedRevocations as loadProductionRevocations,loadGovernedRevocat
 const hash=(value:string|Uint8Array)=>createHash('sha256').update(value).digest('hex');
 const {publicKey,privateKey}=generateKeyPairSync('ed25519'),keyId=revocationKeyId(publicKey);
 const syntheticPins=[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}];
-const loadGovernedRevocations=(releaseId:string,env:NodeJS.ProcessEnv)=>loadGovernedRevocationsForTesting(releaseId,env,syntheticPins);
+const loadGovernedRevocations=(releaseId:string,env:NodeJS.ProcessEnv,mountInfoSource?:()=>Promise<string>)=>loadGovernedRevocationsForTesting(releaseId,env,syntheticPins,mountInfoSource);
 async function fixture(projected=false){
  const base=await mkdtemp(join(tmpdir(),'mcp-revocation-config-')),root=join(base,'cohort');await mkdir(root,{mode:projected?0o755:0o700});if(projected)await chmod(root,0o3777);
  const directory=projected?join(root,'..2026_10_12_00_00_00.123456789'):root;if(projected){await mkdir(directory,{mode:0o755});await chmod(directory,0o2755);}
@@ -77,6 +77,27 @@ test('sticky writable projected root with kubelet mode 01777 is accepted',async(
   assert.equal(state.artifactSha256,hash(f.bytes));assert.equal(state.releaseId,f.releaseId);
  }finally{await rm(f.base,{recursive:true,force:true});}
 });
+test('non-sticky writable projected root requires an exact read-only mountinfo entry',async()=>{
+ const f=await fixture(true);
+ try{
+  const entry=(mountPoint:string,options:string,superOptions='rw')=>`42 1 0:1 / ${mountPoint.replace(/\\/g,'\\134').replace(/ /g,'\\040')} ${options} - tmpfs tmpfs ${superOptions}\n`;
+  const spacedRoot=join(f.base,'cohort with space');await rename(f.root,spacedRoot);f.root=spacedRoot;
+  f.env.STADTSTACK_MCP_REVOCATION_TRUST_FILE=join(spacedRoot,'trust.json');f.env.STADTSTACK_MCP_REVOCATIONS_FILE=join(spacedRoot,'revocations.json');
+  await chmod(f.root,0o2777);
+  const load=(source:()=>Promise<string>)=>loadGovernedRevocations(f.releaseId,f.env,source);
+  const state=await load(async()=>entry(f.root,'ro,relatime'));
+  assert.equal(state.artifactSha256,hash(f.bytes));assert.equal(state.releaseId,f.releaseId);
+  await assert.rejects(load(async()=>entry(f.root,'ro')+entry(f.root,'rw')),GovernedRevocationConfigError);
+  const lastReadOnly=await load(async()=>entry(f.root,'rw')+entry(f.root,'ro'));
+  assert.equal(lastReadOnly.releaseId,f.releaseId);
+  await assert.rejects(load(async()=>entry(f.root,'rw','ro')),GovernedRevocationConfigError);
+  await assert.rejects(load(async()=>entry(f.root,'rw,relatime')),GovernedRevocationConfigError);
+  await assert.rejects(load(async()=>entry(join(f.base,'other'),'ro,relatime')),GovernedRevocationConfigError);
+  await assert.rejects(load(async()=>{throw new Error('mountinfo unavailable');}),GovernedRevocationConfigError);
+  await assert.rejects(load(async()=> 'not mountinfo\n'),GovernedRevocationConfigError);
+ }finally{await rm(f.base,{recursive:true,force:true});}
+});
+
 test('projected configuration rejects symlink chains longer than four hops',async()=>{
  const f=await fixture(true);
  try{
