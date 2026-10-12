@@ -30,17 +30,37 @@ function hasPrintableOAuthMarker(token:Buffer):boolean{
  for(const byte of token)if(byte<0x20||byte>0x7e)return false;
  return true;
 }
-function counts(v:unknown):TokenCounts{const x=object(v);return Object.fromEntries(Object.entries({inputTokens:tokenCount(x.input_tokens),outputTokens:tokenCount(x.output_tokens),cacheReadTokens:tokenCount(x.cache_read_input_tokens),cacheCreationTokens:tokenCount(x.cache_creation_input_tokens)}).filter(([,n])=>n!==undefined));}
+function counts(v:unknown):TokenCounts{const x=object(v);return Object.fromEntries(Object.entries({inputTokens:tokenCount(x.input),outputTokens:tokenCount(x.output),cacheReadTokens:tokenCount(x.cacheRead),cacheCreationTokens:tokenCount(x.cacheWrite)}).filter(([,n])=>n!==undefined));}
+const OmpTextUpdateSchema=z.discriminatedUnion('type',[
+ z.object({type:z.literal('start')}).strict(),
+ z.object({type:z.literal('text_start'),contentIndex:z.number().int().nonnegative()}).strict(),
+ z.object({type:z.literal('text_delta'),contentIndex:z.number().int().nonnegative(),delta:z.string()}).strict(),
+ z.object({type:z.literal('text_end'),contentIndex:z.number().int().nonnegative(),content:z.string()}).strict(),
+ z.object({type:z.literal('done'),reason:z.literal('stop')}).strict(),
+]);
+export interface OmpAssessmentControl {prompt:string;systemPromptSha256:string;outputSchemaSha256:string}
+/** Delivered control bytes, separate from the historical source request hash. */
+export function ompAssessmentControl():OmpAssessmentControl{
+ const schema=canonicalJson(z.toJSONSchema(assessmentOutputSchema)),prompt=PROMPTS.B+'\n\nReturn only JSON matching this exact frozen assessment output schema:\n'+schema+'\n';
+ return {prompt,systemPromptSha256:sha(prompt),outputSchemaSha256:sha(schema)};
+}
 export function inspectOmpEvents(stdout:string,exitCode:number){
  if(exitCode!==0)throw new OmpRunnerHold('provider_failed');
  if(Buffer.byteLength(stdout)>OMP_LIMITS.outputBytes||!stdout.endsWith('\n'))throw new OmpRunnerHold('event_stream');
  const lines=stdout.split('\n');lines.pop();if(!lines.length)throw new OmpRunnerHold('event_stream');
- let final:Record<string,unknown>|undefined,finalLine='';const assistantMessages=new Map<string,string>();
+ let final:Record<string,unknown>|undefined,finalLine='',turns=0,assistantStarts=0;const assistantMessages=new Map<string,string>();
  const rejectAssistant=(message:Record<string,unknown>)=>{
   if(message.role!=='assistant')return;
   const reason=String(message.stopReason??'');
   if(['length','toolUse','error','aborted','failed'].includes(reason))throw new OmpRunnerHold('provider_failed');
-  const identity=typeof message.id==='string'?message.id:sha(canonicalJson(message)),encoded=canonicalJson(message),previous=assistantMessages.get(identity);
+  if(message.completedAt!==undefined&&tokenCount(message.completedAt)===undefined)throw new OmpRunnerHold('event_stream');
+  const {completedAt:_completedAt,...substantive}=message;
+  // The session enriches only the message_end clone with completedAt. Every
+  // other field, including content, timestamp, route, stop state and usage,
+  // must agree across copies of one stable logical response.
+  const responseId=typeof message.responseId==='string'&&message.responseId.length>0?message.responseId:null;
+  if(responseId===null&&tokenCount(message.timestamp)===undefined)throw new OmpRunnerHold('event_stream');
+  const identity=responseId===null?'timestamp:'+String(message.timestamp):'response:'+responseId,encoded=canonicalJson(substantive),previous=assistantMessages.get(identity);
   if(previous!==undefined&&previous!==encoded)throw new OmpRunnerHold('event_stream');
   assistantMessages.set(identity,encoded);if(assistantMessages.size>1)throw new OmpRunnerHold('event_stream');
   const content=Array.isArray(message.content)?message.content:[];
@@ -52,9 +72,14 @@ export function inspectOmpEvents(stdout:string,exitCode:number){
   if(i===0){if(event.type!=='session')throw new OmpRunnerHold('event_stream');continue;}
   if(['tool_call','tool_result','tool_use','tool_progress','permission_request','error','aborted'].includes(event.type))throw new OmpRunnerHold('event_stream');
   if(!['turn_start','turn_end','message_start','message_update','message_end','agent_start','agent_end'].includes(event.type))throw new OmpRunnerHold('event_stream');
+  if(event.type==='turn_start'&&++turns>1)throw new OmpRunnerHold('event_stream');
+  if(event.type==='message_start'&&object(event.message).role==='assistant'&&++assistantStarts>1)throw new OmpRunnerHold('event_stream');
+  if(['message_start','message_end'].includes(event.type)&&object(event.message).role==='toolResult')throw new OmpRunnerHold('event_stream');
   if(event.type==='message_update'){
-   const assistant=object(event.assistantMessage);
-   if(['toolUse','error','aborted','length'].includes(String(assistant.stopReason))||event.reason&&event.reason!=='stop'&&event.reason!=='text')throw new OmpRunnerHold('provider_failed');
+   const update=object(event.assistantMessageEvent);
+   if(update.type==='error'||update.type==='done'&&update.reason!=='stop')throw new OmpRunnerHold('provider_failed');
+   if(typeof update.type==='string'&&update.type.startsWith('toolcall_'))throw new OmpRunnerHold('event_stream');
+   if(!OmpTextUpdateSchema.safeParse(update).success)throw new OmpRunnerHold('event_stream');
   }
   if(event.type==='turn_end'){
    rejectAssistant(object(event.message));
@@ -72,8 +97,7 @@ export function inspectOmpEvents(stdout:string,exitCode:number){
    if(message.upstreamModel!==undefined&&message.upstreamModel!=='claude-haiku-5-5')throw new OmpRunnerHold('model_identity_mismatch');
    const content=Array.isArray(message.content)?message.content:[];
    if(!content.length||content.some(block=>object(block).type!=='text'))throw new OmpRunnerHold('event_stream');
-   if(final&&canonicalJson(final)!==canonicalJson(message))throw new OmpRunnerHold('event_stream');
-   final=message;finalLine=line;
+   if(!final){final=message;finalLine=line;}
   }
  }
  if(!final)throw new OmpRunnerHold('event_stream');
@@ -81,7 +105,8 @@ export function inspectOmpEvents(stdout:string,exitCode:number){
  if(Buffer.byteLength(text)>96*1024)throw new OmpRunnerHold('resource_limit');
  let value:unknown;try{value=assessmentOutputSchema.parse(JSON.parse(text));}catch{throw new OmpRunnerHold('event_stream');}
  const usageRaw=object(final.usage),finalUsage=counts(usageRaw);
- const usage:ReportedUsage={topLevel:Object.keys(finalUsage).length?finalUsage:null,perModel:{'claude-haiku-5-5':finalUsage},cliEstimatedApiCostUsd:null};
+ const cost=object(usageRaw.cost).total,estimatedCost=typeof cost==='number'&&Number.isFinite(cost)&&cost>=0?cost:null;
+ const usage:ReportedUsage={topLevel:Object.keys(finalUsage).length?finalUsage:null,perModel:{'claude-haiku-5-5':{...finalUsage,...(estimatedCost===null?{}:{cliEstimatedApiCostUsd:estimatedCost})}},cliEstimatedApiCostUsd:estimatedCost};
  return {value,responseSha256:sha(finalLine),returnedModel:'claude-haiku-5-5',reportedModels:['claude-haiku-5-5'],usage};
 }
 async function reviewFile(path:string,contract:string):Promise<OmpReview>{
@@ -93,7 +118,8 @@ async function reviewFile(path:string,contract:string):Promise<OmpReview>{
 }
 export async function ompRunnerContractSha256():Promise<string>{
  const files=['district-omp-b-runner.ts','district-assessment.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
- return semanticHash({version:OMP_RUNNER_VERSION,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))})))});
+ const control=ompAssessmentControl();
+ return semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))})))});
 }
 function capture(spawn:OmpSpawn,file:string,args:string[],options:SpawnOptions,input:Buffer,limit:number,timeoutMs:number,signal?:AbortSignal):Promise<{stdout:Buffer;stderr:Buffer;code:number}>{
  const {promise,resolve,reject}=Promise.withResolvers<{stdout:Buffer;stderr:Buffer;code:number}>();
@@ -101,8 +127,8 @@ function capture(spawn:OmpSpawn,file:string,args:string[],options:SpawnOptions,i
  const out:Buffer[]=[],errors:Buffer[]=[];let bytes=0,errorBytes=0,done=false;
  const finish=(error?:Error,code=1)=>{if(done)return;done=true;clearTimeout(timer);if(error){for(const chunk of out)chunk.fill(0);for(const chunk of errors)chunk.fill(0);reject(error);}else{const stdout=Buffer.concat(out,bytes),stderr=Buffer.concat(errors,errorBytes);for(const chunk of out)chunk.fill(0);for(const chunk of errors)chunk.fill(0);resolve({stdout,stderr,code});}};
  const timer=setTimeout(()=>{child.kill('SIGKILL');finish(new OmpRunnerHold('resource_limit'));},timeoutMs);
- child.stdout?.on('data',(b:Buffer)=>{if(done)return;bytes+=b.length;if(bytes>limit){child.kill('SIGKILL');finish(new OmpRunnerHold('resource_limit'));}else out.push(Buffer.from(b));});
- child.stderr?.on('data',(b:Buffer)=>{if(done)return;errorBytes+=b.length;if(errorBytes>OMP_LIMITS.stderrBytes){child.kill('SIGKILL');finish(new OmpRunnerHold('resource_limit'));}else errors.push(Buffer.from(b));});
+ child.stdout?.on('data',(b:Buffer)=>{try{if(done)return;bytes+=b.length;if(bytes>limit){child.kill('SIGKILL');finish(new OmpRunnerHold('resource_limit'));}else out.push(Buffer.from(b));}finally{b.fill(0);}});
+ child.stderr?.on('data',(b:Buffer)=>{try{if(done)return;errorBytes+=b.length;if(errorBytes>OMP_LIMITS.stderrBytes){child.kill('SIGKILL');finish(new OmpRunnerHold('resource_limit'));}else errors.push(Buffer.from(b));}finally{b.fill(0);}});
  child.on('error',()=>finish(new OmpRunnerHold('unavailable')));child.on('close',(code)=>finish(undefined,code??1));
  if(!child.stdin){child.kill('SIGKILL');finish(new OmpRunnerHold('unavailable'));return promise;}
  child.stdin.on('error',()=>{});child.stdin.end(input);return promise;
@@ -115,7 +141,8 @@ export async function resolveOmpCredential(spawn:OmpSpawn,binary:string,jobRoot:
  const binarySha256=sha(await readFile(binary));
  if(binarySha256!==expectedBinarySha256)throw new OmpRunnerHold('security_review_required');
  const version=await capture(spawn,binary,['--version'],{cwd:jobRoot,env,stdio:['pipe','pipe','pipe'],windowsHide:true},Buffer.alloc(0),1024,5000,signal);
- if(version.code!==0||version.stdout.toString('utf8')!==OMP_VERSION)throw new OmpRunnerHold('credential_unavailable');
+ const versionMatches=version.code===0&&version.stdout.equals(Buffer.from(OMP_VERSION+'\n'));version.stdout.fill(0);version.stderr.fill(0);
+ if(!versionMatches)throw new OmpRunnerHold('credential_unavailable');
  const list=async()=>capture(spawn,binary,['token','anthropic','--list'],{cwd:jobRoot,env,stdio:['pipe','pipe','pipe'],windowsHide:true},Buffer.alloc(0),16*1024,10_000,signal);
  const first=await list();if(first.code!==0){first.stdout.fill(0);first.stderr.fill(0);throw new OmpRunnerHold('credential_unavailable');}
  const text=first.stdout.toString('utf8'),accountList=Buffer.from(first.stdout),labels=text.split(/\r?\n/).filter(line=>line.trim());
@@ -134,7 +161,7 @@ export async function resolveOmpCredential(spawn:OmpSpawn,binary:string,jobRoot:
  if(!after||after.dev!==initial.dev||after.ino!==initial.ino||after.size!==initial.size||after.mtimeMs!==initial.mtimeMs||after.ctimeMs!==initial.ctimeMs||afterSha!==binarySha256){token.fill(0);throw new OmpRunnerHold('credential_unavailable');}
  return {token,version:OMP_VERSION,binarySha256,accountLabelSha256};
 }
-export interface OmpRunnerResult {answer:ModelAnswer;stdout:string;startedAt:string;finishedAt:string;imageId:string;settingsSha256:string;systemPromptSha256:string;accountLabelSha256:string;runnerContractSha256:string;toolVersion:string}
+export interface OmpRunnerResult {answer:ModelAnswer;stdout:string;startedAt:string;finishedAt:string;imageId:string;settingsSha256:string;systemPromptSha256:string;outputSchemaSha256:string;accountLabelSha256:string;runnerContractSha256:string;toolVersion:string}
 /** Only the trusted, source-free credential resolver runs on the host. All
  * assessment input/output and child writes belong to the registered lease. */
 export async function runVmOmpAssessment(data:Record<string,unknown>,context:ManagedSourceContext,signal?:AbortSignal,deps:OmpRunnerDependencies={}):Promise<OmpRunnerResult>{
@@ -154,7 +181,7 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
     await scope.assertActive();
     const credentialCwd=join(scope.directory,'credential-cwd');await mkdir(credentialCwd,{mode:0o700});
     const auth=await resolveOmpCredential(deps.spawn??nodeSpawn,deps.binary??OMP_BINARY,credentialCwd,review.ompBinarySha256,scope.signal);token=auth.token;
-    const settings=await readFile(new URL('../docker/omp-b/settings.yml',import.meta.url)),prompt=Buffer.from(PROMPTS.B);
+    const controlContract=ompAssessmentControl(),settings=await readFile(new URL('../docker/omp-b/settings.yml',import.meta.url)),prompt=Buffer.from(controlContract.prompt);
     payload=Buffer.from(canonicalJson(data));
     if(payload.length>OMP_LIMITS.inputBytes)throw new OmpRunnerHold('request_rejected');
     await scope.assertActive();
@@ -162,18 +189,20 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
     const file=await open(join(control,'system-prompt.md'),'wx',0o444);
     try{await file.writeFile(prompt);await file.sync();}finally{await file.close();}
     await chmod(control,0o755);
-    container=await scope.createContainer({profile:'omp-b',socketPath:socket,daemonId:review.dockerDaemonId,imageId:review.imageId,contractSha256:contract,controlSha256:sha(prompt),controlBytes:prompt.length});
+    container=await scope.createContainer({profile:'omp-b',socketPath:socket,daemonId:review.dockerDaemonId,imageId:review.imageId,contractSha256:contract,controlSha256:controlContract.systemPromptSha256,controlBytes:prompt.length});
     const session=await container.start(),streamFailure=Promise.withResolvers<never>();
     void streamFailure.promise.catch(()=>{});
     session.stdout.on('data',(chunk:Buffer)=>{
-     outputBytes+=chunk.length;
-     if(outputBytes>OMP_LIMITS.outputBytes){streamFailure.reject(new OmpRunnerHold('resource_limit'));deadline.abort(new OmpRunnerHold('resource_limit'));}
-     else output.push(Buffer.from(chunk));
+     try{outputBytes+=chunk.length;
+      if(outputBytes>OMP_LIMITS.outputBytes){streamFailure.reject(new OmpRunnerHold('resource_limit'));deadline.abort(new OmpRunnerHold('resource_limit'));}
+      else output.push(Buffer.from(chunk));
+     }finally{chunk.fill(0);}
     });
     session.stderr.on('data',(chunk:Buffer)=>{
-     errorBytes+=chunk.length;
-     if(errorBytes>OMP_LIMITS.stderrBytes){streamFailure.reject(new OmpRunnerHold('resource_limit'));deadline.abort(new OmpRunnerHold('resource_limit'));}
-     else errors.push(Buffer.from(chunk));
+     try{errorBytes+=chunk.length;
+      if(errorBytes>OMP_LIMITS.stderrBytes){streamFailure.reject(new OmpRunnerHold('resource_limit'));deadline.abort(new OmpRunnerHold('resource_limit'));}
+      else errors.push(Buffer.from(chunk));
+     }finally{chunk.fill(0);}
     });
     session.stdout.on('error',error=>streamFailure.reject(error));
     session.stderr.on('error',error=>streamFailure.reject(error));
@@ -194,7 +223,7 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
     const modelEvidence={provider:'anthropic-subscription' as const,tool:'omp-cli' as const,model:'claude-haiku-5-5',toolVersion:auth.version+' sha256:'+auth.binarySha256,modelIdentitySha256:'',modelIdentityBasis:'reported-cli-model-and-tool-version' as const};
     modelEvidence.modelIdentitySha256=modelIdentitySha256(modelEvidence);
     const answer:ModelAnswer={...parsed,evidence:modelEvidence,requestedModel:'claude-haiku-5-5',runtimeWarnings:[]};assertModelResponseIdentity(answer);
-    return {answer,stdout,startedAt,finishedAt,imageId:review.imageId,settingsSha256:sha(settings),systemPromptSha256:sha(prompt),accountLabelSha256:auth.accountLabelSha256,runnerContractSha256:contract,toolVersion:auth.version+' sha256:'+auth.binarySha256};
+    return {answer,stdout,startedAt,finishedAt,imageId:review.imageId,settingsSha256:sha(settings),systemPromptSha256:controlContract.systemPromptSha256,outputSchemaSha256:controlContract.outputSchemaSha256,accountLabelSha256:auth.accountLabelSha256,runnerContractSha256:contract,toolVersion:auth.version+' sha256:'+auth.binarySha256};
    }finally{
     scope.signal.removeEventListener('abort',onAbort);
     // Removal is independently supervised by the canonical authority. An

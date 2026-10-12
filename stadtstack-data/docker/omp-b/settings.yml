@@ -13,6 +13,13 @@ providers:
     serverSideFallback: false
   cacheRetention: none
   cacheWarming: 'off'
+model:
+  loopGuard:
+    enabled: false
+    checkAssistantContent: false
+    toolCallReminder: false
+  toolCallLoopGuard:
+    enabled: false
 contextPromotion:
   enabled: false
 prewalk:

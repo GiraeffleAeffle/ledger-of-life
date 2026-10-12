@@ -53,6 +53,11 @@ const ACQUISITION_VERSION='district-r1-acquisition-v1';
 const PermissionSchema=PolicyReceiptSchema.shape.permission;
 const requestSchema=z.object({url:z.url(),method:z.enum(['GET','POST']),body:z.string().max(65536).nullable(),contentType:z.string().nullable(),publicOperation:z.enum(['genesis_guest','ted_search']).nullable()}).strict();
 export const AcquisitionSelectorSchema=z.object({version:z.literal(ACQUISITION_VERSION),scope:ScopeSchema,root:z.url(),request:requestSchema,permission:PermissionSchema,maxRequests:z.number().int().min(1).max(100),maxBytes:z.number().int().min(1).max(64*1024*1024),sourceVersion:z.string().nullable(),discovery:z.object({stepReceiptSha256:HashSchema,resultSha256:HashSchema}).strict().nullable()}).strict();
+const assessmentBEnqueueInput=z.object({itemArtifactSha256:HashSchema,sourceScope:ScopeSchema,policyProofSha256:HashSchema});
+export const AssessmentBEnqueueManifestSchema=z.object({jobs:z.array(z.discriminatedUnion('transport',[
+ assessmentBEnqueueInput.extend({transport:z.literal('mac-bridge'),clientContractSha256:HashSchema}).strict(),
+ assessmentBEnqueueInput.extend({transport:z.literal('vm-omp')}).strict(),
+])).min(1).max(10000)}).strict();
 interface HttpSourceReference {sha256:string;url:string;policyReceiptSha256:string;httpObservation:HttpObservationProof}
 interface HttpSourceAuditReference extends HttpSourceReference {descriptorSha256:string}
 export const AcquisitionDescriptorPinSchema=z.object({sha256:HashSchema,path:z.string().min(1)}).strict();
@@ -400,8 +405,7 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
   }
   if(command==='enqueue-assessment-b'){
    if(process.platform!=='linux')throw new DistrictExecutionHold('isolation_unavailable');
-   const assessmentInput=z.object({itemArtifactSha256:HashSchema,sourceScope:ScopeSchema,policyProofSha256:HashSchema});
-   const manifest=z.object({jobs:z.array(z.discriminatedUnion('transport',[assessmentInput.extend({transport:z.literal('mac-bridge'),clientContractSha256:HashSchema}).strict(),assessmentInput.extend({transport:z.literal('vm-omp')}).strict()])).min(1).max(10000)}).strict(),broker=new DistrictAssessmentBroker(pool,cas),jobKeys:string[]=[];
+   const manifest=AssessmentBEnqueueManifestSchema.parse(input),broker=new DistrictAssessmentBroker(pool,cas),jobKeys:string[]=[];
    for(const job of manifest.jobs){
     await assertManagedSourceReadable(join(cas.root,'sha256',job.itemArtifactSha256.slice(0,2),job.itemArtifactSha256));
     const item=assessmentItemSchema.parse(JSON.parse((await cas.read(job.itemArtifactSha256)).toString('utf8')));
