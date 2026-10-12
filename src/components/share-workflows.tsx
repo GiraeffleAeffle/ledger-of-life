@@ -5,13 +5,15 @@ import { marketShortfall } from '@/domain/market-preflight';
 import { belowGasDripThreshold } from '@/domain/gas-threshold';
 import { useRentalWallet } from '@/wallets';
 import { SHARE_NAVIGATION_INTENT, type Area } from './areas';
-import { useSectionTabActive } from './section-tabs';
+import { useFinancialRefresh, useSerializedRead } from './use-financial-refresh';
+import { boundedBuildingRead } from './building-read';
+import type { AuthorizedRequest } from './use-city-signals';
 import { settleShareAction } from './share-action';
 import { TestDollars } from './test-dollars';
 import { Figure, Figures, MoreList, MoreRow, ScreenNote, StatusLine } from './blocks';
 import './share-workflows.css';
 
-type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
+type Request = AuthorizedRequest;
 type Step = { description: string; transaction: { chainId: 46630; to: string; data: string; value: string; nonce: number; gas: string; maxFeePerGas: string; maxPriorityFeePerGas: string } };
 type View = {
   network?: 'solana-devnet'; shareDecimals?: number; cashSymbol?: string; walletAddress?: string; walletId?: string; mirrorAvailable?: boolean; canRefreshPrice?: boolean;
@@ -47,12 +49,14 @@ export type ReviewedSolanaOperation = {
 const devnetReceipt = (signature: string) => `https://explorer.solana.com/tx/${encodeURIComponent(signature)}?cluster=devnet`;
 
 /** One durable intent, exact reviewed bytes, and same-id recovery after an ambiguous send. */
-export function useReviewedSolanaOperation(request: Request, endpoint: string, account: string, refresh: () => Promise<void>) {
+export function useReviewedSolanaOperation(request: Request, endpoint: string, account: string, refresh: () => Promise<void>, recoveryRead?: () => Promise<RecoveryView>, enabled = true) {
   const wallet = useRentalWallet();
   const storageKey = `ledger-solana-review:${endpoint}:${account}`;
   const [attempt, setAttempt] = useState<OperationAttempt | null>(null);
   const current = useRef<OperationAttempt | null>(null);
   const acting = useRef(false);
+  const live = useRef(true);
+  useEffect(() => { live.current = true; return () => { live.current = false; }; }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
@@ -63,17 +67,16 @@ export function useReviewedSolanaOperation(request: Request, endpoint: string, a
     if (next) sessionStorage.setItem(storageKey, JSON.stringify(next));
     else sessionStorage.removeItem(storageKey);
   }, [storageKey]);
-  useEffect(() => {
-    let live = true;
-    const restore = async () => {
+  const restore = useSerializedRead(useCallback(async () => {
+      if (acting.current) return;
       setLoaded(false); setError('');
       try {
         const stored = sessionStorage.getItem(storageKey);
         const local = stored ? JSON.parse(stored) as OperationAttempt : null;
         current.current = local; setAttempt(local);
-        const response = await request<RecoveryView & { workflow?: RecoveryView }>(endpoint);
-        if (!live) return;
-        const server = response.workflow ?? response;
+        const response = recoveryRead ? await recoveryRead() : await boundedBuildingRead(signal => request<RecoveryView & { workflow?: RecoveryView }>(endpoint, undefined, { signal }));
+        if (!live.current) return;
+        const server = 'workflow' in response ? response.workflow as RecoveryView : response;
         setReceipts(server.receipts ?? []);
         const active = server.activeOperation;
         if (current.current === local && active && (server.network === 'solana-devnet' || active.network === 'solana-devnet')) {
@@ -84,11 +87,9 @@ export function useReviewedSolanaOperation(request: Request, endpoint: string, a
             submitted: active.state !== 'prepared' || Boolean(same && local?.submitted), result: { id: active.id, state: active.state, signature: active.signature ?? (same ? local?.result?.signature : undefined) } });
         }
         setLoaded(true);
-      } catch (cause) { if (live) setError(cause instanceof Error ? `Operation recovery unavailable: ${cause.message}` : 'The saved operation could not be recovered. Do not repeat a possibly submitted action.'); }
-    };
-    void restore();
-    return () => { live = false; };
-  }, [storageKey, request, endpoint, save, recoveryRevision]);
+      } catch (cause) { if (live.current) setError(cause instanceof Error ? `Operation recovery unavailable: ${cause.message}` : 'The saved operation could not be recovered. Do not repeat a possibly submitted action.'); }
+  }, [storageKey, request, endpoint, save, recoveryRead]));
+  useFinancialRefresh(restore, { enabled, identity: `${storageKey}:${recoveryRevision}`, chain: 'solana' });
   async function run(action: () => Promise<void>) {
     if (acting.current) return;
     acting.current = true; setBusy(true); setError('');
@@ -157,6 +158,7 @@ export function useReviewedSolanaOperation(request: Request, endpoint: string, a
     });
   }
   const terminal = Boolean(attempt?.result && ['confirmed', 'failed', 'expired'].includes(attempt.result.state));
+  useFinancialRefresh(reconcile, { enabled: enabled && Boolean(attempt?.submitted) && !terminal, pendingKey: attempt?.prepared?.id ?? attempt?.id, initial: false, chain: 'solana' });
   async function dismiss() {
     if (busy || !terminal && current.current?.submitted) return;
     await run(async () => {
@@ -196,7 +198,6 @@ export function ShareWorkflows({ request, go }: { request: Request; go: (area: A
 
 function SharedMarketView({ request, account, earlier = false }: { request: Request; go?: (area: Area) => void; account: string; earlier?: boolean }) {
   const wallet = useRentalWallet();
-  const activeTab = useSectionTabActive();
   const revision = useRef(0);
   const acting = useRef(false);
   const [view, setView] = useState<View | null>(null);
@@ -242,13 +243,18 @@ function SharedMarketView({ request, account, earlier = false }: { request: Requ
       if (mounted.current) setLoansLoading(false);
     }
   }
-  const refresh = useCallback(async () => {
+  // Display and durable recovery share one read, including on first mount/return.
+  const readMarket = useSerializedRead(useCallback(async () => {
+    const result = await boundedBuildingRead(signal => request<{ workflow: View & RecoveryView }>(`/api/share-workflows${selector}`, undefined, { signal }));
+    return result.workflow;
+  }, [request, selector]), false);
+  const refresh = useSerializedRead(useCallback(async () => {
     const current = ++revision.current;
     try {
-      const [{ workflow }, robinhood] = await Promise.all([
-        request<{ workflow: View }>(`/api/share-workflows${selector}`),
+      const [workflow, robinhood] = await Promise.all([
+        readMarket(),
         // A failed fee reading must not discard a successful market reading.
-        request<{ robinhood: { ok: boolean; value?: { ethBalance?: string } } | null }>('/api/assets?area=holdings')
+        boundedBuildingRead(signal => request<{ robinhood: { ok: boolean; value?: { ethBalance?: string } } | null }>('/api/assets?area=holdings', undefined, { signal }))
           .then(({ robinhood }) => robinhood).catch(() => null),
       ]);
       if (current !== revision.current) return;
@@ -257,16 +263,9 @@ function SharedMarketView({ request, account, earlier = false }: { request: Requ
     } catch (cause) {
       if (current === revision.current) { setReadError(cause instanceof Error ? cause.message : 'Market unavailable'); setReview(null); }
     }
-  }, [request, selector]);
-  const solanaOperation = useReviewedSolanaOperation(request, '/api/share-workflows', `${account}:${earlier ? 'earlier' : 'primary'}`, refresh);
-  useEffect(() => {
-    const read = () => { if (activeTab && !acting.current && document.visibilityState === 'visible') void refresh(); };
-    read();
-    const timer = setInterval(read, 60_000);
-    window.addEventListener('ledger-balances-changed', read);
-    document.addEventListener('visibilitychange', read);
-    return () => { clearInterval(timer); window.removeEventListener('ledger-balances-changed', read); document.removeEventListener('visibilitychange', read); };
-  }, [refresh, activeTab, account]);
+  }, [request, readMarket]));
+  const solanaOperation = useReviewedSolanaOperation(request, '/api/share-workflows', `${account}:${earlier ? 'earlier' : 'primary'}`, refresh, readMarket, !earlier);
+  useFinancialRefresh(async () => { if (!acting.current) await refresh(); });
   useEffect(() => {
     if (earlier) return;
     const consume = () => { const intent = sessionStorage.getItem(SHARE_NAVIGATION_INTENT); if (intent) { const choice = intent === 'lend' ? 'lend' : 'borrow'; setTab(choice); setOperation(choice === 'lend' ? 'lend' : 'deposit_collateral'); setTaskChosen(true); setReview(null); sessionStorage.removeItem(SHARE_NAVIGATION_INTENT); } };
@@ -372,6 +371,7 @@ function SharedMarketView({ request, account, earlier = false }: { request: Requ
     }}>{label}</button>;
   }
   return <section className="card share-workflows" id={earlier ? 'earlier-share-workflows' : 'share-workflows'}>
+    <button type="button" className="text-button" disabled={busy || solanaOperation.busy} onClick={() => void refresh()}>Refresh balances and market</button>
     <header className="share-market-head"><h2>{earlier ? 'Robinhood Chain test pool · earlier balances' : 'Borrow test dollars against test TSLA, or lend test dollars to earn interest.'}</h2>{view && <p>{solana ? 'Solana devnet · tTSLA and tUSDC · 6 decimals · sponsored fees' : 'Robinhood Chain testnet · TSLA and tUSDG'}</p>}</header>
     {readError && <p role="alert">{readError}</p>}
     {!view && !readError && <p role="status" style={{ minHeight: 240 }}>Reading shared market…</p>}
@@ -446,7 +446,7 @@ function SharedMarketView({ request, account, earlier = false }: { request: Requ
     {review && <div className="share-market-review" role="region" aria-label="Review market action"><p>Review {operations.find(([id]) => id === review.operation)?.[1].replace(/^\d\. /, '').toLowerCase() ?? (review.operation === 'liquidate' ? 'repay part and receive TSLA' : review.operation)}: {review.humanAmount} {review.unit}{review.borrower ? ` for ${review.borrower}` : ''}. Robinhood Chain testnet · pool recipient <code>{view?.deployment?.pool}</code> · source wallet <code>{wallet.wallets.find(item => item.chainType === 'ethereum')?.address}</code>. You sign exact-amount approvals and the market transaction with your own wallet.</p><button type="button" className="button primary" disabled={actionBlocked(review.operation)} onClick={() => void execute()}>Confirm and sign</button><button type="button" className="button secondary" onClick={() => setReview(null)}>Cancel</button>{blockedReason(review.operation) && <p role="status">{blockedReason(review.operation)}</p>}</div>}
     {busy && <p role="status">{stepDescription || 'Waiting for wallet and transaction confirmation…'}</p>}{message && <p role="status">{message}{confirmedHashes.length > 0 && <> · {confirmedHashes.map((hash, index) => <span key={hash}>{index > 0 && ', '}<a href={`${EXPLORER_TX}${hash}`} target="_blank" rel="noopener noreferrer">{confirmedHashes.length > 1 ? `step ${index + 1}` : 'view transaction'}</a></span>)}</>}</p>}{!message && confirmedHashes.length > 0 && <p role="status">Submitted: {confirmedHashes.map((hash, index) => <span key={hash}>{index > 0 && ', '}<a href={`${EXPLORER_TX}${hash}`} target="_blank" rel="noopener noreferrer">step {index + 1}</a></span>)}</p>}{error && <p role="alert">{error}</p>}
     {!earlier && <SolanaOperationReview operation={solanaOperation} />}
-    {!solana && <LocalEarningsRehearsal key={account} request={request} account={account} />}
+    {view && !solana && <LocalEarningsRehearsal key={account} request={request} account={account} />}
     {solana && !earlier && <MoreList><MoreRow title="Robinhood Chain test pool · earlier balances" meta="Separate earlier TSLA, tUSDG, loans and lending"><SharedMarketView request={request} account={account} earlier /></MoreRow></MoreList>}
     <ScreenNote>Test dollars and test TSLA have no monetary value. Borrowing carries liquidation and issuer risk. Deposit earnings belong to the tenant.</ScreenNote>
   </section>;
@@ -455,24 +455,19 @@ function SharedMarketView({ request, account, earlier = false }: { request: Requ
 type Earnings = { status: 'ready'; escrow: string; vault: string; state: number; nonce: string; supplied: boolean; releasableAtomic: string; releasedAtomic: string; securityAtomic: string } | { status: 'starting'; vault: string; usd: string; escrow?: string };
 function LocalEarningsRehearsal({ request, account }: { request: Request; account: string }) {
   const wallet = useRentalWallet();
-  const activeTab = useSectionTabActive();
   const [status, setStatus] = useState<{ enabled: boolean; earnings: Earnings | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [review, setReview] = useState<string | null>(null);
   const revision = useRef(0);
-  const refresh = useCallback(async () => {
+  const refresh = useSerializedRead(useCallback(async () => {
     const current = ++revision.current;
     try {
-      const result = await request<{ enabled: boolean; earnings: Earnings | null }>('/api/share-earnings');
+      const result = await boundedBuildingRead(signal => request<{ enabled: boolean; earnings: Earnings | null }>('/api/share-earnings', undefined, { signal }));
       if (current === revision.current) setStatus(result);
     } catch (cause) { if (current === revision.current) setError(String(cause)); }
-  }, [request]);
-  useEffect(() => {
-    // Same shape as the market view's read(): refresh only sets state after its request resolves.
-    const read = () => { if (activeTab) void refresh(); };
-    read();
-  }, [account, activeTab, refresh]);
+  }, [request]));
+  useFinancialRefresh(async () => { if (!busy) await refresh(); }, { chain: 'evm', identity: account });
   async function execute(operation: string) {
     setBusy(true); setReview(null); setError('');
     try {

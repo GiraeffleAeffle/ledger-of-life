@@ -64,12 +64,15 @@ async function fixture() {
     setGenesis: (value: string) => { genesis = value; }, setMutation: (change: (value: SimulationValue) => void) => { mutate = change; } };
 }
 
-test('base gateway preserves finalized lifetime and distinguishes confirmed block-height observations', async () => {
+test('base gateway preserves finalized lifetime and revalidates expired network evidence', async t => {
   const f = await fixture();
+  let now = 1_000_000;
+  t.mock.method(Date, 'now', () => now);
   assert.deepEqual(await f.gateway.lifetime(), { blockhash: SOLANA_IDS.system, lastValidBlockHeight: '100', blockHeight: '10' });
   assert.equal(await f.gateway.blockHeight('confirmed'), '12');
   assert.equal(await f.gateway.blockHeight('finalized'), '10');
   f.setGenesis('wrong-network');
+  now += 60_001;
   await assert.rejects(f.gateway.lifetime(), /genesis mismatch/);
   await assert.rejects(f.gateway.blockHeight('confirmed'), /genesis mismatch/);
 });
@@ -78,7 +81,7 @@ test('one exact finalized simulation supplies atomic native, token and fee evide
   const f = await fixture();
   assert.deepEqual(await f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address, f.expected),
     { slot: '10', sponsorDebitCeilingLamports: '20000', networkFeeLamports: '10000' });
-  assert.deepEqual(f.calls, ['simulateTransaction']);
+  assert.deepEqual(f.calls, ['getGenesisHash', 'simulateTransaction']);
   assert.equal((await f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address)).sponsorDebitCeilingLamports, '20000');
 });
 
@@ -144,7 +147,8 @@ test('missing or malformed atomic evidence never falls back to another bank or g
     f.setMutation(change);
     await assert.rejects(f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address, f.expected));
   }
-  assert.ok(f.calls.every(method => method === 'simulateTransaction'));
+  assert.equal(f.calls[0], 'getGenesisHash');
+  assert.ok(f.calls.slice(1).every(method => method === 'simulateTransaction'));
 });
 
 test('frozen, uninitialized or executable post-token accounts and failed simulations are refused', async () => {
@@ -194,7 +198,7 @@ test('read-only RPC signal aborts in-flight I/O, refuses subsequent calls and do
   let calls = 0, aborted = false;
   const fetcher: typeof fetch = async (_, options) => {
     calls++;
-    assert.equal(options?.signal, controller.signal);
+    assert.equal(options?.signal?.aborted, false);
     pending.resolve();
     return new Promise<Response>((_resolve, reject) => {
       options!.signal!.addEventListener('abort', () => { aborted = true; reject(options!.signal!.reason); }, { once: true });
@@ -217,7 +221,7 @@ test('read-only RPC signal aborts in-flight I/O, refuses subsequent calls and do
   assert.equal(rateLimitedCalls, 1);
 });
 
-test('financial broadcast retains ten-second per-request deadlines, genesis check, preflight and identical-byte rate-limit recovery', async t => {
+test('financial broadcast retains total deadlines, genesis checks, preflight and identical-byte failover', async t => {
   const deadlines: number[] = [], requests: { method: string; params: unknown[] }[] = [];
   t.mock.method(AbortSignal, 'timeout', (milliseconds: number) => {
     deadlines.push(milliseconds);
@@ -226,6 +230,7 @@ test('financial broadcast retains ten-second per-request deadlines, genesis chec
   let limited = false;
   const gateway = createBaseSolanaGateway({
     rpcUrl: 'https://rpc.example', genesisHash: SOLANA_DEVNET_MANIFEST.genesisHash, maximumSponsorLamports: '10000000',
+    rpcFallbackUrls: ['https://secondary.example/'],
   }, async (_, options) => {
     const body = JSON.parse(String(options?.body));
     requests.push({ method: body.method, params: body.params });
@@ -235,8 +240,8 @@ test('financial broadcast retains ten-second per-request deadlines, genesis chec
   });
   assert.equal(gateway.readSignal, undefined);
   assert.equal(await gateway.broadcast(new Uint8Array([1, 2, 3])), 'fixture-signature');
-  assert.deepEqual(deadlines, [10_000, 10_000, 10_000]);
-  assert.deepEqual(requests.map(request => request.method), ['getGenesisHash', 'sendTransaction', 'sendTransaction']);
-  assert.deepEqual(requests[1], requests[2]);
+  assert.ok(deadlines.every(milliseconds => milliseconds > 0 && milliseconds <= 10_000));
+  assert.deepEqual(requests.map(request => request.method), ['getGenesisHash', 'sendTransaction', 'getGenesisHash', 'sendTransaction']);
+  assert.deepEqual(requests[1], requests[3]);
   assert.deepEqual(requests[1].params, ['AQID', { encoding: 'base64', skipPreflight: false, preflightCommitment: 'finalized' }]);
 });

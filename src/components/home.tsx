@@ -6,6 +6,7 @@ import type { RentalWalletAccess } from '@/wallets/types';
 import { authorizedRequest } from './authorized-request';
 import type { AuthorizedReadOptions } from './authorized-request';
 import { boundedBuildingRead } from './building-read';
+import { useFinancialRefresh, useSerializedRead } from './use-financial-refresh';
 import { AREAS, goToSection, PUBLISH_HOME_NAVIGATION_INTENT, type Area } from './areas';
 import { IdeasArea } from './ideas';
 import { MeArea } from './me';
@@ -23,7 +24,7 @@ import type { TenancyJourney } from '@/server/journey';
 import type { PublicListing } from '@/server/listings';
 import { money } from './workspace-panels';
 import './home-journey.css';
-import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, recoverExpiredRentReview, settlementSplit, tenancyNeedsPerson } from './home-journey-logic';
+import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, recoverExpiredRentReview, settlementSplit, tenancyNeedsPerson } from './home-journey-logic';
 import { operationLabels } from './deposit-activity';
 import { nextStep } from './next-step';
 import { NextStepCard } from './next-step-card';
@@ -110,16 +111,10 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
   const [listingsLoaded, setListingsLoaded] = useState(false);
   const [journeyError, setJourneyError] = useState('');
   const [listingsError, setListingsError] = useState('');
-  const [failureCount, setFailureCount] = useState(0);
-  const paused = pollingPaused(failureCount);
   const error = [journeyError && `Homes: ${journeyError}`, listingsError && `Listings: ${listingsError}`].filter(Boolean).join(' · ');
   const [helpers, setHelpers] = useState<boolean | null>(null);
   const [helperBusy, setHelperBusy] = useState(false);
   const [helperLog, setHelperLog] = useState('');
-  const [automationMessages, setAutomationMessages] = useState<Record<string, string>>({});
-  const reportAutomation = useCallback((agreementId: string, message: string) => {
-    setAutomationMessages(current => current[agreementId] === message ? current : { ...current, [agreementId]: message });
-  }, []);
   useEffect(() => {
     if (area !== 'home' || helpers !== null) return;
     const controller = new AbortController();
@@ -146,8 +141,8 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
     cityInputs.current = signatures;
     if (changed) window.dispatchEvent(new Event(CITY_CHANGED_EVENT));
   }, [tenancies, listings, listingsLoaded]);
-  const load = useCallback(async (background = false) => {
-    const results = await Promise.all([
+  const load = useSerializedRead(useCallback(async () => {
+    await Promise.all([
       boundedBuildingRead(signal => request<{ tenancies: (TenancyJourney | Unavailable)[] }>('/api/journey', undefined, { signal })).then((journey) => {
         setTenancies(journey.tenancies); setJourneyError('');
         return true;
@@ -161,22 +156,10 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
         setListingsError(reason instanceof Error ? reason.message : 'Could not read listings.'); return false;
       }),
     ]);
-    if (results.every(Boolean)) setFailureCount(0);
-    else if (background) setFailureCount((count) => count + 1);
-  }, [request]);
-  useEffect(() => {
-    const first = setTimeout(() => { void load(); }, 0);
-    return () => clearTimeout(first);
-  }, [load]);
-  const retryHome = useCallback(async () => { setFailureCount(0); await load(); }, [load]);
-  const waiting = tenancies?.some((t) => 'unavailable' in t || AUTO[t.next.kind] || t.next.kind === 'invite_arbitrator');
-  const pollingListings = listings.some((l) => l.status === 'open' && (l.relation === 'landlord' || l.relation === 'applicant'));
-  useEffect(() => {
-    if (paused || (!waiting && !pollingListings)) return;
-    const fast = tenancies?.some((t) => 'next' in t && (t.next.kind === 'confirming' || t.next.kind === 'paying_out'));
-    const timer = setInterval(() => { void load(true); }, fast ? 5000 : waiting ? 15000 : 30000);
-    return () => clearInterval(timer);
-  }, [waiting, pollingListings, paused, load, tenancies]);
+  }, [request]));
+  // Shared tenancy context is read once per meaningful area entry, never on an idle clock.
+  useFinancialRefresh(load, { identity: area, enabled: area === 'home' || area === 'money' || area === 'me' || tenancies === null });
+  const retryHome = load;
 
   const helper: Helper | null = helpers
     ? async (body) => {
@@ -219,23 +202,23 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
       <div className="page-heading"><h1 tabIndex={-1}>{meta.label}</h1></div>
       <div className="area-content">
       {step.urgent && area !== 'home' && <NextStepCard step={step} go={go} />}
-      {(error || paused) && <p className="note" role="alert">{paused ? 'Updates are paused. Retry. ' : ''}{error} <button className="button secondary" onClick={() => void retryHome()}>Retry</button></p>}
+      {error && <p className="note" role="alert">{error} <button className="button secondary" onClick={() => void retryHome()}>Retry</button></p>}
+      {area === 'home' && <button type="button" className="text-button" onClick={() => void load()}>Refresh homes</button>}
 
       {area === 'me' && <MeArea request={request} tenancies={ready} listings={listings} go={go}
         homeState={{ homeLoading: tenancies === null && !journeyError, homeError: journeyError || (tenancies?.some((item) => 'unavailable' in item) ? 'Some tenancy readings are unavailable.' : ''), tenancyCount: tenancies?.length ?? 0, listingCount: listings.filter((l) => l.relation === 'landlord' || (l.relation === 'applicant' && l.status === 'open')).length }} />}
 
       {area === 'home' && (
         <div className="housing-journey">
-          {ready.filter(t => t.next.kind !== 'done' && t.next.kind !== 'cancelled').map(t => <TenancyAutomation key={t.agreementId} journey={t} request={request} reload={load} report={reportAutomation} />)}
           {invitation && <JoinInvitation key={invitation} request={request} encoded={invitation} onDone={load} />}
           {(!invitation || current) && <>
             {reviewListings.map(listing => <ApplicantsReview key={listing.id} listing={listing} request={request} reload={load} />)}
             {applicationListings.map(listing => <ApplicationStatus key={listing.id} listing={listing} request={request} reload={load} />)}
             <div id="home-tenancies" tabIndex={-1} className="home-tenancy-anchor" aria-label="Your tenancies">
               {tenancies === null && !journeyError && <p className="note" role="status">Checking your homes… Other Home sections remain available.</p>}
-              {current && <TenancyCard key={current.agreementId} journey={current} request={request} reload={load} accountId={wallet.subject ?? ''} automationMessage={automationMessages[current.agreementId]} />}
+              {current && <TenancyCard key={current.agreementId} journey={current} request={request} reload={load} accountId={wallet.subject ?? ''} />}
             </div>
-            {otherTenancies.map((t) => <MoreRow key={t.agreementId} id={`tenancy-${t.agreementId}`} title={t.property} meta={tenancyNeedsPerson(t) ? 'Needs you' : t.next.label} defaultOpen={tenancyNeedsPerson(t)}><TenancyCard journey={t} request={request} reload={load} accountId={wallet.subject ?? ''} anchored={false} automationMessage={automationMessages[t.agreementId]} /></MoreRow>)}
+            {otherTenancies.map((t) => <MoreRow key={t.agreementId} id={`tenancy-${t.agreementId}`} title={t.property} meta={tenancyNeedsPerson(t) ? 'Needs you' : t.next.label} defaultOpen={tenancyNeedsPerson(t)}><TenancyCard journey={t} request={request} reload={load} accountId={wallet.subject ?? ''} anchored={false} /></MoreRow>)}
             {unavailable.map((t) => <p className="housing-unavailable" key={t.agreementId} id={`tenancy-${t.agreementId}`} tabIndex={-1}><strong>{t.property}</strong> · {t.unavailable}</p>)}
             {!current && showBrowser && <div id="home-options" tabIndex={-1}><ListingBrowser listings={listings} request={request} reload={load} loaded={listingsLoaded} loadError={listingsError} testTools={helpers === true} /></div>}
             <MoreList>
@@ -280,44 +263,9 @@ function readStoredInvite(key: string): { url: string; createdAt: number } | nul
 }
 
 
-/** Exactly one always-mounted owner per active tenancy, independent of lazy details rows. */
-function TenancyAutomation({ journey, request, reload, report }: {
-  journey: TenancyJourney; request: Request; reload: () => Promise<void>; report: (agreementId: string, message: string) => void;
-}) {
-  const advancing = useRef(false);
-  const { agreementId, next } = journey;
-  const shares = journey.depositForm?.kind === 'shares';
-  useEffect(() => {
-    if (shares || next.kind !== 'paying_out') return;
-    let active = true;
-    const advance = async () => {
-      if (advancing.current || !active) return;
-      advancing.current = true;
-      try { await request('/api/journey', { action: 'advance', agreementId }); if (active) report(agreementId, ''); await reload(); }
-      catch { if (active) report(agreementId, 'Payout attempt failed. Retrying while Home is open.'); }
-      finally { advancing.current = false; }
-    };
-    void advance();
-    const timer = setInterval(() => void advance(), 15000);
-    return () => { active = false; clearInterval(timer); };
-  }, [shares, next.kind, agreementId, request, reload, report]);
-  useEffect(() => {
-    if (shares || next.kind !== 'confirming') return;
-    const q = `?agreement=${encodeURIComponent(agreementId)}`;
-    const operationId = next.operationId;
-    const reconcile = async () => {
-      const path = operationId ? `/api/finance/solana/operations/${operationId}/reconcile${q}` : `/api/finance/solana/initialize${q}`;
-      await request(path, operationId ? {} : { action: 'reconcile' });
-      await reload();
-    };
-    const timer = setInterval(() => void reconcile().catch(() => {}), 4000);
-    return () => clearInterval(timer);
-  }, [shares, next, agreementId, request, reload]);
-  return null;
-}
 
-function TenancyCard({ journey, request, reload, accountId, anchored = true, automationMessage }: {
-  journey: TenancyJourney; request: Request; reload: () => Promise<void>; accountId: string; anchored?: boolean; automationMessage?: string;
+function TenancyCard({ journey, request, reload, accountId, anchored = true }: {
+  journey: TenancyJourney; request: Request; reload: () => Promise<void>; accountId: string; anchored?: boolean;
 }) {
   const wallet = useRentalWallet();
   const [busy, setBusy] = useState(false);
@@ -355,12 +303,13 @@ function TenancyCard({ journey, request, reload, accountId, anchored = true, aut
     return () => { active = false; };
   }, [agreementId, next.kind, request, chain?.phase, agreementRetry]);
 
-  const reconcile = useCallback(async () => {
+  const reconcile = useSerializedRead(useCallback(async () => {
     if (shareForm || next.kind !== 'confirming') return;
     const path = next.operationId ? `/api/finance/solana/operations/${next.operationId}/reconcile${q}` : `/api/finance/solana/initialize${q}`;
     await request(path, next.operationId ? {} : { action: 'reconcile' });
     await reload();
-  }, [next, q, request, reload, shareForm]);
+  }, [next, q, request, reload, shareForm]));
+  useFinancialRefresh(reconcile, { enabled: !shareForm && next.kind === 'confirming', pendingKey: next.kind === 'confirming' ? next.operationId ?? `${agreementId}:escrow-setup` : null, initial: false, chain: 'solana' });
   const confirmingId = next.kind === 'confirming' ? next.operationId ?? 'escrow-setup' : null;
   const confirmationSince = confirmation?.id === confirmingId ? confirmation.since : null;
   useEffect(() => {
@@ -560,11 +509,12 @@ function TenancyCard({ journey, request, reload, accountId, anchored = true, aut
         {cancelAction}
       </ActionBox>}
       {next.kind === 'confirming' && <p role="status">{confirmationSince !== null && confirmationStalled(confirmationSince, clock) && 'This is taking longer than usual. '}{!shareForm && <button className="button secondary" onClick={() => void run(reconcile)} disabled={busy}>Check again</button>}</p>}
+      {next.kind === 'paying_out' && !shareForm && <button type="button" className="button secondary" disabled={busy} onClick={() => void run(async () => { await request('/api/journey', { action: 'advance', agreementId }); await reload(); })}>Check fixed-recipient payouts</button>}
       {action}
       {canProposeMoveOut && <button type="button" className="text-button" onClick={() => { const row = document.getElementById(`moving-out-${agreementId}`) as HTMLDetailsElement | null; if (row) { row.open = true; row.scrollIntoView({ block: 'start' }); row.focus({ preventScroll: true }); } }}>Tenant moving out?</button>}
       {cancelAction && (AUTO[next.kind] || (shareForm && journey.stage !== 'agreement')) && <ActionBox title="Cancel during setup" tone="neutral">{cancelAction}</ActionBox>}
       {agreementError && <p className="note" role="alert">Agreement records are unavailable. Review the reasons before signing. <button className="button secondary" onClick={() => setAgreementRetry((count) => count + 1)}>Retry records</button></p>}
-      {(message || automationMessage) && <p className="note" role="status">{message || automationMessage}</p>}
+      {message && <p className="note" role="status">{message}</p>}
       </Hero>
       <MoreList title="About this tenancy">
         {journey.rentTerms && journey.role !== 'arbitrator' && <MoreRow title="Rent & receipts" meta={journey.stage === 'agreement' ? 'Terms to review' : paid?.heading ?? (rent ? 'Not paid yet' : 'Reading status')}>{journey.stage !== 'agreement' && history}<RentTerms terms={journey.rentTerms} /></MoreRow>}
@@ -633,26 +583,12 @@ function RentPayments({ agreementId, role, request, enabled, children }: {
   const [signed, setSigned] = useState<Record<string, string>>({});
   const [review, setReview] = useState<string | null>(null);
   const acting = useRef(false);
-  const automaticReview = useRef<string | null>(null);
   const path = `/api/rent?agreement=${encodeURIComponent(agreementId)}`;
-  const load = useCallback(async () => {
-    const result = await request<{ rent: RentView | null }>(path);
+  const load = useSerializedRead(useCallback(async () => {
+    const result = await boundedBuildingRead(signal => request<{ rent: RentView | null }>(path, undefined, { signal }));
     setRent(result.rent);
     return result.rent;
-  }, [path, request]);
-  useEffect(() => {
-    if (!enabled || role === 'arbitrator') return;
-    let active = true;
-    const update = async () => {
-      try {
-        const result = await request<{ rent: RentView | null }>(path);
-        if (active) setRent(result.rent);
-      } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : 'Could not read rent.'); }
-    };
-    void update();
-    const timer = setInterval(() => void update(), 15000);
-    return () => { active = false; clearInterval(timer); };
-  }, [path, request, role, enabled]);
+  }, [path, request]));
   async function run(work: () => Promise<void>) {
     if (acting.current) return;
     acting.current = true;
@@ -681,18 +617,14 @@ function RentPayments({ agreementId, role, request, enabled, children }: {
   }
   const payment = rentWorkflow(rent);
   const currentTransfer = payment?.steps.find(step => step.state !== 'confirmed');
-  const nextReviewId = rent?.role === 'tenant' && rent.active && currentTransfer?.state === 'prepared'
-    && payment?.steps[0]?.state === 'confirmed' && !currentTransfer.hash ? currentTransfer.id : null;
-  useEffect(() => {
-    if (!nextReviewId || automaticReview.current === nextReviewId || review === nextReviewId || acting.current) return;
-    const timer = setTimeout(() => {
-      automaticReview.current = nextReviewId;
-      void run(prepareReview);
-    }, 0);
-    return () => clearTimeout(timer);
-    // Advance only on a newly confirmed first transfer, not every polling refresh.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nextReviewId, busy, review]);
+  const pendingRentId = currentTransfer && (currentTransfer.state === 'signed' || currentTransfer.state === 'submitted' || signed[currentTransfer.id]) ? currentTransfer.id : null;
+  useFinancialRefresh(async () => {
+    if (acting.current) return;
+    acting.current = true;
+    try { if (pendingRentId) await action('reconcile'); else await load(); setError(''); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Rent confirmation is unavailable. Use Refresh to check the same payment.'); }
+    finally { acting.current = false; }
+  }, { enabled: enabled && role !== 'arbitrator', pendingKey: pendingRentId, identity: agreementId });
   const month = payment?.month ?? rent?.month;
   const monthLabel = month ? new Date(`${month}-01T12:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'This month';
   const paidMonth = rent ? paidRentMonth(rent) : null;

@@ -3,6 +3,7 @@ import { keccak256, parseAbi } from 'viem';
 import { decodePrice, isPriceFresh, priceMaxAge, setPriceInstruction, sharesAddresses, SHARES_PRICE_AUTHORITY, SHARES_PROGRAM_ID, type SharesPrice } from '../finance/solana/shares.ts';
 import { SOLANA_DEVNET_MANIFEST } from '../finance/solana/manifest.ts';
 import { createBaseSolanaGateway, type BaseSolanaGateway } from './solana-rpc.ts';
+import { solanaRpcConfiguration } from './solana-provider-pool.ts';
 import { configuredSolanaOperations, type SolanaOperations } from './solana-operations.ts';
 import { loadSharedMarketManifest, sharedMarketRpc } from './shared-market.ts';
 import type { SolanaSharesManifest } from './solana-shares-config.ts';
@@ -37,7 +38,7 @@ export async function ensureSolanaSharesPrice(store: Store, manifest: SolanaShar
   const derived = await sharesAddresses();
   if (manifest.cluster !== 'devnet' || manifest.genesisHash !== SOLANA_DEVNET_MANIFEST.genesisHash || manifest.programId !== SHARES_PROGRAM_ID || manifest.priceAuthority !== SHARES_PRICE_AUTHORITY || manifest.shareMint !== derived.shareMint || manifest.price !== derived.price) throw new Error('Invalid shares price manifest');
   if (!options.gateway && !environment.SOLANA_RPC_URL) throw new Error('Solana price RPC unavailable');
-  const gateway = options.gateway ?? createBaseSolanaGateway({ rpcUrl: environment.SOLANA_RPC_URL!, genesisHash: manifest.genesisHash, maximumSponsorLamports: '10000000' });
+  const gateway = options.gateway ?? createBaseSolanaGateway({ ...solanaRpcConfiguration(environment, manifest), maximumSponsorLamports: '10000000' });
   async function readPrice() {
     if (await gateway.checkedGenesis() !== manifest.genesisHash) throw new Error('Shares price genesis mismatch');
     const { accounts } = await gateway.multiple([manifest.price]);

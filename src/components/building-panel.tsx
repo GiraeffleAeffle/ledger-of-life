@@ -14,6 +14,7 @@ import type { SolanaOperationResult } from '../server/solana-operations';
 import { usd } from './money-valuation';
 import { BUILDING_RPC_UNAVAILABLE, BUILDING_READ_EXPLANATION, boundedBuildingRead, buildingCacheState, readBuilding } from './building-read';
 import type { BuildingCache } from './building-read';
+import { useFinancialRefresh, useSerializedRead } from './use-financial-refresh';
 
 type Operation = 'approve' | 'stake' | 'unstake' | 'claim' | 'sync';
 type Receipt = { operation: string; quantityRaw: string | null; hash: string; status: 'pending' | 'confirmed' | 'failed' };
@@ -92,7 +93,7 @@ export function BuildingPanel({ request, position: savedPosition, setPosition, v
   const reinvestSigned = useRef<{ stepId: string; bytes: string } | null>(null);
   const account = wallet.wallets.find((item) => item.chainType === 'ethereum' && item.connected)?.address;
   const readAccount = useRef(account);
-  const refresh = useCallback(async () => {
+  const refresh = useSerializedRead(useCallback(async (includePublic = true) => {
     if (reading.current) return;
     reading.current = true;
     setReadingPosition(true);
@@ -100,10 +101,10 @@ export function BuildingPanel({ request, position: savedPosition, setPosition, v
     const current = () => active.current && generation === revision.current;
     try {
       const results = await Promise.all([
-        readBuilding<Building>('/api/building?network=robinhood').then(value => {
+        includePublic ? readBuilding<Building>('/api/building?network=robinhood').then(value => {
           if (current()) { setBuilding(value.network === 'robinhood-testnet' ? value.building : null); setCache(value.cache ?? undefined); setBuildingReadError(value.network !== 'robinhood-testnet' || !value.building); }
           return value.network === 'robinhood-testnet' && Boolean(value.building);
-        }, () => { if (current()) { setBuilding(null); setBuildingReadError(true); } }),
+        }, () => { if (current()) { setBuilding(null); setBuildingReadError(true); } }) : Promise.resolve(true),
         boundedBuildingRead(signal => account ? request<BuildingPosition>('/api/building/claims?network=robinhood', undefined, { signal }) : Promise.resolve(null)).then(own => {
           if (current()) { setPosition(own); setPositionReadError(false); }
           return true;
@@ -111,9 +112,8 @@ export function BuildingPanel({ request, position: savedPosition, setPosition, v
       ]);
       if (current() && results.every(Boolean)) setError('');
     } finally { reading.current = false; if (current()) setReadingPosition(false); }
-  }, [account, request, setPosition, setCache]);
+  }, [account, request, setPosition, setCache]));
   useEffect(() => {
-    if (!activeTab) return;
     active.current = true;
     const live = active;
     const revisions = revision;
@@ -124,12 +124,10 @@ export function BuildingPanel({ request, position: savedPosition, setPosition, v
         readAccount.current = account;
         setPosition(null); setPlan(null); setSubmitted(null); setHasSigned(false); setReinvestHasSigned(false); signed.current = null; reinvestSigned.current = null;
       }
-      void refresh();
     });
-    const timer = setInterval(() => { if (!lock.current) void refresh(); }, 10_000);
     const tick = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
-    return () => { cancelled = true; live.current = false; ++revisions.current; clearInterval(timer); clearInterval(tick); };
-  }, [refresh, activeTab, setPosition, account]);
+    return () => { cancelled = true; live.current = false; ++revisions.current; clearInterval(tick); };
+  }, [setPosition, account]);
   async function act(operation: () => Promise<void>) {
     if (lock.current) return;
     lock.current = true; setBusy(true); setError('');
@@ -142,6 +140,8 @@ export function BuildingPanel({ request, position: savedPosition, setPosition, v
   const pending = receipts.some((receipt) => receipt.status === 'pending') || Boolean(submitted?.status === 'pending' && !receipts.some((receipt) => receipt.hash === submitted.hash && receipt.status !== 'pending'));
   const reinvest = savedPosition?.reinvest;
   const reinvesting = Boolean(reinvest && !['completed', 'stopped'].includes(reinvest.phase));
+  const pendingKey = receipts.find(receipt => receipt.status === 'pending')?.hash ?? (submitted?.status === 'pending' && pending ? submitted.hash : null) ?? (reinvest?.pending ? reinvest.stepId ?? 'saved-reinvest' : null);
+  useFinancialRefresh(async () => { if (!lock.current) await (pendingKey ? refresh(false) : refresh()); }, { chain: 'evm', pendingKey, initial: !pendingKey, identity: account });
   const common = { configured: Boolean(building?.configured && position?.configured && !readError && !publicReadBlocked), connected: Boolean(account), busy: busy || pending || Boolean(plan) || reinvesting, quantityRaw: quantity, walletUnitsRaw: position?.walletUnitsRaw ?? null, stakedRaw: position?.stakedRaw ?? null, earnedRaw: position?.earnedRaw ?? null, pendingRevenueRaw: position?.pendingRevenueRaw ?? null };
   const stakeOperation = quantity && position?.allowanceRaw != null && BigInt(position.allowanceRaw) >= BigInt(quantity) ? 'stake' : 'approve';
   async function prepare(operation: Operation) {
@@ -191,7 +191,7 @@ export function BuildingPanel({ request, position: savedPosition, setPosition, v
   // Until the first building and position reads arrive, "not configured" or "no earnings" would be guesses.
   const settling = !error && !readError && readingPosition && (!building || (Boolean(account) && position == null));
   const units = (raw: string | null | undefined) => raw == null ? '—' : Number(formatUnits(BigInt(raw) / 10n ** 14n, 4)).toLocaleString('en-GB', { maximumFractionDigits: 4 });
-  const openRow = (id: string) => { const row = document.getElementById(id) as HTMLDetailsElement | null; if (row) { row.open = true; row.dispatchEvent(new Event('toggle')); row.scrollIntoView({ behavior: 'smooth', block: 'center' }); } };
+  const openRow = (id: string) => { if (!isFresh() && !lock.current) void refresh(); const row = document.getElementById(id) as HTMLDetailsElement | null; if (row) { row.open = true; row.dispatchEvent(new Event('toggle')); row.scrollIntoView({ behavior: 'smooth', block: 'center' }); } };
   return <div className="lean-building" style={{ overflowWrap: 'anywhere' }}>
     {!earlier && <>
     <Hero visual={visual} title="Fictional housing example" subtitle="Shared housing with rooftop solar in Strausberg · illustrative" status={<StatusLine tone={position?.configured && !readError && !publicReadBlocked ? 'ok' : 'neutral'}>{readError ? BUILDING_RPC_UNAVAILABLE : cache?.state === 'stale' ? 'Saved public reading · not current' : !account ? 'Connect your Shares wallet in Me to see your units' : building && !building.configured ? building.reason || 'Building distributor not configured' : error ? 'Your units could not be checked' : position?.walletUnitsRaw != null && position.stakedRaw != null ? BigInt(position.walletUnitsRaw) + BigInt(position.stakedRaw) === 0n ? 'You hold no tHOME yet' : `You hold ${units((BigInt(position.walletUnitsRaw) + BigInt(position.stakedRaw)).toString())} tHOME · ${BigInt(position.walletUnitsRaw) === 0n ? 'all staked' : `${units(position.stakedRaw)} staked`}` : !readingPosition ? 'Your unit balance is unavailable' : 'Checking your units…'}</StatusLine>}>
@@ -207,6 +207,7 @@ export function BuildingPanel({ request, position: savedPosition, setPosition, v
     {readError && <p className="small-copy" role="status">{earlier && <strong>{BUILDING_RPC_UNAVAILABLE}. </strong>}{BUILDING_READ_EXPLANATION}</p>}
     {building && <PublicBuildingFreshness cache={cache} />}
     {snapshotExpired && <p className="small-copy" role="status">Public income snapshot expired; values are unavailable until checked again.</p>}
+    {(publicReadBlocked || readError) && <button type="button" className="text-button" disabled={busy} onClick={() => void refresh()}>Refresh public income and balances for a fresh review</button>}
     {error && <p role="alert">{error} · No success or missing balance is inferred.</p>}
     {!building && !buildingReadError && !snapshotExpired && <p role="status">Reading the building…</p>}
     {building && !building.configured && <p role="status">Not configured: {building.reason || 'The building distributor has not been provisioned.'}</p>}
@@ -304,16 +305,16 @@ export function SolanaBuildingPanel({ request, houseId, visual, initialUnavailab
   const symbol = houseId === 'workshop' ? 'tWORK' : 'tHOME';
   const endpoint = `/api/building/claims?houseId=${houseId}`;
   const readIdentity = useRef(`${account ?? ''}:${houseId}`);
-  const refresh = useCallback(async () => {
+  const refresh = useSerializedRead(useCallback(async (includePublic = true) => {
     if (reading.current) return;
     reading.current = true;
     const revision = generation.current;
     const current = () => live.current && revision === generation.current;
     try {
       await Promise.all([
-        readBuilding<SolanaBuilding>(`/api/building?houseId=${houseId}`).then(body => {
+        includePublic ? readBuilding<SolanaBuilding>(`/api/building?houseId=${houseId}`).then(body => {
           if (current()) { setBuilding(body.network === 'solana-devnet' ? body.building : null); setCache(body.cache ?? undefined); setBuildingReadError(body.network !== 'solana-devnet' || !body.building); }
-        }, () => { if (current()) { setBuilding(null); setBuildingReadError(true); } }),
+        }, () => { if (current()) { setBuilding(null); setBuildingReadError(true); } }) : Promise.resolve(),
         boundedBuildingRead(signal => account ? request<SolanaPosition>(`/api/building/claims?houseId=${houseId}`, undefined, { signal }) : Promise.resolve(null)).then(own => {
           if (!current()) return;
           setPosition(own); setPositionReadError(false);
@@ -327,7 +328,7 @@ export function SolanaBuildingPanel({ request, houseId, visual, initialUnavailab
         }, () => { if (current()) setPositionReadError(true); }),
       ]);
     } finally { reading.current = false; }
-  }, [account, houseId, request, setCache]);
+  }, [account, houseId, request, setCache]));
   useEffect(() => {
     live.current = true;
     const active = live, revisions = generation;
@@ -339,19 +340,19 @@ export function SolanaBuildingPanel({ request, houseId, visual, initialUnavailab
         readIdentity.current = `${account ?? ''}:${houseId}`;
         setBuilding(null); setPosition(null); setPlan(null); setSubmitted(null); signed.current = null; setHasSigned(false);
       }
-      if (activeTab) void refresh();
     });
-    const timer = setInterval(() => { if (activeTab && !lock.current && document.visibilityState === 'visible') void refresh(); }, 5000);
-    const changed = () => { if (activeTab && !lock.current) void refresh(); };
-    window.addEventListener('ledger-balances-changed', changed);
-    return () => { cancelled = true; active.current = false; ++revisions.current; clearInterval(timer); window.removeEventListener('ledger-balances-changed', changed); };
-  }, [activeTab, refresh, account, houseId]);
+    return () => { cancelled = true; active.current = false; ++revisions.current; };
+  }, [account, houseId]);
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => { if (!cancelled) setActionError(''); });
     return () => { cancelled = true; };
   }, [account, houseId]);
   const pending = Boolean(savedPosition?.receipts.some(receipt => receipt.status === 'pending') || (submitted && !['confirmed', 'failed', 'expired'].includes(submitted.state)));
+  const pendingKey = submitted && pending && !['confirmed', 'failed', 'expired'].includes(submitted.state) ? submitted.id
+    : savedPosition?.activeOperation?.state === 'broadcast' ? savedPosition.activeOperation.id
+    : savedPosition?.receipts.find(receipt => receipt.status === 'pending')?.hash ?? null;
+  useFinancialRefresh(async () => { if (!lock.current) await (pendingKey ? refresh(false) : refresh()); }, { chain: 'solana', pendingKey, initial: !pendingKey, identity: `${account ?? ''}:${houseId}` });
   const endedReview = savedPosition?.activeOperation && ['expired', 'failed'].includes(savedPosition.activeOperation.state) ? savedPosition.activeOperation : null;
   const displayUnits = (raw: string | null | undefined) => raw == null ? '—' : Number(formatUnits(BigInt(raw), 6)).toLocaleString('en-GB', { maximumFractionDigits: 6 });
   let tradeQuantity: string | null = null, stakeQuantity: string | null = null;
@@ -406,7 +407,7 @@ export function SolanaBuildingPanel({ request, houseId, visual, initialUnavailab
     await act(async () => { await request(endpoint, { action: 'cancel', planId: plan.id }); if (live.current) setPlan(null); await refresh(); });
   }
   const totalUnits = position?.walletUnitsRaw != null && position.stakedRaw != null ? (BigInt(position.walletUnitsRaw) + BigInt(position.stakedRaw)).toString() : null;
-  const openRow = (id: string) => { const row = document.getElementById(id) as HTMLDetailsElement | null; if (row) { row.open = true; row.dispatchEvent(new Event('toggle')); row.scrollIntoView({ behavior: 'smooth', block: 'center' }); } };
+  const openRow = (id: string) => { if (!isFresh() && !lock.current) void refresh(); const row = document.getElementById(id) as HTMLDetailsElement | null; if (row) { row.open = true; row.dispatchEvent(new Event('toggle')); row.scrollIntoView({ behavior: 'smooth', block: 'center' }); } };
   return <div className="lean-building solana-house" style={{ overflowWrap: 'anywhere' }}>
     <Hero visual={visual} title={houseId === 'workshop' ? 'Fictional workshop example' : 'Fictional housing example'} subtitle="Solana devnet · fictional local units, no value or rights" status={<StatusLine tone={position && !error && !actionError && !publicReadBlocked ? 'ok' : 'neutral'}>{error ? BUILDING_RPC_UNAVAILABLE : cache?.state === 'stale' ? 'Saved public reading · not current' : !account ? 'Connect your Solana wallet in Me' : actionError ? 'House action needs attention' : totalUnits == null ? 'Checking your house units…' : `You hold ${displayUnits(totalUnits)} ${symbol} · ${displayUnits(position?.stakedRaw)} staked`}</StatusLine>}>
       <Figures>
@@ -420,6 +421,7 @@ export function SolanaBuildingPanel({ request, houseId, visual, initialUnavailab
     {error && <p className="small-copy" role="status">{BUILDING_READ_EXPLANATION}</p>}
     {building && <PublicBuildingFreshness cache={cache} />}
     {snapshotExpired && <p className="small-copy" role="status">Public income snapshot expired; values are unavailable until checked again.</p>}
+    {(publicReadBlocked || error) && <button type="button" className="text-button" disabled={busy} onClick={() => void refresh()}>Refresh public income and balances for a fresh review</button>}
     {actionError && <p className="local-market-alert" role="alert">Last action attempt: {actionError} · Only a verified finalized receipt establishes success.</p>}
     {endedReview && !plan && <div className="local-order-review" aria-label="House review recovery">
       <p role="status">{solanaHouseSigningBlocker(endedReview)}</p>

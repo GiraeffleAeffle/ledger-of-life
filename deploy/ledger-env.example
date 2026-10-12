@@ -29,11 +29,12 @@ RECONCILE_SECRET=REPLACE_ME
 # also works, but is rate limited. Never use mainnet; these test tokens have no real value.
 SOLANA_RPC_URL=https://api.devnet.solana.com
 
-# Optional server-only public-building read fallbacks, in order, as a JSON array of HTTPS devnet URLs.
-# The existing Deployment imports this through Secret ledger-env (envFrom); no frontend/public variable.
-# Leave empty until an owner-controlled provider is configured. Keyed URLs are credentials: never print them.
-# These fallbacks do not replace the financial prepare/sign/broadcast/recovery endpoint above.
-SOLANA_READ_RPC_FALLBACK_URLS=[]
+# Optional ordered server-only RPC fallbacks: secondary first, official public devnet last.
+# A JSON array of HTTPS devnet URLs, imported through Secret ledger-env (envFrom), never NEXT_PUBLIC_*.
+# Configure owner-controlled provider URLs privately; never print URLs or keys.
+# This common policy covers public/private reads and exact signed-byte recovery, not just display data.
+# Leave empty for a single endpoint; localnet never uses devnet fallbacks.
+SOLANA_RPC_FALLBACK_URLS=[]
 
 # Sponsor keypair: a JSON array of 64 integers on ONE line, without surrounding quotes.
 # Generate a fresh key used ONLY by this host; never reuse a personal wallet or commit the filled file.

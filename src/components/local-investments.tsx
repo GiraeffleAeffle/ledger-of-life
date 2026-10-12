@@ -18,6 +18,7 @@ import { DEFAULT_PROJECT_SYSTEMS, type ProjectSystems } from './project-map-mode
 import { TestDollars } from './test-dollars';
 import { BuildingPanel, SolanaBuildingPanel, type BuildingPosition } from './building-panel';
 import { BUILDING_RPC_UNAVAILABLE, BUILDING_READ_EXPLANATION, boundedBuildingRead, readBuilding } from './building-read';
+import { useFinancialRefresh, useSerializedRead } from './use-financial-refresh';
 import { Hero, StatusLine, Figures, Figure, MoreList, MoreRow, ScreenNote } from './blocks';
 import './local-investments.css';
 
@@ -54,7 +55,7 @@ export function LocalInvestments({ request, go, earlier = false }: { request: Au
   const actionRevision = useRef(0);
   const mutating = useRef(false);
   const preparation = useRef<{ id: string; projectId: TestCityInvestmentId; direction: 'buy' | 'sell'; amountRaw: string } | null>(null);
-  const refresh = useCallback((afterMutation = false) => {
+  const refresh = useSerializedRead(useCallback((afterMutation = false) => {
     if (mutating.current && !afterMutation) return Promise.resolve();
     const revision = ++readRevision.current;
     return boundedBuildingRead(signal => request<{ market: LocalInvestmentView }>(earlier ? '/api/local-investments?network=robinhood' : '/api/local-investments', undefined, { signal })).then(({ market: next }) => {
@@ -68,36 +69,25 @@ export function LocalInvestments({ request, go, earlier = false }: { request: Au
     }, (cause: unknown) => {
       if (mounted.current && (!mutating.current || afterMutation) && revision === readRevision.current) setReadError(message(cause));
     });
-  }, [request, earlier]);
+  }, [request, earlier]));
   useEffect(() => {
     mounted.current = true;
     const active = mounted; const reads = readRevision; const actions = actionRevision;
     return () => { active.current = false; ++reads.current; ++actions.current; };
   }, []);
-  useEffect(() => {
-    if (!earlier && primaryNetwork !== 'robinhood') return;
-    if (activeTab && document.visibilityState === 'visible') void refresh();
-    const balancesChanged = (event: Event) => {
-      if (activeTab && document.visibilityState === 'visible' && (event as CustomEvent<{ chain?: string }>).detail?.chain === 'evm') void refresh();
-    };
-    const onVisible = () => { if (activeTab && document.visibilityState === 'visible') void refresh(); };
-    window.addEventListener('ledger-balances-changed', balancesChanged);
-    document.addEventListener('visibilitychange', onVisible);
-    return () => { window.removeEventListener('ledger-balances-changed', balancesChanged); document.removeEventListener('visibilitychange', onVisible); };
-  }, [refresh, activeTab, earlier, primaryNetwork]);
-  useEffect(() => {
-    if (earlier || !activeTab || primaryNetwork !== 'checking') return;
-    const controller = new AbortController();
-    void readBuilding('/api/building', controller.signal).then(body => {
-      if (controller.signal.aborted) return;
+  useFinancialRefresh(async () => { if (!mutating.current) await refresh(); }, { enabled: earlier || primaryNetwork === 'robinhood', chain: 'evm' });
+  const readNetwork = useSerializedRead(useCallback(async () => {
+    try {
+      const body = await readBuilding('/api/building');
+      if (!mounted.current) return;
       setPrimaryNetwork(body.network === 'solana-devnet' ? 'solana' : body.network === 'solana-localnet' ? 'localnet' : body.network === 'robinhood-testnet' ? 'robinhood' : 'unavailable');
       setInitialUnavailable(!body.building);
       setNetworkError(body.network ? '' : 'The configured test network could not be verified. No other chain has been selected.');
-    }).catch(() => {
-      if (!controller.signal.aborted) { setPrimaryNetwork('unavailable'); setNetworkError('The configured test network could not be verified. No other chain has been selected.'); }
-    });
-    return () => controller.abort();
-  }, [activeTab, earlier, primaryNetwork]);
+    } catch {
+      if (mounted.current) { setPrimaryNetwork('unavailable'); setNetworkError('The configured test network could not be verified. No other chain has been selected.'); }
+    }
+  }, []));
+  useFinancialRefresh(readNetwork, { enabled: !earlier && (primaryNetwork === 'checking' || primaryNetwork === 'unavailable') });
   useEffect(() => {
     if (!activeTab) return;
     let current = true;
@@ -119,23 +109,18 @@ export function LocalInvestments({ request, go, earlier = false }: { request: Au
   }, []);
 
   const pendingOrderId = order?.state === 'pending' ? order.id : null;
-  useEffect(() => {
-    if (!pendingOrderId) return;
-    let active = true; let checking = false;
-    const check = () => {
-      if (checking || !activeTab || document.visibilityState === 'hidden') return;
-      checking = true;
-      void request<{ order: LocalInvestmentOrder }>('/api/local-investments?network=robinhood', { action: 'reconcile', orderId: pendingOrderId }).then(({ order: next }) => {
-        if (!active) return;
-        ++readRevision.current; setOrder(next); setActionError('');
-        if (next.state === 'completed' || next.state === 'failed') window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'evm' } }));
-      }, () => {
-        if (active) setActionError('Confirmation is unavailable. The submitted transaction remains unresolved; no replacement order has been started.');
-      }).finally(() => { checking = false; });
-    };
-    check(); const timer = window.setInterval(check, 4000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, [pendingOrderId, request, activeTab]);
+  const checkOrder = useSerializedRead(useCallback(async () => {
+    if (!pendingOrderId || mutating.current) return;
+    try {
+      const { order: next } = await request<{ order: LocalInvestmentOrder }>('/api/local-investments?network=robinhood', { action: 'reconcile', orderId: pendingOrderId });
+      if (!mounted.current) return;
+      ++readRevision.current; setOrder(next); setActionError('');
+      if (next.state === 'completed' || next.state === 'failed') window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'evm' } }));
+    } catch {
+      if (mounted.current) setActionError('Confirmation is unavailable. The submitted transaction remains unresolved; no replacement order has been started.');
+    }
+  }, [pendingOrderId, request]));
+  useFinancialRefresh(checkOrder, { enabled: Boolean(pendingOrderId), pendingKey: pendingOrderId, initial: false, chain: 'evm' });
 
   const project = TEST_CITY_INVESTMENTS.find((item) => item.id === selectedId)!;
   const systems = systemsByProject[selectedId];
@@ -242,6 +227,7 @@ export function LocalInvestments({ request, go, earlier = false }: { request: Au
           <p>Robinhood Chain testnet · network fees use test ETH. Units convey no property or company rights. {TEST_EXIT_NOTICE}</p>
           <ol className="local-order-steps">{currentOrder.steps.map((step) => <li key={step.id} className={`is-${step.state}`}><span>{step.state === 'confirmed' ? <Check size={14} /> : step.kind === 'approve' ? '1' : '2'}</span><div><strong>{step.kind === 'approve' ? `Approve only this ${currentOrder.direction === 'sell' ? project.symbol : 'tUSDG'} amount` : step.kind === 'sell' ? 'Sell back fictional test units' : 'Buy fictional test units'}</strong><small>{step.state === 'confirmed' ? 'Confirmed on the network' : step.state === 'pending' ? 'Submitted · awaiting verified receipt' : step.state === 'failed' ? 'Failed; no success inferred' : 'Your wallet signature is required'}</small>{step.hash && market && <a href={`${market.network.explorerUrl}/tx/${step.hash}`} target="_blank" rel="noopener noreferrer">View {step.kind} transaction <ExternalLink size={12} /></a>}</div></li>)}</ol>
           {currentOrder.state === 'pending' ? <p role="status"><Loader2 className="spin" size={16} /> Checking the signed transaction. Do not start a replacement order.</p> : nextStep && <button type="button" className="button primary" disabled={Boolean(busy) || !healthy || !hasWallet} onClick={() => void signStep()}>{busy ? <><Loader2 className="spin" size={16} />{busy}</> : nextStep.kind === 'approve' ? `Approve ${currentOrder.direction === 'sell' ? project.symbol : 'tUSDG'} in my wallet` : nextStep.kind === 'sell' ? 'Sell back fictional test units with my wallet' : 'Buy fictional test units with my wallet'}</button>}
+          {currentOrder.state === 'pending' && <button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => void checkOrder()}>Check the same signed order</button>}
           {currentOrder.state === 'review' && <button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => void cancelReview()}>Cancel this review</button>}
         </div> : <>
           {currentOrder?.state === 'completed' && <div className="local-order-success" role="status"><Check size={18} /><div><strong>{currentOrder.direction === 'sell' ? 'Sell-back' : 'Purchase'} confirmed.</strong><span>{formatUnits(BigInt(currentOrder.minimumUnitsRaw), 18)} {project.symbol} {currentOrder.direction === 'sell' ? 'in' : 'out'} · {cash(currentOrder.cashAtomic)} tUSDG {currentOrder.direction === 'sell' ? 'out' : 'in'} at the fixed test price. Receipt and both transfers verified.</span>{tradeHash && market && <a href={`${market.network.explorerUrl.replace(/\/$/, '')}/tx/${tradeHash}`} target="_blank" rel="noopener noreferrer">View {currentOrder.direction === 'sell' ? 'sell-back' : 'purchase'} transaction <ExternalLink size={13} /></a>}</div></div>}
@@ -258,6 +244,7 @@ export function LocalInvestments({ request, go, earlier = false }: { request: Au
           {hasWallet && direction === 'buy' && !openOrder && <TestDollars request={request} ethBalance={market?.nativeAtomic ?? undefined} refresh={refresh} />}
         </>}
         {actionError && <p className="local-market-alert" role="alert">{actionError}</p>}
+        <button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => void refresh()}>Refresh wallet and market</button>
         {checkedAt && <span className="local-checked">Wallet/market last checked {checkedAt}{readError ? ' · refresh unavailable' : ''}</span>}
       </div>
   </MoreRow>;
@@ -268,7 +255,7 @@ export function LocalInvestments({ request, go, earlier = false }: { request: Au
         ? <SolanaBuildingPanel key={selectedId} request={request} houseId={project.kind === 'housing' ? 'neighbourhood-homes' : 'workshop'} initialUnavailable={initialUnavailable && project.kind === 'housing'} visual={<ProjectMap key={project.id} project={project} systems={systems} variant="hero" />} />
         : <Hero visual={<ProjectMap key={project.id} project={project} systems={systems} variant="hero" />} title={project.kind === 'housing' ? 'Fictional housing example' : 'Fictional workshop example'} subtitle="Strausberg · illustrative, no value or rights" status={<StatusLine tone="neutral">{primaryNetwork === 'checking' ? 'Checking the configured test network…' : primaryNetwork === 'localnet' && !initialUnavailable ? 'Solana localnet · read-only' : BUILDING_RPC_UNAVAILABLE}</StatusLine>}>
           <Figures><Figure label="Your units" value="—" unit={project.symbol} /><Figure label="Claimable now" value="—" /><Figure label="Project income so far" value="—" /></Figures>
-          {primaryNetwork === 'unavailable' && <><p className="small-copy">{BUILDING_READ_EXPLANATION} {networkError}</p><button type="button" className="text-button" onClick={() => setPrimaryNetwork('checking')}>Check network again</button></>}
+          {primaryNetwork === 'unavailable' && <><p className="small-copy">{BUILDING_READ_EXPLANATION} {networkError}</p><button type="button" className="text-button" onClick={() => void readNetwork()}>Check network again</button></>}
           {primaryNetwork === 'localnet' && <p className="small-copy">{initialUnavailable && BUILDING_READ_EXPLANATION} This environment uses Solana localnet. This wallet supports devnet signing only; localnet financial actions are unavailable. No other chain has been selected.</p>}
         </Hero>}
       <MoreList>

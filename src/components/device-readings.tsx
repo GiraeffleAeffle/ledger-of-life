@@ -1,51 +1,45 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { TrendingUp } from 'lucide-react';
 import type { PublicAdapterConfig, SolarReading, ValidatorReading } from '@/server/adapters';
 import { goToSection, type Area } from './areas';
-import { useSectionTabActive } from './section-tabs';
+import { useFinancialRefresh, useSerializedRead } from './use-financial-refresh';
+import { boundedBuildingRead } from './building-read';
+import type { AuthorizedRequest } from './use-city-signals';
 import './device-readings.css';
 import { MoreList, MoreRow } from './blocks';
 
-type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
+type Request = AuthorizedRequest;
 type Settled<T> = { ok: true; value: T } | { ok: false; error: string; code?: 'price_unavailable' } | null;
 type DevicesResponse = { solar: Settled<SolarReading>; validator: Settled<ValidatorReading>; adapters: PublicAdapterConfig; homeAssistantPull: boolean };
 const money = (value: number, currency: string) => value.toLocaleString('en-US', { style: 'currency', currency });
 
 export function DeviceReadings({ request, go }: { request: Request; go: (area: Area) => void }) {
-  const activeTab = useSectionTabActive();
   const [assets, setAssets] = useState<DevicesResponse | null>(null);
   const [readError, setReadError] = useState('');
   const [refreshing, setRefreshing] = useState(true);
   const revision = useRef(0);
-  const refresh = useCallback(async () => {
+  const refresh = useSerializedRead(useCallback(async () => {
     const current = ++revision.current;
     setRefreshing(true);
     try {
-      const next = await request<DevicesResponse>('/api/assets?area=devices');
+      const next = await boundedBuildingRead(signal => request<DevicesResponse>('/api/assets?area=devices', undefined, { signal }));
       if (current === revision.current) { setAssets(next); setReadError(''); }
     } catch (cause) {
       if (current === revision.current) setReadError(cause instanceof Error ? cause.message : 'Home devices unavailable.');
     } finally {
       if (current === revision.current) setRefreshing(false);
     }
-  }, [request]);
-  useEffect(() => {
-    const visibleRefresh = () => { if (activeTab && document.visibilityState === 'visible') void refresh(); };
-    const initial = setTimeout(visibleRefresh, 0);
-    const interval = setInterval(visibleRefresh, 60_000);
-    document.addEventListener('visibilitychange', visibleRefresh);
-    // Invalidate in-flight reads on unmount; a helper keeps the ref access out of the cleanup expression.
-    const invalidate = () => { revision.current++; };
-    return () => { invalidate(); clearTimeout(initial); clearInterval(interval); document.removeEventListener('visibilitychange', visibleRefresh); };
-  }, [refresh, activeTab]);
+  }, [request]));
+  useFinancialRefresh(refresh);
   const solar = assets?.solar?.ok ? assets.solar.value : null;
   const validator = assets?.validator?.ok ? assets.validator.value : null;
 
-  if (!assets || (!assets.adapters.homeAssistant && !assets.adapters.validator)) return <section id="device-readings" tabIndex={-1} aria-label="Connected readings"><span id="solar-reading" tabIndex={-1} /><span id="validator-reading" tabIndex={-1} /></section>;
+  if (!assets || (!assets.adapters.homeAssistant && !assets.adapters.validator)) return <section id="device-readings" tabIndex={-1} aria-label="Connected readings"><span id="solar-reading" tabIndex={-1} /><span id="validator-reading" tabIndex={-1} />{readError && <p role="status">Connected readings unavailable. <button type="button" className="text-button" disabled={refreshing} onClick={() => void refresh()}>Retry connected readings</button></p>}</section>;
   return (
     <section className="card assets devices" id="device-readings" tabIndex={-1}>
       <h2>Connected readings</h2>
+      <button type="button" className="text-button" disabled={refreshing} onClick={() => void refresh()}>Refresh connected readings</button>
       {readError && <p className="note" role="status">Device refresh unavailable; {assets ? 'showing the last checked readings' : 'no reading confirmed yet'}. {readError} <button className="text-button" type="button" onClick={() => void refresh()}>Retry device readings</button></p>}
       {refreshing && <p className="small-copy" role="status">Checking device readings…</p>}
       <MoreList>

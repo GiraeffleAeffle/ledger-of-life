@@ -13,11 +13,12 @@ import { inferenceCharge, inferenceMaximum, inferencePayee, aiRpc, aiTokenAbi, a
 import { TEST_USDG_ADDRESS } from '../wallets/inference-token.ts';
 import { ConflictError } from './errors.ts';
 import type { Store } from './store.ts';
-import { address, createNoopSigner, createSolanaRpc, type Instruction } from '@solana/kit';
+import { address, createNoopSigner, type Instruction } from '@solana/kit';
 import { TOKEN_PROGRAM_ADDRESS, fetchMaybeToken, findAssociatedTokenPda, getApproveInstruction, getCreateAssociatedTokenIdempotentInstruction, getTransferCheckedInstruction } from '@solana-program/token';
 import { addressesForHouse, depositRewardsInstruction } from '../finance/solana/house.ts';
 import { loadSolanaHouseManifest } from './solana-house-config.ts';
 import { configuredSolanaOperations } from './solana-operations.ts';
+import { createPooledSolanaRpc, solanaRpcConfiguration } from './solana-provider-pool.ts';
 import { configuredFeeSponsor, SolanaServiceError } from './solana-service.ts';
 import { loadBuildingManifest } from './building-revenue.ts';
 import type { SolanaInferenceReview, LocalAiRequest } from './local-ai-types.ts';
@@ -633,9 +634,10 @@ export async function settleSolanaAi(store: Store, key: string, dependencies?: S
       console.warn('local-ai-settlement', { requestId: row.id, stage, code });
   }
 }
-export async function solanaAiWalletBalance(payer: string, mint: string) {
-  if (!process.env.SOLANA_RPC_URL) throw new ConflictError('Solana RPC is unavailable.');
-  const rpc = createSolanaRpc(process.env.SOLANA_RPC_URL);
+export async function solanaAiWalletBalance(payer: string, mint: string, environment: Record<string, string | undefined> = process.env) {
+  const manifest = loadSolanaHouseManifest(environment);
+  if (!manifest || manifest.cashMint !== mint) throw new ConflictError('Solana AI payment deployment is unavailable.');
+  const rpc = createPooledSolanaRpc(solanaRpcConfiguration(environment, manifest));
   const [source] = await findAssociatedTokenPda({ owner: address(payer), mint: address(mint), tokenProgram: TOKEN_PROGRAM_ADDRESS });
   const token = await fetchMaybeToken(rpc, source, { commitment: 'confirmed' });
   return { cashAtomic: token.exists ? token.data.amount.toString() : '0', allowanceAtomic: token.exists ? token.data.delegatedAmount.toString() : '0' };

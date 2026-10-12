@@ -17,12 +17,13 @@ import type * as MoneyModule from './money-area';
 import type * as HomeModule from './home';
 import * as homeLogic from './home-journey-logic.ts';
 import * as nextStepLogic from './next-step.ts';
+import type { AuthorizedRequest } from './use-city-signals';
 
 const requirePackage = createRequire(import.meta.url);
 // The application test runner strips TS but not TSX/CSS. Compile just the view under
 // test, keeping real React and shared layout blocks; replace browser-only services.
-function loadView<T>(file: string, dependencies: Record<string, unknown>, browserWindow?: unknown): T {
-  const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+function loadView<T>(file: string, dependencies: Record<string, unknown>, browserWindow?: unknown, expose: string[] = []): T {
+  const source = readFileSync(new URL(file, import.meta.url), 'utf8') + (expose.length ? `\nexport { ${expose.join(', ')} };` : '');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, esModuleInterop: true } });
   const loaded = { exports: {} };
   const load = (id: string) => {
@@ -42,6 +43,8 @@ const shared = {
   './section-tabs': { useSectionTabActive: () => true },
   './blocks': blocks,
   './building-read': buildingRead,
+  // Effects do not run in these render/callback tests; real scheduling is covered separately.
+  './use-financial-refresh': { useFinancialRefresh: () => {}, useSerializedRead: <T,>(read: T) => read },
 };
 const building = loadView<typeof BuildingModule>('./building-panel.tsx', {
   ...shared, './building-panel-logic': buildingLogic, './money-valuation': { usd: (value: number) => `$${value}` },
@@ -188,6 +191,11 @@ for (const network of ['robinhood', 'solana'] as const) {
       const claim = html.match(/<button[^>]*>Claim<\/button>/)?.[0];
       assert.ok(claim);
       assert.equal(claim.includes('disabled='), state !== 'fresh');
+      if (state !== 'fresh') {
+        const refresh = html.match(/<button[^>]*>Refresh public income and balances for a fresh review<\/button>/)?.[0];
+        assert.ok(refresh, 'stopping display polling must leave an immediately reachable freshness control');
+        assert.equal(refresh.includes('disabled='), false);
+      }
       if (state === 'stale') {
         assert.match(html, /Saved reading, not current/);
         assert.match(html, /Refreshing or temporarily unavailable/);
@@ -230,6 +238,7 @@ test('Home keeps browsing and contextual rows visible while its first tenancy re
 function buildingCallbacks(stateOverrides: Record<number, unknown>, refOverrides: Record<number, unknown>) {
   const states = new Map<number, unknown>();
   const callbacks: (() => unknown)[] = [];
+  const refreshes: { read: () => Promise<unknown>; options: { pendingKey?: string | null } }[] = [];
   let stateIndex = 0, refIndex = 0;
   const hooks = {
     ...React,
@@ -246,8 +255,9 @@ function buildingCallbacks(stateOverrides: Record<number, unknown>, refOverrides
   const panels = loadView<typeof BuildingModule>('./building-panel.tsx', {
     ...shared, react: hooks, './building-panel-logic': buildingLogic, './money-valuation': { usd: (value: number) => `$${value}` },
     '@/wallets': { useRentalWallet: () => ({ ...wallet, signEvmTransaction: neverRequest, signSolanaTransaction: neverRequest }) },
+    './use-financial-refresh': { useFinancialRefresh: (read: () => Promise<unknown>, options: { pendingKey?: string | null }) => { refreshes.push({ read, options }); }, useSerializedRead: <T,>(read: T) => read },
   }, { dispatchEvent: () => true });
-  return { panels, states, callbacks };
+  return { panels, states, callbacks, refreshes };
 }
 
 type TestButton = React.ReactElement<{ children?: ReactNode; disabled?: boolean; onClick?: () => void }>;
@@ -311,3 +321,85 @@ test('a healthy independent refresh clears a transient Robinhood action error', 
   await callbacks[1]();
   assert.equal(states.get(7), '');
 });
+
+for (const network of ['robinhood', 'solana'] as const) {
+  for (const state of ['stale', 'expired'] as const) {
+    test(`${network} ${state} snapshot refresh control actually requests a new public and wallet reading`, async context => {
+      const cache = { state: 'stale', checkedAt: '2026-10-12T12:00:00Z', ageMs: state === 'stale' ? 120_000 : 900_000 };
+      const { panels } = buildingCallbacks(network === 'solana' ? { 12: cache } : { 4: cache }, network === 'solana' ? { 0: true } : {});
+      let publicReads = 0, privateReads = 0;
+      const read = Promise.withResolvers<void>();
+      context.mock.method(globalThis, 'fetch', async () => {
+        publicReads++;
+        return Response.json({ network: network === 'solana' ? 'solana-devnet' : 'robinhood-testnet', building: { configured: true },
+          cache: { state: 'fresh', checkedAt: '2026-10-12T12:00:00Z', ageMs: 0 } });
+      });
+      const request = async <T,>(): Promise<T> => { privateReads++; read.resolve(); return { configured: true, receipts: [], plan: null } as T; };
+      const tree = network === 'solana'
+        ? panels.SolanaBuildingPanel({ request, houseId: 'neighbourhood-homes', visual: null })
+        : panels.BuildingPanel({ request, position: null, setPosition: () => {}, visual: null });
+      const button = viewButtons(tree).find(item => item.props.children === 'Refresh public income and balances for a fresh review');
+      assert.ok(button); assert.equal(button.props.disabled, false);
+      button.props.onClick?.(); await read.promise;
+      assert.equal(publicReads, 1); assert.equal(privateReads, 1);
+    });
+  }
+}
+
+test('pending Solana house recovery reads only the private saved operation while public income is unavailable', async context => {
+  const position = { configured: true, account: 'solana-owner', cashAtomic: '0', receipts: [{ hash: 'saved-signature', status: 'pending' }], plan: null,
+    activeOperation: { id: 'saved-operation', state: 'broadcast', signature: 'saved-signature', operation: 'buy' } };
+  const { panels, refreshes } = buildingCallbacks({ 1: position, 6: true }, { 0: true });
+  context.mock.method(globalThis, 'fetch', neverRequest);
+  const calls: string[] = [];
+  const request = async <T,>(path: string, body?: unknown): Promise<T> => {
+    assert.equal(body, undefined, 'receipt checking must not prepare, sign, or replace an operation');
+    calls.push(path); return position as T;
+  };
+  panels.SolanaBuildingPanel({ request, houseId: 'neighbourhood-homes', visual: null });
+  const recovery = refreshes.find(item => item.options.pendingKey === 'saved-operation');
+  assert.ok(recovery);
+  await recovery.read();
+  assert.deepEqual(calls, ['/api/building/claims?houseId=neighbourhood-homes']);
+});
+
+test('learning a Solana house receipt signature does not change the submitted operation recovery identity', () => {
+  const submitted = { id: 'saved-operation', state: 'broadcast' };
+  const position = { configured: true, cashAtomic: '0', receipts: [{ hash: 'learned-signature', status: 'pending' }], plan: null,
+    activeOperation: { ...submitted, signature: 'learned-signature', operation: 'buy' } };
+  const keys: (string | null | undefined)[] = [];
+  for (const savedPosition of [null, position]) {
+    const { panels, refreshes } = buildingCallbacks({ 1: savedPosition, 7: !savedPosition, 11: submitted }, { 0: true });
+    panels.SolanaBuildingPanel({ request: neverRequest, houseId: 'neighbourhood-homes', visual: null });
+    keys.push(refreshes[0]?.options.pendingKey);
+  }
+  assert.deepEqual(keys, ['saved-operation', 'saved-operation']);
+});
+
+for (const unavailable of [true, false]) {
+  test(`manual saved-purchase recovery survives an ${unavailable ? 'unavailable' : 'initially loading'} portfolio after automatic checks stop`, async () => {
+    let displayRefreshes = 0;
+    const requested = Promise.withResolvers<void>();
+    const actions: unknown[] = [];
+    const react = {
+      ...React,
+      useState: (initial: unknown) => [initial === 'none' ? 'pending' : initial, () => {}],
+      useCallback: <T,>(callback: T) => callback,
+    };
+    const unused = Object.fromEntries(['./device-readings', './home-node', './share-workflows', './local-investments', './local-ai', './test-dollars'].map(id => [id, {}]));
+    const { Portfolio } = loadView<{ Portfolio: (props: { request: AuthorizedRequest }) => ReactNode }>('./money-area.tsx', {
+      ...unused, ...shared, react,
+      './assets': { useHoldingsRead: () => ({ portfolio: { view: null, checkedAt: null, unavailable }, refresh: async () => { displayRefreshes++; } }) },
+    }, undefined, ['Portfolio']);
+    const request = async <T,>(_path: string, body?: unknown): Promise<T> => {
+      actions.push(body); requested.resolve(); return { result: { state: 'pending' } } as T;
+    };
+    // No effects execute: this also models an exhausted automatic recovery allowance.
+    const tree = Portfolio({ request });
+    const button = viewButtons(tree).find(item => item.props.children === 'Check the same pending purchase');
+    assert.ok(button); assert.equal(button.props.disabled, false); assert.equal(actions.length, 0);
+    button.props.onClick?.(); await requested.promise;
+    assert.deepEqual(actions, [{ action: 'purchase_status' }]);
+    assert.equal(displayRefreshes, 0, 'private saved-operation recovery does not depend on public/display health');
+  });
+}

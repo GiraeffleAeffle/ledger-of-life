@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const environment = {
     SOLANA_HOUSE_MANIFEST: process.env.SOLANA_HOUSE_MANIFEST,
     SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
-    SOLANA_READ_RPC_FALLBACK_URLS: process.env.SOLANA_READ_RPC_FALLBACK_URLS,
+    SOLANA_RPC_FALLBACK_URLS: process.env.SOLANA_RPC_FALLBACK_URLS,
   };
   let network: 'solana-devnet' | 'solana-localnet' | 'robinhood-testnet' = query.get('network') !== 'robinhood' && environment.SOLANA_HOUSE_MANIFEST
     ? 'solana-devnet' : 'robinhood-testnet';
