@@ -660,6 +660,29 @@ test('approval and award wording cannot be forced into graph predicates and can 
   }
 });
 
+test('contractor and tender-winner entities do not create unsupported cooperation or planning edges', () => {
+  const town = mention('town', 'Beispielstadt', 'municipality'), company = mention('company', 'Beispiel Netz GmbH', 'company');
+  for (const [type, predicateQuote] of [
+    ['cooperates_with', 'hat den Auftrag erhalten'],
+    ['plans', 'hat die Ausschreibung gewonnen'],
+  ] as const) {
+    const quote = `${company.name} ${predicateQuote} für ${town.name}.`;
+    const claims: GraphClaims = { entities: [{ ...town, quote }, { ...company, quote }], relations: [{ ...relation(town, company), type, predicateQuote, quote }] };
+    assert.equal(graphGroundingChecks(normalizeRelationActions(claims).claims, quote).find(check => check.id === 'graph_relations')?.passed, false);
+    assert.ok(graphGroundingChecks({ ...claims, relations: [] }, quote).every(check => check.passed));
+  }
+  const association = mention('association', 'Beispielverbund');
+  for (const predicateQuote of ['ist Mitglied des', 'besteht aus', 'zusammengeschlossen']) {
+    const quote = predicateQuote === 'besteht aus' ? `${association.name} besteht aus ${town.name}.`
+      : predicateQuote === 'zusammengeschlossen' ? `${town.name} und weitere Gemeinden sind im ${association.name} zusammengeschlossen.`
+      : `${town.name} ist Mitglied des ${association.name}.`;
+    const edge = { ...relation(town, association), type: 'cooperates_with' as const, predicateQuote, quote };
+    const claims = { entities: [town, association], relations: [edge] };
+    assert.equal(graphGroundingChecks(claims, quote).find(check => check.id === 'graph_relations')?.passed, false);
+    assert.ok(graphGroundingChecks({ ...claims, relations: [{ ...edge, type: 'member_of' }] }, quote).every(check => check.passed));
+  }
+});
+
 test('identifiers and nested relation evidence cannot borrow fields from elsewhere in the source', () => {
   const a = mention('a'), b = mention('b');
   const id = { value: '23', namespace: 'Register', issuer: 'Stadt Beispielstadt', quote: `${a.name} Register 23 Stadt Beispielstadt` };
