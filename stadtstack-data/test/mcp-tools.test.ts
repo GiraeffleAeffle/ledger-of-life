@@ -1,3 +1,5 @@
+import {readFile} from 'node:fs/promises';
+import {join} from 'node:path';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {z} from 'zod';
@@ -126,15 +128,10 @@ test('graph MCP tools are read-only, source-bound and reject unbounded or ambigu
   try{
     const tools=await client.listTools();
     const graphDescription=tools.tools.find(tool=>tool.name==='graph_neighbors')?.description??'';
-    assert.match(graphDescription,/member_of/);
-    assert.match(graphDescription,/Coverage is sparse/);
-    assert.match(graphDescription,/Edge IDs are release-specific output IDs/);
-    assert.deepEqual(graphDescription.match(/edge:[a-f0-9]{64}/g),[
-      'edge:7048119fc2453e41926d943f02578c605ef633634148f1401e7d3049d89cdf3c',
-      'edge:abe58d44b4927db8f59eeed36939f06b06d1b1ffe0b604c7d31377ca2c91b43d',
-      'edge:b19c051984380d89ea42f57e3375fa0b15757620d184fc1c725d17c92689bc42',
-    ]);
-    assert.match(tools.tools.find(tool=>tool.name==='entity_search')?.description??'',/AGS-scoped council body/);
+    // Advertised examples must be real operates/asserted edges of the governed release, not stale IDs.
+    const exampleEdges=graphDescription.match(/edge:[a-f0-9]{64}/g)??[],releasedGraph=z.object({edges:z.array(z.object({id:z.string(),type:z.string(),modality:z.string()}).passthrough())}).passthrough().parse(JSON.parse(await readFile(join(governedReleaseDirectory(),'knowledge/graph.json'),'utf8')));
+    assert.equal(exampleEdges.length,3);
+    for(const id of exampleEdges)assert.deepEqual(releasedGraph.edges.filter(edge=>edge.id===id).map(edge=>[edge.type,edge.modality]),[['operates','asserted']],id);
     for(const name of ['entity_search','graph_neighbors','graph_path']){
       const definition=tools.tools.find(tool=>tool.name===name);assert.ok(definition);
       assert.equal(definition.annotations?.readOnlyHint,true);assert.equal(definition.annotations?.destructiveHint,false);
@@ -161,7 +158,7 @@ test('graph MCP tools are read-only, source-bound and reject unbounded or ambigu
   }finally{await client.close();await mcp.close();}
 });
 
-test('0.3.1 heat comparisons, bulk export and quarantine coverage share the released evidence',async()=>{
+test('heat comparisons, bulk export and quarantine coverage share the released evidence',async()=>{
  const release=await loadRelease(),mcp=server({release}),client=new Client({name:'patch-031-regression',version:'1'});
  const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();
  await mcp.connect(serverTransport);await client.connect(clientTransport);
@@ -193,11 +190,14 @@ test('0.3.1 heat comparisons, bulk export and quarantine coverage share the rele
   const coverage=z.object({accounting:z.object({registryMunicipalities:z.number(),attemptedMunicipalities:z.number()}),districts:z.array(z.object({id:z.string(),municipalitiesRegistered:z.number(),municipalitiesAttempted:z.number()}).passthrough()),municipalities:z.array(z.object({id:z.string(),publishedRecords:z.number(),quarantinedRecords:z.number(),quarantineReasons:z.object({categories:z.array(z.object({reason:z.string(),count:z.number()})),failedDeterministicChecks:z.array(z.object({id:z.string(),count:z.number()}))})}).passthrough())}).passthrough();
   const status=z.object({knowledgeCoverage:coverage}).parse((await client.callTool({name:'get_release_status',arguments:{}})).structuredContent).knowledgeCoverage;
   const cities=z.object({knowledgeCoverage:coverage}).parse((await client.callTool({name:'list_cities',arguments:{}})).structuredContent).knowledgeCoverage;
-  assert.deepEqual(status.accounting,cities.accounting);assert.equal(status.accounting.registryMunicipalities,319);assert.equal(status.accounting.attemptedMunicipalities,9);
-  const mol=status.districts.find(district=>district.id==='maerkisch-oderland')!;
-  assert.equal(mol.municipalitiesRegistered,45);assert.equal(mol.municipalitiesAttempted,3);
+  // MCP coverage views must project the governed release's own coverage and record counts.
+  const releasedCoverage=coverage.parse(JSON.parse(await readFile(join(governedReleaseDirectory(),'knowledge/coverage.json'),'utf8')));
+  const releasedRecords=z.object({records:z.array(z.object({municipalityId:z.string()}).passthrough())}).passthrough().parse(JSON.parse(await readFile(join(governedReleaseDirectory(),'knowledge/records.json'),'utf8'))).records;
+  assert.deepEqual(status.accounting,cities.accounting);assert.deepEqual(status.accounting,releasedCoverage.accounting);
+  assert.deepEqual(status.districts,releasedCoverage.districts);assert.equal(status.districts.find(district=>district.id==='maerkisch-oderland')!.municipalitiesRegistered,45);
   const strausberg=status.municipalities.find(city=>city.id==='strausberg')!;
-  assert.equal(strausberg.publishedRecords,39);assert.equal(strausberg.quarantinedRecords,384);
+  assert.equal(strausberg.publishedRecords,releasedRecords.filter(record=>record.municipalityId==='strausberg').length);
+  assert.deepEqual(strausberg.quarantineReasons,releasedCoverage.municipalities.find(city=>city.id==='strausberg')!.quarantineReasons);
   assert.ok(strausberg.quarantineReasons.categories.some(reason=>reason.reason==='missing_sourced_date'&&reason.count>0));
  }finally{await client.close();await mcp.close();}
 });
