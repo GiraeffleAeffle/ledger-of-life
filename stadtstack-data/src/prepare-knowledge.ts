@@ -19,7 +19,8 @@ import type {PreparedDocument} from './district-prepared-document.ts';
 import {writeManagedSourceJson,writePrivateJson} from './district-private-io.ts';
 import type {SourceArtifactBinding} from './district-private-io.ts';
 import {knowledgePreparationInputsSchema} from './district-publication-inputs.ts';
-import {operatorRegistryConfigSchema,operatorRegistryConfigBindingSchema,importOperatorRegistryConfig,parseOperatorRegistryConfiguration,operatorRegistryEndpoints,operatorRegistryConfigContractSha256} from './district-registry-config.ts';
+import {operatorRegistryConfigSchema,operatorRegistryConfigSourcePinSchema,operatorRegistryConfigBindingSchema,importOperatorRegistryConfig,readOperatorRegistryConfigSourcePin} from './district-registry-config.ts';
+import {authorizedPilotCorpusSchema} from './district-corpus.ts';
 import {retainedPublicationSources} from './district-retained-import.ts';
 
 const pinSchema=z.object({path:z.string().min(1),sha256:hashSchema,bytes:z.number().int().nonnegative().max(512*1024*1024)}).strict();
@@ -42,7 +43,7 @@ export const knowledgeRetainedPublicationSourcePinSchema=pinSchema.extend({bindi
  if(pin.bindings.some(binding=>binding.publication.memberSha256!==pin.sha256||binding.publication.memberBytes!==pin.bytes))ctx.addIssue({code:'custom',message:'Retained member pin must contain the exact authenticated publication member bytes'});
 });
 export type KnowledgeRetainedPublicationSourcePin=z.infer<typeof knowledgeRetainedPublicationSourcePinSchema>;
-export const knowledgeRegistryInputSchema=z.union([knowledgeSourcePinSchema,operatorRegistryConfigSchema]);
+export const knowledgeRegistryInputSchema=z.union([operatorRegistryConfigSourcePinSchema,operatorRegistryConfigSchema]);
 export type KnowledgeRegistryInput=z.infer<typeof knowledgeRegistryInputSchema>;
 const runShape={runId:hashSchema,pins:z.object({corpusSha256:hashSchema,registrySha256:hashSchema,promptContractSha256:hashSchema,schemaSha256:hashSchema}).strict(),artifacts:z.object({extractionRun:pinSchema,records:knowledgeSourcePinSchema,quarantine:knowledgeSourcePinSchema,crawl:knowledgeSourcePinSchema,registry:knowledgeRegistryInputSchema,preparationPlan:knowledgeSourcePinSchema.optional()}).strict(),admissions:z.array(z.object({recordId:z.string().min(1),prepared:z.array(knowledgePreparedSourcePinSchema).min(1)}).strict()),schemaProjection:textSchemaProjectionSchema.optional()};
 export const prepareKnowledgeOptionsSchema=z.object({
@@ -72,12 +73,9 @@ async function readPin(pin:KnowledgeAuditPin,policy:CivicPolicyOptions,source?:K
 }
 function decoded(artifact:TextLineageArtifact):unknown{return JSON.parse(typeof artifact.bytes==='string'?artifact.bytes:new TextDecoder('utf-8',{fatal:true}).decode(artifact.bytes));}
 async function readRegistryInput(input:KnowledgeRegistryInput,options:PrepareKnowledgeOptions){
- const pin='kind' in input?knowledgeSourcePinSchema.parse(await importOperatorRegistryConfig({...input,managedRoot:options.output.root,destinationPath:'intake/configuration/'+input.sha256+'.json'},options.policy)):input;
- const artifact=await readPin(pin,options.policy,pin),registry=parseOperatorRegistryConfiguration(decoded(artifact));
- const declared=new Set(pin.bindings.map(binding=>binding.url));
- if(operatorRegistryEndpoints(registry).some(url=>!declared.has(url)))throw Error('Registry endpoints lack complete authenticated provenance bindings');
- const controls=pin.bindings.filter(binding=>binding.kind==='operator_registry_config');
- if(controls.length){const contract=await operatorRegistryConfigContractSha256();if(controls.some(binding=>binding.schemaContractSha256!==contract))throw Error('Operator registry codec contract mismatch');}
+ const pin='kind' in input?await importOperatorRegistryConfig({...input,managedRoot:options.output.root,destinationPath:'intake/configuration/'+input.sha256+'.json'},options.policy):input;
+ const {bytes,registry}=await readOperatorRegistryConfigSourcePin(pin,options.policy);
+ const artifact:TextLineageArtifact={sha256:pin.sha256,bytes};
  return {pin,artifact,registry};
 }
 
@@ -137,6 +135,7 @@ export async function prepareKnowledge(input:PrepareKnowledgeOptions){
   if(run.artifacts.preparationPlan){artifacts.preparationPlan=await readPin(run.artifacts.preparationPlan,options.policy,run.artifacts.preparationPlan);bindings.push(...run.artifacts.preparationPlan.bindings);}
   const contribution:TextRunContribution={runId:run.runId,pins:run.pins,artifacts,sourceArtifactKind:'native_extraction_output'};
   const authenticated=authenticateTextRunContribution(contribution),recordIds:string[]=[];
+  authorizedPilotCorpusSchema.parse(authenticated.extractionRun.corpusSha256);
   if(new Set(run.admissions.map(item=>item.recordId)).size!==run.admissions.length)throw Error('Duplicate record in current admission inventory');
   for(const request of run.admissions){
    const record=authenticated.records.find(record=>record.id===request.recordId);
