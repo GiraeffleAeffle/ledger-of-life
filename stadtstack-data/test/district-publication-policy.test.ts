@@ -31,35 +31,37 @@ async function fixture(directory:string){
 test('publication resolves real private receipt bytes and retains original policy binding on replay',async()=>{
  const directory=await mkdtemp(join(await realpath(tmpdir()),'stadtstack-publication-policy-'));
  try{
-  const {cas,stateDir,records,inventory,admission}=await fixture(directory);
-  const first=await recheckPublicationPolicy(records,inventory,cas,{stateDir,evaluationAt:new Date().toISOString()});
+  const {cas,policyOptions,records,inventory,admission}=await fixture(directory);
+  const first=await recheckPublicationPolicy(records,inventory,cas,{...policyOptions,evaluationAt:new Date().toISOString()});
   assert.equal(first.policy.receipts[0].receiptSha256,admission.receiptSha256);
-  const replay=await recheckPublicationPolicy(records,inventory,cas,{stateDir,evaluationAt:new Date().toISOString(),originalPolicy:first.policy});
+  await assert.rejects(recheckPublicationPolicy(records,inventory,cas,{stateDir:policyOptions.stateDir,evaluationAt:new Date().toISOString()}),/explicitly authorized policy realm/);
+  await assert.rejects(recheckPublicationPolicy(records,inventory,cas,{...policyOptions,authoritySha256:'0'.repeat(64),evaluationAt:new Date().toISOString()}),/Policy authority cannot change/);
+  const replay=await recheckPublicationPolicy(records,inventory,cas,{...policyOptions,evaluationAt:new Date().toISOString(),originalPolicy:first.policy});
   assert.deepEqual(replay.policy,first.policy);
   assert.equal(replay.inventorySha256,first.inventorySha256);
   const rebound={records:[{...inventory.records[0],receipts:[{...inventory.records[0].receipts[0],sourceSha256:'3'.repeat(64)}]}]};
-  await assert.rejects(recheckPublicationPolicy(records,rebound,cas,{stateDir,evaluationAt:new Date().toISOString()}),/binding mismatch/);
-  await assert.rejects(recheckPublicationPolicy(records,{records:[]},cas,{stateDir,evaluationAt:new Date().toISOString()}),/actual policy receipts/);
-  await assert.rejects(recheckPublicationPolicy(records,inventory,cas,{stateDir,evaluationAt:'2022-05-15T12:00:00.000Z'}),/historical clock|expired|revalidation/);
+  await assert.rejects(recheckPublicationPolicy(records,rebound,cas,{...policyOptions,evaluationAt:new Date().toISOString()}),/binding mismatch/);
+  await assert.rejects(recheckPublicationPolicy(records,{records:[]},cas,{...policyOptions,evaluationAt:new Date().toISOString()}),/actual policy receipts/);
+  await assert.rejects(recheckPublicationPolicy(records,inventory,cas,{...policyOptions,evaluationAt:'2022-05-15T12:00:00.000Z'}),/historical clock|expired|revalidation/);
  }finally{await rm(directory,{recursive:true,force:true});}
 });
 
 test('expired original receipt needs actual same-source current proof without altering its provenance',async()=>{
  const directory=await mkdtemp(join(await realpath(tmpdir()),'stadtstack-expired-publication-policy-'));
  try{
-  const {cas,stateDir,admission,records,inventory}=await fixture(directory),now=Date.now();
+  const {cas,policyOptions,admission,records,inventory}=await fixture(directory),now=Date.now();
   const expired:PolicyReceipt={...admission.receipt,checkedAt:new Date(now-120_000).toISOString(),expiresAt:new Date(now-60_000).toISOString()};
   const originalHash=semanticHash(expired);await cas.put(Buffer.from(canonicalJson(expired)),{kind:'receipt',mimeType:'application/json'});
   // Rebind synthetic records through their public verification hash, not a production migration.
   const record=structuredClone(records[0]);record.source.policyReceiptSha256=originalHash;record.verification.policyReceiptSha256=originalHash;
   const {verification,...claims}=record,{evidenceHash,...gates}=verification;record.verification.evidenceHash=semanticHash({...claims,verification:gates});
   const originalInventory={records:[{recordId:record.id,receipts:[{...inventory.records[0].receipts[0],receiptSha256:originalHash}]}]};
-  await assert.rejects(recheckPublicationPolicy([record],originalInventory,cas,{stateDir,evaluationAt:new Date().toISOString()}),/expired|revalidation/);
+  await assert.rejects(recheckPublicationPolicy([record],originalInventory,cas,{...policyOptions,evaluationAt:new Date().toISOString()}),/expired|revalidation/);
   const withProof={records:[{...originalInventory.records[0],receipts:[{...originalInventory.records[0].receipts[0],currentReceiptSha256:admission.receiptSha256}]}]};
-  const current=await recheckPublicationPolicy([record],withProof,cas,{stateDir,evaluationAt:new Date().toISOString()});
+  const current=await recheckPublicationPolicy([record],withProof,cas,{...policyOptions,evaluationAt:new Date().toISOString()});
   assert.equal(current.policy.receipts[0].receiptSha256,originalHash);
   const originalBinding={snapshotSha256:'4'.repeat(64),receipts:current.policy.receipts};
-  const replay=await recheckPublicationPolicy([record],withProof,cas,{stateDir,evaluationAt:new Date().toISOString(),originalPolicy:originalBinding});
+  const replay=await recheckPublicationPolicy([record],withProof,cas,{...policyOptions,evaluationAt:new Date().toISOString(),originalPolicy:originalBinding});
   assert.deepEqual(replay.policy,originalBinding);
   assert.equal(replay.inventorySha256,current.inventorySha256);
  }finally{await rm(directory,{recursive:true,force:true});}
@@ -72,9 +74,9 @@ test('publication private receipt inventory never accepts a boolean approval sub
 test('current optout blocks exact replay even with unchanged original receipt hashes',async()=>{
  const directory=await mkdtemp(join(await realpath(tmpdir()),'stadtstack-revoked-publication-policy-'));
  try{
-  const {cas,stateDir,policyOptions,records,inventory}=await fixture(directory);
-  const original=await recheckPublicationPolicy(records,inventory,cas,{stateDir,evaluationAt:new Date().toISOString()});
+  const {cas,policyOptions,records,inventory}=await fixture(directory);
+  const original=await recheckPublicationPolicy(records,inventory,cas,{...policyOptions,evaluationAt:new Date().toISOString()});
   await recordHostOptOut({host:'example.org',reason:'rights_holder_objection'},policyOptions);
-  await assert.rejects(recheckPublicationPolicy(records,inventory,cas,{stateDir,evaluationAt:new Date().toISOString(),originalPolicy:original.policy}),{code:'HOST_OPTED_OUT'});
+  await assert.rejects(recheckPublicationPolicy(records,inventory,cas,{...policyOptions,evaluationAt:new Date().toISOString(),originalPolicy:original.policy}),{code:'HOST_OPTED_OUT'});
  }finally{await rm(directory,{recursive:true,force:true});}
 });

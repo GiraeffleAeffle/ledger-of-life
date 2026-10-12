@@ -1,0 +1,48 @@
+autoResume: false
+extensions: []
+workspace:
+  additionalDirectories: []
+retry:
+  enabled: false
+  modelFallback: false
+  fallbackChains: {}
+  waitForUsageReset: false
+  usageAwareFallback: false
+providers:
+  anthropic:
+    serverSideFallback: false
+  cacheRetention: none
+  cacheWarming: 'off'
+contextPromotion:
+  enabled: false
+prewalk:
+  enabled: false
+advisor:
+  enabled: false
+autolearn:
+  enabled: false
+  autoContinue: false
+memory:
+  backend: 'off'
+features:
+  unexpectedStopDetection: none
+mcp:
+  enableProjectConfig: false
+plan:
+  enabled: false
+compaction:
+  enabled: false
+  midTurnEnabled: false
+  asyncEnabled: false
+  idleEnabled: false
+  autoContinue: false
+  experimentalContextManagement: false
+  handoffSaveToDisk: false
+startup:
+  checkUpdate: false
+marketplace:
+  autoUpdate: 'off'
+telemetry:
+  otlpExportEnabled: false
+contextFiles:
+  extra: []

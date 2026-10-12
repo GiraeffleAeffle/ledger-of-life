@@ -59,7 +59,7 @@ async function fixture(pool:Pool,name:string){
  const itemArtifact=await put(Buffer.from(canonicalJson(item)),'derived'),snapshotId=randomUUID();
  await pool.query(`INSERT INTO district_pipeline.source_snapshots(id,publisher_id,source_id,municipality_id,ags,tenant,resource_identity,request_method,request_selector_sha256,observation_window,retrieved_at,scope_sha256) VALUES($1,$2,$3,$4,$5,NULL,$6,'GET',$7,$8,$9,$10)`,[snapshotId,scope.publisherId,sourceId,scope.municipalityId,scope.ags,url,digest('GET'),scope.observationWindow,checkedAt,semanticHash(scope)]);
  await pool.query(`INSERT INTO district_pipeline.policy_decisions(id,source_snapshot_id,proof_sha256,source_sha256,receipt_json,state,observed_robots,owner_robots_override,opt_out_version,policy_version,checked_at,expires_at,reason_code) VALUES($1,$2,$3,$4,$5,'allowed','allowed',false,$6,$7,$8,$9,'synthetic_shared_admission')`,[randomUUID(),snapshotId,proof.receiptSha256,sourceSha256,proof.receipt,proof.receipt.optOutSnapshotSha256,proof.receipt.version,checkedAt,expiresAt]);
- const jobKey=await enqueueAssessmentB(broker,{itemArtifactSha256:itemArtifact.sha256,sourceScope:scope,policyProofSha256:proof.receiptSha256,clientContractSha256});
+ const jobKey=await enqueueAssessmentB(broker,{itemArtifactSha256:itemArtifact.sha256,sourceScope:scope,policyProofSha256:proof.receiptSha256,transport:'mac-bridge',clientContractSha256});
  return {directory,policyOptions,authority,cas,store,broker,jobKey,text,itemArtifact,proof};
 }
 async function ready(pool:Pool,jobKey:string){

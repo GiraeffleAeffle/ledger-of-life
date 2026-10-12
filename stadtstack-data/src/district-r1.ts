@@ -400,7 +400,8 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
   }
   if(command==='enqueue-assessment-b'){
    if(process.platform!=='linux')throw new DistrictExecutionHold('isolation_unavailable');
-   const manifest=z.object({jobs:z.array(z.object({itemArtifactSha256:HashSchema,sourceScope:ScopeSchema,policyProofSha256:HashSchema,clientContractSha256:HashSchema}).strict()).min(1).max(10000)}).strict().parse(input),broker=new DistrictAssessmentBroker(pool,cas),jobKeys:string[]=[];
+   const assessmentInput=z.object({itemArtifactSha256:HashSchema,sourceScope:ScopeSchema,policyProofSha256:HashSchema});
+   const manifest=z.object({jobs:z.array(z.discriminatedUnion('transport',[assessmentInput.extend({transport:z.literal('mac-bridge'),clientContractSha256:HashSchema}).strict(),assessmentInput.extend({transport:z.literal('vm-omp')}).strict()])).min(1).max(10000)}).strict(),broker=new DistrictAssessmentBroker(pool,cas),jobKeys:string[]=[];
    for(const job of manifest.jobs){
     await assertManagedSourceReadable(join(cas.root,'sha256',job.itemArtifactSha256.slice(0,2),job.itemArtifactSha256));
     const item=assessmentItemSchema.parse(JSON.parse((await cas.read(job.itemArtifactSha256)).toString('utf8')));

@@ -8,18 +8,31 @@ import {z} from 'zod';
 
 const hash=(value:string)=>createHash('sha256').update(value).digest('hex');
 const hex=z.string().regex(/^[a-f0-9]{64}$/),image=z.string().regex(/^sha256:[a-f0-9]{64}$/);
+export const OMP_B_MODEL_MAX_TIME_SECONDS=150;
 export const DockerParserResourceSchema=z.object({
  id:z.string().uuid(),scratchId:z.string().uuid(),rootId:hex,authoritySha256:hex,nonce:z.string().uuid(),name:z.string().regex(/^stadtstack-parser-[a-f0-9-]{36}-[a-f0-9-]{36}$/),
  socketPath:z.string().min(1).max(4096),daemonId:z.string().regex(/^[A-Za-z0-9:_-]{1,256}$/),imageId:image,contractSha256:hex,
  artifactRelativePath:z.literal('document').nullable(),artifactSha256:hex.nullable(),artifactBytes:z.number().int().nonnegative().max(64*1024*1024).nullable(),configSha256:hex,containerId:hex.nullable(),state:z.enum(['reserved','create_requested','created','start_requested','removed','uncertain']),
 }).strict();
 export type DockerParserResource=z.infer<typeof DockerParserResourceSchema>;
+// Parser records retain their original closed schema; only omp-b records carry
+// the explicit discriminator and source-free control-file identity.
+export const DockerOmpBResourceSchema=DockerParserResourceSchema.extend({
+ profile:z.literal('omp-b'),name:z.string().regex(/^stadtstack-omp-b-[a-f0-9-]{36}-[a-f0-9-]{36}$/),
+ artifactRelativePath:z.null(),artifactSha256:z.null(),artifactBytes:z.null(),
+ controlSha256:hex,controlBytes:z.number().int().positive().max(65536),
+}).strict();
+export const ManagedDockerResourceSchema=z.union([DockerParserResourceSchema,DockerOmpBResourceSchema]);
+export type ManagedDockerResource=z.infer<typeof ManagedDockerResourceSchema>;
+export type ManagedDockerIdentity=DockerParserIdentity|(DockerParserIdentity&{profile:'omp-b';controlSha256:string;controlBytes:number});
 export type DockerParserIdentity=Pick<DockerParserResource,'id'|'scratchId'|'rootId'|'authoritySha256'|'nonce'|'name'|'imageId'|'contractSha256'|'artifactRelativePath'|'artifactSha256'|'artifactBytes'>;
-export interface DockerParserOptions {socketPath:string;imageId:string;contractSha256:string;artifactRelativePath:'document'|null}
+export type ManagedDockerOptions=
+ |{profile?:'parser';socketPath:string;imageId:string;contractSha256:string;artifactRelativePath:'document'|null}
+ |{profile:'omp-b';socketPath:string;daemonId:string;imageId:string;contractSha256:string;controlSha256:string;controlBytes:number};
 export interface DockerAttach {stdin:Writable;stdout:Readable;stderr:Readable;failure:Promise<never>;ended:Promise<void>;close():void}
 export class DockerLifecycleError extends Error {
  readonly code:string;
- constructor(code:string){super('Managed Docker parser resource requires operator review');this.name='DockerLifecycleError';this.code=code;}
+ constructor(code:string){super('Managed Docker resource requires operator review');this.name='DockerLifecycleError';this.code=code;}
 }
 const labels=(resource:DockerParserIdentity)=>({'org.stadtstack.scratch':resource.scratchId,'org.stadtstack.resource':resource.id,'org.stadtstack.nonce':resource.nonce,'org.stadtstack.root':resource.rootId,'org.stadtstack.authority':resource.authoritySha256,'org.stadtstack.contract':resource.contractSha256,'org.stadtstack.input':resource.artifactSha256??'stdin-only','org.stadtstack.input-bytes':String(resource.artifactBytes??0)});
 function stable(value:unknown):string{
@@ -37,7 +50,25 @@ export function dockerParserConfig(resource:DockerParserIdentity,scratchDirector
   },
  };
 }
-export function dockerConfigSha256(resource:DockerParserIdentity,scratchDirectory:string):string{return hash(stable(dockerParserConfig(resource,scratchDirectory)));}
+export function ompExecutionArgs():string[]{return ['--print','--mode','json','--model','anthropic/claude-haiku-5-5','--thinking','off','--no-session','--no-tools','--no-lsp','--no-pty','--no-extensions','--no-skills','--no-rules','--no-title','--no-prewalk','--config','/opt/stadtstack/omp-b-settings.yml','--system-prompt','/control/system-prompt.md','--max-time',String(OMP_B_MODEL_MAX_TIME_SECONDS),'--cwd','/work'];}
+export function ompContainerEnvironment():string[]{return ['PATH=/usr/local/bin:/usr/bin:/bin','HOME=/home/omp','PI_CONFIG_DIR=.omp','PI_CODING_AGENT_DIR=/home/omp/.omp/agent','XDG_CONFIG_HOME=/home/omp/.config','XDG_DATA_HOME=/home/omp/.local/share','XDG_STATE_HOME=/home/omp/.local/state','XDG_CACHE_HOME=/home/omp/.cache','TMPDIR=/tmp','LANG=C.UTF-8','TZ=UTC','PI_NO_TITLE=1','PI_NO_PTY=1'];}
+export function dockerOmpBConfig(resource:DockerParserIdentity&{profile:'omp-b';controlSha256:string;controlBytes:number},scratchDirectory:string){
+ const environment=ompContainerEnvironment();
+ return {
+  Image:resource.imageId,User:'65534:65534',WorkingDir:'/work',OpenStdin:true,StdinOnce:true,Tty:false,AttachStdin:true,AttachStdout:true,AttachStderr:true,StopTimeout:1,
+  Env:environment,Entrypoint:['/usr/bin/env','-i',...environment,'/opt/stadtstack/entry.sh'],Cmd:ompExecutionArgs(),
+  Labels:{...labels(resource),'org.stadtstack.profile':'omp-b','org.stadtstack.control':resource.controlSha256,'org.stadtstack.control-bytes':String(resource.controlBytes)},
+  HostConfig:{ReadonlyRootfs:true,NetworkMode:'bridge',IpcMode:'none',Privileged:false,AutoRemove:false,CapDrop:['ALL'],CapAdd:[],SecurityOpt:['no-new-privileges:true'],Memory:536870912,MemorySwap:536870912,NanoCpus:1000000000,PidsLimit:32,
+   Ulimits:[{Name:'nofile',Soft:64,Hard:64},{Name:'nproc',Soft:32,Hard:32},{Name:'fsize',Soft:33554432,Hard:33554432},{Name:'core',Soft:0,Hard:0}],LogConfig:{Type:'none',Config:{}},
+   Tmpfs:Object.fromEntries(['/home/omp','/tmp','/work'].map(path=>[path,'rw,noexec,nosuid,nodev,size=67108864,uid=65534,gid=65534,mode=0700'])),
+   Mounts:[{Type:'bind',Source:join(scratchDirectory,'control'),Target:'/control',ReadOnly:true,BindOptions:{Propagation:'rprivate'}}],
+  },
+ };
+}
+export function managedDockerConfig(resource:ManagedDockerIdentity,scratchDirectory:string){
+ return 'profile' in resource?dockerOmpBConfig(resource,scratchDirectory):dockerParserConfig(resource,scratchDirectory);
+}
+export function dockerConfigSha256(resource:ManagedDockerIdentity,scratchDirectory:string):string{return hash(stable(managedDockerConfig(resource,scratchDirectory)));}
 /** Resolve an explicitly selected LOCAL Unix socket, never DOCKER_HOST or TCP. */
 export async function canonicalDockerSocket(input:string,fixtureRoot?:string):Promise<string>{
  if(!isAbsolute(input)||input.includes('\0')||input.split('/').some(part=>part==='..'))throw new DockerLifecycleError('DOCKER_SOCKET_UNSAFE');
@@ -71,18 +102,19 @@ export async function dockerDaemonIdentity(socketPath:string,signal?:AbortSignal
  if(result.status!==200)throw new DockerLifecycleError('DOCKER_UNAVAILABLE');
  return z.object({ID:z.string().regex(/^[A-Za-z0-9:_-]{1,256}$/)}).parse(result.value).ID;
 }
-async function sameDaemon(resource:DockerParserResource,fixtureRoot?:string,signal?:AbortSignal):Promise<void>{
+async function sameDaemon(resource:ManagedDockerResource,fixtureRoot?:string,signal?:AbortSignal):Promise<void>{
  signal?.throwIfAborted();if(await canonicalDockerSocket(resource.socketPath,fixtureRoot)!==resource.socketPath||await dockerDaemonIdentity(resource.socketPath,signal)!==resource.daemonId)throw new DockerLifecycleError('DOCKER_DAEMON_CHANGED');
 }
 const inspectSchema=z.object({Id:hex,Name:z.string(),Image:image,Config:z.record(z.string(),z.unknown()),HostConfig:z.record(z.string(),z.unknown()),State:z.object({Running:z.boolean()}).passthrough(),Mounts:z.array(z.record(z.string(),z.unknown())).optional(),NetworkSettings:z.object({Networks:z.record(z.string(),z.unknown()).optional()}).passthrough().optional()}).passthrough();
-export async function inspectDockerParser(resource:DockerParserResource,scratchDirectory:string,fixtureRoot?:string):Promise<{id:string;running:boolean}|null>{
+export async function inspectManagedDocker(resource:ManagedDockerResource,scratchDirectory:string,fixtureRoot?:string):Promise<{id:string;running:boolean}|null>{
  await sameDaemon(resource,fixtureRoot);const result=await engine(resource.socketPath,'GET','/containers/'+encodeURIComponent(resource.name)+'/json');
  if(result.status===404)return null;if(result.status!==200)throw new DockerLifecycleError('DOCKER_INSPECTION_FAILED');
- const value=inspectSchema.parse(result.value),expected=dockerParserConfig(resource,scratchDirectory);
+ const value=inspectSchema.parse(result.value),expected=managedDockerConfig(resource,scratchDirectory),omp='profile' in resource;
  if(value.Name!=='/'+resource.name||value.Image!==resource.imageId||resource.containerId!==null&&value.Id!==resource.containerId||resource.configSha256!==dockerConfigSha256(resource,scratchDirectory))throw new DockerLifecycleError('DOCKER_IDENTITY_MISMATCH');
  const actualLabels=z.record(z.string(),z.string()).parse(value.Config.Labels);
  for(const [key,expectedValue] of Object.entries(expected.Labels))if(actualLabels[key]!==expectedValue)throw new DockerLifecycleError('DOCKER_IDENTITY_MISMATCH');
  for(const key of ['User','WorkingDir','OpenStdin','StdinOnce','Tty','AttachStdin','AttachStdout','AttachStderr','Entrypoint','Cmd'] as const)if(stable(value.Config[key])!==stable(expected[key]))throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');
+ if(omp&&(value.Config.Image!==resource.imageId||!('Env' in expected)||stable(value.Config.Env)!==stable(expected.Env)||stable(actualLabels)!==stable(expected.Labels)))throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');
  // Inspect may include image/default fields; every explicitly constrained field
  // and every mount/security expansion is nevertheless checked, never trusted by name.
  for(const [key,expectedValue] of Object.entries(expected.HostConfig)){
@@ -93,44 +125,50 @@ export async function inspectDockerParser(resource:DockerParserResource,scratchD
  }
  for(const key of ['Binds','Devices','DeviceRequests','VolumesFrom','Links','PortBindings']){const valueAt=value.HostConfig[key];if(valueAt!==null&&valueAt!==undefined&&stable(valueAt)!=='[]'&&stable(valueAt)!=='{}')throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');}
  for(const key of ['PidMode','UTSMode'])if(value.HostConfig[key]!==undefined&&value.HostConfig[key]!=='')throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');
- const mounts=value.Mounts??[];
- for(const mount of mounts){
-  if(mount.Type==='tmpfs'&&mount.Destination==='/scratch')continue;
-  if(!resource.artifactRelativePath||mount.Type!=='bind'||mount.Source!==join(scratchDirectory,'document')||mount.Destination!=='/input/document'||mount.RW!==false||mount.Propagation!=='rprivate')throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');
+ if(omp){
+  for(const key of ['Volumes','ExposedPorts','Healthcheck','OnBuild']){const field=value.Config[key];if(field!==null&&field!==undefined&&stable(field)!=='{}'&&stable(field)!=='[]')throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');}
  }
- if(mounts.filter(mount=>mount.Type==='bind').length!==(resource.artifactRelativePath?1:0))throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');
- if(Object.keys(value.NetworkSettings?.Networks??{}).some(name=>name!=='none'))throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');
- if(value.Config.StopTimeout!==undefined&&value.Config.StopTimeout!==1)throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');
+ const mounts=value.Mounts??[],tmpfsPaths=Object.keys(expected.HostConfig.Tmpfs);
+ for(const mount of mounts){
+  if(mount.Type==='tmpfs'&&typeof mount.Destination==='string'&&tmpfsPaths.includes(mount.Destination))continue;
+  const bind=expected.HostConfig.Mounts[0];
+  if(!bind||mount.Type!=='bind'||mount.Source!==bind.Source||mount.Destination!==bind.Target||mount.RW!==false||mount.Propagation!=='rprivate')throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');
+ }
+ if(mounts.filter(mount=>mount.Type==='bind').length!==expected.HostConfig.Mounts.length)throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');
+ if(omp&&tmpfsPaths.some(path=>mounts.filter(mount=>mount.Type==='tmpfs'&&mount.Destination===path).length>1))throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');
+ const networks=Object.keys(value.NetworkSettings?.Networks??{});
+ if(networks.some(name=>name!==expected.HostConfig.NetworkMode)||omp&&value.State.Running&&(networks.length!==1||networks[0]!=='bridge'))throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');
+ if((omp||value.Config.StopTimeout!==undefined)&&value.Config.StopTimeout!==1)throw new DockerLifecycleError('DOCKER_CONTRACT_MISMATCH');
  return {id:value.Id,running:value.State.Running};
 }
-export async function createDockerParser(resource:DockerParserResource,scratchDirectory:string,fixtureRoot?:string):Promise<string>{
+export async function createManagedDocker(resource:ManagedDockerResource,scratchDirectory:string,fixtureRoot?:string):Promise<string>{
  await sameDaemon(resource,fixtureRoot);
- const result=await engine(resource.socketPath,'POST','/containers/create?name='+encodeURIComponent(resource.name),dockerParserConfig(resource,scratchDirectory));
+ const result=await engine(resource.socketPath,'POST','/containers/create?name='+encodeURIComponent(resource.name),managedDockerConfig(resource,scratchDirectory));
  if(result.status!==201)throw new DockerLifecycleError('DOCKER_CREATE_UNCERTAIN');
- const id=z.object({Id:hex}).passthrough().parse(result.value).Id,inspected=await inspectDockerParser({...resource,containerId:id},scratchDirectory,fixtureRoot);
+ const id=z.object({Id:hex}).passthrough().parse(result.value).Id,inspected=await inspectManagedDocker({...resource,containerId:id},scratchDirectory,fixtureRoot);
  if(!inspected||inspected.running)throw new DockerLifecycleError('DOCKER_CREATE_UNCERTAIN');return id;
 }
 /** Cleanup is independent of host-abort signals but not of daemon/ownership proof. */
-export async function removeDockerParser(resource:DockerParserResource,scratchDirectory:string,fixtureRoot?:string):Promise<void>{
- const observed=await inspectDockerParser(resource,scratchDirectory,fixtureRoot);
+export async function removeManagedDocker(resource:ManagedDockerResource,scratchDirectory:string,fixtureRoot?:string):Promise<void>{
+ const observed=await inspectManagedDocker(resource,scratchDirectory,fixtureRoot);
  if(!observed){if(resource.containerId===null&&resource.state!=='reserved'&&resource.state!=='removed')throw new DockerLifecycleError('DOCKER_CREATE_OUTCOME_UNCONFIRMED');return;}
  const result=await engine(resource.socketPath,'DELETE','/containers/'+encodeURIComponent(observed.id)+'?force=1&v=1');
  if(result.status!==204&&result.status!==404)throw new DockerLifecycleError('DOCKER_REMOVAL_UNCONFIRMED');
- if(await inspectDockerParser({...resource,containerId:observed.id},scratchDirectory,fixtureRoot))throw new DockerLifecycleError('DOCKER_REMOVAL_UNCONFIRMED');
+ if(await inspectManagedDocker({...resource,containerId:observed.id},scratchDirectory,fixtureRoot))throw new DockerLifecycleError('DOCKER_REMOVAL_UNCONFIRMED');
 }
-export async function startDockerParser(resource:DockerParserResource,scratchDirectory:string,fixtureRoot?:string):Promise<void>{
- const observed=await inspectDockerParser(resource,scratchDirectory,fixtureRoot);if(!observed||!resource.containerId||observed.running)throw new DockerLifecycleError('DOCKER_START_REJECTED');
+export async function startManagedDocker(resource:ManagedDockerResource,scratchDirectory:string,fixtureRoot?:string):Promise<void>{
+ const observed=await inspectManagedDocker(resource,scratchDirectory,fixtureRoot);if(!observed||!resource.containerId||observed.running)throw new DockerLifecycleError('DOCKER_START_REJECTED');
  const result=await engine(resource.socketPath,'POST','/containers/'+resource.containerId+'/start');if(result.status!==204)throw new DockerLifecycleError('DOCKER_START_UNCERTAIN');
 }
-export async function waitDockerParser(resource:DockerParserResource,fixtureRoot?:string,signal?:AbortSignal):Promise<{exitCode:number}>{
+export async function waitManagedDocker(resource:ManagedDockerResource,fixtureRoot?:string,signal?:AbortSignal):Promise<{exitCode:number}>{
  await sameDaemon(resource,fixtureRoot,signal);if(!resource.containerId)throw new DockerLifecycleError('DOCKER_IDENTITY_MISMATCH');
- const result=await engine(resource.socketPath,'POST','/containers/'+resource.containerId+'/wait?condition=not-running',undefined,185_000,signal);
+ const result=await engine(resource.socketPath,'POST','/containers/'+resource.containerId+'/wait?condition=not-running',undefined,'profile' in resource?245_000:185_000,signal);
  if(result.status!==200)throw new DockerLifecycleError('DOCKER_WAIT_UNAVAILABLE');
  const value=z.object({StatusCode:z.number().int().min(0).max(255),Error:z.object({Message:z.string()}).nullable().optional()}).parse(result.value);if(value.Error?.Message)throw new DockerLifecycleError('DOCKER_WAIT_FAILED');return {exitCode:value.StatusCode};
 }
 /** Non-TTY attach is opened before start. Payloads remain streams, never audit data. */
-export async function attachDockerParser(resource:DockerParserResource,scratchDirectory:string,fixtureRoot?:string):Promise<DockerAttach>{
- const observed=await inspectDockerParser(resource,scratchDirectory,fixtureRoot);if(!observed||!resource.containerId)throw new DockerLifecycleError('DOCKER_IDENTITY_MISMATCH');
+export async function attachManagedDocker(resource:ManagedDockerResource,scratchDirectory:string,fixtureRoot?:string):Promise<DockerAttach>{
+ const observed=await inspectManagedDocker(resource,scratchDirectory,fixtureRoot);if(!observed||!resource.containerId)throw new DockerLifecycleError('DOCKER_IDENTITY_MISMATCH');
  const {promise,resolve,reject}=Promise.withResolvers<DockerAttach>();
  const req=request({socketPath:resource.socketPath,method:'POST',path:'/containers/'+resource.containerId+'/attach?stream=1&stdin=1&stdout=1&stderr=1',headers:{connection:'Upgrade',upgrade:'tcp'}});let upgraded=false;
  const timer=setTimeout(()=>{req.destroy();reject(new DockerLifecycleError('DOCKER_ATTACH_UNAVAILABLE'));},30_000);

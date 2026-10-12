@@ -15,9 +15,13 @@ import type {ModelAnswer} from './district-model-contract.ts';
 import type {ReasonCode} from './district-step-receipt.ts';
 import {assertCivicPolicyAuthority,readCivicOptOutSnapshot,assertManagedSourceReadable,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyAuthorityReceipt} from './civic-opt-out.ts';
 import {ASSESSMENT_BRIDGE_VERSION,BRIDGE_LIMITS,BridgeLeaseSchema,BridgeRequestSchema,BridgeStatusSchema,BridgePurgeAckSchema,BridgeAnswerSchema,bridgeInputHash,type BridgeAnswer,type BridgeLease,type BridgeRequest,type BridgeStatus} from './district-assessment-bridge-contract.ts';
+import {runVmOmpAssessment,ompRunnerContractSha256,type OmpRunnerResult} from './district-omp-b-runner.ts';
 
 export const ASSESSMENT_B_STEP='assessment_b';
-export const AssessmentBSelectorSchema=z.object({version:z.literal(ASSESSMENT_BRIDGE_VERSION),role:z.literal('B'),provider:z.literal('anthropic-subscription'),requestedModel:z.literal('claude-haiku-5-5'),itemArtifactSha256:HashSchema,clientContractSha256:HashSchema}).strict();
+export const AssessmentBSelectorSchema=z.discriminatedUnion('transport',[
+ z.object({version:z.literal(ASSESSMENT_BRIDGE_VERSION),transport:z.literal('mac-bridge'),role:z.literal('B'),provider:z.literal('anthropic-subscription'),requestedModel:z.literal('claude-haiku-5-5'),itemArtifactSha256:HashSchema,clientContractSha256:HashSchema}).strict(),
+ z.object({version:z.literal(ASSESSMENT_BRIDGE_VERSION),transport:z.literal('vm-omp'),role:z.literal('B'),provider:z.literal('anthropic-subscription'),requestedModel:z.literal('claude-haiku-5-5'),itemArtifactSha256:HashSchema,runnerContractSha256:HashSchema}).strict(),
+]);
 type LeaseState='ready'|'active'|'held'|'expired'|'cancelled'|'submitted';
 interface LeaseRow extends QueryResultRow {id:string;job_id:string;run_id:string;fencing_token:string;item_sha256:string;request_artifact_sha256:string;request_sha256:string;input_sha256:string;authority_id:string;authority_sha256:string;policy_snapshot_sha256:string;client_contract_sha256:string;state:LeaseState;reason_code:ReasonCode|null;created_at:Date;deadline_at:Date;client_id:string|null;claimed_at:Date|null;expires_at:Date;receipt_sha256:string|null;purge_ack_sha256:string|null}
 interface JobAuthorityRow extends QueryResultRow {id:string;job_key:string;spec:DistrictJobSpec;fencing_token:string;state:string;lease_owner:string|null;lease_expires_at:Date|null;cancellation_requested:boolean;run_state:string;run_started_at:Date;run_max_elapsed_ms:number;authorization_id:string;approval_sha256:string;approved_by:string;approved_at:Date;expires_at:Date;allowed_job_keys:string[];allowed_ags:string[];max_jobs:number;max_elapsed_ms:number;jobs_started:number;first_started_at:Date|null;category:string;execution_mode:string;authorization_state:string;notification_approval_sha256:string|null;notification_destination_sha256:string|null;notification_provider:string|null;now:Date}
@@ -29,7 +33,7 @@ export interface RecordedBridgeAssessment {receipt:AssessmentReceipt;answer:Mode
 /** Pin implementation bytes as well as the frozen request contract. No guessed
  * policy source pin: a missing settled module prevents enqueue/execution. */
 export async function assessmentBJobContract():Promise<string>{
- const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-bridge-contract.ts','district-policy-receipt.ts','district-jobs.ts','district-cas.ts','district-claude.ts','district-model-contract.ts','civic-opt-out.ts','source-policy.ts','document-origin.ts'];
+ const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-bridge-contract.ts','district-policy-receipt.ts','district-jobs.ts','district-cas.ts','district-claude.ts','district-model-contract.ts','district-omp-b-runner.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh','civic-opt-out.ts','source-policy.ts','document-origin.ts'];
  return semanticHash({version:ASSESSMENT_BRIDGE_VERSION,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))})))});
 }
 function hardDeadline(row:JobAuthorityRow):number{
@@ -174,7 +178,7 @@ export class DistrictAssessmentBroker {
  async prepare(job:ClaimedJob,signal:AbortSignal):Promise<string>{
   signal.throwIfAborted();
   const selector=AssessmentBSelectorSchema.parse(job.spec.selector);
-  if(job.spec.step!==ASSESSMENT_B_STEP||job.spec.lane!=='assessment'||job.spec.semanticContractSha256!==await assessmentBJobContract()||canonicalJobIdentity(job.spec).jobKey!==job.jobKey)throw new DistrictExecutionHold('quality_failed');
+  if(job.spec.step!==ASSESSMENT_B_STEP||job.spec.lane!=='assessment'||job.spec.semanticContractSha256!==await assessmentBJobContract()||canonicalJobIdentity(job.spec).jobKey!==job.jobKey||selector.transport==='vm-omp'&&selector.runnerContractSha256!==await ompRunnerContractSha256())throw new DistrictExecutionHold('quality_failed');
   return this.transaction(async client=>{
    const current=await this.job(client,job.id,job.runId),reason=disposition(current,job.runId,job.fencingToken);
    if(reason)throw new DistrictExecutionHold(reason);
@@ -189,13 +193,14 @@ export class DistrictAssessmentBroker {
    signal.throwIfAborted();
    const request=await this.persist(client,Buffer.from(canonicalJson(checked.data)),'derived',checked.sources,job.jobKey);
    const id=randomUUID(),deadline=new Date(Math.min(hardDeadline(current),checked.validUntil,current.now.getTime()+BRIDGE_LIMITS.maxLeaseMs));
-   const binding={jobKey:job.jobKey,authorityId:checked.sourceAuthority.authorityId,authoritySha256:checked.sourceAuthority.authoritySha256,policySnapshotSha256:checked.policySnapshotSha256,role:'B' as const,provider:'anthropic-subscription' as const,requestedModel:'claude-haiku-5-5' as const,system:PROMPTS.B,data:checked.data,outputSchema:z.toJSONSchema(assessmentOutputSchema),clientContractSha256:selector.clientContractSha256};
+   const clientContractSha256=selector.transport==='mac-bridge'?selector.clientContractSha256:selector.runnerContractSha256;
+   const binding={jobKey:job.jobKey,authorityId:checked.sourceAuthority.authorityId,authoritySha256:checked.sourceAuthority.authoritySha256,policySnapshotSha256:checked.policySnapshotSha256,role:'B' as const,provider:'anthropic-subscription' as const,requestedModel:'claude-haiku-5-5' as const,system:PROMPTS.B,data:checked.data,outputSchema:z.toJSONSchema(assessmentOutputSchema),clientContractSha256};
    const inputSha256=bridgeInputHash(binding);
    const latest=await this.job(client,job.id,job.runId),latestReason=disposition(latest,job.runId,job.fencingToken);
    if(latestReason)throw new DistrictExecutionHold(latestReason);
    if(deadline<=latest.now)throw new DistrictExecutionHold('lease_expired');
    signal.throwIfAborted();
-   await client.query(`INSERT INTO district_pipeline.assessment_bridge_leases(id,job_id,run_id,fencing_token,item_sha256,request_artifact_sha256,request_sha256,input_sha256,authority_id,authority_sha256,policy_snapshot_sha256,client_contract_sha256,role,provider,requested_model,state,deadline_at,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'B','anthropic-subscription','claude-haiku-5-5','ready',$13,$13)`,[id,job.id,job.runId,job.fencingToken,selector.itemArtifactSha256,request.sha256,assessmentDigest(checked.data),inputSha256,binding.authorityId,binding.authoritySha256,checked.policySnapshotSha256,selector.clientContractSha256,deadline]);
+   await client.query(`INSERT INTO district_pipeline.assessment_bridge_leases(id,job_id,run_id,fencing_token,item_sha256,request_artifact_sha256,request_sha256,input_sha256,authority_id,authority_sha256,policy_snapshot_sha256,client_contract_sha256,role,provider,requested_model,state,deadline_at,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'B','anthropic-subscription','claude-haiku-5-5','ready',$13,$13)`,[id,job.id,job.runId,job.fencingToken,selector.itemArtifactSha256,request.sha256,assessmentDigest(checked.data),inputSha256,binding.authorityId,binding.authoritySha256,checked.policySnapshotSha256,clientContractSha256,deadline]);
    await client.query('INSERT INTO district_pipeline.assessment_bridge_events(id,lease_id,state,reason_code) VALUES($1,$2,\'ready\',\'completed\')',[randomUUID(),id]);
    return id;
   });
@@ -214,7 +219,8 @@ export class DistrictAssessmentBroker {
    const located=await client.query<LeaseRow>(request.operation==='claim'?'SELECT b.* FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1 ORDER BY b.created_at DESC,b.id DESC LIMIT 1':'SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1',[request.operation==='claim'?request.jobKey:request.leaseId]);
    if(located.rows.length!==1)throw new DistrictExecutionHold('dependency_uncommitted');
    const identity=located.rows[0];
-   await this.job(client,identity.job_id,identity.run_id);
+   const authority=await this.job(client,identity.job_id,identity.run_id),selector=AssessmentBSelectorSchema.parse(authority.spec.selector);
+   if(selector.transport!=='mac-bridge')throw new DistrictExecutionHold('isolation_unavailable');
    const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[identity.id]);
    if(found.rows.length!==1)throw new DistrictExecutionHold('lease_lost');
    const row=found.rows[0];
@@ -271,6 +277,8 @@ export class DistrictAssessmentBroker {
   return status(row);
  }
  async waitForAssessment(job:ClaimedJob,signal:AbortSignal):Promise<JobHandlerResult>{
+  const selector=AssessmentBSelectorSchema.parse(job.spec.selector);
+  if(selector.transport!=='mac-bridge')throw new DistrictExecutionHold('quality_failed');
   try{
    await this.prepare(job,signal);
    for(;;){
@@ -286,7 +294,8 @@ export class DistrictAssessmentBroker {
      if(row.state!=='submitted')return {outcome:'held_execution' as const,reasonCode:row.reason_code??'execution_exception'};
      if('reason' in checked)throw new DistrictExecutionHold(checked.reason);
      const submission=await client.query<SubmissionRow>('SELECT * FROM district_pipeline.assessment_bridge_submissions WHERE lease_id=$1',[row.id]),saved=submission.rows[0];
-     if(!saved||saved.state!=='accepted'||!saved.receipt_artifact_sha256||!row.purge_ack_sha256)throw new DistrictExecutionHold('quality_failed');
+     const selector=AssessmentBSelectorSchema.parse(job.spec.selector);
+     if(!saved||saved.state!=='accepted'||!saved.receipt_artifact_sha256||selector.transport==='mac-bridge'&&!row.purge_ack_sha256)throw new DistrictExecutionHold('quality_failed');
      const receipt=validateReceipt(JSON.parse((await this.cas.read(saved.receipt_artifact_sha256)).toString('utf8')),checked.checked.item,'B');
      if(receipt.requestSha256!==row.request_sha256||receipt.provider!=='anthropic-subscription'||receipt.dependencies.length)throw new DistrictExecutionHold('quality_failed');
      const hashes=[row.request_artifact_sha256,saved.provider_response_sha256,saved.answer_artifact_sha256,saved.receipt_artifact_sha256,saved.reconciliation_input_sha256];
@@ -303,12 +312,88 @@ export class DistrictAssessmentBroker {
    if(signal.aborted)await this.transaction(async client=>{await this.job(client,job.id,job.runId);const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE job_id=$1 AND run_id=$2 AND fencing_token=$3 FOR UPDATE',[job.id,job.runId,job.fencingToken]);if(found.rows[0])await this.hold(client,found.rows[0],signal.reason instanceof DistrictExecutionHold?signal.reason.reasonCode:'owner_stopped');});
   }
  }
+ async waitForVmOmpAssessment(job:ClaimedJob,signal:AbortSignal):Promise<JobHandlerResult>{
+  let leaseId:string|undefined;
+  try{
+   const selector=AssessmentBSelectorSchema.parse(job.spec.selector);
+   if(selector.transport!=='vm-omp'||selector.runnerContractSha256!==await ompRunnerContractSha256())throw new DistrictExecutionHold('quality_failed');
+   leaseId=await this.prepare(job,signal);
+   const prepared=await this.transaction(async client=>{
+    const authority=await this.job(client,job.id,job.runId),reason=disposition(authority,job.runId,job.fencingToken);
+    if(reason)throw new DistrictExecutionHold(reason);
+    const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]);
+    const row=found.rows[0];if(!row||row.state!=='ready'||row.fencing_token!==job.fencingToken)throw new DistrictExecutionHold('lease_lost');
+    const current=await this.current(client,row);if('reason' in current)throw new DistrictExecutionHold(current.reason);
+    const clock=await client.query<{now:Date}>('SELECT clock_timestamp() AS now'),claimedAt=clock.rows[0]!.now;
+    if(row.deadline_at<=claimedAt||current.checked.validUntil<=claimedAt.getTime())throw new DistrictExecutionHold('lease_expired');
+    const expiresAt=new Date(Math.min(claimedAt.getTime()+BRIDGE_LIMITS.maxLeaseMs,row.deadline_at.getTime(),hardDeadline(current.job),current.checked.validUntil));
+    if(expiresAt<=claimedAt)throw new DistrictExecutionHold('lease_expired');
+    const intentSha256=semanticHash({version:ASSESSMENT_BRIDGE_VERSION,leaseId:row.id,jobKey:job.jobKey,runId:job.runId,fencingToken:job.fencingToken,inputSha256:row.input_sha256,clientId:'vm-omp-docker',provider:'anthropic-subscription',model:'claude-haiku-5-5'});
+    await client.query('INSERT INTO district_pipeline.assessment_bridge_submission_intents(lease_id,job_id,run_id,fencing_token,input_sha256,intent_sha256,client_id) VALUES($1,$2,$3,$4,$5,$6,$7)',[row.id,job.id,job.runId,job.fencingToken,row.input_sha256,intentSha256,'vm-omp-docker']);
+    await client.query(`UPDATE district_pipeline.assessment_bridge_leases SET state='active',client_id='vm-omp-docker',claimed_at=$2,expires_at=$3,last_checked_at=$2 WHERE id=$1`,[row.id,claimedAt,expiresAt]);
+    row.state='active';row.client_id='vm-omp-docker';row.claimed_at=claimedAt;row.expires_at=expiresAt;
+    await this.event(client,row,'active','completed');
+    return {row,checked:current.checked,intentSha256,claimedAt};
+   });
+   signal.throwIfAborted();
+   let run:OmpRunnerResult;
+   try{run=await runVmOmpAssessment(prepared.checked.data,{
+    ...this.context.policyOptions,root:this.cas.root,kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,
+    authorityId:prepared.checked.sourceAuthority.authorityId,authoritySha256:prepared.checked.sourceAuthority.authoritySha256,
+    bindings:prepared.checked.sources.map(source=>({kind:'prepared_source',url:source.url,sourceSha256:source.sha256,observationId:prepared.row.id,receiptSha256:source.policyReceiptSha256})),
+   },signal,{beforeHandoff:async()=>{
+    await this.transaction(async client=>{
+     const authority=await this.job(client,job.id,job.runId),authorityReason=disposition(authority,job.runId,job.fencingToken);
+     if(authorityReason)throw new DistrictExecutionHold(authorityReason);
+     const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]),row=found.rows[0];
+     if(!row||row.state!=='active'||row.fencing_token!==job.fencingToken)throw new DistrictExecutionHold('lease_lost');
+     const current=await this.current(client,row);if('reason' in current)throw new DistrictExecutionHold(current.reason);
+    });
+   }});}catch(error){
+    const reason=error instanceof DistrictExecutionHold?error.reasonCode:'execution_exception';
+    await this.transaction(async client=>{await this.job(client,job.id,job.runId);const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]);if(found.rows[0])await this.hold(client,found.rows[0],reason);});
+    return {outcome:'held_execution',reasonCode:reason};
+   }
+   const result=await this.transaction(async client=>{
+    const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]),row=found.rows[0];
+    if(!row||row.state!=='active'||row.fencing_token!==job.fencingToken)throw new DistrictExecutionHold('lease_lost');
+    const checked=await this.current(client,row);
+    if('reason' in checked){await this.hold(client,row,checked.reason);return {outcome:'held_execution' as const,reasonCode:checked.reason};}
+    const receivedAt=(await client.query<{now:Date}>('SELECT clock_timestamp() AS now')).rows[0]!.now;
+    const receipt=createAssessmentReceipt(checked.checked.item,'B',run.answer,{startedAt:run.startedAt,finishedAt:run.finishedAt},checked.checked.evidence);
+    if(receipt.requestSha256!==row.request_sha256||receipt.dependencies.length||receipt.provider!=='anthropic-subscription'||Date.parse(run.startedAt)<prepared.claimedAt.getTime()||Date.parse(run.finishedAt)>Math.min(row.expires_at.getTime(),receivedAt.getTime()))throw new DistrictExecutionHold('quality_failed');
+    const transport={selector:'anthropic/claude-haiku-5-5',transport:'vm-omp-docker',transportMayInternallyRetry:true,internalRetryDisclosure:'Provider transient retries may occur up to ten times with one authentication retry; usage covers only the final attempt.',usageScope:'final_attempt_only',networkDisclosure:'Default bridge egress permits inference and may permit shared model-catalog refreshes; no egress-only inference restriction is enforced.',promptDisclosure:'Stock omp may append generated context, footer, date, or cwd material despite the pinned system-prompt file.',imageId:run.imageId,settingsSha256:run.settingsSha256,systemPromptSha256:run.systemPromptSha256,accountLabelSha256:run.accountLabelSha256,runnerContractSha256:run.runnerContractSha256};
+    const response=await this.persist(client,Buffer.from(run.stdout),'provider_response',checked.checked.sources,row.id,'application/x-ndjson');
+    const answer=await this.persist(client,Buffer.from(canonicalJson({version:'assessment-vm-omp-answer-v1',inputSha256:row.input_sha256,responseArtifactSha256:response.sha256,modelAnswer:run.answer,transport,startedAt:run.startedAt,finishedAt:run.finishedAt})),'derived',checked.checked.sources,row.id);
+    const savedReceipt=await this.persist(client,Buffer.from(canonicalJson(receipt)),'receipt',checked.checked.sources,row.id);
+    const reconciliation=await this.persist(client,Buffer.from(canonicalJson({version:'assessment-vm-omp-reconciliation-v1',itemArtifactSha256:row.item_sha256,requestArtifactSha256:row.request_artifact_sha256,requestSha256:row.request_sha256,inputSha256:row.input_sha256,receiptArtifactSha256:savedReceipt.sha256,B:receipt,deterministicIssues:receipt.deterministicIssues,disposition:'assessment_recorded',providerResponseArtifactSha256:response.sha256,transport})),'derived',checked.checked.sources,row.id);
+    const final=await this.current(client,row);
+    if('reason' in final){await this.hold(client,row,final.reason);return {outcome:'held_execution' as const,reasonCode:final.reason};}
+    await client.query(`INSERT INTO district_pipeline.assessment_bridge_submissions(lease_id,submission_sha256,provider_response_sha256,answer_artifact_sha256,receipt_artifact_sha256,reconciliation_input_sha256,provider_request_id,provider_response_id,state,reason_code) VALUES($1,$2,$3,$4,$5,$6,NULL,NULL,'accepted','completed')`,[row.id,semanticHash({leaseId:row.id,inputSha256:row.input_sha256,responseSha256:run.answer.responseSha256}),response.sha256,answer.sha256,savedReceipt.sha256,reconciliation.sha256]);
+    await client.query(`UPDATE district_pipeline.assessment_bridge_leases SET state='submitted',reason_code='completed',receipt_sha256=$2 WHERE id=$1`,[row.id,savedReceipt.sha256]);
+    row.state='submitted';row.receipt_sha256=savedReceipt.sha256;await this.event(client,row,'submitted','completed');
+    const hashes=[row.request_artifact_sha256,response.sha256,answer.sha256,savedReceipt.sha256,reconciliation.sha256];
+    const artifacts=await client.query<{sha256:string;kind:ArtifactKind;mime_type:string;byte_length:string;storage_key:string;disposition:string}>('SELECT * FROM district_pipeline.artifacts WHERE sha256=ANY($1::text[])',[hashes]);
+    if(artifacts.rows.length!==new Set(hashes).size||artifacts.rows.some(item=>item.disposition!=='retained'))throw new DistrictExecutionHold('policy_excluded');
+    const tokens=receipt.usage.topLevel;
+    return {outcome:receipt.deterministicIssues.length||receipt.output.outcome==='unresolved'?'held_quality' as const:'succeeded' as const,reasonCode:receipt.deterministicIssues.length||receipt.output.outcome==='unresolved'?'quality_failed' as const:'completed' as const,outputs:artifacts.rows.map(item=>({sha256:item.sha256,byteLength:Number(item.byte_length),kind:item.kind,mimeType:item.mime_type,storageKey:item.storage_key})),versions:{assessment:ASSESSMENT_BRIDGE_VERSION,role:'B',transport:'vm-omp-docker',runnerContractSha256:run.runnerContractSha256,imageId:run.imageId,settingsSha256:run.settingsSha256,systemPromptSha256:run.systemPromptSha256,accountLabelSha256:run.accountLabelSha256,transportMayInternallyRetry:'true'},provider:{provider:receipt.provider,endpoint:'omp-cli-vm-docker',requestedModel:receipt.requestedModel,returnedModel:receipt.returnedModel,requestId:null,responseId:null,requestSha256:receipt.requestSha256,responseSha256:receipt.responseSha256,batchId:null,customId:job.jobKey,submissionIntentSha256:prepared.intentSha256,tokens:{standardInput:tokens?.inputTokens??null,cacheWriteInput:tokens?.cacheCreationTokens??null,cacheReadInput:tokens?.cacheReadTokens??null,output:tokens?.outputTokens??null},actualBilledUsd:null,estimatedApiUsd:receipt.estimatedApiUsd,currency:'USD' as const,rateCardDate:null,rateCardSha256:null,reservedMicroUsd:0,subscriptionUsage:{availability:'unavailable' as const,units:null}}};
+   });
+   return result;
+  }catch(error){
+   if(leaseId)try{await this.transaction(async client=>{await this.job(client,job.id,job.runId);const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]);if(found.rows[0])await this.hold(client,found.rows[0],error instanceof DistrictExecutionHold?error.reasonCode:'execution_exception');});}catch{}
+   if(error instanceof DistrictExecutionHold)throw error;
+   throw new DistrictExecutionHold('execution_exception');
+  }finally{
+   if(signal.aborted&&leaseId)await this.transaction(async client=>{await this.job(client,job.id,job.runId);const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]);if(found.rows[0])await this.hold(client,found.rows[0],'owner_stopped');});
+  }
+ }
 }
 
 /** Fixed registry entry. Never run Codex in place of offline/unavailable Haiku. */
-export function assessmentBJobHandler(broker:DistrictAssessmentBroker):JobHandler{return ({job,signal,cas})=>{if(cas.root!==broker.cas.root)throw new DistrictExecutionHold('cas_unavailable');return broker.waitForAssessment(job,signal);};}
-export async function enqueueAssessmentB(broker:DistrictAssessmentBroker,input:{itemArtifactSha256:string;sourceScope:AdapterScope;policyProofSha256:string;clientContractSha256:string}):Promise<string>{
- const selector=AssessmentBSelectorSchema.parse({version:ASSESSMENT_BRIDGE_VERSION,role:'B',provider:'anthropic-subscription',requestedModel:'claude-haiku-5-5',itemArtifactSha256:input.itemArtifactSha256,clientContractSha256:input.clientContractSha256});
+export function assessmentBJobHandler(broker:DistrictAssessmentBroker):JobHandler{return ({job,signal,cas})=>{if(cas.root!==broker.cas.root)throw new DistrictExecutionHold('cas_unavailable');const selector=AssessmentBSelectorSchema.parse(job.spec.selector);return selector.transport==='vm-omp'?broker.waitForVmOmpAssessment(job,signal):broker.waitForAssessment(job,signal);};}
+export async function enqueueAssessmentB(broker:DistrictAssessmentBroker,input:({itemArtifactSha256:string;sourceScope:AdapterScope;policyProofSha256:string;transport:'mac-bridge';clientContractSha256:string}|{itemArtifactSha256:string;sourceScope:AdapterScope;policyProofSha256:string;transport:'vm-omp'})):Promise<string>{
+ const base={version:ASSESSMENT_BRIDGE_VERSION,role:'B',provider:'anthropic-subscription',requestedModel:'claude-haiku-5-5',itemArtifactSha256:input.itemArtifactSha256};
+ const selector=AssessmentBSelectorSchema.parse(input.transport==='mac-bridge'?{...base,transport:input.transport,clientContractSha256:input.clientContractSha256}:{...base,transport:input.transport,runnerContractSha256:await ompRunnerContractSha256()});
  const item=assessmentItemSchema.parse(JSON.parse((await broker.cas.read(selector.itemArtifactSha256)).toString('utf8')));
  return broker.store.enqueue({step:ASSESSMENT_B_STEP,lane:'assessment',semanticContractSha256:await assessmentBJobContract(),inputArtifactHashes:[...new Set([selector.itemArtifactSha256,...assessmentEvidenceArtifactHashes(item)])].sort(),sourceScope:ScopeSchema.parse(input.sourceScope),selector,policyProofSha256:HashSchema.parse(input.policyProofSha256)});
 }

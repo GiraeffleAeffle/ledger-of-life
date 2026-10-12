@@ -14,8 +14,8 @@ import {parseArgs} from 'node:util';
 import {z} from 'zod';
 import {SourceAccessPolicySchema,ContentFreeSourcePolicySchema} from './district-schema.ts';
 import {effectiveSourcePermission} from './source-policy.ts';
-import {DockerParserResourceSchema,canonicalDockerSocket,dockerDaemonIdentity,dockerConfigSha256,createDockerParser,attachDockerParser,startDockerParser,waitDockerParser,removeDockerParser} from './civic-docker.ts';
-import type {DockerParserResource,DockerAttach} from './civic-docker.ts';
+import {ManagedDockerResourceSchema,canonicalDockerSocket,dockerDaemonIdentity,dockerConfigSha256,createManagedDocker,attachManagedDocker,startManagedDocker,waitManagedDocker,removeManagedDocker} from './civic-docker.ts';
+import type {ManagedDockerResource,ManagedDockerOptions,DockerAttach} from './civic-docker.ts';
 
 const WEEK=7*24*60*60*1000,MAX_STATE=16*1024*1024,MAX_CONTENT=512*1024*1024,MAX_FILES=100_000,MAX_SCRATCH_FILES=512;
 const digest=(bytes:string|Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
@@ -58,7 +58,7 @@ const scratchSchema=z.object({
  id:z.string().uuid(),rootId:hex,directory:z.string(),purpose:z.enum(['document','classification','openai','artifact']),createdAt:timestamp,ownerPid:z.number().int().positive(),
  identity:identitySchema.nullable(),state:z.enum(['planned','active','closing','closed','purged','partial']),sources:z.array(scratchSourceSchema).min(1).max(10_000),
  groups:z.array(z.object({pid:z.number().int().positive(),settled:z.boolean()}).strict()).max(256),
- resources:z.array(DockerParserResourceSchema).max(16).default([]),
+ resources:z.array(ManagedDockerResourceSchema).max(16).default([]),
  tombstones:z.array(z.object({pathSha256:hex,contentSha256:hex,bytes:z.number().int().nonnegative()}).strict()).max(MAX_SCRATCH_FILES),
 }).strict();
 const inventorySchema=z.object({schemaVersion:z.literal(1),inventoryId:z.string().uuid(),roots:z.array(rootSchema).max(10_000),entries:z.array(entrySchema).max(MAX_FILES),scratch:z.array(scratchSchema).max(MAX_FILES).default([])}).strict();
@@ -129,14 +129,13 @@ export type ManagedSourceContent=ManagedSourceBinding&{relativePath:string;conte
 export type ManagedScratchBinding=ManagedSourceBinding|{phase:'pre-admission'|'preparation-input';url:string;sourceSha256:string};
 export interface ManagedSourceReadOptions extends CivicPolicyOptions {sourceUrl?:string;purpose?:'historical_change_reconstruction_only'}
 export interface ManagedSourceContext extends ManagedAcquisitionLaneOptions {root:string;bindings:ManagedScratchBinding[]}
-export interface ManagedDockerParserOptions {socketPath:string;imageId:string;contractSha256:string;artifactRelativePath:'document'|null}
 export interface ManagedDockerSession {stdin:Writable;stdout:Readable;stderr:Readable;completion:Promise<{exitCode:number}>}
 export interface ManagedDockerContainer {readonly id:string;readonly name:string;start():Promise<ManagedDockerSession>;wait():Promise<{exitCode:number}>;remove():Promise<void>}
 export interface ManagedSourceScratch {
  directory:string;signal:AbortSignal;assertActive():Promise<void>;
  writeSource(relativePath:string,bytes:Uint8Array):Promise<void>;
  spawn(file:string,args:string[],options?:{env?:NodeJS.ProcessEnv}):Promise<ChildProcessWithoutNullStreams>;
- createContainer(options:ManagedDockerParserOptions):Promise<ManagedDockerContainer>;
+ createContainer(options:ManagedDockerOptions):Promise<ManagedDockerContainer>;
 }
 export class HostOptedOutError extends Error {
  readonly code='HOST_OPTED_OUT';readonly host:string;
@@ -747,7 +746,7 @@ async function cleanScratch(inventory:Inventory,lease:ScratchLease,policy:CivicP
  let resourcesRemoved=true;
  if(lease.resources.length){
   const authority=await assertCivicPolicyAuthority(policy),fixtureRoot=authority.mode==='isolated-fixture'?dirname(statePath(policy)):undefined;
-  for(const resource of lease.resources)try{await removeDockerParser(resource,join(root.path,lease.directory),fixtureRoot);resource.state='removed';}catch{resource.state='uncertain';resourcesRemoved=false;issue('daemon_resource_pending');}
+  for(const resource of lease.resources)try{await removeManagedDocker(resource,join(root.path,lease.directory),fixtureRoot);resource.state='removed';}catch{resource.state='uncertain';resourcesRemoved=false;issue('daemon_resource_pending');}
  }
  if(!resourcesRemoved){lease.state='partial';return false;}
  for(const group of lease.groups){if(!group.settled&&processExists(group.pid,true)){issue('scratch_processes_active');return false;}group.settled=true;}
@@ -835,14 +834,29 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
   async createContainer(spec){
    if(sources.some(source=>['authenticated_git_snapshot','operator_registry_config'].includes(source.kind)))throw new CivicPolicyStateError('NON_SOURCE_PROVENANCE_NATIVE_DENIED');
    await assertActive();
-   if(options.purpose==='openai'||!/^sha256:[a-f0-9]{64}$/.test(spec.imageId)||!hex.safeParse(spec.contractSha256).success||spec.artifactRelativePath!==null&&spec.artifactRelativePath!=='document')throw new CivicPolicyStateError('DOCKER_CONTRACT_INVALID');
+   const omp=spec.profile==='omp-b';
+   if(options.purpose==='openai'||!/^sha256:[a-f0-9]{64}$/.test(spec.imageId)||!hex.safeParse(spec.contractSha256).success
+    ||omp&&(options.purpose!=='artifact'||!hex.safeParse(spec.controlSha256).success||!Number.isSafeInteger(spec.controlBytes)||spec.controlBytes<1||spec.controlBytes>65536)
+    ||!omp&&(spec.profile!==undefined&&spec.profile!=='parser'||spec.artifactRelativePath!==null&&spec.artifactRelativePath!=='document'))throw new CivicPolicyStateError('DOCKER_CONTRACT_INVALID');
    const fixtureRoot=authority.mode==='isolated-fixture'?dirname(state):undefined,socketPath=await canonicalDockerSocket(spec.socketPath,fixtureRoot);
    if(contained(state,socketPath)||contained(scratchDirectory,socketPath))throw new CivicPolicyStateError('DOCKER_SOCKET_UNSAFE');
    const daemonId=await dockerDaemonIdentity(socketPath),nonce=randomUUID(),resourceId=randomUUID();
    let artifactSha256:string|null=null,artifactBytes:number|null=null;
-   if(spec.artifactRelativePath){const input=await fileDigest(join(scratchDirectory,'document'));if((input.stat.mode&0o222)!==0||input.stat.size>64*1024*1024)throw new CivicPolicyStateError('DOCKER_INPUT_NOT_IMMUTABLE');artifactSha256=input.sha256;artifactBytes=input.stat.size;}
-   const identity={id:resourceId,scratchId:id,rootId:root.id,authoritySha256:authority.authoritySha256,nonce,name:'stadtstack-parser-'+id+'-'+nonce,socketPath,daemonId,imageId:spec.imageId,contractSha256:spec.contractSha256,artifactRelativePath:spec.artifactRelativePath,artifactSha256,artifactBytes};
-   const resource:DockerParserResource=DockerParserResourceSchema.parse({...identity,configSha256:dockerConfigSha256(identity,scratchDirectory),containerId:null,state:'reserved'});
+   const verifyControl=async()=>{
+    if(spec.profile!=='omp-b')return;
+    const folder=join(scratchDirectory,'control'),metadata=await directory(folder);
+    if((metadata.mode&0o022)!==0)throw new CivicPolicyStateError('DOCKER_INPUT_NOT_IMMUTABLE');
+    const entries=[];for await(const entry of await opendir(folder))entries.push(entry);
+    if(entries.length!==1||entries[0]!.name!=='system-prompt.md'||!entries[0]!.isFile())throw new CivicPolicyStateError('DOCKER_CONTROL_INVALID');
+    const input=await fileDigest(join(folder,'system-prompt.md'));
+    if((input.stat.mode&0o222)!==0||input.sha256!==spec.controlSha256||input.stat.size!==spec.controlBytes)throw new CivicPolicyStateError('DOCKER_INPUT_CHANGED');
+   };
+   if(spec.profile==='omp-b'){await verifyControl();if(daemonId!==spec.daemonId)throw new CivicPolicyStateError('DOCKER_DAEMON_CHANGED');}
+   else if(spec.artifactRelativePath){const input=await fileDigest(join(scratchDirectory,'document'));if((input.stat.mode&0o222)!==0||input.stat.size>64*1024*1024)throw new CivicPolicyStateError('DOCKER_INPUT_NOT_IMMUTABLE');artifactSha256=input.sha256;artifactBytes=input.stat.size;}
+   const identity={id:resourceId,scratchId:id,rootId:root.id,authoritySha256:authority.authoritySha256,nonce,name:(omp?'stadtstack-omp-b-':'stadtstack-parser-')+id+'-'+nonce,socketPath,daemonId,imageId:spec.imageId,contractSha256:spec.contractSha256,
+    artifactRelativePath:spec.profile==='omp-b'?null:spec.artifactRelativePath,artifactSha256,artifactBytes,
+    ...(spec.profile==='omp-b'?{profile:'omp-b' as const,controlSha256:spec.controlSha256,controlBytes:spec.controlBytes}:{})};
+   const resource:ManagedDockerResource=ManagedDockerResourceSchema.parse({...identity,configSha256:dockerConfigSha256(identity,scratchDirectory),containerId:null,state:'reserved'});
    const persist=async()=>{
     await locked(policy,async()=>{const inventory=await loadInventory(state),current=inventory.scratch.find(item=>item.id===id),stored=current?.resources.find(item=>item.id===resourceId);
      if(!current||!stored||stored.nonce!==resource.nonce||stored.configSha256!==resource.configSha256||stored.containerId!==null&&stored.containerId!==resource.containerId)throw new CivicPolicyStateError('DAEMON_RESOURCE_BINDING_MISMATCH');
@@ -857,7 +871,7 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
     if(removal)return removal;
     removal=(async()=>{
      waitCancellation.abort();attachment?.close();await assertCivicPolicyAuthority(policy);
-     try{await removeDockerParser(resource,scratchDirectory,fixtureRoot);resource.state='removed';await persist();}
+     try{await removeManagedDocker(resource,scratchDirectory,fixtureRoot);resource.state='removed';await persist();}
      catch(error){resource.state='uncertain';await persist();throw error;}
     })().finally(()=>{removal=undefined;});
     return removal;
@@ -865,17 +879,18 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
    daemonRemovers.add(remove);
    try{
     await assertActive();resource.state='create_requested';await persist();
-    resource.containerId=await createDockerParser(resource,scratchDirectory,fixtureRoot);resource.state='created';await persist();await assertActive();
+    resource.containerId=await createManagedDocker(resource,scratchDirectory,fixtureRoot);resource.state='created';await persist();await assertActive();
    }catch(error){resource.state='uncertain';await persist();throw error;}
    return {
     get id(){return resource.containerId!;},name:resource.name,remove,
     async start(){
      await assertActive();if(started||resource.state!=='created')throw new CivicPolicyStateError('DOCKER_START_REJECTED');started=true;
      if(resource.artifactRelativePath){const input=await fileDigest(join(scratchDirectory,'document'));if(input.sha256!==resource.artifactSha256||input.stat.size!==resource.artifactBytes||(input.stat.mode&0o222)!==0)throw new CivicPolicyStateError('DOCKER_INPUT_CHANGED');}
-     attachment=await attachDockerParser(resource,scratchDirectory,fixtureRoot);
-     await assertActive();resource.state='start_requested';await persist();await startDockerParser(resource,scratchDirectory,fixtureRoot);
+     await verifyControl();
+     attachment=await attachManagedDocker(resource,scratchDirectory,fixtureRoot);
+     await assertActive();resource.state='start_requested';await persist();await startManagedDocker(resource,scratchDirectory,fixtureRoot);
      const attached=attachment;
-     completion=Promise.race([Promise.all([waitDockerParser(resource,fixtureRoot,waitCancellation.signal),attached.ended]).then(([result])=>result),attached.failure]);void completion.catch(()=>{});
+     completion=Promise.race([Promise.all([waitManagedDocker(resource,fixtureRoot,waitCancellation.signal),attached.ended]).then(([result])=>result),attached.failure]);void completion.catch(()=>{});
      const stdin=new Writable({write(chunk:Buffer,_encoding,callback){void assertActive().then(()=>{attached.stdin.write(chunk,callback);}).catch(error=>{attached.close();callback(error instanceof Error?error:new CivicPolicyStateError('DOCKER_INPUT_REJECTED'));});},final(callback){attached.stdin.end(callback);},destroy(error,callback){if(error)attached.close();callback(error);}});
      stdin.on('error',()=>{});
      return {stdin,stdout:attached.stdout,stderr:attached.stderr,completion};

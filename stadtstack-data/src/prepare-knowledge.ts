@@ -87,7 +87,7 @@ async function assembleKnowledge(options:PrepareKnowledgeOptions,provenance:Auth
  const policyInventory=publicationPolicyReceiptInventorySchema.parse(JSON.parse((await provenance.read(options.policyReceipts)).toString('utf8'))),cas=new DistrictCas(options.casRoot??join(cacheDir,'districts','cas'));
  const preparationEpoch=await readCivicOptOutSnapshot(policyOptions);
  const retainedLineage=retainedPublication?{...retainedPublication.baseline.lineage,selectedRecordOrigins:retainedPublication.selectedRecordOrigins}:null;
- const policy=await recheckPublicationPolicy(knowledge.records,policyInventory,cas,{evaluationAt:new Date().toISOString(),...(options.policyStateDir?{stateDir:options.policyStateDir}:{}),retainedPublication:retainedLineage});
+ const policy=await recheckPublicationPolicy(knowledge.records,policyInventory,cas,{...policyOptions,evaluationAt:new Date().toISOString(),retainedPublication:retainedLineage});
  dependencies.push({role:'policy_receipts',sha256:policy.inventorySha256});
  if(structured){const checked=await verifyStructuredRunReceipts(structured,cas,{evaluationAt:new Date().toISOString(),...(options.policyStateDir?{stateDir:options.policyStateDir}:{}),currentAdmissionReceipts:policy.currentAdmissionReceipts});dependencies.push({role:'structured_receipts',sha256:checked.dependencySha256});}
  const criticalInventory=options.criticalAssessments?JSON.parse((await provenance.read(options.criticalAssessments)).toString('utf8')):{records:[]};

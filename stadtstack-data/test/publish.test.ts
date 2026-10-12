@@ -32,7 +32,7 @@ test('publication replay requires explicit quality and manifest clocks without o
   assert.throws(()=>PublicationOptionsSchema.parse({...options,manifestGeneratedAt:'now'}));
   assert.throws(()=>PublicationOptionsSchema.parse({...options,asOf:undefined}));
   assert.throws(()=>PublicationOptionsSchema.parse({...options,priorRelease:undefined}));
-  assert.throws(()=>PublicationOptionsSchema.parse(({privateProvenance:_unused,...options})),/privateProvenance/);
+  assert.throws(()=>PublicationOptionsSchema.parse({...options,privateProvenance:undefined}),/privateProvenance/);
   assert.deepEqual(await publicationInput('catalogue.json',options),{generatedAt:'2026-10-11T03:46:26.421Z',cities:[]});
  }finally{await rm(directory,{recursive:true,force:true});}
 });
