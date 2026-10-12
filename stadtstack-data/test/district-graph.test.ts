@@ -547,6 +547,50 @@ test('dated future operation and historical wording cannot be silently promoted,
   const futureVerb = { ...base, quote: `${a.name} wird ${b.name} betreiben.`, predicateQuote: 'betreiben' };
   assert.equal(graphGroundingChecks({ entities: [a, b], relations: [futureVerb] }, futureVerb.quote).find(check => check.id === 'graph_modality')?.passed, false);
 });
+test('negated contrast preambles do not negate five explicitly asserted memberships', () => {
+  const members = ['Nordstadt', 'Südstadt', 'Oststadt', 'Weststadt', 'Mittelstadt'].map((name, i) => mention(`m${i}`, name, 'municipality'));
+  const association = mention('association', 'Beispielverbund');
+  const quote = `${members.map(member => member.name).join(', ')} handeln nicht getrennt, sondern haben sich zum Beispielverbund zusammengeschlossen.`;
+  const relations = members.map(member => ({ ...relation(member, association), type: 'member_of' as const, quote, predicateQuote: 'zusammengeschlossen' }));
+  const claims = { entities: [...members, association], relations };
+  assert.ok(graphGroundingChecks(claims, quote).every(check => check.passed));
+  assert.equal(normalizeRelationActions(claims).normalization, null);
+  const { record, index } = release(claims);
+  assert.equal(record.relations.length, 5);
+  for (const edge of record.relations) {
+    assert.equal(index.path({ fromId: edge.fromId, toId: edge.toId, maxHops: 1 }).status, 'found');
+  }
+});
+
+test('contrast scope keeps actual negation, repeated predicates and other modalities conservative', () => {
+  const a = mention('a'), b = mention('b');
+  const base = { ...relation(a, b), type: 'member_of' as const, predicateQuote: 'Mitglied' };
+  for (const quote of [
+    `${a.name} handelt allein, sondern ist nicht Mitglied von ${b.name}.`,
+    `${a.name} ist nicht Mitglied von ${b.name}, sondern arbeitet allein.`,
+    `${a.name} ist nicht Mitglied von ${b.name}, sondern behauptet Mitglied zu sein.`,
+  ]) {
+    const edge = { ...base, quote };
+    assert.equal(graphGroundingChecks({ entities: [a, b], relations: [edge] }, quote).find(check => check.id === 'graph_modality')?.passed, false);
+    assert.equal(graphGroundingChecks({ entities: [a, b], relations: [{ ...edge, modality: 'negated' }] }, quote).find(check => check.id === 'graph_modality')?.passed, true);
+  }
+  for (const modality of ['planned', 'conditional', 'historical'] as const) {
+    const suffix = modality === 'planned' ? 'soll Mitglied' : modality === 'conditional' ? 'ist Mitglied sofern genehmigt' : 'war früher Mitglied im Jahr 2020';
+    const quote = `${a.name} handelt nicht getrennt, sondern ${suffix} von ${b.name}.`;
+    const edge = { ...base, quote, modality, conditions: modality === 'conditional' ? 'sofern genehmigt' : null, time: modality === 'historical' ? { text: '2020', quote: 'im Jahr 2020' } : null };
+    assert.ok(graphGroundingChecks({ entities: [a, b], relations: [edge] }, quote).every(check => check.passed));
+    assert.equal(relationPathEligible(edge), false);
+    assert.equal(graphGroundingChecks({ entities: [a, b], relations: [{ ...edge, modality: 'asserted' }] }, quote).find(check => check.id === 'graph_modality')?.passed, false);
+  }
+  const quote = `${a.name} ist kein Betreiber, sondern beschließt ${b.name}.`;
+  const original = { entities: [a, b], relations: [{ ...relation(a, b), type: 'implements' as const, quote, predicateQuote: 'beschließt' }] };
+  const normalized = normalizeRelationActions(original);
+  assert.equal(normalized.claims.relations[0].type, 'decides');
+  assert.equal(normalized.claims.relations[0].modality, 'decided');
+  assert.ok(graphGroundingChecks(normalized.claims, quote).every(check => check.passed));
+  assert.equal(normalizeRelationActions(normalized.claims).normalization, null);
+});
+
 
 test('explicit construction intent normalizes to plans without promoting future works', () => {
   const builder = mention('builder', 'Beispiel Bau GmbH', 'company'), project = mention('project', 'Beispielmarkt', 'project');
