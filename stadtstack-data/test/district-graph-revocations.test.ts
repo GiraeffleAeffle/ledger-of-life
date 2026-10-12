@@ -8,10 +8,10 @@ import { PROVIDER_CONFIGS } from '../src/district-model-contract.ts';
 import { knowledgeSourceDescriptors } from '../src/mcp-source-identity.ts';
 import { revocationViewIdentity } from '../src/mcp-revocation-view.ts';
 import type { RevocationTarget, VerifiedRevocations } from '../src/civic-revocations.ts';
+import { dataReleaseId } from '../src/data-release.ts';
 import { verifiedMask } from './fixtures/revocations.ts';
 
 const now = '2026-10-10T12:00:00.000Z';
-const releaseId = 'synthetic-graph-revocation-release';
 const registrySourceId = ' Registry Ä / blocked ';
 
 function mention(mentionId: string, name: string, type: GraphClaims['entities'][number]['type'] = 'organization'): GraphClaims['entities'][number] {
@@ -46,7 +46,14 @@ function recordFixture(claims: GraphClaims, id: string, sources = [{ id: 'visibl
 function publication(records: DistrictKnowledgeRecord[]) {
   // Non-canonical whitespace exercises the original sealed byte binding, not just JSON content.
   const bytes = `${JSON.stringify({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records }, null, 2)}\n`;
-  return { bytes, graph: buildKnowledgeGraph(bytes) };
+  const graph = buildKnowledgeGraph(bytes);
+  const graphBytes = JSON.stringify(graph);
+  // Use the sealed identity codec over the actual synthetic publication members.
+  const files = [
+    { path: 'knowledge/records.json', sha256: sha256(bytes), bytes: Buffer.byteLength(bytes) },
+    { path: 'knowledge/graph.json', sha256: sha256(graphBytes), bytes: Buffer.byteLength(graphBytes) },
+  ];
+  return { bytes, graph, releaseId: dataReleaseId(files) };
 }
 function graphFixture() {
   const root = mention('root', 'Graph Start');
@@ -85,7 +92,7 @@ function targetFor(type: RevocationTarget['type'], blocked: DistrictKnowledgeRec
 for (const type of ['record', 'host', 'mcp_source', 'registry_source'] as const) {
   test(`signed ${type} mask rebuilds all graph surfaces from whole visible records`, () => {
     const fixture = graphFixture();
-    const { graph, bytes, visible, blocked, other, rootId, sharedId, endId, secretId } = fixture;
+    const { releaseId, graph, bytes, visible, blocked, other, rootId, sharedId, endId, secretId } = fixture;
     assert.equal(sharedId, blocked.entities[0].entityId);
     assert.equal(graph.entities.find(entity => entity.id === sharedId)!.type, 'authority');
     const originalGraph = structuredClone(graph), originalRecords = structuredClone(fixture.records);
@@ -142,7 +149,7 @@ for (const type of ['record', 'host', 'mcp_source', 'registry_source'] as const)
 }
 
 test('record and registry source targets preserve exact opaque spelling and municipality scope', () => {
-  const { graph, bytes, blocked } = graphFixture();
+  const { releaseId, graph, bytes, blocked } = graphFixture();
   const mask = verifiedMask(releaseId, [
     { type: 'record', recordId: blocked.id.trim() },
     { type: 'record', recordId: blocked.id.toLocaleLowerCase('de') },
@@ -155,7 +162,7 @@ test('record and registry source targets preserve exact opaque spelling and muni
 });
 
 test('empty verified mask preserves all graph content, original evidence and sealed byte identities', () => {
-  const { graph, bytes, rootId, sharedId, endId } = graphFixture();
+  const { releaseId, graph, bytes, rootId, sharedId, endId } = graphFixture();
   const mask = verifiedMask(releaseId);
   const original = new GraphIndex(releaseId, graph, bytes);
   const index = new GraphIndex(releaseId, graph, new TextEncoder().encode(bytes), {}, mask);
@@ -169,7 +176,7 @@ test('empty verified mask preserves all graph content, original evidence and sea
 });
 
 test('a verified mask withholding every record leaves no entities, endpoints or self paths', () => {
-  const { records, graph, bytes, rootId } = graphFixture();
+  const { releaseId, records, graph, bytes, rootId } = graphFixture();
   const mask = verifiedMask(releaseId, records.map(record => ({ type: 'record', recordId: record.id })));
   const index = new GraphIndex(releaseId, graph, bytes, {}, mask);
   const result = index.entitySearch({ query: 'Graph' });
@@ -187,7 +194,7 @@ test('withholding relation evidence disconnects surviving endpoints without leak
   const from = mention('from', 'Graph Surviving Start'), to = mention('to', 'Graph Surviving End');
   const visible = recordFixture({ entities: [from, to], relations: [] }, 'surviving-mentions');
   const blocked = recordFixture({ entities: [from, to], relations: [relation(from, to)] }, 'removed-connection');
-  const { graph, bytes } = publication([visible, blocked]);
+  const { releaseId, graph, bytes } = publication([visible, blocked]);
   const fromId = visible.entities[0].entityId, toId = visible.entities[1].entityId;
   assert.equal(new GraphIndex(releaseId, graph, bytes).path({ fromId, toId, maxHops: 1 }).status, 'found');
   const index = new GraphIndex(releaseId, graph, bytes, {}, verifiedMask(releaseId, [{ type: 'record', recordId: blocked.id }]));
@@ -208,19 +215,19 @@ test('withholding relation evidence disconnects surviving endpoints without leak
 });
 
 test('graph masks require the verified runtime brand and exact sealed release identity', () => {
-  const { graph, bytes } = graphFixture();
+  const { releaseId, graph, bytes } = graphFixture();
+  const empty = publication([]);
   const verified = verifiedMask(releaseId);
-  for (const mask of [null, {}, [], { ...verified }, { ...verified, targets: [] }, { ...verified, releaseId: 'other-release' }]) {
+  for (const mask of [null, {}, [], { ...verified }, { ...verified, targets: [] }, { ...verified, releaseId: empty.releaseId }]) {
     assert.throws(() => new GraphIndex(releaseId, graph, bytes, {}, mask as unknown as VerifiedRevocations), /Expected verified revocation state/);
   }
-  assert.throws(() => new GraphIndex(releaseId, graph, bytes, {}, verifiedMask('other-release')), /release mismatch/);
-  const empty = publication([]);
-  assert.throws(() => new GraphIndex(releaseId, empty.graph, empty.bytes, {}, {} as VerifiedRevocations), /Expected verified revocation state/);
-  assert.throws(() => new GraphIndex(releaseId, empty.graph, empty.bytes, {}, verifiedMask('other-release')), /release mismatch/);
+  assert.throws(() => new GraphIndex(releaseId, graph, bytes, {}, verifiedMask(empty.releaseId)), /release mismatch/);
+  assert.throws(() => new GraphIndex(empty.releaseId, empty.graph, empty.bytes, {}, {} as VerifiedRevocations), /Expected verified revocation state/);
+  assert.throws(() => new GraphIndex(empty.releaseId, empty.graph, empty.bytes, {}, verifiedMask(releaseId)), /release mismatch/);
 });
 
 test('original sealed graph and record validation runs before masked corruption can disappear', () => {
-  const { records, graph, bytes, blocked, sharedId } = graphFixture();
+  const { releaseId, records, graph, bytes, blocked, sharedId } = graphFixture();
   const mask = verifiedMask(releaseId, [{ type: 'record', recordId: blocked.id }]);
   const edited = structuredClone(graph);
   edited.edges.find(edge => edge.evidence.recordId === blocked.id)!.quote = 'Corrupted masked evidence';
@@ -247,7 +254,7 @@ function diamondFixture() {
 }
 
 test('all graph cursors bind the signed cohort even when changed masks expose identical graph bytes', () => {
-  const { graph, bytes, fromId, toId } = diamondFixture();
+  const { releaseId, graph, bytes, fromId, toId } = diamondFixture();
   const originalMask = verifiedMask(releaseId, [], 0);
   const index = new GraphIndex(releaseId, graph, bytes, {}, originalMask);
   const recreated = new GraphIndex(releaseId, graph, bytes, {}, originalMask);
@@ -280,7 +287,7 @@ test('all graph cursors bind the signed cohort even when changed masks expose id
 test('graph budgets remain the fourth argument and bound the visible projection without changing truncation semantics', () => {
   const { record, graph: visibleGraph, bytes: visibleBytes, fromId, toId } = diamondFixture();
   const removed = recordFixture({ entities: [mention('removed', 'Graph Removed')], relations: [] }, 'budget-removed');
-  const { graph, bytes } = publication([record, removed]);
+  const { releaseId, graph, bytes } = publication([record, removed]);
   const mask = verifiedMask(releaseId, [{ type: 'record', recordId: removed.id }]);
   for (const budgets of [{ searchNodes: 1 }, { visitedNodes: 1 }, { examinedEdges: 1 }, { paths: 1 }, { pathSteps: 1 }] as Partial<GraphQueryBudgets>[]) {
     const index = new GraphIndex(releaseId, graph, bytes, budgets, mask);
