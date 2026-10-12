@@ -14,9 +14,11 @@ import {fileURLToPath} from 'node:url';
 import {loadDistrictRegistry} from '../src/district-registry.ts';
 import {knowledgeEvidenceHash} from '../src/district-schema.ts';
 import {syntheticTextRecord} from './helpers/text-publication-fixture.ts';
+import {initializeManagedAcquisitionLane} from '../src/civic-opt-out.ts';
 
 async function stagedFixture(directory:string,t:{after:(callback:()=>Promise<void>)=>void}){
  const context=await createCivicPolicyTestContext(t),stagingDir=join(context.managedRoot,'staging'),privateProvenance=join(directory,'private-provenance.json'),cataloguePath=join(stagingDir,'catalogue.json'),catalogueBytes=Buffer.from(JSON.stringify({generatedAt:'2026-10-11T03:46:26.421Z',cities:[]})),binding={kind:'prepared_source' as const,url:'https://example.org/synthetic-publication-input',sourceSha256:hash('synthetic source'),observationId:'synthetic-publication-input',receiptSha256:hash('synthetic receipt'),independentAllowed:true};
+ await initializeManagedAcquisitionLane(context.managedRoot,{...context.policy,decisionId:context.decisionId,kind:'artifacts'});
  await mkdir(stagingDir,{recursive:true});
  await writeManagedSourceArtifact(context.managedRoot,cataloguePath,catalogueBytes,[binding],{...context.policy,decisionId:context.decisionId,kind:'artifacts'});
  const inventory={schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:[{path:relative(directory,cataloguePath),sha256:hash(catalogueBytes),bytes:catalogueBytes.length,bindings:[binding]}]};

@@ -124,6 +124,7 @@ function page(snapshot:AdmittedSnapshot,scope:AdapterScope,cursor:string|null):P
  const detailIdentity=nativeIdentity(url,source);
  const hasIndexLinks=main.find('a[href]').toArray().some(element=>{
   const target=publicLink($(element).attr('href')!,snapshot.url);
+  if(target&&(/\.pdf(?:$|[?&#])|\.zip(?:$|[?&#])/i.test(target.href)||$(element).attr('type')==='application/pdf'||$(element).attr('download')!==undefined||/\/download|\/dokument|\/document|\/loadDocument/i.test(target.pathname)))return false;
   return target&&target.hostname===root.hostname&&target.href!==snapshot.url&&(nativeIdentity(target,source)||source==='bimschg-mv'&&target.searchParams.get('processor')==='processor.sa.pressemitteilung'&&target.searchParams.has('id')||source==='bimschg-bb'&&target.pathname!==url.pathname&&/bekanntmach|genehmig|immissionsschutz/i.test(target.pathname+' '+$(element).text()));
  });
  const detailFields=detailIdentity||!hasIndexLinks?fields(main):[];

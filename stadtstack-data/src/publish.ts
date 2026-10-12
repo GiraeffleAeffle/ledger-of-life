@@ -174,7 +174,7 @@ const policy=await recheckPublicationPolicy(knowledge.records,inventory,cas,{...
 if(policy.optOutSnapshotSha256!==publicationEpoch.sha256)throw Error('Knowledge admission uses another current-policy epoch');
 if(handoff.dependencies.find(dependency=>dependency.role==='policy_receipts')?.sha256!==policy.inventorySha256)throw Error('Publication policy inventory is not the authentic preparation input');
 const identity=graphIdentityInputs(knowledge),assessmentInventory=options.identityAssessments?JSON.parse((await readPinned(options.identityAssessments)).toString('utf8')):{assertions:[]};
-const admissions=await admitPublicationIdentities({assertions:identity.assertions,mentions:identity.mentions,additionalSourceHashes:identity.additionalSourceHashes,inventoryInput:assessmentInventory,cas,...(options.policyStateDir?{stateDir:options.policyStateDir}:{}),currentAdmissionReceipts:policy.currentAdmissionReceipts,originalAdmissions:knowledge.identityAdmissions});
+const admissions=await admitPublicationIdentities({assertions:identity.assertions,mentions:identity.mentions,additionalSourceHashes:identity.additionalSourceHashes,inventoryInput:assessmentInventory,cas,policyOptions,currentAdmissionReceipts:policy.currentAdmissionReceipts,originalAdmissions:knowledge.identityAdmissions});
 if(handoff.dependencies.find(dependency=>dependency.role==='identity_assessments')?.sha256!==admissions.dependencySha256)throw Error('Identity assessment dependencies changed after preparation');
 const criticalInventory=options.criticalAssessments?JSON.parse((await readPinned(options.criticalAssessments)).toString('utf8')):{records:[]};
 const critical=await admitCriticalKnowledge(knowledge.records,criticalInventory,cas,{policyOptions,currentAdmissionReceipts:policy.currentAdmissionReceipts,originalAdmissions:criticalProjection.admissions,retainedPublication:retainedComposition});
@@ -183,7 +183,7 @@ if(knowledgeCoverage.structuredRun){
  if(!options.structuredRun)throw Error('Native publication requires its actual structured run and receipts');
  const bytes=await readPinned(options.structuredRun),run=structuredRunSchema.parse(JSON.parse(bytes.toString('utf8')));
  if(handoff.dependencies.find(dependency=>dependency.role==='structured_run')?.sha256!==hash(bytes))throw Error('Structured run changed after preparation');
- const checked=await verifyStructuredRunReceipts(run,cas,{evaluationAt:new Date().toISOString(),...(options.policyStateDir?{stateDir:options.policyStateDir}:{}),currentAdmissionReceipts:policy.currentAdmissionReceipts});
+ const checked=await verifyStructuredRunReceipts(run,cas,{...policyOptions,evaluationAt:new Date().toISOString(),currentAdmissionReceipts:policy.currentAdmissionReceipts});
  if(handoff.dependencies.find(dependency=>dependency.role==='structured_receipts')?.sha256!==checked.dependencySha256)throw Error('Native source receipts changed after preparation');
  const expectedCoverage=run.coverage.map(receipt=>({...projectStructuredCoverageReceipt(receipt),publishedRecords:knowledge.records.filter(record=>record.kind==='structured'&&structuredReceiptMatches(record,receipt)).length}));
  if(canonicalJson(expectedCoverage)!==canonicalJson(knowledgeCoverage.adapters))throw Error('Public native coverage differs from its controlled original-receipt projection');

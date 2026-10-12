@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {assignCaseIdentities,caseEvidence,furthestMilestone,knowledgeMetricRecord,stageClaims} from '../src/query-cases.ts';
+import {assignCaseIdentities,caseEvidence,caseMetrics,groupCases,furthestMilestone,knowledgeMetricRecord,stageClaims} from '../src/query-cases.ts';
 import {milestoneRank,normalizePlanningStage,planningStages} from '../src/planning-stages.ts';
 import {areaClaimsFromQuote,resolveMetricSupersession,MetricClaimSchema,MetricEvidenceSchema,type MetricClaim,type MetricRecord} from '../src/case-supersession.ts';
 import type {QueryRecord} from '../src/mcp-query.ts';
@@ -15,6 +15,15 @@ function metric(id:string,value:number,reportedAt:string,replaces?:number):Metri
  const claim:MetricClaim={metric:'plan_area',unit:'ha',value,scope:'fnp:base:amendment:10',scopeEvidence:evidence,instrument:'fnp:base:amendment:10',reportedAt,evidence};
  if(replaces!==undefined)claim.replaces={value:replaces,evidence:{...evidence,quote:`Geltungsbereich von ${replaces} ha auf ${value} ha reduziert.`}};
  return {id,municipalityId:'strausberg',metricClaims:[claim]};
+}
+function projectCases(records:QueryRecord[]){
+ assignCaseIdentities(records,new Map());
+ const metrics=caseMetrics(records,'2026-10-11');
+ for(const record of records)record.supersession=metrics.records.get(record.id);
+ for(const group of groupCases(records)){
+  const history=[...new Set(group.flatMap(record=>record.supersession?.history??[]))];
+  for(const record of group)record.caseMetricHistory=history;
+ }
 }
 
 test('BauGB ordering separates initiation, preliminary draft, early and formal participation',()=>{
@@ -74,7 +83,7 @@ test('explicit same-scope metric reduction returns replacement and full preserve
  assert.equal(old.metricClaims[0].value,68.6);
  const query=[record('old','draft','Vorentwurf'),record('next','draft','Entwurf')];
  query[0].metricClaims=old.metricClaims;query[1].metricClaims=next.metricClaims;
- assignCaseIdentities(query,new Map());
+ projectCases(query);
  assert.equal(query[0].supersession?.status,'superseded');
  assert.equal(caseEvidence(query,'2026-10-11').currentValues[0].claim.value,41.5);
 });
@@ -150,14 +159,14 @@ test('legal instrument participates in replacements, conflicts and complete hist
 test('filtered case summaries retain full conflict history and subsequent explicit replacements',()=>{
  const metrics=[metric('old',68.6,'2024-01-30'),metric('next',41.5,'2025-08-07',68.6),metric('conflict',50,'2025-08-08',68.6)];
  const records=metrics.map(item=>({...record(item.id,'draft','Entwurf'),metricClaims:item.metricClaims}));
- assignCaseIdentities(records,new Map());
+ projectCases(records);
  const page=caseEvidence(records.slice(0,2),'2026-10-11');
  assert.equal(page.currentValues.length,0);assert.equal(page.history.length,3);
  const filtered=caseEvidence([records[1]],'2026-10-11');
  assert.equal(filtered.currentValues.length,0);assert.equal(filtered.history.length,3);
  assert.equal(caseEvidence([records[1]],'2025-08-07').currentValues[0].claim.value,41.5);
  records[2].metricClaims=metric('conflict',40,'2025-08-08',41.5).metricClaims;
- assignCaseIdentities(records,new Map());
+ projectCases(records);
  assert.equal(caseEvidence(records.slice(0,2),'2026-10-11').currentValues[0].claim.value,40);
 });
 

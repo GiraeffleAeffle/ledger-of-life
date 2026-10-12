@@ -5,7 +5,7 @@ import {canonicalOparlUrl} from './dedupe.ts';
 import {beginCouncilTraversal,bodyIdMatchesCity,mergeCouncilRecords,parseOparlList,selectCouncilBody} from './council-oparl.ts';
 import type {CouncilCheckpoint,CouncilEvidence,CouncilKind,OparlBody,OparlRecord,StoredCouncilRecord} from './council-oparl.ts';
 import {PoliteFetcher,PoliteFetchError,sourceContentBinding} from './polite-fetch.ts';
-import type {FetchedDocument,ExcludedDocument,FetchOptions,SourceContentBinding} from './polite-fetch.ts';
+import type {FetchedDocument,ExcludedDocument,FetchOptions,SourceContentBinding,FixturePolicyInspection} from './polite-fetch.ts';
 import {cities,type City} from './cities.ts';
 import {APPROVED_OWNER_ROBOTS_OVERRIDE,ownerRobotsOverrideFor} from './source-policy.ts';
 import {writePrivateJson} from './district-private-io.ts';
@@ -45,12 +45,12 @@ export interface CouncilAcquisition {
  persistCollection(name:'collection.json'|'signals.geojson',value:unknown):Promise<string>;
 }
 /** The City registry—not a caller-selected host or directory name—supplies civic context. */
-export function createCouncilAcquisition(city:City,options:{cacheRoot?:string;policy?:CivicPolicyOptions}={}):CouncilAcquisition {
+export function createCouncilAcquisition(city:City,options:{cacheRoot?:string;policy?:CivicPolicyOptions;fixtureInspection?:FixturePolicyInspection}={}):CouncilAcquisition {
  const registered=cities.find(item=>item.id===city.id);
  if(!registered?.endpoint||!city.endpoint||canonicalOparlUrl(city.endpoint)!==canonicalOparlUrl(registered.endpoint))throw Error('Council acquisition requires a registered City endpoint');
  const registeredSourceUrl=canonicalOparlUrl(registered.endpoint),ownerRobotsOverride=ownerRobotsOverrideFor(registeredSourceUrl);
  if(!ownerRobotsOverride)throw Error('Council acquisition endpoint is not a public source');
- const fetcher=new PoliteFetcher({cacheDir:options.cacheRoot??join(cacheDir,'council','owner-policy-2026-10-11'),timeoutMs:45000,ownerPolicyLane:{decisionId:APPROVED_OWNER_ROBOTS_OVERRIDE.id,...(options.policy??CIVIC_POLICY_AUTHORITY)}});
+ const fetcher=new PoliteFetcher({cacheDir:options.cacheRoot??join(cacheDir,'council','owner-policy-2026-10-11'),timeoutMs:45000,ownerPolicyLane:{decisionId:APPROVED_OWNER_ROBOTS_OVERRIDE.id,...(options.policy??CIVIC_POLICY_AUTHORITY)},fixtureInspection:options.fixtureInspection});
  const observed=new Map<string,SourceContentBinding>(),scope:FetchOptions={registeredSourceUrl,ownerRobotsOverride,hostProfile:'municipal',municipalityName:registered.name};
  const loaderOptions:Parameters<typeof createPoliteCouncilLoader>[1]={...scope,maxRequests:100_000,onDocument:document=>{observed.set(document.url+'\n'+document.sha256,sourceContentBinding(document));}};
  const loadJson=createPoliteCouncilLoader(fetcher,loaderOptions);

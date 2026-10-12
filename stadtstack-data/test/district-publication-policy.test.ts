@@ -10,6 +10,8 @@ import {createPolicyReceipt,type PolicyReceipt} from '../src/district-policy-rec
 import {admitStructuredObservations} from '../src/district-structured-record.ts';
 import {recheckPublicationPolicy,publicationPolicyReceiptInventorySchema} from '../src/district-publication-policy.ts';
 import {recordHostOptOut,provisionCivicPolicyAuthority} from '../src/civic-opt-out.ts';
+import {projectSourcePolicyMetadata,type SourceAccessPolicy} from '../src/source-policy.ts';
+import {DOCUMENT_ORIGIN_CLASSIFIER_VERSION} from '../src/document-origin-contract.ts';
 
 // Synthetic source and origin evidence exercise private receipt binding, never real source admission.
 const bytes=Buffer.from('synthetic policy publication row'),sourceSha256=digest(bytes),url='https://example.org/synthetic-policy.csv';
@@ -18,7 +20,7 @@ async function fixture(directory:string){
  const cas=new DistrictCas(join(directory,'cas')),stateDir=join(directory,'policy-state'),now=Date.now();
  const authority=await provisionCivicPolicyAuthority({stateDir,authorityId:'fixture:'+randomUUID()}),policyOptions={stateDir,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
  const checkedAt=new Date(now-1000).toISOString(),expiresAt=new Date(now+60_000).toISOString();
- const sourcePolicy={robots:{state:'allowed',url:'https://example.org/robots.txt'},tdm:{state:'not_reserved',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only',documentOrigin:{classification:'official_work',method:'rules',classifierVersion:'synthetic-fixture',url,sha256:sourceSha256,classifiedAt:checkedAt,evidence:[{locator:'synthetic fixture',value:'Synthetic official-work origin fixture; no civic evidence.'}]}};
+ const sourcePolicy=projectSourcePolicyMetadata({robots:{state:'allowed',url:'https://example.org/robots.txt'},tdm:{state:'not_reserved',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only',documentOrigin:{classification:'official_work',method:'rules',classifierVersion:DOCUMENT_ORIGIN_CLASSIFIER_VERSION,url,sha256:sourceSha256,classifiedAt:checkedAt,evidence:[{locator:'synthetic fixture',value:'Synthetic official-work origin fixture; no civic evidence.'}]}} satisfies SourceAccessPolicy);
  const admission=await createPolicyReceipt({source:{url,sha256:sourceSha256,mimeType:'text/csv'},sourcePolicy,permission:{kind:'official_work'},scope,checkedAt,expiresAt},policyOptions);
  await cas.put(Buffer.from(canonicalJson(admission.receipt)),{kind:'receipt',mimeType:'application/json'});
  await cas.put(bytes,{kind:'source_original',mimeType:'text/csv',admission:{state:'allowed',sourceSha256,policyProofSha256:admission.receiptSha256,checkedAt,expiresAt}});

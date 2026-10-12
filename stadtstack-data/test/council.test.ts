@@ -14,6 +14,7 @@ import {join} from 'node:path';
 import {hash} from '../src/common.ts';
 import {recordHostOptOut} from '../src/civic-opt-out.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
+import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 
 const at='2026-10-10T12:00:00.000Z';
 const body:OparlBody={id:'https://council.example/body/1',name:'Example',type:'https://schema.oparl.org/1.1/Body',paper:'https://council.example/body/1/paper'};
@@ -275,9 +276,14 @@ test('Duplicate full-list rows cannot conceal missing IDs or authorize withdrawa
 });
 
 interface CouncilWireSeam {wire(url:URL):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
+test('council inspection fixture seam cannot authorize a production acquisition context',()=>{
+ const city=cities.find(city=>city.id==='koeln')!;
+ assert.throws(()=>createCouncilAcquisition(city,{cacheRoot:'/unused-before-inspection',fixtureInspection:fixturePolicyInspection}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_state_unsafe');
+});
+
 test('registered council discovery and traversal retain managed provenance and stop cache reuse on objection',async t=>{
  const {root,policy}=await createCivicPolicyTestContext(t);
- const city=cities.find(city=>city.id==='koeln')!,cacheRoot=join(root,'raw'),acquisition=createCouncilAcquisition(city,{cacheRoot,policy});
+ const city=cities.find(city=>city.id==='koeln')!,cacheRoot=join(root,'raw'),acquisition=createCouncilAcquisition(city,{cacheRoot,policy,fixtureInspection:fixturePolicyInspection});
  const selectedBody:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body',paper:city.councilBodyId+'/paper',meeting:city.councilBodyId+'/meeting'},bodiesUrl=new URL('/oparl/bodies',city.endpoint).href;
  const record:OparlRecord={id:selectedBody.paper+'/1',body:selectedBody.id,type:'https://schema.oparl.org/1.1/Paper',name:'Synthetic municipal council submission',date:'2026-09-01',modified:'2026-09-02T00:00:00Z'};
  let wireCalls=0;
@@ -308,7 +314,7 @@ test('registered council discovery and traversal retain managed provenance and s
 
 test('managed preloaded council pages cannot survive a current document exclusion as stale collector results',async t=>{
  const {root,policy}=await createCivicPolicyTestContext(t);
- const city=cities.find(city=>city.id==='koeln')!,acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy});
+ const city=cities.find(city=>city.id==='koeln')!,acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy,fixtureInspection:fixturePolicyInspection});
  await acquisition.fetcher.initialize();
  const selectedBody:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body',paper:city.councilBodyId+'/paper',meeting:city.councilBodyId+'/meeting'},bodiesUrl=new URL('/oparl/bodies',city.endpoint).href;
  const record:OparlRecord={id:selectedBody.paper+'/1',body:selectedBody.id,type:'https://schema.oparl.org/1.1/Paper',name:'Synthetic previously admitted council submission',date:'2026-09-01',modified:'2026-09-02T00:00:00Z'};
@@ -353,7 +359,7 @@ test('council live context rejects forged registration and never adopts a named 
 
 test('licence-page acquisition keeps its own origin assessment instead of inheriting OParl Body authorship',async t=>{
  const {root,policy}=await createCivicPolicyTestContext(t);
- const city=cities.find(city=>city.id==='koeln')!,acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy});
+ const city=cities.find(city=>city.id==='koeln')!,acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy,fixtureInspection:fixturePolicyInspection});
  const selected:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body',paper:city.councilBodyId+'/paper'};
  acquisition.bindBody(selected);
  const seen:Array<{registeredSourceUrl?:string;originEvidence:FetchOptions['oparlContext']}>= [];

@@ -73,7 +73,7 @@ function runFixture(label: string, records: DistrictKnowledgeRecord[], options: 
   const municipalities = [{ id: municipalityId, selectedDocumentGroups: available, preparedDocumentGroups: available, attemptedDocumentGroups: attempted }];
   const extractionRun = artifact({ schemaVersion: 'stadtstack-extraction-run-v2', generatedAt: options.generatedAt ?? now, assignmentMode: options.assignmentMode ?? 'codex-only', ...pins, scope: 'all_fetched_documents', maxDocumentsPerMunicipality: null, availableDocumentGroups: available, attemptedDocumentGroups: attempted, pendingDocumentGroups: available - attempted, municipalities, fixtureLabel: label });
   const preparationPlan = artifact({ schemaVersion: 'stadtstack-preparation-plan-v1', ...pins, maxDocumentsPerMunicipality: null, availableDocumentGroups: available, selectedDocumentGroups: available, municipalities, groups: [...new Set(documents.map(document => document.sha256))].map(sourceSha256 => ({ expected: { municipalityId, sourceSha256 } })), quarantine: [] });
-  return { runId: extractionRun.sha256, sourceArtifactKind: 'native_extraction_output', pins, artifacts: { extractionRun, records: artifact({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: options.generatedAt ?? now, records }), quarantine: artifact({ schemaVersion: 'stadtstack-quarantine-v1', generatedAt: options.generatedAt ?? now, cases }), crawl, registry, ...(options.includePlan === false ? {} : { preparationPlan }) } };
+  return { runId: extractionRun.sha256, sourceArtifactKind: 'native_extraction_output', pins, artifacts: { extractionRun, records: artifact({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: options.generatedAt ?? now, records, identityAssertions: [], identityAdmissions: [] }), quarantine: artifact({ schemaVersion: 'stadtstack-quarantine-v1', generatedAt: options.generatedAt ?? now, cases }), crawl, registry, ...(options.includePlan === false ? {} : { preparationPlan }) } };
 }
 function compositionInput(contributions: TextRunContribution[], admittedIds: string[][]): DistrictReleaseCompositionInput {
   return { contributions, approvedRunOrder: contributions.map(run => run.runId), admissions: contributions.map((run, index) => ({ runId: run.runId, recordIds: admittedIds[index] })), generatedAt: now };
@@ -258,7 +258,7 @@ test('old full-artifact retained contributions remain audit-readable but cannot 
       { runId: newer.runId, recordId: codex.id, originalEvidenceHash: codex.verification.evidenceHash, projectedRecord: codex },
     ], now);
     const members = explicitKinds ? [{ id: 'opaque-native-row', kind: 'structured' as const, verification: { kind: 'structured' as const } }, codex, haiku] : [codex, haiku];
-    const records = artifact({ schemaVersion: explicitKinds ? 'stadtstack-knowledge-v3' : KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, ...(explicitKinds ? { identityAssertions: [], identityAdmissions: [] } : {}), records: members });
+    const records = artifact({ schemaVersion: explicitKinds ? 'stadtstack-knowledge-v3' : 'stadtstack-knowledge-v2', generatedAt: now, ...(explicitKinds ? { identityAssertions: [], identityAdmissions: [] } : {}), records: members });
     const coverage = artifact({ schemaVersion, generatedAt: now, textLineage: prior, municipalities: [{ id: municipalityId, publishedRecords: members.length }] });
     const files = [
       { path: 'knowledge/records.json' as const, sha256: records.sha256, bytes: Buffer.byteLength(String(records.bytes)) },
@@ -268,12 +268,12 @@ test('old full-artifact retained contributions remain audit-readable but cannot 
     const contributions: TextRunContribution[] = [old, newer].map(run => ({ ...run, sourceArtifactKind: 'retained_publication', artifacts: { ...run.artifacts, records }, retainedPublication: { manifest, coverage } }));
     if (explicitKinds) {
       assert.deepEqual(authenticateTextRunContribution(contributions[0]).records, [haiku]);
-      assert.throws(() => composeDistrictRelease(compositionInput(contributions, [[], [codex.id]])), /separate baseline/);
+      assert.throws(() => composeDistrictRelease(compositionInput(contributions, [[], [codex.id]])), /authenticated retained-role input/);
       continue;
     }
     assert.deepEqual(authenticateTextRunContribution(contributions[0]).records, [haiku]);
     assert.deepEqual(authenticateTextRunContribution(contributions[1]).records, [codex]);
-    assert.throws(() => composeDistrictRelease(compositionInput(contributions, [[], [codex.id]])), /separate baseline/);
+    assert.throws(() => composeDistrictRelease(compositionInput(contributions, [[], [codex.id]])), /authenticated retained-role input/);
   }
 });
 
@@ -287,18 +287,43 @@ test('identity projection rejects foreign record discriminators without strippin
   }
 });
 
-test('the knowledge-v2 consumer rejects explicit v2-to-v3 schema projection without changing authentic inputs', () => {
+test('explicit v2-to-v3 schema projection rejects marked v3 inputs without changing authentic bytes', () => {
   const record = legacyIdentity(recordFixture('explicit-schema-projection'));
   const contribution = runFixture('explicit-schema-projection', [record]);
   const input = compositionInput([contribution], [[record.id]]);
   input.admissions[0].schemaProjection = { version: 'knowledge-v2-to-v3-text-model-v1' };
   const unchanged = structuredClone(input);
-  assert.throws(() => composeDistrictRelease(input), /requires a knowledge-v3 consumer/);
+  assert.throws(() => composeDistrictRelease(input), /requires an unmarked authenticated knowledge-v2 contribution/);
   assert.deepEqual(input, unchanged);
   input.admissions[0].recordIds = [];
-  assert.throws(() => composeDistrictRelease(input), /requires a knowledge-v3 consumer/);
+  assert.throws(() => composeDistrictRelease(input), /requires an unmarked authenticated knowledge-v2 contribution/);
   Object.assign(input.admissions[0], { schemaProjection: { version: 'unapproved-projection' } });
   assert.throws(() => composeDistrictRelease(input), /knowledge-v2-to-v3-text-model-v1/);
+});
+
+test('unmarked v2 originals require explicit projection and retain authentic claims and receipts', () => {
+  const marked = legacyIdentity(recordFixture('unmarked-v2-original'));
+  const { kind: _kind, verification, ...claims } = marked;
+  const { kind: _verificationKind, ...gates } = verification;
+  const original = { ...claims, verification: gates };
+  original.verification.evidenceHash = knowledgeEvidenceHash(original);
+  const contribution = runFixture('unmarked-v2-original', [marked]);
+  contribution.artifacts.records = artifact({ schemaVersion: 'stadtstack-knowledge-v2', generatedAt: now, records: [original] });
+  const input = compositionInput([contribution], [[original.id]]);
+  const authenticBytes = contribution.artifacts.records.bytes;
+  assert.throws(() => composeDistrictRelease(input), /"kind"/);
+  input.admissions[0].schemaProjection = { version: 'knowledge-v2-to-v3-text-model-v1' };
+  const composed = composeDistrictRelease(input);
+  const projected = composed.records.records[0];
+  assert.equal(projected.kind, 'text_model');
+  assert.equal(projected.verification.kind, 'text_model');
+  assert.deepEqual(projected.extraction, original.extraction);
+  assert.deepEqual(projected.sources, original.sources);
+  assert.deepEqual(projected.verification.faithfulness, original.verification.faithfulness);
+  assert.equal(projected.summaryQuote, original.summaryQuote);
+  assert.equal(composed.audit.records[0].originalEvidenceHash, original.verification.evidenceHash);
+  assert.deepEqual(composed.provenance.runs[0].records, [original]);
+  assert.equal(contribution.artifacts.records.bytes, authenticBytes);
 });
 
 // Sealed v3 shape: the extraction summary has historical pins/counts, NOT a
@@ -332,7 +357,7 @@ function retainedFixture(records: DistrictKnowledgeRecord[]): RetainedKnowledgeP
     models: [...models.values()],
     extractionRun: { generatedAt: earlier, assignmentMode: 'balanced', corpusSha256: sha256('historical corpus pin, not reacquired'), registrySha256: sha256('historical registry pin differs from published registry'), promptContractSha256: sha256('historical prompt contract'), schemaSha256: sha256('historical schema'), selection: 'bounded_per_municipality', maxDocumentsPerMunicipality: 7, availableDocumentGroupsAtRunStart: 11, attemptedDocumentGroups: 7, pendingDocumentGroupsAtRunStart: 4 },
   });
-  const output = artifact({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records });
+  const output = artifact({ schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: now, records, identityAssertions: [], identityAdmissions: [] });
   const files = ([['records', output], ['coverage', coverage], ['registry', registry]] as const).map(([kind, value]) => ({ path: `knowledge/${kind}.json` as const, sha256: value.sha256, bytes: Buffer.byteLength(String(value.bytes)) }));
   const manifest = artifact({ schemaVersion: 'stadtstack-data-release-v1', id: dataReleaseId(files), generatedAt: now, files, quality: { publishedRecords: records.length, quarantinedRecords: 0, cities: 1 } });
   return { artifacts: { manifest, records: output, coverage, registry }, recordIds: records.map(record => record.id) };
@@ -378,7 +403,7 @@ test('retained-only republication requires no model runs, synthetic artifacts or
   assert.equal(result.retainedPublication!.selectedRecordOrigins.length, 1);
   assert.throws(() => composeDistrictRelease(compositionInput([], [])), /approved input order/);
   input.retainedPublication.schemaProjection = { version: 'knowledge-v2-to-v3-text-model-v1' };
-  assert.throws(() => composeDistrictRelease(input), /requires a knowledge-v3 consumer/);
+  assert.throws(() => composeDistrictRelease(input), /requires an unmarked authenticated knowledge-v2 publication/);
 });
 
 test('only an admitted native same-ID revision replaces a retained baseline selection', () => {
@@ -417,12 +442,11 @@ test('retained authentication rejects hashes, manifest identity, member sizes, p
     assert.throws(() => authenticateRetainedKnowledgePublication(bad));
   }
   for (const recordIds of [['absent'], [original.id, original.id]]) assert.throws(() => authenticateRetainedKnowledgePublication({ ...baseline, recordIds }), /unique exact/);
-  const omitted = authenticateRetainedKnowledgePublication({ ...baseline, recordIds: [] });
-  assert.deepEqual(omitted.records, [original]);
+  assert.throws(() => authenticateRetainedKnowledgePublication({ ...baseline, recordIds: [] }), /select at least one original text record/);
   const tampered = structuredClone(original); tampered.summary = 'Changed claim';
   assert.throws(() => authenticateRetainedKnowledgePublication(retainedFixture([tampered])), /evidence hash/);
   const candidate = structuredClone(original); candidate.verification.status = 'candidate'; candidate.verification.evidenceHash = knowledgeEvidenceHash(candidate);
-  assert.throws(() => authenticateRetainedKnowledgePublication({ ...retainedFixture([candidate]), recordIds: [] }), /original candidate/);
+  assert.throws(() => authenticateRetainedKnowledgePublication(retainedFixture([candidate])), /original candidate/);
   const gate = structuredClone(original); gate.verification.faithfulness.score = 0.2; gate.verification.evidenceHash = knowledgeEvidenceHash(gate);
   assert.throws(() => authenticateRetainedKnowledgePublication(retainedFixture([gate])), /passing deterministic and model gates/);
   const unbound = structuredClone(original); unbound.sources[0].id = 'unregistered-source'; unbound.verification.evidenceHash = knowledgeEvidenceHash(unbound);

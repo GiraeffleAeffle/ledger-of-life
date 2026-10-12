@@ -332,11 +332,11 @@ test('a genuinely signed revocation creates a complete mask-bound query view',()
   assert.ok(masked.visibleRecordIds.size<original.records.length);
   assert.ok(masked.index.records.every(record=>!record.sourceIds.some(sourceId=>masked.withheldSourceIds.has(sourceId))));
   assert.ok(masked.index.records.every(record=>record.id.startsWith('regional:')));
-  const firstMask=original.withRevocations(signedMask([])),page=firstMask.index.page({cityIds:['hoppegarten'],limit:1,fields:['id']},'search_topics');
+ const firstMask=original.withRevocations(signedMask([])),page=firstMask.index.page({limit:1,fields:['id']},'search_topics');
   assert.ok(page.nextCursor);
   const sameContentDifferentMask=original.withRevocations(signedMask([{type:'record',recordId:'not-in-publication'}]));
   assert.equal(sameContentDifferentMask.index.records.length,firstMask.index.records.length);
-  assert.throws(()=>sameContentDifferentMask.index.page({cityIds:['hoppegarten'],limit:1,fields:['id'],cursor:page.nextCursor!},'search_topics'),/mismatch/);
+ assert.throws(()=>sameContentDifferentMask.index.page({limit:1,fields:['id'],cursor:page.nextCursor!},'search_topics'),/mismatch/);
   const empty=original.withRevocations(signedMask([]));
   assert.equal(empty.index.records.length,original.records.length);
 });

@@ -392,7 +392,7 @@ test('lane context and empty-root marker are required even when wire is mocked',
 
 test('real lane lifecycle enrolls raw and parsed copies and opt-out prevents cache revival',async t=>{
  const root=await realpath(await mkdtemp(join(tmpdir(),'polite-managed-derived-')));t.after(()=>rm(root,{recursive:true,force:true}));
- const options=await politeTestOptions({cacheDir:root}),fetcher=new BasePoliteFetcher(options),url='https://stadt.de/public';let calls=0;
+ const options=await politeTestOptions({cacheDir:root}),fetcher=new BasePoliteFetcher({...options,fixtureInspection:fixturePolicyInspection}),url='https://stadt.de/public';let calls=0;
  t.mock.method(fetcher as unknown as WireSeam,'wire',async(target:URL)=>{
   calls++;if(target.pathname==='/robots.txt'||target.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
   return {status:200,headers:{'content-type':'text/plain',etag:'"fixture"'},body:Buffer.from('Public municipal information with a bounded synthetic source representation.')};
@@ -408,7 +408,7 @@ test('real lane lifecycle enrolls raw and parsed copies and opt-out prevents cac
 
 test('original observation reader and derived gates accept genuine shared-byte receipts, never relocation or exclusions',async t=>{
  const root=await realpath(await mkdtemp(join(tmpdir(),'polite-original-observation-')));t.after(()=>rm(root,{recursive:true,force:true}));
- const options=await politeTestOptions({cacheDir:root}),fetcher=new BasePoliteFetcher(options),body=Buffer.from('Synthetic public municipal representation with sufficient source text.');
+ const options=await politeTestOptions({cacheDir:root}),fetcher=new BasePoliteFetcher({...options,fixtureInspection:fixturePolicyInspection}),body=Buffer.from('Synthetic public municipal representation with sufficient source text.');
  t.mock.method(fetcher as unknown as WireSeam,'wire',async(target:URL)=>target.pathname==='/robots.txt'||target.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'text/plain'},body});
  const first=await fetcher.fetch('https://stadt.de/first'),second=await fetcher.fetch('https://stadt.de/second');
  assert.equal(first.sha256,second.sha256);assert.notEqual(first.observationPath,second.observationPath);
@@ -427,7 +427,7 @@ test('original observation reader and derived gates accept genuine shared-byte r
 
 test('an active inventory entry cannot turn an ineffective stored policy into derived permission',async t=>{
  const root=await realpath(await mkdtemp(join(tmpdir(),'polite-derived-policy-')));t.after(()=>rm(root,{recursive:true,force:true}));
- const options=await politeTestOptions({cacheDir:root}),fetcher=new BasePoliteFetcher(options),body=Buffer.from('Synthetic public municipal source body for a deliberately invalid historical-policy receipt.');
+ const options=await politeTestOptions({cacheDir:root}),fetcher=new BasePoliteFetcher({...options,fixtureInspection:fixturePolicyInspection}),body=Buffer.from('Synthetic public municipal source body for a deliberately invalid historical-policy receipt.');
  t.mock.method(fetcher as unknown as WireSeam,'wire',async(target:URL)=>target.pathname==='/robots.txt'||target.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'text/plain'},body});
  const document=await fetcher.fetch('https://stadt.de/document'),original=JSON.parse(await readFile(document.observationPath,'utf8')) as FetchObservation;
  const observation={...original,policy:{...original.policy!,tdm:{...original.policy!.tdm,state:'unavailable' as const}}},bytes=JSON.stringify(observation)+'\n',name='unavailable-policy.json',observationPath=join(root,'observations',name);
@@ -602,7 +602,7 @@ test('fixture authority never authorizes the actual HTTP boundary',async t=>{
 
 test('invalid remote policy text is withheld and never persisted as exempt metadata',async t=>{
  const root=await mkdtemp(join(tmpdir(),'polite-policy-content-'));t.after(()=>rm(root,{recursive:true,force:true}));
- const options=await politeTestOptions({cacheDir:root}),fetcher=new BasePoliteFetcher(options),url='https://stadt.de/document';
+ const options=await politeTestOptions({cacheDir:root}),fetcher=new BasePoliteFetcher({...options,fixtureInspection:fixturePolicyInspection}),url='https://stadt.de/document';
  const marker='SYNTHETIC-SOURCE-CONTENT',remoteValue=(marker+' ').repeat(1500).trim();
  const bytes=Buffer.from(`<html><meta name="tdm-reservation" content="1"><meta name="tdm-policy" content="${remoteValue}"><h1>Beschluss</h1><p>Herausgeber: Stadt Beispielstadt</p></html>`);
  t.mock.method(fetcher as unknown as WireSeam,'wire',async(target:URL)=>target.pathname==='/robots.txt'||target.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'text/html'},body:bytes});
@@ -620,7 +620,7 @@ test('invalid remote policy text is withheld and never persisted as exempt metad
 
 test('valid policy references are digest-only in returned, observation and request metadata',async t=>{
  const root=await mkdtemp(join(tmpdir(),'polite-policy-uri-digest-'));t.after(()=>rm(root,{recursive:true,force:true}));
- const options=await politeTestOptions({cacheDir:root}),fetcher=new BasePoliteFetcher(options),url='https://stadt.de/document';
+ const options=await politeTestOptions({cacheDir:root}),fetcher=new BasePoliteFetcher({...options,fixtureInspection:fixturePolicyInspection}),url='https://stadt.de/document';
  const marker='SYNTHETIC-CONTENT-IN-URI',reference='https://stadt.de/policy?note='+marker;
  const bytes=Buffer.from(`<html><meta name="tdm-policy" content="${reference}"><h1>Beschlussvorlage</h1><p>Herausgeber: Stadt Beispielstadt</p><p>Informationen zur Entwicklung des Quartiers und zur weiteren Beratung.</p></html>`);
  t.mock.method(fetcher as unknown as WireSeam,'wire',async(target:URL)=>target.pathname==='/robots.txt'||target.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'text/html'},body:bytes});

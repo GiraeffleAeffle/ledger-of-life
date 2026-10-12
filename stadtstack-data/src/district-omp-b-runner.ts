@@ -18,7 +18,10 @@ export const OMP_LIMITS=Object.freeze({walltimeMs:240_000,modelMaxTimeSeconds:OM
 const hash=z.string().regex(/^[a-f0-9]{64}$/),image=z.string().regex(/^sha256:[a-f0-9]{64}$/);
 export const OmpReviewSchema=z.object({version:z.literal(OMP_RUNNER_VERSION),imageId:image,runnerContractSha256:hash,ompBinarySha256:hash,dockerDaemonId:z.string().regex(/^[A-Za-z0-9:_-]{1,256}$/),securityReviewId:z.string().min(1).max(200),reviewedBy:z.string().min(1).max(200),reviewedAt:z.iso.datetime(),dockerSocket:z.string().regex(/^\/run\/(?:[a-zA-Z0-9._-]+\/)*[a-zA-Z0-9._-]+\.sock$/)}).strict();
 export type OmpReview=z.infer<typeof OmpReviewSchema>;
-export class OmpRunnerHold extends Error {constructor(readonly reason:'security_review_required'|'unavailable'|'credential_unavailable'|'request_rejected'|'resource_limit'|'provider_failed'|'event_stream'|'model_identity_mismatch'){super('Native omp assessment held');this.name='OmpRunnerHold';}}
+export class OmpRunnerHold extends Error {
+ readonly reason:'security_review_required'|'unavailable'|'credential_unavailable'|'request_rejected'|'resource_limit'|'provider_failed'|'event_stream'|'model_identity_mismatch';
+ constructor(reason:OmpRunnerHold['reason']){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;}
+}
 export type OmpSpawn=(file:string,args:string[],options:SpawnOptions)=>ChildProcess;
 export interface OmpRunnerDependencies {spawn?:OmpSpawn;binary?:string;reviewPath?:string;beforeHandoff?:()=>Promise<void>}
 const sha=(bytes:string|Uint8Array)=>createHash('sha256').update(bytes).digest('hex');

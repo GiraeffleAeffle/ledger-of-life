@@ -94,10 +94,11 @@ test('school numeric suppression, date schema changes, and native-byte tampering
  assert.equal(adapter.parse(snapshot(workbook(r.sheet,[[r.title.replace('2025/26','2025/2027')],...r.rows]),r.source),sc).coverage.state,'held_quality');
 });
 test('licensed Kita native GENESIS cells keep KR granularity and 1 March reference',()=>{
- const content='GENESIS-Tabelle: 22541-01-04\nGenehmigte Plätze (Anzahl);;;\n;;2025\n;;Insgesamt\n01053;Herzogtum Lauenburg;123\n__________\n',input=snapshot(content,'kita-regional-statistics'),result=adapter.parse(input,scope('kita-regional-statistics','01053100'));
+ const content='GENESIS-Tabelle: 22541-01-04\nGenehmigte Plätze (Anzahl);;\n;;2025\n;;Insgesamt\n01053;Herzogtum Lauenburg;123\n__________\n',input=snapshot(content,'kita-regional-statistics'),result=adapter.parse(input,scope('kita-regional-statistics','01053100'));
  assert.equal(result.coverage.state,'partial');assert.equal(result.observations[0].value,123);assert.equal(result.observations[0].date,'2025-03-01');assert.equal(result.observations[0].geography.ags,null);assert.ok(result.observations[0].subject.includes('KR:01053'));
  assert.equal(adapter.parse(snapshot(content.replace('01053;Herzogtum Lauenburg;123','12064;Märkisch-Oderland;123'),'kita-regional-statistics'),scope('kita-regional-statistics','01053100')).coverage.state,'empty');
  assert.equal(adapter.parse(snapshot(content.replace('__________',''),'kita-regional-statistics'),scope('kita-regional-statistics','01053100')).coverage.state,'held_quality');
+ assert.equal(adapter.parse(snapshot(content.replace('(Anzahl);;','(Anzahl);;;'),'kita-regional-statistics'),scope('kita-regional-statistics','01053100')).coverage.state,'held_quality','A wider header than the native data row is malformed, not partial coverage');
 });
 test('every family route stays scoped to nine pilots; paid/restricted directories held; K03 unaddressed',()=>{
  assert.equal(EDUCATION_SOURCES.length,6);
@@ -140,7 +141,7 @@ test('Rüdersdorf bounded native result fixtures distinguish empty, paginated, c
  assert.equal(adapter.parse(snapshot('<main>Dieses Dokument wurde zurückgezogen.</main>','kita-ruedersdorf'),sc).coverage.state,'not_checked');
 });
 test('Kita rate native percent cells do not become approved/free places; blocked and withdrawn native responses are not empty',()=>{
- const sc=scope('kita-regional-statistics','01053100'),content='GENESIS-Tabelle: 22543-03-01\nBetreuungsquote unter 3 Jahre (%);;;\n;;2025\n;;Insgesamt\n01053;Herzogtum Lauenburg;32,5\n__________\n';
+ const sc=scope('kita-regional-statistics','01053100'),content='GENESIS-Tabelle: 22543-03-01\nBetreuungsquote unter 3 Jahre (%);;\n;;2025\n;;Insgesamt\n01053;Herzogtum Lauenburg;32,5\n__________\n';
  const result=adapter.parse(snapshot(content,'kita-regional-statistics'),sc);assert.equal(result.coverage.state,'partial');assert.equal(result.observations[0].unit,'%');assert.equal(result.observations[0].value,32.5);assert.equal(result.observations[0].date,'2025-03-01');assert.ok(result.observations[0].predicate.includes('kita_u3_rate'));assert.ok(!result.observations.some(o=>o.predicate==='places_offered'));
  for(const [reason,state] of [['Zugang gesperrt','blocked_access'],['Tabelle wurde zurückgezogen','held_quality']]){
   const native=JSON.stringify({Status:{Code:1,Type:'Error',Content:reason}}),input={...snapshot(native,'kita-regional-statistics'),mimeType:'application/json'};

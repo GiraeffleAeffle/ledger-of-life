@@ -225,7 +225,7 @@ export class DistrictJobStore {
     const inFlight=await client.query<{count:string}>('SELECT count(*) FROM district_pipeline.host_lane_leases WHERE lane_key=$1 AND expires_at>clock_timestamp()',[laneKey]);
     if(Number(inFlight.rows[0].count)>=lane.max_in_flight)return 'host_capacity';
     await client.query(`INSERT INTO district_pipeline.host_lane_leases(lane_key,job_id,fencing_token,expires_at) VALUES($1,$2,$3,$4) ON CONFLICT(lane_key,job_id) DO UPDATE SET fencing_token=EXCLUDED.fencing_token,expires_at=EXCLUDED.expires_at`,[laneKey,jobId,fence,expiry]);
-    await client.query(`UPDATE district_pipeline.host_lanes SET last_started_at=clock_timestamp(),next_start_at=clock_timestamp()+min_start_interval_ms*interval '1 millisecond' WHERE lane_key=$1`,[laneKey]);
+    await client.query(`WITH started AS MATERIALIZED (SELECT clock_timestamp() AS at) UPDATE district_pipeline.host_lanes SET last_started_at=started.at,next_start_at=started.at+min_start_interval_ms*interval '1 millisecond' FROM started WHERE lane_key=$1`,[laneKey]);
     return null;
   }
   async claim(run:RunBounds,leaseMs:number):Promise<{kind:'job';job:ClaimedJob}|{kind:'stop';reasonCode:ReasonCode}> {

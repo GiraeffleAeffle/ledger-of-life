@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {z} from 'zod';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {QueryIndex,querySchema,exportRecordsSchema,queryFields,type KnowledgeQueryData,type Regional} from '../src/mcp-query.ts';
@@ -7,7 +8,7 @@ import {admitStructuredObservations} from '../src/district-structured-record.ts'
 import {digest,semanticHash,observation,type StructuredObservation,type StructuredAdapter,type AdapterScope} from '../src/district-adapter-contract.ts';
 import {sourceStageDate} from '../src/query-cases.ts';
 import {server} from '../src/mcp.ts';
-import {loadRelease} from '../src/mcp-release.ts';
+import {syntheticRelease} from './fixtures/mcp-release.ts';
 import type {Catalogue} from '../src/schema.ts';
 import {changesSchema,diff,knowledgeChangeRecord} from '../src/changes.ts';
 
@@ -86,8 +87,8 @@ test('native filters and full evidence pagination remain projection/tool/release
 });
 
 test('MCP exposes native filter schemas, full evidence and separate observation counts',async()=>{
- const {index}=await fixture(),loaded=await loadRelease();
- const mcp=server({release:{...loaded,index}}),client=new Client({name:'synthetic-native-reader-test',version:'1'});
+ const {index}=await fixture(),loaded=syntheticRelease(index);
+ const mcp=server({release:loaded}),client=new Client({name:'synthetic-native-reader-test',version:'1'});
  const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();await mcp.connect(serverTransport);await client.connect(clientTransport);
  try{
   const tools=await client.listTools();
@@ -116,8 +117,8 @@ test('native similarity discovers observations without grouping them as cases or
 });
 
 test('council lookup includes native item kinds without promoting attached metadata to resolutions',async()=>{
- const {index}=await fixture(fixtureScope,['Meeting','AgendaItem','Paper','Body','Organization','File','System']),loaded=await loadRelease();
- const mcp=server({release:{...loaded,index}}),client=new Client({name:'synthetic-native-council-test',version:'1'});
+ const {index}=await fixture(fixtureScope,['Meeting','AgendaItem','Paper','Body','Organization','File','System']),loaded=syntheticRelease(index);
+ const mcp=server({release:loaded}),client=new Client({name:'synthetic-native-council-test',version:'1'});
  const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();await mcp.connect(serverTransport);await client.connect(clientTransport);
  try{
   const result=await client.callTool({name:'get_council_items',arguments:{kinds:['structured'],fields:['id','observationKind','observation','stage','stageDate','evidence']}});
@@ -153,7 +154,7 @@ test('supporting locators preserve separate byte/policy/scope source bindings in
  const primary=exported.sources.find(source=>source.sha256===original.source.sha256)!,support=exported.sources.find(source=>source.sha256===original.supportingSources[0].sha256)!;
  assert.deepEqual(primary.locators,original.observation.evidence);assert.deepEqual(support.locators,original.observation.supportingEvidence.map(evidence=>evidence.locator));
  assert.notEqual(primary.sha256,support.sha256);assert.equal(support.policyReceiptSha256,original.supportingSources[0].policyReceiptSha256);assert.equal(support.scopeSha256,original.supportingSources[0].scopeSha256);assert.equal(support.role,'municipality_join');assert.equal(support.publisher,undefined);assert.equal(support.locator,undefined);
- const loaded=await loadRelease(),mcp=server({release:{...loaded,index}}),client=new Client({name:'synthetic-supporting-reader-test',version:'1'});
+ const loaded=syntheticRelease(index),mcp=server({release:loaded}),client=new Client({name:'synthetic-supporting-reader-test',version:'1'});
  const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();await mcp.connect(serverTransport);await client.connect(clientTransport);
  try{
   const response=await client.callTool({name:'get_sources',arguments:{id:item.id}});assert.equal(response.isError,undefined);
@@ -163,7 +164,7 @@ test('supporting locators preserve separate byte/policy/scope source bindings in
 });
 
 test('native knowledge change feeds preserve reasons and revisions without invented withdrawal or quotes',async()=>{
- const {index,records}=await fixture(),loaded=await loadRelease();
+ const {index,records}=await fixture(),loaded=syntheticRelease(index);
  const rows=records.map(knowledgeChangeRecord),changes=diff([],rows,retrievedAt);
  assert.equal(changes.schemaVersion,'stadtstack-changes-v2');assert.equal(changes.events.length,records.length);
  for(const event of changes.events){
@@ -174,8 +175,10 @@ test('native knowledge change feeds preserve reasons and revisions without inven
  const mcp=server({release:{...loaded,index,changes:{...loaded.changes,ratzeburg:changes}}}),client=new Client({name:'synthetic-native-changes-test',version:'1'});
  const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();await mcp.connect(serverTransport);await client.connect(clientTransport);
  try{
-  const result=await client.callTool({name:'get_changes',arguments:{cityId:'ratzeburg'}});assert.equal(result.isError,undefined);assert.deepEqual(changesSchema.parse(result.structuredContent),changes);
-  const tools=await client.listTools();assert.match(tools.tools.find(tool=>tool.name==='get_changes')!.description!,/removal is not source withdrawal or supersession/);
+ const result=await client.callTool({name:'get_changes',arguments:{cityId:'ratzeburg'}});assert.equal(result.isError,undefined);
+ const {administrativeView:_view,...feed}=z.record(z.string(),z.unknown()).parse(result.structuredContent);
+ assert.deepEqual(changesSchema.parse(feed),changes);
+ const tools=await client.listTools();assert.match(tools.tools.find(tool=>tool.name==='get_changes')!.description!,/never creates a civic removal, withdrawal or supersession/);
   assert.ok(index.records.every(record=>record.supersession?.status==='not_established'&&!record.supersession.currentValues.length),'Numeric native values alone do not establish metric replacement or current-value election');
  }finally{await client.close();await mcp.close();}
 });
@@ -198,7 +201,7 @@ test('native field search borrows only exact record context while retaining amou
  assert.ok(projected.topics.every(topic=>!('quote' in topic)&&!('confidence' in topic)),'Native topic context is a rule/provenance link, not an invented text quote');
  const exported=index.exportRecords({financialRole:'approval'});assert.ok(exported.items.every(record=>!('nativeSearchText' in record)));
  assert.equal(exported.totalCases,0);assert.equal(exported.identifiedProjectCount,0);
- const loaded=await loadRelease(),mcp=server({release:{...loaded,index}}),client=new Client({name:'native-field-context-test',version:'1'});
+ const loaded=syntheticRelease(index),mcp=server({release:loaded}),client=new Client({name:'native-field-context-test',version:'1'});
  const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();await mcp.connect(serverTransport);await client.connect(clientTransport);
  try{
   const result=await client.callTool({name:'search_topics',arguments:{query:'Solar',topic:'solarpark',financialRole:'approval',fields:['id','observation','evidence','nativeRecordContext','financialRole']}});

@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {insertR1MetadataSnapshot,type DistrictJobStore,type DistrictJobSpec} from './district-jobs.ts';
 import {type DistrictCas,type CasArtifact} from './district-cas.ts';
-import {canonicalJson,digest,semanticHash,PARSER_INPUT_MAX_BYTES,type AdmittedSnapshot,type AdapterScope} from './district-adapter-contract.ts';
+import {canonicalJson,digest,semanticHash,PARSER_INPUT_MAX_BYTES,type AdapterScope} from './district-adapter-contract.ts';
 import {PolicyReceiptSchema,recheckPolicyReceipt,type PolicyReceipt} from './district-policy-receipt.ts';
 import {initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,type ManagedSourceBinding,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {structuredJobContract,type StructuredJobContract} from './district-structured-jobs.ts';
@@ -12,7 +12,7 @@ import {HttpObservationProofSchema,HttpObservationSchema,authenticatedHttpBindin
 import type {OperatorRegistryInputPin} from './district-registry-config.ts';
 import {authenticateStructuredRegistry} from './district-structured-registry-admission.ts';
 
-export interface PersistedRepresentation {snapshotId:string;policyDecisionId:string;receiptSha256:string;sourceArtifact:CasArtifact;receiptArtifact:CasArtifact;observationArtifact:CasArtifact;httpObservation:{observationId:string;receiptSha256:string};snapshot:Omit<AdmittedSnapshot,'bytes'>}
+export interface PersistedRepresentation {snapshotId:string;policyDecisionId:string;receiptSha256:string;sourceArtifact:CasArtifact;receiptArtifact:CasArtifact;observationArtifact:CasArtifact;httpObservation:{observationId:string;receiptSha256:string};snapshot:StructuredWorkerRequest['snapshot']}
 /** Canonical safe audit metadata commits to Postgres before registering any purgable CAS duplicate. */
 export async function persistR1Representation(store:DistrictJobStore,cas:DistrictCas,input:{bytes:Uint8Array;receipt:PolicyReceipt;request:{url:string;method:'GET'|'POST';body:string|null;contentType:string|null};retrievedAt:string;fetchedAt:string;sourceVersion:string|null;redirectChain:string[];httpObservation:{observationId:string;receiptSha256:string;bytes:Uint8Array}},policyOptions:CivicPolicyOptions={}):Promise<PersistedRepresentation>{
  const receipt=PolicyReceiptSchema.parse(input.receipt),proof=await recheckPolicyReceipt(receipt,{...policyOptions,evaluationAt:new Date().toISOString()}),sourceSha256=digest(input.bytes);

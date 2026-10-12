@@ -14,6 +14,7 @@ import {sha256} from '../src/district-schema.ts';
 import {CIVIC_ACQUISITION_DECISION_ID,recordHostOptOut,HostOptedOutError,CivicPolicyStateError,type CivicPolicyOptions} from '../src/civic-opt-out.ts';
 import {operatorRegistryConfigSchema,operatorRegistryConfigContractSha256,operatorRegistryEndpoints,readOperatorRegistryInputPin} from '../src/district-registry-config.ts';
 import {writeManagedSourceJson} from '../src/district-private-io.ts';
+import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 
 async function registryPin(root:string,value:DistrictRegistry){
  await mkdir(root,{mode:0o700});
@@ -34,7 +35,7 @@ async function registryPin(root:string,value:DistrictRegistry){
 }
 
 async function exportFixture(t:TestContext,root:string,policy:CivicPolicyOptions){
- const rawRoot=join(root,'raw'),fetcher=new PoliteFetcher({cacheDir:rawRoot,ownerPolicyLane:{decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy}});
+ const rawRoot=join(root,'raw'),fetcher=new PoliteFetcher({cacheDir:rawRoot,ownerPolicyLane:{decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy},fixtureInspection:fixturePolicyInspection});
  await fetcher.initialize();
  t.mock.method(fetcher as unknown as {wire(url:URL):Promise<unknown>},'wire',async(target:URL)=>target.pathname==='/robots.txt'||target.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Synthetic crawl input')});
  const document=await fetcher.fetch('https://stadt.de/fixture-index'),sourceBindings=await fetcher.sourceBindingsForArtifact([sourceContentBinding(document)]);

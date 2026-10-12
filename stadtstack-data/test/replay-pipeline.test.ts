@@ -145,7 +145,7 @@ test('missing or differently prompted actual answer fails closed, never becomes 
 test('original task, source, schema, municipality and identity cannot be rebound to newer evidence',async()=>{
  const fixture=await noCaseFixture();
  for(const patch of [{sourceSha256:hash('other source')},{preparedSha256:hash('other prepared')},{schemaSha256:hash('other schema')},{promptSha256:hash('other prompt')},{municipalityId:'other-city'}])assert.throws(()=>verifyCachedGeneration({...fixture,result:{...fixture.result,...patch}}),/binding mismatch/);
- assert.throws(()=>verifyCachedGeneration({...fixture,identities:[{...identity,toolVersion:'newer-cli'}]}),/identity mismatch/);
+ assert.throws(()=>verifyCachedGeneration({...fixture,identities:[{...identity,toolVersion:'newer-cli'}]}),/Model identity digest mismatch/);
  const changedAnswer={...fixture.answer,returnedModel:'different-model'};
  assert.throws(()=>verifyCachedGeneration({...fixture,answers:new Map([[changedAnswer.binding,changedAnswer]])}),/model binding/);
  const changedText={...fixture.prepared,text:'Another source body'};

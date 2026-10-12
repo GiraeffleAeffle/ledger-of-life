@@ -103,7 +103,9 @@ test('robots exception never replaces source registration, access or TDM/PDF gat
 test('registry config preserves global civic owner decisions and honest historical denial evidence',async()=>{
  const registry=await loadDistrictRegistry(new URL('../sources/district-registry.json',import.meta.url).pathname);
  const configured=registry.municipalities.flatMap(city=>city.sources).filter(source=>source.ownerRobotsOverride);
- assert.equal(configured.length,registry.municipalities.flatMap(city=>city.sources).filter(source=>source.url).length);
+ const publicSources=registry.municipalities.flatMap(city=>city.sources).filter(source=>source.url);
+ assert.deepEqual(configured.map(source=>source.id).sort(),publicSources.filter(source=>source.kind!=='structured').map(source=>source.id).sort());
+ assert.ok(publicSources.filter(source=>source.kind==='structured').every(source=>source.checkState==='not_checked'&&!source.ownerRobotsOverride),'Uninspected structured distributions do not inherit website owner approval');
  for(const item of configured){assert.equal(ownerRobotsOverrideApplies(item.url!,item.ownerRobotsOverride),true);assert.equal(item.override,'owner-approved 2026-10-11');}
  const source=configured.find(item=>item.id==='strausberg-council')!;
  assert.equal(source.id,'strausberg-council');assert.deepEqual(source.ownerRobotsOverride,decision);

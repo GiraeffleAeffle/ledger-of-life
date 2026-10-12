@@ -28,5 +28,5 @@ test('publication provenance authenticates exact bytes and live managed source b
  await writeFile(join(directory,'unbound.json'),'tampered');
  await assert.rejects(provenance.read(join(directory,'unbound.json')));
  await writeFile(path,'tampered');
- await assert.rejects(provenance.read(path),/binding mismatch|managed source/i);
+ await assert.rejects(provenance.read(path),{code:'CONTENT_BINDING_MISMATCH'});
 });

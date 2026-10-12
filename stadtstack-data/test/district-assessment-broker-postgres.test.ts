@@ -37,12 +37,13 @@ function submitFor(lease:BridgeLease){
 
 async function fixture(pool:Pool,name:string){
  const directory=await mkdtemp(join(await realpath(tmpdir()),'assessment-broker-test-'));
- const policyOptions={stateDir:join(directory,'policy')};
+ const stateDir=join(directory,'policy');
  // Explicit isolated TEST owner provisioning, never broker auto-provisioning.
- const authority=await provisionCivicPolicyAuthority(policyOptions);
+ const authority=await provisionCivicPolicyAuthority({stateDir,authorityId:'fixture:'+randomUUID()});
+ const policyOptions={stateDir,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
  const cas=new DistrictCas(join(directory,'cas'),{maxBytes:1024*1024});
  await initializeManagedAcquisitionLane(cas.root,{...policyOptions,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
- const store=new DistrictJobStore(pool),broker=new DistrictAssessmentBroker(pool,cas,{policyOptions});
+ const store=new DistrictJobStore(pool),broker=new DistrictAssessmentBroker(pool,cas,{policyOptions,fixtureProtocol:true});
  const text='Synthetic original evidence '+name+' '+randomUUID()+'.',sourceSha256=digest(text),sourceId='source-'+randomUUID(),url='https://example.org/'+sourceId+'.txt';
  const scope={publisherId:'synthetic-test',sourceId,municipalityId:'strausberg',ags:'12064472',tenant:null,observationWindow:'2026-10-11'};
  const now=Date.now(),checkedAt=new Date(now-1000).toISOString(),expiresAt=new Date(now+120000).toISOString();
@@ -89,6 +90,21 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   const claim=()=>f.broker.dispatch({operation:'claim',jobKey:f.jobKey,clientId:'synthetic-mac-client',clientContractSha256});
   return {...f,authorizationId,run,claim,notifications,controller};
  };
+
+ await t.test('isolated fixture protocol requires explicit pinned opt-in and cannot authorize the production broker',async()=>{
+  const f=await fixture(db,'fixture-boundary');directories.push(f.directory);
+  assert.throws(()=>new DistrictAssessmentBroker(db,f.cas,{fixtureProtocol:true,policyOptions:{stateDir:f.policyOptions.stateDir,authorityId:f.authority.authorityId}}),{name:'DistrictExecutionHold',message:'authorization_revoked'});
+  const production=new DistrictAssessmentBroker(db,f.cas,{policyOptions:f.policyOptions});
+  const authorizationId=await f.store.authorize({approvalSha256:digest(randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[f.jobKey],ags:['12064472'],maxJobs:1,maxElapsedMs:60000,category:'development',mode:'attended'});
+  const run=await runDistrictJobs({store:f.store,cas:f.cas,handlers:{assessment_b:assessmentBJobHandler(production)},authorizationId,maxJobs:1,maxElapsedMs:60000,ownerPresent:true,leaseMs:30000});
+  assert.equal(run.state,'held');assert.equal(run.reasonCode,'authorization_revoked');
+  assert.equal((await db.query('SELECT id FROM district_pipeline.assessment_bridge_leases WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1)',[f.jobKey])).rowCount,0);
+  const nativeKey=await enqueueAssessmentB(f.broker,{itemArtifactSha256:f.itemArtifact.sha256,sourceScope:f.proof.receipt.scope,policyProofSha256:f.proof.receiptSha256,transport:'vm-omp'});
+  const nativeAuthorization=await f.store.authorize({approvalSha256:digest(randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[nativeKey],ags:['12064472'],maxJobs:1,maxElapsedMs:60000,category:'development',mode:'attended'});
+  const nativeRun=await runDistrictJobs({store:f.store,cas:f.cas,handlers:{assessment_b:assessmentBJobHandler(f.broker)},authorizationId:nativeAuthorization,maxJobs:1,maxElapsedMs:60000,ownerPresent:true,leaseMs:30000});
+  assert.equal(nativeRun.state,'held');assert.equal(nativeRun.reasonCode,'isolation_unavailable');
+  assert.equal((await db.query('SELECT id FROM district_pipeline.assessment_bridge_leases WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1)',[nativeKey])).rowCount,0);
+ });
 
  await t.test('intent commits before transfer; genuine answer, inputs and purge acknowledgement persist on the VM',async()=>{
   const f=await start('accepted');
@@ -176,7 +192,7 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
    const f=await start(`interleave-${phase}-${mutation}-${first}`);
    const nonce=randomUUID().replaceAll('-',''),name='bridge_gate_'+nonce;
    const probePool=new Pool({connectionString:isolated.href,max:1,application_name:name,connectionTimeoutMillis:5000,statement_timeout:10000});
-   const probe=new DistrictAssessmentBroker(probePool,f.cas,{policyOptions:f.policyOptions});
+   const probe=new DistrictAssessmentBroker(probePool,f.cas,{policyOptions:f.policyOptions,fixtureProtocol:true});
    const session=await probePool.connect(),probePid=(await session.query<{pid:number}>('SELECT pg_backend_pid() AS pid')).rows[0].pid;session.release();
    const competitor=await db.connect(),competitorPid=(await competitor.query<{pid:number}>('SELECT pg_backend_pid() AS pid')).rows[0].pid;
    const gate=await db.connect(),gateKey=parseInt(nonce.slice(0,6),16)+100000;
@@ -193,9 +209,16 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
    const waitForBlocker=async(pid:number,blocker:number)=>{
     const deadline=Date.now()+5000;
     for(;;){
-     const observed=await db.query<{blockers:number[]}>('SELECT pg_blocking_pids($1) AS blockers',[pid]);
-     if(observed.rows[0].blockers.includes(blocker))return;
-     if(Date.now()>=deadline)throw Error('Expected authority-lock interleaving was not established');
+     // Queue heartbeats may be ahead of this contender on a tuple lock;
+     // require the real transitive blocking chain to reach the intended owner.
+     const observed=await db.query<{blocked:boolean}>(`WITH RECURSIVE blocking(pid,seen) AS (
+      SELECT $1::integer,ARRAY[$1::integer]
+      UNION ALL SELECT blocker.pid,blocking.seen||blocker.pid FROM blocking
+      CROSS JOIN LATERAL unnest(pg_blocking_pids(blocking.pid)) AS blocker(pid)
+      WHERE NOT blocker.pid=ANY(blocking.seen)
+     ) SELECT COALESCE(bool_or(pid=$2),false) AS blocked FROM blocking WHERE pid<>$1`,[pid,blocker]);
+     if(observed.rows[0].blocked)return;
+     if(Date.now()>=deadline)throw Error(`Expected authority-lock interleaving was not established: ${phase}/${mutation}/${first}`);
      await delay(10);
     }
    };

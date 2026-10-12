@@ -14,11 +14,14 @@ import {signRevocations,verifyRevocations,revocationKeyId,type RevocationTarget}
 import {caseMetrics,caseEvidence} from '../src/query-cases.ts';
 import {buildKnowledgeGraph} from '../src/district-graph.ts';
 import {GraphIndex} from '../src/district-graph-query.ts';
-import {loadRelease} from '../src/mcp-release.ts';
 import type {ReleasedKnowledge} from '../src/mcp-release.ts';
 import {server} from '../src/mcp.ts';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
+import {projectKnowledgeRecordIdentity} from '../src/retained-knowledge-lineage.ts';
+import {syntheticRelease} from './fixtures/mcp-release.ts';
+import {PROVIDER_CONFIGS} from '../src/district-model-contract.ts';
+import {graphGroundingChecks} from '../src/district-graph-claims.ts';
 
 // Synthetic test evidence only; these fixtures are never written to the released corpus.
 const municipalities=['strausberg','hoppegarten','ruedersdorf-bei-berlin','ratzeburg','moelln','schwarzenbek','ludwigslust','parchim','hagenow'].map((id,index)=>({id,name:id,ags:`0000000${index}`,districtId:['maerkisch-oderland','herzogtum-lauenburg','ludwigslust-parchim'][Math.floor(index/3)],sources:[]}));
@@ -28,6 +31,8 @@ const catalogue:Catalogue={schemaVersion:'stadtstack-signals-v1',generatedAt:dat
 function record(cityIndex:number,stage:DistrictKnowledgeRecord['stage']='draft',suffix=''):DistrictKnowledgeRecord {
  const city=municipalities[cityIndex],title='Kommunale Wärmeplanung und Fernwärmenetz';
  const fixture: DistrictKnowledgeRecord = { kind: 'text_model', id:`knowledge:${city.id}${suffix}`,municipalityId:city.id,ags:city.ags,districtId:city.districtId,caseKey:`case:${city.id}${suffix}`,caseKeyType:'plan_number',caseType:'planning',caseQuote:'Plan 1',title,titleQuote:title,summary:title,summaryQuote:title,municipalityQuote:city.id,documentDate:'2026-09-20',documentDateQuote:'20.09.2026',documentDateReason:null,topics:[{id:'waermeplanung',parentId:'energie',provenance:'model',confidence:0.9,quote:'Wärmeplanung'}],stage,stageDate:'2026-09-19',stageDateQuote:'19.09.2026',stageDateReason:null,originalStatus:stage,stageQuote:stage === 'unknown' ? '' : stage === 'draft' ? 'Entwurf' : stage,stages:[],entities:[],relations:[],locations:[],sources:[{id:`registry:${city.id}`,url:`https://example.org/${city.id}${suffix}.pdf`,sha256:digest,retrievedAt:date,locator:'Seite 1',mimeType:'application/pdf',sourceType:'website',policy:{robots:{state:'allowed',url:'https://example.org/robots.txt',checkedAt:date},tdm:{state:'not_declared',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}}],extraction:{extractorVersion:'test',extractorSha256:digest,model:'test-model',provider:'openai-subscription',tool:'codex-cli',toolVersion:'synthetic-fixture',modelIdentitySha256:digest,modelIdentityBasis:'configured-cli-model-and-tool-version',returnedModel:null,promptVersion:'test',promptSha256:digest,judgePromptVersion:'test',judgePromptSha256:digest,inputSha256:digest,textSha256:digest,responseSha256:digest,ocrUsed:false,textMethod:'pdf_text',cacheKey:digest,extractedAt:date,chunk:{index:0,count:1,start:0,end:100}},verification:{kind: 'text_model', status: 'auto-verified', deterministic: {passed:true,checks:REQUIRED_DETERMINISTIC_CHECKS.map(id=>({id,passed:true,reason:'synthetic query fixture'}))}, faithfulness: {score:0.9,threshold:0.8,model:'test-model',provider:'openai-subscription',tool:'codex-cli',toolVersion:'synthetic-fixture',modelIdentitySha256:digest,returnedModel:null,reason:'fixture',evaluatedAt:date,responseSha256:digest,sameModel:true,limitation:'Same-model judgment is not independent verification.'}, evidenceHash: digest} }
+ fixture.extraction.model=fixture.verification.faithfulness.model=PROVIDER_CONFIGS['openai-subscription'].model;
+ fixture.verification.deterministic.checks.push(...graphGroundingChecks({entities:[],relations:[]},'Synthetic query fixture'));
  fixture.sources[0].policy.tdm.evidence.push({url:fixture.sources[0].url,locator:'PDF.js 6.3.289 XMP metadata (pdf-tdm-v2)',value:'no_tdm_reservation_field',sha256:fixture.sources[0].sha256,checkedAt:date});
  fixture.verification.evidenceHash=knowledgeEvidenceHash(fixture);
  return fixture;
@@ -193,8 +198,9 @@ test('quoted paper references group records without conflating municipalities or
 });
 
 test('released Solarpark evidence joins sixteen records through explicit DiPlan publication paths',async()=>{
- const envelope=JSON.parse(await readFile(join(outDir,'knowledge/records.json'),'utf8')) as {records:PublicKnowledgeRecord[]};
- const records=envelope.records.filter((record):record is DistrictKnowledgeRecord=>record.kind==='text_model'&&record.municipalityId==='strausberg'&&/Solarpark am Flugplatz|68\/23/i.test(record.title+' '+record.summary));
+ // Historical bytes are query regression fixtures, never a governed serving root.
+ const envelope=JSON.parse(await readFile(join(outDir,'knowledge/records.json'),'utf8')) as {records:DistrictKnowledgeRecord[]};
+ const records=envelope.records.filter(record=>record.municipalityId==='strausberg'&&/Solarpark am Flugplatz|68\/23/i.test(record.title+' '+record.summary)).map(record=>projectKnowledgeRecordIdentity(record,{version:'knowledge-v2-to-v3-text-model-v1'}));
  assert.equal(records.length,16);
  const query=index(records),exported=query.exportRecords({municipality:'strausberg',limit:50});
  assert.equal(exported.totalRecords,16);assert.equal(exported.totalCases,1);
@@ -274,7 +280,7 @@ test('shared metric supersession preserves old quotes and signed masking cannot 
  const conflictIndex=index([old,replacement,competing]),conflict=conflictIndex.compareTopic('waermeplanung',['strausberg']).cities[0].cases[0];
  assert.equal(conflict.currentValues.length,0);assert.ok(conflict.history.some(entry=>entry.claim.value===55&&entry.status==='unresolved'));
  // Injected synthetic query evidence only; the signed mask uses a real verified Ed25519 fixture.
- const publication=await loadRelease(),original=new QueryIndex(publication.dataManifest.id,date,[],regional,catalogue,conflictIndex.knowledge);
+ const publication=syntheticRelease(),original=new QueryIndex(publication.dataManifest.id,date,[],regional,catalogue,conflictIndex.knowledge);
  const {privateKey,publicKey}=generateKeyPairSync('ed25519'),keyId=revocationKeyId(publicKey);
  const maskFor=(targets:RevocationTarget[])=>{
   const signed=signRevocations({schemaVersion:'stadtstack-revocations-v1',releaseId:original.releaseId,issuedAt:date,sequence:1,targets},keyId,privateKey);

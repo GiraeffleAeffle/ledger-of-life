@@ -3,11 +3,12 @@ import {HashSchema,semanticHash,canonicalJson} from './district-adapter-contract
 import {verifyPinnedAssessment} from './district-assessment.ts';
 import {IdentityAdmissionSchema,IdentityAssertionSchema,assertIdentityAssertionsBound,effectiveIntervalFromExpression,type IdentityAdmission,type IdentityAssertion,type IdentityMention} from './district-entity-resolution.ts';
 import type {DistrictCas} from './district-cas.ts';
+import type {CivicPolicyOptions} from './civic-opt-out.ts';
 
 export const identityAssessmentInventorySchema=z.object({assertions:z.array(z.object({assertionId:z.string().regex(/^identity:[a-f0-9]{64}$/),finalArtifactSha256:HashSchema,itemArtifactSha256:HashSchema,AArtifactSha256:HashSchema,BArtifactSha256:HashSchema,CArtifactSha256:HashSchema}).strict())}).strict();
 export type IdentityAssessmentInventory=z.infer<typeof identityAssessmentInventorySchema>;
 /** Public seals come only from replayed private final/item/A/B/C artifacts and exact original evidence. */
-export async function admitPublicationIdentities(input:{assertions:readonly IdentityAssertion[];mentions:IdentityMention[];additionalSourceHashes?:string[];inventoryInput:unknown;cas:DistrictCas;stateDir?:string;currentAdmissionReceipts?:Readonly<Record<string,string>>;originalAdmissions?:readonly IdentityAdmission[]}):Promise<{admissions:IdentityAdmission[];dependencySha256:string}>{
+export async function admitPublicationIdentities(input:{assertions:readonly IdentityAssertion[];mentions:IdentityMention[];additionalSourceHashes?:string[];inventoryInput:unknown;cas:DistrictCas;policyOptions?:CivicPolicyOptions;currentAdmissionReceipts?:Readonly<Record<string,string>>;originalAdmissions?:readonly IdentityAdmission[]}):Promise<{admissions:IdentityAdmission[];dependencySha256:string}>{
  const assertions=input.assertions.map(assertion=>IdentityAssertionSchema.parse(assertion));
  const reviewed=assertions.filter(assertion=>assertion.status==='accepted'&&assertion.method==='authoritative_review');
  const inventory=identityAssessmentInventorySchema.parse(input.inventoryInput),key=(entry:{assertionId:string;finalArtifactSha256:string})=>canonicalJson([entry.assertionId,entry.finalArtifactSha256]),entries=new Map(inventory.assertions.map(entry=>[key(entry),entry]));
@@ -16,7 +17,7 @@ export async function admitPublicationIdentities(input:{assertions:readonly Iden
  for(const assertion of reviewed){
   const entry=entries.get(key({assertionId:assertion.id,finalArtifactSha256:assertion.reviewReceiptSha256!}))!;
   if(entry.finalArtifactSha256!==assertion.reviewReceiptSha256)throw Error('Identity review final receipt binding mismatch');
-  const verified=await verifyPinnedAssessment(input.cas,entry.finalArtifactSha256,entry,{...(input.stateDir?{policyOptions:{stateDir:input.stateDir}}:{}),...(input.currentAdmissionReceipts?{currentAdmissionReceipts:input.currentAdmissionReceipts}:{})});
+  const verified=await verifyPinnedAssessment(input.cas,entry.finalArtifactSha256,entry,{...(input.policyOptions?{policyOptions:input.policyOptions}:{}),...(input.currentAdmissionReceipts?{currentAdmissionReceipts:input.currentAdmissionReceipts}:{})});
   const {final,item,assessments}=verified;
   if(final.disposition!=='ai_reconciled'||final.blocksAffectedAdmission||final.independentlyValidated||!final.output||final.output.outcome==='unresolved'||!item.criticalKinds.includes('identity')||!item.claimIds.includes(assertion.id))throw Error('Identity review assessment is not admitted source-backed identity evidence');
   const left=mentions.get(assertion.leftMentionId),right=mentions.get(assertion.rightMentionId);

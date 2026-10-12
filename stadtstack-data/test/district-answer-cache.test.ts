@@ -37,7 +37,7 @@ async function cacheFixture(t:TestContext,initialize=true) {
   if(initialize)await initializeManagedAcquisitionLane(root,{decisionId:fixture.decisionId,kind:'artifacts',...fixture.policy});
   const enroll=async(bytes:string)=>{
     const relativePath=binding+'.answer.json';
-    await withManagedSourceWrite(root,preparedSourceBindings(sourceContext.references,sourceContext.receiptSha256).map(binding=>({...binding,relativePath,contentSha256:sha256(bytes),independentAllowed:false})),()=>writeFile(join(root,relativePath),bytes,{mode:0o600}),fixture.policy);
+    await withManagedSourceWrite(root,preparedSourceBindings(sourceContext.references,sourceContext.receiptSha256).map(binding=>({...binding,relativePath,contentSha256:sha256(bytes)})),()=>writeFile(join(root,relativePath),bytes,{mode:0o600}),fixture.policy);
   };
   return {root,baseRoot:fixture.root,policy:fixture.policy,sourceContext,options,enroll};
 }

@@ -87,7 +87,7 @@ test('mixed v5 coverage preserves original balanced and Codex-only text receipts
  const oldRegistry=structuredClone(registry);oldRegistry.municipalities[0].sources=oldRegistry.municipalities[0].sources.filter(source=>source.id!==sourceId);
  const documents=[{id:'synthetic-text-source',municipalityId:city.id,sourceId:textSource.id,sha256:inputSha256}];
  const broad={municipalityId:city.id,sourceId:textSource.id,checkState:'checked',checkedAt:earlier,documentCount:1,coverage:{state:'partial',pendingCount:7,runnableCount:5,blockedCount:2,scope:'Synthetic broad source'}};
- const targeted={municipalityId:city.id,sourceId:textSource.id,checkState:'checked',checkedAt:at,documentCount:1,coverage:{state:'complete',pendingCount:0,runnableCount:0,blockedCount:0,sourceCoverage:'not_assessed',targetScope:{kind:'seed_documents',urls:['https://example.org/synthetic'],state:'complete',pendingCount:0,runnableCount:0,blockedCount:0}}};
+ const targeted={municipalityId:city.id,sourceId:textSource.id,checkState:'checked',checkedAt:at,documentCount:1,coverage:{state:'partial',pendingCount:0,runnableCount:0,blockedCount:0,sourceCoverage:'not_assessed',targetScope:{kind:'seed_documents',urls:['https://example.org/synthetic'],state:'complete',pendingCount:0,runnableCount:0,blockedCount:0}}};
  const group={municipalityId:city.id,sourceSha256:inputSha256};
  const historical=syntheticTextContribution(oldRegistry,{...crawl,generatedAt:earlier,documents,checks:[broad]},[old],[],{label:'original-balanced',balanced:true,v2:true,prepared:[group]});
  const correction=syntheticTextContribution(registry,{...crawl,documents,checks:[targeted]},[current],[],{label:'original-codex',prepared:[group]});

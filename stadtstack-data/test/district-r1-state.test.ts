@@ -102,7 +102,7 @@ test('R1 state preserves independent HTTP and policy proofs through managed CAS 
   assert.deepEqual(await cas.read(hash),registry.body);return registry;
  }
  const registry=await admittedRegistry(registryValue,'structured-registry');
- const input={adapter:'gauges' as const,operation:'parse' as const,registry:registry.registryPin,registrySha256:registry.registrySha256,scope:first.receipt.scope,districtId:'mol',snapshot:primary.snapshot,options:{},cursor:null,sourceBindings:[binding,supportBinding],supportingSources:[supportingSource],auxiliary:[{slot:'stationSnapshot' as const,snapshot:{...support.snapshot,request:second.request}}]};
+ const input={adapter:'gauges' as const,operation:'parse' as const,registry:registry.registryPin,registrySha256:registry.registrySha256,scope:first.receipt.scope,districtId:'mol',snapshot:primary.snapshot,options:{},cursor:null,sourceBindings:[binding,supportBinding],supportingSources:[supportingSource],auxiliary:[{slot:'stationSnapshot' as const,snapshot:support.snapshot}]};
  const queued=await enqueueStructuredSnapshot(store,cas,input,policy);
  await t.test('all source and HTTP proofs plus immutable auxiliary bundle participate in job identity',async()=>{
   for(const hash of [primary.sourceArtifact.sha256,primary.receiptSha256,primary.httpObservation.receiptSha256,support.sourceArtifact.sha256,support.receiptSha256,support.httpObservation.receiptSha256])assert.ok(queued.spec.inputArtifactHashes.includes(hash),hash);
@@ -115,7 +115,7 @@ test('R1 state preserves independent HTTP and policy proofs through managed CAS 
   assert.equal((await enqueueStructuredSnapshot(store,cas,input,policy)).jobKey,queued.jobKey);
   const third=await fixture('support-changed','station,value\nsynthetic,3\n'),changed=await persistR1Representation(store,cas,third,policy);
   const changedBinding=authenticatedHttpBinding({...third.httpObservation,bytes:third.httpObservation.bytes.toString('utf8')},third.receipt.source);
-  const next=await enqueueStructuredSnapshot(store,cas,{...input,sourceBindings:[binding,changedBinding],supportingSources:[{...supportingSource,...third.receipt.source,id:third.receipt.scope.sourceId,retrievedAt:third.retrievedAt,policyReceiptSha256:changed.receiptSha256,scopeSha256:semanticHash(third.receipt.scope)}],auxiliary:[{slot:'stationSnapshot',snapshot:{...changed.snapshot,request:third.request}}]},policy);
+  const next=await enqueueStructuredSnapshot(store,cas,{...input,sourceBindings:[binding,changedBinding],supportingSources:[{...supportingSource,...third.receipt.source,id:third.receipt.scope.sourceId,retrievedAt:third.retrievedAt,policyReceiptSha256:changed.receiptSha256,scopeSha256:semanticHash(third.receipt.scope)}],auxiliary:[{slot:'stationSnapshot',snapshot:changed.snapshot}]},policy);
   assert.notEqual(next.jobKey,queued.jobKey);assert.notEqual(z.object({worker:StructuredWorkerRequestSchema}).parse(next.spec.selector).worker.inputArtifactSha256,worker.inputArtifactSha256);
   for(const sourceBindings of [[binding],[supportBinding],[binding,supportBinding,supportBinding],[binding,{...supportBinding,receiptSha256:support.receiptSha256}]])await assert.rejects(enqueueStructuredSnapshot(store,cas,{...input,sourceBindings},policy));
   await assert.rejects(enqueueStructuredSnapshot(store,cas,{...input,supportingSources:[]},policy),/supporting admission/);

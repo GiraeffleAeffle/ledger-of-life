@@ -4,6 +4,7 @@ import {join,basename} from 'node:path';
 import {readFile,lstat,writeFile,mkdir} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
+import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {recordHostOptOut,assertManagedSourceReadable,assertManagedSourceBindings,HostOptedOutError,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 import {writeManagedSourceArtifact,writeManagedSourceJson,writePrivateJson} from '../src/district-private-io.ts';
 import type {SourceArtifactBinding} from '../src/district-private-io.ts';
@@ -57,7 +58,7 @@ async function fixture(t:TestContext,options:{dated?:boolean;bad?:'endpoint'|'ph
   const sourceSha256=sha256(text);
   const reference:PreparedSourceReference={id:'synthetic-source',url:'https://example.org/synthetic-source',sha256:sourceSha256,retrievedAt:at,locator:'document-sha256:'+sourceSha256,mimeType:'text/plain',sourceType:'website',policy:{robots:{state:'allowed',url:'https://example.org/robots.txt'},tdm:{state:'not_declared',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}};
   const references=options.extraReference?[reference,{...reference,id:'synthetic-alias',url:'https://example.net/synthetic-alias',policy:{...reference.policy,robots:{state:'allowed' as const,url:'https://example.net/robots.txt'}}}]:[reference];
-  const prepared=await prepareDocument({bytes:Buffer.from(text),municipalityId:'strausberg',references,mimeType:'text/plain',extractorSha256:sha256('synthetic preparation'),toolVersions:{node:'synthetic'}},async()=>{throw Error('Synthetic fixture must never execute an external document command');});
+  const prepared=await prepareDocument({bytes:Buffer.from(text),municipalityId:'strausberg',references,mimeType:'text/plain',extractorSha256:sha256('synthetic preparation'),toolVersions:{node:'synthetic',parser_isolation:'district-parser-isolation-v1',parser_image:'sha256:'+sha256('synthetic fixture parser image; not reviewed'),parser_contract:sha256('synthetic fixture parser contract; no actual execution')}},async()=>{throw Error('Synthetic fixture must never execute an external document command');});
   await cachePreparedDocument(preparedRoot,prepared,{decisionId:context.decisionId,...context.policy});
   const plan=createWorkPlan([{municipalityId:'strausberg',sourceSha256,preparedSha256:prepared.receiptSha256}],legacyContract,options.balanced?'balanced':'codex-only');
   const task=plan.tasks.find(task=>task.purpose==='production')!,config=PROVIDER_CONFIGS[task.provider];
@@ -551,8 +552,8 @@ test('genuine control provenance conservatively retains non-independent permissi
 interface ControlWireFixture {wire(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
 test('real HTTP and Git-approved configuration control ancestry stays on artifacts, never in native model source scope',async t=>{
  const f=await fixture(t),staged=await managedFreezeFixture(f),managed={decisionId:CIVIC_ACQUISITION_DECISION_ID,...f.policy};
- const fetcher=new PoliteFetcher({cacheDir:join(f.root,'http-control'),minDelayMs:0,ownerPolicyLane:managed});
- // Only the network transport is synthetic; source policy, observations, ledger and raw bytes are real fixture operations.
+ const fetcher=new PoliteFetcher({cacheDir:join(f.root,'http-control'),minDelayMs:0,ownerPolicyLane:managed,fixtureInspection:fixturePolicyInspection});
+ // Transport and parser inspection are synthetic; authority, observations, ledger and raw bytes use real fixture operations.
  t.mock.method(fetcher as unknown as ControlWireFixture,'wire',async(uri:URL)=>{
   if(uri.pathname==='/robots.txt'||uri.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
   return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Stadt Strausberg. Synthetische amtliche Bekanntmachung für einen technischen Test des Kontrollplans.')};

@@ -91,7 +91,7 @@ async function assembleKnowledge(options:PrepareKnowledgeOptions,provenance:Auth
  const retainedLineage=retainedPublication?{...retainedPublication.baseline.lineage,selectedRecordOrigins:retainedPublication.selectedRecordOrigins}:null;
  const policy=await recheckPublicationPolicy(knowledge.records,policyInventory,cas,{...policyOptions,evaluationAt:new Date().toISOString(),retainedPublication:retainedLineage});
  dependencies.push({role:'policy_receipts',sha256:policy.inventorySha256});
- if(structured){const checked=await verifyStructuredRunReceipts(structured,cas,{evaluationAt:new Date().toISOString(),...(options.policyStateDir?{stateDir:options.policyStateDir}:{}),currentAdmissionReceipts:policy.currentAdmissionReceipts});dependencies.push({role:'structured_receipts',sha256:checked.dependencySha256});}
+ if(structured){const checked=await verifyStructuredRunReceipts(structured,cas,{...policyOptions,evaluationAt:new Date().toISOString(),currentAdmissionReceipts:policy.currentAdmissionReceipts});dependencies.push({role:'structured_receipts',sha256:checked.dependencySha256});}
  const criticalInventory=options.criticalAssessments?JSON.parse((await provenance.read(options.criticalAssessments)).toString('utf8')):{records:[]};
  const critical=await admitCriticalKnowledge(knowledge.records,criticalInventory,cas,{policyOptions,currentAdmissionReceipts:policy.currentAdmissionReceipts,retainedPublication});
  dependencies.push({role:'critical_assessments',sha256:critical.dependencySha256});
@@ -113,7 +113,7 @@ async function assembleKnowledge(options:PrepareKnowledgeOptions,provenance:Auth
  knowledge.identityAdmissions=knowledge.identityAdmissions.filter(admission=>assertionHashes.has(admission.assertionSha256));
  const identity=graphIdentityInputs(knowledge);
  const assessmentInventory=options.identityAssessments?JSON.parse((await provenance.read(options.identityAssessments)).toString('utf8')):{assertions:[]};
- const reviewed=await admitPublicationIdentities({assertions:identity.assertions,mentions:identity.mentions,additionalSourceHashes:identity.additionalSourceHashes,inventoryInput:assessmentInventory,cas,...(options.policyStateDir?{stateDir:options.policyStateDir}:{}),currentAdmissionReceipts:policy.currentAdmissionReceipts,...(knowledge.identityAdmissions.length?{originalAdmissions:knowledge.identityAdmissions}:{})});
+ const reviewed=await admitPublicationIdentities({assertions:identity.assertions,mentions:identity.mentions,additionalSourceHashes:identity.additionalSourceHashes,inventoryInput:assessmentInventory,cas,policyOptions,currentAdmissionReceipts:policy.currentAdmissionReceipts,...(knowledge.identityAdmissions.length?{originalAdmissions:knowledge.identityAdmissions}:{})});
  knowledge.identityAdmissions=reviewed.admissions;dependencies.push({role:'identity_assessments',sha256:reviewed.dependencySha256});
  assertKnowledgeSlice(registry,knowledge.records,minimum);
  if(!knowledge.records.length)throw Error('No passing knowledge records');

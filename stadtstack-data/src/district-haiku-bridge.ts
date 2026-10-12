@@ -36,7 +36,12 @@ export function haikuBridgeSshArgs(): string[] {
 }
 export type BridgeHoldReason = 'isolation_unavailable' | 'client_disconnected' | 'lease_expired' | 'authority_changed' | 'provider_failed' | 'submission_unacknowledged' | 'invalid_contract';
 export class HaikuBridgeHold extends Error {
-  constructor(readonly reason: BridgeHoldReason, readonly teardownConfirmed = true) { super('Haiku bridge held'); this.name = 'HaikuBridgeHold'; }
+  readonly reason: BridgeHoldReason;
+  readonly teardownConfirmed: boolean;
+  constructor(reason: BridgeHoldReason, teardownConfirmed = true) {
+    super('Haiku bridge held'); this.name = 'HaikuBridgeHold';
+    this.reason = reason; this.teardownConfirmed = teardownConfirmed;
+  }
 }
 export interface BridgeProcessSpec {
   executable: string; args: readonly string[]; env: NodeJS.ProcessEnv;

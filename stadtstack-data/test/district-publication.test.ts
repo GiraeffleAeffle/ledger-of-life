@@ -126,7 +126,7 @@ test('Coverage reports only actual per-provider admitted identities and counts',
  const substitutedModel=structuredClone(coverage);substitutedModel.models[0].model='different-model';
  assert.throws(()=>validateDistrictCoverage(substitutedModel,registry,records),/model provenance/);
  const falseMode=structuredClone(coverage);falseMode.textLineage!.runs[0].assignmentMode='codex-only';
- assert.throws(()=>validateDistrictCoverage(falseMode,registry,records),/Codex-only assignment/);
+ assert.throws(()=>validateDistrictCoverage(falseMode,registry,records),/Codex-only selected origin provider mismatch/);
 });
 
 test('publication withholds a malformed or nonpublic quoted URL without repairing source evidence',()=>{

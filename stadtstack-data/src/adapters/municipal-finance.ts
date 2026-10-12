@@ -172,7 +172,7 @@ function header(raw:string):Header {
  const thousandMagnitude=/\bTEUR\b|\bT\s*(?:€|EUR\b)|\b(?:Tsd\.?|Tausend)\s*(?:€|EUR\b|Euro\b)/iu;
  const millionMagnitude=/\bMEUR\b|\b(?:Mio\.?|Million(?:en)?)\s*(?:€|EUR\b|Euro\b)/iu;
  const thousands=thousandMagnitude.test(text),millions=millionMagnitude.test(text);
- const unknownMagnitude=/\b(?:Mrd|Milliard(?:e|en)|Billion(?:en)?|[kGT]EUR|Hundert(?:tausend)?)\b|(?:\bin\b|[×*^])\s*\d/iu.test(text);
+ const unknownMagnitude=/\b(?:Mrd|Milliard(?:e|en)|Billion(?:en)?|[kG]EUR|Hundert(?:tausend)?)\b|(?:\bin\b|[×*^])\s*\d/iu.test(text);
  const unrecognizedMagnitude=/\b(?:TEUR|MEUR|Tsd|Tausend|Mio|Million(?:en)?)\b|\bT\s*(?:€|EUR\b)/iu.test(text.replace(thousandMagnitude,'').replace(millionMagnitude,''));
  const scale=unknownMagnitude||unrecognizedMagnitude||thousands&&millions?null:thousands?1000:millions?1000000:1;
  return {raw,field,role,year:year.length===1?year[0]:null,currency,scale,grossNet:/brutto/iu.test(text)?'gross':/netto/iu.test(text)?'net':'unknown'};

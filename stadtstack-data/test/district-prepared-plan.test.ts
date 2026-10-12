@@ -23,7 +23,9 @@ const bytes = Buffer.from(sourceText);
 function reference(): PreparedSourceReference {
   return { id: 'public-source', url: 'https://example.org/document', sha256: sha256(bytes), retrievedAt: '2026-10-01T00:00:00.000Z', locator: 'document-sha256:' + sha256(bytes), mimeType: 'text/plain', sourceType: 'website', policy: { robots: { state: 'allowed', url: 'https://example.org/robots.txt' }, tdm: { state: 'not_declared', evidence: [] }, access: 'public', legalClassification: 'not_assessed', publication: 'facts_with_attribution_only' } };
 }
-const preparation = () => ({ bytes, municipalityId: 'strausberg', references: [reference()], mimeType: 'text/plain', extractorSha256: sha256('extractor'), toolVersions: { node: process.versions.node } });
+// Explicitly synthetic parser identity for fixture receipts, never evidence of a reviewed worker run.
+const fixtureToolVersions = { node: process.versions.node, parser_isolation: 'district-parser-isolation-v1', parser_image: 'sha256:' + sha256('synthetic fixture parser image; not reviewed'), parser_contract: sha256('synthetic fixture parser contract; no actual execution') };
+const preparation = () => ({ bytes, municipalityId: 'strausberg', references: [reference()], mimeType: 'text/plain', extractorSha256: sha256('extractor'), toolVersions: fixtureToolVersions });
 const fixtureCommand = async () => { throw Error('Pure synthetic text fixture must not execute parser commands'); };
 const fixtureSourceBindings = [{ kind: 'http_observation' as const, url: reference().url, sourceSha256: sha256(bytes), observationId: 'synthetic-preparation-fixture', receiptSha256: sha256('synthetic preparation fixture receipt') }];
 test('result references may change span locators but cannot replace prepared identity or policy', () => {

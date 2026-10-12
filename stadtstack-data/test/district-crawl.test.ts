@@ -18,6 +18,7 @@ import type {PoliteFetcherOptions,SourceContentBinding,FetchOptions} from '../sr
 import {politeTestOptions} from './fixtures/polite-lane.ts';
 import {writePrivateJson} from '../src/district-private-io.ts';
 import {assertCivicPolicyAuthority,type CivicPolicyOptions} from '../src/civic-opt-out.ts';
+import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 
 /** Adapter-unit fetch/read/write doubles use explicit fixture authority, not a production acquisition marker. */
 class AdapterFixtureFetcher extends BasePoliteFetcher {
@@ -46,7 +47,7 @@ async function createPoliteFetcher(options:PoliteFetcherOptions):Promise<Adapter
 }
 /** Wire-only tests retain every real transport and managed-lifecycle gate. */
 async function createWireFetcher(options:PoliteFetcherOptions):Promise<BasePoliteFetcher>{
- return new BasePoliteFetcher(await politeTestOptions({...options,cacheDir:join(options.cacheDir,'managed')}));
+ return new BasePoliteFetcher({...await politeTestOptions({...options,cacheDir:join(options.cacheDir,'managed')}),fixtureInspection:fixturePolicyInspection});
 }
 
 // Synthetic upstream policy for frontier tests; PDF parsing itself uses complete PDF fixtures.

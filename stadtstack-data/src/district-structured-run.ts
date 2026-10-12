@@ -8,6 +8,7 @@ import {StructuredJobResultSchema,type StructuredJobResult} from './district-str
 import {STRUCTURED_WORKER_VERSION} from './district-structured-parser-worker.ts';
 import {loadPolicyReceipt,recheckPolicyReceipt} from './district-policy-receipt.ts';
 import type {DistrictCas} from './district-cas.ts';
+import type {CivicPolicyOptions} from './civic-opt-out.ts';
 
 export function structuredCoverageStateForNoOutput(outcome:JobOutcome):AdapterCoverage['state']{
  if(outcome==='succeeded')throw Error('Succeeded structured step requires its actual output');
@@ -69,7 +70,7 @@ export function structuredRecordHasSourcedAction(record:StructuredKnowledgeRecor
 }
 
 /** Operational coverage is backed by original committed receipts and exact sandbox output artifacts. */
-export async function verifyStructuredRunReceipts(run:StructuredRun,cas:DistrictCas,options:{evaluationAt:string;stateDir?:string;currentAdmissionReceipts?:Readonly<Record<string,string>>}):Promise<{dependencySha256:string}>{
+export async function verifyStructuredRunReceipts(run:StructuredRun,cas:DistrictCas,options:CivicPolicyOptions&{evaluationAt:string;currentAdmissionReceipts?:Readonly<Record<string,string>>}):Promise<{dependencySha256:string}>{
  structuredRunSchema.parse(run);
  const contracts=new Set<string>(),dependencies=new Set<string>(),verifiedRecords=new Set<string>();
  for(const row of run.coverage){
@@ -93,7 +94,7 @@ export async function verifyStructuredRunReceipts(run:StructuredRun,cas:District
    if(receipt.outputHashes.length!==1||!row.sourceSha256||!row.policyReceiptSha256||!receipt.inputHashes.includes(row.sourceSha256)||!receipt.inputHashes.includes(row.policyReceiptSha256))throw Error('Structured parser input/output binding mismatch');
    const policy=await loadPolicyReceipt(cas,row.policyReceiptSha256),currentHash=options.currentAdmissionReceipts?.[row.policyReceiptSha256],currentProof=currentHash?await loadPolicyReceipt(cas,currentHash):undefined;
    if(policy.source.sha256!==row.sourceSha256||semanticHash(policy.scope)!==row.scopeSha256||policy.scope.sourceId!==row.sourceId||policy.scope.municipalityId!==row.municipalityId)throw Error('Structured parser policy scope mismatch');
-   await recheckPolicyReceipt(policy,{evaluationAt:options.evaluationAt,...(options.stateDir?{stateDir:options.stateDir}:{}),...(currentProof?{currentProof}:{})});
+   await recheckPolicyReceipt(policy,{...options,...(currentProof?{currentProof}:{})});
    await cas.verify(row.sourceSha256);
    const outputHash=receipt.outputHashes[0],output=StructuredJobResultSchema.parse(JSON.parse((await cas.read(outputHash)).toString('utf8')));
    dependencies.add(outputHash);contracts.add(output.adapterContractSha256);
@@ -102,7 +103,7 @@ export async function verifyStructuredRunReceipts(run:StructuredRun,cas:District
     if(!receipt.inputHashes.includes(source.sha256)||!receipt.inputHashes.includes(source.policyReceiptSha256))throw Error('Unbound supporting parser input');
     const proof=await loadPolicyReceipt(cas,source.policyReceiptSha256),freshHash=options.currentAdmissionReceipts?.[source.policyReceiptSha256],fresh=freshHash?await loadPolicyReceipt(cas,freshHash):undefined;
     if(proof.source.sha256!==source.sha256||proof.source.url!==source.url||proof.source.mimeType!==source.mimeType||semanticHash(proof.scope)!==source.scopeSha256)throw Error('Supporting parser policy binding mismatch');
-    await recheckPolicyReceipt(proof,{evaluationAt:options.evaluationAt,...(options.stateDir?{stateDir:options.stateDir}:{}),...(fresh?{currentProof:fresh}:{})});await cas.verify(source.sha256);
+    await recheckPolicyReceipt(proof,{...options,...(fresh?{currentProof:fresh}:{})});await cas.verify(source.sha256);
    }
    if(receipt.counts.rows!==output.result.coverage.observedRows||receipt.counts.acceptedFacts!==output.records.length||'observations' in output.result&&output.unpublishedObservations!==output.result.observations.length-output.records.length)throw Error('Structured parser receipt counts mismatch');
    const operational=['complete','partial','empty','not_applicable'].includes(output.result.coverage.state);

@@ -85,7 +85,12 @@ export class DistrictAssessmentBroker {
  readonly context:AssessmentEvidenceContext;
  readonly pool:Pool;
  readonly cas:DistrictCas;
- constructor(pool:Pool,cas:DistrictCas,options:Omit<AssessmentEvidenceContext,'cas'>={}){this.pool=pool;this.cas=cas;this.store=new DistrictJobStore(pool);this.context={...options,cas};}
+ readonly fixtureProtocol:boolean;
+ constructor(pool:Pool,cas:DistrictCas,options:Omit<AssessmentEvidenceContext,'cas'>&{fixtureProtocol?:true}={}){
+  const {fixtureProtocol,...context}=options;
+  if(fixtureProtocol&&(!context.policyOptions?.authorityId?.startsWith('fixture:')||!context.policyOptions.authoritySha256||!context.policyOptions.stateDir))throw new DistrictExecutionHold('authorization_revoked');
+  this.pool=pool;this.cas=cas;this.store=new DistrictJobStore(pool);this.context={...context,cas};this.fixtureProtocol=fixtureProtocol===true;
+ }
  private async transaction<T>(body:(client:PoolClient)=>Promise<T>):Promise<T>{
   const client=await this.pool.connect();
   try{await client.query('BEGIN');const result=await body(client);await client.query('COMMIT');return result;}catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
@@ -104,7 +109,8 @@ export class DistrictAssessmentBroker {
  }
  private async checkedEvidence(client:PoolClient,itemHash:string,spec:DistrictJobSpec):Promise<CheckedEvidence>{
   const sourceAuthority=await assertCivicPolicyAuthority(this.context.policyOptions),optout=await readCivicOptOutSnapshot(this.context.policyOptions);
-  if(sourceAuthority.mode!=='codex-workstation-local'||sourceAuthority.authorityId!==optout.authorityId||sourceAuthority.authoritySha256!==optout.authoritySha256)throw new DistrictExecutionHold('authorization_revoked');
+  const requiredMode=this.fixtureProtocol?'isolated-fixture':'codex-workstation-local';
+  if(sourceAuthority.mode!==requiredMode||sourceAuthority.authorityId!==optout.authorityId||sourceAuthority.authoritySha256!==optout.authoritySha256)throw new DistrictExecutionHold('authorization_revoked');
   const item=assessmentItemSchema.parse(JSON.parse((await this.cas.read(itemHash)).toString('utf8')));
   if(digest(canonicalJson(item))!==itemHash)throw new DistrictExecutionHold('quality_failed');
   const hashes=[itemHash,...assessmentEvidenceArtifactHashes(item)];
@@ -178,6 +184,8 @@ export class DistrictAssessmentBroker {
  async prepare(job:ClaimedJob,signal:AbortSignal):Promise<string>{
   signal.throwIfAborted();
   const selector=AssessmentBSelectorSchema.parse(job.spec.selector);
+  // Fixture mode exercises private protocol/storage only, never native provider execution.
+  if(this.fixtureProtocol&&selector.transport!=='mac-bridge')throw new DistrictExecutionHold('isolation_unavailable');
   if(job.spec.step!==ASSESSMENT_B_STEP||job.spec.lane!=='assessment'||job.spec.semanticContractSha256!==await assessmentBJobContract()||canonicalJobIdentity(job.spec).jobKey!==job.jobKey||selector.transport==='vm-omp'&&selector.runnerContractSha256!==await ompRunnerContractSha256())throw new DistrictExecutionHold('quality_failed');
   return this.transaction(async client=>{
    const current=await this.job(client,job.id,job.runId),reason=disposition(current,job.runId,job.fencingToken);

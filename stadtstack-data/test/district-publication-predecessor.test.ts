@@ -16,14 +16,16 @@ test('predecessor authenticates its actual knowledge change member without inven
   return Buffer.from(JSON.stringify({schemaVersion:'stadtstack-data-release-v1',id:dataReleaseId(files),generatedAt:at,files,quality:{publishedRecords:1,quarantinedRecords:0,cities:1}})+'\n');
  };
  let manifestBytes=manifest(true);
- const spy=t.mock.method(childProcess,'execFile',(...args:unknown[])=>{
+ const originalExecFile=childProcess.execFile;
+ const spy=(...args:unknown[])=>{
   const commandArgs=args[1] as string[],callback=args.at(-1) as (error:Error|null,stdout:Buffer,stderr:Buffer)=>void;
   assert.equal(args[0],'git');
   const path=commandArgs[2].split(':./out/')[1],bytes=path==='release-manifest.json'?manifestBytes:members.get(path);
   callback(bytes?null:Error('Synthetic missing committed object'),bytes??Buffer.alloc(0),Buffer.alloc(0));
   return new childProcess.ChildProcess();
- });
- syncBuiltinESMExports();t.after(()=>{spy.mock.restore();syncBuiltinESMExports();});
+ };
+ childProcess.execFile=spy as typeof childProcess.execFile;
+ syncBuiltinESMExports();t.after(()=>{childProcess.execFile=originalExecFile;syncBuiltinESMExports();});
  Object.defineProperty(spy,promisify.custom,{value:(...args:unknown[])=>{
   const {promise,resolve,reject}=Promise.withResolvers<{stdout:Buffer;stderr:Buffer}>();
   Reflect.apply(spy,childProcess,[...args,(error:Error|null,stdout:Buffer,stderr:Buffer)=>error?reject(error):resolve({stdout,stderr})]);

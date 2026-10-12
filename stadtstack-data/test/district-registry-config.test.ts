@@ -94,9 +94,9 @@ test('bounded closed registry codec rejects unknown fields, copied bodies and un
  const nested=operatorRegistryFixtureValue();nested.municipalities[0].sources[0].api={url:'https://example.org/api',method:'POST',format:'diplan-list',form:{body:'Source bodies cannot hide in request metadata'}};bodies.push(nested);
  for(const value of bodies){
   assert.throws(()=>parseOperatorRegistryConfiguration(value));
-  const f=await rawFixture(t,value);
-  await assert.rejects(importOperatorRegistryConfig({...f.input,managedRoot:f.managedRoot,destinationPath:'registry.json'},f.policy));
-  await assert.rejects(lstat(f.managedRoot),{code:'ENOENT'});
+  const f=await createCivicPolicyTestContext(t);
+  await assert.rejects(registryDescriptor(f,value),'The canonical builder must refuse invalid committed metadata before it can become an intake descriptor');
+  await assert.rejects(lstat(join(f.root,'managed-config')),{code:'ENOENT'});
  }
  const unsafe=operatorRegistryFixtureValue();unsafe.municipalities[0].sources[0].url='http://localhost/private';assert.throws(()=>parseOperatorRegistryConfiguration(unsafe));
 });
@@ -200,6 +200,8 @@ test('canonical builder pins committed bytes and admits its schema-valid descrip
  const tampered=structuredClone(built.descriptor);await writeFile(tampered.commit.path,Buffer.from('tampered'));
  await assert.rejects(readOperatorRegistryConfig(tampered,f.policy));
  await execFileAsync('/usr/bin/git',['-c','user.name=Fixture','-c','user.email=fixture@example.test','checkout','--orphan','without-registry'],{cwd:repository});
+ // Orphan checkout retains the old index; explicitly empty this isolated fixture's index.
+ await execFileAsync('/usr/bin/git',['read-tree','--empty'],{cwd:repository});
  await execFileAsync('/usr/bin/git',['-c','user.name=Fixture','-c','user.email=fixture@example.test','commit','--allow-empty','-m','No registry path'],{cwd:repository});
  const missing=(await execFileAsync('/usr/bin/git',['rev-parse','HEAD'],{cwd:repository})).stdout.trim();
  await assert.rejects(buildOperatorRegistryConfigDescriptor({repository,commit:missing,outputDirectory:join(f.root,'missing-registry-path')}));

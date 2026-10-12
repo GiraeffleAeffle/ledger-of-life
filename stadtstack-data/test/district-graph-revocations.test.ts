@@ -177,15 +177,18 @@ test('a verified mask withholding every record leaves no entities, endpoints or 
   assert.throws(() => index.path({ fromId: rootId, toId: rootId, maxHops: 1 }), /Unknown graph entity/);
 });
 
-test('withholding relation evidence disconnects surviving endpoints without leaking it through self paths', () => {
+test('withholding relation evidence removes its source-scoped endpoints while unrelated same-name mentions survive', () => {
   const from = mention('from', 'Graph Surviving Start'), to = mention('to', 'Graph Surviving End');
   const visible = recordFixture({ entities: [from, to], relations: [] }, 'surviving-mentions');
   const blocked = recordFixture({ entities: [from, to], relations: [relation(from, to)] }, 'removed-connection');
   const { releaseId, graph, bytes } = publication([visible, blocked]);
-  const fromId=graph.entities.find(entity=>entity.names.includes(from.name))!.id,toId=graph.entities.find(entity=>entity.names.includes(to.name))!.id;
-  assert.equal(new GraphIndex(releaseId, graph, bytes).path({ fromId, toId, maxHops: 1 }).status, 'found');
+ // Equal display names in distinct documents are not identity joins.
+ const {fromId,toId}=graph.edges[0],original=new GraphIndex(releaseId,graph,bytes);
+ assert.equal(original.path({fromId,toId,maxHops:1,mode:'historical'}).status,'found');
   const index = new GraphIndex(releaseId, graph, bytes, {}, verifiedMask(releaseId, [{ type: 'record', recordId: blocked.id }]));
-  assert.equal(index.entitySearch({query:'Graph Surviving'}).total,0);
+ const visibleProjection=publication([visible]),visibleIndex=new GraphIndex(releaseId,visibleProjection.graph,visibleProjection.bytes);
+ assert.deepEqual(index.entitySearch({query:'Graph Surviving'}).items,visibleIndex.entitySearch({query:'Graph Surviving'}).items);
+ assert.equal(index.entitySearch({query:'Graph Surviving'}).total,2);
   assert.deepEqual(index.graphView().edges,[]);
   for(const id of [fromId,toId]){
     assert.throws(()=>index.neighbors({id}),/Unknown graph entity/);

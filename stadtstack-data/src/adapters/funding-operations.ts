@@ -141,7 +141,7 @@ export function parseFundingOperations(snapshot:AdmittedSnapshot,scope:AdapterSc
       const percent=f==='rate'&&(c.numberFormat?.percentStyle||/%/.test(m.header[m.fields.rate!]!.raw)||/%\s*$/.test(c.raw));
       add(f==='cost'?'approved_eligible_cost':f==='totalCost'?'approved_total_cost':f==='grant'?'approved_grant':f==='euAmount'?'approved_eu_amount':'eu_cofinancing_rate',decimal(c,f==='rate'?nativePercentValue(c):c.raw,f==='rate'),c,{unit:f==='rate'?percent?'percent':'source_rate':'EUR',financialRole:'approval'});
      }
-     for(const [f,af,role] of [['location','ags','project_location'],['office','officeAgs','beneficiary_office']] as const){const c=get(row,f),a=get(row,af);if(!c?.raw.trim()&&!a?.raw.trim())continue;const ags=a?.raw.trim()??null;if(ags&&!/^\d{8}$/.test(ags))throw Error('Invalid source AGS; never pad numeric IDs');const geography={ags,basis:ags?'source_explicit' as const:'unknown' as const,role};if(c)add(role,c.raw,c,{geography,extraEvidence:a?[a]:[]});else add(role+'_ags',ags,a!,{geography});}
+     for(const [f,af,role] of [['location','ags','project_location'],['office','officeAgs','beneficiary_office']] as const){const c=get(row,f),a=get(row,af);if(!c?.raw.trim()&&!a?.raw.trim())continue;const ags=a?.raw.trim()||null;if(ags&&!/^\d{8}$/.test(ags))throw Error('Invalid source AGS; never pad numeric IDs');const geography={ags,basis:ags?'source_explicit' as const:'unknown' as const,role};if(c)add(role,c.raw,c,{geography,extraEvidence:a?[a]:[]});else add(role+'_ags',ags,a!,{geography});}
      observations.push(...rowObs);
     }catch{held++;}
    }

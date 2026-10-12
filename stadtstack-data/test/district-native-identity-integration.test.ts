@@ -19,7 +19,7 @@ function scope(sourceId: string, publisherId = 'fixture'): AdapterScope {
 
 test('funding parser v2 survives exact admission replay with operation, recipient and explicit programme identities', async () => {
   const binding = scope('funding-sh-efre-beneficiaries');
-  const bytes = 'Vorhabennummer;Name des Begünstigten;Rechtsstatus des Begünstigten;Fonds;CCI;Förderperiode;Verwaltungsbehörde;AGS des Vorhabens;Förderfähige Gesamtkosten\r\n00042;Fixture Provider GmbH;juristische Person;EFRE;TEST-CCI;2021-2027;Fixture Verwaltungsbehörde;01053100;100,00\r\n00043;Unqualified Recipient;unknown;EFRE;TEST-CCI;2021-2027;Fixture Verwaltungsbehörde;01053100;200,00\r\n';
+  const bytes = 'Vorhabennummer;Name des Begünstigten;Bezeichnung des Vorhabens;Rechtsstatus des Begünstigten;Fonds;CCI;Förderperiode;Verwaltungsbehörde;AGS des Vorhabens;Förderfähige Gesamtkosten\r\n00042;Fixture Provider GmbH;Synthetic operation one;juristische Person;EFRE;TEST-CCI;2021-2027;Fixture Verwaltungsbehörde;01053100;100,00\r\n00043;Unqualified Recipient;Synthetic operation two;unknown;EFRE;TEST-CCI;2021-2027;Fixture Verwaltungsbehörde;01053100;200,00\r\n';
   const original = snapshot(bytes, 'https://www.schleswig-holstein.de/DE/fachinhalte/F/foerderprogramme/MWAVT/Downloads/FP_21_27/liste_Vorhaben-efre21_csv', 'text/csv');
   const parsed = parseFundingOperations(original, binding);
   assert.ok(parsed.observations.length > 0);

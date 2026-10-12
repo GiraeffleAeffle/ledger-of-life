@@ -128,7 +128,7 @@ test('authenticated retained originals use retained gates only; changed or unsel
   const changedResult=await admitCriticalKnowledge([changed],{records:[]},fixture.context.cas,{retainedPublication:retained.composition});
   assert.deepEqual(changedResult.admissions,[]);
   assert.equal(changedResult.holds[0].reason,'critical_assessment_binding');
-  assert.throws(()=>assertCriticalAdmissionsBound([changed],accepted.admissions,lineage),/evidence binding|publication lineage/);
+  assert.throws(()=>assertCriticalAdmissionsBound([changed],accepted.admissions,lineage),/Critical public projection record\/claim binding mismatch/);
   const unselected={...retained.composition,selectedRecordOrigins:[]};
   const unselectedResult=await admitCriticalKnowledge([record],{records:[]},fixture.context.cas,{retainedPublication:unselected});
   assert.deepEqual(unselectedResult.admissions,[]);
