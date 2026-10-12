@@ -12,11 +12,13 @@ import { syncBuiltinESMExports } from 'node:module';
 import { PROVIDER_CONFIGS, SubscriptionRuntimeError } from '../src/district-model-contract.ts';
 import type {ReportedUsage,RuntimeFailureDiagnostic} from '../src/district-model-contract.ts';
 import { assertClaudeSubscriptionAuth, claudeExecutionArgs, inspectClaudeEvents } from '../src/district-claude.ts';
-import { inspectCodexEvents, modelReadiness, subscriptionChat, subscriptionExecutionArgs, collectSubscriptionProcess, encodeSubscriptionInput } from '../src/district-model.ts';
+import { inspectCodexEvents, modelReadiness, subscriptionChat, subscriptionExecutionArgs, collectSubscriptionProcess, encodeSubscriptionInput, MAX_SUBSCRIPTION_INPUT_BYTES, subscriptionInputWithinBound } from '../src/district-model.ts';
 import { appendUsageEntry, readUsageLedger, hourlyUsage, recordExercisedReadinessProbe, usageEntry, writeOperatorPause, pauseProvider, isProviderStopped, COST_MEANING, appendFailureDiagnostic, failureDiagnosticPath, rejectRuntimeFailure } from '../src/district-model-usage.ts';
 import { classifyRuntimeFailure, failureDiagnostic, runtimeFailureReason, runtimeToolEvidence, RuntimeFailureDiagnosticSchema } from '../src/district-model-diagnostics.ts';
 import {CivicPolicyStateError} from '../src/civic-opt-out.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
+import {EXTRACTION_INSTRUCTIONS,JUDGE_INSTRUCTIONS} from '../src/district-claims.ts';
+import {TOPIC_VOCABULARY} from '../src/topic-vocabulary.ts';
 const digest = (text: string) => createHash('sha256').update(text).digest('hex');
 function claudeResult(extra: Record<string, unknown> = {}) {
   return JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: { supported: true }, usage: { input_tokens: 2, output_tokens: 52, cache_read_input_tokens: 3, cache_creation_input_tokens: 923 }, modelUsage: { 'claude-haiku-5-5': { inputTokens: 2, outputTokens: 52, cacheReadInputTokens: 3, cacheCreationInputTokens: 923, costUSD: 0.008432 } }, total_cost_usd: 0.008432, ...extra });
@@ -293,7 +295,25 @@ test('native runtime rejects fixture, missing and non-OpenAI authority before an
 test('context bounds are deterministic before any process creation or model input write',()=>{
  assert.equal(encodeSubscriptionInput('fixed instructions',{source:'synthetic'}),'{"source":"synthetic"}');
  assert.throws(()=>encodeSubscriptionInput('x'.repeat(8001),{}),/context byte limit/);
- assert.throws(()=>encodeSubscriptionInput('fixed',{source:'x'.repeat(24000)}),/context byte limit/);
+ const overhead=Buffer.byteLength(JSON.stringify({source:''})),atBound={source:'x'.repeat(MAX_SUBSCRIPTION_INPUT_BYTES-overhead)};
+ assert.equal(Buffer.byteLength(encodeSubscriptionInput('fixed',atBound)),MAX_SUBSCRIPTION_INPUT_BYTES);
+ assert.equal(subscriptionInputWithinBound(atBound),true);
+ const oversize={source:atBound.source+'x'};
+ assert.equal(subscriptionInputWithinBound(oversize),false);
+ assert.throws(()=>encodeSubscriptionInput('fixed',oversize),/context byte limit/);
+});
+test('full 12000-character multibyte German windows encode without truncation for extraction and judgment',()=>{
+ const text='äöüß€„'.repeat(2000),source={text};
+ assert.equal(text.length,12000);
+ const extraction={municipality:{id:'strausberg',name:'Strausberg'},vocabulary:TOPIC_VOCABULARY.map(({pattern:_pattern,...topic})=>topic),source};
+ const judgment={source,candidate:{summary:'Strausberg: äöüß€„'}};
+ for(const [system,input] of [[EXTRACTION_INSTRUCTIONS,extraction],[JUDGE_INSTRUCTIONS,judgment]] as const){
+  const bytes=Buffer.byteLength(JSON.stringify(input));
+  assert.ok(bytes>24000&&bytes<=MAX_SUBSCRIPTION_INPUT_BYTES);
+  assert.equal(subscriptionInputWithinBound(input),true);
+  const encoded=encodeSubscriptionInput(system,input);
+  assert.equal(encoded,JSON.stringify(input));assert.equal(JSON.parse(encoded).source.text,text);
+ }
 });
 test('fatal Codex fixtures preserve controlled parser causes without retaining messages or request data', () => {
   const secret = 'private-request-source-header';

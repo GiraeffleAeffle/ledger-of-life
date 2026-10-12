@@ -17,6 +17,9 @@ const EXTRACTION_MODEL = PROVIDER_CONFIGS['openai-subscription'].model;
 const TIMEOUT_MS = 240_000;
 const MAX_PROCESS_BYTES = 512 * 1024;
 const MAX_RESPONSE_BYTES = 48 * 1024;
+// 40 KB is ~12k German-text tokens, leaving room for prompts/schema and a ~4k answer below 30k compaction.
+export const MAX_SUBSCRIPTION_INPUT_BYTES = 40000;
+export const MODEL_INPUT_BOUND_REASON = 'Model input exceeds bounded context';
 const DISABLED_FEATURES = ['shell_tool', 'unified_exec', 'shell_snapshot', 'apps', 'plugins', 'browser_use', 'browser_use_external', 'browser_use_full_cdp_access', 'computer_use', 'in_app_browser', 'in_app_local_automation', 'multi_agent', 'multi_agent_v2', 'hooks', 'view_image', 'image_generation', 'code_mode_host', 'artifact', 'skill_search', 'skill_mcp_dependency_install', 'sleep_tool', 'memories', 'tool_suggest', 'unbounded_connection_retries'];
 let running=false;
 
@@ -177,9 +180,13 @@ export function codexResponseSchema(schema: unknown): unknown {
   }
   return result;
 }
+export function subscriptionInputWithinBound(data:unknown):boolean{
+ const input=JSON.stringify(data);
+ return typeof input==='string'&&Buffer.byteLength(input)<=MAX_SUBSCRIPTION_INPUT_BYTES;
+}
 export function encodeSubscriptionInput(system:string,data:unknown):string{
  const input=JSON.stringify(data);
- if(typeof input!=='string'||Buffer.byteLength(input)>24000||Buffer.byteLength(system)>8000)throw Error('Subscription CLI context byte limit exceeded');
+ if(typeof input!=='string'||Buffer.byteLength(input)>MAX_SUBSCRIPTION_INPUT_BYTES||Buffer.byteLength(system)>8000)throw Error('Subscription CLI context byte limit exceeded');
  return input;
 }
 export async function subscriptionChat(provider: ExtractorProvider, system: string, data: unknown, schema: unknown, context: UsageContext): Promise<ModelAnswer> {

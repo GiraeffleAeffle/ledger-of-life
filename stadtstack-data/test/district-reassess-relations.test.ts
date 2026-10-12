@@ -23,6 +23,8 @@ import {PoliteFetcher,sourceContentBinding} from '../src/polite-fetch.ts';
 import type {FetchObservation} from '../src/polite-fetch.ts';
 import {operatorRegistryConfigSchema,operatorRegistryConfigContractSha256,importOperatorRegistryConfig} from '../src/district-registry-config.ts';
 import {retainedPublicationSources} from '../src/district-retained-import.ts';
+import {MODEL_INPUT_BOUND_REASON,MAX_SUBSCRIPTION_INPUT_BYTES} from '../src/district-model.ts';
+import {isProviderStopped} from '../src/district-model-usage.ts';
 
 // Every source, generation receipt and judge score below is synthetic test data.
 // Real isolated fixture authority only; no native model, network or external document command.
@@ -35,12 +37,12 @@ const generationAnswer=(identity:ModelEvidence,claims:DistrictExtractionClaims)=
   const body={binding:sha256('synthetic original extraction request'),modelIdentitySha256:identity.modelIdentitySha256,receivedAt:at,value:{record:claims,reason:'Synthetic case'},responseSha256:sha256('synthetic original raw response'),returnedModel:identity.model,runtimeWarnings:[]};
   return {...body,cacheSha256:hash(body)};
 };
-async function fixture(t:TestContext,options:{dated?:boolean;bad?:'endpoint'|'phrase';kind?:'planning'|'unchanged';admitted?:boolean;balanced?:boolean;legacyLaterChunk?:boolean;extraReference?:boolean}={}) {
+async function fixture(t:TestContext,options:{dated?:boolean;bad?:'endpoint'|'phrase';kind?:'planning'|'unchanged';admitted?:boolean;balanced?:boolean;legacyLaterChunk?:boolean;extraReference?:boolean;sourcePrefix?:string}={}) {
   const context=await createCivicPolicyTestContext(t),preparedRoot=join(context.root,'prepared'),managedRoot=join(context.root,'artifacts');
   const dated=options.dated!==false,kind=options.kind??'planning';
   const quote=kind==='unchanged'?'Test Netz GmbH betreibt Test Wärmenetz.':'Test Netz GmbH plant den Ausbau von Test Wärmenetz.';
   const relationQuote=options.bad==='endpoint'?'Test Netz GmbH plant den Ausbau.':quote;
-  const text=(options.legacyLaterChunk?'x'.repeat(5000)+'\n':'')+['Strausberg',dated?'Stand 10.10.2026':'Ohne Dokumentdatum',quote,...(relationQuote!==quote?[relationQuote]:[])].join('\n');
+  const text=(options.sourcePrefix??'')+(options.legacyLaterChunk?'x'.repeat(5000)+'\n':'')+['Strausberg',dated?'Stand 10.10.2026':'Ohne Dokumentdatum',quote,...(relationQuote!==quote?[relationQuote]:[])].join('\n');
   const sourceSha256=sha256(text);
   const reference:PreparedSourceReference={id:'synthetic-source',url:'https://example.org/synthetic-source',sha256:sourceSha256,retrievedAt:at,locator:'document-sha256:'+sourceSha256,mimeType:'text/plain',sourceType:'website',policy:{robots:{state:'allowed',url:'https://example.org/robots.txt'},tdm:{state:'not_declared',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}};
   const references=options.extraReference?[reference,{...reference,id:'synthetic-alias',url:'https://example.net/synthetic-alias',policy:{...reference.policy,robots:{state:'allowed' as const,url:'https://example.net/robots.txt'}}}]:[reference];
@@ -112,6 +114,23 @@ function runtime(f:Fixture,value:unknown={score:0.91,reason:'Synthetic judge fix
 async function pass(f:Fixture,implementation:JudgeOnlyRuntime){return executeReassessmentPass({frozen:f.frozen,frozenSha256:f.frozenSha256,contract,provider:f.task.provider,platform:'linux',runtime:implementation,managedRoot:f.managedRoot,policy:f.policy,usage:{ledgerPath:join(f.root,'unused-ledger'),pausePath:join(f.root,'unused-pause')}});}
 function merge(f:Fixture,deltas:ReassessmentDelta[]=[]){return mergeReassessmentDeltas({frozen:f.frozen,frozenSha256:f.frozenSha256,contract,deltas});}
 function reseal(delta:ReassessmentDelta){const {deltaSha256:_old,...body}=delta;delta.deltaSha256=reassessmentDeltaHash(body);return delta;}
+
+test('oversize reassessment judge inputs become deterministic quarantine holds without pausing or invoking the provider',async t=>{
+  const f=await fixture(t,{sourcePrefix:'\u0001'.repeat(8000)+'\n'}),a=assessment(f),r=runtime(f);
+  assert.equal(a.deterministic?.passed,true);assert.equal(a.newlyPassed,true);assert.equal(a.dateEligible,true);
+  assert.ok(Buffer.byteLength(JSON.stringify(a.judgeInput))>MAX_SUBSCRIPTION_INPUT_BYTES);
+  assert.equal(a.needsJudge,false);assert.equal(a.hold,MODEL_INPUT_BOUND_REASON);
+  let readiness=0,pauseChecks=0;
+  r.implementation.readiness=async()=>{readiness++;return f.identity;};
+  r.implementation.stopped=async()=>{pauseChecks++;return false;};
+  const delta=await pass(f,r.implementation),merged=merge(f,[delta]);
+  assert.equal(readiness,0);assert.equal(pauseChecks,0);assert.equal(r.calls.length,0);
+  assert.equal(delta.entries[0].judgeAttempted,false);assert.equal(delta.entries[0].failure,null);
+  assert.equal(await isProviderStopped(join(f.root,'unused-pause'),f.task.provider),false);
+  await assert.rejects(lstat(join(f.root,'unused-pause')),{code:'ENOENT'});
+  assert.equal(merged.records.length,0);assert.equal(merged.report.counts.judgeCalls,0);
+  assert.equal(merged.quarantine.length,1);assert.equal(merged.quarantine[0].reason,MODEL_INPUT_BOUND_REASON);
+});
 
 test('existing planning triple changes type, never becomes implementation, and never calls extraction',async t=>{
   const f=await fixture(t),r=runtime(f),a=assessment(f);
