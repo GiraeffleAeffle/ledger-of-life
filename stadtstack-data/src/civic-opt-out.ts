@@ -610,6 +610,16 @@ export async function markManagedCacheInventoryComplete(input:string,options:Civ
 export async function recordManagedSourceContent(input:string,entry:ManagedSourceContent,options:CivicPolicyOptions={}):Promise<void>{
  const state=statePath(options);await locked(options,async()=>{const inventory=await loadInventory(state),root=inventory.roots.find(root=>root.path===resolve(input));if(!root)throw new CivicPolicyStateError();await verifyRoot(root);await assertHostNotOptedOut(entry.url,options);const item=makeEntry(root,entry),actual=await fileDigest(join(root.path,item.relativePath));if(actual.sha256!==item.contentSha256)throw new CivicPolicyStateError();mergeEntries(inventory,[item]);await saveInventory(state,inventory);});
 }
+/** The only unbound derived fetch format that can become source-bearing.
+ * Validate the old bytes and every recorded host while the inventory is locked.
+ */
+async function readContentFreeFrontier(path:string,policy:CivicPolicyOptions):Promise<string>{
+ const {bytes}=await fileBytes(path,MAX_STATE);let frontier:z.infer<typeof frontierMetadataSchema>;
+ try{frontier=frontierMetadataSchema.parse(JSON.parse(bytes.toString('utf8')));}catch{throw new CivicPolicyStateError('INVALID_FRONTIER_METADATA');}
+ const urls=new Set([...frontier.roots,...frontier.visited,...frontier.queue.flatMap(item=>item.from?[item.url,item.from]:[item.url]),...frontier.failures.map(item=>item.url),...(frontier.excludedDocuments??[]).map(item=>item.url),...Object.keys(frontier.checkedUrls??{})]);
+ for(const url of urls)await assertHostNotOptedOut(url,policy);
+ return digest(bytes);
+}
 /** Bound-cache preflight. A sourceUrl can select a separately permitted ORIGINAL
  * raw representation, never a shared derived result with withdrawn contributors.
  */
@@ -638,8 +648,7 @@ export async function assertManagedSourceReadable(input:string,options:ManagedSo
   try{await lstat(path);}catch(error){if(missing(error))throw new CivicPolicyStateError('ENOENT');throw new CivicPolicyStateError();}
   if(!candidates.length){
    if(root.kind!=='fetch'||all.length||!/^frontiers\/[a-f0-9]{64}\.json$/.test(relativePath))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
-   const frontier=frontierMetadataSchema.parse(JSON.parse((await fileBytes(path,MAX_STATE)).bytes.toString('utf8'))),urls=new Set([...frontier.roots,...frontier.visited,...frontier.queue.flatMap(item=>item.from?[item.url,item.from]:[item.url]),...frontier.failures.map(item=>item.url),...(frontier.excludedDocuments??[]).map(item=>item.url),...Object.keys(frontier.checkedUrls??{})]);
-   for(const url of urls)await assertHostNotOptedOut(url,policy);await assertCivicPolicyAuthority(policy);return;
+   await readContentFreeFrontier(path,policy);await assertCivicPolicyAuthority(policy);return;
   }
   const actual=await fileDigest(path),current=candidates.filter(entry=>entry.contentSha256===actual.sha256);
   if(!current.length)throw new CivicPolicyStateError('CONTENT_BINDING_MISMATCH');
@@ -911,7 +920,14 @@ export async function withManagedSourceWrite<T>(input:string,entries:ManagedSour
   const items=entries.map(entry=>makeEntry(root,entry));
   for(const item of items){
    const prior=inventory.entries.filter(entry=>entry.rootId===root.id&&entry.relativePath===item.relativePath);
-   try{const actual=await fileDigest(join(root.path,item.relativePath));if(actual.sha256!==item.contentSha256&&!prior.some(entry=>entry.contentSha256===actual.sha256))throw new CivicPolicyStateError();}
+   try{
+    const path=join(root.path,item.relativePath),actual=await fileDigest(path);
+    if(actual.sha256!==item.contentSha256&&!prior.some(entry=>entry.contentSha256===actual.sha256)){
+     // Empty/discovery-only frontiers start as closed metadata. Their first
+     // source receipt promotes them without blessing arbitrary unbound bytes.
+     if(root.kind!=='fetch'||prior.length||!/^frontiers\/[a-f0-9]{64}\.json$/.test(item.relativePath)||await readContentFreeFrontier(path,policy)!==actual.sha256)throw new CivicPolicyStateError();
+    }
+   }
    catch(error){if(!missing(error))throw error;}
   }
   mergeEntries(inventory,items);await saveInventory(state,inventory);
