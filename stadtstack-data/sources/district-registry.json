@@ -1,6 +1,6 @@
 {
   "schemaVersion": "stadtstack-source-registry-v1",
-  "generatedAt": "2026-10-11T04:47:23.131Z",
+  "generatedAt": "2026-10-12T21:48:03.614Z",
   "districts": [
     {
       "id": "maerkisch-oderland",
@@ -394,6 +394,45 @@
             "checkedAt": null,
             "evidence": [],
             "reason": "Endpoint-specific robots enforcement belongs to PoliteFetcher at crawl time; research reachability does not override it."
+          }
+        },
+        {
+          "id": "regionalstatistik-genesis",
+          "kind": "structured",
+          "url": "https://www.regionalstatistik.de/genesisws/rest/2020/data/table",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.statistikportal.de/de/open-data",
+              "locator": "Catalog family 1; discovery evidence only; catalog sha256:c19460dddf97c1e4ac2ef85d5bb34a9feff9482af2e8399d06c5b20001d05e40"
+            },
+            {
+              "url": "https://www.regionalstatistik.de/genesisws/rest/2020/application.wadl",
+              "locator": "Catalog family 1; discovery evidence only; catalog sha256:c19460dddf97c1e4ac2ef85d5bb34a9feff9482af2e8399d06c5b20001d05e40"
+            },
+            {
+              "url": "https://www.statistikportal.de/sites/default/files/2026-05/%23%23Regio-Stat-Katalog2026.pdf",
+              "locator": "Catalog family 1; discovery evidence only; catalog sha256:c19460dddf97c1e4ac2ef85d5bb34a9feff9482af2e8399d06c5b20001d05e40"
+            },
+            {
+              "url": "https://www.regionalstatistik.de/genesis/online/",
+              "locator": "Catalog family 1; discovery evidence only; catalog sha256:c19460dddf97c1e4ac2ef85d5bb34a9feff9482af2e8399d06c5b20001d05e40"
+            }
+          ],
+          "reason": "R1 catalog family 1: discovery route only; exact distribution access, origin, schema and municipal completeness not checked by this run.",
+          "rights": {
+            "licence": "Datenlizenz Deutschland – Namensnennung – Version 2.0 explicitly declared by official joint portal for these GENESIS interfaces; dataset-specific exceptions/geobasis terms remain separate.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Catalog description is not document-specific admission."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
           }
         }
       ],
