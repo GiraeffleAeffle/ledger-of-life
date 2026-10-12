@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {readCursor,writeCursor} from './mcp-pagination.ts';
-import {canonical,mcpSourceId} from './mcp-source-identity.ts';
+import {canonical,mcpSourceId,knowledgeSourceDescriptors,sourceMetadataUrls} from './mcp-source-identity.ts';
+import {regionalRecordId,regionalSource,signalSourceDescriptors} from './mcp-read-view.ts';
 import {z} from 'zod';
 import type {Catalogue,Signal} from './schema.ts';
 import {isPublicUrl,publicUrlReason} from './publication-quality.ts';
@@ -32,6 +33,7 @@ export const queryShape={query:z.string().trim().min(1).max(200).optional(),topi
 export const querySchema=z.object({...queryShape,cityIds:z.array(cityIdSchema).min(1).max(50).optional()}).strict();
 export const exportRecordsShape={topic:queryShape.topic,municipality:cityIdSchema.optional(),kinds:queryShape.kinds,observationKinds:queryShape.observationKinds,dateRole:queryShape.dateRole,financialRole:queryShape.financialRole,dateFrom:queryShape.dateFrom,dateTo:queryShape.dateTo,cursor:queryShape.cursor,limit:queryShape.limit};
 export const exportRecordsSchema=z.object(exportRecordsShape).strict();
+export type QueryVisibility={releaseId:string;maskIdentity:string;index:QueryIndex;visibleRecordIds:ReadonlySet<string>;withheldSourceIds:ReadonlySet<string>;sourceDescriptorsByRecord:ReadonlyMap<string,readonly RevocationSourceDescriptor[]>};
 export type QueryOptions=z.infer<typeof querySchema>;
 export type QueryRecord = {id:string;cityId:string;recordType:string;title:string;statement:string;topics:TopicTag[];eventDate:string|null;endDate:string|null;dateSemantics:'source_event'|'source_document'|'source_observation'|'observation'|'unknown';status:string;stage:string|null;asOf:string;sourceIds:string[];sourceTypes:string[];comparisonEligible:boolean;comparisonReason:string|null;geometry:Signal['geometry'];origin:'city'|'regional'|'knowledge';category:string;nextStep?:string;unknowns?:string[];verification?:Signal['properties']['verification']|DistrictKnowledgeRecord['verification']|StructuredKnowledgeRecord['verification'];assertion?:Signal['properties']['assertion'];reviewState?:string;geometryPrecision?:string;districtId?:string;ags?:string;caseKey?:string;caseKeyType?:string;caseId?:string;caseIdentity?:CaseIdentity;documentDate?:string|null;stageDate?:string|null;originalStatus?:string;stageQuote?:string;entities?:DistrictKnowledgeRecord['entities'];relations?:DistrictKnowledgeRecord['relations'];locations?:DistrictKnowledgeRecord['locations'];extraction?:DistrictKnowledgeRecord['extraction'];kind?:'text_model'|'structured';observationKind?:string;observation?:StructuredObservation;evidence?:StructuredLocator[];supportingEvidence?:StructuredObservation['supportingEvidence'];graph?:StructuredKnowledgeRecord['graph'];dateRole?:string|null;datePrecision?:StructuredObservation['datePrecision'];nativeDate?:string|null;calendarRange?:{from:string;to:string;precision:'year'|'month';basis:'derived_calendar_range';meaning:string}|null;financialRole?:StructuredObservation['financialRole'];sourceReferenceDate?:string|null;publishedAt?:string|null;metricClaims?:MetricClaim[];supersession?:RecordSupersession;locator?:string;statementEvidence?:StatementEvidence[];statementStatus?:'source_backed'|'not_extracted'} & Partial<Pick<DistrictKnowledgeRecord,'stages'|'documentDateReason'|'stageDateReason'|'documentDateQuote'|'stageDateQuote'|'titleQuote'|'summaryQuote'|'municipalityQuote'|'caseQuote'>> & { caseMetricHistory?: MetricHistoryEntry[] } & { canonicalStage?: string | null; nativeRecordContext?: NativeRecordContext; nativeSearchText?: string }
 export const nativeRecordContextVersion='native-record-context-v1';
@@ -69,10 +71,14 @@ export class QueryIndex {
   readonly releasedAt:string;
   readonly regional:Regional;
   readonly knowledge?:KnowledgeQueryData;
+  private readonly originalFeatures:Signal[];
+  private readonly originalCatalogue:Catalogue;
+  private readonly maskIdentity:string|null;
   private readonly sourceTypeSet=new Set<string>();
   private readonly stageSet=new Set<string>();
   private readonly originalRecords=new Map<string,unknown>();
-  constructor(releaseId:string,releasedAt:string,features:Signal[],regional:Regional,catalogue:Catalogue,knowledge?:KnowledgeQueryData) {
+  constructor(releaseId:string,releasedAt:string,features:Signal[],regional:Regional,catalogue:Catalogue,knowledge?:KnowledgeQueryData,maskIdentity:string|null=null) {
+    this.originalFeatures=features;this.originalCatalogue=catalogue;this.maskIdentity=maskIdentity;
     const nativeCaseIdentities=new Map<string,ScopedCaseIdentity>();
     const nativeGroups=new Map<string,{binding:NativeRecordContext['binding'];members:QueryRecord[]}>();
     this.releaseId=releaseId;this.releasedAt=releasedAt;this.regional=regional;this.knowledge=knowledge;
@@ -174,6 +180,34 @@ export class QueryIndex {
       for(const record of group)record.caseMetricHistory=history;
     }
   }
+  withRevocations(mask:VerifiedRevocations):QueryVisibility {
+    isSourceRevoked(mask,{});
+    if(mask.releaseId!==this.releaseId)throw Error('Revocation read-view release mismatch');
+    const sourceDescriptorsByRecord=new Map<string,readonly RevocationSourceDescriptor[]>(),visibleRecordIds=new Set<string>(),withheldSourceIds=new Set<string>();
+    const visibleFeatures=this.originalFeatures.filter(feature=>{
+      const descriptors=signalSourceDescriptors(feature);
+      sourceDescriptorsByRecord.set(feature.properties.id,descriptors);
+      const visible=!isRecordRevoked(mask,{recordId:feature.properties.id,municipalityId:feature.properties.cityId,sources:descriptors});
+      if(visible)visibleRecordIds.add(feature.properties.id);else for(const descriptor of descriptors)if(descriptor.mcpSourceId)withheldSourceIds.add(descriptor.mcpSourceId);
+      return visible;
+    });
+    const regional={...this.regional,topics:this.regional.topics.map(topic=>({...topic,municipalities:topic.municipalities.map(municipality=>({...municipality,items:municipality.items.filter(item=>{
+      const id=regionalRecordId(municipality.municipalityId,item),source=regionalSource(item,this.regional.asOf),descriptors=[{mcpSourceId:mcpSourceId(source),municipalityId:municipality.municipalityId,url:item.url},...sourceMetadataUrls(item).filter(url=>url!==item.url).map(url=>({municipalityId:municipality.municipalityId,url}))];
+      sourceDescriptorsByRecord.set(id,descriptors);
+      const visible=!isRecordRevoked(mask,{recordId:id,municipalityId:municipality.municipalityId,sources:descriptors});
+      if(visible)visibleRecordIds.add(id);else for(const descriptor of descriptors)if(descriptor.mcpSourceId)withheldSourceIds.add(descriptor.mcpSourceId);
+      return visible;
+    })}))}))};
+    const knowledge=this.knowledge&&{...this.knowledge,records:this.knowledge.records.filter(record=>{
+      const descriptors=knowledgeSourceDescriptors(record);sourceDescriptorsByRecord.set(record.id,descriptors);
+      const visible=!isRecordRevoked(mask,{recordId:record.id,municipalityId:record.municipalityId,sources:descriptors});
+      if(visible)visibleRecordIds.add(record.id);else for(const descriptor of descriptors)if(descriptor.mcpSourceId)withheldSourceIds.add(descriptor.mcpSourceId);
+      return visible;
+    }),municipalities:this.knowledge.municipalities.map(city=>({...city,amt:city.amt&&sourceMetadataUrls(city.amt).every(url=>!isSourceRevoked(mask,{municipalityId:city.id,url}))?city.amt:null,sources:city.sources.filter(source=>!isSourceRevoked(mask,{municipalityId:city.id,registrySourceId:source.id,...(source.url?{url:source.url}:{})})&&(!source.url||!isSourceRevoked(mask,{url:source.url}))&&sourceMetadataUrls(source).every(url=>!isSourceRevoked(mask,{url}))&&this.knowledge!.records.some(record=>record.municipalityId===city.id&&knowledgeSourceDescriptors(record).some(descriptor=>descriptor.registrySourceId===source.id)&&visibleRecordIds.has(record.id)))})),coverage:{scope:'Current served evidence only; immutable publication, crawl, lineage and quarantine counts are not served-view counts.',municipalities:[]}};
+    const index=new QueryIndex(this.releaseId,this.releasedAt,visibleFeatures,regional,this.originalCatalogue,knowledge,mask.artifactSha256);
+    for(const id of visibleRecordIds){const record=index.records.find(row=>row.id===id);if(record)for(const sourceId of record.sourceIds){const source=index.sources.get(sourceId);if(source){const descriptors=[...(sourceDescriptorsByRecord.get(id)??[]),{mcpSourceId:sourceId,municipalityId:record.cityId,url:typeof source.url==='string'?source.url:undefined,registrySourceId:typeof source.registrySourceId==='string'?source.registrySourceId:undefined}];sourceDescriptorsByRecord.set(id,descriptors);}}}
+    return {releaseId:this.releaseId,maskIdentity:mask.artifactSha256,index,visibleRecordIds,withheldSourceIds,sourceDescriptorsByRecord};
+  }
   private recordKey(record:QueryRecord){return `${record.cityId}:${record.id}`;}
   private addSource(source:Record<string,unknown>) {
     const id=mcpSourceId(source);
@@ -248,7 +282,7 @@ export class QueryIndex {
     if(!Number.isInteger(limit)||limit<1||limit>50)throw Error('limit must be between 1 and 50');
     const fields=[...new Set(options.fields??defaultFields)].sort();
     const {cursor,...filters}=options;
-    const binding=createHash('sha256').update(canonical({scope,caseLinkingVersion:CASE_LINKING_VERSION,stageSemanticsVersion,caseSemanticsVersion,nativeRecordContextVersion,filters:{...filters,fields,cityIds:options.cityIds?[...new Set(options.cityIds)].sort():undefined,recordTypes:options.recordTypes?[...new Set(options.recordTypes)].sort():undefined,kinds:options.kinds?[...new Set(options.kinds)].sort():undefined,observationKinds:options.observationKinds?[...new Set(options.observationKinds)].sort():undefined,sourceTypes:options.sourceTypes?[...new Set(options.sourceTypes)].sort():undefined,limit,excludePlaces:options.excludePlaces??false},extra,includeWithheld})).digest('hex');
+    const binding=createHash('sha256').update(canonical({releaseId:this.releaseId,maskIdentity:this.maskIdentity,scope,caseLinkingVersion:CASE_LINKING_VERSION,stageSemanticsVersion,caseSemanticsVersion,nativeRecordContextVersion,filters:{...filters,fields,cityIds:options.cityIds?[...new Set(options.cityIds)].sort():undefined,recordTypes:options.recordTypes?[...new Set(options.recordTypes)].sort():undefined,kinds:options.kinds?[...new Set(options.kinds)].sort():undefined,observationKinds:options.observationKinds?[...new Set(options.observationKinds)].sort():undefined,sourceTypes:options.sourceTypes?[...new Set(options.sourceTypes)].sort():undefined,limit,excludePlaces:options.excludePlaces??false},extra,includeWithheld})).digest('hex');
     const after=readCursor(cursor,this.releaseId,binding);
     const matches=eligible.filter(record=>(includeWithheld||record.comparisonEligible)&&matchesFilters(record,options));
     let start=0;

@@ -11,7 +11,8 @@ import {GraphEntitySchema,GraphEdgeSchema} from '../src/district-graph.ts';
 import {mkdtemp,realpath,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {randomUUID} from 'node:crypto';
+import {createHash,generateKeyPairSync,randomUUID} from 'node:crypto';
+import {signRevocations,verifyRevocations,revocationKeyId} from '../src/civic-revocations.ts';
 import {provisionCivicPolicyAuthority,recordHostOptOut} from '../src/civic-opt-out.ts';
 
 const envelopeSchema=z.object({source:z.object({release:z.string()}),releasedAt:z.iso.datetime(),respondedAt:z.iso.datetime(),status:z.literal('candidate'),data:z.unknown()}).passthrough();
@@ -29,7 +30,7 @@ test('released MCP contract retains core evidence, separates times and fact/sour
     const before=Date.now();
     const result=await client.callTool({name:'get_core_bundle',arguments:{}});
     const envelope=envelopeSchema.parse(result.structuredContent);
-    assert.equal(envelope.source.release,release.dataManifest.id);assert.equal(envelope.releasedAt,release.dataManifest.generatedAt);
+    assert.equal(envelope.source.release,release.dataManifest.id);assert.equal(envelope.source.readViewId,release.visibility?.maskIdentity??null);assert.equal(envelope.releasedAt,release.dataManifest.generatedAt);
     assert.ok(Date.parse(envelope.respondedAt)>=before&&Date.parse(envelope.respondedAt)<=Date.now());
     assert.equal('date' in envelope,false);
     const core=z.object({bundle:z.unknown(),manifest:z.unknown()}).parse(envelope.data);
@@ -49,8 +50,23 @@ test('released MCP contract retains core evidence, separates times and fact/sour
     assert.equal((await client.callTool({name:'get_source',arguments:{sourceId:fact.id}})).isError,true);
     const status=envelopeSchema.parse((await client.callTool({name:'get_release_status',arguments:{}})).structuredContent);
     assert.deepEqual(z.object({dataManifest:z.unknown(),manifest:z.unknown()}).parse(status.data),{dataManifest:release.dataManifest,manifest:release.manifest});
-    assert.deepEqual(z.object({release:z.object({version:z.string(),dataManifestId:z.string()})}).parse(status.data).release,{version:MCP_RELEASE_VERSION,dataManifestId:release.dataManifest.id});
+    assert.deepEqual(z.object({release:z.object({version:z.string(),dataManifestId:z.string(),mode:z.string(),readViewId:z.string().nullable()})}).parse(status.data).release,{version:MCP_RELEASE_VERSION,dataManifestId:release.dataManifest.id,mode:'sealed',readViewId:release.visibility?.maskIdentity??null});
   } finally {await client.close();await mcp.close();}
+});
+test('hosted sealed reads apply a real synthetic Ed25519 mask to core exports and bind response identity',async()=>{
+  const publication=await loadRelease(),fact=publication.bundle.facts[0],releaseId=publication.dataManifest.id;
+  const {privateKey,publicKey}=generateKeyPairSync('ed25519'),keyId=revocationKeyId(publicKey);
+  const signed=signRevocations({schemaVersion:'stadtstack-revocations-v1',releaseId,issuedAt:'2026-10-10T12:00:00Z',sequence:1,targets:[{type:'record',recordId:fact.id}]},keyId,privateKey);
+  const revocations=verifyRevocations(signed,{schemaVersion:'stadtstack-revocation-trust-v1',releaseId,expectedArtifactSha256:createHash('sha256').update(signed).digest('hex'),keys:[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}]},releaseId);
+  const release=await loadRelease(undefined,{mode:'sealed',revocations}),mcp=server({release}),client=new Client({name:'signed-safe-view-test',version:'1'});
+  const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();await mcp.connect(serverTransport);await client.connect(clientTransport);
+  try{
+    const output=envelopeSchema.parse((await client.callTool({name:'get_core_bundle',arguments:{}})).structuredContent);
+    assert.equal(output.source.readViewId,revocations.artifactSha256);
+    const core=z.object({bundle:z.object({facts:z.array(z.object({id:z.string()}).passthrough())})}).parse(output.data);
+    assert.equal(core.bundle.facts.some(item=>item.id===fact.id),false);
+    assert.equal(release.visibility?.maskIdentity,revocations.artifactSha256);
+  }finally{await client.close();await mcp.close();}
 });
 
 test('get_changes uses the injected immutable release snapshot, not mutable output files',async()=>{
@@ -209,11 +225,11 @@ test('0.3.1 heat comparisons, bulk export and quarantine coverage share the rele
  }finally{await client.close();await mcp.close();}
 });
 
-test('injected immutable releases recheck current authoritative opt-out before every tool access',async(t)=>{
- const release=await loadRelease(),fact=release.bundle.facts[0];
+test('injected VM-candidate releases recheck current authoritative opt-out before every tool access',async(t)=>{
  const base=await mkdtemp(join(await realpath(tmpdir()),'mcp-serving-policy-'));t.after(()=>rm(base,{recursive:true,force:true}));
  const stateDir=join(base,'policy'),authority=await provisionCivicPolicyAuthority({stateDir,authorityId:'fixture:'+randomUUID()});
  const policyOptions={stateDir,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
+ const release=await loadRelease(undefined,{mode:'vm_candidate',policyOptions}),fact=release.bundle.facts[0];
  const mcp=server({release,policyOptions}),client=new Client({name:'injected-serving-policy-test',version:'1'});
  const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();await mcp.connect(serverTransport);await client.connect(clientTransport);
  try{

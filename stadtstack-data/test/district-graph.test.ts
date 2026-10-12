@@ -10,6 +10,8 @@ import { observation, semanticHash, type AdapterScope, type StructuredObservatio
 import { nativeStructuredIdentityGraph } from '../src/district-entity-resolution.ts';
 import { StructuredKnowledgeRecordSchema, STRUCTURED_VERIFICATION_VERSION } from '../src/district-structured-record.ts';
 
+import {createHash,generateKeyPairSync} from 'node:crypto';
+import {signRevocations,verifyRevocations,revocationKeyId,compareRevocationTargets,type RevocationTarget} from '../src/civic-revocations.ts';
 const now = '2026-10-10T12:00:00.000Z';
 // Synthetic test source/gates only; never actual municipality or model evidence.
 function mention(mentionId: string, name = `Test ${mentionId}`, type: GraphClaims['entities'][number]['type'] = 'organization'): GraphClaims['entities'][number] {
@@ -52,6 +54,38 @@ function release(claims: GraphClaims, budgets: ConstructorParameters<typeof Grap
   const graph = buildKnowledgeGraph(bytes, { asOf: now.slice(0, 10) });
   return { record, bytes, graph, index: new GraphIndex('synthetic-release', graph, bytes, budgets) };
 }
+test('graph read views require a genuinely signed mask and preserve only unchanged visible knowledge records',()=>{
+  const admitted=release({entities:[mention('a','Revoked organization'),mention('b','Revoked facility')],relations:[relation(mention('a','Revoked organization'),mention('b','Revoked facility'))]});
+  const releaseId='a'.repeat(64),graph=new GraphIndex(releaseId,admitted.graph,admitted.bytes);
+  const {privateKey,publicKey}=generateKeyPairSync('ed25519'),keyId=revocationKeyId(publicKey);
+  const bytes=signRevocations({schemaVersion:'stadtstack-revocations-v1',releaseId,issuedAt:'2026-10-10T12:00:00Z',sequence:1,targets:[{type:'host',host:'example.org'}]},keyId,privateKey);
+  const trust={schemaVersion:'stadtstack-revocation-trust-v1',releaseId,expectedArtifactSha256:createHash('sha256').update(bytes).digest('hex'),keys:[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}]};
+  const mask=verifyRevocations(bytes,trust,releaseId),safeEnvelope={...JSON.parse(admitted.bytes),records:[]},safeBytes=JSON.stringify(safeEnvelope),safeGraph=buildKnowledgeGraph(safeBytes,{asOf:admitted.graph.asOf});
+  const view=graph.withReadView(safeGraph,safeBytes,new Set(),mask);
+  assert.equal(view.maskIdentity,mask.artifactSha256);
+  assert.equal(view.releaseAsOf,graph.releaseAsOf);
+  assert.equal(view.entitySearch({query:'Revoked'}).total,0);
+  assert.equal(JSON.stringify(view.graphView()).includes('Revoked'),false);
+  const tampered={...safeEnvelope,records:[{...admitted.record,title:'Changed after admission'}]},tamperedBytes=JSON.stringify(tampered);
+  assert.throws(()=>graph.withReadView(buildKnowledgeGraph(tamperedBytes,{asOf:admitted.graph.asOf}),tamperedBytes,new Set([admitted.record.id]),mask),/unchanged visible record subset/);
+});
+test('graph cursors bind the verified mask identity even when a different mask yields identical records',()=>{
+  const records=[
+    fixture({entities:[mention('hidden','Hidden Entity')],relations:[]},'town','hidden-record'),
+    fixture({entities:[mention('alpha','Visible Entity Alpha')],relations:[]},'town','visible-alpha'),
+    fixture({entities:[mention('beta','Visible Entity Beta')],relations:[]},'town','visible-beta'),
+  ];
+  const bytes=JSON.stringify({schemaVersion:KNOWLEDGE_SCHEMA_VERSION,generatedAt:now,identityAssertions:[],identityAdmissions:[],records}),graphData=buildKnowledgeGraph(bytes,{asOf:now.slice(0,10)}),releaseId='b'.repeat(64),graph=new GraphIndex(releaseId,graphData,bytes),safeRecords=records.filter(record=>record.id!=='hidden-record'),safeBytes=JSON.stringify({schemaVersion:KNOWLEDGE_SCHEMA_VERSION,generatedAt:now,identityAssertions:[],identityAdmissions:[],records:safeRecords}),safeGraph=buildKnowledgeGraph(safeBytes,{asOf:now.slice(0,10)}),visibleIds=new Set(safeRecords.map(record=>record.id));
+  const makeMask=(targets:RevocationTarget[])=>{
+    const {privateKey,publicKey}=generateKeyPairSync('ed25519'),keyId=revocationKeyId(publicKey),sorted=[...targets].sort(compareRevocationTargets);
+    const signed=signRevocations({schemaVersion:'stadtstack-revocations-v1',releaseId,issuedAt:'2026-10-10T12:00:00Z',sequence:1,targets:sorted},keyId,privateKey);
+    return verifyRevocations(signed,{schemaVersion:'stadtstack-revocation-trust-v1',releaseId,expectedArtifactSha256:createHash('sha256').update(signed).digest('hex'),keys:[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}]},releaseId);
+  };
+  const firstMask=makeMask([{type:'record',recordId:'hidden-record'}]),first=graph.withReadView(safeGraph,safeBytes,visibleIds,firstMask),page=first.entitySearch({query:'Visible',limit:1});
+  assert.ok(page.nextCursor);
+  const sameContentDifferentMask=graph.withReadView(safeGraph,safeBytes,visibleIds,makeMask([{type:'record',recordId:'hidden-record'},{type:'record',recordId:'absent-record'}]));
+  assert.throws(()=>sameContentDifferentMask.entitySearch({query:'Visible',limit:1,cursor:page.nextCursor!}),/mismatch/);
+});
 
 test('conservative identity preserves homonyms, legal forms, source-scoped projects and conflicting explicit identifiers', () => {
   const input = { entities: [mention('local', 'Stadtwerke', 'company'), mention('body', 'Stadtvertretung', 'authority'), mention('project', 'Schulneubau', 'project'), mention('law', 'Änderung 1', 'law')], relations: [] };

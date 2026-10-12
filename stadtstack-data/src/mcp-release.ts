@@ -15,13 +15,15 @@ import {publicationInputsSchema,verifyPublicationPolicyReceipts,requiredPublicat
 import type {CivicPolicyOptions} from './civic-opt-out.ts';
 import {loadGovernedRevocations} from './mcp-revocation-config.ts';
 import {isSourceRevoked,isRecordRevoked,type VerifiedRevocations,type RevocationSourceDescriptor} from './civic-revocations.ts';
-import {KnowledgeGraphSchema,type KnowledgeGraph} from './district-graph.ts';
+import {buildKnowledgeGraph,KnowledgeGraphSchema,type KnowledgeGraph} from './district-graph.ts';
 import {CriticalAdmissionsSchema} from './district-critical-assessment-contract.ts';
-import {assertCriticalAdmissionsBound} from './district-critical-assessment.ts';
+import {mcpSourceId,sourceMetadataUrls} from './mcp-source-identity.ts';
+import {visibleChanges} from './mcp-read-view.ts';
+import {assertCriticalAdmissionsBound} from './district-critical-assessment-public.ts';
 
 export type ReleaseLoadOptions={mode:'sealed';revocations?:VerifiedRevocations}|{mode:'vm_candidate';policyOptions:CivicPolicyOptions};
 export type ReleasedKnowledge=z.infer<typeof KnowledgeRecordsSchema>;
-export type ReleasedData={bundle:CoreBundle;manifest:Record<string,unknown>;dataManifest:DataRelease;publicationInputs:PublicationInputs;catalogue:Catalogue;features:Signal[];feeds:Record<string,CityFeed>;changes:Record<string,Changes>;regional:Regional;knowledge:ReleasedKnowledge;registry:DistrictRegistry;coverage:DistrictCoverage;knowledgeChanges:Changes;graphData:KnowledgeGraph;index:QueryIndex;graph:GraphIndex;mode:'sealed'|'vm_candidate';revocations:VerifiedRevocations|null};
+export type ReleasedData={bundle:CoreBundle;manifest:Record<string,unknown>;dataManifest:DataRelease;publicationInputs:PublicationInputs;catalogue:Catalogue;features:Signal[];feeds:Record<string,CityFeed>;changes:Record<string,Changes>;regional:Regional;knowledge:ReleasedKnowledge;registry:DistrictRegistry;coverage:DistrictCoverage;servedCoverage:MaskedCoverage|null;knowledgeChanges:Changes;graphData:KnowledgeGraph;index:QueryIndex;graph:GraphIndex;mode:'sealed'|'vm_candidate';revocations:VerifiedRevocations|null;visibility:QueryVisibility|null};
 let release:ReleasedData|undefined;
 let loading:Promise<ReleasedData>|undefined;
 const releaseSourceUrls=new WeakMap<ReleasedData,readonly string[]>();
@@ -74,7 +76,6 @@ export async function loadRelease(directory=governedReleaseDirectory(),options:R
   const knowledgeBytes=await readReleaseFile(directory,dataManifest,'knowledge/records.json');
   const knowledge=validateKnowledgeRelease(JSON.parse(knowledgeBytes.toString('utf8')),registry);
   const criticalProjection=CriticalAdmissionsSchema.parse(JSON.parse((await readReleaseFile(directory,dataManifest,'knowledge/assessment-admissions.json')).toString('utf8')));
-  assertCriticalAdmissionsBound(knowledge.records,criticalProjection.admissions);
   const knowledgeChanges=validateChanges(JSON.parse((await readReleaseFile(directory,dataManifest,'knowledge/changes.json')).toString('utf8')),knowledge.records.map(knowledgeChangeRecord));
   const municipalityIds=new Set(registry.municipalities.map(city=>city.id));
   for(const cityId of municipalityIds){
@@ -95,16 +96,35 @@ export async function loadRelease(directory=governedReleaseDirectory(),options:R
   const coverage=districtCoverageSchema.parse(JSON.parse((await readReleaseFile(directory,dataManifest,'knowledge/coverage.json')).toString('utf8')));
   validateDistrictCoverage(coverage,registry,knowledge.records);
   assertKnowledgeSlice(registry,knowledge.records);
+  assertCriticalAdmissionsBound(knowledge.records,criticalProjection.admissions,coverage.retainedPublication??null);
   const graphData=KnowledgeGraphSchema.parse(JSON.parse((await readReleaseFile(directory,dataManifest,'knowledge/graph.json')).toString('utf8')));
   if(graphData.asOf!==publicationInputs.asOf)throw Error('Released graph asOf is not publication-bound');
   const graph=new GraphIndex(dataManifest.id,graphData,knowledgeBytes);
-  const index=new QueryIndex(dataManifest.id,dataManifest.generatedAt,features,regional,catalogue,{records:knowledge.records,municipalities:registry.municipalities,coverage});
+  const publicationIndex=new QueryIndex(dataManifest.id,dataManifest.generatedAt,features,regional,catalogue,{records:knowledge.records,municipalities:registry.municipalities,coverage});
+  const visibility=revocations?publicationIndex.withRevocations(revocations):null;
+  const index=visibility?.index??publicationIndex;
+  const metadataBase:ReleasedData={bundle,manifest,dataManifest,publicationInputs,catalogue,features,feeds,changes,regional,knowledge,registry,coverage,servedCoverage:null,knowledgeChanges,graphData,index:publicationIndex,graph,mode:options.mode,revocations,visibility:null};
+  const maskedMetadata=visibility?projectMaskedReleaseMetadata(metadataBase,visibility):null;
+  let servedGraph=graph,servedGraphData=graphData,servedFeatures=features,servedRegional=regional,servedKnowledge=knowledge,servedChanges=changes,servedBundle=bundle,servedRegistry=registry;
+  if(visibility&&revocations){
+    servedFeatures=features.filter(feature=>visibility.visibleRecordIds.has(feature.properties.id));
+    servedRegional=visibility.index.regional;
+    const visibleKnowledge=knowledge.records.filter(record=>visibility.visibleRecordIds.has(record.id));
+    servedKnowledge={...knowledge,records:visibleKnowledge};
+    const safeBytes=JSON.stringify({...knowledge,records:visibleKnowledge});
+    const safeGraph=buildKnowledgeGraph(safeBytes,{asOf:graphData.asOf});
+    servedGraph=graph.withReadView(safeGraph,safeBytes,visibility.visibleRecordIds,revocations);
+    servedGraphData=servedGraph.graphView();
+    servedChanges=visibleChanges(changes,features,knowledge,revocations);
+    servedBundle={...bundle,facts:bundle.facts.filter(fact=>{const descriptors:RevocationSourceDescriptor[]=[{url:fact.source.url,mcpSourceId:mcpSourceId(fact.source)},...sourceMetadataUrls(fact.source).filter(url=>url!==fact.source.url).map(url=>({url}))];for(const municipality of registry.municipalities)if(municipality.id===bundle.cityId)for(const source of municipality.sources)if(source.url===fact.source.url)descriptors.push({municipalityId:municipality.id,registrySourceId:source.id,url:source.url});return !isRecordRevoked(revocations,{recordId:fact.id,municipalityId:bundle.cityId,sources:descriptors});})};
+    servedRegistry={...registry,municipalities:registry.municipalities.map(city=>({...city,sources:city.sources.filter(source=>!isSourceRevoked(revocations,{municipalityId:city.id,registrySourceId:source.id,...(source.url?{url:source.url}:{})})&&sourceMetadataUrls(source).every(url=>!isSourceRevoked(revocations,{url}))),amt:city.amt&&isSourceRevoked(revocations,{url:city.amt.sourceUrl})?null:city.amt,administrativeEvidence:city.administrativeEvidence.filter(item=>!isSourceRevoked(revocations,{municipalityId:city.id,url:item.url})),identitySources:city.identitySources.filter(item=>!isSourceRevoked(revocations,{municipalityId:city.id,url:item.url})),seedDocuments:city.seedDocuments.filter(item=>!isSourceRevoked(revocations,{municipalityId:city.id,registrySourceId:item.sourceId,url:item.url})&&item.evidence.every(evidence=>!isSourceRevoked(revocations,{url:evidence.url})))}))};
+  }
   const sourceUrls=new Set<string>(feedSourceUrls);
   for(const feature of features)for(const source of feature.properties.sources){sourceUrls.add(source.url);if(source.snapshotUrl)sourceUrls.add(source.snapshotUrl);}
   for(const fact of bundle.facts)sourceUrls.add(fact.source.url);
   for(const topic of regional.topics)for(const municipality of topic.municipalities)for(const item of municipality.items)sourceUrls.add(item.url);
   for(const record of knowledge.records)for(const source of record.kind==='structured'?[record.source,...record.supportingSources]:record.sources)sourceUrls.add(source.url);
-  const admitted:ReleasedData={bundle,manifest,dataManifest,publicationInputs,catalogue,features,feeds,changes,regional,knowledge,registry,coverage,knowledgeChanges,graphData,index,graph,mode:options.mode,revocations};
+  const admitted:ReleasedData={bundle:servedBundle,manifest,dataManifest,publicationInputs,catalogue:maskedMetadata?.catalogue??catalogue,features:servedFeatures,feeds:maskedMetadata?.feeds??feeds,changes:servedChanges,regional:servedRegional,knowledge:servedKnowledge,registry:servedRegistry,coverage,servedCoverage:maskedMetadata?.coverage??null,knowledgeChanges,graphData:servedGraphData,index,graph:servedGraph,mode:options.mode,revocations,visibility};
   releaseSourceUrls.set(admitted,[...sourceUrls]);
   await recheckReleasePolicy(admitted,options.mode==='vm_candidate'?options.policyOptions:undefined);
   release=admitted;
@@ -131,11 +151,11 @@ export function projectMaskedReleaseMetadata(base:ReleasedData,visibility:QueryV
  const blockedScopes=new Set<string>(),blockedUrls=new Set<string>();
  for(const descriptors of visibility.sourceDescriptorsByRecord.values())for(const descriptor of descriptors)if(isSourceRevoked(mask,descriptor)||descriptor.mcpSourceId&&visibility.withheldSourceIds.has(descriptor.mcpSourceId)){
   if(descriptor.municipalityId&&descriptor.registrySourceId)blockedScopes.add(JSON.stringify([descriptor.municipalityId,descriptor.registrySourceId]));
-  if(descriptor.url)blockedUrls.add(descriptor.url);
+  if(descriptor.url&&!descriptor.municipalityId&&!descriptor.registrySourceId)blockedUrls.add(descriptor.url);
  }
  const allowed=(descriptor:RevocationSourceDescriptor)=>!isSourceRevoked(mask,descriptor)&&!(descriptor.municipalityId&&descriptor.registrySourceId&&blockedScopes.has(JSON.stringify([descriptor.municipalityId,descriptor.registrySourceId])))&&!(descriptor.url&&blockedUrls.has(descriptor.url));
  const visible=base.knowledge.records.filter(record=>visibility.visibleRecordIds.has(record.id)),features=base.features.filter(feature=>visibility.visibleRecordIds.has(feature.properties.id));
- const catalogue:Catalogue={...base.catalogue,cities:base.catalogue.cities.map(city=>({...city,sources:city.sources.filter(source=>allowed({municipalityId:city.id,registrySourceId:source.id,url:source.url})).map(source=>{const {error:_raw,...safe}=source;const count=features.filter(feature=>feature.properties.cityId===city.id&&feature.properties.sources.some(item=>item.url===source.url||item.snapshotUrl===source.url)).length;return {...safe,publishedRecordCount:count,...(source.status==='failed'?{error:'Source unavailable in the original sealed observation'}:{})};})}))};
+ const catalogue:Catalogue={...base.catalogue,cities:base.catalogue.cities.map(city=>({...city,sources:city.sources.filter(source=>allowed({municipalityId:city.id,registrySourceId:source.id,url:source.url})&&sourceMetadataUrls(source).every(url=>!isSourceRevoked(mask,{url}))).map(source=>{const {error:_raw,...safe}=source;const count=features.filter(feature=>feature.properties.cityId===city.id&&feature.properties.sources.some(item=>item.url===source.url||item.snapshotUrl===source.url)).length;return {...safe,publishedRecordCount:count,...(source.status==='failed'?{error:'Source unavailable in the original sealed observation'}:{})};})}))};
  const feeds:Record<string,CityFeed>={};
  for(const [cityId,feed] of Object.entries(base.feeds)){
   const sources=feed.sources.filter(source=>allowed({municipalityId:cityId,registrySourceId:source.id,url:source.url})&&(!source.pageUrl||allowed({municipalityId:cityId,registrySourceId:source.id,url:source.pageUrl}))),sourceIds=new Set(sources.map(source=>source.id));
@@ -144,7 +164,7 @@ export function projectMaskedReleaseMetadata(base:ReleasedData,visibility:QueryV
  }
  const municipalities=base.coverage.municipalities.map(city=>{
   const records=visible.filter(record=>record.municipalityId===city.id),registry=base.registry.municipalities.find(item=>item.id===city.id)!;
-  return {id:city.id,status:records.length?'served_records' as const:'no_served_records' as const,documents:city.documents,publishedRecords:records.length,datedStagedRecords:records.filter(record=>record.kind==='text_model'&&record.stageDate!==null).length,quarantinedRecords:city.quarantinedRecords,servedTextModelRecords:records.filter(record=>record.kind==='text_model').length,servedStructuredRecords:records.filter(record=>record.kind==='structured').length,withheldRecords:city.publishedRecords-records.length,generation:{publishedRecords:city.publishedRecords,textModelRecords:city.textModelRecords,structuredRecords:city.structuredRecords,meaning:'Immutable original publication counts, not current served-view counts'},sources:city.sources.filter(source=>{const original=registry.sources.find(item=>item.id===source.sourceId);return allowed({municipalityId:city.id,registrySourceId:source.sourceId,...(original?.url?{url:original.url}:{})});}).map(source=>({sourceId:source.sourceId,kind:source.kind,registryState:source.registryState,observedState:source.crawlState,checkedAt:source.checkedAt,observedDocuments:source.documentCount,servedRecords:records.filter(record=>record.kind==='structured'?record.source.id===source.sourceId||record.supportingSources.some(item=>item.id===source.sourceId):record.sources.some(item=>item.id===source.sourceId)).length,meaning:'Original source observation clock/count; served records are separately masked'}))};
+  return {id:city.id,status:records.length?'served_records' as const:'no_served_records' as const,documents:city.documents,publishedRecords:records.length,datedStagedRecords:records.filter(record=>record.kind==='text_model'&&record.stageDate!==null).length,quarantinedRecords:city.quarantinedRecords,servedTextModelRecords:records.filter(record=>record.kind==='text_model').length,servedStructuredRecords:records.filter(record=>record.kind==='structured').length,withheldRecords:city.publishedRecords-records.length,generation:{publishedRecords:city.publishedRecords,textModelRecords:city.textModelRecords,structuredRecords:city.structuredRecords,meaning:'Immutable original publication counts, not current served-view counts'},sources:city.sources.filter(source=>{const original=registry.sources.find(item=>item.id===source.sourceId);return allowed({municipalityId:city.id,registrySourceId:source.sourceId,...(original?.url?{url:original.url}:{})})&&sourceMetadataUrls(original??{}).every(url=>!isSourceRevoked(mask,{url}));}).map(source=>({sourceId:source.sourceId,kind:source.kind,registryState:source.registryState,observedState:source.crawlState,checkedAt:source.checkedAt,observedDocuments:source.documentCount,servedRecords:records.filter(record=>record.kind==='structured'?record.source.id===source.sourceId||record.supportingSources.some(item=>item.id===source.sourceId):record.sources.some(item=>item.id===source.sourceId)).length,meaning:'Original source observation clock/count; served records are separately masked'}))};
  });
  return {catalogue,feeds,coverage:{schemaVersion:'stadtstack-district-read-coverage-v1',releaseId:base.dataManifest.id,maskIdentity:mask.artifactSha256,countMeaning:'Governed administrative withholding, not civic withdrawal, source absence, municipality performance or a new source assessment',accounting:{servedRecords:visible.length,withheldRecords:base.knowledge.records.length-visible.length,servedMunicipalities:municipalities.filter(city=>city.publishedRecords>0).length},municipalities}};
 }

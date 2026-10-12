@@ -7,7 +7,9 @@ import {catalogueSchema,collectionSchema,type Catalogue,type Signal} from '../sr
 import {QueryIndex,regionalSchema,querySchema,queryFields,publicData,exportRecordsSchema,type Regional} from '../src/mcp-query.ts';
 import {assignTopics,assertTopic} from '../src/topics.ts';
 import {searchText} from '../src/mcp.ts';
-import {createHash} from 'node:crypto';
+import {createHash,generateKeyPairSync} from 'node:crypto';
+import {signRevocations,verifyRevocations,revocationKeyId,type RevocationTarget} from '../src/civic-revocations.ts';
+import {knowledgeSourceDescriptors,mcpSourceId} from '../src/mcp-source-identity.ts';
 
 const catalogue:Catalogue={schemaVersion:'stadtstack-signals-v1',generatedAt:'2026-10-10T12:00:00Z',publisher:'Test',cities:[{id:'strausberg',name:'Strausberg',state:'Brandenburg',center:[13.88,52.58],bbox:[13,52,14,53],sources:[]}]};
 const regional:Regional={schemaVersion:'stadtstack-regional-topics-v1',generatedAt:'2026-10-09T12:00:00Z',asOf:'2026-10-09',region:{id:'brandenburg-mol',name:'Märkisch-Oderland'},municipalities:[{id:'hoppegarten',name:'Hoppegarten',ags:'12064227'},{id:'strausberg',name:'Strausberg',ags:'12064472'}],topics:[{id:'waermeplanung',label:'Kommunale Wärmeplanung',municipalities:[{municipalityId:'hoppegarten',stage:'planning',items:[{title:'Kommunale Wärmeplanung in Hoppegarten',url:'https://www.gemeinde-hoppegarten.de/news/1/1240589/nachrichten/kommunale-w%C3%A4rmeplanung-in-hoppegarten.html',date:'2026-05-27',sourceType:'cityWebsite',locator:'Veröffentlichung: 27. Mai 2026',stage:'planning'},{title:'Wärmeplanung und Wärmenetz: Datum offen',url:'https://www.gemeinde-hoppegarten.de/seite/864034/kommunale-w%C3%A4rmeplanung.html',date:null,sourceType:'cityWebsite',locator:'Planung; kein dokumentiertes Datum',stage:'planning'}]}]}]};
@@ -20,6 +22,18 @@ function feature(id:string,title:string,kind:Signal['properties']['kind']='plann
 function index() {
   return new QueryIndex('a'.repeat(64),'2026-10-10T12:00:00Z',[feature('solar','Solarpark am Flugplatz'),feature('heat','Am Biotop · Fernwärmeleitung'),feature('pv','Photovoltaik auf kommunalen Gebäuden','council_paper'),feature('undated','Solarpark ohne Quelldatum','planning',null),feature('place','Solar Sportplatz','place',null)],regional,catalogue);
 }
+function signedMask(targets:RevocationTarget[]){
+  const releaseId='a'.repeat(64),{privateKey,publicKey}=generateKeyPairSync('ed25519'),keyId=revocationKeyId(publicKey);
+  const bytes=signRevocations({schemaVersion:'stadtstack-revocations-v1',releaseId,issuedAt:'2026-10-10T12:00:00Z',sequence:1,targets},keyId,privateKey);
+  const trust={schemaVersion:'stadtstack-revocation-trust-v1',releaseId,expectedArtifactSha256:createHash('sha256').update(bytes).digest('hex'),keys:[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}]};
+  return verifyRevocations(bytes,trust,releaseId);
+}
+test('text source identity hashes only the canonical source tuple while retaining its registry ID outside',()=>{
+  const source={id:'registry:one',url:'https://example.org/source',locator:'page 1',sha256:'a'.repeat(64)};
+  const [descriptor]=knowledgeSourceDescriptors({kind:'text_model',municipalityId:'strausberg',sources:[source]});
+  assert.equal(descriptor.registrySourceId,source.id);
+  assert.equal(descriptor.mcpSourceId,mcpSourceId({...source,publisher:'strausberg'}));
+});
 
 test('shared topics match subject text, not category or planning record type',()=>{
   const query=index();
@@ -253,4 +267,18 @@ test('regional statements require source-bound excerpts and never present locato
  const query=make([{...item,...source}]),record=query.exportRecords().items[0];assert.equal(record.statement,source.statement);assert.equal(record.locator,item.locator);assert.equal(record.statementStatus,'source_backed');assert.deepEqual(record.statementEvidence,source.statementEvidence);
  assert.equal(query.sources.get(record.sourceIds[0])!.sha256,source.statementEvidence[0].sourceSha256);
  assert.throws(()=>make([{...item,...source,statement:'Eine andere, nicht belegte Aussage.'}]),/Regional statement/);
+});
+test('a genuinely signed revocation creates a complete mask-bound query view',()=>{
+  const original=index(),masked=original.withRevocations(signedMask([{type:'host',host:'example.org'}]));
+  assert.equal(masked.releaseId,original.releaseId);
+  assert.ok(masked.visibleRecordIds.size<original.records.length);
+  assert.ok(masked.index.records.every(record=>!record.sourceIds.some(sourceId=>masked.withheldSourceIds.has(sourceId))));
+  assert.ok(masked.index.records.every(record=>record.id.startsWith('regional:')));
+  const firstMask=original.withRevocations(signedMask([])),page=firstMask.index.page({cityIds:['hoppegarten'],limit:1,fields:['id']},'search_topics');
+  assert.ok(page.nextCursor);
+  const sameContentDifferentMask=original.withRevocations(signedMask([{type:'record',recordId:'not-in-publication'}]));
+  assert.equal(sameContentDifferentMask.index.records.length,firstMask.index.records.length);
+  assert.throws(()=>sameContentDifferentMask.index.page({cityIds:['hoppegarten'],limit:1,fields:['id'],cursor:page.nextCursor!},'search_topics'),/mismatch/);
+  const empty=original.withRevocations(signedMask([]));
+  assert.equal(empty.index.records.length,original.records.length);
 });

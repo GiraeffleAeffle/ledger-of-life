@@ -4,7 +4,7 @@ import { IdentityBasisSchema, graphIdentityMention, relationModalitySchema, ENTI
 import { StructuredKnowledgeRecordSchema } from './district-structured-record.ts';
 import { StructuredLocatorSchema, ObservationSchema, semanticHash, canonicalJson, type AdapterScope, type StructuredObservation } from './district-adapter-contract.ts';
 import { IdentityMentionSchema, IdentityAssertionSchema, IdentityAdmissionSchema, assertIdentityAssertionsBound, identityAssertion, identifierKey, TemporalPathStepSchema, effectiveIntervalFromExpression, sourceCalendarDay, identityDaySchema, resolveIdentityMentions, unknownValidity, nativeStructuredIdentityGraph, type IdentityMention, type IdentityAssertion, type IdentityAdmission, type TemporalPathStep } from './district-entity-resolution.ts';
-import { canonical } from './mcp-pagination.ts';
+import { canonical } from './mcp-source-identity.ts';
 import { CASE_LINKING_VERSION, CaseIdentitySchema, caseIdentityFromText, type CaseIdentity } from './district-case-linking.ts';
 
 export const GRAPH_SCHEMA_VERSION = 'stadtstack-graph-v3';

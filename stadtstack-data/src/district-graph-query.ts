@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { validateKnowledgeGraph, type GraphEntity, type GraphEdge } from './district-graph.ts';
+import { validateKnowledgeGraph, conservativeGraphReadView, type GraphEntity, type GraphEdge, type KnowledgeGraph } from './district-graph.ts';
+import {canonical,knowledgeSourceDescriptors} from './mcp-source-identity.ts';
+import {isRecordRevoked,isSourceRevoked,type VerifiedRevocations} from './civic-revocations.ts';
 import { identityDaySchema, temporalPathEligible, intervalCouldContain, intervalBoundaryRange, effectiveIntervalFromExpression } from './district-entity-resolution.ts';
 import { boundPage, cursorBinding, readCursor } from './mcp-pagination.ts';
 import { entityTypeSchema } from './district-graph-claims.ts';
@@ -27,6 +29,9 @@ export class GraphIndex {
   readonly releaseId: string;
   readonly releaseAsOf: string;
   readonly identitySha256: string;
+  readonly maskIdentity:string|null;
+  private readonly graph:KnowledgeGraph;
+  private readonly recordsBytes:string|Uint8Array;
   private readonly entities: Map<string, GraphEntity>;
   private readonly orderedEntities: GraphEntity[];
   private readonly outgoing = new Map<string, GraphEdge[]>();
@@ -34,9 +39,9 @@ export class GraphIndex {
   private readonly budgets: GraphQueryBudgets;
   private readonly roleEvidence = new Map<string, GraphEdge[]>();
 
-  constructor(releaseId: string, graph: unknown, recordsBytes: string | Uint8Array, budgets: Partial<GraphQueryBudgets> = {}) {
+  constructor(releaseId: string, graph: unknown, recordsBytes: string | Uint8Array, budgets: Partial<GraphQueryBudgets> = {}, maskIdentity:string|null=null) {
     const bound = validateKnowledgeGraph(graph, recordsBytes);
-    this.releaseId = releaseId; this.recordsSha256 = bound.recordsSha256; this.releaseAsOf = bound.asOf; this.identitySha256 = bound.identitySha256;
+    this.releaseId = releaseId; this.recordsSha256 = bound.recordsSha256; this.releaseAsOf = bound.asOf; this.identitySha256 = bound.identitySha256;this.maskIdentity=maskIdentity;this.graph=bound;this.recordsBytes=recordsBytes;
     this.budgets = { ...GRAPH_QUERY_BUDGETS, ...budgets };
     for (const name of Object.keys(GRAPH_QUERY_BUDGETS) as (keyof GraphQueryBudgets)[]) if (!Number.isInteger(this.budgets[name]) || this.budgets[name] < 1 || this.budgets[name] > GRAPH_QUERY_BUDGETS[name]) throw Error('Invalid graph search budget');
     this.orderedEntities = bound.entities; this.entities = new Map(bound.entities.map(entity => [entity.id, entity]));
@@ -50,7 +55,23 @@ export class GraphIndex {
       }
     }
   }
+  /** Rebuild and validate the safe graph from unchanged visible record bytes; structural closure is conservative. */
+  withReadView(safeGraph:unknown,safeRecordsBytes:string|Uint8Array,visibleRecordIds:ReadonlySet<string>,mask:VerifiedRevocations):GraphIndex {
+    isSourceRevoked(mask,{});
+    if(mask.releaseId!==this.releaseId)throw Error('Graph read mask release mismatch');
+    const originalEnvelope=JSON.parse(typeof this.recordsBytes==='string'?this.recordsBytes:Buffer.from(this.recordsBytes).toString('utf8')) as {schemaVersion:string;generatedAt:string;records:Array<{id:string;municipalityId:string;kind?:string} & Record<string,unknown>>};
+    const safeEnvelope=JSON.parse(typeof safeRecordsBytes==='string'?safeRecordsBytes:Buffer.from(safeRecordsBytes).toString('utf8')) as {schemaVersion:string;generatedAt:string;records:Array<{id:string;municipalityId:string;kind?:string} & Record<string,unknown>>};
+    if(safeEnvelope.schemaVersion!==originalEnvelope.schemaVersion||safeEnvelope.generatedAt!==originalEnvelope.generatedAt)throw Error('Graph read view changed publication envelope');
+    const originals=new Map(originalEnvelope.records.map(record=>[record.id,canonical(record)])),expected=new Set(originalEnvelope.records.filter(record=>!isRecordRevoked(mask,{recordId:record.id,municipalityId:record.municipalityId,sources:knowledgeSourceDescriptors(record as Parameters<typeof knowledgeSourceDescriptors>[0])})).map(record=>record.id));
+    const seen=new Set<string>();
+    for(const record of safeEnvelope.records)if(seen.has(record.id)||!visibleRecordIds.has(record.id)||originals.get(record.id)!==canonical(record))throw Error('Graph read view is not an unchanged visible record subset');else seen.add(record.id);
+    if(seen.size!==expected.size||[...seen].some(id=>!expected.has(id)))throw Error('Graph read view record identity closure mismatch');
+    const checkedSafe=validateKnowledgeGraph(safeGraph,safeRecordsBytes),view=conservativeGraphReadView(this.graph,checkedSafe,visibleRecordIds);
+    if(view.asOf!==this.releaseAsOf)throw Error('Graph read mask changed pinned asOf');
+    return new GraphIndex(this.releaseId,view,safeRecordsBytes,this.budgets,mask.artifactSha256);
+  }
 
+  graphView():KnowledgeGraph{return this.graph;}
   /** Relation scope only: metric replacements and corporate succession never imply an operator transfer. */
   private blockingRoleEvidence(edge: GraphEdge, asOf: string, inspect: () => boolean): GraphEdge[] | null {
     const result: GraphEdge[] = [], reference = edge.temporal.eventDate ?? asOf;
@@ -72,7 +93,7 @@ export class GraphIndex {
   entitySearch(input: unknown) {
     const options = entitySearchSchema.parse(input), asOf = options.asOf ?? this.releaseAsOf;
     const { cursor, ...filters } = options;
-    const binding = cursorBinding({ tool: 'entity_search', filters: { ...filters, asOf }, records: this.recordsSha256, identity: this.identitySha256, budgets: this.budgets });
+    const binding = cursorBinding({ tool: 'entity_search', releaseId:this.releaseId,maskIdentity:this.maskIdentity,filters: { ...filters, asOf }, records: this.recordsSha256, identity: this.identitySha256, budgets: this.budgets });
     readCursor(cursor, this.releaseId, binding);
     const query = options.query.normalize('NFC').toLocaleLowerCase('de'), matches: GraphEntity[] = [];
     let examinedNodes = 0;
@@ -81,14 +102,14 @@ export class GraphIndex {
       if ((!options.type || options.type === entity.type || entity.mentions.some(mention => mention.type === options.type)) && (entity.names.some(name => name.normalize('NFC').toLocaleLowerCase('de').includes(query)) || entity.mentions.some(mention => mention.identifiers.some(identifier => identifier.value.toLocaleLowerCase('de').includes(query))))) matches.push(entity);
     }
     const truncated = examinedNodes < this.orderedEntities.length, page = boundPage(matches, entity => entity.id, options, this.releaseId, binding);
-    return { releaseId: this.releaseId, releaseAsOf: this.releaseAsOf, asOf, temporalMode: 'identity_search', identitySha256: this.identitySha256, recordsSha256: this.recordsSha256, ...page, total: truncated ? null : page.total, matchedLowerBound: matches.length, truncated, complete: !truncated, status: matches.length ? 'found' : truncated ? 'incomplete' : 'not_found', examinedNodes, budgets: this.budgets, scope };
+    return { releaseId: this.releaseId,maskIdentity:this.maskIdentity, releaseAsOf: this.releaseAsOf, asOf, temporalMode: 'identity_search', identitySha256: this.identitySha256, recordsSha256: this.recordsSha256, ...page, total: truncated ? null : page.total, matchedLowerBound: matches.length, truncated, complete: !truncated, status: matches.length ? 'found' : truncated ? 'incomplete' : 'not_found', examinedNodes, budgets: this.budgets, scope };
   }
 
   neighbors(input: unknown) {
     const options = graphNeighborsSchema.parse(input), asOf = options.asOf ?? this.releaseAsOf;
     if (!this.entities.has(options.id)) throw Error('Unknown graph entity; use entity_search');
     const { cursor, ...filters } = options;
-    const binding = cursorBinding({ tool: 'graph_neighbors', filters: { ...filters, asOf, relationTypes: options.relationTypes ? [...new Set(options.relationTypes)].sort() : undefined }, records: this.recordsSha256, identity: this.identitySha256, budgets: this.budgets });
+    const binding = cursorBinding({ tool: 'graph_neighbors', releaseId:this.releaseId,maskIdentity:this.maskIdentity,filters: { ...filters, asOf, relationTypes: options.relationTypes ? [...new Set(options.relationTypes)].sort() : undefined }, records: this.recordsSha256, identity: this.identitySha256, budgets: this.budgets });
     readCursor(cursor, this.releaseId, binding);
     const matches: GraphEdge[] = [], seen = new Set<string>(), visited = new Set<string>([options.id]);
     const lists = options.direction === 'out' ? [this.outgoing.get(options.id) ?? []] : options.direction === 'in' ? [this.incoming.get(options.id) ?? []] : [this.outgoing.get(options.id) ?? [], this.incoming.get(options.id) ?? []];
@@ -111,14 +132,14 @@ export class GraphIndex {
       }) : [];
       return { edge, from: this.entities.get(edge.fromId), to: this.entities.get(edge.toId), pathEligible: supported && graphEdgeModalityEligible(edge) && blocking !== null && !blocking.length, blockingEvidence: blocking ?? [], roleEvidenceComplete: blocking !== null, qualification: blocking === null ? 'incomplete_role_evidence' : blocking.length ? 'unresolved_contradictory_or_ended_role' : supported ? 'supported_as_of' : 'historical_or_unknown_validity' };
     });
-    return { releaseId: this.releaseId, releaseAsOf: this.releaseAsOf, asOf, temporalMode: 'as_of', identitySha256: this.identitySha256, recordsSha256: this.recordsSha256, entity: this.entities.get(options.id), ...page, items, total: truncated ? null : page.total, matchedLowerBound: matches.length, truncated, complete: !truncated, status: matches.length ? 'found' : truncated ? 'incomplete' : 'not_found', visitedNodes: visited.size, examinedEdges, budgets: this.budgets, scope, pathEligibility };
+    return { releaseId: this.releaseId,maskIdentity:this.maskIdentity, releaseAsOf: this.releaseAsOf, asOf, temporalMode: 'as_of', identitySha256: this.identitySha256, recordsSha256: this.recordsSha256, entity: this.entities.get(options.id), ...page, items, total: truncated ? null : page.total, matchedLowerBound: matches.length, truncated, complete: !truncated, status: matches.length ? 'found' : truncated ? 'incomplete' : 'not_found', visitedNodes: visited.size, examinedEdges, budgets: this.budgets, scope, pathEligibility };
   }
 
   path(input: unknown) {
     const options = graphPathSchema.parse(input), asOf = options.asOf ?? this.releaseAsOf;
     if (!this.entities.has(options.fromId) || !this.entities.has(options.toId)) throw Error('Unknown graph entity; use entity_search');
     const { cursor, ...filters } = options;
-    const binding = cursorBinding({ tool: 'graph_path', filters: { ...filters, asOf }, records: this.recordsSha256, identity: this.identitySha256, budgets: this.budgets });
+    const binding = cursorBinding({ tool: 'graph_path', releaseId:this.releaseId,maskIdentity:this.maskIdentity,filters: { ...filters, asOf }, records: this.recordsSha256, identity: this.identitySha256, budgets: this.budgets });
     readCursor(cursor, this.releaseId, binding);
     const paths: Array<{ id: string; entities: GraphEntity[]; edges: GraphEdge[]; hops: number }> = [];
     const visited = new Set<string>([options.fromId]);
@@ -170,6 +191,6 @@ export class GraphIndex {
     }
     paths.sort((a, b) => a.id.localeCompare(b.id));
     const page = boundPage(paths, path => path.id, options, this.releaseId, binding);
-    return { releaseId: this.releaseId, releaseAsOf: this.releaseAsOf, asOf, temporalMode: options.mode, identitySha256: this.identitySha256, recordsSha256: this.recordsSha256, ...page, total: truncated ? null : page.total, pathsLowerBound: paths.length, status: paths.length ? 'found' : truncated ? 'incomplete' : 'not_found_within_hops', shortestHops, maxHops: options.maxHops, truncated, complete: !truncated, visitedNodes: visited.size, examinedEdges, pathSteps, budgets: this.budgets, direction: 'out', pathEligibility, qualification: options.mode === 'historical' ? 'attributed_historical_claims_not_confirmed_current' : 'supported_at_explicit_temporal_reference', modalities: [...new Set(page.items.flatMap(path => path.edges.map(edge => edge.modality)))].sort(), scope, searchNote: 'Directed shortest temporally eligible simple paths only, bounded by maxHops and explicit budgets. Truncated searches are incomplete even when nextCursor is null. Events retain their own sourced date roles; contemporaneous ongoing paths require overlapping evidence-backed intervals.' };
+    return { releaseId: this.releaseId,maskIdentity:this.maskIdentity, releaseAsOf: this.releaseAsOf, asOf, temporalMode: options.mode, identitySha256: this.identitySha256, recordsSha256: this.recordsSha256, ...page, total: truncated ? null : page.total, pathsLowerBound: paths.length, status: paths.length ? 'found' : truncated ? 'incomplete' : 'not_found_within_hops', shortestHops, maxHops: options.maxHops, truncated, complete: !truncated, visitedNodes: visited.size, examinedEdges, pathSteps, budgets: this.budgets, direction: 'out', pathEligibility, qualification: options.mode === 'historical' ? 'attributed_historical_claims_not_confirmed_current' : 'supported_at_explicit_temporal_reference', modalities: [...new Set(page.items.flatMap(path => path.edges.map(edge => edge.modality)))].sort()};
   }
 }
