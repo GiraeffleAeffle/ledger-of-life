@@ -9,7 +9,7 @@ import {tmpdir} from 'node:os';
 import {createHash,randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {assertCivicPolicyAuthority,provisionCivicPolicyAuthority,CIVIC_POLICY_AUTHORITY_ID,assertManagedSourceReadable,withManagedSourceScratch,recoverManagedSourceScratch,assertHostNotOptedOut,readCivicOptOutSnapshot,registerManagedCacheRoot,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,recordHostOptOut,purgeOptedOutHost,recordManagedSourceContent,withManagedSourceWrite,markManagedCacheInventoryComplete,relinquishManagedSourceContent,HostOptedOutError,CivicPolicyStateError,civicOptOutMain} from '../src/civic-opt-out.ts';
-import {assertManagedSourceBindings,assertManagedRawSourceBinding,assertManagedObservationReadable,ManagedSourceBindingSchema,parseContentFreePreparationPlan} from '../src/civic-opt-out.ts';
+import {assertManagedSourceBindings,assertManagedRawSourceBinding,assertManagedObservationReadable,ManagedSourceBindingSchema,parseContentFreePreparationPlan,assertSourceHostsNotOptedOut} from '../src/civic-opt-out.ts';
 import {projectSourcePolicyMetadata} from '../src/source-policy.ts';
 import type {SourceAccessPolicy} from '../src/source-policy.ts';
 import type {ManagedSourceContent,ManagedSourceBinding,CivicPolicyOptions} from '../src/civic-opt-out.ts';
@@ -803,4 +803,47 @@ test('council collection paths are source-bound outputs, never exempt metadata',
  const result=await recordHostOptOut({host:'stadt.de',reason:'municipality_objection'},policy);assert.equal(result.purge.status,'purged');assert.equal(result.purge.deletedFiles,2);
  await writeFile(join(root,'collections','unbound-city-collection.json'),'{"source":"unbound source"}',{mode:0o600});
  await assert.rejects(markManagedCacheInventoryComplete(root,policy),CivicPolicyStateError);
+});
+
+test('inventory larger than 16 MiB loads and saves unchanged v1 format; 256 MiB still fails closed',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),entry=rawEntry('large inventory');
+ await initializeManagedAcquisitionLane(root,{decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+ await publish(root,entry,'large inventory',stateDir);
+ const path=join(stateDir,'inventory.json'),inventory=JSON.parse(await readFile(path,'utf8')),original=inventory.entries[0];
+ // Unique source identities sharing one CAS object exercise same-path indexing
+ // without making thousands of filesystem/source-content fixtures.
+ inventory.entries=Array.from({length:30_000},(_,i)=>{
+  const value={...original,urlSha256:hash('large-inventory-url-'+i)};
+  value.id=hash(JSON.stringify([value.rootId,value.relativePath,value.contentSha256,value.kind,value.sourceSha256,value.host,value.urlSha256,value.observationId??null,value.receiptSha256??null,null,null,null,null,null,null,null,value.independentAllowed]));
+  return value;
+ });
+ const serialized=JSON.stringify(inventory)+'\n';assert.ok(Buffer.byteLength(serialized)>16*1024*1024);assert.ok(Buffer.byteLength(serialized)<256*1024*1024);
+ await writeFile(path,serialized,{mode:0o600});
+ await recordManagedSourceContent(root,entry,policy);
+ const saved=JSON.parse(await readFile(path,'utf8'));
+ assert.deepEqual(Object.keys(saved),['schemaVersion','inventoryId','roots','entries','scratch']);
+ assert.equal(saved.schemaVersion,1);assert.deepEqual(saved.entries.slice(0,30_000),inventory.entries);assert.equal(saved.entries.length,30_001);
+ await assertManagedSourceReadable(join(root,entry.relativePath),policy);
+ const handle=await fsPromises.open(path,'r+');try{await handle.truncate(256*1024*1024+1);}finally{await handle.close();}
+ let called=false;
+ await assert.rejects(withManagedSourceWrite(root,[entry],async()=>{called=true;},policy),CivicPolicyStateError);
+ assert.equal(called,false);assert.equal((await lstat(path)).size,256*1024*1024+1);
+});
+
+test('bulk host gates canonicalize every URL and do not cache between live boundaries',async t=>{
+ const {stateDir}=await sandbox(t),policy=fixturePolicy(stateDir);
+ const urls=['https://COUNCIL.TEST./first','http://council.test/second','https://other.test/third'];
+ await assertSourceHostsNotOptedOut(urls,policy);
+ await assert.rejects(assertSourceHostsNotOptedOut([...urls,'https://user:password@council.test/invalid'],policy),CivicPolicyStateError);
+ await recordHostOptOut({host:'council.test',reason:'municipality_objection'},policy);
+ await assert.rejects(assertSourceHostsNotOptedOut(urls,policy),HostOptedOutError);
+});
+
+test('batched shared paths still validate every content hash and revoked reference',async t=>{
+ const {base,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),root=join(base,'shared-artifacts'),bytes='{"facts":[]}',first={...rawEntry('first'),relativePath:'shared.json',contentSha256:hash(bytes)},second={...rawEntry('second','https://other.test/source'),relativePath:'shared.json',contentSha256:hash(bytes)};
+ await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+ await withManagedSourceWrite(root,[first,second],async()=>{await writeFile(join(root,'shared.json'),bytes,{mode:0o600});},policy);
+ await assert.rejects(withManagedSourceWrite(root,[first,{...second,contentSha256:hash('different')}],async()=>{},policy),CivicPolicyStateError);
+ await recordHostOptOut({host:'council.test',reason:'municipality_objection'},policy);
+ await assert.rejects(withManagedSourceWrite(root,[second],async()=>{},policy),CivicPolicyStateError);
 });
