@@ -20,6 +20,8 @@ import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {dataReleaseId,type DataRelease} from '../src/data-release.ts';
 import {importRetainedPublicationMember,retainedPublicationSources} from '../src/district-retained-import.ts';
 import {projectKnowledgeRecordIdentity} from '../src/retained-knowledge-lineage.ts';
+import {composeDistrictRelease} from '../src/district-release-composition.ts';
+import {textLineageRecordSha256} from '../src/text-run-lineage.ts';
 
 const at='2026-10-11T12:00:00.000Z';
 // Synthetic source and model evidence only; real preparation, policy, authority and ledger gates run.
@@ -59,9 +61,12 @@ async function retainedFixture(t:TestContext){
  const sources=registered.map(source=>({sourceId:source.id,kind:source.kind,registryState:source.checkState,crawlState:source.checkState,checkedAt:source.checkedAt,documentCount:source.kind==='website'?1:0,publishedRecords:source.kind==='website'?1:0,quarantinedRecords:0,quarantineReasons:emptyHistogram,coverage:source.kind==='website'?{state:'partial',pendingCount:0,runnableCount:0,blockedCount:0,sourceCoverage:'not_assessed',targetScope:{kind:'page_roots',urls:[f.reference.url],state:'complete',pendingCount:0,runnableCount:0,blockedCount:0}}:{state:'not_checked',pendingCount:0,runnableCount:0,blockedCount:0},failedLinkCount:0}));
  const model=original.extraction;
  const coverage={schemaVersion:'stadtstack-district-coverage-v3',generatedAt:at,accounting:{registryMunicipalities:1,configuredMunicipalities:1,checkedMunicipalities:1,runSelectedMunicipalities:1,preparedMunicipalities:1,attemptedMunicipalities:1,publishedMunicipalities:1,checkedWithoutPublishedMunicipalities:0,unvisitedMunicipalities:0},districts:[{id:'synthetic-district',ags:'12064',municipalitiesRegistered:1,municipalitiesConfigured:1,municipalitiesChecked:1,municipalitiesAttempted:1,municipalitiesWithRecords:1,municipalitiesWithDatedStages:1,documents:1,publishedRecords:1,quarantinedRecords:0}],municipalities:[{id:'beispielstadt',ags:'12064001',districtId:'synthetic-district',checked:true,status:'gated_records',documents:1,publishedRecords:1,datedStagedRecords:1,quarantinedRecords:0,quarantineReasons:emptyHistogram,extraction,sources}],models:[{provider:model.provider,model:model.model,tool:model.tool,toolVersion:model.toolVersion,modelIdentitySha256:model.modelIdentitySha256,modelIdentityBasis:model.modelIdentityBasis,faithfulnessThreshold:0.8,publishedRecords:1}],extractionRun:{generatedAt:at,assignmentMode:'codex-only',corpusSha256:sha256('synthetic original corpus'),registrySha256:sha256(JSON.stringify(registry)),promptContractSha256:sha256('synthetic original contract'),schemaSha256:sha256('synthetic original schema'),selection:'all_at_run_start',maxDocumentsPerMunicipality:null,availableDocumentGroupsAtRunStart:1,attemptedDocumentGroups:1,pendingDocumentGroupsAtRunStart:0}};
- const seal=async(label:string,manifestClock=at,record=original)=>{
-  const bodies={records:Buffer.from(JSON.stringify({schemaVersion:'stadtstack-knowledge-v2',generatedAt:at,records:[record]},null,2)+'\n'),coverage:Buffer.from(JSON.stringify(coverage,null,2)+'\n'),registry:Buffer.from(JSON.stringify(registry,null,2)+'\n')};
-  const files=(['records','coverage','registry'] as const).map(kind=>({path:`knowledge/${kind}.json`,sha256:sha256(bodies[kind]),bytes:bodies[kind].length})),manifest:DataRelease={schemaVersion:'stadtstack-data-release-v1',id:dataReleaseId(files),generatedAt:manifestClock,files,quality:{publishedRecords:1,quarantinedRecords:0,cities:1}};
+ const seal=async(label:string,manifestClock=at,record:typeof original|typeof original[]=original)=>{
+  const records=Array.isArray(record)?record:[record],sealedCoverage=structuredClone(coverage);
+  sealedCoverage.districts[0].publishedRecords=records.length;sealedCoverage.municipalities[0].publishedRecords=records.length;sealedCoverage.municipalities[0].datedStagedRecords=records.length;sealedCoverage.models[0].publishedRecords=records.length;
+  for(const source of sealedCoverage.municipalities[0].sources)source.publishedRecords=records.filter(record=>record.sources.some(item=>item.id===source.sourceId)).length;
+  const bodies={records:Buffer.from(JSON.stringify({schemaVersion:'stadtstack-knowledge-v2',generatedAt:at,records},null,2)+'\n'),coverage:Buffer.from(JSON.stringify(sealedCoverage,null,2)+'\n'),registry:Buffer.from(JSON.stringify(registry,null,2)+'\n')};
+  const files=(['records','coverage','registry'] as const).map(kind=>({path:`knowledge/${kind}.json`,sha256:sha256(bodies[kind]),bytes:bodies[kind].length})),manifest:DataRelease={schemaVersion:'stadtstack-data-release-v1',id:dataReleaseId(files),generatedAt:manifestClock,files,quality:{publishedRecords:records.length,quarantinedRecords:0,cities:1}};
   const publicationRoot=join(f.root,label+'-publication'),manifestPath=join(publicationRoot,'release-manifest.json');await mkdir(publicationRoot,{mode:0o700});
   const manifestBytes=Buffer.from(JSON.stringify(manifest,null,2)+'\n');await writeFile(manifestPath,manifestBytes,{mode:0o600});
   const pins:Record<string,unknown>={};
@@ -180,6 +185,21 @@ test('retained public admission uses no prepared file and preserves original mod
  const replay=await admitPublicationKnowledge({...input,policyReceipts:first.pin},f.policy);
  assert.deepEqual(replay.receipts,first.receipts);assert.deepEqual(replay.pin,first.pin);
  assert.equal(privateReads,0);assert.equal(network.mock.callCount(),0);
+});
+
+test('multiple retained origins match composition lineage when sealed record order differs from code-unit ID order',async t=>{
+ const f=await retainedFixture(t);
+ // Synthetic records share one source document and model receipt; their historical output order is deliberately noncanonical.
+ const originals=['knowledge:synthetic-retained-z','knowledge:synthetic-retained-A'].map(id=>{const record=structuredClone(f.original);record.id=id;record.verification.evidenceHash=knowledgeEvidenceHash(record);return DistrictKnowledgeRecordSchema.parse(record);});
+ const retainedPublication=await f.seal('multiple-retained',at,originals),[manifest,records,coverage,registry]=await Promise.all((['manifest','records','coverage','registry'] as const).map(async kind=>({bytes:await readFile(retainedPublication[kind].path),sha256:retainedPublication[kind].sha256})));
+ assert.deepEqual(JSON.parse(records.bytes.toString('utf8')).records.map((record:{id:string})=>record.id),originals.map(record=>record.id));
+ const composition=composeDistrictRelease({contributions:[],approvedRunOrder:[],admissions:[],generatedAt:at,retainedPublication:{artifacts:{manifest,records,coverage,registry},recordIds:originals.map(record=>record.id)}});
+ assert.ok(composition.retainedPublication);
+ const composedLineage={...composition.retainedPublication.baseline.lineage,selectedRecordOrigins:composition.retainedPublication.selectedRecordOrigins};
+ assert.deepEqual(composedLineage.selectedRecordOrigins.map(origin=>origin.recordId),[originals[1].id,originals[0].id]);assert.deepEqual(composedLineage.selectedRecordOrigins.map(origin=>origin.outputRecordIndex),[1,0]);
+ const admissions=originals.map(record=>({recordId:record.id,retainedPublication:{originalEvidenceHash:record.verification.evidenceHash}})),admitted=await admitPublicationKnowledge({records:composition.records.records,admissions,retainedPublication,auditDir:f.auditDir},f.policy);
+ assert.ok(admitted.retainedPublication);
+ assert.equal(textLineageRecordSha256(composedLineage),textLineageRecordSha256(admitted.retainedPublication),'Coverage retained origins differ from actual publication admission');
 });
 
 test('retained admission cannot alter claims scores source observations or original extraction and judge clocks',async t=>{

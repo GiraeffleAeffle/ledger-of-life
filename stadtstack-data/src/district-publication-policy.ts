@@ -108,7 +108,8 @@ export async function admitPublicationKnowledge(input:{records:DistrictKnowledge
   decisions.push({recordId:record.id,evidenceHash:record.verification.evidenceHash,checkedAt:new Date().toISOString(),decision:'admitted',basis:'prepared_source',sources});
  }
  decisions.sort((a,b)=>a.recordId.localeCompare(b.recordId));
- const retainedPublication=retained?RetainedKnowledgeLineageSchema.parse({...retained.lineage,selectedRecordOrigins:retainedOrigins.sort((a,b)=>a.outputRecordIndex-b.outputRecordIndex)}):null;
+ // Same canonical order as composeDistrictRelease's retained origins (code-unit recordId), so publish can compare whole lineages.
+ const retainedPublication=retained?RetainedKnowledgeLineageSchema.parse({...retained.lineage,selectedRecordOrigins:retainedOrigins.sort((a,b)=>a.recordId<b.recordId?-1:a.recordId>b.recordId?1:0)}):null;
  const current=publicationPolicyReceiptsSchema.parse({schemaVersion:'stadtstack-publication-policy-receipts-v2',authorityId:authority.authorityId,authoritySha256:authority.authoritySha256,snapshotSha256:snapshot.sha256,contractSha256,records:decisions});
  if((await readCivicOptOutSnapshot(policy)).sha256!==snapshot.sha256)throw Error('Source objection state changed during publication admission');
  if(input.policyReceipts){
