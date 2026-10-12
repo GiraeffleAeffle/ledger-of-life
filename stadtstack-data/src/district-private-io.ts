@@ -2,7 +2,7 @@ import {readFile,writeFile,mkdir,rename,lstat,open,unlink} from 'node:fs/promise
 import {dirname,resolve,relative,isAbsolute,join} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {sha256,hashSchema} from './district-schema.ts';
-import {assertCivicPolicyAuthority,assertHostNotOptedOut,initializeManagedAcquisitionLane,withManagedSourceScratch,withManagedSourceWrite,type ManagedAcquisitionLaneOptions,type ManagedSourceBinding,type ManagedSourceContent} from './civic-opt-out.ts';
+import {assertCivicPolicyAuthority,assertSourceHostsNotOptedOut,initializeManagedAcquisitionLane,withManagedSourceScratch,withManagedSourceWrite,type ManagedAcquisitionLaneOptions,type ManagedSourceBinding,type ManagedSourceContent} from './civic-opt-out.ts';
 
 export type SourceArtifactBinding=ManagedSourceBinding&Pick<ManagedSourceContent,'independentAllowed'>;
 /** Every temporary and final source-bearing copy is enrolled before bytes are created. */
@@ -10,7 +10,7 @@ export async function writeManagedSourceArtifact(root:string,path:string,bytes:s
  const directory=resolve(root),target=resolve(path),relativePath=relative(directory,target);
  if(!relativePath||relativePath.startsWith('..')||isAbsolute(relativePath)||!bindings.length)throw Error('Source artifact needs a contained destination and complete source bindings');
  await assertCivicPolicyAuthority(options);
- for(const binding of bindings)await assertHostNotOptedOut(binding.url,options);
+ await assertSourceHostsNotOptedOut(bindings.map(binding=>binding.url),options);
  await initializeManagedAcquisitionLane(directory,{...options,kind:'artifacts'});
  const contentSha256=sha256(bytes),entries=bindings.map(binding=>({...binding,relativePath,contentSha256}));
  const scratchBindings=bindings.map(({independentAllowed:_independent,...binding})=>binding);

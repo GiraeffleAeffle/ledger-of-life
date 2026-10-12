@@ -7,7 +7,7 @@ import {dataReleaseId,dataReleaseSchema,releasePathSchema,type DataRelease} from
 import {sha256,hashSchema} from './district-schema.ts';
 import {publicUrl} from './polite-fetch.ts';
 import {readPinnedJson,sourceArtifactUrls,writeManagedSourceArtifact} from './district-private-io.ts';
-import {assertCivicPolicyAuthority,assertHostNotOptedOut,assertManagedSourceReadable,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions,type ManagedSourceBinding,type RetainedPublicationBinding} from './civic-opt-out.ts';
+import {assertCivicPolicyAuthority,assertSourceHostsNotOptedOut,assertManagedSourceReadable,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions,type ManagedSourceBinding,type RetainedPublicationBinding} from './civic-opt-out.ts';
 
 export const RETAINED_PUBLICATION_ROOT=fileURLToPath(new URL('../cache/publication/owner-policy-2026-10-11',import.meta.url));
 const frozenOutput=fileURLToPath(new URL('../out',import.meta.url));
@@ -44,7 +44,10 @@ function json(bytes:Uint8Array):unknown {
 async function assertDeclaredSources(sources:RetainedPublicationSource[],policy:CivicPolicyOptions){
  await assertCivicPolicyAuthority(policy);
  const tuples=new Set<string>();
- for(const source of sources){const key=JSON.stringify([source.url,source.sourceSha256]);if(tuples.has(key))throw Error('Duplicate retained source declaration');tuples.add(key);await assertHostNotOptedOut(source.url,policy);}
+ const urls=function*(){
+  for(const source of sources){const key=JSON.stringify([source.url,source.sourceSha256]);if(tuples.has(key))throw Error('Duplicate retained source declaration');tuples.add(key);yield source.url;}
+ };
+ await assertSourceHostsNotOptedOut(urls(),policy);
 }
 async function readPublicationBytes(root:string,path:string,maxBytes:number):Promise<Buffer>{
  const canonicalRoot=await realpath(root),rootStat=await lstat(root);

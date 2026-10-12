@@ -17,7 +17,11 @@ import {effectiveSourcePermission} from './source-policy.ts';
 import {DockerParserResourceSchema,canonicalDockerSocket,dockerDaemonIdentity,dockerConfigSha256,createDockerParser,attachDockerParser,startDockerParser,waitDockerParser,removeDockerParser} from './civic-docker.ts';
 import type {DockerParserResource,DockerAttach} from './civic-docker.ts';
 
-const WEEK=7*24*60*60*1000,MAX_STATE=16*1024*1024,MAX_CONTENT=512*1024*1024,MAX_FILES=100_000,MAX_SCRATCH_FILES=512;
+// 0.3.1 retained members contribute 13,945 URL tuples per destination tree.
+// At the production sample's 1,921 bytes/entry, two baseline destinations plus
+// existing non-retained entries and three crawls/native runs project ~38,658
+// entries / 70.8 MiB. Cap at 256 MiB (3.6x headroom), still fail-closed.
+const WEEK=7*24*60*60*1000,MAX_STATE=256*1024*1024,MAX_CONTENT=512*1024*1024,MAX_FILES=100_000,MAX_SCRATCH_FILES=512;
 const digest=(bytes:string|Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const hex=z.string().regex(/^[a-f0-9]{64}$/),opaque=z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/);
 const timestamp=z.string().datetime({offset:true}),kindSchema=z.enum(['fetch','prepared','artifacts']);
@@ -98,6 +102,27 @@ const checkpointMetadataSchema=z.object({
 type Root=z.infer<typeof rootSchema>;
 type Entry=z.infer<typeof entrySchema>;
 type Inventory=z.infer<typeof inventorySchema>;
+// Transaction-local acceleration only; no index is serialized or reused across
+// disk loads. Buckets keep the inventory's insertion order and entry objects,
+// so state transitions are visible without rebuilding any index.
+interface InventoryIndex {byId:Map<string,Entry>;byPath:Map<string,Entry[]>;byHost:Map<string,Entry[]>;cas:Map<string,{contentSha256:string;sourceSha256:string|null;conflicting:boolean}>}
+const inventoryIndices=new WeakMap<Inventory,InventoryIndex>();
+const inventoryPathKey=(rootId:string,path:string)=>rootId+'\0'+path;
+function indexEntry(index:InventoryIndex,entry:Entry){
+ index.byId.set(entry.id,entry);
+ const pathKey=inventoryPathKey(entry.rootId,entry.relativePath),pathBucket=index.byPath.get(pathKey),hostBucket=index.byHost.get(entry.host);
+ if(pathBucket)pathBucket.push(entry);else index.byPath.set(pathKey,[entry]);
+ if(hostBucket)hostBucket.push(entry);else index.byHost.set(entry.host,[entry]);
+ const binding=index.cas.get(pathKey);
+ if(binding){if(binding.contentSha256!==entry.contentSha256||binding.sourceSha256!==entry.sourceSha256)binding.conflicting=true;}
+ else index.cas.set(pathKey,{contentSha256:entry.contentSha256,sourceSha256:entry.sourceSha256,conflicting:false});
+}
+function inventoryIndex(inventory:Inventory):InventoryIndex{
+ let index=inventoryIndices.get(inventory);
+ if(!index){index={byId:new Map(),byPath:new Map(),byHost:new Map(),cas:new Map()};for(const entry of inventory.entries)indexEntry(index,entry);inventoryIndices.set(inventory,index);}
+ return index;
+}
+function entriesAt(inventory:Inventory,rootId:string,path:string):Entry[]{return inventoryIndex(inventory).byPath.get(inventoryPathKey(rootId,path))??[];}
 type Objection=z.infer<typeof objectionSchema>;
 type Issue=z.infer<typeof issueSchema>;
 type ScratchLease=z.infer<typeof scratchSchema>;
@@ -206,10 +231,10 @@ async function fileDigest(path:string):Promise<{sha256:string;stat:Stats}>{
   return {sha256:hash.digest('hex'),stat};
  }finally{await handle.close();}
 }
-async function atomicJson(path:string,value:unknown,exclusive=false,privateDirectory=true):Promise<void>{
+async function atomicJson(path:string,value:unknown,exclusive=false,privateDirectory=true,serialized?:string):Promise<void>{
  await directory(dirname(path),false,privateDirectory);const temporary=join(dirname(path),'.'+randomUUID()+'.tmp');
  const handle=await open(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
- try{await handle.writeFile(JSON.stringify(value)+'\n');await handle.sync();}finally{await handle.close();}
+ try{await handle.writeFile((serialized??JSON.stringify(value))+'\n');await handle.sync();}finally{await handle.close();}
  try{
   if(exclusive)await link(temporary,path);
   else{try{await fileBytes(path,MAX_STATE,true);}catch(error){if(!missing(error))throw error;}await rename(temporary,path);}
@@ -314,6 +339,14 @@ async function readObjection(state:string,host:string):Promise<Objection|undefin
 export async function assertHostNotOptedOut(url:string,options:CivicPolicyOptions={}):Promise<void>{
  await assertCivicPolicyAuthority(options);const host=hostFromUrl(url);if(await readObjection(statePath(options),host))throw new HostOptedOutError(host);await assertCivicPolicyAuthority(options);
 }
+/** One live boundary over many URL bindings. Validate every URL, but an
+ * objection is host-wide: read each canonical host once in first-seen order.
+ * The set is discarded on return; callers must recheck at their next boundary.
+ */
+export async function assertSourceHostsNotOptedOut(urls:Iterable<string>,options:CivicPolicyOptions={}):Promise<void>{
+ const checked=new Set<string>();
+ for(const url of urls){const host=hostFromUrl(url);if(!checked.has(host)){await assertHostNotOptedOut(url,options);checked.add(host);}}
+}
 function snapshotStamp(stat:BigIntStats):string{
  return [stat.dev,stat.ino,stat.mode,stat.uid,stat.nlink,stat.size,stat.mtimeNs,stat.ctimeNs].join(':');
 }
@@ -417,21 +450,30 @@ function makeEntry(root:Root,input:ManagedSourceContent):Entry{
 async function loadInventory(state:string):Promise<Inventory>{
  let value:Inventory;try{value=inventorySchema.parse(JSON.parse((await fileBytes(join(state,'inventory.json'),MAX_STATE,true)).bytes.toString('utf8')));}catch{throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');}
  const authority=authoritySchema.parse(JSON.parse((await fileBytes(join(state,AUTHORITY_MARKER),8192,true)).bytes.toString('utf8')));if(value.inventoryId!==authority.inventoryId)throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
- if(new Set(value.roots.map(root=>root.id)).size!==value.roots.length||new Set(value.entries.map(entry=>entry.id)).size!==value.entries.length)throw new CivicPolicyStateError();
+ const roots=new Map(value.roots.map(root=>[root.id,root]));
+ if(roots.size!==value.roots.length||inventoryIndex(value).byId.size!==value.entries.length)throw new CivicPolicyStateError();
  for(const root of value.roots)if(root.id!==digest(root.path)||root.path!==resolve(root.path))throw new CivicPolicyStateError();
- for(const entry of value.entries){const root=value.roots.find(root=>root.id===entry.rootId);if(!root||entry.host!==canonicalHost(entry.host)||entry.id!==entryId(entry)||root.kind==='fetch'&&entry.relativePath.startsWith('sha256/')&&entry.sourceSha256!==entry.contentSha256)throw new CivicPolicyStateError();checkedRelative(root,entry.relativePath,entry.contentSha256,entry.receiptSha256);}
+ for(const entry of value.entries){const root=roots.get(entry.rootId);if(!root||entry.host!==canonicalHost(entry.host)||entry.id!==entryId(entry)||root.kind==='fetch'&&entry.relativePath.startsWith('sha256/')&&entry.sourceSha256!==entry.contentSha256)throw new CivicPolicyStateError();checkedRelative(root,entry.relativePath,entry.contentSha256,entry.receiptSha256);}
  if(new Set(value.scratch.map(lease=>lease.id)).size!==value.scratch.length)throw new CivicPolicyStateError();
  for(const lease of value.scratch){
-  if(!value.roots.some(root=>root.id===lease.rootId)||lease.directory!=='scratch/'+lease.id||lease.sources.some(source=>source.host!==canonicalHost(source.host)||source.kind==='pre_admission'&&lease.purpose!=='classification'||source.kind==='preparation_input'&&lease.purpose!=='document'||['authenticated_git_snapshot','operator_registry_config'].includes(source.kind)&&lease.purpose!=='artifact'))throw new CivicPolicyStateError();
+  if(!roots.has(lease.rootId)||lease.directory!=='scratch/'+lease.id||lease.sources.some(source=>source.host!==canonicalHost(source.host)||source.kind==='pre_admission'&&lease.purpose!=='classification'||source.kind==='preparation_input'&&lease.purpose!=='document'||['authenticated_git_snapshot','operator_registry_config'].includes(source.kind)&&lease.purpose!=='artifact'))throw new CivicPolicyStateError();
   if(new Set(lease.resources.map(resource=>resource.id)).size!==lease.resources.length||lease.resources.some(resource=>resource.scratchId!==lease.id||resource.rootId!==lease.rootId||resource.name!=='stadtstack-parser-'+lease.id+'-'+resource.nonce||resource.artifactRelativePath===null&&(resource.artifactSha256!==null||resource.artifactBytes!==null)||resource.artifactRelativePath!==null&&(resource.artifactSha256===null||resource.artifactBytes===null)))throw new CivicPolicyStateError('DAEMON_RESOURCE_BINDING_MISMATCH');
  }
  return value;
 }
-async function saveInventory(state:string,value:Inventory){inventorySchema.parse(value);if(Buffer.byteLength(JSON.stringify(value))>MAX_STATE)throw new CivicPolicyStateError();await atomicJson(join(state,'inventory.json'),value);}
+async function saveInventory(state:string,value:Inventory){
+ // Full save validation remains inexpensive at the projected production size;
+ // retain the exact codec rather than maintaining a second incremental validator.
+ inventorySchema.parse(value);const serialized=JSON.stringify(value);
+ if(Buffer.byteLength(serialized)+1>MAX_STATE)throw new CivicPolicyStateError();
+ await atomicJson(join(state,'inventory.json'),value,false,true,serialized);
+}
 async function verifyRoot(root:Root){if(!sameIdentity(root.identity,await directory(root.path)))throw new CivicPolicyStateError();}
 function mergeEntries(inventory:Inventory,entries:Entry[]){
- for(const entry of entries){const old=inventory.entries.find(item=>item.id===entry.id);if(old){if(old.state!=='active')throw new CivicPolicyStateError('CONTENT_REFERENCE_REVOKED');continue;}
-  if(entry.relativePath==='sha256/'+entry.contentSha256&&inventory.entries.some(item=>item.rootId===entry.rootId&&item.relativePath===entry.relativePath&&(item.contentSha256!==entry.contentSha256||item.sourceSha256!==entry.sourceSha256)))throw new CivicPolicyStateError();inventory.entries.push(entry);
+ const index=inventoryIndex(inventory);
+ for(const entry of entries){const old=index.byId.get(entry.id);if(old){if(old.state!=='active')throw new CivicPolicyStateError('CONTENT_REFERENCE_REVOKED');continue;}
+  const binding=index.cas.get(inventoryPathKey(entry.rootId,entry.relativePath));
+  if(entry.relativePath==='sha256/'+entry.contentSha256&&binding&&(binding.conflicting||binding.contentSha256!==entry.contentSha256||binding.sourceSha256!==entry.sourceSha256))throw new CivicPolicyStateError();inventory.entries.push(entry);indexEntry(index,entry);
  }
 }
 function independentPolicy(raw:unknown,url:string,sha256:string):boolean{
@@ -459,7 +501,7 @@ export async function parseContentFreePreparationPlan(value:unknown):Promise<imp
  return metadata;
 }
 function accountObservationCopy(root:Root,inventory:Inventory,path:string,bytes:Buffer,observation:z.infer<typeof observationSchema>,receipt?:{observationId:string;receiptSha256:string}):'metadata'|'source'|'unbound'{
- const contentSha256=digest(bytes),prior=inventory.entries.filter(entry=>entry.rootId===root.id&&entry.relativePath===path);
+ const contentSha256=digest(bytes),prior=entriesAt(inventory,root.id,path);
  if(observation.policy===undefined||ContentFreeSourcePolicySchema.safeParse(observation.policy).success){
   // A verified content-free replacement can retire the prior unsafe version;
   // it cannot erase an explicit source-content binding to these exact bytes.
@@ -468,7 +510,7 @@ function accountObservationCopy(root:Root,inventory:Inventory,path:string,bytes:
  }
  const sourceSha256=hex.safeParse(observation.sha256);if(!sourceSha256.success||!receipt)return 'unbound';
  const entry=makeEntry(root,{kind:'http_observation',relativePath:path,contentSha256,sourceSha256:sourceSha256.data,url:observation.url,...receipt,independentAllowed:false});
- if(!inventory.entries.some(item=>item.id===entry.id))mergeEntries(inventory,[entry]);return 'source';
+ if(!inventoryIndex(inventory).byId.has(entry.id))mergeEntries(inventory,[entry]);return 'source';
 }
 // Registration is explicit: this never searches home, other worktrees or remote
 // machines. Known formats are inventoried only inside the supplied managed root.
@@ -497,7 +539,7 @@ async function reconcile(root:Root,inventory:Inventory):Promise<boolean>{
      const disposition=accountObservationCopy(root,inventory,path,bytes,observation,receipt);if(disposition!=='metadata')paths.add(path);if(disposition==='unbound')complete=false;
      if(['fetched','not_modified'].includes(observation.state)&&hex.safeParse(observation.sha256).success){
       const sourceSha256=hex.parse(observation.sha256),entry=makeEntry(root,{kind:'http_observation',relativePath:'sha256/'+sourceSha256,contentSha256:sourceSha256,sourceSha256,url:observation.url,observationId:basename(path),receiptSha256:digest(bytes),independentAllowed:independentPolicy(observation.policy,observation.url,sourceSha256)});
-      const old=inventory.entries.find(item=>item.id===entry.id);if(!old)mergeEntries(inventory,[entry]);
+      if(!inventoryIndex(inventory).byId.has(entry.id))mergeEntries(inventory,[entry]);
      }else if(!['failed','redirected','excluded','opted_out'].includes(observation.state))complete=false;
     }catch{complete=false;}continue;
    }
@@ -508,7 +550,7 @@ async function reconcile(root:Root,inventory:Inventory):Promise<boolean>{
     try{const value=pdfPolicySchema.parse(JSON.parse((await fileBytes(join(root.path,path),8192)).bytes.toString('utf8')));if(!path.endsWith('-'+value.sha256+'.json'))complete=false;}catch{complete=false;}continue;
    }
    if(root.kind==='fetch'&&/^frontiers\/[a-f0-9]{64}\.json$/.test(path)){
-    if(inventory.entries.some(entry=>entry.rootId===root.id&&entry.relativePath===path)){paths.add(path);continue;}
+    if(entriesAt(inventory,root.id,path).length){paths.add(path);continue;}
     try{frontierMetadataSchema.parse(JSON.parse((await fileBytes(join(root.path,path),MAX_STATE)).bytes.toString('utf8')));}catch{complete=false;}continue;
    }
    if(root.kind==='fetch'&&/^oparl\/[a-f0-9]{64}\/(?:paper|meeting)\/checkpoint\.json$/.test(path)){
@@ -531,7 +573,7 @@ async function reconcile(root:Root,inventory:Inventory):Promise<boolean>{
     try{const {bytes}=await fileBytes(join(root.path,path),MAX_CONTENT),value=JSON.parse(bytes.toString('utf8')),{receiptSha256,...body}=value;
      if(!['district-prepared-v1','district-prepared-v2'].includes(value.version)||receiptSha256!==path.slice(0,-5)||digest(canonical(body))!==receiptSha256||typeof value.text!=='string'||digest(value.text)!==value.textSha256||value.textLength!==value.text.length||value.offsetUnit!=='utf16_code_units'||!Number.isSafeInteger(value.sourceBytes)||value.sourceBytes<1||value.sourceBytes>MAX_CONTENT||!Array.isArray(value.references)||!value.references.length)throw new CivicPolicyStateError();
      if(value.version==='district-prepared-v2'&&(value.toolVersions?.parser_isolation!=='district-parser-isolation-v1'||!/^sha256:[a-f0-9]{64}$/.test(value.toolVersions?.parser_image??'')||!hex.safeParse(value.toolVersions?.parser_contract).success))throw new CivicPolicyStateError('PREPARED_PARSER_CONTRACT_MISSING');
-     for(const ref of value.references){if(ref.sha256!==value.sourceSha256)throw new CivicPolicyStateError();const entry=makeEntry(root,{kind:'prepared_source',relativePath:path,contentSha256:digest(bytes),sourceSha256:value.sourceSha256,url:ref.url,observationId:ref.id,receiptSha256,independentAllowed:independentPolicy(ref.policy,ref.url,value.sourceSha256)});if(!inventory.entries.some(item=>item.id===entry.id))mergeEntries(inventory,[entry]);}
+     for(const ref of value.references){if(ref.sha256!==value.sourceSha256)throw new CivicPolicyStateError();const entry=makeEntry(root,{kind:'prepared_source',relativePath:path,contentSha256:digest(bytes),sourceSha256:value.sourceSha256,url:ref.url,observationId:ref.id,receiptSha256,independentAllowed:independentPolicy(ref.policy,ref.url,value.sourceSha256)});if(!inventoryIndex(inventory).byId.has(entry.id))mergeEntries(inventory,[entry]);}
     }catch{complete=false;}
    }
    paths.add(path);
@@ -541,7 +583,7 @@ async function reconcile(root:Root,inventory:Inventory):Promise<boolean>{
  for(const path of requests){
   try{const {bytes}=await fileBytes(join(root.path,path),MAX_STATE),value=observationSchema.parse(JSON.parse(bytes.toString('utf8'))),receipt=receipts.get(urlHash(value.url)+':'+value.sha256),disposition=accountObservationCopy(root,inventory,path,bytes,value,receipt);if(disposition!=='metadata')paths.add(path);if(disposition==='unbound')complete=false;}catch{complete=false;}
  }
- for(const path of paths){const entries=inventory.entries.filter(entry=>entry.rootId===root.id&&entry.relativePath===path);
+ for(const path of paths){const entries=entriesAt(inventory,root.id,path);
   if(!entries.length){complete=false;continue;}
   try{
    const actual=await fileDigest(join(root.path,path)),current=entries.filter(entry=>entry.contentSha256===actual.sha256);
@@ -629,13 +671,13 @@ export async function assertManagedSourceReadable(input:string,options:ManagedSo
   const inventory=await loadInventory(state),root=inventory.roots.find(item=>contained(item.path,path));
   if(!root||!root.complete)throw new CivicPolicyStateError('MANAGED_INVENTORY_INCOMPLETE');
   await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);
-  const relativePath=relative(root.path,path).split(sep).join('/'),all=inventory.entries.filter(entry=>entry.rootId===root.id&&entry.relativePath===relativePath);
+  const relativePath=relative(root.path,path).split(sep).join('/'),all=entriesAt(inventory,root.id,relativePath);
   let candidates=all.filter(entry=>entry.state==='active'||entry.state==='revoked');
   if(candidates.some(entry=>entry.kind==='authenticated_git_snapshot')&&options.purpose!=='historical_change_reconstruction_only')throw new CivicPolicyStateError('HISTORICAL_SOURCE_PURPOSE_REQUIRED');
   if(all.length&&!candidates.length){
    // Purge tombstones retain their contributor hosts even after the bytes are
    // gone; an objection must gate omitted ancestors before any file read.
-   for(const entry of all)await assertHostNotOptedOut('https://'+entry.host+'/',policy);
+   await assertSourceHostsNotOptedOut(all.map(entry=>'https://'+entry.host+'/'),policy);
    throw new CivicPolicyStateError('CONTENT_REFERENCE_REVOKED');
   }
   if(options.sourceUrl!==undefined){
@@ -644,7 +686,8 @@ export async function assertManagedSourceReadable(input:string,options:ManagedSo
    if(!selected.length)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
    if(selected.every(entry=>!['retained_publication','authenticated_git_snapshot','operator_registry_config'].includes(entry.kind)&&entry.contentSha256===entry.sourceSha256&&entry.independentAllowed))candidates=selected;
   }
-  for(const entry of candidates){await assertHostNotOptedOut('https://'+entry.host+'/',policy);if(entry.state!=='active')throw new CivicPolicyStateError('CONTENT_REFERENCE_REVOKED');}
+  const checkedHosts=new Set<string>();
+  for(const entry of candidates){if(!checkedHosts.has(entry.host)){await assertHostNotOptedOut('https://'+entry.host+'/',policy);checkedHosts.add(entry.host);}if(entry.state!=='active')throw new CivicPolicyStateError('CONTENT_REFERENCE_REVOKED');}
   try{await lstat(path);}catch(error){if(missing(error))throw new CivicPolicyStateError('ENOENT');throw new CivicPolicyStateError();}
   if(!candidates.length){
    if(root.kind!=='fetch'||all.length||!/^frontiers\/[a-f0-9]{64}\.json$/.test(relativePath))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
@@ -673,7 +716,7 @@ export async function assertManagedObservationReadable(input:string,options:Civi
   try{observation=observationSchema.parse(JSON.parse(bytes.toString('utf8')));}catch{throw new CivicPolicyStateError('INVALID_MANAGED_OBSERVATION');}
   await assertHostNotOptedOut(observation.url,policy);
   if(observation.location!==undefined)await assertHostNotOptedOut(observation.location,policy);
-  const enrolled=inventory.entries.some(entry=>entry.rootId===root.id&&entry.relativePath===relativePath);
+  const enrolled=entriesAt(inventory,root.id,relativePath).length>0;
   if(!enrolled&&observation.policy!==undefined&&!ContentFreeSourcePolicySchema.safeParse(observation.policy).success)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
   await assertCivicPolicyAuthority(policy);return enrolled;
  });
@@ -691,13 +734,14 @@ export async function assertManagedSourceBindings(input:string,bindings:Array<Ma
  await locked(policy,async()=>{
   const inventory=await loadInventory(state),root=inventory.roots.find(item=>contained(item.path,path));if(!root?.complete)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
   await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);
-  const actual=await fileDigest(path),relativePath=relative(root.path,path).split(sep).join('/'),entries=inventory.entries.filter(entry=>entry.rootId===root.id&&entry.relativePath===relativePath&&entry.contentSha256===actual.sha256);
+  const actual=await fileDigest(path),relativePath=relative(root.path,path).split(sep).join('/'),entries=entriesAt(inventory,root.id,relativePath).filter(entry=>entry.contentSha256===actual.sha256);
   if(!entries.length)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
-  for(const entry of entries){await assertHostNotOptedOut('https://'+entry.host+'/',policy);if(entry.state!=='active'||entry.kind==='authenticated_git_snapshot'&&options.purpose!=='historical_change_reconstruction_only')throw new CivicPolicyStateError('CONTENT_REFERENCE_REVOKED');}
-  const expected=new Set(entries.filter(entry=>kind===undefined||entry.kind===kind).map(key)),declared=new Set<string>();
+  const checkedHosts=new Set<string>(),independentByIdentity=new Map<string,Set<boolean>>();
+  for(const entry of entries){if(!checkedHosts.has(entry.host)){await assertHostNotOptedOut('https://'+entry.host+'/',policy);checkedHosts.add(entry.host);}if(entry.state!=='active'||entry.kind==='authenticated_git_snapshot'&&options.purpose!=='historical_change_reconstruction_only')throw new CivicPolicyStateError('CONTENT_REFERENCE_REVOKED');const identity=key(entry),allowed=independentByIdentity.get(identity);if(allowed)allowed.add(entry.independentAllowed);else independentByIdentity.set(identity,new Set([entry.independentAllowed]));}
+  const expected=new Set(entries.filter(entry=>kind===undefined||entry.kind===kind).map(key)),declared=new Set<string>(),bindingHosts=new Set<string>();
   for(const binding of bindings){
-   await assertHostNotOptedOut(binding.url,policy);const identity=key({...sourceProvenance(binding),urlSha256:urlHash(binding.url)});declared.add(identity);
-   if(binding.independentAllowed!==undefined&&entries.filter(entry=>key(entry)===identity).some(entry=>entry.independentAllowed!==binding.independentAllowed))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
+   const host=hostFromUrl(binding.url);if(!bindingHosts.has(host)){await assertHostNotOptedOut(binding.url,policy);bindingHosts.add(host);}const identity=key({...sourceProvenance(binding),urlSha256:urlHash(binding.url)});declared.add(identity);
+   if(binding.independentAllowed!==undefined&&independentByIdentity.get(identity)?.has(!binding.independentAllowed))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
   }
   if(expected.size!==declared.size||[...expected].some(identity=>!declared.has(identity)))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
   await assertCivicPolicyAuthority(policy);
@@ -714,7 +758,7 @@ export async function assertManagedRawSourceBinding(input:string,binding:Extract
  await locked(policy,async()=>{
   const inventory=await loadInventory(state),root=inventory.roots.find(item=>item.kind==='fetch'&&contained(item.path,path));if(!root?.complete)throw new CivicPolicyStateError('HTTP_SOURCE_PROVENANCE_REQUIRED');
   await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);
-  const relativePath=relative(root.path,path).split(sep).join('/'),entry=inventory.entries.find(item=>item.rootId===root.id&&item.relativePath===relativePath&&item.kind==='http_observation'&&item.state==='active'&&item.independentAllowed&&item.urlSha256===urlHash(binding.url)&&item.sourceSha256===proof.sourceSha256&&item.contentSha256===proof.sourceSha256&&item.observationId===binding.observationId&&item.receiptSha256===binding.receiptSha256);
+  const relativePath=relative(root.path,path).split(sep).join('/'),entry=entriesAt(inventory,root.id,relativePath).find(item=>item.kind==='http_observation'&&item.state==='active'&&item.independentAllowed&&item.urlSha256===urlHash(binding.url)&&item.sourceSha256===proof.sourceSha256&&item.contentSha256===proof.sourceSha256&&item.observationId===binding.observationId&&item.receiptSha256===binding.receiptSha256);
   if(!entry||!/^sha256\/[a-f0-9]{64}$/.test(relativePath)||!/^[A-Za-z0-9][A-Za-z0-9._-]{0,159}\.json$/.test(binding.observationId))throw new CivicPolicyStateError('HTTP_SOURCE_PROVENANCE_REQUIRED');
   const observationBytes=(await fileBytes(join(root.path,'observations',binding.observationId),MAX_STATE)).bytes;
   if(digest(observationBytes)!==binding.receiptSha256)throw new CivicPolicyStateError('HTTP_OBSERVATION_BINDING_MISMATCH');
@@ -794,7 +838,7 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
   if(['authenticated_git_snapshot','operator_registry_config'].includes(binding.kind)&&options.purpose!=='artifact')throw new CivicPolicyStateError('NON_SOURCE_PROVENANCE_ADMISSION_DENIED');
   return scratchSourceSchema.parse({...base,...sourceProvenance(binding)});
  });
- for(const binding of bindings)await assertHostNotOptedOut(binding.url,policy);
+ await assertSourceHostsNotOptedOut(bindings.map(binding=>binding.url),policy);
  await initializeManagedAcquisitionLane(path,{...policy,kind:options.kind??'artifacts'});
  const id=randomUUID(),controller=new AbortController(),signal=options.signal?AbortSignal.any([controller.signal,options.signal]):controller.signal;
  let lease!:ScratchLease,root!:Root;
@@ -813,7 +857,7 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
  const stopChildren=()=>{for(const item of children)if(!item.closed&&item.child.pid)try{process.kill(-item.child.pid,'SIGKILL');}catch{/* The owned child may already have exited. */}};
  const assertActive=async()=>{
   signal.throwIfAborted();if(finished)throw new CivicPolicyStateError('SCRATCH_CLOSED');
-  try{await assertCivicPolicyAuthority(policy);await verifyRoot(root);if(!sameIdentity(lease.identity!,await directory(scratchDirectory,false,true)))throw new CivicPolicyStateError('SCRATCH_IDENTITY_MISMATCH');for(const binding of bindings)await assertHostNotOptedOut(binding.url,policy);}
+  try{await assertCivicPolicyAuthority(policy);await verifyRoot(root);if(!sameIdentity(lease.identity!,await directory(scratchDirectory,false,true)))throw new CivicPolicyStateError('SCRATCH_IDENTITY_MISMATCH');await assertSourceHostsNotOptedOut(bindings.map(binding=>binding.url),policy);}
   catch(error){controller.abort(error);throw error;}
  };
  activeScratch.set(id,controller);signal.addEventListener('abort',stopChildren);
@@ -919,24 +963,31 @@ export async function withManagedSourceWrite<T>(input:string,entries:ManagedSour
  const authority=await assertCivicPolicyAuthority(options),state=statePath(options),policy={...options,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};return locked(policy,async()=>{
   const inventory=await loadInventory(state),root=inventory.roots.find(root=>root.path===resolve(input));if(!root||!root.complete||!entries.length)throw new CivicPolicyStateError('MANAGED_INVENTORY_INCOMPLETE');await verifyRoot(root);
   try{await readAcquisitionLaneMarker(root.path,root.kind,authority);}catch(error){if(missing(error))throw new CivicPolicyStateError('ACQUISITION_LANE_REQUIRED');throw error;}
-  for(const entry of entries)await assertHostNotOptedOut(entry.url,policy);
+  await assertSourceHostsNotOptedOut(entries.map(entry=>entry.url),policy);
   const items=entries.map(entry=>makeEntry(root,entry));
+  // A member can have thousands of source URLs but just one byte representation.
+  // The lock excludes participating writers; check each path once on each side
+  // of work, never reuse a digest across the callback or another transaction.
+  const before=new Map<string,string|null>();
   for(const item of items){
-   const prior=inventory.entries.filter(entry=>entry.rootId===root.id&&entry.relativePath===item.relativePath);
+   const prior=entriesAt(inventory,root.id,item.relativePath);
    try{
-    const path=join(root.path,item.relativePath),actual=await fileDigest(path);
-    if(actual.sha256!==item.contentSha256&&!prior.some(entry=>entry.contentSha256===actual.sha256)){
+    const path=join(root.path,item.relativePath);let sha256=before.get(item.relativePath);
+    if(sha256===undefined){sha256=(await fileDigest(path)).sha256;before.set(item.relativePath,sha256);}
+    if(sha256===null)continue;
+    if(sha256!==item.contentSha256&&!prior.some(entry=>entry.contentSha256===sha256)){
      // Empty/discovery-only frontiers start as closed metadata. Their first
      // source receipt promotes them without blessing arbitrary unbound bytes.
-     if(root.kind!=='fetch'||prior.length||!/^frontiers\/[a-f0-9]{64}\.json$/.test(item.relativePath)||await readContentFreeFrontier(path,policy)!==actual.sha256)throw new CivicPolicyStateError();
+     if(root.kind!=='fetch'||prior.length||!/^frontiers\/[a-f0-9]{64}\.json$/.test(item.relativePath)||await readContentFreeFrontier(path,policy)!==sha256)throw new CivicPolicyStateError();
     }
    }
-   catch(error){if(!missing(error))throw error;}
+   catch(error){if(!missing(error))throw error;before.set(item.relativePath,null);}
   }
   mergeEntries(inventory,items);await saveInventory(state,inventory);
   const result=await work();await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);
-  for(const entry of entries)await assertHostNotOptedOut(entry.url,policy);
-  for(const item of items){const actual=await fileDigest(join(root.path,item.relativePath));if(actual.sha256!==item.contentSha256)throw new CivicPolicyStateError();}
+  await assertSourceHostsNotOptedOut(entries.map(entry=>entry.url),policy);
+  const after=new Map<string,string>();
+  for(const item of items){let sha256=after.get(item.relativePath);if(sha256===undefined){sha256=(await fileDigest(join(root.path,item.relativePath))).sha256;after.set(item.relativePath,sha256);}if(sha256!==item.contentSha256)throw new CivicPolicyStateError();}
   return result;
  });
 }
@@ -977,11 +1028,11 @@ async function withdraw(state:string,inventory:Inventory,selected:Entry[],receip
   try{actual=await fileDigest(join(root.path,first.relativePath));}catch(error){if(missing(error)){for(const entry of items){if(entry.state==='active')receipt.removedReferences++;entry.state='missing';}receipt.missingFiles++;continue;}issue('unsafe_content');continue;}
   const matching=items.find(entry=>entry.contentSha256===actual.sha256);
   if(!matching){
-   if(inventory.entries.some(entry=>entry.rootId===root.id&&entry.relativePath===first.relativePath&&entry.contentSha256===actual.sha256)){for(const entry of items){if(entry.state==='active')receipt.removedReferences++;entry.state='missing';}continue;}
+   if(entriesAt(inventory,root.id,first.relativePath).some(entry=>entry.contentSha256===actual.sha256)){for(const entry of items){if(entry.state==='active')receipt.removedReferences++;entry.state='missing';}continue;}
    issue('content_changed');continue;
   }
   first=matching;
-  const others=inventory.entries.filter(entry=>entry.rootId===root.id&&entry.relativePath===first.relativePath&&entry.contentSha256===actual.sha256&&entry.state==='active'&&!items.includes(entry));let independent=true;
+  const selected=new Set(items),others=entriesAt(inventory,root.id,first.relativePath).filter(entry=>entry.contentSha256===actual.sha256&&entry.state==='active'&&!selected.has(entry));let independent=true;
   try{
    for(const item of items.filter(entry=>entry.contentSha256===actual.sha256)){
     let covered=false;
@@ -1004,7 +1055,7 @@ async function withdraw(state:string,inventory:Inventory,selected:Entry[],receip
    await verifyRoot(root);await directory(dirname(join(root.path,first.relativePath)));const now=await lstat(join(root.path,first.relativePath));
    if(!now.isFile()||now.isSymbolicLink()||now.nlink!==1||!sameIdentity(now,actual.stat)||now.size!==actual.stat.size||now.mtimeMs!==actual.stat.mtimeMs||now.ctimeMs!==actual.stat.ctimeMs)throw new CivicPolicyStateError();
    await unlink(join(root.path,first.relativePath));receipt.deletedFiles++;receipt.deletedBytes+=actual.stat.size;
-   for(const entry of inventory.entries.filter(entry=>entry.rootId===root.id&&entry.relativePath===first.relativePath)){if(items.includes(entry)&&entry.state==='active')receipt.removedReferences++;entry.state='deleted';}
+   for(const entry of entriesAt(inventory,root.id,first.relativePath)){if(selected.has(entry)&&entry.state==='active')receipt.removedReferences++;entry.state='deleted';}
   }catch{issue('unsafe_content');}
  }
 }
@@ -1015,7 +1066,7 @@ async function purgeLocked(state:string,objection:Objection,policy:CivicPolicyOp
  for(const root of inventory.roots){try{root.complete=await reconcile(root,inventory);}catch{root.complete=false;receipt.issues.push({code:'unsafe_root',rootId:root.id});}if(!root.complete)receipt.issues.push({code:'inventory_incomplete',rootId:root.id});}
  // Revoked shared entries are reconsidered on retries: the independent host may
  // have objected since the previous attempt. Tombstones never authorize reads.
- await withdraw(state,inventory,inventory.entries.filter(entry=>entry.host===objection.host&&(entry.state==='active'||entry.state==='revoked')),receipt);
+ await withdraw(state,inventory,(inventoryIndex(inventory).byHost.get(objection.host)??[]).filter(entry=>entry.state==='active'||entry.state==='revoked'),receipt);
  for(const lease of inventory.scratch.filter(item=>item.sources.some(source=>source.host===objection.host)&&item.state!=='closed'&&item.state!=='purged')){
   activeScratch.get(lease.id)?.abort(new HostOptedOutError(objection.host));await cleanScratch(inventory,lease,policy,receipt);
  }
@@ -1056,7 +1107,7 @@ export async function relinquishManagedSourceContent(input:string,source:{url:st
  await assertCivicPolicyAuthority(options);
  const state=statePath(options),host=hostFromUrl(source.url),sourceSha256=hex.parse(source.sourceSha256),urlSha256=urlHash(source.url);
  return locked(options,async()=>{const inventory=await loadInventory(state),root=inventory.roots.find(root=>root.path===resolve(input));if(!root)return {disposition:'not_managed',removedReferences:0};if(root.kind!=='fetch')throw new CivicPolicyStateError();
-  const entries=inventory.entries.filter(entry=>entry.rootId===root.id&&entry.host===host&&entry.urlSha256===urlSha256&&entry.sourceSha256===sourceSha256&&(entry.state==='active'||entry.state==='revoked'));if(!entries.length)return {disposition:'not_managed',removedReferences:0};
+  const entries=(inventoryIndex(inventory).byHost.get(host)??[]).filter(entry=>entry.rootId===root.id&&entry.urlSha256===urlSha256&&entry.sourceSha256===sourceSha256&&(entry.state==='active'||entry.state==='revoked'));if(!entries.length)return {disposition:'not_managed',removedReferences:0};
   const now=new Date().toISOString(),receipt=emptyReceipt({schemaVersion:1,host,reason:'rights_holder_objection',receivedAt:now,purgeDueAt:now});await withdraw(state,inventory,entries,receipt);await saveInventory(state,inventory);
   return {disposition:receipt.issues.length?'partial':receipt.retainedSharedFiles?'retained_independent':'removed',removedReferences:receipt.removedReferences};
  });
