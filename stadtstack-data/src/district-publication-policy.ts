@@ -72,6 +72,7 @@ export async function admitPublicationKnowledge(input:{records:DistrictKnowledge
  if(byId.size!==input.admissions.length||byId.size!==input.records.length||new Set(input.records.map(record=>record.id)).size!==input.records.length||input.records.some(record=>!byId.has(record.id)))throw Error('Publication needs an exact current admission inventory');
  const retainedIds=[...byId.values()].filter(request=>'retainedPublication' in request).map(request=>request.recordId);
  if(retainedIds.length&&!input.retainedPublication)throw Error('Retained admissions require the authentic public publication baseline');
+ if(input.retainedPublication&&!retainedIds.length)throw Error('Unused retained publication baseline');
  let retained:AuthenticatedRetainedKnowledgePublication|null=null;
  const decisions:PublicationPolicyReceipts['records']=[],bindings:SourceArtifactBinding[]=[],retainedOrigins:RetainedKnowledgeLineage['selectedRecordOrigins']=[];
  if(input.retainedPublication){const admitted=await readRetainedBaseline(input.retainedPublication,retainedIds,policy);retained=admitted.baseline;bindings.push(...admitted.bindings);}
