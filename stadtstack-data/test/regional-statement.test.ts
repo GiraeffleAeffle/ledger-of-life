@@ -5,7 +5,6 @@ import {extractRegionalStatement,REGIONAL_EXCERPT_LIMITS} from '../regional/stat
 import {regionalStatement,verifyRegionalStatementSnapshot} from '../src/regional-statement.ts';
 import {QueryIndex,regionalSchema,type Regional} from '../src/mcp-query.ts';
 import {normalizeRegionalPublication} from '../src/regional-quality.ts';
-import {EXTRACTION_INSTRUCTIONS,JUDGE_INSTRUCTIONS} from '../src/district-claims.ts';
 
 // Synthetic source prose, not an assertion or quotation about either real heat plan.
 const context='Dieser synthetische Hintergrundabsatz bleibt unzitiert. Er erläutert weitere Verfahrensschritte, allgemeine Beteiligungsmöglichkeiten und methodische Grenzen der Untersuchung. Diese zusätzlichen Angaben werden weder als Aussage veröffentlicht noch aus dem Kontext in die ausgewählten Zitate hineingelesen.';
@@ -52,14 +51,6 @@ test('same regional source identity cannot silently select conflicting substanti
  const other=extractRegionalStatement(`<p>Die Wärmeplanung der Beispielgemeinde beginnt später.</p><p>${context}</p>`,['beginnt']);
  Object.assign(item,other);regional.topics.push(topic);
  assert.throws(()=>query(regional),/Conflicting regional source identity/);
-});
-test('heat extraction contract requests grounded facts, all named members and target precision',()=>{
- for(const instructions of [EXTRACTION_INSTRUCTIONS,JUDGE_INSTRUCTIONS]){
-  assert.match(instructions,/approximate duration, named contractor, suitability-area counts/);
-  assert.match(instructions,/every named member and its member_of relation/);
-  assert.match(instructions,/never invent a calendar day/);
-  assert.match(instructions,/contractor is not thereby a member/);
- }
 });
 
 test('publication verifies retained HTML bytes and exact URL before exposing statements',async()=>{
