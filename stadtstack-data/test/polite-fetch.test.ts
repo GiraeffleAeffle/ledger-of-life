@@ -62,15 +62,31 @@ test('robots denial and unavailable policy are distinct from missing source',asy
  const unavailable=await createPoliteFetcher({cacheDir:join(cache,'unavailable')});t.mock.method(unavailable as unknown as WireSeam,'wire',async()=>({status:503,headers:{},body:Buffer.alloc(0)}));
  await assert.rejects(unavailable.fetch('https://stadt.de/'),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='robots_unavailable');
 });
-test('each redirected origin gets robots checks and private redirect is rejected before transport',async t=>{
+test('cross-host document redirects fail before destination transport or raw/derived retention',async t=>{
  const cache=await mkdtemp(join(tmpdir(),'polite-redirect-'));t.after(()=>rm(cache,{recursive:true,force:true}));
- const fetcher=await createPoliteFetcher({cacheDir:cache}),seen:string[]=[];
+ const fetcher=await createPoliteFetcher({cacheDir:cache}),seen:string[]=[],destination=Buffer.from('destination source body');
  t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>{
   seen.push(url.href);if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
-  return {status:302,headers:{location:url.hostname==='stadt.de'?'https://docs.stadt.de/plan.pdf':'http://127.0.0.1/private'},body:Buffer.alloc(0)};
+  return url.hostname==='stadt.de'?{status:302,headers:{location:'https://docs.stadt.de/plan.pdf'},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'text/plain'},body:destination};
  });
- await assert.rejects(fetcher.fetch('https://stadt.de/start'),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='unsafe_url');
- assert.deepEqual(seen,['https://stadt.de/robots.txt','https://stadt.de/.well-known/tdmrep.json','https://stadt.de/start','https://docs.stadt.de/robots.txt','https://docs.stadt.de/.well-known/tdmrep.json','https://docs.stadt.de/plan.pdf']);
+ await assert.rejects(fetcher.fetch('https://stadt.de/start'),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='cross_host_redirect');
+ assert.deepEqual(seen,['https://stadt.de/robots.txt','https://stadt.de/.well-known/tdmrep.json','https://stadt.de/start']);
+ await assert.rejects(readFile(join(cache,'sha256',hash(destination))),{code:'ENOENT'});
+ await assert.rejects(readdir(join(cache,'frontiers')),{code:'ENOENT'});
+ const observations=await Promise.all((await readdir(join(cache,'observations'))).map(async name=>JSON.parse(await readFile(join(cache,'observations',name),'utf8'))));
+ assert.ok(observations.some(item=>item.url==='https://stadt.de/start'&&item.state==='failed'&&item.failure==='cross_host_redirect'&&item.location==='https://docs.stadt.de/plan.pdf'));
+});
+test('same-host scheme and path redirects retain normal admission and private redirects remain unsafe',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-same-host-'));t.after(()=>rm(cache,{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:cache});
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  if(url.protocol==='http:')return {status:301,headers:{location:'https://stadt.de/final'},body:Buffer.alloc(0)};
+  if(url.pathname==='/private')return {status:302,headers:{location:'http://127.0.0.1/private'},body:Buffer.alloc(0)};
+  return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('public source')};
+ });
+ assert.equal((await fetcher.fetch('http://stadt.de/start')).url,'https://stadt.de/final');
+ await assert.rejects(fetcher.fetch('https://stadt.de/private'),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='unsafe_url');
 });
 test('host scheduler serializes concurrent work and respects minimum spacing',async t=>{
  const cache=await realpath(await mkdtemp(join(tmpdir(),'polite-schedule-')));t.after(()=>rm(cache,{recursive:true,force:true}));
@@ -253,7 +269,7 @@ test('global registered exception preserves real robots/TDM states and independe
    return {status:200,headers:{'content-type':'text/html'},body:Buffer.from(mode==='captcha'?'<title>Just a moment</title><form id="challenge-form"></form>':mode==='third_party'?'<h1>Externer Bericht</h1><p>Ein nicht zugeordneter Text über die Entwicklung des Quartiers und weitere Einzelheiten.</p>':official)};
   });
   const options=mode==='missing'?{}:{ownerRobotsOverride:mode==='forged'?{...decision,id:'forged'} as unknown as typeof decision:decision};
-  if(['public','allowed','unavailable','tdm','redirect'].includes(mode)){
+  if(['public','allowed','unavailable','tdm'].includes(mode)){
    const document=await fetcher.fetch(url,options),observation=JSON.parse(await readFile(document.observationPath,'utf8'));
    assert.equal(document.policy?.robots.state,mode==='allowed'?'allowed':mode==='unavailable'?'unavailable':'blocked');
    assert.equal(document.policy?.override,mode==='allowed'?undefined:'owner-approved 2026-10-11');assert.equal(document.policy?.documentOrigin?.classification,'official_work');
@@ -261,10 +277,10 @@ test('global registered exception preserves real robots/TDM states and independe
    if(mode==='public'){assert.equal(document.policy?.robotsStatus,'disallowed');assert.deepEqual(document.policy?.ownerRobotsOverride,decision);assert.match(document.policy!.robots.sha256!,/^[a-f0-9]{64}$/);assert.ok(document.policy?.robots.checkedAt);}
    if(mode==='unavailable'){assert.equal(document.policy?.robotsStatus,'unavailable');assert.equal(document.policy?.robots.sha256,undefined);assert.ok(document.policy?.robots.checkedAt);}
    if(mode==='tdm'){assert.equal(document.policy?.tdm.state,'reserved');assert.equal(document.policy?.tdmOverride,'owner-approved 2026-10-11');assert.deepEqual(document.policy?.ownerTdmOverride,decision);}
-   if(mode==='redirect'){assert.equal(document.policy?.ownerRobotsOverride?.host,'different.stadt.de');assert.ok(seen.includes('https://different.stadt.de/robots.txt'));}
   }else{
-   const failure=mode==='pdf'||mode==='third_party'?'document_excluded':mode==='captcha'||mode==='forbidden'||mode==='paywall'?'access_barrier':mode==='private'?'unsafe_url':'robots_blocked';
+   const failure=mode==='pdf'||mode==='third_party'?'document_excluded':mode==='captcha'||mode==='forbidden'||mode==='paywall'?'access_barrier':mode==='private'?'unsafe_url':mode==='redirect'?'cross_host_redirect':'robots_blocked';
    await assert.rejects(fetcher.fetch(url,options),(error:unknown)=>error instanceof PoliteFetchError&&error.failure===failure,mode);
+   if(mode==='redirect')assert.ok(!seen.some(value=>new URL(value).hostname==='different.stadt.de'));
   }
  }
 });

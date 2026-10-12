@@ -20,7 +20,7 @@ import type {CivicPolicyOptions,CivicPolicyAuthorityReceipt,ManagedAcquisitionLa
 import {ContentFreeSourcePolicySchema,hashSchema} from './district-schema.ts';
 import {SourceObservationSchema,sourceObservationMatches,type SourceObservation} from './source-observation.ts';
 
-export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'dns_error'|'timeout'|'network_error'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded';
+export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'dns_error'|'timeout'|'network_error'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cross_host_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded';
 export interface FetchObservation {
  url:string;method:'GET'|'POST';checkedAt:string;retrievedAt:string|null;state:'fetched'|'not_modified'|'redirected'|'failed'|'excluded';
  status?:number;failure?:FetchFailure;retryAfter?:string;sha256?:string;bytes?:number;mimeType?:string;etag?:string;lastModified?:string;location?:string;policy?:SourceAccessPolicy;exclusion?:ExcludedDocument['exclusion'];
@@ -380,6 +380,9 @@ export class PoliteFetcher {
      const next=publicUrl(new URL(response.headers.location,url).href);observation.location=next.href;observation.state='redirected';
      if(/\/(?:login|signin|auth|anmelden)(?:\/|$)/i.test(next.pathname)){policy.access='authentication';throw new PoliteFetchError('access_barrier','Authentication redirect; ask municipality');}
      if(resource!=='document')throw new PoliteFetchError('invalid_redirect','Policy-resource redirects are not authorized as policy representations',response.status);
+     // Host-keyed provenance cannot safely transfer an origin's contribution
+     // to a different host; refuse before any destination request or retention.
+     if(next.hostname!==url.hostname)throw new PoliteFetchError('cross_host_redirect','Cross-host source redirect cannot preserve registered-source provenance',response.status);
      await this.observation(observation);
      if(redirects===this.options.maxRedirects)throw new PoliteFetchError('redirect_limit','Redirect bound exceeded');
      if(method==='POST'&&next.origin!==url.origin)throw new PoliteFetchError('invalid_redirect','Cross-origin form redirect rejected');

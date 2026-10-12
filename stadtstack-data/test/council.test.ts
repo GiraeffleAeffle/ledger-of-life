@@ -9,7 +9,7 @@ import type {CouncilCheckpoint,OparlBody,OparlRecord,StoredCouncilRecord} from '
 import {councilBindingFailure,collectOparl} from '../src/council.ts';
 import {PoliteFetcher,PoliteFetchError} from '../src/polite-fetch.ts';
 import type {FetchOptions} from '../src/polite-fetch.ts';
-import {readFile,writeFile,mkdir,stat} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,stat,readdir} from 'node:fs/promises';
 import {join} from 'node:path';
 import {hash} from '../src/common.ts';
 import {recordHostOptOut} from '../src/civic-opt-out.ts';
@@ -45,6 +45,21 @@ test('Scoped council loader never retries policy, HTTP or integrity failures',as
  for(const error of [failure,new PoliteFetchError('tdm_reserved','Reserved'),new PoliteFetchError('http_error','HTTP 429',429),new Error('Council source cache digest mismatch')]){
   failure=error;const before=requests;await assert.rejects(acquisition.loadJson(city.endpoint!),error);assert.equal(requests,before+1);
  }
+});
+
+test('council JSON and text loaders reject cross-host redirects without destination retention',async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t);
+ const city=cities.find(city=>city.id==='koeln')!,acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy}),seen:string[]=[];
+ const bytes=Buffer.from('{"data":[]}'),destination='https://different.stadt.de/oparl';
+ t.mock.method(acquisition.fetcher as unknown as {wire(url:URL):Promise<unknown>},'wire',async(url:URL)=>{
+  seen.push(url.href);
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  return {status:302,headers:{location:destination},body:Buffer.alloc(0)};
+ });
+ for(const load of [acquisition.loadJson,acquisition.loadText])await assert.rejects(load(city.endpoint!),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='cross_host_redirect');
+ assert.ok(!seen.some(value=>new URL(value).hostname==='different.stadt.de'));
+ await assert.rejects(readFile(join(root,'raw','sha256',hash(bytes))),{code:'ENOENT'});
+ await assert.rejects(readdir(join(root,'raw','collections')),{code:'ENOENT'});
 });
 
 test('Düsseldorf selects exact approved municipality and body ID, never the first two shared bodies',()=>{
@@ -358,7 +373,7 @@ test('licence-page acquisition keeps its own origin assessment instead of inheri
 });
 
 test('current council permission denial cannot return loaded records or regain a completed-cache shortcut',async()=>{
- for(const failure of ['document_excluded','tdm_reserved','tdm_unavailable','access_barrier','host_opted_out','host_state_unsafe'] as const){
+ for(const failure of ['document_excluded','tdm_reserved','tdm_unavailable','access_barrier','host_opted_out','host_state_unsafe','cross_host_redirect'] as const){
   const storage=memoryStorage();
   await traverseCouncilList(body,'paper',storage,pageLoader({[body.paper!]:{data:[paper('previously-permitted')]}}),{now:at});
   const denial=new PoliteFetchError(failure,'Synthetic current permission denial');let attempts=0;

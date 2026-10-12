@@ -680,10 +680,13 @@ export async function assertManagedObservationReadable(input:string,options:Civi
  if(sourceBound)await assertManagedSourceReadable(path,policy);
 }
 
-/** Exact inherited provenance, not merely readable bytes or a caller's label. */
-export async function assertManagedSourceBindings(input:string,bindings:Array<ManagedSourceBinding&{independentAllowed?:boolean}>,options:ManagedSourceReadOptions={}):Promise<void>{
+/** Exact inherited provenance; kind restricts the comparison to an operator
+ * registry contribution while leaving the artifact's other dependencies checked.
+ */
+export async function assertManagedSourceBindings(input:string,bindings:Array<ManagedSourceBinding&{independentAllowed?:boolean}>,options:ManagedSourceReadOptions={},kind?:'operator_registry_config'):Promise<void>{
  await assertManagedSourceReadable(input,options);
  const authority=await assertCivicPolicyAuthority(options),policy={...options,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},state=statePath(policy),path=resolve(input);
+ if(kind!==undefined&&(!bindings.length||bindings.some(binding=>binding.kind!==kind)))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
  const key=(value:{kind:string;urlSha256:string;sourceSha256:string|null;observationId?:string;receiptSha256?:string;publication?:unknown;snapshot?:unknown;purpose?:string;configurationSha256?:string;schemaContractSha256?:string;code?:unknown;approval?:unknown})=>canonical([value.kind,value.urlSha256,value.sourceSha256,value.observationId??null,value.receiptSha256??null,value.publication??null,value.snapshot??null,value.purpose??null,value.configurationSha256??null,value.schemaContractSha256??null,value.code??null,value.approval??null]);
  await locked(policy,async()=>{
   const inventory=await loadInventory(state),root=inventory.roots.find(item=>contained(item.path,path));if(!root?.complete)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
@@ -691,7 +694,7 @@ export async function assertManagedSourceBindings(input:string,bindings:Array<Ma
   const actual=await fileDigest(path),relativePath=relative(root.path,path).split(sep).join('/'),entries=inventory.entries.filter(entry=>entry.rootId===root.id&&entry.relativePath===relativePath&&entry.contentSha256===actual.sha256);
   if(!entries.length)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
   for(const entry of entries){await assertHostNotOptedOut('https://'+entry.host+'/',policy);if(entry.state!=='active'||entry.kind==='authenticated_git_snapshot'&&options.purpose!=='historical_change_reconstruction_only')throw new CivicPolicyStateError('CONTENT_REFERENCE_REVOKED');}
-  const expected=new Set(entries.map(key)),declared=new Set<string>();
+  const expected=new Set(entries.filter(entry=>kind===undefined||entry.kind===kind).map(key)),declared=new Set<string>();
   for(const binding of bindings){
    await assertHostNotOptedOut(binding.url,policy);const identity=key({...sourceProvenance(binding),urlSha256:urlHash(binding.url)});declared.add(identity);
    if(binding.independentAllowed!==undefined&&entries.filter(entry=>key(entry)===identity).some(entry=>entry.independentAllowed!==binding.independentAllowed))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
