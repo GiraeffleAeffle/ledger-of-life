@@ -35,11 +35,11 @@ export function solanaHouseId(value: unknown): SolanaHouseId {
   if (value === 'workshop' || value === 'demo-retrofit-workshop') return 'workshop';
   throw new Error('Unknown Solana house.');
 }
-function readGateway(manifest: SolanaHouseManifest, environment: Record<string, string | undefined>) {
+function readGateway(manifest: SolanaHouseManifest, environment: Record<string, string | undefined>, signal?: AbortSignal, fetcher: typeof fetch = fetch) {
   if (!environment.SOLANA_RPC_URL) throw new Error('Solana house RPC is not configured.');
   const url = new URL(environment.SOLANA_RPC_URL);
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) throw new Error('RPC must use HTTPS or loopback.');
-  return createBaseSolanaGateway({ rpcUrl: url.toString(), genesisHash: manifest.genesisHash, maximumSponsorLamports: '10000000' });
+  return createBaseSolanaGateway({ rpcUrl: url.toString(), genesisHash: manifest.genesisHash, maximumSponsorLamports: '10000000' }, fetcher, signal);
 }
 function tokenBalance(row: AccountObservation | null, mint: string, owner: string, missingAllowed = false): bigint {
   if (!row) { if (missingAllowed) return 0n; throw new Error('House token account is missing.'); }
@@ -100,9 +100,58 @@ export function solanaHouseReadModel(manifest: SolanaHouseManifest, id: SolanaHo
     observedSlot: snapshot.slot, observedChainTimestampRaw: snapshot.nowSeconds.toString(),
   };
 }
-export async function readSolanaBuilding(id: SolanaHouseId = 'neighbourhood-homes', environment: Record<string, string | undefined> = process.env) {
+export async function readSolanaBuilding(id: SolanaHouseId = 'neighbourhood-homes', environment: Record<string, string | undefined> = process.env, signal: AbortSignal = AbortSignal.timeout(3_000)) {
+  const deadline = Date.now() + 3_000;
   const manifest = loadSolanaHouseManifest(environment); if (!manifest) throw new Error('Solana house is not configured.');
-  return solanaHouseReadModel(manifest, id, await readSolanaHouseSnapshot(manifest, id, readGateway(manifest, environment)));
+  const urls = [environment.SOLANA_RPC_URL];
+  if (manifest.cluster === 'devnet' && environment.SOLANA_READ_RPC_FALLBACK_URLS) {
+    const configured: unknown = JSON.parse(environment.SOLANA_READ_RPC_FALLBACK_URLS);
+    if (!Array.isArray(configured) || configured.some(value => typeof value !== 'string'))
+      throw new Error('Invalid public Solana read configuration.');
+    for (const value of configured as string[]) {
+      const url = new URL(value);
+      if (url.protocol !== 'https:') throw new Error('Public Solana fallback RPC must use HTTPS.');
+      if (!urls.some(existing => existing && new URL(existing).toString() === url.toString())) urls.push(url.toString());
+    }
+  }
+  for (let index = 0; index < urls.length; index++) {
+    signal.throwIfAborted();
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new DOMException('Public read deadline exceeded.', 'TimeoutError');
+    // Reserve time for every remaining provider instead of letting one hung primary consume it all.
+    const attemptSignal = urls.length === 1 ? signal : AbortSignal.any([
+      signal, AbortSignal.timeout(Math.max(1, Math.floor(remaining / (urls.length - index)))),
+    ]);
+    const rpcUrl = urls[index];
+    let transportFailed = false;
+    const fetcher: typeof fetch = async (input, options) => {
+      try {
+        const response = await fetch(input, options);
+        transportFailed = !response.ok;
+        if (response.ok) {
+          // A received header is not a complete RPC response. Distinguish body I/O from JSON validation.
+          response.json = async () => {
+            let text: string;
+            try { text = await response.text(); }
+            catch (error) { transportFailed = true; throw error; }
+            return JSON.parse(text);
+          };
+        }
+        return response;
+      } catch (error) { transportFailed = true; throw error; }
+    };
+    try {
+      // Each endpoint must supply its own genesis and entire validated finalized bank.
+      const snapshot = await readSolanaHouseSnapshot(manifest, id, readGateway(manifest, { ...environment, SOLANA_RPC_URL: rpcUrl }, attemptSignal, fetcher));
+      attemptSignal.throwIfAborted();
+      return solanaHouseReadModel(manifest, id, snapshot);
+    } catch (error) {
+      signal.throwIfAborted();
+      // Wrong genesis, malformed accounts and configuration errors never trigger failover.
+      if (!transportFailed && !attemptSignal.aborted) throw error;
+    }
+  }
+  throw new Error('Public Solana RPC unavailable.');
 }
 
 /** All displayed actions derive from verified atomic balances; no browser quote authorizes money. */
@@ -223,6 +272,7 @@ export async function cancelSolanaHouseReview(store: Store, identity: VerifiedId
 }
 export async function readSolanaBuildingPosition(store: Store, identity: VerifiedIdentity, id: SolanaHouseId = 'neighbourhood-homes', environment: Record<string, string | undefined> = process.env) {
   const manifest = loadSolanaHouseManifest(environment); if (!manifest) throw new Error('Solana house is not configured.');
+  // This GET also reconciles financial operations; retain its original RPC defaults.
   const wallet = walletFor(identity, 'solana'), snapshot = await readSolanaHouseSnapshot(manifest, id, readGateway(manifest, environment), wallet.address), lane = await journal(store, identity);
   const receipts: { planId: string; operation: string; quantityRaw: string | null; claimedRaw: string | null; hash: string; status: 'pending' | 'confirmed' | 'failed'; explorerUrl: string }[] = [];
   let plan: SolanaHousePlan | null = null;
@@ -243,7 +293,7 @@ export async function readSolanaBuildingPosition(store: Store, identity: Verifie
 }
 export async function readSolanaLocalInvestments(identity: VerifiedIdentity, environment: Record<string, string | undefined> = process.env): Promise<LocalInvestmentView> {
   const manifest = loadSolanaHouseManifest(environment); if (!manifest) throw new Error('Solana house is not configured.');
-  const wallet = walletFor(identity, 'solana'), gateway = readGateway(manifest, environment);
+  const wallet = walletFor(identity, 'solana'), gateway = readGateway(manifest, environment, AbortSignal.timeout(3_000));
   const snapshots = await Promise.all((['neighbourhood-homes', 'workshop'] as const).map(id => readSolanaHouseSnapshot(manifest, id, gateway, wallet.address)));
   return { state: 'ready', network: { chainId: 'solana-devnet', name: 'Solana devnet', explorerUrl: 'https://explorer.solana.com' }, owner: wallet.address, cashAddress: manifest.cashMint, cashAtomic: snapshots[0].cash.toString(), nativeAtomic: null, assets: snapshots.map((snapshot, index) => ({ projectId: index === 0 ? 'demo-neighbourhood-homes' : 'demo-retrofit-workshop', unitAddress: snapshot.house.unitMint, marketAddress: manifest.houses[index === 0 ? 'neighbourhood-homes' : 'workshop'].house, unitDecimals: 6, priceAtomic: snapshot.house.priceCashPerUnit.toString(), holdingRaw: snapshot.walletUnits.toString(), stakedRaw: (snapshot.position?.staked ?? 0n).toString(), totalSupplyRaw: snapshot.unitSupply.toString(), availableUnitsRaw: null, error: null })), order: null, error: null };
 }

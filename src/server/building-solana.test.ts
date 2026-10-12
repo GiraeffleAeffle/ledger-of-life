@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { TestContext } from 'node:test';
+import type { Mock, TestContext } from 'node:test';
 import { generateKeyPairSync } from 'node:crypto';
 import { AccountRole, address, appendTransactionMessageInstructions, blockhash, compileTransaction, createTransactionMessage, generateKeyPairSigner, getAddressEncoder, getBase58Decoder, getCompiledTransactionMessageDecoder, getTransactionDecoder, getTransactionEncoder, partiallySignTransaction, pipe, setTransactionMessageFeePayer, setTransactionMessageLifetimeUsingBlockhash } from '@solana/kit';
 import { ASSOCIATED_TOKEN_PROGRAM_ADDRESS, findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
@@ -8,12 +8,14 @@ import { houseAddresses, HOUSE_DISCRIMINATORS, pendingOwed, positionAddress, typ
 import { SOLANA_DEVNET_MANIFEST, SOLANA_IDS, SOLANA_TEST_USDC_MINT } from '../finance/solana/manifest.ts';
 import type { AccountObservation } from '../finance/solana/observations.ts';
 import type { SolanaHouseManifest } from './solana-house-config.ts';
-import { assertSolanaHouseOperation, buildSolanaHouseAction, houseActionQuote, prepareSolanaHouseAction, readSolanaBuildingPosition, readSolanaHouseSnapshot, reconcileSolanaHouseAction, solanaHouseReadModel, submitSolanaHouseAction, type HouseReadGateway, type SolanaHouseSnapshot } from './building-solana.ts';
+import { assertSolanaHouseOperation, buildSolanaHouseAction, houseActionQuote, prepareSolanaHouseAction, readSolanaBuilding, readSolanaBuildingPosition, readSolanaHouseSnapshot, reconcileSolanaHouseAction, solanaHouseReadModel, submitSolanaHouseAction, type HouseReadGateway, type SolanaHouseSnapshot } from './building-solana.ts';
 import { BaseSolanaGateway } from './solana-rpc.ts';
 import { LocalStore } from './store.ts';
+import type { Store } from './store.ts';
 import { SolanaServiceError } from './solana-service.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import type { ExpectedTokenDelta } from '../finance/solana/reconcile.ts';
+import { GET as getBuilding } from '../../app/api/building/route.ts';
 
 async function fixture(overrides: { house?: Partial<HouseAccount>; position?: Partial<PositionAccount>; nowSeconds?: bigint } = {}) {
   const [program, owner, payer, admin] = await Promise.all(Array.from({ length: 4 }, () => generateKeyPairSigner()));
@@ -362,4 +364,324 @@ test('house pre-sign recovery reports actual inclusive blockhash validity withou
   assert.equal(f.state.simulations.length, simulations); assert.equal(f.state.broadcasts.length, 0);
   const saved = await f.store.get<{ transactionBase64: string; review: unknown }>(`solana-operation:${first.plan.id}`);
   assert.equal(saved?.transactionBase64, first.plan.transactionBase64); assert.deepEqual(saved?.review, first.plan.review);
+});
+
+function publicBuildingEnvironment(t: TestContext, manifest: SolanaHouseManifest) {
+  for (const [key, value] of Object.entries({
+    SOLANA_HOUSE_MANIFEST: JSON.stringify(manifest),
+    SOLANA_RPC_URL: 'https://solana.example/private-provider-key',
+    SOLANA_READ_RPC_FALLBACK_URLS: '[]',
+  })) {
+    const previous = process.env[key];
+    process.env[key] = value;
+    t.after(() => { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; });
+  }
+}
+
+test('public building network survives Solana provider and configuration failures without cross-chain fallback or disclosure', async t => {
+  const f = await fixture();
+  publicBuildingEnvironment(t, f.manifest);
+  let now = Date.UTC(2026, 9, 12);
+  t.mock.method(Date, 'now', () => now);
+  const calls: string[] = [];
+  let failure = false, genesis = f.manifest.genesisHash;
+  t.mock.method(globalThis, 'fetch', async (url: string | URL | Request, options?: RequestInit) => {
+    assert.equal(String(url), process.env.SOLANA_RPC_URL);
+    const body = JSON.parse(String(options?.body));
+    calls.push(body.method);
+    if (failure) throw new Error('Provider rejected https://solana.example/private-provider-key');
+    if (body.method === 'getGenesisHash') return Response.json({ result: genesis });
+    assert.equal(body.method, 'getMultipleAccounts');
+    assert.equal(body.params[1].commitment, 'finalized');
+    return Response.json({ result: { context: { slot: 50 }, value: body.params[0].map((key: string) => {
+      const account = f.accounts.get(key);
+      return account ? { owner: account.owner, executable: account.executable, lamports: 1,
+        data: [Buffer.from(account.data).toString('base64'), 'base64'] } : null;
+    }) } });
+  });
+  const success = await getBuilding(new Request('https://ledger.example/api/building')), body = await success.json();
+  assert.equal(success.status, 200);
+  assert.equal(success.headers.get('cache-control'), 'no-store');
+  assert.equal(body.network, 'solana-devnet');
+  assert.equal(body.building.network, 'solana-devnet');
+  assert.equal(body.building.revenueRaw, '10000000');
+  assert.deepEqual(body.cache, { state: 'fresh', checkedAt: new Date(now).toISOString(), ageMs: 0 });
+  assert.equal((await getBuilding(new Request('https://ledger.example/api/building'))).status, 200);
+  assert.deepEqual(calls, ['getGenesisHash', 'getMultipleAccounts']);
+  process.env.SOLANA_HOUSE_MANIFEST = JSON.stringify({ ...f.manifest, cluster: 'localnet' });
+  const local = await getBuilding(new Request('https://ledger.example/api/building')), localBody = await local.json();
+  assert.equal(local.status, 200);
+  assert.equal(localBody.network, 'solana-localnet');
+  assert.equal(localBody.building.network, 'solana-localnet');
+  process.env.SOLANA_HOUSE_MANIFEST = JSON.stringify(f.manifest);
+  const unavailable = async (network = 'solana-devnet') => {
+    now += 900_000;
+    const response = await getBuilding(new Request('https://ledger.example/api/building'));
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await response.json(), { building: null, network,
+      code: 'rpc_unavailable', error: 'Testnetz-RPC derzeit nicht erreichbar' });
+  };
+  failure = true;
+  await unavailable();
+  failure = false; genesis = 'wrong-network';
+  await unavailable();
+  assert.equal(calls.at(-1), 'getGenesisHash');
+  const before = calls.length;
+  delete process.env.SOLANA_RPC_URL;
+  await unavailable();
+  process.env.SOLANA_HOUSE_MANIFEST = '{invalid private configuration';
+  await unavailable();
+  process.env.SOLANA_HOUSE_MANIFEST = JSON.stringify({ ...f.manifest, cluster: 'localnet' });
+  await unavailable('solana-localnet');
+  assert.equal(calls.length, before);
+});
+
+test('explicit Robinhood and manifest-absent default report Robinhood even on RPC failure', async t => {
+  const f = await fixture();
+  publicBuildingEnvironment(t, f.manifest);
+  const store = new LocalStore(':memory:');
+  const runtime = globalThis as typeof globalThis & { __ledgerStore?: Promise<Store> };
+  const previous = runtime.__ledgerStore;
+  runtime.__ledgerStore = Promise.resolve(store);
+  t.after(async () => { runtime.__ledgerStore = previous; await store.close(); });
+  const urls: string[] = [];
+  t.mock.method(globalThis, 'fetch', async (url: string | URL | Request) => {
+    urls.push(String(url));
+    return new Response('Provider secret must not be returned', { status: 503 });
+  });
+  for (const explicit of [true, false]) {
+    if (!explicit) delete process.env.SOLANA_HOUSE_MANIFEST;
+    const response = await getBuilding(new Request(`https://ledger.example/api/building${explicit ? '?network=robinhood' : ''}`));
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { building: null, network: 'robinhood-testnet',
+      code: 'rpc_unavailable', error: 'Testnetz-RPC derzeit nicht erreichbar' });
+  }
+  assert.deepEqual(urls, ['https://rpc.testnet.chain.robinhood.com/']);
+});
+
+test('public Solana deadline aborts the pending account read after genesis without starting a fresh budget', async t => {
+  const f = await fixture();
+  publicBuildingEnvironment(t, f.manifest);
+  const controller = new AbortController(), pending = Promise.withResolvers<void>();
+  const deadlines: number[] = [], signals: (AbortSignal | null | undefined)[] = [];
+  let aborted = false;
+  t.mock.method(AbortSignal, 'timeout', (milliseconds: number) => {
+    deadlines.push(milliseconds);
+    return controller.signal;
+  });
+  t.mock.method(globalThis, 'fetch', async (_: unknown, options?: RequestInit) => {
+    signals.push(options?.signal);
+    if (JSON.parse(String(options?.body)).method === 'getGenesisHash') return Response.json({ result: f.manifest.genesisHash });
+    pending.resolve();
+    return new Promise<Response>((_resolve, reject) => {
+      options!.signal!.addEventListener('abort', () => { aborted = true; reject(options!.signal!.reason); }, { once: true });
+    });
+  });
+  const read = getBuilding(new Request('https://ledger.example/api/building'));
+  await pending.promise;
+  controller.abort(new DOMException('Read deadline', 'TimeoutError'));
+  const response = await read;
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).network, 'solana-devnet');
+  assert.equal(aborted, true);
+  assert.deepEqual(deadlines, [3_000]);
+  assert.equal(signals.length, 2);
+  assert.equal(signals[0], signals[1]);
+  assert.equal(signals[0]?.aborted, true);
+});
+
+test('house prepare and position recovery keep financial gateway defaults rather than display deadlines', async t => {
+  const f = await lifecycleFixture(t);
+  Object.assign(f.environment, { SOLANA_READ_RPC_FALLBACK_URLS: '["http://forbidden-financial-fallback.example"]' });
+  const prepared = await f.prepare('financial-deadline-isolation');
+  const position = await f.read();
+  const reads = (BaseSolanaGateway.prototype.multiple as Mock<BaseSolanaGateway['multiple']>).mock.calls;
+  assert.equal(reads.length, 2);
+  for (const call of reads) {
+    const gateway = call.this as BaseSolanaGateway;
+    assert.equal(gateway.readSignal, undefined);
+    assert.equal(gateway.config.rpcUrl, new URL(f.environment.SOLANA_RPC_URL).toString());
+  }
+  assert.equal(position.plan?.id, prepared.plan.id);
+  assert.equal(position.activeOperation?.state, 'prepared');
+  assert.equal(f.state.broadcasts.length, 0);
+});
+
+test('public devnet fallback rechecks genesis and reads a complete bank without retrying the same endpoint', async t => {
+  const f = await fixture(), calls: string[] = [];
+  const environment = { SOLANA_HOUSE_MANIFEST: JSON.stringify(f.manifest), SOLANA_RPC_URL: 'https://primary.example/',
+    SOLANA_READ_RPC_FALLBACK_URLS: JSON.stringify(['https://primary.example', 'https://secondary.example', 'https://secondary.example/']) };
+  t.mock.method(globalThis, 'fetch', async (url: string | URL | Request, options?: RequestInit) => {
+    const body = JSON.parse(String(options?.body)), endpoint = new URL(String(url)).hostname;
+    calls.push(`${endpoint}:${body.method}`);
+    if (body.method === 'getGenesisHash') return Response.json({ result: f.manifest.genesisHash });
+    if (endpoint === 'primary.example') return new Response('upstream failed', { status: 503 });
+    assert.equal(body.method, 'getMultipleAccounts');
+    assert.equal(body.params[1].commitment, 'finalized');
+    return Response.json({ result: { context: { slot: 50 }, value: body.params[0].map((key: string) => {
+      const account = f.accounts.get(key)!;
+      return { owner: account.owner, executable: account.executable, lamports: 1,
+        data: [Buffer.from(account.data).toString('base64'), 'base64'] };
+    }) } });
+  });
+  const view = await readSolanaBuilding('neighbourhood-homes', environment);
+  assert.equal(view.observedSlot, '50');
+  assert.equal(view.revenueRaw, '10000000');
+  assert.deepEqual(calls, ['primary.example:getGenesisHash', 'primary.example:getMultipleAccounts',
+    'secondary.example:getGenesisHash', 'secondary.example:getMultipleAccounts']);
+});
+
+test('wrong genesis and malformed accounts never trigger public devnet fallback', async t => {
+  const f = await fixture(), urls: string[] = [];
+  const environment = { SOLANA_HOUSE_MANIFEST: JSON.stringify(f.manifest), SOLANA_RPC_URL: 'https://primary.example/',
+    SOLANA_READ_RPC_FALLBACK_URLS: '["https://secondary.example/"]' };
+  let wrongGenesis = true;
+  t.mock.method(globalThis, 'fetch', async (url: string | URL | Request, options?: RequestInit) => {
+    urls.push(String(url));
+    const body = JSON.parse(String(options?.body));
+    if (body.method === 'getGenesisHash') return Response.json({ result: wrongGenesis ? 'wrong-chain' : f.manifest.genesisHash });
+    return Response.json({ result: { context: { slot: 50 }, value: body.params[0].map(() => null) } });
+  });
+  await assert.rejects(readSolanaBuilding('neighbourhood-homes', environment), /genesis mismatch/);
+  wrongGenesis = false;
+  await assert.rejects(readSolanaBuilding('neighbourhood-homes', environment), /program or account/);
+  assert.deepEqual(urls, Array(3).fill('https://primary.example/'));
+});
+
+test('public fallback configuration is HTTPS-only, optional, devnet-only and never replaces a missing primary', async t => {
+  const f = await fixture(), urls: string[] = [];
+  const environment = { SOLANA_HOUSE_MANIFEST: JSON.stringify(f.manifest), SOLANA_RPC_URL: 'https://primary.example/',
+    SOLANA_READ_RPC_FALLBACK_URLS: '[]' };
+  t.mock.method(globalThis, 'fetch', async (url: string | URL | Request) => {
+    urls.push(String(url));
+    return new Response(null, { status: 429, headers: { 'retry-after': '5' } });
+  });
+  for (const value of ['{}', '["http://secondary.example/"]', '[1]', 'not-json']) {
+    await assert.rejects(readSolanaBuilding('neighbourhood-homes', { ...environment, SOLANA_READ_RPC_FALLBACK_URLS: value }));
+  }
+  assert.equal(urls.length, 0);
+  await assert.rejects(readSolanaBuilding('neighbourhood-homes', { ...environment, SOLANA_RPC_URL: undefined,
+    SOLANA_READ_RPC_FALLBACK_URLS: '["https://secondary.example/"]' }), /not configured/);
+  assert.equal(urls.length, 0);
+  await assert.rejects(readSolanaBuilding('neighbourhood-homes', { ...environment, SOLANA_READ_RPC_FALLBACK_URLS: undefined }), /unavailable/);
+  await assert.rejects(readSolanaBuilding('neighbourhood-homes', { ...environment,
+    SOLANA_HOUSE_MANIFEST: JSON.stringify({ ...f.manifest, cluster: 'localnet' }),
+    SOLANA_READ_RPC_FALLBACK_URLS: '["https://secondary.example/"]' }), /unavailable/);
+  assert.deepEqual(urls, ['https://primary.example/', 'https://primary.example/']);
+});
+
+test('all public fallback candidates share one real aborting three-second budget', async t => {
+  const f = await fixture(), controller = new AbortController(), pending = Promise.withResolvers<void>();
+  const deadlines: number[] = [], urls: string[] = [], signals: (AbortSignal | null | undefined)[] = [];
+  let aborted = false;
+  t.mock.method(Date, 'now', () => 0);
+  t.mock.method(AbortSignal, 'timeout', (milliseconds: number) => { deadlines.push(milliseconds); return controller.signal; });
+  t.mock.method(globalThis, 'fetch', async (url: string | URL | Request, options?: RequestInit) => {
+    urls.push(String(url)); signals.push(options?.signal);
+    if (urls.length === 1) return new Response(null, { status: 429 });
+    pending.resolve();
+    return new Promise<Response>((_resolve, reject) => {
+      options!.signal!.addEventListener('abort', () => { aborted = true; reject(options!.signal!.reason); }, { once: true });
+    });
+  });
+  const read = readSolanaBuilding('neighbourhood-homes', {
+    SOLANA_HOUSE_MANIFEST: JSON.stringify(f.manifest), SOLANA_RPC_URL: 'https://primary.example/',
+    SOLANA_READ_RPC_FALLBACK_URLS: '["https://secondary.example/","https://third.example/"]',
+  });
+  await pending.promise;
+  controller.abort(new DOMException('Read deadline', 'TimeoutError'));
+  await assert.rejects(read, { name: 'TimeoutError' });
+  assert.equal(aborted, true);
+  assert.deepEqual(deadlines, [3_000, 1_000, 1_500]);
+  assert.deepEqual(urls, ['https://primary.example/', 'https://secondary.example/']);
+  assert.ok(signals.every(signal => signal?.aborted));
+});
+
+test('a hung public primary is aborted early enough for a fully validated secondary within the total budget', async t => {
+  const f = await fixture(), pending = Promise.withResolvers<void>();
+  const timers: { milliseconds: number; controller: AbortController }[] = [], calls: string[] = [];
+  let now = 0, primaryAborted = false;
+  t.mock.method(Date, 'now', () => now);
+  t.mock.method(AbortSignal, 'timeout', (milliseconds: number) => {
+    const controller = new AbortController();
+    timers.push({ milliseconds, controller });
+    return controller.signal;
+  });
+  t.mock.method(globalThis, 'fetch', async (url: string | URL | Request, options?: RequestInit) => {
+    const body = JSON.parse(String(options?.body)), endpoint = new URL(String(url)).hostname;
+    calls.push(`${endpoint}:${body.method}`);
+    if (endpoint === 'primary.example') {
+      pending.resolve();
+      return new Promise<Response>((_resolve, reject) => {
+        options!.signal!.addEventListener('abort', () => {
+          primaryAborted = true;
+          reject(options!.signal!.reason);
+        }, { once: true });
+      });
+    }
+    assert.equal(options?.signal?.aborted, false);
+    if (body.method === 'getGenesisHash') return Response.json({ result: f.manifest.genesisHash });
+    assert.equal(body.params[1].commitment, 'finalized');
+    return Response.json({ result: { context: { slot: 50 }, value: body.params[0].map((key: string) => {
+      const account = f.accounts.get(key)!;
+      return { owner: account.owner, executable: account.executable, lamports: 1,
+        data: [Buffer.from(account.data).toString('base64'), 'base64'] };
+    }) } });
+  });
+  const read = readSolanaBuilding('neighbourhood-homes', {
+    SOLANA_HOUSE_MANIFEST: JSON.stringify(f.manifest), SOLANA_RPC_URL: 'https://primary.example/',
+    SOLANA_READ_RPC_FALLBACK_URLS: '["https://secondary.example/"]',
+  });
+  await pending.promise;
+  assert.deepEqual(timers.map(timer => timer.milliseconds), [3_000, 1_500]);
+  now = 1_500;
+  timers[1].controller.abort(new DOMException('Provider read deadline', 'TimeoutError'));
+  const view = await read;
+  assert.equal(primaryAborted, true);
+  assert.equal(view.observedSlot, '50');
+  assert.equal(view.revenueRaw, '10000000');
+  assert.equal(timers[0].controller.signal.aborted, false);
+  assert.deepEqual(timers.map(timer => timer.milliseconds), [3_000, 1_500, 1_500]);
+  assert.ok(now < timers[0].milliseconds);
+  assert.deepEqual(calls, ['primary.example:getGenesisHash', 'secondary.example:getGenesisHash', 'secondary.example:getMultipleAccounts']);
+});
+
+test('public fallback distinguishes HTTP200 body transport failure from malformed JSON and RPC shape', async t => {
+  const f = await fixture(), calls: string[] = [];
+  let failure: 'stream' | 'json' | 'shape' = 'stream';
+  const environment = { SOLANA_HOUSE_MANIFEST: JSON.stringify(f.manifest), SOLANA_RPC_URL: 'https://primary.example/',
+    SOLANA_READ_RPC_FALLBACK_URLS: '["https://secondary.example/"]' };
+  t.mock.method(globalThis, 'fetch', async (url: string | URL | Request, options?: RequestInit) => {
+    const body = JSON.parse(String(options?.body)), endpoint = new URL(String(url)).hostname;
+    calls.push(`${endpoint}:${body.method}`);
+    if (body.method === 'getGenesisHash') return Response.json({ result: f.manifest.genesisHash });
+    if (endpoint === 'primary.example') {
+      if (failure === 'json') return new Response('{"result":invalid-json}', { status: 200 });
+      if (failure === 'shape') return Response.json({ result: [] });
+      return new Response(new ReadableStream<Uint8Array>({
+        start(controller) { controller.error(new TypeError('Upstream response socket terminated')); },
+      }), { status: 200 });
+    }
+    assert.equal(body.method, 'getMultipleAccounts');
+    assert.equal(body.params[1].commitment, 'finalized');
+    return Response.json({ result: { context: { slot: 50 }, value: body.params[0].map((key: string) => {
+      const account = f.accounts.get(key)!;
+      return { owner: account.owner, executable: account.executable, lamports: 1,
+        data: [Buffer.from(account.data).toString('base64'), 'base64'] };
+    }) } });
+  });
+  const view = await readSolanaBuilding('neighbourhood-homes', environment);
+  assert.equal(view.observedSlot, '50');
+  assert.equal(view.revenueRaw, '10000000');
+  assert.deepEqual(calls, ['primary.example:getGenesisHash', 'primary.example:getMultipleAccounts',
+    'secondary.example:getGenesisHash', 'secondary.example:getMultipleAccounts']);
+  calls.length = 0;
+  failure = 'json';
+  await assert.rejects(readSolanaBuilding('neighbourhood-homes', environment), SyntaxError);
+  assert.deepEqual(calls, ['primary.example:getGenesisHash', 'primary.example:getMultipleAccounts']);
+  calls.length = 0;
+  failure = 'shape';
+  await assert.rejects(readSolanaBuilding('neighbourhood-homes', environment), /RPC object unavailable/);
+  assert.deepEqual(calls, ['primary.example:getGenesisHash', 'primary.example:getMultipleAccounts']);
 });

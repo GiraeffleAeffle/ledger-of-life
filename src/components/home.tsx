@@ -4,6 +4,8 @@ import { ArrowRight, Check, Copy, Home as HomeIcon, Loader2, Plus } from 'lucide
 import { useRentalWallet } from '@/wallets';
 import type { RentalWalletAccess } from '@/wallets/types';
 import { authorizedRequest } from './authorized-request';
+import type { AuthorizedReadOptions } from './authorized-request';
+import { boundedBuildingRead } from './building-read';
 import { AREAS, goToSection, PUBLISH_HOME_NAVIGATION_INTENT, type Area } from './areas';
 import { IdeasArea } from './ideas';
 import { MeArea } from './me';
@@ -56,7 +58,7 @@ const AUTO: Record<string, true> = { confirming: true, paying_out: true, wait: t
 type Unavailable = { agreementId: string; property: string; unavailable: string };
 /** Typed view of our own same-origin API responses. */
 type Helper = (body: Record<string, unknown>) => Promise<void>;
-type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
+type Request = <T = Record<string, unknown>>(path: string, body?: unknown, options?: AuthorizedReadOptions) => Promise<T>;
 const b64 = (value: string) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
 const toB64 = (bytes: Uint8Array) => btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''));
 
@@ -82,8 +84,8 @@ function useAuthorizedRequest(): Request {
     latest.current = { identity, getAccessToken: wallet.getAccessToken, generation: generation.current };
     return () => { latest.current = null; };
   }, [identity, wallet.getAccessToken]);
-  return useCallback(<T,>(path: string, body?: unknown): Promise<T> =>
-    authorizedRequest<T>(path, body, identity, () => latest.current), [identity]);
+  return useCallback(<T,>(path: string, body?: unknown, options?: AuthorizedReadOptions): Promise<T> =>
+    authorizedRequest<T>(path, body, identity, () => latest.current, options), [identity]);
 }
 
 export function MyHome({ area, go, sessionHint = false }: { area: Area; go: (area: Area) => void; sessionHint?: boolean }) {
@@ -146,13 +148,13 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
   }, [tenancies, listings, listingsLoaded]);
   const load = useCallback(async (background = false) => {
     const results = await Promise.all([
-      request<{ tenancies: (TenancyJourney | Unavailable)[] }>('/api/journey').then((journey) => {
+      boundedBuildingRead(signal => request<{ tenancies: (TenancyJourney | Unavailable)[] }>('/api/journey', undefined, { signal })).then((journey) => {
         setTenancies(journey.tenancies); setJourneyError('');
         return true;
       }, (reason: unknown) => {
         setJourneyError(reason instanceof Error ? reason.message : 'Could not read your homes.'); return false;
       }),
-      request<{ listings: PublicListing[] }>('/api/listings').then((homes) => {
+      boundedBuildingRead(signal => request<{ listings: PublicListing[] }>('/api/listings', undefined, { signal })).then((homes) => {
         setListings(homes.listings); setListingsLoaded(true); setListingsError('');
         return true;
       }, (reason: unknown) => {
@@ -212,13 +214,10 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
     unavailableAgreementIds: unavailable.map((item) => item.agreementId),
   });
   const meta = AREAS.find((a) => a.id === area)!;
-  const firstReadsPending = (tenancies === null && !journeyError) || (!listingsLoaded && !listingsError);
-  const showSkeleton = firstReadsPending && area === 'home';
   return (
     <>
       <div className="page-heading"><h1 tabIndex={-1}>{meta.label}</h1></div>
-      {showSkeleton && <AreaSkeleton area={area} bodyOnly />}
-      <div className="area-content" hidden={showSkeleton}>
+      <div className="area-content">
       {step.urgent && area !== 'home' && <NextStepCard step={step} go={go} />}
       {(error || paused) && <p className="note" role="alert">{paused ? 'Updates are paused. Retry. ' : ''}{error} <button className="button secondary" onClick={() => void retryHome()}>Retry</button></p>}
 
@@ -233,6 +232,7 @@ function SignedInHome({ area, go }: { area: Area; go: (area: Area) => void }) {
             {reviewListings.map(listing => <ApplicantsReview key={listing.id} listing={listing} request={request} reload={load} />)}
             {applicationListings.map(listing => <ApplicationStatus key={listing.id} listing={listing} request={request} reload={load} />)}
             <div id="home-tenancies" tabIndex={-1} className="home-tenancy-anchor" aria-label="Your tenancies">
+              {tenancies === null && !journeyError && <p className="note" role="status">Checking your homes… Other Home sections remain available.</p>}
               {current && <TenancyCard key={current.agreementId} journey={current} request={request} reload={load} accountId={wallet.subject ?? ''} automationMessage={automationMessages[current.agreementId]} />}
             </div>
             {otherTenancies.map((t) => <MoreRow key={t.agreementId} id={`tenancy-${t.agreementId}`} title={t.property} meta={tenancyNeedsPerson(t) ? 'Needs you' : t.next.label} defaultOpen={tenancyNeedsPerson(t)}><TenancyCard journey={t} request={request} reload={load} accountId={wallet.subject ?? ''} anchored={false} automationMessage={automationMessages[t.agreementId]} /></MoreRow>)}

@@ -234,22 +234,26 @@ export type BaseSolanaGatewayConfig = Pick<SolanaConfiguration, 'rpcUrl' | 'gene
 export class BaseSolanaGateway {
   config: BaseSolanaGatewayConfig;
   fetcher: typeof fetch;
-  constructor(config: BaseSolanaGatewayConfig, fetcher: typeof fetch = fetch) {
+  // Only read-only views supply a shared deadline; financial defaults stay unchanged.
+  readSignal?: AbortSignal;
+  constructor(config: BaseSolanaGatewayConfig, fetcher: typeof fetch = fetch, readSignal?: AbortSignal) {
     this.config = config;
     this.fetcher = fetcher;
+    this.readSignal = readSignal;
   }
   async rpc(method: string, params: unknown[]) {
     let response: Response;
     // Rate-limited requests were not processed; resending identical bytes (even a signed
     // transaction) is idempotent, so a short bounded backoff is safe for every method here.
     for (let attempt = 0; ; attempt++) {
+      this.readSignal?.throwIfAborted();
       response = await this.fetcher(this.config.rpcUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-        signal: AbortSignal.timeout(10_000),
+        signal: this.readSignal ?? AbortSignal.timeout(10_000),
       });
-      if (response.status !== 429 || attempt >= 4) break;
+      if (response.status !== 429 || this.readSignal || attempt >= 4) break;
       const hinted = Number(response.headers.get('retry-after'));
       const pause = Promise.withResolvers<void>();
       setTimeout(pause.resolve, Number.isFinite(hinted) && hinted > 0 ? Math.min(hinted, 5) * 1000 : 500 * 2 ** attempt);
@@ -429,8 +433,8 @@ export class BaseSolanaGateway {
 }
 
 /** The same network, simulation and reconciliation machinery without an escrow snapshot. */
-export function createBaseSolanaGateway(config: BaseSolanaGatewayConfig, fetcher: typeof fetch = fetch) {
-  return new BaseSolanaGateway(config, fetcher);
+export function createBaseSolanaGateway(config: BaseSolanaGatewayConfig, fetcher: typeof fetch = fetch, readSignal?: AbortSignal) {
+  return new BaseSolanaGateway(config, fetcher, readSignal);
 }
 
 export class RpcSolanaGateway extends BaseSolanaGateway implements SolanaGateway {

@@ -1,11 +1,11 @@
 # KEY NAMES ONLY. Copy this file OUTSIDE every repository (for example to ~/ledger-env.local, chmod 600), fill in the real
 # values there, and never commit or paste the filled file.
 #
-# Store it as Secret ledger-env after the namespace exists (first run: --namespace), through the release wrapper:
+# Store it as Secret ledger-env only through a separately approved, Lease-aware Secret operation.
+# See docs/DEPLOYMENT.md: one shared-Lease supervisor and a reviewed fenced launcher are required.
+# Never invoke the old original-infra wrapper directly or manually create/remove session locks.
 #
-#   infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh --secret ~/ledger-env.local
-#
-# That runs deploy/apply.sh --secret, which refuses a file other users can read or one inside a git work tree, shows
+# The existing deploy/apply.sh --secret refuses a file other users can read or one inside a git work tree, shows
 # only the key names and asks for a typed confirmation. --secret replaces the WHOLE Secret: include every key
 # you intend to keep in this file. It restarts the web Deployment if one exists and waits for readiness.
 #
@@ -28,6 +28,12 @@ RECONCILE_SECRET=REPLACE_ME
 # Solana devnet RPC. A keyed HTTPS URL is secret because its key sits in the URL. The public endpoint below
 # also works, but is rate limited. Never use mainnet; these test tokens have no real value.
 SOLANA_RPC_URL=https://api.devnet.solana.com
+
+# Optional server-only public-building read fallbacks, in order, as a JSON array of HTTPS devnet URLs.
+# The existing Deployment imports this through Secret ledger-env (envFrom); no frontend/public variable.
+# Leave empty until an owner-controlled provider is configured. Keyed URLs are credentials: never print them.
+# These fallbacks do not replace the financial prepare/sign/broadcast/recovery endpoint above.
+SOLANA_READ_RPC_FALLBACK_URLS=[]
 
 # Sponsor keypair: a JSON array of 64 integers on ONE line, without surrounding quotes.
 # Generate a fresh key used ONLY by this host; never reuse a personal wallet or commit the filled file.

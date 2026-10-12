@@ -39,7 +39,7 @@ export type BuildingManifest = {
   rewardsSpec: { scheme: string; scale: string };
   rewardDuration: number;
 };
-export type BuildingReadOptions = { loadManifest?: () => Promise<BuildingManifest | null>; rpc?: BuildingRpc };
+export type BuildingReadOptions = { loadManifest?: () => Promise<BuildingManifest | null>; rpc?: BuildingRpc; signal?: AbortSignal };
 export const explorerUrl = 'https://explorer.testnet.chain.robinhood.com';
 const transfer = parseAbiItem('event Transfer(address indexed from,address indexed to,uint256 value)');
 const staked = parseAbiItem('event Staked(address indexed account,uint256 amount)');
@@ -84,8 +84,15 @@ export async function verifyBuildingDeployment(manifest: BuildingManifest, rpc: 
 }
 
 export async function readBuildingView(store: Store, options: BuildingReadOptions = {}) {
+  const signal = options.signal ?? AbortSignal.timeout(3_000);
   const manifest = await (options.loadManifest ?? loadBuildingManifest)();
-  const rpc = options.rpc ?? buildingRpc;
+  if (!manifest?.distributor) throw new Error('Building staking distributor is not deployed.');
+  signal.throwIfAborted();
+  // A single aborting deadline covers verification, snapshot and every history page.
+  // The shared buildingRpc retains its financial timeout and recovery behavior.
+  const rpc = options.rpc ?? createPublicClient({
+    transport: http('https://rpc.testnet.chain.robinhood.com', { timeout: 0, retryCount: 0, fetchOptions: { signal } }),
+  });
   const revenueTransactions: BuildingInflow[] = [];
   const incomeEvidence: IncomeEvidence[] = [];
   let totalStaked = 0n, rewardPerUnit = 0n, pendingRevenue = 0n, undistributedScaled = 0n;
@@ -173,22 +180,56 @@ export async function readBuildingView(store: Store, options: BuildingReadOption
         hostId: journal.hostId, hostName: hosts.find(host => host.id === journal.hostId)?.name ?? journal.hostId });
     }
   }
+  signal.throwIfAborted();
   const revenueRaw = revenueTransactions.reduce((sum, row) => sum + BigInt(row.amountRaw), 0n).toString();
   const attributed = attributeBuildingIncome(revenueTransactions, incomeEvidence);
   return {
-    configured: Boolean(manifest), status: manifest ? 'configured' : 'unconfigured',
-    reason: manifest ? null : 'Building staking distributor is not deployed.', chainId: 46630,
-    distributor: manifest?.distributor ?? null, explorerUrl,
+    configured: true, status: 'configured',
+    reason: null, chainId: 46630,
+    distributor: manifest.distributor, explorerUrl,
     payingDevices,
-    shareToken: manifest?.unitToken ?? investments.assets['demo-neighbourhood-homes'].unitAddress,
-    assetToken: manifest?.payoutToken ?? investments.cashAddress, revenueRaw, revenue: formatUnits(BigInt(revenueRaw), 6),
+    shareToken: manifest.unitToken,
+    assetToken: manifest.payoutToken, revenueRaw, revenue: formatUnits(BigInt(revenueRaw), 6),
     totalStakedRaw: totalStaked.toString(), totalStaked: formatUnits(totalStaked, 18), rewardPerUnitRaw: rewardPerUnit.toString(),
     pendingRevenueRaw: pendingRevenue.toString(), undistributedScaledRaw: undistributedScaled.toString(),
-    rewardDuration: manifest?.rewardDuration ?? 604800, rewardScaleRaw: manifest?.rewardsSpec.scale ?? '1000000000000000000000000000000000000',
+    rewardDuration: manifest.rewardDuration, rewardScaleRaw: manifest.rewardsSpec.scale,
     rewardRateRaw: rewardRate.toString(), periodFinish: Number(periodFinish), lastUpdateTime: Number(lastUpdateTime),
     streamRemainingScaledRaw: streamRemainingScaled.toString(), rewardRemainderScaledRaw: rewardRemainderScaled.toString(),
     stakerCount: [...balances.values()].filter(balance => balance > 0n).length, gpuTokensServed, paidAnswers,
     revenueTransactions: attributed.transactions, incomeSources: attributed.sources,
     validator: null, heat: { runtimeSeconds: knownRuntime ? runtimeMs / 1000 : null, nominalPowerWatts: null, measuredWhPerToken: null },
+  };
+}
+
+/** Public snapshots only: never used for quotes, signing, private balances or recovery. */
+export function createBuildingReadCache<T>(now: () => number = () => Date.now()) {
+  const entries = new Map<string, {
+    value?: { building: T; checkedAt: number };
+    refresh?: Promise<void>;
+    retryAt: number;
+  }>();
+  return async (key: string, read: () => Promise<T>, retainRefresh?: (pending: Promise<void>) => void) => {
+    let entry = entries.get(key);
+    if (!entry) { entry = { retryAt: 0 }; entries.set(key, entry); }
+    const cached = entry.value, age = cached ? Math.max(0, now() - cached.checkedAt) : Infinity;
+    if (age >= 60_000 && !entry.refresh && now() >= entry.retryAt) {
+      const target = entry;
+      target.refresh = Promise.resolve().then(read).then(building => {
+        target.value = { building, checkedAt: now() };
+        target.retryAt = 0;
+      }).catch(() => {
+        // Failed refreshes retain the original observation time, never extend its life.
+        target.retryAt = now() + 60_000;
+      }).finally(() => { target.refresh = undefined; });
+    }
+    // Stale-while-revalidate: one refresh continues independently of requesting clients.
+    if (!cached || age >= 900_000) await entry.refresh;
+    else if (entry.refresh) retainRefresh?.(entry.refresh);
+    const value = entry.value, ageMs = value ? Math.max(0, now() - value.checkedAt) : Infinity;
+    if (!value || ageMs >= 900_000) throw new Error('Building view unavailable.');
+    return { building: value.building, cache: {
+      state: ageMs < 60_000 ? 'fresh' as const : 'stale' as const,
+      checkedAt: new Date(value.checkedAt).toISOString(), ageMs,
+    } };
   };
 }
