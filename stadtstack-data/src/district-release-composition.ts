@@ -3,6 +3,7 @@ import { normalizeGraphClaims } from './district-graph-claims.ts';
 import { DistrictKnowledgeRecordSchema, KNOWLEDGE_SCHEMA_VERSION, knowledgeEvidenceHash, type DistrictKnowledgeRecord } from './district-schema.ts';
 import { knowledgePublicationHold } from './district-publication.ts';
 import { authenticateTextRunContribution, buildAuthenticatedTextRunLineage, textSchemaProjectionSchema, type AuthenticatedTextRunContribution, type TextRunContribution, type TextRecordSelection, type TextRunLineage } from './text-run-lineage.ts';
+import { authenticateRetainedKnowledgePublication, projectKnowledgeRecordIdentity, retainedKnowledgeRecordOrigin, type RetainedKnowledgeComposition, type RetainedKnowledgePublicationInput } from './retained-knowledge-lineage.ts';
 
 /** Admission is supplied by managed intake, not inferred from run order or document dates. */
 export type DistrictTextSchemaProjection = z.infer<typeof textSchemaProjectionSchema>;
@@ -11,6 +12,7 @@ export type DistrictReleaseCompositionInput = {
   contributions: readonly TextRunContribution[];
   approvedRunOrder: readonly string[];
   admissions: readonly DistrictRunAdmission[];
+  retainedPublication?: RetainedKnowledgePublicationInput;
   generatedAt: string;
 };
 export type DistrictRecordCompositionAudit = {
@@ -62,6 +64,7 @@ export type DistrictReleaseComposition = {
     documents: OriginalCrawlDocument[]; checks: Array<OriginalCrawlCheck & { runId: string }>; excludedDocuments: unknown[];
   };
   lineage: TextRunLineage;
+  retainedPublication: RetainedKnowledgeComposition | null;
   selections: TextRecordSelection[];
   audit: {
     schemaVersion: 'stadtstack-district-release-composition-v1'; generatedAt: string;
@@ -99,6 +102,7 @@ function projectRecord(original: DistrictKnowledgeRecord, schemaProjection?: Dis
 }
 
 function assertApprovedOrder(input: DistrictReleaseCompositionInput): void {
+  if (input.contributions.some(run => run.sourceArtifactKind !== 'native_extraction_output')) throw Error('Retained publications must use the authenticated retained-role input, not a text extraction run');
   if (!input.contributions.length || input.approvedRunOrder.length !== input.contributions.length || new Set(input.approvedRunOrder).size !== input.approvedRunOrder.length || input.contributions.some((run, index) => run.runId !== input.approvedRunOrder[index])) {
     throw Error('Contributions require a unique, explicitly approved input order');
   }
@@ -182,11 +186,26 @@ export function composeDistrictRelease(input: DistrictReleaseCompositionInput): 
   });
   const mergedCrawl = mergeCrawlObservations(runs, input.generatedAt);
   const lineage = buildAuthenticatedTextRunLineage(runs, selections, input.generatedAt);
+  let retainedPublication: RetainedKnowledgeComposition | null = null;
+  if (input.retainedPublication) {
+    const baseline = authenticateRetainedKnowledgePublication(input.retainedPublication);
+    const nativeIds = new Set(selections.map(selection => selection.recordId));
+    if (input.retainedPublication.recordIds.some(recordId => nativeIds.has(recordId))) throw Error('A record cannot be selected from both retained publication and native extraction');
+    const selectedRecordOrigins = input.retainedPublication.recordIds.map(recordId => {
+      const localIndex = baseline.records.findIndex(record => record.id === recordId);
+      if (localIndex < 0) throw Error('Retained selection references an absent original record');
+      const projected = projectKnowledgeRecordIdentity(baseline.records[localIndex], baseline.input.schemaProjection);
+      if (knowledgePublicationHold(projected)) throw Error('Retained selection contains a publication-withheld record');
+      return retainedKnowledgeRecordOrigin(baseline, baseline.recordIndexes[localIndex], projected);
+    });
+    retainedPublication = { baseline, selectedRecordOrigins };
+  }
   return {
     records: { schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: input.generatedAt, records: selections.map(selection => selection.projectedRecord) },
     quarantine: { schemaVersion: 'stadtstack-quarantine-v1' as const, generatedAt: input.generatedAt, cases: runs.flatMap(run => run.quarantine.cases) },
     crawl: mergedCrawl.crawl,
     lineage,
+    retainedPublication,
     selections,
     audit: { schemaVersion: 'stadtstack-district-release-composition-v1' as const, generatedAt: input.generatedAt, selectionRule: 'latest_admitted_in_explicit_input_order' as const, approvedRunOrder: [...input.approvedRunOrder], records: versions, quarantine: quarantineAudit },
     provenance: { originalContributions: input.contributions, runs, recordOrigins, quarantineOrigins, withheldRecords, crawlDocuments: mergedCrawl.documents, crawlChecks: mergedCrawl.checks, crawlExcludedDocuments: mergedCrawl.excludedDocuments },

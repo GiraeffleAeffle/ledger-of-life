@@ -7,6 +7,8 @@ import { loadPolicyReceipt } from './district-policy-receipt.ts';
 import type { DistrictCas } from './district-cas.ts';
 import { CriticalAssessmentInventorySchema, CriticalAdmissionSchema,
   type CriticalAdmission, type CriticalPublicationHold } from './district-critical-assessment-contract.ts';
+import { validateRetainedKnowledgeComposition, retainedKnowledgeRecordOrigin, type RetainedKnowledgeComposition } from './retained-knowledge-lineage.ts';
+import { textLineageRecordSha256 } from './text-run-lineage.ts';
 
 export function prepareCriticalAssessment(recordInput: PublicKnowledgeRecord, itemInput: unknown) {
   const record = PublicKnowledgeRecordSchema.parse(recordInput), target = criticalKnowledgeTarget(record);
@@ -20,20 +22,46 @@ export function prepareCriticalAssessment(recordInput: PublicKnowledgeRecord, it
   return assessmentItemSchema.parse({ ...item, claim: 'Independently verify or reject every source-bound critical claim and the complete supplied record projection.',
     claimIds: target.claims.map(claim => claim.claimId), entityIds, criticalKinds, criticalTarget: target });
 }
-/** Only actual private CAS replay can produce public critical admission seals. */
+/** New claims require actual A/B/C replay; authenticated unchanged originals retain only their original gates. */
 export async function admitCriticalKnowledge(recordsInput: readonly PublicKnowledgeRecord[], inventoryInput: unknown, cas: DistrictCas,
-  options: Omit<AssessmentEvidenceContext, 'cas'> & { originalAdmissions?: readonly CriticalAdmission[] } = {}) {
+  options: Omit<AssessmentEvidenceContext, 'cas'> & { originalAdmissions?: readonly CriticalAdmission[]; retainedPublication?: RetainedKnowledgeComposition | null } = {}) {
   const records = recordsInput.map(record => PublicKnowledgeRecordSchema.parse(record));
   const inventory = CriticalAssessmentInventorySchema.parse(inventoryInput), entries = new Map(inventory.records.map(entry => [entry.recordId, entry]));
   // Preserve the original candidate inventory in replay identity after affected
   // records are held. Unused entries never produce admission seals.
   if (entries.size !== inventory.records.length) throw Error('Critical assessment inventory record identity mismatch');
+  const retained = options.retainedPublication ? validateRetainedKnowledgeComposition(options.retainedPublication) : null;
+  const retainedOrigins = new Map(retained?.selectedRecordOrigins.map(origin => [origin.recordId, origin]) ?? []);
   const admissions: CriticalAdmission[] = [], holds: CriticalPublicationHold[] = [];
   for (const record of records) {
     const target = criticalKnowledgeTarget(record);
     if (!target || record.kind !== 'text_model') continue;
     if (record.verification.status !== 'auto-verified' || record.verification.evidenceHash !== knowledgeEvidenceHash(record)) {
       holds.push({ recordId: record.id, reason: 'original_gates_not_admitted' }); continue;
+    }
+    const retainedOrigin = retainedOrigins.get(record.id);
+    if (retained && retainedOrigin) {
+      try {
+        const origin = retainedKnowledgeRecordOrigin(retained.baseline, retainedOrigin.outputRecordIndex, record);
+        if (textLineageRecordSha256(origin) !== textLineageRecordSha256(retainedOrigin)) throw Error('Retained critical record differs from authenticated original');
+        const fields = {
+          version: 'critical-knowledge-admission-v1' as const, recordId: record.id,
+          recordEvidenceSha256: record.verification.evidenceHash, claimProjectionSha256: target.claimProjectionSha256,
+          claims: target.claims.map(claim => ({ claimId: claim.claimId, kind: claim.kind, claimSha256: claim.claimSha256 })),
+          sourceEvidenceHashes: [...new Set(target.claims.flatMap(claim => [claim.sourceSha256, semanticHash([claim.sourceSha256, claim.quote])]))].sort(),
+          labelProvenance: 'retained_original_gates' as const, independentlyValidated: false as const, status: 'admitted' as const,
+          retainedPublication: {
+            releaseId: retained.baseline.lineage.releaseId, manifestSha256: retained.baseline.lineage.manifestSha256,
+            recordsSha256: retained.baseline.lineage.members.records.sha256,
+            originalRecordSha256: origin.originalRecordSha256, originalEvidenceHash: origin.originalEvidenceHash,
+            originSha256: textLineageRecordSha256(origin),
+          },
+        };
+        admissions.push(CriticalAdmissionSchema.parse({ ...fields, sealSha256: semanticHash(fields) }));
+      } catch {
+        holds.push({ recordId: record.id, reason: 'critical_assessment_binding' });
+      }
+      continue;
     }
     const entry = entries.get(record.id);
     if (!entry) { holds.push({ recordId: record.id, reason: 'critical_assessment_missing' }); continue; }
@@ -98,7 +126,7 @@ export async function admitCriticalKnowledge(recordsInput: readonly PublicKnowle
         assessmentReceiptSha256: entry.finalArtifactSha256, itemSha256: final.itemSha256,
         receiptHashes: { A: assessments.A.receiptSha256, B: assessments.B.receiptSha256, C: assessments.C.receiptSha256 },
         artifactHashes: { item: entry.itemArtifactSha256, A: entry.AArtifactSha256, B: entry.BArtifactSha256, C: entry.CArtifactSha256 },
-        sourceEvidenceHashes: [...sourceEvidence].sort(), correlatedErrorRisk: final.correlatedErrorRisk as CriticalAdmission['correlatedErrorRisk'],
+        sourceEvidenceHashes: [...sourceEvidence].sort(), correlatedErrorRisk: final.correlatedErrorRisk as Extract<CriticalAdmission, { labelProvenance: 'ai_reconciled' }>['correlatedErrorRisk'],
         labelProvenance: 'ai_reconciled' as const, independentlyValidated: false as const, status: 'admitted' as const };
       admissions.push(CriticalAdmissionSchema.parse({ ...fields, sealSha256: semanticHash(fields) }));
     } catch {
@@ -109,6 +137,9 @@ export async function admitCriticalKnowledge(recordsInput: readonly PublicKnowle
   holds.sort((a, b) => a.recordId < b.recordId ? -1 : a.recordId > b.recordId ? 1 : 0);
   if (options.originalAdmissions && canonicalJson(options.originalAdmissions) !== canonicalJson(admissions)) throw Error('Published critical admissions differ from actual private assessment replay');
   const included = records.filter(record => !holds.some(hold => hold.recordId === record.id));
-  assertCriticalAdmissionsBound(included, admissions);
-  return { admissions, holds, dependencySha256: semanticHash(inventory.records.map(entry => ({ ...entry })).sort((a, b) => a.recordId < b.recordId ? -1 : a.recordId > b.recordId ? 1 : 0)) };
+  assertCriticalAdmissionsBound(included, admissions, retained ? { ...retained.baseline.lineage, selectedRecordOrigins: retained.selectedRecordOrigins } : null);
+  return { admissions, holds, dependencySha256: semanticHash({
+    assessments: inventory.records.map(entry => ({ ...entry })).sort((a, b) => a.recordId < b.recordId ? -1 : a.recordId > b.recordId ? 1 : 0),
+    retainedPublication: retained ? { lineage: retained.baseline.lineage, recordIds: [...retained.baseline.input.recordIds].sort() } : null,
+  }) };
 }

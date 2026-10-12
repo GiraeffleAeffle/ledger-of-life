@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
 import { canonicalJson, semanticHash, observation } from '../src/district-adapter-contract.ts';
 import { DistrictKnowledgeRecordSchema, REQUIRED_DETERMINISTIC_CHECKS, knowledgeEvidenceHash, sha256, type DistrictKnowledgeRecord } from '../src/district-schema.ts';
 import { GRAPH_DETERMINISTIC_CHECKS } from '../src/district-graph-claims.ts';
@@ -10,9 +11,41 @@ import { prepareCriticalAssessment, admitCriticalKnowledge } from '../src/distri
 import { criticalKnowledgeTarget, assertCriticalAdmissionsBound } from '../src/district-critical-assessment-public.ts';
 import { CriticalAdmissionsSchema, CriticalAdmissionSchema } from '../src/district-critical-assessment-contract.ts';
 import { admitStructuredObservations } from '../src/district-structured-record.ts';
+import { buildDistrictCoverage } from '../src/district-publication.ts';
+import { buildTextRunLineage,type TextLineageArtifact } from '../src/text-run-lineage.ts';
+import { loadDistrictRegistry } from '../src/district-registry.ts';
+import { dataReleaseId } from '../src/data-release.ts';
+import {loadRetainedPublicationComposition} from '../src/district-r1-text-composition.ts';
+import {textArtifact,syntheticTextContribution} from './helpers/text-publication-fixture.ts';
 import { admittedAssessmentFixture, syntheticAssessmentTriplet } from './district-assessment.fixture.ts';
 import type { PolicyReceipt } from '../src/district-policy-receipt.ts';
 interface CriticalFixture { directory: string; context: AssessmentEvidenceContext; source: AssessmentItem['sources'][number]; policy: PolicyReceipt }
+async function retainedPublicationFixture(record:DistrictKnowledgeRecord){
+ const registry=await loadDistrictRegistry(fileURLToPath(new URL('../sources/district-registry.json',import.meta.url)));
+ const city=registry.municipalities.find(item=>item.id===record.municipalityId)!;
+ record.sources[0].id=city.sources[0].id;record.sources[0].sourceType=city.sources[0].kind as typeof record.sources[number]['sourceType'];
+ record.documentDate='2026-10-11';record.documentDateQuote='11 October 2026';record.documentDateReason=null;
+ record.verification.evidenceHash=knowledgeEvidenceHash(record);
+ DistrictKnowledgeRecordSchema.parse(record);
+ const generatedAt='2026-10-11T12:00:00.000Z',crawl={schemaVersion:'stadtstack-crawl-index-v1',generatedAt,documents:[{id:'synthetic-retained',municipalityId:city.id,sourceId:city.sources[0].id,sha256:record.extraction.inputSha256}],checks:[]};
+ const run=syntheticTextContribution(registry,crawl,[record],[]),lineage=buildTextRunLineage([run],[{runId:run.runId,recordId:record.id,originalEvidenceHash:record.verification.evidenceHash,projectedRecord:record}],generatedAt);
+ const coverage=buildDistrictCoverage(registry,crawl,[record],{schemaVersion:'stadtstack-quarantine-v1',cases:[]},lineage,generatedAt);
+ const recordsArtifact=textArtifact({schemaVersion:'stadtstack-knowledge-v3',generatedAt,records:[record],identityAssertions:[],identityAdmissions:[]}),registryArtifact=textArtifact(registry),coverageArtifact=textArtifact(coverage);
+ const files=([['knowledge/records.json',recordsArtifact],['knowledge/coverage.json',coverageArtifact],['knowledge/registry.json',registryArtifact]] as const).map(([path,value])=>({path,sha256:value.sha256,bytes:Buffer.byteLength(value.bytes as string)}));
+ const manifest=textArtifact({schemaVersion:'stadtstack-data-release-v1',id:dataReleaseId(files),generatedAt,files,quality:{publishedRecords:1,quarantinedRecords:0,cities:registry.municipalities.length}});
+ const byPath=new Map<string,TextLineageArtifact>([['manifest.json',manifest],['records.json',recordsArtifact],['coverage.json',coverageArtifact],['registry.json',registryArtifact]]);
+ const retainedPins=Object.fromEntries(([['manifest',manifest],['records',recordsArtifact],['coverage',coverageArtifact],['registry',registryArtifact]] as const).map(([name,value])=>[name,{path:`retained/${name}.json`,sha256:value.sha256}]));
+ const nativePins=Object.fromEntries(Object.entries(run.artifacts).map(([name,value])=>[name,{path:`native/${name}.json`,sha256:value.sha256}]));
+ const raw={schemaVersion:'district-r1-text-composition-input-v1',generatedAt,approvedRunOrder:[run.runId],admissions:[{runId:run.runId,recordIds:[]}],contributions:[{runId:run.runId,pins:run.pins,sourceArtifactKind:'native_extraction_output',artifacts:nativePins}],retainedPublication:{...retainedPins,recordIds:[record.id]}};
+ const load=async(pin:{path:string})=>{
+  const artifact=pin.path.startsWith('retained/')?byPath.get(pin.path.slice('retained/'.length))??byPath.get(pin.path.split('/').at(-1)!):undefined;
+  if(!artifact)throw Error('Unexpected synthetic artifact pin');
+  return artifact.bytes;
+ };
+ const composition=await loadRetainedPublicationComposition(raw,load);
+ assert.ok(composition);
+ return {composition,raw,load,record,registry,coverage};
+}
 
 const digest = semanticHash('synthetic fixture hash');
 function modelRecord(fixture: CriticalFixture, summary: string, stage: 'adopted' | 'implemented' | 'unknown' = 'unknown') {
@@ -77,6 +110,29 @@ test('old generation/single-judge receipts cannot admit a critical finalization 
     assert.deepEqual(record.extraction, generation); assert.deepEqual(record.verification.faithfulness, judgment);
     assert.throws(() => assertCriticalAdmissionsBound([record], []), /cover exactly/);
   } finally { await rm(fixture.directory, { recursive: true, force: true }); }
+});
+test('authenticated retained originals use retained gates only; changed or unselected critical records remain held',async()=>{
+ const fixture=await admittedAssessmentFixture('Strausberg hat den Plan als Satzung beschlossen.');
+ try{
+  const record=modelRecord(fixture,'Strausberg hat den Plan als Satzung beschlossen.','adopted'),retained=await retainedPublicationFixture(record);
+  const accepted=await admitCriticalKnowledge([record],{records:[]},fixture.context.cas,{retainedPublication:retained.composition});
+  assert.deepEqual(accepted.holds,[]);
+  assert.equal(accepted.admissions[0].labelProvenance,'retained_original_gates');
+  assert.equal(accepted.admissions[0].independentlyValidated,false);
+  assert.equal('AArtifactSha256' in accepted.admissions[0],false);
+  const lineage={...retained.composition.baseline.lineage,selectedRecordOrigins:retained.composition.selectedRecordOrigins};
+  assert.doesNotThrow(()=>assertCriticalAdmissionsBound([record],accepted.admissions,lineage));
+  assert.throws(()=>assertCriticalAdmissionsBound([record],accepted.admissions),/exact publication lineage/);
+  const changed=structuredClone(record);changed.summary='Strausberg hat einen anderen Plan beschlossen.';changed.summaryQuote=changed.summary;changed.verification.evidenceHash=knowledgeEvidenceHash(changed);
+  const changedResult=await admitCriticalKnowledge([changed],{records:[]},fixture.context.cas,{retainedPublication:retained.composition});
+  assert.deepEqual(changedResult.admissions,[]);
+  assert.equal(changedResult.holds[0].reason,'critical_assessment_binding');
+  assert.throws(()=>assertCriticalAdmissionsBound([changed],accepted.admissions,lineage),/evidence binding|publication lineage/);
+  const unselected={...retained.composition,selectedRecordOrigins:[]};
+  const unselectedResult=await admitCriticalKnowledge([record],{records:[]},fixture.context.cas,{retainedPublication:unselected});
+  assert.deepEqual(unselectedResult.admissions,[]);
+  assert.equal(unselectedResult.holds[0].reason,'critical_assessment_missing');
+ }finally{await rm(fixture.directory,{recursive:true,force:true});}
 });
 test('actual private final/item/A/B/C replay produces only exact source-bound AI admission and stable full inventory dependency', async () => {
   const text = 'Strausberg hat den Plan als Satzung beschlossen.';

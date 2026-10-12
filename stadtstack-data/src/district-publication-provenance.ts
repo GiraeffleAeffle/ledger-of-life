@@ -17,6 +17,8 @@ const pinSchema=z.object({path:z.string().min(1),sha256:hashSchema,bytes:z.numbe
 export const privatePublicationProvenanceSchema=z.object({schemaVersion:z.literal('stadtstack-private-publication-provenance-v1'),inputs:z.array(pinSchema).min(1)}).strict();
 export type PrivatePublicationProvenance=z.infer<typeof privatePublicationProvenanceSchema>;
 export interface AuthenticatedPublicationProvenance {sha256:string;bindings:SourceArtifactBinding[];read(path:string):Promise<Buffer>;pins:ReadonlyMap<string,PrivatePublicationProvenance['inputs'][number]>}
+const authenticatedProvenances=new WeakSet<object>();
+export function assertAuthenticatedPublicationProvenance(value:AuthenticatedPublicationProvenance):void{if(!authenticatedProvenances.has(value))throw Error('Publication requires an authenticated provenance capability');}
 /** Independent inventory pins plus actual live inventory proofs; no label grants rights. */
 export async function authenticatePublicationProvenance(path:string,expectedSha256:string,policy:CivicPolicyOptions={}):Promise<AuthenticatedPublicationProvenance>{
  hashSchema.parse(expectedSha256);const filename=await realpath(resolve(path)),metadata=await lstat(filename);
@@ -34,5 +36,6 @@ export async function authenticatePublicationProvenance(path:string,expectedSha2
   if(bytes.length!==pin.bytes||sha256(bytes)!==pin.sha256)throw Error('Private publication input byte binding mismatch');
   await assertManagedSourceBindings(actual,pin.bindings,policy);return bytes;
  };
- return {sha256:expectedSha256,bindings:[...contributors.values()],read,pins};
+ const authenticated={sha256:expectedSha256,bindings:[...contributors.values()],read,pins};
+ authenticatedProvenances.add(authenticated);return authenticated;
 }

@@ -29,7 +29,7 @@ import type {DocumentChunk} from './district-claims.ts';
 import type {WorkPlan} from './district-work-plan.ts';
 import type {PreparationPlan} from './district-preparation-run.ts';
 import {IdentityAssertionSchema,IdentityAdmissionSchema} from './district-entity-resolution.ts';
-import {publicationInputsSchema} from './district-publication-inputs.ts';
+import {knowledgePreparationInputsSchema,publicationInputsSchema} from './district-publication-inputs.ts';
 import {priorReleaseSchema,readCommittedReleaseFile,loadPriorPublicationRelease,preloadPriorPublicationReleases,type PriorReleaseCache} from './district-publication-predecessor.ts';
 import {ManagedSourceBindingSchema,assertManagedSourceBindings,assertManagedSourceReadable,withManagedSourceScratch,withManagedSourceWrite,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,type ManagedSourceBinding,type ManagedSourceScratch,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {DistrictCas} from './district-cas.ts';
@@ -37,7 +37,7 @@ import {canonicalJson,semanticHash} from './district-adapter-contract.ts';
 import {insertR1MetadataSnapshot} from './district-jobs.ts';
 import {RepresentationDescriptorSchema} from './district-r1.ts';
 import {authenticatedHttpBinding,authenticateHttpSourceBindings} from './district-http-observation.ts';
-import {authenticatePublicationProvenance} from './district-publication-provenance.ts';
+import {authenticatePublicationProvenance,type AuthenticatedPublicationProvenance} from './district-publication-provenance.ts';
 import type {SourceArtifactBinding} from './district-private-io.ts';
 
 const Pin=z.object({path:z.string().min(1),sha256:hashSchema}).strict();
@@ -107,10 +107,11 @@ type ReplayPin=z.infer<typeof Pin>;
 interface ReplaySourceContext {
  scope:ManagedSourceScratch;
  predecessors:PriorReleaseCache;
- pinned:(pin:ReplayPin,base?:string)=>Promise<Buffer>;
+ provenance:AuthenticatedPublicationProvenance;
  policy:CivicPolicyOptions;
  bindings:SourceArtifactBinding[];
  cas:DistrictCas;
+ provenance:AuthenticatedPublicationProvenance;
  provenanceSha256:string;
 }
 async function authenticateReplayProvenance(receipt:ReplayReceipt,base:string){
@@ -126,8 +127,7 @@ async function authenticateReplayProvenance(receipt:ReplayReceipt,base:string){
   const binding=authenticatedHttpBinding(descriptor.httpObservation,{url:descriptor.snapshot.url,sha256:descriptor.snapshot.sourceSha256,mimeType:descriptor.snapshot.mimeType,retrievedAt:descriptor.snapshot.retrievedAt,fetchedAt:descriptor.fetchedAt});
   descriptors.push(binding);
  }
- if(descriptors.length){const sources=descriptors.map(binding=>{if(binding.kind!=='http_observation')throw Error('Original HTTP acquisition descriptor required');return {url:binding.url,sha256:binding.sourceSha256};});await authenticateHttpSourceBindings(cas,descriptors,sources,policy);}
- return {policy,pinned,bindings,cas,provenanceSha256:receipt.privateProvenance.sha256};
+ return {policy,pinned,bindings,cas,provenance,provenanceSha256:receipt.privateProvenance.sha256};
 }
 const replayArtifactAuditSchema=z.object({schemaVersion:z.literal('district-replay-artifact-audit-v1'),path:z.string().min(1),sha256:hashSchema,bytes:z.number().int().nonnegative(),mimeType:z.string().min(1),kind:z.literal('derived'),storageKey:z.string().regex(/^sha256\/[a-f0-9]{2}\/[a-f0-9]{64}$/),inputBindingSha256:hashSchema}).strict();
 async function persistReplayArtifacts(context:ReplaySourceContext,receiptSha256:string,proof:{comparison:{releaseId:string;manifestSha256:string;files:DataRelease['files']};executedAt:string;completedAt:string;asOf:string;publicationInputsSha256:string}){
@@ -345,7 +345,10 @@ async function replayAdmittedPublication(receipt:ReplayReceipt,base:string,works
  return withPreparedKnowledge({registry:resolve(base,receipt.registry.path),records:resolve(base,receipt.candidateRecords.path),quarantine:resolve(base,receipt.candidateQuarantine.path),textComposition:receipt.textComposition?resolve(base,receipt.textComposition.path):undefined,structuredRun:receipt.structuredRun?resolve(base,receipt.structuredRun.path):undefined,policyReceipts:resolve(base,receipt.policyReceipts.path),identityAssessments:receipt.identityAssessments?resolve(base,receipt.identityAssessments.path):undefined,criticalAssessments:receipt.criticalAssessments?resolve(base,receipt.criticalAssessments.path):undefined,privateProvenance:{path:resolve(base,receipt.privateProvenance.path),sha256:receipt.privateProvenance.sha256},outputRoot:resolve(base,receipt.workspace),casRoot:resolve(base,receipt.casRoot),policyStateDir:receipt.policyStateDir?resolve(base,receipt.policyStateDir):undefined,policyAuthorityId:receipt.policyAuthorityId,policyAuthoritySha256:receipt.policyAuthoritySha256,coverageGeneratedAt:receipt.clocks.coverageGeneratedAt},async prepared=>{
   const nested:ReplaySourceContext={...context,scope:prepared.scope},output=join(prepared.scope.directory,'release'),prior=join(prepared.scope.directory,'prior'),baseline=await stagePriorRelease(receipt,expected,cities,prior,nested);
   for(const [path,bytes] of staging)await privateFile(join(prepared.stagingDir,path),bytes,prepared.scope);
-  await publish({stagingDir:prepared.stagingDir,outDir:output,asOf:original.asOf,priorRelease:receipt.priorRelease,legacyPreviousReleases:receipt.legacyPreviousReleases,offlineReplay:true,priorCityRoot:prior,publicationInputs:resolve(base,receipt.publicationInputs.path),policyReceipts:resolve(base,receipt.policyReceipts.path),identityAssessments:receipt.identityAssessments?resolve(base,receipt.identityAssessments.path):undefined,criticalAssessments:receipt.criticalAssessments?resolve(base,receipt.criticalAssessments.path):undefined,structuredRun:receipt.structuredRun?resolve(base,receipt.structuredRun.path):undefined,regionalPolicyReceipts:receipt.regionalPolicyReceipts?resolve(base,receipt.regionalPolicyReceipts.path):undefined,casRoot:resolve(base,receipt.casRoot),policyStateDir:receipt.policyStateDir?resolve(base,receipt.policyStateDir):undefined,policyAuthorityId:receipt.policyAuthorityId,policyAuthoritySha256:receipt.policyAuthoritySha256,qualityGeneratedAt:receipt.clocks.qualityGeneratedAt,manifestGeneratedAt:receipt.clocks.manifestGeneratedAt},context.predecessors);
+  const readPrior=async(path:string)=>{await prepared.scope.assertActive();const expectedBytes=baseline.files.get(path);if(!expectedBytes)throw Error('Replay predecessor member is not authenticated');const bytes=await readFile(join(prior,path));if(!bytes.equals(expectedBytes))throw Error('Replay predecessor lease member differs from authenticated release');await prepared.scope.assertActive();return bytes;};
+  const readLeaseFile=async(path:string)=>{const handle=await open(join(prepared.stagingDir,path),constants.O_RDONLY|constants.O_NOFOLLOW);try{const stat=await handle.stat();if(!stat.isFile()||stat.size>512*1024*1024)throw Error('Replay preparation staging file rejected');return await handle.readFile();}finally{await handle.close();}};
+  const readStaging=async(path:string)=>{await prepared.scope.assertActive();if(path==='knowledge/preparation-inputs.json'){const bytes=await readLeaseFile(path);knowledgePreparationInputsSchema.parse(JSON.parse(bytes.toString('utf8')));await prepared.scope.assertActive();return bytes;}if(path.startsWith('knowledge/')){const handoff=knowledgePreparationInputsSchema.parse(JSON.parse((await readLeaseFile('knowledge/preparation-inputs.json')).toString('utf8'))),member=handoff.outputs.find(output=>output.path===path);if(!member)throw Error('Replay knowledge staging is not bound to its preparation handoff');const bytes=await readLeaseFile(path);if(bytes.length!==member.bytes||hash(bytes)!==member.sha256)throw Error('Replay knowledge staging differs from its preparation handoff');await prepared.scope.assertActive();return bytes;}const bytes=staging.get(path);if(!bytes)throw Error('Replay staged input is not bound to its receipt');const stored=await readFile(join(prepared.stagingDir,path));if(!stored.equals(bytes))throw Error('Replay lease staging differs from authenticated input bytes');await prepared.scope.assertActive();return bytes;};
+  await publish({stagingDir:prepared.stagingDir,outDir:output,asOf:original.asOf,priorRelease:receipt.priorRelease,legacyPreviousReleases:receipt.legacyPreviousReleases,offlineReplay:true,priorCityRoot:prior,publicationInputs:resolve(base,receipt.publicationInputs.path),textComposition:receipt.textComposition?resolve(base,receipt.textComposition.path):undefined,policyReceipts:resolve(base,receipt.policyReceipts.path),identityAssessments:receipt.identityAssessments?resolve(base,receipt.identityAssessments.path):undefined,criticalAssessments:receipt.criticalAssessments?resolve(base,receipt.criticalAssessments.path):undefined,structuredRun:receipt.structuredRun?resolve(base,receipt.structuredRun.path):undefined,regionalPolicyReceipts:receipt.regionalPolicyReceipts?resolve(base,receipt.regionalPolicyReceipts.path):undefined,privateProvenance:{path:resolve(base,receipt.privateProvenance.path),sha256:receipt.privateProvenance.sha256},casRoot:resolve(base,receipt.casRoot),policyStateDir:receipt.policyStateDir?resolve(base,receipt.policyStateDir):undefined,policyAuthorityId:receipt.policyAuthorityId,policyAuthoritySha256:receipt.policyAuthoritySha256,qualityGeneratedAt:receipt.clocks.qualityGeneratedAt,manifestGeneratedAt:receipt.clocks.manifestGeneratedAt},context.predecessors,{provenance:context.provenance,readPrior,readStaging});
   const actual=await verifyDataRelease(output),comparison=compareReplayRelease(expectedBytes,await readFile(join(output,'release-manifest.json')),actual);
   const proof={schemaVersion:'stadtstack-offline-replay-proof-v2',mode:receipt.mode,executedAt,completedAt:new Date().toISOString(),execution:{modelCalls:0,readinessCalls:0,liveFallback:'forbidden',networkIsolation:'external; not asserted by this proof'},historicalClocks:receipt.clocks,asOf:original.asOf,priorRelease:baseline,publicationInputsSha256:receipt.publicationInputs.sha256,knowledge:prepared.summary,comparison,...(text?{textGeneration:text.textGeneration}:{})};
   return {...proof,persistence:await persistReplayArtifacts(nested,receiptSha256,proof)};

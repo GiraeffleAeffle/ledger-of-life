@@ -4,6 +4,8 @@ import { PublicKnowledgeRecordSchema, type PublicKnowledgeRecord } from './distr
 import { stageEvidenceSupports } from './district-stage-evidence.ts';
 import { CRITICAL_ASSESSMENT_VERSION, CriticalRecordTargetSchema, CriticalClaimSchema, CriticalAdmissionSchema,
   type CriticalClaim } from './district-critical-assessment-contract.ts';
+import { textLineageRecordSha256 } from './text-run-lineage.ts';
+import type { RetainedKnowledgeLineage } from './retained-knowledge-lineage.ts';
 
 // Public content validation only: no VM authority, private CAS, filesystem or model jobs.
 const finalStages = ['adopted', 'in_force', 'implemented'] as const;
@@ -68,7 +70,7 @@ export function criticalKnowledgeTarget(input: PublicKnowledgeRecord) {
     recordEvidenceSha256: record.verification.evidenceHash, claimProjectionSha256: semanticHash(claimProjection),
     claimProjection, claims: required });
 }
-export function assertCriticalAdmissionsBound(recordsInput: readonly PublicKnowledgeRecord[], admissionsInput: unknown): void {
+export function assertCriticalAdmissionsBound(recordsInput: readonly PublicKnowledgeRecord[], admissionsInput: unknown, retainedPublication?: RetainedKnowledgeLineage | null): void {
   const admissions = z.array(CriticalAdmissionSchema).parse(admissionsInput), byId = new Map(admissions.map(seal => [seal.recordId, seal]));
   if (byId.size !== admissions.length) throw Error('Duplicate critical admission record');
   const required = recordsInput.map(record => criticalKnowledgeTarget(record)).filter(target => target !== null);
@@ -77,6 +79,16 @@ export function assertCriticalAdmissionsBound(recordsInput: readonly PublicKnowl
     const seal = byId.get(target.recordId);
     if (!seal || seal.recordEvidenceSha256 !== target.recordEvidenceSha256 || seal.claimProjectionSha256 !== target.claimProjectionSha256
       || canonicalJson(seal.claims) !== canonicalJson(target.claims.map(claim => ({ claimId: claim.claimId, kind: claim.kind, claimSha256: claim.claimSha256 })))) throw Error('Critical public projection record/claim binding mismatch');
+    if (seal.labelProvenance === 'retained_original_gates') {
+      const origin = retainedPublication?.selectedRecordOrigins.find(value => value.recordId === target.recordId);
+      const record = recordsInput.find(value => value.id === target.recordId)!;
+      const binding = seal.retainedPublication;
+      if (!retainedPublication || !origin || binding.releaseId !== retainedPublication.releaseId
+        || binding.manifestSha256 !== retainedPublication.manifestSha256 || binding.recordsSha256 !== retainedPublication.members.records.sha256
+        || binding.originalRecordSha256 !== origin.originalRecordSha256 || binding.originalEvidenceHash !== origin.originalEvidenceHash
+        || binding.originSha256 !== textLineageRecordSha256(origin) || origin.currentEvidenceHash !== target.recordEvidenceSha256
+        || origin.currentRecordSha256 !== textLineageRecordSha256(record)) throw Error('Critical retained original gates lack exact publication lineage');
+    }
     if (target.claims.some(claim => !seal.sourceEvidenceHashes.includes(claim.sourceSha256)
       || !seal.sourceEvidenceHashes.includes(semanticHash([claim.sourceSha256, claim.quote])))) throw Error('Critical public projection original evidence binding mismatch');
   }

@@ -2,7 +2,8 @@ import {join} from 'node:path';
 import {readFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {z} from 'zod';
-import {CoverageSchema,ObservationSchema,HashSchema,ScopeSchema,canonicalJson,semanticHash,digest} from './district-adapter-contract.ts';
+import {operatorRegistryInputPinSchema} from './district-registry-config.ts';
+import {authenticateStructuredRegistry} from './district-structured-registry-admission.ts';
 import {StructuredWorkerRequestSchema,StructuredOutputPageSchema,STRUCTURED_WORKER_VERSION,type StructuredWorkerRequest} from './district-structured-parser-worker.ts';
 import {withParserSandbox,parserIsolationContractSha256,ParserIsolationError,type ParserSourceContext} from './district-parser-isolation.ts';
 import {admitStructuredObservations,StructuredKnowledgeRecordSchema,StructuredSupportingSourceSchema,type StructuredKnowledgeRecord,type StructuredAdmission} from './district-structured-record.ts';
@@ -13,7 +14,7 @@ import {pipelineNotificationConfig} from './district-notifications.ts';
 import {structuredFieldPublicationHold} from './district-public-fields.ts';
 import {HttpSourceBindingSchema,authenticateHttpSourceBindings} from './district-http-observation.ts';
 
-const SelectorSchema=z.object({worker:StructuredWorkerRequestSchema,adapterContractSha256:HashSchema,parserContractSha256:HashSchema,hostContractSha256:HashSchema,districtId:z.string().min(1),supportingSources:z.array(StructuredSupportingSourceSchema),sourceBindings:z.array(HttpSourceBindingSchema).min(1)}).strict();
+const SelectorSchema=z.object({worker:StructuredWorkerRequestSchema,registry:operatorRegistryInputPinSchema,registrySha256:HashSchema,adapterContractSha256:HashSchema,parserContractSha256:HashSchema,hostContractSha256:HashSchema,districtId:z.string().min(1),supportingSources:z.array(StructuredSupportingSourceSchema),sourceBindings:z.array(HttpSourceBindingSchema).min(1)}).strict();
 const resourceSchema=z.object({url:z.url(),nativeId:z.string().min(1),parentId:z.string().nullable(),method:z.enum(['GET','POST']),body:z.string().nullable(),format:z.string().min(1)}).strict();
 const outputSchema=z.object({version:z.literal(STRUCTURED_WORKER_VERSION),requestSha256:HashSchema,adapterId:z.string().min(1),adapterVersion:z.string().min(1),result:z.union([z.object({observations:z.array(ObservationSchema),coverage:CoverageSchema}).strict(),z.object({resources:z.array(resourceSchema),coverage:CoverageSchema}).strict()]),page:StructuredOutputPageSchema.nullable()}).strict();
 export const StructuredJobResultSchema=z.object({schemaVersion:z.literal('district-structured-job-result-v1'),requestSha256:HashSchema,adapterId:z.string().min(1),adapterVersion:z.string().min(1),adapterContractSha256:HashSchema,parserContractSha256:HashSchema,hostContractSha256:HashSchema,scope:ScopeSchema,sourceSha256:HashSchema,policyReceiptSha256:HashSchema,supportingSources:z.array(StructuredSupportingSourceSchema),result:outputSchema.shape.result,page:StructuredOutputPageSchema.nullable(),records:z.array(StructuredKnowledgeRecordSchema),unpublishedObservations:z.number().int().nonnegative()}).strict();
@@ -23,7 +24,7 @@ export interface StructuredJobContract {adapterContractSha256:string;parserContr
 export async function structuredJobContract(adapter:StructuredWorkerRequest['adapter']):Promise<StructuredJobContract>{
  const name=StructuredWorkerRequestSchema.shape.adapter.parse(adapter)==='state-gauges'?'gauges':adapter;
  const adapterContractSha256=digest(await readFile(new URL(`../sources/${name}-contract.json`,import.meta.url)));
- const files=['district-structured-jobs.ts','district-policy-receipt.ts','district-http-observation.ts','source-observation.ts','district-structured-record.ts','district-public-fields.ts','district-entity-resolution.ts','district-case-linking.ts','district-schema.ts','district-graph-claims.ts','planning-stages.ts','case-supersession.ts','source-policy.ts','document-origin-contract.ts','document-origin.ts','civic-opt-out.ts','civic-docker.ts','district-cas.ts','district-step-receipt.ts','district-jobs.ts'];
+ const files=['district-structured-jobs.ts','district-structured-registry-admission.ts','district-registry-config.ts','district-policy-receipt.ts','district-http-observation.ts','source-observation.ts','district-structured-record.ts','district-public-fields.ts','district-entity-resolution.ts','district-case-linking.ts','district-schema.ts','district-graph-claims.ts','planning-stages.ts','case-supersession.ts','source-policy.ts','document-origin-contract.ts','document-origin.ts','civic-opt-out.ts','civic-docker.ts','district-cas.ts','district-step-receipt.ts','district-jobs.ts'];
  const hostContractSha256=semanticHash(await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))}))));
  const parserContractSha256=await parserIsolationContractSha256();
  return {adapterContractSha256,parserContractSha256,hostContractSha256,semanticContractSha256:semanticHash({worker:STRUCTURED_WORKER_VERSION,adapterContractSha256,parserContractSha256,hostContractSha256})};
@@ -47,12 +48,14 @@ async function executeStructured(context:JobHandlerContext):Promise<JobHandlerRe
  const selector=SelectorSchema.parse(context.job.spec.selector),request=selector.worker;
  if(context.job.spec.step!==`structured_${request.operation}`||context.job.spec.policyProofSha256!==request.snapshot.policyReceiptSha256||semanticHash(context.job.spec.sourceScope)!==semanticHash(request.scope)||!context.job.spec.inputArtifactHashes.includes(request.snapshot.sourceSha256)||!context.job.spec.inputArtifactHashes.includes(request.snapshot.policyReceiptSha256))throw Error('Structured job selector binding mismatch');
  if(!context.job.spec.inputArtifactHashes.includes(request.inputArtifactSha256))throw Error('Selected parser artifact omitted from job identity');
+ if(!context.job.spec.inputArtifactHashes.includes(selector.registrySha256))throw Error('Admitted registry omitted from job identity');
  for(const declared of request.auxiliary)if(!selector.supportingSources.some(source=>source.sha256===declared.snapshot.sourceSha256&&source.policyReceiptSha256===declared.snapshot.policyReceiptSha256&&source.url===declared.snapshot.url&&source.mimeType===declared.snapshot.mimeType))throw Error('Auxiliary snapshot lacks admitted supporting source');
  const contract=await structuredJobContract(request.adapter);
  if(selector.adapterContractSha256!==contract.adapterContractSha256||selector.parserContractSha256!==contract.parserContractSha256||selector.hostContractSha256!==contract.hostContractSha256||context.job.spec.semanticContractSha256!==contract.semanticContractSha256)throw Error('Structured parser or admission semantic contract changed');
  const receipt=PolicyReceiptSchema.parse(JSON.parse((await context.cas.read(request.snapshot.policyReceiptSha256)).toString('utf8')));
  if(semanticHash(receipt)!==request.snapshot.policyReceiptSha256||receipt.source.url!==request.snapshot.url||receipt.source.sha256!==request.snapshot.sourceSha256||receipt.source.mimeType!==request.snapshot.mimeType||semanticHash(receipt.scope)!==semanticHash(request.scope))throw Error('Structured source policy binding mismatch');
  const policy=await recheckPolicyReceipt(receipt,{evaluationAt:new Date().toISOString()});
+ await authenticateStructuredRegistry(context.cas,{registry:selector.registry,registrySha256:selector.registrySha256,scope:request.scope,districtId:selector.districtId,supportingSourceIds:selector.supportingSources.map(source=>source.id)},{authorityId:receipt.authorityId,authoritySha256:receipt.authoritySha256});
  const supportAdmissions:StructuredAdmission[]=[];
  for(const source of selector.supportingSources){
   if(!context.job.spec.inputArtifactHashes.includes(source.sha256)||!context.job.spec.inputArtifactHashes.includes(source.policyReceiptSha256))throw Error('Supporting original/receipt omitted from job identity');

@@ -16,10 +16,10 @@ import {canonicalJson} from './district-adapter-contract.ts';
 import {DistrictCas} from './district-cas.ts';
 import {assertPublicUrls} from './publication-quality.ts';
 import {cacheDir,root,hash} from './common.ts';
-import {loadR1TextCompositionInput,buildR1TextCompositionContext,rebuildR1TextCoverageContext,type R1TextCompositionContext} from './district-r1-text-composition.ts';
+import {loadR1TextCompositionInput,loadRetainedPublicationComposition,buildR1TextCompositionContext,rebuildR1TextCoverageContext,type R1TextCompositionContext} from './district-r1-text-composition.ts';
 import {admitCriticalKnowledge} from './district-critical-assessment.ts';
 import {CriticalAdmissionsSchema,CRITICAL_ADMISSIONS_VERSION} from './district-critical-assessment-contract.ts';
-import {readCivicOptOutSnapshot,withManagedSourceScratch,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions,type ManagedSourceScratch} from './civic-opt-out.ts';
+import {assertCriticalAdmissionsBound} from './district-critical-assessment-public.ts';
 import {authenticatePublicationProvenance,type AuthenticatedPublicationProvenance} from './district-publication-provenance.ts';
 import {writeManagedSourceArtifact} from './district-private-io.ts';
 const preparedBindingSchema=z.object({kind:z.literal('prepared_source'),url:z.url(),sourceSha256:z.string().regex(/^[a-f0-9]{64}$/),observationId:z.string().min(1),receiptSha256:z.string().regex(/^[a-f0-9]{64}$/),independentAllowed:z.boolean()}).strict();
@@ -42,14 +42,17 @@ async function assembleKnowledge(options:PrepareKnowledgeOptions,provenance:Auth
  const knowledge=KnowledgeRecordsSchema.parse(JSON.parse(recordBytes.toString('utf8'))),quarantine=JSON.parse(quarantineBytes.toString('utf8'));
  if(!Array.isArray(quarantine.cases))throw Error('Missing actual extraction quarantine evidence');
  const dependencies:PublicationDependency[]=[{role:'registry',sha256:hash(registryBytes)},{role:'candidate_records',sha256:hash(recordBytes)},{role:'candidate_quarantine',sha256:hash(quarantineBytes)}];
- let composition:R1TextCompositionContext|undefined;
+ let composition:R1TextCompositionContext|undefined,retainedPublication:R1TextCompositionContext['retainedPublication']=null;
  if(options.textComposition){
-  const path=await realpath(resolve(options.textComposition)),base=dirname(path),raw=JSON.parse((await provenance.read(path)).toString('utf8'));
-  const input=await loadR1TextCompositionInput(raw,async pin=>{const actual=await realpath(resolve(base,pin.path)),child=relative(base,actual);if(!child||child.startsWith('..')||isAbsolute(child)||actual.split(/[\\/]/).includes('out'))throw Error('Text composition artifact escapes its managed private input root');const bytes=await provenance.read(actual);if(hash(bytes)!==pin.sha256)throw Error('Text composition independent artifact pin mismatch');return bytes;});
+  const path=await realpath(resolve(options.textComposition)),base=dirname(path),inputBytes=await provenance.read(path),raw=JSON.parse(inputBytes.toString('utf8'));
+  const loadArtifact=async(pin:{path:string;sha256:string})=>{const actual=await realpath(resolve(base,pin.path)),child=relative(base,actual);if(!child||child.startsWith('..')||isAbsolute(child)||actual.split(/[\\/]/).includes('out'))throw Error('Text composition artifact escapes its managed private input root');const bytes=await provenance.read(actual);if(hash(bytes)!==pin.sha256)throw Error('Text composition independent artifact pin mismatch');return bytes;};
+  const input=await loadR1TextCompositionInput(raw,loadArtifact);
+  retainedPublication=await loadRetainedPublicationComposition(raw,loadArtifact);
   composition=buildR1TextCompositionContext(input);
+  if(canonicalJson(composition.retainedPublication)!==canonicalJson(retainedPublication))throw Error('Retained publication composition differs from authenticated text input');
   const supplied=knowledge.records.filter(record=>record.kind==='text_model');
   if(canonicalJson(supplied)!==canonicalJson(composition.knowledge.records))throw Error('Candidate text rows differ from authenticated ordered composition');
-  dependencies.push(...composition.dependencies);
+  dependencies.push(...composition.dependencies.filter(dependency=>dependency.role!=='text_composition'),...(dependencies.some(dependency=>dependency.role==='text_composition')?[]:[{role:'text_composition',sha256:hash(inputBytes)}]));
  }
  const structuredBytes=options.structuredRun?await provenance.read(options.structuredRun):undefined,structured=structuredBytes?structuredRunSchema.parse(JSON.parse(structuredBytes.toString('utf8'))):undefined;
  if(structured){
@@ -67,11 +70,12 @@ async function assembleKnowledge(options:PrepareKnowledgeOptions,provenance:Auth
  if(!options.policyReceipts)throw Error('Knowledge publication requires actual private current-policy receipts');
  const policyInventory=publicationPolicyReceiptInventorySchema.parse(JSON.parse((await provenance.read(options.policyReceipts)).toString('utf8'))),cas=new DistrictCas(options.casRoot??join(cacheDir,'districts','cas'));
  const preparationEpoch=await readCivicOptOutSnapshot(policyOptions);
- const policy=await recheckPublicationPolicy(knowledge.records,policyInventory,cas,{evaluationAt:new Date().toISOString(),...(options.policyStateDir?{stateDir:options.policyStateDir}:{})});
+ const retainedLineage=retainedPublication?{...retainedPublication.baseline.lineage,selectedRecordOrigins:retainedPublication.selectedRecordOrigins}:null;
+ const policy=await recheckPublicationPolicy(knowledge.records,policyInventory,cas,{evaluationAt:new Date().toISOString(),...(options.policyStateDir?{stateDir:options.policyStateDir}:{}),retainedPublication:retainedLineage});
  dependencies.push({role:'policy_receipts',sha256:policy.inventorySha256});
  if(structured){const checked=await verifyStructuredRunReceipts(structured,cas,{evaluationAt:new Date().toISOString(),...(options.policyStateDir?{stateDir:options.policyStateDir}:{}),currentAdmissionReceipts:policy.currentAdmissionReceipts});dependencies.push({role:'structured_receipts',sha256:checked.dependencySha256});}
  const criticalInventory=options.criticalAssessments?JSON.parse((await provenance.read(options.criticalAssessments)).toString('utf8')):{records:[]};
- const critical=await admitCriticalKnowledge(knowledge.records,criticalInventory,cas,{policyOptions,currentAdmissionReceipts:policy.currentAdmissionReceipts});
+ const critical=await admitCriticalKnowledge(knowledge.records,criticalInventory,cas,{policyOptions,currentAdmissionReceipts:policy.currentAdmissionReceipts,retainedPublication});
  dependencies.push({role:'critical_assessments',sha256:critical.dependencySha256});
  const criticalIds=new Set(critical.holds.map(hold=>hold.recordId));
  for(const record of knowledge.records)if(record.kind==='text_model'&&criticalIds.has(record.id))quarantine.cases.push({kind:'text_model',recordId:record.id,municipalityId:record.municipalityId,sourceId:record.sources[0].id,sourceSha256:record.extraction.inputSha256,reason:critical.holds.find(hold=>hold.recordId===record.id)!.reason});
@@ -95,11 +99,12 @@ async function assembleKnowledge(options:PrepareKnowledgeOptions,provenance:Auth
  if(!knowledge.records.length)throw Error('No passing knowledge records');
  const finalText=knowledge.records.filter(record=>record.kind==='text_model'),textCoverage=composition?rebuildR1TextCoverageContext(composition,finalText,options.coverageGeneratedAt??knowledge.generatedAt):null;
  if(!composition&&finalText.length)throw Error('Text publication requires explicit authenticated text composition');
- const coverage=buildDistrictCoverage(registry,textCoverage?.crawl??crawlInput,knowledge.records,quarantine,textCoverage?.textLineage??null,options.coverageGeneratedAt??knowledge.generatedAt,structured);
+ const coverage=buildDistrictCoverage(registry,textCoverage?.crawl??crawlInput,knowledge.records,quarantine,textCoverage?.textLineage??null,options.coverageGeneratedAt??knowledge.generatedAt,structured,textCoverage?.retainedPublication??null);
  assertPublicUrls({registry,records:knowledge,coverage});
  const finalEpoch=await readCivicOptOutSnapshot({...policyOptions,authorityId:preparationEpoch.authorityId,authoritySha256:preparationEpoch.authoritySha256});
  if(policy.optOutSnapshotSha256!==preparationEpoch.sha256||finalEpoch.sha256!==preparationEpoch.sha256)throw Error('Current policy changed during knowledge preparation');
  const criticalProjection=CriticalAdmissionsSchema.parse({schemaVersion:CRITICAL_ADMISSIONS_VERSION,admissions:critical.admissions.filter(admission=>knowledge.records.some(record=>record.id===admission.recordId))});
+ assertCriticalAdmissionsBound(knowledge.records,criticalProjection.admissions,coverage.retainedPublication);
  const staged=[['registry',registry],['records',knowledge],['coverage',coverage],['assessment-admissions',criticalProjection]] as const;
  const outputs=staged.map(([name,data])=>({path:`knowledge/${name}.json` as 'knowledge/registry.json'|'knowledge/records.json'|'knowledge/coverage.json'|'knowledge/assessment-admissions.json',bytes:Buffer.from(JSON.stringify(data,null,2)+'\n')}));
  const handoff=knowledgePreparationInputsSchema.parse({schemaVersion:'stadtstack-knowledge-preparation-inputs-v1',dependencies,outputs:outputs.map(({path,bytes})=>({path,sha256:hash(bytes),bytes:bytes.length}))});
@@ -109,21 +114,24 @@ async function assembleKnowledge(options:PrepareKnowledgeOptions,provenance:Auth
 }
 export async function prepareKnowledge(options:PrepareKnowledgeOptions){
  const provenance=await preparationInputs(options),prepared=await assembleKnowledge(options,provenance),outputRoot=resolve(options.outputRoot??join(cacheDir,'districts','r1-knowledge-preparation')),stagingDir=resolve(options.stagingDir??join(outputRoot,'staging','knowledge')),policy=preparationPolicy(options),managed={...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts' as const};
- const outputPins=[];
+ const handoffPath=join(stagingDir,'preparation-inputs.json'),handoffBytes=Buffer.from(JSON.stringify(prepared.handoff,null,2)+'\n'),outputPins=[];
  for(const output of prepared.outputs){const path=join(stagingDir,output.path.slice('knowledge/'.length));const sha256=await writeManagedSourceArtifact(outputRoot,path,output.bytes,provenance.bindings,managed);outputPins.push({path,sha256,bytes:output.bytes.length,bindings:provenance.bindings});}
- for(const [path,data] of [[options.publicationQuarantinePath??join(outputRoot,'publication-quarantine.json'),prepared.publicationQuarantine],[join(stagingDir,'preparation-inputs.json'),prepared.handoff]] as const)await writeManagedSourceArtifact(outputRoot,resolve(path),JSON.stringify(data,null,2)+'\n',provenance.bindings,managed);
+ const handoffSha256=await writeManagedSourceArtifact(outputRoot,handoffPath,handoffBytes,provenance.bindings,managed);outputPins.push({path:handoffPath,sha256:handoffSha256,bytes:handoffBytes.length,bindings:provenance.bindings});
+ await writeManagedSourceArtifact(outputRoot,resolve(options.publicationQuarantinePath??join(outputRoot,'publication-quarantine.json')),JSON.stringify(prepared.publicationQuarantine,null,2)+'\n',provenance.bindings,managed);
  return {...prepared.summary,outputPins};
 }
 /** The consumer runs inside a real nested canonical lease; no caller scope/boolean is accepted. */
-export async function withPreparedKnowledge<T>(options:PrepareKnowledgeOptions,consume:(prepared:{summary:PreparedKnowledgeSummary;stagingDir:string;scope:ManagedSourceScratch})=>Promise<T>):Promise<T>{
+export async function withPreparedKnowledge<T>(options:PrepareKnowledgeOptions,consume:(prepared:{summary:PreparedKnowledgeSummary;stagingDir:string;scope:ManagedSourceScratch;outputPins:Array<{path:string;sha256:string;bytes:number}>})=>Promise<T>):Promise<T>{
  const provenance=await preparationInputs(options),policy=preparationPolicy(options),outputRoot=resolve(options.outputRoot??join(cacheDir,'districts','r1-knowledge-preparation'));
  return withManagedSourceScratch(outputRoot,provenance.bindings.map(({independentAllowed:_flag,...binding})=>binding),async scope=>{
-  const prepared=await assembleKnowledge(options,provenance),stagingDir=join(scope.directory,'staging');
+  const prepared=await assembleKnowledge(options,provenance),stagingDir=join(scope.directory,'staging'),outputPins=prepared.outputs.map(output=>({path:join(stagingDir,output.path),sha256:hash(output.bytes),bytes:output.bytes.length}));
+  const handoffPath=join(stagingDir,'knowledge/preparation-inputs.json'),handoffBytes=Buffer.from(JSON.stringify(prepared.handoff,null,2)+'\n');
+  outputPins.push({path:handoffPath,sha256:hash(handoffBytes),bytes:handoffBytes.length});
   const write=async(path:string,bytes:string|Uint8Array)=>{await scope.assertActive();await mkdir(dirname(path),{recursive:true,mode:0o700});const file=await open(path,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);try{await file.writeFile(bytes);await file.sync();}finally{await file.close();}await scope.assertActive();};
   for(const output of prepared.outputs)await write(join(stagingDir,output.path),output.bytes);
-  await write(join(stagingDir,'knowledge/preparation-inputs.json'),JSON.stringify(prepared.handoff,null,2)+'\n');
+  await write(handoffPath,handoffBytes);
   await write(join(scope.directory,'publication-quarantine.json'),JSON.stringify(prepared.publicationQuarantine,null,2)+'\n');
-  return consume({summary:prepared.summary,stagingDir,scope});
+  return consume({summary:prepared.summary,stagingDir,scope,outputPins});
  },{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',purpose:'artifact'});
 }
 if(process.argv[1]&&await realpath(process.argv[1]).then(entry=>import.meta.url===pathToFileURL(entry).href,()=>false)){

@@ -30,18 +30,31 @@ export const CriticalAssessmentInventorySchema = z.object({ records: z.array(z.o
   AArtifactSha256: HashSchema, BArtifactSha256: HashSchema, CArtifactSha256: HashSchema,
 }).strict()) }).strict();
 export type CriticalAssessmentInventory = z.infer<typeof CriticalAssessmentInventorySchema>;
-const fields = z.object({
+const commonFields = z.object({
   version: z.literal('critical-knowledge-admission-v1'), recordId: z.string().min(1), recordEvidenceSha256: HashSchema,
   claimProjectionSha256: HashSchema,
   claims: z.array(CriticalClaimSchema.pick({ claimId: true, kind: true, claimSha256: true })).min(1),
+  sourceEvidenceHashes: z.array(HashSchema).min(1),
+  independentlyValidated: z.literal(false), status: z.literal('admitted'), sealSha256: HashSchema,
+}).strict();
+/** New or changed critical claims: actual blind original-evidence A/B/C replay. */
+const assessedFields = commonFields.extend({
   assessmentReceiptSha256: HashSchema, itemSha256: HashSchema,
   receiptHashes: z.object({ A: HashSchema, B: HashSchema, C: HashSchema }).strict(),
   artifactHashes: z.object({ item: HashSchema, A: HashSchema, B: HashSchema, C: HashSchema }).strict(),
-  sourceEvidenceHashes: z.array(HashSchema).min(1),
   correlatedErrorRisk: z.enum(['same-model-family', 'different-providers-still-not-independent-validation']),
-  labelProvenance: z.literal('ai_reconciled'), independentlyValidated: z.literal(false), status: z.literal('admitted'),
+  labelProvenance: z.literal('ai_reconciled'),
 }).strict();
-export const CriticalAdmissionSchema = fields.extend({ sealSha256: HashSchema }).strict().superRefine((seal, ctx) => {
+/** Main's narrow exemption: an authenticated byte/claim-equivalent retained original keeps
+ * only its original gates. Not new AI reconciliation, not independent gold, no A/B/C or run IDs. */
+const retainedFields = commonFields.extend({
+  labelProvenance: z.literal('retained_original_gates'),
+  retainedPublication: z.object({
+    releaseId: HashSchema, manifestSha256: HashSchema, recordsSha256: HashSchema,
+    originalRecordSha256: HashSchema, originalEvidenceHash: HashSchema, originSha256: HashSchema,
+  }).strict(),
+}).strict();
+export const CriticalAdmissionSchema = z.discriminatedUnion('labelProvenance', [assessedFields, retainedFields]).superRefine((seal, ctx) => {
   const { sealSha256, ...body } = seal;
   if (sealSha256 !== semanticHash(body)) ctx.addIssue({ code: 'custom', message: 'Critical admission seal hash mismatch' });
   if (new Set(seal.claims.map(c => c.claimId)).size !== seal.claims.length) ctx.addIssue({ code: 'custom', message: 'Duplicate critical claim seal' });

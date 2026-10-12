@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,rm,readFile,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {Pool} from 'pg';
@@ -12,9 +12,12 @@ import {DistrictJobStore,migrateDistrictJobs,runDistrictJobs,artifactVerificatio
 import {createPolicyReceipt} from '../src/district-policy-receipt.ts';
 import {persistR1Representation,enqueueStructuredSnapshot,exportStepReceipt} from '../src/district-r1-state.ts';
 import {authenticatedHttpBinding} from '../src/district-http-observation.ts';
-import {provisionCivicPolicyAuthority,recordHostOptOut,purgeOptedOutHost} from '../src/civic-opt-out.ts';
+import {provisionCivicPolicyAuthority,recordHostOptOut,purgeOptedOutHost,assertManagedSourceBindings} from '../src/civic-opt-out.ts';
 import {encodeStepReceipt,type StepReceipt} from '../src/district-step-receipt.ts';
 import {StructuredWorkerRequestSchema,StructuredInputBundleSchema} from '../src/district-structured-parser-worker.ts';
+import {createOperatorRegistryFixture,operatorRegistryFixtureValue,writeOperatorRegistryInputPin} from './helpers/operator-registry-fixture.ts';
+import {persistOperatorRegistry} from '../src/district-r1.ts';
+import type {DistrictRegistry} from '../src/district-registry.ts';
 
 // Opt-in real local Postgres, with a newly created disposable database. All source
 // content/permissions/observations are synthetic; no HTTP or parser is executed.
@@ -87,10 +90,25 @@ test('R1 state preserves independent HTTP and policy proofs through managed CAS 
  const second=await fixture('support','station,value\nsynthetic,2\n'),support=await persistR1Representation(store,cas,second,policy);
  const supportBinding=authenticatedHttpBinding({...second.httpObservation,bytes:second.httpObservation.bytes.toString('utf8')},second.receipt.source);
  const supportingSource={id:second.receipt.scope.sourceId,...second.receipt.source,retrievedAt:second.retrievedAt,policyReceiptSha256:support.receiptSha256,scopeSha256:semanticHash(second.receipt.scope),role:'source_metadata' as const};
- const input={adapter:'gauges' as const,operation:'parse' as const,scope:first.receipt.scope,districtId:'mol',snapshot:primary.snapshot,options:{},cursor:null,sourceBindings:[binding,supportBinding],supportingSources:[supportingSource],auxiliary:[{slot:'stationSnapshot' as const,snapshot:{...support.snapshot,request:second.request}}]};
+ const registryValue=operatorRegistryFixtureValue(),city=registryValue.municipalities[0];
+ city.id=scope.municipalityId;city.ags=scope.ags;city.districtId='mol';registryValue.districts[0].id='mol';
+ registryValue.inventory[0].ags=scope.ags;registryValue.inventory[0].districtId='mol';
+ for(const name of ['primary','support','support-changed'])city.sources.push({id:'synthetic-'+name,kind:'structured',url:`https://example.org/${name}.csv`,vendor:'unknown',checkState:'not_checked',checkedAt:null,evidence:[],reason:'Synthetic structured fixture endpoint; no observation inferred from configuration'});
+ async function admittedRegistry(value:DistrictRegistry,label:string){
+  const registry=await createOperatorRegistryFixture(t,{context:{root,policy},value,label});
+  const hash=await persistOperatorRegistry(store,cas,registry.admitted,policy);
+  assert.equal(hash,registry.registrySha256);
+  await assertManagedSourceBindings(join(cas.root,'sha256',hash.slice(0,2),hash),registry.admitted.bindings,policy);
+  assert.deepEqual(await cas.read(hash),registry.body);return registry;
+ }
+ const registry=await admittedRegistry(registryValue,'structured-registry');
+ const input={adapter:'gauges' as const,operation:'parse' as const,registry:registry.registryPin,registrySha256:registry.registrySha256,scope:first.receipt.scope,districtId:'mol',snapshot:primary.snapshot,options:{},cursor:null,sourceBindings:[binding,supportBinding],supportingSources:[supportingSource],auxiliary:[{slot:'stationSnapshot' as const,snapshot:{...support.snapshot,request:second.request}}]};
  const queued=await enqueueStructuredSnapshot(store,cas,input,policy);
  await t.test('all source and HTTP proofs plus immutable auxiliary bundle participate in job identity',async()=>{
   for(const hash of [primary.sourceArtifact.sha256,primary.receiptSha256,primary.httpObservation.receiptSha256,support.sourceArtifact.sha256,support.receiptSha256,support.httpObservation.receiptSha256])assert.ok(queued.spec.inputArtifactHashes.includes(hash),hash);
+  assert.ok(queued.spec.inputArtifactHashes.includes(registry.registrySha256));
+  const selector=z.object({registry:z.object({path:z.string(),sha256:z.string()}),registrySha256:z.string()}).parse(queued.spec.selector);
+  assert.deepEqual(selector.registry,registry.registryPin);assert.equal(selector.registrySha256,registry.registrySha256);
   const worker=z.object({worker:StructuredWorkerRequestSchema}).parse(queued.spec.selector).worker,bytes=await cas.read(worker.inputArtifactSha256),bundle=StructuredInputBundleSchema.parse(JSON.parse(bytes.toString('utf8')));
   assert.equal(digest(bytes),worker.inputArtifactSha256);assert.ok(queued.spec.inputArtifactHashes.includes(worker.inputArtifactSha256));
   assert.equal(bundle.sourceBytes,first.bytes.toString('base64'));assert.deepEqual(bundle.auxiliary,[{slot:'stationSnapshot',bytes:second.bytes.toString('base64')}]);
@@ -102,6 +120,34 @@ test('R1 state preserves independent HTTP and policy proofs through managed CAS 
   for(const sourceBindings of [[binding],[supportBinding],[binding,supportBinding,supportBinding],[binding,{...supportBinding,receiptSha256:support.receiptSha256}]])await assert.rejects(enqueueStructuredSnapshot(store,cas,{...input,sourceBindings},policy));
   await assert.rejects(enqueueStructuredSnapshot(store,cas,{...input,supportingSources:[]},policy),/supporting admission/);
   await assert.rejects(enqueueStructuredSnapshot(store,cas,{...input,supportingSources:[{...supportingSource,sha256:digest('wrong')}]},policy));
+ });
+ await t.test('the descriptor path, descriptor digest and admitted registry bytes each bind job identity',async()=>{
+  const movedPin=await writeOperatorRegistryInputPin(root,'same-registry-another-descriptor',registry.sourcePin);
+  assert.equal(movedPin.sha256,registry.registryPin.sha256);
+  assert.notEqual((await enqueueStructuredSnapshot(store,cas,{...input,registry:movedPin},policy)).jobKey,queued.jobKey);
+  const original=await readFile(registry.registryPin.path),formatted=Buffer.from(JSON.stringify(registry.sourcePin,null,2)+'\n');
+  assert.notEqual(digest(formatted),registry.registryPin.sha256);
+  try{
+   await writeFile(registry.registryPin.path,formatted,{mode:0o600});
+   const changedPin={...registry.registryPin,sha256:digest(formatted)};
+   assert.notEqual((await enqueueStructuredSnapshot(store,cas,{...input,registry:changedPin},policy)).jobKey,queued.jobKey);
+  }finally{await writeFile(registry.registryPin.path,original,{mode:0o600});}
+  const changedValue=structuredClone(registryValue);changedValue.notes.push('Synthetic approved operator configuration amendment');
+  const changed=await admittedRegistry(changedValue,'changed-structured-registry');
+  assert.notEqual(changed.registrySha256,registry.registrySha256);
+  const next=await enqueueStructuredSnapshot(store,cas,{...input,registry:changed.registryPin,registrySha256:changed.registrySha256},policy);
+  assert.notEqual(next.jobKey,queued.jobKey);assert.ok(next.spec.inputArtifactHashes.includes(changed.registrySha256));
+ });
+ await t.test('enqueue rejects absent municipalities, absent primary or supporting sources, and mismatched registry hashes',async()=>{
+  for(const missing of ['municipality','primary','support'] as const){
+   const value=structuredClone(registryValue);
+   if(missing==='municipality')value.municipalities[0].id='other-synthetic-town';
+   else value.municipalities[0].sources=value.municipalities[0].sources.filter(source=>source.id!=='synthetic-'+missing);
+   const absent=await admittedRegistry(value,'registry-without-'+missing);
+   await assert.rejects(enqueueStructuredSnapshot(store,cas,{...input,registry:absent.registryPin,registrySha256:absent.registrySha256},policy));
+  }
+  await assert.rejects(enqueueStructuredSnapshot(store,cas,{...input,registrySha256:digest('not the admitted registry bytes')},policy));
+  await assert.rejects(enqueueStructuredSnapshot(store,cas,{...input,registry:{...input.registry,sha256:digest('not the descriptor bytes')}},policy));
  });
  await t.test('export reproduces the exact committed step receipt and refuses another source or missing receipt',async()=>{
   const jobKey=await store.enqueue({...queued.spec,step:'verify_artifacts'});
@@ -122,7 +168,7 @@ test('R1 state preserves independent HTTP and policy proofs through managed CAS 
   await assert.rejects(persistR1Representation(store,cas,first,policy));
   await assert.rejects(enqueueStructuredSnapshot(store,cas,input,policy));
   await purgeOptedOutHost('example.org',policy);
-  for(const hash of [primary.sourceArtifact.sha256,primary.receiptArtifact.sha256,primary.observationArtifact.sha256])await assert.rejects(cas.read(hash));
+  for(const hash of [primary.sourceArtifact.sha256,primary.receiptArtifact.sha256,primary.observationArtifact.sha256,registry.registrySha256])await assert.rejects(cas.read(hash));
   const retained=await pool.query<{payload_json:typeof audit}>('SELECT payload_json FROM district_pipeline.r1_metadata_snapshots WHERE sha256=$1',[semanticHash(audit)]);
   assert.deepEqual(retained.rows[0].payload_json,audit);assert.equal(digest(retained.rows[0].payload_json.bytes),first.httpObservation.receiptSha256);
   const proof=await pool.query<{receipt_json:unknown}>('SELECT receipt_json FROM district_pipeline.policy_decisions WHERE proof_sha256=$1',[primary.receiptSha256]);assert.deepEqual(proof.rows[0].receipt_json,first.receipt);

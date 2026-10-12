@@ -1,16 +1,25 @@
 import {z} from 'zod';
+import {textLineageRecordSha256} from './text-run-lineage.ts';
 import {HashSchema,semanticHash,canonicalJson} from './district-adapter-contract.ts';
 import {DistrictCas} from './district-cas.ts';
 import {loadPolicyReceipt,recheckPolicyReceipt,type PolicyReceipt,type PolicyRecheckResult} from './district-policy-receipt.ts';
 import type {DistrictKnowledgeRecord} from './district-schema.ts';
 import type {StructuredKnowledgeRecord} from './district-structured-record.ts';
 import type {PublicationInputs} from './district-publication-inputs.ts';
+import {RetainedKnowledgeLineageSchema,type RetainedKnowledgeLineage} from './retained-knowledge-lineage.ts';
 
-export const publicationPolicyReceiptInventorySchema=z.object({records:z.array(z.object({recordId:z.string().min(1),receipts:z.array(z.object({sourceUrl:z.url(),sourceSha256:HashSchema,receiptSha256:HashSchema,currentReceiptSha256:HashSchema.optional()}).strict()).min(1)}).strict()),currentAdmissionReceipts:z.record(HashSchema,HashSchema).optional()}).strict();
+export const publicationPolicyReceiptInventorySchema=z.object({records:z.array(z.object({recordId:z.string().min(1),receipts:z.array(z.object({sourceUrl:z.url(),sourceSha256:HashSchema,receiptSha256:HashSchema,currentReceiptSha256:HashSchema.optional()}).strict()).min(1)}).strict()),currentAdmissionReceipts:z.record(HashSchema,HashSchema).optional(),retainedPublication:RetainedKnowledgeLineageSchema.optional()}).strict();
 export type PublicationPolicyReceiptInventory=z.infer<typeof publicationPolicyReceiptInventorySchema>;
 /** Receipt hashes are resolved in private CAS; no caller-provided approval boolean is accepted. */
-export async function recheckPublicationPolicy(records:readonly (DistrictKnowledgeRecord|StructuredKnowledgeRecord)[],inventoryInput:unknown,cas:DistrictCas,options:{evaluationAt:string;stateDir?:string;originalPolicy?:PublicationInputs['policy']}):Promise<{policy:PublicationInputs['policy'];inventorySha256:string;executionSnapshotSha256:string;currentAdmissionReceipts:Readonly<Record<string,string>>;optOutSnapshotSha256:string|null}>{
+export async function recheckPublicationPolicy(records:readonly (DistrictKnowledgeRecord|StructuredKnowledgeRecord)[],inventoryInput:unknown,cas:DistrictCas,options:{evaluationAt:string;stateDir?:string;originalPolicy?:PublicationInputs['policy'];retainedPublication?:RetainedKnowledgeLineage|null}):Promise<{policy:PublicationInputs['policy'];inventorySha256:string;executionSnapshotSha256:string;currentAdmissionReceipts:Readonly<Record<string,string>>;optOutSnapshotSha256:string|null}>{
  const inventory=publicationPolicyReceiptInventorySchema.parse(inventoryInput),byRecord=new Map<string,PublicationPolicyReceiptInventory['records'][number]>();
+ if(canonicalJson(inventory.retainedPublication??null)!==canonicalJson(options.retainedPublication??null))throw Error('Retained policy role does not bind exact authenticated publication lineage');
+ const retainedIds=new Set(options.retainedPublication?.selectedRecordOrigins.map(origin=>origin.recordId)??[]);
+ if(records.some(record=>retainedIds.has(record.id)&&record.kind!=='text_model')||[...retainedIds].some(id=>!records.some(record=>record.id===id)))throw Error('Retained policy role record inventory mismatch');
+ for(const origin of options.retainedPublication?.selectedRecordOrigins??[]){
+  const record=records.find(item=>item.id===origin.recordId)!;
+  if(origin.currentEvidenceHash!==record.verification.evidenceHash||origin.currentRecordSha256!==textLineageRecordSha256(record))throw Error('Retained policy role original evidence binding mismatch');
+ }
  const currentAdmissionReceipts:Record<string,string>={...inventory.currentAdmissionReceipts};
  for(const entry of inventory.records)for(const receipt of entry.receipts)if(receipt.currentReceiptSha256){
   if(currentAdmissionReceipts[receipt.receiptSha256]&&currentAdmissionReceipts[receipt.receiptSha256]!==receipt.currentReceiptSha256)throw Error('Conflicting current policy proof for one original receipt');
@@ -57,6 +66,6 @@ export async function recheckPublicationPolicy(records:readonly (DistrictKnowled
  const executionSnapshotSha256=semanticHash([...snapshots].sort());
  if(options.originalPolicy&&canonicalJson(options.originalPolicy.receipts)!==canonicalJson(receipts))throw Error('Replay original publication policy receipt binding mismatch');
  // Current revalidation proofs are execution inputs, not rewritten original publication provenance.
- const originalInventory={records:inventory.records.map(entry=>({recordId:entry.recordId,receipts:entry.receipts.map(({currentReceiptSha256,...original})=>original).sort((a,b)=>canonicalJson(a)<canonicalJson(b)?-1:canonicalJson(a)>canonicalJson(b)?1:0)})).sort((a,b)=>a.recordId<b.recordId?-1:a.recordId>b.recordId?1:0)};
+ const originalInventory={records:inventory.records.map(entry=>({recordId:entry.recordId,receipts:entry.receipts.map(({currentReceiptSha256,...original})=>original).sort((a,b)=>canonicalJson(a)<canonicalJson(b)?-1:canonicalJson(a)>canonicalJson(b)?1:0)})).sort((a,b)=>a.recordId<b.recordId?-1:a.recordId>b.recordId?1:0),retainedPublication:inventory.retainedPublication??null};
  return {policy:options.originalPolicy??{snapshotSha256:executionSnapshotSha256,receipts},inventorySha256:semanticHash(originalInventory),executionSnapshotSha256,currentAdmissionReceipts,optOutSnapshotSha256:epochs.values().next().value??null};
 }

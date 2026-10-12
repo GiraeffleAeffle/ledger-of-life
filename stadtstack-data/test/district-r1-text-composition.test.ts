@@ -8,7 +8,6 @@ import {GRAPH_DETERMINISTIC_CHECKS,normalizeGraphClaims} from '../src/district-g
 import {PROVIDER_CONFIGS,type ExtractorProvider} from '../src/district-model-contract.ts';
 import {identityAssertion,unknownValidity,type IdentityAdmission,type IdentityAssertion} from '../src/district-entity-resolution.ts';
 import {semanticHash} from '../src/district-adapter-contract.ts';
-import {dataReleaseId} from '../src/data-release.ts';
 
 // Explicit synthetic offline artifacts only; no civic facts, operational receipts,
 // provider/judge execution, source requests or policy authorizations are represented.
@@ -152,43 +151,11 @@ test('final coverage subset keeps all original attempts, rejects native rows and
  assert.throws(()=>rebuildR1TextCoverageContext(context,[first,first],now),/Duplicate selected/);
 });
 
-test('retained mixed v5 publication contributes only text and authentic manifest/coverage pins',()=>{
- const text=record('retained'),native={id:'synthetic-native',kind:'structured',verification:{kind:'structured'}};
- const original=run('retained',[text]);
- const initial=buildR1TextCompositionContext(input([original],[[text.id]]));
- const records=artifact({schemaVersion:'stadtstack-knowledge-v3',generatedAt:now,records:[native,text],identityAssertions:[],identityAdmissions:[]});
- const coverage=artifact({schemaVersion:'stadtstack-district-coverage-v5',generatedAt:now,textLineage:initial.coverage.textLineage});
- const files=[{path:'knowledge/records.json',sha256:records.sha256,bytes:Buffer.byteLength(records.bytes as string)},{path:'knowledge/coverage.json',sha256:coverage.sha256,bytes:Buffer.byteLength(coverage.bytes as string)}];
- const manifest=artifact({schemaVersion:'stadtstack-data-release-v1',id:dataReleaseId(files),generatedAt:now,files,quality:{publishedRecords:2,quarantinedRecords:0,cities:1}});
- const retained:TextRunContribution={runId:original.runId,pins:original.pins,sourceArtifactKind:'retained_publication',artifacts:{...original.artifacts,records},retainedPublication:{manifest,coverage}};
- const context=buildR1TextCompositionContext(input([retained],[[text.id]]));
- assert.deepEqual(context.knowledge.records,[text]);
- assert.equal(context.coverage.textLineage.selectedRecordOrigins[0].outputRecordIndex,1);
- assert.equal(context.replay.runs[0].retainedPublication!.manifestSha256,manifest.sha256);
- assert.equal(context.replay.runs[0].retainedPublication!.coverageSha256,coverage.sha256);
- assert.equal(context.coverage.textLineage.cumulative.groups.attemptedDocumentGroups,1);
- const broken={...retained,retainedPublication:{manifest,coverage:artifact({schemaVersion:'stadtstack-district-coverage-v5',generatedAt:now,textLineage:null})}};
- assert.throws(()=>buildR1TextCompositionContext(input([broken],[[text.id]])),/member binding mismatch/);
-});
-
-test('authentic retained historical v2 member keeps independent publication and original generation clocks',()=>{
- const text=record('historical-retained','anthropic-subscription'),legacy=historicalV2(text);
- const original=run('historical-retained',[legacy],{v2:true,balanced:true,generatedAt:earlier});
- const records=artifact({schemaVersion:'stadtstack-knowledge-v2',generatedAt:now,records:[legacy]});
- const coverage=artifact({schemaVersion:'stadtstack-district-coverage-v3',generatedAt:now,extractionRun:{generatedAt:earlier,assignmentMode:'balanced',...original.pins,selection:'all_at_run_start',maxDocumentsPerMunicipality:null,availableDocumentGroupsAtRunStart:1,attemptedDocumentGroups:1,pendingDocumentGroupsAtRunStart:0},municipalities:[{id:city,publishedRecords:1}],models:[{provider:text.extraction.provider,model:text.extraction.model,tool:text.extraction.tool,toolVersion:text.extraction.toolVersion,modelIdentitySha256:text.extraction.modelIdentitySha256,modelIdentityBasis:text.extraction.modelIdentityBasis,publishedRecords:1,faithfulnessThreshold:0.8}]});
- const files=[{path:'knowledge/records.json',sha256:records.sha256,bytes:Buffer.byteLength(records.bytes as string)},{path:'knowledge/coverage.json',sha256:coverage.sha256,bytes:Buffer.byteLength(coverage.bytes as string)}];
- const manifest=artifact({schemaVersion:'stadtstack-data-release-v1',id:dataReleaseId(files),generatedAt:now,files,quality:{publishedRecords:1,quarantinedRecords:0,cities:1}});
- const retained:TextRunContribution={runId:original.runId,pins:original.pins,sourceArtifactKind:'retained_publication',artifacts:{...original.artifacts,records},retainedPublication:{manifest,coverage}};
- const approved=input([retained],[[text.id]]);
- approved.admissions=[{...approved.admissions[0],schemaProjection:{version:'knowledge-v2-to-v3-text-model-v1'}}];
- const context=buildR1TextCompositionContext(approved),runLineage=context.coverage.textLineage.runs[0];
- assert.equal(runLineage.generatedAt,earlier);
- assert.equal(runLineage.artifactClocks.records,now);
- assert.equal(runLineage.retainedPublication!.generatedAt,now);
- assert.equal(context.knowledge.records[0].extraction.extractedAt,earlier);
- assert.equal(context.knowledge.records[0].verification.faithfulness.evaluatedAt,earlier);
- assert.deepEqual(context.composition.provenance.runs[0].records[0],legacy);
- assert.equal(context.coverage.textLineage.selectedRecordOrigins[0].outputArtifactSha256,records.sha256);
+test('retained publication contributions cannot be represented as extraction runs',()=>{
+ const contribution=run('retained',[record('retained')]);
+ const retained={...contribution,sourceArtifactKind:'retained_publication' as const,retainedPublication:{manifest:artifact({}),coverage:artifact({})}};
+ assert.throws(()=>buildR1TextCompositionContext(input([retained],[['retained']])),/authenticated retained-role input/);
+ assert.equal(r1TextCompositionInputSchema.safeParse({schemaVersion:'district-r1-text-composition-input-v1',generatedAt:now,approvedRunOrder:[contribution.runId],admissions:[{runId:contribution.runId,recordIds:[]}],contributions:[{runId:contribution.runId,pins:contribution.pins,sourceArtifactKind:'retained_publication',artifacts:Object.fromEntries(Object.entries(contribution.artifacts).map(([key,value])=>[key,{path:key,sha256:value.sha256}]))}]}).success,false);
 });
 
 test('failed later correction never deletes an older admitted record or doubles unique attempted bytes',()=>{

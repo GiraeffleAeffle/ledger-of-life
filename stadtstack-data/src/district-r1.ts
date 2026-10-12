@@ -188,11 +188,12 @@ export function parseR1RegistryArguments(rawArgs:readonly string[]){
  return {registryPin:operatorRegistryInputPinSchema.parse({path,sha256}),args};
 }
 
-async function persistOperatorRegistry(store:DistrictJobStore,cas:DistrictCas,admitted:AdmittedOperatorRegistryConfiguration){
+/** Canonical managed CAS copy of the admitted operator registry; the single path for CLI and fixtures. */
+export async function persistOperatorRegistry(store:DistrictJobStore,cas:DistrictCas,admitted:AdmittedOperatorRegistryConfiguration,policy:CivicPolicyOptions={}){
  const hash=digest(admitted.bytes);
- await initializeManagedAcquisitionLane(cas.root,{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
+ await initializeManagedAcquisitionLane(cas.root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
  const entries:ManagedSourceContent[]=admitted.bindings.map(binding=>({...binding,relativePath:`sha256/${hash.slice(0,2)}/${hash}`,contentSha256:hash,independentAllowed:false}));
- const artifact=await withManagedSourceWrite(cas.root,entries,()=>cas.put(admitted.bytes,{kind:'derived',mimeType:'application/json'}));
+ const artifact=await withManagedSourceWrite(cas.root,entries,()=>cas.put(admitted.bytes,{kind:'derived',mimeType:'application/json'}),policy);
  await store.addArtifact(artifact);return hash;
 }
 async function committedResult(store:DistrictJobStore,cas:DistrictCas,receiptSha256:string,resultSha256:string){
@@ -447,7 +448,7 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
    const manifest=z.object({jobs:z.array(z.object({representationSha256:HashSchema,adapter:StructuredWorkerRequestSchema.shape.adapter,operation:z.enum(['parse','discover']),options:z.record(z.string(),z.unknown()),cursor:z.string().nullable(),auxiliary:z.array(z.object({slot:z.enum(['municipalBoundaries','stationSnapshot']),representationSha256:HashSchema}).strict()).max(2)}).strict()).min(1).max(10000)}).strict().parse(input),jobKeys:string[]=[];
    for(const item of manifest.jobs){const descriptor=await loadDescriptor(store,cas,item.representationSha256),{city}=registeredScope(registry,descriptor.scope,descriptor.root),auxiliary:StructuredWorkerRequest['auxiliary']=[],supportingSources:StructuredSupportingSource[]=[],sourceBindings:ManagedSourceBinding[]=[httpObservationBinding({sha256:descriptor.snapshot.sourceSha256,url:descriptor.snapshot.url,policyReceiptSha256:descriptor.receiptSha256,httpObservation:descriptor.httpObservation})];
     for(const support of item.auxiliary){const accepted=await loadDescriptor(store,cas,support.representationSha256);registeredScope(registry,accepted.scope,accepted.root);if(accepted.scope.municipalityId!==city.id||accepted.scope.ags!==city.ags)throw Error('Supporting municipality mismatch');auxiliary.push({slot:support.slot,snapshot:accepted.snapshot});supportingSources.push({id:accepted.scope.sourceId,url:accepted.snapshot.url,sha256:accepted.snapshot.sourceSha256,mimeType:accepted.snapshot.mimeType,retrievedAt:accepted.snapshot.retrievedAt,policyReceiptSha256:accepted.receiptSha256,scopeSha256:semanticHash(accepted.scope),role:support.slot==='municipalBoundaries'?'municipality_join':'source_metadata'});sourceBindings.push(httpObservationBinding({sha256:accepted.snapshot.sourceSha256,url:accepted.snapshot.url,policyReceiptSha256:accepted.receiptSha256,httpObservation:accepted.httpObservation}));}
-    jobKeys.push((await enqueueStructuredSnapshot(store,cas,{adapter:item.adapter,operation:item.operation,scope:descriptor.scope,districtId:city.districtId,snapshot:descriptor.snapshot,options:item.options,cursor:item.cursor,auxiliary,supportingSources,sourceBindings})).jobKey);
+    jobKeys.push((await enqueueStructuredSnapshot(store,cas,{adapter:item.adapter,operation:item.operation,registry:registryPin,registrySha256,scope:descriptor.scope,districtId:city.districtId,snapshot:descriptor.snapshot,options:item.options,cursor:item.cursor,auxiliary,supportingSources,sourceBindings})).jobKey);
    }process.stdout.write(canonicalJson({jobKeys})+'\n');return;
   }
   if(command==='authorize'){

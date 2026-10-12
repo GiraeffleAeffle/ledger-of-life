@@ -4,7 +4,8 @@ import {mkdtemp,writeFile,rm,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {hash,outDir} from '../src/common.ts';
-import {ReplayReceiptSchema,ReplayClocksSchema,ReplayPrivateProvenanceSchema,ScopedGenerationArchiveSchema,verifyReplayAnswer,verifyGenerationArchive,verifyCachedGeneration,replayAnswerBinding,compareReplayRelease,readReplayPin,requiredReplayStaging} from '../src/replay-pipeline.ts';
+import {ReplayReceiptSchema,ReplayClocksSchema,ScopedGenerationArchiveSchema,verifyReplayAnswer,verifyGenerationArchive,verifyCachedGeneration,replayAnswerBinding,compareReplayRelease,readReplayPin,requiredReplayStaging} from '../src/replay-pipeline.ts';
+import {privatePublicationProvenanceSchema} from '../src/district-publication-provenance.ts';
 import {readCommittedReleaseFile} from '../src/district-publication-predecessor.ts';
 import type {HistoricalGeneration,ReplayReceipt} from '../src/replay-pipeline.ts';
 import type {ModelEvidence} from '../src/district-model-contract.ts';
@@ -229,11 +230,12 @@ test('scoped generation archives bind actual prepared/cache code without changin
  assert.notEqual(scoped,replayAnswerBinding(identity,'synthetic instructions',input,{}, {...context,references:[{...context.references[0],url:'https://example.org/other-source'}]}));
 });
 
-test('private replay provenance is a closed proof inventory, never historical Git as source admission',()=>{
- const pin={path:'synthetic-source-artifact.json',sha256:hash('synthetic source artifact')},binding={kind:'http_observation',url:'https://example.org/source',sourceSha256:hash('synthetic original source'),observationId:'synthetic-original-observation',receiptSha256:hash('synthetic observation')};
- const provenance={schemaVersion:'stadtstack-replay-private-provenance-v1',inputs:[{...pin,bindings:[binding]}]};
- assert.equal(ReplayPrivateProvenanceSchema.safeParse(provenance).success,true);
- assert.equal(ReplayPrivateProvenanceSchema.safeParse({...provenance,inputs:[{...pin,bindings:[{...binding,policyApproved:true}]}]}).success,false);
- assert.equal(ReplayPrivateProvenanceSchema.safeParse({...provenance,inputs:[{...pin,bindings:[]}]}).success,false);
- assert.equal(ReplayPrivateProvenanceSchema.safeParse({...provenance,inputs:[{...pin,bindings:[{kind:'authenticated_git_snapshot',url:binding.url,purpose:'historical_change_reconstruction_only',snapshot:{gitCommit:'1'.repeat(40),path:'out/cities/synthetic-town/signals.geojson',blobOid:'2'.repeat(40),sha256:pin.sha256,bytes:1}}]}]}).success,false);
+test('private publication provenance is a closed proof inventory, never historical Git as source admission',()=>{
+ const pin={path:'synthetic-source-artifact.json',sha256:hash('synthetic source artifact'),bytes:12},binding={kind:'http_observation',url:'https://example.org/source',sourceSha256:hash('synthetic original source'),observationId:'synthetic-original-observation',receiptSha256:hash('synthetic observation'),independentAllowed:true};
+ const provenance={schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:[{...pin,bindings:[binding]}]};
+ assert.equal(privatePublicationProvenanceSchema.safeParse(provenance).success,true);
+ assert.equal(privatePublicationProvenanceSchema.safeParse({...provenance,inputs:[{...pin,bindings:[{...binding,policyApproved:true}]}]}).success,false);
+ assert.equal(privatePublicationProvenanceSchema.safeParse({...provenance,inputs:[{...pin,bindings:[]}]}).success,false);
+ assert.equal(privatePublicationProvenanceSchema.safeParse({...provenance,inputs:[{path:pin.path,sha256:pin.sha256,bindings:[binding]}]}).success,false);
+ assert.equal(privatePublicationProvenanceSchema.safeParse({...provenance,inputs:[{...pin,bindings:[{kind:'authenticated_git_snapshot',url:binding.url,purpose:'historical_change_reconstruction_only',snapshot:{gitCommit:'1'.repeat(40),path:'out/cities/synthetic-town/signals.geojson',blobOid:'2'.repeat(40),sha256:pin.sha256,bytes:1},independentAllowed:true}]}]}).success,false);
 });
