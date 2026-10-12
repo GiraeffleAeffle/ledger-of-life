@@ -1,17 +1,20 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {generateKeyPairSync,createHash} from 'node:crypto';
+import {generateKeyPairSync,createHash,createPublicKey} from 'node:crypto';
 import {mkdtemp,mkdir,writeFile,symlink,unlink,rm,chmod} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {signRevocations,revocationKeyId,isRecordRevoked,type RevocationPayload} from '../src/civic-revocations.ts';
-import {loadGovernedRevocations,GovernedRevocationConfigError} from '../src/mcp-revocation-config.ts';
+import {loadGovernedRevocations as loadProductionRevocations,loadGovernedRevocationsForTesting,requireGovernedRevocationSignerPins,GOVERNED_REVOCATION_SIGNER_PINS,GovernedRevocationConfigError} from '../src/mcp-revocation-config.ts';
 
 const hash=(value:string|Uint8Array)=>createHash('sha256').update(value).digest('hex');
+const {publicKey,privateKey}=generateKeyPairSync('ed25519'),keyId=revocationKeyId(publicKey);
+const syntheticPins=[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}];
+const loadGovernedRevocations=(releaseId:string,env:NodeJS.ProcessEnv)=>loadGovernedRevocationsForTesting(releaseId,env,syntheticPins);
 async function fixture(projected=false){
  const base=await mkdtemp(join(tmpdir(),'mcp-revocation-config-')),root=join(base,'cohort');await mkdir(root,{mode:0o700});
  const directory=projected?join(root,'..revision-a'):root;if(projected)await mkdir(directory,{mode:0o700});
- const {publicKey,privateKey}=generateKeyPairSync('ed25519'),keyId=revocationKeyId(publicKey),releaseId=hash('synthetic sealed release');
+ const releaseId=hash('synthetic sealed release');
  const payload:RevocationPayload={schemaVersion:'stadtstack-revocations-v1',releaseId,issuedAt:'2026-10-11T00:00:00Z',sequence:1,targets:[{type:'record',recordId:'knowledge:synthetic'}]};
  const bytes=signRevocations(payload,keyId,privateKey),trust={schemaVersion:'stadtstack-revocation-trust-v1',releaseId,expectedArtifactSha256:hash(bytes),keys:[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}]};
  await writeFile(join(directory,'trust.json'),JSON.stringify(trust)+'\n',{mode:0o600});await writeFile(join(directory,'revocations.json'),bytes,{mode:0o600});
@@ -77,5 +80,39 @@ test('oversized and nonregular configuration files are rejected without fallback
   await assert.rejects(loadGovernedRevocations(f.releaseId,f.env),GovernedRevocationConfigError);
   await unlink(f.env.STADTSTACK_MCP_REVOCATION_TRUST_FILE);await mkdir(f.env.STADTSTACK_MCP_REVOCATION_TRUST_FILE,{mode:0o700});
   await assert.rejects(loadGovernedRevocations(f.releaseId,f.env),GovernedRevocationConfigError);
+ }finally{await rm(f.base,{recursive:true,force:true});}
+});
+
+test('reviewed public SPKIs identify both pinned production signers',()=>{
+ for(const pin of GOVERNED_REVOCATION_SIGNER_PINS)assert.equal(revocationKeyId(createPublicKey({key:Buffer.from(pin.publicKeySpki,'base64'),format:'der',type:'spki'})),pin.keyId);
+});
+test('production signer pin check accepts only the exact pair in either order',async()=>{
+ const f=await fixture();
+ try{
+  for(const keys of [GOVERNED_REVOCATION_SIGNER_PINS,[...GOVERNED_REVOCATION_SIGNER_PINS].reverse()]){
+   const trust={...f.trust,keys};
+   assert.deepEqual(requireGovernedRevocationSignerPins(trust),trust);
+   await writeFile(f.env.STADTSTACK_MCP_REVOCATION_TRUST_FILE,JSON.stringify(trust));
+   // Correct pins pass the independent check, but cannot authorize this synthetic signature.
+   await assert.rejects(loadProductionRevocations(f.releaseId,f.env),GovernedRevocationConfigError);
+  }
+ }finally{await rm(f.base,{recursive:true,force:true});}
+});
+for(const variant of ['missing pin','extra key','substituted key','swapped SPKI'] as const)test(`production startup rejects ${variant}`,async()=>{
+ const f=await fixture();
+ try{
+  const [mac,vm]=GOVERNED_REVOCATION_SIGNER_PINS;
+  const keys=variant==='missing pin'?[mac]:variant==='extra key'?[mac,vm,...syntheticPins]:variant==='substituted key'?[mac,...syntheticPins]:[{...mac,publicKeySpki:vm.publicKeySpki},{...vm,publicKeySpki:mac.publicKeySpki}];
+  const trust={...f.trust,keys};
+  assert.throws(()=>requireGovernedRevocationSignerPins(trust));
+  await writeFile(f.env.STADTSTACK_MCP_REVOCATION_TRUST_FILE,JSON.stringify(trust));
+  await assert.rejects(loadProductionRevocations(f.releaseId,f.env),GovernedRevocationConfigError);
+ }finally{await rm(f.base,{recursive:true,force:true});}
+});
+test('production startup cannot select a synthetic signer cohort through environment',async()=>{
+ const f=await fixture();
+ try{
+  await assert.rejects(loadProductionRevocations(f.releaseId,{...f.env,NODE_ENV:'test',STADTSTACK_MCP_REVOCATION_SIGNER_PINS:JSON.stringify(syntheticPins)}),GovernedRevocationConfigError);
+  assert.equal((await loadGovernedRevocations(f.releaseId,f.env)).keyId,keyId);
  }finally{await rm(f.base,{recursive:true,force:true});}
 });

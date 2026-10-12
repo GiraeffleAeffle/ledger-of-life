@@ -1,9 +1,21 @@
 import {constants} from 'node:fs';
 import {open,lstat,realpath} from 'node:fs/promises';
 import {dirname,isAbsolute,relative,resolve,join,sep} from 'node:path';
-import {MAX_REVOCATION_BYTES,verifyRevocations,type VerifiedRevocations} from './civic-revocations.ts';
+import {MAX_REVOCATION_BYTES,RevocationTrustSchema,verifyRevocations,type RevocationTrust,type VerifiedRevocations} from './civic-revocations.ts';
 
 const MAX_TRUST_BYTES=64*1024;
+/** Reviewed 0.3.2 Mac/VM public signer cohort from reports/handoff-release-0.3.2.json. */
+export const GOVERNED_REVOCATION_SIGNER_PINS:Readonly<RevocationTrust['keys']>=Object.freeze([
+ Object.freeze({keyId:'ed25519:9a687b0082820b1df5743cd2faa1150bd38171fab50d8248d6cad28aca59ab1e',publicKeySpki:'MCowBQYDK2VwAyEA7pH0triIjJrhZWSYqriNuor/5UYHQZnvZK9lSjvuAPA='}),
+ Object.freeze({keyId:'ed25519:8393ad2b0087229073c57103c2e47a1b6f6e987c781b00bcbbaae060aa5ceebd',publicKeySpki:'MCowBQYDK2VwAyEAkod48Z56zro687MC/XdBpzQX3N+YtSMb9U5c0ZIkVeA='}),
+]);
+function requireSignerPins(trust:RevocationTrust,pins:Readonly<RevocationTrust['keys']>):void{
+ if(trust.keys.length!==pins.length||!pins.every(pin=>trust.keys.some(key=>key.keyId===pin.keyId&&key.publicKeySpki===pin.publicKeySpki)))throw new GovernedRevocationConfigError();
+}
+/** Public independent pin-set check; signature and artifact checks still remain mandatory. */
+export function requireGovernedRevocationSignerPins(trustInput:unknown):RevocationTrust{
+ const trust=RevocationTrustSchema.parse(trustInput);requireSignerPins(trust,GOVERNED_REVOCATION_SIGNER_PINS);return trust;
+}
 export class GovernedRevocationConfigError extends Error {
  constructor(){super('Governed revocation configuration is missing, unsafe or invalid');this.name='GovernedRevocationConfigError';}
 }
@@ -37,6 +49,13 @@ async function boundedConfigFile(path:string,maxBytes:number):Promise<Uint8Array
 }
 /** Startup only. A governed Recreate rollout replaces this immutable in-memory cohort. */
 export async function loadGovernedRevocations(expectedReleaseId:string,env:NodeJS.ProcessEnv=process.env):Promise<VerifiedRevocations>{
+ return loadRevocationCohort(expectedReleaseId,env,GOVERNED_REVOCATION_SIGNER_PINS);
+}
+/** Explicit synthetic-cohort injection for tests only; hosted startup never calls this path or selects pins from env. */
+export async function loadGovernedRevocationsForTesting(expectedReleaseId:string,env:NodeJS.ProcessEnv,pins:Readonly<RevocationTrust['keys']>):Promise<VerifiedRevocations>{
+ return loadRevocationCohort(expectedReleaseId,env,pins);
+}
+async function loadRevocationCohort(expectedReleaseId:string,env:NodeJS.ProcessEnv,pins:Readonly<RevocationTrust['keys']>):Promise<VerifiedRevocations>{
  try{
   const trustPath=configuredPath(env.STADTSTACK_MCP_REVOCATION_TRUST_FILE),artifactPath=configuredPath(env.STADTSTACK_MCP_REVOCATIONS_FILE);
   if(trustPath===artifactPath||dirname(trustPath)!==dirname(artifactPath))throw new GovernedRevocationConfigError();
@@ -46,7 +65,8 @@ export async function loadGovernedRevocations(expectedReleaseId:string,env:NodeJ
   await governedDirectoryChain(root,dirname(trustReal));
   const [trustBytes,artifactBytes]=await Promise.all([boundedConfigFile(trustReal,MAX_TRUST_BYTES),boundedConfigFile(artifactReal,MAX_REVOCATION_BYTES)]);
   if(await realpath(trustPath)!==trustReal||await realpath(artifactPath)!==artifactReal)throw new GovernedRevocationConfigError();
-  const trust=JSON.parse(new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(trustBytes));
+  const trust=RevocationTrustSchema.parse(JSON.parse(new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(trustBytes)));
+  requireSignerPins(trust,pins);
   return verifyRevocations(artifactBytes,trust,expectedReleaseId);
  }catch{throw new GovernedRevocationConfigError();}
 }
