@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { dataReleaseId, dataReleaseSchema, requireReleaseFiles } from './data-release.ts';
 import { districtRegistrySchema, type DistrictRegistry } from './district-registry.ts';
-import { DistrictKnowledgeRecordSchema, PublicKnowledgeRecordSchema, KNOWLEDGE_SCHEMA_VERSION, hashSchema, knowledgeEvidenceHash, type DistrictKnowledgeRecord } from './district-schema.ts';
+import { DistrictKnowledgeRecordSchema, PublicKnowledgeRecordSchema, KnowledgeRecordsSchema, KNOWLEDGE_SCHEMA_VERSION, hashSchema, knowledgeEvidenceHash, type DistrictKnowledgeRecord } from './district-schema.ts';
 import { normalizeGraphClaims } from './district-graph-claims.ts';
 import { publicUrlIssues } from './publication-quality.ts';
 import { readTextLineageArtifact, textLineageRecordSha256, textRunLineageSchema, textSchemaProjectionSchema, type TextLineageArtifact } from './text-run-lineage.ts';
@@ -57,6 +57,8 @@ export type AuthenticatedRetainedKnowledgePublication = {
   registry: DistrictRegistry;
   coverage: z.infer<typeof coverageSchema>;
   lineage: RetainedKnowledgeLineage;
+  identityAssertions: z.infer<typeof KnowledgeRecordsSchema.shape.identityAssertions>;
+  identityAdmissions: z.infer<typeof KnowledgeRecordsSchema.shape.identityAdmissions>;
 };
 export type RetainedKnowledgeComposition = { baseline: AuthenticatedRetainedKnowledgePublication; selectedRecordOrigins: RetainedKnowledgeRecordOrigin[] };
 const modelKey = (model: z.infer<typeof modelSchema>) => textLineageRecordSha256({ provider: model.provider, model: model.model, tool: model.tool, toolVersion: model.toolVersion, modelIdentitySha256: model.modelIdentitySha256, modelIdentityBasis: model.modelIdentityBasis });
@@ -82,14 +84,16 @@ export function authenticateRetainedKnowledgePublication(input: RetainedKnowledg
   // Keep the complete sealed public members privately, not a lossy schema projection.
   const coverage = coverageRaw as z.infer<typeof coverageSchema>;
   const output = z.object({ schemaVersion: z.enum(['stadtstack-knowledge-v2', 'stadtstack-knowledge-v3']), generatedAt: clock, records: z.array(z.unknown()) }).passthrough().parse(readTextLineageArtifact(input.artifacts.records));
+  const roots=output.schemaVersion==='stadtstack-knowledge-v3'
+    ? z.object({identityAssertions:KnowledgeRecordsSchema.shape.identityAssertions,identityAdmissions:KnowledgeRecordsSchema.shape.identityAdmissions}).parse(output)
+    : {identityAssertions:[],identityAdmissions:[]};
   const schemaProjection = input.schemaProjection === undefined ? null : textSchemaProjectionSchema.parse(input.schemaProjection);
   if (schemaProjection && (KNOWLEDGE_SCHEMA_VERSION as string) !== 'stadtstack-knowledge-v3') throw Error('Explicit text schema projection requires a knowledge-v3 consumer');
   if (schemaProjection && output.schemaVersion !== 'stadtstack-knowledge-v2') throw Error('Explicit text schema projection requires an unmarked authenticated knowledge-v2 publication');
   if (output.schemaVersion !== KNOWLEDGE_SCHEMA_VERSION && !schemaProjection) throw Error('Retained publication schema requires an explicit supported projection');
   const records:DistrictKnowledgeRecord[]=[],recordIndexes:number[]=[];
   const allRecords=output.records.map((raw,outputRecordIndex)=>{
-    const candidate=raw as DistrictKnowledgeRecord;
-    if(candidate?.kind==='structured')return PublicKnowledgeRecordSchema.parse(raw);
+    if(raw!==null&&typeof raw==='object'&&'kind' in raw&&raw.kind==='structured')return PublicKnowledgeRecordSchema.parse(raw);
     const original=raw as DistrictKnowledgeRecord;
     if(original.verification?.evidenceHash!==knowledgeEvidenceHash(original))throw Error('Original retained record evidence hash mismatch');
     const validationRecord=schemaProjection?{...original,kind:'text_model' as const,verification:{...original.verification,kind:'text_model' as const}}:original;
@@ -142,7 +146,7 @@ export function authenticateRetainedKnowledgePublication(input: RetainedKnowledg
   }
   // registrySha256 is the historical extraction pin, not necessarily the later published registry member.
   const lineage = RetainedKnowledgeLineageSchema.parse({ schemaVersion: 'stadtstack-retained-knowledge-lineage-v1', releaseId: manifest.id, manifestSha256: input.artifacts.manifest.sha256, members, artifactClocks: { manifest: manifest.generatedAt, records: output.generatedAt, coverage: coverage.generatedAt, registry: registry.generatedAt }, recordsSchemaVersion: output.schemaVersion, schemaProjection, historicalCoverageSha256: textLineageRecordSha256(projectRetainedHistoricalCoverage(coverage)), selectedRecordOrigins: [] });
-  return { input, records, recordIndexes, registry, coverage, lineage };
+  return { input, records, recordIndexes, registry, coverage, lineage, ...roots };
 }
 
 /** Identity-only projection shared with native composition; original receipts are never repaired. */
@@ -165,7 +169,7 @@ export function retainedKnowledgeRecordOrigin(baseline: AuthenticatedRetainedKno
 /** Reauthenticate the exact public bytes, including private registry/source proof, at the coverage boundary. */
 export function validateRetainedKnowledgeComposition(value: RetainedKnowledgeComposition): RetainedKnowledgeComposition {
   const baseline = authenticateRetainedKnowledgePublication(value.baseline.input);
-  for (const field of ['records', 'recordIndexes', 'registry', 'coverage', 'lineage'] as const) if (textLineageRecordSha256(baseline[field]) !== textLineageRecordSha256(value.baseline[field])) throw Error('Retained private provenance was changed after authentication');
+  for (const field of ['records', 'recordIndexes', 'registry', 'coverage', 'lineage', 'identityAssertions', 'identityAdmissions'] as const) if (textLineageRecordSha256(baseline[field]) !== textLineageRecordSha256(value.baseline[field])) throw Error('Retained private provenance was changed after authentication');
   RetainedKnowledgeLineageSchema.parse({ ...baseline.lineage, selectedRecordOrigins: value.selectedRecordOrigins });
   for (const origin of value.selectedRecordOrigins) {
     const localIndex=baseline.recordIndexes.indexOf(origin.outputRecordIndex),original=localIndex<0?undefined:baseline.records[localIndex];

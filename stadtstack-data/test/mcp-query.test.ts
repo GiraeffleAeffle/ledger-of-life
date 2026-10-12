@@ -4,12 +4,17 @@ import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {signal,sourceFrom,hash,outDir} from '../src/common.ts';
 import {catalogueSchema,collectionSchema,type Catalogue,type Signal} from '../src/schema.ts';
-import {QueryIndex,regionalSchema,querySchema,queryFields,publicData,exportRecordsSchema,type Regional} from '../src/mcp-query.ts';
+import {QueryIndex,regionalSchema,querySchema,queryFields,publicData,exportRecordsSchema,type Regional,type KnowledgeQueryData} from '../src/mcp-query.ts';
 import {assignTopics,assertTopic} from '../src/topics.ts';
 import {searchText} from '../src/mcp.ts';
 import {createHash,generateKeyPairSync} from 'node:crypto';
 import {signRevocations,verifyRevocations,revocationKeyId,type RevocationTarget} from '../src/civic-revocations.ts';
 import {knowledgeSourceDescriptors,mcpSourceId} from '../src/mcp-source-identity.ts';
+import {observation,semanticHash,type AdapterScope} from '../src/district-adapter-contract.ts';
+import {nativeStructuredIdentityGraph} from '../src/district-entity-resolution.ts';
+import {StructuredKnowledgeRecordSchema,STRUCTURED_VERIFICATION_VERSION} from '../src/district-structured-record.ts';
+import {visibleChanges} from '../src/mcp-read-view.ts';
+import {diff,knowledgeChangeRecord} from '../src/changes.ts';
 
 const catalogue:Catalogue={schemaVersion:'stadtstack-signals-v1',generatedAt:'2026-10-10T12:00:00Z',publisher:'Test',cities:[{id:'strausberg',name:'Strausberg',state:'Brandenburg',center:[13.88,52.58],bbox:[13,52,14,53],sources:[]}]};
 const regional:Regional={schemaVersion:'stadtstack-regional-topics-v1',generatedAt:'2026-10-09T12:00:00Z',asOf:'2026-10-09',region:{id:'brandenburg-mol',name:'Märkisch-Oderland'},municipalities:[{id:'hoppegarten',name:'Hoppegarten',ags:'12064227'},{id:'strausberg',name:'Strausberg',ags:'12064472'}],topics:[{id:'waermeplanung',label:'Kommunale Wärmeplanung',municipalities:[{municipalityId:'hoppegarten',stage:'planning',items:[{title:'Kommunale Wärmeplanung in Hoppegarten',url:'https://www.gemeinde-hoppegarten.de/news/1/1240589/nachrichten/kommunale-w%C3%A4rmeplanung-in-hoppegarten.html',date:'2026-05-27',sourceType:'cityWebsite',locator:'Veröffentlichung: 27. Mai 2026',stage:'planning'},{title:'Wärmeplanung und Wärmenetz: Datum offen',url:'https://www.gemeinde-hoppegarten.de/seite/864034/kommunale-w%C3%A4rmeplanung.html',date:null,sourceType:'cityWebsite',locator:'Planung; kein dokumentiertes Datum',stage:'planning'}]}]}]};
@@ -33,6 +38,58 @@ test('text source identity hashes only the canonical source tuple while retainin
   const [descriptor]=knowledgeSourceDescriptors({kind:'text_model',municipalityId:'strausberg',sources:[source]});
   assert.equal(descriptor.registrySourceId,source.id);
   assert.equal(descriptor.mcpSourceId,mcpSourceId({...source,publisher:'strausberg'}));
+});
+
+test('structured primary and supporting source IDs use the exact indexed attribution for signed masking',()=>{
+  // Synthetic source/verification fixture only; no acquired publisher input or real gate receipt.
+  const scope:AdapterScope={publisherId:'synthetic-publisher-not-the-town',sourceId:'native-source',municipalityId:'strausberg',ags:'12064472',tenant:null,observationWindow:'2026-10-10'};
+  const retrievedAt='2026-10-10T12:00:00Z',sourceSha256=hash(Buffer.from('synthetic primary')),policyReceiptSha256=hash(Buffer.from('synthetic policy')),supportSha256=hash(Buffer.from('synthetic support'));
+  const locator={sourceSha256,format:'json' as const,nativeId:'row-1',path:'$.value',sheet:null,rowKey:'row-1',cells:[],rawValue:1,schemaHash:hash(Buffer.from('synthetic schema')),mappingVersion:'synthetic-v1'};
+  const supportingLocator={...locator,sourceSha256:supportSha256,path:'$.ags',rawValue:scope.ags};
+  const native=observation({publisherId:scope.publisherId,sourceId:scope.sourceId,nativeId:'row-1',nativeVersion:'fixture-1',kind:'StatisticalObservation',subject:'Synthetic heat demand',predicate:'modeled_heat_demand',value:1,unit:'kW',date:null,dateRole:null,financialRole:'none',geography:{ags:scope.ags,basis:'verified_join',role:'administrative_area'},sourceReferenceDate:null,publishedAt:null,retrievedAt,evidence:[locator],supportingEvidence:[{role:'municipality_join',locator:supportingLocator}],limitations:['Synthetic fixture only']});
+  const claims={kind:'structured' as const,id:`structured:${native.id}`,municipalityId:scope.municipalityId,ags:scope.ags,districtId:'maerkisch-oderland',scope,observation:native,source:{id:scope.sourceId,url:'https://example.org/native',sha256:sourceSha256,mimeType:'application/json',retrievedAt,policyReceiptSha256},supportingSources:[{id:'support-source',url:'https://example.org/support',sha256:supportSha256,mimeType:'application/json',retrievedAt,policyReceiptSha256,scopeSha256:semanticHash(scope),role:'municipality_join' as const}],graph:nativeStructuredIdentityGraph(native,scope)};
+  const gates={kind:'structured' as const,status:'auto-verified' as const,version:STRUCTURED_VERIFICATION_VERSION,adapterId:'synthetic-native',mappingVersion:'synthetic-v1',adapterContractSha256:hash(Buffer.from('synthetic contract')),sourceSha256,policyReceiptSha256,scopeSha256:semanticHash(scope),locators:native.evidence,deterministic:{passed:true as const,checks:[{id:'synthetic_fixture',passed:true as const,reason:'Synthetic schema fixture, not actual publication verification'}]}};
+  const record=StructuredKnowledgeRecordSchema.parse({...claims,verification:{...gates,evidenceHash:semanticHash({...claims,verification:gates})}});
+  const knowledge:KnowledgeQueryData={records:[record],municipalities:[{id:scope.municipalityId,name:'Strausberg',ags:scope.ags,districtId:'maerkisch-oderland',sources:[{id:scope.sourceId,kind:'synthetic-native',url:record.source.url,checkState:'checked'},{id:'support-source',kind:'synthetic-native',url:record.supportingSources[0].url,checkState:'checked'}]}],coverage:{municipalities:[{id:scope.municipalityId,status:'gated_records',documents:1,publishedRecords:1,datedStagedRecords:0,quarantinedRecords:0}]}};
+  const original=new QueryIndex('a'.repeat(64),retrievedAt,[],{...regional,topics:[]},catalogue,knowledge),indexed=original.records[0],descriptors=knowledgeSourceDescriptors(record);
+  assert.equal(original.sources.get(indexed.sourceIds[0])!.publisher,scope.publisherId);
+  assert.equal(original.sources.get(indexed.sourceIds[1])!.publisher,undefined);
+  assert.deepEqual(descriptors.filter(source=>source.mcpSourceId).map(source=>source.mcpSourceId),indexed.sourceIds);
+  assert.equal(descriptors[1].mcpSourceId,mcpSourceId({...record.supportingSources[0],locators:[supportingLocator]}));
+  const changes=diff([],knowledge.records.map(knowledgeChangeRecord),retrievedAt);
+  for(const sourceId of indexed.sourceIds){
+    const mask=signedMask([{type:'mcp_source',mcpSourceId:sourceId}]),view=original.withRevocations(mask);
+    assert.equal(view.index.records.length,0);assert.equal(view.index.sources.size,0);
+    assert.equal(view.visibleRecordIds.has(record.id),false);
+    assert.equal(view.index.municipalities.get(scope.municipalityId)!.sources!.some(source=>source.id===original.sources.get(sourceId)!.registrySourceId),false);
+    assert.equal(view.index.exportRecords().items.length,0);
+    assert.equal(visibleChanges({strausberg:changes},[],{records:[record]},mask).strausberg.events.length,0);
+  }
+});
+
+test('a signed regional source target matches its source evidence SHA and withholds original exports',()=>{
+  const statement=excerpt('Die kommunale Wärmeplanung begann im Januar 2024.');
+  const item={title:'Kommunale Wärmeplanung',url:'https://example.org/heat',date:'2026-05-27',stage:'planning',sourceType:'cityWebsite',locator:'Abschnitt 2',...statement};
+  const evidence:Regional={...regional,topics:[{id:'waermeplanung',label:'Wärmeplanung',municipalities:[{municipalityId:'hoppegarten',stage:'planning',items:[item]}]}]};
+  const original=new QueryIndex('a'.repeat(64),catalogue.generatedAt,[],evidence,catalogue),record=original.records[0],sourceId=record.sourceIds[0];
+  assert.equal(original.sources.get(sourceId)!.sha256,statement.statementEvidence[0].sourceSha256);
+  const view=original.withRevocations(signedMask([{type:'mcp_source',mcpSourceId:sourceId}]));
+  assert.equal(view.visibleRecordIds.has(record.id),false);assert.equal(view.index.sources.has(sourceId),false);
+  assert.equal(view.index.exportRecords().items.length,0);
+  assert.deepEqual(view.index.regional.topics[0].municipalities[0].items,[]);
+});
+
+test('an empty signed mask preserves zero-record registry coverage and all query content',()=>{
+  const sources=[{id:'blocked-source',kind:'website',url:'https://example.org/blocked',checkState:'not_found' as const},{id:'unattempted-source',kind:'website',url:null,checkState:'not_checked' as const}];
+  const knowledge:KnowledgeQueryData={records:[],municipalities:[{id:'strausberg',name:'Strausberg',ags:'12064472',districtId:'maerkisch-oderland',sources}],coverage:{municipalities:[{id:'strausberg',status:'checked_no_gated_records',documents:0,publishedRecords:0,datedStagedRecords:0,quarantinedRecords:0}]}};
+  const original=new QueryIndex('a'.repeat(64),catalogue.generatedAt,[feature('visible','Solarpark')],regional,catalogue,knowledge),view=original.withRevocations(signedMask([])).index;
+  assert.deepEqual(view.records,original.records);
+  assert.deepEqual([...view.sources],[...original.sources]);
+  assert.deepEqual(view.municipalities,original.municipalities);
+  assert.deepEqual(view.listTopics(),original.listTopics());
+  assert.deepEqual(view.knowledge,original.knowledge);
+  const filtered=original.withRevocations(signedMask([{type:'registry_source',municipalityId:'strausberg',registrySourceId:'blocked-source'}])).index;
+  assert.deepEqual(filtered.municipalities.get('strausberg')!.sources,[sources[1]]);
 });
 
 test('shared topics match subject text, not category or planning record type',()=>{

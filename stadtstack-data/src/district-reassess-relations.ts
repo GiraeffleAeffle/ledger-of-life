@@ -15,8 +15,8 @@ import {isProviderStopped} from './district-model-usage.ts';
 import {PROVIDER_CONFIGS, ModelEvidenceSchema, assertModelEvidenceIdentity, SubscriptionRuntimeError, type ExtractorProvider, type ModelEvidence, type ModelAnswer, type UsageContext} from './district-model-contract.ts';
 import {CIVIC_POLICY_AUTHORITY,CIVIC_ACQUISITION_DECISION_ID,assertCivicPolicyAuthority,assertHostNotOptedOut,assertManagedSourceBindings,parseContentFreePreparationPlan,initializeManagedAcquisitionLane,HostOptedOutError,CivicPolicyStateError,type CivicPolicyOptions,type ManagedSourceContext} from './civic-opt-out.ts';
 import {modelAnswerCacheBinding} from './district-answer-cache.ts';
-import {knowledgePreparedSourcePinSchema,knowledgeHttpObservationBindingSchema,type KnowledgePreparedSourcePin} from './prepare-knowledge.ts';
-import {operatorRegistryConfigBindingSchema} from './district-registry-config.ts';
+import {knowledgePreparedSourcePinSchema,type KnowledgePreparedSourcePin} from './prepare-knowledge.ts';
+import {artifactBindingSchema} from './district-publication-provenance.ts';
 
 // These artifacts are private replay evidence, not public source-text exports.
 export const REASSESSMENT_VERSION = 'district-relation-reassessment-v2';
@@ -35,7 +35,7 @@ const FrozenBodySchema = z.object({
 }).strict();
 /** Pure historical codec only; never accepted by current filesystem/model entrypoints. */
 export const HistoricalFrozenReassessmentSchema=FrozenBodySchema.extend({version:z.literal('district-relation-reassessment-v1'),contract:Contract.extend({version:z.literal('district-relation-reassessment-v1')})}).strict();
-export const reassessmentArtifactPinSchema=z.object({path:z.string().min(1),sha256:hashSchema,bytes:z.number().int().nonnegative().max(512*1024*1024),bindings:z.array(z.union([knowledgePreparedSourcePinSchema.shape.bindings.element,knowledgeHttpObservationBindingSchema,operatorRegistryConfigBindingSchema])).min(1)}).strict();
+export const reassessmentArtifactPinSchema=z.object({path:z.string().min(1),sha256:hashSchema,bytes:z.number().int().nonnegative().max(512*1024*1024),bindings:z.array(artifactBindingSchema).min(1)}).strict();
 export type ReassessmentArtifactPin=z.infer<typeof reassessmentArtifactPinSchema>;
 const ControlBindingsSchema=z.object({workPlan:z.array(reassessmentArtifactPinSchema.shape.bindings.element).max(100_000),preparationPlan:z.array(reassessmentArtifactPinSchema.shape.bindings.element).max(100_000)}).strict();
 export const FrozenReassessmentSchema=FrozenBodySchema.extend({version:z.literal(REASSESSMENT_VERSION),contract:Contract,controlBindings:ControlBindingsSchema}).strict();

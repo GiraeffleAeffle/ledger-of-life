@@ -15,7 +15,7 @@ import {createHash,generateKeyPairSync,randomUUID} from 'node:crypto';
 import {signRevocations,verifyRevocations,revocationKeyId} from '../src/civic-revocations.ts';
 import {provisionCivicPolicyAuthority,recordHostOptOut} from '../src/civic-opt-out.ts';
 
-const envelopeSchema=z.object({source:z.object({release:z.string()}),releasedAt:z.iso.datetime(),respondedAt:z.iso.datetime(),status:z.literal('candidate'),data:z.unknown()}).passthrough();
+const envelopeSchema=z.object({source:z.object({release:z.string(),readViewId:z.string().nullable()}),releasedAt:z.iso.datetime(),respondedAt:z.iso.datetime(),status:z.literal('candidate'),data:z.unknown()}).passthrough();
 const recordSchema=z.object({id:z.string(),cityId:z.string(),sourceIds:z.array(z.string())}).passthrough();
 
 test('released MCP contract retains core evidence, separates times and fact/source lookup semantics',async()=>{
@@ -58,7 +58,7 @@ test('hosted sealed reads apply a real synthetic Ed25519 mask to core exports an
   const {privateKey,publicKey}=generateKeyPairSync('ed25519'),keyId=revocationKeyId(publicKey);
   const signed=signRevocations({schemaVersion:'stadtstack-revocations-v1',releaseId,issuedAt:'2026-10-10T12:00:00Z',sequence:1,targets:[{type:'record',recordId:fact.id}]},keyId,privateKey);
   const revocations=verifyRevocations(signed,{schemaVersion:'stadtstack-revocation-trust-v1',releaseId,expectedArtifactSha256:createHash('sha256').update(signed).digest('hex'),keys:[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}]},releaseId);
-  const release=await loadRelease(undefined,{mode:'sealed',revocations}),mcp=server({release}),client=new Client({name:'signed-safe-view-test',version:'1'});
+  const release=await loadRelease(undefined,{mode:'sealed',revocations}),mcp=server({release,transformResult:data=>releasedResponse(data,release)}),client=new Client({name:'signed-safe-view-test',version:'1'});
   const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();await mcp.connect(serverTransport);await client.connect(clientTransport);
   try{
     const output=envelopeSchema.parse((await client.callTool({name:'get_core_bundle',arguments:{}})).structuredContent);

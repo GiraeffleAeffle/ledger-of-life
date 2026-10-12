@@ -2,6 +2,7 @@ import {join} from 'node:path';
 import {readFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {z} from 'zod';
+import {CoverageSchema,ObservationSchema,HashSchema,ScopeSchema,canonicalJson,semanticHash,digest} from './district-adapter-contract.ts';
 import {operatorRegistryInputPinSchema} from './district-registry-config.ts';
 import {authenticateStructuredRegistry} from './district-structured-registry-admission.ts';
 import {StructuredWorkerRequestSchema,StructuredOutputPageSchema,STRUCTURED_WORKER_VERSION,type StructuredWorkerRequest} from './district-structured-parser-worker.ts';

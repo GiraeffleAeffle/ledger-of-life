@@ -1,7 +1,8 @@
 import {createHash} from 'node:crypto';
 import {readCursor,writeCursor} from './mcp-pagination.ts';
-import {canonical,mcpSourceId,knowledgeSourceDescriptors,sourceMetadataUrls} from './mcp-source-identity.ts';
+import {canonical,mcpSourceId,knowledgeSources,knowledgeSourceDescriptors,sourceMetadataUrls} from './mcp-source-identity.ts';
 import {regionalRecordId,regionalSource,signalSourceDescriptors} from './mcp-read-view.ts';
+import {isSourceRevoked,isRecordRevoked,type VerifiedRevocations,type RevocationSourceDescriptor} from './civic-revocations.ts';
 import {z} from 'zod';
 import type {Catalogue,Signal} from './schema.ts';
 import {isPublicUrl,publicUrlReason} from './publication-quality.ts';
@@ -103,10 +104,9 @@ export class QueryIndex {
     for(const topic of regional.topics)for(const municipality of topic.municipalities)for(const item of municipality.items) {
       if(!this.municipalities.has(municipality.municipalityId))throw Error('Unknown regional municipality in released evidence');
       // URL + exact source locator identify an evidence item, not a title or inferred case.
-      const identity=canonical({municipalityId:municipality.municipalityId,url:item.url,locator:item.locator});
-      const id=`regional:${createHash('sha256').update(identity).digest('hex')}`;
+      const id=regionalRecordId(municipality.municipalityId,item);
       const statement=regionalStatement(item);
-      const sourceId=this.addSource({url:item.url,title:item.title,publisher:'Official regional evidence (see source URL)',locator:item.locator,sha256:statement.statementEvidence[0]?.sourceSha256,statementEvidence:statement.statementEvidence,retrievedAt:null,asOf:regional.asOf,retrievalNote:'Regional snapshot asOf is known; an individual source retrieval timestamp is not supplied.',licence:'unknown',reuse:'facts_with_attribution',sourceType:item.sourceType,licenceNote:'No open licence inferred by the query layer; see released regional source evidence.'});
+      const sourceId=this.addSource(regionalSource(item,regional.asOf,statement));
       const sourceIds=[sourceId];
       const tags=assignTopics(`${item.title}\n${statement.statement}`,sourceIds);
       if(topicRegistry.some(entry=>entry.id===topic.id)&&!tags.some(tag=>tag.id===topic.id))tags.push({id:topic.id,assignment:'source',ruleId:'released-regional-topic-v1',evidence:item.locator,sourceIds});
@@ -132,13 +132,9 @@ export class QueryIndex {
       if(!this.municipalities.has(record.municipalityId))throw Error('Unknown normalized knowledge municipality');
       if(this.records.some(existing=>existing.id===record.id))throw Error('Duplicate released record identity');
       this.originalRecords.set(record.id,record);
+      const sourceIds=knowledgeSources(record).map(source=>this.addSource(source));
       if(record.kind==='structured'){
         const observation=record.observation;
-        const sourceIds=[this.addSource({...record.source,registrySourceId:record.source.id,publisher:observation.publisherId,sourceType:record.verification.adapterId,locators:observation.evidence})];
-        for(const supportingSource of record.supportingSources){
-          const locators=observation.supportingEvidence.filter(evidence=>evidence.role===supportingSource.role&&evidence.locator.sourceSha256===supportingSource.sha256).map(evidence=>evidence.locator);
-          sourceIds.push(this.addSource({...supportingSource,registrySourceId:supportingSource.id,locators}));
-        }
         const title=observation.subject,statement=canonical({predicate:observation.predicate,value:observation.value,unit:observation.unit});
         this.records.push({id:record.id,cityId:record.municipalityId,ags:record.ags,districtId:record.districtId,kind:'structured',recordType:'structured_observation',observationKind:observation.kind,title,statement,topics:[],...structuredDates(observation),endDate:null,dateRole:observation.dateRole,financialRole:observation.financialRole,sourceReferenceDate:observation.sourceReferenceDate,publishedAt:observation.publishedAt,documentDate:null,stageDate:null,status:'source_native_observation',stage:null,asOf:observation.retrievedAt,sourceIds,sourceTypes:[record.verification.adapterId],comparisonEligible:false,comparisonReason:null,geometry:null,origin:'knowledge',category:observation.kind,verification:record.verification,observation,evidence:observation.evidence,supportingEvidence:observation.supportingEvidence,graph:record.graph,unknowns:observation.limitations,geometryPrecision:'none'});
         const binding:NativeRecordContext['binding']={scope:record.scope,source:record.source,nativeId:observation.nativeId,nativeVersion:observation.nativeVersion,subject:observation.subject,adapterId:record.verification.adapterId,mappingVersion:record.verification.mappingVersion,adapterContractSha256:record.verification.adapterContractSha256};
@@ -146,7 +142,6 @@ export class QueryIndex {
         if(group)group.members.push(member);else nativeGroups.set(key,{binding,members:[member]});
         continue;
       }
-      const sourceIds=record.sources.map(source=>this.addSource({...source,registrySourceId:source.id,publisher:record.municipalityId}));
       const verification=record.verification;
       nativeCaseIdentities.set(record.id,caseIdentityFromText(record));
       const sourceTypes=[...new Set(record.sources.map(source=>source.sourceType))];
@@ -183,7 +178,7 @@ export class QueryIndex {
   withRevocations(mask:VerifiedRevocations):QueryVisibility {
     isSourceRevoked(mask,{});
     if(mask.releaseId!==this.releaseId)throw Error('Revocation read-view release mismatch');
-    const sourceDescriptorsByRecord=new Map<string,readonly RevocationSourceDescriptor[]>(),visibleRecordIds=new Set<string>(),withheldSourceIds=new Set<string>();
+    const sourceDescriptorsByRecord=new Map<string,readonly RevocationSourceDescriptor[]>(),visibleRecordIds=new Set<string>(),withheldSourceIds=new Set<string>(),revokedRegistrySources=new Set<string>();
     const visibleFeatures=this.originalFeatures.filter(feature=>{
       const descriptors=signalSourceDescriptors(feature);
       sourceDescriptorsByRecord.set(feature.properties.id,descriptors);
@@ -200,12 +195,12 @@ export class QueryIndex {
     })}))}))};
     const knowledge=this.knowledge&&{...this.knowledge,records:this.knowledge.records.filter(record=>{
       const descriptors=knowledgeSourceDescriptors(record);sourceDescriptorsByRecord.set(record.id,descriptors);
+      for(const descriptor of descriptors)if(descriptor.registrySourceId&&isSourceRevoked(mask,descriptor))revokedRegistrySources.add(JSON.stringify([record.municipalityId,descriptor.registrySourceId]));
       const visible=!isRecordRevoked(mask,{recordId:record.id,municipalityId:record.municipalityId,sources:descriptors});
       if(visible)visibleRecordIds.add(record.id);else for(const descriptor of descriptors)if(descriptor.mcpSourceId)withheldSourceIds.add(descriptor.mcpSourceId);
       return visible;
-    }),municipalities:this.knowledge.municipalities.map(city=>({...city,amt:city.amt&&sourceMetadataUrls(city.amt).every(url=>!isSourceRevoked(mask,{municipalityId:city.id,url}))?city.amt:null,sources:city.sources.filter(source=>!isSourceRevoked(mask,{municipalityId:city.id,registrySourceId:source.id,...(source.url?{url:source.url}:{})})&&(!source.url||!isSourceRevoked(mask,{url:source.url}))&&sourceMetadataUrls(source).every(url=>!isSourceRevoked(mask,{url}))&&this.knowledge!.records.some(record=>record.municipalityId===city.id&&knowledgeSourceDescriptors(record).some(descriptor=>descriptor.registrySourceId===source.id)&&visibleRecordIds.has(record.id)))})),coverage:{scope:'Current served evidence only; immutable publication, crawl, lineage and quarantine counts are not served-view counts.',municipalities:[]}};
+    }),municipalities:this.knowledge.municipalities.map(city=>mask.targets.length===0?city:({...city,amt:city.amt&&sourceMetadataUrls(city.amt).every(url=>!isSourceRevoked(mask,{municipalityId:city.id,url}))?city.amt:null,sources:city.sources.filter(source=>!revokedRegistrySources.has(JSON.stringify([city.id,source.id]))&&!isSourceRevoked(mask,{municipalityId:city.id,registrySourceId:source.id,...(source.url?{url:source.url}:{})})&&sourceMetadataUrls(source).every(url=>!isSourceRevoked(mask,{url})))})),coverage:mask.targets.length===0?this.knowledge.coverage:{scope:'Current served evidence only; immutable publication, crawl, lineage and quarantine counts are not served-view counts.',municipalities:[]}};
     const index=new QueryIndex(this.releaseId,this.releasedAt,visibleFeatures,regional,this.originalCatalogue,knowledge,mask.artifactSha256);
-    for(const id of visibleRecordIds){const record=index.records.find(row=>row.id===id);if(record)for(const sourceId of record.sourceIds){const source=index.sources.get(sourceId);if(source){const descriptors=[...(sourceDescriptorsByRecord.get(id)??[]),{mcpSourceId:sourceId,municipalityId:record.cityId,url:typeof source.url==='string'?source.url:undefined,registrySourceId:typeof source.registrySourceId==='string'?source.registrySourceId:undefined}];sourceDescriptorsByRecord.set(id,descriptors);}}}
     return {releaseId:this.releaseId,maskIdentity:mask.artifactSha256,index,visibleRecordIds,withheldSourceIds,sourceDescriptorsByRecord};
   }
   private recordKey(record:QueryRecord){return `${record.cityId}:${record.id}`;}

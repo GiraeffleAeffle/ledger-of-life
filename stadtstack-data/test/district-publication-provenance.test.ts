@@ -20,8 +20,13 @@ test('publication provenance authenticates exact bytes and live managed source b
  assert.equal(privatePublicationProvenanceSchema.safeParse({...inventory,inputs:[{...inventory.inputs[0],bindings:[{...binding,independentAllowed:undefined}]}]}).success,false);
  const provenance=await authenticatePublicationProvenance(provenancePath,hash(encoded),context.policy);
  assert.doesNotThrow(()=>assertAuthenticatedPublicationProvenance(provenance));
- assert.throws(()=>assertAuthenticatedPublicationProvenance({sha256:hash(encoded),bindings:[binding],pins:new Map(),read:async()=>bytes}),/authenticated provenance capability/);
+ assert.throws(()=>assertAuthenticatedPublicationProvenance({sha256:hash(encoded),bindings:[binding],read:async()=>bytes}),/authenticated provenance capability/);
  assert.deepEqual(await provenance.read(path),bytes);
+ assert.equal(Object.isFrozen(provenance),true);
+ assert.throws(()=>{provenance.read=async()=>Buffer.from('unbound');});
+ assert.equal('pins' in provenance,false);
+ await writeFile(join(directory,'unbound.json'),'tampered');
+ await assert.rejects(provenance.read(join(directory,'unbound.json')));
  await writeFile(path,'tampered');
  await assert.rejects(provenance.read(path),/binding mismatch|managed source/i);
 });

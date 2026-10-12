@@ -3,19 +3,24 @@ import assert from 'node:assert/strict';
 import {mkdtemp,readFile,writeFile,rm,lstat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,relative} from 'node:path';
-import {prepareKnowledge} from '../src/prepare-knowledge.ts';
-import {KNOWLEDGE_SCHEMA_VERSION} from '../src/district-schema.ts';
+import {prepareKnowledge,withPreparedKnowledge,assertAuthenticatedPreparedPublication} from '../src/prepare-knowledge.ts';
+import {KNOWLEDGE_SCHEMA_VERSION,knowledgeEvidenceHash} from '../src/district-schema.ts';
 import {knowledgePublicationHold,knowledgePublicationQuarantineCase,quarantineReasonHistogram} from '../src/district-publication.ts';
 import {root,hash} from '../src/common.ts';
 import {districtRegistrySchema} from '../src/district-registry.ts';
 import {writeManagedSourceArtifact} from '../src/district-private-io.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
+import {createPolicyReceipt} from '../src/district-policy-receipt.ts';
+import {DistrictCas} from '../src/district-cas.ts';
+import {canonicalJson} from '../src/district-adapter-contract.ts';
+import {syntheticTextRecord,syntheticTextContribution} from './helpers/text-publication-fixture.ts';
+import {buildR1TextCompositionContext} from '../src/district-r1-text-composition.ts';
 
 const at='2026-10-10T12:00:00.000Z';
 test('importable knowledge preparation retains the mandatory district acceptance gate',async()=>{
  for(const minimum of [0,-1,1.5,NaN])await assert.rejects(prepareKnowledge({registry:'not-read',records:'not-read',quarantine:'not-read',minimum}),/at least one evidenced municipality/);
 });
-test('a replay clock cannot substitute implicit lineage for original ordered text contributions or write staging on failure',async()=>{
+test('a replay clock cannot substitute implicit lineage for original ordered text contributions or write staging on failure',async t=>{
  const directory=await mkdtemp(join(tmpdir(),'stadtstack-knowledge-replay-'));
  try{
   const policy=await createCivicPolicyTestContext(t),registry=join(root,'sources','district-registry.json'),registryBytes=await readFile(registry),city=districtRegistrySchema.parse(JSON.parse(registryBytes.toString('utf8'))).municipalities.find(city=>city.sources.length>0)!;
@@ -46,4 +51,39 @@ test('preparation carries text date and URL holds into one source-bound quaranti
  const datedItem=knowledgePublicationQuarantineCase(dated,knowledgePublicationHold(dated)!);
  assert.deepEqual(quarantineReasonHistogram([datedItem]).categories,[{reason:'nonpublic_evidence_url',count:1}]);
  assert.equal(JSON.stringify(datedItem).includes('1998-04-03'),false);
+});
+
+test('prepared publication readers bind native-only outputs and staged pins to the actual managed lease',async t=>{
+ const context=await createCivicPolicyTestContext(t),full=districtRegistrySchema.parse(JSON.parse(await readFile(join(root,'sources','district-registry.json'),'utf8'))),city=full.municipalities[0];
+ const registry=districtRegistrySchema.parse({...full,districts:full.districts.filter(district=>district.id===city.districtId),municipalities:[city],inventory:full.inventory.filter(item=>item.ags===city.ags)});
+ const source=city.sources.find(source=>source.kind==='website')!,sourceBytes=Buffer.from('Synthetic original source, no model or civic fact asserted.'),record=syntheticTextRecord(registry,'synthetic-native-lease',hash(sourceBytes));
+ record.sources[0].id=source.id;record.verification.evidenceHash=knowledgeEvidenceHash(record);
+ const cas=new DistrictCas(join(context.root,'cas')),now=Date.now(),checkedAt=new Date(now-1000).toISOString(),expiresAt=new Date(now+300_000).toISOString(),reference=record.sources[0];
+ const proof=await createPolicyReceipt({source:{url:reference.url,sha256:reference.sha256,mimeType:reference.mimeType},scope:{publisherId:city.id,sourceId:source.id,municipalityId:city.id,ags:city.ags,tenant:null,observationWindow:at},sourcePolicy:reference.policy,permission:{kind:'distribution_licence',distributionUrl:reference.url,licenceId:'synthetic-test-only',termsUrl:'https://example.org/terms',termsSha256:hash('synthetic terms'),approvalSha256:hash('synthetic approval')},checkedAt,expiresAt},context.policy);
+ const receipt=await cas.put(Buffer.from(canonicalJson(proof.receipt)),{kind:'receipt',mimeType:'application/json'});
+ await cas.put(sourceBytes,{kind:'source_original',mimeType:reference.mimeType,admission:{state:'allowed',sourceSha256:reference.sha256,policyProofSha256:receipt.sha256,checkedAt,expiresAt}});
+ const crawl={schemaVersion:'stadtstack-crawl-index-v1',generatedAt:at,documents:[{id:'synthetic-native-document',municipalityId:city.id,sourceId:source.id,sha256:reference.sha256}],checks:[]},run=syntheticTextContribution(registry,crawl,[record],[]),composition=buildR1TextCompositionContext({contributions:[run],approvedRunOrder:[run.runId],admissions:[{runId:run.runId,recordIds:[record.id]}],generatedAt:at});
+ const inputRoot=join(context.managedRoot,'inputs'),artifacts=new Map<string,Buffer>();
+ for(const [name,value] of Object.entries(run.artifacts))artifacts.set(`native/${name}.json`,typeof value.bytes==='string'?Buffer.from(value.bytes):Buffer.from(value.bytes));
+ const textComposition={schemaVersion:'district-r1-text-composition-input-v1',generatedAt:at,approvedRunOrder:[run.runId],admissions:[{runId:run.runId,recordIds:[record.id]}],contributions:[{runId:run.runId,pins:run.pins,sourceArtifactKind:'native_extraction_output',artifacts:Object.fromEntries(Object.entries(run.artifacts).map(([name,value])=>[name,{path:`native/${name}.json`,sha256:value.sha256}]))}]};
+ for(const [name,value] of Object.entries({registry,records:composition.knowledge,quarantine:composition.coverage.quarantine,composition:textComposition,policy:{records:[{recordId:record.id,receipts:[{sourceUrl:reference.url,sourceSha256:reference.sha256,receiptSha256:receipt.sha256}]}]},catalogue:{synthetic:'pinned staging'}}))artifacts.set(`${name}.json`,Buffer.from(JSON.stringify(value)));
+ const binding={kind:'prepared_source' as const,url:reference.url,sourceSha256:reference.sha256,observationId:'synthetic-native-lease',receiptSha256:hash('synthetic prepared receipt'),independentAllowed:true},pins=[];
+ for(const [name,bytes] of artifacts){const path=join(inputRoot,name);await writeManagedSourceArtifact(context.managedRoot,path,bytes,[binding],{...context.policy,decisionId:context.decisionId,kind:'artifacts'});pins.push({path,sha256:hash(bytes),bytes:bytes.length,bindings:[binding]});}
+ const privateProvenancePath=join(context.root,'provenance.json'),encoded=JSON.stringify({schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:pins});await writeFile(privateProvenancePath,encoded);
+ const options={registry:join(inputRoot,'registry.json'),records:join(inputRoot,'records.json'),quarantine:join(inputRoot,'quarantine.json'),textComposition:join(inputRoot,'composition.json'),policyReceipts:join(inputRoot,'policy.json'),privateProvenance:{path:privateProvenancePath,sha256:hash(encoded)},outputRoot:join(context.root,'prepared-publication'),casRoot:cas.root,policyStateDir:context.policy.stateDir,policyAuthorityId:context.policy.authorityId,policyAuthoritySha256:context.policy.authoritySha256,coverageGeneratedAt:at};
+ let expiredPath='';
+ const ended=await withPreparedKnowledge(options,async prepared=>{
+  expiredPath=join(prepared.stagingDir,'knowledge/records.json');
+  assert.doesNotThrow(()=>assertAuthenticatedPreparedPublication(prepared.publication));
+  assert.equal(Object.isFrozen(prepared.publication),true);
+  const records=JSON.parse((await prepared.publication.read(expiredPath)).toString('utf8'));assert.deepEqual(records,composition.knowledge);
+  const coverage=JSON.parse((await prepared.publication.read(join(prepared.stagingDir,'knowledge/coverage.json'))).toString('utf8'));assert.equal(coverage.retainedPublication,null);
+  assert.deepEqual(JSON.parse((await prepared.publication.read(join(prepared.stagingDir,'catalogue.json'))).toString('utf8')),{synthetic:'pinned staging'});
+  await assert.rejects(prepared.publication.read(join(inputRoot,'records.json')));
+  prepared.outputPins[0].sha256=hash('tampered output pin');
+  await writeFile(expiredPath,'tampered');await assert.rejects(prepared.publication.read(expiredPath));
+  return prepared.publication;
+ },{staging:[{destination:'catalogue.json',pin:{path:join(inputRoot,'catalogue.json'),sha256:hash(artifacts.get('catalogue.json')!)}}]});
+ assert.throws(()=>assertAuthenticatedPreparedPublication(ended));
+ await assert.rejects(ended.read(expiredPath));
 });

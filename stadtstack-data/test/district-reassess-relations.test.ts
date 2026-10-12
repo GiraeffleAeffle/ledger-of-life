@@ -28,6 +28,13 @@ import {preparationPlanSchema} from '../src/district-preparation-run.ts';
 const at='2026-10-10T12:00:00.000Z';
 const hash=(value:unknown)=>sha256(JSON.stringify(value));
 const blob=(value:unknown)=>{const bytes=JSON.stringify(value);return {bytes,sha256:sha256(bytes)};};
+test('reassessment source pins use the canonical closed publication binding codec',()=>{
+ const prepared={kind:'prepared_source' as const,url:'https://example.org/synthetic',sourceSha256:sha256('synthetic original'),observationId:'synthetic-prepared',receiptSha256:sha256('synthetic prepared receipt'),independentAllowed:true};
+ const http={...prepared,kind:'http_observation' as const,observationId:'synthetic-http',independentAllowed:false};
+ const pin={path:'synthetic.json',sha256:sha256('synthetic artifact'),bytes:32,bindings:[prepared,http]};
+ assert.deepEqual(reassessmentArtifactPinSchema.parse(pin),pin);
+ for(const binding of [{...http,approved:true},{...http,independentAllowed:undefined},{...http,kind:'authenticated_git_snapshot'}])assert.equal(reassessmentArtifactPinSchema.safeParse({...pin,bindings:[binding]}).success,false);
+});
 const contract:ReassessmentContract={version:REASSESSMENT_VERSION,judgePromptVersion:JUDGE_PROMPT_VERSION,judgePromptSha256:JUDGE_PROMPT_SHA256,judgeSchemaSha256:hash(judgeJSONSchema),assessorSha256:sha256('synthetic assessor code contract'),threshold:0.8};
 const legacyContract={promptSha256:sha256('synthetic legacy joint contract'),schemaSha256:sha256('synthetic legacy schema'),extractorSha256:sha256('synthetic legacy extractor')};
 const generationAnswer=(identity:ModelEvidence,claims:DistrictExtractionClaims)=>{

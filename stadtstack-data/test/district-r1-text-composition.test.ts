@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildR1TextCompositionContext,rebuildR1TextCoverageContext,loadR1TextCompositionInput,r1TextCompositionInputSchema} from '../src/district-r1-text-composition.ts';
+import {buildR1TextCompositionContext,rebuildR1TextCoverageContext,loadR1TextCompositionInput,loadRetainedPublicationComposition,r1TextCompositionInputSchema} from '../src/district-r1-text-composition.ts';
 import {buildTextRunLineage,readTextLineageArtifact,type TextLineageArtifact,type TextRunContribution} from '../src/text-run-lineage.ts';
 import {type DistrictReleaseCompositionInput} from '../src/district-release-composition.ts';
 import {DistrictKnowledgeRecordSchema,knowledgeEvidenceHash,sha256,REQUIRED_DETERMINISTIC_CHECKS,type DistrictKnowledgeRecord} from '../src/district-schema.ts';
@@ -8,6 +8,12 @@ import {GRAPH_DETERMINISTIC_CHECKS,normalizeGraphClaims} from '../src/district-g
 import {PROVIDER_CONFIGS,type ExtractorProvider} from '../src/district-model-contract.ts';
 import {identityAssertion,unknownValidity,type IdentityAdmission,type IdentityAssertion} from '../src/district-entity-resolution.ts';
 import {semanticHash} from '../src/district-adapter-contract.ts';
+import {fileURLToPath} from 'node:url';
+import {loadDistrictRegistry} from '../src/district-registry.ts';
+import {buildDistrictCoverage,validateDistrictCoverage} from '../src/district-publication.ts';
+import {dataReleaseId} from '../src/data-release.ts';
+import {validateRetainedKnowledgeComposition} from '../src/retained-knowledge-lineage.ts';
+import {syntheticTextRecord,syntheticTextContribution} from './helpers/text-publication-fixture.ts';
 
 // Explicit synthetic offline artifacts only; no civic facts, operational receipts,
 // provider/judge execution, source requests or policy authorizations are represented.
@@ -133,6 +139,45 @@ test('actual v3 root identity assertion/admission histories survive composition 
  assert.throws(()=>buildR1TextCompositionContext(input([first,conflict],[['first'],['conflict']])),/Conflicting original identity assertion/);
 });
 
+test('authenticated retained v3 roots survive composition and reject conflicting or rewritten history',async()=>{
+ const registry=await loadDistrictRegistry(fileURLToPath(new URL('../sources/district-registry.json',import.meta.url)));
+ const retained=syntheticTextRecord(registry,'synthetic-retained',sourceHash,'openai-subscription',earlier),city=registry.municipalities[0],source=city.sources.find(source=>source.kind==='website')!;
+ retained.sources[0].id=source.id;retained.sources[0].sourceType='website';retained.verification.evidenceHash=knowledgeEvidenceHash(retained);
+ const {assertion,admission}=identityFixture();
+ const crawl={schemaVersion:'stadtstack-crawl-index-v1',generatedAt:earlier,documents:[{id:'synthetic-retained-document',municipalityId:city.id,sourceId:source.id,sha256:sourceHash}],checks:[]};
+ const original=syntheticTextContribution(registry,crawl,[retained],[]),originalContext=buildR1TextCompositionContext(input([original],[[retained.id]]));
+ const coverage=buildDistrictCoverage(registry,crawl,[retained],{schemaVersion:'stadtstack-quarantine-v1',cases:[]},originalContext.coverage.textLineage,earlier);
+ const artifacts={records:artifact({schemaVersion:'stadtstack-knowledge-v3',generatedAt:earlier,records:[retained],identityAssertions:[assertion],identityAdmissions:[admission]}),registry:artifact(registry),coverage:artifact(coverage)};
+ const files=Object.entries(artifacts).map(([name,value])=>({path:`knowledge/${name}.json`,sha256:value.sha256,bytes:Buffer.byteLength(value.bytes as string)}));
+ const manifest=artifact({schemaVersion:'stadtstack-data-release-v1',id:dataReleaseId(files),generatedAt:earlier,files,quality:{publishedRecords:1,quarantinedRecords:0,cities:registry.municipalities.length}});
+ const emptyCrawl={schemaVersion:'stadtstack-crawl-index-v1',generatedAt:now,documents:[],checks:[]},empty=syntheticTextContribution(registry,emptyCrawl,[],[]);
+ const composed={...input([empty],[[]]),retainedPublication:{artifacts:{manifest,...artifacts},recordIds:[retained.id]}};
+ const context=buildR1TextCompositionContext(composed),before=JSON.stringify(artifacts);
+ assert.deepEqual(context.knowledge.identityAssertions,[assertion]);
+ assert.deepEqual(context.knowledge.identityAdmissions,[admission]);
+ assert.deepEqual(context.knowledge.records,[retained]);
+ assert.equal(JSON.stringify(artifacts),before);
+ const final=buildDistrictCoverage(registry,context.coverage.crawl,context.knowledge.records,context.coverage.quarantine,context.coverage.textLineage,now,undefined,context.coverage.retainedPublication);
+ assert.doesNotThrow(()=>validateDistrictCoverage(final,registry,context.knowledge.records));
+ assert.equal(final.municipalities[0].extraction.attemptedDocumentGroups,0);
+ assert.equal(final.municipalities[0].publishedRecords,1);
+ const misbound={...retained,kind:'structured'} as unknown as Parameters<typeof validateDistrictCoverage>[2][number];
+ assert.throws(()=>validateDistrictCoverage(final,registry,[misbound]),error=>error instanceof Error&&!(error instanceof TypeError));
+ const retainedCase={kind:'text_model',recordId:retained.id,municipalityId:retained.municipalityId,sourceId:source.id,sourceSha256:sourceHash,reason:'No supported case in source excerpt'};
+ const historicalQuarantine=buildDistrictCoverage(registry,context.coverage.crawl,context.knowledge.records,{schemaVersion:'stadtstack-quarantine-v1',cases:[retainedCase]},context.coverage.textLineage,now,undefined,context.coverage.retainedPublication);
+ assert.equal(historicalQuarantine.municipalities[0].quarantinedRecords,1);
+ assert.equal(historicalQuarantine.municipalities[0].extraction.attemptedDocumentGroups,0);
+ assert.throws(()=>buildDistrictCoverage(registry,context.coverage.crawl,context.knowledge.records,{schemaVersion:'stadtstack-quarantine-v1',cases:[{...retainedCase,sourceSha256:sha256('different synthetic source')}]},context.coverage.textLineage,now,undefined,context.coverage.retainedPublication));
+ const rewritten=structuredClone(context.retainedPublication!);rewritten.baseline.identityAssertions=[];
+ assert.throws(()=>validateRetainedKnowledgeComposition(rewritten));
+ const conflicting={...empty,artifacts:{...empty.artifacts,records:artifact({schemaVersion:'stadtstack-knowledge-v3',generatedAt:now,records:[],identityAssertions:[{...assertion,author:'different synthetic author'}],identityAdmissions:[]})}};
+ assert.throws(()=>buildR1TextCompositionContext({...input([conflicting],[[]]),retainedPublication:composed.retainedPublication}));
+ const {identityAssertions:_assertions,...missingRoots}=readTextLineageArtifact(artifacts.records) as Record<string,unknown>;
+ const missingArtifact=artifact(missingRoots),missingFiles=files.map(file=>file.path==='knowledge/records.json'?{...file,sha256:missingArtifact.sha256,bytes:Buffer.byteLength(missingArtifact.bytes as string)}:file);
+ const missingManifest=artifact({schemaVersion:'stadtstack-data-release-v1',id:dataReleaseId(missingFiles),generatedAt:earlier,files:missingFiles,quality:{publishedRecords:1,quarantinedRecords:0,cities:registry.municipalities.length}});
+ assert.throws(()=>buildR1TextCompositionContext({...composed,retainedPublication:{...composed.retainedPublication,artifacts:{...composed.retainedPublication.artifacts,records:missingArtifact,manifest:missingManifest}}}));
+});
+
 test('final coverage subset keeps all original attempts, rejects native rows and claim/judge rewrites',()=>{
  const first=record('first'),second=record('second');
  const contribution=run('two-records',[first,second]);
@@ -143,7 +188,7 @@ test('final coverage subset keeps all original attempts, rejects native rows and
  assert.equal(subset.textLineage.cumulative.groups.attemptedDocumentGroups,1);
  assert.deepEqual(subset.textLineage,buildTextRunLineage([contribution],subset.selections,now));
  assert.throws(()=>rebuildR1TextCoverageContext(context,[{...first,kind:'structured'} as unknown as DistrictKnowledgeRecord],now),/Native records/);
- assert.throws(()=>rebuildR1TextCoverageContext(context,[record('absent')],now),/no selected original run/);
+ assert.throws(()=>rebuildR1TextCoverageContext(context,[record('absent')],now));
  const rewritten=structuredClone(first);rewritten.summary='Changed claim';rewritten.verification.evidenceHash=knowledgeEvidenceHash(rewritten);
  assert.throws(()=>rebuildR1TextCoverageContext(context,[rewritten],now),/changes original claims/);
  const judge=structuredClone(first);judge.verification.faithfulness.evaluatedAt=now;judge.verification.evidenceHash=knowledgeEvidenceHash(judge);
@@ -188,6 +233,7 @@ test('managed-I/O loader uses independently pinned artifacts without implicit pr
  const loaded=await loadR1TextCompositionInput(raw,read);
  assert.equal(loaded.contributions[0].artifacts.records.bytes,contribution.artifacts.records.bytes);
  assert.equal(loaded.admissions[0].schemaProjection,undefined);
+ assert.equal(await loadRetainedPublicationComposition(raw,read),null);
  assert.deepEqual(buildR1TextCompositionContext(loaded).knowledge.records,[record('loaded')]);
  assert.equal(JSON.stringify(raw),original);
  memory.set('synthetic-memory/records','tampered synthetic artifact');

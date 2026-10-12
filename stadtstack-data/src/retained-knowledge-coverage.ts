@@ -5,6 +5,9 @@ import {ModelEvidenceSchema} from './district-model-contract.ts';
 import {textRunLineageSchema} from './text-run-lineage.ts';
 
 const count=z.number().int().nonnegative(),clock=z.string().datetime({offset:true}),checkState=z.enum(['checked','not_found','not_checked']);
+const quarantineReason=z.enum(['deterministic_gate_failed','faithfulness_gate_failed','no_supported_case','invalid_structured_output','document_limit','preparation_failed','extraction_failed','missing_sourced_date','nonpublic_evidence_url','source_binding_unknown','critical_assessment_missing','critical_assessment_held','critical_assessment_binding','original_gates_not_admitted','unknown']);
+const publicCheckId=z.enum([...REQUIRED_DETERMINISTIC_CHECKS,...GRAPH_DETERMINISTIC_CHECKS,'judge_critical_claims']);
+const histogram=z.object({categories:z.array(z.object({reason:quarantineReason,count}).strict()),failedDeterministicChecks:z.array(z.object({id:publicCheckId,count}).strict())}).strict();
 const accounting=z.object({registryMunicipalities:count,configuredMunicipalities:count,checkedMunicipalities:count,runSelectedMunicipalities:count.nullable(),preparedMunicipalities:count.nullable(),attemptedMunicipalities:count,publishedMunicipalities:count,checkedWithoutPublishedMunicipalities:count,unvisitedMunicipalities:count}).strict();
 const extraction=z.object({fetchedDocumentGroups:count,runSelectedDocumentGroups:count.nullable(),preparedDocumentGroups:count.nullable(),attemptedDocumentGroups:count,pendingDocumentGroups:count,unavailableAttemptedDocumentGroups:count}).strict();
 const target=z.object({kind:z.enum(['page_roots','seed_documents']),state:z.enum(['complete','partial','blocked']),pendingCount:count,runnableCount:count,blockedCount:count}).strict();

@@ -15,7 +15,7 @@ import {publicationInputsSchema,verifyPublicationPolicyReceipts,requiredPublicat
 import type {CivicPolicyOptions} from './civic-opt-out.ts';
 import {loadGovernedRevocations} from './mcp-revocation-config.ts';
 import {isSourceRevoked,isRecordRevoked,type VerifiedRevocations,type RevocationSourceDescriptor} from './civic-revocations.ts';
-import {buildKnowledgeGraph,KnowledgeGraphSchema,type KnowledgeGraph} from './district-graph.ts';
+import {buildKnowledgeGraph,projectKnowledgeReadEnvelope,KnowledgeGraphSchema,type KnowledgeGraph} from './district-graph.ts';
 import {CriticalAdmissionsSchema} from './district-critical-assessment-contract.ts';
 import {mcpSourceId,sourceMetadataUrls} from './mcp-source-identity.ts';
 import {visibleChanges} from './mcp-read-view.ts';
@@ -104,20 +104,22 @@ export async function loadRelease(directory=governedReleaseDirectory(),options:R
   const visibility=revocations?publicationIndex.withRevocations(revocations):null;
   const index=visibility?.index??publicationIndex;
   const metadataBase:ReleasedData={bundle,manifest,dataManifest,publicationInputs,catalogue,features,feeds,changes,regional,knowledge,registry,coverage,servedCoverage:null,knowledgeChanges,graphData,index:publicationIndex,graph,mode:options.mode,revocations,visibility:null};
-  const maskedMetadata=visibility?projectMaskedReleaseMetadata(metadataBase,visibility):null;
+  const maskedMetadata=visibility&&revocations?.targets.length?projectMaskedReleaseMetadata(metadataBase,visibility):null;
   let servedGraph=graph,servedGraphData=graphData,servedFeatures=features,servedRegional=regional,servedKnowledge=knowledge,servedChanges=changes,servedBundle=bundle,servedRegistry=registry;
   if(visibility&&revocations){
     servedFeatures=features.filter(feature=>visibility.visibleRecordIds.has(feature.properties.id));
     servedRegional=visibility.index.regional;
-    const visibleKnowledge=knowledge.records.filter(record=>visibility.visibleRecordIds.has(record.id));
-    servedKnowledge={...knowledge,records:visibleKnowledge};
-    const safeBytes=JSON.stringify({...knowledge,records:visibleKnowledge});
+    servedKnowledge=projectKnowledgeReadEnvelope(knowledge,visibility.visibleRecordIds);
+    const safeBytes=servedKnowledge.records.length===knowledge.records.length?knowledgeBytes:JSON.stringify(servedKnowledge);
     const safeGraph=buildKnowledgeGraph(safeBytes,{asOf:graphData.asOf});
     servedGraph=graph.withReadView(safeGraph,safeBytes,visibility.visibleRecordIds,revocations);
     servedGraphData=servedGraph.graphView();
     servedChanges=visibleChanges(changes,features,knowledge,revocations);
     servedBundle={...bundle,facts:bundle.facts.filter(fact=>{const descriptors:RevocationSourceDescriptor[]=[{url:fact.source.url,mcpSourceId:mcpSourceId(fact.source)},...sourceMetadataUrls(fact.source).filter(url=>url!==fact.source.url).map(url=>({url}))];for(const municipality of registry.municipalities)if(municipality.id===bundle.cityId)for(const source of municipality.sources)if(source.url===fact.source.url)descriptors.push({municipalityId:municipality.id,registrySourceId:source.id,url:source.url});return !isRecordRevoked(revocations,{recordId:fact.id,municipalityId:bundle.cityId,sources:descriptors});})};
-    servedRegistry={...registry,municipalities:registry.municipalities.map(city=>({...city,sources:city.sources.filter(source=>!isSourceRevoked(revocations,{municipalityId:city.id,registrySourceId:source.id,...(source.url?{url:source.url}:{})})&&sourceMetadataUrls(source).every(url=>!isSourceRevoked(revocations,{url}))),amt:city.amt&&isSourceRevoked(revocations,{url:city.amt.sourceUrl})?null:city.amt,administrativeEvidence:city.administrativeEvidence.filter(item=>!isSourceRevoked(revocations,{municipalityId:city.id,url:item.url})),identitySources:city.identitySources.filter(item=>!isSourceRevoked(revocations,{municipalityId:city.id,url:item.url})),seedDocuments:city.seedDocuments.filter(item=>!isSourceRevoked(revocations,{municipalityId:city.id,registrySourceId:item.sourceId,url:item.url})&&item.evidence.every(evidence=>!isSourceRevoked(revocations,{url:evidence.url})))}))};
+    servedRegistry={...registry,municipalities:registry.municipalities.map(city=>{
+      const sourceIds=new Set(index.knowledge?.municipalities.find(item=>item.id===city.id)?.sources.map(source=>source.id)??[]);
+      return {...city,sources:city.sources.filter(source=>sourceIds.has(source.id)),amt:city.amt&&isSourceRevoked(revocations,{url:city.amt.sourceUrl})?null:city.amt,administrativeEvidence:city.administrativeEvidence.filter(item=>!isSourceRevoked(revocations,{municipalityId:city.id,url:item.url})),identitySources:city.identitySources.filter(item=>!isSourceRevoked(revocations,{municipalityId:city.id,url:item.url})),seedDocuments:city.seedDocuments.filter(item=>sourceIds.has(item.sourceId)&&!isSourceRevoked(revocations,{municipalityId:city.id,registrySourceId:item.sourceId,url:item.url})&&item.evidence.every(evidence=>!isSourceRevoked(revocations,{url:evidence.url})))};
+    })};
   }
   const sourceUrls=new Set<string>(feedSourceUrls);
   for(const feature of features)for(const source of feature.properties.sources){sourceUrls.add(source.url);if(source.snapshotUrl)sourceUrls.add(source.snapshotUrl);}

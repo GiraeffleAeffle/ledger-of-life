@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DistrictKnowledgeRecordSchema, KNOWLEDGE_SCHEMA_VERSION, REQUIRED_DETERMINISTIC_CHECKS, knowledgeEvidenceHash, sha256 } from '../src/district-schema.ts';
 import { EntityMentionSchema, ENTITY_TYPE_PRECEDENCE, councilBodyIdentity, graphGroundingChecks, normalizeGraphClaims, normalizeRelationActions, relationPathEligible, relationTypeSchema, type GraphClaims } from '../src/district-graph-claims.ts';
-import { buildKnowledgeGraph, validateKnowledgeGraph } from '../src/district-graph.ts';
+import { buildKnowledgeGraph, validateKnowledgeGraph, validateMaskedKnowledgeGraph, projectKnowledgeReadEnvelope } from '../src/district-graph.ts';
 import { GraphIndex, graphNeighborsSchema } from '../src/district-graph-query.ts';
 import { PROVIDER_CONFIGS } from '../src/district-model-contract.ts';
 import { readCursor, writeCursor, cursorBinding } from '../src/mcp-pagination.ts';
 import { observation, semanticHash, type AdapterScope, type StructuredObservation } from '../src/district-adapter-contract.ts';
-import { nativeStructuredIdentityGraph } from '../src/district-entity-resolution.ts';
+import { nativeStructuredIdentityGraph, identityAssertion, IdentityAdmissionSchema, unknownValidity } from '../src/district-entity-resolution.ts';
 import { StructuredKnowledgeRecordSchema, STRUCTURED_VERIFICATION_VERSION } from '../src/district-structured-record.ts';
 
 import {createHash,generateKeyPairSync} from 'node:crypto';
@@ -67,7 +67,7 @@ test('graph read views require a genuinely signed mask and preserve only unchang
   assert.equal(view.entitySearch({query:'Revoked'}).total,0);
   assert.equal(JSON.stringify(view.graphView()).includes('Revoked'),false);
   const tampered={...safeEnvelope,records:[{...admitted.record,title:'Changed after admission'}]},tamperedBytes=JSON.stringify(tampered);
-  assert.throws(()=>graph.withReadView(buildKnowledgeGraph(tamperedBytes,{asOf:admitted.graph.asOf}),tamperedBytes,new Set([admitted.record.id]),mask),/unchanged visible record subset/);
+  assert.throws(()=>graph.withReadView(buildKnowledgeGraph(tamperedBytes,{asOf:admitted.graph.asOf}),tamperedBytes,new Set([admitted.record.id]),mask));
 });
 test('graph cursors bind the verified mask identity even when a different mask yields identical records',()=>{
   const records=[
@@ -81,10 +81,87 @@ test('graph cursors bind the verified mask identity even when a different mask y
     const signed=signRevocations({schemaVersion:'stadtstack-revocations-v1',releaseId,issuedAt:'2026-10-10T12:00:00Z',sequence:1,targets:sorted},keyId,privateKey);
     return verifyRevocations(signed,{schemaVersion:'stadtstack-revocation-trust-v1',releaseId,expectedArtifactSha256:createHash('sha256').update(signed).digest('hex'),keys:[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}]},releaseId);
   };
+  const emptyMask=makeMask([]),empty=graph.withReadView(graphData,bytes,new Set(records.map(record=>record.id)),emptyMask);
+  assert.deepEqual(empty.graphView(),graphData);
+  assert.equal(empty.recordsSha256,graphData.recordsSha256);
+  assert.equal(empty.maskIdentity,emptyMask.artifactSha256);
+  assert.throws(()=>new GraphIndex(releaseId,graphData,bytes,{},emptyMask.artifactSha256));
   const firstMask=makeMask([{type:'record',recordId:'hidden-record'}]),first=graph.withReadView(safeGraph,safeBytes,visibleIds,firstMask),page=first.entitySearch({query:'Visible',limit:1});
   assert.ok(page.nextCursor);
   const sameContentDifferentMask=graph.withReadView(safeGraph,safeBytes,visibleIds,makeMask([{type:'record',recordId:'hidden-record'},{type:'record',recordId:'absent-record'}]));
   assert.throws(()=>sameContentDifferentMask.entitySearch({query:'Visible',limit:1,cursor:page.nextCursor!}),/mismatch/);
+});
+
+test('masking a negative or ended role serves an authenticated conservative graph, not a revived positive path',()=>{
+  const a=mention('operator','Synthetic Operator'),b=mention('facility','Synthetic Site');
+  for(const [entity,value] of [[a,'001'],[b,'002']] as const)entity.identifiers=[{namespace:'HRB',issuer:'Synthetic Court',value,quote:`${entity.name} HRB ${value} Synthetic Court`}];
+  const interval='2020-01-01 bis 2030-12-31',base=relation(a,b);
+  const active=fixture({entities:[a,b],relations:[{...base,quote:`${base.quote} ${interval}`,time:{text:interval,quote:interval}}]},'town','active');
+  for(const ended of [false,true]){
+    const blocking=ended?{...base,quote:`${a.name} betrieb früher ${b.name} bis 2023-12-31.`,predicateQuote:'betrieb',modality:'historical' as const,time:{text:'bis 2023-12-31',quote:'bis 2023-12-31'}}:{...base,quote:`${a.name} betreibt nicht ${b.name} 2024-01-01 bis 2028-12-31.`,modality:'negated' as const,time:{text:'2024-01-01 bis 2028-12-31',quote:'2024-01-01 bis 2028-12-31'}};
+    const hidden=fixture({entities:[a,b],relations:[blocking]},'town','hidden-blocker'),other=fixture({entities:[mention('unrelated','Unrelated Entity')],relations:[]},'town','other');
+    const envelope={schemaVersion:KNOWLEDGE_SCHEMA_VERSION,generatedAt:now,identityAssertions:[],identityAdmissions:[],records:[active,hidden,other]},bytes=JSON.stringify(envelope),releaseId='c'.repeat(64);
+    const originalGraph=buildKnowledgeGraph(bytes,{asOf:'2026-10-10'}),index=new GraphIndex(releaseId,originalGraph,bytes);
+    const options={fromId:originalGraph.entities.find(entity=>entity.names.includes(a.name))!.id,toId:originalGraph.entities.find(entity=>entity.names.includes(b.name))!.id,maxHops:1};
+    assert.equal(index.path(options).status,'not_found_within_hops');
+    const {privateKey,publicKey}=generateKeyPairSync('ed25519'),keyId=revocationKeyId(publicKey);
+    const signed=signRevocations({schemaVersion:'stadtstack-revocations-v1',releaseId,issuedAt:now,sequence:1,targets:[{type:'record',recordId:hidden.id}]},keyId,privateKey);
+    const mask=verifyRevocations(signed,{schemaVersion:'stadtstack-revocation-trust-v1',releaseId,expectedArtifactSha256:sha256(signed),keys:[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}]},releaseId);
+    const visibleIds=new Set([active.id,other.id]),safeBytes=JSON.stringify(projectKnowledgeReadEnvelope(envelope,visibleIds)),safeGraph=buildKnowledgeGraph(safeBytes,{asOf:'2026-10-10'});
+    assert.equal(new GraphIndex(releaseId,safeGraph,safeBytes).path(options).status,'found');
+    const view=index.withReadView(safeGraph,safeBytes,visibleIds,mask);
+    assert.equal(view.entitySearch({query:'Synthetic'}).total,0);
+    assert.equal(view.entitySearch({query:'Unrelated'}).total,1);
+    assert.equal(view.graphView().edges.length,0);
+    assert.throws(()=>view.neighbors({id:options.fromId}),/Unknown graph entity/);
+    assert.throws(()=>view.path(options),/Unknown graph entity/);
+    assert.equal(validateMaskedKnowledgeGraph(view.graphView(),safeBytes,releaseId,mask.artifactSha256),view.graphView());
+    assert.throws(()=>new GraphIndex(releaseId,structuredClone(view.graphView()),safeBytes,{},mask.artifactSha256),/Unauthenticated/);
+    assert.throws(()=>new GraphIndex('d'.repeat(64),view.graphView(),safeBytes,{},mask.artifactSha256),/Unauthenticated/);
+    assert.throws(()=>validateMaskedKnowledgeGraph(view.graphView(),`${safeBytes}\n`,releaseId,mask.artifactSha256),/binding changed/);
+    assert.throws(()=>validateKnowledgeGraph(view.graphView(),safeBytes),/does not match/);
+  }
+});
+
+test('root projection removes whole corrected histories and their absent source witnesses without identity resurrection',()=>{
+  const a=mention('a','Synthetic Utility'),b=mention('b','Renamed Utility');
+  for(const entity of [a,b])entity.identifiers=[{namespace:'HRB',issuer:'Synthetic Court',value:'001',quote:`${entity.name} HRB 001 Synthetic Court`}];
+  const records=[fixture({entities:[a],relations:[]},'town','record-a'),fixture({entities:[b],relations:[]},'town','record-b'),fixture({entities:[],relations:[]},'town','hidden-witness')];
+  const envelope={schemaVersion:KNOWLEDGE_SCHEMA_VERSION,generatedAt:now,identityAssertions:[],identityAdmissions:[],records};
+  const accepted=buildKnowledgeGraph(JSON.stringify(envelope),{asOf:'2026-10-10'}).identity.assertions[0];
+  const corrected={...envelope,identityAssertions:[accepted,{...accepted,version:2,status:'retracted' as const,evidenceHashes:[records[2].extraction.inputSha256]}]},bytes=JSON.stringify(corrected),releaseId='d'.repeat(64);
+  const index=new GraphIndex(releaseId,buildKnowledgeGraph(bytes,{asOf:'2026-10-10'}),bytes);
+  const {privateKey,publicKey}=generateKeyPairSync('ed25519'),keyId=revocationKeyId(publicKey);
+  const signed=signRevocations({schemaVersion:'stadtstack-revocations-v1',releaseId,issuedAt:now,sequence:1,targets:[{type:'record',recordId:records[2].id}]},keyId,privateKey);
+  const mask=verifyRevocations(signed,{schemaVersion:'stadtstack-revocation-trust-v1',releaseId,expectedArtifactSha256:sha256(signed),keys:[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}]},releaseId);
+  const visibleIds=new Set(records.slice(0,2).map(record=>record.id)),safe=projectKnowledgeReadEnvelope(corrected,visibleIds),safeBytes=JSON.stringify(safe),safeGraph=buildKnowledgeGraph(safeBytes,{asOf:'2026-10-10'});
+  assert.deepEqual(safe.identityAssertions,[]);
+  assert.equal(safeGraph.entities.length,1);
+  assert.equal(index.withReadView(safeGraph,safeBytes,visibleIds,mask).entitySearch({query:'Utility'}).total,0);
+  const forgedBytes=JSON.stringify({...safe,identityAssertions:[accepted]});
+  assert.throws(()=>index.withReadView(buildKnowledgeGraph(forgedBytes,{asOf:'2026-10-10'}),forgedBytes,visibleIds,mask));
+  const one=projectKnowledgeReadEnvelope(corrected,new Set([records[0].id]));
+  assert.deepEqual(one.identityAssertions,[]);
+  assert.equal(buildKnowledgeGraph(JSON.stringify(one),{asOf:'2026-10-10'}).entities.length,1);
+  assert.deepEqual(projectKnowledgeReadEnvelope(corrected,new Set(records.map(record=>record.id))),corrected);
+});
+
+test('reviewed roots retain only admissions whose original source evidence remains visible',()=>{
+  // Synthetic public seals only; no real assessment, receipt, or publisher evidence is claimed.
+  const records=[fixture({entities:[mention('a','Reviewed Alpha')],relations:[]},'town','alpha'),fixture({entities:[mention('b','Reviewed Beta')],relations:[]},'town','beta'),fixture({entities:[],relations:[]},'town','witness')];
+  const envelope={schemaVersion:KNOWLEDGE_SCHEMA_VERSION,generatedAt:now,records,identityAssertions:[],identityAdmissions:[]};
+  const mentions=buildKnowledgeGraph(JSON.stringify(envelope),{asOf:'2026-10-10'}).identity.mentions;
+  const reviewReceiptSha256=sha256('synthetic review receipt');
+  const assertion=identityAssertion({version:1,leftMentionId:mentions[0].id,rightMentionId:mentions[1].id,decision:'same_identity',status:'accepted',method:'authoritative_review',ruleVersion:'synthetic-review',author:'synthetic',adjudicator:'synthetic',evidenceHashes:mentions.map(mention=>mention.sourceSha256),reviewReceiptSha256,validity:unknownValidity()});
+  const seal={schemaVersion:'assessment-disposition-v1' as const,assertionId:assertion.id,assertionSha256:semanticHash(assertion),assessmentReceiptSha256:reviewReceiptSha256,receiptHashes:{A:sha256('synthetic A'),B:sha256('synthetic B'),C:sha256('synthetic C')},itemSha256:sha256('synthetic item'),leftMentionId:assertion.leftMentionId,rightMentionId:assertion.rightMentionId,decision:assertion.decision,status:'admitted' as const,adjudicator:'synthetic',labelProvenance:'ai_reconciled' as const,sourceEvidenceHashes:records.map(record=>record.extraction.inputSha256),deterministicPassed:true as const};
+  const admission=IdentityAdmissionSchema.parse({...seal,sealSha256:semanticHash(seal)}),original={...envelope,identityAssertions:[assertion],identityAdmissions:[admission]};
+  assert.equal(buildKnowledgeGraph(JSON.stringify(original),{asOf:'2026-10-10'}).entities.length,1);
+  const safe=projectKnowledgeReadEnvelope(original,new Set(['alpha','beta']));
+  assert.deepEqual(safe.records,records.slice(0,2));
+  assert.deepEqual(safe.identityAssertions,[]);assert.deepEqual(safe.identityAdmissions,[]);
+  assert.equal(buildKnowledgeGraph(JSON.stringify(safe),{asOf:'2026-10-10'}).entities.length,2);
+  const endpoint=projectKnowledgeReadEnvelope(original,new Set(['alpha','witness']));
+  assert.deepEqual(endpoint.identityAssertions,[]);assert.deepEqual(endpoint.identityAdmissions,[]);
 });
 
 test('conservative identity preserves homonyms, legal forms, source-scoped projects and conflicting explicit identifiers', () => {

@@ -4,14 +4,17 @@ import {canonical,knowledgeSourceDescriptors,mcpSourceId,sourceMetadataUrls} fro
 import type {Signal} from './schema.ts';
 import type {Changes} from './changes.ts';
 import type {KnowledgeQueryData,Regional} from './mcp-query.ts';
+import {regionalStatement} from './regional-statement.ts';
 
 type RegionalItem=Regional['topics'][number]['municipalities'][number]['items'][number];
 export function regionalRecordId(municipalityId:string,item:RegionalItem){return `regional:${createHash('sha256').update(canonical({municipalityId,url:item.url,locator:item.locator})).digest('hex')}`;}
-export function regionalSource(item:RegionalItem,asOf:string){return {url:item.url,title:item.title,publisher:'Official regional evidence (see source URL)',locator:item.locator,retrievedAt:null,asOf,retrievalNote:'Regional snapshot asOf is known; an individual source retrieval timestamp is not supplied.',licence:'unknown',reuse:'facts_with_attribution',sourceType:item.sourceType,licenceNote:'No open licence inferred by the query layer; see released regional source evidence.'};}
+export function regionalSource(item:RegionalItem,asOf:string,statement=regionalStatement(item)){
+ return {url:item.url,title:item.title,publisher:'Official regional evidence (see source URL)',locator:item.locator,sha256:statement.statementEvidence[0]?.sourceSha256,statementEvidence:statement.statementEvidence,retrievedAt:null,asOf,retrievalNote:'Regional snapshot asOf is known; an individual source retrieval timestamp is not supplied.',licence:'unknown',reuse:'facts_with_attribution',sourceType:item.sourceType,licenceNote:'No open licence inferred by the query layer; see released regional source evidence.'};
+}
 export function signalSourceDescriptors(feature:Signal):RevocationSourceDescriptor[]{return feature.properties.sources.flatMap(source=>[{mcpSourceId:mcpSourceId(source),url:source.url,municipalityId:feature.properties.cityId},...sourceMetadataUrls(source).filter(url=>url!==source.url).map(url=>({municipalityId:feature.properties.cityId,url}))]);}
 
 /** Hide change evidence whose identity, source ancestry, or replacement witness is withheld. */
-export function visibleChanges(changes:Record<string,Changes>,features:readonly Signal[],knowledge:KnowledgeQueryData,mask:VerifiedRevocations):Record<string,Changes>{
+export function visibleChanges(changes:Record<string,Changes>,features:readonly Signal[],knowledge:Pick<KnowledgeQueryData,'records'>,mask:VerifiedRevocations):Record<string,Changes>{
  const byRecord=new Map<string,RevocationSourceDescriptor[]>(),byHash=new Map<string,RevocationSourceDescriptor[]>(),affectedCities=new Set<string>();
  for(const feature of features){const id=feature.properties.id,city=feature.properties.cityId,sources=signalSourceDescriptors(feature);byRecord.set(id,sources);for(const source of feature.properties.sources)if(source.sha256){const descriptor=sources.find(item=>item.mcpSourceId===mcpSourceId(source));if(descriptor)byHash.set(source.sha256,[...(byHash.get(source.sha256)??[]),descriptor]);}if(isRecordRevoked(mask,{recordId:id,municipalityId:city,sources}))affectedCities.add(city);}
  for(const record of knowledge.records){const descriptors=knowledgeSourceDescriptors(record),recordSources=record.kind==='structured'?[record.source,...record.supportingSources]:record.sources;byRecord.set(record.id,descriptors);for(const source of recordSources){const descriptor=descriptors.find(item=>item.registrySourceId===source.id);if(source.sha256&&descriptor)byHash.set(source.sha256,[...(byHash.get(source.sha256)??[]),descriptor]);}if(isRecordRevoked(mask,{recordId:record.id,municipalityId:record.municipalityId,sources:descriptors}))affectedCities.add(record.municipalityId);}

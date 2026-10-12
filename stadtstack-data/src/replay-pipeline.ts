@@ -29,14 +29,14 @@ import type {DocumentChunk} from './district-claims.ts';
 import type {WorkPlan} from './district-work-plan.ts';
 import type {PreparationPlan} from './district-preparation-run.ts';
 import {IdentityAssertionSchema,IdentityAdmissionSchema} from './district-entity-resolution.ts';
-import {knowledgePreparationInputsSchema,publicationInputsSchema} from './district-publication-inputs.ts';
-import {priorReleaseSchema,readCommittedReleaseFile,loadPriorPublicationRelease,preloadPriorPublicationReleases,type PriorReleaseCache} from './district-publication-predecessor.ts';
-import {ManagedSourceBindingSchema,assertManagedSourceBindings,assertManagedSourceReadable,withManagedSourceScratch,withManagedSourceWrite,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,type ManagedSourceBinding,type ManagedSourceScratch,type CivicPolicyOptions} from './civic-opt-out.ts';
+import {publicationInputsSchema} from './district-publication-inputs.ts';
+import {priorReleaseSchema,loadPriorPublicationRelease,preloadPriorPublicationReleases,type PriorReleaseCache} from './district-publication-predecessor.ts';
+import {withManagedSourceScratch,withManagedSourceWrite,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,type ManagedSourceScratch,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {DistrictCas} from './district-cas.ts';
 import {canonicalJson,semanticHash} from './district-adapter-contract.ts';
 import {insertR1MetadataSnapshot} from './district-jobs.ts';
 import {RepresentationDescriptorSchema} from './district-r1.ts';
-import {authenticatedHttpBinding,authenticateHttpSourceBindings} from './district-http-observation.ts';
+import {authenticatedHttpBinding} from './district-http-observation.ts';
 import {authenticatePublicationProvenance,type AuthenticatedPublicationProvenance} from './district-publication-provenance.ts';
 import type {SourceArtifactBinding} from './district-private-io.ts';
 
@@ -111,7 +111,7 @@ interface ReplaySourceContext {
  policy:CivicPolicyOptions;
  bindings:SourceArtifactBinding[];
  cas:DistrictCas;
- provenance:AuthenticatedPublicationProvenance;
+ pinned:(pin:ReplayPin,location?:string)=>Promise<Buffer>;
  provenanceSha256:string;
 }
 async function authenticateReplayProvenance(receipt:ReplayReceipt,base:string){
@@ -289,20 +289,6 @@ export function compareReplayRelease(expectedBytes:Uint8Array,actualBytes:Uint8A
  return {releaseId:actual.id,manifestSha256:hash(actualBytes),files:actual.files};
 }
 export function requiredReplayStaging(cities:string[]):string[]{return ['catalogue.json','regions/brandenburg-mol/topics.json','core/strausberg-facts.json',...cities.flatMap(id=>[`cities/${id}/signals.geojson`,`cities/${id}/feed.json`])].sort();}
-async function stagePriorRelease(receipt:ReplayReceipt,expected:DataRelease,cities:string[],directory:string,context:ReplaySourceContext){
- const prior=receipt.priorRelease,bytes=await readCommittedReleaseFile(prior.gitCommit,'release-manifest.json',context.predecessors);
- if(hash(bytes)!==prior.manifestSha256)throw Error('Replay prior committed manifest digest mismatch');
- const manifest=dataReleaseSchema.parse(JSON.parse(bytes.toString('utf8')));
- if(manifest.id!==prior.releaseId||dataReleaseId(manifest.files)!==manifest.id||manifest.id===expected.id||Date.parse(manifest.generatedAt)>=Date.parse(expected.generatedAt)||new Set(manifest.files.map(file=>file.path)).size!==manifest.files.length)throw Error('Replay requires an authentic earlier city baseline, not the target release');
- const paths=[...cities.flatMap(city=>[`cities/${city}/signals.geojson`,`cities/${city}/changes.json`]),'knowledge/records.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'];
- for(const path of paths){
-  const file=manifest.files.find(file=>file.path===path);if(!file)throw Error('Replay prior baseline member missing');
-  const body=await readCommittedReleaseFile(prior.gitCommit,path,context.predecessors);
-  if(hash(body)!==file.sha256||body.length!==file.bytes)throw Error('Replay prior committed member binding mismatch');
-  await privateFile(join(directory,path),body,context.scope);
- }
- return {gitCommit:prior.gitCommit,releaseId:manifest.id,manifestSha256:hash(bytes)};
-}
 async function checkRuntime(receipt:ReplayReceipt){
  const runtime=receipt.runtime;
  requireEqual([process.versions.node,process.versions.icu,process.versions.unicode],[runtime.node,runtime.icu,runtime.unicode],'Replay Node/ICU/Unicode version mismatch');
@@ -336,23 +322,21 @@ async function replayAdmittedPublication(receipt:ReplayReceipt,base:string,works
  const quarantine=z.object({schemaVersion:z.literal('stadtstack-quarantine-v1'),generatedAt:z.iso.datetime().optional(),cases:z.array(z.unknown())}).passthrough().parse(JSON.parse(quarantineBytes.toString('utf8')));
  if(text)requireEqual(quarantine.cases,text.quarantine,'Replay original quarantine differs from verified cached reconstruction');
  if(receipt.mode==='structured_only'&&candidate.records.some(record=>record.kind==='text_model'))throw Error('Structured-only replay cannot bypass actual text generation receipts');
- const staging=new Map<string,Buffer>();
- for(const pin of receipt.staging){if(staging.has(pin.destination))throw Error('Replay duplicate staging destination');staging.set(pin.destination,await pinned(pin));}
- const catalogueBytes=staging.get('catalogue.json');if(!catalogueBytes)throw Error('Replay staged catalogue missing');
- const catalogue=z.object({cities:z.array(z.object({id:z.string().regex(/^[a-z0-9-]+$/)})).min(1)}).parse(JSON.parse(catalogueBytes.toString('utf8'))),cities=catalogue.cities.map(city=>city.id);
- requireEqual([...staging.keys()].sort(),requiredReplayStaging(cities),'Replay requires the complete non-knowledge staging inventory');
+ const destinations=receipt.staging.map(pin=>pin.destination);
+ if(new Set(destinations).size!==destinations.length)throw Error('Replay duplicate staging destination');
+ const cataloguePin=receipt.staging.find(pin=>pin.destination==='catalogue.json');if(!cataloguePin)throw Error('Replay staged catalogue missing');
+ const catalogue=z.object({cities:z.array(z.object({id:z.string().regex(/^[a-z0-9-]+$/)})).min(1)}).parse(JSON.parse((await pinned(cataloguePin)).toString('utf8'))),cities=catalogue.cities.map(city=>city.id);
+ requireEqual([...destinations].sort(),requiredReplayStaging(cities),'Replay requires the complete non-knowledge staging inventory');
+ const priorPaths=[...cities.flatMap(city=>[`cities/${city}/signals.geojson`,`cities/${city}/changes.json`]),'knowledge/records.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'];
  if(receipt.textComposition)await pinned(receipt.textComposition);
  return withPreparedKnowledge({registry:resolve(base,receipt.registry.path),records:resolve(base,receipt.candidateRecords.path),quarantine:resolve(base,receipt.candidateQuarantine.path),textComposition:receipt.textComposition?resolve(base,receipt.textComposition.path):undefined,structuredRun:receipt.structuredRun?resolve(base,receipt.structuredRun.path):undefined,policyReceipts:resolve(base,receipt.policyReceipts.path),identityAssessments:receipt.identityAssessments?resolve(base,receipt.identityAssessments.path):undefined,criticalAssessments:receipt.criticalAssessments?resolve(base,receipt.criticalAssessments.path):undefined,privateProvenance:{path:resolve(base,receipt.privateProvenance.path),sha256:receipt.privateProvenance.sha256},outputRoot:resolve(base,receipt.workspace),casRoot:resolve(base,receipt.casRoot),policyStateDir:receipt.policyStateDir?resolve(base,receipt.policyStateDir):undefined,policyAuthorityId:receipt.policyAuthorityId,policyAuthoritySha256:receipt.policyAuthoritySha256,coverageGeneratedAt:receipt.clocks.coverageGeneratedAt},async prepared=>{
-  const nested:ReplaySourceContext={...context,scope:prepared.scope},output=join(prepared.scope.directory,'release'),prior=join(prepared.scope.directory,'prior'),baseline=await stagePriorRelease(receipt,expected,cities,prior,nested);
-  for(const [path,bytes] of staging)await privateFile(join(prepared.stagingDir,path),bytes,prepared.scope);
-  const readPrior=async(path:string)=>{await prepared.scope.assertActive();const expectedBytes=baseline.files.get(path);if(!expectedBytes)throw Error('Replay predecessor member is not authenticated');const bytes=await readFile(join(prior,path));if(!bytes.equals(expectedBytes))throw Error('Replay predecessor lease member differs from authenticated release');await prepared.scope.assertActive();return bytes;};
-  const readLeaseFile=async(path:string)=>{const handle=await open(join(prepared.stagingDir,path),constants.O_RDONLY|constants.O_NOFOLLOW);try{const stat=await handle.stat();if(!stat.isFile()||stat.size>512*1024*1024)throw Error('Replay preparation staging file rejected');return await handle.readFile();}finally{await handle.close();}};
-  const readStaging=async(path:string)=>{await prepared.scope.assertActive();if(path==='knowledge/preparation-inputs.json'){const bytes=await readLeaseFile(path);knowledgePreparationInputsSchema.parse(JSON.parse(bytes.toString('utf8')));await prepared.scope.assertActive();return bytes;}if(path.startsWith('knowledge/')){const handoff=knowledgePreparationInputsSchema.parse(JSON.parse((await readLeaseFile('knowledge/preparation-inputs.json')).toString('utf8'))),member=handoff.outputs.find(output=>output.path===path);if(!member)throw Error('Replay knowledge staging is not bound to its preparation handoff');const bytes=await readLeaseFile(path);if(bytes.length!==member.bytes||hash(bytes)!==member.sha256)throw Error('Replay knowledge staging differs from its preparation handoff');await prepared.scope.assertActive();return bytes;}const bytes=staging.get(path);if(!bytes)throw Error('Replay staged input is not bound to its receipt');const stored=await readFile(join(prepared.stagingDir,path));if(!stored.equals(bytes))throw Error('Replay lease staging differs from authenticated input bytes');await prepared.scope.assertActive();return bytes;};
-  await publish({stagingDir:prepared.stagingDir,outDir:output,asOf:original.asOf,priorRelease:receipt.priorRelease,legacyPreviousReleases:receipt.legacyPreviousReleases,offlineReplay:true,priorCityRoot:prior,publicationInputs:resolve(base,receipt.publicationInputs.path),textComposition:receipt.textComposition?resolve(base,receipt.textComposition.path):undefined,policyReceipts:resolve(base,receipt.policyReceipts.path),identityAssessments:receipt.identityAssessments?resolve(base,receipt.identityAssessments.path):undefined,criticalAssessments:receipt.criticalAssessments?resolve(base,receipt.criticalAssessments.path):undefined,structuredRun:receipt.structuredRun?resolve(base,receipt.structuredRun.path):undefined,regionalPolicyReceipts:receipt.regionalPolicyReceipts?resolve(base,receipt.regionalPolicyReceipts.path):undefined,privateProvenance:{path:resolve(base,receipt.privateProvenance.path),sha256:receipt.privateProvenance.sha256},casRoot:resolve(base,receipt.casRoot),policyStateDir:receipt.policyStateDir?resolve(base,receipt.policyStateDir):undefined,policyAuthorityId:receipt.policyAuthorityId,policyAuthoritySha256:receipt.policyAuthoritySha256,qualityGeneratedAt:receipt.clocks.qualityGeneratedAt,manifestGeneratedAt:receipt.clocks.manifestGeneratedAt},context.predecessors,{provenance:context.provenance,readPrior,readStaging});
+  const nested:ReplaySourceContext={...context,scope:prepared.scope},output=join(prepared.scope.directory,'release'),prior=prepared.publication.priorDirectory;
+  if(!prior)throw Error('Replay requires its authenticated prepared predecessor directory');
+  await publish({stagingDir:prepared.stagingDir,outDir:output,asOf:original.asOf,priorRelease:receipt.priorRelease,legacyPreviousReleases:receipt.legacyPreviousReleases,offlineReplay:true,priorCityRoot:prior,publicationInputs:resolve(base,receipt.publicationInputs.path),textComposition:receipt.textComposition?resolve(base,receipt.textComposition.path):undefined,policyReceipts:resolve(base,receipt.policyReceipts.path),identityAssessments:receipt.identityAssessments?resolve(base,receipt.identityAssessments.path):undefined,criticalAssessments:receipt.criticalAssessments?resolve(base,receipt.criticalAssessments.path):undefined,structuredRun:receipt.structuredRun?resolve(base,receipt.structuredRun.path):undefined,regionalPolicyReceipts:receipt.regionalPolicyReceipts?resolve(base,receipt.regionalPolicyReceipts.path):undefined,privateProvenance:{path:resolve(base,receipt.privateProvenance.path),sha256:receipt.privateProvenance.sha256},casRoot:resolve(base,receipt.casRoot),policyStateDir:receipt.policyStateDir?resolve(base,receipt.policyStateDir):undefined,policyAuthorityId:receipt.policyAuthorityId,policyAuthoritySha256:receipt.policyAuthoritySha256,qualityGeneratedAt:receipt.clocks.qualityGeneratedAt,manifestGeneratedAt:receipt.clocks.manifestGeneratedAt},context.predecessors,prepared.publication);
   const actual=await verifyDataRelease(output),comparison=compareReplayRelease(expectedBytes,await readFile(join(output,'release-manifest.json')),actual);
-  const proof={schemaVersion:'stadtstack-offline-replay-proof-v2',mode:receipt.mode,executedAt,completedAt:new Date().toISOString(),execution:{modelCalls:0,readinessCalls:0,liveFallback:'forbidden',networkIsolation:'external; not asserted by this proof'},historicalClocks:receipt.clocks,asOf:original.asOf,priorRelease:baseline,publicationInputsSha256:receipt.publicationInputs.sha256,knowledge:prepared.summary,comparison,...(text?{textGeneration:text.textGeneration}:{})};
+  const proof={schemaVersion:'stadtstack-offline-replay-proof-v2',mode:receipt.mode,executedAt,completedAt:new Date().toISOString(),execution:{modelCalls:0,readinessCalls:0,liveFallback:'forbidden',networkIsolation:'external; not asserted by this proof'},historicalClocks:receipt.clocks,asOf:original.asOf,priorRelease:receipt.priorRelease,publicationInputsSha256:receipt.publicationInputs.sha256,knowledge:prepared.summary,comparison,...(text?{textGeneration:text.textGeneration}:{})};
   return {...proof,persistence:await persistReplayArtifacts(nested,receiptSha256,proof)};
- });
+ },{staging:receipt.staging.map(pin=>({destination:pin.destination,pin:{path:resolve(base,pin.path),sha256:pin.sha256}})),prior:{release:receipt.priorRelease,paths:priorPaths,targetGeneratedAt:expected.generatedAt,targetReleaseId:expected.id,cache:context.predecessors}});
 }
 
 export async function replayPipeline(receiptPath:string,receiptSha256:string){

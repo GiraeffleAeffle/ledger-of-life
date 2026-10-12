@@ -31,6 +31,7 @@ export const districtCoverageSchema=z.object({
  municipalities:z.array(z.object({id:z.string(),ags:z.string().regex(/^\d{8}$/),districtId:z.string(),checked:z.boolean(),status:z.enum(['gated_records','checked_no_gated_records','not_checked']),documents:count,publishedRecords:count,textModelRecords:count,structuredRecords:count,datedStagedRecords:count,quarantinedRecords:count,quarantineReasons:quarantineReasonHistogramSchema,extraction:extractionCounts,sources:z.array(sourceCoverage)}).strict()),
  models:z.array(admittedModelSchema),
  adapters:z.array(structuredPublicCoverageReceiptSchema.extend({publishedRecords:count})),
+ structuredRun:z.object({generatedAt:structuredRunSchema.shape.generatedAt,registrySha256:structuredRunSchema.shape.registrySha256,questionDispositionSha256:structuredRunSchema.shape.questionDispositionSha256,adapterContractSha256:structuredRunSchema.shape.adapterContractSha256}).strict().nullable(),
  textLineage:textRunLineageSchema.nullable(),
  retainedPublication:RetainedKnowledgeLineageSchema.nullable(),
 }).strict();
@@ -39,7 +40,7 @@ export type TextCoverageRecord=Pick<DistrictKnowledgeRecord,'kind'|'id'|'municip
 export type DistrictCoverageRecord=TextCoverageRecord|StructuredKnowledgeRecord;
 export const crawlSummarySchema=z.object({schemaVersion:z.literal('stadtstack-crawl-index-v1'),generatedAt:z.string(),documents:z.array(z.object({id:z.string(),municipalityId:z.string(),sourceId:z.string(),sha256:z.string().regex(/^[a-f0-9]{64}$/)}).passthrough()),checks:z.array(z.object({municipalityId:z.string(),sourceId:z.string(),runId:z.string().regex(/^[a-f0-9]{64}$/).optional(),checkState,checkedAt:z.string().nullable(),documentCount:count,reason:z.string().optional(),coverage:crawlCoverage.passthrough().optional(),blocked:z.array(z.object({url:z.string(),failure:z.string(),checkedAt:z.string()}).passthrough()).optional()}).passthrough())}).passthrough();
 const quarantineCandidateSchema=z.object({municipalityId:z.string(),extraction:z.object({inputSha256:z.string()}),sources:z.array(z.object({id:z.string(),sha256:z.string()})),verification:z.object({deterministic:z.object({passed:z.boolean(),checks:z.array(z.object({id:z.string(),passed:z.boolean()}))}),faithfulness:z.object({score:z.number().nullable(),threshold:z.number(),responseSha256:z.string().nullable()})})});
-const quarantineCaseSummarySchema=z.object({kind:z.enum(['text_model','structured']).optional(),municipalityId:z.string(),sourceId:z.string(),sourceSha256:z.string().regex(/^[a-f0-9]{64}$/),reason:z.string(),candidate:quarantineCandidateSchema.optional(),publicationReasons:z.array(z.enum(['missing_sourced_date','nonpublic_evidence_url'])).optional()}).strip();
+const quarantineCaseSummarySchema=z.object({kind:z.enum(['text_model','structured']).optional(),recordId:z.string().min(1).optional(),municipalityId:z.string(),sourceId:z.string(),sourceSha256:z.string().regex(/^[a-f0-9]{64}$/),reason:z.string(),candidate:quarantineCandidateSchema.optional(),publicationReasons:z.array(z.enum(['missing_sourced_date','nonpublic_evidence_url'])).optional()}).strip();
 const quarantineSummarySchema=z.object({schemaVersion:z.literal('stadtstack-quarantine-v1'),cases:z.array(quarantineCaseSummarySchema)}).strip();
 
 /** Read only fixed producer reason strings and allowlisted check IDs; never export free text. */
@@ -148,12 +149,18 @@ export function buildDistrictCoverage(registry:DistrictRegistry,crawlInput:unkno
  const textRecords=records.filter((record):record is TextCoverageRecord=>record.kind==='text_model'),structuredRecords=records.filter((record):record is StructuredKnowledgeRecord=>record.kind==='structured');
  const retainedIds=new Set(retainedPublication?.selectedRecordOrigins.map(origin=>origin.recordId)??[]);
  if(structured)validateStructuredRun(structured,registry,structuredRecords);else if(structuredRecords.length)throw Error('Structured records require their bound structured run');
- if(!textLineage&&(textRecords.some(record=>!retainedIds.has(record.id))||quarantine.cases.some(item=>item.kind!=='structured')))throw Error('Text outputs require their authentic text lineage');
  if(new Set(retainedPublication?.selectedRecordOrigins.map(origin=>origin.recordId)??[]).size!==(retainedPublication?.selectedRecordOrigins.length??0)||[...retainedIds].some(id=>!records.some(record=>record.id===id)))throw Error('Retained publication origin inventory mismatch');
  for(const origin of retainedPublication?.selectedRecordOrigins??[]){
   const record=records.find(item=>item.id===origin.recordId)!;
-  if(origin.currentEvidenceHash!==record.verification.evidenceHash||origin.currentRecordSha256!==textLineageRecordSha256(record)||origin.municipalityId!==record.municipalityId||origin.sourceSha256!==record.extraction.inputSha256)throw Error('Retained publication record/origin binding mismatch');
+  if(record.kind!=='text_model'||origin.currentEvidenceHash!==record.verification.evidenceHash||origin.currentRecordSha256!==textLineageRecordSha256(record)||origin.municipalityId!==record.municipalityId||origin.sourceSha256!==record.extraction.inputSha256)throw Error('Retained publication record/origin binding mismatch');
  }
+ const retainedQuarantine=(item:z.infer<typeof quarantineCaseSummarySchema>):boolean=>{
+  const origin=item.recordId?retainedPublication?.selectedRecordOrigins.find(origin=>origin.recordId===item.recordId):undefined;
+  if(!origin)return false;
+  if(item.kind==='structured'||item.municipalityId!==origin.municipalityId||item.sourceSha256!==origin.sourceSha256||!origin.sourceIds.includes(item.sourceId))throw Error('Retained quarantine record/source binding mismatch');
+  return true;
+ };
+ if(!textLineage&&(textRecords.some(record=>!retainedIds.has(record.id))||quarantine.cases.some(item=>item.kind!=='structured'&&!retainedQuarantine(item))))throw Error('Text outputs require their authentic text lineage');
  const models=new Map<string,z.infer<typeof admittedModelSchema>>();
  for(const record of textRecords){
   const {provider,model,tool,toolVersion,modelIdentitySha256,modelIdentityBasis}=record.extraction,key=modelKey(record.extraction),existing=models.get(key);
@@ -165,7 +172,7 @@ export function buildDistrictCoverage(registry:DistrictRegistry,crawlInput:unkno
   const checks=crawl.checks.filter(check=>check.municipalityId===city.id);
   const fetched=new Set(documents.map(document=>document.sha256));
   const attempted=new Set(textLineage?.cumulative.groupBindings.attempted.filter(group=>group.municipalityId===city.id).map(group=>group.sourceSha256)??[]);
-  for(const hash of [...published.filter((record):record is TextCoverageRecord=>record.kind==='text_model'&&!retainedIds.has(record.id)).map(record=>record.extraction.inputSha256),...withheld.filter(item=>item.kind!=='structured'&&!(item.recordId&&retainedIds.has(item.recordId))).map(item=>item.sourceSha256)])if(!attempted.has(hash))throw Error('Text lineage omits a source-bound published or quarantined attempt');
+  for(const hash of [...published.filter((record):record is TextCoverageRecord=>record.kind==='text_model'&&!retainedIds.has(record.id)).map(record=>record.extraction.inputSha256),...withheld.filter(item=>item.kind!=='structured'&&!retainedQuarantine(item)).map(item=>item.sourceSha256)])if(!attempted.has(hash))throw Error('Text lineage omits a source-bound published or quarantined attempt');
   const present=[...attempted].filter(hash=>fetched.has(hash)).length;
   const groups=textLineage?.cumulative.groupBindings;
   const extraction={fetchedDocumentGroups:fetched.size,runSelectedDocumentGroups:groups?.selected==null?null:groups.selected.filter(group=>group.municipalityId===city.id).length,preparedDocumentGroups:groups?.prepared==null?null:groups.prepared.filter(group=>group.municipalityId===city.id).length,attemptedDocumentGroups:present,pendingDocumentGroups:fetched.size-present,unavailableAttemptedDocumentGroups:attempted.size-present};
@@ -199,7 +206,7 @@ export function validateDistrictCoverage(coverage:DistrictCoverage,registry:Dist
  if(new Set(retainedPublication?.selectedRecordOrigins.map(origin=>origin.recordId)??[]).size!==(retainedPublication?.selectedRecordOrigins.length??0))throw Error('Duplicate retained publication origin');
  for(const origin of retainedPublication?.selectedRecordOrigins??[]){
   const record=records.find(item=>item.id===origin.recordId);
-  if(!record||origin.currentEvidenceHash!==record.verification.evidenceHash||origin.currentRecordSha256!==textLineageRecordSha256(record)||origin.municipalityId!==record.municipalityId||origin.sourceSha256!==record.extraction.inputSha256)throw Error('Retained publication record/origin binding mismatch');
+  if(!record||record.kind!=='text_model'||origin.currentEvidenceHash!==record.verification.evidenceHash||origin.currentRecordSha256!==textLineageRecordSha256(record)||origin.municipalityId!==record.municipalityId||origin.sourceSha256!==record.extraction.inputSha256)throw Error('Retained publication record/origin binding mismatch');
  }
  if(textLineage)assertLineageRecords(textLineage,nativeTextRecords);else if(nativeTextRecords.length)throw Error('Missing authentic text lineage');
  const groups=textLineage?.cumulative.groupBindings,knownRuns=new Set(textLineage?.runs.map(run=>run.runId)??[]),knownCities=new Set(registry.municipalities.map(city=>city.id));
@@ -226,7 +233,7 @@ export function validateDistrictCoverage(coverage:DistrictCoverage,registry:Dist
   if(city.textModelRecords!==textModelRecords||city.structuredRecords!==cityRecords.length-textModelRecords)throw Error('Municipality record kind count mismatch');
   const status=city.publishedRecords?'gated_records':city.checked?'checked_no_gated_records':'not_checked';
   if(city.status!==status||city.datedStagedRecords!==datedStagedRecords)throw Error(`Municipality admission coverage mismatch: ${city.id}`);
-  const extraction=city.extraction,publishedGroups=new Set(textRecords.filter(record=>record.municipalityId===city.id).map(record=>record.extraction.inputSha256)).size;
+  const extraction=city.extraction,publishedGroups=new Set(nativeTextRecords.filter(record=>record.municipalityId===city.id).map(record=>record.extraction.inputSha256)).size;
   if(extraction.fetchedDocumentGroups!==extraction.attemptedDocumentGroups+extraction.pendingDocumentGroups||extraction.fetchedDocumentGroups>city.documents||extraction.attemptedDocumentGroups<publishedGroups)throw Error(`Extraction coverage mismatch: ${city.id}`);
   const attempts=extraction.attemptedDocumentGroups+extraction.unavailableAttemptedDocumentGroups;
   const expectedAttempts=groups?.attempted.filter(group=>group.municipalityId===city.id).length??0,expectedSelected=groups?.selected==null?null:groups.selected.filter(group=>group.municipalityId===city.id).length,expectedPrepared=groups?.prepared==null?null:groups.prepared.filter(group=>group.municipalityId===city.id).length;

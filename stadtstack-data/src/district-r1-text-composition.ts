@@ -112,6 +112,10 @@ export function buildR1TextCompositionContext(input:DistrictReleaseCompositionIn
   mergeOriginal(assertions,rootAssertions,value=>canonicalJson([value.id,value.version]),'identity assertion version');
   mergeOriginal(admissions,rootAdmissions,value=>canonicalJson([value.assertionId,value.assertionSha256,value.assessmentReceiptSha256]),'identity admission');
  }
+ if(retainedPublication){
+  mergeOriginal(assertions,retainedPublication.baseline.identityAssertions,value=>canonicalJson([value.id,value.version]),'identity assertion version');
+  mergeOriginal(admissions,retainedPublication.baseline.identityAdmissions,value=>canonicalJson([value.assertionId,value.assertionSha256,value.assessmentReceiptSha256]),'identity admission');
+ }
  const nativeRecords=composition.records.records;
  if(nativeRecords.some(record=>record.kind!=='text_model'||record.verification.kind!=='text_model'))throw Error('R1 text composition requires explicit knowledge-v3 text markers; historical v2 needs an approved schemaProjection');
  const retainedRecords=retainedPublication?.selectedRecordOrigins.map(origin=>{const index=retainedPublication.baseline.recordIndexes.indexOf(origin.outputRecordIndex);if(index<0)throw Error('Retained origin references an absent output record');return projectKnowledgeRecordIdentity(retainedPublication.baseline.records[index],retainedPublication.baseline.input.schemaProjection);})??[];

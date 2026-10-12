@@ -190,7 +190,7 @@ test('receipt requires exact clocks, full private/public prerequisites and has n
  assert.throws(()=>ReplayReceiptSchema.parse({...receipt,allowLiveModel:true}),/Unrecognized/);
  assert.throws(()=>ReplayReceiptSchema.parse({...receipt,coreEvidence:[]}),/Unrecognized/);
  assert.throws(()=>ReplayReceiptSchema.parse({...receipt,priorRelease:undefined}),/Invalid/);
- for(const field of ['candidateRecords','candidateQuarantine','identityState','publicationInputs','policyReceipts','privateProvenance','textRegistry'])assert.throws(()=>ReplayReceiptSchema.parse({...receipt,[field]:undefined}));
+ for(const field of ['candidateRecords','candidateQuarantine','identityState','publicationInputs','policyReceipts','privateProvenance','textComposition','textRegistry'])assert.throws(()=>ReplayReceiptSchema.parse({...receipt,[field]:undefined}));
  const {textRegistry,corpusManifest,rawRoot,index,frozen,deltas,generationContract,answers,modelIdentities,extractionRun,...common}=receipt;
  const native={...common,mode:'structured_only',structuredRun:pin};
  assert.equal(ReplayReceiptSchema.parse(native).mode,'structured_only');

@@ -36,9 +36,10 @@ import {CriticalAdmissionsSchema} from './district-critical-assessment-contract.
 import {readBoundSourceObservation} from './source-observation.ts';
 import {CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
 import {parserIsolationContractSha256} from './district-parser-isolation.ts';
-import {authenticatePublicationProvenance,assertAuthenticatedPublicationProvenance,type AuthenticatedPublicationProvenance} from './district-publication-provenance.ts';
-import {loadRetainedPublicationComposition} from './district-r1-text-composition.ts';
+import {authenticatePublicationProvenance,assertAuthenticatedPublicationProvenance} from './district-publication-provenance.ts';
+import {loadR1TextCompositionInput,buildR1TextCompositionContext} from './district-r1-text-composition.ts';
 import {textLineageRecordSha256} from './text-run-lineage.ts';
+import {assertAuthenticatedPreparedPublication,type AuthenticatedPreparedPublication} from './prepare-knowledge.ts';
 
 export const PublicationOptionsSchema=z.object({stagingDir:z.string().min(1),outDir:z.string().min(1),asOf:identityDaySchema,priorRelease:priorReleaseSchema,legacyPreviousReleases:z.record(z.string().regex(/^[a-z0-9-]+$/),priorReleaseSchema).optional(),policyReceipts:z.string().min(1),regionalPolicyReceipts:z.string().min(1).optional(),identityAssessments:z.string().min(1).optional(),criticalAssessments:z.string().min(1).optional(),structuredRun:z.string().min(1).optional(),textComposition:z.string().min(1).optional(),casRoot:z.string().min(1).optional(),policyStateDir:z.string().min(1).optional(),policyAuthorityId:z.string().min(1).optional(),policyAuthoritySha256:z.string().regex(/^[a-f0-9]{64}$/).optional(),qualityGeneratedAt:z.iso.datetime(),manifestGeneratedAt:z.iso.datetime(),offlineReplay:z.boolean().optional(),priorCityRoot:z.string().min(1).optional(),publicationInputs:z.string().min(1).optional(),privateProvenance:z.object({path:z.string().min(1),sha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict()}).strict().superRefine((value,ctx)=>{if(value.offlineReplay&&(!value.priorCityRoot||!value.publicationInputs))ctx.addIssue({code:'custom',message:'Exact replay requires authentic staged predecessor and original publication input seal'});});
 export type PublicationOptions=z.infer<typeof PublicationOptionsSchema>;
@@ -52,21 +53,23 @@ async function publicationDirectory(path:string):Promise<string>{
  const absolute=resolve(path);
  try{return await realpath(absolute);}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;const parent=dirname(absolute);if(parent===absolute)throw error;return join(await publicationDirectory(parent),basename(absolute));}
 }
-export async function publish(input:PublicationOptions,predecessors?:PriorReleaseCache,custody?:{provenance:AuthenticatedPublicationProvenance;readStaging?:(path:string)=>Promise<Buffer>;readPrior?:(path:string)=>Promise<Buffer>}){
+export async function publish(input:PublicationOptions,predecessors?:PriorReleaseCache,custody?:AuthenticatedPreparedPublication){
 const options=PublicationOptionsSchema.parse(input),replay=options.offlineReplay===true,outDir=options.outDir;
+if(custody)assertAuthenticatedPreparedPublication(custody);
 const outputDirectory=await publicationDirectory(outDir),stageDirectory=await publicationDirectory(options.stagingDir),priorDirectory=options.priorCityRoot?await publicationDirectory(options.priorCityRoot):undefined,historicalDirectory=await publicationDirectory(defaultOutDir);
 if(stageDirectory===outputDirectory||priorDirectory===outputDirectory||outputDirectory===historicalDirectory||replay&&(stageDirectory===historicalDirectory||priorDirectory===historicalDirectory))throw Error('Publication cannot use the target output as an input or replay destination');
 const provenance=custody?.provenance??await authenticatePublicationProvenance(options.privateProvenance.path,options.privateProvenance.sha256,{...(options.policyStateDir?{stateDir:options.policyStateDir}:{}),...(options.policyAuthorityId?{authorityId:options.policyAuthorityId}:{}),...(options.policyAuthoritySha256?{authoritySha256:options.policyAuthoritySha256}:{})});
 if(custody&&provenance.sha256!==options.privateProvenance.sha256)throw Error('Replay publication provenance does not match its independent pin');
 if(custody)assertAuthenticatedPublicationProvenance(custody.provenance);
+if(custody&&(custody.stagingDir!==stageDirectory||custody.priorDirectory!==priorDirectory))throw Error('Publication lease directories differ from authenticated preparation');
 const readPinned=async(path:string)=>provenance.read(resolve(path));
 const staging=new Map<string,Buffer>();
-const sourceInput=async(path:string)=>{publicationStagingPathSchema.parse(path);const bytes=await (custody?.readStaging?custody.readStaging(path):provenance.read(join(options.stagingDir,path)));staging.set(path,bytes);return JSON.parse(bytes.toString('utf8'));};
+const sourceInput=async(path:string)=>{publicationStagingPathSchema.parse(path);const filename=join(options.stagingDir,path),bytes=await (custody?custody.read(filename):provenance.read(filename));staging.set(path,bytes);return JSON.parse(bytes.toString('utf8'));};
 const catalogue=catalogueSchema.parse(await sourceInput('catalogue.json'));
 requiredPublicationStaging(catalogue.cities.map(city=>city.id));
 const priorPaths=[...catalogue.cities.flatMap(city=>[`cities/${city.id}/signals.geojson`,`cities/${city.id}/changes.json`]),'knowledge/records.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'];
 const baseline=await loadPriorPublicationRelease(options.priorRelease,priorPaths,options.manifestGeneratedAt,undefined,predecessors);
-if(options.priorCityRoot)for(const [path,bytes] of baseline.files)if(!bytes.equals(await (custody?.readPrior?custody.readPrior(path):readPinned(join(options.priorCityRoot,path)))))throw Error('Staged predecessor differs from authentic committed release');
+if(options.priorCityRoot)for(const [path,bytes] of baseline.files){const filename=join(options.priorCityRoot,path);if(!bytes.equals(await (custody?custody.read(filename):readPinned(filename))))throw Error('Staged predecessor differs from authentic committed release');}
 const collections:Record<string,FeatureCollection>={},feeds:Record<string,unknown>={};
 const cityQuality=[];
 for(const city of catalogue.cities){
@@ -128,22 +131,29 @@ const prepared=validated.catalogue.cities.map(city=>{
  return {city,collection,full,min};
 });
 const retainedCoreBytes=staging.get('core/strausberg-facts.json')!;
-const retainedCoreManifest=z.object({schemaVersion:z.literal('stadtstack-core-release-v1'),bundleSha256:z.string().regex(/^[a-f0-9]{64}$/),bundleVersion:z.string().regex(/^[a-f0-9]{64}$/),corpus:z.object({fullPath:z.literal('cities/strausberg/signals.geojson'),fullSha256:z.string().regex(/^[a-f0-9]{64}$/),minPath:z.literal('cities/strausberg/signals.min.geojson'),minSha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict()}).passthrough().parse(JSON.parse(baseline.files.get('core/release-manifest.json')!.toString('utf8')));
+const retainedCoreManifest=z.object({schemaVersion:z.literal('stadtstack-core-release-v1'),bundlePath:z.literal('core/strausberg-facts.json'),bundleSha256:z.string().regex(/^[a-f0-9]{64}$/),bundleVersion:z.string().regex(/^[a-f0-9]{64}$/),corpus:z.object({fullPath:z.literal('cities/strausberg/signals.geojson'),fullSha256:z.string().regex(/^[a-f0-9]{64}$/),minPath:z.literal('cities/strausberg/signals.min.geojson'),minSha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict()}).passthrough().parse(JSON.parse(baseline.files.get('core/release-manifest.json')!.toString('utf8')));
 if(retainedCoreManifest.bundleSha256!==hash(retainedCoreBytes)||retainedCoreManifest.bundleVersion!==core.version)throw Error('Retained core manifest binding mismatch');
 const retainedCity=prepared.find(city=>city.city.id==='strausberg')!;
-const handoff=knowledgePreparationInputsSchema.parse(JSON.parse((await (custody?.readStaging?custody.readStaging('knowledge/preparation-inputs.json'):readPinned(join(options.stagingDir,'knowledge/preparation-inputs.json')))).toString('utf8')));
+// The facts and their original gates remain unchanged; corpus pins name this release's exact serialized members.
+retainedCoreManifest.corpus.fullSha256=hash(retainedCity.full);
+retainedCoreManifest.corpus.minSha256=hash(retainedCity.min);
+const handoffPath=join(options.stagingDir,'knowledge/preparation-inputs.json');
+const handoff=knowledgePreparationInputsSchema.parse(JSON.parse((await (custody?custody.read(handoffPath):readPinned(handoffPath))).toString('utf8')));
 for(const output of handoff.outputs){const bytes=staging.get(output.path);if(!bytes||bytes.length!==output.bytes||hash(bytes)!==output.sha256)throw Error('Prepared knowledge changed after its bound admission handoff');}
 const retainedInputBytes=options.textComposition?await readPinned(options.textComposition):undefined;
-const retainedComposition=retainedInputBytes?await loadRetainedPublicationComposition(JSON.parse(retainedInputBytes.toString('utf8')),pin=>provenance.read(resolve(dirname(resolve(options.textComposition!)),pin.path))):null;
+const textComposition=retainedInputBytes?buildR1TextCompositionContext(await loadR1TextCompositionInput(JSON.parse(retainedInputBytes.toString('utf8')),pin=>provenance.read(resolve(dirname(resolve(options.textComposition!)),pin.path)))):null;
+const retainedComposition=textComposition?.retainedPublication??null;
 const textCompositionDependency=handoff.dependencies.find(dependency=>dependency.role==='text_composition')?.sha256;
+if(options.textComposition&&(!retainedInputBytes||!textCompositionDependency||textCompositionDependency!==hash(retainedInputBytes)))throw Error('Text composition input differs from its authenticated preparation dependency');
+if(!options.textComposition&&textCompositionDependency)throw Error('Prepared text composition requires its authenticated input');
 if(knowledgeCoverage.retainedPublication){
  if(!options.textComposition||!retainedComposition||!textCompositionDependency||textCompositionDependency!==hash(retainedInputBytes!))throw Error('Retained publication requires its exact authenticated text-composition input');
  if(textLineageRecordSha256({...retainedComposition.baseline.lineage,selectedRecordOrigins:retainedComposition.selectedRecordOrigins})!==textLineageRecordSha256(knowledgeCoverage.retainedPublication))throw Error('Retained publication coverage lineage differs from authenticated composition');
-}else if(options.textComposition||retainedComposition)throw Error('Text composition input is not bound to retained publication coverage');
+}else if(retainedComposition)throw Error('Unexpected retained composition without retained publication coverage');
 const originalInputs=options.publicationInputs?publicationInputsSchema.parse(JSON.parse((await readPinned(options.publicationInputs)).toString('utf8'))):undefined;
 if(originalInputs&&originalInputs.asOf!==options.asOf)throw Error('Replay graph asOf differs from original publication inputs');
 const inventory=JSON.parse((await readPinned(options.policyReceipts)).toString('utf8'));
-const policy=await recheckPublicationPolicy(knowledge.records,inventory,cas,{evaluationAt:new Date().toISOString(),...(options.policyStateDir?{stateDir:options.policyStateDir}:{}),...(originalInputs?{originalPolicy:originalInputs.policy}:{})});
+const policy=await recheckPublicationPolicy(knowledge.records,inventory,cas,{evaluationAt:new Date().toISOString(),...(options.policyStateDir?{stateDir:options.policyStateDir}:{}),...(originalInputs?{originalPolicy:originalInputs.policy}:{}),retainedPublication:knowledgeCoverage.retainedPublication});
 if(policy.optOutSnapshotSha256!==publicationEpoch.sha256)throw Error('Knowledge admission uses another current-policy epoch');
 if(handoff.dependencies.find(dependency=>dependency.role==='policy_receipts')?.sha256!==policy.inventorySha256)throw Error('Publication policy inventory is not the authentic preparation input');
 const identity=graphIdentityInputs(knowledge),assessmentInventory=options.identityAssessments?JSON.parse((await readPinned(options.identityAssessments)).toString('utf8')):{assertions:[]};

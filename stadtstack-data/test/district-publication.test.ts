@@ -68,8 +68,8 @@ test('replay coverage clock is explicit while original extraction and source clo
  assert.equal(coverage.generatedAt,historical);assert.equal(coverage.textLineage!.runs[0].generatedAt,at);
  assert.equal(crawl.generatedAt,at);assert.equal(run.generatedAt,at);
  assert.throws(()=>buildDistrictCoverage(registry,crawl,[],quarantine,run,'not-a-clock'));
- const before=Date.now(),normal=buildDistrictCoverage(registry,crawl,[],quarantine,run);
- assert.ok(Date.parse(normal.generatedAt)>=before&&Date.parse(normal.generatedAt)<=Date.now());
+ const normal=buildDistrictCoverage(registry,crawl,[],quarantine,run);
+ assert.equal(normal.generatedAt,run.generatedAt);
 });
 
 test('Coverage rejects invented attempted totals, missing pending input and concealed extraction caps',()=>{

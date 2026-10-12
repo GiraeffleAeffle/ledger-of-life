@@ -4,8 +4,9 @@ import { IdentityBasisSchema, graphIdentityMention, relationModalitySchema, ENTI
 import { StructuredKnowledgeRecordSchema } from './district-structured-record.ts';
 import { StructuredLocatorSchema, ObservationSchema, semanticHash, canonicalJson, type AdapterScope, type StructuredObservation } from './district-adapter-contract.ts';
 import { IdentityMentionSchema, IdentityAssertionSchema, IdentityAdmissionSchema, assertIdentityAssertionsBound, identityAssertion, identifierKey, TemporalPathStepSchema, effectiveIntervalFromExpression, sourceCalendarDay, identityDaySchema, resolveIdentityMentions, unknownValidity, nativeStructuredIdentityGraph, type IdentityMention, type IdentityAssertion, type IdentityAdmission, type TemporalPathStep } from './district-entity-resolution.ts';
-import { canonical } from './mcp-source-identity.ts';
+import {canonical,knowledgeSourceDescriptors} from './mcp-source-identity.ts';
 import { CASE_LINKING_VERSION, CaseIdentitySchema, caseIdentityFromText, type CaseIdentity } from './district-case-linking.ts';
+import {isRecordRevoked,isSourceRevoked,type VerifiedRevocations} from './civic-revocations.ts';
 
 export const GRAPH_SCHEMA_VERSION = 'stadtstack-graph-v3';
 const textEvidenceSchema = z.object({
@@ -162,6 +163,29 @@ export function graphIdentityInputs(envelope: unknown): GraphIdentityInputs {
   }
   return { mentions: [...mentions.values()], mentionsById: mentions, assertions, identityAdmissions: input.identityAdmissions, additionalSourceHashes: sourceHashes, mentionEvidence, pendingEdges, cases };
 }
+/** Project immutable roots as whole histories; losing a seal must not revive an older assertion. */
+export function projectKnowledgeReadEnvelope(original:unknown,visibleRecordIds:ReadonlySet<string>):z.infer<typeof KnowledgeRecordsSchema> {
+  const input=KnowledgeRecordsSchema.parse(original);
+  const records=input.records.filter(record=>visibleRecordIds.has(record.id));
+  if(records.length===input.records.length)return input;
+  const projected=graphIdentityInputs({...input,records,identityAssertions:[],identityAdmissions:[]});
+  const mentionIds=new Set(projected.mentions.map(mention=>mention.id));
+  const hashes=new Set([...projected.additionalSourceHashes,...projected.mentions.flatMap(mention=>[mention.sourceSha256,...mention.evidenceHashes,...mention.identifiers.flatMap(identifier=>identifier.evidenceHashes),...mention.validity.evidenceHashes])]);
+  const identityAdmissions=input.identityAdmissions.filter(seal=>mentionIds.has(seal.leftMentionId)&&mentionIds.has(seal.rightMentionId)&&seal.sourceEvidenceHashes.every(hash=>hashes.has(hash)));
+  const removedAssertionIds=new Set<string>();
+  for(const assertion of input.identityAssertions){
+    const bound=mentionIds.has(assertion.leftMentionId)&&mentionIds.has(assertion.rightMentionId)&&[...assertion.evidenceHashes,...assertion.validity.evidenceHashes].every(hash=>hashes.has(hash));
+    const sealed=assertion.method!=='authoritative_review'||assertion.status!=='accepted'||identityAdmissions.some(seal=>seal.assertionId===assertion.id&&seal.assertionSha256===semanticHash(assertion)&&seal.assessmentReceiptSha256===assertion.reviewReceiptSha256);
+    if(!bound||!sealed)removedAssertionIds.add(assertion.id);
+  }
+  const identityAssertions=input.identityAssertions.filter(assertion=>!removedAssertionIds.has(assertion.id));
+  const admissions=identityAdmissions.filter(seal=>!removedAssertionIds.has(seal.assertionId));
+  assertIdentityAssertionsBound(projected.mentions,[...projected.assertions,...identityAssertions],admissions,projected.additionalSourceHashes);
+  return {...input,records,identityAssertions,identityAdmissions:admissions};
+}
+
+const authenticatedGraphs=new WeakMap<KnowledgeGraph,{records:string;fingerprint:string}>();
+const maskedGraphs=new WeakMap<KnowledgeGraph,{original:KnowledgeGraph;originalFingerprint:string;recordsSha256:string;fingerprint:string;mask:VerifiedRevocations;visibleRecordIds:readonly string[]}>();
 
 /** Exact admitted bytes bind claims and both identity input sets; asOf is an explicit publication input. */
 export function buildKnowledgeGraph(recordsBytes: string | Uint8Array, options: { asOf: string }): KnowledgeGraph {
@@ -205,11 +229,26 @@ export function validateKnowledgeGraph(input: unknown, recordsBytes: string | Ui
   if (graph.recordsSha256 !== sha256(recordsBytes)) throw Error('Graph records byte binding mismatch');
   const expected = buildKnowledgeGraph(recordsBytes, { asOf: graph.asOf });
   if (canonical(graph) !== canonical(expected)) throw Error('Graph does not match admitted record and identity evidence');
+  authenticatedGraphs.set(graph,{records:typeof recordsBytes==='string'?recordsBytes:Buffer.from(recordsBytes).toString('utf8'),fingerprint:canonical(graph)});
   return graph;
 }
-/** Withholding is never new truth: remove any component whose original provenance was masked. */
-export function conservativeGraphReadView(original: KnowledgeGraph, safe: KnowledgeGraph, visibleRecordIds: ReadonlySet<string>): KnowledgeGraph {
-  if (safe.asOf !== original.asOf) throw Error('Graph read mask changed pinned asOf');
+/** Withholding is never new truth: authenticate the visible projection against the original graph. */
+export function conservativeGraphReadView(original:KnowledgeGraph,safe:KnowledgeGraph,visibleRecordIds:ReadonlySet<string>,mask:VerifiedRevocations):KnowledgeGraph {
+  isSourceRevoked(mask,{});
+  const originalProof=authenticatedGraphs.get(original),safeProof=authenticatedGraphs.get(safe);
+  if(!originalProof||!safeProof||originalProof.fingerprint!==canonical(original)||safeProof.fingerprint!==canonical(safe))throw Error('Graph read view requires authenticated unchanged publication graphs');
+  const originalEnvelope=KnowledgeRecordsSchema.parse(JSON.parse(originalProof.records)),safeEnvelope=KnowledgeRecordsSchema.parse(JSON.parse(safeProof.records));
+  const expected=new Set(originalEnvelope.records.filter(record=>!isRecordRevoked(mask,{recordId:record.id,municipalityId:record.municipalityId,sources:knowledgeSourceDescriptors(record)})).map(record=>record.id));
+  const originalIds=new Set(originalEnvelope.records.map(record=>record.id)),visibleKnowledgeIds=new Set([...visibleRecordIds].filter(id=>originalIds.has(id)));
+  if(expected.size!==visibleKnowledgeIds.size||[...expected].some(id=>!visibleKnowledgeIds.has(id)))throw Error('Graph read view record identity closure mismatch');
+  const projected=projectKnowledgeReadEnvelope(originalEnvelope,expected);
+  if(canonical(safeEnvelope.records)!==canonical(projected.records))throw Error('Graph read view is not an unchanged visible record subset');
+  if(canonical(safeEnvelope)!==canonical(projected))throw Error('Graph read view changed publication envelope or identity root closure');
+  if(safe.asOf!==original.asOf)throw Error('Graph read mask changed pinned asOf');
+  if(expected.size===originalIds.size){
+    maskedGraphs.set(safe,{original,originalFingerprint:originalProof.fingerprint,recordsSha256:safe.recordsSha256,fingerprint:safeProof.fingerprint,mask,visibleRecordIds:Object.freeze([...expected].sort())});
+    return safe;
+  }
   const adjacency = new Map<string, string[]>(), affected = new Set<string>(), queue: string[] = [];
   const mark = (id: string) => { if (!affected.has(id)) { affected.add(id); queue.push(id); } };
   for (const entity of original.entities) {
@@ -222,14 +261,32 @@ export function conservativeGraphReadView(original: KnowledgeGraph, safe: Knowle
   }
   const originalAssertions = new Map(original.identity.assertions.map(value => [value.id, value]));
   const safeAssertions = new Map(safe.identity.assertions.map(value => [value.id, value]));
-  for (const entity of original.entities) if (entity.identityAssertionIds.some(id => canonicalJson(originalAssertions.get(id)) !== canonicalJson(safeAssertions.get(id) ?? null))) mark(entity.id);
-  for (let index = 0; index < queue.length; index++) for (const id of adjacency.get(queue[index]) ?? []) mark(id);
   const originalOwners = new Map(original.entities.flatMap(entity => entity.mentions.map(mention => [mention.id, entity.id] as const)));
+  for(const [id,assertion] of originalAssertions)if(canonicalJson(assertion)!==canonicalJson(safeAssertions.get(id)??null)){
+    for(const mentionId of [assertion.leftMentionId,assertion.rightMentionId]){
+      const owner=originalOwners.get(mentionId);if(owner)mark(owner);
+    }
+  }
+  for (let index = 0; index < queue.length; index++) for (const id of adjacency.get(queue[index]) ?? []) mark(id);
   const entities = safe.entities.filter(entity => entity.mentions.every(mention => !affected.has(originalOwners.get(mention.id)!)));
   const entityIds = new Set(entities.map(entity => entity.id)), mentionIds = new Set(entities.flatMap(entity => entity.mentions.map(mention => mention.id)));
   const assertions = safe.identity.assertions.filter(value => mentionIds.has(value.leftMentionId) && mentionIds.has(value.rightMentionId));
   const assertionIds = new Set(assertions.map(value => value.id));
   const identity = { mentions: safe.identity.mentions.filter(value => mentionIds.has(value.id)), assertions,
     admissions: safe.identity.admissions.filter(value => assertionIds.has(value.assertionId)), blocked: safe.identity.blocked.filter(value => assertionIds.has(value.assertionId)) };
-  return KnowledgeGraphSchema.parse({ ...safe, entities, edges: safe.edges.filter(edge => entityIds.has(edge.fromId) && entityIds.has(edge.toId)), identity, identitySha256: semanticHash(identity) });
+  const view=KnowledgeGraphSchema.parse({ ...safe, entities, edges: safe.edges.filter(edge => entityIds.has(edge.fromId) && entityIds.has(edge.toId)), identity, identitySha256: semanticHash(identity) });
+  maskedGraphs.set(view,{original,originalFingerprint:originalProof.fingerprint,recordsSha256:safe.recordsSha256,fingerprint:canonical(view),mask,visibleRecordIds:Object.freeze([...expected].sort())});
+  return view;
+}
+
+/** Only an issued conservative projection may skip the ordinary exact-rebuild validator. */
+export function validateMaskedKnowledgeGraph(input:unknown,recordsBytes:string|Uint8Array,releaseId:string,maskIdentity:string):KnowledgeGraph {
+  const graph=input as KnowledgeGraph,proof=maskedGraphs.get(graph);
+  if(!proof||proof.mask.releaseId!==releaseId||proof.mask.artifactSha256!==maskIdentity)throw Error('Unauthenticated masked graph read view');
+  isSourceRevoked(proof.mask,{});
+  if(proof.recordsSha256!==sha256(recordsBytes)||proof.fingerprint!==canonical(graph)||proof.originalFingerprint!==canonical(proof.original))throw Error('Masked graph binding changed');
+  const records=KnowledgeRecordsSchema.parse(JSON.parse(typeof recordsBytes==='string'?recordsBytes:Buffer.from(recordsBytes).toString('utf8'))).records;
+  const ids=records.map(record=>record.id).sort();
+  if(canonical(ids)!==canonical(proof.visibleRecordIds))throw Error('Masked graph visible record binding changed');
+  return graph;
 }

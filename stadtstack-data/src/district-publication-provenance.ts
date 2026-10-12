@@ -6,7 +6,7 @@ import {hashSchema,sha256} from './district-schema.ts';
 import type {SourceArtifactBinding} from './district-private-io.ts';
 
 // Decode the canonical proof body, removing only its separately checked custody flag.
-const artifactBindingSchema=z.unknown().transform((input,ctx):SourceArtifactBinding=>{
+export const artifactBindingSchema=z.unknown().transform((input,ctx):SourceArtifactBinding=>{
  if(!input||typeof input!=='object'||Array.isArray(input)){ctx.addIssue({code:'custom',message:'Source artifact binding must be a closed object'});return z.NEVER;}
  const {independentAllowed,...body}=input as Record<string,unknown>,flag=z.boolean().safeParse(independentAllowed),binding=ManagedSourceBindingSchema.safeParse(body);
  if(!flag.success||!binding.success){ctx.addIssue({code:'custom',message:'Source artifact binding codec mismatch'});return z.NEVER;}
@@ -16,7 +16,7 @@ const artifactBindingSchema=z.unknown().transform((input,ctx):SourceArtifactBind
 const pinSchema=z.object({path:z.string().min(1),sha256:hashSchema,bytes:z.number().int().nonnegative().max(512*1024*1024),bindings:z.array(artifactBindingSchema).min(1)}).strict();
 export const privatePublicationProvenanceSchema=z.object({schemaVersion:z.literal('stadtstack-private-publication-provenance-v1'),inputs:z.array(pinSchema).min(1)}).strict();
 export type PrivatePublicationProvenance=z.infer<typeof privatePublicationProvenanceSchema>;
-export interface AuthenticatedPublicationProvenance {sha256:string;bindings:SourceArtifactBinding[];read(path:string):Promise<Buffer>;pins:ReadonlyMap<string,PrivatePublicationProvenance['inputs'][number]>}
+export interface AuthenticatedPublicationProvenance {readonly sha256:string;readonly bindings:SourceArtifactBinding[];read(path:string):Promise<Buffer>}
 const authenticatedProvenances=new WeakSet<object>();
 export function assertAuthenticatedPublicationProvenance(value:AuthenticatedPublicationProvenance):void{if(!authenticatedProvenances.has(value))throw Error('Publication requires an authenticated provenance capability');}
 /** Independent inventory pins plus actual live inventory proofs; no label grants rights. */
@@ -36,6 +36,7 @@ export async function authenticatePublicationProvenance(path:string,expectedSha2
   if(bytes.length!==pin.bytes||sha256(bytes)!==pin.sha256)throw Error('Private publication input byte binding mismatch');
   await assertManagedSourceBindings(actual,pin.bindings,policy);return bytes;
  };
- const authenticated={sha256:expectedSha256,bindings:[...contributors.values()],read,pins};
+ // Keep the read-authority map private and prevent replacing its authenticated reader.
+ const authenticated=Object.freeze({sha256:expectedSha256,bindings:structuredClone([...contributors.values()]),read});
  authenticatedProvenances.add(authenticated);return authenticated;
 }

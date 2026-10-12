@@ -8,6 +8,8 @@ import type {PublicationOptions} from '../src/publish.ts';
 import {outDir,hash} from '../src/common.ts';
 import {writeManagedSourceArtifact} from '../src/district-private-io.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
+import {authenticatePublicationProvenance} from '../src/district-publication-provenance.ts';
+import type {AuthenticatedPreparedPublication} from '../src/prepare-knowledge.ts';
 
 async function stagedFixture(directory:string,t:{after:(callback:()=>Promise<void>)=>void}){
  const context=await createCivicPolicyTestContext(t),stagingDir=join(context.managedRoot,'staging'),privateProvenance=join(directory,'private-provenance.json'),cataloguePath=join(stagingDir,'catalogue.json'),catalogueBytes=Buffer.from(JSON.stringify({generatedAt:'2026-10-11T03:46:26.421Z',cities:[]})),binding={kind:'prepared_source' as const,url:'https://example.org/synthetic-publication-input',sourceSha256:hash('synthetic source'),observationId:'synthetic-publication-input',receiptSha256:hash('synthetic receipt'),independentAllowed:true};
@@ -41,5 +43,17 @@ test('missing replay staging never falls back to released regional or knowledge 
   for(const path of ['regions/brandenburg-mol/topics.json','knowledge/registry.json','knowledge/records.json','knowledge/coverage.json'])await assert.rejects(publicationInput(path,options),{code:'ENOENT'});
   await assert.rejects(publish({...options,outDir}),/target output/);
   await assert.rejects(publish({...options,priorCityRoot:outDir}),/target output/);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('genuine input provenance does not authorize structurally supplied staging or predecessor readers',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'stadtstack-publication-forged-lease-'));
+ try{
+  const fixture=await stagedFixture(directory,t),options:PublicationOptions={...prerequisites,...fixture,outDir:join(directory,'release'),priorCityRoot:join(directory,'prior'),qualityGeneratedAt:at,manifestGeneratedAt:manifestAt};
+  const provenance=await authenticatePublicationProvenance(fixture.privateProvenance.path,fixture.privateProvenance.sha256,{stateDir:fixture.policyStateDir,authorityId:fixture.policyAuthorityId,authoritySha256:fixture.policyAuthoritySha256});
+  let reads=0;
+  const supplied={provenance,stagingDir:fixture.stagingDir,priorDirectory:options.priorCityRoot,read:async()=>{reads++;return Buffer.from('{}');},readStaging:async()=>{reads++;return Buffer.from('{}');},readPrior:async()=>{reads++;return Buffer.from('{}');}};
+  await assert.rejects(publish(options,undefined,supplied as AuthenticatedPreparedPublication));
+  assert.equal(reads,0);
  }finally{await rm(directory,{recursive:true,force:true});}
 });

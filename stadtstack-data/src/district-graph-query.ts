@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { validateKnowledgeGraph, conservativeGraphReadView, type GraphEntity, type GraphEdge, type KnowledgeGraph } from './district-graph.ts';
-import {canonical,knowledgeSourceDescriptors} from './mcp-source-identity.ts';
-import {isRecordRevoked,isSourceRevoked,type VerifiedRevocations} from './civic-revocations.ts';
+import { validateKnowledgeGraph, validateMaskedKnowledgeGraph, conservativeGraphReadView, type GraphEntity, type GraphEdge, type KnowledgeGraph } from './district-graph.ts';
+import {isSourceRevoked,type VerifiedRevocations} from './civic-revocations.ts';
 import { identityDaySchema, temporalPathEligible, intervalCouldContain, intervalBoundaryRange, effectiveIntervalFromExpression } from './district-entity-resolution.ts';
 import { boundPage, cursorBinding, readCursor } from './mcp-pagination.ts';
 import { entityTypeSchema } from './district-graph-claims.ts';
@@ -31,7 +30,6 @@ export class GraphIndex {
   readonly identitySha256: string;
   readonly maskIdentity:string|null;
   private readonly graph:KnowledgeGraph;
-  private readonly recordsBytes:string|Uint8Array;
   private readonly entities: Map<string, GraphEntity>;
   private readonly orderedEntities: GraphEntity[];
   private readonly outgoing = new Map<string, GraphEdge[]>();
@@ -40,8 +38,8 @@ export class GraphIndex {
   private readonly roleEvidence = new Map<string, GraphEdge[]>();
 
   constructor(releaseId: string, graph: unknown, recordsBytes: string | Uint8Array, budgets: Partial<GraphQueryBudgets> = {}, maskIdentity:string|null=null) {
-    const bound = validateKnowledgeGraph(graph, recordsBytes);
-    this.releaseId = releaseId; this.recordsSha256 = bound.recordsSha256; this.releaseAsOf = bound.asOf; this.identitySha256 = bound.identitySha256;this.maskIdentity=maskIdentity;this.graph=bound;this.recordsBytes=recordsBytes;
+    const bound = maskIdentity===null?validateKnowledgeGraph(graph,recordsBytes):validateMaskedKnowledgeGraph(graph,recordsBytes,releaseId,maskIdentity);
+    this.releaseId = releaseId; this.recordsSha256 = bound.recordsSha256; this.releaseAsOf = bound.asOf; this.identitySha256 = bound.identitySha256;this.maskIdentity=maskIdentity;this.graph=bound;
     this.budgets = { ...GRAPH_QUERY_BUDGETS, ...budgets };
     for (const name of Object.keys(GRAPH_QUERY_BUDGETS) as (keyof GraphQueryBudgets)[]) if (!Number.isInteger(this.budgets[name]) || this.budgets[name] < 1 || this.budgets[name] > GRAPH_QUERY_BUDGETS[name]) throw Error('Invalid graph search budget');
     this.orderedEntities = bound.entities; this.entities = new Map(bound.entities.map(entity => [entity.id, entity]));
@@ -55,19 +53,12 @@ export class GraphIndex {
       }
     }
   }
-  /** Rebuild and validate the safe graph from unchanged visible record bytes; structural closure is conservative. */
+  /** Strictly authenticate safe inputs, then serve the original graph's conservative closure. */
   withReadView(safeGraph:unknown,safeRecordsBytes:string|Uint8Array,visibleRecordIds:ReadonlySet<string>,mask:VerifiedRevocations):GraphIndex {
     isSourceRevoked(mask,{});
+    if(this.maskIdentity!==null)throw Error('Graph read views require the original publication index');
     if(mask.releaseId!==this.releaseId)throw Error('Graph read mask release mismatch');
-    const originalEnvelope=JSON.parse(typeof this.recordsBytes==='string'?this.recordsBytes:Buffer.from(this.recordsBytes).toString('utf8')) as {schemaVersion:string;generatedAt:string;records:Array<{id:string;municipalityId:string;kind?:string} & Record<string,unknown>>};
-    const safeEnvelope=JSON.parse(typeof safeRecordsBytes==='string'?safeRecordsBytes:Buffer.from(safeRecordsBytes).toString('utf8')) as {schemaVersion:string;generatedAt:string;records:Array<{id:string;municipalityId:string;kind?:string} & Record<string,unknown>>};
-    if(safeEnvelope.schemaVersion!==originalEnvelope.schemaVersion||safeEnvelope.generatedAt!==originalEnvelope.generatedAt)throw Error('Graph read view changed publication envelope');
-    const originals=new Map(originalEnvelope.records.map(record=>[record.id,canonical(record)])),expected=new Set(originalEnvelope.records.filter(record=>!isRecordRevoked(mask,{recordId:record.id,municipalityId:record.municipalityId,sources:knowledgeSourceDescriptors(record as Parameters<typeof knowledgeSourceDescriptors>[0])})).map(record=>record.id));
-    const seen=new Set<string>();
-    for(const record of safeEnvelope.records)if(seen.has(record.id)||!visibleRecordIds.has(record.id)||originals.get(record.id)!==canonical(record))throw Error('Graph read view is not an unchanged visible record subset');else seen.add(record.id);
-    if(seen.size!==expected.size||[...seen].some(id=>!expected.has(id)))throw Error('Graph read view record identity closure mismatch');
-    const checkedSafe=validateKnowledgeGraph(safeGraph,safeRecordsBytes),view=conservativeGraphReadView(this.graph,checkedSafe,visibleRecordIds);
-    if(view.asOf!==this.releaseAsOf)throw Error('Graph read mask changed pinned asOf');
+    const checkedSafe=validateKnowledgeGraph(safeGraph,safeRecordsBytes),view=conservativeGraphReadView(this.graph,checkedSafe,visibleRecordIds,mask);
     return new GraphIndex(this.releaseId,view,safeRecordsBytes,this.budgets,mask.artifactSha256);
   }
 
