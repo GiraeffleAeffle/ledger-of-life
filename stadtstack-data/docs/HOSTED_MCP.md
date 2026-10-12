@@ -262,11 +262,50 @@ Do not advertise this endpoint as compatible with ChatGPT's native OAuth connect
 
 ## Governed release procedure
 
-Current privileged work requires the **Lease-enabled governance session**: on the owner’s Mac, `governance/session.py run -- …`; on the VM, `sudo stadtstack-session …`. Releases are coordinated through the CivicMCP operator using the reviewed source/data/image seal. The former directory-lock route and direct `deploy/mcp/session.sh` invocation are not current authorization paths. Never use a persistent/admin kubeconfig or restore an old procedure from historical receipts.
+Privileged rollout is **VM-only**, through the Lease-enabled `sudo stadtstack-session exec <reviewed command>` entry point. The dispatcher uses only `/usr/local/bin/stadtstack-kubectl` for cluster access; it accepts no kubectl binary override and needs no Helm. A busy Lease or incident means stop and coordinate. Never use a persistent/admin kubeconfig, a direct infra script, an old Mac route or a previous application's GO. **0.3.1 remains live until the complete 0.3.2 cutover is accepted.** The commands below are the implementation procedure, not deployment authorization.
 
-The tag-only `.github/workflows/civic-mcp-image.yml` publishes immutable amd64/arm64 images; it does not deploy. A package version or source checkpoint alone is not a release. The approved Git revision/tag, complete data manifest, tagged image digest, OCI identity, chart version and governed acceptance must agree. Source/security review and fresh governed exact-image acceptance precede mutation; public endpoint version/data evidence remains separate from running-image provenance.
+Before tagging, commit the validated **public-only** sealed candidate at `stadtstack-data/release/`: `release-manifest.json` and exactly its members, never raw/model caches. Historical `out/` remains untouched and is excluded from the MCP image. The tag-only `.github/workflows/civic-mcp-image.yml` refuses a missing candidate manifest and publishes immutable amd64/arm64 images; it does not deploy. The Dockerfile checks member hashes using `verifyDataRelease`, without requiring the later signed cohort at build time. Literal package/chart/Git/image version, approved pushed source, successful workflow result, whole-data manifest and tagged image digest must agree.
 
-The pending signed revocation cohort must be verified at startup and mounted through the governed configuration update, with its public trust pin and exact signed-artifact SHA together. A revision-triggered single-replica Recreate rollout replaces the in-memory mask; no policy RPC, per-request filesystem read or stale-mask rollback is authorized. Key provisioning does not authorize a deployment.
+Prepare two **public**, root-owned, non-group/other-writable regular input files outside the clone: `trust.json` and the canonical signed `revocations.json` (no appended newline). Both independent public pins in `reports/handoff-release-0.3.2.json` must be in trust. Its `releaseId` must equal the approved `release/release-manifest.json` ID and `expectedArtifactSha256` must hash the entire signed artifact. Obtain the approved target decision and reviewed canonical signing invocation separately; this procedure neither reads a signer key nor signs. An approved genuinely signed empty mask is supported, not an unsigned fallback.
+
+On **this VM**, use a fresh, clean clone on a branch whose HEAD and upstream equal the approved pushed source. Prerequisites inside the root session: Python 3, Git, Node 22+, Docker with buildx, and `gh` authenticated for read-only workflow metadata/logs; the existing governed namespace and token-hash Secret must already exist. No Helm, age, Mac Keychain or Mac tunnel is used. Fill the reviewed public values below from the accepted source/data/image/cohort; do not invent them:
+
+```sh
+umask 022
+export PATH=/home/max/.local/share/mise/installs/node/24.21.0/bin:$PATH
+git clone --no-hardlinks --branch "$APPROVED_BRANCH" https://github.com/GiraeffleAeffle/ledger-of-life.git "$RELEASE_REPO"
+# RELEASE_REPO is canonical absolute; branch HEAD and upstream must equal APPROVED_SHA.
+# Required reviewed values: APPROVED_SHA (40hex), IMAGE_DIGEST (sha256:64hex),
+# WORKFLOW_RUN_ID, KNOWLEDGE_MUNICIPALITY (a qualifying released municipality),
+# TRUST_FILE and REVOCATIONS_FILE (absolute public input paths), ARTIFACT_SHA256 (64hex).
+sudo stadtstack-session exec /usr/bin/env \
+  PATH="/home/max/.local/share/mise/installs/node/24.21.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+  MCP_RELEASE_REPO="$RELEASE_REPO" MCP_APPROVED_SHA="$APPROVED_SHA" \
+  MCP_RELEASE_VERSION=0.3.2 MCP_IMAGE_DIGEST="$IMAGE_DIGEST" \
+  MCP_WORKFLOW_RUN_ID="$WORKFLOW_RUN_ID" MCP_KNOWLEDGE_MUNICIPALITY="$KNOWLEDGE_MUNICIPALITY" \
+  MCP_REVOCATION_TRUST_FILE="$TRUST_FILE" MCP_REVOCATIONS_FILE="$REVOCATIONS_FILE" \
+  MCP_REVOCATION_ARTIFACT_SHA256="$ARTIFACT_SHA256" \
+  /usr/bin/python3 -I "$RELEASE_REPO/deploy/mcp/deploy.py" --diff-only
+```
+
+Review the root-only evidence at `/var/lib/stadtstack-mcp-release/<source-prefix>-<UTC>/` (0700): exact-image acceptance, source/workflow identity, manifest/cohort hashes, rendered manifests, server dry-run, diff and token profiles (not token hashes). Every dispatcher invocation exports and executes the approved smoke/renderer/chart and performs **fresh** exact-image acceptance with the frozen cohort before any mutation. Then obtain a fresh explicit application GO and source-bound security acknowledgement and invoke:
+
+```sh
+sudo stadtstack-session exec /usr/bin/env \
+  PATH="/home/max/.local/share/mise/installs/node/24.21.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+  MCP_RELEASE_REPO="$RELEASE_REPO" MCP_APPROVED_SHA="$APPROVED_SHA" \
+  MCP_RELEASE_VERSION=0.3.2 MCP_IMAGE_DIGEST="$IMAGE_DIGEST" \
+  MCP_WORKFLOW_RUN_ID="$WORKFLOW_RUN_ID" MCP_KNOWLEDGE_MUNICIPALITY="$KNOWLEDGE_MUNICIPALITY" \
+  MCP_REVOCATION_TRUST_FILE="$TRUST_FILE" MCP_REVOCATIONS_FILE="$REVOCATIONS_FILE" \
+  MCP_REVOCATION_ARTIFACT_SHA256="$ARTIFACT_SHA256" \
+  CLUSTER_OPS_MCP_GO=protected-read-only-civic-mcp MCP_SECURITY_REVIEW_ACK="$APPROVED_SHA" \
+  /usr/bin/python3 -I "$RELEASE_REPO/deploy/mcp/deploy.py" --release
+# At the prompt, type release-mcp-<first 12 characters of APPROVED_SHA>.
+```
+
+The dispatcher renders the committed chart deterministically with standard-library `deploy/mcp/render.py`, then applies manifests with the VM kubectl wrapper. It creates/updates `stadtstack-mcp-revocations` using **binaryData from the exact snapshotted bytes**, never text reserialization. The ConfigMap projects both 0444 files through `..data` into one revision at `/run/config/mcp-revocations`, accepted by the existing startup path/ownership/symlink checks. Signed artifact **and exact trust-byte SHA** pod annotations, together with the existing token-policy revision, trigger the single-replica **Recreate** rollout (including a trust-only cohort change). Secret updates compare-and-swap UID/resourceVersion and preserve every identity/digest; max/buzz remain 300/minute and 8 concurrent, others 60/4, global 32, body 32 KiB and deadline 30 seconds. A failed rollout stops; no automatic permissive-mask rollback is authorized.
+
+After readiness, perform public HTTPS version/data/cohort acceptance with the approved `smoke.py --url https://mcp.stadtstack.eu` and the same four cohort/manifest arguments, using an already-issued VM identity. Its receipt does not attest image provenance. Independently correlate the recorded ReadyPod `imageID` with the approved multiarch/platform image identity through the governed wrapper, and review acceptance across all three districts and the approved signed administrative mask. No request-time policy filesystem read or hot reload is introduced. Missing seal, signature/cohort, source/security approval or final public/image acceptance means do not claim 0.3.2 accepted; preserve evidence and keep the established 0.3.1 release status until accepted cutover.
 
 The chart disables backend HAProxy access logging before redirect handling. Its snippets must be allowed by the governed controller; shared frontend pre-routing rejection logs must also be checked for this host before claiming end-to-end no-content logging.
 

@@ -12,6 +12,12 @@
 {{- if or (ne .Chart.AppVersion $version) (ne .Chart.Version $version) -}}
 {{- fail "Chart version and appVersion must match releaseVersion and the canonical package version" -}}
 {{- end -}}
+{{- if not (regexMatch "^[a-f0-9]{64}$" .Values.revocationArtifactSha256) -}}
+{{- fail "revocationArtifactSha256 must be the lowercase SHA-256 of the signed revocation artifact bytes" -}}
+{{- end -}}
+{{- if not (regexMatch "^[a-f0-9]{64}$" .Values.revocationTrustSha256) -}}
+{{- fail "revocationTrustSha256 must be the lowercase SHA-256 of the public trust bytes" -}}
+{{- end -}}
 {{- end -}}
 {{- define "civicMcp.image" -}}
 {{- if ne .Values.image.repository "ghcr.io/giraeffleaeffle/stadtstack-mcp" -}}
