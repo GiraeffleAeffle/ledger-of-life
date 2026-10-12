@@ -207,6 +207,8 @@ Owner decision of 11 October: registered public civic sources may override robot
 
 Operational `official_work` classification can use the explicit owner TDM decision. Third-party/mixed/unknown documents remain excluded under disallowed robots or reserved TDM; unavailable/malformed TDM fails closed. Invalid 304 declarations cannot erase an earlier reservation. New excluded raw copies are discarded. Public output is facts and short quotes, not full source documents. These are operational policy labels, not legal clearance.
 
+Only the standardized TDMRep well-known lookup follows at most five same-origin redirects (including same-host HTTP→HTTPS upgrades), recording each hop and treating final 404/410 as absence; explicit policy references still reject redirects, and invalid/non-policy responses fail closed before retention.
+
 An objection stops new acquisition/cached reuse/model/preparation/reassessment/publication immediately. Managed raw/derived/scratch copies are inventoried for purge within seven days; incomplete purge remains **partial**, not falsely successful. Nonempty old caches are not automatically enrolled or claimed purged. The new authority/lane has not been run in production here. Tests do not prove real production purge or Docker recovery.
 
 ## 9. VM-only governed release and signing
