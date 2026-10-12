@@ -96,7 +96,10 @@ test('host scheduler serializes concurrent work and respects minimum spacing',as
  const starts:number[]=[];let active=0,maxActive=0;
  const work=async()=>{starts.push(Date.now());active++;maxActive=Math.max(maxActive,active);await Promise.resolve();active--;};
  let complete=false;const pending=Promise.all([scheduler.scheduled(new URL('https://stadt.de/a'),work),scheduler.scheduled(new URL('http://stadt.de/b'),work),scheduler.scheduled(new URL('https://stadt.de/c'),work)]).finally(()=>{complete=true;});
- for(let turn=0;!complete&&turn<3000;turn++){await immediate();t.mock.timers.tick(25);}
+ // Real filesystem I/O interleaves with the mocked clock; bound by wall time, not by a turn count,
+ // so a loaded host cannot strand the remaining mocked timers and hang the runner.
+ const deadline=performance.now()+60_000;
+ while(!complete){assert.ok(performance.now()<deadline,'scheduler did not finish within 60 s of real time');await immediate();t.mock.timers.tick(25);}
  await pending;
  assert.equal(maxActive,1);assert.ok(starts[1]-starts[0]>=2000);assert.ok(starts[2]-starts[1]>=2000);
 });
@@ -232,7 +235,8 @@ test('municipal lane serializes instances, policy requests and restart state wit
  const work=async()=>{starts.push(Date.now());active++;maxActive=Math.max(active,maxActive);await immediate();active--;};
  let complete=false;
  const run=Promise.all(lanes.map((lane,index)=>lane.scheduled(new URL(['https://stadt.de/robots.txt','https://stadt.de/.well-known/tdmrep.json','http://stadt.de/document'][index]),work))).finally(()=>{complete=true;});
- for(let turn=0;!complete&&turn<3000;turn++){await immediate();t.mock.timers.tick(25);}
+ let deadline=performance.now()+60_000;
+ while(!complete){assert.ok(performance.now()<deadline,'lanes did not finish within 60 s of real time');await immediate();t.mock.timers.tick(25);}
  await run;assert.equal(maxActive,1);assert.equal(starts.length,3);
  assert.ok(starts[1]-starts[0]>=5000);assert.ok(starts[2]-starts[1]>=5000);
  const state=JSON.parse(await readFile(join(root,'lanes','stadt.de.json'),'utf8'));
@@ -240,7 +244,8 @@ test('municipal lane serializes instances, policy requests and restart state wit
  // A fresh instance reads the committed timestamp even after the in-memory queue drains.
  const restart=await createPoliteFetcher({cacheDir:join(root,'restart')}) as unknown as LaneSeam;t.mock.method(restart,'hostStateDirectory',()=>join(root,'lanes'));
  complete=false;const resumed=restart.scheduled(new URL('https://stadt.de/restarted'),work).finally(()=>{complete=true;});
- for(let turn=0;!complete&&turn<3000;turn++){await immediate();t.mock.timers.tick(25);}
+ deadline=performance.now()+60_000;
+ while(!complete){assert.ok(performance.now()<deadline,'restarted lane did not finish within 60 s of real time');await immediate();t.mock.timers.tick(25);}
  await resumed;assert.ok(starts[3]-starts[2]>=5000);
 });
 test('shared lane refuses a live other-process lock without stealing it',async t=>{
