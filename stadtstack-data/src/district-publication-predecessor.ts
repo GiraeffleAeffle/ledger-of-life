@@ -36,7 +36,9 @@ export async function loadPriorPublicationRelease(input:PriorRelease,paths:reado
  const manifest=dataReleaseSchema.parse(JSON.parse(bytes.toString('utf8')));
  if(manifest.id!==prior.releaseId||dataReleaseId(manifest.files)!==manifest.id||manifest.id===targetReleaseId||Date.parse(manifest.generatedAt)>=Date.parse(z.iso.datetime().parse(targetGeneratedAt))||new Set(manifest.files.map(file=>file.path)).size!==manifest.files.length)throw Error('Publication requires an authentic earlier baseline, not the target release');
  const members=[],files=new Map<string,Buffer>();
- for(const path of [...paths].sort()){
+ const selectedPaths=[...paths];
+ if(paths.includes('knowledge/records.json')&&!paths.includes('knowledge/changes.json')&&manifest.files.some(file=>file.path==='knowledge/changes.json'))selectedPaths.push('knowledge/changes.json');
+ for(const path of selectedPaths.sort()){
   if(files.has(path))throw Error('Duplicate predecessor member');
   const file=manifest.files.find(file=>file.path===path);if(!file)throw Error(`Replay prior baseline member missing: ${path}`);
   const body=await readCommittedReleaseFile(prior.gitCommit,path,cache);

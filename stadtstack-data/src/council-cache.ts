@@ -1,10 +1,15 @@
-import {rename,readFile} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {cacheDir,hash,jsonFile,save} from './common.ts';
+import {cacheDir,hash} from './common.ts';
 import {canonicalOparlUrl} from './dedupe.ts';
-import {beginCouncilTraversal,mergeCouncilRecords,parseOparlList} from './council-oparl.ts';
+import {beginCouncilTraversal,bodyIdMatchesCity,mergeCouncilRecords,parseOparlList,selectCouncilBody} from './council-oparl.ts';
 import type {CouncilCheckpoint,CouncilEvidence,CouncilKind,OparlBody,OparlRecord,StoredCouncilRecord} from './council-oparl.ts';
-import {PoliteFetcher,PoliteFetchError} from './polite-fetch.ts';
+import {PoliteFetcher,PoliteFetchError,sourceContentBinding} from './polite-fetch.ts';
+import type {FetchedDocument,ExcludedDocument,FetchOptions,SourceContentBinding} from './polite-fetch.ts';
+import {cities,type City} from './cities.ts';
+import {APPROVED_OWNER_ROBOTS_OVERRIDE,ownerRobotsOverrideFor} from './source-policy.ts';
+import {writePrivateJson} from './district-private-io.ts';
+import {HostOptedOutError,CivicPolicyStateError,CIVIC_POLICY_AUTHORITY,type CivicPolicyOptions} from './civic-opt-out.ts';
 
 export interface CouncilSegment {records:OparlRecord[];evidence:CouncilEvidence;withdrawnIds?:string[]}
 export interface CouncilStorage {
@@ -13,35 +18,99 @@ export interface CouncilStorage {
  checkpoint(state:CouncilCheckpoint,segment?:CouncilSegment):Promise<void>;
 }
 export type CouncilLoader=(url:string)=>Promise<CouncilEvidence&{data:unknown}>;
-const councilFetcher=new PoliteFetcher({cacheDir:join(cacheDir,'council-fetch'),timeoutMs:45000});
-export const loadCouncilJson:CouncilLoader=async url=>{
- for(let attempt=0;;attempt++){
+/** Shared loader: no stale fallback or hidden reconnect loop; durable traversal owns resume. */
+export function createPoliteCouncilLoader(fetcher:PoliteFetcher,options:FetchOptions&{maxRequests:number;oparlBody?:{id:string;name:string};onDocument?:(document:FetchedDocument)=>void|Promise<void>;onExcluded?:(document:ExcludedDocument)=>void|Promise<void>}):CouncilLoader {
+ const startedRequests=fetcher.requestCount;
+ return async url=>{
+  await fetcher.initialize();
+  if(fetcher.requestCount-startedRequests>=options.maxRequests)throw Error('OParl request budget exhausted');
   try{
-   const response=await councilFetcher.fetch(canonicalOparlUrl(url));
-   const body=await readFile(response.localPath);
-   if(hash(body)!==response.sha256)throw Error('Council source cache digest mismatch');
-   return {url:response.url,retrievedAt:response.retrievedAt,checkedAt:response.checkedAt,sha256:response.sha256,data:JSON.parse(body.toString('utf8'))};
-  }catch(error){
-   // Reconnect interrupted public GETs only. Policy, HTTP and integrity failures
-   // remain failures; exhausted transient attempts leave the durable cursor intact.
-   if(!(error instanceof PoliteFetchError)||!['network_error','timeout'].includes(error.failure)||attempt>=2)throw error;
-   const pause=Promise.withResolvers<void>();setTimeout(pause.resolve,15_000*2**attempt);await pause.promise;
-  }
- }
-};
-export function councilStorage(bodyId:string,kind:CouncilKind):CouncilStorage {
- const folder=join(cacheDir,'council',hash(canonicalOparlUrl(bodyId)),kind),statePath=join(folder,'checkpoint.json');
+   const response=await fetcher.fetch(url,{ownerRobotsOverride:options.ownerRobotsOverride,registeredSourceUrl:options.registeredSourceUrl,machinePolicyUrls:options.machinePolicyUrls,hostProfile:options.hostProfile??'municipal',municipalityName:options.municipalityName,...(options.oparlBody?{oparlContext:{bodyId:options.oparlBody.id,bodyName:options.oparlBody.name,apiUrl:url}}:{})});
+   await fetcher.assertSourceReadable(response.localPath,response.url);
+   await fetcher.assertSourceBindingsAllowed([sourceContentBinding(response)]);
+   const bytes=await readFile(response.localPath);
+   if(hash(bytes)!==response.sha256)throw Error('Council source cache digest mismatch');
+   await fetcher.assertSourceReadable(response.localPath,response.url);
+   const data:unknown=JSON.parse(bytes.toString('utf8'));
+   await options.onDocument?.(response);
+   return {url:response.url,sha256:response.sha256,retrievedAt:response.retrievedAt,checkedAt:response.checkedAt,data};
+  }catch(error){if(error instanceof PoliteFetchError&&error.excludedDocument)await options.onExcluded?.(error.excludedDocument);throw error;}
+ };
+}
+export interface CouncilAcquisition {
+ cityId:string;registeredSourceUrl:string;fetcher:PoliteFetcher;loadJson:CouncilLoader;
+ loadText(url:string):Promise<CouncilEvidence&{text:string}>;
+ bindBody(body:OparlBody):void;
+ storage(bodyId:string,kind:CouncilKind):CouncilStorage;
+ persistCollection(name:'collection.json'|'signals.geojson',value:unknown):Promise<string>;
+}
+/** The City registry—not a caller-selected host or directory name—supplies civic context. */
+export function createCouncilAcquisition(city:City,options:{cacheRoot?:string;policy?:CivicPolicyOptions}={}):CouncilAcquisition {
+ const registered=cities.find(item=>item.id===city.id);
+ if(!registered?.endpoint||!city.endpoint||canonicalOparlUrl(city.endpoint)!==canonicalOparlUrl(registered.endpoint))throw Error('Council acquisition requires a registered City endpoint');
+ const registeredSourceUrl=canonicalOparlUrl(registered.endpoint),ownerRobotsOverride=ownerRobotsOverrideFor(registeredSourceUrl);
+ if(!ownerRobotsOverride)throw Error('Council acquisition endpoint is not a public source');
+ const fetcher=new PoliteFetcher({cacheDir:options.cacheRoot??join(cacheDir,'council','owner-policy-2026-10-11'),timeoutMs:45000,ownerPolicyLane:{decisionId:APPROVED_OWNER_ROBOTS_OVERRIDE.id,...(options.policy??CIVIC_POLICY_AUTHORITY)}});
+ const observed=new Map<string,SourceContentBinding>(),scope:FetchOptions={registeredSourceUrl,ownerRobotsOverride,hostProfile:'municipal',municipalityName:registered.name};
+ const loaderOptions:Parameters<typeof createPoliteCouncilLoader>[1]={...scope,maxRequests:100_000,onDocument:document=>{observed.set(document.url+'\n'+document.sha256,sourceContentBinding(document));}};
+ const loadJson=createPoliteCouncilLoader(fetcher,loaderOptions);
  return {
-  load:()=>jsonFile<CouncilCheckpoint>(statePath),
-  async readSegment(index){
-   const segment=await jsonFile<CouncilSegment>(join(folder,`page-${index}.json`));
-   if(!segment)throw Error(`Missing council cache segment ${index} for ${bodyId}/${kind}`);
-   return segment;
+  cityId:registered.id,registeredSourceUrl,fetcher,
+  loadJson:url=>loadJson(canonicalOparlUrl(url)),
+  bindBody(body){selectCouncilBody([body],registered);loaderOptions.oparlBody={id:body.id,name:body.name};},
+  async loadText(url){
+   await fetcher.initialize();
+   // Body publisher evidence is for its typed OParl API, not unrelated licence pages.
+   const response=await fetcher.fetch(url,scope);
+   await fetcher.assertSourceReadable(response.localPath,response.url);
+   await fetcher.assertSourceBindingsAllowed([sourceContentBinding(response)]);
+   const bytes=await readFile(response.localPath);
+   if(hash(bytes)!==response.sha256)throw Error('Council source cache digest mismatch');
+   await fetcher.assertSourceReadable(response.localPath,response.url);
+   observed.set(response.url+'\n'+response.sha256,sourceContentBinding(response));
+   return {url:response.url,retrievedAt:response.retrievedAt,checkedAt:response.checkedAt,sha256:response.sha256,text:bytes.toString('utf8')};
   },
-  async checkpoint(state,segment){
-   // A page is durable before its cursor. An interrupted write replays that same page, never skips it.
-   if(segment)await save(join(folder,`page-${state.segments-1}.json`),JSON.stringify(segment));
-   await save(statePath+'.tmp',JSON.stringify(state));await rename(statePath+'.tmp',statePath);
+  async persistCollection(name,value){
+   const path=join(fetcher.cacheDir,'collections',registered.id+'-'+name);
+   await fetcher.persistDerivedJson(path,value,[...observed.values()]);
+   return path;
+  },
+  storage(bodyId,kind){
+   if(!bodyIdMatchesCity(bodyId,registered))throw Error('Council cache Body differs from the registered City');
+   const folder=join(fetcher.cacheDir,'oparl',hash(canonicalOparlUrl(bodyId)),kind),statePath=join(folder,'checkpoint.json');
+   return {
+    async load(){
+     await fetcher.initialize();await fetcher.assertHostAllowed(registeredSourceUrl);await fetcher.assertHostAllowed(bodyId);
+     try{
+      const state=JSON.parse(await readFile(statePath,'utf8')) as CouncilCheckpoint;
+      if(state.schemaVersion!==1||canonicalOparlUrl(state.bodyId)!==canonicalOparlUrl(bodyId)||state.kind!==kind)throw Error('Council checkpoint source binding mismatch');
+      await fetcher.assertHostAllowed(state.baseUrl);return state;
+     }catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return undefined;throw error;}
+    },
+    async readSegment(index){
+     await fetcher.initialize();await fetcher.assertHostAllowed(registeredSourceUrl);await fetcher.assertHostAllowed(bodyId);
+     if(!Number.isInteger(index)||index<0)throw Error('Invalid council cache segment index');
+     const path=join(folder,`page-${index}.json`);
+     await fetcher.assertSourceReadable(path);
+     const segment=JSON.parse(await readFile(path,'utf8')) as CouncilSegment&{sourceBindings?:SourceContentBinding[]};
+     if(!Array.isArray(segment.records)||!segment.sourceBindings?.length||!segment.sourceBindings.some(binding=>binding.url===segment.evidence?.url&&binding.sha256===segment.evidence?.sha256))throw new PoliteFetchError('cache_missing','Council segment lacks bound managed provenance');
+     await fetcher.assertSourceBindingsAllowed(segment.sourceBindings);
+     await fetcher.assertSourceReadable(path);
+     for(const binding of segment.sourceBindings)observed.set(binding.url+'\n'+binding.sha256,binding);
+     return segment;
+    },
+    async checkpoint(state,segment){
+     await fetcher.initialize();await fetcher.assertHostAllowed(registeredSourceUrl);await fetcher.assertHostAllowed(bodyId);
+     if(canonicalOparlUrl(state.bodyId)!==canonicalOparlUrl(bodyId)||state.kind!==kind)throw Error('Council checkpoint source binding mismatch');
+     // A managed page is durable before its metadata cursor; interruption replays it.
+     if(segment){
+      const binding=observed.get(segment.evidence.url+'\n'+segment.evidence.sha256);
+      if(!binding)throw new PoliteFetchError('cache_missing','Council segment has no immutable source observation');
+      await fetcher.persistDerivedJson(join(folder,`page-${state.segments-1}.json`),{...segment,sourceBindings:[binding]},[binding]);
+     }
+     await writePrivateJson(statePath,state);
+    },
+   };
   },
  };
 }
@@ -54,7 +123,13 @@ export async function loadCouncilIndex(storage:CouncilStorage,state:CouncilCheck
  return records;
 }
 export interface CouncilTraversalResult {state:CouncilCheckpoint;records:Map<string,StoredCouncilRecord>;fetchedPages:number;fetchedRecords:number}
-export async function traverseCouncilList(body:OparlBody,kind:CouncilKind,storage:CouncilStorage,loader:CouncilLoader=loadCouncilJson,options:{maxPages?:number;now?:string;reuseCompleteMs?:number}={}):Promise<CouncilTraversalResult> {
+/** Permission loss must never become an availability-only partial-results fallback. */
+export function isCouncilPermissionFailure(error:unknown):boolean {
+ if(error instanceof HostOptedOutError||error instanceof CivicPolicyStateError)return true;
+ if(error instanceof AggregateError)return error.errors.some(isCouncilPermissionFailure);
+ return error instanceof PoliteFetchError&&(['robots_blocked','robots_unavailable','tdm_reserved','tdm_unavailable','access_barrier','document_excluded','host_opted_out','host_state_unsafe','unsafe_url','cross_host_redirect'].includes(error.failure)||error.status===401||error.status===403);
+}
+export async function traverseCouncilList(body:OparlBody,kind:CouncilKind,storage:CouncilStorage,loader:CouncilLoader,options:{maxPages?:number;now?:string;reuseCompleteMs?:number}={}):Promise<CouncilTraversalResult> {
  const base=body[kind];if(!base)throw Error(`Missing ${kind} list for ${body.id}`);
  const maxPages=options.maxPages??50;if(!Number.isInteger(maxPages)||maxPages<1)throw Error('Council page budget must be a positive integer');
  let state=await storage.load();
@@ -119,6 +194,12 @@ export async function traverseCouncilList(body:OparlBody,kind:CouncilKind,storag
    await storage.checkpoint(state,{records:page.records,evidence,...(withdrawnIds?{withdrawnIds}:{})});
    if(state.error)break;
   }catch(error){
+   if(isCouncilPermissionFailure(error)){
+    records.clear();state.error='Current source permission blocks council records and cached reuse';
+    try{await storage.checkpoint(state);}
+    catch(checkpointError){throw new AggregateError([error,checkpointError],'Council permission denial could not be checkpointed');}
+    throw error;
+   }
    if(active.mode==='incremental'&&/\bHTTP (?:400|404|405|422|501)\b/.test(String(error))){
     // A rejected filter is never an empty list. Reconcile the verified base list instead.
     state.filterSupport='unsupported';state.filterSupportReason=`Standard modified_since request rejected: ${String(error)}; not interpreted as empty`;

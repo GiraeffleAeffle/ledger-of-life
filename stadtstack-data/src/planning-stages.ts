@@ -11,8 +11,8 @@ export function milestoneRank(stage:string,planning:boolean):number|null {
 }
 export type PlanningStageAssertion={stage:string;quote:string;originalStatus?:string|null};
 export type StageRankingContext='baugb'|'civic';
-export function stageRankingContext(input:{title:string;titleQuote?:string|null;caseQuote?:string|null;instrument?:string|null}):StageRankingContext {
- return isPlanningInstrument(`${input.titleQuote??input.title}\n${input.caseQuote??''}`)||Boolean(input.instrument?.match(/^(?:bplan|fnp|teilfnp):/))?'baugb':'civic';
+export function stageRankingContext(input:{title:string;titleQuote?:string|null;caseQuote?:string|null;summaryQuote?:string|null;instrument?:string|null}):StageRankingContext {
+ return isPlanningInstrument(`${input.titleQuote??input.title}\n${input.caseQuote??''}\n${input.summaryQuote??''}`)||Boolean(input.instrument?.match(/^(?:bplan|fnp|teilfnp):/))?'baugb':'civic';
 }
 /** Shared by milestone, vocabulary and filter consumers; raw assertions stay intact. */
 export function normalizeStageAssertion(assertion:PlanningStageAssertion,context:StageRankingContext):string {
@@ -77,5 +77,5 @@ export function planningStageRank(stage:string):number|null {
  return index<0?null:index;
 }
 export function isPlanningInstrument(text:string):boolean {
- return /BauGB|Bebauungsplan|Flächennutzungsplan|\b(?:v?B[- ]?Plan|FNP)\b/iu.test(text);
+ return /BauGB|Bebauungsplan|Flächennutzungsplan|Vorhaben\s*[-–]?\s*und\s+Erschließungsplan|\b(?:v?B[- ]?Plan|FNP)\b/iu.test(text);
 }

@@ -1,16 +1,53 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,readFile,writeFile,rm,lstat,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {hash} from '../src/common.ts';
-import {PoliteFetcher,PoliteFetchError} from '../src/polite-fetch.ts';
-import {crawlDistrictRegistry} from '../src/district-crawl.ts';
-import {discoverDocumentLinks,crawlHtmlSource,crawlMvPlanningApi,crawlParticipationApi,crawlOparlSource,createPoliteCouncilLoader} from '../src/district-source-adapters.ts';
+import {PoliteFetcher as BasePoliteFetcher,PoliteFetchError} from '../src/polite-fetch.ts';
+import {crawlDistrictRegistry,projectCrawlIndexDenials,type DistrictCrawlIndex} from '../src/district-crawl.ts';
+import {discoverDocumentLinks,crawlHtmlSource,crawlMvPlanningApi,crawlParticipationApi,crawlOparlSource} from '../src/district-source-adapters.ts';
+import {createPoliteCouncilLoader} from '../src/council-cache.ts';
 import type {RegistryMunicipality,RegistrySource} from '../src/district-source-adapters.ts';
 import {metadataPdf} from './fixtures/tdm-pdf.ts';
 import {PDF_TDM_POLICY_VERSION} from '../src/pdf-tdm-policy.ts';
+import { DOCUMENT_ORIGIN_CLASSIFIER_VERSION } from '../src/document-origin-contract.ts'
 import type {SourceAccessPolicy} from '../src/source-policy.ts';
+import {ownerRobotsOverrideFor} from '../src/source-policy.ts';
+import type {PoliteFetcherOptions,SourceContentBinding,FetchOptions} from '../src/polite-fetch.ts';
+import {politeTestOptions} from './fixtures/polite-lane.ts';
+import {writePrivateJson} from '../src/district-private-io.ts';
+import {assertCivicPolicyAuthority,type CivicPolicyOptions} from '../src/civic-opt-out.ts';
+
+/** Adapter-unit fetch/read/write doubles use explicit fixture authority, not a production acquisition marker. */
+class AdapterFixtureFetcher extends BasePoliteFetcher {
+ private readonly fixturePolicy:CivicPolicyOptions;
+ constructor(options:PoliteFetcherOptions){
+  super(options);assert.ok(options.ownerPolicyLane?.authorityId?.startsWith('fixture:'),'Adapter unit doubles require fixture authority');
+  this.fixturePolicy=options.ownerPolicyLane!;
+ }
+ override async initialize():Promise<void>{
+  await assertCivicPolicyAuthority(this.fixturePolicy);await mkdir(this.cacheDir,{recursive:true,mode:0o700});
+ }
+ override async assertSourceReadable(path:string,sourceUrl?:string):Promise<void>{
+  await this.initialize();if(sourceUrl)await this.assertHostAllowed(sourceUrl);
+  assert.equal((await lstat(path)).isFile(),true,'Adapter fixture source must exist');
+ }
+ override async assertSourceBindingsAllowed(bindings:SourceContentBinding[]):Promise<void>{
+  await this.initialize();assert.ok(bindings.length,'Adapter fixture must carry its mocked upstream binding');
+  for(const binding of bindings)await this.assertHostAllowed(binding.url);
+ }
+ override async persistDerivedJson(path:string,value:unknown,_bindings:SourceContentBinding[]):Promise<void>{
+  await this.initialize();await writePrivateJson(path,value);
+ }
+}
+async function createPoliteFetcher(options:PoliteFetcherOptions):Promise<AdapterFixtureFetcher> {
+ return new AdapterFixtureFetcher(await politeTestOptions({...options,cacheDir:join(options.cacheDir,'managed')}));
+}
+/** Wire-only tests retain every real transport and managed-lifecycle gate. */
+async function createWireFetcher(options:PoliteFetcherOptions):Promise<BasePoliteFetcher>{
+ return new BasePoliteFetcher(await politeTestOptions({...options,cacheDir:join(options.cacheDir,'managed')}));
+}
 
 // Synthetic upstream policy for frontier tests; PDF parsing itself uses complete PDF fixtures.
 function fixturePolicy(url:string,sha256:string,checkedAt:string,mimeType:string):SourceAccessPolicy {
@@ -25,7 +62,7 @@ test('HTML discovery follows actual public PDF links, rejects private URLs and u
 });
 test('HTML fallback prioritizes grounded document seeds and keeps event date unknown',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-adapter-'));t.after(()=>rm(folder,{recursive:true,force:true}));
- const fetcher=new PoliteFetcher({cacheDir:folder}),seen:string[]=[];
+ const fetcher=await createPoliteFetcher({cacheDir:folder}),seen:string[]=[];
  t.mock.method(fetcher,'fetch',async(url:string)=>{
   seen.push(url);const body=Buffer.from(url.endsWith('.pdf')?'%PDF-1.7 fixture':'<h1>Planning</h1><a href="/plan.pdf">Plan</a>');const localPath=join(folder,hash(body));await writeFile(localPath,body);
   return {url,sha256:hash(body),localPath,mimeType:url.endsWith('.pdf')?'application/pdf':'text/html',retrievedAt:'2026-10-01T00:00:00.000Z',checkedAt:'2026-10-01T00:00:00.000Z',status:200,observationPath:join(folder,'observation.json'),policy:fixturePolicy(url,hash(body),'2026-10-01T00:00:00.000Z',url.endsWith('.pdf')?'application/pdf':'text/html')};
@@ -35,13 +72,13 @@ test('HTML fallback prioritizes grounded document seeds and keeps event date unk
 });
 test('robots blocked source remains checked failure, not nonexistent',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-checks-'));t.after(()=>rm(folder,{recursive:true,force:true}));
- const fetcher=new PoliteFetcher({cacheDir:folder});t.mock.method(fetcher,'fetch',async()=>{throw new PoliteFetchError('robots_blocked','Robots disallows source');});
+ const fetcher=await createPoliteFetcher({cacheDir:folder});t.mock.method(fetcher,'fetch',async()=>{throw new PoliteFetchError('robots_blocked','Robots disallows source');});
  const index=await crawlDistrictRegistry({schemaVersion:'stadtstack-source-registry-v1',municipalities:[city]},fetcher,{maxDocuments:3,maxPages:2,maxRequests:3});
  assert.equal(index.checks[0].checkState,'checked');assert.equal(index.checks[0].outcome,'blocked');assert.equal(index.checks[0].blocked?.[0].failure,'robots_blocked');assert.equal(index.documents.length,0);
 });
 test('MV public API flattens observed nested results and binds exact AGS before following PDFs',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-mv-'));t.after(()=>rm(folder,{recursive:true,force:true}));
- const fetcher=new PoliteFetcher({cacheDir:folder}),seen:string[]=[];
+ const fetcher=await createPoliteFetcher({cacheDir:folder}),seen:string[]=[];
  const mvSource:RegistrySource={...source,api:{url:'https://www.gaia-mv.de/geoportalsearch/_ajax/search/?type=Bauleitplan&x_filter%5Bregionalschluessel%5D=130760090090',format:'mv-bauleitplan'}};
  t.mock.method(fetcher,'fetch',async(url:string)=>{
   seen.push(url);const api=url.includes('geoportalsearch'),body=Buffer.from(api?JSON.stringify({success:true,total:2,hits:2,results:[[{_resourceLinkId:'plan-1',title:'Ludwigslust B-Plan',x_GKZ:['13076090'],x_dokumentURL:['https://bauleitplaene-mv.de/download/plan.pdf']},{_resourceLinkId:'wrong-city',title:'Wrong city',x_GKZ:['13076108'],x_dokumentURL:['https://bauleitplaene-mv.de/download/wrong.pdf']}]]}):'%PDF-fixture');const localPath=join(folder,hash(body));await writeFile(localPath,body);
@@ -52,7 +89,7 @@ test('MV public API flattens observed nested results and binds exact AGS before 
 });
 test('DiPlan observed list protocol preserves API case identity without fabricating stage',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-diplan-'));t.after(()=>rm(folder,{recursive:true,force:true}));
- const fetcher=new PoliteFetcher({cacheDir:folder});const apiSource:RegistrySource={...source,api:{url:'https://bb.beteiligung.diplanung.de/list/json',format:'diplan-list',method:'POST',form:{search:'',municipalCode:''}}};
+ const fetcher=await createPoliteFetcher({cacheDir:folder});const apiSource:RegistrySource={...source,api:{url:'https://bb.beteiligung.diplanung.de/list/json',format:'diplan-list',method:'POST',form:{search:'',municipalCode:''}}};
  t.mock.method(fetcher,'fetch',async(url:string)=>{
   const api=url.endsWith('/list/json'),body=Buffer.from(api?JSON.stringify({success:true,procedureCount:1,mapVars:[{procedureId:'case-1',procedureUrl:'/verfahren/case-1/public/detail',externalName:'Ludwigslust Testverfahren',publicParticipationStartDate:'01.07.2026'}],responseHtml:'<div class="c-procedurelist__item" data-procedure-id="case-1">Ludwigslust</div>'}):'<h1>Ludwigslust Testverfahren</h1>');const localPath=join(folder,hash(body));await writeFile(localPath,body);
   return {url,sha256:hash(body),localPath,mimeType:api?'application/json':'text/html',retrievedAt:'2026-10-01T00:00:00.000Z',checkedAt:'2026-10-01T00:00:00.000Z',status:200,observationPath:join(folder,'observation.json')};
@@ -65,7 +102,7 @@ function bobInventory(rows:unknown[]):string {
 }
 test('BOB binds exact AGS and ARS without names, isolates legacy roots and excludes neighboring procedures',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-bob-bound-'));t.after(()=>rm(folder,{recursive:true,force:true}));
- const fetcher=new PoliteFetcher({cacheDir:folder}),seen:string[]=[],root='https://bob-sh.de/';
+ const fetcher=await createPoliteFetcher({cacheDir:folder}),seen:string[]=[],root='https://bob-sh.de/';
  const bobSource:RegistrySource={...source,id:'schwarzenbek-bob-sh',url:root,crawlScope:{pageRoots:[],followLinkedDocuments:false},api:{url:root+'list/json',format:'bobsh-list',method:'POST',form:{municipalCode:'01053'}}};
  const town:RegistryMunicipality={...city,id:'schwarzenbek',name:'Schwarzenbek',ags:'01053116',sources:[bobSource]};
  const rows=[{id:'exact',municipalCode:town.ags,ars:'010530116116'},{id:'ars',ars:'010535373116'},{id:'neighbor',municipalCode:'01053021',ars:'010535373021'}];
@@ -99,7 +136,7 @@ test('BOB missing, partial, malformed, conflicting and unjoined municipal identi
  ];
  for(const scenario of cases)await t.test(scenario.name,async t=>{
   const folder=await mkdtemp(join(tmpdir(),'district-bob-ambiguous-'));t.after(()=>rm(folder,{recursive:true,force:true}));
-  const fetcher=new PoliteFetcher({cacheDir:folder}),seen:string[]=[],root='https://bob-sh.de/';
+  const fetcher=await createPoliteFetcher({cacheDir:folder}),seen:string[]=[],root='https://bob-sh.de/';
   const bobSource:RegistrySource={...source,url:root,api:{url:root+'list/json',format:'bobsh-list'}};
   t.mock.method(fetcher,'fetch',async(url:string)=>{
    seen.push(url);const body=Buffer.from(url===root?bobInventory(scenario.rows):JSON.stringify({success:true,procedureCount:1,mapVars:[{procedureId:'p',procedureUrl:'/verfahren/p/public/detail',externalName:'Schwarzenbek'}],responseHtml:'<div class="c-procedurelist__item" data-procedure-id="p">Schwarzenbek</div>'})),localPath=join(folder,hash(body));await writeFile(localPath,body);
@@ -112,7 +149,7 @@ test('BOB missing, partial, malformed, conflicting and unjoined municipal identi
 test('BOB scoped empty result is distinct from unsupported inventory and respects identity request budget',async t=>{
  for(const mode of ['empty','unsupported','budget'] as const)await t.test(mode,async t=>{
   const folder=await mkdtemp(join(tmpdir(),'district-bob-empty-'));t.after(()=>rm(folder,{recursive:true,force:true}));
-  const fetcher=new PoliteFetcher({cacheDir:folder}),seen:string[]=[],root='https://bob-sh.de/';
+  const fetcher=await createWireFetcher({cacheDir:folder}),seen:string[]=[],root='https://bob-sh.de/';
   const bobSource:RegistrySource={...source,url:root,api:{url:root+'list/json',format:'bobsh-list'}};
   type Wire={wire(url:URL):Promise<{status:number;headers:Record<string,string>;body:Buffer}>};
   t.mock.method(fetcher as unknown as Wire,'wire',async(url:URL)=>{
@@ -128,7 +165,7 @@ test('BOB scoped empty result is distinct from unsupported inventory and respect
 });
 test('BOB ambiguous identity never falls back to registry seeds through the district crawler',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-bob-no-fallback-'));t.after(()=>rm(folder,{recursive:true,force:true}));
- const fetcher=new PoliteFetcher({cacheDir:folder}),seen:string[]=[],root='https://bob-sh.de/';
+ const fetcher=await createPoliteFetcher({cacheDir:folder}),seen:string[]=[],root='https://bob-sh.de/';
  const bobSource:RegistrySource={...source,url:root,api:{url:root+'list/json',format:'bobsh-list'}};
  t.mock.method(fetcher,'fetch',async(url:string)=>{
   seen.push(url);const body=Buffer.from(url===root?bobInventory([{id:'p'}]):JSON.stringify({success:true,procedureCount:1,mapVars:[{procedureId:'p',procedureUrl:'/verfahren/p/public/detail',externalName:'Schwarzenbek'}],responseHtml:'<div class="c-procedurelist__item" data-procedure-id="p">Schwarzenbek</div>'})),localPath=join(folder,hash(body));await writeFile(localPath,body);
@@ -141,7 +178,7 @@ test('BOB ambiguous identity never falls back to registry seeds through the dist
 });
 test('failed public API retains confirmed official-document fallback within its request budget',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-fallback-'));t.after(()=>rm(folder,{recursive:true,force:true}));
- const fetcher=new PoliteFetcher({cacheDir:folder}),apiSource:RegistrySource={...source,api:{url:'https://api.stadt.de/plans',format:'mv-bauleitplan'}};
+ const fetcher=await createWireFetcher({cacheDir:folder}),apiSource:RegistrySource={...source,api:{url:'https://api.stadt.de/plans',format:'mv-bauleitplan'}};
  type Wire={wire(url:URL):Promise<{status:number;headers:Record<string,string>;body:Buffer}>};
  t.mock.method(fetcher as unknown as Wire,'wire',async(url:URL)=>{
   if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
@@ -154,7 +191,7 @@ test('failed public API retains confirmed official-document fallback within its 
 });
 test('shared council loader reports evidence lifecycle after conditional validation',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-loader-'));t.after(()=>rm(folder,{recursive:true,force:true}));
- const fetcher=new PoliteFetcher({cacheDir:folder}),body=Buffer.from('{\"data\":[]}'),localPath=join(folder,hash(body));await writeFile(localPath,body);
+ const fetcher=await createPoliteFetcher({cacheDir:folder}),body=Buffer.from('{\"data\":[]}'),localPath=join(folder,hash(body));await writeFile(localPath,body);
  t.mock.method(fetcher,'fetch',async(url:string)=>({url,sha256:hash(body),localPath,mimeType:'application/json',retrievedAt:'2026-09-01T00:00:00.000Z',checkedAt:'2026-10-01T00:00:00.000Z',status:304,observationPath:join(folder,'observation.json')}));
  const observations:string[]=[],loader=createPoliteCouncilLoader(fetcher,{maxRequests:2,onDocument:document=>{observations.push(document.retrievedAt);}});
  const result=await loader('https://stadt.de/oparl/papers');
@@ -174,10 +211,10 @@ test('230 linked PDFs plus structured plans survive bounded restart and automati
   const body=Buffer.from(text),localPath=join(folder,hash(body));await writeFile(localPath,body);
   const observedAt=new Date().toISOString();return {url,sha256:hash(body),localPath,mimeType,retrievedAt:observedAt,checkedAt:observedAt,status:200,observationPath:join(folder,'observation.json'),policy:fixturePolicy(url,hash(body),observedAt,mimeType)};
  };
- const firstFetcher=new PoliteFetcher({cacheDir:folder});t.mock.method(firstFetcher,'fetch',fixtureFetch);
+ const firstFetcher=await createPoliteFetcher({cacheDir:folder});t.mock.method(firstFetcher,'fetch',fixtureFetch);
  const partial=await crawlDistrictRegistry(registry,firstFetcher,{maxDocuments:8,maxPages:3,maxRequests:24,maxRounds:1});
  assert.equal(partial.checks[0].coverage?.state,'partial');assert.ok(partial.checks[0].coverage!.pendingCount>200);
- const secondFetcher=new PoliteFetcher({cacheDir:folder});t.mock.method(secondFetcher,'fetch',fixtureFetch);
+ const secondFetcher=await createPoliteFetcher({cacheDir:folder});t.mock.method(secondFetcher,'fetch',fixtureFetch);
  const complete=await crawlDistrictRegistry(registry,secondFetcher,{maxDocuments:8,maxPages:3,maxRequests:24});
  assert.equal(complete.checks[0].coverage?.state,'complete');assert.equal(complete.checks[0].coverage?.pendingCount,0);
  assert.equal(complete.documents.filter(document=>document.mimeType==='application/pdf').length,231);
@@ -187,7 +224,7 @@ test('230 linked PDFs plus structured plans survive bounded restart and automati
 });
 test('Deep archives take bounded turns so later municipalities are reached before another round',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-fair-rounds-'));t.after(()=>rm(folder,{recursive:true,force:true}));
- const fetcher=new PoliteFetcher({cacheDir:folder}),turns:string[]=[];
+ const fetcher=await createPoliteFetcher({cacheDir:folder}),turns:string[]=[];
  const municipalities=['first','second'].map(id=>({...city,id,sources:[{...source,url:`https://stadt.de/${id}/`,crawlScope:{pageRoots:[`https://stadt.de/${id}/`],followLinkedDocuments:true}}]}));
  t.mock.method(fetcher,'fetch',async(url:string)=>{
   const pdf=url.endsWith('.pdf'),mimeType=pdf?'application/pdf':'text/html';
@@ -206,7 +243,7 @@ test('Deep archives take bounded turns so later municipalities are reached befor
 });
 test('discovery-only statewide portal is checked without unbound municipal expansion',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-discovery-only-'));t.after(()=>rm(folder,{recursive:true,force:true}));
- const fetcher=new PoliteFetcher({cacheDir:folder}),seen:string[]=[];
+ const fetcher=await createPoliteFetcher({cacheDir:folder}),seen:string[]=[];
  t.mock.method(fetcher,'fetch',async(url:string)=>{
   seen.push(url);const body=Buffer.from('<h1>Landesportal</h1><a href="/verfahren/fremde-stadt">Verfahren</a><a href="/other-city.pdf">Plan</a>'),localPath=join(folder,hash(body));await writeFile(localPath,body);
   return {url,sha256:hash(body),localPath,mimeType:'text/html',retrievedAt:'2026-10-01T00:00:00.000Z',checkedAt:'2026-10-01T00:00:00.000Z',status:200,observationPath:join(folder,'observation.json')};
@@ -217,7 +254,7 @@ test('discovery-only statewide portal is checked without unbound municipal expan
 test('TTL rediscovery finds new links, preserves unfinished work and does not freshen unchecked cache',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-ttl-'));t.after(()=>rm(folder,{recursive:true,force:true}));
  t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-10-10T12:00:00.000Z')});
- const fetcher=new PoliteFetcher({cacheDir:folder}),seen:string[]=[],representations=new Map<string,{sha256:string;retrievedAt:string}>();let expanded=false;
+ const fetcher=await createPoliteFetcher({cacheDir:folder}),seen:string[]=[],representations=new Map<string,{sha256:string;retrievedAt:string}>();let expanded=false;
  t.mock.method(fetcher,'fetch',async(url:string)=>{
   seen.push(url);const isRoot=url===source.url,body=Buffer.from(isRoot?'<h1>Planning</h1><a href="/plan-a.pdf">Plan A</a>'+(expanded?'<a href="/plan-b.pdf">Plan B</a>':''):'%PDF fixture '+url),sha256=hash(body),localPath=join(folder,sha256),checkedAt=new Date().toISOString(),prior=representations.get(url);
   await writeFile(localPath,body);const same=prior?.sha256===sha256,retrievedAt=same?prior.retrievedAt:checkedAt;representations.set(url,{sha256,retrievedAt});
@@ -235,7 +272,7 @@ test('TTL rediscovery finds new links, preserves unfinished work and does not fr
 test('expired document is withdrawn when current policy rejects revalidation',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-ttl-blocked-'));t.after(()=>rm(folder,{recursive:true,force:true}));
  t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-10-10T12:00:00.000Z')});
- const fetcher=new PoliteFetcher({cacheDir:folder}),direct={...source,url:'https://stadt.de/plan.pdf'};let reserved=false;
+ const fetcher=await createPoliteFetcher({cacheDir:folder}),direct={...source,url:'https://stadt.de/plan.pdf'};let reserved=false;
  t.mock.method(fetcher,'fetch',async(url:string)=>{
   if(reserved)throw new PoliteFetchError('tdm_reserved','Current publisher reservation; ask municipality');
   const body=Buffer.from('%PDF fixture'),localPath=join(folder,hash(body)),checkedAt=new Date().toISOString();await writeFile(localPath,body);
@@ -248,7 +285,7 @@ test('expired document is withdrawn when current policy rejects revalidation',as
 });
 test('incomplete OParl Body inventory exposes one runnable durable cursor',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-body-cursor-'));t.after(()=>rm(folder,{recursive:true,force:true}));
- const fetcher=new PoliteFetcher({cacheDir:folder}),endpoint='https://council.stadt.de/system';
+ const fetcher=await createPoliteFetcher({cacheDir:folder}),endpoint='https://council.stadt.de/system';
  t.mock.method(fetcher,'fetch',async(url:string)=>{
   const data=url===endpoint?{id:endpoint,type:'https://schema.oparl.org/1.1/System',body:'https://council.stadt.de/bodies'}:{data:[{id:'https://council.stadt.de/body/1',type:'https://schema.oparl.org/1.1/Body',name:city.name}],links:{next:'https://council.stadt.de/bodies?page=2'}};
   const bytes=Buffer.from(JSON.stringify(data)),localPath=join(folder,hash(bytes)),checkedAt=new Date().toISOString();await writeFile(localPath,bytes);
@@ -260,7 +297,7 @@ test('incomplete OParl Body inventory exposes one runnable durable cursor',async
 test('completed MV API cursor is conditionally rediscovered after TTL rather than frozen forever',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-mv-ttl-'));t.after(()=>rm(folder,{recursive:true,force:true}));
  t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-10-10T12:00:00.000Z')});
- const fetcher=new PoliteFetcher({cacheDir:folder}),mvSource:RegistrySource={...source,api:{url:'https://www.gaia-mv.de/geoportalsearch/_ajax/search/?type=Bauleitplan',format:'mv-bauleitplan'}};let expanded=false,apiCalls=0;
+ const fetcher=await createPoliteFetcher({cacheDir:folder}),mvSource:RegistrySource={...source,api:{url:'https://www.gaia-mv.de/geoportalsearch/_ajax/search/?type=Bauleitplan',format:'mv-bauleitplan'}};let expanded=false,apiCalls=0;
  t.mock.method(fetcher,'fetch',async(url:string)=>{
   const api=url.includes('geoportalsearch');if(api)apiCalls++;
   const records=[{_resourceLinkId:'plan-a',title:'Ludwigslust Plan A',x_GKZ:[city.ags],x_dokumentURL:['https://stadt.de/plan-a.pdf']},...(expanded?[{_resourceLinkId:'plan-b',title:'Ludwigslust Plan B',x_GKZ:[city.ags],x_dokumentURL:['https://stadt.de/plan-b.pdf']}]:[])];
@@ -277,7 +314,7 @@ test('completed MV API cursor is conditionally rediscovered after TTL rather tha
 test('fresh cached PDF with v1 proof is withheld and revalidated despite a long TTL',async t=>{
  const folder=await mkdtemp(join(tmpdir(),'district-policy-upgrade-'));t.after(()=>rm(folder,{recursive:true,force:true}));
  t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-10-10T12:00:00.000Z')});
- const fetcher=new PoliteFetcher({cacheDir:folder}),direct={...source,url:'https://stadt.de/plan.pdf'};let calls=0;
+ const fetcher=await createPoliteFetcher({cacheDir:folder}),direct={...source,url:'https://stadt.de/plan.pdf'};let calls=0;
  t.mock.method(fetcher,'fetch',async(url:string)=>{
   calls++;const body=metadataPdf(),sha256=hash(body),localPath=join(folder,sha256),checkedAt=new Date().toISOString();await writeFile(localPath,body);
   return {url,sha256,localPath,mimeType:'application/pdf',retrievedAt:checkedAt,checkedAt,status:200,observationPath:join(folder,'observation.json'),policy:fixturePolicy(url,sha256,checkedAt,'application/pdf')};
@@ -287,4 +324,176 @@ test('fresh cached PDF with v1 proof is withheld and revalidated despite a long 
  const legacy=JSON.parse(await readFile(frontierPath,'utf8'));legacy.documents[0].policy.tdm.evidence[0].locator='PDF.js fixture XMP metadata (pdf-tdm-v1)';await writeFile(frontierPath,JSON.stringify(legacy));
  const withheld=await crawlHtmlSource(fetcher,city,direct,{...options,maxRequests:0});assert.equal(withheld.documents.length,0);assert.equal(withheld.coverage?.state,'partial');assert.equal(withheld.coverage?.runnableCount,1);assert.equal(calls,1);
  const refreshed=await crawlHtmlSource(fetcher,city,direct,options);assert.equal(calls,2);assert.equal(refreshed.documents.length,1);assert.equal(refreshed.documents[0].sha256,first.documents[0].sha256);assert.ok(refreshed.documents[0].policy!.tdm.evidence[0].locator.endsWith(`(${PDF_TDM_POLICY_VERSION})`));
+});
+
+test('source adapter passes explicit owner decision and stops the frontier immediately on 403/429',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'district-owner-stop-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const configured={...source,ownerRobotsOverride:ownerRobotsOverrideFor(source.url!)!};
+ for(const status of [403,429]){
+  const fetcher=await createPoliteFetcher({cacheDir:join(root,String(status))});let calls=0;
+  const retryAfter='2026-10-12T00:00:00.000Z';
+  t.mock.method(fetcher,'fetch',async(_url:string,options?:FetchOptions)=>{
+   calls++;assert.deepEqual(options?.ownerRobotsOverride,configured.ownerRobotsOverride);assert.equal(options?.hostProfile,'municipal');assert.equal(options?.registeredSourceUrl,configured.url);
+   throw new PoliteFetchError(status===403?'access_barrier':'http_error',`HTTP ${status}`,status,undefined,retryAfter);
+  });
+  const operation=crawlHtmlSource(fetcher,city,configured,{maxDocuments:10,maxPages:10,maxRequests:10},[{sourceId:source.id,url:'https://stadt.de/a'},{sourceId:source.id,url:'https://stadt.de/b'}]);
+  if(status===403)await assert.rejects(operation,(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='access_barrier'&&error.status===403&&error.retryAfter===retryAfter);
+  else{const result=await operation;assert.equal(result.coverage?.runnableCount,0);assert.equal(result.blocked?.[0].status,status);assert.equal(result.blocked?.[0].retryAfter,retryAfter);}
+  assert.equal(calls,1);
+ }
+});
+test('API access stops cannot trigger document fallback',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'district-owner-api-stop-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const configured:RegistrySource={...source,api:{url:'https://stadt.de/api',format:'diplan-list'}},fetcher=await createPoliteFetcher({cacheDir:root});let calls=0;
+ t.mock.method(fetcher,'fetch',async()=>{calls++;throw new PoliteFetchError('http_error','HTTP 429',429,undefined,'2026-10-12T00:00:00.000Z');});
+ const registry={schemaVersion:'stadtstack-source-registry-v1' as const,municipalities:[{...city,sources:[configured],seedDocuments:[{sourceId:source.id,url:'https://stadt.de/document'}]}]};
+ const result=await crawlDistrictRegistry(registry,fetcher,{maxDocuments:10,maxPages:10,maxRequests:10});
+ assert.equal(calls,1);assert.equal(result.checks[0].httpStatus,429);assert.equal(result.checks[0].retryAfter,'2026-10-12T00:00:00.000Z');
+});
+
+test('excluded representations survive the crawl index without parsed links or raw document rows',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'district-excluded-index-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const configured:RegistrySource={...source,ownerRobotsOverride:ownerRobotsOverrideFor(source.url!)!},fetcher=await createWireFetcher({cacheDir:root}),seen:string[]=[];
+ const wire=fetcher as unknown as {wire(url:URL):Promise<{status:number;headers:Record<string,string>;body:Buffer}>};
+ t.mock.method(wire,'wire',async(url:URL)=>{
+  seen.push(url.href);
+  if(url.pathname==='/robots.txt')return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('User-agent: *\nDisallow: /')};
+  if(url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  return {status:200,headers:{'content-type':'text/html'},body:Buffer.from('<h1>Gutachten</h1><p>Verfasser: Ingenieurbüro Beispiel GmbH</p><p>Externe Untersuchung zur Verkehrsentwicklung des Quartiers.</p><a href="/must-not-follow.pdf">Anlage</a>')};
+ });
+ const index=await crawlDistrictRegistry({schemaVersion:'stadtstack-source-registry-v1',municipalities:[{...city,sources:[configured]}]},fetcher,{maxDocuments:10,maxPages:10,maxRequests:10});
+ assert.equal(index.documents.length,0);assert.equal(index.excludedDocuments?.length,1);
+ const excluded=index.excludedDocuments![0];assert.equal(excluded.policy.documentOrigin?.classification,'third_party');assert.equal('localPath' in excluded,false);assert.equal(excluded.municipalityId,city.id);
+ assert.ok(!seen.some(url=>url.includes('must-not-follow')));assert.equal(index.checks[0].blocked?.[0].failure,'document_excluded');
+});
+
+test('exact registered page roots isolate source, seeds, links and previous frontiers',async t=>{
+ const folder=await mkdtemp(join(tmpdir(),'district-exact-pages-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ const target='https://stadt.de/heat',other='https://stadt.de/other-registered-page';
+ const selected:RegistrySource={...source,id:'selected-website',kind:'website',url:'https://stadt.de/',crawlScope:{pageRoots:[target,other],followLinkedDocuments:true}};
+ const neighbor:RegistrySource={...source,id:'unselected-source',url:'https://stadt.de/unselected'};
+ const municipality={...city,sources:[selected,neighbor],seedDocuments:[{sourceId:selected.id,url:'https://stadt.de/unselected-seed.pdf'}]};
+ const registry={schemaVersion:'stadtstack-source-registry-v1' as const,municipalities:[municipality]},fetcher=await createPoliteFetcher({cacheDir:folder}),seen:string[]=[];
+ t.mock.method(fetcher,'fetch',async(url:string,options?:FetchOptions)=>{
+  seen.push(url);assert.equal(options?.registeredSourceUrl,selected.url);
+  const body=Buffer.from('<h1>Selected registered page</h1><a href="/must-not-follow.pdf">Attachment</a>'),localPath=join(folder,hash(body)),at='2026-10-11T00:00:00.000Z';await writeFile(localPath,body);
+  return {url,sha256:hash(body),localPath,mimeType:'text/html',retrievedAt:at,checkedAt:at,status:200,observationPath:join(folder,'fixture-observation.json'),policy:fixturePolicy(url,hash(body),at,'text/html')};
+ });
+ const limits={municipality:city.id,sourceId:selected.id,maxDocuments:1,maxPages:1,maxRequests:1,maxRounds:1};
+ const broader=await crawlHtmlSource(fetcher,municipality,selected,limits),broaderPath=broader.coverage!.frontierPath!,broaderBytes=await readFile(broaderPath,'utf8');assert.ok(broader.coverage!.pendingCount>0);seen.length=0;
+ const first=await crawlDistrictRegistry(registry,fetcher,{...limits,pageRoots:[target]});
+ assert.deepEqual(seen,[target]);assert.deepEqual(first.documents.map(document=>document.url),[target]);
+ assert.equal(first.checks.find(check=>check.sourceId===neighbor.id)?.outcome,'not_checked');assert.match(first.checks.find(check=>check.sourceId===selected.id)!.coverage!.scope,/Exactly selected registered page roots/);
+ const completedTarget=first.checks.find(check=>check.sourceId===selected.id)!.coverage!;
+ assert.equal(completedTarget.state,'partial');assert.equal(completedTarget.sourceCoverage,'not_assessed');assert.equal(completedTarget.targetScope?.state,'complete');assert.deepEqual(completedTarget.targetScope?.urls,[target]);assert.equal(completedTarget.runnableCount,0);
+ const second=await crawlDistrictRegistry(registry,fetcher,{...limits,pageRoots:[other]});
+ assert.deepEqual(seen,[target,other]);assert.deepEqual(second.documents.map(document=>document.url),[other]);
+ assert.notEqual(first.checks.find(check=>check.sourceId===selected.id)?.coverage?.frontierPath,second.checks.find(check=>check.sourceId===selected.id)?.coverage?.frontierPath);
+ assert.equal(await readFile(broaderPath,'utf8'),broaderBytes,'Narrow target completion must not rewrite broader pending work');
+});
+
+test('registered extensionless seed selection bypasses API discovery without expanding other seeds',async t=>{
+ const folder=await mkdtemp(join(tmpdir(),'district-exact-seed-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ const target='https://stadt.de/file/solarpark/fixture-id';
+ const selected:RegistrySource={...source,api:{url:'https://stadt.de/list/json',format:'diplan-list'}};
+ const municipality={...city,sources:[selected],seedDocuments:[{sourceId:selected.id,url:target,title:'Registered Solarpark document',documentDate:'2026-01-02'},{sourceId:selected.id,url:'https://stadt.de/file/unselected'}]};
+ const fetcher=await createPoliteFetcher({cacheDir:folder}),seen:string[]=[];
+ t.mock.method(fetcher,'fetch',async(url:string)=>{
+  seen.push(url);const body=Buffer.from('%PDF synthetic adapter fixture'),localPath=join(folder,hash(body)),at='2026-10-11T00:00:00.000Z';await writeFile(localPath,body);
+  return {url,sha256:hash(body),localPath,mimeType:'application/pdf',retrievedAt:at,checkedAt:at,status:200,observationPath:join(folder,'fixture-observation.json'),policy:fixturePolicy(url,hash(body),at,'application/pdf')};
+ });
+ const index=await crawlDistrictRegistry({schemaVersion:'stadtstack-source-registry-v1',municipalities:[municipality]},fetcher,{municipality:city.id,sourceId:selected.id,seedDocumentUrls:[target],maxDocuments:1,maxPages:1,maxRequests:1,maxRounds:1});
+ assert.deepEqual(seen,[target]);assert.equal(index.documents[0].sourceId,selected.id);assert.equal(index.documents[0].documentDate,'2026-01-02');assert.equal(index.documents[0].adapter,'official-pdf');
+ assert.match(index.checks[0].coverage!.scope,/registered seed documents/);assert.match(index.checks[0].reason!,/API discovery.*not run/);
+ assert.equal(index.checks[0].coverage!.state,'partial');assert.equal(index.checks[0].coverage!.sourceCoverage,'not_assessed');assert.equal(index.checks[0].coverage!.targetScope?.kind,'seed_documents');assert.equal(index.checks[0].coverage!.targetScope?.state,'complete');
+});
+
+test('unknown, mismatched or ambiguous target selections fail before initialization',async t=>{
+ const folder=await mkdtemp(join(tmpdir(),'district-target-reject-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ const root='https://stadt.de/registered',selected={...source,crawlScope:{pageRoots:[root],followLinkedDocuments:true}},fetcher=await createPoliteFetcher({cacheDir:folder});
+ let initializations=0;t.mock.method(fetcher,'initialize',async()=>{initializations++;throw Error('Selection must fail before initialization');});
+ const registry={schemaVersion:'stadtstack-source-registry-v1' as const,municipalities:[{...city,sources:[selected],seedDocuments:[{sourceId:selected.id,url:'https://stadt.de/file/registered'}]}]},limits={maxDocuments:1,maxPages:1,maxRequests:1,maxRounds:1};
+ for(const selection of [
+  {sourceId:selected.id},
+  {municipality:'unknown',sourceId:selected.id},
+  {municipality:city.id,sourceId:'other-source'},
+  {municipality:city.id,pageRoots:[root]},
+  {municipality:city.id,sourceId:selected.id,pageRoots:['https://stadt.de/unregistered']},
+  {municipality:city.id,sourceId:selected.id,pageRoots:[]},
+  {municipality:city.id,sourceId:selected.id,pageRoots:[root,root]},
+  {municipality:city.id,sourceId:selected.id,seedDocumentUrls:['https://stadt.de/file/unregistered']},
+  {municipality:city.id,sourceId:selected.id,pageRoots:[root],seedDocumentUrls:['https://stadt.de/file/registered']},
+ ])await assert.rejects(crawlDistrictRegistry(registry,fetcher,{...limits,...selection}),/registered|registration|selection|Select|Duplicate|mutually exclusive|source/i);
+ assert.equal(initializations,0);
+});
+
+test('fresh-TTL pre-security origin classifications are withheld until revalidated',async t=>{
+ const folder=await mkdtemp(join(tmpdir(),'district-origin-version-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ const selected={...source,ownerRobotsOverride:ownerRobotsOverrideFor(source.url!)!},fetcher=await createPoliteFetcher({cacheDir:folder});let calls=0;
+ t.mock.method(fetcher,'fetch',async(url:string)=>{
+  calls++;const bytes=Buffer.from('Synthetic classified source document'),sha256=hash(bytes),localPath=join(folder,sha256),at=new Date().toISOString();await writeFile(localPath,bytes);
+  const policy:SourceAccessPolicy={...fixturePolicy(url,sha256,at,'text/plain'),documentOrigin:{classification:'official_work',method:'rules',classifierVersion:DOCUMENT_ORIGIN_CLASSIFIER_VERSION,url,sha256,classifiedAt:at,evidence:[]}};
+  return {url,sha256,localPath,mimeType:'text/plain',retrievedAt:at,checkedAt:at,status:200,observationPath:join(folder,'fixture-observation.json'),policy};
+ });
+ const limits={maxDocuments:1,maxPages:1,maxRequests:1,revalidateAfterMs:30*24*60*60_000},first=await crawlHtmlSource(fetcher,city,selected,limits);
+ const path=first.coverage!.frontierPath!,old=JSON.parse(await readFile(path,'utf8'));old.documents[0].policy.documentOrigin.classifierVersion='document-origin-rules-v1';await writeFile(path,JSON.stringify(old));
+ const held=await crawlHtmlSource(fetcher,city,selected,{...limits,maxRequests:0});assert.equal(held.documents.length,0);assert.equal(calls,1);
+ const refreshed=await crawlHtmlSource(fetcher,city,selected,limits);assert.equal(calls,2);assert.equal(refreshed.documents[0].policy?.documentOrigin?.classifierVersion,DOCUMENT_ORIGIN_CLASSIFIER_VERSION);
+});
+
+test('configured seed metadata is rehydrated rather than stored as unbound bootstrap source content',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'district-bootstrap-control-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:root}),seed={url:'https://stadt.de/registered.pdf',sourceId:source.id,title:'Configured municipal seed',documentDate:'2026-10-01',metadata:{stage:'draft'},evidence:[{url:'https://stadt.de/config-proof',locator:'Configured proof'}],dateReason:'Configured date'},municipality={...city,seedDocuments:[seed]};
+ const deferred=await crawlHtmlSource(fetcher,municipality,source,{maxDocuments:1,maxPages:1,maxRequests:0}),path=deferred.coverage!.frontierPath!,bootstrap=JSON.parse(await readFile(path,'utf8'));
+ assert.equal(bootstrap.documents.length,0);assert.equal(bootstrap.sourceBindings,undefined);
+ for(const entry of bootstrap.queue){assert.equal(entry.title,undefined);assert.equal(entry.metadata,undefined);assert.equal(entry.evidence,undefined);assert.equal(entry.dateReason,undefined);}
+ t.mock.method(fetcher,'fetch',async(url:string)=>{
+  const body=Buffer.from('%PDF synthetic adapter source'),localPath=join(root,hash(body)),checkedAt=new Date().toISOString();await writeFile(localPath,body);
+  return {url,sha256:hash(body),localPath,mimeType:'application/pdf',retrievedAt:checkedAt,checkedAt,status:200,observationPath:join(root,'fixture-observation.json'),policy:fixturePolicy(url,hash(body),checkedAt,'application/pdf')};
+ });
+ const result=await crawlHtmlSource(fetcher,municipality,source,{maxDocuments:1,maxPages:1,maxRequests:1});
+ assert.equal(result.documents[0].metadata.title,seed.title);assert.equal(result.documents[0].metadata.stage,'draft');assert.equal(result.documents[0].documentDate,seed.documentDate);assert.equal(result.sourceBindings?.length,1);
+ const persisted=JSON.parse(await readFile(path,'utf8'));assert.equal(persisted.documents[0].metadata.title,undefined);assert.equal(persisted.documents[0].metadata.stage,undefined);assert.equal(persisted.documents[0].documentDate,null);assert.equal(persisted.sourceBindings.length,1);
+});
+
+test('source-wide API permission loss cannot become a document-seed availability fallback',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'district-no-permission-fallback-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:root}),api={...source,api:{url:'https://stadt.de/observed-api',format:'diplan-list' as const}},seen:string[]=[];
+ t.mock.method(fetcher,'fetch',async(url:string)=>{seen.push(url);throw new PoliteFetchError('tdm_unavailable','Policy cannot be resolved');});
+ const result=await crawlDistrictRegistry({schemaVersion:'stadtstack-source-registry-v1',municipalities:[{...city,sources:[api],seedDocuments:[{url:'https://stadt.de/must-not-fallback.pdf',sourceId:source.id}]}]},fetcher,{maxDocuments:1,maxPages:1,maxRequests:3});
+ assert.deepEqual(seen,[api.api.url]);assert.deepEqual(result.documents,[]);assert.equal(result.checks[0].blocked?.[0].failure,'tdm_unavailable');
+});
+
+test('no-body redirect denial exports hashed target audit, not invented HTTP body provenance',()=>{
+ const target='https://third-party.test/denied',policy:SourceAccessPolicy={robots:{state:'blocked',url:'https://third-party.test/robots.txt',sha256:hash('actual denial'),checkedAt:'2026-10-11T12:00:00.000Z'},tdm:{state:'unavailable',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'};
+ const index:DistrictCrawlIndex={schemaVersion:'stadtstack-crawl-index-v1',generatedAt:'2026-10-11T12:00:00.000Z',documents:[],checks:[{municipalityId:city.id,sourceId:source.id,checkState:'checked',checkedAt:'2026-10-11T12:00:00.000Z',documentCount:0,outcome:'blocked',blocked:[{url:target,failure:'robots_blocked',reason:'robots_blocked',checkedAt:'2026-10-11T12:00:00.000Z',policy,action:'ask_municipality'}]}]};
+ const projected=projectCrawlIndexDenials(index,{schemaVersion:'stadtstack-source-registry-v1',municipalities:[city]},new Set(['stadt.de'])),audit=projected.checks[0].blocked![0];
+ assert.equal(audit.url,source.url);assert.equal(audit.urlRole,'registered_source_context');assert.equal(audit.targetUrlSha256,hash(target));assert.equal(audit.policy,undefined);assert.equal(audit.policyAudit?.robotsState,'blocked');assert.equal(audit.policyAudit?.robotsStatus,'disallowed');assert.equal(audit.policyAudit?.tdmState,'unavailable');
+ assert.equal(JSON.stringify(projected).includes('third-party.test'),false);assert.equal('sourceSha256' in audit,false);assert.equal(index.checks[0].blocked![0].url,target);
+});
+
+test('governed persistence failure propagates once instead of retrying it as a source failure',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'district-write-boundary-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:root});let calls=0;
+ t.mock.method(fetcher,'fetch',async()=>{throw new PoliteFetchError('robots_blocked','Actual source denial');});
+ await assert.rejects(crawlDistrictRegistry({schemaVersion:'stadtstack-source-registry-v1',municipalities:[city]},fetcher,{maxDocuments:1,maxPages:1,maxRequests:1,onSource:async(index,bindings)=>{calls++;assert.equal(index.documents.length,0);assert.deepEqual(bindings,[]);throw Error('Managed artifact write rejected');}}),/Managed artifact write rejected/);
+ assert.equal(calls,1);
+});
+
+test('real transport receipts keep a source-bearing frontier readable across a fresh fetcher',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'district-managed-frontier-restart-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const first=await createWireFetcher({cacheDir:root}),seen:string[]=[],limits={maxDocuments:1,maxPages:1,maxRequests:3};
+ type Wire={wire(url:URL):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>};
+ const wire=async(target:URL)=>{
+  if(target.pathname==='/robots.txt'||target.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  seen.push(target.href);
+  return target.href===source.url?{status:200,headers:{'content-type':'text/html'},body:Buffer.from('<h1>Municipal planning archive</h1><a href="/plan.gml">XPlanung</a>')}:{status:200,headers:{'content-type':'application/gml+xml'},body:Buffer.from('<gml:FeatureCollection xmlns:gml="http://www.opengis.net/gml"/>')};
+ };
+ t.mock.method(first as unknown as Wire,'wire',wire);
+ const partial=await crawlHtmlSource(first,city,source,limits);assert.equal(partial.coverage?.state,'partial');assert.equal(partial.documents.length,1);
+ await first.assertSourceReadable(partial.coverage!.frontierPath!);
+ const second=await createWireFetcher({cacheDir:root});t.mock.method(second as unknown as Wire,'wire',wire);
+ const complete=await crawlHtmlSource(second,city,source,{maxDocuments:10,maxPages:3,maxRequests:10});
+ assert.equal(complete.coverage?.state,'complete');assert.equal(complete.documents.length,2);assert.deepEqual(seen,[source.url,'https://stadt.de/plan.gml']);
+ await second.assertSourceReadable(complete.coverage!.frontierPath!);await second.assertSourceBindingsAllowed(complete.sourceBindings!);
 });

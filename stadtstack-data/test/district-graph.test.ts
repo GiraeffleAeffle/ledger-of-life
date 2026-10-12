@@ -11,7 +11,7 @@ import { nativeStructuredIdentityGraph, identityAssertion, IdentityAdmissionSche
 import { StructuredKnowledgeRecordSchema, STRUCTURED_VERIFICATION_VERSION } from '../src/district-structured-record.ts';
 
 import {createHash,generateKeyPairSync} from 'node:crypto';
-import {signRevocations,verifyRevocations,revocationKeyId,compareRevocationTargets,type RevocationTarget} from '../src/civic-revocations.ts';
+import {signRevocations,verifyRevocations,revocationKeyId,compareRevocationTargets,type RevocationTarget,type VerifiedRevocations} from '../src/civic-revocations.ts';
 const now = '2026-10-10T12:00:00.000Z';
 // Synthetic test source/gates only; never actual municipality or model evidence.
 function mention(mentionId: string, name = `Test ${mentionId}`, type: GraphClaims['entities'][number]['type'] = 'organization'): GraphClaims['entities'][number] {
@@ -85,7 +85,7 @@ test('graph cursors bind the verified mask identity even when a different mask y
   assert.deepEqual(empty.graphView(),graphData);
   assert.equal(empty.recordsSha256,graphData.recordsSha256);
   assert.equal(empty.maskIdentity,emptyMask.artifactSha256);
-  assert.throws(()=>new GraphIndex(releaseId,graphData,bytes,{},emptyMask.artifactSha256));
+  assert.throws(()=>new GraphIndex(releaseId,graphData,bytes,{},emptyMask.artifactSha256 as unknown as VerifiedRevocations));
   const firstMask=makeMask([{type:'record',recordId:'hidden-record'}]),first=graph.withReadView(safeGraph,safeBytes,visibleIds,firstMask),page=first.entitySearch({query:'Visible',limit:1});
   assert.ok(page.nextCursor);
   const sameContentDifferentMask=graph.withReadView(safeGraph,safeBytes,visibleIds,makeMask([{type:'record',recordId:'hidden-record'},{type:'record',recordId:'absent-record'}]));
@@ -116,8 +116,8 @@ test('masking a negative or ended role serves an authenticated conservative grap
     assert.throws(()=>view.neighbors({id:options.fromId}),/Unknown graph entity/);
     assert.throws(()=>view.path(options),/Unknown graph entity/);
     assert.equal(validateMaskedKnowledgeGraph(view.graphView(),safeBytes,releaseId,mask.artifactSha256),view.graphView());
-    assert.throws(()=>new GraphIndex(releaseId,structuredClone(view.graphView()),safeBytes,{},mask.artifactSha256),/Unauthenticated/);
-    assert.throws(()=>new GraphIndex('d'.repeat(64),view.graphView(),safeBytes,{},mask.artifactSha256),/Unauthenticated/);
+    assert.throws(()=>new GraphIndex(releaseId,structuredClone(view.graphView()),safeBytes,{},mask,true),/Unauthenticated/);
+    assert.throws(()=>new GraphIndex('d'.repeat(64),view.graphView(),safeBytes,{},mask,true),/mismatch|Unauthenticated/);
     assert.throws(()=>validateMaskedKnowledgeGraph(view.graphView(),`${safeBytes}\n`,releaseId,mask.artifactSha256),/binding changed/);
     assert.throws(()=>validateKnowledgeGraph(view.graphView(),safeBytes),/does not match/);
   }
@@ -838,3 +838,22 @@ test('canonical council alias assertions retract reversibly while retaining orig
   assert.deepEqual(corrected.identity.mentions.map(value => value.name), original.identity.mentions.map(value => value.name));
   assert.ok(corrected.identity.mentions.every(value => value.identifiers.length === 0));
 });
+
+test('Parchim Ludwigslust and Mölln council label aliases share only their actual AGS-scoped body', () => {
+  for (const [city, ags] of [['Parchim', '13076108'], ['Ludwigslust', '13076090'], ['Mölln', '01053090']]) {
+    const short = mention('short', `Stadtvertretung ${city}`, 'authority');
+    const long = mention('long', `Stadtvertretung der Stadt ${city}`, 'organization');
+    const context = { municipalityId: city, sourceSha256: sha256('synthetic council source'), ags };
+    const normalized = normalizeGraphClaims({ entities: [short, long], relations: [] }, context);
+    assert.equal(normalized.entities[0].entityId, normalized.entities[1].entityId);
+    assert.deepEqual(normalized.entities[0].identityBasis, councilBodyIdentity(long.name, ags));
+    assert.equal(normalized.entities[0].identityBasis.kind, 'ags_scoped_council_body');
+    assert.equal(normalized.entities[0].identityBasis.scope, `ags:${ags}`);
+    assert.deepEqual(normalized.entities.map(({ entityId, identityBasis, ...original }) => original), [short, long]);
+    const elsewhere = normalizeGraphClaims({ entities: [short], relations: [] }, { ...context, ags: '99999999' });
+    assert.notEqual(normalized.entities[0].entityId, elsewhere.entities[0].entityId);
+    const sameAgs = normalizeGraphClaims({ entities: [long], relations: [] }, { ...context, municipalityId: `${city}-registry-alias`, sourceSha256: sha256('later source') });
+    assert.equal(normalized.entities[0].entityId, sameAgs.entities[0].entityId);
+  }
+});
+

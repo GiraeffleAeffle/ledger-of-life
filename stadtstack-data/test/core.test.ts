@@ -1,10 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile,mkdtemp,cp,writeFile,rm,symlink} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
+import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {spawnSync} from 'node:child_process';
-import {hash,outDir,root} from '../src/common.ts';
+import {ZodError} from 'zod';
+import {hash,outDir} from '../src/common.ts';
 import {validateCore,deterministic,selected} from '../src/core.ts';
 import {collectionSchema} from '../src/schema.ts';
 import {compactCollection} from '../src/min.ts';
@@ -29,16 +28,15 @@ test('compact corpus and text/topic MCP retain citywide core and identical evide
  const compact=compactCollection(collection);for(const fact of bundle.facts){const p=compact.features.find(f=>f.properties.id===fact.id)!.properties;assert.equal(p.version,fact.version);assert.deepEqual(p.verification,fact.verification);assert.deepEqual(p.assertion,fact.assertion);}
  assert.ok(searchText(collection.features,'Straussee').some(f=>f.properties.id===selected[0].id));for(const fact of bundle.facts.slice(1))assert.ok(searchText(collection.features,String(fact.assertion.year),'haushalt').some(f=>f.properties.id===fact.id));
 });
-test('unconfigured legacy publication cannot replace the retained public release',async()=>{
- const directory=await mkdtemp(join(tmpdir(),'stadtstack-core-publish-'));
- try{
-  await cp(join(root,'src'),join(directory,'src'),{recursive:true});await symlink(join(root,'node_modules'),join(directory,'node_modules'),'dir');await writeFile(join(directory,'package.json'),'{"type":"module"}');
-  await cp(join(root,'regional'),join(directory,'regional'),{recursive:true});await cp(join(root,'sources'),join(directory,'sources'),{recursive:true});
-  await cp(outDir,join(directory,'cache','staging'),{recursive:true});await cp(outDir,join(directory,'out'),{recursive:true});
-  const paths=['catalogue.json','cities/strausberg/signals.geojson','cities/strausberg/signals.min.geojson','core/strausberg-facts.json','core/release-manifest.json','quality-report.json','release-manifest.json'];
-  const before=await Promise.all(paths.map(path=>readFile(join(directory,'out',path))));
-  const run=spawnSync(process.execPath,['--experimental-strip-types',join(directory,'src','publish.ts')],{cwd:directory,encoding:'utf8'});
-  assert.notEqual(run.status,0);assert.match(run.stderr,/Usage:/);
-  assert.deepEqual(await Promise.all(paths.map(path=>readFile(join(directory,'out',path)))),before);
- }finally{await rm(directory,{recursive:true,force:true});}
+test('canonical pre-publication core gate rejects low faithfulness without modifying retained evidence',async()=>{
+ // Governed plan/output behavior is covered in publish.test.ts. This is the
+ // canonical core gate, not the retired implicit CLI or a copied partial runtime.
+ const paths=['cities/strausberg/signals.geojson','core/strausberg-facts.json','core/release-manifest.json','release-manifest.json'];
+ const before=await Promise.all(paths.map(path=>readFile(join(outDir,path))));
+ const bad=structuredClone(bundle);bad.facts[2].verification.faithfulness.score=.1;
+ const bytes=JSON.stringify(bad),candidate=JSON.parse(bytes),corpus=structuredClone(collection);
+ assert.throws(()=>validateCore(candidate,corpus),(error:unknown)=>error instanceof ZodError&&error.issues.some(issue=>issue.path.join('.')==='facts.2.verification.faithfulness.score'));
+ assert.equal(JSON.stringify(candidate),bytes);
+ assert.deepEqual(corpus,collection);
+ assert.deepEqual(await Promise.all(paths.map(path=>readFile(join(outDir,path)))),before);
 });

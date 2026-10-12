@@ -63,7 +63,7 @@ export type DistrictReleaseComposition = {
     schemaVersion: 'stadtstack-crawl-index-v1'; generatedAt: string;
     documents: OriginalCrawlDocument[]; checks: Array<OriginalCrawlCheck & { runId: string }>; excludedDocuments: unknown[];
   };
-  lineage: TextRunLineage;
+  lineage: TextRunLineage | null;
   retainedPublication: RetainedKnowledgeComposition | null;
   selections: TextRecordSelection[];
   audit: {
@@ -103,7 +103,7 @@ function projectRecord(original: DistrictKnowledgeRecord, schemaProjection?: Dis
 
 function assertApprovedOrder(input: DistrictReleaseCompositionInput): void {
   if (input.contributions.some(run => run.sourceArtifactKind !== 'native_extraction_output')) throw Error('Retained publications must use the authenticated retained-role input, not a text extraction run');
-  if (!input.contributions.length || input.approvedRunOrder.length !== input.contributions.length || new Set(input.approvedRunOrder).size !== input.approvedRunOrder.length || input.contributions.some((run, index) => run.runId !== input.approvedRunOrder[index])) {
+  if ((!input.contributions.length && !input.retainedPublication) || input.approvedRunOrder.length !== input.contributions.length || new Set(input.approvedRunOrder).size !== input.approvedRunOrder.length || input.contributions.some((run, index) => run.runId !== input.approvedRunOrder[index])) {
     throw Error('Contributions require a unique, explicitly approved input order');
   }
   const admittedRuns = new Set(input.admissions.map(run => run.runId));
@@ -124,6 +124,16 @@ export function composeDistrictRelease(input: DistrictReleaseCompositionInput): 
   assertApprovedOrder(input);
   const runs = input.contributions.map(authenticateTextRunContribution);
   const admissions = new Map(input.admissions.map(run => [run.runId, new Set(run.recordIds)]));
+  const baseline = input.retainedPublication ? authenticateRetainedKnowledgePublication(input.retainedPublication) : null;
+  const retainedRecords = new Map<string, { record: DistrictKnowledgeRecord; recordIndex: number }>();
+  if (baseline) {
+    const admitted = new Set(baseline.input.recordIds);
+    for (const [localIndex, original] of baseline.records.entries()) if (admitted.has(original.id)) {
+      const record = projectKnowledgeRecordIdentity(original, baseline.input.schemaProjection);
+      if (knowledgePublicationHold(record)) throw Error('Retained selection contains a publication-withheld record');
+      retainedRecords.set(original.id, { record, recordIndex: baseline.recordIndexes[localIndex] });
+    }
+  }
   const selected = new Map<string, TextRecordSelection>();
   const versions: DistrictRecordCompositionAudit[] = [];
   const recordOrigins: DistrictRecordOrigin[] = [];
@@ -164,6 +174,9 @@ export function composeDistrictRelease(input: DistrictReleaseCompositionInput): 
       if (knowledgePublicationHold(projected)) throw Error('Admission inventory contains a publication-withheld record');
       audit.disposition = 'unselected_revision';
       selected.set(original.id, { runId: run.runId, recordId: original.id, originalEvidenceHash: original.verification.evidenceHash, projectedRecord: projected, ...(schemaProjection === undefined ? {} : { schemaProjection }) });
+      const retained = retainedRecords.get(original.id);
+      if (retained && (retained.record.municipalityId !== projected.municipalityId || retained.record.ags !== projected.ags || retained.record.caseKey !== projected.caseKey)) throw Error('Native revision changes retained record identity');
+      retainedRecords.delete(original.id);
     }
     if ([...allowed].some(id => !seen.has(id))) throw Error('Admission inventory references an absent original record');
     for (const [caseIndex, item] of run.quarantine.cases.entries()) {
@@ -185,23 +198,11 @@ export function composeDistrictRelease(input: DistrictReleaseCompositionInput): 
     return { ...origin, selectedRunId: selection?.runId ?? null, selectedEvidenceHash: selection?.projectedRecord.verification.evidenceHash ?? null };
   });
   const mergedCrawl = mergeCrawlObservations(runs, input.generatedAt);
-  const lineage = buildAuthenticatedTextRunLineage(runs, selections, input.generatedAt);
-  let retainedPublication: RetainedKnowledgeComposition | null = null;
-  if (input.retainedPublication) {
-    const baseline = authenticateRetainedKnowledgePublication(input.retainedPublication);
-    const nativeIds = new Set(selections.map(selection => selection.recordId));
-    if (input.retainedPublication.recordIds.some(recordId => nativeIds.has(recordId))) throw Error('A record cannot be selected from both retained publication and native extraction');
-    const selectedRecordOrigins = input.retainedPublication.recordIds.map(recordId => {
-      const localIndex = baseline.records.findIndex(record => record.id === recordId);
-      if (localIndex < 0) throw Error('Retained selection references an absent original record');
-      const projected = projectKnowledgeRecordIdentity(baseline.records[localIndex], baseline.input.schemaProjection);
-      if (knowledgePublicationHold(projected)) throw Error('Retained selection contains a publication-withheld record');
-      return retainedKnowledgeRecordOrigin(baseline, baseline.recordIndexes[localIndex], projected);
-    });
-    retainedPublication = { baseline, selectedRecordOrigins };
-  }
+  const lineage = runs.length ? buildAuthenticatedTextRunLineage(runs, selections, input.generatedAt) : null;
+  const retainedPublication = baseline ? { baseline, selectedRecordOrigins: [...retainedRecords.values()].map(({ record, recordIndex }) => retainedKnowledgeRecordOrigin(baseline, recordIndex, record)).sort((a, b) => a.recordId < b.recordId ? -1 : a.recordId > b.recordId ? 1 : 0) } : null;
+  const records = [...retainedRecords.values()].map(item => item.record).concat(selections.map(selection => selection.projectedRecord)).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   return {
-    records: { schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: input.generatedAt, records: selections.map(selection => selection.projectedRecord) },
+    records: { schemaVersion: KNOWLEDGE_SCHEMA_VERSION, generatedAt: input.generatedAt, records },
     quarantine: { schemaVersion: 'stadtstack-quarantine-v1' as const, generatedAt: input.generatedAt, cases: runs.flatMap(run => run.quarantine.cases) },
     crawl: mergedCrawl.crawl,
     lineage,

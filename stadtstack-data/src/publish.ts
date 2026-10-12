@@ -1,4 +1,4 @@
-import {join,resolve,dirname,basename} from 'node:path';
+import {join,resolve,dirname,basename,relative,isAbsolute} from 'node:path';
 import {readFile,realpath} from 'node:fs/promises';
 import {diff,retainChanges,signalChangeRecord,knowledgeChangeRecord,knowledgeChanges,validateChanges,changeSnapshotHash,type ChangeRecord} from './changes.ts';
 import {cacheDir,outDir as defaultOutDir,save,root} from './common.ts';
@@ -13,7 +13,7 @@ import {normalizeRegionalPublication} from './regional-quality.ts';
 import {sourceHealth,cityTemporalCoverage,assertSourceHealth} from './source-health.ts';
 import {publishDataRelease} from './data-release.ts';
 import {districtRegistrySchema} from './district-registry.ts';
-import {validateKnowledgeRelease} from './district-schema.ts';
+import {validateKnowledgeRelease,PublicKnowledgeRecordSchema,knowledgeEvidenceHash,type PublicKnowledgeRecord} from './district-schema.ts';
 import {districtCoverageSchema,validateDistrictCoverage,assertKnowledgeSlice} from './district-publication.ts';
 import {buildKnowledgeGraph,graphIdentityInputs} from './district-graph.ts';
 import {pathToFileURL} from 'node:url';
@@ -27,7 +27,7 @@ import {admitPublicationIdentities} from './district-publication-identity.ts';
 import {structuredRunSchema,verifyStructuredRunReceipts,projectStructuredCoverageReceipt,structuredReceiptMatches} from './district-structured-run.ts';
 import {DistrictCas} from './district-cas.ts';
 import {canonicalJson,semanticHash} from './district-adapter-contract.ts';
-import {assertHostNotOptedOut,readCivicOptOutSnapshot} from './civic-opt-out.ts';
+import {assertSourceHostsNotOptedOut,readCivicOptOutSnapshot} from './civic-opt-out.ts';
 import type {DistrictKnowledgeRecord} from './district-schema.ts';
 import {loadPolicyReceipt,recheckPolicyReceipt} from './district-policy-receipt.ts';
 import {admitCriticalKnowledge} from './district-critical-assessment.ts';
@@ -53,11 +53,28 @@ async function publicationDirectory(path:string):Promise<string>{
  const absolute=resolve(path);
  try{return await realpath(absolute);}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;const parent=dirname(absolute);if(parent===absolute)throw error;return join(await publicationDirectory(parent),basename(absolute));}
 }
+/** Historical members supply original change state, never current admission. */
+export function historicalKnowledgeRecords(input:unknown):PublicKnowledgeRecord[]{
+ const envelope=z.object({schemaVersion:z.enum(['stadtstack-knowledge-v2','stadtstack-knowledge-v3']),records:z.array(z.unknown())}).passthrough().parse(input);
+ const records=envelope.records.map(raw=>{
+  const record=raw as PublicKnowledgeRecord;
+  if(!record?.verification||record.verification.evidenceHash!==knowledgeEvidenceHash(record))throw Error('Authentic prior knowledge evidence hash mismatch');
+  const marked=envelope.schemaVersion==='stadtstack-knowledge-v2'&&!Object.hasOwn(record,'kind')?{...record,kind:'text_model' as const,verification:{...record.verification,kind:'text_model' as const}}:record;
+  const validation=PublicKnowledgeRecordSchema.safeParse({...marked,verification:{...marked.verification,evidenceHash:knowledgeEvidenceHash(marked)}});
+  if(!validation.success&&validation.error.issues.some(issue=>issue.code!=='custom'||issue.message!=='Pipeline graph identity mismatch'))throw validation.error;
+  return record;
+ });
+ if(new Set(records.map(record=>record.id)).size!==records.length)throw Error('Duplicate authentic prior knowledge record');
+ return records;
+}
+function enclosed(directory:string,path:string):boolean{
+ const name=relative(directory,path);return name===''||!name.startsWith('..')&&!isAbsolute(name);
+}
 export async function publish(input:PublicationOptions,predecessors?:PriorReleaseCache,custody?:AuthenticatedPreparedPublication){
 const options=PublicationOptionsSchema.parse(input),replay=options.offlineReplay===true,outDir=options.outDir;
 if(custody)assertAuthenticatedPreparedPublication(custody);
 const outputDirectory=await publicationDirectory(outDir),stageDirectory=await publicationDirectory(options.stagingDir),priorDirectory=options.priorCityRoot?await publicationDirectory(options.priorCityRoot):undefined,historicalDirectory=await publicationDirectory(defaultOutDir);
-if(stageDirectory===outputDirectory||priorDirectory===outputDirectory||outputDirectory===historicalDirectory||replay&&(stageDirectory===historicalDirectory||priorDirectory===historicalDirectory))throw Error('Publication cannot use the target output as an input or replay destination');
+if(enclosed(outputDirectory,stageDirectory)||priorDirectory&&enclosed(outputDirectory,priorDirectory)||enclosed(historicalDirectory,outputDirectory)||replay&&(enclosed(historicalDirectory,stageDirectory)||priorDirectory&&enclosed(historicalDirectory,priorDirectory)))throw Error('Publication cannot use the target output as an input or replay destination');
 const provenance=custody?.provenance??await authenticatePublicationProvenance(options.privateProvenance.path,options.privateProvenance.sha256,{...(options.policyStateDir?{stateDir:options.policyStateDir}:{}),...(options.policyAuthorityId?{authorityId:options.policyAuthorityId}:{}),...(options.policyAuthoritySha256?{authoritySha256:options.policyAuthoritySha256}:{})});
 if(custody&&provenance.sha256!==options.privateProvenance.sha256)throw Error('Replay publication provenance does not match its independent pin');
 if(custody)assertAuthenticatedPublicationProvenance(custody.provenance);
@@ -190,12 +207,17 @@ for(const {city,collection} of prepared){
  }else changes=diff(beforeRecords,current,catalogue.generatedAt,[],[{cityId:city.id,recordType:'signal'}]);
  cityChanges.set(city.id,retained??JSON.stringify(changes,null,2)+'\n');
 }
-const oldKnowledge=z.object({records:z.array(z.object({id:z.string(),municipalityId:z.string(),verification:z.object({evidenceHash:z.string().regex(/^[a-f0-9]{64}$/)}).passthrough()}).passthrough())}).passthrough().parse(JSON.parse(baseline.files.get('knowledge/records.json')!.toString('utf8')));
-const priorKnowledge=oldKnowledge.records as unknown as typeof knowledge.records;
+const priorKnowledge=historicalKnowledgeRecords(JSON.parse(baseline.files.get('knowledge/records.json')!.toString('utf8')));
 const currentText=knowledge.records.filter((record):record is DistrictKnowledgeRecord=>record.kind==='text_model'),oldText=priorKnowledge.filter(record=>!('kind' in record)||record.kind==='text_model');
 const textChanges=knowledgeChanges(oldText as DistrictKnowledgeRecord[],currentText,knowledge.generatedAt);
 const explicit=textChanges.events.flatMap(event=>event.evidence&&event.targetRevision!==null&&(event.kind==='withdrawn'||event.kind==='superseded')?[{id:event.id,cityId:event.cityId,recordType:event.recordType,kind:event.kind,targetRevision:event.targetRevision,reason:event.reason,evidence:event.evidence}]:[]);
 const knowledgeChangesFeed=validateChanges(diff(priorKnowledge.map(knowledgeChangeRecord),knowledge.records.map(knowledgeChangeRecord),knowledge.generatedAt,explicit,knowledgeRegistry.municipalities.map(city=>({cityId:city.id,recordType:'knowledge' as const}))),knowledge.records.map(knowledgeChangeRecord));
+let knowledgeChangeBytes=JSON.stringify(knowledgeChangesFeed,null,2)+'\n';
+const priorKnowledgeChanges=baseline.files.get('knowledge/changes.json');
+if(priorKnowledgeChanges&&changeSnapshotHash(priorKnowledge.map(knowledgeChangeRecord))===changeSnapshotHash(knowledge.records.map(knowledgeChangeRecord))){
+ retainChanges(JSON.parse(priorKnowledgeChanges.toString('utf8')),knowledge.records.map(knowledgeChangeRecord),undefined,knowledgeRegistry.municipalities.map(city=>({cityId:city.id,recordType:'knowledge' as const})));
+ knowledgeChangeBytes=priorKnowledgeChanges.toString('utf8');
+}
 const dependencies:PublicationDependency[]=[...handoff.dependencies];
 const contractGroups:{role:'publication_contract'|'graph_contract'|'schema_contract';files:string[]}[]=[{role:'publication_contract',files:['publish.ts','prepare-knowledge.ts','district-publication.ts','district-publication-inputs.ts','district-publication-policy.ts','district-publication-identity.ts','district-publication-predecessor.ts','district-publication-provenance.ts','district-critical-assessment.ts','district-critical-assessment-contract.ts','district-r1-text-composition.ts','text-run-lineage.ts','district-release-composition.ts','district-structured-run.ts','data-release.ts','changes.ts','publication-quality.ts','regional-quality.ts','regional-statement.ts','district-regional-statement-verification.ts','district-regional-statement-worker.ts','source-health.ts','core.ts','min.ts']},{role:'graph_contract',files:['district-graph.ts','district-graph-claims.ts','district-entity-resolution.ts']},{role:'schema_contract',files:['district-schema.ts','district-structured-record.ts','district-adapter-contract.ts']}];
 for(const group of contractGroups)dependencies.push({role:group.role,sha256:semanticHash(await Promise.all(group.files.map(async file=>({file,sha256:hash(await readFile(join(root,'src',file)))}))))});
@@ -203,7 +225,7 @@ dependencies.push({role:'parser_contract',sha256:await parserIsolationContractSh
 if(legacyBindings.length)dependencies.push({role:'legacy_city_changes',sha256:semanticHash(legacyBindings)});
 const presealEpoch=await readCivicOptOutSnapshot({ ...policyOptions,authorityId:publicationEpoch.authorityId,authoritySha256:publicationEpoch.authoritySha256 });
 if(presealEpoch.sha256!==publicationEpoch.sha256)throw Error('Current policy changed during whole-publication admission');
-const publicationInputs=sealPublicationInputs({asOf:options.asOf,policy:policy.policy,dependencies,staging,priorRelease:baseline.priorRelease});
+const publicationInputs=sealPublicationInputs({asOf:options.asOf,policy:policy.policy,dependencies,staging,priorRelease:baseline.priorRelease,retainedPublication:knowledgeCoverage.retainedPublication});
 verifyPublicationStaging(publicationInputs,catalogue.cities.map(city=>city.id),staging);verifyPublicationPolicyReceipts(publicationInputs,knowledge.records.map(record=>record.id));
 if(originalInputs&&canonicalJson(originalInputs)!==canonicalJson(publicationInputs))throw Error('Reconstructed publication inputs differ from original immutable seal');
 const evidenceUrls=new Set<string>();
@@ -212,7 +234,7 @@ for(const feed of Object.values(validatedFeeds)){for(const source of feed.source
 for(const topic of regional.data.topics)for(const municipality of topic.municipalities)for(const item of municipality.items)evidenceUrls.add(item.url);
 for(const fact of core.facts)evidenceUrls.add(fact.source.url);
 for(const record of knowledge.records)for(const source of record.kind==='structured'?[record.source,...record.supportingSources]:record.sources)evidenceUrls.add(source.url);
-for(const url of evidenceUrls)await assertHostNotOptedOut(url,{...policyOptions,authorityId:publicationEpoch.authorityId,authoritySha256:publicationEpoch.authoritySha256});
+await assertSourceHostsNotOptedOut(evidenceUrls,{...policyOptions,authorityId:publicationEpoch.authorityId,authoritySha256:publicationEpoch.authoritySha256});
 const finalEpoch=await readCivicOptOutSnapshot({ ...policyOptions,authorityId:publicationEpoch.authorityId,authoritySha256:publicationEpoch.authoritySha256 });
 if(finalEpoch.sha256!==publicationEpoch.sha256)throw Error('Current policy changed before release publication');
 for(const {city,collection,full,min} of prepared){
@@ -235,7 +257,7 @@ await save(join(outDir,'knowledge','records.json'),knowledgeBytes);
 await save(join(outDir,'knowledge','assessment-admissions.json'),staging.get('knowledge/assessment-admissions.json')!.toString('utf8'));
 for(const [name,data] of [['registry',knowledgeRegistry],['coverage',knowledgeCoverage],['graph',knowledgeGraph]] as const)await save(join(outDir,'knowledge',name+'.json'),JSON.stringify(data,null,2)+'\n');
 await save(join(outDir,'quality-report.json'),JSON.stringify(qualityReport,null,2)+'\n');
-await save(join(outDir,'knowledge','changes.json'),JSON.stringify(knowledgeChangesFeed,null,2)+'\n');
+await save(join(outDir,'knowledge','changes.json'),knowledgeChangeBytes);
 await save(join(outDir,'knowledge','publication-inputs.json'),JSON.stringify(publicationInputs,null,2)+'\n');
 const releasePaths=['catalogue.json','quality-report.json','regions/brandenburg-mol/topics.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json','knowledge/registry.json','knowledge/records.json','knowledge/coverage.json','knowledge/graph.json','knowledge/changes.json','knowledge/publication-inputs.json','knowledge/assessment-admissions.json',
  ...catalogue.cities.flatMap(city=>['signals.geojson','signals.min.geojson','feed.json','changes.json'].map(file=>`cities/${city.id}/${file}`))];

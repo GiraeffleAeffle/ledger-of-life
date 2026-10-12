@@ -103,6 +103,8 @@ export function assignCaseIdentities(records:QueryRecord[],sources:Map<string,Re
  const key=(record:QueryRecord,basis:IdentityBasis)=>`${record.cityId}:${basis.type}:${basis.value}`;
  for(const record of records){
   record.caseIdentity={...identities(record,sources),...nativeIdentities?.get(record.id),countedProject:false};
+  delete record.supersession;
+  delete record.caseMetricHistory;
   if(record.caseIdentity.status==='not_applicable')continue;
   const keys=record.caseIdentity.basis.map(basis=>key(record,basis));
   for(const next of keys.slice(1)){const a=find(keys[0]),b=find(next);if(a!==b)parents.set(a<b?b:a,a<b?a:b);}
@@ -145,7 +147,7 @@ export function knowledgeMetricRecord(record:DistrictKnowledgeRecord) {
  return {id:record.id,municipalityId:record.municipalityId,metricClaims:instrument&&verifiedClaims({origin:'knowledge',verification:record.verification})?areaClaimsFromQuote({quote:record.summaryQuote,sourceIds,scope:instrument.value,scopeQuote:instrument.quote,instrument:instrument.value,reportedAt:record.documentDate}):[]};
 }
 /** Canonical filter/display label; original stage/status and source dates remain untouched. */
-export function canonicalRecordStage(record:QueryRecord,context:StageRankingContext=stageRankingContext({title:record.title,titleQuote:record.titleQuote,caseQuote:record.caseQuote,instrument:record.caseIdentity?.instrument?.value})):string|null {
+export function canonicalRecordStage(record:QueryRecord,context:StageRankingContext=stageRankingContext({title:record.title,titleQuote:record.titleQuote,caseQuote:record.caseQuote,summaryQuote:record.summaryQuote,instrument:record.caseIdentity?.instrument?.value})):string|null {
  if(record.kind==='structured'||!record.stage)return null;
  const quote=record.stageQuote??(record.origin==='regional'?record.locator??record.statement:'');
  return normalizeStageAssertion({stage:record.stage,quote,originalStatus:record.originalStatus},context);
@@ -153,7 +155,7 @@ export function canonicalRecordStage(record:QueryRecord,context:StageRankingCont
 /** Stage/date filters bind the same source assertion; top dates are not overwritten by history. */
 export function canonicalRecordStageAssertions(record:QueryRecord):CanonicalStageDateAssertion[] {
  if(record.kind==='structured')return [];
- const context=stageRankingContext({title:record.title,titleQuote:record.titleQuote,caseQuote:record.caseQuote,instrument:record.caseIdentity?.instrument?.value}),top=canonicalRecordStage(record,context);
+ const context=stageRankingContext({title:record.title,titleQuote:record.titleQuote,caseQuote:record.caseQuote,summaryQuote:record.summaryQuote,instrument:record.caseIdentity?.instrument?.value}),top=canonicalRecordStage(record,context);
  const assertions=top?[{stage:top,date:sourceStageDate(record)}]:[];
  for(const assertion of record.stages??[])if(assertion.quote)assertions.push({stage:normalizeStageAssertion(assertion,context),date:assertion.date});
  return assertions;
@@ -167,7 +169,7 @@ export function stageClaims(records:QueryRecord[],asOf:string):StageClaim[] {
   if(!comparisonEligibility(record).comparisonEligible)continue;
   const date=sourceStageDate(record);
   const quote=record.stageQuote??(record.origin==='regional'?record.locator??record.statement:'');
-  const rankingContext=stageRankingContext({title:record.title,titleQuote:record.titleQuote,caseQuote:record.caseQuote,instrument:record.caseIdentity?.instrument?.value});
+  const rankingContext=stageRankingContext({title:record.title,titleQuote:record.titleQuote,caseQuote:record.caseQuote,summaryQuote:record.summaryQuote,instrument:record.caseIdentity?.instrument?.value});
   const stage=canonicalRecordStage(record,rankingContext);
   if(stage&&quote)claims.push({record,stage,date,quote,rankingContext,dateSemantics:date?'source_stage':'unknown',evidenceBasis:record.origin==='knowledge'?'quoted_claim':'released_structured_stage'});
   for(const assertion of record.stages??[])if(assertion.quote)claims.push({record,stage:normalizeStageAssertion(assertion,rankingContext),date:assertion.date,quote:assertion.quote,rankingContext,dateSemantics:assertion.date?'source_stage':'unknown',evidenceBasis:'quoted_claim'});

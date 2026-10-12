@@ -120,6 +120,7 @@ export async function runCodexExtraction(options:{preparationPath:string;prepara
  if(process.platform!=='linux')throw Error('Source extraction runs only on the authoritative Codex VM');
  const selectedPolicy=options.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selectedPolicy),policy={...CIVIC_POLICY_AUTHORITY,...selectedPolicy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
  authoritySchema.parse(policy);
+
  const out=resolve(options.out),contentRoot=join(out,'source-content');
  await initializeManagedAcquisitionLane(contentRoot,{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...policy});
  const releaseLock=await acquirePrivateRunLock(join(out,'run.lock'),'authoritative Codex-only source extraction');
@@ -181,13 +182,13 @@ async function main(){
  }
  if(command==='control'){const action=z.enum(['pause','resume']).parse(values.action);await controlProvider(out,action,policy);console.log(JSON.stringify({provider:'openai-subscription',action,applied:true}));return;}
  if(command==='prepare'){
-  if(!values.index||!values['corpus-sha256']||!values['raw-root']||!values['registry-config']||!values['registry-config-sha256'])throw Error('Usage: district-extract prepare --index PATH --corpus-sha256 HASH --raw-root PATH --registry-config PATH --registry-config-sha256 SHA [--max-documents-per-municipality N]');
+  if(!values.index||!values['corpus-sha256']||!values['raw-root']||!values['registry-config']||!values['registry-config-sha256'])throw Error('Usage: district-extract prepare --index PATH --corpus-sha256 HASH --raw-root PATH --registry-config DESCRIPTOR_PATH --registry-config-sha256 DESCRIPTOR_SHA256 [--max-documents-per-municipality N]');
   const registry=operatorRegistryInputPinSchema.parse({path:values['registry-config'],sha256:values['registry-config-sha256']});
   const {plan,planSha256,path}=await prepareFrozenCorpus({index:values.index,expectedIndexSha256:values['corpus-sha256'],registry,rawRoot:values['raw-root'],maxDocumentsPerMunicipality:values['max-documents-per-municipality']===undefined?undefined:Number(values['max-documents-per-municipality']),policy});
   console.log(JSON.stringify({planSha256,path,preparedGroups:plan.groups.length,quarantinedGroups:plan.quarantine.length,availableGroups:plan.availableDocumentGroups}));if(!plan.groups.length)process.exitCode=1;return;
  }
  if(command==='run'){
-  if(!values['prepared-plan']||!values['prepared-sha256']||!values['registry-config']||!values['registry-config-sha256'])throw Error('Usage: district-extract run --prepared-plan PATH --prepared-sha256 HASH --registry-config PATH --registry-config-sha256 SHA [--out PATH] [--resume]');
+  if(!values['prepared-plan']||!values['prepared-sha256']||!values['registry-config']||!values['registry-config-sha256'])throw Error('Usage: district-extract run --prepared-plan PATH --prepared-sha256 HASH --registry-config DESCRIPTOR_PATH --registry-config-sha256 DESCRIPTOR_SHA256 [--out PATH] [--resume]');
   const registry=operatorRegistryInputPinSchema.parse({path:values['registry-config'],sha256:values['registry-config-sha256']});
   const summary=await runCodexExtraction({preparationPath:values['prepared-plan'],preparationSha256:values['prepared-sha256'],registry,out,resume:values.resume,policy});console.log(JSON.stringify(summary));if(!summary.promotedRecords)process.exitCode=1;return;
  }

@@ -79,6 +79,15 @@ export async function cachedModelAnswer(options: CacheOptions, generate: () => P
   const context = options.sourceContext;
   if (!context || !context.references.length) throw Error('Source model-response cache requires source references and authority');
   hashSchema.parse(context.receiptSha256);
+  // A lock is content-free coordination metadata. Observe it before the
+  // asynchronous authority/source preflight, without reading any answer bytes.
+  // An observed producer ending during that preflight cannot make us its retry.
+  let producerObserved = false;
+  try {
+    const observed = await lstat(join(options.cacheRoot, options.binding + '.answer.lock'));
+    if (!observed.isFile()) throw Error('Source model-response cache lock type rejected');
+    producerObserved = true;
+  } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
   await assertPreparedSourcesActive(context.references, context.policy);
   await mkdir(options.cacheRoot, { recursive: true, mode: 0o700 });
   // Refuse a symlink cache leaf, canonicalize parents (including macOS /var),
@@ -93,6 +102,7 @@ export async function cachedModelAnswer(options: CacheOptions, generate: () => P
   const path = join(root, options.binding + '.answer.json'), lockPath = join(root, options.binding + '.answer.lock');
   const cached = await readAnswer(path, options);
   if (cached) return cached;
+  if (producerObserved) return waitForAnswer(path, lockPath, options);
   options.signal?.throwIfAborted();
   let lock: FileHandle;
   try { lock = await open(lockPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600); }

@@ -8,7 +8,7 @@ import {server} from '../src/mcp.ts';
 import {changesSchema,diff,signalChangeRecord} from '../src/changes.ts';
 import {MCP_RELEASE_VERSION} from '../src/mcp-version.ts';
 import {GraphEntitySchema,GraphEdgeSchema} from '../src/district-graph.ts';
-import {mkdtemp,realpath,rm} from 'node:fs/promises';
+import {mkdtemp,realpath,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash,generateKeyPairSync,randomUUID} from 'node:crypto';
@@ -45,7 +45,8 @@ test('released MCP contract retains core evidence, separates times and fact/sour
     assert.equal(sources.id,fact.id);assert.deepEqual(sources.verification,fact.verification);assert.equal('source' in sources,false);
     assert.deepEqual(sources.sourceIds,record.sourceIds);
     const source=envelopeSchema.parse((await client.callTool({name:'get_source',arguments:{sourceId:record.sourceIds[0]}})).structuredContent);
-    assert.deepEqual(source.data,sources.sources[0]);
+    const {administrativeView:_sourceView,...sourceData}=z.record(z.string(),z.unknown()).parse(source.data);
+    assert.deepEqual(sourceData,sources.sources[0]);
     assert.equal((await client.callTool({name:'get_sources',arguments:{id:record.sourceIds[0]}})).isError,true);
     assert.equal((await client.callTool({name:'get_source',arguments:{sourceId:fact.id}})).isError,true);
     const status=envelopeSchema.parse((await client.callTool({name:'get_release_status',arguments:{}})).structuredContent);
@@ -76,7 +77,10 @@ test('get_changes uses the injected immutable release snapshot, not mutable outp
   const release={...loaded,changes:{...loaded.changes,[cityId]:changes}};
   const mcp=server({release}),client=new Client({name:'immutable-changes-test',version:'1'});
   const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();await mcp.connect(serverTransport);await client.connect(clientTransport);
-  try{assert.deepEqual(changesSchema.parse((await client.callTool({name:'get_changes',arguments:{cityId}})).structuredContent),changes);}
+  try{
+    const {administrativeView:_view,...feed}=z.record(z.string(),z.unknown()).parse((await client.callTool({name:'get_changes',arguments:{cityId}})).structuredContent);
+    assert.deepEqual(changesSchema.parse(feed),changes);
+  }
   finally{await client.close();await mcp.close();}
 });
 
@@ -130,15 +134,19 @@ test('graph MCP tools are read-only, source-bound and reject unbounded or ambigu
   await mcp.connect(serverTransport);await client.connect(clientTransport);
   try{
     const tools=await client.listTools();
+    const reviewedInventory=z.object({schemaVersion:z.literal('stadtstack-graph-v2'),edges:z.array(z.object({id:z.string(),type:z.string(),modality:z.string()}).passthrough())}).parse(JSON.parse(await readFile(new URL('../release/knowledge/graph.json',import.meta.url),'utf8')));
     for(const name of ['entity_search','graph_neighbors','graph_path']){
       const definition=tools.tools.find(tool=>tool.name===name);assert.ok(definition);
       assert.equal(definition.annotations?.readOnlyHint,true);assert.equal(definition.annotations?.destructiveHint,false);
       if(name!=='entity_search'){
         assert.match(definition.description!,/succeeds/);assert.match(definition.description!,/separate/);assert.match(definition.description!,/never.*identity merge/);assert.match(definition.description!,/member_of/);
-        assert.match(definition.description!,/Historical committed 0\.3\.1 inventory/);assert.match(definition.description!,/not current identifiers or live coverage guarantees/);
-        assert.match(definition.description!,/edge:7048119fc2453e41926d943f02578c605ef633634148f1401e7d3049d89cdf3c/);
-        assert.match(definition.description!,/edge:b19c051984380d89ea42f57e3375fa0b15757620d184fc1c725d17c92689bc42/);
+        assert.match(definition.description!,/Reviewed committed 0\.3\.2 graph-v2 inventory/);assert.match(definition.description!,/not current graph-v3 identifiers or live coverage guarantees/);
+        assert.match(definition.description!,/edge:d6b17dc1dddf9d7082674f705e2df5b50485657d80b65357a7dbf77fa6806845/);
+        assert.match(definition.description!,/edge:73c525b5fbbd940c45d53fe0c8829fafb1c894c0ebe18309923d100954945caf/);
         assert.match(definition.description!,/edge:abe58d44b4927db8f59eeed36939f06b06d1b1ffe0b604c7d31377ca2c91b43d/);
+        const ids=[...definition.description!.matchAll(/edge:[a-f0-9]{64}/g)].map(match=>match[0]);
+        assert.equal(new Set(ids).size,3);
+        for(const id of ids){const edge=reviewedInventory.edges.find(edge=>edge.id===id);assert.ok(edge,`Reviewed 0.3.2 example ${id} must exist in its committed inventory`);assert.equal(edge.type,'operates');assert.equal(edge.modality,'asserted');}
       }else{assert.match(definition.description!,/same AGS/);assert.match(definition.description!,/no cross-municipality name merge/);assert.match(definition.description!,/notice\+version scope, not verified companies/);assert.match(definition.description!,/technical party IDs cannot/);}
     }
     const result=await client.callTool({name:'entity_search',arguments:{query:'a',limit:1}});
@@ -184,8 +192,8 @@ test('graph MCP tools are read-only, source-bound and reject unbounded or ambigu
   }finally{await client.close();await mcp.close();}
 });
 
-test('0.3.1 heat comparisons, bulk export and quarantine coverage share the released evidence',async()=>{
- const release=await loadRelease(),mcp=server({release}),client=new Client({name:'patch-031-regression',version:'1'});
+test('0.3.2 heat comparisons, bulk export and quarantine coverage share the released evidence',async()=>{
+ const release=await loadRelease(),mcp=server({release}),client=new Client({name:'patch-032-regression',version:'1'});
  const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();
  await mcp.connect(serverTransport);await client.connect(clientTransport);
  try{
@@ -216,12 +224,13 @@ test('0.3.1 heat comparisons, bulk export and quarantine coverage share the rele
   const coverage=z.object({accounting:z.object({registryMunicipalities:z.number(),attemptedMunicipalities:z.number()}),districts:z.array(z.object({id:z.string(),municipalitiesRegistered:z.number(),municipalitiesAttempted:z.number()}).passthrough()),municipalities:z.array(z.object({id:z.string(),publishedRecords:z.number(),quarantinedRecords:z.number(),quarantineReasons:z.object({categories:z.array(z.object({reason:z.string(),count:z.number()})),failedDeterministicChecks:z.array(z.object({id:z.string(),count:z.number()}))})}).passthrough())}).passthrough();
   const status=z.object({knowledgeCoverage:coverage}).parse((await client.callTool({name:'get_release_status',arguments:{}})).structuredContent).knowledgeCoverage;
   const cities=z.object({knowledgeCoverage:coverage}).parse((await client.callTool({name:'list_cities',arguments:{}})).structuredContent).knowledgeCoverage;
-  assert.deepEqual(status.accounting,cities.accounting);assert.equal(status.accounting.registryMunicipalities,319);assert.equal(status.accounting.attemptedMunicipalities,9);
-  const mol=status.districts.find(district=>district.id==='maerkisch-oderland')!;
-  assert.equal(mol.municipalitiesRegistered,45);assert.equal(mol.municipalitiesAttempted,3);
+  assert.deepEqual(status.accounting,cities.accounting);assert.deepEqual(status.accounting,release.coverage.accounting);
+  const mol=status.districts.find(district=>district.id==='maerkisch-oderland')!,publishedMol=release.coverage.districts.find(district=>district.id==='maerkisch-oderland')!;
+  assert.equal(mol.municipalitiesRegistered,publishedMol.municipalitiesRegistered);assert.equal(mol.municipalitiesAttempted,publishedMol.municipalitiesAttempted);
   const strausberg=status.municipalities.find(city=>city.id==='strausberg')!;
-  assert.equal(strausberg.publishedRecords,39);assert.equal(strausberg.quarantinedRecords,384);
-  assert.ok(strausberg.quarantineReasons.categories.some(reason=>reason.reason==='missing_sourced_date'&&reason.count>0));
+  const published=release.coverage.municipalities.find(city=>city.id==='strausberg')!;
+  assert.equal(strausberg.publishedRecords,published.publishedRecords);assert.equal(strausberg.quarantinedRecords,published.quarantinedRecords);
+  assert.deepEqual(strausberg.quarantineReasons,published.quarantineReasons);
  }finally{await client.close();await mcp.close();}
 });
 

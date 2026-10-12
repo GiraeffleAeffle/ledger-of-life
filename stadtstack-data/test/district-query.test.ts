@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {QueryIndex,type KnowledgeQueryData,type Regional} from '../src/mcp-query.ts';
 import type {Catalogue} from '../src/schema.ts';
-import {knowledgeEvidenceHash,REQUIRED_DETERMINISTIC_CHECKS,type DistrictKnowledgeRecord,type PublicKnowledgeRecord} from '../src/district-schema.ts';
+import {knowledgeEvidenceHash,KNOWLEDGE_SCHEMA_VERSION,REQUIRED_DETERMINISTIC_CHECKS,type DistrictKnowledgeRecord,type PublicKnowledgeRecord} from '../src/district-schema.ts';
 import {CASE_LINKING_VERSION} from '../src/district-case-linking.ts';
 import {matchesFilters} from '../src/district-query.ts';
 import {textMatches} from '../src/topics.ts';
@@ -11,8 +11,11 @@ import {join} from 'node:path';
 import {outDir} from '../src/common.ts';
 import {createHash,generateKeyPairSync} from 'node:crypto';
 import {signRevocations,verifyRevocations,revocationKeyId,type RevocationTarget} from '../src/civic-revocations.ts';
-import {caseMetrics} from '../src/query-cases.ts';
+import {caseMetrics,caseEvidence} from '../src/query-cases.ts';
+import {buildKnowledgeGraph} from '../src/district-graph.ts';
+import {GraphIndex} from '../src/district-graph-query.ts';
 import {loadRelease} from '../src/mcp-release.ts';
+import type {ReleasedKnowledge} from '../src/mcp-release.ts';
 import {server} from '../src/mcp.ts';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
@@ -309,10 +312,13 @@ test('shared metric supersession preserves old quotes and signed masking cannot 
  assert.equal(repeated.withheldContext?.length,1);
  const empty=original.withRevocations(maskFor([])).index;
  assert.deepEqual(empty.records,original.records);
- assert.deepEqual(empty.compareTopic('waermeplanung',['strausberg']),original.compareTopic('waermeplanung',['strausberg']));
- assert.deepEqual(empty.exportRecords(),original.exportRecords());
+ const {administrativeView:_emptyComparisonView,...emptyComparison}=empty.compareTopic('waermeplanung',['strausberg']);
+ const {administrativeView:_originalComparisonView,...originalComparison}=original.compareTopic('waermeplanung',['strausberg']);
+ assert.deepEqual(emptyComparison,originalComparison);
+ const {administrativeView:_emptyExportView,...emptyExport}=empty.exportRecords();
+ const {administrativeView:_originalExportView,...originalExport}=original.exportRecords();
+ assert.deepEqual(emptyExport,originalExport);
  assert.equal(JSON.stringify(empty.records),JSON.stringify(original.records));
- assert.equal(JSON.stringify(empty.exportRecords()),JSON.stringify(original.exportRecords()));
  const metadata=record(0,'draft',':aa-metadata');
  metadata.title=metadata.titleQuote=old.title;metadata.caseKey=old.caseKey;metadata.caseQuote=old.caseQuote;metadata.summary=metadata.summaryQuote='Das Verfahren wird beraten.';
  const metadataFixture=index([old,replacement,competing,metadata]),metadataOriginal=new QueryIndex(original.releaseId,date,[],regional,catalogue,metadataFixture.knowledge),metadataSafe=metadataOriginal.withRevocations(mask).index;
@@ -330,7 +336,8 @@ test('shared metric supersession preserves old quotes and signed masking cannot 
  const combinedFixture=index([old,replacement,competing,otherOld,otherReplacement]),combinedOriginal=new QueryIndex(original.releaseId,date,[],regional,catalogue,combinedFixture.knowledge),combinedSafe=combinedOriginal.withRevocations(mask).index;
  assert.deepEqual(combinedSafe.compareTopic('waermeplanung',['hoppegarten']).cities[0].cases,combinedOriginal.compareTopic('waermeplanung',['hoppegarten']).cities[0].cases);
  assert.equal(combinedSafe.compareTopic('waermeplanung',['hoppegarten']).cities[0].cases[0].currentValues[0].claim.value,41.5);
- const mcp=server({release:{...publication,index:safe,visibility,revocations:mask}}),client=new Client({name:'signed-metric-read-view-fixture',version:'1'});
+ const syntheticKnowledge:ReleasedKnowledge={schemaVersion:KNOWLEDGE_SCHEMA_VERSION,generatedAt:date,identityAssertions:[],identityAdmissions:[],records:conflictIndex.knowledge!.records},syntheticBytes=JSON.stringify(syntheticKnowledge),syntheticGraphData=buildKnowledgeGraph(syntheticBytes,{asOf:date.slice(0,10)}),syntheticGraph=new GraphIndex(original.releaseId,syntheticGraphData,syntheticBytes,{},mask);
+ const mcp=server({release:{...publication,index:safe,visibility,revocations:mask,knowledge:syntheticKnowledge,knowledgeBytes:syntheticBytes,graphData:syntheticGraph.graphView(),graph:syntheticGraph}}),client=new Client({name:'signed-metric-read-view-fixture',version:'1'});
  const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();
  await mcp.connect(serverTransport);await client.connect(clientTransport);
  try{
@@ -371,4 +378,69 @@ test('canonical stage filters use quoted phases and historical vocabulary withou
  assert.equal(query.records.find(record=>record.id===historical.id)!.stageDate,'2026-09-19');
  const city=query.compareTopic('waermeplanung',['strausberg']).cities[0];assert.equal(city.stageCounts.pre_draft,1);assert.equal(city.stageCounts.draft,0);
  assert.equal(query.compareTopic('waermeplanung',['hoppegarten']).cities[0].furthestPositiveMilestone,null,'Generic participation remains unranked for BauGB');
+});
+
+test('canonical stage filters accept released early/formal evidence without relabelling raw assertions',async()=>{
+ const envelope=JSON.parse(await readFile(join(outDir,'knowledge/records.json'),'utf8')) as {records:DistrictKnowledgeRecord[]};
+ const early=envelope.records.find(item=>item.stageQuote==='frühzeitige Beteiligung am Bebauungsplan (VEP) Nr. 68/23')!;
+ const formal=envelope.records.find(item=>item.stageQuote==='öffentliche Auslegung gem. § 3 Abs. 2 BauGB')!;
+ assert.ok(early);assert.ok(formal);
+ const generic=record(0,'consultation',':generic-phase');
+ generic.title=generic.titleQuote='Bebauungsplan Nr. 99/26';
+ generic.stageQuote=generic.originalStatus='Stellungnahme vom 19.09.2026';
+ const query=index([early,formal,generic]);
+ for(const [stage,item] of [['early_consultation',early],['formal_consultation',formal]] as const){
+  const page=query.page({stage,fields:['id','stage','canonicalStage','status']},'search_topics');
+  assert.equal(page.total,1);assert.equal(page.items[0].id,item.id);
+  assert.equal(page.items[0].stage,'consultation');assert.equal(page.items[0].canonicalStage,stage);
+  assert.equal(page.items[0].status,item.originalStatus);
+ }
+ const unresolved=query.page({stage:'consultation'},'search_topics');
+ assert.equal(unresolved.total,1);assert.equal(unresolved.items[0].id,generic.id);
+ assert.equal(caseEvidence([query.records.find(item=>item.id===generic.id)!],date).furthestPositiveMilestone,null);
+});
+
+
+test('preliminary drafts, approval and historical stage filters use one canonical vocabulary',()=>{
+ const preliminary=record(0,'draft',':pre'),draft=record(0,'draft',':draft'),approval=record(0,'decision',':approval');
+ for(const item of [preliminary,draft,approval]){item.title=item.titleQuote='Bebauungsplan Nr. 97/26';item.caseQuote='Bebauungsplan Nr. 97/26';}
+ preliminary.stageQuote=preliminary.originalStatus='Vorentwurf';
+ draft.stageQuote=draft.originalStatus='Entwurf';
+ draft.stages=[{stage:'consultation',date:'2026-08-01',dateQuote:'01.08.2026',originalStatus:'öffentliche Auslegung',quote:'öffentliche Auslegung gem. § 3 Abs. 2 BauGB'}];
+ approval.stageQuote=approval.originalStatus='Die Genehmigung wurde erteilt.';
+ const query=index([preliminary,draft,approval]);
+ assert.deepEqual(query.page({stage:'pre_draft',fields:['id']},'search_topics').items.map(item=>item.id),[preliminary.id]);
+ assert.deepEqual(query.page({stage:'draft',fields:['id']},'search_topics').items.map(item=>item.id),[draft.id]);
+ assert.deepEqual(query.page({stage:'approved',fields:['id']},'search_topics').items.map(item=>item.id),[approval.id]);
+ assert.deepEqual(query.page({stage:'formal_consultation',fields:['id']},'search_topics').items.map(item=>item.id),[draft.id]);
+ assert.equal(query.records.find(item=>item.id===preliminary.id)?.stage,'draft');
+ assert.equal(query.records.find(item=>item.id===preliminary.id)?.canonicalStage,'pre_draft');
+ const compared=query.compareTopic('waermeplanung',['strausberg']);
+ assert.equal(compared.cities[0].stageCounts.pre_draft,1);
+ assert.equal(compared.cities[0].stageCounts.draft,1);
+ assert.equal(compared.cities[0].stageCounts.approved,1);
+});
+
+
+test('stage and date filters bind the same historical assertion without changing original dates',()=>{
+ const item=record(0,'rejected',':historical-stage-date');
+ item.title=item.titleQuote='Bebauungsplan Nr. 96/26';
+ item.stageDate='2026-09-19';
+ item.stages=[
+  {stage:'draft',date:'2025-08-07',dateQuote:'Entwurf vom 07.08.2025',originalStatus:'Entwurf',quote:'Entwurf vom 07.08.2025'},
+  {stage:'consultation',date:'2025-09-07',dateQuote:'07.09.2025',originalStatus:'öffentliche Auslegung',quote:'öffentliche Auslegung gem. § 3 Abs. 2 BauGB'},
+ ];
+ const query=index([item]);
+ assert.equal(query.page({stage:'draft',dateFrom:'2025-08-07',dateTo:'2025-08-07'},'search_topics').total,1);
+ assert.equal(query.page({stage:'draft',dateFrom:'2026-09-19',dateTo:'2026-09-19'},'search_topics').total,0);
+ assert.equal(query.page({stage:'draft',dateFrom:'2025-09-07',dateTo:'2025-09-07'},'search_topics').total,0);
+ assert.equal(query.page({stage:'formal_consultation',dateFrom:'2025-09-07',dateTo:'2025-09-07'},'search_topics').total,1);
+ assert.equal(query.page({stage:'formal_consultation',dateFrom:'2025-08-07',dateTo:'2025-08-07'},'search_topics').total,0);
+ assert.equal(query.page({dateFrom:'2026-09-19',dateTo:'2026-09-19'},'search_topics').total,1);
+ assert.equal(query.records[0].stageDate,'2026-09-19');
+ assert.equal(query.records[0].eventDate,'2026-09-19');
+ item.stages[0].date=null;item.stages[0].dateQuote=null;
+ const undated=index([item]);
+ assert.equal(undated.page({stage:'draft'},'search_topics').total,1);
+ assert.equal(undated.page({stage:'draft',dateFrom:'2025-01-01'},'search_topics').total,0);
 });

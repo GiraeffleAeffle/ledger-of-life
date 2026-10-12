@@ -8,10 +8,12 @@ import {syncBuiltinESMExports} from 'node:module';
 import {join} from 'node:path';
 import {sha256} from '../src/district-schema.ts';
 import {CIVIC_ACQUISITION_DECISION_ID,recordHostOptOut,HostOptedOutError,CivicPolicyStateError,withManagedSourceScratch,assertManagedSourceBindings} from '../src/civic-opt-out.ts';
-import {buildOperatorRegistryConfigDescriptor,operatorRegistryConfigSchema,operatorRegistryConfigBindingSchema,readOperatorRegistryConfig,importOperatorRegistryConfig,readOperatorRegistryConfigSourcePin,parseOperatorRegistryConfiguration,operatorRegistryInputPinSchema,readOperatorRegistryInputPin} from '../src/district-registry-config.ts';
+import {buildOperatorRegistryConfigDescriptor,operatorRegistryConfigSchema,operatorRegistryConfigSourcePinSchema,operatorRegistryConfigBindingSchema,readOperatorRegistryConfig,importOperatorRegistryConfig,readOperatorRegistryConfigSourcePin,parseOperatorRegistryConfiguration,operatorRegistryInputPinSchema,readOperatorRegistryInputPin} from '../src/district-registry-config.ts';
 import {districtR1Cli} from '../src/district-r1.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {createOperatorRegistryFixture,operatorRegistryFixtureValue,registryDescriptor,writeOperatorRegistryInputPin} from './helpers/operator-registry-fixture.ts';
+import {knowledgePreparedSourcePinSchema} from '../src/prepare-knowledge.ts';
+import {privatePublicationProvenanceSchema} from '../src/district-publication-provenance.ts';
 const execFileAsync=promisify(execFile);
 async function rawFixture(t:TestContext,value:unknown=operatorRegistryFixtureValue()){
  const context=await createCivicPolicyTestContext(t),input=await registryDescriptor(context,value);
@@ -34,7 +36,12 @@ test('Git-authenticated owner configuration imports exact managed bytes without 
  assert.deepEqual((await readOperatorRegistryConfigSourcePin(f.sourcePin,f.policy)).bytes,f.body);
  assert.deepEqual(f.admitted.registry,f.value);assert.deepEqual(f.admitted.bytes,f.body);assert.deepEqual(f.admitted.bindings,f.sourcePin.bindings);
  assert.equal(f.sourcePin.sha256,sha256(f.body));assert.equal(f.sourcePin.bytes,f.body.length);
+ assert.equal(operatorRegistryConfigSchema.safeParse(f.input).success,true);
+ assert.equal(operatorRegistryConfigSourcePinSchema.safeParse(f.sourcePin).success,true);
+ assert.equal(knowledgePreparedSourcePinSchema.safeParse(f.sourcePin).success,false,'configuration is not prepared claim admission');
+ assert.equal(privatePublicationProvenanceSchema.safeParse({schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:[{path:f.sourcePin.path,sha256:f.sourcePin.sha256,bytes:f.sourcePin.bytes,bindings:f.sourcePin.bindings}]}).success,true);
  await assertManagedSourceBindings(f.sourcePin.path,f.sourcePin.bindings,f.policy);
+ await assertManagedSourceBindings(f.sourcePin.path,f.sourcePin.bindings,f.policy,'operator_registry_config');
  for(const binding of f.sourcePin.bindings){
   assert.equal(binding.kind,'operator_registry_config');assert.equal(binding.configurationSha256,sha256(f.body));assert.equal(binding.independentAllowed,false);
   assert.deepEqual(binding.code,f.input.code);assert.deepEqual(binding.approval,f.input.approval);

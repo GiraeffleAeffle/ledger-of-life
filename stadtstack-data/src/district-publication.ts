@@ -7,7 +7,8 @@ import {ModelEvidenceSchema,type ModelEvidence} from './district-model-contract.
 import {structuredRunSchema,structuredPublicCoverageReceiptSchema,projectStructuredCoverageReceipt,validateStructuredRun,structuredReceiptMatches,structuredRecordHasSourcedDate,structuredRecordHasSourcedAction} from './district-structured-run.ts';
 import type {StructuredKnowledgeRecord} from './district-structured-record.ts';
 import {textRunLineageSchema,type TextRunLineage,textLineageRecordSha256} from './text-run-lineage.ts';
-import {RetainedKnowledgeLineageSchema,type RetainedKnowledgeLineage} from './retained-knowledge-lineage.ts';
+import {RetainedKnowledgeLineageSchema,validateRetainedKnowledgeComposition,type RetainedKnowledgeComposition,type RetainedKnowledgeLineage} from './retained-knowledge-lineage.ts';
+import {districtCoverageScopeSchema,retainedHistoricalCoverageSchema,projectRetainedHistoricalCoverage} from './retained-knowledge-coverage.ts';
 const count=z.number().int().nonnegative();
 const admittedModelSchema=ModelEvidenceSchema.safeExtend({faithfulnessThreshold:z.literal(0.8),publishedRecords:count}).strict();
 function modelKey(model:ModelEvidence):string{return JSON.stringify([model.provider,model.model,model.tool,model.toolVersion,model.modelIdentitySha256,model.modelIdentityBasis]);}
@@ -34,9 +35,11 @@ export const districtCoverageSchema=z.object({
  structuredRun:z.object({generatedAt:structuredRunSchema.shape.generatedAt,registrySha256:structuredRunSchema.shape.registrySha256,questionDispositionSha256:structuredRunSchema.shape.questionDispositionSha256,adapterContractSha256:structuredRunSchema.shape.adapterContractSha256}).strict().nullable(),
  textLineage:textRunLineageSchema.nullable(),
  retainedPublication:RetainedKnowledgeLineageSchema.nullable(),
+ historicalCoverage:retainedHistoricalCoverageSchema.nullable(),
+ coverageScope:districtCoverageScopeSchema,
 }).strict();
 export type DistrictCoverage=z.infer<typeof districtCoverageSchema>;
-export type TextCoverageRecord=Pick<DistrictKnowledgeRecord,'kind'|'id'|'municipalityId'|'documentDate'|'stageDate'|'stage'|'stages'>&{extraction:ModelEvidence&Pick<DistrictKnowledgeRecord['extraction'],'inputSha256'|'responseSha256'|'promptSha256'|'judgePromptSha256'>;verification:{evidenceHash:string;faithfulness:{responseSha256:string|null}};sources:{id:string}[]};
+export type TextCoverageRecord=Pick<DistrictKnowledgeRecord,'kind'|'id'|'municipalityId'|'documentDate'|'stageDate'|'stage'|'stages'>&{extraction:ModelEvidence&Pick<DistrictKnowledgeRecord['extraction'],'inputSha256'|'responseSha256'|'promptSha256'|'judgePromptSha256'>&{extractedAt?:string};verification:{evidenceHash:string;faithfulness:{responseSha256:string|null;evaluatedAt?:string|null}};sources:{id:string}[]};
 export type DistrictCoverageRecord=TextCoverageRecord|StructuredKnowledgeRecord;
 export const crawlSummarySchema=z.object({schemaVersion:z.literal('stadtstack-crawl-index-v1'),generatedAt:z.string(),documents:z.array(z.object({id:z.string(),municipalityId:z.string(),sourceId:z.string(),sha256:z.string().regex(/^[a-f0-9]{64}$/)}).passthrough()),checks:z.array(z.object({municipalityId:z.string(),sourceId:z.string(),runId:z.string().regex(/^[a-f0-9]{64}$/).optional(),checkState,checkedAt:z.string().nullable(),documentCount:count,reason:z.string().optional(),coverage:crawlCoverage.passthrough().optional(),blocked:z.array(z.object({url:z.string(),failure:z.string(),checkedAt:z.string()}).passthrough()).optional()}).passthrough())}).passthrough();
 const quarantineCandidateSchema=z.object({municipalityId:z.string(),extraction:z.object({inputSha256:z.string()}),sources:z.array(z.object({id:z.string(),sha256:z.string()})),verification:z.object({deterministic:z.object({passed:z.boolean(),checks:z.array(z.object({id:z.string(),passed:z.boolean()}))}),faithfulness:z.object({score:z.number().nullable(),threshold:z.number(),responseSha256:z.string().nullable()})})});
@@ -93,7 +96,7 @@ function coverageAccounting(registry:DistrictRegistry,municipalities:DistrictCov
 
 /** Safe release/list projection: no held candidate, date, URL, quote or producer reason text. */
 export function projectDistrictCoverage(coverage:DistrictCoverage){
- return {accounting:coverage.accounting,districts:coverage.districts,models:coverage.models,adapters:coverage.adapters.map(({family,operation,adapterId,adapterVersion,municipalityId,sourceId,coverage,publishedRecords})=>({family,operation,adapterId,adapterVersion,municipalityId,sourceId,coverage,publishedRecords})),municipalities:coverage.municipalities.map(({id,status,checked,publishedRecords,textModelRecords,structuredRecords,datedStagedRecords,quarantinedRecords,quarantineReasons,extraction})=>({id,status,checked,publishedRecords,textModelRecords,structuredRecords,datedStagedRecords,quarantinedRecords,quarantineReasons,extraction}))};
+ return {accounting:coverage.accounting,districts:coverage.districts,models:coverage.models,adapters:coverage.adapters.map(({family,operation,adapterId,adapterVersion,municipalityId,sourceId,coverage,publishedRecords})=>({family,operation,adapterId,adapterVersion,municipalityId,sourceId,coverage,publishedRecords})),municipalities:coverage.municipalities.map(({id,status,checked,publishedRecords,textModelRecords,structuredRecords,datedStagedRecords,quarantinedRecords,quarantineReasons,extraction})=>({id,status,checked,publishedRecords,textModelRecords,structuredRecords,datedStagedRecords,quarantinedRecords,quarantineReasons,extraction})),historicalCoverage:coverage.historicalCoverage,coverageScope:coverage.coverageScope};
 }
 
 export type KnowledgePublicationHoldReason='missing_sourced_date'|'nonpublic_evidence_url';
@@ -144,23 +147,35 @@ function assertLineageRecords(lineage:TextRunLineage,records:TextCoverageRecord[
   if(run.assignmentMode==='codex-only'&&record.extraction.provider!=='openai-subscription')throw Error('Codex-only assignment cannot claim another provider');
  }
 }
-export function buildDistrictCoverage(registry:DistrictRegistry,crawlInput:unknown,records:DistrictCoverageRecord[],quarantineInput:unknown,lineageInput:unknown,generatedAt?:string,structuredInput?:unknown,retainedPublicationInput:RetainedKnowledgeLineage|null=null):DistrictCoverage{
- const crawl=crawlSummarySchema.parse(crawlInput),quarantine=quarantineSummarySchema.parse(quarantineInput),textLineage=lineageInput==null?null:textRunLineageSchema.parse(lineageInput),retainedPublication=retainedPublicationInput===null?null:RetainedKnowledgeLineageSchema.parse(retainedPublicationInput),structured=structuredInput===undefined?null:structuredRunSchema.parse(structuredInput);
+function coverageScope(retained:boolean):DistrictCoverage['coverageScope']{
+ return {publishedRecords:'selected_native_and_retained',sourceObservations:'native_contributions_only',documents:'native_contributions_only',extractionGroups:'native_contributions_only',quarantinedRecords:'native_contributions_only',crossCohortUniqueDocumentGroups:retained?'unknown':'native_only'};
+}
+const emptyNativeGroups={fetched:[],attempted:[],selected:[],prepared:[]} satisfies TextRunLineage['cumulative']['groupBindings'];
+function assertRetainedOrigins(retained:RetainedKnowledgeLineage|null,lineage:TextRunLineage|null,registry:DistrictRegistry,records:DistrictCoverageRecord[]):void{
+ const origins=retained?.selectedRecordOrigins??[],nativeIds=new Set(lineage?.selectedRecordOrigins.map(origin=>origin.recordId)??[]);
+ if(new Set(records.map(record=>record.id)).size!==records.length||new Set(origins.map(origin=>origin.recordId)).size!==origins.length||origins.some(origin=>nativeIds.has(origin.recordId)))throw Error('Split publication provenance has duplicate selected records');
+ if(lineage?.runs.some(run=>run.sourceArtifactKind!=='native_extraction_output'))throw Error('Current native lineage cannot contain a retained publication contribution');
+ for(const origin of origins){
+  const record=records.find(record=>record.id===origin.recordId);
+  if(!record||record.kind!=='text_model')throw Error('Retained publication origin inventory mismatch');
+  const city=registry.municipalities.find(city=>city.id===record.municipalityId),sourceIds=record.sources.map(source=>source.id).sort();
+  if(!city||sourceIds.some(id=>!city.sources.some(source=>source.id===id)))throw Error('Retained publication registry source binding mismatch');
+  const registered=city.sources.filter(source=>sourceIds.includes(source.id)).map(({id,kind,url})=>({id,kind,url})).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
+  if(origin.municipalityId!==record.municipalityId||origin.sourceSha256!==record.extraction.inputSha256||origin.currentEvidenceHash!==record.verification.evidenceHash||origin.currentRecordSha256!==textLineageRecordSha256(record)||JSON.stringify([...origin.sourceIds].sort())!==JSON.stringify(sourceIds)||origin.registrySourcesSha256!==textLineageRecordSha256(registered)||modelKey(origin.model)!==modelKey(record.extraction)||origin.extractionResponseSha256!==record.extraction.responseSha256||origin.judgeResponseSha256!==record.verification.faithfulness.responseSha256||origin.promptSha256!==record.extraction.promptSha256||origin.judgePromptSha256!==record.extraction.judgePromptSha256||origin.extractedAt!==record.extraction.extractedAt||origin.evaluatedAt!==record.verification.faithfulness.evaluatedAt)throw Error('Retained publication record/origin binding mismatch');
+ }
+}
+export function buildDistrictCoverage(registry:DistrictRegistry,crawlInput:unknown,records:DistrictCoverageRecord[],quarantineInput:unknown,lineageInput:unknown,generatedAt?:string,structuredInput?:unknown,retainedInput:RetainedKnowledgeComposition|null=null):DistrictCoverage{
+ const crawl=crawlSummarySchema.parse(crawlInput),quarantine=quarantineSummarySchema.parse(quarantineInput),textLineage=lineageInput==null?null:textRunLineageSchema.parse(lineageInput),structured=structuredInput===undefined?null:structuredRunSchema.parse(structuredInput);
+ const retained=retainedInput===null?null:validateRetainedKnowledgeComposition(retainedInput);
+ const retainedPublication=retained===null?null:RetainedKnowledgeLineageSchema.parse({...retained.baseline.lineage,selectedRecordOrigins:retained.selectedRecordOrigins});
+ const historicalCoverage=retained===null?null:projectRetainedHistoricalCoverage(retained.baseline.coverage);
+ assertRetainedOrigins(retainedPublication,textLineage,registry,records);
+ if(!textLineage&&(crawl.documents.length||crawl.checks.length))throw Error('Retained-only coverage cannot invent native text observations');
  const textRecords=records.filter((record):record is TextCoverageRecord=>record.kind==='text_model'),structuredRecords=records.filter((record):record is StructuredKnowledgeRecord=>record.kind==='structured');
  const retainedIds=new Set(retainedPublication?.selectedRecordOrigins.map(origin=>origin.recordId)??[]);
  if(structured)validateStructuredRun(structured,registry,structuredRecords);else if(structuredRecords.length)throw Error('Structured records require their bound structured run');
- if(new Set(retainedPublication?.selectedRecordOrigins.map(origin=>origin.recordId)??[]).size!==(retainedPublication?.selectedRecordOrigins.length??0)||[...retainedIds].some(id=>!records.some(record=>record.id===id)))throw Error('Retained publication origin inventory mismatch');
- for(const origin of retainedPublication?.selectedRecordOrigins??[]){
-  const record=records.find(item=>item.id===origin.recordId)!;
-  if(record.kind!=='text_model'||origin.currentEvidenceHash!==record.verification.evidenceHash||origin.currentRecordSha256!==textLineageRecordSha256(record)||origin.municipalityId!==record.municipalityId||origin.sourceSha256!==record.extraction.inputSha256)throw Error('Retained publication record/origin binding mismatch');
- }
- const retainedQuarantine=(item:z.infer<typeof quarantineCaseSummarySchema>):boolean=>{
-  const origin=item.recordId?retainedPublication?.selectedRecordOrigins.find(origin=>origin.recordId===item.recordId):undefined;
-  if(!origin)return false;
-  if(item.kind==='structured'||item.municipalityId!==origin.municipalityId||item.sourceSha256!==origin.sourceSha256||!origin.sourceIds.includes(item.sourceId))throw Error('Retained quarantine record/source binding mismatch');
-  return true;
- };
- if(!textLineage&&(textRecords.some(record=>!retainedIds.has(record.id))||quarantine.cases.some(item=>item.kind!=='structured'&&!retainedQuarantine(item))))throw Error('Text outputs require their authentic text lineage');
+ if(!textLineage&&(textRecords.some(record=>!retainedIds.has(record.id))||quarantine.cases.some(item=>item.kind!=='structured')))throw Error('Text outputs require their authentic text lineage');
+ for(const item of quarantine.cases)if(!registry.municipalities.some(city=>city.id===item.municipalityId&&city.sources.some(source=>source.id===item.sourceId)))throw Error('Quarantine municipality/source binding mismatch');
  const models=new Map<string,z.infer<typeof admittedModelSchema>>();
  for(const record of textRecords){
   const {provider,model,tool,toolVersion,modelIdentitySha256,modelIdentityBasis}=record.extraction,key=modelKey(record.extraction),existing=models.get(key);
@@ -172,10 +187,10 @@ export function buildDistrictCoverage(registry:DistrictRegistry,crawlInput:unkno
   const checks=crawl.checks.filter(check=>check.municipalityId===city.id);
   const fetched=new Set(documents.map(document=>document.sha256));
   const attempted=new Set(textLineage?.cumulative.groupBindings.attempted.filter(group=>group.municipalityId===city.id).map(group=>group.sourceSha256)??[]);
-  for(const hash of [...published.filter((record):record is TextCoverageRecord=>record.kind==='text_model'&&!retainedIds.has(record.id)).map(record=>record.extraction.inputSha256),...withheld.filter(item=>item.kind!=='structured'&&!retainedQuarantine(item)).map(item=>item.sourceSha256)])if(!attempted.has(hash))throw Error('Text lineage omits a source-bound published or quarantined attempt');
+  for(const hash of [...published.filter((record):record is TextCoverageRecord=>record.kind==='text_model'&&!retainedIds.has(record.id)).map(record=>record.extraction.inputSha256),...withheld.filter(item=>item.kind!=='structured').map(item=>item.sourceSha256)])if(!attempted.has(hash))throw Error('Text lineage omits a source-bound published or quarantined attempt');
   const present=[...attempted].filter(hash=>fetched.has(hash)).length;
-  const groups=textLineage?.cumulative.groupBindings;
-  const extraction={fetchedDocumentGroups:fetched.size,runSelectedDocumentGroups:groups?.selected==null?null:groups.selected.filter(group=>group.municipalityId===city.id).length,preparedDocumentGroups:groups?.prepared==null?null:groups.prepared.filter(group=>group.municipalityId===city.id).length,attemptedDocumentGroups:present,pendingDocumentGroups:fetched.size-present,unavailableAttemptedDocumentGroups:attempted.size-present};
+  const groups=textLineage?.cumulative.groupBindings??emptyNativeGroups;
+  const extraction={fetchedDocumentGroups:fetched.size,runSelectedDocumentGroups:groups.selected===null?null:groups.selected.filter(group=>group.municipalityId===city.id).length,preparedDocumentGroups:groups.prepared===null?null:groups.prepared.filter(group=>group.municipalityId===city.id).length,attemptedDocumentGroups:present,pendingDocumentGroups:fetched.size-present,unavailableAttemptedDocumentGroups:attempted.size-present};
   const checked=documents.length>0||attempted.size>0||checks.some(check=>check.checkedAt!==null)||!!structured?.coverage.some(receipt=>receipt.municipalityId===city.id&&receipt.coverage.checkedAt!==null);
   const datedStagedRecords=published.filter(knowledgeRecordHasSourcedAction).length;
   const status=published.length?'gated_records' as const:checked?'checked_no_gated_records' as const:'not_checked' as const;
@@ -194,7 +209,7 @@ export function buildDistrictCoverage(registry:DistrictRegistry,crawlInput:unkno
   return {id:district.id,ags:district.ags,municipalitiesRegistered:registry.inventory.filter(city=>city.districtId===district.id).length,municipalitiesConfigured:selected.length,municipalitiesChecked:selected.filter(city=>city.checked).length,municipalitiesAttempted:selected.filter(city=>city.extraction.attemptedDocumentGroups+city.extraction.unavailableAttemptedDocumentGroups>0).length,municipalitiesWithRecords:selected.filter(city=>city.publishedRecords>0).length,municipalitiesWithDatedStages:selected.filter(city=>city.datedStagedRecords>0).length,documents:selected.reduce((n,city)=>n+city.documents,0),publishedRecords:selected.reduce((n,city)=>n+city.publishedRecords,0),textModelRecords:selected.reduce((n,city)=>n+city.textModelRecords,0),structuredRecords:selected.reduce((n,city)=>n+city.structuredRecords,0),quarantinedRecords:selected.reduce((n,city)=>n+city.quarantinedRecords,0)};
  });
  const adapters=structured?.coverage.map(receipt=>({...projectStructuredCoverageReceipt(receipt),publishedRecords:structuredRecords.filter(record=>structuredReceiptMatches(record,receipt)).length}))??[];
- const coverage=districtCoverageSchema.parse({schemaVersion:'stadtstack-district-coverage-v5',generatedAt:generatedAt??textLineage?.generatedAt??structured?.generatedAt,accounting:coverageAccounting(registry,municipalities),districts,municipalities,models:[...models.values()].sort((a,b)=>modelKey(a).localeCompare(modelKey(b))),adapters,structuredRun:structured?{generatedAt:structured.generatedAt,registrySha256:structured.registrySha256,questionDispositionSha256:structured.questionDispositionSha256,adapterContractSha256:structured.adapterContractSha256}:null,textLineage,retainedPublication});
+ const coverage=districtCoverageSchema.parse({schemaVersion:'stadtstack-district-coverage-v5',generatedAt:generatedAt??textLineage?.generatedAt??structured?.generatedAt??retained?.baseline.lineage.artifactClocks.records,accounting:coverageAccounting(registry,municipalities),districts,municipalities,models:[...models.values()].sort((a,b)=>modelKey(a).localeCompare(modelKey(b))),adapters,structuredRun:structured?{generatedAt:structured.generatedAt,registrySha256:structured.registrySha256,questionDispositionSha256:structured.questionDispositionSha256,adapterContractSha256:structured.adapterContractSha256}:null,textLineage,retainedPublication,historicalCoverage,coverageScope:coverageScope(retained!==null)});
  validateDistrictCoverage(coverage,registry,records);return coverage;
 }
 export function validateDistrictCoverage(coverage:DistrictCoverage,registry:DistrictRegistry,records:DistrictCoverageRecord[]){
@@ -202,14 +217,13 @@ export function validateDistrictCoverage(coverage:DistrictCoverage,registry:Dist
  if(JSON.stringify(coverage.accounting)!==JSON.stringify(coverageAccounting(registry,coverage.municipalities)))throw Error('District coverage accounting mismatch');
  const textRecords=records.filter((record):record is TextCoverageRecord=>record.kind==='text_model'),structuredRecords=records.filter((record):record is StructuredKnowledgeRecord=>record.kind==='structured');
  const textLineage=coverage.textLineage===null?null:textRunLineageSchema.parse(coverage.textLineage),retainedPublication=coverage.retainedPublication===null?null:RetainedKnowledgeLineageSchema.parse(coverage.retainedPublication);
+ assertRetainedOrigins(retainedPublication,textLineage,registry,records);
+ if(retainedPublication===null?coverage.historicalCoverage!==null:coverage.historicalCoverage===null||textLineageRecordSha256(retainedHistoricalCoverageSchema.parse(coverage.historicalCoverage))!==retainedPublication.historicalCoverageSha256)throw Error('Retained historical coverage count/provenance mismatch');
+ if(JSON.stringify(coverage.coverageScope)!==JSON.stringify(coverageScope(retainedPublication!==null)))throw Error('District coverage cohort scope mismatch');
  const retainedIds=new Set(retainedPublication?.selectedRecordOrigins.map(origin=>origin.recordId)??[]),nativeTextRecords=textRecords.filter(record=>!retainedIds.has(record.id));
- if(new Set(retainedPublication?.selectedRecordOrigins.map(origin=>origin.recordId)??[]).size!==(retainedPublication?.selectedRecordOrigins.length??0))throw Error('Duplicate retained publication origin');
- for(const origin of retainedPublication?.selectedRecordOrigins??[]){
-  const record=records.find(item=>item.id===origin.recordId);
-  if(!record||record.kind!=='text_model'||origin.currentEvidenceHash!==record.verification.evidenceHash||origin.currentRecordSha256!==textLineageRecordSha256(record)||origin.municipalityId!==record.municipalityId||origin.sourceSha256!==record.extraction.inputSha256)throw Error('Retained publication record/origin binding mismatch');
- }
  if(textLineage)assertLineageRecords(textLineage,nativeTextRecords);else if(nativeTextRecords.length)throw Error('Missing authentic text lineage');
- const groups=textLineage?.cumulative.groupBindings,knownRuns=new Set(textLineage?.runs.map(run=>run.runId)??[]),knownCities=new Set(registry.municipalities.map(city=>city.id));
+ const groups=textLineage?.cumulative.groupBindings??emptyNativeGroups,knownRuns=new Set(textLineage?.runs.map(run=>run.runId)??[]),knownCities=new Set(registry.municipalities.map(city=>city.id));
+ if([...groups.fetched,...groups.attempted,...(groups.selected??[]),...(groups.prepared??[])].some(group=>!knownCities.has(group.municipalityId)))throw Error('Text lineage municipality is outside the publication registry');
  if(!coverage.structuredRun&&(structuredRecords.length||coverage.adapters.length))throw Error('Missing structured run provenance');
  for(const adapter of coverage.adapters){
   if(!registry.municipalities.some(city=>city.id===adapter.municipalityId&&city.sources.some(source=>source.id===adapter.sourceId)))throw Error('Structured adapter registry binding mismatch');
@@ -234,11 +248,12 @@ export function validateDistrictCoverage(coverage:DistrictCoverage,registry:Dist
   const status=city.publishedRecords?'gated_records':city.checked?'checked_no_gated_records':'not_checked';
   if(city.status!==status||city.datedStagedRecords!==datedStagedRecords)throw Error(`Municipality admission coverage mismatch: ${city.id}`);
   const extraction=city.extraction,publishedGroups=new Set(nativeTextRecords.filter(record=>record.municipalityId===city.id).map(record=>record.extraction.inputSha256)).size;
-  if(extraction.fetchedDocumentGroups!==extraction.attemptedDocumentGroups+extraction.pendingDocumentGroups||extraction.fetchedDocumentGroups>city.documents||extraction.attemptedDocumentGroups<publishedGroups)throw Error(`Extraction coverage mismatch: ${city.id}`);
+  if(extraction.fetchedDocumentGroups!==extraction.attemptedDocumentGroups+extraction.pendingDocumentGroups||extraction.fetchedDocumentGroups>city.documents||extraction.attemptedDocumentGroups+extraction.unavailableAttemptedDocumentGroups<publishedGroups)throw Error(`Extraction coverage mismatch: ${city.id}`);
   const attempts=extraction.attemptedDocumentGroups+extraction.unavailableAttemptedDocumentGroups;
-  const expectedAttempts=groups?.attempted.filter(group=>group.municipalityId===city.id).length??0,expectedSelected=groups?.selected==null?null:groups.selected.filter(group=>group.municipalityId===city.id).length,expectedPrepared=groups?.prepared==null?null:groups.prepared.filter(group=>group.municipalityId===city.id).length;
+  const expectedAttempts=groups.attempted.filter(group=>group.municipalityId===city.id).length,expectedSelected=groups.selected===null?null:groups.selected.filter(group=>group.municipalityId===city.id).length,expectedPrepared=groups.prepared===null?null:groups.prepared.filter(group=>group.municipalityId===city.id).length;
   if(attempts!==expectedAttempts||extraction.runSelectedDocumentGroups!==expectedSelected||extraction.preparedDocumentGroups!==expectedPrepared)throw Error(`Extraction lineage municipality binding mismatch: ${city.id}`);
   if((city.documents>0||attempts>0)&&!city.checked||extraction.runSelectedDocumentGroups!==null&&extraction.runSelectedDocumentGroups<attempts||extraction.preparedDocumentGroups!==null&&(extraction.runSelectedDocumentGroups===null||extraction.preparedDocumentGroups>extraction.runSelectedDocumentGroups))throw Error(`Extraction selection/preparation coverage mismatch: ${city.id}`);
+  if(!textLineage&&(city.documents||city.sources.some(source=>source.documentCount||source.observations.length)))throw Error('Retained-only coverage cannot invent native text observations');
   for(const entry of [city,...city.sources]){
    const histogram=entry.quarantineReasons;
    if(new Set(histogram.categories.map(row=>row.reason)).size!==histogram.categories.length||new Set(histogram.failedDeterministicChecks.map(row=>row.id)).size!==histogram.failedDeterministicChecks.length||histogram.categories.some(row=>row.count===0||row.count>entry.quarantinedRecords)||histogram.failedDeterministicChecks.some(row=>row.count===0||row.count>(histogram.categories.find(row=>row.reason==='deterministic_gate_failed')?.count??0))||histogram.categories.reduce((n,row)=>n+row.count,0)<entry.quarantinedRecords)throw Error('Quarantine reason histogram count mismatch');

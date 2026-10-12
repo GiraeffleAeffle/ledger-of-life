@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -8,81 +8,28 @@ import { TOPICS, tokens, titleClusters } from './taxonomy.mjs';
 import { collectDiPlan } from './diplan.mjs';
 import { collectCouncil } from './council.mjs';
 import { checkWriezenCalendar } from './calendar.mjs';
+import { extractRegionalStatement } from './statements.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const output = join(root, '../out/regions/brandenburg-mol/topics.json');
 const cacheDir = join(root, '.cache');
-const UA = 'StadtstackResearch/1.0 (regional source-index research; polite read-only requests)';
 const DISTRICT = 'https://service.brandenburg.de/service/de/adressen/kommunalverzeichnis/ansicht/~12064-maerkisch-oderland';
 const CSV = 'https://service.brandenburg.de/service/de/adressen/kommunalverzeichnis/kvdaten.csv';
 const asOf = process.env.REGIONAL_AS_OF || new Date().toISOString().slice(0, 10);
 const cutoff = new Date(`${asOf}T12:00:00Z`);
 cutoff.setUTCMonth(cutoff.getUTCMonth() - 18);
 const cutoffDate = cutoff.toISOString().slice(0, 10);
-const offline = process.argv.includes('--offline');
+if (process.argv.slice(2).length !== 1 || process.argv[2] !== '--offline') throw Error('Legacy regional collector is offline-only: pass --offline; acquire new sources through the governed district lane');
 const warnings = [];
-const lastHost = new Map();
-const robotsCache = new Map();
-const hostDelays = new Map();
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const slug = value => value.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-async function cachedFetch(url, { maxAge = 24 * 3600_000, robots = true, method = 'GET', requestBody = null } = {}) {
+async function cachedFetch(url, { method = 'GET', requestBody = null } = {}) {
   const file = join(cacheDir, createHash('sha256').update(`${method} ${url}\n${requestBody || ''}`).digest('hex') + '.txt');
-  let previous;
-  try { previous = await readFile(file, 'utf8'); } catch { /* no cache */ }
-  if (offline) {
-    if (previous === undefined) throw Error(`No offline snapshot: ${url}`);
-    return previous;
+  try { return await readFile(file, 'utf8'); }
+  catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    throw Error(`No offline snapshot: ${url}; acquire through the governed district lane`);
   }
-  if (previous !== undefined && Date.now() - (await stat(file)).mtimeMs < maxAge) return previous;
-  try {
-    if (robots) await checkRobots(url);
-    const host = new URL(url).host;
-    const pause = Math.max(0, (lastHost.get(host) || 0) + (hostDelays.get(host) || 850) - Date.now());
-    if (pause) await sleep(pause);
-    lastHost.set(host, Date.now());
-    const response = await fetch(url, { method, body: requestBody, headers: { 'User-Agent': UA, Accept: 'application/json,text/html,text/csv,text/plain;q=0.8', ...(requestBody && { 'Content-Type': 'application/x-www-form-urlencoded' }) }, signal: AbortSignal.timeout(18000) });
-    if (!response.ok && !(url.endsWith('/robots.txt') && response.status === 404)) throw Error(`HTTP ${response.status}`);
-    const body = response.status === 404 ? '' : await response.text();
-    if (!url.endsWith('/robots.txt') && (!body || body.length > 8_000_000)) throw Error('Empty or too large response');
-    await mkdir(cacheDir, { recursive: true });
-    await writeFile(file, body);
-    return body;
-  } catch (error) {
-    if (previous === undefined) throw Error(`${url}: ${error.message}`);
-    warnings.push(`Last-good cache used for ${url}: ${error.message}`);
-    return previous;
-  }
-}
-
-async function checkRobots(url) {
-  const origin = new URL(url).origin;
-  if (!robotsCache.has(origin)) {
-    const content = await cachedFetch(`${origin}/robots.txt`, { maxAge: 7 * 24 * 3600_000, robots: false }).catch(error => {
-      warnings.push(`${origin}/robots.txt unavailable (${error.message}); skip this origin`);
-      return null;
-    });
-    robotsCache.set(origin, content);
-  }
-  const text = robotsCache.get(origin);
-  if (text === null) throw Error('No robots policy available');
-  const requestedDelay = Math.max(0, ...[...text.matchAll(/^crawl-delay:\s*(\d+(?:\.\d+)?)/gim)].map(match => Number(match[1]) * 1000));
-  if (requestedDelay) hostDelays.set(new URL(url).host, requestedDelay);
-  let active = false, bestLength = 0, blocked = false;
-  const path = new URL(url).pathname;
-  for (const line of text.split(/\r?\n/)) {
-    const clean = line.split('#')[0].trim();
-    const match = /^(user-agent|disallow|allow):\s*(.*)$/i.exec(clean);
-    if (!match) continue;
-    const directive = match[1].toLowerCase();
-    if (directive === 'user-agent') active = match[2] === '*';
-    if (active && match[2] && (directive === 'allow' || directive === 'disallow') && path.startsWith(match[2]) && match[2].length >= bestLength) {
-      bestLength = match[2].length;
-      blocked = directive === 'disallow';
-    }
-  }
-  if (blocked) throw Error(`robots disallow ${path}`);
 }
 
 function parseCsv(text) {
@@ -136,7 +83,7 @@ function buildTopic(category, items, method = 'keyword') {
     const deduped = [...new Map(entries.map(item => [item.url, item])).values()];
     const ranked = ['adopted', 'decision_recorded', 'evaluation', 'decision_pending', 'consultation_closed', 'consultation', 'draft', 'planning', 'referred', 'agenda', 'unknown'];
     const stage = deduped.map(item => item.stage).sort((a, b) => ranked.indexOf(a) - ranked.indexOf(b))[0];
-    return { municipalityId, stage, items: deduped.map(({ title, url, date, sourceType, locator, stage: itemStage, participationEnd }) => ({ title, url, date, sourceType, locator, stage: itemStage, ...(participationEnd ? { participationEnd } : {}) })).sort((a, b) => (b.date || '').localeCompare(a.date || '')) };
+    return { municipalityId, stage, items: deduped.map(({ title, url, date, sourceType, locator, statement, statementEvidence, stage: itemStage, participationEnd }) => ({ title, url, date, sourceType, locator, ...(statement ? { statement, statementEvidence } : {}), stage: itemStage, ...(participationEnd ? { participationEnd } : {}) })).sort((a, b) => (b.date || '').localeCompare(a.date || '')) };
   }).sort((a, b) => a.municipalityId.localeCompare(b.municipalityId));
   const dates = items.map(item => item.date).filter(Boolean).sort();
   return { id: category.id, label: category.label, summary: category.summary, categoryKeywords: category.keywords, municipalities: group, firstSeen: dates[0] || null, lastSeen: dates.at(-1) || null, method, reviewState: 'candidate' };
@@ -153,7 +100,8 @@ async function cityEvidence(known) {
       const html = await pages.get(entry.url);
       const text = load(html)('body').text().replace(/\s+/g, ' ');
       if (!text.includes(entry.evidence)) throw Error('Locator phrase missing or page changed');
-      items.push({ municipalityId: entry.municipality, title: entry.title, url: entry.url, date: entry.date, sourceType: entry.sourceType || 'cityWebsite', locator: entry.locator, stage: entry.stage, category: entry.category });
+      const statement = extractRegionalStatement(html, entry.statementAnchors ?? [entry.evidence]);
+      items.push({ municipalityId: entry.municipality, title: entry.title, url: entry.url, date: entry.date, sourceType: entry.sourceType || 'cityWebsite', locator: entry.locator, ...statement, stage: entry.stage, category: entry.category });
     } catch (error) { warnings.push(`Not publishing ${entry.url} (${entry.municipality}): ${error.message}`); }
   }
   return { items, pages: pages.size };

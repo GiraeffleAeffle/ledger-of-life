@@ -18,15 +18,53 @@ import {isSourceRevoked,isRecordRevoked,type VerifiedRevocations,type Revocation
 import {buildKnowledgeGraph,projectKnowledgeReadEnvelope,KnowledgeGraphSchema,type KnowledgeGraph} from './district-graph.ts';
 import {CriticalAdmissionsSchema} from './district-critical-assessment-contract.ts';
 import {mcpSourceId,sourceMetadataUrls} from './mcp-source-identity.ts';
-import {visibleChanges} from './mcp-read-view.ts';
+import {visibleCatalogue,visibleCore,visibleChanges} from './mcp-read-view.ts';
+import {administrativeView} from './mcp-revocation-view.ts';
 import {assertCriticalAdmissionsBound} from './district-critical-assessment-public.ts';
 
 export type ReleaseLoadOptions={mode:'sealed';revocations?:VerifiedRevocations}|{mode:'vm_candidate';policyOptions:CivicPolicyOptions};
 export type ReleasedKnowledge=z.infer<typeof KnowledgeRecordsSchema>;
-export type ReleasedData={bundle:CoreBundle;manifest:Record<string,unknown>;dataManifest:DataRelease;publicationInputs:PublicationInputs;catalogue:Catalogue;features:Signal[];feeds:Record<string,CityFeed>;changes:Record<string,Changes>;regional:Regional;knowledge:ReleasedKnowledge;registry:DistrictRegistry;coverage:DistrictCoverage;servedCoverage:MaskedCoverage|null;knowledgeChanges:Changes;graphData:KnowledgeGraph;index:QueryIndex;graph:GraphIndex;mode:'sealed'|'vm_candidate';revocations:VerifiedRevocations|null;visibility:QueryVisibility|null};
+export type ReleasedData={bundle:CoreBundle;manifest:Record<string,unknown>;dataManifest:DataRelease;publicationInputs:PublicationInputs;catalogue:Catalogue;features:Signal[];feeds:Record<string,CityFeed>;changes:Record<string,Changes>;regional:Regional;knowledge:ReleasedKnowledge;knowledgeBytes:string|Uint8Array;registry:DistrictRegistry;coverage:DistrictCoverage;servedCoverage:MaskedCoverage|null;knowledgeChanges:Changes;graphData:KnowledgeGraph;index:QueryIndex;graph:GraphIndex;mode:'sealed'|'vm_candidate';revocations:VerifiedRevocations|null;visibility:QueryVisibility|null};
 let release:ReleasedData|undefined;
 let loading:Promise<ReleasedData>|undefined;
 const releaseSourceUrls=new WeakMap<ReleasedData,readonly string[]>();
+const readViews=new WeakMap<ReleasedData,ReleasedData>();
+/** Materialized once per immutable startup snapshot, including injected server releases. */
+export function prepareReleaseReadView(input:ReleasedData):ReleasedData {
+ const cached=readViews.get(input);if(cached&&cached.revocations===input.revocations)return cached;
+ if(input.mode!=='sealed'||!input.revocations)throw Error('Hosted MCP requires a sealed publication with verified revocations');
+ const revocations=input.revocations,view=administrativeView(input.dataManifest.id,revocations);
+ if(input.graph.administrativeView&&input.graph.administrativeView.viewId!==view.viewId)throw Error('Graph administrative read-view mismatch');
+ if(input.visibility){
+  if(input.visibility.index!==input.index||input.visibility.releaseId!==input.dataManifest.id||input.visibility.maskIdentity!==revocations.artifactSha256||input.index.administrativeView?.viewId!==view.viewId||input.graph.administrativeView?.viewId!==view.viewId)throw Error('Sealed MCP serving requires the verified immutable read view');
+ }
+ const {bundle,manifest,dataManifest,publicationInputs,catalogue,features,feeds,changes,regional,knowledge,knowledgeBytes,registry,coverage,knowledgeChanges,graphData,graph}=input;
+ const publicationIndex=input.index;
+ const visibility=input.visibility??publicationIndex.withRevocations(revocations);
+ const index=visibility.index;
+  const metadataBase=input;
+  const maskedMetadata=visibility&&revocations?.targets.length?projectMaskedReleaseMetadata(metadataBase,visibility):null;
+  let servedGraph=graph,servedGraphData=graphData,servedFeatures=features,servedRegional=regional,servedKnowledge=knowledge,servedChanges=changes,servedBundle=bundle,servedRegistry=registry;
+  if(visibility&&revocations){
+    servedFeatures=features.filter(feature=>visibility.visibleRecordIds.has(feature.properties.id));
+    servedRegional=visibility.index.regional;
+    servedKnowledge=projectKnowledgeReadEnvelope(knowledge,visibility.visibleRecordIds);
+    if(!graph.administrativeView){
+      const safeBytes=servedKnowledge.records.length===knowledge.records.length?knowledgeBytes:JSON.stringify(servedKnowledge);
+      const safeGraph=buildKnowledgeGraph(safeBytes,{asOf:graphData.asOf});
+      servedGraph=graph.withReadView(safeGraph,safeBytes,visibility.visibleRecordIds,revocations);
+    }
+    servedGraphData=servedGraph.graphView();
+    servedChanges=visibleChanges(changes,features,knowledge,revocations);
+    servedBundle=visibleCore(bundle,features,revocations,registry.municipalities.flatMap(city=>city.sources.map(source=>({municipalityId:city.id,registrySourceId:source.id,...(source.url?{url:source.url}:{})}))));
+    servedRegistry={...registry,municipalities:registry.municipalities.map(city=>{
+      const sourceIds=new Set(index.knowledge?.municipalities.find(item=>item.id===city.id)?.sources.map(source=>source.id)??[]);
+      return {...city,sources:city.sources.filter(source=>sourceIds.has(source.id)),amt:city.amt&&isSourceRevoked(revocations,{url:city.amt.sourceUrl})?null:city.amt,administrativeEvidence:city.administrativeEvidence.filter(item=>!isSourceRevoked(revocations,{municipalityId:city.id,url:item.url})),identitySources:city.identitySources.filter(item=>!isSourceRevoked(revocations,{municipalityId:city.id,url:item.url})),seedDocuments:city.seedDocuments.filter(item=>sourceIds.has(item.sourceId)&&!isSourceRevoked(revocations,{municipalityId:city.id,registrySourceId:item.sourceId,url:item.url})&&item.evidence.every(evidence=>!isSourceRevoked(revocations,{url:evidence.url})))};
+    })};
+  }
+ const output:ReleasedData={...input,bundle:servedBundle,catalogue:maskedMetadata?.catalogue??catalogue,features:servedFeatures,feeds:maskedMetadata?.feeds??feeds,changes:servedChanges,regional:servedRegional,knowledge:servedKnowledge,registry:servedRegistry,servedCoverage:maskedMetadata?.coverage??null,graphData:servedGraphData,index,graph:servedGraph,revocations,visibility};
+ readViews.set(input,output);readViews.set(output,output);return output;
+}
 /** Sealed hosted reads use the verified startup mask, never VM/CAS policy access. */
 export async function recheckReleasePolicy(data:ReleasedData,policyOptions?:CivicPolicyOptions):Promise<ReleasedData>{
  if(data.mode==='sealed'){if(!data.revocations||data.revocations.releaseId!==data.dataManifest.id)throw Error('Sealed release lacks its governed revocation state');isSourceRevoked(data.revocations,{});return data;}
@@ -66,7 +104,7 @@ export async function loadRelease(directory=governedReleaseDirectory(),options:R
     const collection=collectionSchema.parse(JSON.parse(collectionBytes.toString('utf8')));
     if(city.feedUrl){const feed=cityFeedSchema.parse(JSON.parse((await readReleaseFile(directory,dataManifest,city.feedUrl)).toString('utf8')));if(feed.cityId!==city.id)throw Error('Released feed city mismatch');feeds[city.id]=feed;for(const source of feed.sources){feedSourceUrls.add(source.url);if(source.pageUrl)feedSourceUrls.add(source.pageUrl);}for(const item of feed.items){feedSourceUrls.add(item.url);if(item.locationSource){feedSourceUrls.add(item.locationSource.url);if(item.locationSource.geometrySourceUrl)feedSourceUrls.add(item.locationSource.geometrySourceUrl);}}}
     changes[city.id]=validateChanges(JSON.parse((await readReleaseFile(directory,dataManifest,`cities/${city.id}/changes.json`)).toString('utf8')),collection.features.map(signalChangeRecord));
-    if(changes[city.id].events.some(event=>event.cityId!==city.id||event.recordType!=='signal'))throw Error('Released city change scope mismatch');
+    if(changes[city.id].snapshots.some(snapshot=>snapshot.cityId!==city.id||snapshot.recordType!=='signal')||changes[city.id].events.some(event=>event.cityId!==city.id||event.recordType!=='signal'))throw Error('Released city change scope mismatch');
     if(collection.features.some(feature=>feature.properties.cityId!==city.id))throw Error('Released feature city mismatch');
     features.push(...collection.features);
   }
@@ -84,8 +122,8 @@ export async function loadRelease(directory=governedReleaseDirectory(),options:R
     const prior=changes[cityId];
     changes[cityId]={schemaVersion:'stadtstack-changes-v2',generatedAt:dataManifest.generatedAt,events:[...(prior?.events??[]),...knowledgeChanges.events.filter(event=>event.cityId===cityId)],snapshots:[...(prior?.snapshots??[]),...snapshots]};
   }
-  if(knowledgeChanges.events.some(event=>event.recordType!=='knowledge'||!municipalityIds.has(event.cityId)))throw Error('Released knowledge change scope mismatch');
-  for(const [cityId,feed] of Object.entries(changes))changes[cityId]=changesSchema.parse({...feed,events:feed.events.sort((a,b)=>a.recordType.localeCompare(b.recordType)||a.id.localeCompare(b.id)||a.kind.localeCompare(b.kind))});
+  if(knowledgeChanges.snapshots.some(snapshot=>snapshot.recordType!=='knowledge'||!municipalityIds.has(snapshot.cityId))||knowledgeChanges.events.some(event=>event.recordType!=='knowledge'||!municipalityIds.has(event.cityId)))throw Error('Released knowledge change scope mismatch');
+  for(const [cityId,feed] of Object.entries(changes))changes[cityId]=changesSchema.parse({...feed,generatedAt:dataManifest.generatedAt,snapshots:feed.snapshots.sort((a,b)=>a.recordType.localeCompare(b.recordType)),events:feed.events.sort((a,b)=>a.recordType.localeCompare(b.recordType)||a.id.localeCompare(b.id)||a.kind.localeCompare(b.kind))});
   const publicationInputs=publicationInputsSchema.parse(JSON.parse((await readReleaseFile(directory,dataManifest,'knowledge/publication-inputs.json')).toString('utf8')));
   if(JSON.stringify(publicationInputs.staging.map(member=>member.path))!==JSON.stringify(requiredPublicationStaging(catalogue.cities.map(city=>city.id))))throw Error('Release publication input inventory mismatch');
   verifyPublicationPolicyReceipts(publicationInputs,knowledge.records.map(record=>record.id));
@@ -101,32 +139,13 @@ export async function loadRelease(directory=governedReleaseDirectory(),options:R
   if(graphData.asOf!==publicationInputs.asOf)throw Error('Released graph asOf is not publication-bound');
   const graph=new GraphIndex(dataManifest.id,graphData,knowledgeBytes);
   const publicationIndex=new QueryIndex(dataManifest.id,dataManifest.generatedAt,features,regional,catalogue,{records:knowledge.records,municipalities:registry.municipalities,coverage});
-  const visibility=revocations?publicationIndex.withRevocations(revocations):null;
-  const index=visibility?.index??publicationIndex;
-  const metadataBase:ReleasedData={bundle,manifest,dataManifest,publicationInputs,catalogue,features,feeds,changes,regional,knowledge,registry,coverage,servedCoverage:null,knowledgeChanges,graphData,index:publicationIndex,graph,mode:options.mode,revocations,visibility:null};
-  const maskedMetadata=visibility&&revocations?.targets.length?projectMaskedReleaseMetadata(metadataBase,visibility):null;
-  let servedGraph=graph,servedGraphData=graphData,servedFeatures=features,servedRegional=regional,servedKnowledge=knowledge,servedChanges=changes,servedBundle=bundle,servedRegistry=registry;
-  if(visibility&&revocations){
-    servedFeatures=features.filter(feature=>visibility.visibleRecordIds.has(feature.properties.id));
-    servedRegional=visibility.index.regional;
-    servedKnowledge=projectKnowledgeReadEnvelope(knowledge,visibility.visibleRecordIds);
-    const safeBytes=servedKnowledge.records.length===knowledge.records.length?knowledgeBytes:JSON.stringify(servedKnowledge);
-    const safeGraph=buildKnowledgeGraph(safeBytes,{asOf:graphData.asOf});
-    servedGraph=graph.withReadView(safeGraph,safeBytes,visibility.visibleRecordIds,revocations);
-    servedGraphData=servedGraph.graphView();
-    servedChanges=visibleChanges(changes,features,knowledge,revocations);
-    servedBundle={...bundle,facts:bundle.facts.filter(fact=>{const descriptors:RevocationSourceDescriptor[]=[{url:fact.source.url,mcpSourceId:mcpSourceId(fact.source)},...sourceMetadataUrls(fact.source).filter(url=>url!==fact.source.url).map(url=>({url}))];for(const municipality of registry.municipalities)if(municipality.id===bundle.cityId)for(const source of municipality.sources)if(source.url===fact.source.url)descriptors.push({municipalityId:municipality.id,registrySourceId:source.id,url:source.url});return !isRecordRevoked(revocations,{recordId:fact.id,municipalityId:bundle.cityId,sources:descriptors});})};
-    servedRegistry={...registry,municipalities:registry.municipalities.map(city=>{
-      const sourceIds=new Set(index.knowledge?.municipalities.find(item=>item.id===city.id)?.sources.map(source=>source.id)??[]);
-      return {...city,sources:city.sources.filter(source=>sourceIds.has(source.id)),amt:city.amt&&isSourceRevoked(revocations,{url:city.amt.sourceUrl})?null:city.amt,administrativeEvidence:city.administrativeEvidence.filter(item=>!isSourceRevoked(revocations,{municipalityId:city.id,url:item.url})),identitySources:city.identitySources.filter(item=>!isSourceRevoked(revocations,{municipalityId:city.id,url:item.url})),seedDocuments:city.seedDocuments.filter(item=>sourceIds.has(item.sourceId)&&!isSourceRevoked(revocations,{municipalityId:city.id,registrySourceId:item.sourceId,url:item.url})&&item.evidence.every(evidence=>!isSourceRevoked(revocations,{url:evidence.url})))};
-    })};
-  }
+  const metadataBase:ReleasedData={bundle,manifest,dataManifest,publicationInputs,catalogue,features,feeds,changes,regional,knowledge,knowledgeBytes,registry,coverage,servedCoverage:null,knowledgeChanges,graphData,index:publicationIndex,graph,mode:options.mode,revocations,visibility:null};
   const sourceUrls=new Set<string>(feedSourceUrls);
   for(const feature of features)for(const source of feature.properties.sources){sourceUrls.add(source.url);if(source.snapshotUrl)sourceUrls.add(source.snapshotUrl);}
   for(const fact of bundle.facts)sourceUrls.add(fact.source.url);
   for(const topic of regional.topics)for(const municipality of topic.municipalities)for(const item of municipality.items)sourceUrls.add(item.url);
   for(const record of knowledge.records)for(const source of record.kind==='structured'?[record.source,...record.supportingSources]:record.sources)sourceUrls.add(source.url);
-  const admitted:ReleasedData={bundle:servedBundle,manifest,dataManifest,publicationInputs,catalogue:maskedMetadata?.catalogue??catalogue,features:servedFeatures,feeds:maskedMetadata?.feeds??feeds,changes:servedChanges,regional:servedRegional,knowledge:servedKnowledge,registry:servedRegistry,coverage,servedCoverage:maskedMetadata?.coverage??null,knowledgeChanges,graphData:servedGraphData,index,graph:servedGraph,mode:options.mode,revocations,visibility};
+  const admitted=options.mode==='sealed'?prepareReleaseReadView(metadataBase):metadataBase;
   releaseSourceUrls.set(admitted,[...sourceUrls]);
   await recheckReleasePolicy(admitted,options.mode==='vm_candidate'?options.policyOptions:undefined);
   release=admitted;
@@ -157,7 +176,7 @@ export function projectMaskedReleaseMetadata(base:ReleasedData,visibility:QueryV
  }
  const allowed=(descriptor:RevocationSourceDescriptor)=>!isSourceRevoked(mask,descriptor)&&!(descriptor.municipalityId&&descriptor.registrySourceId&&blockedScopes.has(JSON.stringify([descriptor.municipalityId,descriptor.registrySourceId])))&&!(descriptor.url&&blockedUrls.has(descriptor.url));
  const visible=base.knowledge.records.filter(record=>visibility.visibleRecordIds.has(record.id)),features=base.features.filter(feature=>visibility.visibleRecordIds.has(feature.properties.id));
- const catalogue:Catalogue={...base.catalogue,cities:base.catalogue.cities.map(city=>({...city,sources:city.sources.filter(source=>allowed({municipalityId:city.id,registrySourceId:source.id,url:source.url})&&sourceMetadataUrls(source).every(url=>!isSourceRevoked(mask,{url}))).map(source=>{const {error:_raw,...safe}=source;const count=features.filter(feature=>feature.properties.cityId===city.id&&feature.properties.sources.some(item=>item.url===source.url||item.snapshotUrl===source.url)).length;return {...safe,publishedRecordCount:count,...(source.status==='failed'?{error:'Source unavailable in the original sealed observation'}:{})};})}))};
+ const catalogue=visibleCatalogue(base.catalogue,features,mask);
  const feeds:Record<string,CityFeed>={};
  for(const [cityId,feed] of Object.entries(base.feeds)){
   const sources=feed.sources.filter(source=>allowed({municipalityId:cityId,registrySourceId:source.id,url:source.url})&&(!source.pageUrl||allowed({municipalityId:cityId,registrySourceId:source.id,url:source.pageUrl}))),sourceIds=new Set(sources.map(source=>source.id));

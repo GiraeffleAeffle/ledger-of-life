@@ -11,7 +11,7 @@ const SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
 const HEARTBEAT_FRAME = Buffer.from(WORKER_HEARTBEAT.slice(0, -1));
 export type WorkerLease<T> = { control: Promise<T>; signal: AbortSignal; dispose: () => void };
 
-// SSH authenticates the channel. Only one bounded JSON control frame is accepted;
+// A native parent pipe accepts one bounded, authority-pinned JSON control frame;
 // subsequent frames are fixed heartbeats, never further commands or source text.
 export function startWorkerLease<T>(input: Readable, parse: (raw: unknown) => T, options: { leaseMs?: number; signals?: EventEmitter } = {}): WorkerLease<T> {
   const controller = new AbortController();

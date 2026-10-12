@@ -1,7 +1,7 @@
 import {readFile,mkdir,realpath,lstat} from 'node:fs/promises';
 import {join} from 'node:path';
 import {z} from 'zod';
-import {modelReadiness,subscriptionChat} from './district-model.ts';
+import {modelReadiness,subscriptionChat,subscriptionInputWithinBound,MODEL_INPUT_BOUND_REASON} from './district-model.ts';
 import {PROVIDER_CONFIGS,type ExtractorProvider,type ModelEvidence,type UsageContext} from './district-model-contract.ts';
 import {cachedModelAnswer,modelAnswerCacheBinding} from './district-answer-cache.ts';
 import type {CachedAnswer} from './district-answer-cache.ts';
@@ -68,7 +68,6 @@ export async function archiveJointExtractionContract(out:string,contract:Extract
   return {path,sha256:sha256(bytes)};
  }finally{await release();}
 }
-
 async function cachedAnswer(provider:ExtractorProvider,identity:ModelEvidence,system:string,input:unknown,schema:object,cacheRoot:string,usage:UsageContext,prepared:PreparedDocument,policy:CivicPolicyOptions,cacheContext:PreparedCacheContext):Promise<CachedAnswer>{
  usage.signal?.throwIfAborted();
  await assertPreparedSourcesActive(prepared.references,policy);
@@ -113,14 +112,23 @@ export async function inferPreparedDocument(options:{taskId:string;groupId:strin
  }
  options.usage.signal?.throwIfAborted();
  await assertPreparedSourcesActive(prepared.references,policy);
- await archiveJointExtractionContract(options.out,contract,options.usage.signal);
- const identity=options.fixtureReadinessExecutor?await sourceFreeModelReadiness(options.provider,options.fixtureReadinessExecutor,options.usage.signal):await modelReadiness(options.provider,options.usage.signal,policy),config=PROVIDER_CONFIGS[options.provider];
- const cacheRoot=join(options.out,'cache');await mkdir(cacheRoot,{recursive:true,mode:0o700});
- await initializeManagedAcquisitionLane(await realpath(cacheRoot),{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...policy});
+ let identity:ModelEvidence|undefined;
+ const config=PROVIDER_CONFIGS[options.provider],cacheRoot=join(options.out,'cache');
  const cacheContext=preparedCacheContext(prepared.receiptSha256,prepared.references),cacheBindings=preparedSourceBindings(prepared.references,prepared.receiptSha256),recordSourceBinding=JSON.stringify({municipality,sourceContext:cacheContext});
  for(const chunk of document){
   options.usage.signal?.throwIfAborted();
   await assertPreparedSourcesActive(prepared.references,policy);
+  const extractionInput={municipality:{id:municipality.id,name:municipality.name},vocabulary:TOPIC_VOCABULARY.map(({pattern:_pattern,...topic})=>topic),source:{text:chunk.text}};
+  if(!subscriptionInputWithinBound(extractionInput)){
+   rejection(chunk.index,MODEL_INPUT_BOUND_REASON);
+   chunks.push({index:chunk.index,outcome:'rejected',responseSha256:null,recordId:null});continue;
+  }
+  if(!identity){
+   await archiveJointExtractionContract(options.out,contract,options.usage.signal);
+   identity=options.fixtureReadinessExecutor?await sourceFreeModelReadiness(options.provider,options.fixtureReadinessExecutor,options.usage.signal):await modelReadiness(options.provider,options.usage.signal,policy);
+   await mkdir(cacheRoot,{recursive:true,mode:0o700});
+   await initializeManagedAcquisitionLane(await realpath(cacheRoot),{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...policy});
+  }
   const cacheKey=extractionCacheKey({provider:options.provider,documentHash:prepared.sourceSha256,textHash:prepared.textSha256,extractorHash:contract.extractorSha256,modelIdentitySha256:identity.modelIdentitySha256,chunk:{index:chunk.index,start:chunk.start,end:chunk.end},municipalityId:municipality.id,sourceBinding:recordSourceBinding}),recordPath=join(cacheRoot,cacheKey+'.record.json');
   const references=prepared.references.map(reference=>({...reference,locator:`text-sha256:${prepared.textSha256};chars:${chunk.start}-${chunk.end}`}));
   let cached:DistrictKnowledgeRecord|undefined;
@@ -128,19 +136,25 @@ export async function inferPreparedDocument(options:{taskId:string;groupId:strin
   if(cached){
    if(cached.extraction.cacheKey!==cacheKey||cached.extraction.provider!==options.provider||cached.extraction.textSha256!==prepared.textSha256||cached.ags!==municipality.ags||cached.districtId!==municipality.districtId)throw Error('Source extraction cache binding mismatch');
    if(cached.verification.status==='auto-verified'&&!deterministicChecks(cachedClaims(cached),chunk.text,municipality.name).passed)throw Error('Source extraction cache no longer passes exact checks');
+   assertPreparedReferenceMembership(cached.sources,prepared.references);
    cached=rebindSourceReferences(cached,references);
    if(cached.verification.status==='auto-verified')records.push(cached);else rejection(chunk.index,cached.verification.reason??'Candidate gates failed',cached);
    chunks.push({index:chunk.index,outcome:cached.verification.status==='auto-verified'?'admitted':'rejected',responseSha256:cached.extraction.responseSha256,recordId:cached.id});continue;
   }
   // Operational/model failures propagate: the provider lane pauses instead of retrying every chunk.
-  const answer=await cachedAnswer(options.provider,identity,EXTRACTION_INSTRUCTIONS,{municipality:{id:municipality.id,name:municipality.name},vocabulary:TOPIC_VOCABULARY.map(({pattern:_pattern,...topic})=>topic),source:{text:chunk.text}},outputJSONSchema,cacheRoot,{...options.usage,purpose:options.purpose==='agreement'?'agreement':'extraction',groupId:options.groupId},prepared,policy,cacheContext);
+  const answer=await cachedAnswer(options.provider,identity,EXTRACTION_INSTRUCTIONS,extractionInput,outputJSONSchema,cacheRoot,{...options.usage,purpose:options.purpose==='agreement'?'agreement':'extraction',groupId:options.groupId},prepared,policy,cacheContext);
   const decoded=extractionOutputSchema.safeParse(answer.value);
   if(!decoded.success){rejection(chunk.index,'Structured output/schema validation failed');chunks.push({index:chunk.index,outcome:'rejected',responseSha256:answer.responseSha256,recordId:null});continue;}
   if(!decoded.data.record){rejection(chunk.index,'No supported case in source excerpt');chunks.push({index:chunk.index,outcome:'no_case',responseSha256:answer.responseSha256,recordId:null});continue;}
   const restored=restoreSourceQuotes(decoded.data.record,chunk.text,chunk.start),{claims,normalization:relationNormalization}=normalizeRelationActions(restored.claims),normalization=restored.normalization,deterministic=deterministicChecks(claims,chunk.text,municipality.name);
   let faithfulness:DistrictKnowledgeRecord['verification']['faithfulness']={score:null,threshold:0.8,model:identity.model,provider:identity.provider,tool:identity.tool,toolVersion:identity.toolVersion,modelIdentitySha256:identity.modelIdentitySha256,returnedModel:null,reason:'Not evaluated: deterministic gate failed',evaluatedAt:null,responseSha256:null,sameModel:true,limitation:LIMITATION};
   if(deterministic.passed){
-   const judgment=await cachedAnswer(options.provider,identity,JUDGE_INSTRUCTIONS,{source:{text:chunk.text},candidate:claims},judgeJSONSchema,cacheRoot,{...options.usage,purpose:options.purpose==='agreement'?'agreement':'judge',groupId:options.groupId},prepared,policy,cacheContext);
+   const judgeInput={source:{text:chunk.text},candidate:claims};
+   if(!subscriptionInputWithinBound(judgeInput)){
+    rejection(chunk.index,MODEL_INPUT_BOUND_REASON);
+    chunks.push({index:chunk.index,outcome:'rejected',responseSha256:answer.responseSha256,recordId:null});continue;
+   }
+   const judgment=await cachedAnswer(options.provider,identity,JUDGE_INSTRUCTIONS,judgeInput,judgeJSONSchema,cacheRoot,{...options.usage,purpose:options.purpose==='agreement'?'agreement':'judge',groupId:options.groupId},prepared,policy,cacheContext);
    const judged=judgeSchema.safeParse(judgment.value);
    if(judged.success){faithfulness={...faithfulness,score:judged.data.score,reason:judged.data.reason,evaluatedAt:judgment.receivedAt,responseSha256:judgment.responseSha256,returnedModel:judgment.returnedModel,runtimeWarnings:judgment.runtimeWarnings};if(judged.data.criticalUnsupported)deterministic.checks.push({id:'judge_critical_claims',passed:false,reason:'Actual model judge found a critically unsupported claim'});deterministic.passed=deterministic.checks.every(check=>check.passed);}
    else faithfulness.reason='Actual judge returned invalid structured output';

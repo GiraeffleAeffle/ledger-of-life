@@ -1,7 +1,7 @@
 import {z} from 'zod';
 import {composeDistrictRelease,type DistrictReleaseComposition,type DistrictReleaseCompositionInput} from './district-release-composition.ts';
 import {buildAuthenticatedTextRunLineage,textExtractionRunSchema,textSchemaProjectionSchema,type TextLineageArtifact,type TextRunContribution,type TextRecordSelection,type TextRunLineage} from './text-run-lineage.ts';
-import {authenticateRetainedKnowledgePublication,type RetainedKnowledgeComposition,type RetainedKnowledgeLineage,type RetainedKnowledgePublicationInput,projectKnowledgeRecordIdentity,retainedKnowledgeRecordOrigin,validateRetainedKnowledgeComposition} from './retained-knowledge-lineage.ts';
+import {type RetainedKnowledgeComposition,type RetainedKnowledgePublicationInput,retainedKnowledgeRecordOrigin,validateRetainedKnowledgeComposition} from './retained-knowledge-lineage.ts';
 import {KnowledgeRecordsSchema,KNOWLEDGE_SCHEMA_VERSION,hashSchema,sha256,type DistrictKnowledgeRecord} from './district-schema.ts';
 import {canonicalJson,semanticHash} from './district-adapter-contract.ts';
 import type {IdentityAssertion,IdentityAdmission} from './district-entity-resolution.ts';
@@ -13,9 +13,9 @@ const contributionPins={runId:hashSchema,pins:inputPinsSchema,artifacts:z.object
 export const r1TextCompositionInputSchema=z.object({
  schemaVersion:z.literal('district-r1-text-composition-input-v1'),
  generatedAt:z.iso.datetime({offset:true}),
- approvedRunOrder:z.array(hashSchema).min(1),
- admissions:z.array(z.object({runId:hashSchema,recordIds:z.array(z.string().min(1)),schemaProjection:textSchemaProjectionSchema.optional()}).strict()).min(1),
- contributions:z.array(z.object({...contributionPins,sourceArtifactKind:z.literal('native_extraction_output')}).strict()).min(1),
+ approvedRunOrder:z.array(hashSchema),
+ admissions:z.array(z.object({runId:hashSchema,recordIds:z.array(z.string().min(1)),schemaProjection:textSchemaProjectionSchema.optional()}).strict()),
+ contributions:z.array(z.object({...contributionPins,sourceArtifactKind:z.literal('native_extraction_output')}).strict()),
  retainedPublication:z.object({manifest:artifactPinSchema,records:artifactPinSchema,coverage:artifactPinSchema,registry:artifactPinSchema,recordIds:z.array(z.string().min(1)).min(1),schemaProjection:textSchemaProjectionSchema.optional()}).strict().optional(),
 }).strict();
 export type R1TextCompositionArtifactPin=z.infer<typeof artifactPinSchema>;
@@ -43,31 +43,12 @@ export async function loadR1TextCompositionInput(raw:unknown,loadArtifact:(pin:R
  return {contributions,approvedRunOrder:input.approvedRunOrder,admissions:input.admissions,...(retainedPublication?{retainedPublication}:{}),generatedAt:input.generatedAt};
 }
 
-/** Canonical retained-publication loader shared by preparation and publication. */
-export async function loadRetainedPublicationComposition(rawTextCompositionInput:unknown,loadArtifact:(pin:R1TextCompositionArtifactPin)=>Promise<string|Uint8Array>):Promise<RetainedKnowledgeComposition|null>{
- const input=r1TextCompositionInputSchema.parse(rawTextCompositionInput);
- if(!input.retainedPublication)return null;
- const pin=input.retainedPublication,load=async(artifactPin:R1TextCompositionArtifactPin):Promise<TextLineageArtifact>=>{
-  const bytes=await loadArtifact(artifactPin);
-  if(sha256(bytes)!==artifactPin.sha256)throw Error('Text composition artifact pin mismatch');
-  return {bytes,sha256:artifactPin.sha256};
- };
- const baseline=authenticateRetainedKnowledgePublication({artifacts:{manifest:await load(pin.manifest),records:await load(pin.records),coverage:await load(pin.coverage),registry:await load(pin.registry)},recordIds:pin.recordIds,...(pin.schemaProjection?{schemaProjection:pin.schemaProjection}:{})});
- const selectedRecordOrigins=pin.recordIds.map(recordId=>{
-  const localIndex=baseline.records.findIndex(record=>record.id===recordId);
-  if(localIndex<0)throw Error('Retained selection references an absent original record');
-  const projected=projectKnowledgeRecordIdentity(baseline.records[localIndex],baseline.input.schemaProjection);
-  return retainedKnowledgeRecordOrigin(baseline,baseline.recordIndexes[localIndex],projected);
- });
- return validateRetainedKnowledgeComposition({baseline,selectedRecordOrigins});
-}
-
 /** Private source-bearing inputs; only textLineage and retainedPublication are public coverage fields. */
 export type R1TextCoverageContext={
  crawl:DistrictReleaseComposition['crawl'];
  quarantine:DistrictReleaseComposition['quarantine'];
- textLineage:TextRunLineage;
- retainedPublication:RetainedKnowledgeLineage|null;
+ textLineage:TextRunLineage|null;
+ retainedPublication:RetainedKnowledgeComposition|null;
  runs:DistrictReleaseComposition['provenance']['runs'];
  selections:TextRecordSelection[];
 };
@@ -116,12 +97,9 @@ export function buildR1TextCompositionContext(input:DistrictReleaseCompositionIn
   mergeOriginal(assertions,retainedPublication.baseline.identityAssertions,value=>canonicalJson([value.id,value.version]),'identity assertion version');
   mergeOriginal(admissions,retainedPublication.baseline.identityAdmissions,value=>canonicalJson([value.assertionId,value.assertionSha256,value.assessmentReceiptSha256]),'identity admission');
  }
- const nativeRecords=composition.records.records;
- if(nativeRecords.some(record=>record.kind!=='text_model'||record.verification.kind!=='text_model'))throw Error('R1 text composition requires explicit knowledge-v3 text markers; historical v2 needs an approved schemaProjection');
- const retainedRecords=retainedPublication?.selectedRecordOrigins.map(origin=>{const index=retainedPublication.baseline.recordIndexes.indexOf(origin.outputRecordIndex);if(index<0)throw Error('Retained origin references an absent output record');return projectKnowledgeRecordIdentity(retainedPublication.baseline.records[index],retainedPublication.baseline.input.schemaProjection);})??[];
- const recordById=new Map<string,DistrictKnowledgeRecord>();
- for(const record of [...retainedRecords,...nativeRecords])recordById.set(record.id,record);
- const knowledge={schemaVersion:KNOWLEDGE_SCHEMA_VERSION,generatedAt:input.generatedAt,records:[...recordById.values()],identityAssertions:[...assertions.values()],identityAdmissions:[...admissions.values()]};
+ const records=composition.records.records;
+ if(records.some(record=>record.kind!=='text_model'||record.verification.kind!=='text_model'))throw Error('R1 text composition requires explicit knowledge-v3 text markers; historical v2 needs an approved schemaProjection');
+ const knowledge={schemaVersion:KNOWLEDGE_SCHEMA_VERSION,generatedAt:input.generatedAt,records,identityAssertions:[...assertions.values()],identityAdmissions:[...admissions.values()]};
  const replayPayload={
   generatedAt:input.generatedAt,
   approvedRunOrder:[...input.approvedRunOrder],
@@ -130,7 +108,7 @@ export function buildR1TextCompositionContext(input:DistrictReleaseCompositionIn
   retainedPublication:input.retainedPublication??null,
  };
  const dependencySha256=semanticHash(replayPayload);
- return {composition,retainedPublication,knowledge,coverage:{crawl:composition.crawl,quarantine:composition.quarantine,textLineage:composition.lineage,retainedPublication:retainedPublication?{...retainedPublication.baseline.lineage,selectedRecordOrigins:retainedPublication.selectedRecordOrigins}:null,runs:composition.provenance.runs,selections:composition.selections},replay:{...replayPayload,dependencySha256},dependencies:[{role:'text_composition',sha256:dependencySha256}]};
+ return {composition,retainedPublication,knowledge,coverage:{crawl:composition.crawl,quarantine:composition.quarantine,textLineage:composition.lineage,retainedPublication,runs:composition.provenance.runs,selections:composition.selections},replay:{...replayPayload,dependencySha256},dependencies:[{role:'text_composition',sha256:dependencySha256}]};
 }
 
 /** Rebind the public helper to the final admitted text subset after managed policy
@@ -147,11 +125,11 @@ export function rebuildR1TextCoverageContext(context:R1TextCompositionContext,re
   return {...original,projectedRecord:record};
  });
  if(records.some(record=>!nativeSelected.has(record.id)&&!retainedSelected.has(record.id)))throw Error('Final text record has no selected original contribution');
- const textLineage=buildAuthenticatedTextRunLineage(context.composition.provenance.runs,selections,generatedAt);
+ const textLineage=context.composition.provenance.runs.length?buildAuthenticatedTextRunLineage(context.composition.provenance.runs,selections,generatedAt):null;
  const selectedRecordOrigins=context.composition.retainedPublication?.selectedRecordOrigins.flatMap(origin=>{
   const record=records.find(item=>item.id===origin.recordId);
   return record&&retainedSelected.has(record.id)?[retainedKnowledgeRecordOrigin(context.composition.retainedPublication!.baseline,origin.outputRecordIndex,record)]:[];
  })??[];
- const retainedPublication=context.composition.retainedPublication?{...context.composition.retainedPublication.baseline.lineage,selectedRecordOrigins}:null;
+ const retainedPublication=context.composition.retainedPublication?validateRetainedKnowledgeComposition({baseline:context.composition.retainedPublication.baseline,selectedRecordOrigins}):null;
  return {...context.coverage,selections,textLineage,retainedPublication};
 }

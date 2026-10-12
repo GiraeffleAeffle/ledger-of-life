@@ -86,7 +86,8 @@ test('an empty signed mask preserves zero-record registry coverage and all query
   assert.deepEqual(view.records,original.records);
   assert.deepEqual([...view.sources],[...original.sources]);
   assert.deepEqual(view.municipalities,original.municipalities);
-  assert.deepEqual(view.listTopics(),original.listTopics());
+  const {administrativeView:_view,...visibleTopics}=view.listTopics(),{administrativeView:_originalView,...originalTopics}=original.listTopics();
+  assert.deepEqual(visibleTopics,originalTopics);
   assert.deepEqual(view.knowledge,original.knowledge);
   const filtered=original.withRevocations(signedMask([{type:'registry_source',municipalityId:'strausberg',registrySourceId:'blocked-source'}])).index;
   assert.deepEqual(filtered.municipalities.get('strausberg')!.sources,[sources[1]]);

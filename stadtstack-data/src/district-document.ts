@@ -86,7 +86,6 @@ except Exception:
     let textBytes = 0;
     for (let index = 0; index < pageCount; index++) {
       let page = pages[index]?.trim() ?? '';
-      // Sparse/scanned pages are rendered and OCRed even when other PDF pages have a text layer.
       if ((page.match(/[\p{L}\p{N}]/gu) ?? []).length < 80) {
         const prefix = `/scratch/page-${index + 1}`;
         await execute('pdftoppm', ['-f', String(index + 1), '-l', String(index + 1), '-r', '150', '-scale-to', '2400', '-singlefile', '-png', pdf, prefix]);

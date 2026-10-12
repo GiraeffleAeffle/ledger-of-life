@@ -10,8 +10,11 @@ import { prepareDocument } from '../src/district-prepared-document.ts';
 import type { PreparedDocument, PreparedSourceReference } from '../src/district-prepared-document.ts';
 import { createWorkPlan, runWorkPlan } from '../src/district-work-plan.ts';
 import { sha256 } from '../src/district-schema.ts';
-import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
-import {recordHostOptOut,CivicPolicyStateError} from '../src/civic-opt-out.ts';
+import { recordHostOptOut, CivicPolicyStateError } from '../src/civic-opt-out.ts';
+import { createCivicPolicyTestContext } from './fixtures/civic-policy.ts';
+import {MODEL_INPUT_BOUND_REASON,MAX_SUBSCRIPTION_INPUT_BYTES} from '../src/district-model.ts';
+import {documentChunks} from '../src/district-claims.ts';
+import {isProviderStopped} from '../src/district-model-usage.ts';
 import type {ReadinessExecutor} from '../src/district-model-readiness.ts';
 
 async function preparedText(text: string): Promise<PreparedDocument> {
@@ -65,6 +68,40 @@ test('oversized prepared documents quarantine before readiness and do not pause 
   } finally { spawnGuard.mock.restore(); syncBuiltinESMExports(); }
 });
 
+test('oversize serialized chunk inputs quarantine without readiness, provider calls or a paused lane', async context => {
+  const {root:fixtureRoot,policy}=await createCivicPolicyTestContext(context),root=join(fixtureRoot,'run');
+  await mkdir(root,{mode:0o700});
+  const spawnGuard=context.mock.method(childProcess,'spawn',()=>{throw Error('Native calls forbidden for deterministic oversize input');});
+  syncBuiltinESMExports();
+  try {
+    const prepared=await Promise.all([preparedText('\u0001'.repeat(12000)),preparedText('\u0002'.repeat(23200))]);
+    const contract=await jointExtractionContract(),pausePath=join(root,'pause.json');
+    const plan=createWorkPlan(prepared.map(document=>({municipalityId:document.municipalityId,sourceSha256:document.sourceSha256,preparedSha256:document.receiptSha256})),contract,'codex-only');
+    let completed=0;
+    await runWorkPlan(plan,async(task,pinnedContract,signal)=>{
+      const document=prepared.find(document=>document.sourceSha256===task.group.sourceSha256)!;
+      const expectedChunks=documentChunks(document.text);
+      assert.ok(expectedChunks.every(chunk=>Buffer.byteLength(JSON.stringify({source:{text:chunk.text}}))>MAX_SUBSCRIPTION_INPUT_BYTES));
+      const result=await inferPreparedDocument({
+        taskId:task.id,groupId:task.groupId,purpose:task.purpose,provider:task.provider,
+        municipality:{id:'strausberg',name:'Strausberg',ags:'12064472',districtId:'maerkisch-oderland'},
+        prepared:document,expected:document,contract:pinnedContract,out:root,policy,
+        usage:{ledgerPath:join(root,'usage.jsonl'),pausePath,signal,policy},
+      });
+      assert.deepEqual(result.records,[]);
+      assert.deepEqual(result.chunks,expectedChunks.map(chunk=>({index:chunk.index,outcome:'rejected',responseSha256:null,recordId:null})));
+      assert.deepEqual(result.quarantine.map(item=>({chunk:item.chunk,reason:item.reason})),expectedChunks.map(chunk=>({chunk:chunk.index,reason:MODEL_INPUT_BOUND_REASON})));
+      assert.ok(result.quarantine.every(item=>!item.candidate&&item.sourceSha256===document.sourceSha256));
+      completed++;
+      return {resultSha256:sha256(JSON.stringify(result)),preparedSha256:result.preparedSha256,promptSha256:result.promptSha256,schemaSha256:result.schemaSha256};
+    },async()=>{},async()=>false);
+    assert.equal(completed,2);assert.ok(plan.tasks.every(task=>task.state==='completed'&&task.attempts===1));
+    assert.equal(plan.providers['openai-subscription'],'ready');
+    assert.equal(await isProviderStopped(pausePath,'openai-subscription'),false);
+    assert.equal(spawnGuard.mock.callCount(),0);assert.deepEqual(await readdir(root),[]);
+  } finally {spawnGuard.mock.restore();syncBuiltinESMExports();}
+});
+
 test('budget handling does not swallow cancellation, prepared integrity, or operational readiness failures', async context => {
   const {root:fixtureRoot,policy}=await createCivicPolicyTestContext(context),root=join(fixtureRoot,'run');
   await mkdir(root,{mode:0o700});
@@ -101,4 +138,21 @@ test('current objection stops oversized-source admission before the budget hold 
  await recordHostOptOut({host:'example.org',reason:'municipality_objection',reference:'synthetic-budget-objection'},policy);
  await assert.rejects(inferPreparedDocument({taskId:sha256('synthetic blocked task'),groupId:sha256('synthetic blocked group'),purpose:'production',provider:'openai-subscription',municipality:{id:'strausberg',name:'Strausberg',ags:'12064472',districtId:'maerkisch-oderland'},prepared,expected:prepared,contract,out:join(root,'blocked-run'),policy,fixtureReadinessExecutor,usage:{ledgerPath:join(root,'usage.jsonl'),pausePath:join(root,'pause.json'),policy}}),error=>error instanceof Error&&/objection/.test(error.message));
  assert.equal(readinessCalls,0);
+});
+
+test('recorded objection stops prepared inference before readiness or subscription transmission', async context => {
+  const { root, policy } = await createCivicPolicyTestContext(context);
+  const spawnGuard = context.mock.method(childProcess, 'spawn', () => { throw Error('Native calls forbidden after objection'); });
+  syncBuiltinESMExports();
+  try {
+    const prepared = await preparedText('Strausberg: synthetic source content long enough for normal document preparation.'), contract = await jointExtractionContract();
+    await recordHostOptOut({ host: 'example.org', reason: 'municipality_objection', reference: 'synthetic-inference-test' }, policy);
+    await assert.rejects(inferPreparedDocument({
+      taskId: sha256('synthetic task'), groupId: sha256('synthetic group'), purpose: 'production', provider: 'openai-subscription',
+      municipality: { id: 'strausberg', name: 'Strausberg', ags: '12064472', districtId: 'maerkisch-oderland' },
+      prepared, expected: prepared, contract, out: join(root, 'results'), policy,
+      usage: { ledgerPath: join(root, 'usage.jsonl'), pausePath: join(root, 'pause.json') },
+    }), /objection/);
+    assert.equal(spawnGuard.mock.callCount(), 0);
+  } finally { spawnGuard.mock.restore(); syncBuiltinESMExports(); }
 });

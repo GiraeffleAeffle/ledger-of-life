@@ -10,7 +10,7 @@ import {preparationPlanSchema, type PreparationPlan} from './district-preparatio
 import {WorkPlanSchema, restoreWorkPlan, classifyWorkFailure, WorkFailureSchema, type WorkPlan, type WorkTask} from './district-work-plan.ts';
 import {verifyPreparedDocument, readPreparedDocument, assertPreparedSourcesActive, assertPreparedReferenceMembership, preparedSourceBindings, preparedCacheContext, type PreparedDocument, type PreparedSourceReference} from './district-prepared-document.ts';
 import {writeManagedSourceJson, writeManagedSourceArtifact, readPinnedJson, acquirePrivateRunLock} from './district-private-io.ts';
-import {modelReadiness, subscriptionChat} from './district-model.ts';
+import {modelReadiness, subscriptionChat, subscriptionInputWithinBound, MODEL_INPUT_BOUND_REASON} from './district-model.ts';
 import {isProviderStopped} from './district-model-usage.ts';
 import {PROVIDER_CONFIGS, ModelEvidenceSchema, assertModelEvidenceIdentity, SubscriptionRuntimeError, type ExtractorProvider, type ModelEvidence, type ModelAnswer, type UsageContext} from './district-model-contract.ts';
 import {CIVIC_POLICY_AUTHORITY,CIVIC_ACQUISITION_DECISION_ID,assertCivicPolicyAuthority,assertHostNotOptedOut,assertManagedSourceBindings,parseContentFreePreparationPlan,initializeManagedAcquisitionLane,HostOptedOutError,CivicPolicyStateError,type CivicPolicyOptions,type ManagedSourceContext} from './civic-opt-out.ts';
@@ -96,7 +96,7 @@ export function assertNativeReassessmentHost(provider:ExtractorProvider, platfor
   if(provider!=='openai-subscription'||platform!=='linux')throw Error('Reassessment judge requires the authoritative native Codex-only VM');
 }
 export async function currentReassessmentContract():Promise<ReassessmentContract> {
-  const files=['district-reassess-relations.ts','district-work-plan.ts','district-preparation-run.ts','prepare-knowledge.ts','district-claims.ts','district-schema.ts','source-policy.ts','document-origin.ts','document-origin-rules.ts','document-origin-contract.ts','civic-opt-out.ts','district-answer-cache.ts','district-graph-claims.ts','district-model.ts','district-model-contract.ts','district-claude.ts','district-model-usage.ts','district-model-diagnostics.ts','district-private-io.ts','district-prepared-document.ts'];
+  const files=['district-reassess-relations.ts','district-work-plan.ts','district-preparation-run.ts','district-registry-config.ts','prepare-knowledge.ts','district-claims.ts','district-stage-evidence.ts','district-schema.ts','source-policy.ts','document-origin.ts','document-origin-rules.ts','document-origin-contract.ts','civic-opt-out.ts','district-answer-cache.ts','district-graph-claims.ts','district-model.ts','district-model-contract.ts','district-claude.ts','district-model-usage.ts','district-model-diagnostics.ts','district-private-io.ts','district-prepared-document.ts'];
   const hashes=await Promise.all(files.map(async name=>({name,sha256:sha256(await readFile(new URL(name,import.meta.url)))})));
   return {version:REASSESSMENT_VERSION,judgePromptVersion:JUDGE_PROMPT_VERSION,judgePromptSha256:JUDGE_PROMPT_SHA256,judgeSchemaSha256:jsonHash(judgeJSONSchema),assessorSha256:jsonHash(hashes),threshold:0.8};
 }
@@ -171,7 +171,7 @@ function recordedSourceChunk(record:DistrictKnowledgeRecord,prepared:PreparedDoc
 export function validateFrozenReassessment(input:unknown,current:ReassessmentContract):Validated {
   const frozen=FrozenReassessmentSchema.parse(input);checkContract(frozen.contract,current);
   const plan=WorkPlanSchema.parse(decode(frozen.workPlan)),preparation=preparationPlanSchema.parse(decode(frozen.preparationPlan));
-  for(const item of preparation.quarantine)if(item.candidate)for(const source of item.candidate.sources)if(!frozen.controlBindings.preparationPlan.some(binding=>binding.url===source.url&&binding.sourceSha256===source.sha256&&binding.observationId===source.id))throw Error('Preparation quarantine candidate lacks an actual control-source receipt');
+  for(const item of preparation.quarantine)if(item.candidate)for(const source of item.candidate.sources)if(!frozen.controlBindings.preparationPlan.some(binding=>(binding.kind==='http_observation'||binding.kind==='prepared_source')&&binding.url===source.url&&binding.sourceSha256===source.sha256&&(binding.kind==='http_observation'||binding.observationId===source.id)))throw Error('Preparation quarantine candidate lacks an actual control-source receipt');
   if(plan.tasks.some(task=>task.state==='running'))throw Error('Reassessment requires a stopped frozen work plan');
   restoreWorkPlan(plan); // Validate derived assignments without rewriting the frozen plan.
   const tasks=plan.tasks.filter(task=>task.purpose==='production'&&task.state==='completed');
@@ -318,9 +318,10 @@ export function assessExistingRelation(input:{key:string;record:DistrictKnowledg
   const originalDeterministicPassed=[...REQUIRED_DETERMINISTIC_CHECKS,...GRAPH_DETERMINISTIC_CHECKS].every(id=>record.verification.deterministic.checks.some(check=>check.id===id&&check.passed));
   const newlyPassed=deterministic.passed&&!originalDeterministicPassed;
   const judgeInput={source:{text:chunk.text},candidate:claims};
+  const needsJudge=deterministic.passed&&dateEligible&&(changed||newlyPassed),oversized=needsJudge&&!subscriptionInputWithinBound(judgeInput);
   return {...base,claims,normalization:normalized.normalization,quoteNormalization:restored.normalization,deterministic,changed,newlyPassed,dateEligible,
-    needsJudge:deterministic.passed&&dateEligible&&(changed||newlyPassed),
-    hold:!deterministic.passed?'deterministic_gate_failed':!dateEligible?'date_missing':!changed&&!newlyPassed&&record.verification.status!=='auto-verified'?'previous_judge_failed_or_unknown':null,
+    needsJudge:needsJudge&&!oversized,
+    hold:oversized?MODEL_INPUT_BOUND_REASON:!deterministic.passed?'deterministic_gate_failed':!dateEligible?'date_missing':!changed&&!newlyPassed&&record.verification.status!=='auto-verified'?'previous_judge_failed_or_unknown':null,
     judgeInput,judgeBinding:reassessmentJudgeBinding(record.extraction.provider,identityOf(record),judgeInput,prepared),claimsSha256:jsonHash(claims)};
 }
 function assessLocated(item:Located,answers:Answer[]):RelationAssessment {

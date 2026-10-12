@@ -52,6 +52,7 @@ const metadataLocators:Record<string,true>={
  'robots.txt applicable StadtstackData group':true,'robots.txt HTTP absence':true,
  'Actual robots retrieval/interpretation attempt unavailable':true,'Robots representation rejected before raw retention':true,
  'W3C TDMRep origin rules':true,'TDMRep standardized location HTTP absence':true,'TDMRep matching location':true,
+ 'TDMRep standardized location HTTP absence after same-host redirect':true,
  'Machine policy retrieval or interpretation failed':true,'Policy evidence digest':true,'Policy evidence inventory':true,
 };
 const metadataValues:Record<string,true>={

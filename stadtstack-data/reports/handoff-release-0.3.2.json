@@ -1,0 +1,65 @@
+{
+  "ownerDirective": "Mac shuts down tonight. Do not start any Mac rollout. Future privileged rollout is VM-only through sudo stadtstack-session, with fresh application GO, exact reviewed source/data/image and signed revocation cohort. Busy Lease or incident means stop and coordinate. No manual directory locks or direct infra scripts.",
+  "currentLive": {
+    "url": "https://mcp.stadtstack.eu/mcp",
+    "version": "0.3.1",
+    "source": "47083b92ad18613763536ea79d4db1aaccaa6eea",
+    "image": "ghcr.io/giraeffleaeffle/stadtstack-mcp:0.3.1@sha256:5efca884f0bcc453a9a9df0b8a543526ce42c74da82bb56a26a88fffe1dd7d98",
+    "dataManifestId": "25d99c9382ccbfeb3fbdef8541409950c8e4adc96852922f151e661d25c90eaf",
+    "acceptance": "All20 read-only tools invoked across main and supplemental public acceptance. Approved-SHA runtime gate passed; independent governed ReadyPod imageID matched digest. Public receipts attest endpoint/version/data, not image identity.",
+    "credentials": "Existing max/buzz IDs and digests preserved; explicit300 authenticated HTTP requests/minute and8 concurrent. Other token remains60/4. Global32,32KiB body,30s deadline unchanged. Limit-only deploy must not silently issue/rotate/revoke tokens.",
+    "workflow": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/38143467613",
+    "prEvidence": "https://github.com/GiraeffleAeffle/ledger-of-life/pull/6#issuecomment-6109821418",
+    "cleanup": "Last CivicMCP privileged session completed: non-MCP boundary unchanged, temporary credentials/tunnel cleaned, viewer restored/status-verified, lock released. No later cluster operation by CivicMCP."
+  },
+  "pendingRelease": {
+    "version": "0.3.2",
+    "status": "No exact reviewed source/data/image seal or signed revocation cohort handed to CivicMCP. No0.3.2 signing, image publication or rollout performed by CivicMCP.",
+    "releaseDirectory": "STADTSTACK_MCP_RELEASE_DIR must be absolute, e.g. /app/release, containing verified sealed data. Tracked package out/descendants and stale-out fallback prohibited.",
+    "revocationPaths": {
+      "STADTSTACK_MCP_REVOCATION_TRUST_FILE": "/run/config/mcp-revocations/trust.json",
+      "STADTSTACK_MCP_REVOCATIONS_FILE": "/run/config/mcp-revocations/revocations.json"
+    },
+    "delivery": "Same governed read-only config cohort, both projected paths resolving into one physical revision. Separate from release data and bearer Secret. Bounded root/process-owned regular files without group/other write bits. Startup-only verification into memory; no request-time filesystem or VM-policy RPC. Revision-triggered single-replica Recreate; no stale-serving fallback or automatic rollback to old permissive mask. Keep manifest and revocation identities distinct. Administrative masking is not civic withdrawal.",
+    "deploymentCaution": "Old private Mac wrapper paths are not a VM procedure and must not be copied as a directory-lock bypass. Use committed approved release implementation under the VM Lease entry point; adapt/review VM-specific operational prerequisites before activation."
+  },
+  "signer": {
+    "provisioned": true,
+    "privateCustody": "Mac key remains ONLY owner Mac Keychain: service org.stadtstack.mcp.revocation-signer, account max, PKCS#8 DER. No Mac key exported/copied. Main separately authorized a NEW VM-generated key; both public pins must be in the governed trust cohort.",
+    "keyId": "ed25519:9a687b0082820b1df5743cd2faa1150bd38171fab50d8248d6cad28aca59ab1e",
+    "publicKeySpki": "MCowBQYDK2VwAyEA7pH0triIjJrhZWSYqriNuor/5UYHQZnvZK9lSjvuAPA=",
+    "vmSigner": {
+      "host": "codex-workstation via codex-netbird",
+      "machineIdFileSha256": "84e44b05b75fbed614c6a2e74690d2580c0035039055077acf22b6ba68f24dfd",
+      "createdOnVm": true,
+      "privateKeyPath": "/var/lib/stadtstack-signer/revocation-signer.pem",
+      "custody": "Root-owned0600 PEM inside root-owned0700 directory; generated on VM with openssl genpkey -algorithm ed25519. Never copied/printed/git. This is Main's explicitly approved root-only PEM option, not age encryption.",
+      "publicReceiptPath": "/var/lib/stadtstack-signer/revocation-signer.public.json",
+      "keyId": "ed25519:8393ad2b0087229073c57103c2e47a1b6f6e987c781b00bcbbaae060aa5ceebd",
+      "publicKeySpki": "MCowBQYDK2VwAyEAkod48Z56zro687MC/XdBpzQX3N+YtSMb9U5c0ZIkVeA=",
+      "signedRelease": false
+    },
+    "api": "Canonical shared src/civic-revocations.ts signRevocations(payload,keyId,privateKey:KeyObject):Uint8Array owns serialization. Use revocationKeyId, revocationHostFromUrl and compareRevocationTargets helpers; do not fork serializers or target validation.",
+    "trust": "schemaVersion stadtstack-revocation-trust-v1; releaseId is exact serving manifest64hex; expectedArtifactSha256 hashes EXACT complete canonical signed artifact bytes, not payload-only bytes; keys MUST include BOTH Mac and VM keyId/publicKeySpki pins, so either may sign. No newline in signed artifact.",
+    "payload": "schemaVersion stadtstack-revocations-v1; releaseId; issuedAt UTC seconds or3-digit milliseconds; sequence nonnegative safe integer; targets sorted by canonical comparator. No expiry or default unsigned empty list.",
+    "targets": "record(recordId), host(host), mcp_source(mcpSourceId source:<64hex>), registry_source(municipalityId,registrySourceId). recordId/registrySourceId opaque exact non-control Unicode: preserve whitespace/case/NFC-vs-NFD/URL punctuation; no invented512-character grammar. Per-ID and artifact1MiB bounds.",
+    "blockingPrerequisite": "Signer availability blocker resolved by actual independent VM provisioning under Main authorization. No signed artifact/trust cohort exists yet: exact sealed release ID, approved target decision, canonical reviewed signer and dual-pin trust cohort remain required. No0.3.2 signing or deployment performed;24h expedited republish remains target, not availability guarantee."
+  },
+  "liveAcceptanceRequired": [
+    "Solarpark draft2025-08-07, not early consultation; date supported by stage evidence, not inferred solely from document version.",
+    "Consume frozen reports/correction-solarpark-0.3.2.json. Baseline knowledge:strausberg:312ccd92c53c6241c52e3349 evidenceHash a10003da8af7d63973ba0fc32a6ee6d9218a393afd2a17889dabc42bf6b838e6 from0.3.1. Current plan_area41.5ha, retain68.6ha history, event superseded NOT withdrawn, retain distinct legal instruments.",
+    "Replacement selected by actually admitted source https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/e85e3cda-c72c-405f-9b66-bd1ac7d6c347, expected sourceSha2566b3d0a467c73bac1617dbcc88a692d9cc3319ec2d17ca22dbd3e5d91c764ea55, metric plan_area, instrument/scope fnp:base:amendment:10,41.5ha. No invented replacement ID or admission claim.",
+    "get_changes includes source-stated reduction reason, previousEvidenceHash, source-bound replacement, prior version and kinds. export_records retains old+replacement records/history/both source attributions across filters and pagination.",
+    "Substantive Ruedersdorf heat facts: start January2024 without invented day; about18months qualifier; EWE NETZ; two suitability areas; at leastfive measures withinfive years. Accept source number words zwei/fuenf, not only digits.",
+    "Hoppegarten27May2026 stays publication/source-page date; mid2027 is planned imprecise target, not exact date/completion. All five directed member_of relations distinct from energielenker contractor.",
+    "Merged council aliases and known three-edge example IDs from sealed source; no fabricated positive graph results.",
+    "Exercise configured signed administrative mask over all direct/derived read surfaces without exposing masked source data or mislabelling it civic withdrawal. Fail closed on missing/invalid/mixed/replayed configured state; preserve separate public endpoint and governed image evidence scopes."
+  ],
+  "notesAndEvidence": {
+    "publicSignerReceiptMac": "/Users/max/.cache/cluster-ops/mcp-revocation-signer-public.json",
+    "liveEvidenceMac": "/Users/max/.cache/cluster-ops/mcp-release-47083b92ad18-20261011T134018Z/ plus mcp-0.3.1-{reviewed-source,advisory-smoke,public-smoke,public-semantics,identity-correlation,memory}.json",
+    "transferCaution": "Do not bulk-copy cluster-ops, Keychain, kubeconfigs, secrets or credential files. Public pin above is sufficient for verification. Governed evidence directories require filtering before transfer; handoff text records essential accepted identity.",
+    "guide": "Guide-only local commit1e0d6b5c8c0ac91f356e6db20e0edaf81891daa2 was handed to CivicPipelineMap and integrated there as0ee1424. Custody addition in civic-council-override/stadtstack-data/docs/HOSTED_MCP.md is parent-owned and preserved in its later guide integration. CivicMCP has no remaining independent guide commit to push.",
+    "scopes": "Frozen0.3.0 assessments unchanged; no extraction/judge calls by release operator; native GUI clients untested.0.3.1 final advisory cgroup peak reading320958464bytes after restart, not asserted across all prior cgroup lifetimes or as live-pod heap."
+  }
+}

@@ -1,0 +1,671 @@
+{
+  "schemaVersion": "stadtstack-changes-v2",
+  "generatedAt": "2026-10-10T21:56:45.237Z",
+  "snapshots": [
+    {
+      "cityId": "muenster",
+      "recordType": "signal",
+      "previous": "2e658ed52285743dc5fd4aa5bd43c4596f3a9e7206d84eba3db2f82eeb48607f",
+      "current": "bb233186dfc540947b1406f2ee8fc1f4968d560322648a9b736dd5a4f0983e6e",
+      "generatedAt": "2026-10-10T21:56:45.237Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14560",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "428e8627c5fa73675fb03f2b4bf93ecc5bde61772ac58ec1b7f64a67116f48ca",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a",
+          "e5711c9812febf8ad669e1107aca9b5d8f7214f4b35feef915a1d395223dedc9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14561",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cd354d8e25c06a02dc4ef2d387916203b1a51ff1e04a482162f82ab3beb09338",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "254079f2cb418c38a88a501465c621b6cf44d1730d9c3cc44467ac515280bbaf",
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14562",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c513436bef18e92413f1b3b739bf488838c11761049eb4ee4d162e361b47843b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a",
+          "9ce4e38be5e4b5a7a940ebcf2b1b6b3cd9b5b6f5c08f8831bb8d0d7c055a717b"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14563",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1a592858e0d31ba1226e467018e74c0797898e3bf6df911d32732a1796538275",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9a47852a0f60f72abc44c7121fbfa2c330af56a85a9510a44085813b196300e4",
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14564",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3ba6e3230a6b3a4b5dd28031d481a9ddf28000ce8f1ff98cae519832e355197e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "6892af6c60d66c82778977adce53d717d3b08f078aab14019a45cf1c801eacb1",
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14565",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1ee682d87c66b4eb282bbc85bde0a745c7bbc863ef78fe7762190dd0bef71b8f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a",
+          "f3af5ef0e9a98d69e778e7ae579df580e16808617c76aba10010f7517e775e7c"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14566",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "25ac8234083865a9bf256288a288a050f5091f84e4efe2caf3a4976d87908123",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "493706a1dd9b303e68f91366cd50fe2e3d380fef8f377fc2342f0149f3290c4d",
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14567",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "334d885e102c339ccffe88a4316f30deadcdb113d190b009849bde37ce1de976",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a",
+          "afeb4f3b70ae900f8f04f04274f759af06944c4db580e33d8c490c4aa6454dd6"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14568",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9e815e80886f4b77a3466efbb1cea2cecd59d482a51fe668ee82e50061eff2d4",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "73b05c3074e6209c82c7a133b06a6d7db604aeaf8ec6e3732cbc5415fa5fe6d0",
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14569",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "721e6244046a7ec4f12b019698200d0841012e72d500eb35daf3909ae1de35d1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a",
+          "edd6a818efb94c52d96d3222aeda696bf7a47bfa9840827b305918de4af99b11"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14570",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "37974196b1ddbe9378d93c6025c035c1cb00a16f7ad68b28e8406cd95f6b360f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a",
+          "dc2cef799666f6f9a11091dee1e4df75e3ca2fd4657d6580e1327226d0d6c0b0"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14571",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "066c751ed8d36e11feb4dfcd8ff75efe70571ffe42e286e793d8ad5fe63c5202",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a",
+          "b75c7b70c5f1a5193708d020f3c85e3d1b30af5c392e6da05f0b65ab2d9d7205"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14572",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "16dc9d4e7ae799062642259ee83d76cace34337a10e6fd404a01501bf95f122a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "19d89a0989df2c710baf92d9ca96019fe3065f2dfc0013173b78b123f9c70030",
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14573",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "30c7eb5f072f440cb121154df1c7039eedcee66dde0cf3741d8a77f892710ed7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1b2e57972e6bc0eee96f8e7de34ca171eebdeb944dd7cbff9713f5bdb7beaa5b",
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14574",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "90cdfec7f9dbee94c6bda65f7aa7a9fa31904058399012a5cc9e9db50b745078",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "141694fd78466ae6d73a2729aa3f97f54c710a0ec05a10639152a4b8103f5ffa",
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14575",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6a7856635085b5fca6237301dcc49bb5e607f7a03d94eddde7328548b3d84a84",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "31bc749f0234c264f80c08da0bd031c75ac484dcec0e9ed4976609953f510b98",
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14576",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e443dedba16d0f2258cbad2339236eead317297654557453c1f5b54e36ae934a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a",
+          "fd8811ec8f0c8f44b51766ebd4d0b24c8788d662760af3248637e8ba30f24f44"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14577",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "978a031466319fbc10a6edf1ffaffd4c8f7616ec2bcb4f9fff81b506fb2b19ae",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "6565eed0856396e15014db9128f89d6e1c25b41af70f4666c923b7f2ad69508a",
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14578",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a3148de0bfdac6d7f89cde7e7f07f9ba66d324009fad07a6b2b75549459a3b93",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "0fc6a03f7406a488ab8c29ea6e2d6e83d2e0cb4dc89aa37dfc7230ba5dd20a39",
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14579",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "90029a325ddba37f6198cf33f390adc98498faf522ac18fb98471555fb4e1801",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a",
+          "d1d61cfd6dc54b0b06b767904ee2b1d7179c4158bb5ae3c6d33323027d1c46b6"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14580",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d6c3936c08714dd63a9cb2a6223e73a3e6bb630a27bde89f9699f1c6ccac646b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "66ff9013074be5ce3d81008c996392d3c6c9866fdd7a2e633b705b055900f1da",
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14581",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "804b8169de726978ddbce67820ab0542fa533144999fc9a7518c06193cf94455",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a",
+          "dbb6934edfb2525be4fc8122926786417368157c435fe267c783aff1307274d9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14582",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "85d94b4af105f2a329da037c4a2825d6416c7e4c36dce0fbe828cd335a5f39cc",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a",
+          "e15a2d239b302dd9fa91365145b9c03fa7efbdc920764cf7dc54f15bbf06b2ef"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14585",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6957c24a9fed7540aa02384787b64a3c79825c7428047ceefd0f11e6eddda70c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "27908b956716b5b7987547cf6afb75ca8c1acb4827fb19da3f4cfbab96214ebd",
+          "9a513b9f353b5a9824e09108f3867a72954a75a29d04bba446316abd23a3e02a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14591",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3aab0e0477443d1d53ca91834c7a8b1e20f7576c3e115212d211e8b55a0eaa8f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "2c0616f01e4977a1863e7e335daf54e633b3c20051f879e193f2fcd6caf368c1",
+          "ee01b8f0e521234ea2c39e1ca7622922bba6ee4313a7706bc1ec1e749810d573"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14627",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4975a5aa42b4af96e510bd03c2e9ba6c02723bdbe97da1d180c9eee7f09fb337",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "2c0616f01e4977a1863e7e335daf54e633b3c20051f879e193f2fcd6caf368c1",
+          "39924ebd7865c3ee7eccf9e1f4c73517705428a6e073a6c1d08764c6abda439c"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14629",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "30bd755981be2cfd26fb79ace996559bbf0e0930291cfc09942143c1bc7e3832",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "2c0616f01e4977a1863e7e335daf54e633b3c20051f879e193f2fcd6caf368c1",
+          "5f2eb3bd5f13a7a3a815fcc69fdcbba5014f8ab97a82904ccc8b420f7fb58568"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14631",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2d13be00c0ffa5d204a182190db9cc11c52b0806b1539c5a9e5283b5e33a08be",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "2c0616f01e4977a1863e7e335daf54e633b3c20051f879e193f2fcd6caf368c1",
+          "49264ab82841c689214fb5eb4a8608df91da63c6261dd082c3f16992d901230d"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14633",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f27647828c735bb3c18bfb3302085a02647cc916f7be8afca7de61ac5f1982a8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "2c0616f01e4977a1863e7e335daf54e633b3c20051f879e193f2fcd6caf368c1",
+          "d432f88089e94034e4a4c1c3ad42311f078c6a9d68dc2251e15d17e6dc162afe"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14635",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ef360f1d0699538f120ad15515b3d224b11f509ae73a10dcef6e5201246a035b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "2c0616f01e4977a1863e7e335daf54e633b3c20051f879e193f2fcd6caf368c1",
+          "9848706247f39f39d0415fa430a6be579a325970522398893351895e3535bf8e"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14868",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "25533f17a96a6114a152686594dbbc40dd7c11b3fbfbe2fe34cb5ce5578513e2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "2c0616f01e4977a1863e7e335daf54e633b3c20051f879e193f2fcd6caf368c1",
+          "ff71350cb4d62f45f01e58171565e34c214e2b1fb2a8df7038ca5a820ac7e9af"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14869",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7beb18f489a19ac1bcd2ed7ae19000af2bf5ec4bed9146aa5389b584af770efd",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "2c0616f01e4977a1863e7e335daf54e633b3c20051f879e193f2fcd6caf368c1",
+          "5de138fd7ce66facf7f8636c0b2a10782fb2883e79aff52106d10f8143136d0f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fmeetings%2F14870",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fd71793ddf0055c9edb0c750897e7d7cae40d6b86949b18a5b36febd1ba54a7b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "2c0616f01e4977a1863e7e335daf54e633b3c20051f879e193f2fcd6caf368c1",
+          "8b7677d340efb2782d11b75c97d0a0d29bd987a818725ae1ec59d7de55e26efb"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.stadt-muenster.de%2Fbodies%2F0001%2Fpapers%2Fvo%2F2004056677",
+      "cityId": "muenster",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "89c29a220ee1ef9b8904e1533d0fce64c02b1482fa41435bbbd86855c6a3a0fd",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "3a2f9bda2c7ddcfc36da6972f2e7ebc413e521c8cc265b96659b5a0306f7597a",
+          "3c3c92880082af9ba87c312d72e4197ad2739ffbed6acb69a62ebb0c24459342",
+          "595a0c27ee10e0f31a6bebef5beb4ff2e7f84deafa4f6a8e44d371082bef6950"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "fa2273b7e32207e48f311328f347a318611c8450034d310be39ffc05c9bfa2ee",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "3a2f9bda2c7ddcfc36da6972f2e7ebc413e521c8cc265b96659b5a0306f7597a",
+          "3c3c92880082af9ba87c312d72e4197ad2739ffbed6acb69a62ebb0c24459342",
+          "595a0c27ee10e0f31a6bebef5beb4ff2e7f84deafa4f6a8e44d371082bef6950"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    }
+  ]
+}

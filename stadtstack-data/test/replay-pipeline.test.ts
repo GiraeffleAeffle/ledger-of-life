@@ -185,13 +185,13 @@ test('pinned input reader rejects changed bytes and target-output reuse includin
 
 test('receipt requires exact clocks, full private/public prerequisites and has no live execution option',()=>{
  const pin={path:'synthetic-input.json',sha256:hash('synthetic pin')};
- const receipt:ReplayReceipt={schemaVersion:'stadtstack-offline-replay-v2',mode:'text_and_structured',textComposition:pin,candidateRecords:pin,candidateQuarantine:pin,identityState:pin,publicationInputs:pin,policyReceipts:pin,privateProvenance:pin,casRoot:'cas',textRegistry:pin,corpusManifest:pin,rawRoot:'raw',registry:pin,index:pin,frozen:pin,deltas:[],generationContract:pin,answers:[],modelIdentities:[identity],extractionRun:pin,clocks,staging:[{...pin,destination:'catalogue.json'}],priorRelease:{gitCommit:'a'.repeat(40),manifestSha256:hash('prior manifest'),releaseId:hash('prior release')},expectedRelease:pin,runtime:{node:'synthetic',icu:'synthetic',unicode:'synthetic',locale:'de-DE',timeZone:'Europe/Berlin',packageLockSha256:hash('lock'),sourceFiles:[pin]},workspace:'cache/synthetic-fresh-replay'};
+ const receipt:ReplayReceipt={schemaVersion:'stadtstack-offline-replay-v2',mode:'text_and_structured',textComposition:pin,candidateRecords:pin,candidateQuarantine:pin,identityState:pin,publicationInputs:pin,policyReceipts:pin,privateProvenance:pin,casRoot:'cas',textRegistry:pin,corpusManifest:pin,corpusIndexes:[{name:'original',rawRoot:'raw'}],rawRoot:'raw',registry:pin,index:pin,frozen:pin,deltas:[],generationContract:pin,answers:[],modelIdentities:[identity],extractionRun:pin,clocks,staging:[{...pin,destination:'catalogue.json'}],priorRelease:{gitCommit:'a'.repeat(40),manifestSha256:hash('prior manifest'),releaseId:hash('prior release')},expectedRelease:pin,runtime:{node:'synthetic',icu:'synthetic',unicode:'synthetic',locale:'de-DE',timeZone:'Europe/Berlin',packageLockSha256:hash('lock'),sourceFiles:[pin]},workspace:'cache/synthetic-fresh-replay'};
  assert.deepEqual(ReplayReceiptSchema.parse(receipt),receipt);
  assert.throws(()=>ReplayReceiptSchema.parse({...receipt,allowLiveModel:true}),/Unrecognized/);
  assert.throws(()=>ReplayReceiptSchema.parse({...receipt,coreEvidence:[]}),/Unrecognized/);
  assert.throws(()=>ReplayReceiptSchema.parse({...receipt,priorRelease:undefined}),/Invalid/);
- for(const field of ['candidateRecords','candidateQuarantine','identityState','publicationInputs','policyReceipts','privateProvenance','textComposition','textRegistry'])assert.throws(()=>ReplayReceiptSchema.parse({...receipt,[field]:undefined}));
- const {textRegistry,corpusManifest,rawRoot,index,frozen,deltas,generationContract,answers,modelIdentities,extractionRun,...common}=receipt;
+ for(const field of ['candidateRecords','candidateQuarantine','identityState','publicationInputs','policyReceipts','privateProvenance','textComposition','textRegistry','corpusIndexes'])assert.throws(()=>ReplayReceiptSchema.parse({...receipt,[field]:undefined}));
+ const {textRegistry,corpusManifest,corpusIndexes,rawRoot,index,frozen,deltas,generationContract,answers,modelIdentities,extractionRun,...common}=receipt;
  const native={...common,mode:'structured_only',structuredRun:pin};
  assert.equal(ReplayReceiptSchema.parse(native).mode,'structured_only');
  assert.throws(()=>ReplayReceiptSchema.parse({...native,modelIdentities:[identity]}),/Unrecognized/);

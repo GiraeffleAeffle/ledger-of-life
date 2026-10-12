@@ -3,13 +3,17 @@ import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,relative} from 'node:path';
-import {publicationInput,PublicationOptionsSchema,publish} from '../src/publish.ts';
+import {publicationInput,PublicationOptionsSchema,publish,historicalKnowledgeRecords} from '../src/publish.ts';
 import type {PublicationOptions} from '../src/publish.ts';
 import {outDir,hash} from '../src/common.ts';
 import {writeManagedSourceArtifact} from '../src/district-private-io.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {authenticatePublicationProvenance} from '../src/district-publication-provenance.ts';
 import type {AuthenticatedPreparedPublication} from '../src/prepare-knowledge.ts';
+import {fileURLToPath} from 'node:url';
+import {loadDistrictRegistry} from '../src/district-registry.ts';
+import {knowledgeEvidenceHash} from '../src/district-schema.ts';
+import {syntheticTextRecord} from './helpers/text-publication-fixture.ts';
 
 async function stagedFixture(directory:string,t:{after:(callback:()=>Promise<void>)=>void}){
  const context=await createCivicPolicyTestContext(t),stagingDir=join(context.managedRoot,'staging'),privateProvenance=join(directory,'private-provenance.json'),cataloguePath=join(stagingDir,'catalogue.json'),catalogueBytes=Buffer.from(JSON.stringify({generatedAt:'2026-10-11T03:46:26.421Z',cities:[]})),binding={kind:'prepared_source' as const,url:'https://example.org/synthetic-publication-input',sourceSha256:hash('synthetic source'),observationId:'synthetic-publication-input',receiptSha256:hash('synthetic receipt'),independentAllowed:true};
@@ -56,4 +60,19 @@ test('genuine input provenance does not authorize structurally supplied staging 
   await assert.rejects(publish(options,undefined,supplied as AuthenticatedPreparedPublication));
   assert.equal(reads,0);
  }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('authentic predecessor change revisions retain original unmarked bytes and reject invalid evidence or current markers',async()=>{
+ const registry=await loadDistrictRegistry(fileURLToPath(new URL('../sources/district-registry.json',import.meta.url)));
+ const record=syntheticTextRecord(registry,'synthetic-prior-knowledge',hash('synthetic source'),'openai-subscription',at);
+ const {kind:_kind,...claims}=record,{kind:_verificationKind,...verification}=record.verification;
+ const original={...claims,verification};original.verification.evidenceHash=knowledgeEvidenceHash(original);
+ const envelope={schemaVersion:'stadtstack-knowledge-v2',generatedAt:at,records:[original]},before=JSON.stringify(envelope);
+ assert.deepEqual(historicalKnowledgeRecords(envelope),[original]);
+ assert.equal(JSON.stringify(envelope),before);
+ assert.throws(()=>historicalKnowledgeRecords({...envelope,records:[{...original,summary:'Changed authentic prior assertion'}]}),/evidence hash mismatch/);
+ assert.throws(()=>historicalKnowledgeRecords({...envelope,records:[original,original]}),/Duplicate/);
+ assert.throws(()=>historicalKnowledgeRecords({...envelope,schemaVersion:'stadtstack-knowledge-v3'}));
+ const unknown={...record,kind:'unknown',verification:{...record.verification}};unknown.verification.evidenceHash=knowledgeEvidenceHash(unknown);
+ assert.throws(()=>historicalKnowledgeRecords({...envelope,schemaVersion:'stadtstack-knowledge-v3',records:[unknown]}));
 });

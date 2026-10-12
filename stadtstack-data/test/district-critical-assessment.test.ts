@@ -15,7 +15,7 @@ import { buildDistrictCoverage } from '../src/district-publication.ts';
 import { buildTextRunLineage,type TextLineageArtifact } from '../src/text-run-lineage.ts';
 import { loadDistrictRegistry } from '../src/district-registry.ts';
 import { dataReleaseId } from '../src/data-release.ts';
-import {loadRetainedPublicationComposition} from '../src/district-r1-text-composition.ts';
+import {loadR1TextCompositionInput,buildR1TextCompositionContext} from '../src/district-r1-text-composition.ts';
 import {textArtifact,syntheticTextContribution} from './helpers/text-publication-fixture.ts';
 import { admittedAssessmentFixture, syntheticAssessmentTriplet } from './district-assessment.fixture.ts';
 import type { PolicyReceipt } from '../src/district-policy-receipt.ts';
@@ -36,13 +36,14 @@ async function retainedPublicationFixture(record:DistrictKnowledgeRecord){
  const byPath=new Map<string,TextLineageArtifact>([['manifest.json',manifest],['records.json',recordsArtifact],['coverage.json',coverageArtifact],['registry.json',registryArtifact]]);
  const retainedPins=Object.fromEntries(([['manifest',manifest],['records',recordsArtifact],['coverage',coverageArtifact],['registry',registryArtifact]] as const).map(([name,value])=>[name,{path:`retained/${name}.json`,sha256:value.sha256}]));
  const nativePins=Object.fromEntries(Object.entries(run.artifacts).map(([name,value])=>[name,{path:`native/${name}.json`,sha256:value.sha256}]));
+ const nativeArtifacts=new Map(Object.entries(run.artifacts).map(([name,value])=>[`native/${name}.json`,value]));
  const raw={schemaVersion:'district-r1-text-composition-input-v1',generatedAt,approvedRunOrder:[run.runId],admissions:[{runId:run.runId,recordIds:[]}],contributions:[{runId:run.runId,pins:run.pins,sourceArtifactKind:'native_extraction_output',artifacts:nativePins}],retainedPublication:{...retainedPins,recordIds:[record.id]}};
  const load=async(pin:{path:string})=>{
-  const artifact=pin.path.startsWith('retained/')?byPath.get(pin.path.slice('retained/'.length))??byPath.get(pin.path.split('/').at(-1)!):undefined;
+  const artifact=pin.path.startsWith('retained/')?byPath.get(pin.path.slice('retained/'.length))??byPath.get(pin.path.split('/').at(-1)!):nativeArtifacts.get(pin.path);
   if(!artifact)throw Error('Unexpected synthetic artifact pin');
   return artifact.bytes;
  };
- const composition=await loadRetainedPublicationComposition(raw,load);
+ const composition=buildR1TextCompositionContext(await loadR1TextCompositionInput(raw,load)).retainedPublication;
  assert.ok(composition);
  return {composition,raw,load,record,registry,coverage};
 }

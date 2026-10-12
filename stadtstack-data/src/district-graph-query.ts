@@ -1,8 +1,11 @@
 import { z } from 'zod';
-import { validateKnowledgeGraph, validateMaskedKnowledgeGraph, conservativeGraphReadView, type GraphEntity, type GraphEdge, type KnowledgeGraph } from './district-graph.ts';
-import {isSourceRevoked,type VerifiedRevocations} from './civic-revocations.ts';
+import { buildKnowledgeGraph, projectKnowledgeReadEnvelope, validateKnowledgeGraph, validateMaskedKnowledgeGraph, conservativeGraphReadView, type GraphEntity, type GraphEdge, type KnowledgeGraph } from './district-graph.ts';
+import {isRecordRevoked,isSourceRevoked,type VerifiedRevocations} from './civic-revocations.ts';
 import { identityDaySchema, temporalPathEligible, intervalCouldContain, intervalBoundaryRange, effectiveIntervalFromExpression } from './district-entity-resolution.ts';
 import { boundPage, cursorBinding, readCursor } from './mcp-pagination.ts';
+import {administrativeView,type AdministrativeView} from './mcp-revocation-view.ts';
+import {knowledgeSourceDescriptors} from './mcp-source-identity.ts';
+import {KnowledgeRecordsSchema} from './district-schema.ts';
 import { entityTypeSchema } from './district-graph-claims.ts';
 
 const pageShape = { limit: z.number().int().min(1).max(50).default(20), cursor: z.string().min(1).max(2048).optional() };
@@ -29,6 +32,7 @@ export class GraphIndex {
   readonly releaseAsOf: string;
   readonly identitySha256: string;
   readonly maskIdentity:string|null;
+  readonly administrativeView:AdministrativeView|null;
   private readonly graph:KnowledgeGraph;
   private readonly entities: Map<string, GraphEntity>;
   private readonly orderedEntities: GraphEntity[];
@@ -37,8 +41,24 @@ export class GraphIndex {
   private readonly budgets: GraphQueryBudgets;
   private readonly roleEvidence = new Map<string, GraphEdge[]>();
 
-  constructor(releaseId: string, graph: unknown, recordsBytes: string | Uint8Array, budgets: Partial<GraphQueryBudgets> = {}, maskIdentity:string|null=null) {
-    const bound = maskIdentity===null?validateKnowledgeGraph(graph,recordsBytes):validateMaskedKnowledgeGraph(graph,recordsBytes,releaseId,maskIdentity);
+  constructor(releaseId: string, graph: unknown, recordsBytes: string | Uint8Array, budgets: Partial<GraphQueryBudgets> = {}, revocations?:VerifiedRevocations, authenticatedReadView=false) {
+    let bound:KnowledgeGraph;
+    if(authenticatedReadView){
+      if(!revocations)throw Error('Authenticated graph read view requires verified revocations');
+      this.administrativeView=administrativeView(releaseId,revocations);
+      bound=validateMaskedKnowledgeGraph(graph,recordsBytes,releaseId,revocations.artifactSha256);
+    }else{
+      bound=validateKnowledgeGraph(graph,recordsBytes);
+      this.administrativeView=revocations===undefined?null:administrativeView(releaseId,revocations);
+      if(revocations!==undefined){
+        const original=KnowledgeRecordsSchema.parse(JSON.parse(typeof recordsBytes==='string'?recordsBytes:Buffer.from(recordsBytes).toString('utf8')));
+        const ids=new Set(original.records.filter(record=>!isRecordRevoked(revocations,{recordId:record.id,municipalityId:record.municipalityId,sources:knowledgeSourceDescriptors(record)})).map(record=>record.id));
+        const safeBytes=ids.size===original.records.length?recordsBytes:JSON.stringify(projectKnowledgeReadEnvelope(original,ids));
+        const safe=validateKnowledgeGraph(buildKnowledgeGraph(safeBytes,{asOf:bound.asOf}),safeBytes);
+        bound=conservativeGraphReadView(bound,safe,ids,revocations);
+      }
+    }
+    const maskIdentity=revocations?.artifactSha256??null;
     this.releaseId = releaseId; this.recordsSha256 = bound.recordsSha256; this.releaseAsOf = bound.asOf; this.identitySha256 = bound.identitySha256;this.maskIdentity=maskIdentity;this.graph=bound;
     this.budgets = { ...GRAPH_QUERY_BUDGETS, ...budgets };
     for (const name of Object.keys(GRAPH_QUERY_BUDGETS) as (keyof GraphQueryBudgets)[]) if (!Number.isInteger(this.budgets[name]) || this.budgets[name] < 1 || this.budgets[name] > GRAPH_QUERY_BUDGETS[name]) throw Error('Invalid graph search budget');
@@ -59,7 +79,7 @@ export class GraphIndex {
     if(this.maskIdentity!==null)throw Error('Graph read views require the original publication index');
     if(mask.releaseId!==this.releaseId)throw Error('Graph read mask release mismatch');
     const checkedSafe=validateKnowledgeGraph(safeGraph,safeRecordsBytes),view=conservativeGraphReadView(this.graph,checkedSafe,visibleRecordIds,mask);
-    return new GraphIndex(this.releaseId,view,safeRecordsBytes,this.budgets,mask.artifactSha256);
+    return new GraphIndex(this.releaseId,view,safeRecordsBytes,this.budgets,mask,true);
   }
 
   graphView():KnowledgeGraph{return this.graph;}
@@ -93,7 +113,7 @@ export class GraphIndex {
       if ((!options.type || options.type === entity.type || entity.mentions.some(mention => mention.type === options.type)) && (entity.names.some(name => name.normalize('NFC').toLocaleLowerCase('de').includes(query)) || entity.mentions.some(mention => mention.identifiers.some(identifier => identifier.value.toLocaleLowerCase('de').includes(query))))) matches.push(entity);
     }
     const truncated = examinedNodes < this.orderedEntities.length, page = boundPage(matches, entity => entity.id, options, this.releaseId, binding);
-    return { releaseId: this.releaseId,maskIdentity:this.maskIdentity, releaseAsOf: this.releaseAsOf, asOf, temporalMode: 'identity_search', identitySha256: this.identitySha256, recordsSha256: this.recordsSha256, ...page, total: truncated ? null : page.total, matchedLowerBound: matches.length, truncated, complete: !truncated, status: matches.length ? 'found' : truncated ? 'incomplete' : 'not_found', examinedNodes, budgets: this.budgets, scope };
+    return { administrativeView:this.administrativeView,releaseId: this.releaseId,maskIdentity:this.maskIdentity, releaseAsOf: this.releaseAsOf, asOf, temporalMode: 'identity_search', identitySha256: this.identitySha256, recordsSha256: this.recordsSha256, ...page, total: truncated ? null : page.total, matchedLowerBound: matches.length, truncated, complete: !truncated, status: matches.length ? 'found' : truncated ? 'incomplete' : 'not_found', examinedNodes, budgets: this.budgets, scope };
   }
 
   neighbors(input: unknown) {
@@ -123,7 +143,7 @@ export class GraphIndex {
       }) : [];
       return { edge, from: this.entities.get(edge.fromId), to: this.entities.get(edge.toId), pathEligible: supported && graphEdgeModalityEligible(edge) && blocking !== null && !blocking.length, blockingEvidence: blocking ?? [], roleEvidenceComplete: blocking !== null, qualification: blocking === null ? 'incomplete_role_evidence' : blocking.length ? 'unresolved_contradictory_or_ended_role' : supported ? 'supported_as_of' : 'historical_or_unknown_validity' };
     });
-    return { releaseId: this.releaseId,maskIdentity:this.maskIdentity, releaseAsOf: this.releaseAsOf, asOf, temporalMode: 'as_of', identitySha256: this.identitySha256, recordsSha256: this.recordsSha256, entity: this.entities.get(options.id), ...page, items, total: truncated ? null : page.total, matchedLowerBound: matches.length, truncated, complete: !truncated, status: matches.length ? 'found' : truncated ? 'incomplete' : 'not_found', visitedNodes: visited.size, examinedEdges, budgets: this.budgets, scope, pathEligibility };
+    return { administrativeView:this.administrativeView,releaseId: this.releaseId,maskIdentity:this.maskIdentity, releaseAsOf: this.releaseAsOf, asOf, temporalMode: 'as_of', identitySha256: this.identitySha256, recordsSha256: this.recordsSha256, entity: this.entities.get(options.id), ...page, items, total: truncated ? null : page.total, matchedLowerBound: matches.length, truncated, complete: !truncated, status: matches.length ? 'found' : truncated ? 'incomplete' : 'not_found', visitedNodes: visited.size, examinedEdges, budgets: this.budgets, scope, pathEligibility };
   }
 
   path(input: unknown) {
@@ -182,6 +202,6 @@ export class GraphIndex {
     }
     paths.sort((a, b) => a.id.localeCompare(b.id));
     const page = boundPage(paths, path => path.id, options, this.releaseId, binding);
-    return { releaseId: this.releaseId,maskIdentity:this.maskIdentity, releaseAsOf: this.releaseAsOf, asOf, temporalMode: options.mode, identitySha256: this.identitySha256, recordsSha256: this.recordsSha256, ...page, total: truncated ? null : page.total, pathsLowerBound: paths.length, status: paths.length ? 'found' : truncated ? 'incomplete' : 'not_found_within_hops', shortestHops, maxHops: options.maxHops, truncated, complete: !truncated, visitedNodes: visited.size, examinedEdges, pathSteps, budgets: this.budgets, direction: 'out', pathEligibility, qualification: options.mode === 'historical' ? 'attributed_historical_claims_not_confirmed_current' : 'supported_at_explicit_temporal_reference', modalities: [...new Set(page.items.flatMap(path => path.edges.map(edge => edge.modality)))].sort()};
+    return { administrativeView:this.administrativeView,releaseId: this.releaseId,maskIdentity:this.maskIdentity, releaseAsOf: this.releaseAsOf, asOf, temporalMode: options.mode, identitySha256: this.identitySha256, recordsSha256: this.recordsSha256, ...page, total: truncated ? null : page.total, pathsLowerBound: paths.length, status: paths.length ? 'found' : truncated ? 'incomplete' : 'not_found_within_hops', shortestHops, maxHops: options.maxHops, truncated, complete: !truncated, visitedNodes: visited.size, examinedEdges, pathSteps, budgets: this.budgets, direction: 'out', pathEligibility, qualification: options.mode === 'historical' ? 'attributed_historical_claims_not_confirmed_current' : 'supported_at_explicit_temporal_reference', modalities: [...new Set(page.items.flatMap(path => path.edges.map(edge => edge.modality)))].sort()};
   }
 }

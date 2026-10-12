@@ -3,12 +3,12 @@ import {isIP} from 'node:net';
 import {request as httpRequest} from 'node:http';
 import {request as httpsRequest} from 'node:https';
 import {mkdir,readFile,writeFile,rename,lstat,realpath} from 'node:fs/promises';
-import {join,resolve,basename,relative,isAbsolute} from 'node:path';
+import {join,resolve,basename,dirname,relative,isAbsolute} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {homedir} from 'node:os';
 import {createGunzip,createInflate,createBrotliDecompress} from 'node:zlib';
 import {hash,ua} from './common.ts';
-import {parseTdmRules,tdmRuleForUrl,matchesPolicyPattern,ownerRobotsOverrideFor,ownerRobotsOverrideApplies,effectiveRobotsPermission,documentOriginExcludes,effectiveSourcePermission,projectSourcePolicyMetadata} from './source-policy.ts';
+import {parseTdmRules,parseTdmReservation,tdmRuleForUrl,matchesPolicyPattern,ownerRobotsOverrideFor,ownerRobotsOverrideApplies,effectiveRobotsPermission,documentOriginExcludes,effectiveSourcePermission,projectSourcePolicyMetadata} from './source-policy.ts';
 import type {SourceAccessPolicy,PolicyEvidence,TdmRule,OwnerRobotsOverride} from './source-policy.ts';
 import {acquirePrivateRunLock,writePrivateJson} from './district-private-io.ts';
 import {inspectPdfTdmPolicy} from './pdf-tdm-policy.ts';
@@ -22,13 +22,13 @@ import type {DocumentOriginInput} from './document-origin-contract.ts';
 import type {DocumentOriginClassification} from './document-origin-contract.ts';
 import {classifyDocumentOrigin} from './document-origin.ts';
 import type {OParlOriginContext} from './document-origin-contract.ts';
-import {assertHostNotOptedOut,assertCivicPolicyAuthority,assertManagedSourceReadable,assertManagedRawSourceBinding,HostOptedOutError,CivicPolicyStateError,initializeManagedAcquisitionLane,withManagedSourceWrite,withManagedSourceScratch,relinquishManagedSourceContent} from './civic-opt-out.ts';
+import {assertHostNotOptedOut,assertCivicPolicyAuthority,assertManagedSourceReadable,assertManagedObservationReadable,assertManagedRawSourceBinding,HostOptedOutError,CivicPolicyStateError,initializeManagedAcquisitionLane,withManagedSourceWrite,withManagedSourceScratch,relinquishManagedSourceContent} from './civic-opt-out.ts';
 import type {CivicPolicyOptions,CivicPolicyAuthorityReceipt,ManagedAcquisitionLaneOptions,ManagedSourceBinding} from './civic-opt-out.ts';
 import {ContentFreeSourcePolicySchema,hashSchema} from './district-schema.ts';
-import {SourceObservationSchema,type SourceObservation} from './source-observation.ts';
+import {SourceObservationSchema,sourceObservationMatches,type SourceObservation} from './source-observation.ts';
 import {nativePublicRequestHeaders,type NativePublicOperation} from './district-native-request.ts';
 
-export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'dns_error'|'timeout'|'network_error'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded'|'host_admission_deferred';
+export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'dns_error'|'timeout'|'network_error'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cross_host_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded'|'host_admission_deferred';
 class RequestAdmissionInterruption extends Error {readonly admissionError:unknown;constructor(error:unknown){super('Public request admission held');this.admissionError=error;}}
 export interface FetchObservation {
  url:string;method:'GET'|'POST';checkedAt:string;retrievedAt:string|null;state:'fetched'|'not_modified'|'redirected'|'failed'|'excluded';
@@ -155,10 +155,11 @@ export class PoliteFetcher {
  }
  private async checkedSourceBindings(bindings:SourceContentBinding[]):Promise<Array<Extract<ManagedSourceBinding,{kind:'http_observation'}>>>{
   await this.initialize();
-  if(!bindings.length)throw new PoliteFetchError('host_state_unsafe','Source content has no immutable provenance');
+  if(!Array.isArray(bindings)||!bindings.length||bindings.some(binding=>!binding||typeof binding.url!=='string'||typeof binding.observationPath!=='string'))throw new PoliteFetchError('host_state_unsafe','Source content has no valid immutable provenance');
   const result:Array<Extract<ManagedSourceBinding,{kind:'http_observation'}>>=[];
   for(const binding of bindings){
    if(!hashSchema.safeParse(binding.sha256).success)throw new PoliteFetchError('host_state_unsafe','Invalid source binding digest');
+   publicUrl(binding.url);
    await this.assertHostAllowed(binding.url);
    const name=basename(binding.observationPath),observationPath=join(this.cacheDir,'observations',name),rawPath=join(this.cacheDir,'sha256',binding.sha256);
    if(resolve(binding.observationPath)!==observationPath||name.length>160||!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.json$/.test(name))throw new PoliteFetchError('host_state_unsafe','Source observation is outside the managed root or invalid');
@@ -167,10 +168,12 @@ export class PoliteFetcher {
    try{
     const metadata=await lstat(observationPath);
     if(!metadata.isFile()||metadata.isSymbolicLink()||metadata.size>16*1024*1024||await realpath(observationPath)!==observationPath)throw Error('Observation path/type/size rejected');
+    await assertManagedObservationReadable(observationPath,this.policyOptions());
     bytes=await readFile(observationPath);observation=SourceObservationSchema.parse(JSON.parse(bytes.toString('utf8')));
+    await assertManagedObservationReadable(observationPath,this.policyOptions());
    }
-   catch{throw new PoliteFetchError('host_state_unsafe','Immutable source observation is missing or invalid');}
-   if(observation.url!==binding.url||observation.sha256!==binding.sha256||!['fetched','not_modified'].includes(observation.state))throw new PoliteFetchError('host_state_unsafe','Immutable source observation binding mismatch');
+   catch(error){if(error instanceof HostOptedOutError||error instanceof CivicPolicyStateError)throw error;throw new PoliteFetchError('host_state_unsafe','Immutable source observation is missing or invalid');}
+   if(!sourceObservationMatches(observation,{url:binding.url,sha256:binding.sha256,mimeType:observation.mimeType,retrievedAt:observation.retrievedAt,checkedAt:observation.checkedAt,status:observation.status,sizeBytes:(await lstat(rawPath)).size,bodyState:'retained'}))throw new PoliteFetchError('host_state_unsafe','Immutable source observation binding mismatch');
    const proof:Extract<ManagedSourceBinding,{kind:'http_observation'}>={kind:'http_observation',url:binding.url,sourceSha256:binding.sha256,observationId:name,receiptSha256:hash(bytes)};
    await assertManagedRawSourceBinding(rawPath,proof,this.policyOptions());
    const parsed=ContentFreeSourcePolicySchema.safeParse(observation.policy);
@@ -193,7 +196,7 @@ export class PoliteFetcher {
   await withManagedSourceScratch(this.cacheDir,proofs,async scope=>{
    await scope.assertActive();const temporary=join(scope.directory,'derived.json');
    await writeFile(temporary,bytes,{mode:0o600,flag:'wx'});
-   await withManagedSourceWrite(this.cacheDir,entries,async()=>{await rename(temporary,resolve(path));},this.policyOptions());
+   await withManagedSourceWrite(this.cacheDir,entries,async()=>{await mkdir(dirname(resolve(path)),{recursive:true,mode:0o700});await rename(temporary,resolve(path));},this.policyOptions());
   },{...this.activeLane!,kind:'fetch',purpose:'artifact'});
  }
  async sourceBindingsForArtifact(bindings:SourceContentBinding[]):Promise<Array<Extract<ManagedSourceBinding,{kind:'http_observation'}>&{independentAllowed:true}>>{
@@ -337,13 +340,14 @@ export class PoliteFetcher {
   if(!cached||Date.now()>=cached.expiresAt){
    const pending=(async()=>{
     // Standardized location, not a guessed municipal API: W3C TDMRep 2024 §6.1.
+    const redirectChain=knownUrl?undefined:[policyUrl];
     try{
-     const response=await this.fetchInternal(policyUrl,{ownerRobotsOverride,hostProfile},'tdm');
+     const response=await this.fetchInternal(policyUrl,{ownerRobotsOverride,hostProfile},'tdm',redirectChain);
      if(response.validatedPolicy?.kind!=='tdm')throw new PoliteFetchError('tdm_unavailable','Validated TDM policy missing');
-     return {rules:response.validatedPolicy.value,evidence:{url:policyUrl,locator:'W3C TDMRep origin rules',value:'checked',sha256:response.sha256,checkedAt:response.checkedAt}};
+     return {rules:response.validatedPolicy.value,evidence:{url:response.url,locator:'W3C TDMRep origin rules',value:'checked',sha256:response.sha256,checkedAt:response.checkedAt}};
     }catch(error){
      if(error instanceof RequestAdmissionInterruption)throw error;
-     if(!knownUrl&&error instanceof PoliteFetchError&&(error.status===404||error.status===410))return {rules:[],evidence:{url:policyUrl,locator:'TDMRep standardized location HTTP absence',value:String(error.status),checkedAt:new Date().toISOString()}};
+     if(!knownUrl&&error instanceof PoliteFetchError&&error.failure==='http_error'&&(error.status===404||error.status===410))return {rules:[],evidence:{url:redirectChain?.at(-1)??policyUrl,locator:`TDMRep standardized location HTTP absence${redirectChain&&redirectChain.length>1?' after same-host redirect':''}`,value:String(error.status),checkedAt:new Date().toISOString()}};
      if(error instanceof PoliteFetchError&&(error.failure==='access_barrier'||error.failure==='unsafe_url'||error.status===429||error.failure.startsWith('host_')))throw error;
      throw new PoliteFetchError('tdm_unavailable',`Machine-readable TDM policy could not be checked${error instanceof PoliteFetchError&&error.status?` (policy HTTP ${error.status})`:''}; ask municipality`,error instanceof PoliteFetchError?error.status:undefined,undefined,error instanceof PoliteFetchError?error.retryAfter:undefined);
     }
@@ -352,13 +356,14 @@ export class PoliteFetcher {
   return cached.response;
  }
  async fetch(url:string,options:FetchOptions={}):Promise<FetchedDocument>{await this.initialize();this.fetchCount++;try{return await this.fetchInternal(url,options,'document');}catch(error){if(error instanceof RequestAdmissionInterruption)throw error.admissionError;throw error;}}
- private async fetchInternal(input:string,options:FetchOptions,resource:'document'|'robots'|'tdm'):Promise<FetchedDocument&{validatedPolicy?:ValidatedPolicy}>{
+ private async fetchInternal(input:string,options:FetchOptions,resource:'document'|'robots'|'tdm',standardTdmChain?:string[]):Promise<FetchedDocument&{validatedPolicy?:ValidatedPolicy}>{
   const checkRobots=resource!=='robots',checkTdm=resource==='document';
   let url=publicUrl(input),method=options.method??'GET',body=options.body;
   const registeredApproval=ownerRobotsOverrideApplies(options.registeredSourceUrl??input,options.ownerRobotsOverride);
   if(method==='POST'&&(!body||Buffer.byteLength(body)>65536))throw new PoliteFetchError('unsafe_url','Only bounded public form requests supported');
   if(body!==undefined)for(const key of new URLSearchParams(body).keys())if(/^(?:password|secret|authorization|access_token|api_key|apikey|sessionid|phpsessid|cookie)$/i.test(key))throw new PoliteFetchError('unsafe_url','Credential-bearing public form rejected');
-  for(let redirects=0;redirects<=this.options.maxRedirects;redirects++){
+  const redirectLimit=standardTdmChain?Math.min(5,this.options.maxRedirects):this.options.maxRedirects;
+  for(let redirects=0;redirects<=redirectLimit;redirects++){
    if(options.hostProfile==='municipal')this.delays.set(url.hostname,Math.max(5000,this.delays.get(url.hostname)??0));
    let checkedAt=new Date().toISOString();const observation:FetchObservation={url:url.href,method,checkedAt,retrievedAt:null,state:'failed'};
    const policy:SourceAccessPolicy={robots:{state:'unavailable',url:new URL('/robots.txt',url).href},tdm:{state:'unavailable',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'};
@@ -402,9 +407,19 @@ export class PoliteFetcher {
      if(!response.headers.location)throw new PoliteFetchError('invalid_redirect','Missing redirect destination',response.status);
      const next=publicUrl(new URL(response.headers.location,url).href);observation.location=next.href;observation.state='redirected';
      if(/\/(?:login|signin|auth|anmelden)(?:\/|$)/i.test(next.pathname)){policy.access='authentication';throw new PoliteFetchError('access_barrier','Authentication redirect; ask municipality');}
-     if(resource!=='document')throw new PoliteFetchError('invalid_redirect','Policy-resource redirects are not authorized as policy representations',response.status);
+     if(resource!=='document'&&!standardTdmChain)throw new PoliteFetchError('invalid_redirect','Policy-resource redirects are not authorized as policy representations',response.status);
+     if(standardTdmChain){
+      const sameOrigin=next.origin===url.origin;
+      const secureUpgrade=url.protocol==='http:'&&next.protocol==='https:'&&next.hostname===url.hostname&&next.port===url.port;
+      if(!sameOrigin&&!secureUpgrade)throw new PoliteFetchError('cross_host_redirect','Standardized TDM policy redirect must preserve origin or upgrade HTTP to HTTPS',response.status);
+      if(standardTdmChain.includes(next.href))throw new PoliteFetchError('redirect_limit','Standardized TDM policy redirect loop',response.status);
+     }
+     // Host-keyed provenance cannot safely transfer an origin's contribution
+     // to a different host; refuse before any destination request or retention.
+     if(next.hostname!==url.hostname)throw new PoliteFetchError('cross_host_redirect','Cross-host source redirect cannot preserve registered-source provenance',response.status);
      await this.observation(observation);
-     if(redirects===this.options.maxRedirects)throw new PoliteFetchError('redirect_limit','Redirect bound exceeded');
+     if(redirects===redirectLimit)throw new PoliteFetchError('redirect_limit','Redirect bound exceeded');
+     standardTdmChain?.push(next.href);
      if(method==='POST'&&next.origin!==url.origin)throw new PoliteFetchError('invalid_redirect','Cross-origin form redirect rejected');
      this.onRedirect?.({requestUrl:input,from:url.href,to:next.href,status:response.status});
      if(response.status===303||method==='POST'&&[301,302].includes(response.status)){method='GET';body=undefined;}
@@ -431,9 +446,17 @@ export class PoliteFetcher {
      // A policy-reference sentinel is never fabricated into a wire header.
      const retained:PolicyEvidence[]=[];
      for(const [header,locator] of Object.entries(representationPolicyLocators)){
-      if(response.headers[header]!==undefined)continue;
-      const evidence=previous.policy?.tdm.evidence.findLast(item=>item.url===url.href&&item.locator===locator);
-      if(evidence)retained.push(evidence);
+      const prior=previous.policy?.tdm.evidence.filter(item=>item.url===url.href&&item.locator===locator)??[];
+      if(header==='tdm-reservation'){
+       const update=parseTdmReservation(response.headers[header]);if(update.state==='valid')continue;
+       const declaration=prior.findLast(item=>item.value==='1')??prior.findLast(item=>item.value==='0');
+       if(declaration)retained.push(declaration);
+       const invalid=update.state==='absent'?prior.findLast(item=>item.value==='invalid_reservation_declaration'):undefined;
+       if(invalid)retained.push(invalid);
+      }else{
+       if(response.headers[header]!==undefined)continue;
+       const evidence=prior.at(-1);if(evidence)retained.push(evidence);
+      }
      }
      if(previous.policy&&retained.length)retainedPolicyEvidence=projectSourcePolicyMetadata({...previous.policy,tdm:{...previous.policy.tdm,evidence:retained}}).tdm.evidence;
      Object.assign(observation,previous,{url:url.href,method,checkedAt,state:'not_modified',status:304,policy,bytes:representation.length,etag:response.headers.etag??previous.etag,lastModified:response.headers['last-modified']??previous.lastModified});

@@ -7,6 +7,7 @@ import { startWorkerLease, finishWorkerLease, startWorkerHeartbeat, WORKER_CONTR
 import { inferPreparedDocument } from '../src/district-inference.ts';
 import { prepareDocument } from '../src/district-prepared-document.ts';
 import { sha256 } from '../src/district-schema.ts';
+import { createCivicPolicyTestContext } from './fixtures/civic-policy.ts';
 
 const control = z.object({ task: z.literal('authorized-task') }).strict();
 const frame = JSON.stringify({ task: 'authorized-task' }) + '\n';
@@ -140,14 +141,15 @@ test('coordinator heartbeat failure cleans interval and reports only controlled 
   dispose(); output.destroy();
 });
 
-test('lease AbortSignal reaches prepared inference and halts before readiness or model calls', async () => {
+test('lease AbortSignal reaches prepared inference and halts before readiness or model calls', async t => {
+  const fixture = await createCivicPolicyTestContext(t);
   const bytes = Buffer.from('Synthetic municipal document for cancellation-path testing only. No real public claim, date, person or model response is asserted by this fixture.');
   const prepared = await prepareDocument({ bytes, municipalityId: 'strausberg', mimeType: 'text/plain', extractorSha256: sha256('extractor'), toolVersions: { node: process.versions.node }, references: [{ id: 'source', url: 'https://example.org/source', sha256: sha256(bytes), retrievedAt: '2026-10-01T00:00:00.000Z', locator: 'source', mimeType: 'text/plain', sourceType: 'website', policy: { robots: { state: 'allowed', url: 'https://example.org/robots.txt' }, tdm: { state: 'not_declared', evidence: [] }, access: 'public', legalClassification: 'not_assessed', publication: 'facts_with_attribution_only' } }] }, async () => { throw Error('Synthetic text fixture must not execute parser commands'); });
   const input = new PassThrough(), signals = new EventEmitter();
   const lease = startWorkerLease(input, raw => control.parse(raw), { signals });
   try {
     input.write(frame); await lease.control; signals.emit('SIGTERM');
-    await assert.rejects(inferPreparedDocument({ taskId: sha256('task'), groupId: sha256('group'), purpose: 'production', provider: 'openai-subscription', municipality: { id: 'strausberg', name: 'Strausberg', ags: '12064472', districtId: 'maerkisch-oderland' }, prepared, expected: prepared, contract: { promptSha256: sha256('prompt'), schemaSha256: sha256('schema') }, out: 'unused-no-model-call', usage: { ledgerPath: 'unused-ledger', pausePath: 'unused-pause', signal: lease.signal } }), error => error === lease.signal.reason);
+    await assert.rejects(inferPreparedDocument({ taskId: sha256('task'), groupId: sha256('group'), purpose: 'production', provider: 'openai-subscription', municipality: { id: 'strausberg', name: 'Strausberg', ags: '12064472', districtId: 'maerkisch-oderland' }, prepared, expected: prepared, contract: { promptSha256: sha256('prompt'), schemaSha256: sha256('schema') }, out: 'unused-no-model-call', policy: fixture.policy, usage: { ledgerPath: 'unused-ledger', pausePath: 'unused-pause', signal: lease.signal } }), error => error === lease.signal.reason);
     assertAborted(input, signals);
   } finally { lease.dispose(); assertClean(input, signals); input.destroy(); }
 });

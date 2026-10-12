@@ -12,13 +12,15 @@ import { syncBuiltinESMExports } from 'node:module';
 import { PROVIDER_CONFIGS, SUPPORTED_MODEL_ROUTES, SupportedModelRouteSchema, ModelEvidenceSchema, modelIdentitySha256, assertModelEvidenceIdentity, assertModelResponseIdentity, SubscriptionRuntimeError } from '../src/district-model-contract.ts';
 import type {ReportedUsage,RuntimeFailureDiagnostic} from '../src/district-model-contract.ts';
 import { assertClaudeSubscriptionAuth, claudeExecutionArgs, inspectClaudeEvents } from '../src/district-claude.ts';
-import { inspectCodexEvents, modelReadiness, subscriptionChat, subscriptionExecutionArgs, collectSubscriptionProcess, encodeSubscriptionInput } from '../src/district-model.ts';
+import { inspectCodexEvents, modelReadiness, subscriptionChat, subscriptionExecutionArgs, collectSubscriptionProcess, encodeSubscriptionInput, MAX_SUBSCRIPTION_INPUT_BYTES, subscriptionInputWithinBound } from '../src/district-model.ts';
 import { appendUsageEntry, readUsageLedger, hourlyUsage, recordExercisedReadinessProbe, usageEntry, writeOperatorPause, pauseProvider, isProviderStopped, COST_MEANING, appendFailureDiagnostic, failureDiagnosticPath, rejectRuntimeFailure } from '../src/district-model-usage.ts';
 import { classifyRuntimeFailure, failureDiagnostic, runtimeFailureReason, runtimeToolEvidence, RuntimeFailureDiagnosticSchema } from '../src/district-model-diagnostics.ts';
 import {CivicPolicyStateError} from '../src/civic-opt-out.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import { sourceFreeModelReadiness, type ReadinessExecutor } from '../src/district-model-readiness.ts';
 import { BridgeAnswerSchema } from '../src/district-assessment-bridge-contract.ts';
+import {EXTRACTION_INSTRUCTIONS,JUDGE_INSTRUCTIONS} from '../src/district-claims.ts';
+import {TOPIC_VOCABULARY} from '../src/topic-vocabulary.ts';
 const digest = (text: string) => createHash('sha256').update(text).digest('hex');
 function claudeResult(extra: Record<string, unknown> = {}) {
   return JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: { supported: true }, usage: { input_tokens: 2, output_tokens: 52, cache_read_input_tokens: 3, cache_creation_input_tokens: 923 }, modelUsage: { 'claude-haiku-5-5': { inputTokens: 2, outputTokens: 52, cacheReadInputTokens: 3, cacheCreationInputTokens: 923, costUSD: 0.008432 } }, total_cost_usd: 0.008432, ...extra });
@@ -40,6 +42,8 @@ test('provider arguments isolate tools and never enable API-key or fallback mode
   for (const flag of ['--bare', '--fallback-model', '--dangerously-skip-permissions']) assert.ok(!args.includes(flag));
   const codex = subscriptionExecutionArgs('/tmp/unit', '/tmp/unit/schema.json', '/tmp/unit/answer.json', 'fixed instructions');
   assert.ok(codex.includes(PROVIDER_CONFIGS['openai-subscription'].model));
+  assert.equal(PROVIDER_CONFIGS['openai-subscription'].model, 'gpt-6.1-sol');
+  assert.ok(codex.includes('model_reasoning_effort="medium"'));
   assert.ok(codex.includes('forced_login_method="chatgpt"'));
   assert.ok(codex.includes('read-only'));
 });
@@ -79,8 +83,14 @@ test('reported tool availability and attempts reject even otherwise successful o
     assert.equal(inspectClaudeEvents(JSON.stringify(event) + '\n' + claudeResult()).toolAttempted, true);
   }
   assert.equal(inspectCodexEvents('{"type":"item.started","item":{"type":"command_execution"}}').toolAttempted, true);
-  assert.throws(() => inspectCodexEvents('{"type":"session.started","model":"wrong"}\n{"type":"session.started","model":"gpt-6-luna"}'), /different model/);
+  assert.throws(() => inspectCodexEvents(`{"type":"session.started","model":"wrong"}\n{"type":"session.started","model":"${PROVIDER_CONFIGS['openai-subscription'].model}"}`), /different model/);
 });
+test('live Codex model validation does not accept historical models as a fallback', () => {
+  const event = (model: string) => JSON.stringify({ type: 'session.started', model });
+  assert.equal(inspectCodexEvents(event('gpt-6.1-sol')).returnedModel, 'gpt-6.1-sol');
+  for (const model of ['gpt-6-luna', 'gpt-x']) assert.throws(() => inspectCodexEvents(event(model)), /different model/);
+});
+
 test('hourly ledger separates scopes, missing reports, failures and API estimates from subscription charges', async () => {
   const root = await mkdtemp(join(tmpdir(), 'district-usage-test-'));
   try {
@@ -212,6 +222,12 @@ test('failure diagnostics project only controlled fields and do not fabricate ex
   assert.throws(() => RuntimeFailureDiagnosticSchema.parse({ ...diagnostic, parserFailureCategory: secret }));
   assert.throws(() => RuntimeFailureDiagnosticSchema.parse({ ...diagnostic, toolEvidence: [{ activity: 'attempt', kind: secret }] }));
   assert.throws(() => RuntimeFailureDiagnosticSchema.parse({ ...diagnostic, requestedModel: 'claude-haiku-5-5' }));
+  assert.equal(diagnostic.requestedModel, 'gpt-6.1-sol');
+  assert.equal(RuntimeFailureDiagnosticSchema.parse({ ...diagnostic, requestedModel: 'gpt-6-luna' }).requestedModel, 'gpt-6-luna');
+  for (const requestedModel of ['gpt-6.1-sol', 'gpt-6-luna']) {
+    assert.equal(RuntimeFailureDiagnosticSchema.safeParse({ ...diagnostic, provider: 'anthropic-subscription', requestedModel }).success, false);
+  }
+  assert.equal(RuntimeFailureDiagnosticSchema.safeParse({ ...diagnostic, requestedModel: 'gpt-x' }).success, false);
   for (const stream of ['null', '[]', '{"type":']) {
     assert.throws(() => inspectCodexEvents(stream), error => error instanceof SubscriptionRuntimeError && error.reason === 'event_stream');
   }
@@ -295,7 +311,25 @@ test('native runtime rejects fixture, missing and non-OpenAI authority before an
 test('context bounds are deterministic before any process creation or model input write',()=>{
  assert.equal(encodeSubscriptionInput('fixed instructions',{source:'synthetic'}),'{"source":"synthetic"}');
  assert.throws(()=>encodeSubscriptionInput('x'.repeat(8001),{}),/context byte limit/);
- assert.throws(()=>encodeSubscriptionInput('fixed',{source:'x'.repeat(24000)}),/context byte limit/);
+ const overhead=Buffer.byteLength(JSON.stringify({source:''})),atBound={source:'x'.repeat(MAX_SUBSCRIPTION_INPUT_BYTES-overhead)};
+ assert.equal(Buffer.byteLength(encodeSubscriptionInput('fixed',atBound)),MAX_SUBSCRIPTION_INPUT_BYTES);
+ assert.equal(subscriptionInputWithinBound(atBound),true);
+ const oversize={source:atBound.source+'x'};
+ assert.equal(subscriptionInputWithinBound(oversize),false);
+ assert.throws(()=>encodeSubscriptionInput('fixed',oversize),/context byte limit/);
+});
+test('full 12000-character multibyte German windows encode without truncation for extraction and judgment',()=>{
+ const text='äöüß€„'.repeat(2000),source={text};
+ assert.equal(text.length,12000);
+ const extraction={municipality:{id:'strausberg',name:'Strausberg'},vocabulary:TOPIC_VOCABULARY.map(({pattern:_pattern,...topic})=>topic),source};
+ const judgment={source,candidate:{summary:'Strausberg: äöüß€„'}};
+ for(const [system,input] of [[EXTRACTION_INSTRUCTIONS,extraction],[JUDGE_INSTRUCTIONS,judgment]] as const){
+  const bytes=Buffer.byteLength(JSON.stringify(input));
+  assert.ok(bytes>24000&&bytes<=MAX_SUBSCRIPTION_INPUT_BYTES);
+  assert.equal(subscriptionInputWithinBound(input),true);
+  const encoded=encodeSubscriptionInput(system,input);
+  assert.equal(encoded,JSON.stringify(input));assert.equal(JSON.parse(encoded).source.text,text);
+ }
 });
 test('fatal Codex fixtures preserve controlled parser causes without retaining messages or request data', () => {
   const secret = 'private-request-source-header';
@@ -458,14 +492,14 @@ test('supported route contract rejects every mixed tool/provider/model combinati
   for (const tool of ['codex-cli', 'claude-cli', 'omp-cli'] as const) {
     const supported = SUPPORTED_MODEL_ROUTES[tool];
     for (const provider of ['openai-subscription', 'anthropic-subscription'] as const) {
-      for (const model of ['gpt-6-luna', 'claude-haiku-5-5', 'claude-haiku-4-5', 'anthropic/claude-haiku-5-5']) {
-        const valid = provider === supported.provider && model === supported.model;
+      for (const model of ['gpt-6.1-sol', 'gpt-6-luna', 'claude-haiku-5-5', 'claude-haiku-4-5', 'anthropic/claude-haiku-5-5']) {
+        const valid = provider === supported.provider && (model === supported.model || 'historicalModels' in supported && supported.historicalModels.some(historical => historical === model));
         assert.equal(SupportedModelRouteSchema.safeParse({ provider, tool, model }).success, valid);
         const identity = { provider, tool, model, toolVersion: '0.0.0-synthetic', modelIdentityBasis: supported.modelIdentityBasis };
         assert.equal(ModelEvidenceSchema.safeParse({ ...identity, modelIdentitySha256: modelIdentitySha256(identity) }).success, valid);
       }
     }
-    const identity = { ...supported, tool, toolVersion: '0.0.0-synthetic' };
+    const identity = { provider: supported.provider, model: supported.model, modelIdentityBasis: supported.modelIdentityBasis, tool, toolVersion: '0.0.0-synthetic' };
     const wrongBasis = supported.modelIdentityBasis === 'reported-cli-model-and-tool-version'
       ? 'configured-cli-model-and-tool-version' : 'reported-cli-model-and-tool-version';
     assert.equal(ModelEvidenceSchema.safeParse({ ...identity, modelIdentityBasis: wrongBasis, modelIdentitySha256: modelIdentitySha256(identity) }).success, false);
@@ -482,7 +516,8 @@ test('synthetic omp response identity requires exact requested and reported logi
     assert.throws(() => assertModelResponseIdentity({ ...response, returnedModel }), /identity mismatch/);
   }
   assert.throws(() => assertModelResponseIdentity({ ...response, requestedModel: 'anthropic/claude-haiku-5-5' }), /identity mismatch/);
-  const codex = { ...SUPPORTED_MODEL_ROUTES['codex-cli'], tool: 'codex-cli' as const, toolVersion: '0.0.0-synthetic' };
+  const route = SUPPORTED_MODEL_ROUTES['codex-cli'];
+  const codex = { provider: route.provider, model: route.model, modelIdentityBasis: route.modelIdentityBasis, tool: 'codex-cli' as const, toolVersion: '0.0.0-synthetic' };
   assert.doesNotThrow(() => assertModelResponseIdentity({ evidence: { ...codex, modelIdentitySha256: modelIdentitySha256(codex) },
     requestedModel: codex.model, returnedModel: null }));
 });

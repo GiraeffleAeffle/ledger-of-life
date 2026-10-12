@@ -1,8 +1,9 @@
 import {createHash} from 'node:crypto';
 import {readCursor,writeCursor} from './mcp-pagination.ts';
 import {canonical,mcpSourceId,knowledgeSources,knowledgeSourceDescriptors,sourceMetadataUrls} from './mcp-source-identity.ts';
-import {regionalRecordId,regionalSource,signalSourceDescriptors} from './mcp-read-view.ts';
+import {visibleSignals,visibleRegional,visibleKnowledge,regionalRecordId,regionalSource,signalSourceDescriptors} from './mcp-read-view.ts';
 import {isSourceRevoked,isRecordRevoked,type VerifiedRevocations,type RevocationSourceDescriptor} from './civic-revocations.ts';
+import {administrativeView,type AdministrativeView} from './mcp-revocation-view.ts';
 import {z} from 'zod';
 import type {Catalogue,Signal} from './schema.ts';
 import {isPublicUrl,publicUrlReason} from './publication-quality.ts';
@@ -74,12 +75,14 @@ export class QueryIndex {
   readonly knowledge?:KnowledgeQueryData;
   private readonly originalFeatures:Signal[];
   private readonly originalCatalogue:Catalogue;
-  private readonly maskIdentity:string|null;
+  private maskIdentity:string|null=null;
+  private readView:AdministrativeView|null=null;
+  get administrativeView():AdministrativeView|null{return this.readView;}
   private readonly sourceTypeSet=new Set<string>();
   private readonly stageSet=new Set<string>();
   private readonly originalRecords=new Map<string,unknown>();
-  constructor(releaseId:string,releasedAt:string,features:Signal[],regional:Regional,catalogue:Catalogue,knowledge?:KnowledgeQueryData,maskIdentity:string|null=null,metricReadConstraints:readonly MetricReadConstraint[]=[]) {
-    this.originalFeatures=features;this.originalCatalogue=catalogue;this.maskIdentity=maskIdentity;
+  constructor(releaseId:string,releasedAt:string,features:Signal[],regional:Regional,catalogue:Catalogue,knowledge?:KnowledgeQueryData,revocations?:VerifiedRevocations,metricReadConstraints:readonly MetricReadConstraint[]=[]) {
+    this.originalFeatures=features;this.originalCatalogue=catalogue;
     const nativeCaseIdentities=new Map<string,ScopedCaseIdentity>();
     const nativeGroups=new Map<string,{binding:NativeRecordContext['binding'];members:QueryRecord[]}>();
     this.releaseId=releaseId;this.releasedAt=releasedAt;this.regional=regional;this.knowledge=knowledge;
@@ -122,7 +125,8 @@ export class QueryIndex {
       regionalRecords.set(id,record);
     }
     this.records.push(...regionalRecords.values());
-    const admissionRows=knowledge?z.object({municipalities:z.array(municipalityRecordCoverageSchema)}).parse(knowledge.coverage).municipalities:[];
+    const maskedCoverage=knowledge?.coverage&&typeof knowledge.coverage==='object'&&'administrativeView' in knowledge.coverage;
+    const admissionRows=knowledge&&!maskedCoverage?z.object({municipalities:z.array(municipalityRecordCoverageSchema)}).parse(knowledge.coverage).municipalities:[];
     const admissionByCity=new Map(admissionRows.map(row=>[row.id,row]));
     for(const municipality of knowledge?.municipalities??[]) {
       const previous=this.municipalities.get(municipality.id);
@@ -178,36 +182,30 @@ export class QueryIndex {
         if(withheld.length&&record.supersession)record.supersession.withheldContext=withheld;
       }
     }
+    if(revocations!==undefined)return this.withRevocations(revocations).index;
   }
   withRevocations(mask:VerifiedRevocations):QueryVisibility {
     isSourceRevoked(mask,{});
     if(mask.releaseId!==this.releaseId)throw Error('Revocation read-view release mismatch');
-    const sourceDescriptorsByRecord=new Map<string,readonly RevocationSourceDescriptor[]>(),visibleRecordIds=new Set<string>(),withheldSourceIds=new Set<string>(),revokedRegistrySources=new Set<string>();
-    const visibleFeatures=this.originalFeatures.filter(feature=>{
-      const descriptors=signalSourceDescriptors(feature);
-      sourceDescriptorsByRecord.set(feature.properties.id,descriptors);
-      const visible=!isRecordRevoked(mask,{recordId:feature.properties.id,municipalityId:feature.properties.cityId,sources:descriptors});
-      if(visible)visibleRecordIds.add(feature.properties.id);else for(const descriptor of descriptors)if(descriptor.mcpSourceId)withheldSourceIds.add(descriptor.mcpSourceId);
-      return visible;
-    });
-    const regional={...this.regional,topics:this.regional.topics.map(topic=>({...topic,municipalities:topic.municipalities.map(municipality=>({...municipality,items:municipality.items.filter(item=>{
-      const id=regionalRecordId(municipality.municipalityId,item),source=regionalSource(item,this.regional.asOf),descriptors=[{mcpSourceId:mcpSourceId(source),municipalityId:municipality.municipalityId,url:item.url},...sourceMetadataUrls(item).filter(url=>url!==item.url).map(url=>({municipalityId:municipality.municipalityId,url}))];
-      sourceDescriptorsByRecord.set(id,descriptors);
-      const visible=!isRecordRevoked(mask,{recordId:id,municipalityId:municipality.municipalityId,sources:descriptors});
-      if(visible)visibleRecordIds.add(id);else for(const descriptor of descriptors)if(descriptor.mcpSourceId)withheldSourceIds.add(descriptor.mcpSourceId);
-      return visible;
-    })}))}))};
-    const knowledge=this.knowledge&&{...this.knowledge,records:this.knowledge.records.filter(record=>{
-      const descriptors=knowledgeSourceDescriptors(record);sourceDescriptorsByRecord.set(record.id,descriptors);
-      for(const descriptor of descriptors)if(descriptor.registrySourceId&&isSourceRevoked(mask,descriptor))revokedRegistrySources.add(JSON.stringify([record.municipalityId,descriptor.registrySourceId]));
-      const visible=!isRecordRevoked(mask,{recordId:record.id,municipalityId:record.municipalityId,sources:descriptors});
-      if(visible)visibleRecordIds.add(record.id);else for(const descriptor of descriptors)if(descriptor.mcpSourceId)withheldSourceIds.add(descriptor.mcpSourceId);
-      return visible;
-    }),municipalities:this.knowledge.municipalities.map(city=>mask.targets.length===0?city:({...city,amt:city.amt&&sourceMetadataUrls(city.amt).every(url=>!isSourceRevoked(mask,{municipalityId:city.id,url}))?city.amt:null,sources:city.sources.filter(source=>!revokedRegistrySources.has(JSON.stringify([city.id,source.id]))&&!isSourceRevoked(mask,{municipalityId:city.id,registrySourceId:source.id,...(source.url?{url:source.url}:{})})&&sourceMetadataUrls(source).every(url=>!isSourceRevoked(mask,{url})))})),coverage:mask.targets.length===0?this.knowledge.coverage:{scope:'Current served evidence only; immutable publication, crawl, lineage and quarantine counts are not served-view counts.',municipalities:[]}};
+    const view=administrativeView(this.releaseId,mask);
+    const sourceDescriptorsByRecord=new Map<string,readonly RevocationSourceDescriptor[]>(),visibleRecordIds=new Set<string>(),withheldSourceIds=new Set<string>();
+    for(const feature of this.originalFeatures)sourceDescriptorsByRecord.set(feature.properties.id,signalSourceDescriptors(feature));
+    for(const topic of this.regional.topics)for(const municipality of topic.municipalities)for(const item of municipality.items){
+      const source=regionalSource(item,this.regional.asOf);
+      sourceDescriptorsByRecord.set(regionalRecordId(municipality.municipalityId,item),[{mcpSourceId:mcpSourceId(source),municipalityId:municipality.municipalityId,url:item.url},...sourceMetadataUrls(item).filter(url=>url!==item.url).map(url=>({municipalityId:municipality.municipalityId,url}))]);
+    }
+    for(const record of this.knowledge?.records??[])sourceDescriptorsByRecord.set(record.id,knowledgeSourceDescriptors(record));
+    for(const record of this.records){
+      const sources=sourceDescriptorsByRecord.get(record.id)??[];
+      if(!isRecordRevoked(mask,{recordId:record.id,municipalityId:record.cityId,sources}))visibleRecordIds.add(record.id);
+      else for(const source of sources)if(source.mcpSourceId)withheldSourceIds.add(source.mcpSourceId);
+    }
+    const visibleFeatures=visibleSignals(this.originalFeatures,mask),regional=visibleRegional(this.regional,mask),knowledge=this.knowledge&&visibleKnowledge(this.knowledge,mask,view);
     const originalMetrics=caseMetrics(this.records,this.releasedAt);
     const affectedGroups=new Set(originalMetrics.history.filter(entry=>!visibleRecordIds.has(entry.recordId)).map(entry=>metricGroupId(entry.municipalityId,entry.claim)));
     const constraints=[...affectedGroups].sort().map<MetricReadConstraint>(groupId=>({groupId,status:'unresolved',reason:'withheld_read_context'}));
-    const index=new QueryIndex(this.releaseId,this.releasedAt,visibleFeatures,regional,this.originalCatalogue,knowledge,mask.artifactSha256,[...constraints,...(originalMetrics.withheldContext??[])]);
+    const index=new QueryIndex(this.releaseId,this.releasedAt,visibleFeatures,regional,this.originalCatalogue,knowledge,undefined,[...constraints,...(originalMetrics.withheldContext??[])]);
+    index.maskIdentity=mask.artifactSha256;index.readView=view;
     return {releaseId:this.releaseId,maskIdentity:mask.artifactSha256,index,visibleRecordIds,withheldSourceIds,sourceDescriptorsByRecord};
   }
   private recordKey(record:QueryRecord){return `${record.cityId}:${record.id}`;}
@@ -233,7 +231,7 @@ export class QueryIndex {
         if(record.comparisonEligible)count.count++;else count.withheldCount++;
       }
     }
-    return {registryVersion:topicRegistryVersion,scope:'Shared hierarchical topics with actual rule/source/model provenance when supplied. Native observations have deterministic rule assignments, never invented source quotes or confidence. Counts describe evidence records, not projects or municipal performance.',cities,topics:topicRegistry.map(topic=>{
+    return {administrativeView:this.administrativeView,registryVersion:topicRegistryVersion,scope:'Shared hierarchical topics with actual rule/source/model provenance when supplied. Native observations have deterministic rule assignments, never invented source quotes or confidence. Counts describe evidence records, not projects or municipal performance.',cities,topics:topicRegistry.map(topic=>{
       const perCity=cities.map(city=>({cityId:city.id,...(counts[`${topic.id}:${city.id}`]??{count:0,withheldCount:0})}));
       return {id:topic.id,parentId:topic.parentId,label:topic.label,summary:topic.summary,ruleId:topic.ruleId,total:perCity.reduce((total,city)=>total+city.count,0),perCity};
     })};
@@ -248,7 +246,7 @@ export class QueryIndex {
     const options={...filters,topic,cityIds};this.validateFilters(options);
     const coverage=this.knowledge?.coverage;
     const rows=coverage&&typeof coverage==='object'&&'municipalities' in coverage&&Array.isArray(coverage.municipalities)?coverage.municipalities: [];
-    return {releaseId:this.releaseId,...compareDistrictTopic(this.records,[...new Set(cityIds)],options,cityId=>{
+    return {releaseId:this.releaseId,administrativeView:this.administrativeView,...compareDistrictTopic(this.records,[...new Set(cityIds)],options,cityId=>{
       const municipality=this.municipalities.get(cityId);
       return {municipality:municipality?{id:municipality.id,name:municipality.name,ags:municipality.ags,districtId:municipality.districtId,coverage:municipality.coverage}:null,
         sourceCoverage:rows.find(row=>row&&typeof row==='object'&&row.id===cityId)??null,
@@ -258,7 +256,7 @@ export class QueryIndex {
   similar(id:string,filters:DistrictFilters={},limit=20) {
     this.validateFilters(filters);
     if(!Number.isInteger(limit)||limit<1||limit>50)throw Error('limit must be between 1 and 50');
-    return {releaseId:this.releaseId,...similarDistrictRecords(this.records,id,filters,limit,this.releasedAt)};
+    return {releaseId:this.releaseId,administrativeView:this.administrativeView,...similarDistrictRecords(this.records,id,filters,limit,this.releasedAt)};
   }
   exportRecords(input:z.input<typeof exportRecordsSchema>={}) {
     const {topic,municipality,cursor,limit,...nativeFilters}=exportRecordsSchema.parse(input);
@@ -284,7 +282,7 @@ export class QueryIndex {
     if(!Number.isInteger(limit)||limit<1||limit>50)throw Error('limit must be between 1 and 50');
     const fields=[...new Set(options.fields??defaultFields)].sort();
     const {cursor,...filters}=options;
-    const binding=createHash('sha256').update(canonical({releaseId:this.releaseId,maskIdentity:this.maskIdentity,scope,caseLinkingVersion:CASE_LINKING_VERSION,stageSemanticsVersion,caseSemanticsVersion,nativeRecordContextVersion,filters:{...filters,fields,cityIds:options.cityIds?[...new Set(options.cityIds)].sort():undefined,recordTypes:options.recordTypes?[...new Set(options.recordTypes)].sort():undefined,kinds:options.kinds?[...new Set(options.kinds)].sort():undefined,observationKinds:options.observationKinds?[...new Set(options.observationKinds)].sort():undefined,sourceTypes:options.sourceTypes?[...new Set(options.sourceTypes)].sort():undefined,limit,excludePlaces:options.excludePlaces??false},extra,includeWithheld})).digest('hex');
+    const binding=createHash('sha256').update(canonical({viewId:this.administrativeView?.viewId,releaseId:this.releaseId,maskIdentity:this.maskIdentity,scope,caseLinkingVersion:CASE_LINKING_VERSION,stageSemanticsVersion,caseSemanticsVersion,nativeRecordContextVersion,filters:{...filters,fields,cityIds:options.cityIds?[...new Set(options.cityIds)].sort():undefined,recordTypes:options.recordTypes?[...new Set(options.recordTypes)].sort():undefined,kinds:options.kinds?[...new Set(options.kinds)].sort():undefined,observationKinds:options.observationKinds?[...new Set(options.observationKinds)].sort():undefined,sourceTypes:options.sourceTypes?[...new Set(options.sourceTypes)].sort():undefined,limit,excludePlaces:options.excludePlaces??false},extra,includeWithheld})).digest('hex');
     const after=readCursor(cursor,this.releaseId,binding);
     const matches=eligible.filter(record=>(includeWithheld||record.comparisonEligible)&&matchesFilters(record,options));
     let start=0;
@@ -294,6 +292,6 @@ export class QueryIndex {
     if(start+limit<matches.length) {
       nextCursor=writeCursor(this.releaseId,binding,this.recordKey(records[records.length-1]));
     }
-    return {items:records.map(record=>Object.fromEntries(fields.map(field=>[field,record[field]]))),total:matches.length,nextCursor,withheld:{count:eligible.filter(record=>!record.comparisonEligible&&matchesFilters(record,options)).length,meaning:includeWithheld?'Discovery includes explicitly ineligible evidence; never compare these items as dated progress':'Missing required dates/status or failed verification gates withheld from comparison; get_regional_topics includes regional and normalized discovery evidence'},fields};
+    return {administrativeView:this.administrativeView,items:records.map(record=>Object.fromEntries(fields.map(field=>[field,record[field]]))),total:matches.length,nextCursor,withheld:{count:eligible.filter(record=>!record.comparisonEligible&&matchesFilters(record,options)).length,meaning:includeWithheld?'Discovery includes explicitly ineligible evidence; never compare these items as dated progress':'Missing required dates/status or failed verification gates withheld from comparison; get_regional_topics includes regional and normalized discovery evidence'},fields};
   }
 }

@@ -52,12 +52,13 @@ export const PolicyEvidenceSchema = z.object({
 });
 export const SourceAccessPolicySchema = z.object({
   robots: z.object({ state: z.enum(['allowed', 'blocked', 'unavailable']), url: z.url().max(8192), sha256: hashSchema.optional(), checkedAt: z.iso.datetime().optional() }).strict(),
-  tdm: z.object({ state: z.enum(['reserved', 'not_reserved', 'not_declared', 'unavailable']), evidence: z.array(PolicyEvidenceSchema).max(256), referenceStatus: z.literal('unavailable').optional() }).strict(),
+  tdm: z.object({ state: z.enum(['reserved', 'not_reserved', 'not_declared', 'unavailable']), evidence: z.array(PolicyEvidenceSchema).max(256), referenceStatus: z.literal('unavailable').optional(), declarationStatus: z.literal('unavailable').optional() }).strict(),
   access: z.enum(['public', 'authentication', 'captcha', 'paywall']), legalClassification: z.literal('not_assessed'), publication: z.literal('facts_with_attribution_only'),
   ownerRobotsOverride: OwnerRobotsOverrideSchema.optional(), robotsStatus: z.enum(['allowed', 'disallowed', 'unavailable']).optional(), override: z.literal('owner-approved 2026-10-11').optional(),
   ownerTdmOverride: OwnerRobotsOverrideSchema.optional(), tdmOverride: z.literal('owner-approved 2026-10-11').optional(),
   documentOrigin: DocumentOriginSchema.optional(),
 }).strict().superRefine((policy, ctx) => {
+  if (policy.tdm.evidence.some(evidence => evidence.value === 'invalid_reservation_declaration') && policy.tdm.declarationStatus !== 'unavailable') ctx.addIssue({ code: 'custom', message: 'Invalid reservation declaration must remain unavailable' });
   if (policy.ownerRobotsOverride !== undefined || policy.robotsStatus !== undefined || policy.override !== undefined) {
     if (!effectiveRobotsPermission(policy, policy.robots.url)) ctx.addIssue({ code: 'custom', message: 'Owner robots audit requires an exact approved decision and honest declared robots evidence' });
   }
@@ -151,7 +152,7 @@ export const DistrictKnowledgeRecordSchema = DistrictExtractionClaimsSchema.exte
   } catch { fail('Invalid graph mention references'); }
   const actionNormalization = record.extraction.relationNormalization;
   // Frozen original contracts stay readable for reassessment; never relabel their generation.
-  if ((actionNormalization || record.extraction.promptVersion === 'district-claims-v8-action-relations') && normalizeRelationActions(record).normalization !== null) fail('Graph actions must be canonical before gating and judging');
+  if ((actionNormalization || record.extraction.promptVersion === 'district-claims-v8-action-relations' || record.extraction.promptVersion === 'district-claims-v9-civic-policy-facts') && normalizeRelationActions(record).normalization !== null) fail('Graph actions must be canonical before gating and judging');
   if (actionNormalization) {
     if (actionNormalization.sourceSha256 !== record.extraction.inputSha256 || actionNormalization.textSha256 !== record.extraction.textSha256 || actionNormalization.responseSha256 !== record.extraction.responseSha256) fail('Relation normalization source/response binding mismatch');
     const indexes = new Set<number>();

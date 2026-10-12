@@ -3,7 +3,6 @@ import {execFile} from 'node:child_process';
 import {constants} from 'node:fs';
 import {chmod,mkdir,readFile,open,realpath,lstat,writeFile} from 'node:fs/promises';
 import {promisify} from 'node:util';
-
 import {dirname,isAbsolute,join,relative,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {z} from 'zod';
@@ -60,6 +59,7 @@ export async function buildOperatorRegistryConfigDescriptor(input:{repository:st
  };
  const actualBlob=createHash('sha1').update(`blob ${body.length}\0`).update(body).digest('hex');
  if(actualBlob!==blobOid)throw Error('Git blob bytes do not authenticate their OID');
+ const code=await writePinned('district-registry.json',body);
  const commitBytes=await git(['cat-file','commit',gitCommit]),commitPin=await writePinned(`commit-${gitCommit}.bin`,commitBytes,gitCommit);
  const treePins=[];
  for(const revision of [`${gitCommit}:stadtstack-data/sources`,`${gitCommit}:stadtstack-data`,`${gitCommit}^{tree}`]){
@@ -71,7 +71,6 @@ export async function buildOperatorRegistryConfigDescriptor(input:{repository:st
  await writeFile(descriptorPath,descriptorBytes,{mode:0o600,flag:'wx'});
  return {descriptorPath,descriptorSha256:sha256(descriptorBytes),descriptor};
 }
-
 
 /** Bind the actual bounded codec, registry schema and URL/provenance validators, not an unversioned promise. */
 export async function operatorRegistryConfigContractSha256(){
@@ -158,12 +157,12 @@ export async function readOperatorRegistryConfigSourcePin(raw:OperatorRegistryCo
 
 export const operatorRegistryInputPinSchema=z.object({path:z.string().min(1),sha256:hashSchema}).strict();
 export type OperatorRegistryInputPin=z.infer<typeof operatorRegistryInputPinSchema>;
-export interface AdmittedOperatorRegistryConfiguration {bytes:Buffer;registry:DistrictRegistry;bindings:OperatorRegistryConfigBinding[]}
+export interface AdmittedOperatorRegistryConfiguration {path:string;bytes:Buffer;registry:DistrictRegistry;bindings:OperatorRegistryConfigBinding[]}
 /** A descriptor pin is control metadata, never a bare registry-data path. */
 export async function readOperatorRegistryInputPin(input:OperatorRegistryInputPin,policy:CivicPolicyOptions):Promise<AdmittedOperatorRegistryConfiguration>{
  const pin=operatorRegistryInputPinSchema.parse(input);
  await assertCivicPolicyAuthority(policy);
  const descriptor=z.union([operatorRegistryConfigSchema,operatorRegistryConfigSourcePinSchema]).parse(await readPinnedJson(pin.path,pin.sha256,8*1024*1024));
- if('kind' in descriptor)return readOperatorRegistryConfig(descriptor,policy);
- return {...await readOperatorRegistryConfigSourcePin(descriptor,policy),bindings:descriptor.bindings};
+ if('kind' in descriptor)return {path:descriptor.path,...await readOperatorRegistryConfig(descriptor,policy)};
+ return {path:descriptor.path,...await readOperatorRegistryConfigSourcePin(descriptor,policy),bindings:descriptor.bindings};
 }

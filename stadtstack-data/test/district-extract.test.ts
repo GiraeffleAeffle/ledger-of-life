@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import { KNOWLEDGE_SCHEMA_VERSION, DistrictExtractionClaimsSchema, DistrictKnowledgeRecordSchema, QUOTE_NORMALIZATION_VERSION, assertSubscriptionSourcePolicy, knowledgeEvidenceHash, sha256, validateKnowledgeRelease, type DistrictKnowledgeRecord } from '../src/district-schema.ts';
 import { canonicalWhitespace, dateOccursInQuote, deterministicChecks, documentChunks, extractionCacheKey, summaryNumbersSupported, NoCaseCacheSchema, rebindSourceReferences, restoreSourceQuotes, EXTRACTION_INSTRUCTIONS, JUDGE_INSTRUCTIONS, EXTRACTOR_VERSION, PROMPT_VERSION, JUDGE_PROMPT_VERSION, PROMPT_SHA256, JUDGE_PROMPT_SHA256, type ExtractionCacheBinding } from '../src/district-claims.ts';
 import {stageEvidenceSupports} from '../src/district-stage-evidence.ts';
@@ -10,6 +11,8 @@ import { TOPICS } from '../regional/taxonomy.mjs';
 import {groupCrawlDocuments,selectExtractionGroups} from '../src/district-corpus.ts';
 import {PROVIDER_CONFIGS,modelIdentitySha256} from '../src/district-model-contract.ts';
 import {normalizeGraphClaims} from '../src/district-graph-claims.ts';
+import {ownerRobotsOverrideFor} from '../src/source-policy.ts';
+import { DOCUMENT_ORIGIN_CLASSIFIER_VERSION } from '../src/document-origin-contract.ts'
 const EXTRACTION_MODEL=PROVIDER_CONFIGS['openai-subscription'].model;
 
 test('Bounded extraction prioritizes grounded seeds, preserves same-byte references and gives municipalities fair turns',()=>{
@@ -46,9 +49,9 @@ test('shared extraction and judge instructions fit the native 8000-byte system b
 });
 
 test('action relation contract is versioned in shared extraction and faithfulness prompts', () => {
-  assert.equal(EXTRACTOR_VERSION, 'district-extractor-v9-action-relations');
-  assert.equal(PROMPT_VERSION, 'district-claims-v8-action-relations');
-  assert.equal(JUDGE_PROMPT_VERSION, 'district-faithfulness-v7-action-relations');
+  assert.equal(EXTRACTOR_VERSION, 'district-extractor-v10-civic-policy-facts');
+  assert.equal(PROMPT_VERSION, 'district-claims-v9-civic-policy-facts');
+  assert.equal(JUDGE_PROMPT_VERSION, 'district-faithfulness-v8-civic-policy-facts');
   for (const instructions of [EXTRACTION_INSTRUCTIONS, JUDGE_INSTRUCTIONS]) {
     assert.ok(instructions.includes('Joint graph in this SAME response'));
     assert.ok(instructions.includes('predicateQuote copies the COMPLETE relation verb/phrase'));
@@ -58,6 +61,24 @@ test('action relation contract is versioned in shared extraction and faithfulnes
     assert.ok(instructions.includes('not just lexical matches'));
   }
   assert.ok(JUDGE_INSTRUCTIONS.includes('criticalUnsupported=true and score below 0.8'));
+});
+
+test('same-case consecutive substantive facts share one bounded literal summary quote', () => {
+  for (const instructions of [EXTRACTION_INSTRUCTIONS, JUDGE_INSTRUCTIONS]) {
+    assert.ok(instructions.includes('Same-case facts in consecutive sentences'));
+    assert.ok(instructions.includes('ONE contiguous summaryQuote (max 1800 characters)'));
+    assert.ok(instructions.includes('entity only: NO relation unless a listed predicate is literally supported'));
+    assert.ok(instructions.includes('means member_of, NEVER cooperates_with'));
+  }
+  const facts = 'Die Wärmeplanung begann im Januar 2024 und dauert etwa 18 Monate. Beispiel Netz GmbH wurde beauftragt. Es gibt zwei Eignungsgebiete. In fünf Jahren sollen mindestens fünf Maßnahmen umgesetzt werden.';
+  const source = `${text}\n${facts}`, value = claims();
+  value.summary = facts; value.summaryQuote = facts;
+  value.entities.push({ mentionId: 'contractor', name: 'Beispiel Netz GmbH', type: 'company', quote: 'Beispiel Netz GmbH wurde beauftragt.', identifiers: [] });
+  assert.equal(DistrictExtractionClaimsSchema.safeParse(value).success, true);
+  assert.equal(deterministicChecks(value, source, 'Beispielstadt').passed, true);
+  assert.equal(DistrictExtractionClaimsSchema.safeParse({ ...value, summaryQuote: 'x'.repeat(1801) }).success, false);
+  value.summaryQuote = facts.replace('Beispiel Netz GmbH wurde beauftragt. ', '');
+  assert.equal(deterministicChecks(value, source, 'Beispielstadt').checks.find(check => check.id === 'exact_quotes')?.passed, false);
 });
 // Synthetic unit-test material only; never a municipal record or production model evidence.
 const text = 'Stadt Beispielstadt\nWärmeplanung\nDer Entwurf der Wärmeplanung wurde am 09.10.2026 veröffentlicht.\nStand: 10.10.2026';
@@ -140,6 +161,70 @@ test('dates reject impossible days and retrieval-time substitution', () => {
   missing.documentDate = null; missing.documentDateQuote = null; missing.documentDateReason = 'Not stated';
   assert.equal(deterministicChecks(missing, text, 'Beispielstadt').passed, true);
 });
+test('date evidence excludes filename tokens while preserving complete printed dates', () => {
+  for (const quote of ['2026-10-09_plan_entwurf', 'plan-2026-10-09.pdf', '09.10.2026.docx', 'x2026-10-09', '2026-10-09x']) {
+    assert.equal(dateOccursInQuote('2026-10-09', quote), false, quote);
+  }
+  for (const quote of ['Stand: 2026-10-09.', '(09.10.2026)', 'Fassung vom 9. Oktober 2026', '09.10.2026–10.10.2026']) {
+    assert.equal(dateOccursInQuote('2026-10-09', quote), true, quote);
+  }
+  const value = claims(), filename = '2026-10-09_plan_entwurf';
+  value.documentDate = '2026-10-09'; value.documentDateQuote = filename;
+  value.stageDateQuote = filename;
+  value.stages = [{ stage: 'draft', originalStatus: 'Entwurf', quote: 'Entwurf', date: '2026-10-09', dateQuote: filename }];
+  const checks = deterministicChecks(value, `${text}\n${filename}`, 'Beispielstadt');
+  for (const id of ['document_date', 'stage_date', 'stage_history']) assert.equal(checks.checks.find(check => check.id === id)?.passed, false, id);
+});
+
+test('later chunks with only month/year keep date null and explicit missing-date reasons', () => {
+  const excerpt = 'Stadt Beispielstadt\nWärmeplanung\nEntwurf der Wärmeplanung\nStand: Oktober 2026';
+  const source = `${text}\n${'Fülltext\n'.repeat(1600)}${excerpt}`;
+  const chunk = documentChunks(source).at(-1)!;
+  assert.ok(chunk.index > 0);
+  assert.equal(chunk.text.includes('Stand: 10.10.2026'), false);
+  const value = claims();
+  value.summary = 'Entwurf der Wärmeplanung'; value.summaryQuote = value.summary;
+  value.documentDate = null; value.documentDateQuote = 'Stand: Oktober 2026';
+  value.documentDateReason = 'Nur Monat und Jahr in diesem Auszug.';
+  value.stageQuote = 'Entwurf der Wärmeplanung'; value.originalStatus = 'Entwurf';
+  value.stageDate = null; value.stageDateQuote = null; value.stageDateReason = 'Kein vollständiges Ereignisdatum in diesem Auszug.';
+  value.stages = [{ stage: 'draft', originalStatus: 'Entwurf', quote: value.stageQuote, date: null, dateQuote: null }];
+  assert.equal(deterministicChecks(value, chunk.text, 'Beispielstadt').passed, true);
+  assert.equal(DistrictExtractionClaimsSchema.safeParse(value).success, true); // History has no reason field.
+  value.documentDate = '2026-10-01';
+  assert.equal(deterministicChecks(value, chunk.text, 'Beispielstadt').checks.find(check => check.id === 'document_date')?.passed, false);
+  value.documentDate = null; value.documentDateReason = null; value.stageDateReason = null;
+  const missing = deterministicChecks(value, chunk.text, 'Beispielstadt');
+  for (const id of ['document_date', 'stage_date']) assert.equal(missing.checks.find(check => check.id === id)?.passed, false, id);
+  for (const instructions of [EXTRACTION_INSTRUCTIONS, JUDGE_INSTRUCTIONS]) {
+    assert.ok(instructions.includes('THIS excerpt'));
+    assert.ok(instructions.includes('documentDateReason/stageDateReason nonempty'));
+    assert.ok(instructions.includes('history date=null, dateQuote=null (no reason field)'));
+  }
+});
+
+test('valid output shape does not repair missing reasons or a conflicting source-document key', () => {
+  const value = record();
+  assert.ok(EXTRACTION_INSTRUCTIONS.includes('not a grant ID'));
+  value.stageDate = null; value.stageDateQuote = null; value.stageDateReason = null;
+  value.caseKey = 'Grant-123'; value.caseQuote = 'Grant-123';
+  const raw = claims();
+  raw.stageDate = null; raw.stageDateQuote = null; raw.stageDateReason = null;
+  raw.caseKey = 'Grant-123'; raw.caseQuote = 'Grant-123';
+  assert.equal(DistrictExtractionClaimsSchema.safeParse(raw).success, true);
+  const checks = deterministicChecks(raw, `${text}\nGrant-123`, 'Beispielstadt');
+  for (const id of ['case_identity', 'stage_date']) assert.equal(checks.checks.find(check => check.id === id)?.passed, false, id);
+  value.verification.status = 'candidate'; value.verification.deterministic = checks;
+  value.verification.evidenceHash = knowledgeEvidenceHash(value);
+  const parsed = DistrictKnowledgeRecordSchema.safeParse(value);
+  assert.equal(parsed.success, false);
+  if (!parsed.success) {
+    const messages = parsed.error.issues.map(issue => issue.message);
+    assert.ok(messages.includes('Missing stage date needs reason'));
+    assert.ok(messages.includes('Source-document fallback identity mismatch'));
+  }
+});
+
 test('stage labels, source identifiers and topic assignments fail closed', () => {
   const value = claims();
   value.originalStatus = 'in Kraft';
@@ -177,6 +262,32 @@ test('release requires actual-shaped judge evidence, all deterministic checks an
   good.title = 'Mutated after judging';
   assert.throws(() => DistrictKnowledgeRecordSchema.parse(good), /evidence hash/);
 });
+test('current sol and retained luna record models preserve strict same-model and provider evidence', () => {
+  assert.equal(PROVIDER_CONFIGS['openai-subscription'].model, 'gpt-6.1-sol');
+  assert.deepEqual(PROVIDER_CONFIGS['openai-subscription'].historicalModels, ['gpt-6-luna']);
+  assert.deepEqual(PROVIDER_CONFIGS['anthropic-subscription'].historicalModels, []);
+  for (const model of ['gpt-6.1-sol', 'gpt-6-luna']) {
+    const value = record();
+    value.extraction.model = model; value.verification.faithfulness.model = model;
+    const identityHash = sha256(`Synthetic model identity for ${model}`);
+    value.extraction.modelIdentitySha256 = identityHash; value.verification.faithfulness.modelIdentitySha256 = identityHash;
+    value.verification.evidenceHash = knowledgeEvidenceHash(value);
+    assert.deepEqual(DistrictKnowledgeRecordSchema.parse(value), value);
+    const mismatch = structuredClone(value);
+    mismatch.verification.faithfulness.model = model === 'gpt-6-luna' ? 'gpt-6.1-sol' : 'gpt-6-luna';
+    mismatch.verification.evidenceHash = knowledgeEvidenceHash(mismatch);
+    assert.throws(() => DistrictKnowledgeRecordSchema.parse(mismatch), /Same-model judge identity mismatch/);
+    const wrongTool = structuredClone(value);
+    wrongTool.extraction.tool = 'claude-cli'; wrongTool.verification.faithfulness.tool = 'claude-cli';
+    wrongTool.verification.evidenceHash = knowledgeEvidenceHash(wrongTool);
+    assert.throws(() => DistrictKnowledgeRecordSchema.parse(wrongTool), /Unsupported subscription tool\/provider\/model route/);
+  }
+  const unknown = record();
+  unknown.extraction.model = 'gpt-x'; unknown.verification.faithfulness.model = 'gpt-x';
+  unknown.verification.evidenceHash = knowledgeEvidenceHash(unknown);
+  assert.throws(() => DistrictKnowledgeRecordSchema.parse(unknown), /Unsupported subscription tool\/provider\/model route/);
+});
+
 test('evidence hash is stable under JSON property order, but bound to all claims', () => {
   const value = record();
   const reordered = Object.fromEntries(Object.entries(value).reverse()) as DistrictKnowledgeRecord;
@@ -227,9 +338,24 @@ test('chunking covers entire long sources with bounded overlap and no silent tru
   const chunks = documentChunks(source);
   assert.equal(chunks[0].start, 0);
   assert.equal(chunks.at(-1)!.end, source.length);
-  assert.ok(chunks.every(chunk => chunk.text.length <= 4800 && source.slice(chunk.start, chunk.end) === chunk.text));
+  assert.ok(chunks.every(chunk => chunk.text.length <= 12000 && source.slice(chunk.start, chunk.end) === chunk.text));
   for (let index = 1; index < chunks.length; index++) assert.ok(chunks[index].start < chunks[index - 1].end);
   assert.throws(() => documentChunks('x'.repeat(4800 * 81)), /chunk limit/);
+  assert.equal(documentChunks('x'.repeat(320800)).at(-1)!.end,320800);
+  assert.throws(() => documentChunks('x'.repeat(320801)), /chunk limit/);
+});
+test('contiguous context retains a distant printed document date and explicit correction without borrowed evidence',async()=>{
+  const fixture=JSON.parse(await readFile(new URL('../reports/correction-solarpark-0.3.2.json',import.meta.url),'utf8'));
+  // Synthetic placement reproduces the known span distance; this is not the actual PDF/text snapshot.
+  const header='10. Änderung des Flächennutzungsplans\n7. August 2025\n';
+  const source=header+'x'.repeat(10604-header.length)+fixture.replacementEvidence.quote+'y'.repeat(20000);
+  const first=documentChunks(source)[0];
+  assert.equal(first.text,source.slice(first.start,first.end));
+  assert.ok(first.text.includes('7. August 2025'));
+  assert.ok(first.text.includes(fixture.replacementEvidence.quote));
+  assert.notEqual(sha256(source),fixture.replacementEvidence.expectedRetainedSourceSha256);
+  assert.equal(EXTRACTION_INSTRUCTIONS.includes('68,6'),false);
+  assert.equal(EXTRACTION_INSTRUCTIONS.includes('41,5'),false);
 });
 test('HTML extraction removes active content and decodes source text', () => {
   assert.equal(htmlToDocumentText('<script>fake instructions</script><p>W&auml;rme &amp; &#246;ffentlich</p>'), 'Wärme & öffentlich');
@@ -292,6 +418,35 @@ test('missing, reserved or blocked source policy prevents subscription transmiss
   ]) assert.throws(() => assertSubscriptionSourcePolicy(blocked), /ask_municipality/);
   const cached = record();
   assert.throws(() => rebindSourceReferences(cached, [{ ...cached.sources[0], policy: { ...cached.sources[0].policy, access: 'captcha' } }]), /ask_municipality/);
+});
+test('record and cache source rebinding retain the blocked owner decision without weakening other release gates', () => {
+  const original = record(), url = 'https://strausberg.allris.cloud/public/si010';
+  const source: DistrictKnowledgeRecord['sources'][number] = {
+    ...original.sources[0], id: 'strausberg-council', url, sourceType: 'council',
+    policy: { ...original.sources[0].policy, robots: { state: 'blocked', url: new URL('/robots.txt', url).href, sha256: sha256('synthetic robots denial'), checkedAt: '2026-10-11T12:00:00.000Z' }, ownerRobotsOverride: ownerRobotsOverrideFor(url)!, robotsStatus: 'disallowed', override: 'owner-approved 2026-10-11', documentOrigin: { classification: 'official_work', method: 'rules', classifierVersion: DOCUMENT_ORIGIN_CLASSIFIER_VERSION, url, sha256: original.sources[0].sha256, classifiedAt: '2026-10-11T12:00:00.000Z', evidence: [{ locator: 'synthetic fixture', value: 'administrative authorship and formal work fixture' }] } },
+  };
+  const rebound = rebindSourceReferences(original, [source]);
+  const retained = DistrictKnowledgeRecordSchema.parse(rebound).sources.find(item => item.id === source.id)!;
+  assert.deepEqual(retained.policy, source.policy);
+  assert.equal(retained.policy.robots.state, 'blocked');
+  assert.notEqual(rebound.verification.evidenceHash, original.verification.evidenceHash);
+  for (const mutate of [
+    (item: typeof source) => { item.url = 'https://other.allris.cloud/public/si010'; },
+    (item: typeof source) => { delete item.policy.ownerRobotsOverride; },
+    (item: typeof source) => { item.policy.robots.state = 'unavailable'; },
+    (item: typeof source) => { item.policy.access = 'captcha'; },
+    (item: typeof source) => { item.policy.tdm.state = 'reserved'; },
+    (item: typeof source) => { item.mimeType = 'application/pdf'; },
+  ]) {
+    const changed = structuredClone(rebound);
+    mutate(changed.sources.find(item => item.id === source.id)!);
+    changed.verification.evidenceHash = knowledgeEvidenceHash(changed);
+    assert.equal(DistrictKnowledgeRecordSchema.safeParse(changed).success, false);
+  }
+  const failedGates = structuredClone(rebound);
+  failedGates.verification.faithfulness.score = 0;
+  failedGates.verification.evidenceHash = knowledgeEvidenceHash(failedGates);
+  assert.equal(DistrictKnowledgeRecordSchema.safeParse(failedGates).success, false);
 });
 
 test('source-category duplicates group once per municipality and bytes, without merging municipalities', () => {

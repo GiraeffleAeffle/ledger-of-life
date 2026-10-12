@@ -1,14 +1,14 @@
 import {readFile,mkdir} from 'node:fs/promises';
-import {dirname,join} from 'node:path';
+import {dirname,resolve,join} from 'node:path';
 import {z} from 'zod';
 import {readOperatorRegistryInputPin,type OperatorRegistryInputPin} from './district-registry-config.ts';
 import {loadFrozenCorpus,groupCrawlDocuments,selectExtractionGroups,authorizedPilotCorpusSchema} from './district-corpus.ts';
 import {hashSchema,sha256} from './district-schema.ts';
 import {safeFailure} from './district-claims.ts';
-import {PreparedDocumentSchema,PREPARED_VM_ROOT,prepareDocument,readPreparedDocument,collectPreparationToolVersions,preparationExtractorSha256,cachePreparedDocument,preparedSourceBindings,type PreparedSourceReference} from './district-prepared-document.ts';
+import {PreparedDocumentSchema,PREPARED_VM_ROOT,prepareDocument,readPreparedDocument,verifyPreparedDocument,assertPreparedSourcesActive,collectPreparationToolVersions,preparationExtractorSha256,cachePreparedDocument,preparedSourceBindings,type PreparedSourceReference} from './district-prepared-document.ts';
 import {municipalityBindingSchema,quarantineCaseSchema,type QuarantineCase} from './district-inference.ts';
 import {writePrivateJson} from './district-private-io.ts';
-import {CIVIC_ACQUISITION_DECISION_ID,assertCivicPolicyAuthority,assertManagedSourceReadable,initializeManagedAcquisitionLane,withManagedSourceWrite,HostOptedOutError,CivicPolicyStateError,type CivicPolicyOptions,type ManagedSourceBinding} from './civic-opt-out.ts';
+import {CIVIC_ACQUISITION_DECISION_ID,assertCivicPolicyAuthority,assertManagedSourceReadable,assertManagedSourceBindings,initializeManagedAcquisitionLane,withManagedSourceWrite,HostOptedOutError,CivicPolicyStateError,type CivicPolicyOptions,type ManagedSourceBinding} from './civic-opt-out.ts';
 import {readBoundSourceObservation} from './source-observation.ts';
 
 export const PREPARATION_ARTIFACT_ROOT=join(dirname(PREPARED_VM_ROOT),'preparation-artifacts');
@@ -28,8 +28,10 @@ export async function prepareFrozenCorpus(options:{index:string;expectedIndexSha
   await mkdir(path,{recursive:true,mode:0o700});await initializeManagedAcquisitionLane(path,{...lane,kind});
  }
  await assertManagedSourceReadable(options.index,policy);
- const corpus=await loadFrozenCorpus(options.index,options.expectedIndexSha256),registryAdmission=await readOperatorRegistryInputPin(options.registry,policy),registryBytes=registryAdmission.bytes,registry=registryAdmission.registry;
- await assertManagedSourceReadable(options.index,policy);
+ const registryAdmission=await readOperatorRegistryInputPin(options.registry,policy),registryBytes=registryAdmission.bytes,registry=registryAdmission.registry;
+ await assertManagedSourceBindings(options.index,registryAdmission.bindings,policy,'operator_registry_config');
+ const corpus=await loadFrozenCorpus(options.index,options.expectedIndexSha256);
+ await assertManagedSourceBindings(options.index,registryAdmission.bindings,policy,'operator_registry_config');
  const available=groupCrawlDocuments(corpus.documents),seeds=registry.municipalities.flatMap(municipality=>municipality.seedDocuments.map(seed=>({municipalityId:municipality.id,sourceId:seed.sourceId,url:seed.url})));
  const selected=selectExtractionGroups(corpus.documents,seeds,options.maxDocumentsPerMunicipality),extractorSha256=await preparationExtractorSha256();
  const groups:PreparationGroup[]=[],quarantine:QuarantineCase[]=[],toolVersions=new Map<string,Record<string,string>>(),acquisitionBindings:ManagedSourceBinding[]=[];
@@ -42,6 +44,7 @@ export async function prepareFrozenCorpus(options:{index:string;expectedIndexSha
     options.signal?.throwIfAborted();
     const source=municipality?.sources.find(item=>item.id===document.sourceId);
     if(!municipality||municipality.ags!==document.ags||municipality.districtId!==document.districtId||!source||source.checkState!=='checked'||!source.url)throw Error('Unbound source or municipality identity');
+    if(resolve(dirname(resolve(options.index)),document.localPath)!==resolve(options.rawRoot,'sha256',document.sha256))throw Error('Frozen source path differs from its original managed CAS location');
     const acquired=await readBoundSourceObservation({rawRoot:options.rawRoot,document,policy,registeredSource:source});
     if(mimeType&&mimeType!==document.mimeType)throw Error('Source MIME conflict within identical-byte group');
     references.push({id:source.id,url:document.url,sha256:document.sha256,retrievedAt:document.retrievedAt,locator:`document-sha256:${document.sha256}`,mimeType:document.mimeType,sourceType:source.kind,policy:acquired.policy});
@@ -63,6 +66,7 @@ export async function prepareFrozenCorpus(options:{index:string;expectedIndexSha
     const pointer=z.object({receiptSha256:hashSchema}).strict().parse(JSON.parse(await readFile(indexPath,'utf8')));
     await assertManagedSourceReadable(indexPath,policy);
     receipt=await readPreparedDocument({...pointer,municipalityId:municipality.id,sourceSha256:first.sha256,extractorSha256,references,toolVersions:versions},policy);
+    verifyPreparedDocument(receipt,receipt,bytes);
    }catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
    if(!receipt){
     receipt=await prepareDocument({bytes,municipalityId:municipality.id,references,mimeType,extractorSha256,toolVersions:versions,managedRoot:preparedRoot,policy,sourceBindings,signal:options.signal});
@@ -81,6 +85,7 @@ export async function prepareFrozenCorpus(options:{index:string;expectedIndexSha
  const encoded=JSON.stringify(plan,null,2)+'\n',planSha256=sha256(encoded),relativePlan=join('plans',planSha256+'.json'),path=join(artifactRoot,relativePlan);
  const bindings=[...registryAdmission.bindings.map(binding=>({...binding,relativePath:relativePlan,contentSha256:planSha256})),...acquisitionBindings.map(binding=>({...binding,relativePath:relativePlan,contentSha256:planSha256,independentAllowed:false}))];
  if(!acquisitionBindings.length)throw Error('No authenticated acquisition binding is available for a managed preparation plan');
+ await assertPreparedSourcesActive(groups.flatMap(group=>group.expected.references),policy);
  await withManagedSourceWrite(artifactRoot,bindings,()=>writePrivateJson(path,plan),policy);
  return {plan,planSha256,path};
 }

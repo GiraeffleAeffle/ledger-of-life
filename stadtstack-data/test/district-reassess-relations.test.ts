@@ -1,7 +1,8 @@
 import test from 'node:test';
 import type {TestContext} from 'node:test';
-import {join} from 'node:path';
-import {readFile,lstat} from 'node:fs/promises';
+import {join,basename} from 'node:path';
+import {readFile,lstat,writeFile,mkdir} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {recordHostOptOut,assertManagedSourceReadable,assertManagedSourceBindings,HostOptedOutError,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 import {writeManagedSourceArtifact,writeManagedSourceJson,writePrivateJson} from '../src/district-private-io.ts';
@@ -19,9 +20,15 @@ import type {CachedAnswer} from '../src/district-answer-cache.ts';
 import type {CivicPolicyOptions} from '../src/civic-opt-out.ts';
 import {canonicalJson} from '../src/district-adapter-contract.ts';
 import {PROVIDER_CONFIGS, EMPTY_USAGE, type ModelEvidence, type ModelAnswer} from '../src/district-model-contract.ts';
-import {REASSESSMENT_VERSION, reassessmentArtifactPinSchema, assessExistingRelation, materializeReassessment, executeReassessmentPass, mergeReassessmentDeltas, validateFrozenReassessment, assertNativeReassessmentHost, relationDateEligible, reassessmentJudgeBinding, reassessmentDeltaHash, freezeReassessment, mergeReassessment, FrozenReassessmentSchema, HistoricalFrozenReassessmentSchema, type ReassessmentContract, type FrozenReassessment, type JudgeOnlyRuntime, type ReassessmentDelta, type ReassessmentJudgeEvidence} from '../src/district-reassess-relations.ts';
+import {REASSESSMENT_VERSION, assessExistingRelation, materializeReassessment, executeReassessmentPass, mergeReassessmentDeltas, validateFrozenReassessment, assertNativeReassessmentHost, relationDateEligible, reassessmentJudgeBinding, reassessmentDeltaHash, freezeReassessment, mergeReassessment, FrozenReassessmentSchema, HistoricalFrozenReassessmentSchema, reassessmentArtifactPinSchema, type ReassessmentContract, type FrozenReassessment, type JudgeOnlyRuntime, type ReassessmentDelta, type ReassessmentJudgeEvidence} from '../src/district-reassess-relations.ts';
 import {assembleRun,readTaskResult} from '../src/district-extract.ts';
 import {preparationPlanSchema} from '../src/district-preparation-run.ts';
+import {PoliteFetcher,sourceContentBinding} from '../src/polite-fetch.ts';
+import type {FetchObservation} from '../src/polite-fetch.ts';
+import {operatorRegistryConfigSchema,operatorRegistryConfigContractSha256,importOperatorRegistryConfig} from '../src/district-registry-config.ts';
+import {retainedPublicationSources} from '../src/district-retained-import.ts';
+import {MODEL_INPUT_BOUND_REASON,MAX_SUBSCRIPTION_INPUT_BYTES} from '../src/district-model.ts';
+import {isProviderStopped} from '../src/district-model-usage.ts';
 
 // Every source, generation receipt and judge score below is synthetic test data.
 // Real isolated fixture authority only; no native model, network or external document command.
@@ -41,12 +48,12 @@ const generationAnswer=(identity:ModelEvidence,claims:DistrictExtractionClaims)=
   const body={binding:sha256('synthetic original extraction request'),modelIdentitySha256:identity.modelIdentitySha256,receivedAt:at,value:{record:claims,reason:'Synthetic case'},responseSha256:sha256('synthetic original raw response'),returnedModel:identity.model,runtimeWarnings:[]};
   return {...body,cacheSha256:hash(body)};
 };
-async function fixture(t:TestContext,options:{dated?:boolean;bad?:'endpoint'|'phrase';kind?:'planning'|'unchanged';admitted?:boolean;balanced?:boolean;legacyLaterChunk?:boolean;extraReference?:boolean}={}):Promise<Fixture> {
+async function fixture(t:TestContext,options:{dated?:boolean;bad?:'endpoint'|'phrase';kind?:'planning'|'unchanged';admitted?:boolean;balanced?:boolean;legacyLaterChunk?:boolean;extraReference?:boolean;sourcePrefix?:string}={}):Promise<Fixture> {
   const context=await createCivicPolicyTestContext(t),preparedRoot=join(context.root,'prepared'),managedRoot=join(context.root,'artifacts');
   const dated=options.dated!==false,kind=options.kind??'planning';
   const quote=kind==='unchanged'?'Test Netz GmbH betreibt Test Wärmenetz.':'Test Netz GmbH plant den Ausbau von Test Wärmenetz.';
   const relationQuote=options.bad==='endpoint'?'Test Netz GmbH plant den Ausbau.':quote;
-  const text=(options.legacyLaterChunk?'x'.repeat(5000)+'\n':'')+['Strausberg',dated?'Stand 10.10.2026':'Ohne Dokumentdatum',quote,...(relationQuote!==quote?[relationQuote]:[])].join('\n');
+  const text=(options.sourcePrefix??'')+(options.legacyLaterChunk?'x'.repeat(5000)+'\n':'')+['Strausberg',dated?'Stand 10.10.2026':'Ohne Dokumentdatum',quote,...(relationQuote!==quote?[relationQuote]:[])].join('\n');
   const sourceSha256=sha256(text);
   const reference:PreparedSourceReference={id:'synthetic-source',url:'https://example.org/synthetic-source',sha256:sourceSha256,retrievedAt:at,locator:'document-sha256:'+sourceSha256,mimeType:'text/plain',sourceType:'website',policy:{robots:{state:'allowed',url:'https://example.org/robots.txt'},tdm:{state:'not_declared',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}};
   const references=options.extraReference?[reference,{...reference,id:'synthetic-alias',url:'https://example.net/synthetic-alias',policy:{...reference.policy,robots:{state:'allowed' as const,url:'https://example.net/robots.txt'}}}]:[reference];
@@ -123,6 +130,22 @@ async function pass(f:Fixture,implementation:JudgeOnlyRuntime){return executeRea
 function merge(f:Fixture,deltas:ReassessmentDelta[]=[]){return mergeReassessmentDeltas({frozen:f.frozen,frozenSha256:f.frozenSha256,contract,deltas});}
 function reseal(delta:ReassessmentDelta){const {deltaSha256:_old,...body}=delta;delta.deltaSha256=reassessmentDeltaHash(body);return delta;}
 
+test('oversize reassessment judge inputs become deterministic quarantine holds without pausing or invoking the provider',async t=>{
+  const f=await fixture(t,{sourcePrefix:'\u0001'.repeat(8000)+'\n'}),a=assessment(f),r=runtime(f);
+  assert.equal(a.deterministic?.passed,true);assert.equal(a.newlyPassed,true);assert.equal(a.dateEligible,true);
+  assert.ok(Buffer.byteLength(JSON.stringify(a.judgeInput))>MAX_SUBSCRIPTION_INPUT_BYTES);
+  assert.equal(a.needsJudge,false);assert.equal(a.hold,MODEL_INPUT_BOUND_REASON);
+  let readiness=0,pauseChecks=0;
+  r.implementation.readiness=async()=>{readiness++;return f.identity;};
+  r.implementation.stopped=async()=>{pauseChecks++;return false;};
+  const delta=await pass(f,r.implementation),merged=merge(f,[delta]);
+  assert.equal(readiness,0);assert.equal(pauseChecks,0);assert.equal(r.calls.length,0);
+  assert.equal(delta.entries[0].judgeAttempted,false);assert.equal(delta.entries[0].failure,null);
+  assert.equal(await isProviderStopped(join(f.root,'unused-pause'),f.task.provider),false);
+  await assert.rejects(lstat(join(f.root,'unused-pause')),{code:'ENOENT'});
+  assert.equal(merged.records.length,0);assert.equal(merged.report.counts.judgeCalls,0);
+  assert.equal(merged.quarantine.length,1);assert.equal(merged.quarantine[0].reason,MODEL_INPUT_BOUND_REASON);
+});
 test('existing planning triple changes type, never becomes implementation, and never calls extraction',async t=>{
   const f=await fixture(t),r=runtime(f),a=assessment(f);
   assert.equal(a.claims?.relations[0].type,'plans');assert.equal(a.claims?.relations[0].modality,'planned');assert.equal(a.deterministic?.passed,true);assert.equal(a.newlyPassed,true);
@@ -325,7 +348,6 @@ test('freeze requires every explicit original answer pin without creating an unb
  await assert.rejects(freezeReassessment({...staged.options,answers:[]}),/every selected original answer receipt/);
  await assert.rejects(lstat(staged.options.out),{code:'ENOENT'});
 });
-
 test('correct full answer pins and locator-specific payloads retain every prepared contributor',async t=>{
  const f=await fixture(t,{extraReference:true}),staged=await managedFreezeFixture(f),preparation=preparationPlanSchema.parse(JSON.parse(f.frozen.preparationPlan.bytes));
  const cached=await readTaskResult(staged.paths.result,f.task,f.plan,preparation.groups[0],f.policy);
@@ -509,4 +531,65 @@ test('genuine source-bound control ancestors survive freeze, judge context, delt
  assert.equal(objection.purge.status,'purged');
  for(const output of [frozen,deltaPin,merged,...merged.artifacts])await assert.rejects(lstat(output.path),{code:'ENOENT'});
  await assert.rejects(mergeReassessment({frozen,deltas:[deltaPin],out:join(f.root,'denied-control-merge'),policy:f.policy}),HostOptedOutError);
+});
+
+test('genuine control provenance conservatively retains non-independent permission through frozen and merge copies',async t=>{
+ const f=await fixture(t),staged=await managedFreezeFixture(f),bindings=staged.bindings.map(binding=>({...binding,independentAllowed:false}));
+ const path=join(f.managedRoot,'nonindependent-work-plan.json'),bytes=JSON.stringify(f.plan,null,2)+'\n';
+ const sha=await writeManagedSourceArtifact(f.managedRoot,path,bytes,bindings,{decisionId:CIVIC_ACQUISITION_DECISION_ID,...f.policy});
+ const workPlan=knowledgePreparedSourcePinSchema.parse({path,sha256:sha,bytes:Buffer.byteLength(bytes),bindings});
+ const frozen=await freezeReassessment({...staged.options,workPlan});
+ assert.deepEqual(frozen.bindings,bindings);
+ await assertManagedSourceBindings(frozen.path,bindings,f.policy);
+ const merged=await mergeReassessment({frozen,deltas:[],out:join(f.root,'nonindependent-merge'),policy:f.policy});
+ for(const pin of [merged,...merged.artifacts]){
+  assert.deepEqual(pin.bindings,bindings);
+  await assertManagedSourceBindings(pin.path,bindings,f.policy);
+ }
+});
+
+interface ControlWireFixture {wire(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
+test('real HTTP and Git-approved configuration control ancestry stays on artifacts, never in native model source scope',async t=>{
+ const f=await fixture(t),staged=await managedFreezeFixture(f),managed={decisionId:CIVIC_ACQUISITION_DECISION_ID,...f.policy};
+ const fetcher=new PoliteFetcher({cacheDir:join(f.root,'http-control'),minDelayMs:0,ownerPolicyLane:managed});
+ // Only the network transport is synthetic; source policy, observations, ledger and raw bytes are real fixture operations.
+ t.mock.method(fetcher as unknown as ControlWireFixture,'wire',async(uri:URL)=>{
+  if(uri.pathname==='/robots.txt'||uri.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Stadt Strausberg. Synthetische amtliche Bekanntmachung für einen technischen Test des Kontrollplans.')};
+ });
+ const response=await fetcher.fetch('https://http.example.org/control'),observed=sourceContentBinding(response);
+ const http:SourceArtifactBinding={kind:'http_observation',url:observed.url,sourceSha256:observed.sha256,observationId:basename(observed.observationPath),receiptSha256:sha256(await readFile(observed.observationPath)),independentAllowed:observed.independentAllowed};
+ const url='https://config.example.org/source',evidence={url,locator:'Synthetic registry control reference',sha256:sha256('synthetic registry reference'),retrievedAt:at};
+ const value={schemaVersion:'stadtstack-source-registry-v1',generatedAt:at,districts:[{id:'maerkisch-oderland',name:'Synthetic district',ags:'12064',state:'Brandenburg',inventorySources:[evidence],inventoryAsOf:'2026-10-10',inventoryComplete:true}],municipalities:[{id:'strausberg',name:'Strausberg',ags:'12064472',districtId:'maerkisch-oderland',districtAgs:'12064',amt:null,administrativeStatus:'amtsfrei',administrativeEvidence:[evidence],identitySources:[evidence],sources:['website','council','participation','gazette'].map(kind=>({id:kind,kind,url,vendor:'unknown',checkState:'not_checked',checkedAt:null,evidence:[],reason:'Synthetic configuration only'})),seedDocuments:[{url,sourceId:'website',title:'Synthetic configured seed',documentDate:null,dateReason:'No observation date',evidence:[evidence]}]}],inventory:[{ags:'12064472',name:'Strausberg',districtId:'maerkisch-oderland',identitySourceUrl:url,pilot:true,sourceCheckState:'not_checked',reason:'Synthetic configuration only'}],notes:['Synthetic Git-approved control, not source/model evidence']};
+ const codeRoot=join(f.root,'config-code');await mkdir(codeRoot,{mode:0o700});
+ const codeBytes=Buffer.from(JSON.stringify(value)+'\n'),codePath=join(codeRoot,'registry.json');await writeFile(codePath,codeBytes,{mode:0o600});
+ const oid=(kind:string,bytes:Buffer)=>createHash('sha1').update(kind+' '+bytes.length+'\0').update(bytes).digest('hex');
+ const entry=(name:string,object:string,mode='40000')=>Buffer.concat([Buffer.from(mode+' '+name+'\0'),Buffer.from(object,'hex')]);
+ const store=async(kind:string,bytes:Buffer)=>{const object=oid(kind,bytes),path=join(codeRoot,kind+'-'+object+'.bin');await writeFile(path,bytes,{mode:0o600});return {path,oid:object,sha256:sha256(bytes),bytes:bytes.length};};
+ const blobOid=oid('blob',codeBytes),leaf=await store('tree',entry('district-registry.json',blobOid,'100644')),middle=await store('tree',entry('sources',leaf.oid)),tree=await store('tree',entry('stadtstack-data',middle.oid));
+ const commit=await store('commit',Buffer.from(`tree ${tree.oid}\nauthor Synthetic Fixture <fixture@example.test> 0 +0000\ncommitter Synthetic Fixture <fixture@example.test> 0 +0000\n\nSynthetic registry control\n`));
+ const descriptor=operatorRegistryConfigSchema.parse({kind:'operator_registry_config',path:codePath,sha256:sha256(codeBytes),bytes:codeBytes.length,schemaContractSha256:await operatorRegistryConfigContractSha256(),code:{gitCommit:commit.oid,path:'stadtstack-data/sources/district-registry.json',blobOid,sha256:sha256(codeBytes),bytes:codeBytes.length},approval:{role:'district_source_registry',approver:'owner',decisionId:CIVIC_ACQUISITION_DECISION_ID,date:'2026-10-11',configurationSha256:sha256(codeBytes),gitCommit:commit.oid},commit,trees:[leaf,middle,tree],declaredEndpoints:[...new Set(retainedPublicationSources(value).map(source=>source.url))]});
+ const config=await importOperatorRegistryConfig({...descriptor,managedRoot:join(f.root,'config-control'),destinationPath:'registry.json'},f.policy);
+ const controls=[http,...config.bindings],path=join(f.managedRoot,'mixed-control-work-plan.json'),bytes=JSON.stringify(f.plan,null,2)+'\n',digest=await writeManagedSourceArtifact(f.managedRoot,path,bytes,controls,managed);
+ const workPlan=reassessmentArtifactPinSchema.parse({path,sha256:digest,bytes:Buffer.byteLength(bytes),bindings:controls});
+ const frozen=await freezeReassessment({...staged.options,workPlan}),stored=FrozenReassessmentSchema.parse(JSON.parse(await readFile(frozen.path,'utf8')));
+ assert.deepEqual(new Set(frozen.bindings.map(binding=>binding.kind)),new Set(['prepared_source','http_observation','operator_registry_config']));
+ assert.deepEqual(stored.controlBindings.workPlan,controls);
+ const r=runtime(f),judge=r.implementation.judge;
+ r.implementation.judge=async(...args)=>{
+  assert.deepEqual(args[4].sourceContext?.bindings,staged.bindings.map(({independentAllowed:_flag,...binding})=>binding));
+  return judge(...args);
+ };
+ const delta=await executeReassessmentPass({frozen:stored,frozenSha256:frozen.sha256,contract:stored.contract,provider:'openai-subscription',platform:'linux',runtime:r.implementation,managedRoot:f.managedRoot,policy:f.policy,usage:{ledgerPath:join(f.root,'unused-ledger'),pausePath:join(f.root,'unused-pause')}});
+ const deltaPath=join(f.managedRoot,'mixed-delta.json'),deltaBytes=JSON.stringify(delta,null,2)+'\n',deltaSha=await writeManagedSourceArtifact(f.managedRoot,deltaPath,deltaBytes,frozen.bindings,managed);
+ const deltaPin=reassessmentArtifactPinSchema.parse({path:deltaPath,sha256:deltaSha,bytes:Buffer.byteLength(deltaBytes),bindings:frozen.bindings});
+ const merged=await mergeReassessment({frozen,deltas:[deltaPin],out:join(f.root,'mixed-merge'),policy:f.policy});
+ for(const pin of [frozen,deltaPin,merged,...merged.artifacts])await assertManagedSourceBindings(pin.path,frozen.bindings,f.policy);
+ assert.equal(r.calls.length,1);
+ const retainedControls=faultyBindings(f,'retained',bytes);
+ assert.equal(reassessmentArtifactPinSchema.safeParse({...workPlan,bindings:retainedControls}).success,true); // Canonical artifact codec accepts custody; authentication still requires actual provenance.
+ assert.equal(reassessmentArtifactPinSchema.safeParse({...workPlan,bindings:[{kind:'authenticated_git_snapshot',purpose:'historical_change_reconstruction_only',url,sourceSha256:null,snapshot:descriptor.code,independentAllowed:false}]}).success,false);
+ const objection=await recordHostOptOut({host:'config.example.org',reason:'rights_holder_objection',reference:'synthetic-mixed-control-purge'},f.policy);
+ assert.equal(objection.purge.status,'purged');
+ for(const pin of [frozen,deltaPin,merged,...merged.artifacts])await assert.rejects(lstat(pin.path),{code:'ENOENT'});
 });

@@ -1,0 +1,376 @@
+{
+  "schemaVersion": "stadtstack-pipeline-handoff-evidence-v1",
+  "status": "WIP handoff metadata; not a new source, model, preparation or release receipt",
+  "vmProcessObservation": {
+    "observedAt": "2026-10-11T22:34:25.309197+00:00",
+    "host": "codex-workstation",
+    "processes": [],
+    "scope": "Named civic extraction/model/worker entrypoints only; no raw argv printed",
+    "action": "read_only_no_queue_started_or_modified"
+  },
+  "authorityDecision": {
+    "decisionSource": "Main, owner-confirmed current instruction",
+    "decisionDate": "2026-10-11",
+    "executionHost": "codex-workstation",
+    "newOperations": [
+      "acquisition",
+      "text_and_ocr_preparation",
+      "extraction_and_judgment"
+    ],
+    "assignmentMode": "codex-only",
+    "policyAuthority": {
+      "id": "owner-2026-10-11-codex-workstation",
+      "stateDir": "/home/max/.local/state/stadtstack-data/civic-policy",
+      "provisioning": "explicit owner action before execution; not yet performed by this task",
+      "missingUnavailableForeignState": "fail_closed",
+      "machineBinding": {
+        "os": "Linux",
+        "hostname": "codex-workstation",
+        "user": "max",
+        "machineIdFileSha256": "84e44b05b75fbed614c6a2e74690d2580c0035039055077acf22b6ba68f24dfd",
+        "evidence": "Read-only SSH uname/hostname/id and sha256sum of /etc/machine-id; raw machine ID and credentials were not printed."
+      }
+    },
+    "crossMachineHaiku": {
+      "enabled": false,
+      "unblockRequires": [
+        "actual shared R1 PostgreSQL policy authority",
+        "per-machine purge acknowledgments",
+        "current authority checks at every source/model/cache/publication boundary"
+      ]
+    },
+    "historicalEvidence": "Existing sealed Codex/Haiku runs and receipts remain historical, unmodified; this decision grants no new Mac model execution.",
+    "development": "Source edits and isolated synthetic tests may remain in local worktrees; no live acquisition/model operation there.",
+    "retainedKnowledgePublication": {
+      "authorization": "Main explicitly confirmed unchanged authenticated 0.3.1 carry-forward",
+      "releaseId": "25d99c9382ccbfeb3fbdef8541409950c8e4adc96852922f151e661d25c90eaf",
+      "sourceCommit": "47083b92ad18613763536ea79d4db1aaccaa6eea",
+      "manifestSha256": "89d48df832f0a7fc12875af715bfa5fc03bb9ea096fdf8667e056d37c895130b",
+      "preserve": [
+        "exact original claims",
+        "original gates",
+        "original source/model/judge clocks"
+      ],
+      "currentChecks": [
+        "host policy",
+        "opt-out at publication"
+      ],
+      "newReceipts": false,
+      "reacquireHistorical228Sources": false,
+      "freshAcquisitionScope": "bounded Hoppegarten and Ruedersdorf heat pages plus exact Strausberg 10th-FNP solar PDF only",
+      "evidenceKind": "instruction record, not an HTTP/model/prepared/publication receipt"
+    }
+  },
+  "predecessorBindings": {
+    "schemaVersion": "civic-patch-predecessor-bindings-v1",
+    "purpose": "Authentic retained-publication and legacy change reconstruction byte pins; not HTTP observations or new source admission receipts.",
+    "retainedRelease": {
+      "gitCommit": "47083b92ad18613763536ea79d4db1aaccaa6eea",
+      "manifestPath": "stadtstack-data/out/release-manifest.json",
+      "manifestSha256": "89d48df832f0a7fc12875af715bfa5fc03bb9ea096fdf8667e056d37c895130b",
+      "manifestBytes": 7292,
+      "releaseId": "25d99c9382ccbfeb3fbdef8541409950c8e4adc96852922f151e661d25c90eaf",
+      "members": [
+        {
+          "path": "catalogue.json",
+          "sha256": "67c591e235c45689fceba5322af47ce772344dc9631b2ec5963628c40eca7921",
+          "bytes": 183922
+        },
+        {
+          "path": "cities/castrop-rauxel/changes.json",
+          "sha256": "46072e4d65ed0f4993ca931bc205377b481e7413ed70328134ddfa3f72dbc78f",
+          "bytes": 2222
+        },
+        {
+          "path": "cities/castrop-rauxel/feed.json",
+          "sha256": "bb48fa82d518f7fecd667e1b01b0c7b0b846088164608cff04e944b289896555",
+          "bytes": 524
+        },
+        {
+          "path": "cities/castrop-rauxel/signals.geojson",
+          "sha256": "4f8a7665054e027dd2699a3d04129955a75efb590d03635f1b6bf989e2f7f6b1",
+          "bytes": 582553
+        },
+        {
+          "path": "cities/dresden/changes.json",
+          "sha256": "80af2466efc5dddfb7b2756f474e4f667b6eb1078fe5b390fb48de080a251f03",
+          "bytes": 1719
+        },
+        {
+          "path": "cities/dresden/feed.json",
+          "sha256": "940a50e8da9b8432274845f9d808a71e3c4f3e13fed407eabe63195fd73cf153",
+          "bytes": 90177
+        },
+        {
+          "path": "cities/dresden/signals.geojson",
+          "sha256": "0c74b3707299dc16b35d6b1c25ebc1b6e6e4d3c30a8b9fa1a730d4ae7ce5abf6",
+          "bytes": 4009511
+        },
+        {
+          "path": "cities/duesseldorf/changes.json",
+          "sha256": "1fbafde22fbb0914e450c209a956eb5b8b008b32c94412321bb802d161a23301",
+          "bytes": 34405
+        },
+        {
+          "path": "cities/duesseldorf/feed.json",
+          "sha256": "39542f25a7d4a76f8f51584c06b470cbf0feea02c598bb1c9f397affa30daf69",
+          "bytes": 540
+        },
+        {
+          "path": "cities/duesseldorf/signals.geojson",
+          "sha256": "66056de4b870aca6494c1fd0997600c32e5ae9623f610f909875281b0a1c7e76",
+          "bytes": 3697582
+        },
+        {
+          "path": "cities/freiburg/changes.json",
+          "sha256": "e4953ed71963d06306c5234b0e343fcacce5ed023904902ebf550180b5a68dd3",
+          "bytes": 4989
+        },
+        {
+          "path": "cities/freiburg/feed.json",
+          "sha256": "b259e5c32e5458f60204db44a01900acb9f1d23714f2f8e1937eee93860434ad",
+          "bytes": 544
+        },
+        {
+          "path": "cities/freiburg/signals.geojson",
+          "sha256": "e395123a16c385a087251d1679c750956c35efe97d35a97252f624b7003d070b",
+          "bytes": 1870262
+        },
+        {
+          "path": "cities/koeln/changes.json",
+          "sha256": "d808acbf155942301a1ba6c0ca38b0f088a507d13a52189e283c60dcf38421f9",
+          "bytes": 11301
+        },
+        {
+          "path": "cities/koeln/feed.json",
+          "sha256": "3a34ae91595410388527aa176b8adbbcee20779c62b650b2e45366db1f9718bc",
+          "bytes": 5384
+        },
+        {
+          "path": "cities/koeln/signals.geojson",
+          "sha256": "2408c0bb4b1ac2b96d8a0957e9aa70699ca4c56a3d05d32acf563df6face030e",
+          "bytes": 15119678
+        },
+        {
+          "path": "cities/muenster/changes.json",
+          "sha256": "522f00f2c01fb82aba6e01137851a5a4093604b8c76bd28fe02be106775c2c67",
+          "bytes": 3101
+        },
+        {
+          "path": "cities/muenster/feed.json",
+          "sha256": "066245bb2ed0cbcc4ca5817325dbdd3f6afc5cdd6ff2db370be5bbd897327364",
+          "bytes": 16752
+        },
+        {
+          "path": "cities/muenster/signals.geojson",
+          "sha256": "aa07b8a847236770935d48ddc6c8ffe35b62ca5baf259f9fa6c4567fea9d356a",
+          "bytes": 11118741
+        },
+        {
+          "path": "cities/strausberg/changes.json",
+          "sha256": "efa507043d5963ff9929ede5a4ba0c86aeb54d18208e0e52b066e6728a253c58",
+          "bytes": 721
+        },
+        {
+          "path": "cities/strausberg/feed.json",
+          "sha256": "653ab823b3c9426a703ae8414017a3e3265cae98795f6ce820d1bdfcdb54acb8",
+          "bytes": 20188
+        },
+        {
+          "path": "cities/strausberg/signals.geojson",
+          "sha256": "b87e96a2df101be316f9af6d028cb106f10110f1170ef9e050869aa222af4f3c",
+          "bytes": 305529
+        },
+        {
+          "path": "cities/wuppertal/changes.json",
+          "sha256": "62fd478a5f0b0cfa8813a5fb40ebf5436ce80fe147c590bd86ec65542567bb7a",
+          "bytes": 17758
+        },
+        {
+          "path": "cities/wuppertal/feed.json",
+          "sha256": "a735c82e50e9bff2907a95f1c9cdeea6ae1727e0b31a5bfb27066d9256a65dad",
+          "bytes": 22676
+        },
+        {
+          "path": "cities/wuppertal/signals.geojson",
+          "sha256": "343cf98b0185a3641c4156e9efb7be86585464b6ed321e5aba04ef92067c6e24",
+          "bytes": 2561615
+        },
+        {
+          "path": "core/handover-draft.json",
+          "sha256": "d8b49e028e103fa1007aaaacb6f17daa40fe09d3e119bbc1dd108550cad21d57",
+          "bytes": 1786
+        },
+        {
+          "path": "core/release-manifest.json",
+          "sha256": "8a41d0aeaea62a8284b4194269dbd4ff0f5561cb931b186181433656a6852bcc",
+          "bytes": 2989
+        },
+        {
+          "path": "core/strausberg-facts.json",
+          "sha256": "ff2cc11e26322a30663f1f62ad39873056cfb4f9ff34c44684b36453f70e3c75",
+          "bytes": 8074
+        },
+        {
+          "path": "knowledge/coverage.json",
+          "sha256": "2427caca4b0e63a3756dbb227b624eaa5ef31cb0a91cf9af454045aa3f3f7dfc",
+          "bytes": 108188
+        },
+        {
+          "path": "knowledge/records.json",
+          "sha256": "b2e94b2ee9b7ec9d805c6587a61d6f02bb56b769abbb3787ce5dac57e7a60d1c",
+          "bytes": 3380500
+        },
+        {
+          "path": "knowledge/registry.json",
+          "sha256": "105e6a8e9d575523e02c51fad5d0940ba8fc824adf897736a41db1babee32ec1",
+          "bytes": 467952
+        },
+        {
+          "path": "regions/brandenburg-mol/topics.json",
+          "sha256": "a22c59c12c2a7a2a41d2b9644536cab84fe9e21797db1bea7c8c017bfce7c3be",
+          "bytes": 54798
+        }
+      ]
+    },
+    "earlierSignalSnapshot": {
+      "basis": "authenticated_git_commit_and_exact_blob_bytes",
+      "gitCommit": "67b6b3604d6ec19c7981fe0f1880e2fac11f7b2c",
+      "members": [
+        {
+          "cityId": "castrop-rauxel",
+          "path": "stadtstack-data/out/cities/castrop-rauxel/signals.geojson",
+          "sha256": "9cc90b1969483eb8fa676547ead1e5d1179867e088ae47c0401156cbf1a6ab9e",
+          "bytes": 637063,
+          "blobOid": "6de5143d805c06c803fead9a9acb6c51696c1544"
+        },
+        {
+          "cityId": "dresden",
+          "path": "stadtstack-data/out/cities/dresden/signals.geojson",
+          "sha256": "0ce41b90f573fc6258b32c9e62c6cab4b11dc5922fb8e70eb31dceb8243ab52f",
+          "bytes": 3957351,
+          "blobOid": "50c10deff9126e19f24f5f3d8fdce1188f0edda6"
+        },
+        {
+          "cityId": "duesseldorf",
+          "path": "stadtstack-data/out/cities/duesseldorf/signals.geojson",
+          "sha256": "1033e7f56b0e9f99ad7848b4d2da59c74d97e0e35dac3b4fca6e7e703d6be820",
+          "bytes": 4314245,
+          "blobOid": "ee5c846225e861feb34c176e5120f7ed1d65655c"
+        },
+        {
+          "cityId": "freiburg",
+          "path": "stadtstack-data/out/cities/freiburg/signals.geojson",
+          "sha256": "185331d3e91ee4babf7851afe50a3c9ef99111e85dd916d8e034214d44a37e2a",
+          "bytes": 1948513,
+          "blobOid": "951ee2b39a064f688163fbaabf9a185ba3317d6a"
+        },
+        {
+          "cityId": "koeln",
+          "path": "stadtstack-data/out/cities/koeln/signals.geojson",
+          "sha256": "d1a5de0f20f3737e1b0ad588a4cc345995ed17bce95381efc331ee9e19be4a8f",
+          "bytes": 15502420,
+          "blobOid": "1e94c9a8e617aaf4551280dbfc56574540581744"
+        },
+        {
+          "cityId": "muenster",
+          "path": "stadtstack-data/out/cities/muenster/signals.geojson",
+          "sha256": "bce91a85046ef43a80f759af7cdc2b52d90db544c17e5e278e26a5dd6f26446e",
+          "bytes": 11128250,
+          "blobOid": "f7c8bdad108d909bcba0db22084e3086af48f463"
+        },
+        {
+          "cityId": "strausberg",
+          "path": "stadtstack-data/out/cities/strausberg/signals.geojson",
+          "sha256": "914ace7b9cc90e38b56d51e877abfe9e55ae39b2efff075259894648ca3f70b4",
+          "bytes": 312784,
+          "blobOid": "d801b37bf5b8a8a6fc66c9b42a37206a919a7488"
+        },
+        {
+          "cityId": "wuppertal",
+          "path": "stadtstack-data/out/cities/wuppertal/signals.geojson",
+          "sha256": "413cea8f650d0912c70094785d6bf64889c3a373b38d4541c3a306bfb9d9fc1c",
+          "bytes": 2952686,
+          "blobOid": "222eaea16bba2000b1f5097d9c811e09b8334d25"
+        }
+      ],
+      "provenanceKind": "authenticated_git_snapshot",
+      "purpose": "historical_change_reconstruction_only",
+      "releaseManifest": "absent at this commit; do not fabricate one or claim a sealed release"
+    },
+    "currentAdmission": "Require current VM authority and explicitly typed retained-publication source bindings before managed intake; never relabel these pins as HTTP receipts."
+  },
+  "earlierManifestEvidence": {
+    "exists": false,
+    "gitCommit": "67b6b3604d6ec19c7981fe0f1880e2fac11f7b2c",
+    "path": "stadtstack-data/out/release-manifest.json"
+  },
+  "cityChangeBaseline": {
+    "purpose": "Authentic prior snapshots for v1-to-v2 retained city change-feed reconstruction; no fabricated versions or hashes",
+    "priorCommit": "67b6b3604d6ec19c7981fe0f1880e2fac11f7b2c",
+    "currentSnapshotCommit": "ae44a163b96e5b8aca4a397b8e0f31268f6a7ee9",
+    "pathPattern": "stadtstack-data/out/cities/{cityId}/signals.geojson",
+    "legacyChangesGeneratedAt": "2026-10-10T21:56:45.237Z",
+    "observedMatches": {
+      "strausberg": {
+        "added": 0,
+        "changed": 12,
+        "removed": 12
+      },
+      "wuppertal": {
+        "added": 0,
+        "changed": 1,
+        "removed": 193
+      },
+      "muenster": {
+        "added": 0,
+        "changed": 1,
+        "removed": 33
+      },
+      "koeln": {
+        "added": 0,
+        "changed": 1,
+        "removed": 270
+      },
+      "freiburg": {
+        "added": 0,
+        "changed": 0,
+        "removed": 62
+      },
+      "duesseldorf": {
+        "added": 0,
+        "changed": 0,
+        "removed": 345
+      },
+      "dresden": {
+        "added": 0,
+        "changed": 0,
+        "removed": 20
+      },
+      "castrop-rauxel": {
+        "added": 0,
+        "changed": 0,
+        "removed": 24
+      }
+    },
+    "evidence": "Direct ID/version diff of Strausberg67b6b36 and current matched all three legacy arrays. Other seven matched95821e4; git tree diff95821e4..67b6b36 confirmed no changes to their signals.geojson. Stored feeds were read from unchanged frozen0.3.1 out.",
+    "publicationRule": "Supply pinned snapshots explicitly to retainChanges; verify exact legacy added/changed/removed sets and derive prior version/content/source hashes from authentic records. No implicit Git/network lookup. Bind canonical previous/current snapshot hashes in feed, exact filebytes/globalrelease via manifest. Preserve valid v2 unchanged city history; new changed snapshots compute new events. Removal does not imply source withdrawal or supersession."
+  },
+  "lastExecutedSourceGate": {
+    "files": 56,
+    "tests": 778,
+    "passed": 703,
+    "failed": 75,
+    "skipped": 0,
+    "durationSeconds": 133.54,
+    "state": "Failed before the subsequent repair, retained-baseline and signed-reader waves; none of those later changes were verified",
+    "typecheck": "Passed before the later waves; not evidence for this WIP snapshot",
+    "vmLogPath": "/home/max/stadtstack-ops/civic-pipeline-handoff/source-gate-before-repairs.txt"
+  },
+  "rebuildHandoff": {
+    "branch": "rebuild-r1",
+    "sha": "ae1fb256e7b9c179832ff42eb66d60b08f3a84f7",
+    "brief": "stadtstack-data/docs/R1_STATUS.md",
+    "state": "WIP; separate VM continuation, not deployment approval"
+  }
+}

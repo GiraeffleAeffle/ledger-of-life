@@ -1,0 +1,471 @@
+{
+  "schemaVersion": "stadtstack-changes-v2",
+  "generatedAt": "2026-10-10T21:56:45.237Z",
+  "snapshots": [
+    {
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "previous": "ec362554fd8553be23657ee1f18328e644266155db0f1a8e8a9097d4103bc08b",
+      "current": "300d8dd86cb0fc51a19a6912090f353ea0ca728304f869391114343bf155eddc",
+      "generatedAt": "2026-10-10T21:56:45.237Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-ABES-12",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a68be44076cc3776eb60e52f49433f62a068ae89d0e0c199d299f271e101f450",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "da4d28925a32cc244c9df1b7078466a55b7666c5d3ef93e50e288039676c09aa",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-ACI-3",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3dfc259f6f3ea3ff1525848184f8cc30ad35dd803ea0c5ed0f876949347d180a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "7dc5dc58644aa79e48d8748795c0e5974835cb87b03520d2a05a3d7a7c31968c",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-AGID-12",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "33cb82cc98eeaf619c0c68c5589292da746a5e948d7c79d866c88823d83d3682",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "35e3ebec4ba806dfff4d374b9137f191cc1379498dd1bec44cc77417f8b3fec9",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-AGID-13",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "50176a2c65ccfbd5fa9d4b6fe79a52179de1b9e042a020d79c629f942ebff87a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "f1d1431940e2f90ad922288f7f1c019a95aefae06ccbe9140b2791a6dc8e3894",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-AKUM-3",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c21f50560a740813625ae0ef5bb145a94f571f60ee31144bc0977b630ff14000",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "311b4374157c18350befdd338f38be2e253b5ba9e9d2e5ef31c1c0d562d624a3",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-AKUM-4",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "db38bd93617b893171b975fd3de457e18c919ac7f18c8f93de1cd79d5c5448f0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "959f52d5255ca8cf3f644f31d06f218e0d946271ad15a4335d47ed76f17b48da",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-AuWi-61",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "467b3f77a1fd9aa59d394bb2afc4570362a2e11d413cd1a604b8269bc8a24de1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ddf95c9b80c4cd01cee1255ded4206f287384b44a744287714d0a065da73aaac",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-AuWi-62",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "19be7f42375508e572f29ff4709f18c2e496d60952c72a6c0b1e338ab19183a6",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b795813bc178e6d364ed4a01f70c6603cb03c928429b4dc0b32ac40f273c7d89",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-B1-134",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "661ec96b3548b707308be1ab50f28d9ab19383e96b8317558bef6f4b480512c1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "678b6d7be6d419b59e718a166103bade39f1a9962aa391b732667a070c437b47",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-B1-135",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "279ce7db54979786046f5cdada4b2f13776da084b0e7e172c96552cecef70a44",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "68f8c601a37e0eb039914c6b8242a5f059c1b701e32bad9793c43e65eb810fbb",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-B2-132",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "734c3fd2737f14b7440eb716817acf8181fd2a172814f0706875c8ef99ab2f36",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a4d7ea98e1861d41d544b5bded8478c348453fb7d898fd3ef02aeb7655f36197",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-B2-133",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b70a0e11d82eb6449e6ac44b97471bea729f24bf97c90a30e81c716b7c52bd13",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c92a42c6f4ecec37c6348042d70342abd8ea075d74f56464cffa29ad51ecad57",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-B3-129",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "10ca9671c0a92801873592ca2d586a2467b9289f7b10212ad857c8bad4045c73",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "19f375241d0585451646843f53558d2dc762c3597dfeafde5e7c45ce9ea463e2",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-B3-130",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2726551a62e74e5958833b42204bc0e8611db654919c8057c95a6e7f74ead467",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
+          "fc316816188a7951c8bc04315baff4efb7fa5497fec422fa8e1f2766fc7eee39"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-EUV-64",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f29130523f26f5be03530456e8b5f14621b288dce4cae31902c3b207f4cdfa1f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "3d8102558054082142261c49c67d117446ad3448374c3304da26646e1d399ece",
+          "cedf8c3cf6ff840f543a63e185de1c1bc95191b419983a1e3f5dab70bfae8cef"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-EUV-65",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "36debb944eba409629be94549eb0b78ac5281222f20e98d3dcc9510cdb0ce8d9",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "2959ca9da5834dce59bbc4bfd6536fb8131c43c0d6fbffe35024973785fa9c99",
+          "cedf8c3cf6ff840f543a63e185de1c1bc95191b419983a1e3f5dab70bfae8cef"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-HFA-139",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "37844619eb102e994387f3760c0e87dfaf10b8f8d8079697205be47ee7b832e7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "f25afa77e0c0be5e6b6cc47a2fc67b999d0a0ee65d98cbe72d149cbc473a92ab",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-HFA-140",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cd7d0d9bf134cd2405e927c9b2d660a1137af82fbbbfb3ee03e3f8e623242efd",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "173d9fe5996ff047b48d7c92a14cf3d4ffedaf89707207297f47a2ea1b29b097",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-JHA-111",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e97b37fd12473ab97b11ea1518697c4ebdc6238c7a1b934e6431bbe484089886",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902",
+          "f9ae3c8ead94e8f7851793ac804027b01de4a0ff69185284026be20c28266b1b"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-JHA-113",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "74f7a1ac0a295b72aec6eed56054e5e8833ecd3447d8275bffa36a23d94b4275",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a8eaa645663056f3203a56986841abdad29611858db057a0200b1221cb3cf3b7",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-RAT-164",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2e9342fbf7860518ebebfed929642e391430e7c4c3b96899921e3c595a8c5aff",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "4faf43a79825398b4f2f93511d5527a2b369545b98cd30f5fc27957f9c32c3ea",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-RAT-165",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "12495a09df9c5865c95837a20221da28fe21f948f2417d62a5831d89709b20dc",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c2c08556726a4332c724d0ac2f5989c71064a16e8230c594ab310ccc36c001b1",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-RAT-166",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e652112cc47214e539db2e9b6c05c0a9b651fef8219a5fb0fd1b450696d03d5d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "e228d140abdfbc4f79dbc6d0fe2ac79dfda563629ebd67f4ba7c62dd029019d9",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fcastroprauxel.gremien.info%2Foparl%2Fmeeting%2F2026-RPA-52",
+      "cityId": "castrop-rauxel",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0e1e21fd27434e0cc9faa7ddf5e0f48a2b03cfe9f63b5412c99e6ab8352e892c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "6b3104df689324a774d6833301a95a595ed77c8470903cbf0f2713bb1acf1c4a",
+          "f32dfad52db6e0e379d98d651bb2b14ab383d6492f775da2cba9d4ae663a0902"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    }
+  ]
+}

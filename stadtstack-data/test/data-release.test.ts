@@ -22,6 +22,11 @@ test('manifest validates bytes and inventory, not merely core bundle identity',a
   assert.equal((await verifyDataRelease(directory)).id,manifest.id);
   const captured=await verifyDataRelease(directory);
   assert.equal((await readReleaseFile(directory,captured,'catalogue.json')).toString('utf8'),JSON.stringify({fixture:'catalogue.json'}));
+  for(const required of ['knowledge/changes.json','knowledge/publication-inputs.json','knowledge/assessment-admissions.json']){
+   await publishDataRelease(directory,paths.filter(path=>path!==required),manifest.quality,manifest.generatedAt);
+   await assert.rejects(verifyDataRelease(directory),error=>error instanceof Error&&error.message===`Release does not bind required file: ${required}`);
+  }
+  await publishDataRelease(directory,paths,manifest.quality,manifest.generatedAt);
   // Simulate publication after the earlier verification, retaining identical byte length.
   await writeFile(join(directory,'catalogue.json'),JSON.stringify({fixture:'CATALOGUE.JSON'}));
   await assert.rejects(readReleaseFile(directory,captured,'catalogue.json'),/Release file mismatch/);

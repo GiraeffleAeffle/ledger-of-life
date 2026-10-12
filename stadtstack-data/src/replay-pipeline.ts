@@ -61,7 +61,7 @@ const ReplayCommonSchema=z.object({
  runtime:z.object({node:z.string().min(1),icu:z.string().min(1),unicode:z.string().min(1),locale:z.string().min(1),timeZone:z.string().min(1),packageLockSha256:hashSchema,sourceFiles:z.array(Pin).min(1)}).strict(),workspace:z.string().min(1),
 }).strict();
 export const ReplayReceiptSchema=z.discriminatedUnion('mode',[
- ReplayCommonSchema.extend({mode:z.literal('text_and_structured'),textComposition:Pin,textRegistry:Pin,corpusManifest:Pin,rawRoot:z.string().min(1),index:Pin,frozen:Pin,deltas:z.array(Pin),generationContract:Pin,answers:z.array(Pin),modelIdentities:z.array(Identity).min(1),extractionRun:Pin}).strict(),
+ ReplayCommonSchema.extend({mode:z.literal('text_and_structured'),textComposition:Pin,textRegistry:Pin,corpusManifest:Pin,corpusIndexes:z.array(z.object({name:z.string().min(1),rawRoot:z.string().min(1)}).strict()).min(1),rawRoot:z.string().min(1),index:Pin,frozen:Pin,deltas:z.array(Pin),generationContract:Pin,answers:z.array(Pin),modelIdentities:z.array(Identity).min(1),extractionRun:Pin}).strict(),
  ReplayCommonSchema.extend({mode:z.literal('structured_only'),structuredRun:Pin}).strict(),
  ReplayCommonSchema.extend({mode:z.literal('retained_text_composition'),textComposition:Pin}).strict(),
 ]);
@@ -100,7 +100,7 @@ export async function readReplayPin(pin:z.infer<typeof Pin>,base:string,allowTar
  const metadata=await lstat(path);
  if(!metadata.isFile()||metadata.size>512*1024*1024)throw Error('Replay pinned artifact size/type rejected');
  const bytes=await readFile(path);
- if(hash(bytes)!==pin.sha256)throw Error('Replay pinned artifact digest mismatch');
+ if(bytes.length!==metadata.size||hash(bytes)!==pin.sha256)throw Error('Replay pinned artifact digest mismatch');
  return bytes;
 }
 type ReplayPin=z.infer<typeof Pin>;
@@ -203,7 +203,7 @@ function checkIdentities(identities:ModelEvidence[],historical:HistoricalGenerat
   const {provider,tool,model,modelIdentityBasis}=identity,routes=historical.models.SUPPORTED_MODEL_ROUTES;
   if(routes){
    const route=routes[tool];
-   if(!route||provider!==route.provider||model!==route.model||modelIdentityBasis!==route.modelIdentityBasis)throw Error('Replay historical model identity mismatch');
+   if(!route||provider!==route.provider||model!==route.model&&(!('historicalModels' in route)||!route.historicalModels.some(historicalModel=>historicalModel===model))||modelIdentityBasis!==route.modelIdentityBasis)throw Error('Replay historical model identity mismatch');
   }else{
    // Pre-route archives retain their original exact tool; today's omp support
    // cannot relabel a historical Claude/Codex generation as a different run.
@@ -320,6 +320,7 @@ async function replayAdmittedPublication(receipt:ReplayReceipt,base:string,works
  const dependency=(role:string)=>original.dependencies.find(dependency=>dependency.role===role)?.sha256;
  if(dependency('registry')!==receipt.registry.sha256||dependency('candidate_records')!==receipt.candidateRecords.sha256||dependency('candidate_quarantine')!==receipt.candidateQuarantine.sha256||original.priorRelease.gitCommit!==receipt.priorRelease.gitCommit||original.priorRelease.manifestSha256!==receipt.priorRelease.manifestSha256||original.priorRelease.releaseId!==receipt.priorRelease.releaseId)throw Error('Replay original publication inputs do not bind supplied authentic prerequisites');
  const quarantine=z.object({schemaVersion:z.literal('stadtstack-quarantine-v1'),generatedAt:z.iso.datetime().optional(),cases:z.array(z.unknown())}).passthrough().parse(JSON.parse(quarantineBytes.toString('utf8')));
+ if(quarantine.generatedAt!==receipt.clocks.quarantineGeneratedAt)throw Error('Replay quarantine source clock mismatch');
  if(text)requireEqual(quarantine.cases,text.quarantine,'Replay original quarantine differs from verified cached reconstruction');
  if(receipt.mode==='structured_only'&&candidate.records.some(record=>record.kind==='text_model'))throw Error('Structured-only replay cannot bypass actual text generation receipts');
  const destinations=receipt.staging.map(pin=>pin.destination);
@@ -360,11 +361,14 @@ export async function replayPipeline(receiptPath:string,receiptSha256:string){
  const context:ReplaySourceContext={...source,scope,predecessors},workspace=scope.directory;
  if(receipt.mode!=='text_and_structured')return replayAdmittedPublication(receipt,base,workspace,expectedBytes,expected,context,receiptSha256);
  const registryBytes=await pinned(receipt.registry),registry=districtRegistrySchema.parse(JSON.parse(registryBytes.toString('utf8'))),textRegistryBytes=await pinned(receipt.textRegistry),indexBytes=await pinned(receipt.index);
- await pinned(receipt.corpusManifest);
- const corpus=await verifyCorpusManifest(resolve(base,receipt.corpusManifest.path),resolve(base,receipt.rawRoot));
- if(corpus.manifestSha256!==receipt.corpusManifest.sha256||corpus.inputs.registrySha256!==receipt.textRegistry.sha256||!corpus.inputs.indexes.some(index=>index.sha256===receipt.index.sha256)||corpus.inputs.releaseId!==expected.id||corpus.inputs.releaseManifestSha256!==receipt.expectedRelease.sha256)throw Error('Replay corpus manifest input/release binding mismatch');
+ const manifestBytes=await pinned(receipt.corpusManifest);
+ const corpus=await verifyCorpusManifest({manifest:{path:resolve(base,receipt.corpusManifest.path),sha256:receipt.corpusManifest.sha256},indexes:receipt.corpusIndexes.map(({name,rawRoot})=>({name,rawRoot:resolve(base,rawRoot)})),policy:context.policy});
+ if(hash(manifestBytes)!==corpus.manifestSha256||!corpus.inputs.indexes.some(index=>index.sha256===receipt.index.sha256)||corpus.inputs.releaseId!==expected.id||corpus.inputs.releaseManifestSha256!==receipt.expectedRelease.sha256)throw Error('Replay corpus manifest input/release binding mismatch');
  const frozen=JSON.parse((await pinned(receipt.frozen)).toString('utf8')),contract=await currentReassessmentContract(),validated=validateFrozenReassessment(frozen,contract);
- if(validated.preparation.corpusSha256!==receipt.index.sha256||validated.preparation.registrySha256!==receipt.textRegistry.sha256||corpus.inputs.preparationPlanSha256!==validated.frozen.preparationPlan.sha256||corpus.inputs.workPlanSha256!==validated.frozen.workPlan.sha256||corpus.inputs.workPlanId!==validated.plan.id)throw Error('Replay frozen preparation/work-plan/corpus binding mismatch');
+ const generations=corpus.inputs.generations.filter(generation=>generation.registrySha256===receipt.textRegistry.sha256&&generation.preparationPlanSha256===validated.frozen.preparationPlan.sha256&&generation.workPlanSha256===validated.frozen.workPlan.sha256&&generation.workPlanId===validated.plan.id);
+ if(validated.preparation.corpusSha256!==receipt.index.sha256||validated.preparation.registrySha256!==receipt.textRegistry.sha256||generations.length!==1||!corpus.inputs.indexes.some(index=>index.runId===generations[0].runId&&index.sha256===receipt.index.sha256&&index.role==='original_run_corpus'))throw Error('Replay frozen preparation/work-plan/corpus binding mismatch');
+ const originalRoot=receipt.corpusIndexes.find(root=>corpus.inputs.indexes.some(index=>index.name===root.name&&index.runId===generations[0].runId&&index.sha256===receipt.index.sha256));
+ if(!originalRoot||await realpath(resolve(base,originalRoot.rawRoot))!==await realpath(resolve(base,receipt.rawRoot)))throw Error('Replay original corpus raw root differs from prepared-source root');
  const runBytes=await pinned(receipt.extractionRun),run=JSON.parse(runBytes.toString('utf8')) as Record<string,unknown>;
  checkExtractionRun(run,validated);
  const generationRaw=JSON.parse((await pinned(receipt.generationContract)).toString('utf8')),generationArchive=verifyGenerationArchive(generationRaw);

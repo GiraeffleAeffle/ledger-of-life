@@ -63,11 +63,13 @@ function checkedReferences(references: PreparedSourceReference[], sourceSha256: 
     return reference;
   }).sort((a, b) => canonical(a).localeCompare(canonical(b), 'en'));
 }
-/** Span locators may vary; source identity and policy must belong to the authenticated receipt. */
+/** Record locators may select spans; all other source identity/policy fields must
+ * belong to the actual prepared receipt, never a source inferred from payload JSON. */
 export function assertPreparedReferenceMembership(references: readonly PreparedSourceReference[], expected: readonly PreparedSourceReference[]): void {
   const identity = (reference: PreparedSourceReference) => { const { locator: _locator, ...source } = ReferenceSchema.parse(reference); return canonical(source); };
   const allowed = new Set(expected.map(identity));
   if (references.some(reference => !allowed.has(identity(reference)))) throw Error('Source reference differs from authenticated prepared context');
+
 }
 export async function assertPreparedSourcesActive(references: PreparedSourceReference[], options: CivicPolicyOptions = {}): Promise<void> {
   // Host-only authority modules are deliberately absent from the credential-free parser image.
@@ -81,7 +83,7 @@ export async function assertPreparedSourcesActive(references: PreparedSourceRefe
   }
 }
 export async function preparationExtractorSha256(): Promise<string> {
-  return sha256(canonical({ sourceFiles: await Promise.all(['district-document.ts', 'district-prepared-document.ts', 'district-preparation-run.ts', 'district-corpus.ts', 'source-observation.ts', 'district-private-io.ts', 'district-schema.ts', 'source-policy.ts', 'document-origin.ts', 'document-origin-contract.ts', 'document-origin-rules.ts', 'civic-opt-out.ts'].map(async file => sha256(await readFile(new URL(file, import.meta.url))))), parserIsolation: await parserIsolationContractSha256() }));
+  return sha256(canonical({ sourceFiles: await Promise.all(['district-document.ts', 'district-prepared-document.ts', 'district-preparation-run.ts', 'district-registry-config.ts', 'district-registry.ts', 'district-corpus.ts', 'source-observation.ts', 'district-private-io.ts', 'district-schema.ts', 'source-policy.ts', 'document-origin.ts', 'document-origin-contract.ts', 'document-origin-rules.ts', 'civic-opt-out.ts'].map(async file => sha256(await readFile(new URL(file, import.meta.url))))), parserIsolation: await parserIsolationContractSha256() }));
 }
 export async function collectPreparationToolVersions(mimeType: string, sourceContext?: ParserSourceContext): Promise<Record<string, string>> {
   const tools: ParserTool[] = mimeType.split(';')[0] === 'application/pdf' ? ['pdfinfo', 'pdftotext', 'pdftoppm', 'tesseract'] : /zip/i.test(mimeType) ? ['python3'] : ['node'];

@@ -21,6 +21,8 @@ spec:
         app.kubernetes.io/version: {{ .Values.releaseVersion | quote }}
       annotations:
         civic-mcp.stadtstack.eu/token-secret-revision: {{ .Values.tokenSecretRevision | quote }}
+        civic-mcp.stadtstack.eu/revocation-artifact-sha256: {{ .Values.revocationArtifactSha256 | quote }}
+        civic-mcp.stadtstack.eu/revocation-trust-sha256: {{ .Values.revocationTrustSha256 | quote }}
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
@@ -48,8 +50,12 @@ spec:
               value: /run/secrets/mcp/token-hashes.json
             - name: MCP_PUBLIC_ORIGIN
               value: https://mcp.stadtstack.eu
-            - name: STADTSTACK_DATA_OUT
-              value: /app/out
+            - name: STADTSTACK_MCP_RELEASE_DIR
+              value: /app/release
+            - name: STADTSTACK_MCP_REVOCATION_TRUST_FILE
+              value: /run/config/mcp-revocations/trust.json
+            - name: STADTSTACK_MCP_REVOCATIONS_FILE
+              value: /run/config/mcp-revocations/revocations.json
           startupProbe:
             httpGet:
               path: /health
@@ -80,6 +86,9 @@ spec:
             - name: token-hashes
               mountPath: /run/secrets/mcp
               readOnly: true
+            - name: mcp-revocations
+              mountPath: /run/config/mcp-revocations
+              readOnly: true
       volumes:
         - name: token-hashes
           secret:
@@ -89,3 +98,13 @@ spec:
             items:
               - key: token-hashes.json
                 path: token-hashes.json
+        - name: mcp-revocations
+          configMap:
+            name: stadtstack-mcp-revocations
+            optional: false
+            defaultMode: 0444
+            items:
+              - key: trust.json
+                path: trust.json
+              - key: revocations.json
+                path: revocations.json

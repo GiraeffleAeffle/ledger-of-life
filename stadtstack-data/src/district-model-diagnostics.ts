@@ -10,13 +10,13 @@ const ToolEvidenceSchema = z.union([
 ]);
 export const RuntimeFailureDiagnosticSchema = z.object({
   version: z.literal(1), callId: z.uuid(), groupId: Hash.nullable(), groupIdSha256: Hash.nullable(),
-  provider: z.enum(['openai-subscription', 'anthropic-subscription']), requestedModel: z.enum(['gpt-6-luna', 'claude-haiku-5-5']),
+  provider: z.enum(['openai-subscription', 'anthropic-subscription']), requestedModel: z.enum(['gpt-6.1-sol', 'gpt-6-luna', 'claude-haiku-5-5']),
   startedAt: z.iso.datetime(), failedAt: z.iso.datetime(), attempted: z.boolean(), exitCode: z.number().int().min(0).max(255).nullable(),
   failureCategory: z.enum(['subscription_authentication', 'model_identity_mismatch', 'model_identity_missing', 'rate_limit', 'generation_error', 'invalid_structured_output', 'tool_attempt', 'operator_pause', 'process_failure']),
   reason: z.enum(['timeout', 'output_bound', 'operator_pause', 'model', 'schema', 'context', 'tool', 'generation', 'authentication', 'rate_limit', 'configuration', 'event_stream', 'input_channel', 'process']),
   parserFailureCategory: z.enum(['model_metadata_unavailable', 'structured_schema_rejected', 'configured_model_unavailable', 'context_limit', 'subscription_authentication', 'cli_configuration', 'rate_limit', 'generation_error', 'model_identity_mismatch', 'model_identity_missing', 'invalid_structured_output']).nullable(),
   toolEvidence: z.array(ToolEvidenceSchema).max(64), toolEvidenceTruncated: z.boolean(),
-}).strict().refine(value => value.requestedModel === PROVIDER_CONFIGS[value.provider].model && !(value.groupId && value.groupIdSha256));
+}).strict().refine(value => (value.requestedModel === PROVIDER_CONFIGS[value.provider].model || (PROVIDER_CONFIGS[value.provider].historicalModels as readonly string[]).includes(value.requestedModel)) && !(value.groupId && value.groupIdSha256));
 
 export function runtimeFailureReason(category: string | null): RuntimeFailureReason {
   switch (category) {
