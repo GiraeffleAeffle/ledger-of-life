@@ -8,11 +8,16 @@
 !src/**
 !regional/
 !regional/taxonomy.mjs
-!out/
-!out/**
-# Do not ship superseded publications in the runtime image.
-out/previous/
-out/previous/**
+!release/
+!release/**
+# Historical output, caches and tests remain excluded by the default deny above.
+**/out/
+**/cache/
+**/.cache/
+**/test/
+**/tests/
+**/*.test.*
+**/*.spec.*
 # Defense in depth if a credential ever lands in an included directory.
 **/.env*
 **/.npmrc

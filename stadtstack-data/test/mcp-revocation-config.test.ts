@@ -12,13 +12,13 @@ const {publicKey,privateKey}=generateKeyPairSync('ed25519'),keyId=revocationKeyI
 const syntheticPins=[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}];
 const loadGovernedRevocations=(releaseId:string,env:NodeJS.ProcessEnv)=>loadGovernedRevocationsForTesting(releaseId,env,syntheticPins);
 async function fixture(projected=false){
- const base=await mkdtemp(join(tmpdir(),'mcp-revocation-config-')),root=join(base,'cohort');await mkdir(root,{mode:0o700});
- const directory=projected?join(root,'..revision-a'):root;if(projected)await mkdir(directory,{mode:0o700});
+ const base=await mkdtemp(join(tmpdir(),'mcp-revocation-config-')),root=join(base,'cohort');await mkdir(root,{mode:projected?0o755:0o700});
+ const directory=projected?join(root,'..2026_10_12_00_00_00.123456789'):root;if(projected)await mkdir(directory,{mode:0o755});
  const releaseId=hash('synthetic sealed release');
  const payload:RevocationPayload={schemaVersion:'stadtstack-revocations-v1',releaseId,issuedAt:'2026-10-11T00:00:00Z',sequence:1,targets:[{type:'record',recordId:'knowledge:synthetic'}]};
  const bytes=signRevocations(payload,keyId,privateKey),trust={schemaVersion:'stadtstack-revocation-trust-v1',releaseId,expectedArtifactSha256:hash(bytes),keys:[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}]};
- await writeFile(join(directory,'trust.json'),JSON.stringify(trust)+'\n',{mode:0o600});await writeFile(join(directory,'revocations.json'),bytes,{mode:0o600});
- if(projected){await symlink('..revision-a',join(root,'..data'),'dir');await symlink('..data/trust.json',join(root,'trust.json'));await symlink('..data/revocations.json',join(root,'revocations.json'));}
+ await writeFile(join(directory,'trust.json'),JSON.stringify(trust)+'\n',{mode:projected?0o444:0o600});await writeFile(join(directory,'revocations.json'),bytes,{mode:projected?0o444:0o600});
+ if(projected){await symlink('..2026_10_12_00_00_00.123456789',join(root,'..data'),'dir');await symlink('..data/trust.json',join(root,'trust.json'));await symlink('..data/revocations.json',join(root,'revocations.json'));}
  const env={STADTSTACK_MCP_REVOCATION_TRUST_FILE:join(root,'trust.json'),STADTSTACK_MCP_REVOCATIONS_FILE:join(root,'revocations.json')};
  return {base,root,directory,env,bytes,trust,releaseId};
 }

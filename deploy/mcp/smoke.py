@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exact-image or public HTTPS acceptance. Outputs evidence, never bearer values."""
 import argparse, base64, datetime, hashlib, json, os, pathlib, re, secrets, subprocess, tempfile, time, urllib.error, urllib.request
+from stat import S_ISDIR, S_ISREG
 
 if not __debug__:
     raise RuntimeError('Acceptance requires Python assertions enabled')
@@ -15,6 +16,10 @@ p.add_argument('--knowledge-municipality',default='ratzeburg',help='Municipality
 p.add_argument('--entity-query',help='Optional source-grounded entity name/identifier; otherwise use a released knowledge mention, then the selected municipality slug')
 p.add_argument('--run-id',help='Governed invocation nonce; otherwise generated locally')
 p.add_argument('--scratch-dir',help='Private wrapper-owned temporary directory for disposable hash-only material')
+p.add_argument('--revocation-trust-file',help='Frozen public cohort trust.json, required for 0.3.2 and later')
+p.add_argument('--revocations-file',help='Frozen public cohort revocations.json, required for 0.3.2 and later')
+p.add_argument('--revocation-artifact-sha256',help='SHA256 of the exact complete signed artifact bytes')
+p.add_argument('--data-manifest-id',help='Exact sealed serving data manifest SHA256')
 args=p.parse_args()
 version_pattern=r'(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)'
 if not re.fullmatch(version_pattern,args.release_version): p.error('Literal stable numeric release version required, without a prefix')
@@ -28,6 +33,71 @@ if args.entity_query is not None and not 1<=len(args.entity_query.strip())<=200:
 if args.url and args.url!='https://mcp.stadtstack.eu': p.error('Live origin must be https://mcp.stadtstack.eu')
 acceptance_run_id=secrets.token_hex(16) if args.run_id is None else args.run_id
 if not re.fullmatch(r'[0-9a-f]{32}',acceptance_run_id): p.error('Run ID must be 32 lowercase hexadecimal characters')
+
+def revocation_cohort(trust_file,artifact_file,artifact_sha256,manifest_id):
+    """Validate the frozen public mount; signature/target verification is server-owned."""
+    if not all(isinstance(value,str) and value==value.strip() and '\0' not in value for value in (trust_file,artifact_file,artifact_sha256,manifest_id)):
+        raise ValueError('Invalid public revocation cohort arguments')
+    if not all(re.fullmatch(r'[0-9a-f]{64}',value) for value in (artifact_sha256,manifest_id)):
+        raise ValueError('Exact artifact SHA256 and data manifest identity required')
+    trust_path,artifact_path=pathlib.Path(trust_file),pathlib.Path(artifact_file)
+    if not trust_path.is_absolute() or not artifact_path.is_absolute() or '..' in trust_path.parts or '..' in artifact_path.parts or trust_path.name!='trust.json' or artifact_path.name!='revocations.json' or trust_path.parent!=artifact_path.parent:
+        raise ValueError('Public cohort must be trust.json and revocations.json in one absolute directory')
+    cohort_dir=trust_path.parent
+    for directory in (*reversed(cohort_dir.parents),cohort_dir):
+        metadata=directory.lstat()
+        sticky_ancestor=directory!=cohort_dir and bool(metadata.st_mode & 0o1000)
+        if not S_ISDIR(metadata.st_mode) or metadata.st_uid!=0 or metadata.st_mode & 0o022 and not sticky_ancestor or directory==cohort_dir and not metadata.st_mode & 0o001:
+            raise ValueError('Public cohort directory chain must be root-owned, non-writable by others and container-accessible')
+    if {entry.name for entry in cohort_dir.iterdir()}!={'trust.json','revocations.json'}:
+        raise ValueError('Public cohort directory must contain only trust.json and revocations.json')
+    def public_bytes(path,bound):
+        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        try:
+            initial=os.fstat(fd)
+            if not S_ISREG(initial.st_mode) or initial.st_uid!=0 or initial.st_mode & 0o222 or not initial.st_mode & 0o004 or not 0<initial.st_size<=bound:
+                raise ValueError('Public cohort files must be bounded root-owned non-writable container-readable regular files')
+            with os.fdopen(fd,'rb',closefd=False) as stream:
+                value=stream.read(bound+1)
+            final=os.fstat(fd);named=path.lstat()
+            identity=lambda metadata:(metadata.st_dev,metadata.st_ino,metadata.st_size,metadata.st_mtime_ns,metadata.st_ctime_ns,metadata.st_mode,metadata.st_uid)
+            if len(value)!=initial.st_size or identity(initial)!=identity(final) or identity(initial)!=identity(named):
+                raise ValueError('Public cohort changed while being read')
+            return value
+        finally:
+            os.close(fd)
+    trust_bytes=public_bytes(trust_path,64*1024)
+    artifact_bytes=public_bytes(artifact_path,1024*1024)
+    trust=json.loads(trust_bytes.decode('utf-8'));artifact=json.loads(artifact_bytes.decode('utf-8'))
+    if not isinstance(trust,dict) or set(trust)!={'schemaVersion','releaseId','expectedArtifactSha256','keys'} or trust['schemaVersion']!='stadtstack-revocation-trust-v1' or trust['releaseId']!=manifest_id or trust['expectedArtifactSha256']!=artifact_sha256:
+        raise ValueError('Public trust cohort does not match approved artifact and data release')
+    if hashlib.sha256(artifact_bytes).hexdigest()!=artifact_sha256:
+        raise ValueError('Signed revocation artifact SHA256 mismatch')
+    if not isinstance(trust['keys'],list) or not 1<=len(trust['keys'])<=16:
+        raise ValueError('Public trust cohort requires public verification keys')
+    key_ids=set()
+    for key in trust['keys']:
+        if not isinstance(key,dict) or set(key)!={'keyId','publicKeySpki'}:
+            raise ValueError('Public trust cohort contains non-public key fields')
+        public_key=base64.b64decode(key['publicKeySpki'],validate=True)
+        if len(public_key)!=44 or not public_key.startswith(bytes.fromhex('302a300506032b6570032100')) or base64.b64encode(public_key).decode()!=key['publicKeySpki'] or key['keyId']!='ed25519:'+hashlib.sha256(public_key).hexdigest() or key['keyId'] in key_ids:
+            raise ValueError('Public trust key identity is invalid')
+        key_ids.add(key['keyId'])
+    if not isinstance(artifact,dict) or not isinstance(artifact.get('payload'),dict) or artifact['payload'].get('releaseId')!=manifest_id or artifact.get('keyId') not in key_ids:
+        raise ValueError('Signed artifact release/key does not match public trust cohort')
+    # Canonical schema, signature and target ordering are checked by image startup,
+    # using the shared implementation, never a second Python signature verifier.
+    return {'directory':str(cohort_dir),'revocationArtifactSha256':artifact_sha256,'revocationTrustSha256':hashlib.sha256(trust_bytes).hexdigest(),'payload':artifact['payload']}
+
+cohort_values=(args.revocation_trust_file,args.revocations_file,args.revocation_artifact_sha256,args.data_manifest_id)
+if any(value is not None for value in cohort_values) and not all(value is not None for value in cohort_values):
+    p.error('Revocation trust/artifact files, artifact SHA256 and data manifest ID must be supplied together')
+if tuple(map(int,args.release_version.split('.'))) >= (0,3,2) and not all(value is not None for value in cohort_values):
+    p.error('0.3.2 and later require --revocation-trust-file --revocations-file --revocation-artifact-sha256 --data-manifest-id')
+try:
+    cohort=revocation_cohort(*cohort_values) if all(value is not None for value in cohort_values) else None
+except (ValueError,TypeError,OSError,KeyError) as error:
+    p.error('Invalid frozen public revocation cohort: '+str(error))
 scratch_dir=pathlib.Path(args.scratch_dir) if args.scratch_dir is not None else pathlib.Path.home()
 if args.scratch_dir is not None:
     scratch_stat=scratch_dir.lstat()
@@ -93,13 +163,25 @@ def call(name,arguments={}):
     assert datetime.datetime.fromisoformat(value['respondedAt'].replace('Z','+00:00')).tzinfo is not None
     # Response time may advance between calls; it is not a release/event date.
     checks.setdefault('firstRespondedAt',value['respondedAt'])
+    if cohort is not None:
+        administrative_view(value['data'].get('administrativeView'))
     checks['lastRespondedAt']=value['respondedAt']
     return value['data']
 
-GRAPH_RELATION_TYPES=('operates','funds','implements','plans','decides','approves','amends','located_in','cooperates_with','cites')
+def administrative_view(view):
+    assert isinstance(view,dict) and view['kind']=='signed_administrative_revocation'
+    assert view['releaseId']==args.data_manifest_id==checks['envelopeRelease']
+    assert view['revocationsSha256']==cohort['revocationArtifactSha256']
+    identity=json.dumps(['stadtstack-mcp-read-view-v1',args.data_manifest_id,cohort['revocationArtifactSha256']],separators=(',',':'))
+    assert view['viewId']==hashlib.sha256(identity.encode()).hexdigest()
+    assert view['sequence']==cohort['payload']['sequence'] and view['issuedAt']==cohort['payload']['issuedAt']
+    assert isinstance(view['meaning'],str) and view['meaning'].strip()
+    assert view==checks.setdefault('administrativeView',view), 'Administrative view changed during acceptance'
+
+GRAPH_RELATION_TYPES=('operates','funds','implements','plans','decides','approves','amends','located_in','cooperates_with','member_of','cites')
 GRAPH_MODALITIES=('asserted','planned','decided','implemented','proposed','conditional','negated','historical')
 PATH_MODALITY_BY_TYPE={
-    'operates':'asserted','funds':'asserted','amends':'asserted','located_in':'asserted','cooperates_with':'asserted','cites':'asserted',
+    'operates':'asserted','funds':'asserted','amends':'asserted','located_in':'asserted','cooperates_with':'asserted','member_of':'asserted','cites':'asserted',
     'decides':'decided','approves':'decided','implements':'implemented',
 }
 
@@ -117,6 +199,7 @@ def graph_path_policy(policy):
 
 def graph_page(value,kind,records_sha):
     assert value['releaseId']==checks['envelopeRelease'] and value['recordsSha256']==records_sha
+    if cohort is not None: administrative_view(value['administrativeView'])
     assert isinstance(value['items'],list) and len(value['items'])<=20
     assert isinstance(value['truncated'],bool) and isinstance(value['complete'],bool) and value['complete']==(not value['truncated'])
     assert value['scope'] and (value['nextCursor'] is None or isinstance(value['nextCursor'],str) and value['nextCursor'])
@@ -221,12 +304,21 @@ try:
         # Only hashes are copied; parent directory remains 0700 on the host.
         hashfile=pathlib.Path(hash_mount.name)/'token-hashes.json'
         disposable_configuration()
-        container=command(['docker','run','--detach','--name','civic-mcp-smoke-'+acceptance_run_id,'--platform','linux/amd64','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges:true','--memory','1g','--cpus','1','--publish','127.0.0.1::4318','--mount','type=bind,source='+str(hashfile)+',target=/run/secrets/mcp/token-hashes.json,readonly',args.image])
+        cohort_options=[]
+        if cohort is not None:
+            assert revocation_cohort(*cohort_values)==cohort, 'Frozen public cohort changed before image startup'
+            cohort_options=['--mount','type=bind,source='+cohort['directory']+',target=/run/config/mcp-revocations,readonly','--env','STADTSTACK_MCP_RELEASE_DIR=/app/release','--env','STADTSTACK_MCP_REVOCATION_TRUST_FILE=/run/config/mcp-revocations/trust.json','--env','STADTSTACK_MCP_REVOCATIONS_FILE=/run/config/mcp-revocations/revocations.json']
+        container=command(['docker','run','--detach','--name','civic-mcp-smoke-'+acceptance_run_id,'--platform','linux/amd64','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges:true','--memory','1g','--cpus','1','--publish','127.0.0.1::4318','--mount','type=bind,source='+str(hashfile)+',target=/run/secrets/mcp/token-hashes.json,readonly',*cohort_options,args.image])
         port=command(['docker','port',container,'4318/tcp']).split(':')[-1]
         origin='http://127.0.0.1:'+port
         details=json.loads(command(['docker','inspect',container]))[0]
         assert details['Config']['Image']==args.image and details['Config']['User']=='1000:1000'
         assert details['HostConfig']['ReadonlyRootfs'] and details['HostConfig']['CapDrop']==['ALL']
+        if cohort is not None:
+            mount=next(mount for mount in details['Mounts'] if mount['Destination']=='/run/config/mcp-revocations')
+            assert mount['Type']=='bind' and mount['Source']==cohort['directory'] and mount['RW'] is False
+            assert set(cohort_options[3::2])<=set(details['Config']['Env'])
+            checks['readOnlyRevocationCohort']=True
         labels=details['Config'].get('Labels') or {}
         assert labels.get('org.opencontainers.image.version')==args.release_version, 'Image OCI version differs from the release tag'
         assert labels.get('org.opencontainers.image.ref.name')==args.release_version, 'Image OCI tag identity differs from the release tag'
@@ -264,19 +356,29 @@ try:
     assert all(t['annotations']['readOnlyHint'] and not t['annotations']['destructiveHint'] for t in tools)
     checks['readOnlyTools']=names
     core=call('get_core_bundle')
-    assert len(core['bundle']['facts'])==3 and all(f['verification']['status']=='auto-verified' and f['source']['url'] and f['source']['documentDate'] and 'date' not in f for f in core['bundle']['facts'])
-    checks['sharedCoreBundleVersion']=core['bundle']['version']
-    fact=call('get_signal',{'id':'lake:straussee-level-2026-09-14'})
-    assert fact['verification']['status']=='auto-verified' and fact['sourceIds'] and fact['eventDate']=='2026-09-14' and fact['asOf']
+    filtered=cohort is not None and bool(cohort['payload']['targets'])
+    assert (len(core['bundle']['facts'])<=3 if filtered else len(core['bundle']['facts'])==3)
+    assert all(f['verification']['status']=='auto-verified' and f['source']['url'] and f['source']['documentDate'] and 'date' not in f for f in core['bundle']['facts'])
+    if filtered:
+        assert 'version' not in core['bundle'] and 'manifest' not in core
+        checks['sharedCoreBundleVersion']=core['sealedIdentity']['coreBundleVersion']
+        visible=call('search_topics',{'limit':1,'fields':['id']})
+        assert visible['items'], 'The configured administrative view has no visible record for lookup acceptance'
+        fact=call('get_signal',{'id':visible['items'][0]['id']})
+        assert fact['sourceIds'] and fact['asOf']
+    else:
+        checks['sharedCoreBundleVersion']=core['bundle']['version']
+        fact=call('get_signal',{'id':'lake:straussee-level-2026-09-14'})
+        assert fact['verification']['status']=='auto-verified' and fact['sourceIds'] and fact['eventDate']=='2026-09-14' and fact['asOf']
     assert not {'source','sources','date','properties'}.intersection(fact), 'Obsolete full-record aliases remain'
     attribution=call('get_sources',{'id':fact['id']})
     assert attribution['sources'] and attribution['sourceIds']==fact['sourceIds'] and 'source' not in attribution
     source=call('get_source',{'sourceId':fact['sourceIds'][0]})
-    assert source['id']==fact['sourceIds'][0] and source['url'] and source['retrievedAt']
+    assert source['id']==fact['sourceIds'][0] and (source['url'] or source.get('urlWithheldReason')) and (source.get('retrievedAt') or source.get('retrievalNote'))
     assert source in attribution['sources']
     topics=call('list_topics')['topics']
     assert topics
-    assert call('search_topics',{'query':'Straussee','limit':5})['items']
+    assert call('search_topics',{'limit':5} if filtered else {'query':'Straussee','limit':5})['items']
     assert call('get_council_items',{'limit':1})['items']
     regional=call('get_regional_topics',{'sourceTypes':['councilAgenda'],'limit':50,'fields':['id','cityId','sourceIds','eventDate','comparisonEligible']})
     eligible=next(item for item in regional['items'] if item['comparisonEligible'])
@@ -291,33 +393,47 @@ try:
     status,rejected=request(data={'jsonrpc':'2.0','id':8,'method':'tools/call','params':{'name':'search_topics','arguments':{**projection,'limit':2,'cursor':first['nextCursor']}}})
     assert status==200 and rejected['result'].get('isError'), 'Cursor was accepted with changed query filters'
     release=call('get_release_status')
-    assert release['manifest']['bundleVersion']==core['bundle']['version'] and release['dataManifest']['id']==checks['envelopeRelease']
     assert release['release']['version']==args.release_version==checks['serverVersion'], 'Status and initialized server versions must equal the literal release tag'
-    assert release['release']['dataManifestId']==release['dataManifest']['id'], 'Status release points to a different data manifest'
+    assert release['release']['dataManifestId']==checks['envelopeRelease'], 'Status release points to a different data manifest'
+    if cohort is not None:
+        assert release['release']['dataManifestId']==args.data_manifest_id, 'Serving manifest differs from approved sealed data'
+    if filtered:
+        assert 'dataManifest' not in release and 'manifest' not in release
+        assert release['sealedIdentity']==core['sealedIdentity']
+        assert release['sealedIdentity']['dataManifestId']==args.data_manifest_id
+        assert re.fullmatch(r'[0-9a-f]{64}',release['sealedIdentity']['coreBundleSha256'])
+    else:
+        assert release['manifest']['bundleVersion']==core['bundle']['version'] and release['dataManifest']['id']==checks['envelopeRelease']
     checks['statusReleaseVersion']=release['release']['version']
     checks['statusDataManifestId']=release['release']['dataManifestId']
     coverage=release['knowledgeCoverage']
-    accounting=coverage['accounting']
-    for field in ('registryMunicipalities','configuredMunicipalities','checkedMunicipalities','attemptedMunicipalities','publishedMunicipalities','checkedWithoutPublishedMunicipalities','unvisitedMunicipalities'):
-        assert type(accounting[field]) is int and accounting[field]>=0
-    for field in ('runSelectedMunicipalities','preparedMunicipalities'):
-        assert accounting[field] is None or type(accounting[field]) is int and 0<=accounting[field]<=accounting['configuredMunicipalities']
-    assert accounting['registryMunicipalities']>=accounting['configuredMunicipalities']>=accounting['checkedMunicipalities']>=accounting['publishedMunicipalities']
-    assert accounting['checkedMunicipalities']+accounting['unvisitedMunicipalities']==accounting['registryMunicipalities']
-    assert accounting['publishedMunicipalities']+accounting['checkedWithoutPublishedMunicipalities']==accounting['checkedMunicipalities']
-    assert len(coverage['municipalities'])==accounting['configuredMunicipalities']
-    assert sum(row['municipalitiesRegistered'] for row in coverage['districts'])==accounting['registryMunicipalities']
-    assert sum(row['municipalitiesAttempted'] for row in coverage['districts'])==accounting['attemptedMunicipalities']
-    for row in coverage['municipalities']:
-        assert type(row['checked']) is bool and row['status']==('gated_records' if row['publishedRecords'] else 'checked_no_gated_records' if row['checked'] else 'not_checked')
-        assert 0<=row['datedStagedRecords']<=row['publishedRecords'] and row['quarantinedRecords']>=0
-        for field,key in (('categories','reason'),('failedDeterministicChecks','id')):
-            assert all(item[key] and type(item['count']) is int and 0<item['count']<=row['quarantinedRecords'] for item in row['quarantineReasons'][field])
-    checks['coverageAccounting']=accounting
+    if filtered:
+        assert set(coverage)=={'scope','administrativeView','municipalities'} and coverage['scope']
+        administrative_view(coverage['administrativeView'])
+        assert all(set(row)=={'id','publishedRecords','datedStagedRecords'} and row['id'] and type(row['publishedRecords']) is int and type(row['datedStagedRecords']) is int and 0<=row['datedStagedRecords']<=row['publishedRecords'] for row in coverage['municipalities'])
+        checks['visibleCoverage']={'municipalities':len(coverage['municipalities']),'publishedRecords':sum(row['publishedRecords'] for row in coverage['municipalities']),'scope':coverage['scope']}
+    else:
+        accounting=coverage['accounting']
+        for field in ('registryMunicipalities','configuredMunicipalities','checkedMunicipalities','attemptedMunicipalities','publishedMunicipalities','checkedWithoutPublishedMunicipalities','unvisitedMunicipalities'):
+            assert type(accounting[field]) is int and accounting[field]>=0
+        for field in ('runSelectedMunicipalities','preparedMunicipalities'):
+            assert accounting[field] is None or type(accounting[field]) is int and 0<=accounting[field]<=accounting['configuredMunicipalities']
+        assert accounting['registryMunicipalities']>=accounting['configuredMunicipalities']>=accounting['checkedMunicipalities']>=accounting['publishedMunicipalities']
+        assert accounting['checkedMunicipalities']+accounting['unvisitedMunicipalities']==accounting['registryMunicipalities']
+        assert accounting['publishedMunicipalities']+accounting['checkedWithoutPublishedMunicipalities']==accounting['checkedMunicipalities']
+        assert len(coverage['municipalities'])==accounting['configuredMunicipalities']
+        assert sum(row['municipalitiesRegistered'] for row in coverage['districts'])==accounting['registryMunicipalities']
+        assert sum(row['municipalitiesAttempted'] for row in coverage['districts'])==accounting['attemptedMunicipalities']
+        for row in coverage['municipalities']:
+            assert type(row['checked']) is bool and row['status']==('gated_records' if row['publishedRecords'] else 'checked_no_gated_records' if row['checked'] else 'not_checked')
+            assert 0<=row['datedStagedRecords']<=row['publishedRecords'] and row['quarantinedRecords']>=0
+            for field,key in (('categories','reason'),('failedDeterministicChecks','id')):
+                assert all(item[key] and type(item['count']) is int and 0<item['count']<=row['quarantinedRecords'] for item in row['quarantineReasons'][field])
+        checks['coverageAccounting']=accounting
     encoded_cursor=first['nextCursor'].split('.')[0]
     cursor_payload=json.loads(base64.urlsafe_b64decode(encoded_cursor+'='*(-len(encoded_cursor)%4)))
-    assert cursor_payload['release']==release['dataManifest']['id']
-    checks['sharedDataRelease']=release['dataManifest']['id']
+    assert cursor_payload['release']==checks['statusDataManifestId']
+    checks['sharedDataRelease']=checks['statusDataManifestId']
     checks['sourcedDatedLookups']=True
     checks['topicSourceRegionalCursorContract']=True
     knowledge=call('get_regional_topics',{'municipalityId':args.knowledge_municipality,'limit':50,'fields':['id','cityId','origin','topics']})
@@ -366,28 +482,31 @@ try:
     checks['exportRecords']=export_checks
     # Only IDs/edges returned by the admitted release are used. Empty or bounded
     # discovery is recorded explicitly; inventing an entity or a self-path is not acceptance.
-    bound_files={item['path']:item for item in release['dataManifest']['files']}
-    assert 'knowledge/graph.json' in bound_files and 'knowledge/records.json' in bound_files
-    records_sha=bound_files['knowledge/records.json']['sha256']
-    assert all(re.fullmatch(r'[0-9a-f]{64}',bound_files[path]['sha256']) for path in ['knowledge/graph.json','knowledge/records.json'])
+    bound_files={item['path']:item for item in release['dataManifest']['files']} if not filtered else None
+    if bound_files is not None:
+        assert 'knowledge/graph.json' in bound_files and 'knowledge/records.json' in bound_files
+        assert all(re.fullmatch(r'[0-9a-f]{64}',bound_files[path]['sha256']) for path in ['knowledge/graph.json','knowledge/records.json'])
     knowledge_detail=call('get_signal',{'id':target['id']})
     mentions=knowledge_detail['entities']
     assert isinstance(mentions,list) and all(isinstance(mention,dict) and re.fullmatch(r'entity:[0-9a-f]{64}',mention['entityId']) for mention in mentions)
     entity_query=args.entity_query.strip() if args.entity_query is not None else mentions[0]['name'][:200].strip() if mentions else args.knowledge_municipality
     search=call('entity_search',{'query':entity_query,'limit':20})
+    records_sha=bound_files['knowledge/records.json']['sha256'] if bound_files is not None else search['recordsSha256']
+    assert re.fullmatch(r'[0-9a-f]{64}',records_sha)
     graph_page(search,'entity',records_sha)
     for entity in search['items']:
         assert re.fullmatch(r'entity:[0-9a-f]{64}',entity['id']) and entity['names'] and entity['mentions']
         assert entity['type'] in ['municipality','authority','organization','project','facility','funding_programme','law','place','company']
-        assert entity['identityBasis']['kind'] in ['explicit_identifier','municipality_scoped_name','source_scoped_name']
+        assert entity['identityBasis']['kind'] in ['explicit_identifier','municipality_scoped_name','ags_scoped_council_body','source_scoped_name']
         assert entity['identityBasis']['ambiguity']
         for mention in entity['mentions']:
             assert mention['quote'] and mention['name']
             graph_evidence(mention['evidence'])
     entity_id=search['items'][0]['id'] if search['items'] else mentions[0]['entityId'] if mentions else None
-    graph_checks={'recordsSha256':records_sha,'graphFileSha256':bound_files['knowledge/graph.json']['sha256'],'queryOrigin':'operator' if args.entity_query is not None else 'released_mention' if mentions else 'municipality_slug','entityIdOrigin':'entity_search' if search['items'] else 'released_record_mention' if mentions else None,'entitySearch':{'status':search['status'],'returned':len(search['items']),'total':search['total'],'truncated':search['truncated']},'neighbors':{'exercised':False,'reason':'No entity discovered by search or the sampled released record'},'path':{'exercised':False,'reason':'No distinct released endpoints discovered'},'toolsExercised':['entity_search']}
+    graph_checks={'recordsSha256':records_sha,'graphFileSha256':bound_files['knowledge/graph.json']['sha256'] if bound_files is not None else None,'hashScope':'sealed publication binding; not filtered response bytes','queryOrigin':'operator' if args.entity_query is not None else 'released_mention' if mentions else 'municipality_slug','entityIdOrigin':'entity_search' if search['items'] else 'released_record_mention' if mentions else None,'entitySearch':{'status':search['status'],'returned':len(search['items']),'total':search['total'],'truncated':search['truncated']},'neighbors':{'exercised':False,'reason':'No entity discovered by search or the sampled released record'},'path':{'exercised':False,'reason':'No distinct released endpoints discovered'},'toolsExercised':['entity_search']}
     if entity_id is not None:
-        neighbors=call('graph_neighbors',{'id':entity_id,'direction':'both','relationTypes':list(GRAPH_RELATION_TYPES),'limit':20})
+        relation_types=[relation for relation in GRAPH_RELATION_TYPES if relation!='member_of' or tuple(map(int,args.release_version.split('.'))) >= (0,3,2)]
+        neighbors=call('graph_neighbors',{'id':entity_id,'direction':'both','relationTypes':relation_types,'limit':20})
         graph_page(neighbors,'neighbors',records_sha)
         graph_path_policy(neighbors['pathEligibility'])
         assert neighbors['entity']['id']==entity_id
@@ -445,6 +564,11 @@ try:
         checks['tokenPolicies']={'defaultNamedProfiles':defaults,'explicitProfilesAfterRestart':elevated,'activationProfileAfterRestart':activation,'isolatedTokenUnaffected':True,'startupActivationOnly':True,'concurrencySaturationExercised':False}
         checks['rateLimit']=True
     evidence={'passed':True,'runId':acceptance_run_id,'releaseVersion':checks['serverVersion'],'dataManifestId':checks['statusDataManifestId'],'origin':origin,'checks':checks,'timestamp':datetime.datetime.now(datetime.timezone.utc).isoformat()}
+    if cohort is not None:
+        assert revocation_cohort(*cohort_values)==cohort, 'Frozen public cohort changed during acceptance'
+        for field in ('revocationArtifactSha256','revocationTrustSha256'):
+            checks[field]=cohort[field]
+            evidence[field]=cohort[field]
     if args.url:
         evidence.update(acceptanceScope='public_endpoint_version_data',imageProvenanceVerified=False,runningImageIdentityVerified=False,suppliedImageReference=args.image,imageIdentityNote='Caller-supplied reference is unverified. Endpoint/version/data acceptance does not identify the running image; correlate separately with governed rollout and ReadyPod evidence.')
     else:
