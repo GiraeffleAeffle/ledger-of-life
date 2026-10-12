@@ -145,6 +145,7 @@ node --experimental-strip-types src/district-crawl.ts \
 Use `--seed-document` instead of `--page-root` for the PDF. Target results stay source-wide partial/not-assessed; do not claim full source completion.
 
 4. Record the **actual new corpus SHA(s)** and obtain/record authorization for those exact scoped inputs. `district-corpus.ts` currently permits only the old two historical corpus hashes; a caller-selected new digest cannot bypass that guard. Add only actual approved new hashes after acquisition, review/commit the change, and use that tested code. No fake temporary allowlist or wildcard.
+   Native intake (`knowledge:prepare` and `quality:refresh`) rechecks every authenticated run against this exact corpus allowlist. The current registry accepts only Git-approved operator configuration descriptors or authenticated managed operator pins; retained registry members remain historical baseline artifacts, not current configuration authority.
 5. Prepare and extract using the pinned admitted registry input descriptor (raw Git-approved descriptor or managed operator pin), not `--registry`:
 
 ```sh

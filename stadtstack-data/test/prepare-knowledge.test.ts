@@ -1,8 +1,7 @@
 import test from 'node:test';
 import type {TestContext} from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile,lstat,writeFile,mkdir,unlink} from 'node:fs/promises';
-import {createHash} from 'node:crypto';
+import {readFile,lstat,writeFile,unlink} from 'node:fs/promises';
 import {join} from 'node:path';
 import {prepareKnowledge,prepareKnowledgeOptionsSchema,knowledgeSourcePinSchema,knowledgePreparedSourcePinSchema,knowledgeRetainedPublicationSourcePinSchema} from '../src/prepare-knowledge.ts';
 import type {PrepareKnowledgeOptions,KnowledgeSourcePin,KnowledgeRetainedPublicationSourcePin} from '../src/prepare-knowledge.ts';
@@ -17,7 +16,9 @@ import {writeManagedSourceJson,writeManagedSourceArtifact,writePrivateJson} from
 import {assertManagedSourceReadable,recordHostOptOut,HostOptedOutError} from '../src/civic-opt-out.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {knowledgePreparationInputsSchema} from '../src/district-publication-inputs.ts';
-import {operatorRegistryConfigSchema,operatorRegistryConfigContractSha256} from '../src/district-registry-config.ts';
+import {importOperatorRegistryConfig} from '../src/district-registry-config.ts';
+import {registryDescriptor} from './fixtures/operator-registry.ts';
+import {authorizedPilotCorpusSchema} from '../src/district-corpus.ts';
 import {retainedPublicationSources,importRetainedPublicationMember} from '../src/district-retained-import.ts';
 import {dataReleaseId,type DataRelease} from '../src/data-release.ts';
 
@@ -37,7 +38,8 @@ async function intakeFixture(t:TestContext){
  };
  const evidence={url,locator:'synthetic registry evidence',sha256:sha256(text),retrievedAt:earlier};
  const registry={schemaVersion:'stadtstack-source-registry-v1',generatedAt:earlier,districts:[{id:'synthetic-district',name:'Synthetic district',ags:'12064',state:'Brandenburg',inventorySources:[evidence],inventoryAsOf:'2026-10-01',inventoryComplete:true}],municipalities:[{id:'synthetic-town',name:'Synthetic town',ags:'12064001',districtId:'synthetic-district',districtAgs:'12064',amt:null,administrativeStatus:'amtsfrei',administrativeEvidence:[evidence],identitySources:[evidence],sources:['website','council','participation','gazette'].map(kind=>({id:kind,kind,url,vendor:'unknown',checkState:kind==='website'?'checked':'not_checked',checkedAt:kind==='website'?earlier:null,evidence:kind==='website'?[evidence]:[],reason:'Synthetic source configuration'})),seedDocuments:[{url,sourceId:'website',title:'Synthetic heat plan',documentDate:'2026-10-01',evidence:[evidence]}]}],inventory:[{ags:'12064001',name:'Synthetic town',districtId:'synthetic-district',identitySourceUrl:url,pilot:true,sourceCheckState:'not_checked',reason:'Synthetic fixture'}],notes:['Synthetic registry only']};
- const registryPin=await sourcePin('registry',registry),config=PROVIDER_CONFIGS['openai-subscription'],identity=sha256('synthetic model identity');
+ const descriptor=await registryDescriptor(fixture,registry);
+ const registryPin=await importOperatorRegistryConfig({...descriptor,managedRoot:fixture.managedRoot,destinationPath:'registry.json'},fixture.policy),config=PROVIDER_CONFIGS['openai-subscription'],identity=sha256('synthetic model identity');
  function record(label:string,clock:string):DistrictKnowledgeRecord{
   const row={id:'synthetic-record',municipalityId:'synthetic-town',ags:'12064001',districtId:'synthetic-district',title:'Synthetic heat plan',titleQuote:'Synthetic heat plan',summary:'Der synthetische Wärmeplan liegt als Entwurf vor.',summaryQuote:'Der synthetische Wärmeplan liegt als Entwurf vor.',municipalityQuote:'Synthetic town',caseKeyType:'source_document',caseKey:`source_document:${reference.sha256}`,caseQuote:null,caseType:'planning',documentDate:'2026-10-01',documentDateQuote:'Document date 2026-10-01',documentDateReason:null,stage:'draft',stageDate:null,stageDateQuote:null,stageDateReason:'No separate event date',originalStatus:'Entwurf',stageQuote:'als Entwurf',stages:[],topics:[],locations:[],entities:[],relations:[],sources:[{...reference,retrievedAt:earlier,policy:{...reference.policy,robots:{...reference.policy.robots,checkedAt:earlier}}}],extraction:{extractorVersion:'synthetic-extractor',extractorSha256:sha256('synthetic-extractor'),model:config.model,provider:'openai-subscription',tool:config.tool,toolVersion:'synthetic-tool',modelIdentitySha256:identity,modelIdentityBasis:config.modelIdentityBasis,returnedModel:null,runtimeWarnings:[],promptVersion:'synthetic-prompt',promptSha256:sha256('synthetic-prompt'),judgePromptVersion:'synthetic-judge',judgePromptSha256:sha256('synthetic-judge'),inputSha256:reference.sha256,textSha256:prepared.textSha256,responseSha256:sha256(label),ocrUsed:false,textMethod:'text',cacheKey:sha256('cache:'+label),extractedAt:clock,chunk:{index:0,count:1,start:0,end:prepared.textLength}},verification:{status:'auto-verified',deterministic:{passed:true,checks:[...REQUIRED_DETERMINISTIC_CHECKS,...GRAPH_DETERMINISTIC_CHECKS].map(id=>({id,passed:true,reason:'Synthetic fixture gate'}))},faithfulness:{score:0.9,threshold:0.8,model:config.model,provider:'openai-subscription',tool:config.tool,toolVersion:'synthetic-tool',modelIdentitySha256:identity,returnedModel:null,reason:'Synthetic fixture, not an actual model judgment',evaluatedAt:clock,responseSha256:sha256('judge:'+label),sameModel:true,limitation:'Same-model judgment is not independent verification.'},evidenceHash:''}};
   row.verification.evidenceHash=knowledgeEvidenceHash(row);return DistrictKnowledgeRecordSchema.parse(row);
@@ -51,6 +53,8 @@ async function intakeFixture(t:TestContext){
   const runPath=join(fixture.root,label+'-run.json'),runHash=await writePrivateJson(runPath,run);
   runs.push({runId:runHash,pins,sourceArtifactKind:'native_extraction_output',artifacts:{extractionRun:{path:runPath,sha256:runHash,bytes:Buffer.byteLength(JSON.stringify(run,null,2)+'\n')},records:await sourcePin(label+'-records',{schemaVersion:KNOWLEDGE_SCHEMA_VERSION,generatedAt:clock,records:[original]}),quarantine:await sourcePin(label+'-quarantine',{schemaVersion:'stadtstack-quarantine-v1',generatedAt:clock,cases:[]}),crawl,registry:registryPin},admissions:[{recordId:original.id,prepared:[preparedPin]}]});
  }
+ const approved=new Set(runs.map(run=>run.pins.corpusSha256)),parseCorpus=authorizedPilotCorpusSchema.parse.bind(authorizedPilotCorpusSchema);
+ t.mock.method(authorizedPilotCorpusSchema,'parse',(value:unknown)=>typeof value==='string'&&approved.has(value)?value:parseCorpus(value));
  const options=prepareKnowledgeOptionsSchema.parse({schemaVersion:'stadtstack-managed-knowledge-intake-v1',policy:fixture.policy,registry:registryPin,runs,approvedRunOrder:runs.map(run=>run.runId),generatedAt:at,minimumPerDistrict:1,output:{root:join(fixture.root,'output'),stagingDir:join(fixture.root,'output','knowledge'),auditDir:join(fixture.root,'audit')}});
  return {...fixture,options,originals,prepared,preparedPin,sourcePin};
 }
@@ -73,10 +77,24 @@ async function retainedFixture(t:TestContext){
   const imported=await importRetainedPublicationMember({publicationRoot,manifestSha256:manifestSha,releaseId:manifest.id,memberPath:'knowledge/'+name+'.json',declaredSources:retainedPublicationSources(value),managedRoot,destinationPath:'knowledge/'+name+'.json'},f.policy);
   members[name]=knowledgeRetainedPublicationSourcePinSchema.parse({path:imported.path,sha256:imported.sha256,bytes:imported.bytes,bindings:imported.bindings});
  }
- const options=prepareKnowledgeOptionsSchema.parse({...f.options,registry:members.registry,runs:[],approvedRunOrder:[],retainedPublication:{artifacts:{manifest:{path:manifestPath,sha256:manifestSha,bytes:Buffer.byteLength(manifestBytes)},...members},admissions:[{recordId:f.originals[0].id,originalEvidenceHash:f.originals[0].verification.evidenceHash}]},generatedAt:'2026-10-12T12:00:00.000Z',output:{root:join(f.root,'republished'),stagingDir:join(f.root,'republished','knowledge'),auditDir:join(f.root,'republished-audit')}});
+ const options=prepareKnowledgeOptionsSchema.parse({...f.options,runs:[],approvedRunOrder:[],retainedPublication:{artifacts:{manifest:{path:manifestPath,sha256:manifestSha,bytes:Buffer.byteLength(manifestBytes)},...members},admissions:[{recordId:f.originals[0].id,originalEvidenceHash:f.originals[0].verification.evidenceHash}]},generatedAt:'2026-10-12T12:00:00.000Z',output:{root:join(f.root,'republished'),stagingDir:join(f.root,'republished','knowledge'),auditDir:join(f.root,'republished-audit')}});
  return {f,first,manifest,options,members};
 }
 
+test('managed source pins without operator configuration provenance cannot authorize the current registry',async t=>{
+ const fixture=await intakeFixture(t),value=JSON.parse(await readFile(fixture.options.registry.path,'utf8'));
+ const source=await fixture.sourcePin('not-operator-configuration',value);
+ await assert.rejects(prepareKnowledge({...fixture.options,registry:source} as unknown as PrepareKnowledgeOptions));
+ const options=structuredClone(fixture.options);options.runs[0].artifacts.registry=source as typeof options.registry;
+ await assert.rejects(prepareKnowledge(options));
+ await assert.rejects(lstat(fixture.options.output.root),{code:'ENOENT'});
+});
+test('self-consistent native runs over an unapproved corpus are rejected at intake',async t=>{
+ const fixture=await intakeFixture(t);
+ t.mock.restoreAll();
+ await assert.rejects(prepareKnowledge(fixture.options),/Invalid option/);
+ await assert.rejects(lstat(fixture.options.output.stagingDir),{code:'ENOENT'});
+});
 test('explicit intake schema retains mandatory district acceptance and rejects legacy fallback options',()=>{
  for(const minimumPerDistrict of [0,-1,1.5,NaN])assert.equal(prepareKnowledgeOptionsSchema.safeParse({minimumPerDistrict}).success,false);
  assert.equal(prepareKnowledgeOptionsSchema.safeParse({registry:'out/knowledge/registry.json',records:'out/knowledge/records.json'}).success,false);
@@ -177,28 +195,22 @@ test('declared source pins cannot relabel or add provenance beyond the authorita
 });
 
 test('Git-bound current operator registry bootstraps without repainting original run registry pins',async t=>{
- const fixture=await intakeFixture(t),options=structuredClone(fixture.options),codeRoot=join(fixture.root,'registry-code');await mkdir(codeRoot,{mode:0o700});
+ const fixture=await intakeFixture(t),options=structuredClone(fixture.options);
  const value=JSON.parse(await readFile(options.registry.path,'utf8'));value.notes.push('Synthetic explicitly approved current configuration amendment');
- const bytes=Buffer.from(JSON.stringify(value)+'\n'),path=join(codeRoot,'registry.json');await writeFile(path,bytes,{mode:0o600});
- const oid=(kind:string,body:Buffer)=>createHash('sha1').update(kind+' '+body.length+'\0').update(body).digest('hex');
- const treeEntry=(name:string,object:string,mode='40000')=>Buffer.concat([Buffer.from(mode+' '+name+'\0'),Buffer.from(object,'hex')]);
- const store=async(kind:string,body:Buffer)=>{const object=oid(kind,body),path=join(codeRoot,kind+'-'+object+'.bin');await writeFile(path,body,{mode:0o600});return {path,oid:object,sha256:sha256(body),bytes:body.length};};
- const blobOid=oid('blob',bytes),leaf=await store('tree',treeEntry('district-registry.json',blobOid,'100644')),middle=await store('tree',treeEntry('sources',leaf.oid)),tree=await store('tree',treeEntry('stadtstack-data',middle.oid));
- const commit=await store('commit',Buffer.from(`tree ${tree.oid}\nauthor Synthetic Fixture <fixture@example.test> 0 +0000\ncommitter Synthetic Fixture <fixture@example.test> 0 +0000\n\nSynthetic registry configuration\n`));
- const registry=operatorRegistryConfigSchema.parse({kind:'operator_registry_config',path,sha256:sha256(bytes),bytes:bytes.length,schemaContractSha256:await operatorRegistryConfigContractSha256(),code:{gitCommit:commit.oid,path:'stadtstack-data/sources/district-registry.json',blobOid,sha256:sha256(bytes),bytes:bytes.length},commit,trees:[leaf,middle,tree],approval:{role:'district_source_registry',approver:'owner',decisionId:fixture.decisionId,date:'2026-10-11',configurationSha256:sha256(bytes),gitCommit:commit.oid},declaredEndpoints:[...new Set(retainedPublicationSources(value).map(source=>source.url))]});
- options.registry=registry;
+ const registry=await registryDescriptor(fixture,value,'amended-registry-code');options.registry=registry;
  const result=await prepareKnowledge(options),receipt=JSON.parse(await readFile(result.preparationReceipt.path,'utf8')),coverage=JSON.parse(await readFile(result.outputs[2].path,'utf8'));
  assert.equal(receipt.dependencies.find((entry:{role:string})=>entry.role==='registry').sha256,registry.sha256);
  assert.deepEqual(coverage.textLineage.runs.map((run:{pins:{registrySha256:string}})=>run.pins.registrySha256),options.runs.map(run=>run.pins.registrySha256));
  assert.ok(result.outputs.every(pin=>pin.bindings.some(binding=>binding.kind==='operator_registry_config'&&binding.configurationSha256===registry.sha256)));
- const materialized=join(options.output.root,'intake/configuration',registry.sha256+'.json');assert.deepEqual(await readFile(materialized),bytes);await assertManagedSourceReadable(materialized,fixture.policy);
+ const materialized=join(options.output.root,'intake/configuration',registry.sha256+'.json');assert.deepEqual(await readFile(materialized),await readFile(registry.path));await assertManagedSourceReadable(materialized,fixture.policy);
  assert.equal(prepareKnowledgeOptionsSchema.safeParse({...options,runs:options.runs.map(run=>({...run,admissions:[{recordId:'synthetic-record',prepared:[result.outputs[0]]}]}))}).success,false,'derived control metadata cannot authorize prepared source admission');
 });
 
 test('sealed retained-only intake needs no private native or prepared artifacts and preserves original evidence clocks',async t=>{
  const {f,options,manifest,members}=await retainedFixture(t);
- const unavailable=new Set([f.preparedPin.path,...f.options.runs.flatMap(run=>Object.values(run.artifacts).flatMap(pin=>pin?[pin.path]:[]))]);
+ const unavailable=new Set([f.preparedPin.path,...f.options.runs.flatMap(run=>Object.values(run.artifacts).flatMap(pin=>pin&&pin.path!==options.registry.path?[pin.path]:[]))]);
  for(const path of unavailable)await unlink(path);
+ t.mock.restoreAll(); // Retained admission must not depend on the synthetic corpus authorization seam.
  const result=await prepareKnowledge(options),records=JSON.parse(await readFile(result.outputs[1].path,'utf8')),coverage=JSON.parse(await readFile(result.outputs[2].path,'utf8'));
  assert.deepEqual(records.records,[f.originals[0]]);
  assert.equal(coverage.textLineage,null);assert.equal(coverage.retainedPublication.releaseId,manifest.id);
@@ -216,7 +228,7 @@ test('sealed retained-only intake needs no private native or prepared artifacts 
  assert.deepEqual(provenance.runs,[]);assert.deepEqual(Object.keys(provenance.retainedPublication.baseline.input.artifacts).sort(),['coverage','manifest','records','registry']);
  const quarantine=JSON.parse(await readFile(result.privateArtifacts['candidate-quarantine'].path,'utf8'));
  assert.deepEqual(quarantine.runs,[]);assert.equal(quarantine.retainedPublication.privateQuarantineAvailability,'not_supplied');
- assert.ok(result.outputs.every(pin=>pin.bindings.every(binding=>binding.kind==='retained_publication')));
+ assert.ok(result.outputs.every(pin=>pin.bindings.some(binding=>binding.kind==='retained_publication')&&pin.bindings.some(binding=>binding.kind==='operator_registry_config')));
 });
 
 test('retained baseline precedes admitted native revisions without using generation clocks as release order',async t=>{
