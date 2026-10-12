@@ -1,5 +1,7 @@
 # Civic pipeline: VM resume brief
 
+> **Update 12 October 2026, 22:06 UTC:** 0.3.2 was completed on the VM and is live (source `57bddbb`, tag `0.3.2`, data manifest `4ceebf75…`); see `HOSTED_MCP.md` § Rollout evidence. The original handoff text below is kept as the historical brief.
+
 Handoff: **12 October 2026, Berlin**. The owner stopped the Mac work and moved all continuation to the VM. **This branch is WIP, not an approved or deployable 0.3.2 release. Do not tag or deploy it.** No new 0.3.2 acquisition, preparation, model run, publication, image or rollout was performed.
 
 ## 1. What is live and where the work is

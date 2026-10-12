@@ -1,6 +1,6 @@
 # Protected hosted civic MCP: owner guide
 
-The protected endpoint is **https://mcp.stadtstack.eu/mcp**, upgraded to the 20-tool **0.3.1** release on 11 October 2026 at 13:41 UTC (15:41 Berlin). It exposes read-only civic tools; use MCP `tools/list` for the current inventory. Personal bearer access is required. Client-specific GUI interoperability is not implied by the exercised generic HTTP acceptance below.
+The protected endpoint is **https://mcp.stadtstack.eu/mcp**, upgraded to the 20-tool **0.3.2** release on 12 October 2026 at 22:06 UTC (00:06 Berlin, 13 October). It exposes read-only civic tools; use MCP `tools/list` for the current inventory. Personal bearer access is required. Client-specific GUI interoperability is not implied by the exercised generic HTTP acceptance below.
 
 ## HTTP and security contract
 
@@ -14,7 +14,7 @@ The protected endpoint is **https://mcp.stadtstack.eu/mcp**, upgraded to the 20-
 
 ## Read-only tools and evidence
 
-The **20-tool contract below is live with literal Git tag, image tag and MCP version `0.3.1`**. Current and historical acceptance records are separated at the end of this guide. Use `tools/list` and `get_release_status` to identify the exact live inventory and whole-data release.
+The **20-tool contract below is live with literal Git tag, image tag and MCP version `0.3.2`**. Current and historical acceptance records are separated at the end of this guide. Use `tools/list` and `get_release_status` to identify the exact live inventory and whole-data release.
 
 | Tool | Purpose |
 | --- | --- |
@@ -47,9 +47,9 @@ Hosted envelopes contain `source.release` (whole-data manifest ID), `releasedAt`
 
 Startup verifies every allowlisted whole-data release hash/size against `out/release-manifest.json`, including catalogue, quality report, regional evidence, each city's full/min/changes/feed exports and `knowledge/{registry,records,coverage}.json`. It hashes the exact parsed buffers, and changes are retained in the immutable startup snapshot. Individual knowledge source/model/date gates remain mandatory. Release acceptance needs qualifying evidence across all three districts, not every registered town: `recordCoverage` and full knowledge coverage explicitly distinguish `gated_records`, `checked_no_gated_records` and `not_checked`, with published/dated-stage counts. The separate selected-core checks remain. Whole-data identity changes with non-core data; requests never recollect or mix mutable release files.
 
-### Pending 0.3.2 source checkpoint — not live
+### Current 0.3.2 source checkpoint — deployed
 
-The package/source checkpoint is not a deployable data release. Tracked `out/` remains the sealed 0.3.1 snapshot. New VM-only acquisition, correction admission, composed-release validation and governed rollout have not been established by this documentation. The live tool table and receipts below describe **0.3.1**, not these pending changes.
+The source checkpoint is now deployed. The live tool table and receipts below describe **0.3.2**.
 
 New governed releases require the absolute `STADTSTACK_MCP_RELEASE_DIR` serving path; the canonical selector rejects the tracked historical `out/` tree and never falls back to it. Startup verifies every allowlisted whole-data hash/size against that directory's `release-manifest.json`, including catalogue, quality report, regional evidence, each city's full/min/changes/feed exports and `knowledge/{registry,records,coverage,graph,changes,publication-inputs}.json`. It hashes the exact parsed buffers, validates the sealed input cohort, and retains changes in the immutable startup snapshot. Individual knowledge source/model/date gates remain mandatory. Release acceptance needs qualifying evidence across all three districts, not every registered town: `recordCoverage` distinguishes `gated_records`, `checked_no_gated_records` and `not_checked` with published/dated-stage counts. The separate selected-core checks remain. Whole-data identity changes with non-core data; requests never recollect or mix mutable release files. The historical deployment receipts below are unchanged; this serving contract is not a new deployment claim.
 
@@ -71,9 +71,9 @@ The Mac key still requires the owner's travelling Mac. **A later explicit owner 
 
 ### Live source-bound graph tools
 
-These three tools are part of the live **20-tool 0.3.1** release. Their successful retrieval/acceptance does not establish added answer utility: the frozen 0.3.0 evaluation's seven graph comparisons measured no incremental benefit. That evaluation was not rerun or relabelled for this patch.
+These three tools are part of the live **20-tool 0.3.2** release. Their successful retrieval/acceptance does not establish added answer utility: the frozen 0.3.0 evaluation's seven graph comparisons measured no incremental benefit. That evaluation was not rerun or relabelled for this patch.
 
-The live version is **`0.3.1`**, taken from `stadtstack-data/package.json`: literal Git tag, image tag, OCI version/ref-name metadata and MCP `serverInfo.version` agree. `get_release_status` returns `release: {version, dataManifestId}` alongside the full `dataManifest`; its ID matches `dataManifest.id`. The older v0.2.1 deployment incorrectly reported `serverInfo.version:0.3.0`, so that old value alone never proved a 19-tool rollout. Local/governed image checks establish artifact provenance; public checks establish endpoint/version/data behavior. Running-image identity is evidenced separately by the governed ReadyPod imageID, not by the MCP response.
+The live version is **`0.3.2`**, taken from `stadtstack-data/package.json`: literal Git tag, image tag, OCI version/ref-name metadata and MCP `serverInfo.version` agree. `get_release_status` returns `release: {version, dataManifestId}` alongside the full `dataManifest`; its ID matches `dataManifest.id`. The older v0.2.1 deployment incorrectly reported `serverInfo.version:0.3.0`, so that old value alone never proved a 19-tool rollout. Local/governed image checks establish artifact provenance; public checks establish endpoint/version/data behavior. Running-image identity is evidenced separately by the governed ReadyPod imageID, not by the MCP response.
 
 | Tool | Arguments and evidence |
 | --- | --- |
@@ -336,7 +336,19 @@ The chart disables backend HAProxy access logging before redirect handling. Its 
 
 ## Rollout evidence
 
-### Current: 0.3.1, case semantics, entity aliases and analyst access
+### Current: 0.3.2, signed revocation cohort and retained/native knowledge
+
+- Deployed source: `57bddbbd8b84b0634229ad9cd45b689bda7271ea`; literal Git tag and MCP version **`0.3.2`**. Live since 12 October 2026 22:06 UTC (00:06 Berlin, 13 October).
+- Image: `ghcr.io/giraeffleaeffle/stadtstack-mcp:0.3.2@sha256:133e2ef28427e42135050dabc5cc6ab1295deb5fa7d29bf680154b5a66827f83` (workflow run [38314264141](https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/38314264141)); ReadyPod `imageID` matched the digest, with zero restarts.
+- Whole-data manifest: `4ceebf75374df54c51bcf4a212c73770186a1a6db502423be7f108b665096691`, 44 members; 232 knowledge records across nine knowledge municipalities and three districts. Managed intake generation 9 → publication 9 → `verifyDataRelease`; fresh-root replay reproduced the same manifest (`85b92363…`). Registry codec contract `5246f48b…` round 4 used the same owner-approved registry `0c7625ef…` at `6ba2506`.
+- The deployed signed revocation cohort is empty (targets `[]`, sequence 1; issued `2026-10-12T20:29:22Z` by the VM signer). Trust includes both governed pins, VM `ed25519:8393ad2b…` and Mac `ed25519:9a687b00…`. Artifact SHA-256 `6f615f40eb87557c2619cb0b99e568f4fd53d08acb5f41ee09838298a753c5ad`; trust SHA-256 `67789dd2d58b2c03459e7c9a7fde70ed093a50a8878f78308e0e9f9e94980600`; owner decision `owner-2026-10-12-empty-revocation-cohort`.
+- Acceptance gates: full source 903/903, MCP tools 6/6 against committed `release/`, deploy acceptance 24/24, TypeScript 0 errors; security review had no blocking findings. In-cluster startup was pre-tested with the real ConfigMap; governed diff-only exact-image acceptance and governed release passed. Public HTTPS `smoke.py --url` acceptance from VM identity `codex-workstation` reported version 0.3.2 and matching manifest/cohort hashes.
+- Spot check: Strausberg FNP 10th amendment record `knowledge:strausberg:50a9c0720257cee32d5a37e7` is `draft`, document date 2025-08-07. `get_changes` reports the 68.6 → 41.5 ha correction to `knowledge:strausberg:312ccd92c53c6241c52e3349` as `superseded`, not withdrawn.
+- Two failed rollout attempts were each restored to 0.3.1 with `rollout undo` within minutes; public 503 intervals were about five and three minutes. Kubelet ConfigMap/secret volume roots are 2777/3777 (setgid/sticky, world-writable read-only mounts), which the startup loader initially rejected. Fixes in `ccfee40` and `57bddbb` accept sticky roots or the exact read-only mount point per `/proc/self/mountinfo`, with owner checks on every traversed entry. Exact-image smoke now mounts a ConfigMap-shaped projection. Earlier image fix `a9bc0d8` added missing `regional/statements.mjs`.
+- Operator prerequisites/notes: install `docker-buildx` on the VM; governed read-only `gh api` calls need `GH_CONFIG_DIR=/home/max/.config/gh`. Deployment retains a stale `last-applied-configuration` from rollbacks (harmless; next governed apply supersedes it). ConfigMap `stadtstack-mcp-revocations` is now in use.
+- Root-only evidence: `/var/lib/stadtstack-mcp-release/57bddbbd8b84-20261012T220602Z`; public receipt `~/stadtstack-ops/reviews/public-acceptance-0.3.2.json`. Private policy inventory is about 225 MB after this release; compact inventory using shared binding sets is required before next publication (Vikunja task 65).
+
+### Historical: 0.3.1, case semantics, entity aliases and analyst access
 
 - Deployed source: `47083b92ad18613763536ea79d4db1aaccaa6eea`; literal Git tag, image tag, initialize `serverInfo.version` and release-status version all **`0.3.1`**.
 - Image: `ghcr.io/giraeffleaeffle/stadtstack-mcp:0.3.1@sha256:5efca884f0bcc453a9a9df0b8a543526ce42c74da82bb56a26a88fffe1dd7d98`.
