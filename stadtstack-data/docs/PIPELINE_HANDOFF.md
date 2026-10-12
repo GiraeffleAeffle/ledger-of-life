@@ -62,6 +62,8 @@ Legacy implicit live collectors/evaluators, API-key fallbacks and ungoverned old
 
 Host aliases `codex-workstation` / `codex-netbird` refer to the same VM, user `max`. Installed Node used by this pipeline: `/home/max/.local/share/mise/installs/node/24.21.0/bin/node`.
 
+The civic lane fails closed on group/world-writable managed files and ancestry. The VM login default is `umask 002`, under which every gate and pipeline command fails with `host_state_unsafe`/`CIVIC_POLICY_STATE_UNSAFE`. Run all tests and pipeline commands with `umask 022` (or stricter) from a checkout without group/other write bits (`chmod -R go-w` after cloning). Do not weaken the permission checks instead.
+
 Historical processing tree: `/home/max/civic-knowledge-slice/stadtstack-data`:
 
 - `cache/districts/raw`: historical source bodies/observations.
