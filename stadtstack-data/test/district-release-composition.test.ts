@@ -103,6 +103,7 @@ test('mixed genuine-shape legacy/current runs project only graph identities and 
   assert.equal(projected.relations[0].fromId, projected.entities[0].entityId);
   assert.deepEqual(result.provenance.runs[0].records, [legacy, oldCodex]);
   assert.strictEqual(result.provenance.originalContributions[0], historical);
+  assert.ok(result.lineage);
   assert.deepEqual(result.lineage.runs.map(run => run.assignmentMode), ['balanced', 'codex-only']);
   const audit = result.audit.records.find(item => item.recordId === legacy.id)!;
   assert.equal(audit.originalEvidenceHash, legacy.verification.evidenceHash);
@@ -121,6 +122,7 @@ test('duplicate record selection follows only the explicitly approved order, not
   const result = composeDistrictRelease(compositionInput([left, right], [['collision'], ['collision']]));
   assert.deepEqual(result.records.records, [second]);
   assert.deepEqual(result.audit.records.map(item => item.disposition), ['unselected_revision', 'selected']);
+  assert.ok(result.lineage);
   assert.equal(result.lineage.selectedRecordOrigins[0].runId, right.runId);
   assert.equal(result.lineage.selectedRecordOrigins[0].outputArtifactSha256, right.artifacts.records.sha256);
   const reversed = composeDistrictRelease(compositionInput([right, left], [['collision'], ['collision']]));
@@ -149,6 +151,7 @@ test('failed new candidate retains older admitted evidence and original quaranti
   assert.equal(result.audit.quarantine[0].selectedRunId, historical.runId);
   assert.equal(result.audit.quarantine[0].selectedEvidenceHash, old.verification.evidenceHash);
   assert.equal(JSON.stringify(result.audit).includes(item.reason), false);
+  assert.ok(result.lineage);
   assert.equal(result.lineage.cumulative.attemptsAcrossRuns, 2);
   assert.equal(result.lineage.cumulative.groups.attemptedDocumentGroups, 1);
   const inOutputs = runFixture('candidate-in-output', [failed]);
@@ -211,6 +214,7 @@ test('overlapping byte groups deduplicate coverage without erasing aliases, obse
   assert.equal(result.provenance.crawlDocuments[0].observations.length, 2);
   assert.equal(result.provenance.crawlDocuments[0].observations[1].document.retrievedAt, now);
   assert.equal(result.provenance.crawlExcludedDocuments.length, 2);
+  assert.ok(result.lineage);
   assert.equal(result.lineage.cumulative.frontierUnion, 'unknown');
   assert.deepEqual(result.lineage.cumulative.groups, { fetchedDocumentGroups: 1, selectedDocumentGroups: { state: 'exact', count: 1 }, preparedDocumentGroups: { state: 'exact', count: 1 }, attemptedDocumentGroups: 1, pendingFetchedDocumentGroups: 0, unavailableAttemptedDocumentGroups: 0 });
   assert.equal(result.lineage.cumulative.attemptsAcrossRuns, 2);
@@ -224,6 +228,7 @@ test('different bytes at the same crawl document identity preserve both versions
   const second = runFixture('new-bytes-no-attempt', [], { documents: [{ id: 'synthetic-document', municipalityId, sourceId, sha256: changed, url: 'https://example.org/synthetic-source' }], includePlan: false });
   const result = composeDistrictRelease(compositionInput([first, second], [[record.id], []]));
   assert.equal(result.crawl.documents.length, 2);
+  assert.ok(result.lineage);
   assert.equal(result.lineage.cumulative.groups.fetchedDocumentGroups, 2);
   assert.equal(result.lineage.cumulative.groups.attemptedDocumentGroups, 1);
   assert.equal(result.lineage.cumulative.groups.pendingFetchedDocumentGroups, 1);

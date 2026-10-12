@@ -390,6 +390,8 @@ test('retained coverage rejects counts, source host, member proofs, origins and 
  assert.throws(()=>build(wrongOrigin),/origin mismatch/);
  const wrongClock=structuredClone(coverage);wrongClock.retainedPublication!.selectedRecordOrigins[0].evaluatedAt=at;
  assert.throws(()=>validateDistrictCoverage(wrongClock,registry,records),/record\/source\/model binding/);
+ const unevaluated=structuredClone(records);unevaluated[0].verification.faithfulness.evaluatedAt=null;
+ assert.throws(()=>validateDistrictCoverage(coverage,registry,unevaluated),/record\/source\/model binding/);
  const wrongProof=structuredClone(coverage);wrongProof.retainedPublication!.members.coverage.bytes++;
  assert.throws(()=>validateDistrictCoverage(wrongProof,registry,records,composition.retainedPublication),/member\/origin proof mismatch/);
  const changedSource=structuredClone(records);changedSource[0].sources[0].id=city.sources[1].id;

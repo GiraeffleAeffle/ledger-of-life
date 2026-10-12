@@ -16,7 +16,7 @@ function inside(root:string,path:string):boolean {
 }
 async function governedDirectoryChain(root:string,cohort:string):Promise<void>{
  const uid=process.getuid?.();if(uid===undefined)throw new GovernedRevocationConfigError();
- let current=sep;
+ let current:string=sep;
  for(const component of cohort.split(sep).filter(Boolean)){
   current=join(current,component);const metadata=await lstat(current);
   const stickyAncestor=(metadata.mode&0o1000)!==0&&current!==root&&!inside(root,current);
