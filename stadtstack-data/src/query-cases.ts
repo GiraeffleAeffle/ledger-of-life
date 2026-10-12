@@ -3,7 +3,7 @@ import type {QueryRecord} from './mcp-query.ts';
 import type {DistrictKnowledgeRecord} from './district-schema.ts';
 import type {CaseIdentity as ScopedCaseIdentity} from './district-case-linking.ts';
 import {milestoneRank,normalizeStageAssertion,positiveStages,stageRankingContext,type StageRankingContext,type CanonicalStageDateAssertion} from './planning-stages.ts';
-import {areaClaimsFromQuote,resolveMetricSupersession} from './case-supersession.ts';
+import {areaClaimsFromQuote,resolveMetricSupersession,type MetricReadConstraint} from './case-supersession.ts';
 
 export type IdentityBasis={type:'plan_number'|'diplan'|'paper_reference'|'bobsh'|'record';value:string;quote:string;recordId:string;sourceIds:string[]};
 export type CaseIdentity={status:'source_identified'|'unresolved'|'not_applicable';basis:IdentityBasis[];instrument:IdentityBasis|null;relatedInstruments:IdentityBasis[]} & Partial<ScopedCaseIdentity>;
@@ -130,12 +130,12 @@ export function scopedCases(records:QueryRecord[],includeDocumentBuckets=false) 
  }).sort((a,b)=>a.id.localeCompare(b.id));
 }
 /** Shared source-supported metric semantics; native claims require admitted scope/replacement witnesses. */
-export function caseMetrics(records:QueryRecord[],asOf:string) {
+export function caseMetrics(records:QueryRecord[],asOf:string,readConstraints:readonly MetricReadConstraint[]=[]) {
  return resolveMetricSupersession(records.map(record=>{
   const instrument=record.caseIdentity?.instrument;
   const metricClaims=verifiedClaims(record)?record.metricClaims??(record.kind!=='structured'&&instrument?areaClaimsFromQuote({quote:record.summaryQuote??'',sourceIds:record.sourceIds,scope:instrument.value,scopeQuote:instrument.quote,instrument:instrument.value,reportedAt:record.documentDate??null}):[]):[];
   return {id:record.id,municipalityId:record.cityId,metricClaims};
- }),asOf,records.flatMap(record=>record.caseMetricHistory??record.supersession?.history??[]));
+ }),asOf,records.flatMap(record=>record.caseMetricHistory??record.supersession?.history??[]),[...readConstraints,...records.flatMap(record=>record.supersession?.withheldContext??[])]);
 }
 /** Shared text publication projector; native changes use the canonical source-native change contract. */
 export function knowledgeMetricRecord(record:DistrictKnowledgeRecord) {
@@ -193,6 +193,6 @@ export function caseEvidence(records:QueryRecord[],asOf:string){
   const procedures=record.caseIdentity?.basis.filter(basis=>basis.type==='diplan')??[];
   return procedures.length>1?[{type:'shared_published_procedure_evidence',recordId:record.id,sourceIds:record.sourceIds,procedures,meaning:'The same released evidence explicitly binds these procedure identifiers/paths; a case bundle, not legal instrument equivalence.'}]:[];
  });
- const metricState={currentValues:metrics.currentValues,history:metrics.history,supersession:metrics.relationships,metricEvidenceSourceIds:[...new Set(metrics.history.flatMap(entry=>[...entry.claim.evidence.sourceIds,...entry.claim.scopeEvidence.sourceIds,...(entry.claim.replaces?.evidence.sourceIds??[])]))].sort()};
+ const metricState={currentValues:metrics.currentValues,history:metrics.history,supersession:metrics.relationships,...(metrics.withheldContext?.length?{withheldContext:metrics.withheldContext}:{}),metricEvidenceSourceIds:[...new Set(metrics.history.flatMap(entry=>[...entry.claim.evidence.sourceIds,...entry.claim.scopeEvidence.sourceIds,...(entry.claim.replaces?.evidence.sourceIds??[])]))].sort()};
  return {...metricState,id:first.caseId??first.id,caseId:first.caseId??first.id,cityId:first.cityId,districtId:records.find(record=>record.districtId)?.districtId,title:first.title,memberRecordIds:records.map(record=>record.id).sort(),recordCount:records.length,eligibleRecordIds:eligible.map(record=>record.id).sort(),comparisonEligible:eligible.length>0,comparisonReason:eligible.length?null:'No member record passes the shared comparison eligibility gate',identityStatus:identityBasis.some(basis=>basis.type!=='record')?'source_identified':'unresolved',identityBasis,sourceIds:[...new Set(records.flatMap(record=>record.sourceIds))].sort(),topics:[...new Map(records.flatMap(record=>record.topics).map(topic=>[topic.id,topic])).values()],furthestSupportedStage:milestone?.stage??null,furthestSupportedDate:milestone?.date??null,furthestPositiveMilestone:milestone,instruments:[...instrumentGroups.values()].map(({identity,records})=>({identity,memberRecordIds:records.map(record=>record.id).sort(),furthestPositiveMilestone:furthestMilestone(records,asOf)})),relationships:[...procedureLinks,...records.filter(record=>record.caseIdentity&&record.caseIdentity.relatedInstruments.length).map(record=>({type:'source_mentions_instruments',recordId:record.id,sourceIds:record.sourceIds,instruments:[record.caseIdentity!.instrument,...record.caseIdentity!.relatedInstruments],meaning:'Explicit source co-reference, not legal equivalence or transferred stage.'}))],unknowns:[...(identityBasis.some(basis=>basis.type!=='record')?[]:['Case identity unknown; record-scoped fallback is counted explicitly.']),...(records.some(record=>!record.caseIdentity?.instrument)?['Some member legal instruments are unidentified; their stages are not assigned to another instrument.']:[]),...(metrics.history.some(entry=>entry.status==='unresolved')?['Current metric values are unresolved without an explicit sourced replacement relation; newer documents alone do not supersede prior claims.']:[])]};
 }

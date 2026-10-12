@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {createHash} from 'node:crypto';
 export const caseSemanticsVersion='stadtstack-case-semantics-0.3.2';
 export const MetricEvidenceSchema=z.object({
  quote:z.string().min(1).max(1800).optional(),
@@ -25,7 +26,12 @@ export const MetricClaimSchema=z.object({
 export type MetricClaim=z.infer<typeof MetricClaimSchema>;
 export type MetricRecord={id:string;municipalityId:string;metricClaims:MetricClaim[]};
 export type MetricHistoryEntry={recordId:string;municipalityId:string;claim:MetricClaim;status:'superseded'|'current_supported'|'unresolved';supersededBy:string[]};
-export type RecordSupersession={status:'superseded'|'partially_superseded'|'not_established';currentValues:MetricHistoryEntry[];history:MetricHistoryEntry[]};
+/** Administrative uncertainty only; never includes the withheld record, value, quote or source. */
+export type MetricReadConstraint={groupId:string;status:'unresolved';reason:'withheld_read_context'};
+export type RecordSupersession={status:'superseded'|'partially_superseded'|'not_established';currentValues:MetricHistoryEntry[];history:MetricHistoryEntry[];withheldContext?:MetricReadConstraint[]};
+export function metricGroupId(municipalityId:string,claim:Pick<MetricClaim,'scope'|'instrument'|'metric'|'unit'>):string {
+ return `metric-group:${createHash('sha256').update(JSON.stringify([municipalityId,claim.scope,claim.instrument,claim.metric,claim.unit])).digest('hex')}`;
+}
 export type MetricSupersession={recordId:string;replacementRecordId:string;metric:string;unit:string;scope:string;instrument:string|null;previousValue:number;currentValue:number;evidence:MetricEvidence;reportedAt:string};
 function sourced(evidence:MetricEvidence):boolean {
  if(!evidence.sourceIds.length)return false;
@@ -34,7 +40,7 @@ function sourced(evidence:MetricEvidence):boolean {
  return evidence.locator!==null&&typeof evidence.locator==='object'&&Object.keys(evidence.locator).length>0;
 }
 /** Call only on admitted evidence. Dates constrain explicit replacement, never create it. */
-export function resolveMetricSupersession(records:readonly MetricRecord[],asOf:string,historyContext:readonly MetricHistoryEntry[]=[]):{records:Map<string,RecordSupersession>;relationships:MetricSupersession[];currentValues:MetricHistoryEntry[];history:MetricHistoryEntry[]} {
+export function resolveMetricSupersession(records:readonly MetricRecord[],asOf:string,historyContext:readonly MetricHistoryEntry[]=[],readConstraints:readonly MetricReadConstraint[]=[]):{records:Map<string,RecordSupersession>;relationships:MetricSupersession[];currentValues:MetricHistoryEntry[];history:MetricHistoryEntry[];withheldContext?:MetricReadConstraint[]} {
  // Full released context survives record filtering and pagination. Explicit input
  // records replace their cached projections, while omitted siblings remain evidence.
  const context=new Map<string,MetricRecord>();
@@ -46,8 +52,14 @@ export function resolveMetricSupersession(records:readonly MetricRecord[],asOf:s
  for(const record of records)context.set(JSON.stringify([record.municipalityId,record.id]),record);
  const complete=[...context.values()];
  const entries=complete.flatMap(record=>record.metricClaims.filter(claim=>Number.isFinite(claim.value)&&claim.scope&&claim.metric&&claim.unit&&sourced(claim.evidence)&&sourced(claim.scopeEvidence)&&(!claim.reportedAt||claim.reportedAt<=asOf.slice(0,10))).map(claim=>({municipalityId:record.municipalityId,recordId:record.id,claim,status:'unresolved' as MetricHistoryEntry['status'],supersededBy:[] as string[]})));
+ const constraints=new Map(readConstraints.map(constraint=>[constraint.groupId,constraint]));
+ const entryGroups=new Map(constraints.size?entries.map(entry=>[entry,metricGroupId(entry.municipalityId,entry.claim)] as const):[]);
+ const withheldEntries=new Set(entries.filter(entry=>constraints.has(entryGroups.get(entry)??'')));
+ const withheldContext=[...constraints.values()].filter(constraint=>entries.some(entry=>entryGroups.get(entry)===constraint.groupId)).sort((a,b)=>a.groupId.localeCompare(b.groupId));
  const relationships:MetricSupersession[]=[];
  for(const next of entries){
+  // Masking cannot create a replacement/current decision by deleting competing evidence.
+  if(withheldEntries.has(next))continue;
   const replacement=next.claim.replaces;
   if(!replacement||!sourced(replacement.evidence)||!next.claim.reportedAt)continue;
   const previous=entries.filter(old=>old.recordId!==next.recordId&&old.municipalityId===next.municipalityId&&old.claim.scope===next.claim.scope&&old.claim.instrument===next.claim.instrument&&old.claim.metric===next.claim.metric&&old.claim.unit===next.claim.unit&&old.claim.value===replacement.value&&old.claim.reportedAt&&old.claim.reportedAt<next.claim.reportedAt!&&(!replacement.reportedAt||replacement.reportedAt===old.claim.reportedAt));
@@ -65,9 +77,10 @@ export function resolveMetricSupersession(records:readonly MetricRecord[],asOf:s
  for(const record of complete){
   const own=history.filter(entry=>entry.recordId===record.id),superseded=own.filter(entry=>entry.status==='superseded');
   const related=history.filter(entry=>entry.municipalityId===record.municipalityId&&own.some(old=>old.claim.scope===entry.claim.scope&&old.claim.instrument===entry.claim.instrument&&old.claim.metric===entry.claim.metric&&old.claim.unit===entry.claim.unit));
-  result.set(record.id,{status:superseded.length?(superseded.length===own.length?'superseded':'partially_superseded'):'not_established',currentValues:related.filter(entry=>entry.status==='current_supported'),history:related});
+  const withheld=withheldContext.filter(constraint=>related.some(entry=>entryGroups.get(entry)===constraint.groupId));
+  result.set(record.id,{status:superseded.length?(superseded.length===own.length?'superseded':'partially_superseded'):'not_established',currentValues:related.filter(entry=>entry.status==='current_supported'),history:related,...(withheld.length?{withheldContext:withheld}:{})});
  }
- return {records:result,relationships,currentValues,history};
+ return {records:result,relationships,currentValues,history,...(withheldContext.length?{withheldContext}:{})};
 }
 /** Conservative released-quote rule: an explicit area reduction within one identified instrument. */
 export function areaClaimsFromQuote(input:{quote:string;sourceIds:string[];scope:string;scopeQuote:string;instrument:string;reportedAt:string|null}):MetricClaim[] {

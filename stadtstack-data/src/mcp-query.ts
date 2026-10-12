@@ -16,7 +16,7 @@ import {districtCoverageSchema} from './district-publication.ts';
 import {assignCaseIdentities,canonicalRecordStage,canonicalRecordStages,caseEvidence,caseMetrics,comparisonEligibility,groupCases,regionalDates,scopedCases,type CaseIdentity} from './query-cases.ts';
 import {CASE_LINKING_VERSION,caseIdentityFromText,type CaseIdentity as ScopedCaseIdentity} from './district-case-linking.ts';
 import {positiveStages,stageSemanticsVersion} from './planning-stages.ts';
-import {caseSemanticsVersion,type MetricClaim,type MetricHistoryEntry,type RecordSupersession} from './case-supersession.ts';
+import {caseSemanticsVersion,metricGroupId,type MetricReadConstraint,type MetricClaim,type MetricHistoryEntry,type RecordSupersession} from './case-supersession.ts';
 import {regionalStatement,regionalStatementFields,type StatementEvidence} from './regional-statement.ts';
 
 export interface RegistrySourceSummary {id:string;kind:string;url:string|null;checkState:'checked'|'not_found'|'not_checked'}
@@ -78,7 +78,7 @@ export class QueryIndex {
   private readonly sourceTypeSet=new Set<string>();
   private readonly stageSet=new Set<string>();
   private readonly originalRecords=new Map<string,unknown>();
-  constructor(releaseId:string,releasedAt:string,features:Signal[],regional:Regional,catalogue:Catalogue,knowledge?:KnowledgeQueryData,maskIdentity:string|null=null) {
+  constructor(releaseId:string,releasedAt:string,features:Signal[],regional:Regional,catalogue:Catalogue,knowledge?:KnowledgeQueryData,maskIdentity:string|null=null,metricReadConstraints:readonly MetricReadConstraint[]=[]) {
     this.originalFeatures=features;this.originalCatalogue=catalogue;this.maskIdentity=maskIdentity;
     const nativeCaseIdentities=new Map<string,ScopedCaseIdentity>();
     const nativeGroups=new Map<string,{binding:NativeRecordContext['binding'];members:QueryRecord[]}>();
@@ -168,11 +168,15 @@ export class QueryIndex {
       record.canonicalStage=canonicalRecordStage(record);
       for(const stage of canonicalRecordStages(record))this.stageSet.add(stage);
     }
-    const metrics=caseMetrics(this.records,this.releasedAt);
+    const metrics=caseMetrics(this.records,this.releasedAt,metricReadConstraints);
     for(const record of this.records)record.supersession=metrics.records.get(record.id);
     for(const group of groupCases(this.records)){
       const history=[...new Set(group.flatMap(record=>record.supersession?.history??[]))];
-      for(const record of group)record.caseMetricHistory=history;
+      const withheld=[...new Map(group.flatMap(record=>record.supersession?.withheldContext??[]).map(constraint=>[constraint.groupId,constraint])).values()].sort((a,b)=>a.groupId.localeCompare(b.groupId));
+      for(const record of group){
+        record.caseMetricHistory=history;
+        if(withheld.length&&record.supersession)record.supersession.withheldContext=withheld;
+      }
     }
   }
   withRevocations(mask:VerifiedRevocations):QueryVisibility {
@@ -200,7 +204,10 @@ export class QueryIndex {
       if(visible)visibleRecordIds.add(record.id);else for(const descriptor of descriptors)if(descriptor.mcpSourceId)withheldSourceIds.add(descriptor.mcpSourceId);
       return visible;
     }),municipalities:this.knowledge.municipalities.map(city=>mask.targets.length===0?city:({...city,amt:city.amt&&sourceMetadataUrls(city.amt).every(url=>!isSourceRevoked(mask,{municipalityId:city.id,url}))?city.amt:null,sources:city.sources.filter(source=>!revokedRegistrySources.has(JSON.stringify([city.id,source.id]))&&!isSourceRevoked(mask,{municipalityId:city.id,registrySourceId:source.id,...(source.url?{url:source.url}:{})})&&sourceMetadataUrls(source).every(url=>!isSourceRevoked(mask,{url})))})),coverage:mask.targets.length===0?this.knowledge.coverage:{scope:'Current served evidence only; immutable publication, crawl, lineage and quarantine counts are not served-view counts.',municipalities:[]}};
-    const index=new QueryIndex(this.releaseId,this.releasedAt,visibleFeatures,regional,this.originalCatalogue,knowledge,mask.artifactSha256);
+    const originalMetrics=caseMetrics(this.records,this.releasedAt);
+    const affectedGroups=new Set(originalMetrics.history.filter(entry=>!visibleRecordIds.has(entry.recordId)).map(entry=>metricGroupId(entry.municipalityId,entry.claim)));
+    const constraints=[...affectedGroups].sort().map<MetricReadConstraint>(groupId=>({groupId,status:'unresolved',reason:'withheld_read_context'}));
+    const index=new QueryIndex(this.releaseId,this.releasedAt,visibleFeatures,regional,this.originalCatalogue,knowledge,mask.artifactSha256,[...constraints,...(originalMetrics.withheldContext??[])]);
     return {releaseId:this.releaseId,maskIdentity:mask.artifactSha256,index,visibleRecordIds,withheldSourceIds,sourceDescriptorsByRecord};
   }
   private recordKey(record:QueryRecord){return `${record.cityId}:${record.id}`;}

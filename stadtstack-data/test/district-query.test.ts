@@ -9,6 +9,13 @@ import {textMatches} from '../src/topics.ts';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {outDir} from '../src/common.ts';
+import {createHash,generateKeyPairSync} from 'node:crypto';
+import {signRevocations,verifyRevocations,revocationKeyId,type RevocationTarget} from '../src/civic-revocations.ts';
+import {caseMetrics} from '../src/query-cases.ts';
+import {loadRelease} from '../src/mcp-release.ts';
+import {server} from '../src/mcp.ts';
+import {Client} from '@modelcontextprotocol/sdk/client/index.js';
+import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 
 // Synthetic test evidence only; these fixtures are never written to the released corpus.
 const municipalities=['strausberg','hoppegarten','ruedersdorf-bei-berlin','ratzeburg','moelln','schwarzenbek','ludwigslust','parchim','hagenow'].map((id,index)=>({id,name:id,ags:`0000000${index}`,districtId:['maerkisch-oderland','herzogtum-lauenburg','ludwigslust-parchim'][Math.floor(index/3)],sources:[]}));
@@ -247,7 +254,7 @@ test('shared BauGB ordering keeps early participation below a later draft and ge
  assert.equal(index([early,draft,formal]).compareTopic('waermeplanung',['strausberg']).cities[0].furthestPositiveMilestone?.stage,'formal_consultation');
 });
 
-test('shared metric supersession preserves old quotes and reports sourced replacement/current/history, not newest wins',()=>{
+test('shared metric supersession preserves old quotes and signed masking cannot resurrect current values',async()=>{
  const old=record(0,'draft',':area-old'),replacement=record(0,'draft',':area-new');
  for(const item of [old,replacement]){item.title=item.titleQuote='10. Änderung des Flächennutzungsplans Solarpark';item.caseKey='10';item.caseQuote='10. Änderung Flächennutzungsplan';}
  old.stageQuote='Vorentwurf der 10. Änderung';old.stageDate=old.documentDate='2024-01-15';old.summary=old.summaryQuote='Der Geltungsbereich beträgt etwa 68,6 ha.';
@@ -261,8 +268,83 @@ test('shared metric supersession preserves old quotes and reports sourced replac
  assert.equal(filtered.currentValues[0].claim.value,41.5);assert.equal(filtered.history.length,2);
  const page=query.exportRecords({limit:1});assert.equal(page.cases[0].currentValues[0].claim.value,41.5);assert.ok(page.cases[0].metricEvidenceSourceIds.every(id=>page.sources.some(source=>source.id===id)));
  const competing=record(0,'draft',':area-competing');competing.title=competing.titleQuote=old.title;competing.caseKey=old.caseKey;competing.caseQuote=old.caseQuote;competing.stageQuote='Entwurf der 10. Änderung';competing.stageDate=competing.documentDate='2025-09-01';competing.summary=competing.summaryQuote='Der Geltungsbereich beträgt etwa 55 ha.';
- const conflict=index([old,replacement,competing]).compareTopic('waermeplanung',['strausberg']).cities[0].cases[0];
+ const conflictIndex=index([old,replacement,competing]),conflict=conflictIndex.compareTopic('waermeplanung',['strausberg']).cities[0].cases[0];
  assert.equal(conflict.currentValues.length,0);assert.ok(conflict.history.some(entry=>entry.claim.value===55&&entry.status==='unresolved'));
+ // Injected synthetic query evidence only; the signed mask uses a real verified Ed25519 fixture.
+ const publication=await loadRelease(),original=new QueryIndex(publication.dataManifest.id,date,[],regional,catalogue,conflictIndex.knowledge);
+ const {privateKey,publicKey}=generateKeyPairSync('ed25519'),keyId=revocationKeyId(publicKey);
+ const maskFor=(targets:RevocationTarget[])=>{
+  const signed=signRevocations({schemaVersion:'stadtstack-revocations-v1',releaseId:original.releaseId,issuedAt:date,sequence:1,targets},keyId,privateKey);
+  return verifyRevocations(signed,{schemaVersion:'stadtstack-revocation-trust-v1',releaseId:original.releaseId,expectedArtifactSha256:createHash('sha256').update(signed).digest('hex'),keys:[{keyId,publicKeySpki:publicKey.export({format:'der',type:'spki'}).toString('base64')}]},original.releaseId);
+ };
+ const mask=maskFor([{type:'record',recordId:competing.id}]),visibility=original.withRevocations(mask),safe=visibility.index;
+ for(const item of safe.records){
+  assert.equal(item.supersession?.status,'not_established');
+  assert.deepEqual(item.supersession?.currentValues,[]);
+  assert.ok(item.supersession?.history.every(entry=>entry.status==='unresolved'&&entry.supersededBy.length===0&&entry.claim.value!==55));
+  assert.equal(item.supersession?.withheldContext?.length,1);
+  assert.deepEqual(Object.keys(item.supersession!.withheldContext![0]).sort(),['groupId','reason','status']);
+ }
+ for(const filters of [{},{query:'68,6'},{query:'41,5'}]){
+  const result=safe.compareTopic('waermeplanung',['strausberg'],filters).cities[0].cases[0];
+  assert.deepEqual(result.currentValues,[]);assert.deepEqual(result.supersession,[]);
+  assert.equal(result.withheldContext?.length,1);
+  assert.equal(result.history.length,2);
+  assert.ok(result.history.every(entry=>entry.recordId!==competing.id&&entry.claim.value!==55&&entry.status==='unresolved'));
+ }
+ let cursor:string|undefined;
+ do{
+  const page=safe.exportRecords({limit:1,cursor});
+  assert.deepEqual(page.items[0].supersession?.currentValues,[]);
+  assert.deepEqual(page.cases[0].currentValues,[]);assert.deepEqual(page.cases[0].supersession,[]);
+  assert.equal(page.cases[0].withheldContext?.length,1);
+  assert.deepEqual(page.items[0].originalRecord,[old,replacement].find(item=>item.id===page.items[0].id));
+  assert.ok(page.cases[0].metricEvidenceSourceIds.every(id=>page.sources.some(source=>source.id===id)));
+  assert.equal(JSON.stringify(page).includes(competing.id),false);
+  assert.equal(JSON.stringify(page).includes('55 ha'),false);
+  cursor=page.nextCursor??undefined;
+ }while(cursor);
+ const repeated=caseMetrics(safe.records.filter(item=>item.id===old.id),date);
+ assert.deepEqual(repeated.currentValues,[]);assert.deepEqual(repeated.relationships,[]);
+ assert.equal(repeated.withheldContext?.length,1);
+ const empty=original.withRevocations(maskFor([])).index;
+ assert.deepEqual(empty.records,original.records);
+ assert.deepEqual(empty.compareTopic('waermeplanung',['strausberg']),original.compareTopic('waermeplanung',['strausberg']));
+ assert.deepEqual(empty.exportRecords(),original.exportRecords());
+ assert.equal(JSON.stringify(empty.records),JSON.stringify(original.records));
+ assert.equal(JSON.stringify(empty.exportRecords()),JSON.stringify(original.exportRecords()));
+ const metadata=record(0,'draft',':aa-metadata');
+ metadata.title=metadata.titleQuote=old.title;metadata.caseKey=old.caseKey;metadata.caseQuote=old.caseQuote;metadata.summary=metadata.summaryQuote='Das Verfahren wird beraten.';
+ const metadataFixture=index([old,replacement,competing,metadata]),metadataOriginal=new QueryIndex(original.releaseId,date,[],regional,catalogue,metadataFixture.knowledge),metadataSafe=metadataOriginal.withRevocations(mask).index;
+ const metriclessPage=metadataSafe.exportRecords({limit:1});
+ assert.equal(metriclessPage.items[0].id,metadata.id);
+ assert.deepEqual(metriclessPage.items[0].supersession?.history,[]);
+ assert.equal(metriclessPage.items[0].supersession?.withheldContext?.length,1);
+ assert.deepEqual(metriclessPage.cases[0].currentValues,[]);
+ assert.equal(metriclessPage.cases[0].withheldContext?.length,1);
+ assert.deepEqual(caseMetrics(metadataSafe.records.filter(item=>item.id===metadata.id),date).currentValues,[]);
+ const otherOld=record(1,'draft',':area-old'),otherReplacement=record(1,'draft',':area-new');
+ for(const item of [otherOld,otherReplacement]){item.title=item.titleQuote=old.title;item.caseKey=old.caseKey;item.caseQuote=old.caseQuote;}
+ otherOld.documentDate=old.documentDate;otherOld.summary=otherOld.summaryQuote=old.summary;
+ otherReplacement.documentDate=replacement.documentDate;otherReplacement.summary=otherReplacement.summaryQuote=replacement.summary;
+ const combinedFixture=index([old,replacement,competing,otherOld,otherReplacement]),combinedOriginal=new QueryIndex(original.releaseId,date,[],regional,catalogue,combinedFixture.knowledge),combinedSafe=combinedOriginal.withRevocations(mask).index;
+ assert.deepEqual(combinedSafe.compareTopic('waermeplanung',['hoppegarten']).cities[0].cases,combinedOriginal.compareTopic('waermeplanung',['hoppegarten']).cities[0].cases);
+ assert.equal(combinedSafe.compareTopic('waermeplanung',['hoppegarten']).cities[0].cases[0].currentValues[0].claim.value,41.5);
+ const mcp=server({release:{...publication,index:safe,visibility,revocations:mask}}),client=new Client({name:'signed-metric-read-view-fixture',version:'1'});
+ const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();
+ await mcp.connect(serverTransport);await client.connect(clientTransport);
+ try{
+  for(const id of [old.id,replacement.id]){
+   const response=await client.callTool({name:'get_signal',arguments:{id}});
+   assert.equal(response.isError,undefined);
+   const output=response.structuredContent;
+   assert.ok(output&&typeof output==='object'&&'supersession' in output);
+   assert.deepEqual(output.supersession,safe.records.find(item=>item.id===id)!.supersession);
+   assert.equal(JSON.stringify(response.structuredContent).includes(competing.id),false);
+   assert.equal(JSON.stringify(response.structuredContent).includes('55 ha'),false);
+  }
+  assert.equal((await client.callTool({name:'get_signal',arguments:{id:competing.id}})).isError,true);
+ }finally{await client.close();await mcp.close();}
 });
 
 test('metricless paginated case members preserve complete sibling metric state and attribution',()=>{
