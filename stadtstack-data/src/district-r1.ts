@@ -22,11 +22,11 @@ import {StructuredJobResultSchema,structuredJobHandlers} from './district-struct
 import {persistR1Representation,enqueueStructuredSnapshot,exportStepReceipt} from './district-r1-state.ts';
 import {PolicyReceiptSchema,createPolicyReceipt,recheckPolicyReceipt} from './district-policy-receipt.ts';
 import {StepReceiptSchema} from './district-step-receipt.ts';
-import {PoliteFetcher} from './polite-fetch.ts';
-import type {FetchedDocument} from './polite-fetch.ts';
+import {PoliteFetcher,PoliteFetchError} from './polite-fetch.ts';
+import type {FetchedDocument,FetchFailure,FixturePolicyInspection} from './polite-fetch.ts';
 import {nativePublicRequestHeaders} from './district-native-request.ts';
 import {pipelineNotificationConfig} from './district-notifications.ts';
-import {initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceReadable,assertManagedRawSourceBinding,CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
+import {initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceReadable,assertManagedRawSourceBinding,assertCivicPolicyAuthority,CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
 import type {ManagedSourceContent,ManagedSourceBinding,CivicPolicyOptions} from './civic-opt-out.ts';
 import {HttpObservationSchema,HttpObservationProofSchema,HttpSourceBindingSchema,authenticatedHttpBinding} from './district-http-observation.ts';
 import type {HttpObservationProof} from './district-http-observation.ts';
@@ -34,7 +34,7 @@ import {ownerRobotsOverrideFor} from './source-policy.ts';
 import {structuredRunSchema,structuredCoverageReceiptSchema,structuredCoverageStateForNoOutput,verifyStructuredRunReceipts} from './district-structured-run.ts';
 import type {StructuredJobResult} from './district-structured-jobs.ts';
 import type {StructuredCoverageReceipt} from './district-structured-run.ts';
-import type {StepReceipt} from './district-step-receipt.ts';
+import type {StepReceipt,ReasonCode} from './district-step-receipt.ts';
 import type {StructuredSupportingSource} from './district-structured-record.ts';
 import {StructuredKnowledgeRecordSchema} from './district-structured-record.ts';
 import type {StructuredWorkerRequest} from './district-structured-parser-worker.ts';
@@ -77,7 +77,7 @@ export const RepresentationDescriptorSchema=z.object({version:z.literal('distric
  if(descriptor.receiptSha256!==descriptor.snapshot.policyReceiptSha256||descriptor.sourceArtifact.sha256!==descriptor.snapshot.sourceSha256||descriptor.sourceArtifact.mimeType!==descriptor.snapshot.mimeType)ctx.addIssue({code:'custom',message:'Representation policy and source artifact binding mismatch'});
 });
 export const HostGroupsSchema=z.object({schemaVersion:z.literal('district-host-groups-v1'),serviceGroups:z.tuple([z.object({id:z.literal('r1-public-acquisition'),groupingBasis:z.literal('conservative_capacity_pool_not_publisher_equivalence'),scope:z.literal('all_registered_public_sources_and_observed_redirect_hosts'),minStartIntervalMs:z.literal(2500),maxInFlight:z.literal(1)}).strict()])}).strict();
-async function acquisitionContract(){
+export async function acquisitionContract(){
  const hostGroupsBytes=await readFile(join(REPO,'sources/district-host-groups.json'));
  HostGroupsSchema.parse(JSON.parse(hostGroupsBytes.toString('utf8')));
  return semanticHash({version:ACQUISITION_VERSION,hostGroupsSha256:digest(hostGroupsBytes),files:await Promise.all(['district-r1.ts','polite-fetch.ts','district-policy-receipt.ts','source-policy.ts','civic-opt-out.ts','district-native-request.ts'].map(async file=>({file,sha256:digest(await readFile(join(REPO,'src',file)))})))});
@@ -123,9 +123,9 @@ export async function readFetchedBytes(root:string,file:string,sha256:string,max
 }
 
 /** Read only the actual transport-returned immutable observation in the fixed fetch root. */
-async function readHttpObservation(response:FetchedDocument){
- const observationId=basename(response.observationPath),path=join(R1_FETCH_ROOT,'observations',observationId);
- if(resolve(response.observationPath)!==path||await realpath(R1_FETCH_ROOT)!==R1_FETCH_ROOT||await realpath(dirname(path))!==dirname(path))throw Error('HTTP observation escaped fixed fetch root');
+async function readHttpObservation(response:FetchedDocument,root=R1_FETCH_ROOT,policy:CivicPolicyOptions={}){
+ const observationId=basename(response.observationPath),path=join(root,'observations',observationId);
+ if(resolve(response.observationPath)!==path||await realpath(root)!==root||await realpath(dirname(path))!==dirname(path))throw Error('HTTP observation escaped fixed fetch root');
  const file=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW);
  try{
   const stat=await file.stat();if(!stat.isFile()||stat.size<1||stat.size>1024*1024)throw Error('HTTP observation type or byte bound rejected');
@@ -135,7 +135,7 @@ async function readHttpObservation(response:FetchedDocument){
   const proof=HttpObservationProofSchema.parse({observationId,receiptSha256:digest(bytes),bytes:bytes.toString('utf8')}),observation=HttpObservationSchema.parse(JSON.parse(proof.bytes));
   const binding=authenticatedHttpBinding(proof,{url:response.url,sha256:response.sha256,mimeType:response.mimeType,retrievedAt:response.retrievedAt,fetchedAt:response.checkedAt});
   if(binding.kind!=='http_observation'||observation.status!==response.status)throw Error('HTTP observation differs from actual fetched response');
-  await assertManagedRawSourceBinding(join(R1_FETCH_ROOT,'sha256',response.sha256),binding);
+  await assertManagedRawSourceBinding(join(root,'sha256',response.sha256),binding,policy);
   return proof;
  }finally{await file.close();}
 }
@@ -223,15 +223,33 @@ export async function validateAcquisitionSelector(registry:DistrictRegistry,stor
  }else if(request.url!==selector.root)throw Error('Non-root acquisition requires committed discovery output');
  return selector;
 }
-export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegistry):JobHandler{return async context=>{
+// Do not project error messages, URLs, response bodies or policy evidence into receipts.
+// network_error also wraps unexpected cache/inspection errors; keep it generic.
+const acquisitionFailureReasons:Readonly<Record<FetchFailure,ReasonCode>>={
+ unsafe_url:'source_policy_refused',robots_blocked:'source_policy_refused',robots_unavailable:'source_policy_refused',
+ tdm_reserved:'source_policy_refused',tdm_unavailable:'source_policy_refused',access_barrier:'source_access_barrier',
+ dns_error:'source_unavailable',timeout:'source_unavailable',network_error:'execution_exception',http_error:'source_http_error',
+ too_large:'source_limit_exceeded',redirect_limit:'source_redirect_refused',invalid_redirect:'source_redirect_refused',
+ cross_host_redirect:'source_redirect_refused',cache_missing:'cas_unavailable',unsupported_encoding:'source_unavailable',
+ host_busy:'host_capacity',host_state_unsafe:'source_policy_refused',host_cooldown:'host_delay',
+ host_opted_out:'policy_excluded',document_excluded:'policy_excluded',host_admission_deferred:'host_capacity',
+};
+export function acquisitionFailureReason(error:unknown):ReasonCode|null {
+ return error instanceof PoliteFetchError&&Object.hasOwn(acquisitionFailureReasons,error.failure)?acquisitionFailureReasons[error.failure]:null;
+}
+export interface AcquisitionFixture {fetchRoot:string;policy:CivicPolicyOptions;inspection?:FixturePolicyInspection}
+export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegistry,fixture?:AcquisitionFixture):JobHandler{return async context=>{
  const selector=await validateAcquisitionSelector(registry,store,context.cas,context.job.spec.selector),contract=await acquisitionContract();
  if(context.job.spec.semanticContractSha256!==contract||semanticHash(context.job.spec.sourceScope)!==semanticHash(selector.scope))throw Error('Acquisition job contract mismatch');
- const {city,source}=registeredScope(registry,selector.scope,selector.root);await privateRoot(R1_FETCH_ROOT);
- await initializeManagedAcquisitionLane(R1_FETCH_ROOT,{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'fetch'});
+ // A custom root/inspection seam is fixture-only, never a production authority override.
+ if(fixture&&(await assertCivicPolicyAuthority(fixture.policy)).mode!=='isolated-fixture')throw Error('Acquisition fixture requires isolated authority');
+ const fetchRoot=fixture?.fetchRoot??R1_FETCH_ROOT,policy=fixture?.policy??{};
+ const {city,source}=registeredScope(registry,selector.scope,selector.root);await privateRoot(fetchRoot);
+ await initializeManagedAcquisitionLane(fetchRoot,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'fetch'});
  let requests=0;const redirectChain=[selector.request.url];
  const group=HostGroupsSchema.parse(JSON.parse(await readFile(join(REPO,'sources/district-host-groups.json'),'utf8'))).serviceGroups[0],laneKey=`service:${group.id}`;
- const fetcher=new PoliteFetcher({cacheDir:R1_FETCH_ROOT,minDelayMs:group.minStartIntervalMs,maxBytes:selector.maxBytes,ownerPolicyLane:{decisionId:CIVIC_ACQUISITION_DECISION_ID},beforeRequest:async url=>{
-  context.signal.throwIfAborted();if(++requests>selector.maxRequests)throw new DistrictExecutionHold('host_capacity');
+ const fetcher=new PoliteFetcher({cacheDir:fetchRoot,minDelayMs:group.minStartIntervalMs,maxBytes:selector.maxBytes,ownerPolicyLane:{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID},fixtureInspection:fixture?.inspection,beforeRequest:async url=>{
+  context.signal.throwIfAborted();if(++requests>selector.maxRequests)throw new DistrictExecutionHold('source_limit_exceeded');
   // Capacity pooling never rewrites the actual URL/host used by SSRF, policy or redirect evidence.
   if(!['http:','https:'].includes(new URL(url).protocol))throw Error('Non-public acquisition transport');
   const lane=await store.pool.query<{normalized_host:string;shared_service_group:string;max_in_flight:number;min_start_interval_ms:number}>('INSERT INTO district_pipeline.host_lanes(lane_key,normalized_host,shared_service_group,max_in_flight,min_start_interval_ms) VALUES($1,$2,$3,$4,$5) ON CONFLICT(lane_key) DO UPDATE SET lane_key=EXCLUDED.lane_key RETURNING normalized_host,shared_service_group,max_in_flight,min_start_interval_ms',[laneKey,'*',group.id,group.maxInFlight,group.minStartIntervalMs]);
@@ -244,12 +262,14 @@ export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegis
   if(waitMs)await waitBeforeDispatch(waitMs,undefined,{signal:context.signal}).catch(error=>{context.signal.throwIfAborted();throw error;});
   await context.acquireHostLane(laneKey);context.signal.throwIfAborted();
  },onRedirect:event=>{if(event.requestUrl===selector.request.url)redirectChain.push(event.to);}});
- const response=await fetcher.fetch(selector.request.url,{method:selector.request.method,body:selector.request.body??undefined,publicOperation:selector.request.publicOperation??undefined,ownerRobotsOverride:ownerRobotsOverrideFor(selector.root)??undefined,registeredSourceUrl:selector.root,municipalityName:city.name,machinePolicyUrls:source.knownMachinePolicyUrls});
- context.signal.throwIfAborted();const bytes=await readFetchedBytes(R1_FETCH_ROOT,response.localPath,response.sha256,selector.maxBytes),httpObservation=await readHttpObservation(response);
- const checkedAt=new Date().toISOString(),proof=await createPolicyReceipt({source:{url:response.url,sha256:response.sha256,mimeType:response.mimeType},sourcePolicy:response.policy,scope:selector.scope,permission:selector.permission,checkedAt,expiresAt:new Date(Date.parse(checkedAt)+60*60*1000).toISOString()});
- const representation=await persistR1Representation(store,context.cas,{bytes,receipt:proof.receipt,request:selector.request,retrievedAt:response.retrievedAt,fetchedAt:response.checkedAt,sourceVersion:selector.sourceVersion,redirectChain,httpObservation:{observationId:httpObservation.observationId,receiptSha256:httpObservation.receiptSha256,bytes:Buffer.from(httpObservation.bytes)}});
+ let response:FetchedDocument;
+ try{response=await fetcher.fetch(selector.request.url,{method:selector.request.method,body:selector.request.body??undefined,publicOperation:selector.request.publicOperation??undefined,ownerRobotsOverride:ownerRobotsOverrideFor(selector.root)??undefined,registeredSourceUrl:selector.root,municipalityName:city.name,machinePolicyUrls:source.knownMachinePolicyUrls});}
+ catch(error){context.signal.throwIfAborted();const reasonCode=acquisitionFailureReason(error);if(reasonCode===null||reasonCode==='execution_exception')throw error;return {outcome:'held_execution',reasonCode,versions:{acquisition:contract}};}
+ context.signal.throwIfAborted();const bytes=await readFetchedBytes(fetchRoot,response.localPath,response.sha256,selector.maxBytes),httpObservation=await readHttpObservation(response,fetchRoot,policy);
+ const checkedAt=new Date().toISOString(),proof=await createPolicyReceipt({source:{url:response.url,sha256:response.sha256,mimeType:response.mimeType},sourcePolicy:response.policy,scope:selector.scope,permission:selector.permission,checkedAt,expiresAt:new Date(Date.parse(checkedAt)+60*60*1000).toISOString()},policy);
+ const representation=await persistR1Representation(store,context.cas,{bytes,receipt:proof.receipt,request:selector.request,retrievedAt:response.retrievedAt,fetchedAt:response.checkedAt,sourceVersion:selector.sourceVersion,redirectChain,httpObservation:{observationId:httpObservation.observationId,receiptSha256:httpObservation.receiptSha256,bytes:Buffer.from(httpObservation.bytes)}},policy);
  const descriptor=RepresentationDescriptorSchema.parse({version:'district-r1-representation-v1',scope:selector.scope,root:selector.root,snapshotId:representation.snapshotId,policyDecisionId:representation.policyDecisionId,receiptSha256:representation.receiptSha256,sourceArtifact:representation.sourceArtifact,snapshot:representation.snapshot,httpObservation,fetchedAt:response.checkedAt,admittedAt:proof.receipt.checkedAt,redirectChain});
- const artifact=await persistMetadata(store,context.cas,{kind:'acquisition_descriptor',payload:descriptor,sources:[{sha256:response.sha256,url:response.url,policyReceiptSha256:proof.receiptSha256,httpObservation}]});
+ const artifact=await persistMetadata(store,context.cas,{kind:'acquisition_descriptor',payload:descriptor,sources:[{sha256:response.sha256,url:response.url,policyReceiptSha256:proof.receiptSha256,httpObservation}]},policy);
  return {outcome:'succeeded',reasonCode:'completed',outputs:[representation.sourceArtifact,representation.receiptArtifact,representation.observationArtifact,artifact],versions:{acquisition:contract},counts:{bytes:bytes.length}};
 };}
 async function loadDescriptor(store:DistrictJobStore,cas:DistrictCas,hash:string){

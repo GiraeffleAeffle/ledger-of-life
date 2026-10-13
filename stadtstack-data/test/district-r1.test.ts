@@ -1,16 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,symlink,rm,readFile,realpath} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,symlink,rm,readFile,realpath,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {AcquisitionSelectorSchema,HostGroupsSchema,registeredScope,validateAcquisitionSelector,readFetchedBytes,structuredHoldSummary,parseR1RegistryArguments} from '../src/district-r1.ts';
-import {digest,observation,CoverageSchema} from '../src/district-adapter-contract.ts';
+import {AcquisitionSelectorSchema,HostGroupsSchema,registeredScope,validateAcquisitionSelector,readFetchedBytes,structuredHoldSummary,parseR1RegistryArguments,acquisitionHandler,acquisitionContract,acquisitionFailureReason} from '../src/district-r1.ts';
+import {digest,observation,CoverageSchema,canonicalJson,semanticHash} from '../src/district-adapter-contract.ts';
 import {districtRegistrySchema} from '../src/district-registry.ts';
 import {DistrictCas} from '../src/district-cas.ts';
-import {DistrictJobStore} from '../src/district-jobs.ts';
+import {DistrictJobStore,migrateDistrictJobs,runDistrictJobs,type OwnerNotification} from '../src/district-jobs.ts';
 import {Pool} from 'pg';
 import {ResidualInputSchema} from '../src/district-residual-jobs.ts';
 import {HttpObservationProofSchema} from '../src/district-http-observation.ts';
+import {randomUUID} from 'node:crypto';
+import {PoliteFetcher,PoliteFetchError,type FetchFailure} from '../src/polite-fetch.ts';
+import {ReasonCodeSchema,StepReceiptSchema} from '../src/district-step-receipt.ts';
+import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
+import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
+import {sendPipelineNotification,pipelineNotificationConfig} from '../src/district-notifications.ts';
 
 const scope={publisherId:'fixture-publisher',sourceId:'fixture-source',municipalityId:'ratzeburg',ags:'01053100',tenant:null,observationWindow:'2026-10-11'};
 async function registryFixture(){
@@ -113,4 +119,72 @@ test('native commands require an explicit registry descriptor pin without a bare
  assert.throws(()=>parseR1RegistryArguments([...flags,'--registry-config','another.json']),/Duplicate/);
  assert.throws(()=>parseR1RegistryArguments(['--registry-config','--registry-config-sha256',hash]),/requires a value/);
  assert.throws(()=>parseR1RegistryArguments(['--registry-config','descriptor.json','--registry-config-sha256','not-a-hash']));
+});
+
+test('acquisition reasons are canonical content-free holds, not exception-text projections',()=>{
+ const expected:Record<FetchFailure,string>={
+  unsafe_url:'source_policy_refused',robots_blocked:'source_policy_refused',robots_unavailable:'source_policy_refused',
+  tdm_reserved:'source_policy_refused',tdm_unavailable:'source_policy_refused',access_barrier:'source_access_barrier',
+  dns_error:'source_unavailable',timeout:'source_unavailable',network_error:'execution_exception',http_error:'source_http_error',
+  too_large:'source_limit_exceeded',redirect_limit:'source_redirect_refused',invalid_redirect:'source_redirect_refused',
+  cross_host_redirect:'source_redirect_refused',cache_missing:'cas_unavailable',unsupported_encoding:'source_unavailable',
+  host_busy:'host_capacity',host_state_unsafe:'source_policy_refused',host_cooldown:'host_delay',
+  host_opted_out:'policy_excluded',document_excluded:'policy_excluded',host_admission_deferred:'host_capacity',
+ };
+ for(const [failure,reason] of Object.entries(expected)){
+  assert.equal(acquisitionFailureReason(new PoliteFetchError(failure as FetchFailure,'PRIVATE_REASON_SENTINEL',401)),reason);
+  assert.equal(ReasonCodeSchema.parse(reason),reason);
+ }
+ assert.equal(acquisitionFailureReason(Error('PRIVATE_REASON_SENTINEL')),null);
+ assert.equal(acquisitionFailureReason({failure:'access_barrier'}),null);
+ assert.equal(acquisitionFailureReason(new PoliteFetchError('unclassified' as FetchFailure,'PRIVATE_REASON_SENTINEL')),null);
+});
+
+const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
+test('real acquisition handler records a 401 held receipt and owner notification without admitting artifacts',{skip:!connectionString,timeout:120000},async t=>{
+ const url=new URL(connectionString!);
+ if(!['postgres:','postgresql:'].includes(url.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(url.hostname))throw Error('Acquisition fixture refuses non-local Postgres');
+ const host=url.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Acquisition fixture refuses non-local host override');
+ const admin=new Pool({connectionString,max:2,connectionTimeoutMillis:5000,statement_timeout:10000}),database='district_acquisition_test_'+randomUUID().replaceAll('-','');
+ const resources:{created:boolean;pool?:Pool}={created:false};
+ t.after(async()=>{try{await resources.pool?.end();if(resources.created)await admin.query('DROP DATABASE "'+database+'" WITH (FORCE)');}finally{await admin.end();}});
+ await admin.query('CREATE DATABASE "'+database+'"');resources.created=true;
+ const isolated=new URL(url);isolated.pathname='/'+database;
+ const pool=new Pool({connectionString:isolated.href,max:8,connectionTimeoutMillis:5000,statement_timeout:10000});resources.pool=pool;
+ const fixture=await createCivicPolicyTestContext(t),fetchRoot=join(fixture.root,'fetch'),cas=new DistrictCas(join(fixture.root,'cas')),store=new DistrictJobStore(pool);
+ await migrateDistrictJobs(pool);
+ const registry=await registryFixture(),seen:string[]=[],notifications:OwnerNotification[]=[],sentMessages:string[]=[];
+ interface WireSeam {wire(url:URL):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
+ // Same wire seam as polite-fetch.test.ts: actual fetch/policy classification, no DNS or HTTP.
+ t.mock.method(PoliteFetcher.prototype as unknown as WireSeam,'wire',async (target:URL)=>{
+  seen.push(target.pathname);
+  if(target.pathname==='/robots.txt'||target.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  assert.equal(target.href,selector.request.url);
+  return {status:401,headers:{'content-type':'text/plain'},body:Buffer.from('PRIVATE_401_BODY_SENTINEL')};
+ });
+ const jobKey=await store.enqueue({step:'acquire_representation',lane:'acquisition',semanticContractSha256:await acquisitionContract(),inputArtifactHashes:[],sourceScope:scope,selector,policyProofSha256:null});
+ const notificationConfig={...pipelineNotificationConfig,notifyOwner:async (notification:OwnerNotification)=>{
+  notifications.push(notification);
+  return sendPipelineNotification(notification,{readToken:async()=>'synthetic_fixture_publisher_token',send:async(_target,init)=>{
+   const message=String(init?.body);sentMessages.push(message);
+   return new Response(JSON.stringify({id:'fixture-message-'+notification.phase,event:'message',topic:'pipeline',message,time:Math.floor(Date.now()/1000)}),{status:200});
+  }});
+ }};
+ const authorizationId=await store.authorize({approvalSha256:digest('synthetic acquisition approval'),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development',mode:'bounded_unattended',notificationApprovalSha256:notificationConfig.notificationApprovalSha256,notificationDestinationSha256:notificationConfig.destinationSha256,notificationProvider:notificationConfig.provider});
+ const result=await runDistrictJobs({store,cas,handlers:{acquire_representation:acquisitionHandler(store,registry,{fetchRoot,policy:fixture.policy,inspection:fixturePolicyInspection})},authorizationId,maxJobs:1,maxElapsedMs:60000,mode:'bounded_unattended',notifyOwner:notificationConfig.notifyOwner,notificationApprovalSha256:notificationConfig.notificationApprovalSha256,notificationDestinationSha256:notificationConfig.destinationSha256,notificationProvider:notificationConfig.provider});
+ assert.equal(result.state,'held');assert.equal(result.reasonCode,'source_access_barrier');assert.equal(result.jobsStarted,1);
+ assert.deepEqual(seen,['/robots.txt','/.well-known/tdmrep.json','/root']);
+ const rows=await pool.query<{receipt:unknown;receipt_sha256:string}>('SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId]);assert.equal(rows.rowCount,1);
+ const receipt=StepReceiptSchema.parse(rows.rows[0].receipt);
+ assert.equal(receipt.outcome,'held_execution');assert.equal(receipt.reasonCode,'source_access_barrier');assert.deepEqual(receipt.outputHashes,[]);assert.equal(receipt.counts.bytes,null);assert.equal(rows.rows[0].receipt_sha256,semanticHash(receipt));assert.deepEqual(result.receiptIds,[receipt.id]);
+ const job=await pool.query<{state:string;reason_code:string}>('SELECT state,reason_code FROM district_pipeline.jobs WHERE job_key=$1',[jobKey]);assert.deepEqual(job.rows,[{state:'held_execution',reason_code:'source_access_barrier'}]);
+ for(const table of ['representations','source_snapshots','policy_decisions','artifacts','job_output_artifacts','r1_metadata_snapshots'])assert.equal((await pool.query('SELECT 1 FROM district_pipeline.'+table)).rowCount,0,table);
+ assert.deepEqual((await readdir(fetchRoot)).sort(),['.civic-acquisition-lane.json','observations']);
+ const observations=await Promise.all((await readdir(join(fetchRoot,'observations'))).map(async name=>JSON.parse(await readFile(join(fetchRoot,'observations',name),'utf8'))));
+ const failed=observations.find(observation=>observation.url===selector.request.url);
+ assert.equal(failed?.status,401);assert.equal(failed?.failure,'access_barrier');assert.equal(failed?.policy.access,'authentication');
+ assert.deepEqual(notifications.map(notification=>[notification.phase,notification.state,notification.reasonCode]),[['startup','running',null],['disposition','held','source_access_barrier']]);
+ assert.equal(JSON.parse(sentMessages[1]).reasonCode,'source_access_barrier');
+ const outbox=await pool.query<{state:string}>('SELECT state FROM district_pipeline.owner_notifications WHERE run_id=$1 ORDER BY phase',[result.runId]);assert.deepEqual(outbox.rows,[{state:'delivered'},{state:'delivered'}]);
+ assert.doesNotMatch(canonicalJson({receipt,notifications,sentMessages,observations}),/PRIVATE_401_BODY_SENTINEL|synthetic_fixture_publisher_token/);
 });
