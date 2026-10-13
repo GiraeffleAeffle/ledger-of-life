@@ -621,17 +621,36 @@ function managedRootPath(input:string,state:string):string{
  if(path===parse(path).root||path===homedir()||path===state||contained(path,state)||contained(state,path)||path.split(sep).some(part=>part==='.secrets'||part==='.ssh'||part==='.git'))throw new CivicPolicyStateError();
  return path;
 }
-async function enrollRoot(state:string,path:string,kind:Root['kind']):Promise<Root>{
- const inventory=await loadInventory(state),stat=await directory(path,true),id=digest(path);let root=inventory.roots.find(root=>root.id===id);
+async function reconcileManagedRoot(inventory:Inventory,path:string,kind:Root['kind']):Promise<Root>{
+ const stat=await directory(path,true),id=digest(path);let root=inventory.roots.find(root=>root.id===id);
  if(root){if(root.kind!==kind||!sameIdentity(root.identity,stat))throw new CivicPolicyStateError();}
  else{if(inventory.roots.some(root=>contained(root.path,path)||contained(path,root.path)))throw new CivicPolicyStateError();root={id,path,kind,identity:{dev:stat.dev,ino:stat.ino},complete:false};inventory.roots.push(root);}
- root.complete=await reconcile(root,inventory);await saveInventory(state,inventory);return root;
+ root.complete=await reconcile(root,inventory);return root;
+}
+async function enrollRoot(state:string,path:string,kind:Root['kind']):Promise<Root>{
+ const inventory=await loadInventory(state),root=await reconcileManagedRoot(inventory,path,kind);await saveInventory(state,inventory);return root;
 }
 async function readAcquisitionLaneMarker(path:string,kind:Root['kind'],authority?:CivicPolicyAuthorityReceipt):Promise<void>{
  try{
   const stat=await directory(path),marker=laneMarkerSchema.parse(JSON.parse((await fileBytes(join(path,LANE_MARKER),8192,true)).bytes.toString('utf8')));
   if(marker.kind!==kind||marker.rootId!==digest(path)||!sameIdentity(marker.identity,stat)||authority&&(marker.authorityId!==authority.authorityId||marker.authoritySha256!==authority.authoritySha256))throw new CivicPolicyStateError('ACQUISITION_LANE_MISMATCH');
  }catch(error){if(missing(error))throw error;throw new CivicPolicyStateError('ACQUISITION_LANE_UNSAFE');}
+}
+async function reconcileAcquisitionLane(inventory:Inventory,path:string,kind:Root['kind'],authority:CivicPolicyAuthorityReceipt):Promise<Root>{
+ let needsMarker=false;
+ try{await directory(path);}catch(error){if(missing(error))needsMarker=true;else throw error;}
+ if(!needsMarker){
+  try{await readAcquisitionLaneMarker(path,kind,authority);}catch(error){
+   if(!missing(error))throw error;
+   for await(const _entry of await opendir(path))throw new CivicPolicyStateError('ACQUISITION_LANE_REQUIRED');
+   needsMarker=true;
+  }
+ }
+ if(needsMarker){
+  const stat=await directory(path,true);
+  await atomicJson(join(path,LANE_MARKER),{schemaVersion:1,decisionId:CIVIC_ACQUISITION_DECISION_ID,rootId:digest(path),identity:{dev:stat.dev,ino:stat.ino},kind,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},true,false);
+ }
+ return reconcileManagedRoot(inventory,path,kind);
 }
 const laneInitializations=new Map<string,Promise<void>>();
 /** Explicit acquisition opt-in, never inferred from a dated directory name.
@@ -642,20 +661,11 @@ const laneInitializations=new Map<string,Promise<void>>();
 export async function initializeManagedAcquisitionLane(input:string,options:ManagedAcquisitionLaneOptions):Promise<void>{
  if(options.decisionId!==CIVIC_ACQUISITION_DECISION_ID)throw new CivicPolicyStateError('ACQUISITION_DECISION_REQUIRED');
  const authority=await assertCivicPolicyAuthority(options),state=statePath(options),path=managedRootPath(input,state),kind=kindSchema.parse(options.kind??'fetch');
- const needsMarker=async():Promise<boolean>=>{
-  try{await directory(path);}catch(error){if(missing(error))return true;throw error;}
-  try{await readAcquisitionLaneMarker(path,kind,authority);return false;}catch(error){if(!missing(error))throw error;}
-  for await(const _entry of await opendir(path))throw new CivicPolicyStateError('ACQUISITION_LANE_REQUIRED');
-  return true;
- };
  const prior=laneInitializations.get(path)??Promise.resolve();let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});laneInitializations.set(path,gate);await prior;
  try{
   await locked(options,async()=>{
-   if(await needsMarker()){
-    const stat=await directory(path,true);
-    await atomicJson(join(path,LANE_MARKER),{schemaVersion:1,decisionId:CIVIC_ACQUISITION_DECISION_ID,rootId:digest(path),identity:{dev:stat.dev,ino:stat.ino},kind,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},true,false);
-   }
-   const root=await enrollRoot(state,path,kind);if(!root.complete)throw new CivicPolicyStateError('MANAGED_INVENTORY_INCOMPLETE');
+   const inventory=await loadInventory(state),root=await reconcileAcquisitionLane(inventory,path,kind,authority);
+   await saveInventory(state,inventory);if(!root.complete)throw new CivicPolicyStateError('MANAGED_INVENTORY_INCOMPLETE');
   });
  }finally{release();if(laneInitializations.get(path)===gate)laneInitializations.delete(path);}
 }
@@ -860,12 +870,15 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
   return scratchSourceSchema.parse({...base,...sourceProvenance(binding)});
  });
  await assertSourceHostsNotOptedOut(bindings.map(binding=>binding.url),policy);
- await initializeManagedAcquisitionLane(path,{...policy,kind:options.kind??'artifacts'});
+ if(options.decisionId!==CIVIC_ACQUISITION_DECISION_ID)throw new CivicPolicyStateError('ACQUISITION_DECISION_REQUIRED');
+ const lanePath=managedRootPath(path,state),kind=kindSchema.parse(options.kind??'artifacts');
  const id=randomUUID(),controller=new AbortController(),signal=options.signal?AbortSignal.any([controller.signal,options.signal]):controller.signal;
  let lease!:ScratchLease,root!:Root;
  await locked(policy,async()=>{
-  const inventory=await loadInventory(state);root=inventory.roots.find(item=>item.path===path)!;
-  if(!root?.complete)throw new CivicPolicyStateError('MANAGED_INVENTORY_INCOMPLETE');
+  const inventory=await loadInventory(state);root=await reconcileAcquisitionLane(inventory,lanePath,kind,authority);
+  // Reconciliation and the planned lease share the pre-mkdir commit. Even a
+  // refused incomplete lane must retain its reconciled completeness durably.
+  if(!root.complete){await saveInventory(state,inventory);throw new CivicPolicyStateError('MANAGED_INVENTORY_INCOMPLETE');}
   lease={id,rootId:root.id,directory:'scratch/'+id,purpose:options.purpose,createdAt:new Date().toISOString(),ownerPid:process.pid,identity:null,state:'planned',sources,groups:[],resources:[],tombstones:[]};
   inventory.scratch.push(lease);await saveInventory(state,inventory);
   await directory(join(root.path,'scratch'),true,true);await mkdir(join(root.path,lease.directory),{mode:0o700});
@@ -949,9 +962,12 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
     if(removal)return removal;
     removal=(async()=>{
      waitCancellation.abort();attachment?.close();await assertCivicPolicyAuthority(policy);
-     try{await removeManagedDocker(resource,scratchDirectory,fixtureRoot);resource.state='removed';await persist();}
+     // Keep the durable known CID until final close; recovery re-proves absence
+     // after an interruption here. Failed removal still commits uncertainty.
+     try{await removeManagedDocker(resource,scratchDirectory,fixtureRoot);resource.state='removed';daemonRemovers.delete(remove);}
      catch(error){resource.state='uncertain';await persist();throw error;}
-    })().finally(()=>{removal=undefined;});
+    })();
+    void removal.catch(()=>{removal=undefined;});
     return removal;
    };
    daemonRemovers.add(remove);
@@ -986,6 +1002,9 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
   try{await Promise.race([Promise.allSettled(children.map(item=>item.completion)),new Promise<void>(resolve=>{timer=setTimeout(resolve,5000);})]);}finally{clearTimeout(timer);}
   signal.removeEventListener('abort',stopChildren);activeScratch.delete(id);
   signal.removeEventListener('abort',stopDaemons);
+  // Drain abort-triggered removals (and their failure commits) before loading
+  // the final close transaction, so no stale callback can overwrite it.
+  await Promise.allSettled([...daemonRemovers].map(remove=>remove()));
   const clean=await locked(policy,async()=>{const inventory=await loadInventory(state),current=inventory.scratch.find(item=>item.id===id);if(!current||current.ownerPid!==process.pid)throw new CivicPolicyStateError('SCRATCH_IDENTITY_MISMATCH');current.state='closing';const complete=await cleanScratch(inventory,current,policy,undefined,true);if(!complete)current.state='partial';await saveInventory(state,inventory);return complete;});
   if(!clean)throw new CivicPolicyStateError('SCRATCH_CLEANUP_INCOMPLETE');
  }

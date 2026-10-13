@@ -4,6 +4,8 @@ import {createServer} from 'node:http';
 import {mkdtemp,realpath,chmod,rm,readFile,lstat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {promises as fsPromises} from 'node:fs';
+import {syncBuiltinESMExports} from 'node:module';
 import {randomUUID} from 'node:crypto';
 import {DockerParserResourceSchema,DockerOmpBResourceSchema,ManagedDockerResourceSchema,dockerParserConfig,dockerOmpBConfig,managedDockerConfig,dockerConfigSha256,inspectManagedDocker,createManagedDocker,startManagedDocker,removeManagedDocker,DockerLifecycleError,type ManagedDockerResource} from '../src/civic-docker.ts';
 
@@ -155,8 +157,25 @@ async function fakeDaemon(path:string){
  return {containers,settings,events,async close(){for(const socket of connections)socket.destroy();const closed=Promise.withResolvers<void>();server.close(error=>error?closed.reject(error):closed.resolve());await closed.promise;}};
 }
 
-test('Docker name is reserved before create, CID committed before start, attach is lossless, removal precedes scratch unlink',async()=>{
+test('Docker name is reserved before create, CID committed before start, attach is lossless, removal precedes scratch unlink',async t=>{
  const fixture=await createCivicPolicyTestContext(),daemon=await fakeDaemon(join(fixture.root,'d.sock')),bytes=Buffer.from('synthetic parser input');let directory='';
+ const inventoryPath=join(fixture.policy.stateDir!,'inventory.json'),originalOpen=fsPromises.open,originalRename=fsPromises.rename;
+ let fullReads=0;const commits:Array<{lease:string;resource?:string}>=[];
+ t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+  const handle=await originalOpen(...args);
+  if(String(args[0])===inventoryPath){
+   const read=handle.read.bind(handle);
+   t.mock.method(handle,'read',async(buffer:Buffer,offset:number,length:number,position:number|null)=>{
+    if(offset===0&&position===null)fullReads++;
+    return read(buffer,offset,length,position);
+   });
+  }
+  return handle;
+ });
+ t.mock.method(fsPromises,'rename',async(...args:Parameters<typeof fsPromises.rename>)=>{
+  await originalRename(...args);
+  if(String(args[1])===inventoryPath){const inventory=JSON.parse(await readFile(inventoryPath,'utf8')),lease=inventory.scratch[0];commits.push({lease:lease.state,...(lease.resources.length?{resource:lease.resources[0].state}:{})});}
+ });syncBuiltinESMExports();
  try{
   daemon.settings.onCreate=async container=>{const inventory=JSON.parse(await readFile(join(fixture.policy.stateDir!,'inventory.json'),'utf8')),resource=inventory.scratch[0].resources[0];assert.equal(resource.name,container.name);assert.equal(resource.state,'create_requested');assert.equal(resource.containerId,null);};
   daemon.settings.onStart=async container=>{const inventory=JSON.parse(await readFile(join(fixture.policy.stateDir!,'inventory.json'),'utf8')),resource=inventory.scratch[0].resources[0];assert.equal(resource.containerId,container.id);assert.equal(resource.state,'start_requested');};
@@ -168,7 +187,9 @@ test('Docker name is reserved before create, CID committed before start, attach 
    assert.deepEqual(await session.completion,{exitCode:0});assert.deepEqual(await container.wait(),{exitCode:0});assert.match(stdout,/"ready":true/);assert.match(stdout,/"ok":true/);assert.match(stderr,/synthetic diagnostic/);await container.remove();
   },{decisionId:fixture.decisionId,purpose:'classification',...fixture.policy});
   assert.deepEqual(daemon.events.slice(0,3),['create','attach','start']);assert.equal(daemon.containers.size,0);await assert.rejects(lstat(directory),{code:'ENOENT'});
- }finally{await daemon.close();await fixture.dispose();}
+  assert.deepEqual(commits,[{lease:'planned'},{lease:'active'},{lease:'active',resource:'reserved'},{lease:'active',resource:'create_requested'},{lease:'active',resource:'created'},{lease:'active',resource:'start_requested'},{lease:'closed',resource:'removed'}]);
+  assert.equal(fullReads,13,'six loads plus seven prior-file reads from saves');
+ }finally{t.mock.restoreAll();syncBuiltinESMExports();await daemon.close();await fixture.dispose();}
 });
 
 test('unconfirmed daemon removal retains mounted source bytes and reports partial until actual removal is confirmed',async()=>{
@@ -218,4 +239,68 @@ test('unknown create outcomes cannot be declared absent while a late daemon crea
   daemon.settings.failCreate=false;daemon.containers.set(resource.name,{name:resource.name,id:digest(resource.name),config:dockerParserConfig(resource,directory),running:false,waiters:[]});
   assert.equal((await recoverManagedSourceScratch(fixture.policy)).status,'complete');
  }finally{daemon.settings.failCreate=false;await recoverManagedSourceScratch(fixture.policy).catch(()=>{});await daemon.close();await fixture.dispose();}
+});
+
+for(const boundary of ['before-remove','after-remove','after-unlink'] as const)test('merged close recovers worker death '+boundary,async()=>{
+ const fixture=await createCivicPolicyTestContext(),daemon=await fakeDaemon(join(fixture.root,'d.sock'));let worker:ChildProcess|undefined;
+ try{
+  const moduleUrl=new URL('../src/civic-opt-out.ts',import.meta.url).href;
+  const script=`import {withManagedSourceScratch,CIVIC_ACQUISITION_DECISION_ID} from ${JSON.stringify(moduleUrl)};import {promises as fs} from 'node:fs';import {syncBuiltinESMExports} from 'node:module';import {createHash} from 'node:crypto';import {join} from 'node:path';const [root,policy,socketPath,boundary]=process.argv.slice(1),bytes=Buffer.from('crash fixture source');if(boundary==='after-unlink'){const rmdir=fs.rmdir;fs.rmdir=async(...args)=>{const result=await rmdir(...args);if(String(args[0]).startsWith(join(root,'scratch')+'/'))process.exit(0);return result;};syncBuiltinESMExports();}await withManagedSourceScratch(root,[{phase:'pre-admission',url:'https://parser-fixture.invalid/input',sourceSha256:createHash('sha256').update(bytes).digest('hex')}],async scope=>{await scope.writeSource('document',bytes);await fs.chmod(join(scope.directory,'document'),0o444);const container=await scope.createContainer({socketPath,imageId:'sha256:'+'a'.repeat(64),contractSha256:'b'.repeat(64),artifactRelativePath:'document'});if(boundary==='before-remove')process.exit(0);await container.remove();if(boundary==='after-remove')process.exit(0);},{...JSON.parse(policy),decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification'});`;
+  worker=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',script,fixture.managedRoot,JSON.stringify(fixture.policy),join(fixture.root,'d.sock'),boundary],{stdio:'ignore'});
+  assert.equal(await new Promise<number|null>((resolve,reject)=>{worker!.once('error',reject);worker!.once('close',resolve);}),0);
+  const inventory=JSON.parse(await readFile(join(fixture.policy.stateDir!,'inventory.json'),'utf8')),lease=inventory.scratch[0],directory=join(fixture.managedRoot,lease.directory);
+  assert.equal(lease.state,'active');assert.equal(lease.resources[0].state,'created');assert.match(lease.resources[0].containerId,/^[a-f0-9]{64}$/);
+  assert.equal(daemon.containers.size,boundary==='before-remove'?1:0);
+  if(boundary==='after-unlink')await assert.rejects(lstat(directory),{code:'ENOENT'});
+  else assert.equal((await lstat(join(directory,'document'))).isFile(),true);
+  if(boundary==='after-unlink'){
+   // Only this crash happens inside the close lock. Explicit fixture operator
+   // release follows observed child exit; recovery itself must never steal it.
+   const lock=join(fixture.policy.stateDir!,'inventory.lock');assert.equal(JSON.parse(await readFile(lock,'utf8')).pid,worker.pid);await rm(lock);
+  }
+  const recovered=await recoverManagedSourceScratch(fixture.policy);assert.equal(recovered.status,'complete');assert.deepEqual(recovered.recoveredLeases,[lease.id]);assert.equal(daemon.containers.size,0);
+  await assert.rejects(lstat(directory),{code:'ENOENT'});
+ }finally{worker?.kill('SIGKILL');await daemon.close();await fixture.dispose();}
+});
+
+test('successful removal is committed with partial scratch close if unlink fails',async t=>{
+ const fixture=await createCivicPolicyTestContext(),daemon=await fakeDaemon(join(fixture.root,'d.sock'));let directory='';
+ const originalUnlink=fsPromises.unlink;
+ t.mock.method(fsPromises,'unlink',async(...args:Parameters<typeof fsPromises.unlink>)=>{
+  if(String(args[0])===join(directory,'document'))throw Object.assign(new Error('synthetic interrupted unlink'),{code:'EIO'});
+  return originalUnlink(...args);
+ });syncBuiltinESMExports();
+ try{
+  await assert.rejects(withManagedSourceScratch(fixture.managedRoot,[{phase:'pre-admission',url:'https://parser-fixture.invalid/input',sourceSha256:digest('source')}],async scope=>{
+   directory=scope.directory;await scope.writeSource('document',Buffer.from('source'));await chmod(join(directory,'document'),0o444);
+   const container=await scope.createContainer({socketPath:join(fixture.root,'d.sock'),imageId:'sha256:'+'a'.repeat(64),contractSha256:'b'.repeat(64),artifactRelativePath:'document'});
+   await container.remove();await container.remove();
+   const inventory=JSON.parse(await readFile(join(fixture.policy.stateDir!,'inventory.json'),'utf8'));
+   assert.equal(inventory.scratch[0].resources[0].state,'created','no standalone successful removal commit');
+  },{...fixture.policy,decisionId:fixture.decisionId,purpose:'classification'}),error=>error instanceof CivicPolicyStateError&&error.code==='SCRATCH_CLEANUP_INCOMPLETE');
+  assert.equal(daemon.containers.size,0);assert.equal(daemon.events.filter(event=>event==='delete').length,1);
+  const inventory=JSON.parse(await readFile(join(fixture.policy.stateDir!,'inventory.json'),'utf8'));
+  assert.equal(inventory.scratch[0].state,'partial');assert.equal(inventory.scratch[0].resources[0].state,'removed');assert.equal(await readFile(join(directory,'document'),'utf8'),'source');
+  t.mock.restoreAll();syncBuiltinESMExports();
+  assert.equal((await recoverManagedSourceScratch(fixture.policy)).status,'complete');await assert.rejects(lstat(directory),{code:'ENOENT'});
+ }finally{t.mock.restoreAll();syncBuiltinESMExports();await daemon.close();await fixture.dispose();}
+});
+
+for(const failed of [false,true])test('abort during merged removal drains callbacks before '+(failed?'partial':'closed')+' commit',async()=>{
+ const fixture=await createCivicPolicyTestContext(),daemon=await fakeDaemon(join(fixture.root,'d.sock')),controller=new AbortController(),entered=Promise.withResolvers<void>(),release=Promise.withResolvers<void>();let directory='';
+ try{
+  daemon.settings.refuseDelete=failed;daemon.settings.onDelete=async()=>{entered.resolve();await release.promise;assert.equal((await lstat(join(directory,'document'))).isFile(),true);};
+  const work=withManagedSourceScratch(fixture.managedRoot,[{phase:'pre-admission',url:'https://parser-fixture.invalid/input',sourceSha256:digest('source')}],async scope=>{
+   directory=scope.directory;await scope.writeSource('document',Buffer.from('source'));await chmod(join(directory,'document'),0o444);
+   const container=await scope.createContainer({socketPath:join(fixture.root,'d.sock'),imageId:'sha256:'+'a'.repeat(64),contractSha256:'b'.repeat(64),artifactRelativePath:'document'});
+   await container.remove();
+  },{...fixture.policy,decisionId:fixture.decisionId,purpose:'classification',signal:controller.signal});
+  const rejected=assert.rejects(work,failed?CivicPolicyStateError:{name:'AbortError'});
+  await entered.promise;controller.abort();release.resolve();await rejected;
+  const inventory=JSON.parse(await readFile(join(fixture.policy.stateDir!,'inventory.json'),'utf8'));
+  assert.equal(inventory.scratch[0].state,failed?'partial':'closed');assert.equal(inventory.scratch[0].resources[0].state,failed?'uncertain':'removed');
+  assert.equal(daemon.containers.size,failed?1:0);
+  if(failed){assert.equal(await readFile(join(directory,'document'),'utf8'),'source');daemon.settings.refuseDelete=false;assert.equal((await recoverManagedSourceScratch(fixture.policy)).status,'complete');}
+  await assert.rejects(lstat(directory),{code:'ENOENT'});
+ }finally{release.resolve();await daemon.close();await fixture.dispose();}
 });
