@@ -74,7 +74,7 @@ export async function buildOperatorRegistryConfigDescriptor(input:{repository:st
 
 /** Bind the actual bounded codec, registry schema and URL/provenance validators, not an unversioned promise. */
 export async function operatorRegistryConfigContractSha256(){
- const files=['district-registry-config.ts','district-registry.ts','district-schema.ts','district-git-snapshot-import.ts','district-retained-import.ts','district-private-io.ts','text-run-lineage.ts','source-policy.ts','document-origin-contract.ts','polite-fetch.ts','public-address.ts','civic-opt-out.ts'];
+ const files=['district-registry-config.ts','district-registry.ts','district-schema.ts','district-git-snapshot-import.ts','district-retained-import.ts','district-private-io.ts','text-run-lineage.ts','source-policy.ts','registered-source-policy.ts','document-origin-contract.ts','polite-fetch.ts','public-address.ts','civic-opt-out.ts'];
  return sha256(JSON.stringify(await Promise.all(files.map(async file=>sha256(await readFile(new URL(file,import.meta.url)))))));
 }
 /** Configuration metadata only. Unknown/model/body keys cannot be silently stripped into permission. */

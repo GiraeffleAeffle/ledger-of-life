@@ -9,7 +9,7 @@ import type {RegistryMunicipality,CrawlDocument,CrawlExcludedDocument,AdapterOpt
 import {operatorRegistryConfigImportSchema,importOperatorRegistryConfig,readOperatorRegistryConfigSourcePin} from './district-registry-config.ts';
 import {readPinnedJson,writeManagedSourceJson,sourceArtifactUrls,type SourceArtifactBinding} from './district-private-io.ts';
 import {isCouncilPermissionFailure} from './council-cache.ts';
-import {APPROVED_OWNER_ROBOTS_OVERRIDE,documentOriginExcludes} from './source-policy.ts';
+import {APPROVED_OWNER_ROBOTS_OVERRIDE,documentOriginExcludes,PUBLIC_SOURCE_POLICY_VALIDITY_MS} from './source-policy.ts';
 import {CIVIC_POLICY_AUTHORITY,assertCivicPolicyAuthority,initializeManagedAcquisitionLane,assertManagedObservationReadable} from './civic-opt-out.ts';
 import {ContentFreeSourcePolicySchema,sha256} from './district-schema.ts';
 import {SourceObservationSchema,sourceObservationMatches} from './source-observation.ts';
@@ -62,7 +62,7 @@ export async function crawlDistrictRegistry(registry:CrawlRegistry,fetcher:Polit
    const seeds=city.seedDocuments?.filter(seed=>seed.sourceId===source.id)??[];
    if(!source.url&&!source.api&&!seeds.length&&!options.pageRoots?.length){index.checks.push({...base,checkState:source.checkState==='not_found'?'not_found':'not_checked',checkedAt:source.checkedAt,outcome:source.checkState==='not_found'?'registry_not_found':'not_checked',reason:source.reason??'No confirmed public endpoint in source registry'});continue;}
    const checkIndex=index.checks.length;index.checks.push({...base,checkState:'not_checked',checkedAt:null,outcome:'not_checked',reason:'Source traversal pending'});
-   work.push({city,source,checkIndex,totalRequests:0,done:false});
+   work.push({city,source:{...source,registeredMunicipalityId:city.id},checkIndex,totalRequests:0,done:false});
   }
  }
  // Give every municipality one bounded turn before deep archives take another.
@@ -145,8 +145,9 @@ async function main(){
  if(!inside(resolve(importDescriptor.managedRoot))||resolve(importDescriptor.managedRoot)===cache||contains(cache,resolve(importDescriptor.managedRoot))||contains(resolve(importDescriptor.managedRoot),cache))throw Error('Registry control import requires a separate ignored artifacts root');
  const requestedPolicy={...CIVIC_POLICY_AUTHORITY,...(values['policy-authority-sha256']!==undefined?{authoritySha256:values['policy-authority-sha256']}:{})},authority=await assertCivicPolicyAuthority(requestedPolicy);
  const policy={...requestedPolicy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},lane={decisionId:APPROVED_OWNER_ROBOTS_OVERRIDE.id,...policy};
- const fetcher=await createDistrictCrawlFetcher({cacheDir:cache,ownerPolicyLane:lane,policyTtlMs:Math.min(revalidateAfterMs,60*60_000)});
+ const fetcher=await createDistrictCrawlFetcher({cacheDir:cache,ownerPolicyLane:lane,policyTtlMs:Math.min(revalidateAfterMs,PUBLIC_SOURCE_POLICY_VALIDITY_MS)});
  const control=await importOperatorRegistryConfig(importDescriptor,policy),{registry}=await readOperatorRegistryConfigSourcePin(control,policy),selection:DistrictCrawlSelection={municipality:values.municipality,sourceId:values.source,pageRoots:values['page-root'],seedDocumentUrls:values['seed-document']};
+ fetcher.registerRegisteredSources(registry,control.sha256);
  validateDistrictCrawlSelection(registry,selection);
  await fetcher.initialize();await initializeManagedAcquisitionLane(outputRoot,{...lane,kind:'artifacts'});
  if(!inside(await realpath(cache))||!inside(await realpath(outputRoot))||!inside(await realpath(importDescriptor.managedRoot)))throw Error('Cache symlinks may not escape ignored cache directory');

@@ -20,19 +20,30 @@ export interface CouncilStorage {
 }
 export type CouncilLoader=(url:string)=>Promise<CouncilEvidence&{data:unknown}>;
 /** Shared loader: no stale fallback or hidden reconnect loop; durable traversal owns resume. */
+function observedCouncilUrls(value:unknown):string[] {
+ const pending:unknown[]=[value],urls:string[]=[];
+ while(pending.length){
+  const item=pending.pop();
+  if(typeof item==='string'){if(/^https?:\/\//i.test(item))urls.push(item);}
+  else if(Array.isArray(item))for(const child of item)pending.push(child);
+  else if(item!==null&&typeof item==='object')for(const child of Object.values(item))pending.push(child);
+ }
+ return urls;
+}
 export function createPoliteCouncilLoader(fetcher:PoliteFetcher,options:FetchOptions&{maxRequests:number;oparlBody?:{id:string;name:string};onDocument?:(document:FetchedDocument)=>void|Promise<void>;onExcluded?:(document:ExcludedDocument)=>void|Promise<void>}):CouncilLoader {
  const startedRequests=fetcher.requestCount;
  return async url=>{
   await fetcher.initialize();
   if(fetcher.requestCount-startedRequests>=options.maxRequests)throw Error('OParl request budget exhausted');
   try{
-   const response=await fetcher.fetch(url,{ownerRobotsOverride:options.ownerRobotsOverride,registeredSourceUrl:options.registeredSourceUrl,machinePolicyUrls:options.machinePolicyUrls,hostProfile:options.hostProfile??'municipal',municipalityName:options.municipalityName,...(options.oparlBody?{oparlContext:{bodyId:options.oparlBody.id,bodyName:options.oparlBody.name,apiUrl:url}}:{})});
+   const response=await fetcher.fetch(url,{ownerRobotsOverride:options.ownerRobotsOverride,registeredSourceUrl:options.registeredSourceUrl,registeredMunicipalityId:options.registeredMunicipalityId,registeredSourceId:options.registeredSourceId,machinePolicyUrls:options.machinePolicyUrls,hostProfile:options.hostProfile??'municipal',municipalityName:options.municipalityName,...(options.oparlBody?{oparlContext:{bodyId:options.oparlBody.id,bodyName:options.oparlBody.name,apiUrl:url}}:{})});
    await fetcher.assertSourceReadable(response.localPath,response.url);
    await fetcher.assertSourceBindingsAllowed([sourceContentBinding(response)]);
    const bytes=await readFile(response.localPath);
    if(hash(bytes)!==response.sha256)throw Error('Council source cache digest mismatch');
    await fetcher.assertSourceReadable(response.localPath,response.url);
    const data:unknown=JSON.parse(bytes.toString('utf8'));
+   await fetcher.recordDiscoveredSourceLinks(options,response,()=>observedCouncilUrls(data));
    await options.onDocument?.(response);
    return {url:response.url,sha256:response.sha256,retrievedAt:response.retrievedAt,checkedAt:response.checkedAt,data};
   }catch(error){if(error instanceof PoliteFetchError&&error.excludedDocument)await options.onExcluded?.(error.excludedDocument);throw error;}

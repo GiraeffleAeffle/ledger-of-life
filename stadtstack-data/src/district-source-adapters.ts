@@ -25,11 +25,12 @@ export interface RegistrySource {
  ownerRobotsOverride?:OwnerRobotsOverride;robotsStatus?:'allowed'|'disallowed'|'unavailable';override?:'owner-approved 2026-10-11';hostProfile?:'municipal'|'default';
  /** Original configured URL retained when an adapter suppresses root discovery. */
  registeredSourceUrl?:string;
+ registeredMunicipalityId?:string;
  legalBasis?:{classification:'section_5_official_act_candidate'|'section_44b_tdm_candidate'|'unassessed';reason?:string};
 }
 function sourceFetchOptions(source:RegistrySource):FetchOptions {
  const registeredSourceUrl=source.registeredSourceUrl??source.url??source.api?.url;
- return {registeredSourceUrl,ownerRobotsOverride:source.ownerRobotsOverride,machinePolicyUrls:source.knownMachinePolicyUrls,hostProfile:source.hostProfile??'municipal'};
+ return {registeredSourceUrl,registeredMunicipalityId:source.registeredMunicipalityId,registeredSourceId:source.id,ownerRobotsOverride:source.ownerRobotsOverride,machinePolicyUrls:source.knownMachinePolicyUrls,hostProfile:source.hostProfile??'municipal'};
 }
 /** Safe coded scope evidence; never includes source-controlled procedure text. */
 export class MunicipalIdentityBindingError extends Error {
@@ -210,6 +211,10 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
  while(frontier.queue.length&&requests<options.maxRequests&&processedDocuments<options.maxDocuments&&htmlPages<options.maxPages){
   const item=frontier.queue[0];if(visited.has(item.url)&&!item.revalidate){frontier.queue.shift();await persist();continue;}requests++;
   try{
+   if(item.from!==item.url&&fetcher.hasRegisteredSourceDecision(sourceFetchOptions(source))){
+    const parent=frontier.documents.find(row=>row.url===item.from);
+    if(parent&&/^(?:text\/html|application\/xhtml\+xml)$/.test(parent.mimeType)&&discoverDocumentLinks(await readSourceText(fetcher,parent),parent.url).some(link=>link.url===item.url))await fetcher.recordDiscoveredSourceLinks(sourceFetchOptions(source),parent,[item.url]);
+   }
    const response=await fetcher.fetch(item.url,{...sourceFetchOptions(source),title:item.title,linkText:item.title,municipalityName:municipality.name}),isHtml=/^(?:text\/html|application\/xhtml\+xml)$/.test(response.mimeType),isPdf=response.mimeType==='application/pdf';
    frontier.sourceBindings=mergeSourceBindings(frontier.sourceBindings!,[sourceContentBinding(response)]);
    const isStructured=/xml|gml|zip/.test(response.mimeType)||/\.(?:xml|gml|zip)(?:$|[?])/i.test(response.url);
@@ -225,15 +230,18 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
    visited.add(item.url);visited.add(response.url);frontier.queue.shift();
    if(html)htmlPages++;
    if(html&&!discoveryOnly&&!targets){
+    const discovered:string[]=[];
     for(const link of discoverDocumentLinks(html,response.url)){
      if(boundRoots&&!link.pdf&&!link.structured&&!/\/(?:loadDocument|download)\.(?:php|phtml)(?:\?|$)/i.test(link.url)){
       const candidate=new URL(link.url);
       if(!boundRoots.some(root=>candidate.origin===root.origin&&(candidate.pathname===root.pathname||candidate.pathname.startsWith(root.pathname.slice(0,root.pathname.lastIndexOf('/')+1)))))continue;
      }
      if(!boundRoots&&source.crawlScope?.followLinkedDocuments===false&&(link.pdf||link.structured))continue;
+     discovered.push(link.url);
      if(visited.has(link.url)||queued.has(link.url)||failed.has(link.url))continue;
      frontier.queue.push({url:link.url,title:link.title,sourceId:source.id,depth:item.depth+1,from:response.url});queued.add(link.url);
     }
+    await fetcher.recordDiscoveredSourceLinks(sourceFetchOptions(source),response,discovered);
    }
   }catch(error){
    if(error instanceof CrawlRequestEvidenceCaptureError)throw error;
@@ -348,6 +356,7 @@ export async function crawlMvPlanningApi(fetcher:PoliteFetcher,municipality:Regi
    if(!Array.isArray(record.x_GKZ)||!record.x_GKZ.includes(municipality.ags)||typeof record.title!=='string'||typeof record._resourceLinkId!=='string'||!Array.isArray(record.x_dokumentURL))continue;
    for(const link of record.x_dokumentURL){
     if(typeof link!=='string')continue;const documentUrl=publicUrl(link).href;if(state.metadata[documentUrl])continue;
+    await fetcher.recordDiscoveredSourceLinks(sourceFetchOptions(source),response,[documentUrl]);
     state.metadata[documentUrl]={title:record.title,caseKey:record._resourceLinkId};state.seeds.push({url:documentUrl,title:record.title,sourceId:source.id,documentDate:null});
    }
   }

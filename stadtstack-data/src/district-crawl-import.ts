@@ -17,6 +17,7 @@ import {loadResidualSource} from './district-residual-jobs.ts';
 import {readCommittedPolicyRefresh} from './district-policy-refresh.ts';
 import type {BoundSourceObservation} from './source-observation.ts';
 import type {DistrictRegistry} from './district-registry.ts';
+import {sourcePolicyExpiresAt} from './source-policy.ts';
 
 export interface CrawlPolicyRefreshOperation {
  enqueue?:(manifest:z.infer<typeof CrawlCorpusImportSchema>,acquired:BoundSourceObservation,custody:{registrySha256:string;corpusObservations:z.infer<typeof ResidualInputSchema>['corpusObservations']})=>Promise<void>;
@@ -118,9 +119,7 @@ export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:Di
     reasonCode='source_policy_refused';
     refreshing=true;const current=await operation.refresh(acquired,source);refreshing=false;sourcePolicy=current.sourcePolicy;expiresAt=current.expiresAt;
    }else{
-    const clocks=[acquired.observation.checkedAt,acquired.policy.robots.checkedAt,...acquired.policy.tdm.evidence.map(row=>row.checkedAt)];
-    if(!acquired.policy.tdm.evidence.length||clocks.some(clock=>!clock||!Number.isFinite(Date.parse(clock))||Date.parse(clock)>Date.now()))throw Error('Source policy evidence clock is incomplete');
-    expiresAt=new Date(Math.min(...clocks.map(clock=>Date.parse(clock!)))+60*60*1000).toISOString();
+    expiresAt=sourcePolicyExpiresAt(acquired.policy,acquired.observation.checkedAt,document,selected.scope);
    }
    if(Date.parse(expiresAt)<=Date.now())throw Error('Source policy is stale; separately authorized revalidation required');
    reasonCode='source_policy_refused';

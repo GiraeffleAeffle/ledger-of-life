@@ -19,7 +19,7 @@ const SelectorSchema=z.object({version:z.literal(VERSION),manifestSha256:HashSch
 export const CrawlPolicyRefreshEnqueueSchema=z.object({manifest:z.lazy(()=>CrawlCorpusImportSchema),maxRequests:SelectorSchema.shape.maxRequests,previousRefreshes:z.array(PreviousRefreshSchema.extend({documentId:z.string().min(1)}).strict()).max(500).optional()}).strict();
 const OriginalRobotsAbsencePinSchema=z.object({path:z.string().min(1),observationId:z.string().regex(/^[0-9]+-[a-f0-9-]{36}\.json$/),receiptSha256:HashSchema}).strict();
 export async function policyRefreshContract(){
- const files=['district-policy-refresh.ts','district-crawl-import.ts','district-residual-jobs.ts','district-registry-config.ts','district-r1.ts','district-jobs.ts','district-step-receipt.ts','polite-fetch.ts','district-policy-receipt.ts','source-policy.ts','civic-opt-out.ts'];
+ const files=['district-policy-refresh.ts','district-crawl-import.ts','district-residual-jobs.ts','district-registry-config.ts','district-r1.ts','district-jobs.ts','district-step-receipt.ts','polite-fetch.ts','district-policy-receipt.ts','source-policy.ts','registered-source-policy.ts','civic-opt-out.ts'];
  return semanticHash({version:VERSION,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))}))),hostGroupsSha256:digest(await readFile(new URL('../sources/district-host-groups.json',import.meta.url)))});
 }
 /** Preflight is offline and may admit stale originals only for this network job.
@@ -65,7 +65,7 @@ export function policyRefreshHandler(store:DistrictJobStore,createFetcher:(conte
   const result=await importCrawlCorpusForResidual(store,context.cas,manifest,{refresh:async(acquired,source)=>{
    context.signal.throwIfAborted();await assertManagedSourceBindings(path,[acquired.binding],policy);
    if(prior)await assertManagedSourceBindings(join(context.cas.root,'sha256',prior.hash.slice(0,2),prior.hash),[acquired.binding],policy);
-   const current=await fetcher.refreshPolicyForOriginal({url:acquired.observation.url,sha256:acquired.observation.sha256},acquired.policy,{machinePolicyUrls:source.knownMachinePolicyUrls,originalPolicyRoot:manifest.rawRoot});
+   const current=await fetcher.refreshPolicyForOriginal({url:acquired.observation.url,sha256:acquired.observation.sha256},acquired.policy,{machinePolicyUrls:source.knownMachinePolicyUrls,originalPolicyRoot:manifest.rawRoot,scope:manifest.documents[0].scope});
    originalRobotsAbsence=current.originalRobotsAbsence;
    for(const path of current.observations){await assertManagedObservationReadable(path,policy);const stat=await lstat(path);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>1024*1024)throw Error('Policy observation bound rejected');observations.push({path,sha256:digest(await readFile(path))});}
    context.signal.throwIfAborted();return current;
