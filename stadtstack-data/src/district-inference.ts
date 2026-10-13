@@ -68,7 +68,8 @@ export async function archiveJointExtractionContract(out:string,contract:Extract
   return {path,sha256:sha256(bytes)};
  }finally{await release();}
 }
-async function cachedAnswer(provider:ExtractorProvider,identity:ModelEvidence,system:string,input:unknown,schema:object,cacheRoot:string,usage:UsageContext,prepared:PreparedDocument,policy:CivicPolicyOptions,cacheContext:PreparedCacheContext):Promise<CachedAnswer>{
+type GovernedUsage = UsageContext & { beforeSourceCall?: (requestSha256:string)=>Promise<void> };
+async function cachedAnswer(provider:ExtractorProvider,identity:ModelEvidence,system:string,input:unknown,schema:object,cacheRoot:string,usage:GovernedUsage,prepared:PreparedDocument,policy:CivicPolicyOptions,cacheContext:PreparedCacheContext):Promise<CachedAnswer>{
  usage.signal?.throwIfAborted();
  await assertPreparedSourcesActive(prepared.references,policy);
  const binding=modelAnswerCacheBinding({provider,modelIdentitySha256:identity.modelIdentitySha256,system,input,schema,sourceContext:cacheContext});
@@ -76,6 +77,7 @@ async function cachedAnswer(provider:ExtractorProvider,identity:ModelEvidence,sy
  return cachedModelAnswer({cacheRoot,binding,modelIdentitySha256:identity.modelIdentitySha256,signal:usage.signal,sourceContext:{decisionId:CIVIC_ACQUISITION_DECISION_ID,references:prepared.references,receiptSha256:prepared.receiptSha256,policy}},async()=>{
   usage.signal?.throwIfAborted();
   await assertPreparedSourcesActive(prepared.references,policy);
+  await usage.beforeSourceCall?.(semanticHash(binding));
   const modelUsage={...usage,policy,sourceContext};
   const answer=await subscriptionChat(provider,system,input,schema,modelUsage).catch(error=>{usage.signal?.throwIfAborted();throw error;});
   usage.signal?.throwIfAborted();
@@ -86,7 +88,7 @@ async function cachedAnswer(provider:ExtractorProvider,identity:ModelEvidence,sy
 function cachedClaims(record:DistrictKnowledgeRecord):DistrictExtractionClaims{
  return rawClaimsFromRecordSchema.parse({...record,caseKey:record.caseKeyType==='source_document'?null:record.caseKey});
 }
-export async function inferPreparedDocument(options:{taskId:string;groupId:string;purpose:'production'|'agreement';provider:ExtractorProvider;municipality:MunicipalityBinding;prepared:PreparedDocument;expected:PreparedExpectation;contract:{promptSha256:string;schemaSha256:string};out:string;usage:Omit<UsageContext,'purpose'|'groupId'>;policy?:CivicPolicyOptions;fixtureReadinessExecutor?:ReadinessExecutor}):Promise<DocumentResult>{
+export async function inferPreparedDocument(options:{taskId:string;groupId:string;purpose:'production'|'agreement';provider:ExtractorProvider;municipality:MunicipalityBinding;prepared:PreparedDocument;expected:PreparedExpectation;contract:{promptSha256:string;schemaSha256:string};out:string;usage:Omit<GovernedUsage,'purpose'|'groupId'>;policy?:CivicPolicyOptions;fixtureReadinessExecutor?:ReadinessExecutor}):Promise<DocumentResult>{
  options.usage.signal?.throwIfAborted();
  if(options.provider!=='openai-subscription')throw Error('Source inference requires the Codex-only authority');
  const selectedPolicy=options.policy??options.usage.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selectedPolicy),policy={...selectedPolicy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};

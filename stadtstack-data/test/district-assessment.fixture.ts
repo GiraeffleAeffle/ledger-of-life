@@ -2,17 +2,21 @@ import { mkdtemp, realpath } from 'node:fs/promises';
 import { randomUUID, createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DistrictCas } from '../src/district-cas.ts';
+import { DistrictCas, type CasPutOptions } from '../src/district-cas.ts';
 import { createPolicyReceipt } from '../src/district-policy-receipt.ts';
 import { canonicalJson, digest } from '../src/district-adapter-contract.ts';
 import { encodeStepReceipt, unknownReceiptCounts, type StepReceipt } from '../src/district-step-receipt.ts';
-import { provisionCivicPolicyAuthority } from '../src/civic-opt-out.ts';
+import { provisionCivicPolicyAuthority, initializeManagedAcquisitionLane, withManagedSourceWrite, CIVIC_ACQUISITION_DECISION_ID } from '../src/civic-opt-out.ts';
 import { z } from 'zod';
 import { assessmentOutputSchema, PROMPTS, digest as assessmentDigest, originalEvidence, buildAssessmentPassInput,
-  type AssessmentEvidenceContext, type AssessmentItem, type AssessmentOutput, type AssessmentReceipt } from '../src/district-assessment.ts';
+  type AssessmentEvidenceContext, type AssessmentItem, type AssessmentOutput, type AssessmentReceipt, type AssessmentPassInput } from '../src/district-assessment.ts';
+import {DistrictKnowledgeRecordSchema,REQUIRED_DETERMINISTIC_CHECKS,knowledgeEvidenceHash} from '../src/district-schema.ts';
+import {GRAPH_DETERMINISTIC_CHECKS} from '../src/district-graph-claims.ts';
+import {PROVIDER_CONFIGS,EMPTY_USAGE,type ModelAnswer} from '../src/district-model-contract.ts';
+import type {PolicyReceipt} from '../src/district-policy-receipt.ts';
 
 // Synthetic licensed bytes and explicit parser receipts; never source data or provider calls.
-export async function admittedAssessmentFixture(text: string) {
+export async function admittedAssessmentFixture(text: string, managed = false) {
   const directory = await mkdtemp(join(await realpath(tmpdir()), 'assessment-cas-test-'));
   const cas = new DistrictCas(join(directory, 'cas'), { maxBytes: 1024 * 1024 });
   // Explicit synthetic provisioning follows the canonical opt-out test seam.
@@ -27,8 +31,17 @@ export async function admittedAssessmentFixture(text: string) {
     sourcePolicy: { robots: { state: 'allowed', url: 'https://example.org/robots.txt' }, tdm: { state: 'not_declared', evidence: [] }, access: 'public', legalClassification: 'not_assessed', publication: 'facts_with_attribution_only' },
     permission: { kind: 'distribution_licence', distributionUrl: source.url, licenceId: 'synthetic-test-only', termsUrl: 'https://example.org/terms', termsSha256: digest('test terms'), approvalSha256: digest('test approval') },
     checkedAt, expiresAt }, policyOptions);
-  const policyArtifact = await cas.put(Buffer.from(canonicalJson(created.receipt)), { kind: 'receipt', mimeType: 'application/json' });
-  const originalArtifact = await cas.put(Buffer.from(text), { kind: 'source_original', mimeType: 'text/plain', admission: {
+  if (managed) await initializeManagedAcquisitionLane(cas.root, { ...policyOptions, decisionId: CIVIC_ACQUISITION_DECISION_ID, kind: 'artifacts' });
+  const put = async (bytes: Buffer, options: CasPutOptions) => {
+    if (!managed) return cas.put(bytes, options);
+    const hash = digest(bytes);
+    return withManagedSourceWrite(cas.root, [{ kind: 'http_observation', relativePath: `sha256/${hash.slice(0,2)}/${hash}`,
+      contentSha256: hash, url: source.url, sourceSha256: source.sha256, observationId: 'synthetic-assessment-fixture',
+      receiptSha256: created.receiptSha256, independentAllowed: options.kind === 'source_original' }],
+      () => cas.put(bytes, options), policyOptions);
+  };
+  const policyArtifact = await put(Buffer.from(canonicalJson(created.receipt)), { kind: 'receipt', mimeType: 'application/json' });
+  const originalArtifact = await put(Buffer.from(text), { kind: 'source_original', mimeType: 'text/plain', admission: {
     state: 'allowed', sourceSha256: source.sha256, policyProofSha256: policyArtifact.sha256, checkedAt, expiresAt } });
   const step: StepReceipt = { version: 'district-step-receipt-v1', canonicalizationVersion: 'district-json-v1',
     id: randomUUID(), runId: randomUUID(), jobKey: digest('fixture parse'), step: 'parse', lane: 'cpu', sourceId: 'source1', municipalityId: 'strausberg',
@@ -37,7 +50,7 @@ export async function admittedAssessmentFixture(text: string) {
     inputHashes: [source.sha256], outputHashes: [source.sha256], policyProofSha256: policyArtifact.sha256, originProofSha256: null,
     versions: { parser: 'fixture-parser-v1' }, cache: { disposition: 'miss', originalGenerationReceiptId: null }, provider: null, counts: unknownReceiptCounts };
   const encoded = encodeStepReceipt(step);
-  const parserArtifact = await cas.put(Buffer.from(encoded.bytes), { kind: 'receipt', mimeType: 'application/json' });
+  const parserArtifact = await put(Buffer.from(encoded.bytes), { kind: 'receipt', mimeType: 'application/json' });
   return { directory, authority, context: { cas, policyOptions }, policy: created.receipt, policyArtifact, parserArtifact, originalArtifact,
     originalObjectPath: join(cas.root, originalArtifact.storageKey),
     source: { sourceId: 'source1', originalSha256: source.sha256, textSha256: source.sha256, parserVersion: 'fixture-parser-v1',
@@ -68,4 +81,19 @@ export async function syntheticAssessmentTriplet(item: AssessmentItem, output: A
   const reconciliation = buildAssessmentPassInput(item, evidence, 'C', { A, B });
   const C = syntheticAssessmentReceipt(item, 'C', output, reconciliation.data, reconciliation.dependencies);
   return { A, B, C };
+}
+export function recordFor(f:{source:AssessmentItem['sources'][number];policy:PolicyReceipt},text:string){
+ const pinned=PROVIDER_CONFIGS['openai-subscription'],hash=digest('synthetic record contract');
+ const route={provider:'openai-subscription' as const,model:pinned.model,tool:pinned.tool};
+ const config={...route,modelIdentityBasis:pinned.modelIdentityBasis};
+ const record={kind:'text_model',id:'knowledge:fixture:'+randomUUID(),municipalityId:'strausberg',ags:'12064472',districtId:'maerkisch-oderland',title:'Strausberg',titleQuote:'Strausberg',municipalityQuote:'Strausberg',summary:text,summaryQuote:text,caseKeyType:'source_document',caseKey:'source_document:'+f.source.originalSha256,caseQuote:null,caseType:'unknown',documentDate:null,documentDateQuote:null,documentDateReason:'Synthetic undated source',stage:'unknown',stageDate:null,stageDateQuote:null,stageDateReason:'Synthetic undated event',originalStatus:'',stageQuote:'',stages:[],entities:[],relations:[],locations:[],topics:[],sources:[{id:f.source.sourceId,url:f.policy.source.url,sha256:f.source.originalSha256,retrievedAt:'2026-10-11T00:00:00.000Z',locator:'source-original',mimeType:'text/plain',sourceType:'website',policy:f.policy.sourcePolicy}],extraction:{extractorVersion:'synthetic-test',extractorSha256:hash,...config,toolVersion:'synthetic-test',modelIdentitySha256:hash,returnedModel:null,promptVersion:'synthetic-test',promptSha256:hash,judgePromptVersion:'synthetic-test',judgePromptSha256:hash,inputSha256:f.source.originalSha256,textSha256:f.source.textSha256,responseSha256:hash,ocrUsed:false,textMethod:'text',cacheKey:hash,extractedAt:'2026-10-11T00:00:00.000Z',chunk:{index:0,count:1,start:0,end:text.length}},verification:{kind:'text_model',status:'auto-verified',deterministic:{passed:true,checks:[...REQUIRED_DETERMINISTIC_CHECKS,...GRAPH_DETERMINISTIC_CHECKS].map(id=>({id,passed:true,reason:'Synthetic fixture only'}))},faithfulness:{score:0.9,threshold:0.8,...route,toolVersion:'synthetic-test',modelIdentitySha256:hash,returnedModel:null,reason:'Synthetic fixture only',evaluatedAt:'2026-10-11T00:00:00.000Z',responseSha256:hash,sameModel:true,limitation:'Same-model judgment is not independent verification.'},evidenceHash:hash}};
+ record.verification.evidenceHash=knowledgeEvidenceHash(record);return DistrictKnowledgeRecordSchema.parse(record);
+}
+export function answer(input:AssessmentPassInput,unresolved=false):ModelAnswer{
+ const data=input.data as {itemId:string;claimIds:string[];evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]};
+ const source=data.evidence[0],locator=source.locators[0];
+ const output:AssessmentOutput={itemId:data.itemId,outcome:unresolved?'unresolved':'supported',assertions:unresolved?[]:data.claimIds.map(claimId=>({claimId,sourceId:source.sourceId,locatorId:locator.id,quote:locator.quote,subjectId:null,objectId:null,unit:null,value:null,date:null,dateRole:null,financialRole:'none' as const,stage:null,modality:'unknown' as const})),scores:{correctness:2,sources:2,usefulness:unresolved?0:1},holdReasons:[],rationale:'Synthetic provider fixture; never a civic assessment.'};
+ const config=PROVIDER_CONFIGS['openai-subscription'];
+ const identity={provider:'openai-subscription' as const,tool:config.tool,toolVersion:'0.0.0-synthetic-test-only',model:config.model,modelIdentityBasis:config.modelIdentityBasis};
+ return {value:output,responseSha256:digest(canonicalJson(output)),evidence:{...identity,modelIdentitySha256:digest(JSON.stringify(identity))},requestedModel:config.model,returnedModel:null,reportedModels:[],runtimeWarnings:[],usage:{...EMPTY_USAGE,perModel:{}}};
 }

@@ -10,6 +10,7 @@ import type {TextRunContribution} from '../src/text-run-lineage.ts';
 const hash='a'.repeat(64);
 const bounds={maxDocuments:1,maxChunks:4,maxModelCalls:8,paidMicroUsd:0} as const;
 const input={documentId:'original-document',corpusSha256:PILOT_BASE_CORPUS_SHA256,corpusObservations:[{kind:'http_observation' as const,url:'https://example.org/original',sourceSha256:hash,observationId:'1-11111111-1111-4111-8111-111111111111.json',receiptSha256:'f'.repeat(64)}],registrySha256:'b'.repeat(64),registry:{path:'/fixture/operator-registry-descriptor.json',sha256:'d'.repeat(64)},policyReceiptSha256:'c'.repeat(64),httpObservation:{observationId:'1-11111111-1111-4111-8111-111111111111.json',receiptSha256:'f'.repeat(64)},requestEvidenceSha256:hash,bounds};
+const residualJobHandlers=residualJobHandlersFor({} as Pool);
 test('residual lane accepts original documents and unresolved metadata narratives, not fabricated text containers',()=>{
  for(const mime of ['application/pdf','text/html','application/xhtml+xml','text/plain','text/plain; charset=utf-8','application/json','application/xml','text/xml'])assert.equal(residualMimeSupported(mime),true);
  for(const mime of ['application/zip','image/png','application/octet-stream'])assert.equal(residualMimeSupported(mime),false);
