@@ -6,14 +6,15 @@ import {tmpdir,userInfo} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {spawn,execFileSync} from 'node:child_process';
 import {inspect} from 'node:util';
-import {readGenesisOwnerCredentials,GENESIS_CREDENTIAL_MAX_BYTES,GenesisCredentialUnavailable} from '../src/genesis-owner-credentials.ts';
+import {readGenesisOwnerCredentials,GENESIS_CREDENTIAL_MAX_BYTES,GenesisCredentialUnavailable,GenesisOwnerCredentials,GenesisResponseScreeningHold,GENESIS_RESPONSE_SCREEN_LIMITS} from '../src/genesis-owner-credentials.ts';
 import {APPROVED_OWNER_GENESIS_ACCESS,ownerGenesisAccessFor,effectiveSourcePermission} from '../src/source-policy.ts';
 import {ContentFreeSourcePolicySchema} from '../src/district-schema.ts';
 import {PoliteFetcher,PoliteFetchError,type FetchObservation} from '../src/polite-fetch.ts';
 import {politeTestOptions} from './fixtures/polite-lane.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
+import {deflatedZip,unicodeEscape,percentEscape} from './fixtures/genesis-echo.ts';
 
-const token='fixture-secret-token-628104',username='fixture-owner-user-628104',password='fixture-owner-password-628104';
+const token='fixture-secret-token-628104',username='fixture-owner-user-628104',password='fixture-sécure-password-628104';
 const endpoint='https://www.regionalstatistik.de/genesisws/rest/2020/data/table';
 const body=new URLSearchParams({name:'12411-02-03',area:'free',language:'de',regionalvariable:'GEMEIN',regionalkey:'12064472',startyear:'2024',endyear:'2024',compress:'false',transpose:'false',job:'false'}).toString();
 function noSecrets(bytes:string|Buffer){for(const secret of [token,username,password])assert.ok(!Buffer.from(bytes).includes(Buffer.from(secret)),'Credential bytes escaped the host boundary');}
@@ -54,6 +55,40 @@ test('trusted file reader accepts only private regular bounded owner credential 
  const linked=join(root,'linked');await symlink(root,linked);await assert.rejects(readGenesisOwnerCredentials(join(linked,'credentials.json')),GenesisCredentialUnavailable);
 });
 
+test('response screening decodes every JSON string, ZIP member and retained header before admission',()=>{
+ const secret='sécure-"password',credentials=new GenesisOwnerCredentials('password',username,secret);
+ const hold=(bytes:Buffer,mime='application/json',headers:Record<string,string>={})=>{
+  assert.throws(()=>credentials.screenResponse(bytes,{'content-type':mime,...headers},200),(error:unknown)=>{
+   assert.ok(error instanceof GenesisResponseScreeningHold);assert.equal(error.cause,undefined);
+   noSecrets(inspect(error));assert.ok(!inspect(error).includes(secret),'Screening error exposed private material');return true;
+  });
+ };
+ for(const value of [username,secret]){
+  for(const mixed of [false,true]){
+   const encoded=unicodeEscape(value,mixed);
+   hold(Buffer.from(`{"Status":{"Content":"${encoded}"}}`));
+   hold(Buffer.from(`{"${encoded}":17}`));
+   hold(Buffer.from(`{"value":"${encoded}","value":17}`));
+   hold(deflatedZip({'table.csv':'value;number\nsafe;17\n','ignored.json':`{"value":"${encoded}"}`}), 'application/zip');
+  }
+  hold(deflatedZip({'table.csv':`value;number\n"${value.replaceAll('"','""')}";17\n`}), 'application/zip');
+  hold(deflatedZip({[percentEscape(value)+'.txt']:'safe'}),'application/zip');
+  for(const passes of [1,3,8])hold(Buffer.from('{"value":17}'),'application/json',{location:'https://other.de/'+percentEscape(value,passes)});
+ }
+ hold(Buffer.from('{"value":17}'),'application/json',{etag:Buffer.from(secret).toString('latin1')});
+ const quoteSecret='"quote"password',quoted=new GenesisOwnerCredentials('token',quoteSecret,'');
+ assert.throws(()=>quoted.screenResponse(Buffer.from('value\n"""quote""password"\n'),{'content-type':'text/csv'},200),GenesisResponseScreeningHold);
+ for(const [bytes,mime] of [[Buffer.from('{"malformed":'),'application/json'],[deflatedZip({'table.csv':'safe','ignored.bin':'safe'}),'application/zip'],[Buffer.from('%PDF-unknown'),'text/plain'],[Buffer.from([0,1,2]),'application/octet-stream'],[Buffer.from('safe'),'image/png'],[deflatedZip({'table.csv':'a'.repeat(100000)}),'application/zip']] as const)hold(bytes,mime);
+ hold(Buffer.alloc(GENESIS_RESPONSE_SCREEN_LIMITS.inputBytes+1),'text/plain');
+ hold(Buffer.from('{"value":17}'),'application/json',{etag:'x'.repeat(GENESIS_RESPONSE_SCREEN_LIMITS.headerBytes+1)});
+ hold(Buffer.from('{"value":17}'),'application/json',{location:percentEscape('ordinary',9)});
+ credentials.screenResponse(Buffer.from('{"value":"ordinary","nested":{"safe":"déjà"}}'),{'content-type':'application/json'},200);
+ credentials.screenResponse(Buffer.from('value;number\nsafe;17\n'),{'content-type':'text/csv'},200);
+ credentials.screenResponse(deflatedZip({'table.csv':'value;number\nsafe;17\n','ignored.json':'{"safe":17}'}),{'content-type':'application/zip'},200);
+ credentials.screenResponse(Buffer.alloc(0),{location:'https://other.de/public'},307);
+ credentials.clear();quoted.clear();
+});
+
 test('reviewed-entry integration runs only in an isolated source snapshot and fixture authority',async t=>{
  // No mutable production decision/credential injection. A disposable source copy
  // models the lead's future code-reviewed entry; the checked-in list stays empty.
@@ -61,7 +96,7 @@ test('reviewed-entry integration runs only in an isolated source snapshot and fi
  t.after(()=>rm(snapshot,{recursive:true,force:true}));
  await cp(join(packageRoot,'src'),join(snapshot,'src'),{recursive:true});await cp(join(packageRoot,'regional'),join(snapshot,'regional'),{recursive:true});
  await mkdir(join(snapshot,'test','fixtures'),{recursive:true});
- for(const name of ['genesis-owner-account.ts','polite-lane.ts','polite-inspection.ts','civic-policy.ts','tdm-pdf.ts'])await cp(join(packageRoot,'test','fixtures',name),join(snapshot,'test','fixtures',name));
+ for(const name of ['genesis-owner-account.ts','genesis-echo.ts','polite-lane.ts','polite-inspection.ts','civic-policy.ts','tdm-pdf.ts'])await cp(join(packageRoot,'test','fixtures',name),join(snapshot,'test','fixtures',name));
  await symlink(join(packageRoot,'node_modules'),join(snapshot,'node_modules'),'dir');
  await cp(join(packageRoot,'migrations'),join(snapshot,'migrations'),{recursive:true});
  await cp(join(packageRoot,'src'),join(snapshot,'legacy-src'),{recursive:true});
