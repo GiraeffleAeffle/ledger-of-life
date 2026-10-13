@@ -691,19 +691,19 @@ test('invalid 304 reservation cannot erase prior declarations and remains blocki
  }
 });
 
-test('policy wrappers preserve typed runtime failures and unknown exception identity',async t=>{
+test('policy wrappers preserve typed failures and structured unknown causes with policy-phase context',async t=>{
  const cache=await mkdtemp(join(tmpdir(),'polite-policy-errors-'));t.after(()=>rm(cache,{recursive:true,force:true}));
- const errors=[Error('Synthetic unexpected runtime failure'),...(['network_error','dns_error','timeout','cache_missing','too_large','unsupported_encoding'] as const).map(failure=>new PoliteFetchError(failure,'Synthetic typed failure'))];
  interface PolicySeam {
   fetchInternal():Promise<never>;
   policy(url:URL):Promise<unknown>;
   machinePolicy(url:URL):Promise<unknown>;
  }
- for(const [index,error] of errors.entries()){
-  const fetcher=await createPoliteFetcher({cacheDir:join(cache,String(index))}),seam=fetcher as unknown as PolicySeam;
+ for(const phase of ['robots','tdm'] as const)for(const kind of ['unknown','network_error','dns_error','timeout','cache_missing','too_large','unsupported_encoding'] as const){
+  const error=kind==='unknown'?Error('Synthetic unexpected runtime failure'):new PoliteFetchError(kind,'Synthetic typed failure');
+  const fetcher=await createPoliteFetcher({cacheDir:join(cache,phase+'-'+kind)}),seam=fetcher as unknown as PolicySeam;
   t.mock.method(seam,'fetchInternal',async()=>{throw error;});
-  await assert.rejects(seam.policy(new URL('https://stadt.de/document')),failure=>failure===error);
-  await assert.rejects(seam.machinePolicy(new URL('https://stadt.de/document')),failure=>failure===error);
+  const request=phase==='robots'?seam.policy(new URL('https://stadt.de/document')):seam.machinePolicy(new URL('https://stadt.de/document'));
+  await assert.rejects(request,(failure:unknown)=>failure instanceof PoliteFetchError&&failure.policyPhase===phase&&(kind==='unknown'?failure.failure==='network_error'&&failure.cause===error:failure===error));
  }
 });
 
@@ -712,7 +712,7 @@ test('PDF inspection runtime errors remain network_error with structured cause, 
  const options=await politeTestOptions({cacheDir:cache}),cause=Error('Synthetic PDF cache or version failure');
  const fetcher=new BasePoliteFetcher({...options,fixtureInspection:{...fixturePolicyInspection,pdf:async()=>{throw cause;}}});
  t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'application/pdf'},body:Buffer.from('%PDF-invalid')});
- await assert.rejects(fetcher.fetch('https://stadt.de/plan.pdf'),(failure:unknown)=>failure instanceof PoliteFetchError&&failure.failure==='network_error'&&failure.cause===cause);
+ await assert.rejects(fetcher.fetch('https://stadt.de/plan.pdf'),(failure:unknown)=>failure instanceof PoliteFetchError&&failure.failure==='network_error'&&failure.policyPhase==='tdm'&&failure.cause===cause);
 });
 
 test('invalid fetched robots without an owner override remains a source-policy refusal',async t=>{

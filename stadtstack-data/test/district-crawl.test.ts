@@ -498,3 +498,41 @@ test('real transport receipts keep a source-bearing frontier readable across a f
  assert.equal(complete.coverage?.state,'complete');assert.equal(complete.documents.length,2);assert.deepEqual(seen,[source.url,'https://stadt.de/plan.gml']);
  await second.assertSourceReadable(complete.coverage!.frontierPath!);await second.assertSourceBindingsAllowed(complete.sourceBindings!);
 });
+
+for(const phase of ['robots','tdm'] as const)test(`mandatory API ${phase} transport failure blocks document-seed fallback`,async t=>{
+ const folder=await mkdtemp(join(tmpdir(),'district-policy-phase-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ const fetcher=await createWireFetcher({cacheDir:folder}),apiSource:RegistrySource={...source,api:{url:'https://api.stadt.de/plans',format:'mv-bauleitplan'}},seen:string[]=[];
+ interface Wire {wire(url:URL):Promise<{status:number;headers:Record<string,string>;body:Buffer}>}
+ t.mock.method(fetcher as unknown as Wire,'wire',async(url:URL)=>{
+  seen.push(url.href);
+  if(url.hostname==='api.stadt.de'&&url.pathname===(phase==='robots'?'/robots.txt':'/.well-known/tdmrep.json'))throw new PoliteFetchError('network_error','Synthetic mandatory policy transport failure');
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  return {status:200,headers:{'content-type':'application/pdf'},body:metadataPdf()};
+ });
+ const registry={schemaVersion:'stadtstack-source-registry-v1' as const,municipalities:[{...city,sources:[apiSource],seedDocuments:[{sourceId:source.id,url:'https://stadt.de/must-not-fallback.pdf'}]}]};
+ const index=await crawlDistrictRegistry(registry,fetcher,{maxDocuments:2,maxPages:2,maxRequests:3});
+ assert.deepEqual(index.documents,[]);assert.equal(index.checks[0].outcome,'blocked');assert.equal(index.checks[0].blocked?.[0].failure,'network_error');
+ assert.equal(fetcher.requestCount,1);assert.doesNotMatch(index.checks[0].reason!,/official-document fallback/);
+ assert.deepEqual(seen,phase==='robots'?['https://api.stadt.de/robots.txt']:['https://api.stadt.de/robots.txt','https://api.stadt.de/.well-known/tdmrep.json']);
+});
+
+for(const phase of ['robots','tdm'] as const)test(`HTML frontier ${phase} transport failure cannot return source-wide preloaded documents`,async t=>{
+ const root=await mkdtemp(join(tmpdir(),'district-frontier-policy-phase-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const first=await createWireFetcher({cacheDir:root}),limits={maxDocuments:1,maxPages:1,maxRequests:3};
+ interface Wire {wire(url:URL):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
+ t.mock.method(first as unknown as Wire,'wire',async(url:URL)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  assert.equal(url.href,source.url);
+  return {status:200,headers:{'content-type':'text/html'},body:Buffer.from('<h1>Municipal planning archive</h1><a href="/plan.gml">XPlanung</a>')};
+ });
+ const initial=await crawlHtmlSource(first,city,source,limits);assert.equal(initial.documents.length,1);assert.equal(initial.coverage?.pendingCount,1);
+ const second=await createWireFetcher({cacheDir:root}),denial=new PoliteFetchError('network_error','Synthetic mandatory frontier policy transport failure'),seen:string[]=[];
+ t.mock.method(second as unknown as Wire,'wire',async(url:URL)=>{
+  seen.push(url.pathname);
+  if(url.pathname===(phase==='robots'?'/robots.txt':'/.well-known/tdmrep.json'))throw denial;
+  assert.equal(url.pathname,'/robots.txt');return {status:404,headers:{},body:Buffer.alloc(0)};
+ });
+ const returned:unknown[]=[];
+ await assert.rejects(async()=>{returned.push(await crawlHtmlSource(second,city,source,{maxDocuments:10,maxPages:3,maxRequests:10}));},error=>error===denial&&denial.policyPhase===phase);
+ assert.deepEqual(returned,[]);assert.deepEqual(seen,phase==='robots'?['/robots.txt']:['/robots.txt','/.well-known/tdmrep.json']);
+});

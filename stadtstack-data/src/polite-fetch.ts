@@ -43,6 +43,7 @@ export function sourceContentBinding(document:FetchedDocument):SourceContentBind
 }
 export class PoliteFetchError extends Error {
  failure:FetchFailure;status?:number;policy?:SourceAccessPolicy;retryAfter?:string;robotsEvidence?:PolicyEvidence;excludedDocument?:ExcludedDocument;
+ policyPhase:'robots'|'tdm'|null=null;
  constructor(failure:FetchFailure,message:string,status?:number,policy?:SourceAccessPolicy,retryAfter?:string,cause?:unknown){super(message,cause===undefined?undefined:{cause});this.name='PoliteFetchError';this.failure=failure;this.status=status;this.policy=policy;this.retryAfter=retryAfter;}
 }
 // Closed source-metadata findings from the existing PDF worker protocol.
@@ -331,9 +332,12 @@ export class PoliteFetcher {
     if(error instanceof PoliteFetchError&&error.failure==='http_error'&&(error.status===404||error.status===410))return {rules:[],delayMs:0,evidence:{url:new URL('/robots.txt',url).href,locator:'robots.txt HTTP absence',value:String(error.status),checkedAt:new Date().toISOString()}};
     // Transport/runtime errors (including network_error) and unknown exceptions
     // are not evidence that a fetched policy is unavailable or invalid.
-    if(!(error instanceof PoliteFetchError)||error.status===429||(error.failure!=='http_error'&&error.failure!=='robots_unavailable'))throw error;
-    const failure=new PoliteFetchError('robots_unavailable',`Robots policy unavailable${error instanceof PoliteFetchError&&error.status?` (policy HTTP ${error.status})`:''}; source existence is unknown`,error instanceof PoliteFetchError?error.status:undefined,undefined,error instanceof PoliteFetchError?error.retryAfter:undefined);
-    failure.robotsEvidence=error instanceof PoliteFetchError&&error.robotsEvidence?error.robotsEvidence:{url:new URL('/robots.txt',url).href,locator:'Actual robots retrieval/interpretation attempt unavailable',value:'unavailable',checkedAt:result?.checkedAt??attemptedAt,...(result?{sha256:result.sha256}:{})};throw failure;
+    const failure=error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Robots policy check failed',undefined,undefined,undefined,error);
+    failure.policyPhase??='robots';
+    if(failure.status===429||(failure.failure!=='http_error'&&failure.failure!=='robots_unavailable'))throw failure;
+    const unavailable=new PoliteFetchError('robots_unavailable',`Robots policy unavailable${failure.status?` (policy HTTP ${failure.status})`:''}; source existence is unknown`,failure.status,undefined,failure.retryAfter,failure);
+    unavailable.policyPhase=failure.policyPhase;
+    unavailable.robotsEvidence=failure.robotsEvidence??{url:new URL('/robots.txt',url).href,locator:'Actual robots retrieval/interpretation attempt unavailable',value:'unavailable',checkedAt:result?.checkedAt??attemptedAt,...(result?{sha256:result.sha256}:{})};throw unavailable;
    }
   })();cached={expiresAt:Date.now()+this.options.policyTtlMs,response:pending};this.robots.set(url.origin,cached);}
   return cached.response;
@@ -355,8 +359,11 @@ export class PoliteFetcher {
      if(!knownUrl&&error instanceof PoliteFetchError&&error.failure==='http_error'&&(error.status===404||error.status===410))return {rules:[],evidence:{url:redirectChain?.at(-1)??policyUrl,locator:`TDMRep standardized location HTTP absence${redirectChain&&redirectChain.length>1?' after same-host redirect':''}`,value:String(error.status),checkedAt:new Date().toISOString()}};
      // Only actual HTTP/policy-representation failures become policy unavailability.
      // Preserve network_error, DNS/timeout, cache/limit/redirect and unknown errors.
-     if(!(error instanceof PoliteFetchError)||error.status===429||(error.failure!=='http_error'&&error.failure!=='tdm_unavailable'))throw error;
-     throw new PoliteFetchError('tdm_unavailable',`Machine-readable TDM policy could not be checked${error instanceof PoliteFetchError&&error.status?` (policy HTTP ${error.status})`:''}; ask municipality`,error instanceof PoliteFetchError?error.status:undefined,undefined,error instanceof PoliteFetchError?error.retryAfter:undefined);
+     const failure=error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','TDM policy check failed',undefined,undefined,undefined,error);
+     failure.policyPhase??='tdm';
+     if(failure.status===429||(failure.failure!=='http_error'&&failure.failure!=='tdm_unavailable'))throw failure;
+     const unavailable=new PoliteFetchError('tdm_unavailable',`Machine-readable TDM policy could not be checked${failure.status?` (policy HTTP ${failure.status})`:''}; ask municipality`,failure.status,undefined,failure.retryAfter,failure);
+     unavailable.policyPhase=failure.policyPhase;throw unavailable;
     }
    })();cached={expiresAt:Date.now()+this.options.policyTtlMs,response:pending};this.machinePolicies.set(cacheKey,cached);
   }
@@ -376,6 +383,7 @@ export class PoliteFetcher {
    const policy:SourceAccessPolicy={robots:{state:'unavailable',url:new URL('/robots.txt',url).href},tdm:{state:'unavailable',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'};
    observation.policy=policy;
    let requestMetadataPath:string|undefined;
+   let policyPhase:PoliteFetchError['policyPhase']=resource==='document'?null:resource;
    try{
     await this.assertHostAllowed(url.href);
     if(/\/(?:login|signin|auth|anmelden)(?:\/|$)/i.test(url.pathname)){policy.access='authentication';throw new PoliteFetchError('access_barrier','Authentication endpoint is outside public acquisition');}
@@ -477,6 +485,7 @@ export class PoliteFetcher {
      localPath=join(this.cacheDir,'sha256',sha256);
      Object.assign(observation,{state:'fetched',sha256,retrievedAt,mimeType,bytes:representation.length});
     }
+    if(checkTdm)policyPhase='tdm';
     const inspectionContext:ParserSourceContext={...this.activeLane!,root:this.cacheDir,kind:'fetch',purpose:'classification',bindings:[{phase:'pre-admission',url:url.href,sourceSha256:sha256}]};
     const resourcePolicy=await (this.fixtureInspection?.resource??inspectResourcePolicySandbox)(url.href,response.headers,representation,mimeType,inspectionContext);
     if(retainedPolicyEvidence){
@@ -552,6 +561,7 @@ export class PoliteFetcher {
      policy.ownerTdmOverride=ownerRobotsOverrideFor(url.href)!;policy.tdmOverride='owner-approved 2026-10-11';
     }
     if(checkTdm&&!effectiveSourcePermission(policy,{url:url.href,sha256}))throw new PoliteFetchError(policy.tdm.state==='reserved'?'tdm_reserved':'tdm_unavailable','Source policy does not authorize retaining this representation');
+    policyPhase=null;
     observation.etag=response.headers.etag??observation.etag;observation.lastModified=response.headers['last-modified']??observation.lastModified;
     const observationPath=join(this.cacheDir,'observations',`${Date.now()}-${randomUUID()}.json`),observationBytes=this.encodeObservation(observation);
     const persist=async()=>{
@@ -565,7 +575,7 @@ export class PoliteFetcher {
     if(error instanceof RequestAdmissionInterruption){Object.assign(policy,projectSourcePolicyMetadata(policy));observation.policy=policy;observation.state='failed';observation.failure='host_admission_deferred';await this.observation(observation);throw error;}
     if(error instanceof PoliteFetchError&&error.excludedDocument)throw error;
     Object.assign(policy,projectSourcePolicyMetadata(policy));observation.policy=policy;
-    const failure=error instanceof PoliteFetchError?error:error instanceof HostOptedOutError?new PoliteFetchError('host_opted_out','Host objection is active; source retention stopped'):error instanceof CivicPolicyStateError?new PoliteFetchError('host_state_unsafe','Managed source inventory is incomplete or unavailable; use an explicitly registered safe acquisition lane'):new PoliteFetchError('network_error','Fetch or cache operation failed',undefined,undefined,undefined,error);failure.policy=policy;observation.state='failed';observation.failure=failure.failure;observation.retryAfter=failure.retryAfter;await this.observation(observation);
+    const failure=error instanceof PoliteFetchError?error:error instanceof HostOptedOutError?new PoliteFetchError('host_opted_out','Host objection is active; source retention stopped'):error instanceof CivicPolicyStateError?new PoliteFetchError('host_state_unsafe','Managed source inventory is incomplete or unavailable; use an explicitly registered safe acquisition lane'):new PoliteFetchError('network_error','Fetch or cache operation failed',undefined,undefined,undefined,error);failure.policyPhase??=policyPhase;failure.policy=policy;observation.state='failed';observation.failure=failure.failure;observation.retryAfter=failure.retryAfter;await this.observation(observation);
     // A failed admission does not undo a 304's representation-header update.
     if(observation.status===304&&observation.sha256&&observation.retrievedAt&&requestMetadataPath){
      await mkdir(join(this.cacheDir,'requests'),{recursive:true});const temporary=requestMetadataPath+'.'+randomUUID()+'.tmp';

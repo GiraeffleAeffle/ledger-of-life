@@ -400,3 +400,39 @@ test('permission denial remains structured when its durable metadata checkpoint 
  const failing:CouncilStorage={...storage,checkpoint:async()=>{throw Error('Synthetic unavailable checkpoint');}},denial=new PoliteFetchError('http_error','Synthetic HTTP403',403);
  await assert.rejects(traverseCouncilList(body,'paper',failing,async()=>{throw denial;},{now:'2026-10-11T12:00:00.000Z'}),error=>error instanceof AggregateError&&error.errors[0]===denial&&isCouncilPermissionFailure(error));
 });
+
+for(const phase of ['robots','tdm'] as const)test(`council ${phase} transport failures cannot reuse preloaded records or completed cache`,async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t),city=cities.find(city=>city.id==='koeln')!;
+ const selected:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body',paper:city.councilBodyId+'/paper'};
+ const record:OparlRecord={id:selected.paper+'/1',body:selected.id,type:'https://schema.oparl.org/1.1/Paper',name:'Synthetic preloaded council record',date:'2026-09-01',modified:'2026-09-02T00:00:00Z'},storage=memoryStorage();
+ const initial=await traverseCouncilList(selected,'paper',storage,pageLoader({[selected.paper!]:{data:[record]}}),{now:at});assert.equal(initial.records.size,1);
+ const acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy,fixtureInspection:fixturePolicyInspection});acquisition.bindBody(selected);
+ const denial=new PoliteFetchError('network_error','Synthetic mandatory policy transport failure'),seen:string[]=[];
+ t.mock.method(acquisition.fetcher as unknown as CouncilWireSeam,'wire',async(url:URL)=>{
+  seen.push(url.pathname);
+  if(url.pathname===(phase==='robots'?'/robots.txt':'/.well-known/tdmrep.json'))throw denial;
+  assert.equal(url.pathname,'/robots.txt');return {status:404,headers:{},body:Buffer.alloc(0)};
+ });
+ const returned:unknown[]=[];
+ for(const [now,reuseCompleteMs] of [['2026-10-11T12:00:00.000Z',0],['2026-10-11T12:01:00.000Z',48*60*60_000]] as const){
+  await assert.rejects(async()=>{returned.push(await traverseCouncilList(selected,'paper',storage,acquisition.loadJson,{now,reuseCompleteMs}));},error=>error===denial&&denial.policyPhase===phase&&isCouncilPermissionFailure(error));
+  assert.match((await storage.load())!.error!,/Current source permission/);
+ }
+ assert.deepEqual(returned,[]);assert.equal(acquisition.fetcher.requestCount,2);
+ assert.deepEqual(seen,phase==='robots'?['/robots.txt']:['/robots.txt','/.well-known/tdmrep.json']);
+});
+
+test('ordinary council document transport errors keep partial availability without policy-phase context',async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t),city=cities.find(city=>city.id==='koeln')!;
+ const selected:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body',paper:city.councilBodyId+'/paper'};
+ const record:OparlRecord={id:selected.paper+'/1',body:selected.id,type:'https://schema.oparl.org/1.1/Paper',name:'Synthetic preloaded council record',date:'2026-09-01',modified:'2026-09-02T00:00:00Z'},storage=memoryStorage();
+ await traverseCouncilList(selected,'paper',storage,pageLoader({[selected.paper!]:{data:[record]}}),{now:at});
+ const acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy,fixtureInspection:fixturePolicyInspection});acquisition.bindBody(selected);
+ const failure=new PoliteFetchError('network_error','Synthetic ordinary document transport failure');
+ t.mock.method(acquisition.fetcher as unknown as CouncilWireSeam,'wire',async(url:URL)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  throw failure;
+ });
+ const partial=await traverseCouncilList(selected,'paper',storage,acquisition.loadJson,{now:'2026-10-11T12:00:00.000Z'});
+ assert.equal(partial.records.size,1);assert.equal(failure.policyPhase,null);assert.equal(isCouncilPermissionFailure(failure),false);
+});
