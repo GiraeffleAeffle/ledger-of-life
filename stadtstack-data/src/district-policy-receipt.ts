@@ -14,6 +14,7 @@ export const PolicyReceiptSchema=z.object({version:z.literal(POLICY_RECEIPT_VERS
  const fail=(message:string)=>ctx.addIssue({code:'custom',message});
  if(Date.parse(receipt.expiresAt)<=Date.parse(receipt.checkedAt)||Date.parse(receipt.expiresAt)-Date.parse(receipt.checkedAt)>24*60*60*1000)fail('Policy receipt validity must be positive and at most 24 hours');
  if(receipt.permission.kind==='distribution_licence'&&receipt.permission.distributionUrl!==receipt.source.url)fail('Distribution licence does not bind exact received URL');
+ if(receipt.sourcePolicy.access==='authenticated_owner_account'&&receipt.permission.kind!=='facts_with_attribution')fail('Owner account permission is facts_with_attribution only');
  if(receipt.policySnapshotSha256!==semanticHash({source:receipt.source,scope:receipt.scope,sourcePolicy:receipt.sourcePolicy,permission:receipt.permission,authorityId:receipt.authorityId,authoritySha256:receipt.authoritySha256,optOutSnapshotSha256:receipt.optOutSnapshotSha256}))fail('Policy snapshot hash mismatch');
 });
 export type PolicyReceipt=z.infer<typeof PolicyReceiptSchema>;
@@ -23,6 +24,7 @@ export interface PolicyRecheckResult {receipt:PolicyReceipt;receiptSha256:string
 function assertSharedAdmission(receipt:Pick<PolicyReceipt,'source'|'sourcePolicy'|'permission'>):void {
  assertSubscriptionSourcePolicy(receipt.sourcePolicy,receipt.source);
  if(!effectiveSourcePermission(receipt.sourcePolicy,receipt.source))throw Error('Shared source policy excludes bytes');
+ if(receipt.sourcePolicy.access==='authenticated_owner_account'&&receipt.permission.kind!=='facts_with_attribution')throw Error('Owner account permission is facts_with_attribution only');
  if(receipt.permission.kind==='official_work'&&receipt.sourcePolicy.documentOrigin?.classification!=='official_work')throw Error('Official-work permission lacks exact-byte classification');
  if(receipt.permission.kind==='distribution_licence'&&receipt.permission.distributionUrl!==receipt.source.url)throw Error('Distribution permission mismatch');
 }
