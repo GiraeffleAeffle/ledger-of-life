@@ -198,6 +198,65 @@ test('inventory edits and root inode replacement fail closed with durable error 
  const changed=await purgeOptedOutHost('council.test', fixturePolicy(stateDir));assert.equal(changed.status,'partial');assert.equal(changed.deletedFiles,0);assert.equal(await readFile(join(root,entry.relativePath),'utf8'),bytes);
 });
 
+test('cached inventory rejects different bytes even when tampering preserves its size',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),bytes='cached raw source',entry=rawEntry(bytes);
+ await registerManagedCacheRoot(root,{kind:'fetch',...policy});await publish(root,entry,bytes,stateDir);
+ const path=join(stateDir,'inventory.json'),original=await readFile(path,'utf8');
+ for(const tamper of ['schema','entry-identity'] as const){
+  await writeFile(path,original,{mode:0o600});
+  await assertManagedSourceReadable(join(root,entry.relativePath),policy);
+  await assertManagedSourceReadable(join(root,entry.relativePath),policy);
+  const value=JSON.parse(original);
+  if(tamper==='schema')value.entries[0].contentSha256='g'+value.entries[0].contentSha256.slice(1);
+  else value.entries[0].host='counci1.test';
+  const changed=JSON.stringify(value)+'\n';
+  assert.notEqual(changed,original);assert.equal(Buffer.byteLength(changed),Buffer.byteLength(original));
+  await writeFile(path,changed,{mode:0o600});
+  await assert.rejects(assertManagedSourceReadable(join(root,entry.relativePath),policy),CivicPolicyStateError);
+  assert.equal(await readFile(path,'utf8'),changed);assert.equal(await readFile(join(root,entry.relativePath),'utf8'),bytes);
+ }
+});
+
+test('cached inventory parses independent objects without leaking nested mutations',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),entry=rawEntry('independent cached source');
+ await registerManagedCacheRoot(root,{kind:'fetch',...policy});await publish(root,entry,'independent cached source',stateDir);
+ await assertManagedSourceReadable(join(root,entry.relativePath),policy);
+ const serialized=await readFile(join(stateDir,'inventory.json'),'utf8'),expected=JSON.parse(serialized);
+ const parsed:Array<typeof expected>=[],originalParse=JSON.parse;
+ // Observe the actual fresh inventory parses through the public locked reader,
+ // without exporting a private loader or replacing any authority/file checks.
+ t.mock.method(JSON,'parse',(...args:Parameters<typeof JSON.parse>)=>{
+  const value=originalParse(...args);if(args[0]===serialized)parsed.push(value);return value;
+ });
+ await assertManagedSourceReadable(join(root,entry.relativePath),policy);assert.equal(parsed.length,1);
+ const first=parsed[0];first.roots[0].complete=false;first.entries[0].state='revoked';first.scratch.push({invalid:'mutation'});first.entries.push({...first.entries[0]});
+ await assertManagedSourceReadable(join(root,entry.relativePath),policy);assert.equal(parsed.length,2);
+ const second=parsed[1];assert.notStrictEqual(second,first);assert.notStrictEqual(second.roots,first.roots);assert.notStrictEqual(second.roots[0],first.roots[0]);assert.notStrictEqual(second.entries[0],first.entries[0]);assert.notStrictEqual(second.scratch,first.scratch);
+ assert.deepEqual(second,expected);assert.equal(await readFile(join(stateDir,'inventory.json'),'utf8'),serialized);
+});
+
+for(const missingDefault of ['scratch','resources'] as const)test('noncanonical inventory retains '+missingDefault+' default through recovery before canonical save',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),entry=rawEntry('legacy cached source');
+ await registerManagedCacheRoot(root,{kind:'fetch',...policy});await publish(root,entry,'legacy cached source',stateDir);
+ if(missingDefault==='resources')await closedRetirementLease(root,stateDir);
+ const path=join(stateDir,'inventory.json'),legacy=JSON.parse(await readFile(path,'utf8'));
+ if(missingDefault==='scratch')delete legacy.scratch;
+ else{
+  // A recoverable non-closed lease must consume resources before its save;
+  // a closed lease would bypass that default-consuming cleanup path.
+  legacy.scratch[0].state='planned';delete legacy.scratch[0].resources;
+ }
+ const serialized=JSON.stringify(legacy)+'\n';await writeFile(path,serialized,{mode:0o600});
+ for(let i=0;i<2;i++)await assertManagedSourceReadable(join(root,entry.relativePath),policy);
+ assert.equal(await readFile(path,'utf8'),serialized);
+ // Recovery consumes both defaults before canonicalizing anything on disk.
+ const recovery=await recoverManagedSourceScratch(policy);assert.equal(recovery.status,'complete');assert.deepEqual(recovery.pendingLeases,[]);
+ const saved=JSON.parse(await readFile(path,'utf8'));
+ if(missingDefault==='scratch'){assert.deepEqual(recovery.recoveredLeases,[]);assert.deepEqual(saved.scratch,[]);}
+ else{assert.deepEqual(recovery.recoveredLeases,[legacy.scratch[0].id]);assert.deepEqual(saved.scratch[0].resources,[]);assert.equal(saved.scratch[0].state,'purged');}
+ await assertManagedSourceReadable(join(root,entry.relativePath),policy);
+});
+
 test('crashed producer enrollment is retained and a missing content file is accounted for on purge',async t=>{
  const {root,stateDir}=await sandbox(t);await initializeManagedAcquisitionLane(root, {decisionId: CIVIC_ACQUISITION_DECISION_ID, ...fixturePolicy(stateDir)});const entry=rawEntry('not-written');
  await assert.rejects(withManagedSourceWrite(root, [entry], async()=>{throw Error('synthetic crash');}, fixturePolicy(stateDir)),/synthetic crash/);
