@@ -101,6 +101,10 @@ const checkpointMetadataSchema=z.object({
 type Root=z.infer<typeof rootSchema>;
 type Entry=z.infer<typeof entrySchema>;
 type Inventory=z.infer<typeof inventorySchema>;
+// Only exact canonical inventory bytes are memoized, never mutable inventories.
+// Legacy bytes requiring codec defaults stay on the full-validation path until
+// a save emits the fully parsed value. Authority and safe-file reads stay live.
+const validatedInventoryBytes=new Map<string,string>();
 // Transaction-local acceleration only; no index is serialized or reused across
 // disk loads. Buckets keep the inventory's insertion order and entry objects,
 // so state transitions are visible without rebuilding any index.
@@ -448,8 +452,15 @@ function makeEntry(root:Root,input:ManagedSourceContent):Entry{
  return entrySchema.parse({...value,id:entryId(value),state:'active'});
 }
 async function loadInventory(state:string):Promise<Inventory>{
- let value:Inventory;try{value=inventorySchema.parse(JSON.parse((await fileBytes(join(state,'inventory.json'),MAX_STATE,true)).bytes.toString('utf8')));}catch{throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');}
+ let value:Inventory,bytes:Buffer,sha256:string,validated:boolean;
+ try{
+  bytes=(await fileBytes(join(state,'inventory.json'),MAX_STATE,true)).bytes;sha256=digest(bytes);
+  validated=validatedInventoryBytes.get(state)===sha256;
+  value=JSON.parse(bytes.toString('utf8'));
+  if(!validated){validatedInventoryBytes.delete(state);value=inventorySchema.parse(value);}
+ }catch{validatedInventoryBytes.delete(state);throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');}
  const authority=authoritySchema.parse(JSON.parse((await fileBytes(join(state,AUTHORITY_MARKER),8192,true)).bytes.toString('utf8')));if(value.inventoryId!==authority.inventoryId)throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
+ if(validated)return value;
  const roots=new Map(value.roots.map(root=>[root.id,root]));
  if(roots.size!==value.roots.length||inventoryIndex(value).byId.size!==value.entries.length)throw new CivicPolicyStateError();
  for(const root of value.roots)if(root.id!==digest(root.path)||root.path!==resolve(root.path))throw new CivicPolicyStateError();
@@ -459,14 +470,17 @@ async function loadInventory(state:string):Promise<Inventory>{
   if(!roots.has(lease.rootId)||lease.directory!=='scratch/'+lease.id||lease.sources.some(source=>source.host!==canonicalHost(source.host)||source.kind==='pre_admission'&&lease.purpose!=='classification'||source.kind==='preparation_input'&&lease.purpose!=='document'||['authenticated_git_snapshot','operator_registry_config'].includes(source.kind)&&lease.purpose!=='artifact'))throw new CivicPolicyStateError();
   if(new Set(lease.resources.map(resource=>resource.id)).size!==lease.resources.length||lease.resources.some(resource=>resource.scratchId!==lease.id||resource.rootId!==lease.rootId||resource.name!==('profile' in resource?'stadtstack-omp-b-':'stadtstack-parser-')+lease.id+'-'+resource.nonce||resource.artifactRelativePath===null&&(resource.artifactSha256!==null||resource.artifactBytes!==null)||resource.artifactRelativePath!==null&&(resource.artifactSha256===null||resource.artifactBytes===null)))throw new CivicPolicyStateError('DAEMON_RESOURCE_BINDING_MISMATCH');
  }
+ if(bytes.equals(Buffer.from(JSON.stringify(value)+'\n')))validatedInventoryBytes.set(state,sha256);
  return value;
 }
 async function saveInventory(state:string,value:Inventory){
- // Full save validation remains inexpensive at the projected production size;
- // retain the exact codec rather than maintaining a second incremental validator.
- inventorySchema.parse(value);const serialized=JSON.stringify(value);
+ // Always retain the exact full codec; no second incremental validator. Reuse
+ // its parsed result so saved/cached bytes include every codec default. The
+ // already-single serialization is passed through atomicJson without a repeat.
+ const parsed=inventorySchema.parse(value),serialized=JSON.stringify(parsed);
  if(Buffer.byteLength(serialized)+1>MAX_STATE)throw new CivicPolicyStateError();
- await atomicJson(join(state,'inventory.json'),value,false,true,serialized);
+ await atomicJson(join(state,'inventory.json'),parsed,false,true,serialized);
+ validatedInventoryBytes.set(state,createHash('sha256').update(serialized).update('\n').digest('hex'));
 }
 async function verifyRoot(root:Root){if(!sameIdentity(root.identity,await directory(root.path)))throw new CivicPolicyStateError();}
 function mergeEntries(inventory:Inventory,entries:Entry[]){

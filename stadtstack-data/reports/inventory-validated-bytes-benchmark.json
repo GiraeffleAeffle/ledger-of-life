@@ -1,0 +1,385 @@
+{
+  "schemaVersion": "stadtstack-inventory-validated-bytes-benchmark-v1",
+  "baselineSourceCommit": "103abc5",
+  "runtime": "v24.21.0",
+  "fixture": {
+    "entries": 150000,
+    "serializedBytesIncludingNewline": 115942135,
+    "httpObservationEntries": 60000,
+    "preparedSourceEntries": 60000,
+    "retainedPublicationEntries": 30000,
+    "productionStateAccessed": false
+  },
+  "method": {
+    "generation": "150000 canonical makeEntry entries (60000 HTTP, 60000 prepared, 30000 retained); real SHA256 hashes; isolated fixture UUID authority; stages include bounded safe read, UTF8 decoding in JSON.parse, full strict codec, structural checks/index construction, atomic replacement and file/directory fsync; lock wait/acquisition excluded; 3 samples each; no production data/state or network",
+    "authorization": "Executed only after Main sent GO bench; every benchmark and test command used umask 022 and taskset -c 0-3 nice -n 10.",
+    "isolation": "Fresh realpath/mkdtemp fixture:<UUID> realm provisioned with provisionCivicPolicyAuthority and three canonical initialized lanes. makeEntry and inventorySchema were exported only from disposable source copies; entries use real SHA256 hashes. Fixture directories and source copies were removed after each run.",
+    "measurement": "performance.now stage timers injected into disposable copies of the exact before/after source. Three samples per mode. Timers include safe bounded reads, UTF8 decoding in JSON.parse, full schema parse, structural checks and transient index construction, stringify, atomic replacement and file/directory fsync. Lock acquisition and its authority preflight are excluded from timings, but locked() runs them normally. Atomic totals include prior-inventory safe read, temporary-file write/sync, rename and parent sync; write/fsync stages are subsets, not additive extra work.",
+    "uninstrumented": "Separate disposable source copies with export-only changes supplied full load/save totals. After load iteration 0 is cold; iterations 1 and 2 are warm following save. Instrumented coldLoad explicitly clears only the process-local digest entry; cachedLoad follows a cold validation; savedBytesLoad follows saveInventory.",
+    "comparison": "Identical entry counts, kind distribution and serialized size; UUIDs, paths and filesystem identities differ between disposable realms. This 115.94 MB synthetic fixture is not the production inventory and does not reproduce production sandbox latency.",
+    "aggregation": "Median of three samples per mode and stage; independent stage medians need not sum to the total median."
+  },
+  "medianStageTimingsMs": {
+    "before": {
+      "load": {
+        "total": 4107.26,
+        "read": 147.675,
+        "jsonParse": 478.723,
+        "schema": 1134.595,
+        "authority": 1.549,
+        "structural": 2296.43
+      },
+      "save": {
+        "total": 2218.436,
+        "schema": 1128.576,
+        "stringify": 466.538,
+        "write": 394.626,
+        "fileFsync": 49.942,
+        "directoryFsync": 3.0,
+        "atomic": 596.412
+      }
+    },
+    "after": {
+      "cachedLoad": {
+        "total": 784.568,
+        "read": 153.01,
+        "sha256": 145.68,
+        "jsonParse": 466.454,
+        "authority": 12.615
+      },
+      "coldLoad": {
+        "total": 4986.142,
+        "read": 153.614,
+        "sha256": 150.079,
+        "jsonParse": 524.245,
+        "schema": 1064.459,
+        "authority": 1.685,
+        "structural": 2177.901,
+        "canonicalComparison": 814.783
+      },
+      "save": {
+        "total": 2396.768,
+        "schema": 1033.721,
+        "stringify": 481.288,
+        "write": 372.766,
+        "fileFsync": 52.373,
+        "directoryFsync": 11.962,
+        "atomic": 601.754,
+        "sha256": 245.738
+      },
+      "savedBytesLoad": {
+        "total": 792.824,
+        "read": 154.424,
+        "sha256": 147.825,
+        "jsonParse": 468.226,
+        "authority": 10.749
+      }
+    }
+  },
+  "samples": {
+    "before": [
+      {
+        "iteration": 0,
+        "mode": "load",
+        "total": 4182.840817999999,
+        "read": 150.51051999999981,
+        "jsonParse": 524.4579880000001,
+        "schema": 1209.9328430000005,
+        "authority": 1.3762619999997696,
+        "structural": 2296.429908
+      },
+      {
+        "iteration": 0,
+        "mode": "save",
+        "total": 2432.481836000001,
+        "schema": 1141.9525090000006,
+        "stringify": 581.764733,
+        "write": 401.0062000000016,
+        "fileFsync": 68.69683499999883,
+        "directoryFsync": 3.5305389999994077,
+        "atomic": 663.8613949999999
+      },
+      {
+        "iteration": 1,
+        "mode": "load",
+        "total": 4107.2603119999985,
+        "read": 147.67542800000228,
+        "jsonParse": 472.9424519999993,
+        "schema": 1134.5949299999993,
+        "authority": 1.5488980000009178,
+        "structural": 2350.356889999999
+      },
+      {
+        "iteration": 1,
+        "mode": "save",
+        "total": 2218.4362219999966,
+        "schema": 1128.5756059999985,
+        "stringify": 449.7274230000003,
+        "write": 369.19250399999873,
+        "fileFsync": 49.941563000000315,
+        "directoryFsync": 2.657875000000786,
+        "atomic": 596.412214
+      },
+      {
+        "iteration": 2,
+        "mode": "load",
+        "total": 3928.190856999998,
+        "read": 119.866446,
+        "jsonParse": 478.72335600000224,
+        "schema": 1112.4939829999967,
+        "authority": 1.885256000001391,
+        "structural": 2215.075069999999
+      },
+      {
+        "iteration": 2,
+        "mode": "save",
+        "total": 2149.946468000002,
+        "schema": 1060.4671579999995,
+        "stringify": 466.537733000001,
+        "write": 394.62615599999845,
+        "fileFsync": 39.675710999999865,
+        "directoryFsync": 2.999975999999151,
+        "atomic": 574.7937320000019
+      }
+    ],
+    "after": [
+      {
+        "iteration": 0,
+        "mode": "coldLoad",
+        "total": 4986.141647,
+        "read": 153.61439000000064,
+        "sha256": 135.9092810000002,
+        "jsonParse": 575.1963039999991,
+        "schema": 1158.8511340000005,
+        "authority": 1.4967429999996966,
+        "structural": 2146.0474830000003,
+        "canonicalComparison": 814.7834540000003
+      },
+      {
+        "iteration": 0,
+        "mode": "cachedLoad",
+        "total": 769.2678599999999,
+        "read": 153.01040699999976,
+        "sha256": 137.71840599999996,
+        "jsonParse": 473.6637219999993,
+        "authority": 4.734543000000485
+      },
+      {
+        "iteration": 0,
+        "mode": "save",
+        "total": 2373.976197,
+        "schema": 1033.7206809999989,
+        "stringify": 454.54849699999977,
+        "write": 372.7664540000005,
+        "fileFsync": 52.3729450000028,
+        "directoryFsync": 10.860138999996707,
+        "atomic": 597.2254250000005,
+        "sha256": 244.18623200000002
+      },
+      {
+        "iteration": 0,
+        "mode": "savedBytesLoad",
+        "total": 792.8236610000022,
+        "read": 154.424160999999,
+        "sha256": 136.70293599999786,
+        "jsonParse": 488.3618090000018,
+        "authority": 13.167500999999902
+      },
+      {
+        "iteration": 1,
+        "mode": "coldLoad",
+        "total": 4989.166674,
+        "read": 165.01207799999975,
+        "sha256": 163.16752500000075,
+        "jsonParse": 524.245092000001,
+        "schema": 1064.4591499999988,
+        "authority": 1.9856970000000729,
+        "structural": 2217.994584,
+        "canonicalComparison": 852.0353639999994
+      },
+      {
+        "iteration": 1,
+        "mode": "cachedLoad",
+        "total": 788.3345499999996,
+        "read": 148.48781999999846,
+        "sha256": 160.56965599999967,
+        "jsonParse": 466.4538169999978,
+        "authority": 12.615318000000116
+      },
+      {
+        "iteration": 1,
+        "mode": "save",
+        "total": 2526.326629000003,
+        "schema": 1075.299328000001,
+        "stringify": 481.28842200000145,
+        "write": 436.83274399999937,
+        "fileFsync": 68.85554899999988,
+        "directoryFsync": 12.100389999999607,
+        "atomic": 670.0227639999976,
+        "sha256": 253.00127300000167
+      },
+      {
+        "iteration": 1,
+        "mode": "savedBytesLoad",
+        "total": 793.3400929999989,
+        "read": 164.94223599999896,
+        "sha256": 149.29396800000177,
+        "jsonParse": 468.22623199999725,
+        "authority": 10.748609999998735
+      },
+      {
+        "iteration": 2,
+        "mode": "coldLoad",
+        "total": 4769.513902999999,
+        "read": 125.22062000000005,
+        "sha256": 150.0787420000015,
+        "jsonParse": 479.08850299999904,
+        "schema": 1049.701551000002,
+        "authority": 1.684653000000253,
+        "structural": 2177.9010430000017,
+        "canonicalComparison": 785.5726359999971
+      },
+      {
+        "iteration": 2,
+        "mode": "cachedLoad",
+        "total": 784.5675639999972,
+        "read": 165.2396230000013,
+        "sha256": 145.67995399999927,
+        "jsonParse": 460.54724899999565,
+        "authority": 12.955633000005037
+      },
+      {
+        "iteration": 2,
+        "mode": "save",
+        "total": 2396.767507999997,
+        "schema": 1019.713720000007,
+        "stringify": 486.2908610000013,
+        "write": 372.4022000000041,
+        "fileFsync": 51.90332599999965,
+        "directoryFsync": 11.961741000006441,
+        "atomic": 601.7535350000035,
+        "sha256": 245.73832699999912
+      },
+      {
+        "iteration": 2,
+        "mode": "savedBytesLoad",
+        "total": 747.2660710000055,
+        "read": 141.24198700000125,
+        "sha256": 147.82533700000204,
+        "jsonParse": 448.3890640000027,
+        "authority": 9.64508300000307
+      }
+    ]
+  },
+  "uninstrumentedTotalsMs": {
+    "before": [
+      {
+        "iteration": 0,
+        "mode": "load",
+        "total": 3773.723785999995
+      },
+      {
+        "iteration": 0,
+        "mode": "save",
+        "total": 2152.782613000003
+      },
+      {
+        "iteration": 1,
+        "mode": "load",
+        "total": 3905.8520949999947
+      },
+      {
+        "iteration": 1,
+        "mode": "save",
+        "total": 1876.9356210000042
+      },
+      {
+        "iteration": 2,
+        "mode": "load",
+        "total": 3381.1318369999935
+      },
+      {
+        "iteration": 2,
+        "mode": "save",
+        "total": 2020.3306870000015
+      }
+    ],
+    "after": [
+      {
+        "iteration": 0,
+        "mode": "load",
+        "total": 4730.609989000004
+      },
+      {
+        "iteration": 0,
+        "mode": "save",
+        "total": 2246.3704629999993
+      },
+      {
+        "iteration": 1,
+        "mode": "load",
+        "total": 730.2897400000002
+      },
+      {
+        "iteration": 1,
+        "mode": "save",
+        "total": 2104.859104000003
+      },
+      {
+        "iteration": 2,
+        "mode": "load",
+        "total": 760.2522420000023
+      },
+      {
+        "iteration": 2,
+        "mode": "save",
+        "total": 2189.6670809999996
+      }
+    ]
+  },
+  "findings": {
+    "cachedLoadSpeedupRatio": 5.235,
+    "saveChangePercent": 8.04,
+    "interpretation": "Repeated load median fell from 4107.260 ms to 784.568 ms (5.235x). Cold load rose to 4986.142 ms because exact canonical-byte comparison adds serialization/buffer comparison, and every load hashes freshly read bytes. Save median rose from 2218.436 ms to 2396.768 ms (+8.04%), including 245.738 ms for hashing the canonical output. No save speedup is claimed.",
+    "saveDecision": "Baseline already serializes once and passes serialized JSON to atomicJson. Stringify is material (~466.538 ms), but no duplicate stringify exists to remove. Keep full inventorySchema.parse and reuse its returned value to emit defaults canonically; no incremental validator was introduced.",
+    "cacheSemantics": "Process-local state-directory -> exact SHA256 only. Canonical fully validated loads seed the cache after all structural checks; noncanonical/legacy loads remain uncached. Successful fully parsed saves seed it after atomicJson completes. Matching fresh bounded file bytes still undergo JSON.parse and the authority marker/inventoryId check; no mutable object, TTL, mtime-only key or cross-process cache file is retained."
+  },
+  "verification": {
+    "command": "umask 022 && taskset -c 0-3 nice -n 10 /home/max/.local/share/mise/installs/node/24.21.0/bin/node --experimental-strip-types --test --test-concurrency=1 test/civic-opt-out.test.ts",
+    "tests": 94,
+    "passed": 94,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "durationMs": 37160.052968,
+    "regressions": [
+      "Same-size changed bytes fail both schema and entry-identity validation after cached reads.",
+      "Fresh cached JSON parses have independent inventory arrays and nested objects; mutating one does not alter another or disk bytes.",
+      "Separate noncanonical legacy fixtures missing scratch and missing scratch.resources exercise recovery after warm reads and before any canonicalizing save; the resources lease is planned/non-closed so cleanup consumes its default."
+    ],
+    "mutationProof": {
+      "mutation": "Temporarily replaced the canonical-byte comparison with unconditional validatedInventoryBytes.set(state,sha256) after a successful cold load.",
+      "command": "umask 022 && taskset -c 0-3 nice -n 10 /home/max/.local/share/mise/installs/node/24.21.0/bin/node --experimental-strip-types --test --test-concurrency=1 --test-name-pattern='noncanonical inventory retains' test/civic-opt-out.test.ts",
+      "expectedFailureExitCode": 1,
+      "tests": 2,
+      "passed": 0,
+      "failed": 2,
+      "failures": [
+        "Missing scratch: TypeError: inventory.scratch is not iterable at recoverManagedSourceScratch.",
+        "Missing resources on planned lease: TypeError: Cannot read properties of undefined (reading 'length') at cleanScratch."
+      ],
+      "durationMs": 1213.439811,
+      "restoration": "Restored the exact canonical-byte comparison before running typecheck and the full test file; both regressions then passed."
+    },
+    "typecheck": {
+      "command": "umask 022 && R1_VERIFY_LOG_ROOT=\"$PWD/reports/.inventory-perf-typecheck\" taskset -c 0-3 nice -n 10 ./scripts/r1-verify.sh typecheck",
+      "exitCode": 0,
+      "output": "tsc=0"
+    },
+    "notRun": [
+      "Repository-wide tests",
+      "Docker/parser sentinels",
+      "Production/live acquisition jobs"
+    ]
+  }
+}
