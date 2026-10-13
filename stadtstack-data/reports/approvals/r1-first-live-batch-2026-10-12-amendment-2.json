@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-first-live-batch-2026-10-12-amendment-2",
+  "amends": [
+    {"id": "r1-first-live-batch-2026-10-12", "path": "stadtstack-data/reports/approvals/r1-first-live-batch-2026-10-12.json", "sha256": "4fdff1a60c64f1c4ebfe49f4757bc8dca297db9060b89cf9f52d80c9b8bffba4"},
+    {"id": "r1-first-live-batch-2026-10-12-amendment-1", "path": "stadtstack-data/reports/approvals/r1-first-live-batch-2026-10-12-amendment-1.json", "sha256": "d49596ccea79f07ac420966d842c914589809a08c4406c19374a4d88af8b28dc"}
+  ],
+  "recordedAt": "2026-10-13T06:10:00Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session, after the lead explained why attended mode needs the owner at a terminal and that unattended would need a new approval",
+  "ownerStatementsVerbatim": [
+    "It would be good if you could do it unattended"
+  ],
+  "approvedChange": {
+    "mode": "bounded_unattended",
+    "scope": "K1 only: the two runs (acquire_representation, then structured_parse) defined by the original record and amendment 1",
+    "conditions": [
+      "Code-enforced unattended gates unchanged: durable ntfy startup acknowledgement on topic pipeline (existing PIPELINE_NOTIFICATION_APPROVAL of 2026-10-11) before any job is claimed; hold/checkpoint/failure notifications; no claim without the startup ACK.",
+      "Each run is bounded by scripts/r1-vm-run.sh (GNU timeout OS deadline) and its authorization's maxJobs/maxElapsedMs/expiresAt.",
+      "The R1 lead starts the runs only after the final parser sentinels pass on the authorized image, the code is frozen, migrations 002/003 are applied and a network-free rehearsal succeeds; the lead monitors each run and may stop it with SIGTERM.",
+      "Every other bound of the original record and amendment 1 is unchanged (25 min total, at most 5 jobs, one table/year, at most one data/table POST, facts_with_attribution, expiry 2026-10-14T21:59:59Z)."
+    ]
+  },
+  "notApproved": [
+    "PEGELONLINE or any other source",
+    "unattended execution beyond the two K1 runs",
+    "paid API execution or overage spending",
+    "merging the inventory performance change into the K1 code before its own review and sentinel re-run"
+  ]
+}
