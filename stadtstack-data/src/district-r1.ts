@@ -38,13 +38,15 @@ import type {StepReceipt,ReasonCode} from './district-step-receipt.ts';
 import type {StructuredSupportingSource} from './district-structured-record.ts';
 import {StructuredKnowledgeRecordSchema} from './district-structured-record.ts';
 import type {StructuredWorkerRequest} from './district-structured-parser-worker.ts';
-import {ResidualInputSchema,residualJobHandlers,enqueueResidualPreparation,enqueueCommittedResidualExtraction,exportResidualTextContribution} from './district-residual-jobs.ts';
+import {ResidualInputSchema,residualJobHandlersFor,enqueueResidualPreparation,enqueueCommittedResidualExtraction,exportResidualTextContribution} from './district-residual-jobs.ts';
 import {CrawlCorpusImportSchema,importCrawlCorpusForResidual} from './district-crawl-import.ts';
-import {DistrictAssessmentBroker,assessmentBJobHandler,enqueueAssessmentB,assessmentEvidenceArtifactHashes} from './district-assessment-broker.ts';
+import {DistrictAssessmentBroker,enqueueAssessmentB,assessmentEvidenceArtifactHashes} from './district-assessment-broker.ts';
 import {assessmentItemSchema} from './district-assessment.ts';
+import {assessmentQueueHandlers,enqueueResidualAssessmentItems,enqueuePreparedAssessmentPass,enqueueAssessmentResolution,exportAssessmentResults} from './district-assessment-jobs.ts';
 import {r1TextCompositionInputSchema,loadR1TextCompositionInput} from './district-r1-text-composition.ts';
 import {structuredFieldPublicationHold} from './district-public-fields.ts';
 import type {StructuredFieldHold} from './district-public-fields.ts';
+import {CrawlPolicyRefreshEnqueueSchema,enqueueCrawlPolicyRefresh,policyRefreshHandler} from './district-policy-refresh.ts';
 
 const REPO=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 export const R1_FETCH_ROOT=join(REPO,'cache/districts/r1-fetch');
@@ -232,19 +234,16 @@ export function acquisitionFailureReason(error:unknown):ReasonCode|null {
  return error instanceof PoliteFetchError&&Object.hasOwn(acquisitionFailureReasons,error.failure)?acquisitionFailureReasons[error.failure]:null;
 }
 export interface AcquisitionFixture {fetchRoot:string;policy:CivicPolicyOptions;inspection?:FixturePolicyInspection}
-export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegistry,fixture?:AcquisitionFixture):JobHandler{return async context=>{
- const selector=await validateAcquisitionSelector(registry,store,context.cas,context.job.spec.selector),contract=await acquisitionContract();
- if(context.job.spec.semanticContractSha256!==contract||semanticHash(context.job.spec.sourceScope)!==semanticHash(selector.scope))throw Error('Acquisition job contract mismatch');
- // A custom root/inspection seam is fixture-only, never a production authority override.
+/** Shared governed request admission for acquisition and current-policy jobs. */
+export async function createR1PublicFetcher(store:DistrictJobStore,context:Parameters<JobHandler>[0],options:{maxRequests:number;maxBytes:number;fixture?:AcquisitionFixture;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void}){
+ const fixture=options.fixture;
  if(fixture&&(await assertCivicPolicyAuthority(fixture.policy)).mode!=='isolated-fixture')throw Error('Acquisition fixture requires isolated authority');
  const fetchRoot=fixture?.fetchRoot??R1_FETCH_ROOT,policy=fixture?.policy??{};
- const {city,source}=registeredScope(registry,selector.scope,selector.root);await privateRoot(fetchRoot);
- await initializeManagedAcquisitionLane(fetchRoot,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'fetch'});
- let requests=0;const redirectChain=[selector.request.url];
+ await privateRoot(fetchRoot);await initializeManagedAcquisitionLane(fetchRoot,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'fetch'});
+ let requests=0;
  const group=HostGroupsSchema.parse(JSON.parse(await readFile(join(REPO,'sources/district-host-groups.json'),'utf8'))).serviceGroups[0],laneKey=`service:${group.id}`;
- const fetcher=new PoliteFetcher({cacheDir:fetchRoot,minDelayMs:group.minStartIntervalMs,maxBytes:selector.maxBytes,ownerPolicyLane:{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID},fixtureInspection:fixture?.inspection,beforeRequest:async url=>{
-  context.signal.throwIfAborted();if(++requests>selector.maxRequests)throw new DistrictExecutionHold('source_limit_exceeded');
-  // Capacity pooling never rewrites the actual URL/host used by SSRF, policy or redirect evidence.
+ return new PoliteFetcher({cacheDir:fetchRoot,minDelayMs:group.minStartIntervalMs,maxBytes:options.maxBytes,ownerPolicyLane:{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID},fixtureInspection:fixture?.inspection,beforeRequest:async url=>{
+  context.signal.throwIfAborted();if(++requests>options.maxRequests)throw new DistrictExecutionHold('source_limit_exceeded');
   if(!['http:','https:'].includes(new URL(url).protocol))throw Error('Non-public acquisition transport');
   const lane=await store.pool.query<{normalized_host:string;shared_service_group:string;max_in_flight:number;min_start_interval_ms:number}>('INSERT INTO district_pipeline.host_lanes(lane_key,normalized_host,shared_service_group,max_in_flight,min_start_interval_ms) VALUES($1,$2,$3,$4,$5) ON CONFLICT(lane_key) DO UPDATE SET lane_key=EXCLUDED.lane_key RETURNING normalized_host,shared_service_group,max_in_flight,min_start_interval_ms',[laneKey,'*',group.id,group.maxInFlight,group.minStartIntervalMs]);
   const configured=lane.rows[0];if(configured.normalized_host!=='*'||configured.shared_service_group!==group.id||configured.max_in_flight!==1||configured.min_start_interval_ms<group.minStartIntervalMs)throw Error('Pinned shared capacity configuration mismatch');
@@ -255,7 +254,18 @@ export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegis
   if(!Number.isSafeInteger(waitMs)||waitMs<0||waitMs>60000)throw new DistrictExecutionHold('host_delay');
   if(waitMs)await waitBeforeDispatch(waitMs,undefined,{signal:context.signal}).catch(error=>{context.signal.throwIfAborted();throw error;});
   await context.acquireHostLane(laneKey);context.signal.throwIfAborted();
- },onRedirect:event=>{if(event.requestUrl===selector.request.url)redirectChain.push(event.to);}});
+ },onRedirect:options.onRedirect});
+}
+export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegistry,fixture?:AcquisitionFixture):JobHandler{return async context=>{
+ const selector=await validateAcquisitionSelector(registry,store,context.cas,context.job.spec.selector),contract=await acquisitionContract();
+ if(context.job.spec.semanticContractSha256!==contract||semanticHash(context.job.spec.sourceScope)!==semanticHash(selector.scope))throw Error('Acquisition job contract mismatch');
+ // A custom root/inspection seam is fixture-only, never a production authority override.
+ if(fixture&&(await assertCivicPolicyAuthority(fixture.policy)).mode!=='isolated-fixture')throw Error('Acquisition fixture requires isolated authority');
+ const fetchRoot=fixture?.fetchRoot??R1_FETCH_ROOT,policy=fixture?.policy??{};
+ const {city,source}=registeredScope(registry,selector.scope,selector.root);await privateRoot(fetchRoot);
+ await initializeManagedAcquisitionLane(fetchRoot,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'fetch'});
+ const redirectChain=[selector.request.url];
+ const fetcher=await createR1PublicFetcher(store,context,{maxRequests:selector.maxRequests,maxBytes:selector.maxBytes,fixture,onRedirect:event=>{if(event.requestUrl===selector.request.url)redirectChain.push(event.to);}});
  let response:FetchedDocument;
  try{response=await fetcher.fetch(selector.request.url,{method:selector.request.method,body:selector.request.body??undefined,publicOperation:selector.request.publicOperation??undefined,ownerRobotsOverride:ownerRobotsOverrideFor(selector.root)??undefined,registeredSourceUrl:selector.root,municipalityName:city.name,machinePolicyUrls:source.knownMachinePolicyUrls});}
  catch(error){context.signal.throwIfAborted();const reasonCode=acquisitionFailureReason(error);if(reasonCode===null||reasonCode==='execution_exception')throw error;return {outcome:'held_execution',reasonCode,versions:{acquisition:contract}};}
@@ -378,8 +388,8 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
    if(authorizationIndex<0)throw Error('Explicit authorization required');
    const authorization=await pool.query<{has_b:boolean;only_b:boolean}>(`SELECT BOOL_OR(j.step='assessment_b') AS has_b,BOOL_AND(j.step='assessment_b') AS only_b FROM district_pipeline.preauthorizations a JOIN district_pipeline.jobs j ON j.job_key=ANY(a.allowed_job_keys) WHERE a.id=$1`,[authorizationId]);
    if(authorization.rows[0]?.has_b&&!authorization.rows[0]?.only_b)throw new DistrictExecutionHold('authorization_mode_mismatch');
-   const broker=new DistrictAssessmentBroker(pool,new DistrictCas(CAS_ROOT)),assessmentHandler=assessmentBJobHandler(broker);
-   await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlers,acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry),assessment_b:context=>{if(process.platform!=='linux')throw new DistrictExecutionHold('isolation_unavailable');return assessmentHandler(context);}},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
+   const refreshStore=new DistrictJobStore(pool),refresh=policyRefreshHandler(refreshStore,(context,maxRequests)=>createR1PublicFetcher(refreshStore,context,{maxRequests,maxBytes:1024*1024}));
+   await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlersFor(pool),...assessmentQueueHandlers(pool),policy_refresh:refresh,acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry)},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
   }finally{await pool.end();}return;
  }
  if(args.length)throw Error('R1 commands require only explicit registry configuration flags and bounded JSON stdin');
@@ -400,6 +410,11 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
    const manifest=CrawlCorpusImportSchema.parse(input);
    if(canonicalJson(manifest.registry)!==canonicalJson(registryPin))throw Error('Crawl import descriptor must match admitted CLI registry pin');
    process.stdout.write(canonicalJson(await importCrawlCorpusForResidual(store,cas,manifest))+'\n');return;
+  }
+  if(command==='enqueue-policy-refresh'){
+   const manifest=CrawlPolicyRefreshEnqueueSchema.parse(input);
+   if(canonicalJson(manifest.manifest.registry)!==canonicalJson(registryPin))throw Error('Refresh descriptor must match admitted CLI registry pin');
+   process.stdout.write(canonicalJson(await enqueueCrawlPolicyRefresh(store,cas,manifest))+'\n');return;
   }
   if(command==='export-text-contribution'){
    const manifest=z.object({jobKeys:z.array(HashSchema).min(1).max(10000),compositionArtifactSha256:HashSchema}).strict().parse(input),compositionPath=join(cas.root,'sha256',manifest.compositionArtifactSha256.slice(0,2),manifest.compositionArtifactSha256);
@@ -430,6 +445,25 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
   if(command==='enqueue-residual-extraction'){
    const manifest=z.object({preparationJobKeys:z.array(HashSchema).min(1).max(10000)}).strict().parse(input),jobKeys:string[]=[];
    for(const preparationJobKey of manifest.preparationJobKeys)jobKeys.push(await enqueueCommittedResidualExtraction(pool,store,cas,preparationJobKey));
+   process.stdout.write(canonicalJson({jobKeys})+'\n');return;
+  }
+  if(command==='assessment-results'){
+   const manifest=z.object({jobKeys:z.array(HashSchema).min(1).max(10000)}).strict().parse(input);
+   process.stdout.write(canonicalJson(await exportAssessmentResults(pool,cas,manifest.jobKeys))+'\n');return;
+  }
+  if(command==='enqueue-assessment-items'){
+   const manifest=z.object({extractionJobKeys:z.array(HashSchema).min(1).max(10000)}).strict().parse(input),jobKeys:string[]=[];
+   for(const key of manifest.extractionJobKeys)jobKeys.push(await enqueueResidualAssessmentItems(pool,store,cas,key));
+   process.stdout.write(canonicalJson({jobKeys})+'\n');return;
+  }
+  if(command==='enqueue-assessment-a'||command==='enqueue-prepared-assessment-b'){
+   const manifest=z.object({preparationJobKeys:z.array(HashSchema).min(1).max(10000)}).strict().parse(input),jobKeys:string[]=[],broker=new DistrictAssessmentBroker(pool,cas);
+   for(const key of manifest.preparationJobKeys)jobKeys.push(...await enqueuePreparedAssessmentPass(pool,store,cas,key,command==='enqueue-assessment-a'?'A':'B',broker));
+   process.stdout.write(canonicalJson({jobKeys})+'\n');return;
+  }
+  if(command==='enqueue-assessment-c'||command==='enqueue-assessment-reconciliation'){
+   const job=z.object({AJobKey:HashSchema,BJobKey:HashSchema,CJobKey:HashSchema.optional()}).strict(),manifest=z.object({jobs:z.array(job).min(1).max(10000)}).strict().parse(input),jobKeys:string[]=[];
+   for(const selected of manifest.jobs)jobKeys.push(await enqueueAssessmentResolution(pool,store,cas,selected,command==='enqueue-assessment-c'?'C':'reconcile'));
    process.stdout.write(canonicalJson({jobKeys})+'\n');return;
   }
   if(command==='enqueue-assessment-b'){

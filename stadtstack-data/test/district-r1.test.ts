@@ -18,6 +18,7 @@ import {ReasonCodeSchema,StepReceiptSchema} from '../src/district-step-receipt.t
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {sendPipelineNotification,pipelineNotificationConfig} from '../src/district-notifications.ts';
+import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 
 const scope={publisherId:'fixture-publisher',sourceId:'fixture-source',municipalityId:'ratzeburg',ags:'01053100',tenant:null,observationWindow:'2026-10-11'};
 async function registryFixture(){
@@ -159,11 +160,11 @@ for(const scenario of [
  if(!['postgres:','postgresql:'].includes(url.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(url.hostname))throw Error('Acquisition fixture refuses non-local Postgres');
  const host=url.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Acquisition fixture refuses non-local host override');
  const admin=new Pool({connectionString,max:2,connectionTimeoutMillis:5000,statement_timeout:10000}),database='district_acquisition_test_'+randomUUID().replaceAll('-','');
- const resources:{created:boolean;pool?:Pool}={created:false};
- t.after(async()=>{try{await resources.pool?.end();if(resources.created)await admin.query('DROP DATABASE "'+database+'"');}finally{await admin.end();}});
+ const closeAdmin=poolShutdownBarrier(admin),resources:{created:boolean;closePool?:()=>Promise<void>}={created:false};
+ t.after(async()=>{try{await resources.closePool?.();if(resources.created)await admin.query('DROP DATABASE "'+database+'"');}finally{await closeAdmin();}});
  await admin.query('CREATE DATABASE "'+database+'"');resources.created=true;
  const isolated=new URL(url);isolated.pathname='/'+database;
- const pool=new Pool({connectionString:isolated.href,max:8,connectionTimeoutMillis:5000,statement_timeout:10000});resources.pool=pool;
+ const pool=new Pool({connectionString:isolated.href,max:8,connectionTimeoutMillis:5000,statement_timeout:10000});resources.closePool=poolShutdownBarrier(pool);
  const fixture=await createCivicPolicyTestContext(t),fetchRoot=join(fixture.root,'fetch'),cas=new DistrictCas(join(fixture.root,'cas')),store=new DistrictJobStore(pool);
  await migrateDistrictJobs(pool);
  const registry=await registryFixture(),seen:string[]=[],notifications:OwnerNotification[]=[],sentMessages:string[]=[];

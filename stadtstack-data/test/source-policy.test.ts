@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {parseTdmRules,parseTdmReservation,tdmRuleForUrl,inspectResourcePolicy,matchesPolicyPattern,ownerRobotsOverrideFor,ownerRobotsOverrideApplies,effectiveRobotsPermission,documentOriginExcludes,effectiveSourcePermission,projectSourcePolicyMetadata,MAX_POLICY_METADATA_EVIDENCE,type SourceAccessPolicy} from '../src/source-policy.ts';
+import {parseTdmRules,parseTdmReservation,tdmRuleForUrl,inspectResourcePolicy,matchesPolicyPattern,ownerRobotsOverrideFor,ownerRobotsOverrideApplies,effectiveRobotsPermission,documentOriginExcludes,effectiveSourcePermission,projectSourcePolicyMetadata,MAX_POLICY_METADATA_EVIDENCE,ownerGenesisAccessFor,ownerGenesisRobotsDecisionFor,type SourceAccessPolicy} from '../src/source-policy.ts';
 import {SourceAccessPolicySchema,ContentFreeSourcePolicySchema,assertSubscriptionSourcePolicy,sha256} from '../src/district-schema.ts';
 import {districtSourceSchema,loadDistrictRegistry} from '../src/district-registry.ts';
 import { DOCUMENT_ORIGIN_CLASSIFIER_VERSION } from '../src/document-origin-contract.ts'
@@ -158,6 +158,46 @@ test('origin matrix permits bound official reservations without erasing them and
  assert.equal(assertSubscriptionSourcePolicy(reserved,pdf).override,undefined);
  assert.throws(()=>assertSubscriptionSourcePolicy({...reserved,tdm:{...reserved.tdm,evidence:[]}},pdf),/parsed metadata evidence/);
  assert.throws(()=>assertSubscriptionSourcePolicy({...reserved,ownerTdmOverride:undefined,tdmOverride:undefined},pdf),/blocks extraction/);
+});
+
+test('reviewed owner GENESIS API exemption changes only robots exclusion, never origin or TDM',()=>{
+ const url='https://www.regionalstatistik.de/genesisws/rest/2020/data/table',account=ownerGenesisAccessFor(url);assert.ok(account);
+ const audit={decisionId:account.id,credentialKind:'token' as const},grant=ownerGenesisRobotsDecisionFor(url,audit);assert.ok(grant);
+ assert.equal(grant.id,'r1-genesis-api-robots-2026-10-13');assert.ok(Object.isFrozen(grant));
+ const owner=ownerRobotsOverrideFor(url);assert.ok(owner);
+ const document={url,sha256:'b'.repeat(64),mimeType:'application/json'};
+ const base:SourceAccessPolicy={robots:{state:'blocked',url:'https://www.regionalstatistik.de/robots.txt',sha256:'a'.repeat(64),checkedAt},tdm:{state:'not_declared',evidence:[]},access:'authenticated_owner_account',ownerAccountAccess:{...audit,robotsDecisionId:grant.id},legalClassification:'not_assessed',publication:'facts_with_attribution_only',ownerRobotsOverride:owner,robotsStatus:'disallowed',override:'owner-approved 2026-10-11',documentOrigin:{classification:'unknown',method:'rules',classifierVersion:DOCUMENT_ORIGIN_CLASSIFIER_VERSION,url,sha256:document.sha256,classifiedAt:checkedAt,evidence:[]}};
+ for(const endpoint of [url,url+'file'])for(const credentialKind of ['token','password'] as const){
+  const exact={...document,url:endpoint},policy:SourceAccessPolicy={...base,ownerAccountAccess:{...base.ownerAccountAccess!,credentialKind},documentOrigin:{...base.documentOrigin!,url:endpoint}};
+  assert.equal(documentOriginExcludes(policy,exact),false);assert.equal(effectiveSourcePermission(policy,exact),true);
+  const parsed=assertSubscriptionSourcePolicy(policy,exact,{url:endpoint,ownerRobotsOverride:owner});
+  assert.equal(parsed.documentOrigin!.classification,'unknown');assert.equal(parsed.robots.state,'blocked');assert.equal(parsed.ownerAccountAccess!.robotsDecisionId,grant.id);
+  assert.ok(ContentFreeSourcePolicySchema.safeParse(policy).success);
+  const reserved:SourceAccessPolicy={...policy,tdm:{state:'reserved',evidence:[]},ownerTdmOverride:owner,tdmOverride:'owner-approved 2026-10-11'};
+  assert.equal(documentOriginExcludes(reserved,exact),true);assert.equal(effectiveSourcePermission(reserved,exact),false);
+  assert.throws(()=>assertSubscriptionSourcePolicy(reserved,exact),/blocks extraction/);
+ }
+ for(const changed of [
+  {...base,access:'public' as const,ownerAccountAccess:undefined},
+  {...base,ownerAccountAccess:undefined},
+  {...base,ownerAccountAccess:audit},
+  {...base,ownerAccountAccess:{...base.ownerAccountAccess!,decisionId:'forged'}},
+  {...base,ownerAccountAccess:{...base.ownerAccountAccess!,robotsDecisionId:'forged'}},
+ ]){
+  assert.equal(documentOriginExcludes(changed,document),true);assert.equal(effectiveSourcePermission(changed,document),false);
+  assert.throws(()=>assertSubscriptionSourcePolicy(changed,document));
+ }
+ for(const endpoint of ['https://other.de/genesisws/rest/2020/data/table','https://www.regionalstatistik.de/genesisws/rest/2020/data/cube','https://www.regionalstatistik.de/genesisws/rest/2020/metadata/table','https://www.regionalstatistik.de/web/page','http://www.regionalstatistik.de/genesisws/rest/2020/data/table',url+'?x=1',url+'#fragment']){
+  const exact={...document,url:endpoint},policy:SourceAccessPolicy={...base,documentOrigin:{...base.documentOrigin!,url:endpoint}};
+  assert.equal(ownerGenesisRobotsDecisionFor(endpoint,audit),null);
+  assert.equal(documentOriginExcludes(policy,exact),true);assert.equal(effectiveSourcePermission(policy,exact),false);
+ }
+ for(const documentOrigin of [undefined,{...base.documentOrigin!,sha256:'c'.repeat(64)},{...base.documentOrigin!,classifierVersion:'document-origin-rules-v1'}]){
+  assert.equal(documentOriginExcludes({...base,documentOrigin},document),true);assert.equal(effectiveSourcePermission({...base,documentOrigin},document),false);
+ }
+ for(const changed of [{...base,robots:{...base.robots,sha256:undefined}},{...base,tdm:{state:'unavailable' as const,evidence:[]}},{...base,tdm:{...base.tdm,referenceStatus:'unavailable' as const}}])assert.equal(effectiveSourcePermission(changed,document),false);
+ assert.equal(SourceAccessPolicySchema.safeParse({...base,robots:{...base.robots,state:'allowed'},ownerRobotsOverride:undefined,robotsStatus:undefined,override:undefined}).success,false);
+ assert.equal(SourceAccessPolicySchema.safeParse({...base,ownerAccountAccess:{...base.ownerAccountAccess!,robotsDecisionId:'forged'}}).success,false);
 });
 test('excluded acquisition rows preserve honest policy evidence but cannot enter retained corpus documents',()=>{
  const policy=councilPolicy(),excluded={id:'excluded:fixture',municipalityId:'strausberg',ags:'12064472',districtId:'maerkisch-oderland',sourceId:'strausberg-council',url:councilUrl,sha256:'b'.repeat(64),mimeType:'application/pdf',retrievedAt:checkedAt,checkedAt,status:200,observationPath:'observations/fixture.json',policy:{...policy,documentOrigin:{...policy.documentOrigin!,classification:'third_party' as const}},sizeBytes:100,documentDate:null,adapter:'official-pdf',metadata:{},exclusion:{reason:'non_official_restricted' as const,excludedAt:checkedAt,previousManagedCopy:'not_managed' as const}};

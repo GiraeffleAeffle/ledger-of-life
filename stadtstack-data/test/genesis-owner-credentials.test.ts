@@ -21,6 +21,7 @@ async function isolatedGenesisSnapshot(t:TestContext):Promise<{packageRoot:strin
  await cp(join(packageRoot,'src'),join(snapshot,'src'),{recursive:true});await cp(join(packageRoot,'regional'),join(snapshot,'regional'),{recursive:true});
  await mkdir(join(snapshot,'test','fixtures'),{recursive:true});
  for(const name of ['genesis-owner-account.ts','genesis-no-owner-decision.ts','genesis-echo.ts','polite-lane.ts','polite-inspection.ts','civic-policy.ts','tdm-pdf.ts'])await cp(join(packageRoot,'test','fixtures',name),join(snapshot,'test','fixtures',name));
+ await mkdir(join(snapshot,'test','helpers'),{recursive:true});await cp(join(packageRoot,'test','helpers','postgres-pool.ts'),join(snapshot,'test','helpers','postgres-pool.ts'));
  await symlink(join(packageRoot,'node_modules'),join(snapshot,'node_modules'),'dir');
  await cp(join(packageRoot,'migrations'),join(snapshot,'migrations'),{recursive:true});
  // Pin a disposable credential path BEFORE executing any copied code, even in
