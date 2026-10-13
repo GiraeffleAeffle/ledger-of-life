@@ -601,6 +601,39 @@ test('interrupted worker scratch is recoverable without scanning unrelated tempo
  const receipt=await recoverManagedSourceScratch(policy);assert.equal(receipt.status,'complete');assert.equal(receipt.deletedFiles,2);assert.deepEqual(receipt.recoveredLeases,[lease.id]);await assert.rejects(lstat(join(root,lease.directory)),{code:'ENOENT'});assert.equal(await readFile(join(unrelated,'source.pdf'),'utf8'),'unrelated untouched');
 });
 
+test('merged lane enrollment refuses incomplete or rebound roots before planned lease mkdir',async t=>{
+ const {base,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),root=join(base,'merged-lane'),binding={phase:'pre-admission' as const,url:'https://council.test/source',sourceSha256:hash('source')};
+ const options={...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification' as const,kind:'artifacts' as const};
+ await initializeManagedAcquisitionLane(root,options);
+ await writeFile(join(root,'unbound.txt'),'unbound source bytes',{mode:0o600});
+ let called=false;
+ await assert.rejects(withManagedSourceScratch(root,[binding],async()=>{called=true;},options),error=>error instanceof CivicPolicyStateError&&error.code==='MANAGED_INVENTORY_INCOMPLETE');
+ const inventory=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));
+ assert.equal(inventory.roots[0].complete,false);assert.deepEqual(inventory.scratch,[]);assert.equal(called,false);
+ await assert.rejects(lstat(join(root,'scratch')),{code:'ENOENT'});
+ const marker=await readFile(join(root,'.civic-acquisition-lane.json'));await rename(root,join(base,'original'));
+ await mkdir(root,{mode:0o700});await writeFile(join(root,'.civic-acquisition-lane.json'),marker,{mode:0o600});
+ await assert.rejects(withManagedSourceScratch(root,[binding],async()=>{called=true;},options),CivicPolicyStateError);
+ assert.equal(called,false);await assert.rejects(lstat(join(root,'scratch')),{code:'ENOENT'});
+});
+
+for(const boundary of ['before-mkdir','after-mkdir'] as const)test('merged planned commit survives worker death '+boundary,async t=>{
+ const {base,stateDir}=await sandbox(t),root=join(base,'planned-crash'),policy=fixturePolicy(stateDir);
+ const moduleUrl=new URL('../src/civic-opt-out.ts',import.meta.url).href;
+ const script=`import {promises as fs} from 'node:fs';import {syncBuiltinESMExports} from 'node:module';import {join} from 'node:path';import {withManagedSourceScratch,CIVIC_ACQUISITION_DECISION_ID} from ${JSON.stringify(moduleUrl)};const [root,policy,boundary]=process.argv.slice(1);const mkdir=fs.mkdir;fs.mkdir=async(...args)=>{const lease=String(args[0]).startsWith(join(root,'scratch')+'/');if(lease&&boundary==='before-mkdir')process.exit(0);const result=await mkdir(...args);if(lease)process.exit(0);return result;};syncBuiltinESMExports();await withManagedSourceScratch(root,[{phase:'pre-admission',url:'https://council.test/source',sourceSha256:'1'.repeat(64)}],async()=>{process.exit(99);},{...JSON.parse(policy),decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification'});`;
+ const child=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',script,root,JSON.stringify(policy),boundary],{stdio:'ignore'});
+ assert.equal(await new Promise<number|null>((resolve,reject)=>{child.once('error',reject);child.once('close',resolve);}),0);
+ const inventory=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8')),lease=inventory.scratch[0];
+ assert.equal(inventory.roots[0].complete,true);assert.equal(lease.state,'planned');assert.equal(lease.identity,null);assert.equal(lease.sources[0].host,'council.test');
+ if(boundary==='after-mkdir')assert.deepEqual(await readdir(join(root,lease.directory)),[]);
+ else await assert.rejects(lstat(join(root,lease.directory)),{code:'ENOENT'});
+ // Operator fixture step: the child has exited and owns this interrupted lock.
+ // Recovery deliberately never steals locks, including from dead workers.
+ const lock=join(stateDir,'inventory.lock');assert.equal(JSON.parse(await readFile(lock,'utf8')).pid,child.pid);await rm(lock);
+ const receipt=await recoverManagedSourceScratch(policy);assert.equal(receipt.status,'complete');assert.deepEqual(receipt.recoveredLeases,[lease.id]);
+ await assert.rejects(lstat(join(root,lease.directory)),{code:'ENOENT'});
+});
+
 test('explicit source reads cannot alias another URL or a different mutable artifact version',async t=>{
  const {base,stateDir}=await sandbox(t),root=join(base,'bound-reads'),policy=fixturePolicy(stateDir);await initializeManagedAcquisitionLane(root,{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...policy});
  const original={...rawEntry('first','https://first.test/source',true),relativePath:'raw.txt'};await publish(root,original,'first',stateDir);
