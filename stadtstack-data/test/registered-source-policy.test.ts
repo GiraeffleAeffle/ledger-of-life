@@ -112,7 +112,7 @@ test('registered blocked robots retain unknown origin, honour reservations/opt-o
  assert.equal(witness?.discovery?.from,child.url);assert.deepEqual(witness?.discovery?.anchor,{url:parent.url,sha256:parent.sha256});
  for(const path of ['reserved','reserved.pdf'])await assert.rejects(fetcher.fetch(root+path,requestOptions),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='document_excluded');
  await assert.rejects(fetcher.fetch(root+'login',requestOptions),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='access_barrier');
- const outside=await lane('outside');await assert.rejects(outside.fetcher.fetch('https://unregistered.example/',{...requestOptions,registeredSourceUrl:'https://unregistered.example/',ownerRobotsOverride:ownerRobotsOverrideFor('https://unregistered.example/')??undefined}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='document_excluded');
+ const outside=await lane('outside');await assert.rejects(outside.fetcher.fetch('https://unregistered-fixture.de/',{...requestOptions,registeredSourceUrl:'https://unregistered-fixture.de/',ownerRobotsOverride:ownerRobotsOverrideFor('https://unregistered-fixture.de/')??undefined}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='document_excluded');
  assert.equal(sourcePolicyValidityMs(response.policy!,response,scope),REGISTERED_SOURCE_POLICY_VALIDITY_MS);
  assert.equal(sourcePolicyValidityMs({...response.policy!,tdm:{...response.policy!.tdm,evidence:[]}},response,{...scope,sourceId:'unregistered'}),PUBLIC_SOURCE_POLICY_VALIDITY_MS);
  const clocks=[response.checkedAt,response.policy!.robots.checkedAt!,...response.policy!.tdm.evidence.map(row=>row.checkedAt!)],start=Math.min(...clocks.map(Date.parse));

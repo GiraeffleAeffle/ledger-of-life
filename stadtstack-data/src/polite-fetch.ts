@@ -582,7 +582,7 @@ export class PoliteFetcher {
   let url=publicUrl(input),method=options.method??'GET',body=options.body;
   const registeredAudit=this.registeredAudit(url.href,options);
   const registeredApproval=Boolean(registeredAudit)||ownerRobotsOverrideApplies(options.registeredSourceUrl??input,options.ownerRobotsOverride);
-  const registeredOwnerAccount=this.publicPolicyFetcher&&options.registeredSourceId==='regionalstatistik-genesis'&&ownerGenesisRobotsDecisionFor(url.href)&&this.publicPolicyFetcher.registeredScopes.has(this.registeredKey({municipalityId:options.registeredMunicipalityId,sourceId:options.registeredSourceId,root:options.registeredSourceUrl}));
+  const registeredOwnerAccount=this.publicPolicyFetcher&&options.registeredSourceId==='regionalstatistik-genesis'&&ownerGenesisAccessFor(url.href)&&this.publicPolicyFetcher.registeredScopes.has(this.registeredKey({municipalityId:options.registeredMunicipalityId,sourceId:options.registeredSourceId,root:options.registeredSourceUrl}));
   const policyTtlMs=registeredAudit||registeredOwnerAccount?REGISTERED_SOURCE_POLICY_VALIDITY_MS:this.options.policyTtlMs;
   if(method==='POST'&&(!body||Buffer.byteLength(body)>65536))throw new PoliteFetchError('unsafe_url','Only bounded public form requests supported');
   if(body!==undefined)for(const key of new URLSearchParams(body).keys())if(/^(?:password|secret|authorization|access_token|api_key|apikey|sessionid|phpsessid|cookie)$/i.test(key))throw new PoliteFetchError('unsafe_url','Credential-bearing public form rejected');
