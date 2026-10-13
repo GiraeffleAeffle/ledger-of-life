@@ -68,7 +68,7 @@ export async function archiveJointExtractionContract(out:string,contract:Extract
   return {path,sha256:sha256(bytes)};
  }finally{await release();}
 }
-type GovernedUsage = UsageContext & { beforeSourceCall?: (requestSha256:string)=>Promise<void> };
+type GovernedUsage = UsageContext & { beforeSourceCall?: (requestSha256:string)=>Promise<void>;onModelIdentity?:(identity:ModelEvidence)=>Promise<void>;fixtureProvider?:typeof subscriptionChat };
 async function cachedAnswer(provider:ExtractorProvider,identity:ModelEvidence,system:string,input:unknown,schema:object,cacheRoot:string,usage:GovernedUsage,prepared:PreparedDocument,policy:CivicPolicyOptions,cacheContext:PreparedCacheContext):Promise<CachedAnswer>{
  usage.signal?.throwIfAborted();
  await assertPreparedSourcesActive(prepared.references,policy);
@@ -79,7 +79,7 @@ async function cachedAnswer(provider:ExtractorProvider,identity:ModelEvidence,sy
   await assertPreparedSourcesActive(prepared.references,policy);
   await usage.beforeSourceCall?.(semanticHash(binding));
   const modelUsage={...usage,policy,sourceContext};
-  const answer=await subscriptionChat(provider,system,input,schema,modelUsage).catch(error=>{usage.signal?.throwIfAborted();throw error;});
+  const answer = await (usage.fixtureProvider??subscriptionChat)(provider,system,input,schema,modelUsage).catch(error=>{usage.signal?.throwIfAborted();throw error;});
   usage.signal?.throwIfAborted();
   if(answer.evidence.modelIdentitySha256!==identity.modelIdentitySha256||answer.evidence.provider!==provider)throw Error('Subscription CLI identity changed during document processing');
   return {binding,modelIdentitySha256:identity.modelIdentitySha256,receivedAt:new Date().toISOString(),value:answer.value,responseSha256:answer.responseSha256,returnedModel:answer.returnedModel,runtimeWarnings:answer.runtimeWarnings};
@@ -92,7 +92,7 @@ export async function inferPreparedDocument(options:{taskId:string;groupId:strin
  options.usage.signal?.throwIfAborted();
  if(options.provider!=='openai-subscription')throw Error('Source inference requires the Codex-only authority');
  const selectedPolicy=options.policy??options.usage.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selectedPolicy),policy={...selectedPolicy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
- if(options.fixtureReadinessExecutor!==undefined&&authority.mode!=='isolated-fixture')throw new CivicPolicyStateError('FIXTURE_READINESS_REQUIRES_ISOLATED_AUTHORITY');
+ if((options.fixtureReadinessExecutor!==undefined||options.usage.fixtureProvider!==undefined)&&authority.mode!=='isolated-fixture')throw new CivicPolicyStateError('FIXTURE_READINESS_REQUIRES_ISOLATED_AUTHORITY');
  const municipality=municipalityBindingSchema.parse(options.municipality),prepared=verifyPreparedDocument(options.prepared,options.expected),contract=await jointExtractionContract();
  await assertPreparedSourcesActive(prepared.references,policy);
  if(prepared.municipalityId!==municipality.id||contract.promptSha256!==options.contract.promptSha256||contract.schemaSha256!==options.contract.schemaSha256)throw Error('Prepared source or joint extraction contract mismatch');
@@ -128,6 +128,7 @@ export async function inferPreparedDocument(options:{taskId:string;groupId:strin
   if(!identity){
    await archiveJointExtractionContract(options.out,contract,options.usage.signal);
    identity=options.fixtureReadinessExecutor?await sourceFreeModelReadiness(options.provider,options.fixtureReadinessExecutor,options.usage.signal):await modelReadiness(options.provider,options.usage.signal,policy);
+   await options.usage.onModelIdentity?.(identity);
    await mkdir(cacheRoot,{recursive:true,mode:0o700});
    await initializeManagedAcquisitionLane(await realpath(cacheRoot),{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...policy});
   }

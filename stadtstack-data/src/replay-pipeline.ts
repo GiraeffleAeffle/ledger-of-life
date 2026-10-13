@@ -66,7 +66,8 @@ export const ReplayReceiptSchema=z.discriminatedUnion('mode',[
  ReplayCommonSchema.extend({mode:z.literal('retained_text_composition'),textComposition:Pin}).strict(),
 ]);
 export type ReplayReceipt=z.infer<typeof ReplayReceiptSchema>;
-type Answer=z.infer<typeof ReassessmentAnswerSchema>;
+export type ReplayAnswer=z.infer<typeof ReassessmentAnswerSchema>;
+type Answer=ReplayAnswer;
 const archiveSourceSchema=z.object({name:z.string(),sha256:hashSchema,code:z.string()}).strict();
 const archiveBody={archivedAt:z.iso.datetime(),promptSha256:hashSchema,schemaSha256:hashSchema,extractorSha256:hashSchema,promptVersion:z.string().min(1),judgePromptVersion:z.string().min(1),judgePromptSha256:hashSchema,extractionInstructions:z.string().min(1),judgeInstructions:z.string().min(1),outputSchema:z.record(z.string(),z.unknown()),judgeSchema:z.record(z.string(),z.unknown()),sources:z.array(archiveSourceSchema)};
 export const ScopedGenerationArchiveSchema=z.object({...archiveBody,schemaVersion:z.literal('stadtstack-extraction-contract-archive-v2'),extractorVersion:z.string().min(1),cacheBindingVersion:z.literal('prepared-source-scoped-v2'),cacheCodecSha256:hashSchema,cacheContextSource:archiveSourceSchema.extend({name:z.literal('district-prepared-document.ts')}).strict()}).strict();
@@ -181,13 +182,18 @@ export function verifyGenerationArchive(raw:unknown):GenerationArchive{
  }
  return archive;
 }
+/** Queue-native replay uses the same scoped archive authentication, with no
+ * historical code materialization or provider/cache-miss path. */
+export async function authenticateScopedGeneration(raw:unknown):Promise<HistoricalGeneration>{
+ const archive=verifyGenerationArchive(raw);
+ if(archive.schemaVersion!=='stadtstack-extraction-contract-archive-v2')throw Error('Queue replay requires its original scoped generation archive');
+ for(const source of [...archive.sources,archive.cacheContextSource])if(hash(await readFile(new URL(source.name,import.meta.url)))!==source.sha256)throw Error('Scoped replay requires the exact original source/cache implementation');
+ requireEqual([ClaimsModule.EXTRACTOR_VERSION,ClaimsModule.PROMPT_VERSION,ClaimsModule.JUDGE_PROMPT_VERSION,ClaimsModule.PROMPT_SHA256,ClaimsModule.JUDGE_PROMPT_SHA256,ClaimsModule.CLAIM_SCHEMA_SHA256],[archive.extractorVersion,archive.promptVersion,archive.judgePromptVersion,archive.promptSha256,archive.judgePromptSha256,archive.schemaSha256],'Scoped replay original contract mismatch');
+ return {archive,claims:ClaimsModule,schema:SchemaModule,graph:GraphModule,vocabulary:VocabularyModule,models:ModelModule};
+}
 async function loadHistoricalGeneration(raw:unknown,directory:string,scope:ManagedSourceScratch):Promise<HistoricalGeneration>{
  const archive=verifyGenerationArchive(raw);
- if(archive.schemaVersion==='stadtstack-extraction-contract-archive-v2'){
-  for(const source of [...archive.sources,archive.cacheContextSource])if(hash(await readFile(new URL(source.name,import.meta.url)))!==source.sha256)throw Error('Scoped replay requires the exact original source/cache implementation');
-  requireEqual([ClaimsModule.EXTRACTOR_VERSION,ClaimsModule.PROMPT_VERSION,ClaimsModule.JUDGE_PROMPT_VERSION,ClaimsModule.PROMPT_SHA256,ClaimsModule.JUDGE_PROMPT_SHA256,ClaimsModule.CLAIM_SCHEMA_SHA256],[archive.extractorVersion,archive.promptVersion,archive.judgePromptVersion,archive.promptSha256,archive.judgePromptSha256,archive.schemaSha256],'Scoped replay original contract mismatch');
-  return {archive,claims:ClaimsModule,schema:SchemaModule,graph:GraphModule,vocabulary:VocabularyModule,models:ModelModule};
- }
+ if(archive.schemaVersion==='stadtstack-extraction-contract-archive-v2')return authenticateScopedGeneration(raw);
  // Only the archived pure schema/claims modules are importable. Never materialize
  // archived inference, model, readiness or transport implementations for execution.
  for(const source of archive.sources)if(Object.hasOwn(executableArchiveFiles,source.name))await privateFile(join(directory,'src',source.name),source.code,scope);
