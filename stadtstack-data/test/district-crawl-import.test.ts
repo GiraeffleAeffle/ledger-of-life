@@ -40,7 +40,7 @@ test('public request evidence excludes credential/header fields and binds select
  assert.throws(()=>ObservationRequestSchema.parse({...request,headers:{username:'owner',password:'secret'}}));
  assert.throws(()=>ObservationRequestSchema.parse({...request,bodySha256:digest('tampered')}));
 });
-test('offline frozen crawl import preserves managed originals and produces enqueue-ready residual jobs',{skip:!connectionString,timeout:300000},async t=>{
+test('offline frozen crawl import preserves managed originals and produces enqueue-ready residual jobs',{skip:!connectionString,timeout:450000},async t=>{
  const endpoint=new URL(connectionString!);
  if(!['postgres:','postgresql:'].includes(endpoint.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(endpoint.hostname))throw Error('Test refuses non-local PG');
  const host=endpoint.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Test refuses non-local PG host');
@@ -254,7 +254,7 @@ test('offline frozen crawl import preserves managed originals and produces enque
   });
   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
    const handler=policyRefreshHandler(store,(context,maxRequests)=>createR1PublicFetcher(store,context,{maxRequests,maxBytes:1024*1024,fixture:{fetchRoot:join(root!,'continuation-fetch'),policy,inspection:fixturePolicyInspection}}));
-   const authorize=(jobKey:string,phase='initial')=>store.authorize({approvalSha256:digest('Synthetic continuation authorization '+jobKey+' '+phase),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
+   const authorize=(jobKey:string,phase='initial',expiresAt=new Date(Date.now()+60000).toISOString(),maxElapsedMs=60000)=>store.authorize({approvalSha256:digest('Synthetic continuation authorization '+jobKey+' '+phase),approvedBy:'synthetic-fixture-owner',expiresAt,jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs,category:'development'});
    const first=(await enqueueCrawlPolicyRefresh(store,item.cas,{manifest:item.manifest,maxRequests:4})).jobKeys[0].jobKey;
    const firstAuthorization=await authorize(first),historicalTime=new Date(Date.now()-3601000);
    // Genuine fixture policy observations are captured at this controlled earlier
@@ -310,10 +310,47 @@ test('offline frozen crawl import preserves managed originals and produces enque
     return {outcome:'succeeded',reasonCode:'completed',outputs:[parser,text],versions:{preparation:prepared.extractorSha256,node:process.versions.node,...source.policyCheck.versions},counts:{bytes:bytes.length}};
    };
    prepareFixture.currentPolicy=production.residual_prepare.currentPolicy;
-   await store.resume(preparationKey);
-   const preparationAuthorization=await authorize(preparationKey,'after-owner-resume');
-   const preparedRun=await runDistrictJobs({store,cas:item.cas,handlers:{residual_prepare:prepareFixture},authorizationId:preparationAuthorization,ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
-   assert.equal(preparedRun.jobsStarted,1);
+   for(const bound of ['lease','authorization'] as const)await st.test(`finish continuation crossing ${bound} deadline cannot commit successful effects`,async()=>{
+    await store.resume(preparationKey);
+    const authorizationId=await authorize(preparationKey,'delayed-finish-'+bound,bound==='authorization'?new Date(Date.now()+30000).toISOString():undefined);
+    let hookCalls=0;
+    const guardedPrepare:JobHandler=context=>prepareFixture(context);
+    guardedPrepare.currentPolicy=async(spec,cas)=>{
+     const continuation=await production.residual_prepare.currentPolicy!(spec,cas);
+     if(++hookCalls===2){
+      // Wait against the actual persisted PG deadline. The hook does not move
+      // clocks, mutate authority or invent a continuation/receipt.
+      if(bound==='lease')await pool!.query(`SELECT pg_sleep(GREATEST(0,extract(epoch FROM(lease_expires_at-clock_timestamp())))+0.05) FROM district_pipeline.jobs WHERE job_key=$1`,[preparationKey]);
+      else await pool!.query(`SELECT pg_sleep(GREATEST(0,extract(epoch FROM(expires_at-clock_timestamp())))+0.05) FROM district_pipeline.preauthorizations WHERE id=$1`,[authorizationId]);
+     }
+     return continuation;
+    };
+    const result=await runDistrictJobs({store,cas:item.cas,handlers:{residual_prepare:guardedPrepare},authorizationId,ownerPresent:true,maxJobs:1,maxElapsedMs:60000,leaseMs:5000});
+    const reason=bound==='lease'?'lease_lost':'authorization_expired';
+    assert.equal(hookCalls,2);assert.equal(result.jobsStarted,1);assert.equal(result.state,'held');assert.equal(result.reasonCode,reason);
+    const rows=await pool!.query('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId]);
+    assert.equal(rows.rowCount,1);assert.equal(rows.rows[0].receipt.outcome,'held_execution');assert.equal(rows.rows[0].receipt.reasonCode,reason);assert.deepEqual(rows.rows[0].receipt.outputHashes,[]);
+    assert.equal((await pool!.query(`SELECT id FROM district_pipeline.step_receipts WHERE run_id=$1 AND outcome='succeeded'`,[result.runId])).rowCount,0);
+   });
+   await st.test('claim continuation crossing authorization deadline grants no lease or attempt',async()=>{
+    await store.resume(preparationKey);
+    const authorizationId=await authorize(preparationKey,'delayed-claim',new Date(Date.now()+15000).toISOString());
+    const before=await pool!.query('SELECT attempt FROM district_pipeline.jobs WHERE job_key=$1',[preparationKey]);let hookCalls=0,handlerCalls=0;
+    const guardedPrepare:JobHandler=async context=>{handlerCalls++;return prepareFixture(context);};
+    guardedPrepare.currentPolicy=async(spec,cas)=>{
+     const continuation=await production.residual_prepare.currentPolicy!(spec,cas);hookCalls++;
+     await pool!.query(`SELECT pg_sleep(GREATEST(0,extract(epoch FROM(expires_at-clock_timestamp())))+0.05) FROM district_pipeline.preauthorizations WHERE id=$1`,[authorizationId]);
+     return continuation;
+    };
+    const result=await runDistrictJobs({store,cas:item.cas,handlers:{residual_prepare:guardedPrepare},authorizationId,ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+    assert.equal(hookCalls,1);assert.equal(handlerCalls,0);assert.equal(result.jobsStarted,0);assert.equal(result.state,'held');assert.equal(result.reasonCode,'authorization_expired');
+    const after=await pool!.query('SELECT state,attempt,lease_owner FROM district_pipeline.jobs WHERE job_key=$1',[preparationKey]);
+    assert.equal(after.rows[0].state,'queued');assert.equal(after.rows[0].attempt,before.rows[0].attempt);assert.equal(after.rows[0].lease_owner,null);
+    assert.equal((await pool!.query('SELECT id FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId])).rowCount,0);
+   });
+   const preparationAuthorization=await authorize(preparationKey,'after-owner-resume',new Date(Date.now()+120000).toISOString(),120000);
+   const preparedRun=await runDistrictJobs({store,cas:item.cas,handlers:{residual_prepare:prepareFixture},authorizationId:preparationAuthorization,ownerPresent:true,maxJobs:1,maxElapsedMs:120000});
+   assert.equal(preparedRun.jobsStarted,1,canonicalJson(preparedRun));
    const preparationRows=await pool!.query('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[preparedRun.runId]),preparedReceipt=preparationRows.rows[0].receipt;
    assert.equal(preparedReceipt.outcome,'succeeded');assert.equal(preparedReceipt.policyProofSha256,original.policyReceiptSha256);
    assert.equal(preparedReceipt.versions[`policyRebinding.${original.policyReceiptSha256}.${secondReceipt.receipt_sha256}`],checked.admissibilityReceiptSha256);
