@@ -27,7 +27,7 @@ import type {CivicPolicyOptions,CivicPolicyAuthorityReceipt,ManagedAcquisitionLa
 import {ContentFreeSourcePolicySchema,hashSchema} from './district-schema.ts';
 import {SourceObservationSchema,sourceObservationMatches,type SourceObservation} from './source-observation.ts';
 import {nativePublicRequestHeaders,type NativePublicOperation} from './district-native-request.ts';
-import {ownerGenesisAccessFor} from './source-policy.ts';
+import {ownerGenesisAccessFor,ownerGenesisRobotsDecisionFor} from './source-policy.ts';
 import {readGenesisOwnerCredentials,type GenesisOwnerCredentials} from './genesis-owner-credentials.ts';
 import {genesisOwnerAccountRoot,readGenesisOwnerRepresentation} from './genesis-owner-acquisition.ts';
 import {persistCrawlRequestEvidence,CrawlRequestEvidenceCaptureError} from './district-crawl-request.ts';
@@ -477,6 +477,10 @@ export class PoliteFetcher {
      try{ownerCredentials=await readGenesisOwnerCredentials();}catch{throw new PoliteFetchError('credential_unavailable','credential_unavailable');}
      if(ownerCredentials.contains(url.href)||ownerCredentials.contains(body??''))throw new PoliteFetchError('credential_unavailable','credential_unavailable');
      policy.access='authenticated_owner_account';policy.ownerAccountAccess={decisionId:ownerDecision.id,credentialKind:ownerCredentials.kind};
+     if(policy.robots.state==='blocked'){
+      const robotsDecision=ownerGenesisRobotsDecisionFor(url.href,policy.ownerAccountAccess);
+      if(robotsDecision)policy.ownerAccountAccess.robotsDecisionId=robotsDecision.id;
+     }
     }
     const response=await this.wire(url,method,body,previous?.state==='excluded'?undefined:previous,options.publicOperation,ownerCredentials);checkedAt=new Date().toISOString();observation.checkedAt=checkedAt;observation.status=response.status;
     if(ownerCredentials)try{ownerCredentials.screenResponse(response.body,response.headers,response.status);}catch{throw new PoliteFetchError('access_barrier','Authenticated response withheld');}

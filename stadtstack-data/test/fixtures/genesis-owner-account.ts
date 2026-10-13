@@ -15,7 +15,7 @@ import {PoliteFetcher,PoliteFetchError,type FetchObservation} from '../../src/po
 import type {FetchedDocument,PoliteFetcherOptions,FixturePolicyInspection} from '../../src/polite-fetch.ts';
 import {nativePublicRequestHeaders,type NativePublicOperation} from '../../src/district-native-request.ts';
 import {GENESIS_OWNER_CREDENTIAL_PATH,GENESIS_CREDENTIAL_MAX_BYTES,type GenesisOwnerCredentials} from '../../src/genesis-owner-credentials.ts';
-import {ownerGenesisAccessFor,effectiveSourcePermission} from '../../src/source-policy.ts';
+import {ownerGenesisAccessFor,ownerGenesisRobotsDecisionFor,ownerRobotsOverrideFor,effectiveSourcePermission} from '../../src/source-policy.ts';
 import {ContentFreeSourcePolicySchema} from '../../src/district-schema.ts';
 import {createPolicyReceipt} from '../../src/district-policy-receipt.ts';
 import {DistrictCas} from '../../src/district-cas.ts';
@@ -29,6 +29,7 @@ import {HttpObservationProofSchema} from '../../src/district-http-observation.ts
 import {SourceObservationSchema} from '../../src/source-observation.ts';
 import {assertManagedSourceReadable,assertManagedRawSourceBinding,recoverManagedSourceScratch,recordHostOptOut} from '../../src/civic-opt-out.ts';
 import {deflatedZip,unicodeEscape,percentEscape} from './genesis-echo.ts';
+import {poolShutdownBarrier} from '../helpers/postgres-pool.ts';
 
 const token='fixture-secret-token-628104',username='fixture-owner-user-628104',password='fixture-sécure-password-628104';
 const endpoint='https://www.regionalstatistik.de/genesisws/rest/2020/data/table';
@@ -38,6 +39,16 @@ function noSecrets(bytes:string|Buffer){
  for(const secret of [token,username,password])for(const value of [secret,unicodeEscape(secret),unicodeEscape(secret,true),percentEscape(secret),percentEscape(secret,3),percentEscape(secret,8)])assert.ok(!buffer.includes(Buffer.from(value)),'Credential bytes escaped the host boundary');
 }
 async function scanArtifacts(root:string){for(const entry of await readdir(root,{withFileTypes:true})){const path=join(root,entry.name);if(entry.isDirectory())await scanArtifacts(path);else if(entry.isFile())noSecrets(await readFile(path));}}
+async function noRobotsExemptionInPublicRoot(root:string):Promise<void>{
+ for(const entry of await readdir(root,{withFileTypes:true})){
+  const path=join(root,entry.name);
+  if(entry.isDirectory())await noRobotsExemptionInPublicRoot(path);
+  else if(entry.isFile()){
+   const bytes=await readFile(path);
+   assert.ok(!bytes.includes(Buffer.from('robotsDecisionId'))&&!bytes.includes(Buffer.from('r1-genesis-api-robots-2026-10-13')),'Owner-account exemption escaped into the legacy public fetch root');
+  }
+ }
+}
 interface Response {status:number;headers:Record<string,string|undefined>;body:Buffer}
 interface Seam {
  wire(url:URL,method:'GET'|'POST',body:string|undefined,previous:FetchObservation|undefined,operation?:NativePublicOperation,credentials?:GenesisOwnerCredentials):Promise<Response>;
@@ -48,8 +59,8 @@ test('checked-in reviewed owner entry exercises headers, holds, persisted receip
  const decision=ownerGenesisAccessFor(endpoint);assert.ok(decision,'Checked-in owner approval must cover the fixture endpoint');
  const root=await mkdtemp(join(tmpdir(),'genesis-reviewed-artifacts-'));t.after(()=>rm(root,{recursive:true,force:true}));
  const seen:Array<{host:string;path:string;authenticated:boolean}>=[];
- type Reply='success'|'cross'|'same'|'echo'|'header-echo'|'unauthorized'|'unicode'|'mixed-unicode'|'json-key'|'shadowed-value'|'zip'|'zip-extra'|'zip-name'|'percent-location'|'nested-percent-location'|'unknown';
- let reply:Reply='success',kind:'token'|'password'='token',inspectedData=0;
+ type Reply='success'|'reserved'|'cross'|'same'|'echo'|'header-echo'|'unauthorized'|'unicode'|'mixed-unicode'|'json-key'|'shadowed-value'|'zip'|'zip-extra'|'zip-name'|'percent-location'|'nested-percent-location'|'unknown';
+ let reply:Reply='success',kind:'token'|'password'='token',inspectedData=0,robotsBlocked=false;
  const guardedInspection:FixturePolicyInspection={...fixturePolicyInspection,async resource(...args){
   if(/^https:\/\/www\.regionalstatistik\.de\/genesisws\/rest\/2020\/data\/table(?:file)?$/.test(args[0]))inspectedData++;
   return fixturePolicyInspection.resource(...args);
@@ -65,6 +76,7 @@ test('checked-in reviewed owner entry exercises headers, holds, persisted receip
   }
   else {assert.ok(req.headers.username===undefined||req.headers.username==='GAST','Unexpected account header');assert.ok(req.headers.password===undefined||req.headers.password==='GAST','Unexpected account header');}
   seen.push({host,path,authenticated:isData});
+  if(path==='/robots.txt'&&robotsBlocked){res.writeHead(200,{'content-type':'text/plain'});res.end('User-agent: *\nDisallow: /\n');return;}
   if(path==='/robots.txt'||path==='/.well-known/tdmrep.json'){res.writeHead(404);res.end();return;}
   if(isData&&reply==='cross'){res.writeHead(307,{location:'https://other.de/stolen'});res.end();return;}
   if(isData&&reply==='same'){res.writeHead(307,{location:'https://www.regionalstatistik.de/genesisws/rest/2020/data/tablefile'});res.end();return;}
@@ -82,7 +94,7 @@ test('checked-in reviewed owner entry exercises headers, holds, persisted receip
    }
    if(reply==='unknown'){res.writeHead(200,{'content-type':'image/png'});res.end('unrecognized');return;}
   }
-  res.writeHead(200,{'content-type':'application/json',...(isData&&reply==='header-echo'?{etag:token}:{})});
+  res.writeHead(200,{'content-type':'application/json',...(isData&&reply==='header-echo'?{etag:token}:{}),...(isData&&reply==='reserved'?{'tdm-reservation':'1'}:{})});
   res.end(JSON.stringify({value:isData&&reply==='echo'?token:17}));
  });
  server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise<void>(done=>server.close(()=>done())));
@@ -120,6 +132,31 @@ test('checked-in reviewed owner entry exercises headers, holds, persisted receip
   successes.push({source,options,cache});
   await fetcher.fetch('https://other.de/public.json');await fetcher.fetch('https://www.regionalstatistik.de/genesisws/rest/2020/metadata/table',{method:'POST',body,publicOperation:'genesis_guest'});
  }
+ const ownerRobots=ownerRobotsOverrideFor(endpoint);assert.ok(ownerRobots);
+ const robotsGrant=ownerGenesisRobotsDecisionFor(endpoint,{decisionId:decision.id,credentialKind:'token'});assert.ok(robotsGrant);
+ robotsBlocked=true;
+ for(const credentialKind of ['token','password'] as const){
+  kind=credentialKind;reply='success';await writeFile(GENESIS_OWNER_CREDENTIAL_PATH,JSON.stringify(kind==='token'?{token}:{username,password}));
+  const {fetcher,options,cache}=await lane(kind+'-robots'),requestUrl=endpoint+(kind==='password'?'file':'');
+  const source=await fetcher.fetch(requestUrl,{method:'POST',body,publicOperation:'genesis_guest',ownerRobotsOverride:ownerRobots,registeredSourceUrl:requestUrl});
+  assert.equal(source.policy?.robots.state,'blocked');assert.equal(source.policy?.documentOrigin?.classification,'unknown');
+  assert.deepEqual(source.policy?.ownerAccountAccess,{decisionId:decision.id,credentialKind:kind,robotsDecisionId:robotsGrant.id});
+  assert.ok(source.observationPath.startsWith(genesisOwnerAccountRoot(cache)+'/'));
+  const observation=JSON.parse(await readFile(source.observationPath,'utf8'));
+  assert.equal(observation.policy.ownerAccountAccess.robotsDecisionId,robotsGrant.id);assert.equal(observation.policy.documentOrigin.classification,'unknown');
+  assert.equal(JSON.parse(await readFile(join(genesisOwnerAccountRoot(cache),'.civic-acquisition-lane.json'),'utf8')).kind,'artifacts');
+  await readGenesisOwnerRepresentation(cache,source,options.ownerPolicyLane);
+  await fetcher.assertSourceBindingsAllowed([{url:source.url,sha256:source.sha256,observationPath:source.observationPath,independentAllowed:true}]);
+  await noRobotsExemptionInPublicRoot(cache);
+  successes.push({source,options,cache});
+ }
+ kind='token';reply='reserved';await writeFile(GENESIS_OWNER_CREDENTIAL_PATH,JSON.stringify({token}));
+ const reservedLane=await lane('robots-tdm-reserved');
+ await assert.rejects(reservedLane.fetcher.fetch(endpoint,{method:'POST',body,publicOperation:'genesis_guest',ownerRobotsOverride:ownerRobots,registeredSourceUrl:endpoint}),(error:unknown)=>{
+  assert.ok(error instanceof PoliteFetchError);assert.equal(error.failure,'document_excluded');assert.equal(error.policy?.tdm.state,'reserved');assert.equal(error.policy?.documentOrigin?.classification,'unknown');assert.equal(error.policy?.ownerAccountAccess?.robotsDecisionId,robotsGrant.id);return true;
+ });
+ await noRobotsExemptionInPublicRoot(reservedLane.cache);
+ robotsBlocked=false;
  kind='token';await writeFile(GENESIS_OWNER_CREDENTIAL_PATH,JSON.stringify({token}));
  for(const [name,mode,failure] of [['cross-redirect','cross','cross_host_redirect'],['same-redirect','same','invalid_redirect'],['response-echo','echo','access_barrier'],['header-echo','header-echo','access_barrier'],['rejected-account','unauthorized','access_barrier']] as const){
   reply=mode;const {fetcher}=await lane(name),before=seen.length;
@@ -196,20 +233,26 @@ test('checked-in reviewed owner entry exercises headers, holds, persisted receip
  // Real canonical policy receipts and, when the coordinated gate supplies PG,
  // real representation persistence through the existing R1 CAS/PG writer.
  const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
- let pool:Pool|undefined,admin:Pool|undefined,database:string|undefined;
+ let pool:Pool|undefined,admin:Pool|undefined,database:string|undefined,closePool:(()=>Promise<void>)|undefined,closeAdmin:(()=>Promise<void>)|undefined;
  if(connectionString){
   const url=new URL(connectionString),host=url.searchParams.get('host');
   assert.ok(['localhost','127.0.0.1','::1',''].includes(url.hostname)&&(!host||host.startsWith('/')||['localhost','127.0.0.1','::1'].includes(host))&&url.pathname!=='/civic_r1','Non-fixture database rejected');
-  admin=new Pool({connectionString,user:userInfo().username,max:2});database='genesis_auth_test_'+randomUUID().replaceAll('-','');await admin.query('CREATE DATABASE "'+database+'"');url.pathname='/'+database;pool=new Pool({connectionString:url.href,user:userInfo().username,max:2});await migrateDistrictJobs(pool);
+  admin=new Pool({connectionString,user:userInfo().username,max:2});closeAdmin=poolShutdownBarrier(admin);database='genesis_auth_test_'+randomUUID().replaceAll('-','');await admin.query('CREATE DATABASE "'+database+'"');url.pathname='/'+database;pool=new Pool({connectionString:url.href,user:userInfo().username,max:2});closePool=poolShutdownBarrier(pool);await migrateDistrictJobs(pool);
  }
  try{
   for(const {source,options,cache} of successes){
    const scope={publisherId:'fixture-regionalstatistik',sourceId:'regionalstatistik-genesis',municipalityId:'strausberg',ags:'12064472',tenant:null,observationWindow:'2024'},checkedAt=new Date().toISOString();
    const proof=await createPolicyReceipt({source:{url:source.url,sha256:source.sha256,mimeType:source.mimeType},sourcePolicy:source.policy,permission:{kind:'facts_with_attribution'},scope,checkedAt,expiresAt:new Date(Date.now()+60_000).toISOString()},options.ownerPolicyLane);
    noSecrets(JSON.stringify(proof));
+   assert.equal(proof.receipt.sourcePolicy.ownerAccountAccess?.robotsDecisionId,source.policy?.ownerAccountAccess?.robotsDecisionId);
+   if(source.policy?.robots.state==='blocked'){
+    assert.equal(proof.receipt.sourcePolicy.ownerAccountAccess?.robotsDecisionId,robotsGrant.id);
+    assert.equal(proof.receipt.sourcePolicy.documentOrigin?.classification,'unknown');assert.equal(proof.receipt.permission.kind,'facts_with_attribution');
+    assert.ok(!source.observationPath.startsWith(cache+'/'));await noRobotsExemptionInPublicRoot(cache);
+   }
    await assert.rejects(createPolicyReceipt({source:proof.receipt.source,sourcePolicy:source.policy,permission:{kind:'official_work'},scope,checkedAt,expiresAt:proof.receipt.expiresAt},options.ownerPolicyLane),/facts_with_attribution only/);
    if(pool){
-    const observationBytes=await readFile(source.observationPath),cas=new DistrictCas(join(root,'cas-'+source.policy!.ownerAccountAccess!.credentialKind)),store=new DistrictJobStore(pool);
+    const observationBytes=await readFile(source.observationPath),cas=new DistrictCas(join(root,'cas-'+basename(cache))),store=new DistrictJobStore(pool);
     const input={bytes:await readFile(source.localPath),receipt:proof.receipt,request:{url:source.url,method:'POST' as const,body,contentType:'application/x-www-form-urlencoded;charset=UTF-8'},retrievedAt:source.retrievedAt,fetchedAt:source.checkedAt,sourceVersion:null,redirectChain:[],httpObservation:{observationId:basename(source.observationPath),receiptSha256:digest(observationBytes),bytes:observationBytes}};
     await persistR1Representation(store,cas,input,options.ownerPolicyLane);
     await assert.rejects(persistR1Representation(store,cas,{...input,httpObservation:{observationId:denialName,receiptSha256:digest(denialBytes),bytes:denialBytes}},options.ownerPolicyLane));
@@ -226,6 +269,6 @@ test('checked-in reviewed owner entry exercises headers, holds, persisted receip
   }
   const denialPurge=await legacy.recordHostOptOut({host:'www.regionalstatistik.de',reason:'rights_holder_objection',reference:'fixture-genesis-denial-purge'},errorLane.options.ownerPolicyLane);
   assert.equal(denialPurge.purge.status,'purged');await assert.rejects(readFile(denialPath),{code:'ENOENT'});
- }finally{await pool?.end();if(admin&&database)await admin.query('DROP DATABASE "'+database+'" WITH (FORCE)');await admin?.end();}
+ }finally{try{await closePool?.();if(admin&&database)await admin.query('DROP DATABASE "'+database+'"');}finally{await closeAdmin?.();}}
  noSecrets(JSON.stringify(seen));noSecrets(JSON.stringify(process.argv));noSecrets(JSON.stringify(process.env));
 });

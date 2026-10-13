@@ -15,6 +15,7 @@ import {assessmentItemSchema,type AssessmentOutput} from '../src/district-assess
 import {createPolicyReceipt} from '../src/district-policy-receipt.ts';
 import {encodeStepReceipt,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
 import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
+import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 
 // Opt-in isolated LOCAL Postgres only; synthetic sources/CLI event fixtures.
 // Nothing invokes SSH, provider binaries, external sources or notification networks.
@@ -73,10 +74,10 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
  if(!['postgres:','postgresql:'].includes(base.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(base.hostname))throw Error('Broker fixture refuses a remote database');
  const host=base.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Broker fixture refuses a remote host override');
  const admin=new Pool({connectionString,max:2,connectionTimeoutMillis:5000,statement_timeout:10000}),database='district_bridge_test_'+randomUUID().replaceAll('-','');
- let pool:Pool|undefined,created=false;const directories:string[]=[];
- t.after(async()=>{try{await pool?.end();if(created)await admin.query('DROP DATABASE "'+database+'" WITH (FORCE)');}finally{await admin.end();for(const directory of directories)await rm(directory,{recursive:true,force:true});}});
+ const closeAdmin=poolShutdownBarrier(admin);let pool:Pool|undefined,closePool:(()=>Promise<void>)|undefined,created=false;const directories:string[]=[];
+ t.after(async()=>{try{await closePool?.();if(created)await admin.query('DROP DATABASE "'+database+'"');}finally{await closeAdmin();for(const directory of directories)await rm(directory,{recursive:true,force:true});}});
  await admin.query('CREATE DATABASE "'+database+'"');created=true;const isolated=new URL(base);isolated.pathname='/'+database;
- pool=new Pool({connectionString:isolated.href,max:8,connectionTimeoutMillis:5000,statement_timeout:10000});const db=pool;
+ pool=new Pool({connectionString:isolated.href,max:8,connectionTimeoutMillis:5000,statement_timeout:10000});closePool=poolShutdownBarrier(pool);const db=pool;
  await migrateDistrictJobs(db);
  const start=async(name:string,bounded=false)=>{
   const f=await fixture(db,name);directories.push(f.directory);

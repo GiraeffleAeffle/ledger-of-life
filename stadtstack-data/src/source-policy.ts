@@ -39,7 +39,18 @@ export interface OwnerGenesisAccessDecision {
 export const APPROVED_OWNER_GENESIS_ACCESS:readonly OwnerGenesisAccessDecision[]=Object.freeze([
  Object.freeze({id:'owner-2026-10-13-regionalstatistik-account',date:'2026-10-13',approver:'owner',host:'www.regionalstatistik.de',purpose:'regionalstatistik_genesis_statistics',permission:'facts_with_attribution'} as const),
 ]);
-export interface OwnerAccountAccess {decisionId:string;credentialKind:'token'|'password'}
+export interface OwnerGenesisRobotsDecision {
+ readonly id:string;readonly date:string;readonly approver:'owner';readonly host:'www.regionalstatistik.de';
+ readonly accountDecisionId:string;readonly purpose:'regionalstatistik_genesis_statistics';readonly permission:'facts_with_attribution';
+}
+/** Owner's "Yes please A", task 82; exact approval bytes:
+ * reports/approvals/r1-genesis-api-robots-2026-10-13.json (sha256 ca6f7f14…).
+ * Exempts only the robots restriction on the registered-account machine interface,
+ * never a TDM reservation, origin classification, or public/guest request. */
+export const APPROVED_OWNER_GENESIS_ROBOTS:readonly OwnerGenesisRobotsDecision[]=Object.freeze([
+ Object.freeze({id:'r1-genesis-api-robots-2026-10-13',date:'2026-10-13',approver:'owner',host:'www.regionalstatistik.de',accountDecisionId:'owner-2026-10-13-regionalstatistik-account',purpose:'regionalstatistik_genesis_statistics',permission:'facts_with_attribution'} as const),
+]);
+export interface OwnerAccountAccess {decisionId:string;credentialKind:'token'|'password';robotsDecisionId?:string}
 export function isOwnerGenesisEndpoint(url:string):boolean {
  try{
   const target=new URL(url);
@@ -54,8 +65,15 @@ export function ownerAccountAccessApplies(url:string,audit:OwnerAccountAccess|un
  const decision=ownerGenesisAccessFor(url);
  return !!decision&&!!audit&&audit.decisionId===decision.id&&(audit.credentialKind==='token'||audit.credentialKind==='password');
 }
+export function ownerGenesisRobotsDecisionFor(url:string,audit:OwnerAccountAccess|undefined):OwnerGenesisRobotsDecision|null {
+ if(!audit||!ownerAccountAccessApplies(url,audit))return null;
+ return APPROVED_OWNER_GENESIS_ROBOTS.find(decision=>decision.accountDecisionId===audit.decisionId&&decision.host==='www.regionalstatistik.de'&&decision.approver==='owner'&&decision.purpose==='regionalstatistik_genesis_statistics'&&decision.permission==='facts_with_attribution'&&/^[a-z0-9][a-z0-9-]{0,159}$/.test(decision.id)&&/^\d{4}-\d{2}-\d{2}$/.test(decision.date))??null;
+}
+export function ownerGenesisRobotsExemptionApplies(policy:SourceAccessPolicy,url:string):boolean {
+ return policy.robots.state==='blocked'&&policy.access==='authenticated_owner_account'&&policy.ownerAccountAccess?.robotsDecisionId!==undefined&&ownerGenesisRobotsDecisionFor(url,policy.ownerAccountAccess)?.id===policy.ownerAccountAccess.robotsDecisionId;
+}
 export function effectiveAccountAccess(policy:Pick<SourceAccessPolicy,'access'|'ownerAccountAccess'>,url:string):boolean {
- return policy.access==='public'?policy.ownerAccountAccess===undefined:policy.access==='authenticated_owner_account'&&ownerAccountAccessApplies(url,policy.ownerAccountAccess);
+ return policy.access==='public'?policy.ownerAccountAccess===undefined:policy.access==='authenticated_owner_account'&&ownerAccountAccessApplies(url,policy.ownerAccountAccess)&&(policy.ownerAccountAccess?.robotsDecisionId===undefined||ownerGenesisRobotsDecisionFor(url,policy.ownerAccountAccess)?.id===policy.ownerAccountAccess.robotsDecisionId);
 }
 
 export interface PolicyEvidence {url:string;locator:string;value:string;sha256?:string;checkedAt?:string;valueSha256?:string;valueBytes?:number;locatorSha256?:string;locatorBytes?:number;itemCount?:number}
@@ -171,7 +189,8 @@ export function documentOriginExcludes(policy:SourceAccessPolicy,document:{url:s
  const parsed=DocumentOriginSchema.safeParse(policy.documentOrigin);
  if(!parsed.success||parsed.data.url!==document.url||parsed.data.sha256!==document.sha256)return true;
  if((policy.robots.state==='blocked'||policy.tdm.state==='reserved')&&parsed.data.classifierVersion!==DOCUMENT_ORIGIN_CLASSIFIER_VERSION)return true;
- return parsed.data.classification!=='official_work'&&(policy.robots.state==='blocked'||policy.tdm.state==='reserved');
+ const robotsRestricts=policy.robots.state==='blocked'&&!ownerGenesisRobotsExemptionApplies(policy,document.url);
+ return parsed.data.classification!=='official_work'&&(robotsRestricts||policy.tdm.state==='reserved');
 }
 /** Shared pre-CAS/pre-model admission; PDF metadata completeness is additionally checked by the schema gate. */
 export function effectiveSourcePermission(policy:SourceAccessPolicy,document:{url:string;sha256:string}):boolean {

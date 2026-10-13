@@ -14,6 +14,7 @@ import {persistR1Representation} from '../src/district-r1-state.ts';
 import {admitStructuredObservations} from '../src/district-structured-record.ts';
 import {persistMetadata,R1ArtifactAuditSchema,RepresentationDescriptorSchema} from '../src/district-r1.ts';
 import {provisionCivicPolicyAuthority,recordHostOptOut,purgeOptedOutHost} from '../src/civic-opt-out.ts';
+import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 
 // Opt-in disposable local Postgres and isolated managed-source authority. This
 // authored fixture makes no HTTP, parser, provider or publication calls.
@@ -23,11 +24,11 @@ test('source quotations and parser errors remain purgable CAS, never immutable R
  if(!['postgres:','postgresql:'].includes(url.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(url.hostname))throw Error('Privacy fixture refuses non-local Postgres');
  const host=url.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Privacy fixture refuses non-local host override');
  const admin=new Pool({connectionString,max:2,connectionTimeoutMillis:5000,statement_timeout:10000}),database='district_metadata_test_'+randomUUID().replaceAll('-','');
- const resources:{created:boolean;pool?:Pool;root?:string}={created:false};
- t.after(async()=>{try{await resources.pool?.end();if(resources.created)await admin.query('DROP DATABASE "'+database+'" WITH (FORCE)');}finally{await admin.end();if(resources.root)await rm(resources.root,{recursive:true,force:true});}});
+ const closeAdmin=poolShutdownBarrier(admin),resources:{created:boolean;closePool?:()=>Promise<void>;root?:string}={created:false};
+ t.after(async()=>{try{await resources.closePool?.();if(resources.created)await admin.query('DROP DATABASE "'+database+'"');}finally{await closeAdmin();if(resources.root)await rm(resources.root,{recursive:true,force:true});}});
  await admin.query('CREATE DATABASE "'+database+'"');resources.created=true;
  const isolated=new URL(url);isolated.pathname='/'+database;
- const pool=new Pool({connectionString:isolated.href,max:4,connectionTimeoutMillis:5000,statement_timeout:10000});resources.pool=pool;
+ const pool=new Pool({connectionString:isolated.href,max:4,connectionTimeoutMillis:5000,statement_timeout:10000});resources.closePool=poolShutdownBarrier(pool);
  const root=await realpath(await mkdtemp(join(tmpdir(),'r1-metadata-privacy-')));resources.root=root;
  const options={stateDir:join(root,'authority'),authorityId:`fixture:${randomUUID()}`},authority=await provisionCivicPolicyAuthority(options),policy={...options,authoritySha256:authority.authoritySha256};
  const store=new DistrictJobStore(pool);await migrateDistrictJobs(pool);

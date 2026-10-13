@@ -7,7 +7,7 @@ import {StructuredKnowledgeRecordSchema} from './district-structured-record.ts';
 import {IdentityAssertionSchema,IdentityAdmissionSchema} from './district-entity-resolution.ts';
 import { APPROVED_OWNER_ROBOTS_OVERRIDE, effectiveRobotsPermission, effectiveSourcePermission, ownerRobotsOverrideApplies, isContentFreePolicyEvidence, isPolicyMetadataUrl, MAX_POLICY_METADATA_EVIDENCE } from './source-policy.ts';
 import { DocumentOriginSchema } from './document-origin-contract.ts';
-import {ownerAccountAccessApplies} from './source-policy.ts';
+import {ownerAccountAccessApplies,ownerGenesisRobotsExemptionApplies} from './source-policy.ts';
 
 export const KNOWLEDGE_SCHEMA_VERSION = 'stadtstack-knowledge-v3';
 export const FAITHFULNESS_THRESHOLD = 0.8;
@@ -55,7 +55,7 @@ export const SourceAccessPolicySchema = z.object({
   robots: z.object({ state: z.enum(['allowed', 'blocked', 'unavailable']), url: z.url().max(8192), sha256: hashSchema.optional(), checkedAt: z.iso.datetime().optional() }).strict(),
   tdm: z.object({ state: z.enum(['reserved', 'not_reserved', 'not_declared', 'unavailable']), evidence: z.array(PolicyEvidenceSchema).max(256), referenceStatus: z.literal('unavailable').optional(), declarationStatus: z.literal('unavailable').optional() }).strict(),
   access: z.enum(['public', 'authentication', 'captcha', 'paywall','authenticated_owner_account']), legalClassification: z.literal('not_assessed'), publication: z.literal('facts_with_attribution_only'),
-  ownerAccountAccess: z.object({decisionId:z.string().regex(/^[a-z0-9][a-z0-9-]{0,159}$/),credentialKind:z.enum(['token','password'])}).strict().optional(),
+  ownerAccountAccess: z.object({decisionId:z.string().regex(/^[a-z0-9][a-z0-9-]{0,159}$/),credentialKind:z.enum(['token','password']),robotsDecisionId:z.string().regex(/^[a-z0-9][a-z0-9-]{0,159}$/).optional()}).strict().optional(),
   ownerRobotsOverride: OwnerRobotsOverrideSchema.optional(), robotsStatus: z.enum(['allowed', 'disallowed', 'unavailable']).optional(), override: z.literal('owner-approved 2026-10-11').optional(),
   ownerTdmOverride: OwnerRobotsOverrideSchema.optional(), tdmOverride: z.literal('owner-approved 2026-10-11').optional(),
   documentOrigin: DocumentOriginSchema.optional(),
@@ -64,6 +64,11 @@ export const SourceAccessPolicySchema = z.object({
     let approved=false;
     try { approved=ownerAccountAccessApplies(new URL('/genesisws/rest/2020/data/table',policy.robots.url).href,policy.ownerAccountAccess); } catch {}
     if (policy.access !== 'authenticated_owner_account' || !approved) ctx.addIssue({code:'custom',message:'Owner account audit requires the exact approved host decision'});
+    if (policy.ownerAccountAccess?.robotsDecisionId !== undefined) {
+      let exempt=false;
+      try { exempt=ownerGenesisRobotsExemptionApplies(policy,policy.documentOrigin?.url??new URL('/genesisws/rest/2020/data/table',policy.robots.url).href); } catch {}
+      if (!exempt) ctx.addIssue({code:'custom',message:'Owner-account robots exemption audit requires the exact blocked API decision'});
+    }
   }
   if (policy.tdm.evidence.some(evidence => evidence.value === 'invalid_reservation_declaration') && policy.tdm.declarationStatus !== 'unavailable') ctx.addIssue({ code: 'custom', message: 'Invalid reservation declaration must remain unavailable' });
   if (policy.ownerRobotsOverride !== undefined || policy.robotsStatus !== undefined || policy.override !== undefined) {

@@ -15,7 +15,7 @@ PG_BIN=/usr/lib/postgresql/16/bin
 log_root=${R1_VERIFY_LOG_ROOT:-$HOME/.local/state/stadtstack-data/r1-verify}
 mkdir -p -m 0700 "$log_root"
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
-cpus=(taskset -c 0-3 nice -n 10)
+cpus=(taskset -c "${R1_VERIFY_CPUS:-0-3}" nice -n 10)
 
 if [[ $mode == typecheck || $mode == all ]]; then
   "${cpus[@]}" node_modules/.bin/tsc --noEmit >"$log_root/tsc-$stamp.log" 2>&1 && echo "tsc=0" || { echo "tsc=failed log=$log_root/tsc-$stamp.log"; [[ $mode == all ]] || exit 1; }
