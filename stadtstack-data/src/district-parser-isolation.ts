@@ -273,9 +273,11 @@ export async function withParserSandbox<T>(artifact: string | Uint8Array | null,
         const exited = child.exitCode !== null || child.signalCode !== null ? Promise.resolve(true)
           : new Promise<boolean>(resolve => child!.once('exit', () => resolve(true)));
         let exitTimer: NodeJS.Timeout | undefined;
-        const removedByDaemon = await Promise.race([exited, new Promise<boolean>(resolve => { exitTimer = setTimeout(() => resolve(false), 10_000); })]);
+        const exitedInTime = await Promise.race([exited, new Promise<boolean>(resolve => { exitTimer = setTimeout(() => resolve(false), 10_000); })]);
         clearTimeout(exitTimer);
-        if (!removedByDaemon) {
+        // Only a normal CLI exit implies the attached `run --rm` saw daemon-side removal; a
+        // killed/failed CLI (timeouts and failures SIGKILL it) can leave the worker running.
+        if (!exitedInTime || child.exitCode !== 0 || child.signalCode !== null) {
           try { await execute(DOCKER, ['rm', '--force', name], { env, timeout: 10_000, maxBuffer: 16 * 1024, encoding: 'utf8' }); }
           catch { /* absence below is the only cleanup proof */ }
           child.kill('SIGKILL');
