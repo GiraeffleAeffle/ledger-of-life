@@ -90,6 +90,28 @@ The reviewed completion snapshot is `fb4e08eee8bf1a3bf036433893553b5ebb0e7ae4dec
 
 The append-only authorized corpus allowlist additionally retains the exact 0.3.2 round-2 and round-3 target snapshots for Strausberg Solarpark, Rüdersdorf heat planning and Hoppegarten heat planning (`src/district-corpus.ts`). These specific additions do not authorize arbitrary new corpus hashes, municipalities or source endpoints.
 
+### Offline crawl-to-residual import
+
+`knowledge:r1 import-crawl-corpus` explicitly imports an already frozen, **exact owner-authorized** managed index. It performs no networking, parsing, model calls or enqueueing. Registry/robots approval is not corpus approval: the existing eight production hashes remain unchanged; no new nine-town corpus is authorized by this implementation.
+
+```sh
+npm run knowledge:r1 -- import-crawl-corpus \
+  --registry-config "$REGISTRY_DESCRIPTOR_JSON" \
+  --registry-config-sha256 "$REGISTRY_DESCRIPTOR_SHA256" < "$IMPORT_MANIFEST"
+```
+
+The strict stdin JSON manifest has `index: {path, sha256}`, `rawRoot`, the identical `registry: {path, sha256}` descriptor pin, `observations: [{path, sha256}]` for **all** immutable index dependencies (including discovery/excluded observations), and `documents: [{documentId, scope, permission, bounds, requestEvidence: {path, sha256}}]`. Scope explicitly supplies `publisherId`, `sourceId`, `municipalityId`, eight-digit `ags`, `tenant` and `observationWindow`; hostnames never become publisher identities. Select 1–200 distinct originals. Each job requires `maxDocuments: 1`, `maxChunks: 1–24`, `maxModelCalls: 2–48`, `paidMicroUsd: 0`. Indexes are bounded to 64 MiB/10,000 originals and observation/request proofs to 1 MiB each. ZIP/GML containers are not converted into fabricated text.
+
+Import authenticates exact registry plus complete original/negative HTTP ancestry, retains index/observation bytes and original retrieval/check clocks, and checks selected managed bodies against their original observation hashes. Current opt-out/shared policy is rechecked; a new PolicyReceipt expires no later than one hour after the oldest actual robots/TDM/representation evidence. Missing clocks or stale policy hold that original; import never refreshes evidence timestamps. Missing complete ancestry holds the entire selection rather than duplicating an incomplete index. Actual request method/URL/content type, body digest/public selector and redirect chain live in an independently pinned managed sidecar at `${rawRoot}-request-evidence/requests/<original-observationId>`, bound to the exact original observation. Legacy observations lacking a sidecar hold for import only; their byte format and existing processing are unchanged. No request headers or account credentials are recorded.
+
+Authenticated GENESIS owner-account originals are intentionally outside this residual importer and remain held; their supported route is the structured R1 queue. Fetch capture still stores their credential-free request/redirect sidecars at `${rawRoot}-genesis-owner-account-request-evidence`, with no public selector text or credential headers.
+
+Output is `{jobs, holds, coverage}`. `jobs` contains genuine `ResidualInputSchema` manifests with exact corpus/registry/policy/HTTP pins, `requestEvidenceSha256`, and `corpusObservations` for full-index execution custody. Save only `{jobs}` for the existing `enqueue-residual-preparation` command, with the same registry flags. A fixture-only capability requires a provisioned, pinned isolated authority; it cannot add production hashes or be enabled through an environment variable or CLI flag.
+
+Coverage counts mean **authenticated imported observations**, not live acquisition, model output, complete municipal coverage or publication. Imported PG observation audits are labelled `origin: imported`; no `acquire_representation` StepReceipt is emitted. Queued extraction still requires the actual committed succeeded preparation and its receipt/prepared hash. Direct preparation runs remain distinct; `export-text-contribution` still requires real sealed native assembly/archive and publication-side admission. Import authority/DB writes and later job execution each need their own authorization.
+
+The request-evidence sidecar is an ordinary `artifacts`-kind managed entry using existing `http_observation` provenance, not a new inventory/observation codec. Static comparison against tag **0.3.2**, `src/civic-opt-out.ts:73–80,545–554,593–605`, confirms that old strict observation decoding applies only to `fetch` roots; sidecar artifacts are instead authenticated by existing inventory/digest checks. Recovery (`:1019`) and opt-out/purge (`:1152,1180,1186`) reconcile all enrolled roots, so preserving the old observation/request files is necessary. No compatibility shim, old-tool purge bypass or new provenance kind is introduced.
+
 BOB-SH procedure IDs are joined to exact eight-digit AGS (or a consistent twelve-digit ARS), never town-name or Amt-name substrings. Its versioned bound-seed frontier excludes statewide roots and neighboring procedures while retaining policy-checked linked documents. Missing/conflicting identity cannot fall back to generic seeds. A successful exact-code empty result describes only the observed query scope, not a municipality's whole planning activity.
 
 PDF extraction uses `pdftotext` reading order, not physical `-layout`: the latter interleaved newspaper columns and split source words in the actual Hagenow gazette. The reading-order conversion removed all 109 observed line-hyphenation breaks there without weakening quotation, date, stage or model gates.

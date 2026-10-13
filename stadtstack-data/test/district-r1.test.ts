@@ -10,6 +10,7 @@ import {DistrictCas} from '../src/district-cas.ts';
 import {DistrictJobStore,migrateDistrictJobs,runDistrictJobs,type OwnerNotification} from '../src/district-jobs.ts';
 import {Pool} from 'pg';
 import {ResidualInputSchema} from '../src/district-residual-jobs.ts';
+import {PILOT_BASE_CORPUS_SHA256} from '../src/district-corpus.ts';
 import {HttpObservationProofSchema} from '../src/district-http-observation.ts';
 import {randomUUID} from 'node:crypto';
 import {PoliteFetcher,PoliteFetchError,type FetchFailure} from '../src/polite-fetch.ts';
@@ -74,7 +75,7 @@ test('host grouping is a pinned conservative capacity pool, not publisher equiva
 });
 
 test('residual enqueue is bounded subscription work without caller-selected handlers or paid routes',()=>{
- const hash='a'.repeat(64),input={documentId:'fixture-document',corpusSha256:hash,registry:{path:'/fixture/operator-registry-descriptor.json',sha256:hash},registrySha256:hash,policyReceiptSha256:hash,httpObservation:{observationId:'fixture-observation.json',receiptSha256:hash},bounds:{maxDocuments:1,maxChunks:24,maxModelCalls:48,paidMicroUsd:0}};
+ const hash='a'.repeat(64),input={documentId:'fixture-document',corpusSha256:PILOT_BASE_CORPUS_SHA256,corpusObservations:[{kind:'http_observation',url:'https://example.org/original',sourceSha256:hash,observationId:'1-11111111-1111-4111-8111-111111111111.json',receiptSha256:hash}],registry:{path:'/fixture/operator-registry-descriptor.json',sha256:hash},registrySha256:hash,policyReceiptSha256:hash,httpObservation:{observationId:'1-11111111-1111-4111-8111-111111111111.json',receiptSha256:hash},requestEvidenceSha256:hash,bounds:{maxDocuments:1,maxChunks:24,maxModelCalls:48,paidMicroUsd:0}};
  assert.equal(ResidualInputSchema.parse(input).bounds.maxModelCalls,48);
  for(const changed of [
   {...input,bounds:{...input.bounds,maxDocuments:2}},

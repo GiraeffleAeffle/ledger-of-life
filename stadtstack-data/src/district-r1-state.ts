@@ -3,18 +3,26 @@ import {insertR1MetadataSnapshot,type DistrictJobStore,type DistrictJobSpec} fro
 import {type DistrictCas,type CasArtifact} from './district-cas.ts';
 import {canonicalJson,digest,semanticHash,PARSER_INPUT_MAX_BYTES,type AdapterScope} from './district-adapter-contract.ts';
 import {PolicyReceiptSchema,recheckPolicyReceipt,type PolicyReceipt} from './district-policy-receipt.ts';
-import {initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,type ManagedSourceBinding,type CivicPolicyOptions} from './civic-opt-out.ts';
+import {initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,type ManagedSourceBinding,type ManagedSourceContent,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {structuredJobContract,type StructuredJobContract} from './district-structured-jobs.ts';
 import {STRUCTURED_WORKER_VERSION,type StructuredWorkerRequest} from './district-structured-parser-worker.ts';
 import {encodeStepReceipt,StepReceiptSchema} from './district-step-receipt.ts';
 import {type StructuredSupportingSource} from './district-structured-record.ts';
 import {HttpObservationProofSchema,HttpObservationSchema,authenticatedHttpBinding,authenticateHttpSourceBindings} from './district-http-observation.ts';
-import type {OperatorRegistryInputPin} from './district-registry-config.ts';
+import type {OperatorRegistryInputPin,AdmittedOperatorRegistryConfiguration} from './district-registry-config.ts';
 import {authenticateStructuredRegistry} from './district-structured-registry-admission.ts';
 
+/** Canonical managed CAS copy of the admitted operator registry; the single path for CLI and fixtures. */
+export async function persistOperatorRegistry(store:DistrictJobStore,cas:DistrictCas,admitted:AdmittedOperatorRegistryConfiguration,policy:CivicPolicyOptions={}){
+ const hash=digest(admitted.bytes);
+ await initializeManagedAcquisitionLane(cas.root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
+ const entries:ManagedSourceContent[]=admitted.bindings.map(binding=>({...binding,relativePath:`sha256/${hash.slice(0,2)}/${hash}`,contentSha256:hash,independentAllowed:false}));
+ const artifact=await withManagedSourceWrite(cas.root,entries,()=>cas.put(admitted.bytes,{kind:'derived',mimeType:'application/json'}),policy);
+ await store.addArtifact(artifact);return hash;
+}
 export interface PersistedRepresentation {snapshotId:string;policyDecisionId:string;receiptSha256:string;sourceArtifact:CasArtifact;receiptArtifact:CasArtifact;observationArtifact:CasArtifact;httpObservation:{observationId:string;receiptSha256:string};snapshot:StructuredWorkerRequest['snapshot']}
 /** Canonical safe audit metadata commits to Postgres before registering any purgable CAS duplicate. */
-export async function persistR1Representation(store:DistrictJobStore,cas:DistrictCas,input:{bytes:Uint8Array;receipt:PolicyReceipt;request:{url:string;method:'GET'|'POST';body:string|null;contentType:string|null};retrievedAt:string;fetchedAt:string;sourceVersion:string|null;redirectChain:string[];httpObservation:{observationId:string;receiptSha256:string;bytes:Uint8Array}},policyOptions:CivicPolicyOptions={}):Promise<PersistedRepresentation>{
+export async function persistR1Representation(store:DistrictJobStore,cas:DistrictCas,input:{bytes:Uint8Array;receipt:PolicyReceipt;request:{url:string;method:'GET'|'POST';body:string|null;contentType:string|null};retrievedAt:string;fetchedAt:string;sourceVersion:string|null;redirectChain:string[];httpObservation:{observationId:string;receiptSha256:string;bytes:Uint8Array};origin?:'imported'},policyOptions:CivicPolicyOptions={}):Promise<PersistedRepresentation>{
  const receipt=PolicyReceiptSchema.parse(input.receipt),proof=await recheckPolicyReceipt(receipt,{...policyOptions,evaluationAt:new Date().toISOString()}),sourceSha256=digest(input.bytes);
  if(sourceSha256!==receipt.source.sha256)throw Error('Acquired representation byte binding mismatch');
  const originalObservation=HttpObservationProofSchema.parse({...input.httpObservation,bytes:Buffer.from(input.httpObservation.bytes).toString('utf8')});
@@ -32,7 +40,7 @@ export async function persistR1Representation(store:DistrictJobStore,cas:Distric
   if(policy.rowCount!==1||policy.rows[0].state!=='allowed'||policy.rows[0].source_snapshot_id!==snapshotId||semanticHash(policy.rows[0].receipt_json)!==proof.receiptSha256)throw Error('Existing policy proof is excluded or incompatible');policyDecisionId=policy.rows[0].id;
   await client.query('COMMIT');
  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
- await insertR1MetadataSnapshot(store.pool,{kind:'http_observation',payload:{schemaVersion:'district-http-observation-audit-v1',...originalObservation}});
+ await insertR1MetadataSnapshot(store.pool,{kind:'http_observation',payload:{schemaVersion:'district-http-observation-audit-v1',...originalObservation,...(input.origin?{origin:input.origin}:{})}});
  await initializeManagedAcquisitionLane(cas.root,{...policyOptions,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
  const receiptBytes=Buffer.from(canonicalJson(receipt));
  const sourceArtifact=await withManagedSourceWrite(cas.root,[{...binding,relativePath:`sha256/${sourceSha256.slice(0,2)}/${sourceSha256}`,contentSha256:sourceSha256,independentAllowed:true}],()=>cas.put(input.bytes,{kind:'source_original',mimeType:receipt.source.mimeType,admission:{state:'allowed',sourceSha256,policyProofSha256:proof.receiptSha256,checkedAt:receipt.checkedAt,expiresAt:receipt.expiresAt}}),policyOptions);

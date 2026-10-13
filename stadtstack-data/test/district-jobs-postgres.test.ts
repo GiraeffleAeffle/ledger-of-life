@@ -9,11 +9,13 @@ import {canonicalJson,digest} from '../src/district-adapter-contract.ts';
 import {DistrictCas} from '../src/district-cas.ts';
 import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,insertR1MetadataSnapshot,runDistrictJobs,deliverDistrictOwnerNotifications,artifactVerificationHandler,type AuthorizationInput,type ClaimedJob,type DistrictJobSpec,type JobHandler,type OwnerNotification,type NotificationAcknowledgement} from '../src/district-jobs.ts';
 import {CANONICALIZATION_VERSION,STEP_RECEIPT_VERSION,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
+import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 
 // Real Postgres only. The connection must be local and its role must have CREATEDB.
 // Run: DISTRICT_TEST_DATABASE_URL=postgresql://localhost/postgres node --experimental-strip-types --test test/district-jobs-postgres.test.ts
 // Each invocation creates/drops its own randomly named database; no existing schema is cleared.
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
+
 function jobSpec(name:string,step='verify_artifacts',hashes:string[]=[]):DistrictJobSpec {
   return {step,lane:'cpu',semanticContractSha256:digest('integration-contract-v1'),inputArtifactHashes:hashes,sourceScope:{publisherId:'synthetic-publisher',sourceId:'synthetic-'+name,municipalityId:'strausberg',ags:'12064472',tenant:null,observationWindow:'2026-10-11'},selector:{scenario:name,nonce:randomUUID()},policyProofSha256:null};
 }
@@ -26,17 +28,18 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
   if(!['postgres:','postgresql:'].includes(url.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(url.hostname))throw Error('Integration test refuses a non-local Postgres endpoint');
   const host=url.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Integration test refuses non-local host override');
   const admin=new Pool({connectionString,max:2,connectionTimeoutMillis:5000,statement_timeout:10000});
+  const closeAdmin=poolShutdownBarrier(admin);
   const database='district_r1_test_'+randomUUID().replaceAll('-','');
-  const resources:{created:boolean;pool?:Pool;directory?:string}={created:false};
+  const resources:{created:boolean;closePool?:()=>Promise<void>;directory?:string}={created:false};
   t.after(async()=>{
-    try{await resources.pool?.end();if(resources.created)await admin.query('DROP DATABASE "'+database+'" WITH (FORCE)');}
-    finally{await admin.end();if(resources.directory)await rm(resources.directory,{recursive:true,force:true});}
+    try{await resources.closePool?.();if(resources.created)await admin.query('DROP DATABASE "'+database+'"');}
+    finally{await closeAdmin();if(resources.directory)await rm(resources.directory,{recursive:true,force:true});}
   });
   await admin.query('CREATE DATABASE "'+database+'"');
   resources.created=true;
   const isolated=new URL(url);isolated.pathname='/'+database;
   const pool=new Pool({connectionString:isolated.href,max:8,connectionTimeoutMillis:5000,statement_timeout:10000});
-  resources.pool=pool;
+  resources.closePool=poolShutdownBarrier(pool);
   const directory=await mkdtemp(join(tmpdir(),'district-pg-cas-'));
   resources.directory=directory;
   const store=new DistrictJobStore(pool),cas=new DistrictCas(join(directory,'cas'));
@@ -176,6 +179,7 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
       const bounds=await store.beginRun(authorizationId,1,60000),claim=await store.claim(bounds,30000);
       assert.equal(claim.kind,'job');if(claim.kind!=='job')return;
       const workPool=new Pool({connectionString:isolated.href,max:1,connectionTimeoutMillis:5000,statement_timeout:15000}),workStore=new DistrictJobStore(workPool);
+      const closeWorkPool=poolShutdownBarrier(workPool);
       const observer=await workPool.connect(),pid=(await observer.query<{pid:number}>('SELECT pg_backend_pid() AS pid')).rows[0].pid;observer.release();
       const authority=await pool.connect(),serviceLock=operation==='recovery'?await pool.connect():null;
       let guardOpen=false,settled=false;
@@ -215,7 +219,7 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
         if(guardOpen)await authority.query('ROLLBACK');authority.release();
         await completion;
         if(serviceLock){await serviceLock.query('SELECT pg_advisory_unlock(18441,2)');serviceLock.release();}
-        await workPool.end();await store.endRun(bounds.runId,'held','owner_stopped');
+        await closeWorkPool();await store.endRun(bounds.runId,'held','owner_stopped');
       }
     }
   });

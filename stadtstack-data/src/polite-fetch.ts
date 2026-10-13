@@ -30,6 +30,7 @@ import {nativePublicRequestHeaders,type NativePublicOperation} from './district-
 import {ownerGenesisAccessFor} from './source-policy.ts';
 import {readGenesisOwnerCredentials,type GenesisOwnerCredentials} from './genesis-owner-credentials.ts';
 import {genesisOwnerAccountRoot,readGenesisOwnerRepresentation} from './genesis-owner-acquisition.ts';
+import {persistCrawlRequestEvidence} from './district-crawl-request.ts';
 
 export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'credential_unavailable'|'dns_error'|'timeout'|'network_error'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cross_host_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded'|'host_admission_deferred';
 class RequestAdmissionInterruption extends Error {readonly admissionError:unknown;constructor(error:unknown){super('Public request admission held');this.admissionError=error;}}
@@ -426,6 +427,7 @@ export class PoliteFetcher {
   if(method==='POST'&&(!body||Buffer.byteLength(body)>65536))throw new PoliteFetchError('unsafe_url','Only bounded public form requests supported');
   if(body!==undefined)for(const key of new URLSearchParams(body).keys())if(/^(?:password|secret|authorization|access_token|api_key|apikey|sessionid|phpsessid|cookie)$/i.test(key))throw new PoliteFetchError('unsafe_url','Credential-bearing public form rejected');
   const redirectLimit=standardTdmChain?Math.min(5,this.options.maxRedirects):this.options.maxRedirects;
+  const actualRedirectChain=[url.href],originalMethod=method,originalBody=body;
   for(let redirects=0;redirects<=redirectLimit;redirects++){
    if(options.hostProfile==='municipal')this.delays.set(url.hostname,Math.max(5000,this.delays.get(url.hostname)??0));
    let checkedAt=new Date().toISOString();const observation:FetchObservation={url:url.href,method,checkedAt,retrievedAt:null,state:'failed'};
@@ -498,6 +500,7 @@ export class PoliteFetcher {
      standardTdmChain?.push(next.href);
      if(method==='POST'&&next.origin!==url.origin)throw new PoliteFetchError('invalid_redirect','Cross-origin form redirect rejected');
      this.onRedirect?.({requestUrl:input,from:url.href,to:next.href,status:response.status});
+     actualRedirectChain.push(next.href);
      if(response.status===303||method==='POST'&&[301,302].includes(response.status)){method='GET';body=undefined;}
      url=next;continue;
     }
@@ -639,6 +642,10 @@ export class PoliteFetcher {
     };
     const sourceEntry={kind:'http_observation' as const,relativePath:relative(this.cacheDir,localPath),contentSha256:sha256,sourceSha256:sha256,url:url.href,observationId:basename(observationPath),receiptSha256:hash(observationBytes),independentAllowed:checkTdm&&effectiveSourcePermission(policy,{url:url.href,sha256})};
     await withManagedSourceWrite(this.cacheDir,[sourceEntry,...(this.publicPolicyFetcher?[{...sourceEntry,relativePath:relative(this.cacheDir,observationPath),contentSha256:hash(observationBytes),independentAllowed:false}]:[])],persist,this.policyOptions());
+    if(checkTdm){
+     const publicSelector=originalBody!==undefined&&![...new URLSearchParams(originalBody).keys()].some(key=>/^(?:username|user|password|secret|authorization|access_token|api_key|apikey|token|sessionid|phpsessid|cookie)$/i.test(key))&&String(policy.access)!=='authenticated_owner_account'?originalBody:null;
+     await persistCrawlRequestEvidence(this.cacheDir,{schemaVersion:'stadtstack-crawl-request-evidence-v1',httpObservation:{kind:'http_observation',url:url.href,sourceSha256:sha256,observationId:basename(observationPath),receiptSha256:hash(observationBytes)},request:{url:input,method:originalMethod,contentType:originalBody===undefined?null:nativePublicRequestHeaders(publicUrl(input),originalMethod,originalBody,options.publicOperation)['Content-Type']??null,bodySha256:originalBody===undefined?null:hash(originalBody),publicSelector},redirectChain:actualRedirectChain},this.policyOptions());
+    }
     return {url:url.href,sha256,localPath,mimeType,retrievedAt,checkedAt,status:response.status,observationPath,policy:observation.policy,...(validatedPolicy?{validatedPolicy}:{})};
    }catch(error){
     if(error instanceof RequestAdmissionInterruption){Object.assign(policy,projectSourcePolicyMetadata(policy));observation.policy=policy;observation.state='failed';observation.failure='host_admission_deferred';await this.observation(observation);throw error;}

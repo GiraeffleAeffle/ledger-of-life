@@ -16,10 +16,9 @@ import {districtRegistrySchema} from './district-registry.ts';
 import type {DistrictRegistry} from './district-registry.ts';
 import {registerStructuredCatalog} from './district-structured-registry.ts';
 import {buildOperatorRegistryConfigDescriptor,readOperatorRegistryInputPin,operatorRegistryInputPinSchema,parseOperatorRegistryConfiguration} from './district-registry-config.ts';
-import type {AdmittedOperatorRegistryConfiguration} from './district-registry-config.ts';
 import {StructuredWorkerRequestSchema,StructuredSnapshotMetadataSchema} from './district-structured-parser-worker.ts';
 import {StructuredJobResultSchema,structuredJobHandlers} from './district-structured-jobs.ts';
-import {persistR1Representation,enqueueStructuredSnapshot,exportStepReceipt} from './district-r1-state.ts';
+import {persistOperatorRegistry,persistR1Representation,enqueueStructuredSnapshot,exportStepReceipt} from './district-r1-state.ts';
 import {PolicyReceiptSchema,createPolicyReceipt,recheckPolicyReceipt} from './district-policy-receipt.ts';
 import {StepReceiptSchema} from './district-step-receipt.ts';
 import {PoliteFetcher,PoliteFetchError} from './polite-fetch.ts';
@@ -40,6 +39,7 @@ import type {StructuredSupportingSource} from './district-structured-record.ts';
 import {StructuredKnowledgeRecordSchema} from './district-structured-record.ts';
 import type {StructuredWorkerRequest} from './district-structured-parser-worker.ts';
 import {ResidualInputSchema,residualJobHandlers,enqueueResidualPreparation,enqueueCommittedResidualExtraction,exportResidualTextContribution} from './district-residual-jobs.ts';
+import {CrawlCorpusImportSchema,importCrawlCorpusForResidual} from './district-crawl-import.ts';
 import {DistrictAssessmentBroker,assessmentBJobHandler,enqueueAssessmentB,assessmentEvidenceArtifactHashes} from './district-assessment-broker.ts';
 import {assessmentItemSchema} from './district-assessment.ts';
 import {r1TextCompositionInputSchema,loadR1TextCompositionInput} from './district-r1-text-composition.ts';
@@ -81,7 +81,7 @@ export const HostGroupsSchema=z.object({schemaVersion:z.literal('district-host-g
 export async function acquisitionContract(){
  const hostGroupsBytes=await readFile(join(REPO,'sources/district-host-groups.json'));
  HostGroupsSchema.parse(JSON.parse(hostGroupsBytes.toString('utf8')));
- return semanticHash({version:ACQUISITION_VERSION,hostGroupsSha256:digest(hostGroupsBytes),files:await Promise.all(['district-r1.ts','polite-fetch.ts','district-policy-receipt.ts','source-policy.ts','civic-opt-out.ts','district-native-request.ts','genesis-owner-credentials.ts','genesis-owner-acquisition.ts'].map(async file=>({file,sha256:digest(await readFile(join(REPO,'src',file)))})))});
+ return semanticHash({version:ACQUISITION_VERSION,hostGroupsSha256:digest(hostGroupsBytes),files:await Promise.all(['district-r1.ts','district-r1-state.ts','polite-fetch.ts','district-crawl-request.ts','district-policy-receipt.ts','source-policy.ts','civic-opt-out.ts','district-native-request.ts','genesis-owner-credentials.ts','genesis-owner-acquisition.ts'].map(async file=>({file,sha256:digest(await readFile(join(REPO,'src',file)))})))});
 }
 
 /** Controlled counts over the actual committed pages; no source literals or raw hold explanations. */
@@ -194,14 +194,6 @@ export function parseR1RegistryArguments(rawArgs:readonly string[]){
  return {registryPin:operatorRegistryInputPinSchema.parse({path,sha256}),args};
 }
 
-/** Canonical managed CAS copy of the admitted operator registry; the single path for CLI and fixtures. */
-export async function persistOperatorRegistry(store:DistrictJobStore,cas:DistrictCas,admitted:AdmittedOperatorRegistryConfiguration,policy:CivicPolicyOptions={}){
- const hash=digest(admitted.bytes);
- await initializeManagedAcquisitionLane(cas.root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
- const entries:ManagedSourceContent[]=admitted.bindings.map(binding=>({...binding,relativePath:`sha256/${hash.slice(0,2)}/${hash}`,contentSha256:hash,independentAllowed:false}));
- const artifact=await withManagedSourceWrite(cas.root,entries,()=>cas.put(admitted.bytes,{kind:'derived',mimeType:'application/json'}),policy);
- await store.addArtifact(artifact);return hash;
-}
 async function committedResult(store:DistrictJobStore,cas:DistrictCas,receiptSha256:string,resultSha256:string){
  const rows=await store.pool.query<{receipt:unknown}>('SELECT receipt FROM district_pipeline.step_receipts WHERE receipt_sha256=$1',[receiptSha256]);
  if(rows.rowCount!==1)throw Error('Committed receipt required');
@@ -404,6 +396,11 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
  try{
   await persistOperatorRegistry(store,cas,admitted);
   const input=await stdinJson();
+  if(command==='import-crawl-corpus'){
+   const manifest=CrawlCorpusImportSchema.parse(input);
+   if(canonicalJson(manifest.registry)!==canonicalJson(registryPin))throw Error('Crawl import descriptor must match admitted CLI registry pin');
+   process.stdout.write(canonicalJson(await importCrawlCorpusForResidual(store,cas,manifest))+'\n');return;
+  }
   if(command==='export-text-contribution'){
    const manifest=z.object({jobKeys:z.array(HashSchema).min(1).max(10000),compositionArtifactSha256:HashSchema}).strict().parse(input),compositionPath=join(cas.root,'sha256',manifest.compositionArtifactSha256.slice(0,2),manifest.compositionArtifactSha256);
    await assertManagedSourceReadable(compositionPath);
