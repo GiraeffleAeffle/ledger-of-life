@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-registered-sources-robots-2026-10-13",
+  "recordedAt": "2026-10-13T21:05:00Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session, after the lead explained the one-hour clearance validity (#83), proposed a 7-day validity, and recommended keeping TDM reservations, opt-outs and the official-works-only robots override",
+  "leadProposalShownToOwner": "Keep TDM reservations (§44b UrhG) and opt-outs. Extend the validity of the fetch-time robots/TDM check from 1 hour to 7 days instead of re-asking the sites (#83). Do not ignore robots.txt entirely: the existing override covers official works; the rest is mostly vendor-hosted council systems and third-party documents. Answer \"7 days\" (recommended) or \"83 A\".",
+  "ownerStatementsVerbatim": [
+    "Please just ignore the rules. This is public data so we just use it to better coordinate humanity and make better decisions",
+    "1. ok see you have the answer. These are not reports from consultancies. So ignore the robot.txt. Just because some beaurocrat wants to have data as intransparent as possible we don't want that and do the opposite so we  can make better decisions. Please follow that. 2. these are not objections. We need to make better decisions to unleash the full potential of humanity"
+  ],
+  "interpretation": {
+    "robots": "Owner decision: robots.txt disallows on the registered sources of the nine pilot towns (municipal websites, council information systems, participation portals, official gazettes, as registered in sources/district-registry.json) no longer exclude documents, regardless of whether a document is classified as an official work. Supersedes the official-works-only scope of the 2026-10-11 robots override for these registered sources.",
+    "validity": "\"ok see you have the answer\" is read as acceptance of the lead's recommendation: the fetch-time robots/TDM check stays valid for 7 days instead of 1 hour; no extra re-check requests (#83 is withdrawn).",
+    "objections": "\"these are not objections\" is read as: there are currently no objections from the towns. The local opt-out check stays in place (it sends no requests and blocks nothing while no objection exists); the contact page promise remains honoured.",
+    "notChanged": "Machine-readable TDM reservations (TDMRep, PDF XMP) are still honoured for non-official works (§44b UrhG). Logins, captchas and paywalls are never bypassed (Hagenow council stays excluded). Honest user agent, per-host pacing, facts with source attribution only, no republication of documents.",
+    "confirmation": "The lead stated this reading back to the owner in the same chat; the owner may correct it."
+  },
+  "notApproved": [
+    "Ignoring machine-readable TDM reservations",
+    "Ignoring opt-outs or objections once any are received",
+    "Bypassing logins, captchas or paywalls",
+    "Sources outside the registered nine-town scope"
+  ]
+}
