@@ -141,13 +141,25 @@ test('acquisition reasons are canonical content-free holds, not exception-text p
 });
 
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
-test('real acquisition handler records a 401 held receipt and owner notification without admitting artifacts',{skip:!connectionString,timeout:120000},async t=>{
+for(const scenario of [
+ {name:'401 access barrier',endpoint:'/root',mode:'401',reason:'source_access_barrier',failure:'access_barrier'},
+ {name:'robots network error',endpoint:'/robots.txt',mode:'network',reason:'execution_exception',failure:'network_error'},
+ {name:'TDM network error',endpoint:'/.well-known/tdmrep.json',mode:'network',reason:'execution_exception',failure:'network_error'},
+ {name:'robots unknown error',endpoint:'/robots.txt',mode:'unknown',reason:'execution_exception',failure:'network_error'},
+ {name:'TDM unknown error',endpoint:'/.well-known/tdmrep.json',mode:'unknown',reason:'execution_exception',failure:'network_error'},
+ {name:'robots inspection error',endpoint:'/robots.txt',mode:'inspection',reason:'execution_exception',failure:'network_error'},
+ {name:'TDM inspection error',endpoint:'/.well-known/tdmrep.json',mode:'inspection',reason:'execution_exception',failure:'network_error'},
+ {name:'PDF inspection error',endpoint:'/root',mode:'pdf',reason:'execution_exception',failure:'network_error'},
+ {name:'PDF runtime finding',endpoint:'/root',mode:'pdf_runtime_finding',reason:'execution_exception',failure:'network_error'},
+ {name:'invalid fetched PDF metadata',endpoint:'/root',mode:'pdf_invalid',reason:'source_policy_refused',failure:'tdm_unavailable'},
+ {name:'invalid fetched TDM',endpoint:'/.well-known/tdmrep.json',mode:'invalid',reason:'source_policy_refused',failure:'tdm_unavailable'},
+] as const)test(`real acquisition handler: ${scenario.name} holds without artifacts and notifies its specific reason`,{skip:!connectionString,timeout:120000},async t=>{
  const url=new URL(connectionString!);
  if(!['postgres:','postgresql:'].includes(url.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(url.hostname))throw Error('Acquisition fixture refuses non-local Postgres');
  const host=url.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Acquisition fixture refuses non-local host override');
  const admin=new Pool({connectionString,max:2,connectionTimeoutMillis:5000,statement_timeout:10000}),database='district_acquisition_test_'+randomUUID().replaceAll('-','');
  const resources:{created:boolean;pool?:Pool}={created:false};
- t.after(async()=>{try{await resources.pool?.end();if(resources.created)await admin.query('DROP DATABASE "'+database+'" WITH (FORCE)');}finally{await admin.end();}});
+ t.after(async()=>{try{await resources.pool?.end();if(resources.created)await admin.query('DROP DATABASE "'+database+'"');}finally{await admin.end();}});
  await admin.query('CREATE DATABASE "'+database+'"');resources.created=true;
  const isolated=new URL(url);isolated.pathname='/'+database;
  const pool=new Pool({connectionString:isolated.href,max:8,connectionTimeoutMillis:5000,statement_timeout:10000});resources.pool=pool;
@@ -158,10 +170,28 @@ test('real acquisition handler records a 401 held receipt and owner notification
  // Same wire seam as polite-fetch.test.ts: actual fetch/policy classification, no DNS or HTTP.
  t.mock.method(PoliteFetcher.prototype as unknown as WireSeam,'wire',async (target:URL)=>{
   seen.push(target.pathname);
+  if(target.pathname===scenario.endpoint){
+   if(scenario.mode==='network')throw new PoliteFetchError('network_error','PRIVATE_RUNTIME_SENTINEL');
+   if(scenario.mode==='unknown')throw Error('PRIVATE_RUNTIME_SENTINEL');
+   if(scenario.mode==='invalid')return {status:200,headers:{'content-type':target.pathname==='/robots.txt'?'text/plain':'application/json'},body:Buffer.from('PRIVATE_INVALID_POLICY_SENTINEL')};
+   if(scenario.mode==='inspection')return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('User-agent: *\nAllow: /')};
+   if(scenario.mode==='pdf'||scenario.mode==='pdf_runtime_finding'||scenario.mode==='pdf_invalid')return {status:200,headers:{'content-type':'application/pdf'},body:Buffer.from('%PDF-invalid')};
+   return {status:401,headers:{'content-type':'text/plain'},body:Buffer.from('PRIVATE_401_BODY_SENTINEL')};
+  }
   if(target.pathname==='/robots.txt'||target.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
-  assert.equal(target.href,selector.request.url);
-  return {status:401,headers:{'content-type':'text/plain'},body:Buffer.from('PRIVATE_401_BODY_SENTINEL')};
+  throw Error('Source document must not be requested after policy failure');
  });
+ const inspection={...fixturePolicyInspection,
+  resource:async (...args:Parameters<typeof fixturePolicyInspection.resource>)=>{
+   if(scenario.mode==='inspection'&&new URL(args[0]).pathname===scenario.endpoint)throw Error('PRIVATE_RUNTIME_SENTINEL');
+   return fixturePolicyInspection.resource(...args);
+  },
+  pdf:async (...args:Parameters<typeof fixturePolicyInspection.pdf>)=>{
+   if(scenario.mode==='pdf')throw Error('PRIVATE_RUNTIME_SENTINEL');
+   if(scenario.mode==='pdf_runtime_finding')return {...await fixturePolicyInspection.pdf(...args),finding:{state:'unavailable' as const,reason:'parser_version_mismatch'}};
+   return fixturePolicyInspection.pdf(...args);
+  },
+ };
  const jobKey=await store.enqueue({step:'acquire_representation',lane:'acquisition',semanticContractSha256:await acquisitionContract(),inputArtifactHashes:[],sourceScope:scope,selector,policyProofSha256:null});
  const notificationConfig={...pipelineNotificationConfig,notifyOwner:async (notification:OwnerNotification)=>{
   notifications.push(notification);
@@ -171,20 +201,21 @@ test('real acquisition handler records a 401 held receipt and owner notification
   }});
  }};
  const authorizationId=await store.authorize({approvalSha256:digest('synthetic acquisition approval'),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development',mode:'bounded_unattended',notificationApprovalSha256:notificationConfig.notificationApprovalSha256,notificationDestinationSha256:notificationConfig.destinationSha256,notificationProvider:notificationConfig.provider});
- const result=await runDistrictJobs({store,cas,handlers:{acquire_representation:acquisitionHandler(store,registry,{fetchRoot,policy:fixture.policy,inspection:fixturePolicyInspection})},authorizationId,maxJobs:1,maxElapsedMs:60000,mode:'bounded_unattended',notifyOwner:notificationConfig.notifyOwner,notificationApprovalSha256:notificationConfig.notificationApprovalSha256,notificationDestinationSha256:notificationConfig.destinationSha256,notificationProvider:notificationConfig.provider});
- assert.equal(result.state,'held');assert.equal(result.reasonCode,'source_access_barrier');assert.equal(result.jobsStarted,1);
- assert.deepEqual(seen,['/robots.txt','/.well-known/tdmrep.json','/root']);
+ const result=await runDistrictJobs({store,cas,handlers:{acquire_representation:acquisitionHandler(store,registry,{fetchRoot,policy:fixture.policy,inspection})},authorizationId,maxJobs:1,maxElapsedMs:60000,mode:'bounded_unattended',notifyOwner:notificationConfig.notifyOwner,notificationApprovalSha256:notificationConfig.notificationApprovalSha256,notificationDestinationSha256:notificationConfig.destinationSha256,notificationProvider:notificationConfig.provider});
+ assert.equal(result.state,'held');assert.equal(result.reasonCode,scenario.reason);assert.equal(result.jobsStarted,1);
+ assert.deepEqual(seen,scenario.endpoint==='/robots.txt'?['/robots.txt']:scenario.endpoint==='/.well-known/tdmrep.json'?['/robots.txt','/.well-known/tdmrep.json']:['/robots.txt','/.well-known/tdmrep.json','/root']);
  const rows=await pool.query<{receipt:unknown;receipt_sha256:string}>('SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId]);assert.equal(rows.rowCount,1);
  const receipt=StepReceiptSchema.parse(rows.rows[0].receipt);
- assert.equal(receipt.outcome,'held_execution');assert.equal(receipt.reasonCode,'source_access_barrier');assert.deepEqual(receipt.outputHashes,[]);assert.equal(receipt.counts.bytes,null);assert.equal(rows.rows[0].receipt_sha256,semanticHash(receipt));assert.deepEqual(result.receiptIds,[receipt.id]);
- const job=await pool.query<{state:string;reason_code:string}>('SELECT state,reason_code FROM district_pipeline.jobs WHERE job_key=$1',[jobKey]);assert.deepEqual(job.rows,[{state:'held_execution',reason_code:'source_access_barrier'}]);
+ assert.equal(receipt.outcome,'held_execution');assert.equal(receipt.reasonCode,scenario.reason);assert.deepEqual(receipt.outputHashes,[]);assert.equal(receipt.counts.bytes,null);assert.equal(rows.rows[0].receipt_sha256,semanticHash(receipt));assert.deepEqual(result.receiptIds,[receipt.id]);
+ const job=await pool.query<{state:string;reason_code:string}>('SELECT state,reason_code FROM district_pipeline.jobs WHERE job_key=$1',[jobKey]);assert.deepEqual(job.rows,[{state:'held_execution',reason_code:scenario.reason}]);
  for(const table of ['representations','source_snapshots','policy_decisions','artifacts','job_output_artifacts','r1_metadata_snapshots'])assert.equal((await pool.query('SELECT 1 FROM district_pipeline.'+table)).rowCount,0,table);
  assert.deepEqual((await readdir(fetchRoot)).sort(),['.civic-acquisition-lane.json','observations']);
  const observations=await Promise.all((await readdir(join(fetchRoot,'observations'))).map(async name=>JSON.parse(await readFile(join(fetchRoot,'observations',name),'utf8'))));
  const failed=observations.find(observation=>observation.url===selector.request.url);
- assert.equal(failed?.status,401);assert.equal(failed?.failure,'access_barrier');assert.equal(failed?.policy.access,'authentication');
- assert.deepEqual(notifications.map(notification=>[notification.phase,notification.state,notification.reasonCode]),[['startup','running',null],['disposition','held','source_access_barrier']]);
- assert.equal(JSON.parse(sentMessages[1]).reasonCode,'source_access_barrier');
+ assert.equal(failed?.failure,scenario.failure);
+ if(scenario.mode==='401'){assert.equal(failed.status,401);assert.equal(failed.policy.access,'authentication');}
+ assert.deepEqual(notifications.map(notification=>[notification.phase,notification.state,notification.reasonCode]),[['startup','running',null],['disposition','held',scenario.reason]]);
+ assert.equal(JSON.parse(sentMessages[1]).reasonCode,scenario.reason);
  const outbox=await pool.query<{state:string}>('SELECT state FROM district_pipeline.owner_notifications WHERE run_id=$1 ORDER BY phase',[result.runId]);assert.deepEqual(outbox.rows,[{state:'delivered'},{state:'delivered'}]);
- assert.doesNotMatch(canonicalJson({receipt,notifications,sentMessages,observations}),/PRIVATE_401_BODY_SENTINEL|synthetic_fixture_publisher_token/);
+ assert.doesNotMatch(canonicalJson({receipt,notifications,sentMessages,observations}),/PRIVATE_401_BODY_SENTINEL|PRIVATE_RUNTIME_SENTINEL|PRIVATE_INVALID_POLICY_SENTINEL|synthetic_fixture_publisher_token/);
 });

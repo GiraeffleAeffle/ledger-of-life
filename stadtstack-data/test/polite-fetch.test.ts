@@ -143,7 +143,8 @@ test('standardized TDMRep redirects admit only same-origin absence or valid poli
    assert.equal(document.policy?.tdm.state,'not_declared');
    assert.ok(document.policy?.tdm.evidence.some(item=>item.locator==='TDMRep standardized location HTTP absence after same-host redirect'&&item.url==='https://stadt.de/policy'&&item.value===(mode==='gone'?'410':'404')));
   }else{
-   await assert.rejects(fetcher.fetch('https://stadt.de/plan',mode==='explicit'?{machinePolicyUrls:['https://stadt.de/policy']}:{}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure===(mode==='reserved'?'tdm_reserved':'tdm_unavailable'));
+   const failure=mode==='reserved'?'tdm_reserved':mode==='cross-host'?'cross_host_redirect':mode==='loop'||mode==='limit'?'redirect_limit':mode==='explicit'?'invalid_redirect':'tdm_unavailable';
+   await assert.rejects(fetcher.fetch('https://stadt.de/plan',mode==='explicit'?{machinePolicyUrls:['https://stadt.de/policy']}:{}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure===failure);
    assert.ok(!seen.includes('https://stadt.de/plan'));
   }
   assert.ok(!seen.some(url=>url.startsWith('https://other.de/')));
@@ -688,4 +689,38 @@ test('invalid 304 reservation cannot erase prior declarations and remains blocki
   for(const document of [restored,again]){assert.equal(document.sha256,first.sha256);assert.equal(document.retrievedAt,first.retrievedAt);assert.equal(document.policy?.tdm.state,'not_reserved');assert.equal(document.policy?.tdm.declarationStatus,undefined);assert.ok(!document.policy?.tdm.evidence.some(item=>item.value==='invalid_reservation_declaration'));}
   for(const directory of ['observations','requests'])for(const name of await readdir(join(cache,directory)))assert.equal((await readFile(join(cache,directory,name),'utf8')).includes('PRIVATE-'),false);
  }
+});
+
+test('policy wrappers preserve typed runtime failures and unknown exception identity',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-policy-errors-'));t.after(()=>rm(cache,{recursive:true,force:true}));
+ const errors=[Error('Synthetic unexpected runtime failure'),...(['network_error','dns_error','timeout','cache_missing','too_large','unsupported_encoding'] as const).map(failure=>new PoliteFetchError(failure,'Synthetic typed failure'))];
+ interface PolicySeam {
+  fetchInternal():Promise<never>;
+  policy(url:URL):Promise<unknown>;
+  machinePolicy(url:URL):Promise<unknown>;
+ }
+ for(const [index,error] of errors.entries()){
+  const fetcher=await createPoliteFetcher({cacheDir:join(cache,String(index))}),seam=fetcher as unknown as PolicySeam;
+  t.mock.method(seam,'fetchInternal',async()=>{throw error;});
+  await assert.rejects(seam.policy(new URL('https://stadt.de/document')),failure=>failure===error);
+  await assert.rejects(seam.machinePolicy(new URL('https://stadt.de/document')),failure=>failure===error);
+ }
+});
+
+test('PDF inspection runtime errors remain network_error with structured cause, not policy refusals',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-pdf-runtime-'));t.after(()=>rm(cache,{recursive:true,force:true}));
+ const options=await politeTestOptions({cacheDir:cache}),cause=Error('Synthetic PDF cache or version failure');
+ const fetcher=new BasePoliteFetcher({...options,fixtureInspection:{...fixturePolicyInspection,pdf:async()=>{throw cause;}}});
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'application/pdf'},body:Buffer.from('%PDF-invalid')});
+ await assert.rejects(fetcher.fetch('https://stadt.de/plan.pdf'),(failure:unknown)=>failure instanceof PoliteFetchError&&failure.failure==='network_error'&&failure.cause===cause);
+});
+
+test('invalid fetched robots without an owner override remains a source-policy refusal',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-invalid-policy-'));t.after(()=>rm(cache,{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:cache});
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>{
+  assert.equal(url.pathname,'/robots.txt');
+  return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Not a robots policy representation')};
+ });
+ await assert.rejects(fetcher.fetch('https://stadt.de/document'),(failure:unknown)=>failure instanceof PoliteFetchError&&failure.failure==='robots_unavailable'&&failure.status===200);
 });
