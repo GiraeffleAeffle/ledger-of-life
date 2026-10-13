@@ -12,7 +12,7 @@ import {inspect} from 'node:util';
 import {randomUUID} from 'node:crypto';
 import {Pool} from 'pg';
 import {PoliteFetcher,PoliteFetchError,type FetchObservation} from '../../src/polite-fetch.ts';
-import type {FetchedDocument,PoliteFetcherOptions} from '../../src/polite-fetch.ts';
+import type {FetchedDocument,PoliteFetcherOptions,FixturePolicyInspection} from '../../src/polite-fetch.ts';
 import {nativePublicRequestHeaders,type NativePublicOperation} from '../../src/district-native-request.ts';
 import {GENESIS_OWNER_CREDENTIAL_PATH,GENESIS_CREDENTIAL_MAX_BYTES,type GenesisOwnerCredentials} from '../../src/genesis-owner-credentials.ts';
 import {APPROVED_OWNER_GENESIS_ACCESS,effectiveSourcePermission} from '../../src/source-policy.ts';
@@ -28,11 +28,15 @@ import {genesisOwnerAccountRoot,readGenesisOwnerRepresentation} from '../../src/
 import {HttpObservationProofSchema} from '../../src/district-http-observation.ts';
 import {SourceObservationSchema} from '../../src/source-observation.ts';
 import {assertManagedSourceReadable,assertManagedRawSourceBinding,recoverManagedSourceScratch,recordHostOptOut} from '../../src/civic-opt-out.ts';
+import {deflatedZip,unicodeEscape,percentEscape} from './genesis-echo.ts';
 
-const token='fixture-secret-token-628104',username='fixture-owner-user-628104',password='fixture-owner-password-628104';
+const token='fixture-secret-token-628104',username='fixture-owner-user-628104',password='fixture-sécure-password-628104';
 const endpoint='https://www.regionalstatistik.de/genesisws/rest/2020/data/table';
 const body=new URLSearchParams({name:'12411-02-03',area:'free',language:'de',regionalvariable:'GEMEIN',regionalkey:'12064472',startyear:'2024',endyear:'2024',compress:'false',transpose:'false',job:'false'}).toString();
-function noSecrets(bytes:string|Buffer){for(const secret of [token,username,password])assert.ok(!Buffer.from(bytes).includes(Buffer.from(secret)),'Credential bytes escaped the host boundary');}
+function noSecrets(bytes:string|Buffer){
+ const buffer=Buffer.from(bytes);
+ for(const secret of [token,username,password])for(const value of [secret,unicodeEscape(secret),unicodeEscape(secret,true),percentEscape(secret),percentEscape(secret,3),percentEscape(secret,8)])assert.ok(!buffer.includes(Buffer.from(value)),'Credential bytes escaped the host boundary');
+}
 async function scanArtifacts(root:string){for(const entry of await readdir(root,{withFileTypes:true})){const path=join(root,entry.name);if(entry.isDirectory())await scanArtifacts(path);else if(entry.isFile())noSecrets(await readFile(path));}}
 interface Response {status:number;headers:Record<string,string|undefined>;body:Buffer}
 interface Seam {
@@ -44,17 +48,40 @@ test('fixture-reviewed owner entry exercises headers, holds, persisted receipts 
  assert.equal(APPROVED_OWNER_GENESIS_ACCESS[0]?.id,'fixture-owner-genesis');
  const root=await mkdtemp(join(tmpdir(),'genesis-reviewed-artifacts-'));t.after(()=>rm(root,{recursive:true,force:true}));
  const seen:Array<{host:string;path:string;authenticated:boolean}>=[];
- let reply:'success'|'cross'|'same'|'echo'|'header-echo'|'unauthorized'='success',kind:'token'|'password'='token';
+ type Reply='success'|'cross'|'same'|'echo'|'header-echo'|'unauthorized'|'unicode'|'mixed-unicode'|'json-key'|'shadowed-value'|'zip'|'zip-extra'|'zip-name'|'percent-location'|'nested-percent-location'|'unknown';
+ let reply:Reply='success',kind:'token'|'password'='token',inspectedData=0;
+ const guardedInspection:FixturePolicyInspection={...fixturePolicyInspection,async resource(...args){
+  if(/^https:\/\/www\.regionalstatistik\.de\/genesisws\/rest\/2020\/data\/table(?:file)?$/.test(args[0]))inspectedData++;
+  return fixturePolicyInspection.resource(...args);
+ }};
  const server=createServer(async(req,res)=>{
   const chunks:Buffer[]=[];for await(const chunk of req)chunks.push(Buffer.from(chunk));noSecrets(Buffer.concat(chunks));noSecrets(req.url??'');
   const host=req.headers.host??'',path=req.url??'',isData=host==='www.regionalstatistik.de'&&/^\/genesisws\/rest\/2020\/data\/table(?:file)?$/.test(path);
-  if(isData){assert.ok(req.headers.username===(kind==='token'?token:username),'Owner username header mismatch');assert.ok(req.headers.password===(kind==='token'?'':password),'Owner password header mismatch');}
+  if(isData){
+   assert.ok(req.headers.username===(kind==='token'?token:username),'Owner username header mismatch');
+   // HTTP exposes header octets as Latin-1; the loopback request implementation
+   // may send the Unicode fixture password as UTF-8. Match either exact encoding.
+   assert.ok(kind==='token'?req.headers.password==='':req.headers.password===password||req.headers.password===Buffer.from(password).toString('latin1'),'Owner password header mismatch');
+  }
   else {assert.ok(req.headers.username===undefined||req.headers.username==='GAST','Unexpected account header');assert.ok(req.headers.password===undefined||req.headers.password==='GAST','Unexpected account header');}
   seen.push({host,path,authenticated:isData});
   if(path==='/robots.txt'||path==='/.well-known/tdmrep.json'){res.writeHead(404);res.end();return;}
   if(isData&&reply==='cross'){res.writeHead(307,{location:'https://other.de/stolen'});res.end();return;}
   if(isData&&reply==='same'){res.writeHead(307,{location:'https://www.regionalstatistik.de/genesisws/rest/2020/data/tablefile'});res.end();return;}
   if(isData&&reply==='unauthorized'){res.writeHead(401,{'www-authenticate':'fixture'});res.end();return;}
+  if(isData){
+   const secret=kind==='token'?token:password,encoded=unicodeEscape(secret,reply==='mixed-unicode');
+   if(reply==='percent-location'||reply==='nested-percent-location'){res.writeHead(307,{location:'https://other.de/'+percentEscape(secret,reply==='percent-location'?1:3)});res.end();return;}
+   if(['unicode','mixed-unicode','json-key','shadowed-value'].includes(reply)){
+    res.writeHead(200,{'content-type':'application/json'});
+    res.end(reply==='json-key'?`{"${encoded}":17}`:reply==='shadowed-value'?`{"value":"${encoded}","value":17}`:`{"Status":{"Code":1,"Content":"${encoded}"}}`);return;
+   }
+   if(reply==='zip'||reply==='zip-extra'||reply==='zip-name'){
+    const members:Record<string,string>=reply==='zip'?{'table.csv':`value;number\n${secret};17\n`}:reply==='zip-extra'?{'table.csv':'value;number\nsafe;17\n','ignored.json':`{"Status":{"Content":"${encoded}"}}`}:{'table.csv':'value;number\nsafe;17\n',[percentEscape(secret)+'.txt']:'safe'};
+    res.writeHead(200,{'content-type':'application/zip'});res.end(deflatedZip(members));return;
+   }
+   if(reply==='unknown'){res.writeHead(200,{'content-type':'image/png'});res.end('unrecognized');return;}
+  }
   res.writeHead(200,{'content-type':'application/json',...(isData&&reply==='header-echo'?{etag:token}:{})});
   res.end(JSON.stringify({value:isData&&reply==='echo'?token:17}));
  });
@@ -70,10 +97,12 @@ test('fixture-reviewed owner entry exercises headers, holds, persisted receipts 
  t.mock.method(PoliteFetcher.prototype as unknown as Seam,'wire',async function(this:Seam,url:URL,method:'GET'|'POST',requestBody:string|undefined,previous:FetchObservation|undefined,operation:NativePublicOperation|undefined,credentials:GenesisOwnerCredentials|undefined){
   if(failWire&&credentials)throw new Error(token,{cause:new Error(password)});
   const headers=credentials?credentials.requestHeaders(url,method,requestBody,operation):nativePublicRequestHeaders(url,method,requestBody,operation);
-  return this.wireRequest(url,method,requestBody,previous,{address:'127.0.0.1',family:4},headers);
+  const response=await this.wireRequest(url,method,requestBody,previous,{address:'127.0.0.1',family:4},headers);
+  if(credentials&&['unicode','mixed-unicode','json-key','shadowed-value','zip','zip-extra','zip-name'].includes(reply))assert.ok(!credentials.contains(response.body),'Regression fixture must bypass the old raw-only screen');
+  return response;
  });
  async function lane(name:string){
-  const cache=join(root,name),options=await politeTestOptions({cacheDir:cache}),fetcher=new PoliteFetcher({...options,fixtureInspection:fixturePolicyInspection});
+  const cache=join(root,name),options=await politeTestOptions({cacheDir:cache}),fetcher=new PoliteFetcher({...options,fixtureInspection:guardedInspection});
   fetchers.push({fetcher,stateDir:options.ownerPolicyLane!.stateDir!,cache,options});
   return {fetcher,options,cache};
  }
@@ -98,6 +127,27 @@ test('fixture-reviewed owner entry exercises headers, holds, persisted receipts 
   assert.equal(seen.slice(before).filter(item=>item.path==='/stolen').length,0);
   assert.equal(seen.slice(before).filter(item=>item.authenticated).length,1);
  }
+ for(const credentialKind of ['token','password'] as const){
+  kind=credentialKind;await writeFile(GENESIS_OWNER_CREDENTIAL_PATH,JSON.stringify(kind==='token'?{token}:{username,password}));
+  for(const mode of ['unicode','mixed-unicode','json-key','shadowed-value','zip','zip-extra','zip-name','percent-location','nested-percent-location','unknown'] as const){
+   reply=mode;const {fetcher,cache}=await lane(`${kind}-${mode}`),before=seen.length,inspectionsBefore=inspectedData;
+   await assert.rejects(fetcher.fetch(endpoint+(mode.startsWith('zip')?'file':''),{method:'POST',body,publicOperation:'genesis_guest'}),(error:unknown)=>{
+    assert.ok(error instanceof PoliteFetchError);assert.equal(error.failure,'access_barrier');assert.equal(error.cause,undefined);noSecrets(inspect(error));return true;
+   });
+   assert.equal(inspectedData,inspectionsBefore,'An unscreened authenticated body entered the inspection boundary');
+   assert.equal(seen.slice(before).filter(item=>item.authenticated).length,1);
+   assert.equal(seen.slice(before).filter(item=>item.host==='other.de').length,0);
+   const heldRoot=genesisOwnerAccountRoot(cache);
+   assert.ok(!(await readdir(heldRoot)).includes('sha256'),'Withheld response bytes entered source custody');
+   for(const name of await readdir(join(heldRoot,'observations'))){
+    const held=JSON.parse(await readFile(join(heldRoot,'observations',name),'utf8'));
+    assert.equal(held.location,undefined,'A failed header screen retained a location');
+    assert.equal(SourceObservationSchema.safeParse(held).success,false);
+   }
+   await scanArtifacts(heldRoot);
+  }
+ }
+ kind='token';await writeFile(GENESIS_OWNER_CREDENTIAL_PATH,JSON.stringify({token}));
  reply='success';
  for(const name of ['missing','file-permissions','parent-permissions','symlink','oversize','invalid-json']){
   await rm(GENESIS_OWNER_CREDENTIAL_PATH,{force:true});await chmod(join(process.cwd(),'credentials'),0o700);

@@ -479,7 +479,7 @@ export class PoliteFetcher {
      policy.access='authenticated_owner_account';policy.ownerAccountAccess={decisionId:ownerDecision.id,credentialKind:ownerCredentials.kind};
     }
     const response=await this.wire(url,method,body,previous?.state==='excluded'?undefined:previous,options.publicOperation,ownerCredentials);checkedAt=new Date().toISOString();observation.checkedAt=checkedAt;observation.status=response.status;
-    if(ownerCredentials&&(ownerCredentials.contains(response.body)||Object.values(response.headers).some(value=>value!==undefined&&ownerCredentials!.contains(value))))throw new PoliteFetchError('access_barrier','Authenticated response withheld');
+    if(ownerCredentials)try{ownerCredentials.screenResponse(response.body,response.headers,response.status);}catch{throw new PoliteFetchError('access_barrier','Authenticated response withheld');}
     if([301,302,303,307,308].includes(response.status)){
      if(!response.headers.location)throw new PoliteFetchError('invalid_redirect','Missing redirect destination',response.status);
      const next=publicUrl(new URL(response.headers.location,url).href);observation.location=next.href;observation.state='redirected';

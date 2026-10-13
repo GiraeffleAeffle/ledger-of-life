@@ -3,9 +3,15 @@ import {open,lstat,realpath,type FileHandle} from 'node:fs/promises';
 import {dirname,basename,resolve} from 'node:path';
 import {isOwnerGenesisEndpoint} from './source-policy.ts';
 import {nativePublicRequestHeaders,type NativePublicOperation} from './district-native-request.ts';
+import {readZip,readCsv} from './adapters/structured-tables.ts';
 
 export const GENESIS_OWNER_CREDENTIAL_PATH='/home/max/.config/stadtstack/regionalstatistik/credentials.json';
 export const GENESIS_CREDENTIAL_MAX_BYTES=16*1024;
+export const GENESIS_RESPONSE_SCREEN_LIMITS=Object.freeze({inputBytes:4*1024*1024,totalBytes:16*1024*1024,memberBytes:4*1024*1024,members:64,ratio:200,headerBytes:8192,percentPasses:8,jsonStrings:200000});
+/** Never attach remote text, archive names or a parser cause to this hold. */
+export class GenesisResponseScreeningHold extends Error {
+ constructor(){super('authenticated_response_screening_hold');this.name='GenesisResponseScreeningHold';}
+}
 /** Content-free failure; never attach filesystem/JSON errors or a cause. */
 export class GenesisCredentialUnavailable extends Error {
  constructor(){super('credential_unavailable');this.name='GenesisCredentialUnavailable';}
@@ -24,12 +30,90 @@ export class GenesisOwnerCredentials {
   headers.username=this.#username;headers.password=this.#password;
   return headers;
  }
- /** Refuse echoes before any parser, policy evidence, redirect callback or persistence.
-  * Also cover the common JSON, URL and base64 representations of an echoed value. */
+ /** Raw memory-only check for outbound selectors and scalar echoes. Decoded
+  * response screening below is mandatory before any response-derived effect. */
  contains(value:string|Buffer):boolean {
   const bytes=Buffer.isBuffer(value)?value:Buffer.from(value);
   for(const needle of this.#needles)if(bytes.includes(needle))return true;
+  if(typeof value==='string'&&/[\u0080-\u00ff]/.test(value)){
+   // Node exposes HTTP header octets as Latin-1, even when a sender encoded a
+   // value in UTF-8. Check that byte interpretation too, without logging it.
+   const octets=Buffer.from(value,'latin1');
+   for(const needle of this.#needles)if(octets.includes(needle))return true;
+  }
   return false;
+ }
+ #screenScalar(value:string,percentDecode=false):void {
+  if(this.contains(value))throw new GenesisResponseScreeningHold();
+  if(!percentDecode)return;
+  if(Buffer.byteLength(value)>GENESIS_RESPONSE_SCREEN_LIMITS.headerBytes)throw new GenesisResponseScreeningHold();
+  for(let pass=0;pass<GENESIS_RESPONSE_SCREEN_LIMITS.percentPasses;pass++){
+   if(!/%[a-f0-9]{2}/i.test(value))return;
+   // Decode every percent byte, including Latin-1 octets and over-encoding of
+   // ordinary ASCII. Scan both interpretations; never persist the decoded text.
+   value=value.replace(/(?:%[a-f0-9]{2})+/gi,encoded=>{
+    const bytes=Buffer.from(encoded.replaceAll('%',''),'hex');
+    if(this.contains(bytes))throw new GenesisResponseScreeningHold();
+    try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{return bytes.toString('latin1');}
+   });
+   if(this.contains(value))throw new GenesisResponseScreeningHold();
+  }
+  if(/%[a-f0-9]{2}/i.test(value))throw new GenesisResponseScreeningHold();
+ }
+ #screenCsv(text:string):void {
+  const table=readCsv(Buffer.from(text),{limits:{inputBytes:8*1024*1024,rows:20000,columns:128,cells:200000}});
+  for(const row of table.rows)for(const cell of row)this.#screenScalar(cell.raw);
+ }
+ #screenJson(text:string):void {
+  JSON.parse(text);
+  // Scan ALL lexical string tokens after JSON.parse unescaping, not just the
+  // resulting object: duplicate keys must not hide an overwritten echo.
+  let strings=0;
+  for(const token of text.matchAll(/"(?:[^"\\]|\\.)*"/g)){
+   if(++strings>GENESIS_RESPONSE_SCREEN_LIMITS.jsonStrings)throw new GenesisResponseScreeningHold();
+   const value:string=JSON.parse(token[0]);this.#screenScalar(value);
+   if(value.includes('\n')||value.includes('\r'))this.#screenCsv(value);
+  }
+ }
+ #screenText(bytes:Uint8Array,format:'json'|'csv'|'text'):void {
+  const buffer=Buffer.from(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  if(this.contains(buffer))throw new GenesisResponseScreeningHold();
+  const latin1=buffer.toString('latin1');let utf8:string|undefined;
+  try{utf8=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{}
+  for(const text of utf8===undefined||utf8===latin1?[latin1]:[utf8,latin1]){
+   if(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(text)||/^(?:%PDF-|<|PK)/.test(text.trimStart()))throw new GenesisResponseScreeningHold();
+   this.#screenScalar(text);
+   const trimmed=text.replace(/^\uFEFF/,'').trimStart();
+   if(format==='json'||trimmed.startsWith('{')||trimmed.startsWith('['))this.#screenJson(trimmed);
+   else this.#screenCsv(text);
+  }
+ }
+ /** Host-only secrecy gate. HOLD on an echo, invalid/bounded decode, or unknown
+  * format; never redact-and-admit and never send these bytes to a sandbox first. */
+ screenResponse(body:Buffer,headers:Record<string,string|undefined>,status:number):void {
+  try{
+   if(!this.#username||body.length>GENESIS_RESPONSE_SCREEN_LIMITS.inputBytes)throw new GenesisResponseScreeningHold();
+   for(const value of Object.values(headers))if(value!==undefined)this.#screenScalar(value,true);
+   if(!body.length&&status>=300)return; // No retained error/redirect body.
+   if(this.contains(body))throw new GenesisResponseScreeningHold();
+   const mime=(headers['content-type']??'application/octet-stream').split(';')[0].trim().toLowerCase();
+   if(body[0]===0x50&&body[1]===0x4b||['application/zip','application/x-zip-compressed'].includes(mime)){
+    const {inputBytes,totalBytes,memberBytes,members,ratio}=GENESIS_RESPONSE_SCREEN_LIMITS;
+    const archive=readZip(body,{inputBytes,totalBytes,memberBytes,members,ratio});
+    if(!archive.size)throw new GenesisResponseScreeningHold();
+    for(const [name,bytes] of archive){
+     this.#screenScalar(name,true);
+     if(name.endsWith('/')&&!bytes.length)continue;
+     const format=/\.json$/i.test(name)?'json':/\.csv$/i.test(name)?'csv':/\.txt$/i.test(name)?'text':null;
+     if(!format)throw new GenesisResponseScreeningHold();
+     this.#screenText(bytes,format);
+    }
+   }else{
+    const format=/^(?:application|text)\/(?:[a-z0-9!#$&^_.+-]+\+)?json$/.test(mime)?'json':['text/csv','application/csv'].includes(mime)?'csv':['text/plain','application/octet-stream'].includes(mime)?'text':null;
+    if(!format)throw new GenesisResponseScreeningHold();
+    this.#screenText(body,format);
+   }
+  }catch{throw new GenesisResponseScreeningHold();}
  }
  clear():void {this.#username='';this.#password='';for(const needle of this.#needles)needle.fill(0);this.#needles=[];}
 }
