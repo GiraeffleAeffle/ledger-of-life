@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "stadtstack-r1-stage-authorization-record-v1",
+  "id": "r1-k2-stage-structured-parse-page2-2026-10-13",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under the owner approval below; not a new owner approval",
+  "issuedAt": "2026-10-13T10:45:00Z",
+  "parentApproval": {
+    "id": "r1-k2-and-genesis-owner-account-2026-10-13",
+    "path": "stadtstack-data/reports/approvals/r1-k2-and-genesis-owner-account-2026-10-13.json",
+    "sha256": "d7c8074d80d5636520cdb0422d1f161da6529c0dbe1cb1f97256b21770823b66"
+  },
+  "reason": "The first parse page committed output observations 0–1565 of 3816 (structured-output-page-v1 cursor). This record covers the second page of the same representation. Budget is counted against the parent by actual process wall time, conservatively including startup.",
+  "stage": {
+    "step": "structured_parse",
+    "adapter": "gauges",
+    "operation": "parse",
+    "representationSha256": "7e144f0bbd06ec3655467d520b68eba71d1c574aa6bdf0adc0b92b4a752b5ca3",
+    "cursor": "{\"bindingSha256\":\"be5b433b614288ecf53e143885ecf72836005cffbdb218611be58242963db334\",\"kind\":\"structured-output-page-v1\",\"offset\":1565}",
+    "jobKeys": ["97e1fa0be69f69747ac596bd93e7daa80c9a5f0e94a09c2ce18d051f56001eaa"],
+    "ags": ["13076060"],
+    "maxJobs": 1,
+    "maxElapsedMs": 480000,
+    "osDeadlineSeconds": 480,
+    "mode": "bounded_unattended",
+    "category": "production",
+    "expiresAt": "2026-10-16T21:59:59Z"
+  },
+  "cumulativeWithinParent": {
+    "priorRuns": [
+      {"authorizationId": "d8cfc29d-76ea-4cea-834a-f8e6dc25f609", "runId": "6a60345b-850c-4130-9105-aa6b89e99cf3", "step": "acquire_representation", "executorMs": 135496, "processWallSeconds": 167},
+      {"authorizationId": "a24e66a0-28a5-44ba-affe-917d123f6307", "runId": "f311d068-1f14-47f2-856f-d3213098821a", "step": "structured_parse page 1", "executorMs": 194809, "processWallSeconds": 232}
+    ],
+    "jobsIncludingThis": 3,
+    "parentMaxJobs": 5,
+    "wallSecondsUsedBefore": 399,
+    "wallSecondsBoundIncludingThis": 879,
+    "parentTotalSeconds": 1500
+  }
+}
