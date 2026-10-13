@@ -10,6 +10,7 @@ import {cities,type City} from './cities.ts';
 import {APPROVED_OWNER_ROBOTS_OVERRIDE,ownerRobotsOverrideFor} from './source-policy.ts';
 import {writePrivateJson} from './district-private-io.ts';
 import {HostOptedOutError,CivicPolicyStateError,CIVIC_POLICY_AUTHORITY,type CivicPolicyOptions} from './civic-opt-out.ts';
+import {CrawlRequestEvidenceCaptureError} from './district-crawl-request.ts';
 
 export interface CouncilSegment {records:OparlRecord[];evidence:CouncilEvidence;withdrawnIds?:string[]}
 export interface CouncilStorage {
@@ -194,6 +195,7 @@ export async function traverseCouncilList(body:OparlBody,kind:CouncilKind,storag
    await storage.checkpoint(state,{records:page.records,evidence,...(withdrawnIds?{withdrawnIds}:{})});
    if(state.error)break;
   }catch(error){
+   if(error instanceof CrawlRequestEvidenceCaptureError)throw error;
    if(isCouncilPermissionFailure(error)){
     records.clear();state.error='Current source permission blocks council records and cached reuse';
     try{await storage.checkpoint(state);}

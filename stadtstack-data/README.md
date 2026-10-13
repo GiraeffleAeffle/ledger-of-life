@@ -110,6 +110,8 @@ Originals with identical bytes may share a CAS path while retaining distinct HTT
 
 HTML traversal and registry/API discovery propagate this capture error as an internal operator failure: pending frontier entries and their previous originals remain intact, API seed fallback is not attempted, and no municipality/source-unavailability disposition is emitted. The standalone crawler exits nonzero with an explicit operator-repair message; repair the managed capture lane before explicitly resuming retained work.
 
+OParl list traversal and council rights-page discovery also propagate capture failures unchanged. A capture failure neither checkpoints an availability error nor returns cached/partial council records as a successful traversal; it is not a permission denial and does not clear admitted records. Rights discovery cannot replace it with a “page unavailable / rights unknown” note.
+
 Authenticated GENESIS owner-account originals are intentionally outside this residual importer and remain held; their supported route is the structured R1 queue. Fetch capture still stores their credential-free request/redirect sidecars at `${rawRoot}-genesis-owner-account-request-evidence`, with no public selector text or credential headers.
 
 Output is `{jobs, holds, coverage}`. `jobs` contains genuine `ResidualInputSchema` manifests with exact corpus/registry/policy/HTTP pins, `requestEvidenceSha256`, and `corpusObservations` for full-index execution custody. Save only `{jobs}` for the existing `enqueue-residual-preparation` command, with the same registry flags. A fixture-only capability requires a provisioned, pinned isolated authority; it cannot add production hashes or be enabled through an environment variable or CLI flag.
