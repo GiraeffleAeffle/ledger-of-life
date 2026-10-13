@@ -7,7 +7,8 @@ import {join,relative} from 'node:path';
 import {Pool} from 'pg';
 import {digest,canonicalJson} from '../src/district-adapter-contract.ts';
 import {DistrictCas} from '../src/district-cas.ts';
-import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,runDistrictJobs,type JobHandler} from '../src/district-jobs.ts';
+import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,runDistrictJobs,type JobHandler,type DistrictJobSpec} from '../src/district-jobs.ts';
+import type {StepReceipt} from '../src/district-step-receipt.ts';
 import {importCrawlCorpusForResidual} from '../src/district-crawl-import.ts';
 import {withFixtureAuthorizedCorpus,authorizedPilotCorpusSchema,loadFrozenCorpusBytes} from '../src/district-corpus.ts';
 import {ResidualInputSchema,residualJobHandlersFor,enqueueResidualPreparation,enqueueCommittedResidualExtraction,loadResidualSource} from '../src/district-residual-jobs.ts';
@@ -379,7 +380,7 @@ test('offline frozen crawl import preserves managed originals and produces enque
    const reconcileKey=await enqueueAssessmentResolution(pool!,store,item.cas,{...pair,CJobKey},'reconcile',policy);
    assert.equal((await runAssessment(reconcileKey,'deterministic-current-refresh')).state,'completed');assert.equal(modelCalls,2);
    for(const jobKey of [assessmentPreparationKey,AJobKey,BJobKey,CJobKey,reconcileKey]){
-    const rows=await pool!.query(`SELECT r.receipt,j.spec FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE j.job_key=$1 AND r.outcome='succeeded'`,[jobKey]);
+    const rows=await pool!.query<{receipt:StepReceipt;spec:DistrictJobSpec}>(`SELECT r.receipt,j.spec FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE j.job_key=$1 AND r.outcome='succeeded'`,[jobKey]);
     assert.equal(rows.rowCount,1);assert.equal(rows.rows[0].receipt.policyProofSha256,original.policyReceiptSha256);
     assert.equal(rows.rows[0].receipt.versions[`policyRebinding.${original.policyReceiptSha256}.${secondReceipt.receipt_sha256}`],checked.admissibilityReceiptSha256);
     assert.equal(rows.rows[0].spec.policyProofSha256,original.policyReceiptSha256);
