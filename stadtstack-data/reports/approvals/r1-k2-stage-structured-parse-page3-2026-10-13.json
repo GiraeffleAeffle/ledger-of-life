@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "stadtstack-r1-stage-authorization-record-v1",
+  "id": "r1-k2-stage-structured-parse-page3-2026-10-13",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under the owner approval below; not a new owner approval",
+  "issuedAt": "2026-10-13T11:00:00Z",
+  "parentApproval": {
+    "id": "r1-k2-and-genesis-owner-account-2026-10-13",
+    "path": "stadtstack-data/reports/approvals/r1-k2-and-genesis-owner-account-2026-10-13.json",
+    "sha256": "d7c8074d80d5636520cdb0422d1f161da6529c0dbe1cb1f97256b21770823b66"
+  },
+  "reason": "Pages 1–2 committed output observations 0–3129 of 3816. This record covers the final page of the same representation. Budget is counted against the parent by actual process wall time, conservatively including startup.",
+  "stage": {
+    "step": "structured_parse",
+    "adapter": "gauges",
+    "operation": "parse",
+    "representationSha256": "7e144f0bbd06ec3655467d520b68eba71d1c574aa6bdf0adc0b92b4a752b5ca3",
+    "cursor": "{\"bindingSha256\":\"be5b433b614288ecf53e143885ecf72836005cffbdb218611be58242963db334\",\"kind\":\"structured-output-page-v1\",\"offset\":3129}",
+    "jobKeys": ["c342c914b9e75b8826ffa3990ef9380d19fc9fdd55c9928bfa3d7b76c1b0b39b"],
+    "ags": ["13076060"],
+    "maxJobs": 1,
+    "maxElapsedMs": 480000,
+    "osDeadlineSeconds": 480,
+    "mode": "bounded_unattended",
+    "category": "production",
+    "expiresAt": "2026-10-16T21:59:59Z"
+  },
+  "cumulativeWithinParent": {
+    "priorRuns": [
+      {"authorizationId": "d8cfc29d-76ea-4cea-834a-f8e6dc25f609", "runId": "6a60345b-850c-4130-9105-aa6b89e99cf3", "step": "acquire_representation", "executorMs": 135496, "processWallSeconds": 167},
+      {"authorizationId": "a24e66a0-28a5-44ba-affe-917d123f6307", "runId": "f311d068-1f14-47f2-856f-d3213098821a", "step": "structured_parse page 1", "executorMs": 194809, "processWallSeconds": 232},
+      {"authorizationId": "95c09743-edbc-46b8-a057-10d36d6dc18b", "runId": "5f582f17-d494-4fd5-8aea-a6c7a2a22dcc", "step": "structured_parse page 2", "executorMs": 172107, "processWallSeconds": 230}
+    ],
+    "jobsIncludingThis": 4,
+    "parentMaxJobs": 5,
+    "wallSecondsUsedBefore": 629,
+    "wallSecondsBoundIncludingThis": 1109,
+    "parentTotalSeconds": 1500
+  }
+}
