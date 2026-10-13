@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "stadtstack-r1-stage-authorization-record-v1",
+  "id": "r1-k1-retry-stage-acquisition-2026-10-13",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under the owner approvals below; not a new owner approval",
+  "issuedAt": "2026-10-13T12:40:00Z",
+  "parentApproval": {
+    "id": "r1-k2-and-genesis-owner-account-2026-10-13",
+    "path": "stadtstack-data/reports/approvals/r1-k2-and-genesis-owner-account-2026-10-13.json",
+    "sha256": "d7c8074d80d5636520cdb0422d1f161da6529c0dbe1cb1f97256b21770823b66",
+    "clause": "approved.genesisOwnerAccount.k1Retry"
+  },
+  "originalK1Approvals": [
+    {"id": "r1-first-live-batch-2026-10-12", "sha256": "4fdff1a60c64f1c4ebfe49f4757bc8dca297db9060b89cf9f52d80c9b8bffba4"},
+    {"id": "r1-first-live-batch-2026-10-12-amendment-1", "sha256": "d49596ccea79f07ac420966d842c914589809a08c4406c19374a4d88af8b28dc"},
+    {"id": "r1-first-live-batch-2026-10-12-amendment-2", "sha256": "3a48409d4a11dc9c671b4ddfa78787ed6253d1f703d71f064e22148c9ead453d"}
+  ],
+  "preconditionsMet": {
+    "ownerDecisionEntry": "owner-2026-10-13-regionalstatistik-account in src/source-policy.ts (commit 5222297)",
+    "securityReviews": "GENESIS owner-account review: P1 credential-echo screening fixed and re-reviewed YES (89f473e); bridge/capture reviews YES (8ea02d5)",
+    "sourceGate": "8adaa86: tsc=0, 1518 tests, 1470 pass, 0 fail, 48 opt-in skips",
+    "parserAuthorization": "image sha256:ef9584f35e5d81116d9172b72d928fa6a6f0a71484c40cacdb72a99677779de2, contract 56c9003c93937d249d955043f6004144e4516cdd83857a67e048002aeaf4767d; sentinels 29/30 (+1 Mac skip), 30/30, 17/17"
+  },
+  "stage": {
+    "step": "acquire_representation",
+    "selector": "unchanged K1 acquisition.json: GENESIS POST data/table, table 12411-02-03, year 2024, regionalkey 12064472, regionalvariable GEMEIN; now sent with the owner's own account through the reviewed owner-account lane",
+    "registryDescriptor": {"path": "cache/districts/r1-operator/registry-96e34c4-code-8adaa86/operator-registry-config.json", "sha256": "6d002bb3232f9a3358325202f7ab44909c16c0bbcfce773ac29232bb24b416d5", "registryCommit": "96e34c49891d9be3762b5ae181df7c0a32682cc1"},
+    "jobKeys": ["8587590553f69424240e6d6b61f1ffd3f7e3c6a30708d8ea8389b1bd2c6ad2f4"],
+    "ags": ["12064472"],
+    "maxJobs": 1,
+    "maxElapsedMs": 600000,
+    "osDeadlineSeconds": 600,
+    "mode": "bounded_unattended",
+    "category": "production",
+    "expiresAt": "2026-10-14T21:59:59Z",
+    "newDataRequests": 1
+  },
+  "cumulativeWithinK1": {
+    "priorRuns": [
+      {"authorizationId": "d54b41a8-5fda-4437-90c6-83cf6f94f056", "runId": "85a9e281-e4cf-43c1-927d-871c7b6f9232", "step": "acquire_representation", "processWallSeconds": 165, "result": "held, HTTP 401 guest access"}
+    ],
+    "jobsIncludingThis": 2,
+    "k1MaxJobs": 5,
+    "wallSecondsUsedBefore": 165,
+    "wallSecondsBoundIncludingThis": 765,
+    "k1TotalSeconds": 1500
+  }
+}
