@@ -11,7 +11,7 @@ import type {HistoricalGeneration,ReplayReceipt} from '../src/replay-pipeline.ts
 import type {ModelEvidence} from '../src/district-model-contract.ts';
 import type {DocumentResult} from '../src/district-inference.ts';
 import type {PreparedSourceReference} from '../src/district-prepared-document.ts';
-import {prepareDocument} from '../src/district-prepared-document.ts';
+import {prepareDocument,preparedCacheContext} from '../src/district-prepared-document.ts';
 import {dataReleaseId} from '../src/data-release.ts';
 import type {DataRelease} from '../src/data-release.ts';
 import * as claims from '../src/district-claims.ts';
@@ -20,6 +20,7 @@ import * as graph from '../src/district-graph-claims.ts';
 import * as vocabulary from '../src/topic-vocabulary.ts';
 import * as models from '../src/district-model-contract.ts';
 import {semanticHash} from '../src/district-adapter-contract.ts';
+import {subscriptionInputWithinBound,MODEL_INPUT_BOUND_REASON} from '../src/district-model.ts';
 
 // Entirely synthetic evidence. No private corpus, provider, readiness, external
 // document command, Git subprocess or network is needed by these unit tests.
@@ -33,6 +34,12 @@ function syntheticArchive(){
  const sources=archiveNames.map(name=>{const code='// Synthetic archived file: '+name+'\n';return {name,code,sha256:hash(code)};});
  return {schemaVersion:'stadtstack-extraction-contract-archive-v1' as const,archivedAt:at,promptSha256:hash('synthetic original prompt identity'),schemaSha256:jsonHash(claims.outputJSONSchema),extractorSha256:jsonHash({version:'district-extractor-v8-joint-graph',hashes:sources.map(source=>source.sha256)}),extractorVersion:'district-extractor-v8-joint-graph' as const,promptVersion:'synthetic-original-extraction',judgePromptVersion:'synthetic-original-judge',judgePromptSha256:jsonHash({system:'Synthetic original judge instructions',schema:claims.judgeJSONSchema}),extractionInstructions:'Synthetic original extraction instructions',judgeInstructions:'Synthetic original judge instructions',outputSchema:claims.outputJSONSchema,judgeSchema:claims.judgeJSONSchema,sources};
 }
+function syntheticScopedArchive(){
+ const original=syntheticArchive(),sources=claims.EXTRACTOR_SOURCE_FILES.map(name=>{const code='// Synthetic scoped source '+name;return {name,code,sha256:hash(code)};});
+ const cacheCode='// Synthetic prepared cache context',cacheContextSource={name:'district-prepared-document.ts' as const,code:cacheCode,sha256:hash(cacheCode)};
+ return ScopedGenerationArchiveSchema.parse({...original,schemaVersion:'stadtstack-extraction-contract-archive-v2',extractorVersion:claims.EXTRACTOR_VERSION,sources,extractorSha256:jsonHash({version:claims.EXTRACTOR_VERSION,hashes:sources.map(source=>source.sha256)}),cacheBindingVersion:'prepared-source-scoped-v2',cacheContextSource,cacheCodecSha256:semanticHash({preparedContextSha256:cacheContextSource.sha256,answerCacheSha256:sources.find(source=>source.name==='district-answer-cache.ts')!.sha256})});
+}
+
 async function noCaseFixture(text='Strausberg synthetic source with no supported case.'){
  const sourceSha256=hash(text);
  const reference:PreparedSourceReference={id:'synthetic-source',url:'https://example.org/synthetic-source',sha256:sourceSha256,retrievedAt:at,locator:'document-sha256:'+sourceSha256,mimeType:'text/plain',sourceType:'website',policy:{robots:{state:'allowed',url:'https://example.org/robots.txt'},tdm:{state:'not_declared',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}};
@@ -216,18 +223,51 @@ test('an arbitrary predecessor cache cannot substitute for authenticated immutab
 });
 
 test('scoped generation archives bind actual prepared/cache code without changing historical v1',()=>{
- const original=syntheticArchive(),sources=claims.EXTRACTOR_SOURCE_FILES.map(name=>{const code='// Synthetic scoped source '+name;return {name,code,sha256:hash(code)};});
- const cacheCode='// Synthetic prepared cache context',cacheContextSource={name:'district-prepared-document.ts' as const,code:cacheCode,sha256:hash(cacheCode)};
- const archive=ScopedGenerationArchiveSchema.parse({...original,schemaVersion:'stadtstack-extraction-contract-archive-v2',extractorVersion:claims.EXTRACTOR_VERSION,sources,extractorSha256:jsonHash({version:claims.EXTRACTOR_VERSION,hashes:sources.map(source=>source.sha256)}),cacheBindingVersion:'prepared-source-scoped-v2',cacheContextSource,cacheCodecSha256:semanticHash({preparedContextSha256:cacheContextSource.sha256,answerCacheSha256:sources.find(source=>source.name==='district-answer-cache.ts')!.sha256})});
+ const original=syntheticArchive(),archive=syntheticScopedArchive();
  assert.deepEqual(verifyGenerationArchive(archive),archive);
  assert.deepEqual(verifyGenerationArchive(original),original);
  assert.throws(()=>verifyGenerationArchive({...archive,cacheCodecSha256:hash('wrong codec')}),/cache codec digest/);
- assert.throws(()=>verifyGenerationArchive({...archive,cacheContextSource:{...cacheContextSource,code:'changed'}}),/cache codec digest/);
+ assert.throws(()=>verifyGenerationArchive({...archive,cacheContextSource:{...archive.cacheContextSource,code:'changed'}}),/cache codec digest/);
  const context={preparedReceiptSha256:hash('synthetic prepared receipt'),references:[{id:'synthetic-source',url:'https://example.org/source',sha256:hash('synthetic source')}]},input={source:{text:'same synthetic text'}};
  const scoped=replayAnswerBinding(identity,'synthetic instructions',input,{},context);
  assert.notEqual(scoped,replayAnswerBinding(identity,'synthetic instructions',input,{}));
  assert.notEqual(scoped,replayAnswerBinding(identity,'synthetic instructions',input,{}, {...context,preparedReceiptSha256:hash('different prepared receipt')}));
  assert.notEqual(scoped,replayAnswerBinding(identity,'synthetic instructions',input,{}, {...context,references:[{...context.references[0],url:'https://example.org/other-source'}]}));
+});
+
+test('scoped replay authenticates pre-generation input-budget holds without identities or answers',async()=>{
+ const fixture=await noCaseFixture('漢'.repeat(12000)),archive=syntheticScopedArchive();
+ fixture.historical.archive=archive;fixture.result.promptSha256=jsonHash({extraction:archive.promptSha256,judge:archive.judgePromptSha256,extractorSha256:archive.extractorSha256});
+ assert.equal(subscriptionInputWithinBound(fixture.sourceInput),false);
+ fixture.result.quarantine[0].reason=MODEL_INPUT_BOUND_REASON;fixture.result.chunks[0]={index:0,outcome:'rejected',responseSha256:null,recordId:null};
+ fixture.identities=[];fixture.answers.clear();
+ const before=JSON.stringify(fixture.result);
+ assert.deepEqual(verifyCachedGeneration(fixture),{generationAnswers:0,judgeAnswers:0});assert.equal(JSON.stringify(fixture.result),before);
+ const forged=structuredClone(fixture.result);forged.chunks[0].responseSha256=hash('nonexistent budget response');
+ assert.throws(()=>verifyCachedGeneration({...fixture,result:forged}),/input-budget hold has a response/);
+ const under=await noCaseFixture();under.historical.archive=archive;under.result.promptSha256=fixture.result.promptSha256;
+ under.result.quarantine[0].reason=MODEL_INPUT_BOUND_REASON;under.result.chunks[0]={index:0,outcome:'rejected',responseSha256:null,recordId:null};under.answers.clear();
+ assert.throws(()=>verifyCachedGeneration(under),/extraction answer missing or ambiguous/);
+});
+
+test('scoped replay authenticates an over-budget judge input without requiring a judge response',async()=>{
+ const admitted=await admittedFixture(),fixture=await noCaseFixture(admitted.prepared.text+'\n'+'a'.repeat(1500)),archive=syntheticScopedArchive();
+ fixture.historical.archive=archive;fixture.result.promptSha256=jsonHash({extraction:archive.promptSha256,judge:archive.judgePromptSha256,extractorSha256:archive.extractorSha256});
+ const original=claims.extractionOutputSchema.parse(admitted.answer.value).record!;
+ const raw=schema.DistrictExtractionClaimsSchema.parse({...original,entities:Array.from({length:30},(_,index)=>({mentionId:'entity'+index,name:'Strausberg',type:'municipality',quote:fixture.prepared.text,identifiers:[]}))});
+ const chunk=claims.documentChunks(fixture.prepared.text)[0],restored=claims.restoreSourceQuotes(raw,chunk.text,chunk.start),normalized=graph.normalizeRelationActions(restored.claims).claims;
+ assert.equal(claims.deterministicChecks(normalized,chunk.text,fixture.municipality.name).passed,true);
+ assert.equal(subscriptionInputWithinBound(fixture.sourceInput),true);assert.equal(subscriptionInputWithinBound({source:{text:chunk.text},candidate:normalized}),false);
+ const context=preparedCacheContext(fixture.prepared.receiptSha256,fixture.prepared.references),value={record:raw,reason:'Synthetic bounded judge fixture'};
+ const body={binding:replayAnswerBinding(identity,archive.extractionInstructions,fixture.sourceInput,archive.outputSchema,context),modelIdentitySha256:identity.modelIdentitySha256,receivedAt:at,value,responseSha256:jsonHash(value),returnedModel:identity.model,runtimeWarnings:[]};
+ const answer=verifyReplayAnswer({...body,cacheSha256:jsonHash(body)});
+ fixture.answers=new Map([[answer.binding,answer]]);fixture.result.quarantine[0].reason=MODEL_INPUT_BOUND_REASON;
+ fixture.result.chunks[0]={index:0,outcome:'rejected',responseSha256:answer.responseSha256,recordId:null};
+ const before=JSON.stringify(fixture.result);
+ assert.deepEqual(verifyCachedGeneration(fixture),{generationAnswers:1,judgeAnswers:0});assert.equal(JSON.stringify(fixture.result),before);
+ const reducedValue={...value,record:{...raw,entities:[]}},reducedBody={...body,value:reducedValue,responseSha256:jsonHash(reducedValue)},reduced=verifyReplayAnswer({...reducedBody,cacheSha256:jsonHash(reducedBody)});
+ const forged=structuredClone(fixture.result);forged.chunks[0].responseSha256=reduced.responseSha256;
+ assert.throws(()=>verifyCachedGeneration({...fixture,result:forged,answers:new Map([[reduced.binding,reduced]])}),/bound historical answer missing/);
 });
 
 test('private publication provenance is a closed proof inventory, never historical Git as source admission',()=>{

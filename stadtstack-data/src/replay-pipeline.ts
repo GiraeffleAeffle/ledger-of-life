@@ -16,6 +16,7 @@ import type {PreparedDocument,PreparedCacheContext} from './district-prepared-do
 import {modelAnswerCacheBinding} from './district-answer-cache.ts';
 import type {DocumentResult,MunicipalityBinding} from './district-inference.ts';
 import {ModelEvidenceSchema,assertModelEvidenceIdentity,type ModelEvidence} from './district-model-contract.ts';
+import {subscriptionInputWithinBound,MODEL_INPUT_BOUND_REASON} from './district-model.ts';
 import {withPreparedKnowledge} from './prepare-knowledge.ts';
 import {publish} from './publish.ts';
 import {dataReleaseSchema,dataReleaseId,verifyDataRelease} from './data-release.ts';
@@ -248,21 +249,30 @@ export function verifyCachedGeneration(input:{result:DocumentResult;prepared:Pre
   const outcomes=result.chunks.filter(item=>item.index===chunk.index),found=candidates.filter(record=>record.extraction.chunk.index===chunk.index);
   if(outcomes.length!==1||found.length>1)throw Error('Replay original chunk result inventory mismatch');
   const outcome=outcomes[0],record=found[0],sourceInput={municipality:{id:municipality.id,name:municipality.name},vocabulary:historical.vocabulary.TOPIC_VOCABULARY.map(({pattern:_pattern,...topic})=>topic),source:{text:chunk.text}};
-  const possible=identities.filter(identity=>identity.provider===result.provider&&(!record||identity.modelIdentitySha256===record.extraction.modelIdentitySha256)).flatMap(identity=>{const answer=answers.get(replayAnswerBinding(identity,archive.extractionInstructions,sourceInput,archive.outputSchema,cacheContext));return answer&&answer.responseSha256===outcome.responseSha256?[{identity,answer}]:[];});
-  if(possible.length!==1)throw Error('Replay bound historical extraction answer missing or ambiguous; live generation is forbidden');
-  const {identity}=possible[0],answer=boundAnswer(answers,identity,archive.extractionInstructions,sourceInput,archive.outputSchema,cacheContext);generationAnswers++;
-  const decoded=claims.extractionOutputSchema.safeParse(answer.value);
   const rejectWithoutCandidate=(reason:string,kind:'rejected'|'no_case')=>{
    if(record||outcome.recordId!==null||outcome.outcome!==kind)throw Error('Replay original withheld outcome mismatch');
    const quarantine=result.quarantine.filter(item=>item.chunk===chunk.index);
    if(quarantine.length!==1||quarantine[0].candidate||quarantine[0].reason!==reason)throw Error('Replay original explicit hold mismatch');
   };
+  if(cacheContext&&!subscriptionInputWithinBound(sourceInput)){
+   rejectWithoutCandidate(MODEL_INPUT_BOUND_REASON,'rejected');
+   if(outcome.responseSha256!==null)throw Error('Replay pre-generation input-budget hold has a response');
+   continue;
+  }
+  const possible=identities.filter(identity=>identity.provider===result.provider&&(!record||identity.modelIdentitySha256===record.extraction.modelIdentitySha256)).flatMap(identity=>{const answer=answers.get(replayAnswerBinding(identity,archive.extractionInstructions,sourceInput,archive.outputSchema,cacheContext));return answer&&answer.responseSha256===outcome.responseSha256?[{identity,answer}]:[];});
+  if(possible.length!==1)throw Error('Replay bound historical extraction answer missing or ambiguous; live generation is forbidden');
+  const {identity}=possible[0],answer=boundAnswer(answers,identity,archive.extractionInstructions,sourceInput,archive.outputSchema,cacheContext);generationAnswers++;
+  const decoded=claims.extractionOutputSchema.safeParse(answer.value);
   if(!decoded.success){rejectWithoutCandidate('Structured output/schema validation failed','rejected');continue;}
   if(!decoded.data.record){rejectWithoutCandidate('No supported case in source excerpt','no_case');continue;}
-  const restored=claims.restoreSourceQuotes(decoded.data.record,chunk.text,chunk.start),candidateClaims=restored.claims,deterministic=claims.deterministicChecks(candidateClaims,chunk.text,municipality.name);
+  const restored=claims.restoreSourceQuotes(decoded.data.record,chunk.text,chunk.start);
+  const action=cacheContext?graph.normalizeRelationActions(restored.claims):{claims:restored.claims,normalization:null};
+  const candidateClaims=action.claims,relationNormalization=action.normalization,deterministic=claims.deterministicChecks(candidateClaims,chunk.text,municipality.name);
   let faithfulness:DistrictKnowledgeRecord['verification']['faithfulness']={score:null,threshold:0.8,model:identity.model,provider:identity.provider,tool:identity.tool,toolVersion:identity.toolVersion,modelIdentitySha256:identity.modelIdentitySha256,returnedModel:null,reason:'Not evaluated: deterministic gate failed',evaluatedAt:null,responseSha256:null,sameModel:true,limitation:claims.LIMITATION};
   if(deterministic.passed){
-   const judgment=boundAnswer(answers,identity,archive.judgeInstructions,{source:{text:chunk.text},candidate:candidateClaims},archive.judgeSchema,cacheContext);judgeAnswers++;
+   const judgeInput={source:{text:chunk.text},candidate:candidateClaims};
+   if(cacheContext&&!subscriptionInputWithinBound(judgeInput)){rejectWithoutCandidate(MODEL_INPUT_BOUND_REASON,'rejected');continue;}
+   const judgment=boundAnswer(answers,identity,archive.judgeInstructions,judgeInput,archive.judgeSchema,cacheContext);judgeAnswers++;
    const judged=claims.judgeSchema.safeParse(judgment.value);
    if(judged.success){faithfulness={...faithfulness,score:judged.data.score,reason:judged.data.reason,evaluatedAt:judgment.receivedAt,responseSha256:judgment.responseSha256,returnedModel:judgment.returnedModel,runtimeWarnings:judgment.runtimeWarnings};if(judged.data.criticalUnsupported)deterministic.checks.push({id:'judge_critical_claims',passed:false,reason:'Actual model judge found a critically unsupported claim'});deterministic.passed=deterministic.checks.every(check=>check.passed);}
    else faithfulness.reason='Actual judge returned invalid structured output';
@@ -274,7 +284,7 @@ export function verifyCachedGeneration(input:{result:DocumentResult;prepared:Pre
    const references=prepared.references.map(reference=>({...reference,locator:`text-sha256:${prepared.textSha256};chars:${chunk.start}-${chunk.end}`}));
    const cacheKey=claims.extractionCacheKey({provider:identity.provider,documentHash:prepared.sourceSha256,textHash:prepared.textSha256,extractorHash:archive.extractorSha256,modelIdentitySha256:identity.modelIdentitySha256,chunk:{index:chunk.index,start:chunk.start,end:chunk.end},municipalityId:municipality.id,sourceBinding:JSON.stringify(cacheContext?{municipality,sourceContext:cacheContext}:municipality)});
    const candidate={...candidateClaims,...normalizedGraph,kind:'text_model' as const,id:`knowledge:${municipality.id}:${hash(`${caseKey}\n${prepared.sourceSha256}\n${chunk.index}`).slice(0,24)}`,municipalityId:municipality.id,ags:municipality.ags,districtId:municipality.districtId,caseKey,sources:references,
-    extraction:{extractorVersion:archive.extractorVersion,extractorSha256:archive.extractorSha256,...identity,returnedModel:answer.returnedModel,runtimeWarnings:answer.runtimeWarnings,quoteNormalization:restored.normalization,promptVersion:archive.promptVersion,promptSha256:archive.promptSha256,judgePromptVersion:archive.judgePromptVersion,judgePromptSha256:archive.judgePromptSha256,inputSha256:prepared.sourceSha256,textSha256:prepared.textSha256,responseSha256:answer.responseSha256,ocrUsed:prepared.ocrUsed,textMethod:prepared.method,documentLimitations:[...prepared.limitations,historical.models.PROVIDER_CONFIGS[identity.provider].toolLimitation],cacheKey,extractedAt:answer.receivedAt,chunk:{index:chunk.index,count:chunk.count,start:chunk.start,end:chunk.end}},
+    extraction:{extractorVersion:archive.extractorVersion,extractorSha256:archive.extractorSha256,...identity,returnedModel:answer.returnedModel,runtimeWarnings:answer.runtimeWarnings,quoteNormalization:restored.normalization,...(relationNormalization?{relationNormalization:{...relationNormalization,sourceSha256:prepared.sourceSha256,textSha256:prepared.textSha256,responseSha256:answer.responseSha256}}:{}),promptVersion:archive.promptVersion,promptSha256:archive.promptSha256,judgePromptVersion:archive.judgePromptVersion,judgePromptSha256:archive.judgePromptSha256,inputSha256:prepared.sourceSha256,textSha256:prepared.textSha256,responseSha256:answer.responseSha256,ocrUsed:prepared.ocrUsed,textMethod:prepared.method,documentLimitations:[...prepared.limitations,historical.models.PROVIDER_CONFIGS[identity.provider].toolLimitation],cacheKey,extractedAt:answer.receivedAt,chunk:{index:chunk.index,count:chunk.count,start:chunk.start,end:chunk.end}},
     verification:{kind:'text_model' as const,status:passed?'auto-verified' as const:'candidate' as const,deterministic,faithfulness,evidenceHash:'',...(!passed?{reason:!deterministic.passed?deterministic.checks.filter(check=>!check.passed).map(check=>check.id).join(', '):'Faithfulness gate not passed'}:{})}};
    candidate.verification.evidenceHash=schema.knowledgeEvidenceHash(candidate);
    rebuilt=claims.rebindSourceReferences(schema.DistrictKnowledgeRecordSchema.parse(candidate),references);
