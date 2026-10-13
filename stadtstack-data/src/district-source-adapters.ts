@@ -325,6 +325,7 @@ export async function crawlParticipationApi(fetcher:PoliteFetcher,municipality:R
   seeds.push({url:new URL(procedure.procedureUrl,response.url).href,title:procedure.externalName,sourceId:source.id,documentDate:null});
  }
  const apiRequests=fetcher.requestCount-before;
+ await fetcher.recordDiscoveredSourceLinks(sourceFetchOptions(source),response,seeds.map(seed=>seed.url));
  const result=await crawlHtmlSource(fetcher,municipality,source,{...options,maxRequests:Math.max(0,options.maxRequests-apiRequests),discoveryBindings:mergeSourceBindings(options.discoveryBindings??[],[sourceContentBinding(response)],inventory?[sourceContentBinding(inventory)]:[])},bob?seeds:[...seeds,...municipality.seedDocuments?.filter(seed=>seed.sourceId===source.id)??[]],bob?seeds.map(seed=>seed.url):undefined);
  for(const document of result.documents){document.adapter=source.api.format;const seed=seeds.find(item=>item.url===document.url||item.url===document.metadata.discoveredFrom);const procedure=data.mapVars.find(item=>new URL(item.procedureUrl,response.url).href===seed?.url);if(procedure){document.metadata.caseKey=procedure.procedureId;document.metadata.caseKeyType=source.api.format==='diplan-list'?'diplan':'bobsh';}}
  result.requests+=apiRequests;result.checkedAt=[result.checkedAt,response.checkedAt,inventory?.checkedAt].filter((value):value is string=>!!value).sort().at(-1)??null;result.notes.unshift(`Observed ${source.api.format} public list ${response.url}; sha256 ${response.sha256}; all ${data.procedureCount} listed procedures considered for municipal discovery`);
@@ -341,6 +342,22 @@ export async function crawlMvPlanningApi(fetcher:PoliteFetcher,municipality:Regi
  let state:ApiState;
  try{state=JSON.parse(await readDerivedText(fetcher,statePath)) as ApiState;if(state.url!==source.api.url||!Array.isArray(state.sourceBindings))throw new PoliteFetchError('host_state_unsafe','MV API cache requires managed provenance; use a fresh acquisition lane');await fetcher.assertSourceBindingsAllowed(state.sourceBindings);}
  catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;state={url:source.api.url,offset:0,total:null,complete:false,seeds:[],metadata:{},evidence:[],sourceBindings:[]};}
+ if(state.seeds.length&&fetcher.hasRegisteredSourceDecision(sourceFetchOptions(source))){
+  for(const binding of state.sourceBindings){
+   const rawPath=join(fetcher.cacheDir,'sha256',binding.sha256);await fetcher.assertSourceReadable(rawPath,binding.url);
+   const bytes=await readFile(rawPath);if(hash(bytes)!==binding.sha256)throw new PoliteFetchError('host_state_unsafe','MV discovery body binding mismatch');
+   await fetcher.assertSourceBindingsAllowed([binding]);
+   const data=JSON.parse(bytes.toString('utf8')) as {success?:boolean;results?:unknown[][]};
+   if(data.success!==true||!Array.isArray(data.results)||data.results.some(group=>!Array.isArray(group)))throw Error('Unexpected retained MV discovery response');
+   const links:string[]=[];
+   for(const row of data.results.flat()){
+    if(!row||typeof row!=='object')continue;const record=row as {title?:unknown;_resourceLinkId?:unknown;x_GKZ?:unknown;x_dokumentURL?:unknown};
+    if(!Array.isArray(record.x_GKZ)||!record.x_GKZ.includes(municipality.ags)||typeof record.title!=='string'||typeof record._resourceLinkId!=='string'||!Array.isArray(record.x_dokumentURL))continue;
+    for(const link of record.x_dokumentURL)if(typeof link==='string')links.push(publicUrl(link).href);
+   }
+   fetcher.authorizeRegisteredSourceDiscovery(sourceFetchOptions(source),binding,links);
+  }
+ }
  const priorApiCheck=state.evidence.at(-1)?.checkedAt;
  if(state.complete&&(!priorApiCheck||!Number.isFinite(Date.parse(priorApiCheck))||Date.now()-Date.parse(priorApiCheck)>=(options.revalidateAfterMs??DEFAULT_SOURCE_REVALIDATE_MS))){state.offset=0;state.total=null;state.complete=false;}
  const notes:string[]=[];let requests=0;

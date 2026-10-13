@@ -4,7 +4,7 @@ import {createServer,request as httpRequest,type IncomingMessage,type RequestOpt
 import https from 'node:https';
 import {syncBuiltinESMExports} from 'node:module';
 import {once} from 'node:events';
-import {cp,readFile,writeFile,symlink} from 'node:fs/promises';
+import {cp,readFile,writeFile,symlink,mkdir} from 'node:fs/promises';
 import {join,dirname} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {execFileSync} from 'node:child_process';
@@ -117,11 +117,15 @@ test('registered blocked robots retain unknown origin, honour reservations/opt-o
  assert.equal(sourcePolicyValidityMs({...response.policy!,tdm:{...response.policy!.tdm,evidence:[]}},response,{...scope,sourceId:'unregistered'}),PUBLIC_SOURCE_POLICY_VALIDITY_MS);
  const clocks=[response.checkedAt,response.policy!.robots.checkedAt!,...response.policy!.tdm.evidence.map(row=>row.checkedAt!)],start=Math.min(...clocks.map(Date.parse));
  const expiresAt=sourcePolicyExpiresAt(response.policy!,response.checkedAt,response,scope);assert.equal(Date.parse(expiresAt),start+REGISTERED_SOURCE_POLICY_VALIDITY_MS);
+ const originalPolicy={...response.policy!,tdm:{...response.policy!.tdm,evidence:response.policy!.tdm.evidence.filter(row=>!readRegisteredRobotsAudit([row],response.url))}};
+ assert.equal(sourcePolicyValidityMs(originalPolicy,response,scope),REGISTERED_SOURCE_POLICY_VALIDITY_MS);
+ assert.equal(sourcePolicyExpiresAt(originalPolicy,response.checkedAt,response,scope),expiresAt);
  const created=await createPolicyReceipt({source:{url:response.url,sha256:response.sha256,mimeType:response.mimeType},scope,sourcePolicy:response.policy,permission:{kind:'facts_with_attribution'},checkedAt:new Date().toISOString(),expiresAt},options.ownerPolicyLane);
  assert.ok(PolicyReceiptSchema.safeParse(created.receipt).success);
  assert.equal(PolicyReceiptSchema.safeParse({...created.receipt,expiresAt:new Date(start+REGISTERED_SOURCE_POLICY_VALIDITY_MS+1).toISOString()}).success,false);
  // Actual released tag code, not a permissive mock schema.
  const legacyRoot=join(registryFixture.root,'legacy-src');await cp(join(packageRoot,'src'),legacyRoot,{recursive:true});
+ await mkdir(join(registryFixture.root,'regional'),{recursive:true});await cp(join(packageRoot,'regional','taxonomy.mjs'),join(registryFixture.root,'regional','taxonomy.mjs'));
  await symlink(join(packageRoot,'node_modules'),join(registryFixture.root,'node_modules'),'dir');
  for(const name of ['civic-opt-out.ts','civic-docker.ts','source-policy.ts','district-schema.ts','source-observation.ts'])await writeFile(join(legacyRoot,name),execFileSync('/usr/bin/git',['show',`0.3.2:stadtstack-data/src/${name}`],{cwd:packageRoot,maxBuffer:4*1024*1024}));
  const legacySchema=await import(pathToFileURL(join(legacyRoot,'district-schema.ts')).href),legacyObservation=await import(pathToFileURL(join(legacyRoot,'source-observation.ts')).href),legacyPolicy=await import(pathToFileURL(join(legacyRoot,'civic-opt-out.ts')).href);
