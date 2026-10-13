@@ -8,16 +8,17 @@ import {authorizedPilotCorpusSchema,loadFrozenCorpusBytes,corpusFixturePolicy} f
 import {HttpObservationProofSchema,authenticatedHttpBinding,HttpSourceBindingSchema} from './district-http-observation.ts';
 import {SourceObservationSchema,sourceObservationMatches} from './source-observation.ts';
 import {CrawlRequestEvidenceSchema} from './district-crawl-request.ts';
-import {loadPolicyReceipt,recheckPolicyReceipt,type PolicyReceipt} from './district-policy-receipt.ts';
+import type {PolicyReceipt} from './district-policy-receipt.ts';
 import {PreparedDocumentSchema,prepareDocument,verifyPreparedDocument,preparationExtractorSha256,collectPreparationToolVersions,type PreparedSourceReference} from './district-prepared-document.ts';
 import {inferPreparedDocument,jointExtractionContract,documentResultSchema} from './district-inference.ts';
 import {documentChunks} from './district-claims.ts';
 import {readParserReview,ParserIsolationError} from './district-parser-isolation.ts';
-import {DistrictJobStore,canonicalJobIdentity,type DistrictJobSpec,type JobHandlerContext,type JobHandler} from './district-jobs.ts';
+import {DistrictJobStore,canonicalJobIdentity,type DistrictJobSpec,type JobHandlerContext,type JobHandler,type JobHandlerResult} from './district-jobs.ts';
 import {encodeStepReceipt,type StepReceipt} from './district-step-receipt.ts';
 import type {DistrictCas} from './district-cas.ts';
 import {authenticateTextRunContribution,type TextRunContribution} from './text-run-lineage.ts';
 import {initializeManagedAcquisitionLane,withManagedSourceWrite,withManagedSourceScratch,assertManagedSourceReadable,assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
+import {recheckResidualPolicy,type ResidualPolicyCheck} from './district-policy-refresh.ts';
 
 export const ResidualBoundsSchema=z.object({maxDocuments:z.literal(1),maxChunks:z.number().int().min(1).max(24),maxModelCalls:z.number().int().min(2).max(48),paidMicroUsd:z.literal(0)}).strict();
 const HttpObservationBindingSchema=z.object({observationId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/),receiptSha256:HashSchema}).strict();
@@ -27,17 +28,24 @@ const PreparationSelectorSchema=ResidualInputSchema.extend({contract:ContractSch
 const ExtractionSelectorSchema=PreparationSelectorSchema.extend({preparationJobKey:HashSchema,preparationReceiptId:z.uuid(),preparationReceiptSha256:HashSchema,preparedArtifactSha256:HashSchema}).strict();
 export const ResidualExtractionSchema=z.object({schemaVersion:z.literal('district-residual-extraction-v1'),documentId:z.string(),corpusSha256:HashSchema,registrySha256:HashSchema,policyReceiptSha256:HashSchema,preparationJobKey:HashSchema,preparationReceiptId:z.uuid(),preparationReceiptSha256:HashSchema,preparedArtifactSha256:HashSchema,result:documentResultSchema.extend({provider:z.literal('openai-subscription'),purpose:z.literal('production')})}).strict();
 export async function residualJobContract(){
- const files=['district-residual-jobs.ts','district-corpus.ts','district-crawl-request.ts','district-http-observation.ts','source-observation.ts','district-inference.ts','district-answer-cache.ts','district-model.ts','district-policy-receipt.ts','civic-opt-out.ts','district-jobs.ts'];
+ const files=['district-residual-jobs.ts','district-corpus.ts','district-crawl-request.ts','district-http-observation.ts','source-observation.ts','district-inference.ts','district-answer-cache.ts','district-model.ts','district-policy-receipt.ts','district-policy-refresh.ts','civic-opt-out.ts','district-jobs.ts'];
  return ContractSchema.parse({preparationSha256:await preparationExtractorSha256(),extraction:await jointExtractionContract(),hostSha256:semanticHash(await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))}))))});
 }
 export function residualMimeSupported(mimeType:string){return ['application/pdf','text/html','application/xhtml+xml','text/plain','application/json','application/xml','text/xml'].includes(mimeType.split(';')[0].trim().toLowerCase());}
+export interface ResidualSourceOptions {store?:DistrictJobStore;onContinuation?:(check:ResidualPolicyCheck)=>void}
+interface ResidualJobContext extends JobHandlerContext {store:DistrictJobStore;recordPolicy:(check:ResidualPolicyCheck)=>void}
+type ResidualHandler=(context:ResidualJobContext)=>Promise<JobHandlerResult>;
+async function recheckJobPolicy(context:ResidualJobContext){
+ const checked=await recheckResidualPolicy(context.store,context.cas,ResidualInputSchema.strip().parse(context.job.spec.selector));
+ context.recordPolicy(checked);return checked;
+}
 /** Metadata narratives remain attached to their actual original; no synthetic text is generated here. */
-export async function loadResidualSource(cas:DistrictCas,input:z.infer<typeof ResidualInputSchema>){
+export async function loadResidualSource(cas:DistrictCas,input:z.infer<typeof ResidualInputSchema>,options:ResidualSourceOptions={}){
  input=ResidualInputSchema.strip().parse(input);
  // Defense at the byte-load boundary, even when an execution caller skipped parsing.
  authorizedPilotCorpusSchema.parse(input.corpusSha256);
- const receipt=await loadPolicyReceipt(cas,input.policyReceiptSha256);
- await recheckPolicyReceipt(receipt,{...policyOptions(receipt),evaluationAt:new Date().toISOString()});
+ const initial=await recheckResidualPolicy(options.store,cas,input),receipt=initial.receipt;
+ if(initial.continuation)options.onContinuation?.(initial);
  const migration=input.crawlRegistry?await readCrawlOperatorRegistryInputPin(input.crawlRegistry,input.registry,policyOptions(receipt)):undefined;
  const admittedRegistry=migration?.processing??await readOperatorRegistryInputPin(input.registry,policyOptions(receipt));
  if(digest(admittedRegistry.bytes)!==input.registrySha256)throw Error('Residual registry differs from authenticated operator configuration');
@@ -69,41 +77,42 @@ export async function loadResidualSource(cas:DistrictCas,input:z.infer<typeof Re
  await assertManagedSourceBindings(join(cas.root,'sha256',input.requestEvidenceSha256.slice(0,2),input.requestEvidenceSha256),[sourceBinding],policyOptions(receipt));
  const requestEvidence=CrawlRequestEvidenceSchema.parse(JSON.parse((await cas.read(input.requestEvidenceSha256)).toString('utf8')));
  if(canonicalJson(requestEvidence.httpObservation)!==canonicalJson(sourceBinding))throw Error('Residual original request evidence binding differs');
- await recheckPolicyReceipt(receipt,{...policyOptions(receipt),evaluationAt:new Date().toISOString()});
+ const policyCheck=await recheckResidualPolicy(options.store,cas,input);
+ if(policyCheck.continuation)options.onContinuation?.(policyCheck);
  const reference:PreparedSourceReference={id:source.id,url:document.url,sha256:document.sha256,retrievedAt:document.retrievedAt,locator:`document-sha256:${document.sha256}`,mimeType:document.mimeType,sourceType:source.kind,policy:receipt.sourcePolicy};
- return {document,municipality:{id:municipality.id,name:municipality.name,ags:municipality.ags,districtId:municipality.districtId},receipt,reference,sourceBinding};
+ return {document,municipality:{id:municipality.id,name:municipality.name,ags:municipality.ags,districtId:municipality.districtId},receipt,reference,sourceBinding,policyCheck};
 }
 const policyOptions=(receipt:PolicyReceipt)=>({...corpusFixturePolicy(),authorityId:receipt.authorityId,authoritySha256:receipt.authoritySha256});
-async function persist(context:JobHandlerContext,receipt:PolicyReceipt,value:unknown,kind:'parser_output'|'derived'){
- await recheckPolicyReceipt(receipt,{...policyOptions(receipt),evaluationAt:new Date().toISOString()});context.signal.throwIfAborted();
+async function persist(context:ResidualJobContext,receipt:PolicyReceipt,value:unknown,kind:'parser_output'|'derived'){
+ await recheckJobPolicy(context);context.signal.throwIfAborted();
  const bytes=Buffer.from(canonicalJson(value)),hash=digest(bytes),relativePath=`sha256/${hash.slice(0,2)}/${hash}`,policy=policyOptions(receipt);
  await initializeManagedAcquisitionLane(context.cas.root,{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...policy});
  const selected=context.job.spec.step==='residual_extract'?ExtractionSelectorSchema.parse(context.job.spec.selector):PreparationSelectorSchema.parse(context.job.spec.selector);
- const source=await loadResidualSource(context.cas,selected);
+ const source=await loadResidualSource(context.cas,selected,{store:context.store,onContinuation:context.recordPolicy});
  const artifact=await withManagedSourceWrite(context.cas.root,[{relativePath,contentSha256:hash,...source.sourceBinding,independentAllowed:true}],()=>context.cas.put(bytes,{kind,mimeType:'application/json'}),policy);
- await recheckPolicyReceipt(receipt,{...policyOptions(receipt),evaluationAt:new Date().toISOString()});return artifact;
+ await recheckJobPolicy(context);return artifact;
 }
-async function admitted(context:JobHandlerContext,selector:z.infer<typeof PreparationSelectorSchema>){
+async function admitted(context:ResidualJobContext,selector:z.infer<typeof PreparationSelectorSchema>){
  if(process.platform!=='linux')throw Error('Residual source execution requires the authorized Codex VM');
  if(canonicalJson(selector.contract)!==canonicalJson(await residualJobContract())||context.job.spec.semanticContractSha256!==semanticHash(selector.contract))throw Error('Residual preparation/extraction/code contract changed');
- const source=await loadResidualSource(context.cas,selector);
+ const source=await loadResidualSource(context.cas,selector,{store:context.store,onContinuation:context.recordPolicy});
  if(context.job.spec.policyProofSha256!==selector.policyReceiptSha256||canonicalJson(context.job.spec.sourceScope)!==canonicalJson(source.receipt.scope))throw Error('Residual job scope or policy binding mismatch');
  for(const hash of [selector.corpusSha256,selector.registrySha256,selector.policyReceiptSha256,selector.httpObservation.receiptSha256,selector.requestEvidenceSha256,source.document.sha256,...selector.corpusObservations.map(binding=>binding.receiptSha256)])if(!context.job.spec.inputArtifactHashes.includes(hash))throw Error('Residual original/provenance omitted from job identity');
  await assertManagedSourceReadable(join(context.cas.root,'sha256',source.document.sha256.slice(0,2),source.document.sha256),{...policyOptions(source.receipt),sourceUrl:source.document.url});
  await readParserReview();context.signal.throwIfAborted();return source;
 }
-const prepare:JobHandler=async context=>{
+const prepare:ResidualHandler=async context=>{
  const selector=PreparationSelectorSchema.parse(context.job.spec.selector);if(context.job.spec.step!=='residual_prepare')throw Error('Residual preparation step mismatch');
  try{
  const source=await admitted(context,selector),toolVersions=await collectPreparationToolVersions(source.document.mimeType),bytes=await context.cas.read(source.document.sha256);
- await recheckPolicyReceipt(source.receipt,{...policyOptions(source.receipt),evaluationAt:new Date().toISOString()});
+ await recheckJobPolicy(context);
  const input={bytes,municipalityId:source.municipality.id,references:[source.reference],mimeType:source.document.mimeType,extractorSha256:selector.contract.preparationSha256,toolVersions,managedRoot:join(context.cas.root,'residual-prepared'),policy:policyOptions(source.receipt),signal:context.signal,sourceBindings:[source.sourceBinding]};
  const prepared=await prepareDocument(input);context.signal.throwIfAborted();
  const chunks=documentChunks(prepared.text);if(chunks.length>selector.bounds.maxChunks||2*chunks.length>selector.bounds.maxModelCalls)return {outcome:'held_quality',reasonCode:'quality_failed'};
  return {outcome:'succeeded',reasonCode:'completed',outputs:[await persist(context,source.receipt,prepared,'parser_output')],versions:{preparation:prepared.extractorSha256,...prepared.toolVersions},counts:{bytes:bytes.length,spans:chunks.length}};
  }catch(error){if(error instanceof ParserIsolationError)return {outcome:'held_execution',reasonCode:'isolation_unavailable'};if(error instanceof Error&&error.message==='Document exceeds model chunk limit')return {outcome:'held_quality',reasonCode:'quality_failed'};throw error;}
 };
-const extract:JobHandler=async context=>{
+const extract:ResidualHandler=async context=>{
  const selector=ExtractionSelectorSchema.parse(context.job.spec.selector);if(context.job.spec.step!=='residual_extract'||!context.job.dependencyReceiptIds.includes(selector.preparationReceiptId)||!context.job.spec.inputArtifactHashes.includes(selector.preparedArtifactSha256))throw Error('Residual extraction requires actual committed preparation output');
  const source=await admitted(context,selector);
  await assertManagedSourceReadable(join(context.cas.root,'sha256',selector.preparedArtifactSha256.slice(0,2),selector.preparedArtifactSha256),policyOptions(source.receipt));
@@ -112,24 +121,30 @@ const extract:JobHandler=async context=>{
  const chunks=documentChunks(prepared.text);if(chunks.length>selector.bounds.maxChunks||2*chunks.length>selector.bounds.maxModelCalls)return {outcome:'held_quality',reasonCode:'quality_failed'};
  const out=join(context.cas.root,'residual-model',context.job.jobKey),policy=policyOptions(source.receipt);
  const options={taskId:context.job.jobKey,groupId:semanticHash({municipalityId:source.municipality.id,sourceSha256:source.document.sha256}),purpose:'production' as const,provider:'openai-subscription' as const,municipality:source.municipality,prepared,expected:prepared,contract:selector.contract.extraction,out,usage:{ledgerPath:join(out,'usage.jsonl'),pausePath:join(out,'pause.json'),signal:context.signal},policy};
- const result=await inferPreparedDocument(options);context.signal.throwIfAborted();await recheckPolicyReceipt(source.receipt,{...policyOptions(source.receipt),evaluationAt:new Date().toISOString()});
+ const result=await inferPreparedDocument(options);context.signal.throwIfAborted();await recheckJobPolicy(context);
  const envelope=ResidualExtractionSchema.parse({schemaVersion:'district-residual-extraction-v1',documentId:selector.documentId,corpusSha256:selector.corpusSha256,registrySha256:selector.registrySha256,policyReceiptSha256:selector.policyReceiptSha256,preparationJobKey:selector.preparationJobKey,preparationReceiptId:selector.preparationReceiptId,preparationReceiptSha256:selector.preparationReceiptSha256,preparedArtifactSha256:selector.preparedArtifactSha256,result});
  const rejected=result.chunks.some(chunk=>chunk.outcome==='rejected');
  return {outcome:result.records.length?'succeeded':rejected?'held_quality':'no_supported_case',reasonCode:result.records.length?'completed':rejected?'quality_failed':'no_supported_case',outputs:[await persist(context,source.receipt,envelope,'derived')],versions:{extractor:selector.contract.extraction.extractorSha256,prompt:result.promptSha256,schema:result.schemaSha256},counts:{spans:result.chunks.length,acceptedFacts:result.records.length,heldFacts:result.quarantine.length,distinctCases:new Set(result.records.map(row=>row.caseKey)).size}};
 };
 /** No source subprocess runs outside the existing reviewed parser/model APIs. */
-function sourceScoped(handler:JobHandler):JobHandler{return async context=>{
- const raw=context.job.spec.step==='residual_extract'?ExtractionSelectorSchema.parse(context.job.spec.selector):PreparationSelectorSchema.parse(context.job.spec.selector);
- const selector={documentId:raw.documentId,corpusSha256:raw.corpusSha256,corpusObservations:raw.corpusObservations,registrySha256:raw.registrySha256,registry:raw.registry,...(raw.crawlRegistry?{crawlRegistry:raw.crawlRegistry}:{}),policyReceiptSha256:raw.policyReceiptSha256,httpObservation:raw.httpObservation,requestEvidenceSha256:raw.requestEvidenceSha256,bounds:raw.bounds,contract:raw.contract};
- const source=await loadResidualSource(context.cas,selector),policy=policyOptions(source.receipt);
- return withManagedSourceScratch(context.cas.root,[source.sourceBinding],async scope=>{
-  await scope.assertActive();const result=await handler({...context,signal:scope.signal});await scope.assertActive();
-  await recheckPolicyReceipt(source.receipt,{...policyOptions(source.receipt),evaluationAt:new Date().toISOString()});return result;
- },{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',purpose:context.job.spec.step==='residual_extract'?'openai':'document',signal:context.signal,...policy});
-};}
-export const residualJobHandlers:Readonly<Record<string,JobHandler>>={residual_prepare:sourceScoped(prepare),residual_extract:sourceScoped(extract)};
+function sourceScoped(store:DistrictJobStore,handler:ResidualHandler):JobHandler{
+ const scoped:JobHandler=async context=>{
+  const raw=context.job.spec.step==='residual_extract'?ExtractionSelectorSchema.parse(context.job.spec.selector):PreparationSelectorSchema.parse(context.job.spec.selector),selector=ResidualInputSchema.strip().parse(raw),versions:Record<string,string>={};
+  const recordPolicy=(check:ResidualPolicyCheck)=>{Object.assign(versions,check.versions);},source=await loadResidualSource(context.cas,selector,{store,onContinuation:recordPolicy}),policy=policyOptions(source.receipt);
+  return withManagedSourceScratch(context.cas.root,[source.sourceBinding],async scope=>{
+   const residualContext={...context,store,recordPolicy,signal:scope.signal};
+   await scope.assertActive();const result=await handler(residualContext);await scope.assertActive();
+   await recheckJobPolicy(residualContext);return {...result,versions:{...result.versions,...versions}};
+  },{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',purpose:context.job.spec.step==='residual_extract'?'openai':'document',signal:context.signal,...policy});
+ };
+ scoped.currentPolicy=async(spec,cas)=>(await recheckResidualPolicy(store,cas,ResidualInputSchema.strip().parse(spec.selector))).continuation;
+ return scoped;
+}
+export function residualJobHandlersFor(pool:Pool):Readonly<Record<string,JobHandler>>{
+ const store=new DistrictJobStore(pool);return {residual_prepare:sourceScoped(store,prepare),residual_extract:sourceScoped(store,extract)};
+}
 export async function enqueueResidualPreparation(store:DistrictJobStore,cas:DistrictCas,input:z.infer<typeof ResidualInputSchema>){
- const selected=ResidualInputSchema.parse(input),source=await loadResidualSource(cas,selected),contract=await residualJobContract();
+ const selected=ResidualInputSchema.parse(input),source=await loadResidualSource(cas,selected,{store}),contract=await residualJobContract();
  const spec:DistrictJobSpec={step:'residual_prepare',lane:'residual_preparation',semanticContractSha256:semanticHash(contract),inputArtifactHashes:[...new Set([selected.corpusSha256,selected.registrySha256,selected.policyReceiptSha256,selected.httpObservation.receiptSha256,selected.requestEvidenceSha256,source.document.sha256,...selected.corpusObservations.map(binding=>binding.receiptSha256)])],sourceScope:source.receipt.scope,selector:{...selected,contract},policyProofSha256:selected.policyReceiptSha256};
  return store.enqueue(spec,{reservedMicroUsd:0});
 }
@@ -138,6 +153,7 @@ export async function enqueueCommittedResidualExtraction(pool:Pool,store:Distric
  const query=await pool.query<{spec:DistrictJobSpec;receipt:StepReceipt;receipt_sha256:string}>(`SELECT j.spec,r.receipt,r.receipt_sha256 FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id AND r.outcome=j.state WHERE j.job_key=$1 AND j.state='succeeded' AND j.spec->>'step'='residual_prepare' ORDER BY r.attempt DESC LIMIT 1`,[preparationJobKey]);
  if(query.rows.length!==1)throw Error('Residual predecessor preparation is not committed');
  const row=query.rows[0],encoded=encodeStepReceipt(row.receipt),selector=PreparationSelectorSchema.parse(row.spec.selector);
+ await loadResidualSource(cas,ResidualInputSchema.strip().parse(selector),{store});
  if(encoded.sha256!==row.receipt_sha256||encoded.receipt.jobKey!==preparationJobKey||canonicalJobIdentity(row.spec).jobKey!==preparationJobKey||encoded.receipt.outputHashes.length!==1)throw Error('Committed residual preparation receipt binding mismatch');
  const preparedArtifactSha256=encoded.receipt.outputHashes[0];await cas.verify(preparedArtifactSha256);
  const prepared=PreparedDocumentSchema.parse(JSON.parse((await cas.read(preparedArtifactSha256)).toString('utf8')));verifyPreparedDocument(prepared,prepared);
@@ -149,7 +165,7 @@ export async function enqueueCommittedResidualExtraction(pool:Pool,store:Distric
  * a fabricated aggregate model identity or a replacement for a missing run. */
 export async function exportResidualTextContribution(pool:Pool,cas:DistrictCas,jobKeys:readonly string[],contribution:TextRunContribution){
  if(!jobKeys.length||new Set(jobKeys).size!==jobKeys.length)throw Error('Residual contribution requires distinct committed extraction jobs');
- const authenticated=authenticateTextRunContribution(contribution),receipts:StepReceipt[]=[],results:z.infer<typeof ResidualExtractionSchema>[]=[];
+ const authenticated=authenticateTextRunContribution(contribution),receipts:StepReceipt[]=[],results:z.infer<typeof ResidualExtractionSchema>[]=[],store=new DistrictJobStore(pool);
  if(authenticated.sourceArtifactKind!=='native_extraction_output'||authenticated.extractionRun.assignmentMode!=='codex-only')throw Error('Residual contribution requires its genuine Codex-only native run');
  for(const jobKey of jobKeys){
   HashSchema.parse(jobKey);
@@ -157,7 +173,7 @@ export async function exportResidualTextContribution(pool:Pool,cas:DistrictCas,j
   if(committed.rows.length!==1)throw Error('Residual contribution extraction is not committed');
   const row=committed.rows[0],encoded=encodeStepReceipt(row.receipt),selector=ExtractionSelectorSchema.parse(row.spec.selector);
   if(encoded.sha256!==row.receipt_sha256||encoded.receipt.jobKey!==jobKey||canonicalJobIdentity(row.spec).jobKey!==jobKey||encoded.receipt.outputHashes.length!==1||!encoded.receipt.dependencyReceiptIds.includes(selector.preparationReceiptId))throw Error('Residual contribution StepReceipt binding mismatch');
-  const source=await loadResidualSource(cas,selector),outputHash=encoded.receipt.outputHashes[0];
+  const source=await loadResidualSource(cas,selector,{store}),outputHash=encoded.receipt.outputHashes[0];
   await assertManagedSourceReadable(join(cas.root,'sha256',outputHash.slice(0,2),outputHash),policyOptions(source.receipt));
   const result=ResidualExtractionSchema.parse(JSON.parse((await cas.read(outputHash)).toString('utf8')));
   if(result.documentId!==selector.documentId||result.policyReceiptSha256!==selector.policyReceiptSha256||result.preparationJobKey!==selector.preparationJobKey||result.result.sourceSha256!==source.document.sha256||result.result.municipalityId!==source.municipality.id||result.result.taskId!==jobKey||result.preparationReceiptSha256!==selector.preparationReceiptSha256||result.preparationReceiptId!==selector.preparationReceiptId||result.preparedArtifactSha256!==selector.preparedArtifactSha256||result.corpusSha256!==authenticated.pins.corpusSha256||result.registrySha256!==authenticated.pins.registrySha256||result.result.promptSha256!==authenticated.pins.promptContractSha256||result.result.schemaSha256!==authenticated.pins.schemaSha256)throw Error('Residual contribution original run/provenance mismatch');

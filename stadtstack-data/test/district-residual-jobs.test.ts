@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import type {Pool} from 'pg';
-import {ResidualBoundsSchema,ResidualInputSchema,ResidualExtractionSchema,residualMimeSupported,residualJobHandlers,enqueueResidualPreparation,loadResidualSource,enqueueCommittedResidualExtraction,exportResidualTextContribution} from '../src/district-residual-jobs.ts';
+import {ResidualBoundsSchema,ResidualInputSchema,ResidualExtractionSchema,residualMimeSupported,residualJobHandlersFor,enqueueResidualPreparation,loadResidualSource,enqueueCommittedResidualExtraction,exportResidualTextContribution} from '../src/district-residual-jobs.ts';
 import {PILOT_BASE_CORPUS_SHA256} from '../src/district-corpus.ts';
 import type {JobHandlerContext} from '../src/district-jobs.ts';
 import {canonicalJobIdentity,type DistrictJobStore} from '../src/district-jobs.ts';
@@ -32,7 +32,7 @@ test('corpus, registry, policy and bounds participate in exact canonical job ide
  for(const changed of [{...input,documentId:'other-original'},{...input,registrySha256:'d'.repeat(64)},{...input,registry:{...input.registry,sha256:'e'.repeat(64)}},{...input,bounds:{...bounds,maxChunks:3}},{...input,policyReceiptSha256:'e'.repeat(64)}])assert.notEqual(canonicalJobIdentity({...spec,selector:changed}).jobKey,original);
 });
 test('fixed registry exposes preparation and extraction only, never Mac substitution',()=>{
- assert.deepEqual(Object.keys(residualJobHandlers).sort(),['residual_extract','residual_prepare']);
+ assert.deepEqual(Object.keys(residualJobHandlersFor({} as Pool)).sort(),['residual_extract','residual_prepare']);
 });
 test('dependent extraction cannot enqueue an uncommitted or merely predicted preparation',async()=>{
  let enqueued=false;
@@ -68,9 +68,10 @@ test('unauthorized corpora fail schema, enqueue, defensive load and both executi
  const store={enqueue:async()=>{enqueues++;return hash;}} as unknown as DistrictJobStore;
  await assert.rejects(enqueueResidualPreparation(store,cas,unauthorized),/owner-authorized/);
  await assert.rejects(loadResidualSource(cas,unauthorized),/owner-authorized/);
+ const handlers=residualJobHandlersFor({query:async()=>assert.fail('Must not query unauthorized source')} as unknown as Pool);
  for(const step of ['residual_prepare','residual_extract']){
   const selector={...unauthorized,contract:{preparationSha256:hash,extraction:{promptSha256:hash,schemaSha256:hash,extractorSha256:hash},hostSha256:hash},...(step==='residual_extract'?{preparationJobKey:hash,preparationReceiptId:'11111111-1111-4111-8111-111111111111',preparationReceiptSha256:hash,preparedArtifactSha256:hash}:{})};
-  await assert.rejects(residualJobHandlers[step]({job:{spec:{step,selector}},cas} as unknown as JobHandlerContext),/owner-authorized/);
+  await assert.rejects(handlers[step]({job:{spec:{step,selector}},cas} as unknown as JobHandlerContext),/owner-authorized/);
  }
  assert.equal(reads,0);assert.equal(enqueues,0);
 });

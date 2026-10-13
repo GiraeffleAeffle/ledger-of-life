@@ -38,14 +38,14 @@ import type {StepReceipt,ReasonCode} from './district-step-receipt.ts';
 import type {StructuredSupportingSource} from './district-structured-record.ts';
 import {StructuredKnowledgeRecordSchema} from './district-structured-record.ts';
 import type {StructuredWorkerRequest} from './district-structured-parser-worker.ts';
-import {ResidualInputSchema,residualJobHandlers,enqueueResidualPreparation,enqueueCommittedResidualExtraction,exportResidualTextContribution} from './district-residual-jobs.ts';
+import {ResidualInputSchema,residualJobHandlersFor,enqueueResidualPreparation,enqueueCommittedResidualExtraction,exportResidualTextContribution} from './district-residual-jobs.ts';
 import {CrawlCorpusImportSchema,importCrawlCorpusForResidual} from './district-crawl-import.ts';
 import {DistrictAssessmentBroker,assessmentBJobHandler,enqueueAssessmentB,assessmentEvidenceArtifactHashes} from './district-assessment-broker.ts';
 import {assessmentItemSchema} from './district-assessment.ts';
 import {r1TextCompositionInputSchema,loadR1TextCompositionInput} from './district-r1-text-composition.ts';
 import {structuredFieldPublicationHold} from './district-public-fields.ts';
 import type {StructuredFieldHold} from './district-public-fields.ts';
-import {enqueueCrawlPolicyRefresh,policyRefreshHandler} from './district-policy-refresh.ts';
+import {CrawlPolicyRefreshEnqueueSchema,enqueueCrawlPolicyRefresh,policyRefreshHandler} from './district-policy-refresh.ts';
 
 const REPO=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 export const R1_FETCH_ROOT=join(REPO,'cache/districts/r1-fetch');
@@ -389,7 +389,7 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
    if(authorization.rows[0]?.has_b&&!authorization.rows[0]?.only_b)throw new DistrictExecutionHold('authorization_mode_mismatch');
    const broker=new DistrictAssessmentBroker(pool,new DistrictCas(CAS_ROOT)),assessmentHandler=assessmentBJobHandler(broker);
    const refreshStore=new DistrictJobStore(pool),refresh=policyRefreshHandler(refreshStore,(context,maxRequests)=>createR1PublicFetcher(refreshStore,context,{maxRequests,maxBytes:1024*1024}));
-   await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlers,policy_refresh:refresh,acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry),assessment_b:context=>{if(process.platform!=='linux')throw new DistrictExecutionHold('isolation_unavailable');return assessmentHandler(context);}},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
+   await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlersFor(pool),policy_refresh:refresh,acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry),assessment_b:context=>{if(process.platform!=='linux')throw new DistrictExecutionHold('isolation_unavailable');return assessmentHandler(context);}},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
   }finally{await pool.end();}return;
  }
  if(args.length)throw Error('R1 commands require only explicit registry configuration flags and bounded JSON stdin');
@@ -412,7 +412,7 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
    process.stdout.write(canonicalJson(await importCrawlCorpusForResidual(store,cas,manifest))+'\n');return;
   }
   if(command==='enqueue-policy-refresh'){
-   const manifest=z.object({manifest:CrawlCorpusImportSchema,maxRequests:z.number().int().min(2).max(100)}).strict().parse(input);
+   const manifest=CrawlPolicyRefreshEnqueueSchema.parse(input);
    if(canonicalJson(manifest.manifest.registry)!==canonicalJson(registryPin))throw Error('Refresh descriptor must match admitted CLI registry pin');
    process.stdout.write(canonicalJson(await enqueueCrawlPolicyRefresh(store,cas,manifest))+'\n');return;
   }

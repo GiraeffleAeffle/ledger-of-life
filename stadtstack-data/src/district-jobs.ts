@@ -14,10 +14,16 @@ export const R1_MUNICIPALITIES:Readonly<Record<string,string>>={strausberg:'1206
 const token=z.string().regex(/^[a-z][a-z0-9_.:-]{0,127}$/);
 const SpecSchema=z.object({step:token,lane:token,semanticContractSha256:HashSchema,inputArtifactHashes:z.array(HashSchema),sourceScope:ScopeSchema,selector:z.unknown(),policyProofSha256:HashSchema.nullable()}).strict();
 export interface DistrictJobSpec {step:string;lane:string;semanticContractSha256:string;inputArtifactHashes:string[];sourceScope:AdapterScope;selector:unknown;policyProofSha256:string|null}
-export interface ClaimedJob {id:string;jobKey:string;spec:DistrictJobSpec;attempt:number;fencingToken:string;runId:string;enqueuedAt:string;startedAt:string;leaseExpiresAt:string;dependencyReceiptIds:string[];category:'production'|'evaluation'|'development'}
+export interface JobPolicyContinuation {fromReceiptSha256:string;toReceiptSha256:string;refreshStepReceiptSha256:string;refreshStepReceiptId:string;originalIdentitySha256:string}
+export interface ClaimedJob {id:string;jobKey:string;spec:DistrictJobSpec;attempt:number;fencingToken:string;runId:string;enqueuedAt:string;startedAt:string;leaseExpiresAt:string;dependencyReceiptIds:string[];category:'production'|'evaluation'|'development';policyContinuations?:JobPolicyContinuation[]}
 export interface JobHandlerContext {job:ClaimedJob;signal:AbortSignal;cas:DistrictCas;acquireHostLane:(laneKey:string)=>Promise<void>}
 export interface JobHandlerResult {outcome:JobOutcome;reasonCode:ReasonCode;outputs?:CasArtifact[];versions?:Record<string,string>;counts?:Partial<StepReceipt['counts']>;cache?:StepReceipt['cache'];provider?:StepReceipt['provider'];originProofSha256?:string|null}
-export type JobHandler=(context:JobHandlerContext)=>Promise<JobHandlerResult>;
+export interface JobHandler {(context:JobHandlerContext):Promise<JobHandlerResult>;currentPolicy?:(spec:DistrictJobSpec,cas:DistrictCas)=>Promise<JobPolicyContinuation|undefined>}
+type CurrentPolicyCheck=(spec:DistrictJobSpec)=>Promise<JobPolicyContinuation|undefined>;
+const CONTINUATION_STEPS=new Set(['residual_prepare','residual_extract','assessment_prepare','assessment_a','assessment_b','assessment_c','assessment_reconcile']);
+export function policyContinuationVersions(continuation:JobPolicyContinuation):Record<string,string>{
+ return {[`policyRebinding.${continuation.fromReceiptSha256}.${continuation.refreshStepReceiptSha256}`]:continuation.toReceiptSha256};
+}
 export interface ExecutorResult {runId:string;state:'completed'|'held';reasonCode:ReasonCode;jobsStarted:number;receiptIds:string[]}
 export type ExecutionMode='attended'|'bounded_unattended';
 export interface OwnerNotification {id:string;phase:'startup'|'disposition';runId:string;authorizationId:string;state:'running'|'completed'|'held';reasonCode:ReasonCode|null;jobsStarted:number;receiptIds:string[];notificationApprovalSha256:string;destinationSha256:string;provider:string}
@@ -198,7 +204,7 @@ export class DistrictJobStore {
     }
     return auth;
   }
-  private async policyDisposition(client:PoolClient,jobId:string,spec:DistrictJobSpec):Promise<ReasonCode|null> {
+  private async policyDisposition(client:PoolClient,jobId:string,spec:DistrictJobSpec,currentPolicy?:CurrentPolicyCheck,onContinuation?:(value:JobPolicyContinuation)=>void):Promise<ReasonCode|null> {
     const originals=await client.query<{sha256:string;disposition:string}>(`SELECT a.sha256,a.disposition FROM district_pipeline.job_input_artifacts i JOIN district_pipeline.artifacts a ON a.sha256=i.artifact_sha256 WHERE i.job_id=$1`,[jobId]);
     if(originals.rows.some(row=>row.disposition!=='retained'))return 'policy_excluded';
     if(!spec.policyProofSha256){
@@ -207,11 +213,24 @@ export class DistrictJobStore {
     }
     const policies=await client.query<{state:string;checked_at:Date;expires_at:Date;source_sha256:string;publisher_id:string;source_id:string;municipality_id:string;ags:string;tenant:string|null;observation_window:string;now:Date}>(`SELECT p.*,s.publisher_id,s.source_id,s.municipality_id,s.ags,s.tenant,s.observation_window,clock_timestamp() AS now FROM district_pipeline.policy_decisions p JOIN district_pipeline.source_snapshots s ON s.id=p.source_snapshot_id WHERE p.proof_sha256=$1`,[spec.policyProofSha256]);
     if(!policies.rowCount)return 'policy_excluded';const policy=policies.rows[0];
-    if(policy.checked_at>policy.now||policy.expires_at<=policy.now)return 'policy_expired';
     if(policy.state==='held_origin')return 'origin_unresolved';
     if(policy.state!=='allowed')return 'policy_excluded';
     const scope=spec.sourceScope;
     if(policy.publisher_id!==scope.publisherId||policy.source_id!==scope.sourceId||policy.municipality_id!==scope.municipalityId||policy.ags!==scope.ags||policy.tenant!==scope.tenant||policy.observation_window!==scope.observationWindow||!spec.inputArtifactHashes.includes(policy.source_sha256))return 'policy_excluded';
+    if(policy.checked_at>policy.now)return 'policy_expired';
+    if(policy.expires_at<=policy.now){
+      if(!CONTINUATION_STEPS.has(spec.step))return 'policy_expired';
+      if(!currentPolicy)return 'source_policy_stale';
+      try{
+        const continuation=await currentPolicy(spec);
+        if(!continuation||continuation.fromReceiptSha256!==spec.policyProofSha256)return 'source_policy_stale';
+        for(const hash of [continuation.toReceiptSha256,continuation.refreshStepReceiptSha256,continuation.originalIdentitySha256])HashSchema.parse(hash);
+        z.uuid().parse(continuation.refreshStepReceiptId);
+        const current=await client.query(`SELECT p.checked_at,p.expires_at,clock_timestamp() AS now FROM district_pipeline.policy_decisions p JOIN district_pipeline.source_snapshots s ON s.id=p.source_snapshot_id JOIN district_pipeline.step_receipts r ON r.receipt_sha256=$2 JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE p.proof_sha256=$1 AND p.state='allowed' AND p.source_sha256=$3 AND s.publisher_id=$4 AND s.source_id=$5 AND s.municipality_id=$6 AND s.ags=$7 AND s.tenant IS NOT DISTINCT FROM $8 AND s.observation_window=$9 AND j.state='succeeded' AND j.step='policy_refresh' AND r.outcome='succeeded' AND r.id=$10 AND r.receipt->'versions'->>'policyRefreshReceipt'=$1 AND r.receipt->'versions'->>'policyRefreshOriginal'=$11`,[continuation.toReceiptSha256,continuation.refreshStepReceiptSha256,policy.source_sha256,scope.publisherId,scope.sourceId,scope.municipalityId,scope.ags,scope.tenant,scope.observationWindow,continuation.refreshStepReceiptId,continuation.originalIdentitySha256]);
+        if(current.rowCount!==1||current.rows[0].checked_at<=policy.checked_at||current.rows[0].checked_at>current.rows[0].now||current.rows[0].expires_at<=current.rows[0].now)return 'source_policy_stale';
+        onContinuation?.(continuation);return null;
+      }catch{return 'source_policy_stale';}
+    }
     return null;
   }
   private async hostAdmission(client:PoolClient,laneKey:string,jobId:string,fence:string,expiry:Date):Promise<ReasonCode|null> {
@@ -228,7 +247,7 @@ export class DistrictJobStore {
     await client.query(`WITH started AS MATERIALIZED (SELECT clock_timestamp() AS at) UPDATE district_pipeline.host_lanes SET last_started_at=started.at,next_start_at=started.at+min_start_interval_ms*interval '1 millisecond' FROM started WHERE lane_key=$1`,[laneKey]);
     return null;
   }
-  async claim(run:RunBounds,leaseMs:number):Promise<{kind:'job';job:ClaimedJob}|{kind:'stop';reasonCode:ReasonCode}> {
+  async claim(run:RunBounds,leaseMs:number,currentPolicy?:CurrentPolicyCheck):Promise<{kind:'job';job:ClaimedJob}|{kind:'stop';reasonCode:ReasonCode}> {
     if(!Number.isInteger(leaseMs)||leaseMs<50||leaseMs>300000)throw Error('Lease bound rejected');
     return this.transaction<{kind:'job';job:ClaimedJob}|{kind:'stop';reasonCode:ReasonCode}>(async client=>{
       const auth=await this.assertRun(client,run);
@@ -248,12 +267,12 @@ export class DistrictJobStore {
         }
         return {kind:'stop',reasonCode:'no_ready_jobs'};
       }
-      const row=candidates.rows[0];let hold:ReasonCode|null=null;
+      const row=candidates.rows[0];let hold:ReasonCode|null=null,continuation:JobPolicyContinuation|undefined;
       if(row.cancellation_requested)hold='cancellation_requested';
-      if(!hold)hold=await this.policyDisposition(client,row.id,row.spec);
+      if(!hold)hold=await this.policyDisposition(client,row.id,row.spec,currentPolicy,value=>{continuation=value;});
       // R1 has no authorization for paid API execution, irrespective of available budget.
       if(Number(row.reserved_micro_usd)>0)hold='paid_not_authorized';
-      if(hold){await client.query(`UPDATE district_pipeline.jobs SET state=$2,reason_code=$3 WHERE id=$1`,[row.id,hold==='cancellation_requested'?'cancelled':hold.startsWith('policy_')?'blocked_policy':hold==='origin_unresolved'?'held_origin':'held_execution',hold]);return {kind:'stop',reasonCode:hold};}
+      if(hold){await client.query(`UPDATE district_pipeline.jobs SET state=$2,reason_code=$3 WHERE id=$1`,[row.id,hold==='cancellation_requested'?'cancelled':hold.startsWith('policy_')||hold==='source_policy_stale'?'blocked_policy':hold==='origin_unresolved'?'held_origin':'held_execution',hold]);return {kind:'stop',reasonCode:hold};}
       const now=auth.now.getTime(),authorizationEnd=auth.first_started_at!.getTime()+auth.max_elapsed_ms;
       const expiry=new Date(Math.min(now+leaseMs,auth.expires_at.getTime(),authorizationEnd,run.startedAt.getTime()+run.maxElapsedMs));
       const fence=(BigInt(row.fencing_token)+1n).toString();
@@ -262,7 +281,7 @@ export class DistrictJobStore {
       const receiptIds=dependencies.rows.map(receipt=>receipt.id);
       const leased=await client.query<JobRow>(`UPDATE district_pipeline.jobs SET state='leased',reason_code=NULL,lease_owner=$2,lease_expires_at=$3,fencing_token=$4,attempt=attempt+1,attempt_started_at=clock_timestamp(),claimed_dependency_receipt_ids=$5 WHERE id=$1 RETURNING *`,[row.id,run.runId,expiry,fence,receiptIds]);
       await client.query('UPDATE district_pipeline.preauthorizations SET jobs_started=jobs_started+1 WHERE id=$1',[run.authorizationId]);
-      const current=leased.rows[0];return {kind:'job',job:{id:current.id,jobKey:current.job_key,spec:current.spec,attempt:current.attempt,fencingToken:fence,runId:run.runId,enqueuedAt:current.created_at.toISOString(),startedAt:current.attempt_started_at.toISOString(),leaseExpiresAt:expiry.toISOString(),dependencyReceiptIds:receiptIds,category:auth.category}};
+      const current=leased.rows[0];return {kind:'job',job:{id:current.id,jobKey:current.job_key,spec:current.spec,attempt:current.attempt,fencingToken:fence,runId:run.runId,enqueuedAt:current.created_at.toISOString(),startedAt:current.attempt_started_at.toISOString(),leaseExpiresAt:expiry.toISOString(),dependencyReceiptIds:receiptIds,category:auth.category,...(continuation?{policyContinuations:[continuation]}:{})}};
     });
   }
   async renew(run:RunBounds,job:ClaimedJob,leaseMs:number):Promise<string> {
@@ -298,12 +317,12 @@ export class DistrictJobStore {
     for(const dependency of receipt.dependencyReceiptIds)await client.query('INSERT INTO district_pipeline.step_receipt_dependencies(receipt_id,dependency_receipt_id) VALUES($1,$2)',[receipt.id,dependency]);
     for(const hash of receipt.outputHashes)await client.query('INSERT INTO district_pipeline.job_output_artifacts(receipt_id,artifact_sha256) VALUES($1,$2)',[receipt.id,hash]);
   }
-  async finish(run:RunBounds,job:ClaimedJob,receipt:StepReceipt):Promise<void> {
+  async finish(run:RunBounds,job:ClaimedJob,receipt:StepReceipt,currentPolicy?:CurrentPolicyCheck):Promise<void> {
     await this.transaction(async client=>{
       await this.assertRun(client,run);
       const current=await client.query<JobRow>(`SELECT * FROM district_pipeline.jobs WHERE id=$1 AND lease_owner=$2 AND fencing_token=$3 AND state='leased' AND lease_expires_at>clock_timestamp() AND NOT cancellation_requested FOR UPDATE`,[job.id,job.runId,job.fencingToken]);
       if(!current.rowCount)throw new DistrictExecutionHold('lease_lost');
-      const policy=await this.policyDisposition(client,job.id,job.spec);
+      const policy=await this.policyDisposition(client,job.id,job.spec,currentPolicy,value=>{Object.assign(receipt.versions,policyContinuationVersions(value));});
       if(policy)throw new DistrictExecutionHold(policy);
       await this.insertReceipt(client,job,receipt);
       await client.query(`UPDATE district_pipeline.jobs SET state=$4,reason_code=$5,lease_owner=NULL,lease_expires_at=NULL WHERE id=$1 AND lease_owner=$2 AND fencing_token=$3`,[job.id,job.runId,job.fencingToken,receipt.outcome,receipt.reasonCode]);
@@ -434,7 +453,8 @@ export class DistrictJobStore {
 }
 
 function makeReceipt(job:ClaimedJob,result:JobHandlerResult,elapsedMs:number|null,cpu:NodeJS.CpuUsage|null,finishedAt=new Date().toISOString()):StepReceipt {
-  return {version:STEP_RECEIPT_VERSION,canonicalizationVersion:CANONICALIZATION_VERSION,id:randomUUID(),runId:job.runId,jobKey:job.jobKey,step:job.spec.step,lane:job.spec.lane,sourceId:job.spec.sourceScope.sourceId,municipalityId:job.spec.sourceScope.municipalityId,attempt:job.attempt,leaseToken:job.fencingToken,category:job.category,dependencyReceiptIds:job.dependencyReceiptIds,enqueuedAt:job.enqueuedAt,startedAt:job.startedAt,finishedAt,queueWaitMs:Math.max(0,Date.parse(job.startedAt)-Date.parse(job.enqueuedAt)),elapsedMs,cpuUserMicros:cpu?.user??null,cpuSystemMicros:cpu?.system??null,outcome:result.outcome,reasonCode:result.reasonCode,inputHashes:job.spec.inputArtifactHashes,outputHashes:[...new Set((result.outputs??[]).map(output=>output.sha256))].sort(),policyProofSha256:job.spec.policyProofSha256,originProofSha256:result.originProofSha256??null,versions:result.versions??{},cache:result.cache??{disposition:'not_applicable',originalGenerationReceiptId:null},provider:result.provider??null,counts:{...unknownReceiptCounts,...result.counts}};
+  const versions={...result.versions};for(const continuation of job.policyContinuations??[])Object.assign(versions,policyContinuationVersions(continuation));
+  return {version:STEP_RECEIPT_VERSION,canonicalizationVersion:CANONICALIZATION_VERSION,id:randomUUID(),runId:job.runId,jobKey:job.jobKey,step:job.spec.step,lane:job.spec.lane,sourceId:job.spec.sourceScope.sourceId,municipalityId:job.spec.sourceScope.municipalityId,attempt:job.attempt,leaseToken:job.fencingToken,category:job.category,dependencyReceiptIds:job.dependencyReceiptIds,enqueuedAt:job.enqueuedAt,startedAt:job.startedAt,finishedAt,queueWaitMs:Math.max(0,Date.parse(job.startedAt)-Date.parse(job.enqueuedAt)),elapsedMs,cpuUserMicros:cpu?.user??null,cpuSystemMicros:cpu?.system??null,outcome:result.outcome,reasonCode:result.reasonCode,inputHashes:job.spec.inputArtifactHashes,outputHashes:[...new Set((result.outputs??[]).map(output=>output.sha256))].sort(),policyProofSha256:job.spec.policyProofSha256,originProofSha256:result.originProofSha256??null,versions,cache:result.cache??{disposition:'not_applicable',originalGenerationReceiptId:null},provider:result.provider??null,counts:{...unknownReceiptCounts,...result.counts}};
 }
 export interface ExecutorOptions {store:DistrictJobStore;cas:DistrictCas;handlers:Readonly<Record<string,JobHandler>>;authorizationId:string;mode?:ExecutionMode;ownerPresent?:true;maxJobs:number;maxElapsedMs:number;leaseMs?:number;signal?:AbortSignal;notifyOwner?:NotificationConfig['notifyOwner'];notificationApprovalSha256?:string;notificationDestinationSha256?:string;notificationProvider?:string}
 /** No polling daemon, subprocess, arbitrary module loading, or automatic retries.
@@ -471,10 +491,11 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
     const availableMs=Math.min(run.deadlineAt.getTime()-run.startedAt.getTime(),options.maxElapsedMs-(monotonicStart-invocationStart));
     const deadlineReason:ReasonCode=availableMs<run.deadlineAt.getTime()-run.startedAt.getTime()?'max_time_reached':run.deadlineReason;
     if(notificationConfig)await deliverDistrictOwnerNotifications(options.store,notificationConfig,Math.max(1,availableMs));
+    const currentPolicy:CurrentPolicyCheck=async spec=>Object.hasOwn(options.handlers,spec.step)?await options.handlers[spec.step].currentPolicy?.(spec,options.cas):undefined;
     while(jobsStarted<options.maxJobs){
       if(stopped)break;
       if(performance.now()-monotonicStart>=availableMs){stopped=deadlineReason;break;}
-      const claim=await options.store.claim(run,leaseMs);
+      const claim=await options.store.claim(run,leaseMs,currentPolicy);
       if(claim.kind==='stop'){stopped=claim.reasonCode;break;}
       const job=claim.job; jobsStarted++;
       const controller=new AbortController();const abortRun=()=>controller.abort(stopController.signal.reason);stopController.signal.addEventListener('abort',abortRun,{once:true});
@@ -507,7 +528,7 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
         }
         for(const output of result.outputs??[]){controller.signal.throwIfAborted();await options.cas.verify(output.sha256);await options.store.addArtifact(output);}
         receipt=makeReceipt(job,result,performance.now()-start,process.cpuUsage(cpu));
-        await options.store.finish(run,job,receipt);receiptIds.push(receipt.id);
+        await options.store.finish(run,job,receipt,currentPolicy);receiptIds.push(receipt.id);
         if(result.outcome!=='succeeded'&&result.outcome!=='no_supported_case'){stopped=result.reasonCode;break;}
       } catch(error) {
         const reason=error instanceof DistrictExecutionHold?error.reasonCode:'execution_exception';

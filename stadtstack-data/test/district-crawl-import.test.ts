@@ -5,22 +5,24 @@ import {mkdtemp,mkdir,writeFile,readFile,rm,unlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,relative} from 'node:path';
 import {Pool} from 'pg';
-import {digest} from '../src/district-adapter-contract.ts';
+import {digest,canonicalJson} from '../src/district-adapter-contract.ts';
 import {DistrictCas} from '../src/district-cas.ts';
-import {DistrictJobStore,migrateDistrictJobs,runDistrictJobs} from '../src/district-jobs.ts';
+import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,runDistrictJobs,type JobHandler} from '../src/district-jobs.ts';
 import {importCrawlCorpusForResidual} from '../src/district-crawl-import.ts';
 import {withFixtureAuthorizedCorpus,authorizedPilotCorpusSchema,loadFrozenCorpusBytes} from '../src/district-corpus.ts';
-import {ResidualInputSchema,enqueueResidualPreparation,loadResidualSource} from '../src/district-residual-jobs.ts';
+import {ResidualInputSchema,residualJobHandlersFor,enqueueResidualPreparation,loadResidualSource} from '../src/district-residual-jobs.ts';
 import {ObservationRequestSchema,persistCrawlRequestEvidence} from '../src/district-crawl-request.ts';
 import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceBindings,recoverManagedSourceScratch,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 import {createOperatorRegistryFixture,operatorRegistryFixtureValue} from './helpers/operator-registry-fixture.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
-import {enqueueCrawlPolicyRefresh,policyRefreshHandler} from '../src/district-policy-refresh.ts';
+import {enqueueCrawlPolicyRefresh,policyRefreshHandler,recheckResidualPolicy} from '../src/district-policy-refresh.ts';
 import {createR1PublicFetcher} from '../src/district-r1.ts';
 import {PoliteFetcher,type FetchObservation} from '../src/polite-fetch.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {loadPolicyReceipt,recheckPolicyReceipt} from '../src/district-policy-receipt.ts';
+import {prepareDocument} from '../src/district-prepared-document.ts';
+import {assessmentItemSchema,originalEvidence} from '../src/district-assessment.ts';
 
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 test('public request evidence excludes credential/header fields and binds selector bytes',()=>{
@@ -30,7 +32,7 @@ test('public request evidence excludes credential/header fields and binds select
  assert.throws(()=>ObservationRequestSchema.parse({...request,headers:{username:'owner',password:'secret'}}));
  assert.throws(()=>ObservationRequestSchema.parse({...request,bodySha256:digest('tampered')}));
 });
-test('offline frozen crawl import preserves managed originals and produces enqueue-ready residual jobs',{skip:!connectionString,timeout:120000},async t=>{
+test('offline frozen crawl import preserves managed originals and produces enqueue-ready residual jobs',{skip:!connectionString,timeout:300000},async t=>{
  const endpoint=new URL(connectionString!);
  if(!['postgres:','postgresql:'].includes(endpoint.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(endpoint.hostname))throw Error('Test refuses non-local PG');
  const host=endpoint.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Test refuses non-local PG host');
@@ -50,14 +52,20 @@ test('offline frozen crawl import preserves managed originals and produces enque
  const registry=await createOperatorRegistryFixture(t,{context:{root,policy},value}),store=new DistrictJobStore(pool);
  const scope={publisherId:'synthetic-explicit-publisher',sourceId:source.id,municipalityId:city.id,ags:city.ags,tenant:null,observationWindow:'synthetic-bounded-window'};
  const bounds={maxDocuments:1 as const,maxChunks:4,maxModelCalls:8,paidMicroUsd:0 as const};
- async function fixture(label:string,config:{stale?:boolean;missingRequest?:boolean;post?:boolean;extra?:boolean;sameBytes?:boolean;selectExtra?:boolean;body?:Buffer;url?:string;casRoot?:string;robotsBody?:string}={}){
+ async function fixture(label:string,config:{stale?:boolean;missingRequest?:boolean;post?:boolean;extra?:boolean;sameBytes?:boolean;selectExtra?:boolean;body?:Buffer;url?:string;casRoot?:string;robotsBody?:string;robotsAbsence?:404|410}={}){
   const rawRoot=join(root!,label+'-raw'),indexRoot=join(root!,label+'-index'),casRoot=config.casRoot??join(root!,label+'-cas');
   for(const [path,kind] of [[rawRoot,'fetch'],[indexRoot,'artifacts'],[casRoot,'artifacts']] as const)await initializeManagedAcquisitionLane(path,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind});
   const checkedAt=new Date(Date.now()-(config.stale?7200000:3000)).toISOString(),url=config.url??'https://example.org/'+label,bytes=config.body??Buffer.from('Synthetic civic fixture original '+label),sha256=digest(bytes),observationId=`${Date.now()}-${randomUUID()}.json`,observationPath=join(rawRoot,'observations',observationId);
   const publicSelector=config.post?'municipality=12064472':null;
-  const observation={url,method:config.post?'POST':'GET',checkedAt,retrievedAt:checkedAt,state:'fetched',status:200,sha256,bytes:bytes.length,mimeType:'text/plain',policy:{robots:{state:'allowed',url:'https://example.org/robots.txt',sha256:digest(config.robotsBody??'synthetic robots'),checkedAt},tdm:{state:'not_declared',evidence:[{url:'https://example.org/.well-known/tdmrep.json',locator:'TDMRep standardized location HTTP absence',value:'404',checkedAt}]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}};
+  const observation={url,method:config.post?'POST':'GET',checkedAt,retrievedAt:checkedAt,state:'fetched',status:200,sha256,bytes:bytes.length,mimeType:'text/plain',policy:{robots:{state:'allowed',url:'https://example.org/robots.txt',...(config.robotsAbsence?{}:{sha256:digest(config.robotsBody??'synthetic robots')}),checkedAt},tdm:{state:'not_declared',evidence:[{url:'https://example.org/.well-known/tdmrep.json',locator:'TDMRep standardized location HTTP absence',value:'404',checkedAt}]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}};
   const observationBytes=Buffer.from(JSON.stringify(observation,null,2)+'\n'),binding={kind:'http_observation' as const,url,sourceSha256:sha256,observationId,receiptSha256:digest(observationBytes)};
-  await withManagedSourceWrite(rawRoot,[{...binding,relativePath:'sha256/'+sha256,contentSha256:sha256,independentAllowed:true}],async()=>{await mkdir(join(rawRoot,'sha256'),{recursive:true,mode:0o700});await mkdir(join(rawRoot,'observations'),{recursive:true,mode:0o700});await writeFile(join(rawRoot,'sha256',sha256),bytes,{mode:0o600});await writeFile(observationPath,observationBytes,{mode:0o600});},policy);
+  const absenceId=`${Date.now()}-${randomUUID()}.json`,absenceBytes=Buffer.from(JSON.stringify({url:'https://example.org/robots.txt',method:'GET',checkedAt,retrievedAt:null,state:'failed',status:config.robotsAbsence,failure:'http_error'})+'\n');
+  const robotsAbsencePin=config.robotsAbsence?{path:join(rawRoot,'observations',absenceId),observationId:absenceId,receiptSha256:digest(absenceBytes)}:undefined;
+  await withManagedSourceWrite(rawRoot,[{...binding,relativePath:'sha256/'+sha256,contentSha256:sha256,independentAllowed:true}],async()=>{
+   await mkdir(join(rawRoot,'sha256'),{recursive:true,mode:0o700});await mkdir(join(rawRoot,'observations'),{recursive:true,mode:0o700});
+   await writeFile(join(rawRoot,'sha256',sha256),bytes,{mode:0o600});await writeFile(observationPath,observationBytes,{mode:0o600});
+   if(robotsAbsencePin)await writeFile(robotsAbsencePin.path,absenceBytes,{mode:0o600});
+  },policy);
   const path=join(indexRoot,'index.json'),document={id:label,municipalityId:city.id,ags:city.ags,districtId:city.districtId,sourceId:source.id,url,sha256,mimeType:'text/plain',retrievedAt:checkedAt,checkedAt,status:200,observationPath,documentDate:null,localPath:relative(indexRoot,join(rawRoot,'sha256',sha256)),adapter:'synthetic-test-only',metadata:{}};
   const documents=[document],observations=[{path:observationPath,sha256:digest(observationBytes)}],bindings=[binding];
   if(config.extra){
@@ -74,7 +82,7 @@ test('offline frozen crawl import preserves managed originals and produces enque
    const extraBinding=bindings[1],extraEvidence=await persistCrawlRequestEvidence(rawRoot,{schemaVersion:'stadtstack-crawl-request-evidence-v1',httpObservation:extraBinding,request:{url:extraBinding.url,method:'GET',contentType:null,bodySha256:null,publicSelector:null},redirectChain:[extraBinding.url]},policy);
    manifest.documents.push({...manifest.documents[0],documentId:documents[1].id,requestEvidence:extraEvidence});
   }
-  return {manifest,indexBytes,cas:new DistrictCas(casRoot),bytes,binding,observationBytes,document};
+  return {manifest,indexBytes,cas:new DistrictCas(casRoot),bytes,binding,observationBytes,document,robotsAbsencePin};
  }
  await t.test('happy GET/POST imports preserve exact bytes/clocks and enqueue genuine preparation jobs',async()=>{
   for(const post of [false,true]){
@@ -138,12 +146,12 @@ test('offline frozen crawl import preserves managed originals and produces enque
   const item=await fixture('legacy',{missingRequest:true});
   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.equal(imported.jobs.length,0);assert.equal(imported.holds[0].reasonCode,'request_evidence_unavailable');});
  });
- await t.test('durable authorized refresh admits stale originals, preserves ancestry, and expires at its genuine new boundary',async st=>{
-  const robotsBody='User-agent: *\nAllow: /\n',item=await fixture('refresh-stale',{stale:true,robotsBody}),seen:string[]=[];
+ for(const absence of [undefined,404] as const)await t.test(`durable authorized refresh admits stale originals (${absence??'robots body'}), preserves ancestry, and expires at its genuine new boundary`,async st=>{
+  const robotsBody='User-agent: *\nAllow: /\n',item=await fixture('refresh-stale-'+(absence??'body'),{stale:true,robotsBody,robotsAbsence:absence}),seen:string[]=[];
   interface WireSeam {wire(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
   st.mock.method(PoliteFetcher.prototype as unknown as WireSeam,'wire',async (url:URL)=>{
    seen.push(url.pathname);
-   if(url.pathname==='/robots.txt')return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from(robotsBody)};
+   if(url.pathname==='/robots.txt')return {status:absence??200,headers:{'content-type':'text/plain'},body:absence?Buffer.alloc(0):Buffer.from(robotsBody)};
    if(url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
    throw Error('Refresh must not refetch original body');
   });
@@ -156,6 +164,9 @@ test('offline frozen crawl import preserves managed originals and produces enque
    const result=await runDistrictJobs({store,cas:item.cas,handlers:{policy_refresh:handler},authorizationId,ownerPresent:true,maxJobs:1,maxElapsedMs:60000});assert.equal(result.jobsStarted,1);
    const row=await pool!.query('SELECT state FROM district_pipeline.jobs WHERE job_key=$1',[jobKey]);assert.equal(row.rows[0].state,'succeeded');
    assert.deepEqual(seen,['/robots.txt','/.well-known/tdmrep.json']);
+   const receipts=await pool!.query('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId]);
+   const refreshOutput=JSON.parse((await item.cas.read(receipts.rows[0].receipt.outputHashes[0])).toString('utf8'));
+   assert.deepEqual(refreshOutput.originalRobotsAbsence,item.robotsAbsencePin);
    const imported=await importCrawlCorpusForResidual(store,item.cas,{...item.manifest,documents:item.manifest.documents.map(row=>({...row,policyRefreshJobKey:jobKey}))});assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
    const job=imported.jobs[0],source=await loadResidualSource(item.cas,job),proof=await loadPolicyReceipt(item.cas,job.policyReceiptSha256);
    assert.equal(source.document.checkedAt,item.document.checkedAt);assert.equal(source.document.retrievedAt,item.document.retrievedAt);assert.deepEqual(await readFile(item.document.observationPath),item.observationBytes);assert.deepEqual(await item.cas.read(item.document.sha256),item.bytes);
@@ -166,8 +177,151 @@ test('offline frozen crawl import preserves managed originals and produces enque
    assert.equal((await importCrawlCorpusForResidual(store,item.cas,mismatched)).jobs.length,0);
    st.mock.timers.enable({apis:['Date'],now:new Date(proof.expiresAt)});
    await assert.rejects(recheckPolicyReceipt(proof,{...policy,evaluationAt:new Date().toISOString()}),/expired/);
-   await assert.rejects(loadResidualSource(item.cas,job),/expired/);
+   await assert.rejects(loadResidualSource(item.cas,job),(error:unknown)=>error instanceof DistrictExecutionHold&&error.reasonCode==='source_policy_stale');
    st.mock.timers.reset();
+  });
+ });
+ await t.test('explicit receipt-bound generation renews an expired success without changing originals or bounds',async st=>{
+  const robotsBody='User-agent: *\nAllow: /\n',item=await fixture('refresh-generation',{stale:true,robotsBody});
+  interface WireSeam {wire(url:URL):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
+  st.mock.method(PoliteFetcher.prototype as unknown as WireSeam,'wire',async(url:URL)=>{
+   if(url.pathname==='/robots.txt')return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from(robotsBody)};
+   if(url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+   throw Error('Generation must not refetch original body');
+  });
+  await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+   const handler=policyRefreshHandler(store,(context,maxRequests)=>createR1PublicFetcher(store,context,{maxRequests,maxBytes:1024*1024,fixture:{fetchRoot:join(root!,'generation-fetch'),policy,inspection:fixturePolicyInspection}}));
+   const first=(await enqueueCrawlPolicyRefresh(store,item.cas,{manifest:item.manifest,maxRequests:4})).jobKeys[0].jobKey;
+   const authorize=(jobKey:string)=>store.authorize({approvalSha256:digest('Synthetic generation authorization '+jobKey),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
+   const firstAuthorization=await authorize(first);
+   const firstRun=await runDistrictJobs({store,cas:item.cas,handlers:{policy_refresh:handler},authorizationId:firstAuthorization,ownerPresent:true,maxJobs:1,maxElapsedMs:60000,leaseMs:60000});
+   const rows=await pool!.query('SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE run_id=$1',[firstRun.runId]),firstReceipt=rows.rows[0];
+   assert.equal(firstReceipt.receipt.outcome,'succeeded');
+   const firstOutput=JSON.parse((await item.cas.read(firstReceipt.receipt.outputHashes[0])).toString('utf8')),firstProof=await loadPolicyReceipt(item.cas,firstOutput.job.policyReceiptSha256);
+   const previous={documentId:item.document.id,jobKey:first,receiptSha256:firstReceipt.receipt_sha256},renewal={manifest:item.manifest,maxRequests:4,previousRefreshes:[previous]};
+   await assert.rejects(enqueueCrawlPolicyRefresh(store,item.cas,{...renewal,previousRefreshes:[{...previous,receiptSha256:digest('forged predecessor pin')}]}),/StepReceipt pin/);
+   const foreign=await fixture('foreign-generation',{stale:true,robotsBody});
+   await withFixtureAuthorizedCorpus(foreign.indexBytes,policy,async()=>assert.rejects(enqueueCrawlPolicyRefresh(store,foreign.cas,{manifest:foreign.manifest,maxRequests:4,previousRefreshes:[{...previous,documentId:foreign.document.id}]}),/selected import/));
+   const uncommitted=await fixture('uncommitted-generation',{stale:true,robotsBody});
+   await withFixtureAuthorizedCorpus(uncommitted.indexBytes,policy,async()=>{
+    const pending=(await enqueueCrawlPolicyRefresh(store,uncommitted.cas,{manifest:uncommitted.manifest,maxRequests:4})).jobKeys[0].jobKey;
+    await assert.rejects(enqueueCrawlPolicyRefresh(store,uncommitted.cas,{manifest:uncommitted.manifest,maxRequests:4,previousRefreshes:[{documentId:uncommitted.document.id,jobKey:pending,receiptSha256:digest('no committed receipt')}]}),/not committed/);
+   });
+   const nextTime=new Date(Date.parse(firstProof.expiresAt)+1000);
+   // Only the isolated public-policy fixture clock advances. Queue authorizations,
+   // leases and StepReceipts continue to use their genuine disposable-PG clocks.
+   st.mock.timers.enable({apis:['Date'],now:nextTime});
+   let second:string;
+   try{
+    assert.equal((await importCrawlCorpusForResidual(store,item.cas,{...item.manifest,documents:item.manifest.documents.map(row=>({...row,policyRefreshJobKey:first}))})).jobs.length,0);
+    second=(await enqueueCrawlPolicyRefresh(store,item.cas,renewal)).jobKeys[0].jobKey;
+    assert.equal((await enqueueCrawlPolicyRefresh(store,item.cas,renewal)).jobKeys[0].jobKey,second);
+   }finally{st.mock.timers.reset();}
+   assert.notEqual(second,first);
+   const secondAuthorization=await authorize(second);assert.notEqual(secondAuthorization,firstAuthorization);
+   const secondRun=await runDistrictJobs({store,cas:item.cas,handlers:{policy_refresh:async context=>{
+    st.mock.timers.enable({apis:['Date'],now:nextTime});
+    try{return await handler(context);}finally{st.mock.timers.reset();}
+   }},authorizationId:secondAuthorization,ownerPresent:true,maxJobs:1,maxElapsedMs:60000,leaseMs:60000});
+   const secondRows=await pool!.query('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[secondRun.runId]),secondReceipt=secondRows.rows[0].receipt;
+   assert.equal(secondReceipt.outcome,'succeeded');assert.deepEqual(secondReceipt.dependencyReceiptIds,[firstReceipt.receipt.id]);
+   const secondOutput=JSON.parse((await item.cas.read(secondReceipt.outputHashes[0])).toString('utf8'));
+   assert.deepEqual(secondOutput.previousRefresh,{jobKey:first,receiptSha256:firstReceipt.receipt_sha256});
+   st.mock.timers.enable({apis:['Date'],now:nextTime});
+   try{
+    const imported=await importCrawlCorpusForResidual(store,item.cas,{...item.manifest,documents:item.manifest.documents.map(row=>({...row,policyRefreshJobKey:second}))});
+    assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
+    const current=await loadResidualSource(item.cas,imported.jobs[0]);assert.deepEqual(imported.jobs[0].bounds,bounds);assert.ok(Date.parse(current.receipt.expiresAt)>Date.parse(firstProof.expiresAt));
+   }finally{st.mock.timers.reset();}
+   assert.deepEqual(await readFile(item.document.observationPath),item.observationBytes);assert.deepEqual(await item.cas.read(item.document.sha256),item.bytes);
+  });
+ });
+ await t.test('expired queued policy continues only through current unchanged committed refresh and records real rebinding',async st=>{
+  const robotsBody='User-agent: *\nAllow: /\n',item=await fixture('refresh-continuation',{stale:true,robotsBody});let stricter=false;
+  interface WireSeam {wire(url:URL):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
+  st.mock.method(PoliteFetcher.prototype as unknown as WireSeam,'wire',async(url:URL)=>{
+   if(url.pathname==='/robots.txt')return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from(stricter?'User-agent: *\nDisallow: /\n':robotsBody)};
+   if(url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+   throw Error('Continuation must not refetch original body');
+  });
+  await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+   const handler=policyRefreshHandler(store,(context,maxRequests)=>createR1PublicFetcher(store,context,{maxRequests,maxBytes:1024*1024,fixture:{fetchRoot:join(root!,'continuation-fetch'),policy,inspection:fixturePolicyInspection}}));
+   const authorize=(jobKey:string,phase='initial')=>store.authorize({approvalSha256:digest('Synthetic continuation authorization '+jobKey+' '+phase),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
+   const first=(await enqueueCrawlPolicyRefresh(store,item.cas,{manifest:item.manifest,maxRequests:4})).jobKeys[0].jobKey;
+   const firstAuthorization=await authorize(first),historicalTime=new Date(Date.now()-3601000);
+   // Genuine fixture policy observations are captured at this controlled earlier
+   // fixture time, not rewritten later. Real queue/PG receipt clocks are untouched.
+   const firstRun=await runDistrictJobs({store,cas:item.cas,handlers:{policy_refresh:async context=>{
+    st.mock.timers.enable({apis:['Date'],now:historicalTime});
+    try{return await handler(context);}finally{st.mock.timers.reset();}
+   }},authorizationId:firstAuthorization,ownerPresent:true,maxJobs:1,maxElapsedMs:60000,leaseMs:60000});
+   const firstRows=await pool!.query('SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE run_id=$1',[firstRun.runId]),firstReceipt=firstRows.rows[0];
+   assert.equal(firstReceipt.receipt.outcome,'succeeded');
+   const firstOutput=JSON.parse((await item.cas.read(firstReceipt.receipt.outputHashes[0])).toString('utf8')),original=ResidualInputSchema.parse(firstOutput.job),pinned=await loadPolicyReceipt(item.cas,original.policyReceiptSha256);
+   assert.ok(Date.parse(pinned.expiresAt)<Date.now());
+   let preparationKey:string;
+   st.mock.timers.enable({apis:['Date'],now:new Date(pinned.checkedAt)});
+   try{preparationKey=await enqueueResidualPreparation(store,item.cas,original);}finally{st.mock.timers.reset();}
+   const stale=(error:unknown)=>error instanceof DistrictExecutionHold&&error.reasonCode==='source_policy_stale';
+   await assert.rejects(recheckResidualPolicy(store,item.cas,original),stale);
+   const production=residualJobHandlersFor(pool!),deniedAuthorization=await authorize(preparationKey,'stale-hold');
+   const denied=await runDistrictJobs({store,cas:item.cas,handlers:production,authorizationId:deniedAuthorization,ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+   assert.equal(denied.jobsStarted,0);assert.equal(denied.reasonCode,'source_policy_stale');
+   const foreign=await fixture('foreign-continuation',{stale:true,robotsBody,body:item.bytes,url:item.document.url,casRoot:item.cas.root});
+   await withFixtureAuthorizedCorpus(foreign.indexBytes,policy,async()=>{
+    const foreignKey=(await enqueueCrawlPolicyRefresh(store,foreign.cas,{manifest:foreign.manifest,maxRequests:4})).jobKeys[0].jobKey;
+    const foreignAuthorization=await authorize(foreignKey);
+    const foreignHandler=policyRefreshHandler(store,(context,maxRequests)=>createR1PublicFetcher(store,context,{maxRequests,maxBytes:1024*1024,fixture:{fetchRoot:join(root!,'foreign-continuation-fetch'),policy,inspection:fixturePolicyInspection}}));
+    const foreignRun=await runDistrictJobs({store,cas:foreign.cas,handlers:{policy_refresh:foreignHandler},authorizationId:foreignAuthorization,ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+    const state=await pool!.query('SELECT state FROM district_pipeline.jobs WHERE job_key=$1',[foreignKey]);assert.equal(state.rows[0].state,'succeeded');assert.equal(foreignRun.jobsStarted,1);
+   });
+   // Same URL, body bytes, realm and scope do not substitute a different original
+   // observation/index: the foreign refresh above must not unblock this job.
+   await assert.rejects(recheckResidualPolicy(store,item.cas,original),stale);
+   const previous={documentId:item.document.id,jobKey:first,receiptSha256:firstReceipt.receipt_sha256},renewal={manifest:item.manifest,maxRequests:4,previousRefreshes:[previous]};
+   await assert.rejects(enqueueCrawlPolicyRefresh(store,item.cas,{...renewal,maxRequests:5}),/request bounds/);
+   const second=(await enqueueCrawlPolicyRefresh(store,item.cas,renewal)).jobKeys[0].jobKey,secondAuthorization=await authorize(second);
+   const secondRun=await runDistrictJobs({store,cas:item.cas,handlers:{policy_refresh:handler},authorizationId:secondAuthorization,ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+   const secondRows=await pool!.query('SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE run_id=$1',[secondRun.runId]),secondReceipt=secondRows.rows[0];assert.equal(secondReceipt.receipt.outcome,'succeeded');
+   const checked=await recheckResidualPolicy(store,item.cas,original);assert.equal(checked.receiptSha256,original.policyReceiptSha256);assert.deepEqual(checked.receipt,pinned);assert.equal(checked.continuation!.refreshStepReceiptSha256,secondReceipt.receipt_sha256);
+   assert.deepEqual(checked.versions,{[`policyRebinding.${original.policyReceiptSha256}.${secondReceipt.receipt_sha256}`]:checked.admissibilityReceiptSha256});
+   const loaded=await loadResidualSource(item.cas,original,{store});assert.deepEqual(loaded.receipt,pinned);assert.equal(loaded.policyCheck.admissibilityReceiptSha256,checked.admissibilityReceiptSha256);
+   const textOutput:{parserSha256?:string;textSha256?:string}={};
+   // Existing preparation command seam: decode the real synthetic original text
+   // in-process; no Docker, command output, model result, or version is invented.
+   const prepareFixture:JobHandler=async context=>{
+    const selected=ResidualInputSchema.strip().parse(context.job.spec.selector),source=await loadResidualSource(context.cas,selected,{store}),bytes=await context.cas.read(source.document.sha256);
+    const selector=context.job.spec.selector as {contract:{preparationSha256:string}};
+    const prepared=await prepareDocument({bytes,municipalityId:source.municipality.id,references:[source.reference],mimeType:source.document.mimeType,extractorSha256:selector.contract.preparationSha256,toolVersions:{node:process.versions.node},managedRoot:join(context.cas.root,'continuation-prepared'),policy,sourceBindings:[source.sourceBinding],signal:context.signal},async()=>assert.fail('Plain-text fixture has no subprocess'));
+    const persist=async(value:Buffer,kind:'parser_output'|'derived',mimeType:string)=>{
+     const hash=digest(value),artifact=await withManagedSourceWrite(context.cas.root,[{...source.sourceBinding,relativePath:`sha256/${hash.slice(0,2)}/${hash}`,contentSha256:hash,independentAllowed:true}],()=>context.cas.put(value,{kind,mimeType}),policy);
+     await store.addArtifact(artifact);return artifact;
+    };
+    const parser=await persist(Buffer.from(canonicalJson(prepared)),'parser_output','application/json'),text=await persist(Buffer.from(prepared.text),'derived','text/plain');
+    textOutput.parserSha256=parser.sha256;textOutput.textSha256=text.sha256;
+    return {outcome:'succeeded',reasonCode:'completed',outputs:[parser],versions:{preparation:prepared.extractorSha256,node:process.versions.node,...source.policyCheck.versions},counts:{bytes:bytes.length}};
+   };
+   prepareFixture.currentPolicy=production.residual_prepare.currentPolicy;
+   await store.resume(preparationKey);
+   const preparationAuthorization=await authorize(preparationKey,'after-owner-resume');
+   const preparedRun=await runDistrictJobs({store,cas:item.cas,handlers:{residual_prepare:prepareFixture},authorizationId:preparationAuthorization,ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+   assert.equal(preparedRun.jobsStarted,1);
+   const preparationRows=await pool!.query('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[preparedRun.runId]),preparedReceipt=preparationRows.rows[0].receipt;
+   assert.equal(preparedReceipt.outcome,'succeeded');assert.equal(preparedReceipt.policyProofSha256,original.policyReceiptSha256);
+   assert.equal(preparedReceipt.versions[`policyRebinding.${original.policyReceiptSha256}.${secondReceipt.receipt_sha256}`],checked.admissibilityReceiptSha256);
+   const prepared=JSON.parse((await item.cas.read(textOutput.parserSha256!)).toString('utf8')),rubric='Synthetic exact-original policy continuation fixture';
+   const assessment=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:'synthetic-continuation-item',question:'Is this exact original available?',claim:prepared.text,rubric,rubricSha256:digest(rubric),sources:[{sourceId:scope.sourceId,originalSha256:item.document.sha256,textSha256:textOutput.textSha256,parserVersion:prepared.extractorSha256,parserReceiptSha256:textOutput.parserSha256,admissionReceiptSha256:original.policyReceiptSha256,ocrSuspected:false,locators:[{id:'synthetic-original',page:null,table:null,start:0,end:prepared.text.length}]}],claimIds:['synthetic-original-claim'],entityIds:[],constraints:[],criticalKinds:[]});
+   await assert.rejects(originalEvidence(assessment,{cas:item.cas,policyOptions:policy}),/expired/);
+   const evidence=await originalEvidence(assessment,{cas:item.cas,policyOptions:policy,currentAdmissionReceipts:{[original.policyReceiptSha256]:checked.admissibilityReceiptSha256}});
+   assert.equal(evidence[0].admissionReceiptSha256,original.policyReceiptSha256);assert.equal(evidence[0].locators[0].quote,prepared.text);
+   st.mock.timers.enable({apis:['Date'],now:new Date(checked.currentReceipt.expiresAt)});
+   try{await assert.rejects(recheckResidualPolicy(store,item.cas,original),stale);}finally{st.mock.timers.reset();}
+   stricter=true;
+   const changed=(await enqueueCrawlPolicyRefresh(store,item.cas,{manifest:item.manifest,maxRequests:4,previousRefreshes:[{documentId:item.document.id,jobKey:second,receiptSha256:secondReceipt.receipt_sha256}]})).jobKeys[0].jobKey,changedAuthorization=await authorize(changed);
+   await runDistrictJobs({store,cas:item.cas,handlers:{policy_refresh:handler},authorizationId:changedAuthorization,ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+   const changedState=await pool!.query('SELECT state FROM district_pipeline.jobs WHERE job_key=$1',[changed]);assert.equal(changedState.rows[0].state,'blocked_policy');
+   await assert.rejects(recheckResidualPolicy(store,item.cas,original),stale);
+   assert.deepEqual(await readFile(item.document.observationPath),item.observationBytes);assert.deepEqual(await item.cas.read(item.document.sha256),item.bytes);
   });
  });
  for(const kind of ['robots_stricter','tdm_reserved','opt_out'] as const)await t.test(`durable refresh holds ${kind}`,async st=>{
@@ -186,13 +340,14 @@ test('offline frozen crawl import preserves managed originals and produces enque
    if(kind==='opt_out')await recordHostOptOut({host:'example.org',reason:'rights_holder_objection'},policy);
    const handler=policyRefreshHandler(store,(context,maxRequests)=>createR1PublicFetcher(store,context,{maxRequests,maxBytes:1024*1024,fixture:{fetchRoot:join(root!,'refresh-held-fetch-'+kind),policy,inspection:fixturePolicyInspection}}));
    const result=await runDistrictJobs({store,cas:item.cas,handlers:{policy_refresh:handler},authorizationId,ownerPresent:true,maxJobs:1,maxElapsedMs:60000});assert.equal(result.state,'held');assert.equal(result.jobsStarted,1);
-   const receipts=await pool!.query('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId]);assert.deepEqual(receipts.rows[0].receipt.outputHashes,[]);
+   const receipts=await pool!.query('SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId]);assert.deepEqual(receipts.rows[0].receipt.outputHashes,[]);
    if(kind==='opt_out'){
     // The canonical executor refuses the already purged/withdrawn input CAS
     // before dispatching the handler; it is an execution hold, not a refetch.
     assert.equal(receipts.rows[0].receipt.outcome,'held_execution');assert.equal(receipts.rows[0].receipt.reasonCode,'cas_unavailable');assert.equal(requests,0);
    }else{
     assert.equal(receipts.rows[0].receipt.outcome,'blocked_policy');
+    await assert.rejects(enqueueCrawlPolicyRefresh(store,item.cas,{manifest:item.manifest,maxRequests:4,previousRefreshes:[{documentId:item.document.id,jobKey,receiptSha256:receipts.rows[0].receipt_sha256}]}),/not committed/);
     assert.deepEqual(await readFile(item.document.observationPath),item.observationBytes);
    }
   });

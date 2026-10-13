@@ -5,7 +5,7 @@ import {join,basename} from 'node:path';
 import {tmpdir} from 'node:os';
 import {PoliteFetcher as BasePoliteFetcher,PoliteFetchError,parseRobots,robotsAllows,publicUrl,sourceContentBinding} from '../src/polite-fetch.ts';
 import {isPublicAddress} from '../src/public-address.ts';
-import type {FetchObservation,ExcludedDocument,PoliteFetcherOptions} from '../src/polite-fetch.ts';
+import type {FetchObservation,ExcludedDocument,PoliteFetcherOptions,RobotsPolicy} from '../src/polite-fetch.ts';
 import {metadataPdf,reservedXmp} from './fixtures/tdm-pdf.ts';
 import {ownerRobotsOverrideFor,APPROVED_OWNER_ROBOTS_OVERRIDE} from '../src/source-policy.ts';
 import {spawn} from 'node:child_process';
@@ -47,7 +47,7 @@ test('private, loopback, mapped IPv6, transition and special networks fail close
  for(const url of ['http://127.1/a','http://2130706433/a','http://[::1]/','http://router.local/a','http://localhost/a','file:///etc/passwd','https://user:pass@stadt.de/','https://stadt.de:11434/','https://stadt.de/?token=private'])assert.throws(()=>publicUrl(url),PoliteFetchError);
  assert.equal(publicUrl('https://www.stadt.de/plan.pdf#page=2').href,'https://www.stadt.de/plan.pdf');
 });
-interface WireResult {status:number;headers:Record<string,string|undefined>;body:Buffer}
+interface WireResult {status:number;headers:Record<string,string|undefined>;body:Buffer;conditionalRequestSent?:boolean}
 interface WireSeam {wire(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined):Promise<WireResult>}
 test('conditional 304 retains original byte hash and retrieval observation',async t=>{
  const cache=await mkdtemp(join(tmpdir(),'polite-cache-'));t.after(()=>rm(cache,{recursive:true,force:true}));
@@ -760,8 +760,8 @@ test('current policy refresh uses actual 304 observations and never refetches th
  let refresh=false;
  t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL,_method:string,_body:string|undefined,validators:FetchObservation|undefined)=>{
   seen.push({path:url.pathname,validators});
-  if(url.pathname==='/robots.txt')return refresh?{status:304,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'text/plain',etag:'"robots-v1"'},body:Buffer.from('User-agent: *\nAllow: /\n')};
-  if(url.pathname==='/.well-known/tdmrep.json')return refresh?{status:304,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'application/json',etag:'"tdm-v1"'},body:Buffer.from('[]')};
+  if(url.pathname==='/robots.txt')return refresh?{status:304,headers:{},body:Buffer.alloc(0),conditionalRequestSent:!!validators?.etag}:{status:200,headers:{'content-type':'text/plain',etag:'"robots-v1"'},body:Buffer.from('User-agent: *\nAllow: /\n')};
+  if(url.pathname==='/.well-known/tdmrep.json')return refresh?{status:304,headers:{},body:Buffer.alloc(0),conditionalRequestSent:!!validators?.etag}:{status:200,headers:{'content-type':'application/json',etag:'"tdm-v1"'},body:Buffer.from('[]')};
   if(refresh)throw Error('Original body must not be refetched');
   return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Synthetic original body')};
  });
@@ -777,6 +777,42 @@ test('current policy refresh uses actual 304 observations and never refetches th
  assert.equal(Date.parse(current.expiresAt),Math.min(Date.parse(current.sourcePolicy.robots.checkedAt!),...current.sourcePolicy.tdm.evidence.map(row=>Date.parse(row.checkedAt!)))+3600000);
 });
 
+test('current 304 validators authenticate complete shared-body custody across hosts and repeated checks',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-shared-policy-validators-'));t.after(()=>rm(cache,{recursive:true,force:true}));t.after(()=>rm(cache+'-request-evidence',{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:cache});let refresh=false,documentRequests=0;
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL,_method:string,_body:string|undefined,validators:FetchObservation|undefined)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json'){
+   if(refresh){assert.ok(validators?.etag);return {status:304,headers:{},body:Buffer.alloc(0),conditionalRequestSent:true};}
+   const robots=url.pathname==='/robots.txt';
+   return {status:200,headers:{'content-type':robots?'text/plain':'application/json',etag:robots?'"shared-robots"':'"shared-tdm"'},body:Buffer.from(robots?'User-agent: *\nAllow: /\n':'[]')};
+  }
+  assert.equal(refresh,false);documentRequests++;return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Synthetic original '+url.hostname)};
+ });
+ const first=await fetcher.fetch('https://first.stadt.de/original'),second=await fetcher.fetch('https://second.stadt.de/original');
+ assert.equal(first.policy!.robots.sha256,second.policy!.robots.sha256);
+ refresh=true;
+ for(let pass=0;pass<2;pass++){
+  const current=await fetcher.refreshPolicyForOriginal(first,first.policy!);assert.equal(current.observations.length,2);
+  for(const path of current.observations)assert.equal(JSON.parse(await readFile(path,'utf8')).status,304);
+ }
+ assert.equal(documentRequests,2);
+});
+
+for(const collision of ['known_policy','robots_redirect','tdm_redirect'] as const)test(`policy refresh holds ${collision} before dispatching any original-body request`,async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-refresh-original-collision-'));t.after(()=>rm(cache,{recursive:true,force:true}));t.after(()=>rm(cache+'-request-evidence',{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:cache});let refresh=false,documentRequests=0;
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>{
+  if(url.pathname==='/original'){documentRequests++;assert.equal(refresh,false);return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Synthetic unchanged original')};}
+  if(refresh&&(collision==='robots_redirect'&&url.pathname==='/robots.txt'||collision==='tdm_redirect'&&url.pathname==='/.well-known/tdmrep.json'))return {status:302,headers:{location:'/original#policy-redirect'},body:Buffer.alloc(0)};
+  if(url.pathname==='/robots.txt')return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('User-agent: *\nAllow: /\n')};
+  if(url.pathname==='/.well-known/tdmrep.json')return {status:200,headers:{'content-type':'application/json'},body:Buffer.from('[]')};
+  assert.fail('Unexpected public request');
+ });
+ const original=await fetcher.fetch('https://stadt.de/original');refresh=true;
+ await assert.rejects(fetcher.refreshPolicyForOriginal(original,original.policy!,{machinePolicyUrls:collision==='known_policy'?['https://stadt.de/original#configured-policy']:[]}));
+ assert.equal(documentRequests,1);
+});
+
 for(const changed of ['robots_stricter','robots_permissive_change','tdm_reserved','opt_out'] as const)test(`current policy refresh holds ${changed} without refetching original`,async t=>{
  const cache=await mkdtemp(join(tmpdir(),'polite-policy-hold-'));t.after(()=>rm(cache,{recursive:true,force:true}));t.after(()=>rm(cache+'-request-evidence',{recursive:true,force:true}));
  const options=await politeTestOptions({cacheDir:cache}),fetcher=new BasePoliteFetcher({...options,fixtureInspection:fixturePolicyInspection});let refresh=false,documentRequests=0;
@@ -789,4 +825,115 @@ for(const changed of ['robots_stricter','robots_permissive_change','tdm_reserved
  if(changed==='opt_out')await recordHostOptOut({host:'stadt.de',reason:'rights_holder_objection'},options.ownerPolicyLane!);
  refresh=true;
  await assert.rejects(fetcher.refreshPolicyForOriginal(original,original.policy!),PoliteFetchError);assert.equal(documentRequests,1);
+});
+
+for(const endpoint of ['/robots.txt','/.well-known/tdmrep.json'])for(const mode of ['no-validator','forged-cache-validator','conditional-not-sent'] as const)test(`current policy ${endpoint} holds unsolicited 304 (${mode})`,async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-unsolicited-304-'));t.after(()=>rm(cache,{recursive:true,force:true}));t.after(()=>rm(cache+'-request-evidence',{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:cache});let refresh=false,targetValidators:FetchObservation|undefined;
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL,_method:string,_body:string|undefined,validators:FetchObservation|undefined)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json'){
+   if(refresh&&url.pathname===endpoint){targetValidators=validators;return {status:304,headers:{},body:Buffer.alloc(0),conditionalRequestSent:mode==='forged-cache-validator'};}
+   const etag=url.pathname!==endpoint||mode==='conditional-not-sent'?'"genuine-fixture-validator"':undefined;
+   return {status:200,headers:{'content-type':url.pathname==='/robots.txt'?'text/plain':'application/json',etag},body:Buffer.from(url.pathname==='/robots.txt'?'User-agent: *\nAllow: /\n':'[]')};
+  }
+  assert.equal(refresh,false);return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Synthetic original')};
+ });
+ const original=await fetcher.fetch('https://stadt.de/original'),before=await readFile(original.observationPath);
+ if(mode==='forged-cache-validator'){
+  const path=join(cache,'requests',hash('GET https://stadt.de'+endpoint+'\n')+'.json'),metadata=JSON.parse(await readFile(path,'utf8'));
+  metadata.etag='"not-in-any-original-observation"';await writeFile(path,JSON.stringify(metadata),{mode:0o600});
+ }
+ refresh=true;
+ await assert.rejects(fetcher.refreshPolicyForOriginal(original,original.policy!),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='cache_missing'&&error.status===304);
+ assert.equal(!!targetValidators,mode==='conditional-not-sent');assert.deepEqual(await readFile(original.observationPath),before);
+});
+
+test('current policy 304 accepts actual original Last-Modified validators without inventing an ETag',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-date-validator-'));t.after(()=>rm(cache,{recursive:true,force:true}));t.after(()=>rm(cache+'-request-evidence',{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:cache}),lastModified='Wed, 01 Jul 2026 00:00:00 GMT';let refresh=false;
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL,_method:string,_body:string|undefined,validators:FetchObservation|undefined)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json'){
+   if(refresh){assert.equal(validators?.etag,undefined);assert.equal(validators?.lastModified,lastModified);return {status:304,headers:{},body:Buffer.alloc(0),conditionalRequestSent:!!validators?.lastModified};}
+   return {status:200,headers:{'content-type':url.pathname==='/robots.txt'?'text/plain':'application/json','last-modified':lastModified},body:Buffer.from(url.pathname==='/robots.txt'?'User-agent: *\nAllow: /\n':'[]')};
+  }
+  assert.equal(refresh,false);return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Synthetic original')};
+ });
+ const original=await fetcher.fetch('https://stadt.de/original');refresh=true;
+ const current=await fetcher.refreshPolicyForOriginal(original,original.policy!);assert.equal(current.observations.length,2);
+ for(const path of current.observations)assert.equal(JSON.parse(await readFile(path,'utf8')).status,304);
+});
+
+test('acquisition and refresh share public same-origin non-robots machine-policy filtering and canonical deduplication',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-configured-policy-filter-'));t.after(()=>rm(cache,{recursive:true,force:true}));t.after(()=>rm(cache+'-request-evidence',{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:cache}),seen:string[]=[];
+ const machinePolicyUrls=['https://stadt.de/robots.txt','https://stadt.de/robots.txt#configured','https://other.de/policy','https://stadt.de/policy','https://stadt.de/policy#duplicate'];
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>{
+  seen.push(url.href);assert.equal(url.hostname,'stadt.de');
+  if(url.pathname==='/robots.txt')return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('User-agent: *\nAllow: /\n')};
+  if(url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  if(url.pathname==='/policy')return {status:200,headers:{'content-type':'application/json'},body:Buffer.from('[]')};
+  assert.equal(seen.length,4);return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Synthetic original')};
+ });
+ const original=await fetcher.fetch('https://stadt.de/original',{machinePolicyUrls});
+ await fetcher.refreshPolicyForOriginal(original,original.policy!,{machinePolicyUrls});
+ assert.deepEqual(seen.map(url=>new URL(url).pathname),['/robots.txt','/.well-known/tdmrep.json','/policy','/original','/robots.txt','/.well-known/tdmrep.json','/policy']);
+});
+
+for(const status of [404,410] as const)test(`robots ${status} absence refresh authenticates original observation and holds a changed absence status`,async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-absence-refresh-'));t.after(()=>rm(cache,{recursive:true,force:true}));t.after(()=>rm(cache+'-request-evidence',{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:cache});let currentStatus:number=status,refresh=false;
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>{
+  if(url.pathname==='/robots.txt')return {status:currentStatus,headers:{},body:Buffer.alloc(0)};
+  if(url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  assert.equal(refresh,false);return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Synthetic original')};
+ });
+ const original=await fetcher.fetch('https://stadt.de/original'),before=await readFile(original.observationPath);refresh=true;
+ const current=await fetcher.refreshPolicyForOriginal(original,original.policy!),proof=current.originalRobotsAbsence!;
+ assert.ok(proof);assert.equal(basename(proof.path),proof.observationId);assert.equal(hash(await readFile(proof.path)),proof.receiptSha256);
+ const originalAbsence=JSON.parse(await readFile(proof.path,'utf8'));assert.equal(originalAbsence.status,status);assert.equal(originalAbsence.checkedAt,original.policy!.robots.checkedAt);
+ currentStatus=status===404?410:404;
+ await assert.rejects(fetcher.refreshPolicyForOriginal(original,original.policy!),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='robots_blocked');
+ assert.deepEqual(await readFile(original.observationPath),before);
+});
+
+test('legacy hashless robots evidence without any matching managed absence observation stays held',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-legacy-absence-'));t.after(()=>rm(cache,{recursive:true,force:true}));t.after(()=>rm(cache+'-request-evidence',{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:cache});
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Synthetic original')});
+ const original=await fetcher.fetch('https://stadt.de/original');
+ const names=await readdir(join(cache,'observations'));
+ for(const name of names){const path=join(cache,'observations',name);if(JSON.parse(await readFile(path,'utf8')).url==='https://stadt.de/robots.txt')await rm(path);}
+ await assert.rejects(fetcher.refreshPolicyForOriginal(original,original.policy!),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='robots_unavailable');
+});
+
+for(const mode of ['single-earlier','agreeing-earlier','ambiguous-earlier','exact-preferred','boundary-window','outside-window'] as const)test(`legacy robots absence association: ${mode}`,async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-legacy-absence-window-'));t.after(()=>rm(cache,{recursive:true,force:true}));t.after(()=>rm(cache+'-request-evidence',{recursive:true,force:true}));
+ const options=await politeTestOptions({cacheDir:cache}),fetcher=new BasePoliteFetcher({...options,fixtureInspection:fixturePolicyInspection});
+ t.mock.timers.enable({apis:['Date'],now:new Date()});let status:number=404;
+ t.mock.method(BasePoliteFetcher.prototype as unknown as WireSeam,'wire',async(url:URL)=>url.pathname==='/robots.txt'?{status,headers:{},body:Buffer.alloc(0)}:url.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Synthetic legacy body')});
+ interface PolicySeam {policy(url:URL,hostProfile?:'default'|'municipal'):Promise<RobotsPolicy>}
+ const policySeam=fetcher as unknown as PolicySeam,actualPolicy=policySeam.policy;
+ let legacyPolicy:RobotsPolicy|undefined;
+ const legacy=t.mock.method(policySeam,'policy',async function(url:URL,hostProfile?:'default'|'municipal'){
+  if(legacyPolicy)return legacyPolicy;
+  const policy=await actualPolicy.call(fetcher,url,hostProfile);
+  if(mode==='agreeing-earlier'||mode==='ambiguous-earlier'||mode==='exact-preferred'){
+   if(mode!=='agreeing-earlier')status=410;
+   const other=new BasePoliteFetcher({...options,fixtureInspection:fixturePolicyInspection});await other.fetch('https://stadt.de/other-original');status=404;
+  }
+  if(mode==='exact-preferred'){
+   t.mock.timers.tick(1000);const exact=new BasePoliteFetcher({...options,fixtureInspection:fixturePolicyInspection});await exact.fetch('https://stadt.de/exact-original');
+  }else t.mock.timers.tick(mode==='outside-window'?60001:mode==='boundary-window'?60000:1000);
+  // This is the original crawler's post-observation clock convention, captured
+  // during fixture acquisition, not a rewrite of a retained observation.
+  legacyPolicy={...policy,evidence:{...policy.evidence!,checkedAt:new Date().toISOString()}};
+  return legacyPolicy;
+ });
+ const original=await fetcher.fetch('https://stadt.de/original');legacy.mock.restore();
+ if(mode==='ambiguous-earlier'||mode==='outside-window'){
+  await assert.rejects(fetcher.refreshPolicyForOriginal(original,original.policy!),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='robots_unavailable');
+ }else{
+  const current=await fetcher.refreshPolicyForOriginal(original,original.policy!),chosen=JSON.parse(await readFile(current.originalRobotsAbsence!.path,'utf8'));
+  assert.equal(chosen.status,404);assert.equal(Date.parse(original.policy!.robots.checkedAt!)-Date.parse(chosen.checkedAt),mode==='exact-preferred'?0:mode==='boundary-window'?60000:1000);
+ }
 });

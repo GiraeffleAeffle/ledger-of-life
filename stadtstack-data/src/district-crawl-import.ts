@@ -19,7 +19,7 @@ import type {BoundSourceObservation} from './source-observation.ts';
 import type {DistrictRegistry} from './district-registry.ts';
 
 export interface CrawlPolicyRefreshOperation {
- enqueue?:(manifest:z.infer<typeof CrawlCorpusImportSchema>,acquired:BoundSourceObservation)=>Promise<void>;
+ enqueue?:(manifest:z.infer<typeof CrawlCorpusImportSchema>,acquired:BoundSourceObservation,custody:{registrySha256:string;corpusObservations:z.infer<typeof ResidualInputSchema>['corpusObservations']})=>Promise<void>;
  refresh?:(acquired:BoundSourceObservation,source:DistrictRegistry['municipalities'][number]['sources'][number])=>Promise<{sourcePolicy:BoundSourceObservation['policy'];expiresAt:string}>;
 }
 
@@ -27,7 +27,7 @@ const observationPin=z.object({path:z.string().min(1),sha256:HashSchema}).strict
 export const CrawlCorpusImportSchema=z.object({
  index:z.object({path:z.string().min(1),sha256:authorizedPilotCorpusSchema}).strict(),rawRoot:z.string().min(1),registry:operatorRegistryInputPinSchema,crawlRegistry:CrawlRegistryPinSchema.optional(),
  observations:z.array(observationPin).min(1).max(10000),
- documents:z.array(z.object({documentId:z.string().min(1),scope:ScopeSchema,permission:PolicyReceiptSchema.shape.permission,bounds:ResidualBoundsSchema,requestEvidence:observationPin.optional(),policyRefreshJobKey:HashSchema.optional()}).strict()).min(1).max(200),
+ documents:z.array(z.object({documentId:z.string().min(1),scope:ScopeSchema,permission:PolicyReceiptSchema.shape.permission,bounds:z.lazy(()=>ResidualBoundsSchema),requestEvidence:observationPin.optional(),policyRefreshJobKey:HashSchema.optional()}).strict()).min(1).max(200),
 }).strict().superRefine((input,ctx)=>{
  if(new Set(input.documents.map(row=>row.documentId)).size!==input.documents.length||new Set(input.observations.map(row=>row.path)).size!==input.observations.length)ctx.addIssue({code:'custom',message:'Import selections and original observation paths must be distinct'});
 });
@@ -105,7 +105,7 @@ export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:Di
    if(!acquired.policy.tdm.evidence.length||originalClocks.some(clock=>!clock||!Number.isFinite(Date.parse(clock))||Date.parse(clock)>Date.now()))throw Error('Original policy evidence clock is incomplete');
    if(operation.enqueue){
     if(selected.policyRefreshJobKey)throw Error('A refresh cannot refresh a previous refresh selection');
-    committing=true;await operation.enqueue({...input,documents:[selected]},acquired);continue;
+    committing=true;await operation.enqueue({...input,documents:[selected]},acquired,{registrySha256,corpusObservations});continue;
    }
    if(selected.policyRefreshJobKey){
     reasonCode='source_policy_stale';
