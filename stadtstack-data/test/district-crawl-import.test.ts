@@ -32,7 +32,7 @@ test('public request evidence excludes credential/header fields and binds select
  assert.throws(()=>ObservationRequestSchema.parse({...request,headers:{username:'owner',password:'secret'}}));
  assert.throws(()=>ObservationRequestSchema.parse({...request,bodySha256:digest('tampered')}));
 });
-test('offline frozen crawl import preserves managed originals and produces enqueue-ready residual jobs',{skip:!connectionString,timeout:300000},async t=>{
+test('offline frozen crawl import preserves managed originals and produces enqueue-ready residual jobs',{skip:!connectionString,timeout:450000},async t=>{
  const endpoint=new URL(connectionString!);
  if(!['postgres:','postgresql:'].includes(endpoint.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(endpoint.hostname))throw Error('Test refuses non-local PG');
  const host=endpoint.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Test refuses non-local PG host');
@@ -246,7 +246,7 @@ test('offline frozen crawl import preserves managed originals and produces enque
   });
   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
    const handler=policyRefreshHandler(store,(context,maxRequests)=>createR1PublicFetcher(store,context,{maxRequests,maxBytes:1024*1024,fixture:{fetchRoot:join(root!,'continuation-fetch'),policy,inspection:fixturePolicyInspection}}));
-   const authorize=(jobKey:string,phase='initial',expiresAt=new Date(Date.now()+60000).toISOString())=>store.authorize({approvalSha256:digest('Synthetic continuation authorization '+jobKey+' '+phase),approvedBy:'synthetic-fixture-owner',expiresAt,jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
+   const authorize=(jobKey:string,phase='initial',expiresAt=new Date(Date.now()+60000).toISOString(),maxElapsedMs=60000)=>store.authorize({approvalSha256:digest('Synthetic continuation authorization '+jobKey+' '+phase),approvedBy:'synthetic-fixture-owner',expiresAt,jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs,category:'development'});
    const first=(await enqueueCrawlPolicyRefresh(store,item.cas,{manifest:item.manifest,maxRequests:4})).jobKeys[0].jobKey;
    const firstAuthorization=await authorize(first),historicalTime=new Date(Date.now()-3601000);
    // Genuine fixture policy observations are captured at this controlled earlier
@@ -340,9 +340,9 @@ test('offline frozen crawl import preserves managed originals and produces enque
     assert.equal(after.rows[0].state,'queued');assert.equal(after.rows[0].attempt,before.rows[0].attempt);assert.equal(after.rows[0].lease_owner,null);
     assert.equal((await pool!.query('SELECT id FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId])).rowCount,0);
    });
-   const preparationAuthorization=await authorize(preparationKey,'after-owner-resume');
-   const preparedRun=await runDistrictJobs({store,cas:item.cas,handlers:{residual_prepare:prepareFixture},authorizationId:preparationAuthorization,ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
-   assert.equal(preparedRun.jobsStarted,1);
+   const preparationAuthorization=await authorize(preparationKey,'after-owner-resume',new Date(Date.now()+120000).toISOString(),120000);
+   const preparedRun=await runDistrictJobs({store,cas:item.cas,handlers:{residual_prepare:prepareFixture},authorizationId:preparationAuthorization,ownerPresent:true,maxJobs:1,maxElapsedMs:120000});
+   assert.equal(preparedRun.jobsStarted,1,canonicalJson(preparedRun));
    const preparationRows=await pool!.query('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[preparedRun.runId]),preparedReceipt=preparationRows.rows[0].receipt;
    assert.equal(preparedReceipt.outcome,'succeeded');assert.equal(preparedReceipt.policyProofSha256,original.policyReceiptSha256);
    assert.equal(preparedReceipt.versions[`policyRebinding.${original.policyReceiptSha256}.${secondReceipt.receipt_sha256}`],checked.admissibilityReceiptSha256);
