@@ -2,7 +2,7 @@ import {mkdir,writeFile,rename,open} from 'node:fs/promises';
 import {constants} from 'node:fs';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {withParserSandbox,readParserReview,type ParserSourceContext} from './district-parser-isolation.ts';
+import {withParserSandbox,readParserReview,assertParserSandboxRepresentation,type ParserSourceContext,type ParserSandbox} from './district-parser-isolation.ts';
 import {digest} from './district-adapter-contract.ts';
 export const PDF_TDM_POLICY_VERSION='pdf-tdm-v2';
 const MAX_INPUT=32*1024*1024,MAX_OUTPUT=8192,DEADLINE_MS=15000;
@@ -11,9 +11,10 @@ export interface PdfTdmPolicyResult {schemaVersion:1;policyVersion:string;pdfjsV
 const versions=new Map<string,Promise<string>>();
 
 /** Source-only metadata inspection in the reviewed credential-free job, never host PDF.js. */
-export async function inspectPdfTdmPolicy(bytes:Buffer,sha256:string,cacheRoot:string,context:ParserSourceContext):Promise<PdfTdmPolicyResult>{
+export async function inspectPdfTdmPolicy(bytes:Buffer,sha256:string,cacheRoot:string,context:ParserSourceContext,sandbox?:ParserSandbox):Promise<PdfTdmPolicyResult>{
  if(!/^[a-f0-9]{64}$/.test(sha256)||digest(bytes)!==sha256)throw Error('Invalid PDF metadata cache digest');
  if(context.purpose!=='classification'||!context.bindings.some(binding=>'sourceSha256' in binding&&binding.sourceSha256===sha256))throw Error('PDF metadata inspection requires a source-only classification binding');
+ if(sandbox)assertParserSandboxRepresentation(sandbox,sha256,context);
  context.signal?.throwIfAborted();
  // Host-only active permission is not part of the minimal parser-image dependency closure.
  const {assertCivicPolicyAuthority,assertHostNotOptedOut}=await import('./civic-opt-out.ts');
@@ -22,11 +23,12 @@ export async function inspectPdfTdmPolicy(bytes:Buffer,sha256:string,cacheRoot:s
  const review=await readParserReview(),key=review.imageId+':'+review.runnerSha256;
  let version=versions.get(key);
  if(!version){
-  version=withParserSandbox(null,async sandbox=>{
+  const inspectVersion=async(sandbox:ParserSandbox)=>{
    const result=JSON.parse((await sandbox.run('node',['--max-old-space-size=192','--experimental-strip-types','/opt/stadtstack/src/pdf-tdm-policy-worker.ts','--version'],DEADLINE_MS)).stdout) as {policyVersion?:unknown;pdfjsVersion?:unknown};
    if(result.policyVersion!==PDF_TDM_POLICY_VERSION||typeof result.pdfjsVersion!=='string'||!/^[A-Za-z0-9.+-]+$/.test(result.pdfjsVersion))throw Error('PDF parser version unavailable');
    return result.pdfjsVersion;
-  },context);
+  };
+  version=sandbox?inspectVersion(sandbox):withParserSandbox(null,inspectVersion,context);
   versions.set(key,version);
   void version.catch(()=>{if(versions.get(key)===version)versions.delete(key);});
  }
@@ -53,7 +55,7 @@ export async function inspectPdfTdmPolicy(bytes:Buffer,sha256:string,cacheRoot:s
  if(bytes.length>MAX_INPUT||bytes.length===0)finding={state:'unavailable',reason:'size_limit'};
  else{
   try{
-   finding=await withParserSandbox(bytes,async sandbox=>{
+   const inspectMetadata=async(sandbox:ParserSandbox):Promise<PdfTdmFinding>=>{
     const output=(await sandbox.run('node',['--max-old-space-size=192','--experimental-strip-types','/opt/stadtstack/src/pdf-tdm-policy-worker.ts','/input/document'],DEADLINE_MS)).stdout;
     if(Buffer.byteLength(output)>MAX_OUTPUT)return {state:'unavailable',reason:'parser_output_limit'};
     const result=JSON.parse(output) as PdfTdmFinding&{policyVersion?:unknown;pdfjsVersion?:unknown};
@@ -61,7 +63,9 @@ export async function inspectPdfTdmPolicy(bytes:Buffer,sha256:string,cacheRoot:s
     if(result.state==='checked'&&[0,1,null].includes(result.reservation)&&typeof result.policyPresent==='boolean'&&typeof result.metadataPresent==='boolean')return {state:'checked',reservation:result.reservation,policyPresent:result.policyPresent,metadataPresent:result.metadataPresent};
     if(result.state==='unavailable'&&typeof result.reason==='string'&&/^[a-z_]{1,64}$/.test(result.reason))return {state:'unavailable',reason:result.reason};
     return {state:'unavailable',reason:'parser_protocol_error'};
-   },context);
+   };
+   // Same checked-result cache and protocol, using the selected PDF when batched.
+   finding=await (sandbox?inspectMetadata(sandbox):withParserSandbox(bytes,inspectMetadata,context));
   }catch(error){
    if(context.signal?.aborted)throw error;
    if(error instanceof Error&&error.name==='TimeoutError')finding={state:'unavailable',reason:'metadata_timeout'};

@@ -1,22 +1,63 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,writeFile,mkdir,rm} from 'node:fs/promises';
+import {mkdtemp,readFile,writeFile,mkdir,rm,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {createRequire} from 'node:module';
 import {hash} from '../src/common.ts';
 import {inspectPdfTdmPolicy as sandboxPdfTdmPolicy,PDF_TDM_POLICY_VERSION} from '../src/pdf-tdm-policy.ts';
-import {readParserReview} from '../src/district-parser-isolation.ts';
+import {readParserReview,withParserSandbox,type ParserSourceContext} from '../src/district-parser-isolation.ts';
 import {PREPARED_VM_ROOT} from '../src/district-prepared-document.ts';
 import {metadataPdf,reservedXmp} from './fixtures/tdm-pdf.ts';
+import {inspectResourcePolicySandbox} from '../src/district-policy-inspection.ts';
+import {classifyDocumentOrigin} from '../src/document-origin.ts';
+import {assertCivicPolicyAuthority,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 // A cold invocation enrolls two real scopes (version probe + artifact), each with ~100 s of host inventory work.
 const reviewedSecurityOptions={skip:process.env.STADTSTACK_PARSER_SECURITY_TESTS!=='1',timeout:2*240000};
-async function inspectPdfTdmPolicy(bytes:Buffer,sha256:string,cacheRoot:string){
+async function withPdfInspectionFixture<T>(bytes:Buffer,inspect:(context:ParserSourceContext)=>Promise<T>):Promise<T>{
  await readParserReview(); // No environment flag can approve or provision the sandbox.
- const {assertCivicPolicyAuthority,CIVIC_ACQUISITION_DECISION_ID}=await import('../src/civic-opt-out.ts');
  const authority=await assertCivicPolicyAuthority();
- return sandboxPdfTdmPolicy(bytes,sha256,cacheRoot,{root:join(dirname(PREPARED_VM_ROOT),'parser-security-fixtures'),kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256,purpose:'classification',bindings:[{phase:'pre-admission',url:'https://pdf-tdm-fixture.invalid/synthetic-input',sourceSha256:sha256}]});
+ return inspect({root:join(dirname(PREPARED_VM_ROOT),'parser-security-fixtures'),kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256,purpose:'classification',bindings:[{phase:'pre-admission',url:'https://pdf-tdm-fixture.invalid/synthetic-input',sourceSha256:hash(bytes)}]});
 }
+async function inspectPdfTdmPolicy(bytes:Buffer,sha256:string,cacheRoot:string){
+ return withPdfInspectionFixture(bytes,context=>sandboxPdfTdmPolicy(bytes,sha256,cacheRoot,context));
+}
+
+test('one PDF sandbox keeps separate-execution outcomes and the exact checked-result cache key', {...reviewedSecurityOptions,timeout:4*240000}, async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'pdf-tdm-batch-'));t.after(()=>rm(cache,{recursive:true,force:true}));
+ const bytes=metadataPdf(reservedXmp),sha256=hash(bytes),commands:string[]=[];
+ await withPdfInspectionFixture(bytes,async context=>{
+  const url=context.bindings[0].url,input={url,mimeType:'application/pdf',bytes};
+  const combined=await withParserSandbox(bytes,async sandbox=>{
+   const run=sandbox.run;
+   sandbox.run=async(tool,args,timeoutMs)=>{commands.push(args.at(-1)==='--version'?'version':args.includes('/opt/stadtstack/src/pdf-tdm-policy-worker.ts')?'metadata':args[2]);return run(tool,args,timeoutMs);};
+   const resource=await inspectResourcePolicySandbox(url,{},bytes,input.mimeType,context,sandbox);
+   const origin=await classifyDocumentOrigin(input,{scratch:context,sandbox});
+   const pdf=await sandboxPdfTdmPolicy(bytes,sha256,cache,context,sandbox);
+   return {resource,origin,pdf};
+  },context);
+  assert.deepEqual(commands,['resource','origin','version','metadata']);
+  const resource=await inspectResourcePolicySandbox(url,{},bytes,input.mimeType,context);
+  const origin=await classifyDocumentOrigin(input,{scratch:context});
+  const pdf=await sandboxPdfTdmPolicy(bytes,sha256,cache,context);
+  assert.equal(JSON.stringify(resource),JSON.stringify(combined.resource));
+  // Only the independent worker observation clock differs between executions.
+  assert.equal(JSON.stringify({...origin,classifiedAt:combined.origin.classifiedAt}),JSON.stringify(combined.origin));
+  assert.equal(pdf.fromCache,true);assert.equal(combined.pdf.fromCache,false);
+  assert.equal(JSON.stringify({...pdf,fromCache:false}),JSON.stringify(combined.pdf));
+  const review=await readParserReview();
+  assert.deepEqual(await readdir(join(cache,'pdf-tdm-policy')),[`${PDF_TDM_POLICY_VERSION}-${pdf.pdfjsVersion}-${review.imageId.slice(7)}-${review.runnerSha256}-${sha256}.json`]);
+  // A hit still runs origin/resource; it adds neither a version nor metadata command.
+  commands.length=0;
+  await withParserSandbox(bytes,async sandbox=>{
+   const run=sandbox.run;sandbox.run=async(tool,args,timeoutMs)=>{commands.push(args[2]);return run(tool,args,timeoutMs);};
+   await inspectResourcePolicySandbox(url,{},bytes,input.mimeType,context,sandbox);
+   await classifyDocumentOrigin(input,{scratch:context,sandbox});
+   assert.equal((await sandboxPdfTdmPolicy(bytes,sha256,cache,context,sandbox)).fromCache,true);
+  },context);
+  assert.deepEqual(commands,['resource','origin']);
+ });
+});
 
 test('compressed XMP reservation with an alternate namespace prefix is detected and cached by digest/version', reviewedSecurityOptions, async t=>{
  const cache=await mkdtemp(join(tmpdir(),'pdf-tdm-compressed-'));t.after(()=>rm(cache,{recursive:true,force:true}));
