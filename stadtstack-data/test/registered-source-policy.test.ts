@@ -139,7 +139,7 @@ test('registered blocked robots retain unknown origin, honour reservations/opt-o
  const policyCount=seen.filter(row=>row.path==='/robots.txt'||row.path==='/.well-known/tdmrep.json').length;
  await fetcher.fetch(root+'six-days',requestOptions);
  assert.equal(seen.filter(row=>row.path==='/robots.txt'||row.path==='/.well-known/tdmrep.json').length,policyCount);
- await recordHostOptOut({host:'www.ratzeburg.de',reason:'rights_holder_objection',reference:'synthetic fixture'},options.ownerPolicyLane);
+ await recordHostOptOut({host:'www.ratzeburg.de',reason:'rights_holder_objection',reference:'synthetic-fixture'},options.ownerPolicyLane);
  await assert.rejects(recheckPolicyReceipt(created.receipt,{...options.ownerPolicyLane,evaluationAt:new Date(now).toISOString()}));
  const requests=seen.length;await assert.rejects(fetcher.fetch(root,requestOptions));assert.equal(seen.length,requests);
  now=start+REGISTERED_SOURCE_POLICY_VALIDITY_MS+1000;
