@@ -9,7 +9,8 @@ import {inspectPdfTdmPolicy as sandboxPdfTdmPolicy,PDF_TDM_POLICY_VERSION} from 
 import {readParserReview} from '../src/district-parser-isolation.ts';
 import {PREPARED_VM_ROOT} from '../src/district-prepared-document.ts';
 import {metadataPdf,reservedXmp} from './fixtures/tdm-pdf.ts';
-const reviewedSecurityOptions={skip:process.env.STADTSTACK_PARSER_SECURITY_TESTS!=='1',timeout:240000};
+// A cold invocation enrolls two real scopes (version probe + artifact), each with ~100 s of host inventory work.
+const reviewedSecurityOptions={skip:process.env.STADTSTACK_PARSER_SECURITY_TESTS!=='1',timeout:2*240000};
 async function inspectPdfTdmPolicy(bytes:Buffer,sha256:string,cacheRoot:string){
  await readParserReview(); // No environment flag can approve or provision the sandbox.
  const {assertCivicPolicyAuthority,CIVIC_ACQUISITION_DECISION_ID}=await import('../src/civic-opt-out.ts');
@@ -25,19 +26,25 @@ test('compressed XMP reservation with an alternate namespace prefix is detected 
  assert.equal(first.finding.reservation,1);assert.equal(first.finding.policyPresent,true);assert.equal(first.policyVersion,PDF_TDM_POLICY_VERSION);assert.equal(first.fromCache,false);
  const second=await inspectPdfTdmPolicy(bytes,digest,cache);assert.equal(second.fromCache,true);assert.equal(second.checkedAt,first.checkedAt);
 });
-test('valid PDF without metadata and explicit zero are distinct checked results', reviewedSecurityOptions, async t=>{
+test('valid PDF without metadata has a checked absent reservation', reviewedSecurityOptions, async t=>{
  const cache=await mkdtemp(join(tmpdir(),'pdf-tdm-clear-'));t.after(()=>rm(cache,{recursive:true,force:true}));
  const absent=metadataPdf(),absentResult=await inspectPdfTdmPolicy(absent,hash(absent),cache);
  assert.deepEqual(absentResult.finding,{state:'checked',reservation:null,policyPresent:false,metadataPresent:false});
+});
+test('valid PDF with explicit zero has a checked zero reservation', reviewedSecurityOptions, async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'pdf-tdm-zero-'));t.after(()=>rm(cache,{recursive:true,force:true}));
  const zero=metadataPdf(reservedXmp.replace('<mine:reservation>1','<mine:reservation>0')),zeroResult=await inspectPdfTdmPolicy(zero,hash(zero),cache);
  assert.equal(zeroResult.finding.state,'checked');if(zeroResult.finding.state==='checked')assert.equal(zeroResult.finding.reservation,0);
 });
-test('malformed PDF and compressed malformed metadata are unavailable, never no-reservation', reviewedSecurityOptions, async t=>{
- const cache=await mkdtemp(join(tmpdir(),'pdf-tdm-invalid-'));t.after(()=>rm(cache,{recursive:true,force:true}));
- for(const bytes of [Buffer.from('%PDF-invalid'),metadataPdf('<x:xmpmeta><malformed>')]){
+for(const {name,bytes} of [
+ {name:'malformed PDF',bytes:Buffer.from('%PDF-invalid')},
+ {name:'compressed malformed metadata',bytes:metadataPdf('<x:xmpmeta><malformed>')},
+]){
+ test(`${name} is unavailable, never no-reservation`, reviewedSecurityOptions, async t=>{
+  const cache=await mkdtemp(join(tmpdir(),'pdf-tdm-invalid-'));t.after(()=>rm(cache,{recursive:true,force:true}));
   const result=await inspectPdfTdmPolicy(bytes,hash(bytes),cache);assert.equal(result.finding.state,'unavailable');
- }
-});
+ });
+}
 test('numeric XML references in TDM namespaces and values cannot hide a reservation', reviewedSecurityOptions, async t=>{
  const cache=await mkdtemp(join(tmpdir(),'pdf-tdm-entities-'));t.after(()=>rm(cache,{recursive:true,force:true}));
  const xml=reservedXmp.replace('http://www.w3.org/ns/tdmrep/','http://www.w3.org/ns/tdmrep&#47;').replace('<mine:reservation>1','<mine:reservation>&#49;');
@@ -50,25 +57,34 @@ test('hexadecimal references and TDM attribute forms use the same XML decoding s
  const bytes=metadataPdf(xml),result=await inspectPdfTdmPolicy(bytes,hash(bytes),cache);
  assert.equal(result.finding.state,'checked');if(result.finding.state==='checked')assert.equal(result.finding.reservation,1);
 });
-test('escaped references are not decoded twice and CDATA retains its literal meaning', reviewedSecurityOptions, async t=>{
+test('escaped namespace references are not decoded twice', reviewedSecurityOptions, async t=>{
  const cache=await mkdtemp(join(tmpdir(),'pdf-tdm-once-'));t.after(()=>rm(cache,{recursive:true,force:true}));
  const literalNamespace=metadataPdf(reservedXmp.replace('http://www.w3.org/ns/tdmrep/','http://www.w3.org/ns/tdmrep&amp;#47;'));
  const namespaceResult=await inspectPdfTdmPolicy(literalNamespace,hash(literalNamespace),cache);
  assert.equal(namespaceResult.finding.state,'checked');if(namespaceResult.finding.state==='checked')assert.equal(namespaceResult.finding.reservation,null);
- for(const value of ['&amp;#49;','&#38;#49;','<![CDATA[&#49;]]>']){
+});
+for(const [name,value] of [['escaped decimal','&amp;#49;'],['escaped ampersand','&#38;#49;'],['literal CDATA','<![CDATA[&#49;]]>']]){
+ test(`TDM reservation values retain single XML decoding: ${name}`, reviewedSecurityOptions, async t=>{
+  const cache=await mkdtemp(join(tmpdir(),'pdf-tdm-once-'));t.after(()=>rm(cache,{recursive:true,force:true}));
   const bytes=metadataPdf(reservedXmp.replace('<mine:reservation>1',`<mine:reservation>${value}`)),result=await inspectPdfTdmPolicy(bytes,hash(bytes),cache);
   assert.equal(result.finding.state,'unavailable');
- }
+ });
+}
+test('CDATA retains a literal valid TDM reservation', reviewedSecurityOptions, async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'pdf-tdm-cdata-'));t.after(()=>rm(cache,{recursive:true,force:true}));
  const cdata=metadataPdf(reservedXmp.replace('<mine:reservation>1','<mine:reservation><![CDATA[1]]>')),cdataResult=await inspectPdfTdmPolicy(cdata,hash(cdata),cache);
  assert.equal(cdataResult.finding.state,'checked');if(cdataResult.finding.state==='checked')assert.equal(cdataResult.finding.reservation,1);
 });
-test('DTD declarations and invalid XML code points remain unavailable', reviewedSecurityOptions, async t=>{
- const cache=await mkdtemp(join(tmpdir(),'pdf-tdm-rejected-'));t.after(()=>rm(cache,{recursive:true,force:true}));
- const dtd=reservedXmp.replace('<?xml version="1.0"?>','<?xml version="1.0"?><!DOCTYPE x:xmpmeta [<!ENTITY reserved "1">]>').replace('<mine:reservation>1','<mine:reservation>&reserved;');
- for(const xml of [dtd,reservedXmp.replace('<mine:reservation>1','<mine:reservation>&#xD800;')]){
+const dtd=reservedXmp.replace('<?xml version="1.0"?>','<?xml version="1.0"?><!DOCTYPE x:xmpmeta [<!ENTITY reserved "1">]>').replace('<mine:reservation>1','<mine:reservation>&reserved;');
+for(const {name,xml} of [
+ {name:'DTD declarations',xml:dtd},
+ {name:'invalid XML code points',xml:reservedXmp.replace('<mine:reservation>1','<mine:reservation>&#xD800;')},
+]){
+ test(`${name} remain unavailable`, reviewedSecurityOptions, async t=>{
+  const cache=await mkdtemp(join(tmpdir(),'pdf-tdm-rejected-'));t.after(()=>rm(cache,{recursive:true,force:true}));
   const bytes=metadataPdf(xml),result=await inspectPdfTdmPolicy(bytes,hash(bytes),cache);assert.equal(result.finding.state,'unavailable');
- }
-});
+ });
+}
 test('a legal namespace prefix cannot shadow the namespace binding table prototype', reviewedSecurityOptions, async t=>{
  const cache=await mkdtemp(join(tmpdir(),'pdf-tdm-prefix-'));t.after(()=>rm(cache,{recursive:true,force:true}));
  const xml=reservedXmp.replace('xmlns:mine=','xmlns:__proto__=').replaceAll('mine:','__proto__:');

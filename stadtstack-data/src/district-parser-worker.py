@@ -68,7 +68,9 @@ def run_tool(request):
         # -I ignores user/environment startup configuration; -S excludes site packages.
         args = ['-I', '-S'] + args
     elif name == 'node':
-        args = ['--max-old-space-size=256'] + args
+        # Type stripping uses Wasm; explicit bounds checks avoid its 10-GiB
+        # virtual-memory trap-handler reservation under our fixed RLIMIT_AS.
+        args = ['--disable-wasm-trap-handler', '--max-old-space-size=256'] + args
     def child_limits():
         # V8 reserves a multi-GB address cage; the cgroup still caps resident memory at 512 MiB.
         limit = 8 * 1024 * 1024 * 1024 if name == 'node' else 512 * 1024 * 1024

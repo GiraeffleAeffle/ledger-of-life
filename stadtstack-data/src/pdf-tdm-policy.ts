@@ -23,10 +23,10 @@ export async function inspectPdfTdmPolicy(bytes:Buffer,sha256:string,cacheRoot:s
  let version=versions.get(key);
  if(!version){
   version=withParserSandbox(null,async sandbox=>{
-   const result=JSON.parse((await sandbox.run('node',['--max-old-space-size=192','--experimental-strip-types','/opt/stadtstack/src/pdf-tdm-policy-worker.ts','--version'])).stdout) as {policyVersion?:unknown;pdfjsVersion?:unknown};
+   const result=JSON.parse((await sandbox.run('node',['--max-old-space-size=192','--experimental-strip-types','/opt/stadtstack/src/pdf-tdm-policy-worker.ts','--version'],DEADLINE_MS)).stdout) as {policyVersion?:unknown;pdfjsVersion?:unknown};
    if(result.policyVersion!==PDF_TDM_POLICY_VERSION||typeof result.pdfjsVersion!=='string'||!/^[A-Za-z0-9.+-]+$/.test(result.pdfjsVersion))throw Error('PDF parser version unavailable');
    return result.pdfjsVersion;
-  },{...context,signal:context.signal?AbortSignal.any([context.signal,AbortSignal.timeout(DEADLINE_MS)]):AbortSignal.timeout(DEADLINE_MS)});
+  },context);
   versions.set(key,version);
   void version.catch(()=>{if(versions.get(key)===version)versions.delete(key);});
  }
@@ -54,14 +54,14 @@ export async function inspectPdfTdmPolicy(bytes:Buffer,sha256:string,cacheRoot:s
  else{
   try{
    finding=await withParserSandbox(bytes,async sandbox=>{
-    const output=(await sandbox.run('node',['--max-old-space-size=192','--experimental-strip-types','/opt/stadtstack/src/pdf-tdm-policy-worker.ts','/input/document'])).stdout;
+    const output=(await sandbox.run('node',['--max-old-space-size=192','--experimental-strip-types','/opt/stadtstack/src/pdf-tdm-policy-worker.ts','/input/document'],DEADLINE_MS)).stdout;
     if(Buffer.byteLength(output)>MAX_OUTPUT)return {state:'unavailable',reason:'parser_output_limit'};
     const result=JSON.parse(output) as PdfTdmFinding&{policyVersion?:unknown;pdfjsVersion?:unknown};
     if(result.policyVersion!==PDF_TDM_POLICY_VERSION||result.pdfjsVersion!==pdfjsVersion)return {state:'unavailable',reason:'parser_version_mismatch'};
     if(result.state==='checked'&&[0,1,null].includes(result.reservation)&&typeof result.policyPresent==='boolean'&&typeof result.metadataPresent==='boolean')return {state:'checked',reservation:result.reservation,policyPresent:result.policyPresent,metadataPresent:result.metadataPresent};
     if(result.state==='unavailable'&&typeof result.reason==='string'&&/^[a-z_]{1,64}$/.test(result.reason))return {state:'unavailable',reason:result.reason};
     return {state:'unavailable',reason:'parser_protocol_error'};
-   },{...context,signal:context.signal?AbortSignal.any([context.signal,AbortSignal.timeout(DEADLINE_MS)]):AbortSignal.timeout(DEADLINE_MS)});
+   },context);
   }catch(error){
    if(context.signal?.aborted)throw error;
    if(error instanceof Error&&error.name==='TimeoutError')finding={state:'unavailable',reason:'metadata_timeout'};
@@ -72,7 +72,7 @@ export async function inspectPdfTdmPolicy(bytes:Buffer,sha256:string,cacheRoot:s
  for(const binding of context.bindings)await assertHostNotOptedOut(binding.url,context);
  // Content-free findings only; transient parser/resource failures never become cached permission.
  if(finding.state==='checked'){
-  await mkdir(folder,{recursive:true,mode:0o700});const temporary=path+'.'+randomUUID()+'.tmp';
+  await mkdir(folder,{recursive:true,mode:0o700});const temporary=join(folder,'.'+randomUUID()+'.tmp');
   await writeFile(temporary,JSON.stringify(result)+'\n',{flag:'wx',mode:0o600});await rename(temporary,path);
  }
  return result;

@@ -43,6 +43,7 @@ test('Docker parser contract binds only one artifact and fixed bounded isolation
   assert.equal(args.filter(arg => arg === '--mount').length, 1);
   assert.ok(args.includes('type=bind,src=/tmp/private/document,dst=/input/document,readonly,bind-propagation=rprivate'));
   assert.ok(args.includes('--tmpfs=/scratch:rw,noexec,nosuid,nodev,size=134217728,uid=65534,gid=65534,mode=0700'));
+  assert.ok(args.includes('--rm')); // Daemon-side removal survives a crashed controller; cleanup proves absence.
   assert.ok(!args.some(arg => /privileged|host=|docker\.sock|\/home\//.test(arg)));
   assert.throws(() => parserContainerArgs('latest', 'stadtstack-parser-' + randomUUID(), null), ParserIsolationError);
   assert.throws(() => parserContainerArgs('sha256:' + 'a'.repeat(64), 'stadtstack-parser-' + randomUUID(), '/tmp/input,src=/etc'), ParserIsolationError);
@@ -84,19 +85,22 @@ test('XML/GML external entities, DTDs, internal expansion and UTF-16 input are r
   assert.equal((await extractDocumentText(Buffer.from(XML), 'application/xml', undefined, fixtureCommand)).text, XML);
 });
 
-test('reviewed default text/HTML/JSON/XML branches execute only through the document worker', securityOptions, async () => {
-  const sentence = 'A synthetic public municipal source statement with sufficient original text for parsing.';
-  const fixtures = [
-    { mime: 'text/plain', input: sentence, text: sentence, method: 'text' },
-    { mime: 'text/html', input: `<script>untrusted script</script><p>${sentence}</p>`, text: sentence, method: 'html' },
-    { mime: 'application/json', input: JSON.stringify({ statement: sentence }), text: JSON.stringify({ statement: sentence }), method: 'json' },
-    { mime: 'application/gml+xml', input: XML, text: XML, method: 'xml' },
-  ];
-  for (const fixture of fixtures) {
+// Each source-owned job gets its own test budget; shared production inventory
+// enrollment/teardown is outside the sandbox's independently enforced walltime.
+const sentence = 'A synthetic public municipal source statement with sufficient original text for parsing.';
+for (const fixture of [
+  { mime: 'text/plain', input: sentence, text: sentence, method: 'text' },
+  { mime: 'text/html', input: `<script>untrusted script</script><p>${sentence}</p>`, text: sentence, method: 'html' },
+  { mime: 'application/json', input: JSON.stringify({ statement: sentence }), text: JSON.stringify({ statement: sentence }), method: 'json' },
+  { mime: 'application/gml+xml', input: XML, text: XML, method: 'xml' },
+]) {
+  test(`reviewed default ${fixture.method} branch executes only through the document worker`, securityOptions, async () => {
     const bytes = Buffer.from(fixture.input);
     const parsed = await withInspectionFixture(bytes, context => extractDocumentText(bytes, fixture.mime, context));
     assert.equal(parsed.text, fixture.text); assert.equal(parsed.method, fixture.method);
-  }
+  });
+}
+test('reviewed default XML worker rejects unsafe originals', securityOptions, async () => {
   const unsafe = Buffer.from('<!DOCTYPE Plan SYSTEM "file:///etc/private-secret">' + XML);
   await assert.rejects(withInspectionFixture(unsafe, context => extractDocumentText(unsafe, 'application/xml', context)), /XML safety/);
 });
@@ -185,6 +189,18 @@ test('reviewed sandbox hides sentinel secrets, host files and inherited Python c
       assert.equal(childEnvironments.length, 5);
       for (const keys of childEnvironments) assert.deepEqual(keys, evidence.keys);
     }, context));
+  } finally {
+    for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+// Origin and policy inspection enroll two real scopes, each with ~100 s of host inventory work.
+test('reviewed origin and policy workers hide sentinel secrets', { ...securityOptions, timeout: 2 * securityOptions.timeout }, async () => {
+  const sentinel = 'sentinel-' + randomUUID();
+  const previous = Object.fromEntries(secretKeys.map(key => [key, process.env[key]]));
+  try {
+    for (const key of secretKeys) process.env[key] = sentinel;
     const html = Buffer.from('<html><title>Beschlussvorlage</title><meta name="tdm-reservation" content="1"><main><p>Herausgeber: Stadt Beispielstadt</p><p>Beschluss zur weiteren Entwicklung des Quartiers in der kommenden Sitzung.</p></main></html>');
     await withInspectionFixture(html, async context => {
       const url = context.bindings[0].url;
@@ -196,7 +212,6 @@ test('reviewed sandbox hides sentinel secrets, host files and inherited Python c
     });
   } finally {
     for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
-    await rm(root, { recursive: true, force: true });
   }
 });
 
@@ -216,8 +231,17 @@ test('reviewed sandbox enforces output bounds and permits only selected input/to
   await withParserSandbox(null, async sandbox => {
     await assert.rejects(sandbox.run('/bin/sh', ['-c', 'true']), ParserIsolationError);
     await assert.rejects(sandbox.run('pdfinfo', ['/etc/passwd']), ParserIsolationError);
+    for (const timeoutMs of [0, -1, NaN, PARSER_LIMITS.walltimeMs + 1]) {
+      await assert.rejects(sandbox.run('python3', ['--version'], timeoutMs), error => error instanceof ParserIsolationError && error.reason === 'request_rejected');
+    }
     await assert.rejects(sandbox.run('python3', ['-c', `import sys;sys.stdout.write('x'*${PARSER_LIMITS.outputBytes + 1})`]), (error: unknown) => error instanceof ParserIsolationError && error.reason === 'resource_limit');
   });
+});
+
+test('reviewed sandbox enforces a command deadline after readiness and removes the container', securityOptions, async () => {
+  await assert.rejects(withParserSandbox(null, async sandbox => {
+    await sandbox.run('python3', ['-c', 'import time;time.sleep(2)'], 50);
+  }), error => error instanceof Error && error.name === 'TimeoutError');
 });
 
 test('reviewed PDF tools share internal OCR scratch without mounting host output directories', securityOptions, async () => {
@@ -231,22 +255,26 @@ test('reviewed PDF tools share internal OCR scratch without mounting host output
   }, context));
 });
 
-test('reviewed archive parser rejects traversal, symlink, encryption, expansion, member count and XML attacks', securityOptions, async () => {
+test('reviewed archive parser accepts bounded source XML', securityOptions, async () => {
   const valid = zip([{ name: 'plan.xml', text: XML }]);
   assert.equal((await withInspectionFixture(valid, context => extractDocumentText(valid, 'application/zip', context))).text, XML);
-  const malicious: ZipMember[][] = [
-    [{ name: '../escape.xml', text: XML }], [{ name: '/etc/escape.xml', text: XML }],
-    [{ name: 'C:\\escape.xml', text: XML }], [{ name: 'nested\\escape.xml', text: XML }],
-    [{ name: 'link.xml', text: '/etc/private-secret', mode: 0o120777 }],
-    [{ name: 'plan.xml', text: XML, encrypted: true }],
-    [{ name: 'plan.xml', text: 'a'.repeat(500_000), compress: true }],
-    [{ name: 'plan.xml', text: XML, declaredBytes: 25 * 1024 * 1024 }],
-    Array.from({ length: 201 }, (_, index) => ({ name: `plan-${index}.xml`, text: XML })),
-    [{ name: 'plan.xml', text: '<!DOCTYPE Plan SYSTEM "http://192.0.2.1/private">' + XML }],
-    [{ name: 'plan.xml', text: '<!DOCTYPE Plan [<!ENTITY secret SYSTEM "file:///etc/private-secret">]>' + XML }],
-  ];
-  for (const members of malicious) {
+});
+const archiveAttacks: { name: string; members: ZipMember[] }[] = [
+  { name: 'parent traversal', members: [{ name: '../escape.xml', text: XML }] },
+  { name: 'absolute path', members: [{ name: '/etc/escape.xml', text: XML }] },
+  { name: 'Windows drive', members: [{ name: 'C:\\escape.xml', text: XML }] },
+  { name: 'backslash path', members: [{ name: 'nested\\escape.xml', text: XML }] },
+  { name: 'symlink', members: [{ name: 'link.xml', text: '/etc/private-secret', mode: 0o120777 }] },
+  { name: 'encryption', members: [{ name: 'plan.xml', text: XML, encrypted: true }] },
+  { name: 'expansion ratio', members: [{ name: 'plan.xml', text: 'a'.repeat(500_000), compress: true }] },
+  { name: 'expanded size', members: [{ name: 'plan.xml', text: XML, declaredBytes: 25 * 1024 * 1024 }] },
+  { name: 'member count', members: Array.from({ length: 201 }, (_, index) => ({ name: `plan-${index}.xml`, text: XML })) },
+  { name: 'external DTD', members: [{ name: 'plan.xml', text: '<!DOCTYPE Plan SYSTEM "http://192.0.2.1/private">' + XML }] },
+  { name: 'external entity', members: [{ name: 'plan.xml', text: '<!DOCTYPE Plan [<!ENTITY secret SYSTEM "file:///etc/private-secret">]>' + XML }] },
+];
+for (const { name, members } of archiveAttacks) {
+  test(`reviewed archive parser rejects ${name}`, securityOptions, async () => {
     const bytes = zip(members);
     await assert.rejects(withInspectionFixture(bytes, context => extractDocumentText(bytes, 'application/zip', context)), /archive limit|text limit|XML safety/);
-  }
-});
+  });
+}

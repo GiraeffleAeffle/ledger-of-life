@@ -388,19 +388,19 @@ test('production origin classification requires matching original-byte source co
  }
 });
 
-test('reviewed isolated worker classifies compressed PDF authorship and malformed originals', {skip:process.env.STADTSTACK_PARSER_SECURITY_TESTS!=='1',concurrency:false,timeout:240_000}, async()=>{
- await readParserReview(); // The environment switch is not security authorization.
- const authority=await assertCivicPolicyAuthority(),root=join(dirname(PREPARED_VM_ROOT),'parser-origin-security-fixtures');
- const fixtures:[Buffer,'official_work'|'third_party'|'mixed'|'unknown'][]=[
-  [originPdf(official,{producer:'Microsoft Word'}),'official_work'],
-  [originPdf(neutral,{author:'Plan GmbH'}),'third_party'],
-  [originPdf(official,{author:'Plan GmbH'}),'mixed'],
-  [originPdf(official,{author:'Private Person private@example.org'}),'unknown'],
-  [Buffer.from('%PDF-invalid'),'unknown'],
- ];
- for(const [bytes,classification] of fixtures){
+const originSecurityFixtures: { name: string; bytes: Buffer; classification: 'official_work'|'third_party'|'mixed'|'unknown' }[] = [
+ {name:'commercial producer',bytes:originPdf(official,{producer:'Microsoft Word'}),classification:'official_work'},
+ {name:'external author',bytes:originPdf(neutral,{author:'Plan GmbH'}),classification:'third_party'},
+ {name:'mixed authorship',bytes:originPdf(official,{author:'Plan GmbH'}),classification:'mixed'},
+ {name:'private author',bytes:originPdf(official,{author:'Private Person private@example.org'}),classification:'unknown'},
+ {name:'malformed original',bytes:Buffer.from('%PDF-invalid'),classification:'unknown'},
+];
+for(const {name,bytes,classification} of originSecurityFixtures){
+ test(`reviewed isolated worker classifies compressed PDF: ${name}`, {skip:process.env.STADTSTACK_PARSER_SECURITY_TESTS!=='1',concurrency:false,timeout:240_000}, async()=>{
+  await readParserReview(); // The environment switch is not security authorization.
+  const authority=await assertCivicPolicyAuthority(),root=join(dirname(PREPARED_VM_ROOT),'parser-origin-security-fixtures');
   const result=await classifyOrigin({url,mimeType:'application/pdf',bytes},{scratch:{root,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',bindings:[{phase:'pre-admission',url,sourceSha256:digest(bytes)}]}});
   assert.equal(result.classification,classification);
   for(const privateValue of ['Private Person','private@example.org','Plan GmbH','Microsoft Word'])assert.equal(JSON.stringify(result.evidence).includes(privateValue),false);
- }
-});
+ });
+}

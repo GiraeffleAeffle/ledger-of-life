@@ -33,7 +33,7 @@ export class ParserIsolationError extends Error {
   }
 }
 export type ParserOutput = { stdout: string; stderr: string };
-export type ParserSandbox = { run: (tool: string, args: string[]) => Promise<ParserOutput> };
+export type ParserSandbox = { run: (tool: string, args: string[], timeoutMs?: number) => Promise<ParserOutput> };
 export type ParserSourceContext = ManagedSourceContext & { purpose: 'document' | 'classification' | 'artifact'; signal?: AbortSignal };
 const execute = promisify(execFile);
 const DOCKER = '/usr/bin/docker';
@@ -96,6 +96,9 @@ export function parserControllerEnvironment(jobRoot: string, socket: string): No
 export function parserContainerArgs(imageId: string, name: string, artifactPath: string | null): string[] {
   if (!/^sha256:[a-f0-9]{64}$/.test(imageId) || !/^stadtstack-parser-[a-f0-9-]{36}$/.test(name) ||
       (artifactPath !== null && (!artifactPath.startsWith('/') || /[,\n\r]/.test(artifactPath)))) throw new ParserIsolationError('request_rejected');
+  // --rm keeps crash cleanup with the daemon: if this controller dies, stdin closes, the
+  // worker exits and Docker removes the container. Attached `run --rm` exits only after
+  // removal, so the controller proves absence instead of racing its own forced removal.
   return ['run', '--rm', '--interactive', '--pull=never', '--name', name, '--network=none', '--ipc=none',
     '--read-only', '--user=65534:65534', '--cap-drop=ALL', '--security-opt=no-new-privileges=true',
     '--pids-limit=32', '--memory=512m', '--memory-swap=512m', '--cpus=1', '--ulimit=cpu=120:120',
@@ -234,14 +237,19 @@ export async function withParserSandbox<T>(artifact: string | Uint8Array | null,
       });
       timer = setTimeout(() => fail(new ParserIsolationError('resource_limit')), PARSER_LIMITS.walltimeMs);
       if (!('ready' in await ready)) throw new ParserIsolationError('unavailable');
-      const run = async (tool: string, args: string[]): Promise<ParserOutput> => {
+      const run = async (tool: string, args: string[], timeoutMs?: number): Promise<ParserOutput> => {
         await scope?.assertActive();
         if (!PARSER_TOOLS.includes(tool as ParserTool) || pending) throw new ParserIsolationError('request_rejected');
+        if (timeoutMs !== undefined && (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > PARSER_LIMITS.walltimeMs)) throw new ParserIsolationError('request_rejected');
         const request = JSON.stringify({ tool, args: sandboxArgs(args, typeof artifact === 'string' ? artifact : null) }) + '\n';
         if (Buffer.byteLength(request) > 128 * 1024) throw new ParserIsolationError('request_rejected');
         const result = receive();
-        stdin!.write(request);
-        const response = await result;
+        // Tool-specific deadlines exclude durable host enrollment; cancellation
+        // and the independent supervisor/whole-job bounds still cover the job.
+        const commandTimer = timeoutMs === undefined ? undefined : setTimeout(() => fail(new DOMException('Parser command timed out', 'TimeoutError')), timeoutMs);
+        let response: z.infer<typeof ResponseSchema>;
+        try { stdin!.write(request); response = await result; }
+        finally { clearTimeout(commandTimer); }
         if ('ready' in response) throw new ParserIsolationError('request_rejected');
         if (!response.ok) throw new ParserIsolationError(response.reason);
         const decode = (value: string) => {
@@ -262,11 +270,23 @@ export async function withParserSandbox<T>(artifact: string | Uint8Array | null,
       stdin?.end();
       if (container) await container.remove(); // Canonical durable removal proof precedes scratch unlink.
       if (child) {
-        let cleanupFailed = false;
-        try { await execute(DOCKER, ['rm', '--force', name], { env, timeout: 10_000, maxBuffer: 16 * 1024, encoding: 'utf8' }); }
-        catch { cleanupFailed = child.exitCode !== 0; }
-        child.kill('SIGKILL');
-        if (cleanupFailed) throw new ParserIsolationError('unavailable');
+        const exited = child.exitCode !== null || child.signalCode !== null ? Promise.resolve(true)
+          : new Promise<boolean>(resolve => child!.once('exit', () => resolve(true)));
+        let exitTimer: NodeJS.Timeout | undefined;
+        const removedByDaemon = await Promise.race([exited, new Promise<boolean>(resolve => { exitTimer = setTimeout(() => resolve(false), 10_000); })]);
+        clearTimeout(exitTimer);
+        if (!removedByDaemon) {
+          try { await execute(DOCKER, ['rm', '--force', name], { env, timeout: 10_000, maxBuffer: 16 * 1024, encoding: 'utf8' }); }
+          catch { /* absence below is the only cleanup proof */ }
+          child.kill('SIGKILL');
+        }
+        let present = true;
+        try { await execute(DOCKER, ['container', 'inspect', '--format', '{{.Id}}', name], { env, timeout: 10_000, maxBuffer: 16 * 1024, encoding: 'utf8' }); }
+        catch (error) {
+          const stderr = error && typeof error === 'object' && 'stderr' in error ? String(error.stderr) : '';
+          present = !/No such (?:container|object)/i.test(stderr);
+        }
+        if (present) throw new ParserIsolationError('unavailable');
       }
     }
   };
