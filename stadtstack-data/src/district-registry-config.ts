@@ -118,10 +118,13 @@ async function pinnedBytes(pin:z.infer<typeof pinSchema>):Promise<Buffer>{
   return bytes;
  }finally{await file.close();}
 }
-export async function readOperatorRegistryConfig(raw:OperatorRegistryConfig,policy:CivicPolicyOptions){
+export async function readOperatorRegistryConfig(raw:OperatorRegistryConfig,policy:CivicPolicyOptions,current?:OperatorRegistryConfig){
  const input=operatorRegistryConfigSchema.parse(raw);
  await endpointsActive(input.declaredEndpoints,policy);
- if(input.schemaContractSha256!==await operatorRegistryConfigContractSha256())throw Error('Operator registry codec contract mismatch');
+ if(current){
+  const fresh=operatorRegistryConfigSchema.parse(current),authenticated=await readOperatorRegistryConfig(fresh,policy);
+  if(input.sha256!==fresh.sha256||input.bytes!==fresh.bytes||input.code.gitCommit!==fresh.code.gitCommit||input.code.blobOid!==fresh.code.blobOid||JSON.stringify(input.approval)!==JSON.stringify(fresh.approval)||sha256(authenticated.bytes)!==input.sha256)throw Error('Crawl registry configuration or committed approval differs from processing descriptor');
+ }else if(input.schemaContractSha256!==await operatorRegistryConfigContractSha256())throw Error('Operator registry codec contract mismatch');
  const commit=await pinnedBytes(input.commit),trees=new Map<string,Buffer>();
  for(const tree of input.trees){if(trees.has(tree.oid))throw Error('Duplicate registry Git tree proof');trees.set(tree.oid,await pinnedBytes(tree));}
  const bytes=await pinnedBytes(input);
@@ -165,4 +168,33 @@ export async function readOperatorRegistryInputPin(input:OperatorRegistryInputPi
  const descriptor=z.union([operatorRegistryConfigSchema,operatorRegistryConfigSourcePinSchema]).parse(await readPinnedJson(pin.path,pin.sha256,8*1024*1024));
  if('kind' in descriptor)return {path:descriptor.path,...await readOperatorRegistryConfig(descriptor,policy)};
  return {path:descriptor.path,...await readOperatorRegistryConfigSourcePin(descriptor,policy),bindings:descriptor.bindings};
+}
+
+/** Explicit migration evidence, not a codec compatibility switch. A managed
+ * crawl descriptor additionally needs its original complete Git proof. */
+export const CrawlRegistryPinSchema=z.object({pin:operatorRegistryInputPinSchema,gitProof:operatorRegistryInputPinSchema.optional()}).strict();
+export async function readCrawlOperatorRegistryInputPin(crawl:z.infer<typeof CrawlRegistryPinSchema>,currentPin:OperatorRegistryInputPin,policy:CivicPolicyOptions){
+ const input=CrawlRegistryPinSchema.parse(crawl);
+ const fresh=operatorRegistryConfigSchema.parse(await readPinnedJson(currentPin.path,currentPin.sha256,8*1024*1024));
+ const processing={path:fresh.path,...await readOperatorRegistryConfig(fresh,policy)};
+ const old=z.union([operatorRegistryConfigSchema,operatorRegistryConfigSourcePinSchema]).parse(await readPinnedJson(input.pin.path,input.pin.sha256,8*1024*1024));
+ let descriptor:OperatorRegistryConfig;
+ if('kind' in old)descriptor=old;
+ else{
+  if(!input.gitProof)throw Error('Managed crawl registry lacks original Git proof');
+  const proof=z.union([operatorRegistryConfigSchema,operatorRegistryConfigImportSchema]).parse(await readPinnedJson(input.gitProof.path,input.gitProof.sha256,8*1024*1024));
+  if('managedRoot' in proof){
+   const {managedRoot,destinationPath,...original}=proof;descriptor=original;
+   if(resolve(old.path)!==resolve(join(managedRoot,destinationPath)))throw Error('Crawl registry proof changes managed location');
+  }else descriptor=proof;
+  if(old.sha256!==descriptor.sha256||old.bytes!==descriptor.bytes)throw Error('Crawl registry proof changes managed configuration');
+ }
+ const authenticated=await readOperatorRegistryConfig(descriptor,policy,fresh);
+ if(sha256(processing.bytes)!==sha256(authenticated.bytes))throw Error('Crawl and processing configuration bytes differ');
+ if(!('kind' in old)){
+  if(JSON.stringify(old.bindings)!==JSON.stringify(authenticated.bindings))throw Error('Crawl registry descriptor bindings differ from original Git proof');
+  await assertManagedSourceReadable(old.path,policy);await assertManagedSourceBindings(old.path,old.bindings,policy);
+  if(sha256(await pinnedBytes(old))!==descriptor.sha256)throw Error('Managed crawl registry bytes differ');
+ }
+ return {processing,crawl:{path:old.path,...authenticated},pins:{crawl:input,processing:currentPin}};
 }

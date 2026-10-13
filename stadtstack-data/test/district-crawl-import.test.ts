@@ -7,7 +7,7 @@ import {join,relative} from 'node:path';
 import {Pool} from 'pg';
 import {digest} from '../src/district-adapter-contract.ts';
 import {DistrictCas} from '../src/district-cas.ts';
-import {DistrictJobStore,migrateDistrictJobs} from '../src/district-jobs.ts';
+import {DistrictJobStore,migrateDistrictJobs,runDistrictJobs} from '../src/district-jobs.ts';
 import {importCrawlCorpusForResidual} from '../src/district-crawl-import.ts';
 import {withFixtureAuthorizedCorpus,authorizedPilotCorpusSchema,loadFrozenCorpusBytes} from '../src/district-corpus.ts';
 import {ResidualInputSchema,enqueueResidualPreparation,loadResidualSource} from '../src/district-residual-jobs.ts';
@@ -16,6 +16,11 @@ import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManag
 import {createOperatorRegistryFixture,operatorRegistryFixtureValue} from './helpers/operator-registry-fixture.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
+import {enqueueCrawlPolicyRefresh,policyRefreshHandler} from '../src/district-policy-refresh.ts';
+import {createR1PublicFetcher} from '../src/district-r1.ts';
+import {PoliteFetcher,type FetchObservation} from '../src/polite-fetch.ts';
+import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
+import {loadPolicyReceipt,recheckPolicyReceipt} from '../src/district-policy-receipt.ts';
 
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 test('public request evidence excludes credential/header fields and binds selector bytes',()=>{
@@ -45,12 +50,12 @@ test('offline frozen crawl import preserves managed originals and produces enque
  const registry=await createOperatorRegistryFixture(t,{context:{root,policy},value}),store=new DistrictJobStore(pool);
  const scope={publisherId:'synthetic-explicit-publisher',sourceId:source.id,municipalityId:city.id,ags:city.ags,tenant:null,observationWindow:'synthetic-bounded-window'};
  const bounds={maxDocuments:1 as const,maxChunks:4,maxModelCalls:8,paidMicroUsd:0 as const};
- async function fixture(label:string,config:{stale?:boolean;missingRequest?:boolean;post?:boolean;extra?:boolean;sameBytes?:boolean;selectExtra?:boolean;body?:Buffer;url?:string;casRoot?:string}={}){
+ async function fixture(label:string,config:{stale?:boolean;missingRequest?:boolean;post?:boolean;extra?:boolean;sameBytes?:boolean;selectExtra?:boolean;body?:Buffer;url?:string;casRoot?:string;robotsBody?:string}={}){
   const rawRoot=join(root!,label+'-raw'),indexRoot=join(root!,label+'-index'),casRoot=config.casRoot??join(root!,label+'-cas');
   for(const [path,kind] of [[rawRoot,'fetch'],[indexRoot,'artifacts'],[casRoot,'artifacts']] as const)await initializeManagedAcquisitionLane(path,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind});
   const checkedAt=new Date(Date.now()-(config.stale?7200000:3000)).toISOString(),url=config.url??'https://example.org/'+label,bytes=config.body??Buffer.from('Synthetic civic fixture original '+label),sha256=digest(bytes),observationId=`${Date.now()}-${randomUUID()}.json`,observationPath=join(rawRoot,'observations',observationId);
   const publicSelector=config.post?'municipality=12064472':null;
-  const observation={url,method:config.post?'POST':'GET',checkedAt,retrievedAt:checkedAt,state:'fetched',status:200,sha256,bytes:bytes.length,mimeType:'text/plain',policy:{robots:{state:'allowed',url:'https://example.org/robots.txt',sha256:digest('synthetic robots'),checkedAt},tdm:{state:'not_declared',evidence:[{url:'https://example.org/.well-known/tdmrep.json',locator:'TDMRep standardized location HTTP absence',value:'404',checkedAt}]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}};
+  const observation={url,method:config.post?'POST':'GET',checkedAt,retrievedAt:checkedAt,state:'fetched',status:200,sha256,bytes:bytes.length,mimeType:'text/plain',policy:{robots:{state:'allowed',url:'https://example.org/robots.txt',sha256:digest(config.robotsBody??'synthetic robots'),checkedAt},tdm:{state:'not_declared',evidence:[{url:'https://example.org/.well-known/tdmrep.json',locator:'TDMRep standardized location HTTP absence',value:'404',checkedAt}]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}};
   const observationBytes=Buffer.from(JSON.stringify(observation,null,2)+'\n'),binding={kind:'http_observation' as const,url,sourceSha256:sha256,observationId,receiptSha256:digest(observationBytes)};
   await withManagedSourceWrite(rawRoot,[{...binding,relativePath:'sha256/'+sha256,contentSha256:sha256,independentAllowed:true}],async()=>{await mkdir(join(rawRoot,'sha256'),{recursive:true,mode:0o700});await mkdir(join(rawRoot,'observations'),{recursive:true,mode:0o700});await writeFile(join(rawRoot,'sha256',sha256),bytes,{mode:0o600});await writeFile(observationPath,observationBytes,{mode:0o600});},policy);
   const path=join(indexRoot,'index.json'),document={id:label,municipalityId:city.id,ags:city.ags,districtId:city.districtId,sourceId:source.id,url,sha256,mimeType:'text/plain',retrievedAt:checkedAt,checkedAt,status:200,observationPath,documentDate:null,localPath:relative(indexRoot,join(rawRoot,'sha256',sha256)),adapter:'synthetic-test-only',metadata:{}};
@@ -132,6 +137,65 @@ test('offline frozen crawl import preserves managed originals and produces enque
  await t.test('legacy observations lacking original request/redirect evidence hold, never guessed GET selectors',async()=>{
   const item=await fixture('legacy',{missingRequest:true});
   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.equal(imported.jobs.length,0);assert.equal(imported.holds[0].reasonCode,'request_evidence_unavailable');});
+ });
+ await t.test('durable authorized refresh admits stale originals, preserves ancestry, and expires at its genuine new boundary',async st=>{
+  const robotsBody='User-agent: *\nAllow: /\n',item=await fixture('refresh-stale',{stale:true,robotsBody}),seen:string[]=[];
+  interface WireSeam {wire(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
+  st.mock.method(PoliteFetcher.prototype as unknown as WireSeam,'wire',async (url:URL)=>{
+   seen.push(url.pathname);
+   if(url.pathname==='/robots.txt')return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from(robotsBody)};
+   if(url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+   throw Error('Refresh must not refetch original body');
+  });
+  await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+   const queued=await enqueueCrawlPolicyRefresh(store,item.cas,{manifest:item.manifest,maxRequests:4});assert.deepEqual(queued.holds,[]);assert.equal(queued.jobKeys.length,1);
+   const jobKey=queued.jobKeys[0].jobKey;
+   const before=await importCrawlCorpusForResidual(store,item.cas,{...item.manifest,documents:item.manifest.documents.map(row=>({...row,policyRefreshJobKey:jobKey}))});assert.equal(before.jobs.length,0);
+   const authorizationId=await store.authorize({approvalSha256:digest('Synthetic refresh fixture authorization '+jobKey),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
+   const handler=policyRefreshHandler(store,(context,maxRequests)=>createR1PublicFetcher(store,context,{maxRequests,maxBytes:1024*1024,fixture:{fetchRoot:join(root!,'refresh-fetch'),policy,inspection:fixturePolicyInspection}}));
+   const result=await runDistrictJobs({store,cas:item.cas,handlers:{policy_refresh:handler},authorizationId,ownerPresent:true,maxJobs:1,maxElapsedMs:60000});assert.equal(result.jobsStarted,1);
+   const row=await pool!.query('SELECT state FROM district_pipeline.jobs WHERE job_key=$1',[jobKey]);assert.equal(row.rows[0].state,'succeeded');
+   assert.deepEqual(seen,['/robots.txt','/.well-known/tdmrep.json']);
+   const imported=await importCrawlCorpusForResidual(store,item.cas,{...item.manifest,documents:item.manifest.documents.map(row=>({...row,policyRefreshJobKey:jobKey}))});assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
+   const job=imported.jobs[0],source=await loadResidualSource(item.cas,job),proof=await loadPolicyReceipt(item.cas,job.policyReceiptSha256);
+   assert.equal(source.document.checkedAt,item.document.checkedAt);assert.equal(source.document.retrievedAt,item.document.retrievedAt);assert.deepEqual(await readFile(item.document.observationPath),item.observationBytes);assert.deepEqual(await item.cas.read(item.document.sha256),item.bytes);
+   assert.ok(Date.parse(proof.sourcePolicy.robots.checkedAt!)>Date.parse(item.document.checkedAt));
+   assert.equal(Date.parse(proof.expiresAt),Math.min(Date.parse(proof.sourcePolicy.robots.checkedAt!),...proof.sourcePolicy.tdm.evidence.map(row=>Date.parse(row.checkedAt!)))+3600000);
+   await enqueueResidualPreparation(store,item.cas,job);
+   const mismatched={...item.manifest,documents:item.manifest.documents.map(row=>({...row,bounds:{...row.bounds,maxChunks:2},policyRefreshJobKey:jobKey}))};
+   assert.equal((await importCrawlCorpusForResidual(store,item.cas,mismatched)).jobs.length,0);
+   st.mock.timers.enable({apis:['Date'],now:new Date(proof.expiresAt)});
+   await assert.rejects(recheckPolicyReceipt(proof,{...policy,evaluationAt:new Date().toISOString()}),/expired/);
+   await assert.rejects(loadResidualSource(item.cas,job),/expired/);
+   st.mock.timers.reset();
+  });
+ });
+ for(const kind of ['robots_stricter','tdm_reserved','opt_out'] as const)await t.test(`durable refresh holds ${kind}`,async st=>{
+  const robotsBody='User-agent: *\nAllow: /\n',item=await fixture('refresh-hold-'+kind,{stale:true,robotsBody});
+  let requests=0;
+  interface WireSeam {wire(url:URL):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
+  st.mock.method(PoliteFetcher.prototype as unknown as WireSeam,'wire',async (url:URL)=>{
+   requests++;
+   if(url.pathname==='/robots.txt')return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from(kind==='robots_stricter'?'User-agent: *\nDisallow: /\n':robotsBody)};
+   if(url.pathname==='/.well-known/tdmrep.json')return {status:200,headers:{'content-type':'application/json'},body:Buffer.from('[{"location":"/","tdm-reservation":1}]')};
+   throw Error('Held refresh must not request original body');
+  });
+  await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+   const queued=await enqueueCrawlPolicyRefresh(store,item.cas,{manifest:item.manifest,maxRequests:4}),jobKey=queued.jobKeys[0].jobKey;
+   const authorizationId=await store.authorize({approvalSha256:digest('Synthetic held refresh authorization '+jobKey),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
+   if(kind==='opt_out')await recordHostOptOut({host:'example.org',reason:'rights_holder_objection'},policy);
+   const handler=policyRefreshHandler(store,(context,maxRequests)=>createR1PublicFetcher(store,context,{maxRequests,maxBytes:1024*1024,fixture:{fetchRoot:join(root!,'refresh-held-fetch-'+kind),policy,inspection:fixturePolicyInspection}}));
+   const result=await runDistrictJobs({store,cas:item.cas,handlers:{policy_refresh:handler},authorizationId,ownerPresent:true,maxJobs:1,maxElapsedMs:60000});assert.equal(result.state,'held');assert.equal(result.jobsStarted,1);
+   const receipts=await pool!.query('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId]);assert.deepEqual(receipts.rows[0].receipt.outputHashes,[]);
+   if(kind==='opt_out'){
+    // The canonical executor refuses the already purged/withdrawn input CAS
+    // before dispatching the handler; it is an execution hold, not a refetch.
+    assert.equal(receipts.rows[0].receipt.outcome,'held_execution');assert.equal(receipts.rows[0].receipt.reasonCode,'cas_unavailable');assert.equal(requests,0);
+   }else{
+    assert.equal(receipts.rows[0].receipt.outcome,'blocked_policy');
+    assert.deepEqual(await readFile(item.document.observationPath),item.observationBytes);
+   }
+  });
  });
 });
 test('request sidecars leave old observation bytes unchanged and remain recoverable/purgable managed artifacts',async t=>{

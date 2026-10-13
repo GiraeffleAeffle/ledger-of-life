@@ -31,6 +31,7 @@ import {ownerGenesisAccessFor,ownerGenesisRobotsDecisionFor} from './source-poli
 import {readGenesisOwnerCredentials,type GenesisOwnerCredentials} from './genesis-owner-credentials.ts';
 import {genesisOwnerAccountRoot,readGenesisOwnerRepresentation} from './genesis-owner-acquisition.ts';
 import {persistCrawlRequestEvidence,CrawlRequestEvidenceCaptureError} from './district-crawl-request.ts';
+import {semanticHash} from './district-adapter-contract.ts';
 
 export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'credential_unavailable'|'dns_error'|'timeout'|'network_error'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cross_host_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded'|'host_admission_deferred';
 class RequestAdmissionInterruption extends Error {readonly admissionError:unknown;constructor(error:unknown){super('Public request admission held');this.admissionError=error;}}
@@ -134,6 +135,7 @@ export class PoliteFetcher {
  private authorityMode?:CivicPolicyAuthorityReceipt['mode'];
  private ownerAccountFetcher?:PoliteFetcher;
  private readonly publicPolicyFetcher?:PoliteFetcher;
+ private policyObservationPaths:string[]|undefined;
  get requestCount():number{return this.fetchCount;}
  constructor(options:PoliteFetcherOptions,publicPolicyFetcher?:PoliteFetcher){
   if(options.fixtureInspection&&(!options.ownerPolicyLane?.authorityId?.startsWith('fixture:')||!options.ownerPolicyLane.authoritySha256||!options.ownerPolicyLane.stateDir))throw new PoliteFetchError('host_state_unsafe','Injected inspection requires a fully pinned isolated fixture authority');
@@ -350,6 +352,7 @@ export class PoliteFetcher {
  private async observation(value:FetchObservation,path=join(this.cacheDir,'observations',`${Date.now()}-${randomUUID()}.json`),bytes=this.encodeObservation(value),alreadyManaged=false):Promise<string>{
   await this.initialize();
   const persist=async()=>{await mkdir(join(this.cacheDir,'observations'),{recursive:true});await writeFile(path,bytes,{flag:'wx',mode:0o600});return path;};
+  this.policyObservationPaths?.push(path);
   if(!this.publicPolicyFetcher||alreadyManaged)return persist();
   // A denial's actual observation bytes are inventoried as their OWN content
   // for custody/purge only, never as a fetched representation or admissible proof.
@@ -408,6 +411,39 @@ export class PoliteFetcher {
    })();cached={expiresAt:Date.now()+this.options.policyTtlMs,response:pending};this.machinePolicies.set(cacheKey,cached);
   }
   return cached.response;
+ }
+ /** Authorized current-proof operation: policy endpoints only, never the original body.
+  * A new operation bypasses in-memory TTLs, but retains genuine HTTP validators.
+  * Even a permissive policy change is a hold; old body-specific findings stay old. */
+ async refreshPolicyForOriginal(source:{url:string;sha256:string},original:SourceAccessPolicy,options:Pick<FetchOptions,'machinePolicyUrls'|'hostProfile'>={}){
+  const input=source.url;
+  await this.initialize();await this.assertHostAllowed(input);
+  const url=publicUrl(input);
+  if(this.publicPolicyFetcher||original.access!=='public'||this.policyObservationPaths)throw new PoliteFetchError('host_state_unsafe','Policy refresh requires an exclusive public policy lane');
+  this.robots.clear();this.machinePolicies.clear();this.policyObservationPaths=[];
+  try{
+   const robots=await this.policy(url,options.hostProfile);
+   const currentRobots={state:robotsAllows(robots,input)?'allowed' as const:'blocked' as const,url:robots.evidence!.url,...(robots.evidence!.sha256?{sha256:robots.evidence!.sha256}:{}),checkedAt:robots.evidence!.checkedAt};
+   const withoutClock=(value:PolicyEvidence|SourceAccessPolicy['robots'])=>{const {checkedAt,...fields}=value;return semanticHash(fields);};
+   if(withoutClock(currentRobots)!==withoutClock(original.robots))throw new PoliteFetchError('robots_blocked','Robots policy changed; original held');
+   const originEvidence:PolicyEvidence[]=[];
+   for(const knownUrl of [undefined,...new Set(options.machinePolicyUrls??[])]){
+    if(knownUrl&&publicUrl(knownUrl).origin!==url.origin)throw new PoliteFetchError('unsafe_url','Machine policy origin differs');
+    const current=await this.machinePolicy(url,knownUrl,original.ownerRobotsOverride,options.hostProfile);
+    originEvidence.push(current.evidence);
+    const rule=tdmRuleForUrl(current.rules,input);
+    if(rule)originEvidence.push({...current.evidence,locator:'TDMRep matching location',value:String(rule['tdm-reservation'])});
+   }
+   const isOrigin=(row:PolicyEvidence)=>row.locator==='W3C TDMRep origin rules'||row.locator==='TDMRep matching location'||row.locator.startsWith('TDMRep standardized location HTTP absence');
+   const oldOrigin=original.tdm.evidence.filter(isOrigin);
+   if(!oldOrigin.length||JSON.stringify(oldOrigin.map(withoutClock))!==JSON.stringify(originEvidence.map(withoutClock)))throw new PoliteFetchError('tdm_reserved','TDMRep policy changed; original held');
+   const sourcePolicy={...original,robots:currentRobots,tdm:{...original.tdm,evidence:[...original.tdm.evidence.filter(row=>!isOrigin(row)),...originEvidence]}};
+   if(!effectiveSourcePermission(sourcePolicy,source))throw new PoliteFetchError('tdm_reserved','Current source policy refuses original');
+   const clocks=[currentRobots.checkedAt,...originEvidence.map(row=>row.checkedAt)];
+   if(clocks.some(clock=>!clock||!Number.isFinite(Date.parse(clock))||Date.parse(clock)>Date.now()))throw new PoliteFetchError('host_state_unsafe','Current policy clock is incomplete');
+   await this.assertHostAllowed(input);
+   return {sourcePolicy,expiresAt:new Date(Math.min(...clocks.map(clock=>Date.parse(clock!)))+60*60*1000).toISOString(),observations:[...this.policyObservationPaths]};
+  }catch(error){if(error instanceof RequestAdmissionInterruption)throw error.admissionError;throw error;}finally{this.policyObservationPaths=undefined;}
  }
  async fetch(url:string,options:FetchOptions={}):Promise<FetchedDocument>{
   await this.initialize();this.fetchCount++;

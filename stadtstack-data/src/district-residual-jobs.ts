@@ -3,7 +3,7 @@ import {basename,join} from 'node:path';
 import type {Pool} from 'pg';
 import {z} from 'zod';
 import {HashSchema,canonicalJson,digest,semanticHash} from './district-adapter-contract.ts';
-import {readOperatorRegistryInputPin,operatorRegistryInputPinSchema} from './district-registry-config.ts';
+import {readOperatorRegistryInputPin,operatorRegistryInputPinSchema,CrawlRegistryPinSchema,readCrawlOperatorRegistryInputPin} from './district-registry-config.ts';
 import {authorizedPilotCorpusSchema,loadFrozenCorpusBytes,corpusFixturePolicy} from './district-corpus.ts';
 import {HttpObservationProofSchema,authenticatedHttpBinding,HttpSourceBindingSchema} from './district-http-observation.ts';
 import {SourceObservationSchema,sourceObservationMatches} from './source-observation.ts';
@@ -21,7 +21,7 @@ import {initializeManagedAcquisitionLane,withManagedSourceWrite,withManagedSourc
 
 export const ResidualBoundsSchema=z.object({maxDocuments:z.literal(1),maxChunks:z.number().int().min(1).max(24),maxModelCalls:z.number().int().min(2).max(48),paidMicroUsd:z.literal(0)}).strict();
 const HttpObservationBindingSchema=z.object({observationId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/),receiptSha256:HashSchema}).strict();
-export const ResidualInputSchema=z.object({documentId:z.string().min(1),corpusSha256:authorizedPilotCorpusSchema,corpusObservations:z.array(HttpSourceBindingSchema).min(1).max(10000),registrySha256:HashSchema,registry:operatorRegistryInputPinSchema,policyReceiptSha256:HashSchema,httpObservation:HttpObservationBindingSchema,requestEvidenceSha256:HashSchema,bounds:ResidualBoundsSchema}).strict();
+export const ResidualInputSchema=z.object({documentId:z.string().min(1),corpusSha256:authorizedPilotCorpusSchema,corpusObservations:z.array(HttpSourceBindingSchema).min(1).max(10000),registrySha256:HashSchema,registry:operatorRegistryInputPinSchema,crawlRegistry:CrawlRegistryPinSchema.optional(),policyReceiptSha256:HashSchema,httpObservation:HttpObservationBindingSchema,requestEvidenceSha256:HashSchema,bounds:ResidualBoundsSchema}).strict();
 const ContractSchema=z.object({preparationSha256:HashSchema,extraction:z.object({promptSha256:HashSchema,schemaSha256:HashSchema,extractorSha256:HashSchema}).strict(),hostSha256:HashSchema}).strict();
 const PreparationSelectorSchema=ResidualInputSchema.extend({contract:ContractSchema}).strict();
 const ExtractionSelectorSchema=PreparationSelectorSchema.extend({preparationJobKey:HashSchema,preparationReceiptId:z.uuid(),preparationReceiptSha256:HashSchema,preparedArtifactSha256:HashSchema}).strict();
@@ -38,12 +38,13 @@ export async function loadResidualSource(cas:DistrictCas,input:z.infer<typeof Re
  authorizedPilotCorpusSchema.parse(input.corpusSha256);
  const receipt=await loadPolicyReceipt(cas,input.policyReceiptSha256);
  await recheckPolicyReceipt(receipt,{...policyOptions(receipt),evaluationAt:new Date().toISOString()});
- const admittedRegistry=await readOperatorRegistryInputPin(input.registry,policyOptions(receipt));
+ const migration=input.crawlRegistry?await readCrawlOperatorRegistryInputPin(input.crawlRegistry,input.registry,policyOptions(receipt)):undefined;
+ const admittedRegistry=migration?.processing??await readOperatorRegistryInputPin(input.registry,policyOptions(receipt));
  if(digest(admittedRegistry.bytes)!==input.registrySha256)throw Error('Residual registry differs from authenticated operator configuration');
  await assertManagedSourceReadable(join(cas.root,'sha256',input.registrySha256.slice(0,2),input.registrySha256),policyOptions(receipt));
  if(digest(await cas.read(input.registrySha256))!==digest(admittedRegistry.bytes))throw Error('Residual registry CAS copy changes admitted configuration');
  const registry=admittedRegistry.registry,corpusPath=join(cas.root,'sha256',input.corpusSha256.slice(0,2),input.corpusSha256);
- await assertManagedSourceBindings(corpusPath,[...admittedRegistry.bindings,...input.corpusObservations],policyOptions(receipt));
+ await assertManagedSourceBindings(corpusPath,[...admittedRegistry.bindings,...(migration?.crawl.bindings??[]),...input.corpusObservations],policyOptions(receipt));
  const corpus=loadFrozenCorpusBytes(await cas.read(input.corpusSha256),input.corpusSha256);
  const observations=new Map<string,z.infer<typeof SourceObservationSchema>>();
  for(const binding of input.corpusObservations){
@@ -119,7 +120,7 @@ const extract:JobHandler=async context=>{
 /** No source subprocess runs outside the existing reviewed parser/model APIs. */
 function sourceScoped(handler:JobHandler):JobHandler{return async context=>{
  const raw=context.job.spec.step==='residual_extract'?ExtractionSelectorSchema.parse(context.job.spec.selector):PreparationSelectorSchema.parse(context.job.spec.selector);
- const selector={documentId:raw.documentId,corpusSha256:raw.corpusSha256,corpusObservations:raw.corpusObservations,registrySha256:raw.registrySha256,registry:raw.registry,policyReceiptSha256:raw.policyReceiptSha256,httpObservation:raw.httpObservation,requestEvidenceSha256:raw.requestEvidenceSha256,bounds:raw.bounds,contract:raw.contract};
+ const selector={documentId:raw.documentId,corpusSha256:raw.corpusSha256,corpusObservations:raw.corpusObservations,registrySha256:raw.registrySha256,registry:raw.registry,...(raw.crawlRegistry?{crawlRegistry:raw.crawlRegistry}:{}),policyReceiptSha256:raw.policyReceiptSha256,httpObservation:raw.httpObservation,requestEvidenceSha256:raw.requestEvidenceSha256,bounds:raw.bounds,contract:raw.contract};
  const source=await loadResidualSource(context.cas,selector),policy=policyOptions(source.receipt);
  return withManagedSourceScratch(context.cas.root,[source.sourceBinding],async scope=>{
   await scope.assertActive();const result=await handler({...context,signal:scope.signal});await scope.assertActive();

@@ -8,7 +8,7 @@ import {syncBuiltinESMExports} from 'node:module';
 import {join} from 'node:path';
 import {sha256} from '../src/district-schema.ts';
 import {CIVIC_ACQUISITION_DECISION_ID,recordHostOptOut,HostOptedOutError,CivicPolicyStateError,withManagedSourceScratch,assertManagedSourceBindings} from '../src/civic-opt-out.ts';
-import {buildOperatorRegistryConfigDescriptor,operatorRegistryConfigSchema,operatorRegistryConfigSourcePinSchema,operatorRegistryConfigBindingSchema,readOperatorRegistryConfig,importOperatorRegistryConfig,readOperatorRegistryConfigSourcePin,parseOperatorRegistryConfiguration,operatorRegistryInputPinSchema,readOperatorRegistryInputPin} from '../src/district-registry-config.ts';
+import {buildOperatorRegistryConfigDescriptor,operatorRegistryConfigSchema,operatorRegistryConfigSourcePinSchema,operatorRegistryConfigBindingSchema,readOperatorRegistryConfig,importOperatorRegistryConfig,readOperatorRegistryConfigSourcePin,parseOperatorRegistryConfiguration,operatorRegistryInputPinSchema,readOperatorRegistryInputPin,readCrawlOperatorRegistryInputPin} from '../src/district-registry-config.ts';
 import {districtR1Cli} from '../src/district-r1.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {createOperatorRegistryFixture,operatorRegistryFixtureValue,registryDescriptor,writeOperatorRegistryInputPin} from './helpers/operator-registry-fixture.ts';
@@ -211,4 +211,38 @@ test('registry-descriptor CLI validates flags and confines output to the operato
  for(const args of [[],['--commit','abc'],['--commit','a','--output','x','--commit','b'],['--commit','a','--output','x','--other']])
   await assert.rejects(districtR1Cli(['registry-descriptor',...args]));
  await assert.rejects(districtR1Cli(['registry-descriptor','--commit','a'.repeat(40),'--output','/tmp/out']));
+});
+
+test('explicit crawl migration authenticates older codec proofs against identical current Git configuration and records both pins',async t=>{
+ const f=await rawFixture(t),old={...f.input,schemaContractSha256:sha256('synthetic earlier codec contract')};
+ const crawlPin=await writeOperatorRegistryInputPin(f.root,'old-crawl-descriptor',old),currentPin=await writeOperatorRegistryInputPin(f.root,'fresh-processing-descriptor',f.input);
+ await assert.rejects(readOperatorRegistryInputPin(crawlPin,f.policy),/codec contract mismatch/);
+ const admitted=await readCrawlOperatorRegistryInputPin({pin:crawlPin},currentPin,f.policy);
+ assert.deepEqual(admitted.processing.bytes,f.body);assert.deepEqual(admitted.crawl.bytes,f.body);
+ assert.deepEqual(admitted.pins,{crawl:{pin:crawlPin},processing:currentPin});
+ assert.ok(admitted.crawl.bindings.every(row=>row.schemaContractSha256===old.schemaContractSha256));
+ assert.ok(admitted.processing.bindings.every(row=>row.schemaContractSha256===f.input.schemaContractSha256));
+});
+
+test('crawl migration rejects different configuration, unknown commit, absent trees and forged Git proofs',async t=>{
+ const f=await rawFixture(t),currentPin=await writeOperatorRegistryInputPin(f.root,'fresh-processing-descriptor',f.input),different=await registryDescriptor(f,{...operatorRegistryFixtureValue(),notes:['Different synthetic configuration']},'different-config');
+ const old={...f.input,schemaContractSha256:sha256('synthetic earlier codec contract')};
+ for(const [name,descriptor] of [
+  ['different',different],
+  ['unknown-commit',{...old,code:{...old.code,gitCommit:'a'.repeat(40)},commit:{...old.commit,oid:'a'.repeat(40)},approval:{...old.approval,gitCommit:'a'.repeat(40)}}],
+  ['missing-tree',{...old,trees:old.trees.slice(1)}],
+ ] as const){
+  const pin=await writeOperatorRegistryInputPin(f.root,'bad-crawl-'+name,descriptor);
+  await assert.rejects(readCrawlOperatorRegistryInputPin({pin},currentPin,f.policy));
+ }
+ const fake=Buffer.from('Synthetic forged commit object'),path=join(f.root,'forged-commit.bin');await writeFile(path,fake,{mode:0o600});
+ const forged={...old,commit:{...old.commit,path,sha256:sha256(fake),bytes:fake.length}},pin=await writeOperatorRegistryInputPin(f.root,'forged-crawl',forged);
+ await assert.rejects(readCrawlOperatorRegistryInputPin({pin},currentPin,f.policy));
+});
+
+test('managed crawl migration requires its matching complete original Git descriptor proof',async t=>{
+ const f=await createOperatorRegistryFixture(t),currentPin=await writeOperatorRegistryInputPin(f.root,'fresh-processing-descriptor',f.input),proofPin=await writeOperatorRegistryInputPin(f.root,'original-crawl-git-proof',f.input);
+ await assert.rejects(readCrawlOperatorRegistryInputPin({pin:f.registryPin},currentPin,f.policy),/lacks original Git proof/);
+ const admitted=await readCrawlOperatorRegistryInputPin({pin:f.registryPin,gitProof:proofPin},currentPin,f.policy);
+ assert.deepEqual(admitted.crawl.bindings,f.sourcePin.bindings);assert.deepEqual(admitted.pins.crawl,{pin:f.registryPin,gitProof:proofPin});
 });
