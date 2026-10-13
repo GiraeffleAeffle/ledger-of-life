@@ -13,6 +13,7 @@ import type {SourceAccessPolicy,OwnerRobotsOverride} from './source-policy.ts';
 import {PDF_TDM_POLICY_VERSION} from './pdf-tdm-policy.ts';
 import { DOCUMENT_ORIGIN_CLASSIFIER_VERSION } from './document-origin-contract.ts'
 import {writePrivateJson} from './district-private-io.ts';
+import {CrawlRequestEvidenceCaptureError} from './district-crawl-request.ts';
 
 export interface RegistrySource {
  id:string;kind:'council'|'participation'|'gazette'|'website'|'structured';url:string|null;vendor:string;
@@ -235,6 +236,7 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
     }
    }
   }catch(error){
+   if(error instanceof CrawlRequestEvidenceCaptureError)throw error;
    if(isCouncilPermissionFailure(error)){frontier.documents=[];frontier.queue=[];throw error;}
    const failure=error instanceof PoliteFetchError?error.failure:'representation_error',status=error instanceof PoliteFetchError?error.status:undefined,checkedAt=new Date().toISOString();
    const transient=['timeout','network_error','dns_error','robots_unavailable','tdm_unavailable','host_cooldown','host_busy'].includes(failure)||status===429||status!==undefined&&status>=500;
