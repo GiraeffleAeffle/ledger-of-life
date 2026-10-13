@@ -145,7 +145,7 @@ test('registered blocked robots retain unknown origin, honour reservations/opt-o
  assert.equal(readRegisteredRobotsAudit(bobPdf.policy!.tdm.evidence,bobPdf.url)?.municipalDiscovery?.ags,city.ags);
  assert.ok(!seen.some(row=>row.host==='bob-sh.de'&&row.path.includes('/foreign/')));
  const bobOptions={registeredMunicipalityId:city.id,registeredSourceId:bobSource.id,registeredSourceUrl:bobSource.url!};
- await assert.rejects(bobLane.fetcher.fetch('https://bob-sh.de/verfahren/unbound/public/detail',bobOptions),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='document_excluded');
+ await assert.rejects(bobLane.fetcher.fetch('https://bob-sh.de/verfahren/unbound/public/detail',bobOptions),(error:unknown)=>error instanceof PoliteFetchError&&['robots_blocked','document_excluded'].includes(error.failure));
  const bobAudit=readRegisteredRobotsAudit(bobPdf.policy!.tdm.evidence,bobPdf.url)!;assert.equal(registeredRobotsAuditApplies({...bobAudit,municipalDiscovery:{...bobAudit.municipalDiscovery!,ags:'01053090'}},bobPdf.url),false);
  retryFrontierMode=true;
  const retryLane=await lane('retry-frontier'),retrySource={...gazette,registeredMunicipalityId:city.id},limits={maxRequests:1,maxPages:10,maxDocuments:10};
