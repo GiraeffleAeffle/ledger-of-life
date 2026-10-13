@@ -28,11 +28,38 @@ export function ownerRobotsOverrideApplies(url:string,supplied:unknown):boolean 
  return Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key)&&value[key]===approved[key]);
 }
 
+export interface OwnerGenesisAccessDecision {
+ readonly id:string;readonly date:string;readonly approver:'owner';readonly host:'www.regionalstatistik.de';
+ readonly purpose:'regionalstatistik_genesis_statistics';readonly permission:'facts_with_attribution';
+}
+/** Code-reviewed decisions only. EMPTY until the owner's explicit written approval;
+ * robots/corpus approvals do not authorize use of an account. No runtime overrides. */
+export const APPROVED_OWNER_GENESIS_ACCESS:readonly OwnerGenesisAccessDecision[]=Object.freeze([]);
+export interface OwnerAccountAccess {decisionId:string;credentialKind:'token'|'password'}
+export function isOwnerGenesisEndpoint(url:string):boolean {
+ try{
+  const target=new URL(url);
+  return target.origin==='https://www.regionalstatistik.de'&&!target.username&&!target.password&&!target.search&&!target.hash&&/^\/genesisws\/rest\/2020\/data\/table(?:file)?$/.test(target.pathname);
+ }catch{return false;}
+}
+export function ownerGenesisAccessFor(url:string):OwnerGenesisAccessDecision|null {
+ if(!isOwnerGenesisEndpoint(url))return null;
+ return APPROVED_OWNER_GENESIS_ACCESS.find(decision=>decision.host==='www.regionalstatistik.de'&&decision.approver==='owner'&&decision.purpose==='regionalstatistik_genesis_statistics'&&decision.permission==='facts_with_attribution'&&/^[a-z0-9][a-z0-9-]{0,159}$/.test(decision.id)&&/^\d{4}-\d{2}-\d{2}$/.test(decision.date))??null;
+}
+export function ownerAccountAccessApplies(url:string,audit:OwnerAccountAccess|undefined):boolean {
+ const decision=ownerGenesisAccessFor(url);
+ return !!decision&&!!audit&&audit.decisionId===decision.id&&(audit.credentialKind==='token'||audit.credentialKind==='password');
+}
+export function effectiveAccountAccess(policy:Pick<SourceAccessPolicy,'access'|'ownerAccountAccess'>,url:string):boolean {
+ return policy.access==='public'?policy.ownerAccountAccess===undefined:policy.access==='authenticated_owner_account'&&ownerAccountAccessApplies(url,policy.ownerAccountAccess);
+}
+
 export interface PolicyEvidence {url:string;locator:string;value:string;sha256?:string;checkedAt?:string;valueSha256?:string;valueBytes?:number;locatorSha256?:string;locatorBytes?:number;itemCount?:number}
 export interface SourceAccessPolicy {
  robots:{state:'allowed'|'blocked'|'unavailable';url:string;sha256?:string;checkedAt?:string};
  tdm:{state:'reserved'|'not_reserved'|'not_declared'|'unavailable';evidence:PolicyEvidence[];referenceStatus?:'unavailable';declarationStatus?:'unavailable'};
- access:'public'|'authentication'|'captcha'|'paywall';
+ access:'public'|'authentication'|'captcha'|'paywall'|'authenticated_owner_account';
+ ownerAccountAccess?:OwnerAccountAccess;
  legalClassification:'not_assessed';
  publication:'facts_with_attribution_only';
  ownerRobotsOverride?:OwnerRobotsOverride;
@@ -144,7 +171,7 @@ export function documentOriginExcludes(policy:SourceAccessPolicy,document:{url:s
 }
 /** Shared pre-CAS/pre-model admission; PDF metadata completeness is additionally checked by the schema gate. */
 export function effectiveSourcePermission(policy:SourceAccessPolicy,document:{url:string;sha256:string}):boolean {
- if(!effectiveRobotsPermission(policy,document.url)||policy.access!=='public'||policy.tdm.state==='unavailable'||policy.tdm.referenceStatus==='unavailable'||policy.tdm.declarationStatus==='unavailable'||documentOriginExcludes(policy,document))return false;
+ if(!effectiveRobotsPermission(policy,document.url)||!effectiveAccountAccess(policy,document.url)||policy.tdm.state==='unavailable'||policy.tdm.referenceStatus==='unavailable'||policy.tdm.declarationStatus==='unavailable'||documentOriginExcludes(policy,document))return false;
  if(policy.tdm.state==='reserved')return policy.documentOrigin?.classification==='official_work'&&policy.tdmOverride==='owner-approved 2026-10-11'&&ownerRobotsOverrideApplies(document.url,policy.ownerTdmOverride);
  return policy.ownerTdmOverride===undefined&&policy.tdmOverride===undefined;
 }
