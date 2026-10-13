@@ -49,6 +49,8 @@ Credential values remain private host memory and those two request headers only;
 
 Only the approved data request uses the fixed sibling `<rawRoot>-genesis-owner-account` with an **artifacts-kind** acquisition marker; robots/TDM remain public requests in the original fetch root. Honest new owner-account observation metadata must not be written into fetch roots while tag-0.3.2 tools share this authority, since their strict legacy codecs cannot decode it. Authenticated POSTs do not use the legacy mutable request cache. Failed/interrupted observations are inventoried as their own exact bytes for purge/recovery custody only (`independentAllowed:false`), never successful source evidence. See the [README acquisition boundary](../README.md#run) for the legacy reconciliation references and exact-success admission behavior.
 
+GENESIS regression tests do not require the production approval list to remain empty. No-entry GAST/401 behavior is exercised in a disposable source snapshot with an explicitly empty decision list; the actual checked-in decision is separately tested against uncovered hosts/endpoints/paths and forged audit metadata. Authenticated integration uses that real decision unchanged in another source snapshot, but rewrites the credential reader to a private synthetic fixture file before any child executes, uses only loopback transport and fixture authority, and never opens the owner's actual credential file.
+
 ## 1. Locations, ownership and observed state
 
 - Repository: `GiraeffleAeffle/ledger-of-life`, branch `rebuild-r1`, draft PR <https://github.com/GiraeffleAeffle/ledger-of-life/pull/7>.

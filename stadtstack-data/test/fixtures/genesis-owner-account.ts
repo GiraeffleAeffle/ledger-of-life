@@ -15,7 +15,7 @@ import {PoliteFetcher,PoliteFetchError,type FetchObservation} from '../../src/po
 import type {FetchedDocument,PoliteFetcherOptions,FixturePolicyInspection} from '../../src/polite-fetch.ts';
 import {nativePublicRequestHeaders,type NativePublicOperation} from '../../src/district-native-request.ts';
 import {GENESIS_OWNER_CREDENTIAL_PATH,GENESIS_CREDENTIAL_MAX_BYTES,type GenesisOwnerCredentials} from '../../src/genesis-owner-credentials.ts';
-import {APPROVED_OWNER_GENESIS_ACCESS,effectiveSourcePermission} from '../../src/source-policy.ts';
+import {ownerGenesisAccessFor,effectiveSourcePermission} from '../../src/source-policy.ts';
 import {ContentFreeSourcePolicySchema} from '../../src/district-schema.ts';
 import {createPolicyReceipt} from '../../src/district-policy-receipt.ts';
 import {DistrictCas} from '../../src/district-cas.ts';
@@ -44,8 +44,8 @@ interface Seam {
  wireRequest(url:URL,method:'GET'|'POST',body:string|undefined,previous:FetchObservation|undefined,pinned:{address:string;family:number},headers:Record<string,string>):Promise<Response>;
 }
 
-test('fixture-reviewed owner entry exercises headers, holds, persisted receipts and redirect refusal',async t=>{
- assert.equal(APPROVED_OWNER_GENESIS_ACCESS[0]?.id,'fixture-owner-genesis');
+test('checked-in reviewed owner entry exercises headers, holds, persisted receipts and redirect refusal',async t=>{
+ const decision=ownerGenesisAccessFor(endpoint);assert.ok(decision,'Checked-in owner approval must cover the fixture endpoint');
  const root=await mkdtemp(join(tmpdir(),'genesis-reviewed-artifacts-'));t.after(()=>rm(root,{recursive:true,force:true}));
  const seen:Array<{host:string;path:string;authenticated:boolean}>=[];
  type Reply='success'|'cross'|'same'|'echo'|'header-echo'|'unauthorized'|'unicode'|'mixed-unicode'|'json-key'|'shadowed-value'|'zip'|'zip-extra'|'zip-name'|'percent-location'|'nested-percent-location'|'unknown';
@@ -110,7 +110,7 @@ test('fixture-reviewed owner entry exercises headers, holds, persisted receipts 
  for(const credentialKind of ['token','password'] as const){
   kind=credentialKind;reply='success';await writeFile(GENESIS_OWNER_CREDENTIAL_PATH,JSON.stringify(kind==='token'?{token}:{username,password}),{mode:0o600});await chmod(GENESIS_OWNER_CREDENTIAL_PATH,0o600);
   const {fetcher,options,cache}=await lane(kind),source=await fetcher.fetch(endpoint+(kind==='password'?'file':''),{method:'POST',body,publicOperation:'genesis_guest'});
-  assert.equal(source.policy?.access,'authenticated_owner_account');assert.deepEqual(source.policy?.ownerAccountAccess,{decisionId:'fixture-owner-genesis',credentialKind:kind});
+  assert.equal(source.policy?.access,'authenticated_owner_account');assert.deepEqual(source.policy?.ownerAccountAccess,{decisionId:decision.id,credentialKind:kind});
   assert.ok(ContentFreeSourcePolicySchema.safeParse(source.policy).success);assert.ok(effectiveSourcePermission(source.policy!,source));
   const observation=await readFile(source.observationPath);noSecrets(observation);assert.ok(observation.includes(Buffer.from('authenticated_owner_account')));
   const marker=JSON.parse(await readFile(join(genesisOwnerAccountRoot(cache),'.civic-acquisition-lane.json'),'utf8'));assert.equal(marker.kind,'artifacts');

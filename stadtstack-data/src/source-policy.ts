@@ -32,9 +32,13 @@ export interface OwnerGenesisAccessDecision {
  readonly id:string;readonly date:string;readonly approver:'owner';readonly host:'www.regionalstatistik.de';
  readonly purpose:'regionalstatistik_genesis_statistics';readonly permission:'facts_with_attribution';
 }
-/** Code-reviewed decisions only. EMPTY until the owner's explicit written approval;
- * robots/corpus approvals do not authorize use of an account. No runtime overrides. */
-export const APPROVED_OWNER_GENESIS_ACCESS:readonly OwnerGenesisAccessDecision[]=Object.freeze([]);
+/** Code-reviewed decisions only, each backed by the owner's explicit written approval;
+ * robots/corpus approvals do not authorize use of an account. No runtime overrides.
+ * owner-2026-10-13-regionalstatistik-account: "1. yes" in the omp chat, recorded in
+ * reports/approvals/r1-k2-and-genesis-owner-account-2026-10-13.json (sha256 d7c8074d…). */
+export const APPROVED_OWNER_GENESIS_ACCESS:readonly OwnerGenesisAccessDecision[]=Object.freeze([
+ Object.freeze({id:'owner-2026-10-13-regionalstatistik-account',date:'2026-10-13',approver:'owner',host:'www.regionalstatistik.de',purpose:'regionalstatistik_genesis_statistics',permission:'facts_with_attribution'} as const),
+]);
 export interface OwnerAccountAccess {decisionId:string;credentialKind:'token'|'password'}
 export function isOwnerGenesisEndpoint(url:string):boolean {
  try{
