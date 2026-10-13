@@ -76,7 +76,7 @@ test('managed native text intake rejects a corpus outside the exact owner allowl
  const privateProvenancePath=join(context.root,'provenance.json'),encoded=JSON.stringify({schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:pins});await writeFile(privateProvenancePath,encoded);
  const options={registry:join(inputRoot,'registry.json'),records:join(inputRoot,'records.json'),quarantine:join(inputRoot,'quarantine.json'),textComposition:join(inputRoot,'composition.json'),policyReceipts:join(inputRoot,'policy.json'),privateProvenance:{path:privateProvenancePath,sha256:hash(encoded)},outputRoot:join(context.root,'prepared-publication'),casRoot:cas.root,policyStateDir:context.policy.stateDir,policyAuthorityId:context.policy.authorityId,policyAuthoritySha256:context.policy.authoritySha256,coverageGeneratedAt:at};
  let entered=false;
- await assert.rejects(withPreparedKnowledge(options,async()=>{entered=true;}),/Invalid option: expected one of/);
+ await assert.rejects(withPreparedKnowledge(options,async()=>{entered=true;}),/owner-authorized/);
  assert.equal(entered,false);
 });
 

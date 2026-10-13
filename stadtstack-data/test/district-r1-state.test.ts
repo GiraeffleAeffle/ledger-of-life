@@ -16,7 +16,7 @@ import {provisionCivicPolicyAuthority,recordHostOptOut,purgeOptedOutHost,assertM
 import {encodeStepReceipt,type StepReceipt} from '../src/district-step-receipt.ts';
 import {StructuredWorkerRequestSchema,StructuredInputBundleSchema} from '../src/district-structured-parser-worker.ts';
 import {createOperatorRegistryFixture,operatorRegistryFixtureValue,writeOperatorRegistryInputPin} from './helpers/operator-registry-fixture.ts';
-import {persistOperatorRegistry} from '../src/district-r1.ts';
+import {persistOperatorRegistry} from '../src/district-r1-state.ts';
 import type {DistrictRegistry} from '../src/district-registry.ts';
 
 // Opt-in real local Postgres, with a newly created disposable database. All source

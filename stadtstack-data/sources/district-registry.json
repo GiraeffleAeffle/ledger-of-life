@@ -1,6 +1,6 @@
 {
   "schemaVersion": "stadtstack-source-registry-v1",
-  "generatedAt": "2026-10-12T21:48:03.614Z",
+  "generatedAt": "2026-10-13T06:26:42.624Z",
   "districts": [
     {
       "id": "maerkisch-oderland",
@@ -88,7 +88,13 @@
           "id": "strausberg-planning",
           "kind": "participation",
           "url": "https://www.stadt-strausberg.de/bauleitplanung-2/",
-          "ownerRobotsOverride": {"host": "www.stadt-strausberg.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.stadt-strausberg.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -172,7 +178,13 @@
           "id": "strausberg-website",
           "kind": "website",
           "url": "https://www.stadt-strausberg.de/",
-          "ownerRobotsOverride": {"host": "www.stadt-strausberg.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.stadt-strausberg.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -320,7 +332,13 @@
           "id": "strausberg-participation",
           "kind": "participation",
           "url": "https://bb.beteiligung.diplanung.de/verfahren/altstadtquartier-srb/public/detail",
-          "ownerRobotsOverride": {"host": "bb.beteiligung.diplanung.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "bb.beteiligung.diplanung.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -391,7 +409,13 @@
           "id": "strausberg-gazette",
           "kind": "gazette",
           "url": "https://www.stadt-strausberg.de/neue-strausberger-zeitung/",
-          "ownerRobotsOverride": {"host": "www.stadt-strausberg.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.stadt-strausberg.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -561,7 +585,13 @@
           "id": "hoppegarten-website",
           "kind": "website",
           "url": "https://www.gemeinde-hoppegarten.de/",
-          "ownerRobotsOverride": {"host": "www.gemeinde-hoppegarten.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.gemeinde-hoppegarten.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -619,7 +649,13 @@
           "id": "hoppegarten-council",
           "kind": "council",
           "url": "https://ratsinfo.gemeinde-hoppegarten.de/",
-          "ownerRobotsOverride": {"host": "ratsinfo.gemeinde-hoppegarten.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "ratsinfo.gemeinde-hoppegarten.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "sessionnet",
           "checkState": "checked",
@@ -695,7 +731,13 @@
           "id": "hoppegarten-participation",
           "kind": "participation",
           "url": "https://bb.beteiligung.diplanung.de/verfahren/eb568622-04ec-41e7-8069-fd8204fa88d8/public/detail",
-          "ownerRobotsOverride": {"host": "bb.beteiligung.diplanung.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "bb.beteiligung.diplanung.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -766,7 +808,13 @@
           "id": "hoppegarten-gazette",
           "kind": "gazette",
           "url": "https://www.gemeinde-hoppegarten.de/amtsblatt/index.php",
-          "ownerRobotsOverride": {"host": "www.gemeinde-hoppegarten.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.gemeinde-hoppegarten.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -869,7 +917,13 @@
           "id": "ruedersdorf-bei-berlin-website",
           "kind": "website",
           "url": "https://www.ruedersdorf.de/",
-          "ownerRobotsOverride": {"host": "www.ruedersdorf.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.ruedersdorf.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -927,7 +981,13 @@
           "id": "ruedersdorf-bei-berlin-council",
           "kind": "council",
           "url": "https://ratsinfo-online.net/ruedersdorf-bi/allris.net.asp",
-          "ownerRobotsOverride": {"host": "ratsinfo-online.net", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "ratsinfo-online.net",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "allris",
           "checkState": "checked",
@@ -1004,7 +1064,13 @@
           "id": "ruedersdorf-bei-berlin-participation",
           "kind": "participation",
           "url": "https://bb.beteiligung.diplanung.de/plan/bplan53biomassezentrum",
-          "ownerRobotsOverride": {"host": "bb.beteiligung.diplanung.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "bb.beteiligung.diplanung.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -1075,7 +1141,13 @@
           "id": "ruedersdorf-bei-berlin-gazette",
           "kind": "gazette",
           "url": "https://www.ruedersdorf.de/politik-verwaltung/bekanntmachungen/gemeindemagazin/",
-          "ownerRobotsOverride": {"host": "www.ruedersdorf.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.ruedersdorf.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -1207,7 +1279,13 @@
           "id": "ratzeburg-website",
           "kind": "website",
           "url": "https://www.ratzeburg.de/",
-          "ownerRobotsOverride": {"host": "www.ratzeburg.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.ratzeburg.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -1267,7 +1345,13 @@
           "id": "ratzeburg-council",
           "kind": "council",
           "url": "https://session.ratzeburg.de/ri/?fdirect=1",
-          "ownerRobotsOverride": {"host": "session.ratzeburg.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "session.ratzeburg.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "sessionnet",
           "checkState": "checked",
@@ -1326,7 +1410,13 @@
           "id": "ratzeburg-participation",
           "kind": "participation",
           "url": "https://www.ratzeburg.de/Stadtentwicklung/Bauleitplanung/Bebauungspl%C3%A4ne-der-Stadt-Ratzeburg",
-          "ownerRobotsOverride": {"host": "www.ratzeburg.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.ratzeburg.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -1384,7 +1474,13 @@
           "id": "ratzeburg-gazette",
           "kind": "gazette",
           "url": "https://www.ratzeburg.de/B%C3%BCrgerservice/Bekanntmachungen-Ortsrecht/Amtliche-Bekanntmachung/",
-          "ownerRobotsOverride": {"host": "www.ratzeburg.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.ratzeburg.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -1464,7 +1560,13 @@
           "id": "ratzeburg-bob-sh",
           "kind": "participation",
           "url": "https://bob-sh.de/",
-          "ownerRobotsOverride": {"host": "bob-sh.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "bob-sh.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -1616,7 +1718,13 @@
           "id": "moelln-website",
           "kind": "website",
           "url": "https://www.moelln.de/",
-          "ownerRobotsOverride": {"host": "www.moelln.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.moelln.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -1674,7 +1782,13 @@
           "id": "moelln-council",
           "kind": "council",
           "url": "https://www.moelln.sitzung-online.de/integration/si010",
-          "ownerRobotsOverride": {"host": "www.moelln.sitzung-online.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.moelln.sitzung-online.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "allris",
           "checkState": "checked",
@@ -1734,7 +1848,13 @@
           "id": "moelln-participation",
           "kind": "participation",
           "url": "https://www.moelln.de/fileadmin/Stadt_Moelln/Dateien/Bebauungsplaene/BP_86/2.Aenderung/Begruendung.pdf",
-          "ownerRobotsOverride": {"host": "www.moelln.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.moelln.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -1792,7 +1912,13 @@
           "id": "moelln-gazette",
           "kind": "gazette",
           "url": "https://www.moelln.de/buergerservice-politik/bekanntmachungen/amtliche-bekanntmachungen",
-          "ownerRobotsOverride": {"host": "www.moelln.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.moelln.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -1872,7 +1998,13 @@
           "id": "moelln-bob-sh",
           "kind": "participation",
           "url": "https://bob-sh.de/",
-          "ownerRobotsOverride": {"host": "bob-sh.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "bob-sh.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -1980,7 +2112,13 @@
           "id": "schwarzenbek-website",
           "kind": "website",
           "url": "https://www.schwarzenbek.de/",
-          "ownerRobotsOverride": {"host": "www.schwarzenbek.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.schwarzenbek.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -2038,7 +2176,13 @@
           "id": "schwarzenbek-council",
           "kind": "council",
           "url": "https://sessionnet.owl-it.de/schwarzenbek/bi/",
-          "ownerRobotsOverride": {"host": "sessionnet.owl-it.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "sessionnet.owl-it.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "sessionnet",
           "checkState": "checked",
@@ -2097,7 +2241,13 @@
           "id": "schwarzenbek-participation",
           "kind": "participation",
           "url": "https://www.schwarzenbek.de/Themen/Bauen-Umwelt/",
-          "ownerRobotsOverride": {"host": "www.schwarzenbek.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.schwarzenbek.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -2155,7 +2305,13 @@
           "id": "schwarzenbek-gazette",
           "kind": "gazette",
           "url": "https://www.schwarzenbek.de/Service/Amtl-Bekanntmachungen/",
-          "ownerRobotsOverride": {"host": "www.schwarzenbek.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.schwarzenbek.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -2235,7 +2391,13 @@
           "id": "schwarzenbek-bob-sh",
           "kind": "participation",
           "url": "https://bob-sh.de/",
-          "ownerRobotsOverride": {"host": "bob-sh.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "bob-sh.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -2385,7 +2547,13 @@
           "id": "ludwigslust-website",
           "kind": "website",
           "url": "https://www.ludwigslust.de/",
-          "ownerRobotsOverride": {"host": "www.ludwigslust.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.ludwigslust.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -2443,7 +2611,13 @@
           "id": "ludwigslust-council",
           "kind": "council",
           "url": "https://ris.ludwigslust.de/",
-          "ownerRobotsOverride": {"host": "ris.ludwigslust.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "ris.ludwigslust.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "sessionnet",
           "checkState": "checked",
@@ -2505,7 +2679,13 @@
           "id": "ludwigslust-participation",
           "kind": "participation",
           "url": "https://www.gaia-mv.de/geoportalsearch/_ajax/search/?type=Bauleitplan&offset=0&n=100&crs=EPSG%3A25832&x_filter%5Bregionalschluessel%5D=130760090090",
-          "ownerRobotsOverride": {"host": "www.gaia-mv.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.gaia-mv.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -2580,7 +2760,13 @@
           "id": "ludwigslust-gazette",
           "kind": "gazette",
           "url": "https://www.ludwigslust.de/Politik-Verwaltung/Verwaltung/%C3%96ffentliche-Bekanntmachungen/Allgemeine-Bekanntmachungen-/",
-          "ownerRobotsOverride": {"host": "www.ludwigslust.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.ludwigslust.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -2696,7 +2882,13 @@
           "id": "parchim-website",
           "kind": "website",
           "url": "https://www.parchim.de/",
-          "ownerRobotsOverride": {"host": "www.parchim.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.parchim.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -2758,7 +2950,13 @@
           "id": "parchim-council",
           "kind": "council",
           "url": "https://parchim.sitzung-mv.de/public/gr020?GRLFDNR=1",
-          "ownerRobotsOverride": {"host": "parchim.sitzung-mv.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "parchim.sitzung-mv.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "allris",
           "checkState": "checked",
@@ -2820,7 +3018,13 @@
           "id": "parchim-participation",
           "kind": "participation",
           "url": "https://www.gaia-mv.de/geoportalsearch/_ajax/search/?type=Bauleitplan&offset=0&n=100&crs=EPSG%3A25832&x_filter%5Bregionalschluessel%5D=130760108108",
-          "ownerRobotsOverride": {"host": "www.gaia-mv.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.gaia-mv.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -2895,7 +3099,13 @@
           "id": "parchim-gazette",
           "kind": "gazette",
           "url": "https://www.parchim.de/de/politik-verwaltung/verwaltung/amtliches-bekanntmachungsblatt-uns-puett/",
-          "ownerRobotsOverride": {"host": "www.parchim.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.parchim.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -5620,7 +5830,13 @@
           "id": "hagenow-publisher-gazette",
           "kind": "gazette",
           "url": "https://epaper.wittich.de/frontend/catalogs/547927/1/pdf/complete.pdf",
-          "ownerRobotsOverride": {"host": "epaper.wittich.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "epaper.wittich.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -5747,7 +5963,13 @@
           "id": "hagenow-website",
           "kind": "website",
           "url": "https://www.hagenow.de/",
-          "ownerRobotsOverride": {"host": "www.hagenow.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.hagenow.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -5810,7 +6032,13 @@
           "id": "hagenow-council",
           "kind": "council",
           "url": "https://hagenow.sitzung-mv.de/ratsinfo/logon",
-          "ownerRobotsOverride": {"host": "hagenow.sitzung-mv.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "hagenow.sitzung-mv.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "allris",
           "checkState": "not_checked",
@@ -5877,7 +6105,13 @@
           "id": "hagenow-participation",
           "kind": "participation",
           "url": "https://www.gaia-mv.de/geoportalsearch/_ajax/search/?type=Bauleitplan&offset=0&n=100&crs=EPSG%3A25832&x_filter%5Bregionalschluessel%5D=130760060060",
-          "ownerRobotsOverride": {"host": "www.gaia-mv.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.gaia-mv.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -5962,7 +6196,13 @@
           "id": "hagenow-gazette",
           "kind": "gazette",
           "url": "https://www.hagenow.de/service-fuer-buerger/downloadcenter/bekanntmachungen-und-sonstiges.html",
-          "ownerRobotsOverride": {"host": "www.hagenow.de", "reason": "public civic sources, owner decision", "date": "2026-10-11", "approver": "owner", "id": "owner-2026-10-11-public-civic-sources"},
+          "ownerRobotsOverride": {
+            "host": "www.hagenow.de",
+            "reason": "public civic sources, owner decision",
+            "date": "2026-10-11",
+            "approver": "owner",
+            "id": "owner-2026-10-11-public-civic-sources"
+          },
           "override": "owner-approved 2026-10-11",
           "vendor": "other",
           "checkState": "checked",
@@ -5989,6 +6229,37 @@
             "checkedAt": null,
             "evidence": [],
             "reason": "Endpoint-specific robots enforcement belongs to PoliteFetcher at crawl time; research reachability does not override it."
+          }
+        },
+        {
+          "id": "pegelonline",
+          "kind": "structured",
+          "url": "https://m.pegelonline.wsv.de/webservices/rest-api/v2/stations.json",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://m.pegelonline.wsv.de/webservice/dokuRestapi",
+              "locator": "Catalog family 11; discovery evidence only; catalog sha256:c19460dddf97c1e4ac2ef85d5bb34a9feff9482af2e8399d06c5b20001d05e40"
+            },
+            {
+              "url": "https://m.pegelonline.wsv.de/gast/nutzungsbedingungen",
+              "locator": "Catalog family 11; discovery evidence only; catalog sha256:c19460dddf97c1e4ac2ef85d5bb34a9feff9482af2e8399d06c5b20001d05e40"
+            }
+          ],
+          "reason": "R1 catalog family 11: discovery route only; exact distribution access, origin, schema and municipal completeness not checked by this run.",
+          "rights": {
+            "licence": "dl-de/zero-2-0 explicit",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Catalog description is not document-specific admission."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
           }
         }
       ],

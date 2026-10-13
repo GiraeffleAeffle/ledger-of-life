@@ -1,4 +1,6 @@
 import {readFile} from 'node:fs/promises';
+import {AsyncLocalStorage} from 'node:async_hooks';
+import {assertCivicPolicyAuthority,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {z} from 'zod';
 import {daySchema,hashSchema,sha256,SourceAccessPolicySchema} from './district-schema.ts';
 import {documentOriginExcludes} from './source-policy.ts';
@@ -15,7 +17,15 @@ export const PATCH_032_STRAUSBERG_SOLARPARK_CORPUS_SHA256='1306a37e00e47505bd9f8
 export const PATCH_032_RUEDERSDORF_HEAT_CORPUS_SHA256='5dcbf35e456d0c2fc04dd7ecfd3cb069f76020ffbb67c5bd245e1bacb7193db6';
 export const PATCH_032_HOPPEGARTEN_HEAT_CORPUS_SHA256='9aae0d802de6aeb9b349bef5cd9862ceb573091dbad45f121bfacb39ad8f600a';
 // Exact owner-authorized snapshots; a caller-selected checksum cannot extend scope.
-export const authorizedPilotCorpusSchema=z.enum([PILOT_BASE_CORPUS_SHA256,PILOT_COMPLETION_CORPUS_SHA256,PATCH_032_R2_STRAUSBERG_SOLARPARK_CORPUS_SHA256,PATCH_032_R2_RUEDERSDORF_HEAT_CORPUS_SHA256,PATCH_032_R2_HOPPEGARTEN_HEAT_CORPUS_SHA256,PATCH_032_STRAUSBERG_SOLARPARK_CORPUS_SHA256,PATCH_032_RUEDERSDORF_HEAT_CORPUS_SHA256,PATCH_032_HOPPEGARTEN_HEAT_CORPUS_SHA256]);
+const ownerAuthorizedCorpusSchema=z.enum([PILOT_BASE_CORPUS_SHA256,PILOT_COMPLETION_CORPUS_SHA256,PATCH_032_R2_STRAUSBERG_SOLARPARK_CORPUS_SHA256,PATCH_032_R2_RUEDERSDORF_HEAT_CORPUS_SHA256,PATCH_032_R2_HOPPEGARTEN_HEAT_CORPUS_SHA256,PATCH_032_STRAUSBERG_SOLARPARK_CORPUS_SHA256,PATCH_032_RUEDERSDORF_HEAT_CORPUS_SHA256,PATCH_032_HOPPEGARTEN_HEAT_CORPUS_SHA256]);
+const fixtureCorpus=new AsyncLocalStorage<{sha256:string;policy:CivicPolicyOptions}>();
+export const authorizedPilotCorpusSchema=hashSchema.refine(hash=>ownerAuthorizedCorpusSchema.safeParse(hash).success||fixtureCorpus.getStore()?.sha256===hash,'Corpus is not an exact owner-authorized snapshot');
+/** Test-only, scoped capability: no environment switch or production hash entry. */
+export async function withFixtureAuthorizedCorpus<T>(bytes:Uint8Array,policy:CivicPolicyOptions,body:()=>Promise<T>):Promise<T>{
+ if((await assertCivicPolicyAuthority(policy)).mode!=='isolated-fixture')throw Error('Corpus fixtures require an isolated authority realm');
+ return fixtureCorpus.run({sha256:sha256(bytes),policy},body);
+}
+export function corpusFixturePolicy():CivicPolicyOptions|undefined{return fixtureCorpus.getStore()?.policy;}
 export const crawlDocumentSchema=z.object({id:z.string(),municipalityId:z.string(),ags:z.string().regex(/^\d{8}$/),districtId:z.string(),sourceId:z.string(),url:z.url(),sha256:hashSchema,mimeType:z.string(),retrievedAt:z.iso.datetime(),checkedAt:z.iso.datetime().optional(),status:z.number().int().min(100).max(599).optional(),observationPath:z.string().min(1).optional(),documentDate:daySchema.nullable(),localPath:z.string(),adapter:z.string(),metadata:z.record(z.string(),z.unknown()),policy:z.unknown().optional(),exclusion:z.never().optional()});
 export type CrawlDocument=z.infer<typeof crawlDocumentSchema>;
 export const excludedCrawlDocumentSchema=crawlDocumentSchema.omit({localPath:true,policy:true,exclusion:true}).extend({
@@ -27,11 +37,14 @@ export const excludedCrawlDocumentSchema=crawlDocumentSchema.omit({localPath:tru
 });
 export type ExcludedCrawlDocument=z.infer<typeof excludedCrawlDocumentSchema>;
 export const frozenCorpusSchema=z.object({schemaVersion:z.literal('stadtstack-crawl-index-v1'),documents:z.array(crawlDocumentSchema),excludedDocuments:z.array(excludedCrawlDocumentSchema).optional()}).passthrough();
+export function loadFrozenCorpusBytes(bytes:Uint8Array,expectedSha256:string){
+ authorizedPilotCorpusSchema.parse(expectedSha256);
+ if(sha256(bytes)!==expectedSha256)throw Error('Frozen corpus index hash mismatch');
+ return frozenCorpusSchema.parse(JSON.parse(Buffer.from(bytes).toString('utf8')));
+}
 export async function loadFrozenCorpus(path:string,expectedSha256:string){
  authorizedPilotCorpusSchema.parse(expectedSha256);
- const bytes=await readFile(path);
- if(sha256(bytes)!==hashSchema.parse(expectedSha256))throw Error('Frozen corpus index hash mismatch');
- return frozenCorpusSchema.parse(JSON.parse(bytes.toString('utf8')));
+ return loadFrozenCorpusBytes(await readFile(path),expectedSha256);
 }
 export function groupCrawlDocuments<T extends {municipalityId:string;sha256:string}>(documents:T[]):T[][]{
  const groups=new Map<string,T[]>();

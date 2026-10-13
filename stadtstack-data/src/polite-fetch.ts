@@ -27,8 +27,12 @@ import type {CivicPolicyOptions,CivicPolicyAuthorityReceipt,ManagedAcquisitionLa
 import {ContentFreeSourcePolicySchema,hashSchema} from './district-schema.ts';
 import {SourceObservationSchema,sourceObservationMatches,type SourceObservation} from './source-observation.ts';
 import {nativePublicRequestHeaders,type NativePublicOperation} from './district-native-request.ts';
+import {ownerGenesisAccessFor} from './source-policy.ts';
+import {readGenesisOwnerCredentials,type GenesisOwnerCredentials} from './genesis-owner-credentials.ts';
+import {genesisOwnerAccountRoot,readGenesisOwnerRepresentation} from './genesis-owner-acquisition.ts';
+import {persistCrawlRequestEvidence} from './district-crawl-request.ts';
 
-export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'dns_error'|'timeout'|'network_error'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cross_host_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded'|'host_admission_deferred';
+export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'credential_unavailable'|'dns_error'|'timeout'|'network_error'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cross_host_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded'|'host_admission_deferred';
 class RequestAdmissionInterruption extends Error {readonly admissionError:unknown;constructor(error:unknown){super('Public request admission held');this.admissionError=error;}}
 export interface FetchObservation {
  url:string;method:'GET'|'POST';checkedAt:string;retrievedAt:string|null;state:'fetched'|'not_modified'|'redirected'|'failed'|'excluded';
@@ -128,13 +132,17 @@ export class PoliteFetcher {
  private fetchCount=0;
  private initialization?:Promise<void>;private readonly lane:PoliteFetcherOptions['ownerPolicyLane'];private activeLane?:NonNullable<PoliteFetcherOptions['ownerPolicyLane']>;
  private authorityMode?:CivicPolicyAuthorityReceipt['mode'];
+ private ownerAccountFetcher?:PoliteFetcher;
+ private readonly publicPolicyFetcher?:PoliteFetcher;
  get requestCount():number{return this.fetchCount;}
- constructor(options:PoliteFetcherOptions){
+ constructor(options:PoliteFetcherOptions,publicPolicyFetcher?:PoliteFetcher){
   if(options.fixtureInspection&&(!options.ownerPolicyLane?.authorityId?.startsWith('fixture:')||!options.ownerPolicyLane.authoritySha256||!options.ownerPolicyLane.stateDir))throw new PoliteFetchError('host_state_unsafe','Injected inspection requires a fully pinned isolated fixture authority');
   this.fixtureInspection=options.fixtureInspection;
   this.beforeRequest=options.beforeRequest;this.onRedirect=options.onRedirect;
   this.cacheDir=resolve(options.cacheDir);this.options={minDelayMs:2000,timeoutMs:25000,maxBytes:24*1024*1024,maxRedirects:5,policyTtlMs:60*60_000,...options};
   this.lane=options.ownerPolicyLane;
+  this.publicPolicyFetcher=publicPolicyFetcher;
+  if(publicPolicyFetcher&&this.cacheDir!==genesisOwnerAccountRoot(publicPolicyFetcher.cacheDir))throw new PoliteFetchError('host_state_unsafe','Owner account lane routing rejected');
   for(const key of ['minDelayMs','timeoutMs','maxBytes','maxRedirects','policyTtlMs'] as const)if(!Number.isFinite(this.options[key])||this.options[key]<0)throw Error(`Invalid ${key}`);
   if(this.options.policyTtlMs===0)throw Error('Policy TTL must be positive');
  }
@@ -145,7 +153,7 @@ export class PoliteFetcher {
    const authority=await assertCivicPolicyAuthority(lane);
    if(this.fixtureInspection&&authority.mode!=='isolated-fixture')throw new PoliteFetchError('host_state_unsafe','Production authority cannot use injected inspection');
    const context={...lane,...(lane.stateDir?{stateDir:resolve(lane.stateDir)}:{}),authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
-   await initializeManagedAcquisitionLane(this.cacheDir,context);this.activeLane=context;this.authorityMode=authority.mode;
+   await initializeManagedAcquisitionLane(this.cacheDir,{...context,...(this.publicPolicyFetcher?{kind:'artifacts' as const}:{})});this.activeLane=context;this.authorityMode=authority.mode;
   })().catch(()=>{throw new PoliteFetchError('host_state_unsafe','Policy authority, acquisition marker, ownership or completeness rejected; no implicit provisioning or legacy enrollment');});
   await this.initialization;
  }
@@ -177,6 +185,14 @@ export class PoliteFetcher {
    if(!hashSchema.safeParse(binding.sha256).success)throw new PoliteFetchError('host_state_unsafe','Invalid source binding digest');
    publicUrl(binding.url);
    await this.assertHostAllowed(binding.url);
+   if(dirname(resolve(binding.observationPath))===join(genesisOwnerAccountRoot(this.cacheDir),'observations')){
+    await assertManagedSourceReadable(binding.observationPath,{...this.policyOptions(),sourceUrl:binding.url});
+    const observed=SourceObservationSchema.parse(JSON.parse(await readFile(binding.observationPath,'utf8')));
+    if(observed.url!==binding.url||observed.sha256!==binding.sha256)throw new PoliteFetchError('host_state_unsafe','Owner account source binding mismatch');
+    const document:FetchedDocument={...observed,policy:observed.policy,localPath:join(genesisOwnerAccountRoot(this.cacheDir),'sha256',binding.sha256.slice(0,2),binding.sha256),observationPath:binding.observationPath};
+    const checked=await readGenesisOwnerRepresentation(this.cacheDir,document,this.policyOptions(),this.options.maxBytes);
+    result.push({kind:'http_observation',url:document.url,sourceSha256:document.sha256,observationId:checked.httpObservation.observationId,receiptSha256:checked.httpObservation.receiptSha256});continue;
+   }
    const name=basename(binding.observationPath),observationPath=join(this.cacheDir,'observations',name),rawPath=join(this.cacheDir,'sha256',binding.sha256);
    if(resolve(binding.observationPath)!==observationPath||name.length>160||!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.json$/.test(name))throw new PoliteFetchError('host_state_unsafe','Source observation is outside the managed root or invalid');
    await this.assertSourceReadable(rawPath,binding.url);
@@ -285,7 +301,7 @@ export class PoliteFetcher {
    try{state.delayMs=Math.ceil(Math.min(8.64e15,Math.max(state.delayMs,parseRobots(response.body.toString('utf8')).delayMs)));}catch{/* Uninterpretable policy remains unavailable; never invent an allow. */}
   }
  }
- private async wire(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,operation?:NativePublicOperation):Promise<WireResponse>{
+ private async wire(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,operation?:NativePublicOperation,credentials?:GenesisOwnerCredentials):Promise<WireResponse>{
    await this.initialize();
    if(this.authorityMode!=='codex-workstation-local')throw new PoliteFetchError('host_state_unsafe','Live HTTP acquisition requires the canonical production authority');
    await this.assertHostAllowed(url.href);
@@ -296,8 +312,13 @@ export class PoliteFetcher {
    finally{clearTimeout(dnsTimer);}
    if(!addresses.length||addresses.some(item=>!isPublicAddress(item.address)))throw new PoliteFetchError('unsafe_url','DNS resolved a non-public address');
    const pinned=addresses[0];
-   const nativeHeaders=nativePublicRequestHeaders(url,method,body,operation);
-  return this.scheduled(url,()=>new Promise<WireResponse>((done,reject)=>{
+   const nativeHeaders=credentials?credentials.requestHeaders(url,method,body,operation):nativePublicRequestHeaders(url,method,body,operation);
+   return this.scheduled(url,()=>this.wireRequest(url,method,body,validators,pinned,nativeHeaders),(response,state)=>this.recordHostResponse(url,response,state));
+ }
+ /** Transport seam used by disposable fixture servers; production reaches this
+  * only through the authority, DNS pinning and exact-host scheduler above. */
+ private wireRequest(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,pinned:{address:string;family:number},nativeHeaders:Record<string,string>):Promise<WireResponse>{
+  return new Promise<WireResponse>((done,reject)=>{
     const headers:Record<string,string>={'User-Agent':ua,Accept:'application/json,text/html,application/pdf,text/plain;q=0.8','Accept-Encoding':'identity'};
     if(body!==undefined){Object.assign(headers,nativeHeaders);headers['Content-Length']=String(Buffer.byteLength(body));}
     if(method==='GET'&&validators?.etag)headers['If-None-Match']=validators.etag;
@@ -320,17 +341,23 @@ export class PoliteFetcher {
     const timer=setTimeout(()=>request.destroy(new PoliteFetchError('timeout','Request deadline exceeded')),this.options.timeoutMs);
     request.on('error',error=>{clearTimeout(timer);reject(error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Public request failed'));});
     request.end(body);
-   }),(response,state)=>this.recordHostResponse(url,response,state));
+   });
  }
  private encodeObservation(value:FetchObservation):string{
   if(value.policy)value.policy=projectSourcePolicyMetadata(value.policy);
   return JSON.stringify(value,null,2)+'\n';
  }
- private async observation(value:FetchObservation,path=join(this.cacheDir,'observations',`${Date.now()}-${randomUUID()}.json`),bytes=this.encodeObservation(value)):Promise<string>{
+ private async observation(value:FetchObservation,path=join(this.cacheDir,'observations',`${Date.now()}-${randomUUID()}.json`),bytes=this.encodeObservation(value),alreadyManaged=false):Promise<string>{
   await this.initialize();
-  await mkdir(join(this.cacheDir,'observations'),{recursive:true});await writeFile(path,bytes,{flag:'wx',mode:0o600});return path;
+  const persist=async()=>{await mkdir(join(this.cacheDir,'observations'),{recursive:true});await writeFile(path,bytes,{flag:'wx',mode:0o600});return path;};
+  if(!this.publicPolicyFetcher||alreadyManaged)return persist();
+  // A denial's actual observation bytes are inventoried as their OWN content
+  // for custody/purge only, never as a fetched representation or admissible proof.
+  const contentSha256=hash(bytes),sourceSha256=value.sha256??contentSha256;
+  return withManagedSourceWrite(this.cacheDir,[{kind:'http_observation',relativePath:relative(this.cacheDir,path),contentSha256,sourceSha256,url:value.url,observationId:basename(path),receiptSha256:contentSha256,independentAllowed:false}],persist,this.policyOptions());
  }
  private async policy(url:URL,hostProfile?:FetchOptions['hostProfile']):Promise<RobotsPolicy>{
+  if(this.publicPolicyFetcher)return this.publicPolicyFetcher.policy(url,hostProfile);
   let cached=this.robots.get(url.origin);
   if(!cached||Date.now()>=cached.expiresAt){const pending=(async()=>{
    const attemptedAt=new Date().toISOString();let result:(FetchedDocument&{validatedPolicy?:ValidatedPolicy})|undefined;
@@ -355,6 +382,7 @@ export class PoliteFetcher {
   return cached.response;
  }
  private async machinePolicy(url:URL,knownUrl?:string,ownerRobotsOverride?:OwnerRobotsOverride,hostProfile?:FetchOptions['hostProfile']):Promise<{rules:TdmRule[];evidence:PolicyEvidence}>{
+  if(this.publicPolicyFetcher)return this.publicPolicyFetcher.machinePolicy(url,knownUrl,ownerRobotsOverride,hostProfile);
   const policyUrl=knownUrl?publicUrl(knownUrl).href:new URL('/.well-known/tdmrep.json',url).href;
   const cacheKey=`${knownUrl?'required':'standard'}:${policyUrl}:${ownerRobotsOverrideApplies(policyUrl,ownerRobotsOverride)?ownerRobotsOverride!.id:'no-override'}`;
   let cached=this.machinePolicies.get(cacheKey);
@@ -381,7 +409,17 @@ export class PoliteFetcher {
   }
   return cached.response;
  }
- async fetch(url:string,options:FetchOptions={}):Promise<FetchedDocument>{await this.initialize();this.fetchCount++;try{return await this.fetchInternal(url,options,'document');}catch(error){if(error instanceof RequestAdmissionInterruption)throw error.admissionError;throw error;}}
+ async fetch(url:string,options:FetchOptions={}):Promise<FetchedDocument>{
+  await this.initialize();this.fetchCount++;
+  try{
+   if(!this.publicPolicyFetcher&&options.method==='POST'&&options.publicOperation==='genesis_guest'&&ownerGenesisAccessFor(url)){
+    this.ownerAccountFetcher??=new PoliteFetcher({...this.options,cacheDir:genesisOwnerAccountRoot(this.cacheDir),ownerPolicyLane:this.activeLane,fixtureInspection:this.fixtureInspection,beforeRequest:this.beforeRequest,onRedirect:this.onRedirect},this);
+    await this.ownerAccountFetcher.initialize();
+    return await this.ownerAccountFetcher.fetchInternal(url,options,'document');
+   }
+   return await this.fetchInternal(url,options,'document');
+  }catch(error){if(error instanceof RequestAdmissionInterruption)throw error.admissionError;throw error;}
+ }
  private async fetchInternal(input:string,options:FetchOptions,resource:'document'|'robots'|'tdm',standardTdmChain?:string[]):Promise<FetchedDocument&{validatedPolicy?:ValidatedPolicy}>{
   const checkRobots=resource!=='robots',checkTdm=resource==='document';
   let url=publicUrl(input),method=options.method??'GET',body=options.body;
@@ -389,6 +427,7 @@ export class PoliteFetcher {
   if(method==='POST'&&(!body||Buffer.byteLength(body)>65536))throw new PoliteFetchError('unsafe_url','Only bounded public form requests supported');
   if(body!==undefined)for(const key of new URLSearchParams(body).keys())if(/^(?:password|secret|authorization|access_token|api_key|apikey|sessionid|phpsessid|cookie)$/i.test(key))throw new PoliteFetchError('unsafe_url','Credential-bearing public form rejected');
   const redirectLimit=standardTdmChain?Math.min(5,this.options.maxRedirects):this.options.maxRedirects;
+  const actualRedirectChain=[url.href],originalMethod=method,originalBody=body;
   for(let redirects=0;redirects<=redirectLimit;redirects++){
    if(options.hostProfile==='municipal')this.delays.set(url.hostname,Math.max(5000,this.delays.get(url.hostname)??0));
    let checkedAt=new Date().toISOString();const observation:FetchObservation={url:url.href,method,checkedAt,retrievedAt:null,state:'failed'};
@@ -396,6 +435,7 @@ export class PoliteFetcher {
    observation.policy=policy;
    let requestMetadataPath:string|undefined;
    let policyPhase:PoliteFetchError['policyPhase']=resource==='document'?null:resource;
+   let ownerCredentials:GenesisOwnerCredentials|undefined;
    try{
     await this.assertHostAllowed(url.href);
     if(/\/(?:login|signin|auth|anmelden)(?:\/|$)/i.test(url.pathname)){policy.access='authentication';throw new PoliteFetchError('access_barrier','Authentication endpoint is outside public acquisition');}
@@ -427,12 +467,23 @@ export class PoliteFetcher {
      }
     }
     const key=hash(method+' '+url.href+'\n'+(body??'')+(options.publicOperation?'\npublic-operation:'+options.publicOperation:'')),meta=join(this.cacheDir,'requests',key+'.json');let previous:FetchObservation|undefined;
-    requestMetadataPath=meta;
-    try{previous=JSON.parse(await readFile(meta,'utf8'));}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw new PoliteFetchError('cache_missing','Invalid cache metadata');}
-    const response=await this.wire(url,method,body,previous?.state==='excluded'?undefined:previous,options.publicOperation);checkedAt=new Date().toISOString();observation.checkedAt=checkedAt;observation.status=response.status;
+    if(!this.publicPolicyFetcher){
+     requestMetadataPath=meta;
+     try{previous=JSON.parse(await readFile(meta,'utf8'));}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw new PoliteFetchError('cache_missing','Invalid cache metadata');}
+    }
+    const ownerDecision=resource==='document'&&options.publicOperation==='genesis_guest'&&method==='POST'?ownerGenesisAccessFor(url.href):null;
+    if(ownerDecision&&this.publicPolicyFetcher){
+     policy.access='authentication';
+     try{ownerCredentials=await readGenesisOwnerCredentials();}catch{throw new PoliteFetchError('credential_unavailable','credential_unavailable');}
+     if(ownerCredentials.contains(url.href)||ownerCredentials.contains(body??''))throw new PoliteFetchError('credential_unavailable','credential_unavailable');
+     policy.access='authenticated_owner_account';policy.ownerAccountAccess={decisionId:ownerDecision.id,credentialKind:ownerCredentials.kind};
+    }
+    const response=await this.wire(url,method,body,previous?.state==='excluded'?undefined:previous,options.publicOperation,ownerCredentials);checkedAt=new Date().toISOString();observation.checkedAt=checkedAt;observation.status=response.status;
+    if(ownerCredentials&&(ownerCredentials.contains(response.body)||Object.values(response.headers).some(value=>value!==undefined&&ownerCredentials!.contains(value))))throw new PoliteFetchError('access_barrier','Authenticated response withheld');
     if([301,302,303,307,308].includes(response.status)){
      if(!response.headers.location)throw new PoliteFetchError('invalid_redirect','Missing redirect destination',response.status);
      const next=publicUrl(new URL(response.headers.location,url).href);observation.location=next.href;observation.state='redirected';
+     if(ownerCredentials)throw new PoliteFetchError(next.hostname!==url.hostname?'cross_host_redirect':'invalid_redirect','Authenticated source redirects are refused',response.status);
      if(/\/(?:login|signin|auth|anmelden)(?:\/|$)/i.test(next.pathname)){policy.access='authentication';throw new PoliteFetchError('access_barrier','Authentication redirect; ask municipality');}
      if(resource!=='document'&&!standardTdmChain)throw new PoliteFetchError('invalid_redirect','Policy-resource redirects are not authorized as policy representations',response.status);
      if(standardTdmChain){
@@ -449,6 +500,7 @@ export class PoliteFetcher {
      standardTdmChain?.push(next.href);
      if(method==='POST'&&next.origin!==url.origin)throw new PoliteFetchError('invalid_redirect','Cross-origin form redirect rejected');
      this.onRedirect?.({requestUrl:input,from:url.href,to:next.href,status:response.status});
+     actualRedirectChain.push(next.href);
      if(response.status===303||method==='POST'&&[301,302].includes(response.status)){method='GET';body=undefined;}
      url=next;continue;
     }
@@ -494,11 +546,11 @@ export class PoliteFetcher {
      const prefix=representation.subarray(0,256).toString('utf8').trimStart();
      mimeType=prefix.startsWith('%PDF-')?'application/pdf':representation.length>=4&&representation[0]===0x50&&representation[1]===0x4b&&[3,5,7].includes(representation[2])?'application/zip':(response.headers['content-type']??'application/octet-stream').split(';')[0].trim().toLowerCase();
      if((mimeType==='application/octet-stream'||mimeType==='text/plain')&&/^<\?xml\b|^<(?:gml|xplan|wfs):/i.test(prefix))mimeType='application/xml';
-     localPath=join(this.cacheDir,'sha256',sha256);
+     localPath=this.publicPolicyFetcher?join(this.cacheDir,'sha256',sha256.slice(0,2),sha256):join(this.cacheDir,'sha256',sha256);
      Object.assign(observation,{state:'fetched',sha256,retrievedAt,mimeType,bytes:representation.length});
     }
     if(checkTdm)policyPhase='tdm';
-    const inspectionContext:ParserSourceContext={...this.activeLane!,root:this.cacheDir,kind:'fetch',purpose:'classification',bindings:[{phase:'pre-admission',url:url.href,sourceSha256:sha256}]};
+    const inspectionContext:ParserSourceContext={...this.activeLane!,root:this.cacheDir,kind:this.publicPolicyFetcher?'artifacts':'fetch',purpose:'classification',bindings:[{phase:'pre-admission',url:url.href,sourceSha256:sha256}]};
     let validatedPolicy:ValidatedPolicy|undefined;
     const inspect=async(sandbox?:ParserSandbox)=>{
     const resourcePolicy=await (this.fixtureInspection?.resource??inspectResourcePolicySandbox)(url.href,response.headers,representation,mimeType,inspectionContext,sandbox);
@@ -511,14 +563,15 @@ export class PoliteFetcher {
      }
      resourcePolicy.evidence.unshift(...retainedPolicyEvidence);
     }
-    policy.access=resourcePolicy.access;
+    policy.access=ownerCredentials&&resourcePolicy.access==='public'?'authenticated_owner_account':resourcePolicy.access;
+    if(policy.access!=='authenticated_owner_account')delete policy.ownerAccountAccess;
     // Representation headers remain ahead of potentially numerous origin rules
     // so bounded metadata cannot lose the fields needed for the next 304.
     policy.tdm.evidence.unshift(...resourcePolicy.evidence);
     if(resourcePolicy.reservation!==null&&policy.tdm.state!=='reserved')policy.tdm.state=resourcePolicy.reservation===1?'reserved':'not_reserved';
     if(resourcePolicy.referenceUnavailable)policy.tdm.referenceStatus='unavailable';
     if(resourcePolicy.declarationUnavailable){policy.tdm.declarationStatus='unavailable';if(policy.tdm.state!=='reserved')policy.tdm.state='unavailable';}
-    if(policy.access!=='public')throw new PoliteFetchError('access_barrier',`${policy.access} barrier; ask municipality`);
+    if(policy.access!=='public'&&policy.access!=='authenticated_owner_account')throw new PoliteFetchError('access_barrier',`${policy.access} barrier; ask municipality`);
     if(checkTdm&&(policy.tdm.referenceStatus==='unavailable'||policy.tdm.declarationStatus==='unavailable'))throw new PoliteFetchError('tdm_unavailable','Machine-readable TDM declaration or policy reference is unavailable; source withheld');
     if(resource==='robots'){
      try{
@@ -566,11 +619,11 @@ export class PoliteFetcher {
     if(checkTdm&&policy.tdm.state==='reserved'&&!registeredApproval)throw new PoliteFetchError('tdm_reserved','PDF machine-readable TDM reservation; no owner-authorized official-work exception');
     await this.assertHostAllowed(url.href);
     if(checkTdm&&documentOriginExcludes(policy,{url:url.href,sha256})){
-     const previousManagedCopy=(await relinquishManagedSourceContent(this.cacheDir,{url:url.href,sourceSha256:sha256},this.policyOptions())).disposition;
+     const previousManagedCopy=this.publicPolicyFetcher?'not_managed':(await relinquishManagedSourceContent(this.cacheDir,{url:url.href,sourceSha256:sha256},this.policyOptions())).disposition;
      const exclusion:ExcludedDocument['exclusion']={reason:'non_official_restricted',excludedAt:new Date().toISOString(),previousManagedCopy};
      Object.assign(observation,{state:'excluded',exclusion,sha256,retrievedAt,mimeType,bytes:representation.length});delete observation.etag;delete observation.lastModified;
-     const observationPath=await this.observation(observation);await mkdir(join(this.cacheDir,'requests'),{recursive:true});
-     const temporary=meta+'.'+randomUUID()+'.tmp';await writeFile(temporary,JSON.stringify(observation),{mode:0o600,flag:'wx'});await rename(temporary,meta);
+     const observationPath=await this.observation(observation);
+     if(!this.publicPolicyFetcher){await mkdir(join(this.cacheDir,'requests'),{recursive:true});const temporary=meta+'.'+randomUUID()+'.tmp';await writeFile(temporary,JSON.stringify(observation),{mode:0o600,flag:'wx'});await rename(temporary,meta);}
      const failure=new PoliteFetchError('document_excluded','Non-official or uncertain work excluded under robots denial or TDM reservation',response.status,observation.policy);
      failure.excludedDocument={url:url.href,sha256,mimeType,retrievedAt,checkedAt,status:response.status,observationPath,policy:observation.policy!,sizeBytes:representation.length,exclusion};throw failure;
     }
@@ -583,23 +636,33 @@ export class PoliteFetcher {
     const observationPath=join(this.cacheDir,'observations',`${Date.now()}-${randomUUID()}.json`),observationBytes=this.encodeObservation(observation);
     const persist=async()=>{
      await this.assertHostAllowed(url.href);
-     await mkdir(join(this.cacheDir,'sha256'),{recursive:true});await writeFile(localPath,representation,{flag:'wx',mode:0o600}).catch(error=>{if(error.code!=='EEXIST')throw error;});
-     await this.observation(observation,observationPath,observationBytes);await mkdir(join(this.cacheDir,'requests'),{recursive:true});const temporary=meta+'.'+randomUUID()+'.tmp';await writeFile(temporary,JSON.stringify(observation),{mode:0o600,flag:'wx'});await rename(temporary,meta);
+     await mkdir(dirname(localPath),{recursive:true});await writeFile(localPath,representation,{flag:'wx',mode:0o600}).catch(error=>{if(error.code!=='EEXIST')throw error;});
+     await this.observation(observation,observationPath,observationBytes,!!this.publicPolicyFetcher);
+     if(!this.publicPolicyFetcher){await mkdir(join(this.cacheDir,'requests'),{recursive:true});const temporary=meta+'.'+randomUUID()+'.tmp';await writeFile(temporary,JSON.stringify(observation),{mode:0o600,flag:'wx'});await rename(temporary,meta);}
     };
-    await withManagedSourceWrite(this.cacheDir,[{kind:'http_observation',relativePath:'sha256/'+sha256,contentSha256:sha256,sourceSha256:sha256,url:url.href,observationId:basename(observationPath),receiptSha256:hash(observationBytes),independentAllowed:checkTdm&&effectiveSourcePermission(policy,{url:url.href,sha256})}],persist,this.policyOptions());
+    const sourceEntry={kind:'http_observation' as const,relativePath:relative(this.cacheDir,localPath),contentSha256:sha256,sourceSha256:sha256,url:url.href,observationId:basename(observationPath),receiptSha256:hash(observationBytes),independentAllowed:checkTdm&&effectiveSourcePermission(policy,{url:url.href,sha256})};
+    await withManagedSourceWrite(this.cacheDir,[sourceEntry,...(this.publicPolicyFetcher?[{...sourceEntry,relativePath:relative(this.cacheDir,observationPath),contentSha256:hash(observationBytes),independentAllowed:false}]:[])],persist,this.policyOptions());
+    if(checkTdm){
+     const publicSelector=originalBody!==undefined&&![...new URLSearchParams(originalBody).keys()].some(key=>/^(?:username|user|password|secret|authorization|access_token|api_key|apikey|token|sessionid|phpsessid|cookie)$/i.test(key))&&String(policy.access)!=='authenticated_owner_account'?originalBody:null;
+     await persistCrawlRequestEvidence(this.cacheDir,{schemaVersion:'stadtstack-crawl-request-evidence-v1',httpObservation:{kind:'http_observation',url:url.href,sourceSha256:sha256,observationId:basename(observationPath),receiptSha256:hash(observationBytes)},request:{url:input,method:originalMethod,contentType:originalBody===undefined?null:nativePublicRequestHeaders(publicUrl(input),originalMethod,originalBody,options.publicOperation)['Content-Type']??null,bodySha256:originalBody===undefined?null:hash(originalBody),publicSelector},redirectChain:actualRedirectChain},this.policyOptions());
+    }
     return {url:url.href,sha256,localPath,mimeType,retrievedAt,checkedAt,status:response.status,observationPath,policy:observation.policy,...(validatedPolicy?{validatedPolicy}:{})};
    }catch(error){
     if(error instanceof RequestAdmissionInterruption){Object.assign(policy,projectSourcePolicyMetadata(policy));observation.policy=policy;observation.state='failed';observation.failure='host_admission_deferred';await this.observation(observation);throw error;}
     if(error instanceof PoliteFetchError&&error.excludedDocument)throw error;
     Object.assign(policy,projectSourcePolicyMetadata(policy));observation.policy=policy;
-    const failure=error instanceof PoliteFetchError?error:error instanceof HostOptedOutError?new PoliteFetchError('host_opted_out','Host objection is active; source retention stopped'):error instanceof CivicPolicyStateError?new PoliteFetchError('host_state_unsafe','Managed source inventory is incomplete or unavailable; use an explicitly registered safe acquisition lane'):new PoliteFetchError('network_error','Fetch or cache operation failed',undefined,undefined,undefined,error);failure.policyPhase??=policyPhase;failure.policy=policy;observation.state='failed';observation.failure=failure.failure;observation.retryAfter=failure.retryAfter;await this.observation(observation);
+    if(policy.access!=='authenticated_owner_account')delete policy.ownerAccountAccess;
+    const original=error instanceof PoliteFetchError?error:error instanceof HostOptedOutError?new PoliteFetchError('host_opted_out','Host objection is active; source retention stopped'):error instanceof CivicPolicyStateError?new PoliteFetchError('host_state_unsafe','Managed source inventory is incomplete or unavailable; use an explicitly registered safe acquisition lane'):new PoliteFetchError('network_error','Fetch or cache operation failed',undefined,undefined,undefined,ownerCredentials?undefined:error);
+    // An authenticated failure has no remote strings, causes, paths or headers.
+    const failure=ownerCredentials?new PoliteFetchError(original.failure,'Authenticated GENESIS request held',original.status):original;
+    failure.policyPhase??=policyPhase;failure.policy=policy;observation.state='failed';observation.failure=failure.failure;observation.retryAfter=ownerCredentials?undefined:failure.retryAfter;await this.observation(observation);
     // A failed admission does not undo a 304's representation-header update.
     if(observation.status===304&&observation.sha256&&observation.retrievedAt&&requestMetadataPath){
      await mkdir(join(this.cacheDir,'requests'),{recursive:true});const temporary=requestMetadataPath+'.'+randomUUID()+'.tmp';
      await writeFile(temporary,JSON.stringify(observation),{mode:0o600,flag:'wx'});await rename(temporary,requestMetadataPath);
     }
     throw failure;
-   }
+   }finally{ownerCredentials?.clear();}
   }
   throw new PoliteFetchError('redirect_limit','Redirect bound exceeded');
  }

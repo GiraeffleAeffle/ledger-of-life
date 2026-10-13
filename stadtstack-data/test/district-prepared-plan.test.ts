@@ -237,7 +237,7 @@ test('pilot authorization rejects an internally correct substituted index and pi
     const index = JSON.stringify({ schemaVersion: 'stadtstack-crawl-index-v1', documents: [], laterCrawlDocuments: 7623 });
     const path = join(directory, 'index.json');
     await writeFile(path, index);
-    await assert.rejects(loadFrozenCorpus(path, sha256(index)), /Invalid option/);
+    await assert.rejects(loadFrozenCorpus(path, sha256(index)), /owner-authorized/);
     await assert.rejects(loadFrozenCorpus(path, PILOT_BASE_CORPUS_SHA256), /hash mismatch/);
     const plan = { schemaVersion: 'stadtstack-preparation-plan-v1', generatedAt: '2026-10-01T00:00:00.000Z', corpusSha256: PILOT_BASE_CORPUS_SHA256, registrySha256: sha256('registry'), extractorSha256: sha256('extractor'), maxDocumentsPerMunicipality: null, availableDocumentGroups: 0, selectedDocumentGroups: 0, selectedRepresentations: 0, municipalities: [], groups: [], quarantine: [] };
     assert.equal(preparationPlanSchema.parse(plan).corpusSha256, PILOT_BASE_CORPUS_SHA256);
@@ -245,7 +245,7 @@ test('pilot authorization rejects an internally correct substituted index and pi
     await writeFile(planPath, substituted);
     // Mac coordinator and VM worker both apply this schema after transport pinning.
     const correctlyPinned = await readPinnedJson(planPath, sha256(substituted));
-    assert.throws(() => preparationPlanSchema.parse(correctlyPinned), /Invalid option/);
+    assert.throws(() => preparationPlanSchema.parse(correctlyPinned), /owner-authorized/);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 

@@ -1,11 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,writeFile,rm,lstat,mkdir} from 'node:fs/promises';
+import {mkdtemp,readFile,writeFile,rm,lstat,mkdir,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {hash} from '../src/common.ts';
 import {PoliteFetcher as BasePoliteFetcher,PoliteFetchError} from '../src/polite-fetch.ts';
-import {crawlDistrictRegistry,projectCrawlIndexDenials,type DistrictCrawlIndex} from '../src/district-crawl.ts';
+import {createDistrictCrawlFetcher,crawlDistrictRegistry,projectCrawlIndexDenials,type DistrictCrawlIndex} from '../src/district-crawl.ts';
 import {discoverDocumentLinks,crawlHtmlSource,crawlMvPlanningApi,crawlParticipationApi,crawlOparlSource} from '../src/district-source-adapters.ts';
 import {createPoliteCouncilLoader} from '../src/council-cache.ts';
 import type {RegistryMunicipality,RegistrySource} from '../src/district-source-adapters.ts';
@@ -56,6 +56,36 @@ function fixturePolicy(url:string,sha256:string,checkedAt:string,mimeType:string
 }
 const source:RegistrySource={id:'city-planning',kind:'participation',url:'https://stadt.de/planning',vendor:'other',checkState:'checked',checkedAt:'2026-10-01T00:00:00.000Z',evidence:[{url:'https://stadt.de/planning',locator:'Planning portal'}]};
 const city:RegistryMunicipality={id:'ludwigslust',name:'Ludwigslust',ags:'13076090',districtId:'ludwigslust-parchim',sources:[source]};
+
+test('standalone crawler fetcher consumes the shared configured pacing floor without acquisition',async t=>{
+ const folder=await mkdtemp(join(tmpdir(),'district-crawl-pacing-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ const config=JSON.parse(await readFile(new URL('../sources/district-host-groups.json',import.meta.url),'utf8'));
+ const fetcher=await createDistrictCrawlFetcher({cacheDir:folder,policyTtlMs:30_000});
+ assert.ok(fetcher instanceof BasePoliteFetcher);
+ assert.equal(fetcher.options.minDelayMs,config.serviceGroups[0].minStartIntervalMs);
+ assert.equal(fetcher.options.minDelayMs,2500);assert.equal(config.serviceGroups[0].maxInFlight,1);
+ assert.equal(fetcher.options.policyTtlMs,30_000);assert.equal(fetcher.requestCount,0);
+ assert.deepEqual(await readdir(folder),[]);
+});
+test('standalone crawler rejects invalid host spacing and concurrency config before acquisition',async t=>{
+ const folder=await mkdtemp(join(tmpdir(),'district-crawl-invalid-pacing-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ const config=JSON.parse(await readFile(new URL('../sources/district-host-groups.json',import.meta.url),'utf8')),group=config.serviceGroups[0],path=join(folder,'host-groups.json');
+ for(const changed of [
+  {...config,serviceGroups:[{...group,minStartIntervalMs:2000}]},
+  {...config,serviceGroups:[{...group,maxInFlight:2}]},
+  {...config,serviceGroups:[{...group,unrecognized:true}]},
+  {...config,serviceGroups:[]},
+  {...config,serviceGroups:[group,group]},
+  {...config,unrecognized:true},
+ ]){
+  await writeFile(path,JSON.stringify(changed));
+  await assert.rejects(createDistrictCrawlFetcher({cacheDir:join(folder,'raw')},path),{name:'ZodError'});
+ }
+ await writeFile(path,'not JSON');
+ await assert.rejects(createDistrictCrawlFetcher({cacheDir:join(folder,'raw')},path),SyntaxError);
+ await assert.rejects(createDistrictCrawlFetcher({cacheDir:join(folder,'raw')},join(folder,'missing.json')),{code:'ENOENT'});
+ await assert.rejects(lstat(join(folder,'raw')),{code:'ENOENT'});
+});
 
 test('HTML discovery follows actual public PDF links, rejects private URLs and unrelated navigation',()=>{
  const links=discoverDocumentLinks('<a href="/plan.pdf">Plan &amp; Begründung</a><a href="https://files.stadt.de/plan.pdf">Anlage</a><a href="http://127.1/plan.pdf">private</a><a href="/login">Login</a><a href="/tourismus">Tourismus</a><a href="/bekanntmachungen/plan">Bekanntmachung</a><a href="https://other.de/bekanntmachung">foreign navigation</a>','https://stadt.de/planning');

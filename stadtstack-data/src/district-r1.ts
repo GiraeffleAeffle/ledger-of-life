@@ -16,21 +16,21 @@ import {districtRegistrySchema} from './district-registry.ts';
 import type {DistrictRegistry} from './district-registry.ts';
 import {registerStructuredCatalog} from './district-structured-registry.ts';
 import {buildOperatorRegistryConfigDescriptor,readOperatorRegistryInputPin,operatorRegistryInputPinSchema,parseOperatorRegistryConfiguration} from './district-registry-config.ts';
-import type {AdmittedOperatorRegistryConfiguration} from './district-registry-config.ts';
 import {StructuredWorkerRequestSchema,StructuredSnapshotMetadataSchema} from './district-structured-parser-worker.ts';
 import {StructuredJobResultSchema,structuredJobHandlers} from './district-structured-jobs.ts';
-import {persistR1Representation,enqueueStructuredSnapshot,exportStepReceipt} from './district-r1-state.ts';
+import {persistOperatorRegistry,persistR1Representation,enqueueStructuredSnapshot,exportStepReceipt} from './district-r1-state.ts';
 import {PolicyReceiptSchema,createPolicyReceipt,recheckPolicyReceipt} from './district-policy-receipt.ts';
 import {StepReceiptSchema} from './district-step-receipt.ts';
 import {PoliteFetcher,PoliteFetchError} from './polite-fetch.ts';
 import type {FetchedDocument,FetchFailure,FixturePolicyInspection} from './polite-fetch.ts';
 import {nativePublicRequestHeaders} from './district-native-request.ts';
+import {readGenesisOwnerRepresentation} from './genesis-owner-acquisition.ts';
 import {pipelineNotificationConfig} from './district-notifications.ts';
 import {initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceReadable,assertManagedRawSourceBinding,assertCivicPolicyAuthority,CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
 import type {ManagedSourceContent,ManagedSourceBinding,CivicPolicyOptions} from './civic-opt-out.ts';
 import {HttpObservationSchema,HttpObservationProofSchema,HttpSourceBindingSchema,authenticatedHttpBinding} from './district-http-observation.ts';
 import type {HttpObservationProof} from './district-http-observation.ts';
-import {ownerRobotsOverrideFor} from './source-policy.ts';
+import {ownerRobotsOverrideFor,ownerGenesisAccessFor} from './source-policy.ts';
 import {structuredRunSchema,structuredCoverageReceiptSchema,structuredCoverageStateForNoOutput,verifyStructuredRunReceipts} from './district-structured-run.ts';
 import type {StructuredJobResult} from './district-structured-jobs.ts';
 import type {StructuredCoverageReceipt} from './district-structured-run.ts';
@@ -39,6 +39,7 @@ import type {StructuredSupportingSource} from './district-structured-record.ts';
 import {StructuredKnowledgeRecordSchema} from './district-structured-record.ts';
 import type {StructuredWorkerRequest} from './district-structured-parser-worker.ts';
 import {ResidualInputSchema,residualJobHandlers,enqueueResidualPreparation,enqueueCommittedResidualExtraction,exportResidualTextContribution} from './district-residual-jobs.ts';
+import {CrawlCorpusImportSchema,importCrawlCorpusForResidual} from './district-crawl-import.ts';
 import {DistrictAssessmentBroker,assessmentBJobHandler,enqueueAssessmentB,assessmentEvidenceArtifactHashes} from './district-assessment-broker.ts';
 import {assessmentItemSchema} from './district-assessment.ts';
 import {r1TextCompositionInputSchema,loadR1TextCompositionInput} from './district-r1-text-composition.ts';
@@ -80,7 +81,7 @@ export const HostGroupsSchema=z.object({schemaVersion:z.literal('district-host-g
 export async function acquisitionContract(){
  const hostGroupsBytes=await readFile(join(REPO,'sources/district-host-groups.json'));
  HostGroupsSchema.parse(JSON.parse(hostGroupsBytes.toString('utf8')));
- return semanticHash({version:ACQUISITION_VERSION,hostGroupsSha256:digest(hostGroupsBytes),files:await Promise.all(['district-r1.ts','polite-fetch.ts','district-policy-receipt.ts','source-policy.ts','civic-opt-out.ts','district-native-request.ts'].map(async file=>({file,sha256:digest(await readFile(join(REPO,'src',file)))})))});
+ return semanticHash({version:ACQUISITION_VERSION,hostGroupsSha256:digest(hostGroupsBytes),files:await Promise.all(['district-r1.ts','district-r1-state.ts','polite-fetch.ts','district-crawl-request.ts','district-policy-receipt.ts','source-policy.ts','civic-opt-out.ts','district-native-request.ts','genesis-owner-credentials.ts','genesis-owner-acquisition.ts'].map(async file=>({file,sha256:digest(await readFile(join(REPO,'src',file)))})))});
 }
 
 /** Controlled counts over the actual committed pages; no source literals or raw hold explanations. */
@@ -193,14 +194,6 @@ export function parseR1RegistryArguments(rawArgs:readonly string[]){
  return {registryPin:operatorRegistryInputPinSchema.parse({path,sha256}),args};
 }
 
-/** Canonical managed CAS copy of the admitted operator registry; the single path for CLI and fixtures. */
-export async function persistOperatorRegistry(store:DistrictJobStore,cas:DistrictCas,admitted:AdmittedOperatorRegistryConfiguration,policy:CivicPolicyOptions={}){
- const hash=digest(admitted.bytes);
- await initializeManagedAcquisitionLane(cas.root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
- const entries:ManagedSourceContent[]=admitted.bindings.map(binding=>({...binding,relativePath:`sha256/${hash.slice(0,2)}/${hash}`,contentSha256:hash,independentAllowed:false}));
- const artifact=await withManagedSourceWrite(cas.root,entries,()=>cas.put(admitted.bytes,{kind:'derived',mimeType:'application/json'}),policy);
- await store.addArtifact(artifact);return hash;
-}
 async function committedResult(store:DistrictJobStore,cas:DistrictCas,receiptSha256:string,resultSha256:string){
  const rows=await store.pool.query<{receipt:unknown}>('SELECT receipt FROM district_pipeline.step_receipts WHERE receipt_sha256=$1',[receiptSha256]);
  if(rows.rowCount!==1)throw Error('Committed receipt required');
@@ -216,6 +209,7 @@ export async function validateAcquisitionSelector(registry:DistrictRegistry,stor
  if(request.method==='GET'&&(request.body!==null||request.publicOperation!==null||request.contentType!==null))throw Error('GET selector cannot carry POST profile');
  const headers=nativePublicRequestHeaders(new URL(request.url),request.method,request.body??undefined,request.publicOperation??undefined);
  if(request.method==='POST'&&request.contentType!==headers['Content-Type'])throw Error('Content type must match fixed native profile');
+ if(request.publicOperation==='genesis_guest'&&ownerGenesisAccessFor(request.url)&&selector.permission.kind!=='facts_with_attribution')throw Error('Owner account permission is facts_with_attribution only');
  if(selector.discovery){
   const {receipt,result}=await committedResult(store,cas,selector.discovery.stepReceiptSha256,selector.discovery.resultSha256);
   if(receipt.step!=='structured_discover'||receipt.outcome!=='succeeded'||semanticHash(result.scope)!==semanticHash(selector.scope)||!('resources' in result.result)||!result.result.resources.some(resource=>resource.url===request.url&&resource.method===request.method&&resource.body===request.body))throw Error('Resource is not an actual admitted discovery selector');
@@ -227,7 +221,7 @@ export async function validateAcquisitionSelector(registry:DistrictRegistry,stor
 // network_error also wraps unexpected cache/inspection errors; keep it generic.
 const acquisitionFailureReasons:Readonly<Record<FetchFailure,ReasonCode>>={
  unsafe_url:'source_policy_refused',robots_blocked:'source_policy_refused',robots_unavailable:'source_policy_refused',
- tdm_reserved:'source_policy_refused',tdm_unavailable:'source_policy_refused',access_barrier:'source_access_barrier',
+ tdm_reserved:'source_policy_refused',tdm_unavailable:'source_policy_refused',access_barrier:'source_access_barrier',credential_unavailable:'source_access_barrier',
  dns_error:'source_unavailable',timeout:'source_unavailable',network_error:'execution_exception',http_error:'source_http_error',
  too_large:'source_limit_exceeded',redirect_limit:'source_redirect_refused',invalid_redirect:'source_redirect_refused',
  cross_host_redirect:'source_redirect_refused',cache_missing:'cas_unavailable',unsupported_encoding:'source_unavailable',
@@ -265,7 +259,8 @@ export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegis
  let response:FetchedDocument;
  try{response=await fetcher.fetch(selector.request.url,{method:selector.request.method,body:selector.request.body??undefined,publicOperation:selector.request.publicOperation??undefined,ownerRobotsOverride:ownerRobotsOverrideFor(selector.root)??undefined,registeredSourceUrl:selector.root,municipalityName:city.name,machinePolicyUrls:source.knownMachinePolicyUrls});}
  catch(error){context.signal.throwIfAborted();const reasonCode=acquisitionFailureReason(error);if(reasonCode===null||reasonCode==='execution_exception')throw error;return {outcome:'held_execution',reasonCode,versions:{acquisition:contract}};}
- context.signal.throwIfAborted();const bytes=await readFetchedBytes(fetchRoot,response.localPath,response.sha256,selector.maxBytes),httpObservation=await readHttpObservation(response,fetchRoot,policy);
+ context.signal.throwIfAborted();
+ const {bytes,httpObservation}=response.policy?.access==='authenticated_owner_account'?await readGenesisOwnerRepresentation(fetchRoot,response,policy,selector.maxBytes):{bytes:await readFetchedBytes(fetchRoot,response.localPath,response.sha256,selector.maxBytes),httpObservation:await readHttpObservation(response,fetchRoot,policy)};
  const checkedAt=new Date().toISOString(),proof=await createPolicyReceipt({source:{url:response.url,sha256:response.sha256,mimeType:response.mimeType},sourcePolicy:response.policy,scope:selector.scope,permission:selector.permission,checkedAt,expiresAt:new Date(Date.parse(checkedAt)+60*60*1000).toISOString()},policy);
  const representation=await persistR1Representation(store,context.cas,{bytes,receipt:proof.receipt,request:selector.request,retrievedAt:response.retrievedAt,fetchedAt:response.checkedAt,sourceVersion:selector.sourceVersion,redirectChain,httpObservation:{observationId:httpObservation.observationId,receiptSha256:httpObservation.receiptSha256,bytes:Buffer.from(httpObservation.bytes)}},policy);
  const descriptor=RepresentationDescriptorSchema.parse({version:'district-r1-representation-v1',scope:selector.scope,root:selector.root,snapshotId:representation.snapshotId,policyDecisionId:representation.policyDecisionId,receiptSha256:representation.receiptSha256,sourceArtifact:representation.sourceArtifact,snapshot:representation.snapshot,httpObservation,fetchedAt:response.checkedAt,admittedAt:proof.receipt.checkedAt,redirectChain});
@@ -401,6 +396,11 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
  try{
   await persistOperatorRegistry(store,cas,admitted);
   const input=await stdinJson();
+  if(command==='import-crawl-corpus'){
+   const manifest=CrawlCorpusImportSchema.parse(input);
+   if(canonicalJson(manifest.registry)!==canonicalJson(registryPin))throw Error('Crawl import descriptor must match admitted CLI registry pin');
+   process.stdout.write(canonicalJson(await importCrawlCorpusForResidual(store,cas,manifest))+'\n');return;
+  }
   if(command==='export-text-contribution'){
    const manifest=z.object({jobKeys:z.array(HashSchema).min(1).max(10000),compositionArtifactSha256:HashSchema}).strict().parse(input),compositionPath=join(cas.root,'sha256',manifest.compositionArtifactSha256.slice(0,2),manifest.compositionArtifactSha256);
    await assertManagedSourceReadable(compositionPath);

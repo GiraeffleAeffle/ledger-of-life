@@ -10,6 +10,7 @@ import {DistrictCas} from '../src/district-cas.ts';
 import {DistrictJobStore,migrateDistrictJobs,runDistrictJobs,type OwnerNotification} from '../src/district-jobs.ts';
 import {Pool} from 'pg';
 import {ResidualInputSchema} from '../src/district-residual-jobs.ts';
+import {PILOT_BASE_CORPUS_SHA256} from '../src/district-corpus.ts';
 import {HttpObservationProofSchema} from '../src/district-http-observation.ts';
 import {randomUUID} from 'node:crypto';
 import {PoliteFetcher,PoliteFetchError,type FetchFailure} from '../src/polite-fetch.ts';
@@ -74,7 +75,7 @@ test('host grouping is a pinned conservative capacity pool, not publisher equiva
 });
 
 test('residual enqueue is bounded subscription work without caller-selected handlers or paid routes',()=>{
- const hash='a'.repeat(64),input={documentId:'fixture-document',corpusSha256:hash,registry:{path:'/fixture/operator-registry-descriptor.json',sha256:hash},registrySha256:hash,policyReceiptSha256:hash,httpObservation:{observationId:'fixture-observation.json',receiptSha256:hash},bounds:{maxDocuments:1,maxChunks:24,maxModelCalls:48,paidMicroUsd:0}};
+ const hash='a'.repeat(64),input={documentId:'fixture-document',corpusSha256:PILOT_BASE_CORPUS_SHA256,corpusObservations:[{kind:'http_observation',url:'https://example.org/original',sourceSha256:hash,observationId:'1-11111111-1111-4111-8111-111111111111.json',receiptSha256:hash}],registry:{path:'/fixture/operator-registry-descriptor.json',sha256:hash},registrySha256:hash,policyReceiptSha256:hash,httpObservation:{observationId:'1-11111111-1111-4111-8111-111111111111.json',receiptSha256:hash},requestEvidenceSha256:hash,bounds:{maxDocuments:1,maxChunks:24,maxModelCalls:48,paidMicroUsd:0}};
  assert.equal(ResidualInputSchema.parse(input).bounds.maxModelCalls,48);
  for(const changed of [
   {...input,bounds:{...input.bounds,maxDocuments:2}},
@@ -124,7 +125,7 @@ test('native commands require an explicit registry descriptor pin without a bare
 test('acquisition reasons are canonical content-free holds, not exception-text projections',()=>{
  const expected:Record<FetchFailure,string>={
   unsafe_url:'source_policy_refused',robots_blocked:'source_policy_refused',robots_unavailable:'source_policy_refused',
-  tdm_reserved:'source_policy_refused',tdm_unavailable:'source_policy_refused',access_barrier:'source_access_barrier',
+  tdm_reserved:'source_policy_refused',tdm_unavailable:'source_policy_refused',access_barrier:'source_access_barrier',credential_unavailable:'source_access_barrier',
   dns_error:'source_unavailable',timeout:'source_unavailable',network_error:'execution_exception',http_error:'source_http_error',
   too_large:'source_limit_exceeded',redirect_limit:'source_redirect_refused',invalid_redirect:'source_redirect_refused',
   cross_host_redirect:'source_redirect_refused',cache_missing:'cas_unavailable',unsupported_encoding:'source_unavailable',

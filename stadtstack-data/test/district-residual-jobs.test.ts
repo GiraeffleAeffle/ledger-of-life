@@ -1,13 +1,15 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import type {Pool} from 'pg';
-import {ResidualBoundsSchema,ResidualInputSchema,ResidualExtractionSchema,residualMimeSupported,residualJobHandlers,enqueueCommittedResidualExtraction,exportResidualTextContribution} from '../src/district-residual-jobs.ts';
+import {ResidualBoundsSchema,ResidualInputSchema,ResidualExtractionSchema,residualMimeSupported,residualJobHandlers,enqueueResidualPreparation,loadResidualSource,enqueueCommittedResidualExtraction,exportResidualTextContribution} from '../src/district-residual-jobs.ts';
+import {PILOT_BASE_CORPUS_SHA256} from '../src/district-corpus.ts';
+import type {JobHandlerContext} from '../src/district-jobs.ts';
 import {canonicalJobIdentity,type DistrictJobStore} from '../src/district-jobs.ts';
 import type {DistrictCas} from '../src/district-cas.ts';
 import type {TextRunContribution} from '../src/text-run-lineage.ts';
 const hash='a'.repeat(64);
-const bounds={maxDocuments:1,maxChunks:4,maxModelCalls:8,paidMicroUsd:0};
-const input={documentId:'original-document',corpusSha256:hash,registrySha256:'b'.repeat(64),registry:{path:'/fixture/operator-registry-descriptor.json',sha256:'d'.repeat(64)},policyReceiptSha256:'c'.repeat(64),httpObservation:{observationId:'fixture-original-observation.json',receiptSha256:'f'.repeat(64)},bounds};
+const bounds={maxDocuments:1,maxChunks:4,maxModelCalls:8,paidMicroUsd:0} as const;
+const input={documentId:'original-document',corpusSha256:PILOT_BASE_CORPUS_SHA256,corpusObservations:[{kind:'http_observation' as const,url:'https://example.org/original',sourceSha256:hash,observationId:'1-11111111-1111-4111-8111-111111111111.json',receiptSha256:'f'.repeat(64)}],registrySha256:'b'.repeat(64),registry:{path:'/fixture/operator-registry-descriptor.json',sha256:'d'.repeat(64)},policyReceiptSha256:'c'.repeat(64),httpObservation:{observationId:'1-11111111-1111-4111-8111-111111111111.json',receiptSha256:'f'.repeat(64)},requestEvidenceSha256:hash,bounds};
 test('residual lane accepts original documents and unresolved metadata narratives, not fabricated text containers',()=>{
  for(const mime of ['application/pdf','text/html','application/xhtml+xml','text/plain','text/plain; charset=utf-8','application/json','application/xml','text/xml'])assert.equal(residualMimeSupported(mime),true);
  for(const mime of ['application/zip','image/png','application/octet-stream'])assert.equal(residualMimeSupported(mime),false);
@@ -57,4 +59,18 @@ test('residual extraction metadata requires authentic preparation provenance and
  assert.throws(()=>ResidualExtractionSchema.parse({...envelope,model:{provider:'openai-subscription'}}));
  assert.throws(()=>ResidualExtractionSchema.parse({...envelope,result:{...result,provider:'anthropic-subscription'}}));
  assert.throws(()=>ResidualExtractionSchema.parse({...envelope,result:{...result,purpose:'agreement'}}));
+});
+test('unauthorized corpora fail schema, enqueue, defensive load and both execution paths before any source processing',async()=>{
+ const unauthorized={...input,corpusSha256:hash};
+ assert.throws(()=>ResidualInputSchema.parse(unauthorized),/owner-authorized/);
+ let reads=0,enqueues=0;
+ const cas={read:async()=>{reads++;throw Error('Must not read unauthorized source');}} as unknown as DistrictCas;
+ const store={enqueue:async()=>{enqueues++;return hash;}} as unknown as DistrictJobStore;
+ await assert.rejects(enqueueResidualPreparation(store,cas,unauthorized),/owner-authorized/);
+ await assert.rejects(loadResidualSource(cas,unauthorized),/owner-authorized/);
+ for(const step of ['residual_prepare','residual_extract']){
+  const selector={...unauthorized,contract:{preparationSha256:hash,extraction:{promptSha256:hash,schemaSha256:hash,extractorSha256:hash},hostSha256:hash},...(step==='residual_extract'?{preparationJobKey:hash,preparationReceiptId:'11111111-1111-4111-8111-111111111111',preparationReceiptSha256:hash,preparedArtifactSha256:hash}:{})};
+  await assert.rejects(residualJobHandlers[step]({job:{spec:{step,selector}},cas} as unknown as JobHandlerContext),/owner-authorized/);
+ }
+ assert.equal(reads,0);assert.equal(enqueues,0);
 });
