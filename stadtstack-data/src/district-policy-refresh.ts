@@ -62,10 +62,10 @@ export function policyRefreshHandler(store:DistrictJobStore,createFetcher:(conte
   if(prior&&(!context.job.spec.inputArtifactHashes.includes(prior.hash)||!context.job.dependencyReceiptIds.includes(prior.receiptId)))throw Error('Refresh generation omits its prior committed output/dependency');
   const fetcher=await createFetcher(context,selector.maxRequests),observations:Array<{path:string;sha256:string}>=[];
   let originalRobotsAbsence:z.infer<typeof OriginalRobotsAbsencePinSchema>|undefined;
-  const result=await importCrawlCorpusForResidual(store,context.cas,manifest,{refresh:async(acquired,source)=>{
+  const result=await importCrawlCorpusForResidual(store,context.cas,manifest,{refresh:async(acquired,source,registeredSourceEligibility)=>{
    context.signal.throwIfAborted();await assertManagedSourceBindings(path,[acquired.binding],policy);
    if(prior)await assertManagedSourceBindings(join(context.cas.root,'sha256',prior.hash.slice(0,2),prior.hash),[acquired.binding],policy);
-   const current=await fetcher.refreshPolicyForOriginal({url:acquired.observation.url,sha256:acquired.observation.sha256},acquired.policy,{machinePolicyUrls:source.knownMachinePolicyUrls,originalPolicyRoot:manifest.rawRoot,scope:manifest.documents[0].scope});
+   const current=await fetcher.refreshPolicyForOriginal({url:acquired.observation.url,sha256:acquired.observation.sha256},acquired.policy,{machinePolicyUrls:source.knownMachinePolicyUrls,originalPolicyRoot:manifest.rawRoot,scope:manifest.documents[0].scope,registeredSourceEligibility});
    originalRobotsAbsence=current.originalRobotsAbsence;
    for(const path of current.observations){await assertManagedObservationReadable(path,policy);const stat=await lstat(path);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>1024*1024)throw Error('Policy observation bound rejected');observations.push({path,sha256:digest(await readFile(path))});}
    context.signal.throwIfAborted();return current;

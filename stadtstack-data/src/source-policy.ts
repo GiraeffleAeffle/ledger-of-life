@@ -3,7 +3,7 @@ import {isIP} from 'node:net';
 import {createHash} from 'node:crypto';
 import {isPublicAddress} from './public-address.ts';
 import { DocumentOriginSchema,DOCUMENT_ORIGIN_CLASSIFIER_VERSION,type DocumentOriginClassification } from './document-origin-contract.ts'
-import {readRegisteredRobotsAudit,REVIEWED_REGISTERED_ROBOTS_SCOPES,registeredRobotsUrlInRoots,REGISTERED_SOURCE_POLICY_VALIDITY_MS,PUBLIC_SOURCE_POLICY_VALIDITY_MS} from './registered-source-policy.ts';
+import {readRegisteredRobotsAudit,registeredRobotsScope,registeredRobotsAuditApplies,registeredRobotsUrlInRoots,REGISTERED_SOURCE_POLICY_VALIDITY_MS,PUBLIC_SOURCE_POLICY_VALIDITY_MS,type RegisteredRobotsAudit} from './registered-source-policy.ts';
 export {REGISTERED_SOURCE_POLICY_VALIDITY_MS,PUBLIC_SOURCE_POLICY_VALIDITY_MS} from './registered-source-policy.ts';
 
 /** Owner operational decision only: not municipal permission, a licence, or an access-barrier exemption. */
@@ -184,16 +184,16 @@ export function effectiveRobotsPermission(policy:SourceAccessPolicy,documentUrl:
   return ownerRobotsOverrideApplies(robots.href,policy.ownerRobotsOverride)&&robots.origin===document.origin&&robots.pathname==='/robots.txt'&&!robots.search&&!robots.hash;
  }catch{return false;}
 }
-export function registeredSourcePolicyApplies(policy:SourceAccessPolicy,document:{url:string},scope?:{municipalityId:string;sourceId:string;ags:string}):boolean {
+export function registeredSourcePolicyApplies(policy:SourceAccessPolicy,document:{url:string},scope?:{municipalityId:string;sourceId:string;ags:string},eligibility?:RegisteredRobotsAudit):boolean {
  const audit=readRegisteredRobotsAudit(policy.tdm.evidence,document.url);
  if(audit)return scope===undefined||audit.municipalityId===scope.municipalityId&&audit.sourceId===scope.sourceId&&audit.ags===scope.ags;
- if(!scope)return false;
- const reviewed=REVIEWED_REGISTERED_ROBOTS_SCOPES.find(row=>row.municipalityId===scope.municipalityId&&row.sourceId===scope.sourceId&&row.ags===scope.ags);
+ if(!scope||!eligibility||eligibility.municipalityId!==scope.municipalityId||eligibility.sourceId!==scope.sourceId||eligibility.ags!==scope.ags||!registeredRobotsAuditApplies(eligibility,eligibility.root))return false;
+ const reviewed=registeredRobotsScope(eligibility.municipalityId,eligibility.sourceId,eligibility.root);
  return !!reviewed&&(registeredRobotsUrlInRoots(reviewed,document.url)||reviewed.sourceId==='regionalstatistik-genesis'&&ownerGenesisRobotsExemptionApplies(policy,document.url));
 }
-export function registeredSourcePolicyContextUrls(policy:SourceAccessPolicy,document:{url:string},scope?:{municipalityId:string;sourceId:string;ags:string}):string[] {
+export function registeredSourcePolicyContextUrls(policy:SourceAccessPolicy,document:{url:string},scope?:{municipalityId:string;sourceId:string;ags:string},eligibility?:RegisteredRobotsAudit):string[] {
  const audit=readRegisteredRobotsAudit(policy.tdm.evidence,document.url);
- const root=audit?.root??(scope&&registeredSourcePolicyApplies(policy,document,scope)?REVIEWED_REGISTERED_ROBOTS_SCOPES.find(row=>row.municipalityId===scope.municipalityId&&row.sourceId===scope.sourceId&&row.ags===scope.ags)?.root:undefined);
+ const root=audit?.root??(eligibility&&registeredSourcePolicyApplies(policy,document,scope,eligibility)?eligibility.root:undefined);
  const hosts=new Set([new URL(document.url).hostname]),urls:string[]=[];
  for(const url of [root,audit?.discovery?.from,audit?.discovery?.anchor?.url])if(url){const host=new URL(url).hostname;if(!hosts.has(host)){hosts.add(host);urls.push(url);}}
  return urls;
@@ -201,13 +201,13 @@ export function registeredSourcePolicyContextUrls(policy:SourceAccessPolicy,docu
 export function isOriginTdmEvidence(row:PolicyEvidence):boolean {
  return row.locator==='W3C TDMRep origin rules'||row.locator==='TDMRep matching location'||row.locator.startsWith('TDMRep standardized location HTTP absence');
 }
-export function sourcePolicyValidityMs(policy:SourceAccessPolicy,document:{url:string},scope?:{municipalityId:string;sourceId:string;ags:string}):number {
- return registeredSourcePolicyApplies(policy,document,scope)?REGISTERED_SOURCE_POLICY_VALIDITY_MS:PUBLIC_SOURCE_POLICY_VALIDITY_MS;
+export function sourcePolicyValidityMs(policy:SourceAccessPolicy,document:{url:string},scope?:{municipalityId:string;sourceId:string;ags:string},eligibility?:RegisteredRobotsAudit):number {
+ return registeredSourcePolicyApplies(policy,document,scope,eligibility)?REGISTERED_SOURCE_POLICY_VALIDITY_MS:PUBLIC_SOURCE_POLICY_VALIDITY_MS;
 }
-export function sourcePolicyExpiresAt(policy:SourceAccessPolicy,checkedAt:string,document:{url:string},scope?:{municipalityId:string;sourceId:string;ags:string}):string {
+export function sourcePolicyExpiresAt(policy:SourceAccessPolicy,checkedAt:string,document:{url:string},scope?:{municipalityId:string;sourceId:string;ags:string},eligibility?:RegisteredRobotsAudit):string {
  const clocks=[checkedAt,policy.robots.checkedAt,...policy.tdm.evidence.map(row=>row.checkedAt)];
  if(!policy.tdm.evidence.length||clocks.some(clock=>!clock||!Number.isFinite(Date.parse(clock))||Date.parse(clock)>Date.now()))throw Error('Source policy evidence clock is incomplete');
- return new Date(Math.min(...clocks.map(clock=>Date.parse(clock!)))+sourcePolicyValidityMs(policy,document,scope)).toISOString();
+ return new Date(Math.min(...clocks.map(clock=>Date.parse(clock!)))+sourcePolicyValidityMs(policy,document,scope,eligibility)).toISOString();
 }
 
 /** Unknown is never promoted to official; legacy ordinary policies may omit classification. */

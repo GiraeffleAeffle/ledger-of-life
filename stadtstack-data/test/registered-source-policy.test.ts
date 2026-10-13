@@ -18,7 +18,7 @@ import {PolicyReceiptSchema,createPolicyReceipt,recheckPolicyReceipt} from '../s
 import {recordHostOptOut,recoverManagedSourceScratch} from '../src/civic-opt-out.ts';
 import {admittedRegisteredRobotsScopes,REVIEWED_REGISTERED_ROBOTS_SCOPES,REGISTERED_SOURCE_ROBOTS_DECISION,REGISTERED_SOURCE_POLICY_VALIDITY_MS,PUBLIC_SOURCE_POLICY_VALIDITY_MS,registeredRobotsAuditApplies,registeredRobotsEvidence,readRegisteredRobotsAudit} from '../src/registered-source-policy.ts';
 import {createOperatorRegistryFixture} from './helpers/operator-registry-fixture.ts';
-import {discoverDocumentLinks} from '../src/district-source-adapters.ts';
+import {discoverDocumentLinks,crawlHtmlSource,crawlParticipationApi} from '../src/district-source-adapters.ts';
 import {politeTestOptions} from './fixtures/polite-lane.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {metadataPdf,reservedXmp} from './fixtures/tdm-pdf.ts';
@@ -66,11 +66,18 @@ test('frozen owner scope matches the admitted nine-town registry, never a change
 test('registered blocked robots retain unknown origin, honour reservations/opt-outs, expire at seven days and decode with real legacy codecs',async t=>{
  const registryFixture=await createOperatorRegistryFixture(t,{value:await registry()}),seen:Array<{host:string;path:string}>=[];
  const pdf=metadataPdf(reservedXmp);
+ let retryFrontierMode=false,retryResponses=0;
  const server=createServer((req,res)=>{
   assert.equal(req.headers.username,undefined);assert.equal(req.headers.password,undefined);
   const host=req.headers.host??'',path=req.url??'';seen.push({host,path});
   if(path==='/robots.txt'){res.writeHead(200,{'content-type':'text/plain'});res.end('User-agent: *\nDisallow: /\n');return;}
   if(path==='/.well-known/tdmrep.json'){res.writeHead(404);res.end();return;}
+  if(host==='bob-sh.de'&&path==='/list/json'){res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({success:true,procedureCount:2,mapVars:[{procedureId:'own',externalName:'Fixture own',procedureUrl:'/verfahren/own/public/detail'},{procedureId:'foreign',externalName:'Fixture foreign',procedureUrl:'/verfahren/foreign/public/detail'}],responseHtml:'<div class="c-procedurelist__item" data-procedure-id="own">Fixture own</div><div class="c-procedurelist__item" data-procedure-id="foreign">Fixture foreign</div>'}));return;}
+  if(host==='bob-sh.de'&&path==='/'){res.writeHead(200,{'content-type':'text/html'});res.end(`<script>var initialProcedures = JSON.parse('${JSON.stringify([{id:'own',municipalCode:'01053100'},{id:'foreign',municipalCode:'01053090'}])}');</script>`);return;}
+  if(host==='bob-sh.de'&&path==='/verfahren/own/public/detail'){res.writeHead(200,{'content-type':'text/html'});res.end('<a href="/file/own/document.pdf">Dokument</a><a href="/verfahren/foreign/public/detail">Fremd</a>');return;}
+  if(host==='bob-sh.de'&&path==='/file/own/document.pdf'){res.writeHead(200,{'content-type':'application/pdf'});res.end(metadataPdf(''));return;}
+  if(path==='/retry/documentation.html'&&retryResponses++===0){res.writeHead(503);res.end('Fixture transient');return;}
+  if(retryFrontierMode){res.writeHead(200,{'content-type':'text/html'});res.end(path==='/retry/documentation.html'?'<html>Fixture recovered</html>':'<a href="/retry/documentation.html">Dokument</a>');return;}
   if(path==='/reserved.pdf'){res.writeHead(200,{'content-type':'application/pdf'});res.end(pdf);return;}
   if(path==='/login'){res.writeHead(401,{'www-authenticate':'fixture'});res.end();return;}
   res.writeHead(200,{'content-type':'text/html',...(path==='/reserved'?{'tdm-reservation':'1'}:{})});
@@ -118,11 +125,37 @@ test('registered blocked robots retain unknown origin, honour reservations/opt-o
  const clocks=[response.checkedAt,response.policy!.robots.checkedAt!,...response.policy!.tdm.evidence.map(row=>row.checkedAt!)],start=Math.min(...clocks.map(Date.parse));
  const expiresAt=sourcePolicyExpiresAt(response.policy!,response.checkedAt,response,scope);assert.equal(Date.parse(expiresAt),start+REGISTERED_SOURCE_POLICY_VALIDITY_MS);
  const originalPolicy={...response.policy!,tdm:{...response.policy!.tdm,evidence:response.policy!.tdm.evidence.filter(row=>!readRegisteredRobotsAudit([row],response.url))}};
- assert.equal(sourcePolicyValidityMs(originalPolicy,response,scope),REGISTERED_SOURCE_POLICY_VALIDITY_MS);
- assert.equal(sourcePolicyExpiresAt(originalPolicy,response.checkedAt,response,scope),expiresAt);
+ const eligibility=fetcher.registeredSourceEligibility(requestOptions);assert.ok(eligibility);
+ assert.equal(sourcePolicyValidityMs(originalPolicy,response,scope),PUBLIC_SOURCE_POLICY_VALIDITY_MS);
+ assert.equal(sourcePolicyValidityMs(originalPolicy,response,scope,eligibility),REGISTERED_SOURCE_POLICY_VALIDITY_MS);
+ assert.equal(sourcePolicyExpiresAt(originalPolicy,response.checkedAt,response,scope,eligibility),expiresAt);
+ const changed=structuredClone(registryFixture.admitted.registry);changed.municipalities.find(row=>row.id===scope.municipalityId)!.sources.find(row=>row.id===scope.sourceId)!.crawlScope!.followLinkedDocuments=false;
+ const changedFixture=await createOperatorRegistryFixture(t,{value:changed}),changedFetcher=new PoliteFetcher({...options,fixtureInspection:inspection});
+ changedFetcher.registerRegisteredSources(changedFixture.admitted.registry,changedFixture.registrySha256);
+ assert.equal(changedFetcher.registeredSourceEligibility(requestOptions),undefined);
+ assert.equal(sourcePolicyValidityMs(originalPolicy,response,scope,changedFetcher.registeredSourceEligibility(requestOptions)),PUBLIC_SOURCE_POLICY_VALIDITY_MS);
  const created=await createPolicyReceipt({source:{url:response.url,sha256:response.sha256,mimeType:response.mimeType},scope,sourcePolicy:response.policy,permission:{kind:'facts_with_attribution'},checkedAt:new Date().toISOString(),expiresAt},options.ownerPolicyLane);
  assert.ok(PolicyReceiptSchema.safeParse(created.receipt).success);
  assert.equal(PolicyReceiptSchema.safeParse({...created.receipt,expiresAt:new Date(start+REGISTERED_SOURCE_POLICY_VALIDITY_MS+1).toISOString()}).success,false);
+ const city=registryFixture.admitted.registry.municipalities.find(row=>row.id==='ratzeburg')!;
+ const bobSource={...city.sources.find(row=>row.id==='ratzeburg-bob-sh')!,registeredMunicipalityId:city.id};
+ assert.equal(bobSource.crawlScope?.followLinkedDocuments,false);
+ const bobLane=await lane('bob-exact'),bobResult=await crawlParticipationApi(bobLane.fetcher,city,bobSource,{maxRequests:12,maxPages:10,maxDocuments:10});
+ const bobPdf=bobResult.documents.find(row=>row.url==='https://bob-sh.de/file/own/document.pdf');assert.ok(bobPdf);
+ assert.equal(readRegisteredRobotsAudit(bobPdf.policy!.tdm.evidence,bobPdf.url)?.municipalDiscovery?.ags,city.ags);
+ assert.ok(!seen.some(row=>row.host==='bob-sh.de'&&row.path.includes('/foreign/')));
+ const bobOptions={registeredMunicipalityId:city.id,registeredSourceId:bobSource.id,registeredSourceUrl:bobSource.url!};
+ await assert.rejects(bobLane.fetcher.fetch('https://bob-sh.de/verfahren/unbound/public/detail',bobOptions),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='document_excluded');
+ const bobAudit=readRegisteredRobotsAudit(bobPdf.policy!.tdm.evidence,bobPdf.url)!;assert.equal(registeredRobotsAuditApplies({...bobAudit,municipalDiscovery:{...bobAudit.municipalDiscovery!,ags:'01053090'}},bobPdf.url),false);
+ retryFrontierMode=true;
+ const retryLane=await lane('retry-frontier'),retrySource={...gazette,registeredMunicipalityId:city.id},limits={maxRequests:1,maxPages:10,maxDocuments:10};
+ await crawlHtmlSource(retryLane.fetcher,city,retrySource,limits,[]);
+ const failed=await crawlHtmlSource(retryLane.fetcher,city,retrySource,limits,[]);
+ const frontier=JSON.parse(await readFile(failed.coverage!.frontierPath!,'utf8'));assert.equal(frontier.failures[0].from,gazette.url);assert.equal(frontier.failures[0].failure,'http_error');
+ const retryClock=t.mock.method(Date,'now',()=>Date.parse(frontier.failures[0].retryAfter)+1),freshRetry=new PoliteFetcher({...retryLane.options,fixtureInspection:inspection});
+ freshRetry.registerRegisteredSources(registryFixture.admitted.registry,registryFixture.registrySha256);
+ const recovered=await crawlHtmlSource(freshRetry,city,retrySource,limits,[]);retryClock.mock.restore();retryFrontierMode=false;
+ assert.ok(recovered.documents.some(row=>row.url===root+'retry/documentation.html'&&readRegisteredRobotsAudit(row.policy!.tdm.evidence,row.url)?.discovery?.from===gazette.url));
  // Actual released tag code, not a permissive mock schema.
  const legacyRoot=join(registryFixture.root,'legacy-src');await cp(join(packageRoot,'src'),legacyRoot,{recursive:true});
  await mkdir(join(registryFixture.root,'regional'),{recursive:true});await cp(join(packageRoot,'regional','taxonomy.mjs'),join(registryFixture.root,'regional','taxonomy.mjs'));

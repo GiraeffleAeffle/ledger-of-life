@@ -51,7 +51,7 @@ export const DEFAULT_SOURCE_REVALIDATE_MS=24*60*60_000;
 export interface AdapterOptions {maxDocuments:number;maxPages:number;maxRequests:number;activeOparlRecordIds?:Set<string>;revalidateAfterMs?:number;pageRoots?:string[];seedDocumentUrls?:string[];discoveryBindings?:SourceContentBinding[]}
 export interface DiscoveredLink {url:string;title:string;pdf:boolean;structured:boolean}
 interface FrontierEntry extends SourceSeed {from:string;depth:number;revalidate?:boolean;previous?:CrawlDocument}
-export interface FrontierFailure {url:string;failure:string;reason:string;checkedAt:string;status?:number;policy?:SourceAccessPolicy;retryAfter?:string;action:'ask_municipality';urlRole?:'registered_source_context';targetUrlSha256?:string;policyAudit?:{policySha256:string;sourceHostSha256:string;robotsState:SourceAccessPolicy['robots']['state'];robotsStatus:'allowed'|'disallowed'|'unavailable';override:'owner-approved 2026-10-11'|null;tdmState:SourceAccessPolicy['tdm']['state'];tdmReferenceStatus:'unavailable'|null;tdmDeclarationStatus?:'unavailable'|null;access:SourceAccessPolicy['access']}}
+export interface FrontierFailure {url:string;from?:string;depth?:number;failure:string;reason:string;checkedAt:string;status?:number;policy?:SourceAccessPolicy;retryAfter?:string;action:'ask_municipality';urlRole?:'registered_source_context';targetUrlSha256?:string;policyAudit?:{policySha256:string;sourceHostSha256:string;robotsState:SourceAccessPolicy['robots']['state'];robotsStatus:'allowed'|'disallowed'|'unavailable';override:'owner-approved 2026-10-11'|null;tdmState:SourceAccessPolicy['tdm']['state'];tdmReferenceStatus:'unavailable'|null;tdmDeclarationStatus?:'unavailable'|null;access:SourceAccessPolicy['access']}}
 interface SourceFrontier {schemaVersion:1;municipalityId:string;sourceId:string;queue:FrontierEntry[];visited:string[];documents:CrawlDocument[];excludedDocuments?:CrawlExcludedDocument[];failures:FrontierFailure[];roots:string[];checkedUrls?:Record<string,{checkedAt:string;documentId:string}>;lastCheckedAt?:string|null;sourceBindings?:SourceContentBinding[]}
 /** Explicit target selection never inherits unrelated roots, seeds or API discovery. */
 export function registeredSourceTargets(municipality:RegistryMunicipality,source:RegistrySource,options:Pick<AdapterOptions,'pageRoots'|'seedDocumentUrls'>):{kind:'pages'|'seeds';urls:string[];seeds:SourceSeed[]}|undefined {
@@ -191,7 +191,7 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
  // Failed checks are retried only after their explicit backoff/TTL, never by bypassing their restriction.
  const deferred=frontier.failures.filter(item=>item.retryAfter?Date.parse(item.retryAfter)<=now:now-Date.parse(item.checkedAt)>=ttl);
  for(const item of deferred){
-  if(!queued.has(item.url)){frontier.queue.push({url:item.url,sourceId:source.id,depth:0,from:item.url,revalidate:true});queued.add(item.url);}
+  if(!queued.has(item.url)){frontier.queue.push({url:item.url,sourceId:source.id,depth:item.depth??0,from:item.from??item.url,revalidate:true});queued.add(item.url);}
   failed.delete(item.url);visited.delete(item.url);
  }
  frontier.failures=frontier.failures.filter(item=>!deferred.includes(item));
@@ -249,7 +249,7 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
    const failure=error instanceof PoliteFetchError?error.failure:'representation_error',status=error instanceof PoliteFetchError?error.status:undefined,checkedAt=new Date().toISOString();
    const transient=['timeout','network_error','dns_error','robots_unavailable','tdm_unavailable','host_cooldown','host_busy'].includes(failure)||status===429||status!==undefined&&status>=500;
    const retryAfter=error instanceof PoliteFetchError?error.retryAfter:undefined;
-   frontier.failures.push({url:item.url,failure,reason:failure,checkedAt,...(status?{status}:{}),...(error instanceof PoliteFetchError&&error.policy?{policy:error.policy}:{}),...(retryAfter?{retryAfter}:transient?{retryAfter:new Date(Date.now()+15*60_000).toISOString()}:{}),action:'ask_municipality'});
+   frontier.failures.push({url:item.url,from:item.from,depth:item.depth,failure,reason:failure,checkedAt,...(status?{status}:{}),...(error instanceof PoliteFetchError&&error.policy?{policy:error.policy}:{}),...(retryAfter?{retryAfter}:transient?{retryAfter:new Date(Date.now()+15*60_000).toISOString()}:{}),action:'ask_municipality'});
    hostStopped=status===403||status===429||failure.startsWith('host_');
    if(item.previous)frontier.documents=frontier.documents.filter(document=>document.id!==item.previous!.id);
    frontier.lastCheckedAt=checkedAt;failed.add(item.url);frontier.queue.shift();
@@ -289,6 +289,7 @@ export async function crawlParticipationApi(fetcher:PoliteFetcher,municipality:R
  $('.c-procedurelist__item[data-procedure-id]').each((_,element)=>{const row=$(element);names.set(row.attr('data-procedure-id')!,row.text().replace(/\s+/g,' '));});
  const normalizedName=municipality.name.toLocaleLowerCase('de'),seeds:SourceSeed[]=[];
  const bob=source.api.format==='bobsh-list',bindings=new Map<string,string|null>();let inventory:FetchedDocument|undefined;
+ const boundProcedures:Array<{procedureId:string;procedureUrl:string}>=[];
  if(bob){
   if(!source.url||!/^\d{8}$/.test(municipality.ags))throw Error('BOB discovery requires a registered inventory root and exact eight-digit AGS');
   if(fetcher.requestCount-before>=options.maxRequests)return {documents:[],sourceBindings:[sourceContentBinding(response)],notes:['BOB municipal identity inventory deferred by request budget; no empty-coverage inference'],requests:fetcher.requestCount-before,checkedAt:response.checkedAt,coverage:{state:'partial',pendingCount:1,runnableCount:1,blockedCount:0,scope:'Public BOB inventory and exact municipal-code bindings'}};
@@ -323,8 +324,10 @@ export async function crawlParticipationApi(fetcher:PoliteFetcher,municipality:R
   }
   // A consultation start is not the document's publication or decision date.
   seeds.push({url:new URL(procedure.procedureUrl,response.url).href,title:procedure.externalName,sourceId:source.id,documentDate:null});
+  if(bob)boundProcedures.push({procedureId:procedure.procedureId,procedureUrl:seeds.at(-1)!.url});
  }
  const apiRequests=fetcher.requestCount-before;
+ if(bob&&inventory)await fetcher.recordExactMunicipalBobDiscoveries(sourceFetchOptions(source),response,inventory,municipality.ags,boundProcedures);
  await fetcher.recordDiscoveredSourceLinks(sourceFetchOptions(source),response,seeds.map(seed=>seed.url));
  const result=await crawlHtmlSource(fetcher,municipality,source,{...options,maxRequests:Math.max(0,options.maxRequests-apiRequests),discoveryBindings:mergeSourceBindings(options.discoveryBindings??[],[sourceContentBinding(response)],inventory?[sourceContentBinding(inventory)]:[])},bob?seeds:[...seeds,...municipality.seedDocuments?.filter(seed=>seed.sourceId===source.id)??[]],bob?seeds.map(seed=>seed.url):undefined);
  for(const document of result.documents){document.adapter=source.api.format;const seed=seeds.find(item=>item.url===document.url||item.url===document.metadata.discoveredFrom);const procedure=data.mapVars.find(item=>new URL(item.procedureUrl,response.url).href===seed?.url);if(procedure){document.metadata.caseKey=procedure.procedureId;document.metadata.caseKeyType=source.api.format==='diplan-list'?'diplan':'bobsh';}}

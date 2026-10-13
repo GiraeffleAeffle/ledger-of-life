@@ -33,7 +33,7 @@ import {readGenesisOwnerCredentials,type GenesisOwnerCredentials} from './genesi
 import {genesisOwnerAccountRoot,readGenesisOwnerRepresentation} from './genesis-owner-acquisition.ts';
 import {persistCrawlRequestEvidence,CrawlRequestEvidenceCaptureError} from './district-crawl-request.ts';
 import {semanticHash} from './district-adapter-contract.ts';
-import {admittedRegisteredRobotsScopes,registeredRobotsAuditApplies,registeredRobotsEvidence,readRegisteredRobotsAudit,registeredRobotsScope,REGISTERED_SOURCE_POLICY_VALIDITY_MS,PUBLIC_SOURCE_POLICY_VALIDITY_MS,type RegisteredRobotsAudit,type RegisteredSourceConfiguration} from './registered-source-policy.ts';
+import {admittedRegisteredRobotsScopes,registeredRobotsAuditApplies,registeredRobotsEvidence,readRegisteredRobotsAudit,registeredRobotsScope,registeredBobScope,REGISTERED_SOURCE_POLICY_VALIDITY_MS,PUBLIC_SOURCE_POLICY_VALIDITY_MS,type RegisteredRobotsAudit,type RegisteredSourceConfiguration} from './registered-source-policy.ts';
 import {sourcePolicyValidityMs,registeredSourcePolicyContextUrls,isOriginTdmEvidence} from './source-policy.ts';
 
 export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'credential_unavailable'|'dns_error'|'timeout'|'network_error'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cross_host_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded'|'host_admission_deferred';
@@ -151,9 +151,12 @@ export class PoliteFetcher {
   this.registeredScopes.clear();this.registeredDiscoveries.clear();
   for(const audit of admittedRegisteredRobotsScopes(registry,registrySha256))this.registeredScopes.set(this.registeredKey(audit),audit);
  }
+ registeredSourceEligibility(options:FetchOptions):RegisteredRobotsAudit|undefined {
+  return this.registeredScopes.get(this.registeredKey({municipalityId:options.registeredMunicipalityId,sourceId:options.registeredSourceId,root:options.registeredSourceUrl}));
+ }
  hasRegisteredSourceDecision(options:FetchOptions):boolean {
   const audit=this.registeredScopes.get(this.registeredKey({municipalityId:options.registeredMunicipalityId,sourceId:options.registeredSourceId,root:options.registeredSourceUrl}));
-  return !!audit&&!!registeredRobotsScope(audit.municipalityId,audit.sourceId,audit.root)?.followLinkedDocuments;
+  const scope=audit&&registeredRobotsScope(audit.municipalityId,audit.sourceId,audit.root);return !!scope&&(scope.followLinkedDocuments||registeredBobScope(scope));
  }
  private registeredKey(scope:{municipalityId?:string;sourceId?:string;root?:string}):string{return JSON.stringify([scope.municipalityId,scope.sourceId,scope.root]);}
  private registeredAudit(url:string,options:FetchOptions):RegisteredRobotsAudit|undefined {
@@ -172,7 +175,7 @@ export class PoliteFetcher {
   const anchor=prior.discovery?.anchor??(prior.discovery?{url:prior.discovery.from,sha256:prior.discovery.sha256}:undefined);
   for(const target of targets){
    if(registeredRobotsAuditApplies(base,target))continue;
-   const candidate={...base,discovery:{from:from.url,sha256:from.sha256,...(anchor?{anchor}:{})}};
+   const candidate={...base,...(prior.municipalDiscovery?{municipalDiscovery:prior.municipalDiscovery}:{}),discovery:{from:from.url,sha256:from.sha256,...(anchor?{anchor}:{})}};
    if(!registeredRobotsAuditApplies(candidate,target))continue;
    if((target+'#'+encodeURIComponent(JSON.stringify(candidate))).length<=8192)this.registeredDiscoveries.set(key+'\n'+target,candidate);
   }
@@ -182,6 +185,15 @@ export class PoliteFetcher {
   const observedTargets=typeof targets==='function'?targets():targets;if(!observedTargets.length)return;
   await this.assertSourceReadable(from.localPath,from.url);await this.assertSourceBindingsAllowed([sourceContentBinding(from)]);
   this.authorizeRegisteredSourceDiscovery(options,from,observedTargets);
+ }
+ async recordExactMunicipalBobDiscoveries(options:FetchOptions,list:FetchedDocument,inventory:FetchedDocument,ags:string,procedures:readonly {procedureId:string;procedureUrl:string}[]):Promise<void> {
+  const base=this.registeredSourceEligibility(options),scope=base&&registeredRobotsScope(base.municipalityId,base.sourceId,base.root);
+  if(!base||!scope||!registeredBobScope(scope)||ags!==base.ags||inventory.url!==scope.root||list.url!==scope.apiUrl)return;
+  await this.assertSourceBindingsAllowed([sourceContentBinding(list),sourceContentBinding(inventory)]);
+  for(const procedure of procedures){
+   const candidate:RegisteredRobotsAudit={...base,municipalDiscovery:{ags,...procedure,inventoryUrl:inventory.url,inventorySha256:inventory.sha256},discovery:{from:list.url,sha256:list.sha256}};
+   if(registeredRobotsAuditApplies(candidate,procedure.procedureUrl))this.registeredDiscoveries.set(this.registeredKey(base)+'\n'+procedure.procedureUrl,candidate);
+  }
  }
  get requestCount():number{return this.fetchCount;}
  constructor(options:PoliteFetcherOptions,publicPolicyFetcher?:PoliteFetcher){
@@ -533,7 +545,7 @@ export class PoliteFetcher {
  /** Authorized current-proof operation: policy endpoints only, never the original body.
   * A new operation bypasses in-memory TTLs, but retains genuine HTTP validators.
   * Even a permissive policy change is a hold; old body-specific findings stay old. */
- async refreshPolicyForOriginal(source:{url:string;sha256:string},original:SourceAccessPolicy,options:Pick<FetchOptions,'machinePolicyUrls'|'hostProfile'>&{originalPolicyRoot?:string;scope?:{municipalityId:string;sourceId:string;ags:string}}={}){
+ async refreshPolicyForOriginal(source:{url:string;sha256:string},original:SourceAccessPolicy,options:Pick<FetchOptions,'machinePolicyUrls'|'hostProfile'>&{originalPolicyRoot?:string;scope?:{municipalityId:string;sourceId:string;ags:string};registeredSourceEligibility?:RegisteredRobotsAudit}={}){
   const input=source.url;
   await this.initialize();await this.assertHostAllowed(input);
   const url=publicUrl(input);
@@ -563,7 +575,7 @@ export class PoliteFetcher {
    const clocks=[currentRobots.checkedAt,...originEvidence.map(row=>row.checkedAt)];
    if(clocks.some(clock=>!clock||!Number.isFinite(Date.parse(clock))||Date.parse(clock)>Date.now()))throw new PoliteFetchError('host_state_unsafe','Current policy clock is incomplete');
    await this.assertHostAllowed(input);
-   return {sourcePolicy,expiresAt:new Date(Math.min(...clocks.map(clock=>Date.parse(clock!)))+sourcePolicyValidityMs(sourcePolicy,source,options.scope)).toISOString(),observations:[...this.policyObservationPaths],...(absence?{originalRobotsAbsence:absence.proof}:{})};
+   return {sourcePolicy,expiresAt:new Date(Math.min(...clocks.map(clock=>Date.parse(clock!)))+sourcePolicyValidityMs(sourcePolicy,source,options.scope,options.registeredSourceEligibility)).toISOString(),observations:[...this.policyObservationPaths],...(absence?{originalRobotsAbsence:absence.proof}:{})};
   }catch(error){if(error instanceof RequestAdmissionInterruption)throw error.admissionError;throw error;}finally{this.policyObservationPaths=undefined;this.policyRefreshOriginalUrl=undefined;}
  }
  async fetch(url:string,options:FetchOptions={}):Promise<FetchedDocument>{

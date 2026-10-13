@@ -55,8 +55,8 @@ const rows:RegisteredRobotsScope[]=[
  {"municipalityId":"hagenow","ags":"13076060","sourceId":"pegelonline","root":"https://m.pegelonline.wsv.de/webservices/rest-api/v2/stations.json","pageRoots":[],"followLinkedDocuments":false,"apiUrl":null,"seeds":[],"kind":"structured"},
 ];
 export const REVIEWED_REGISTERED_ROBOTS_SCOPES:readonly RegisteredRobotsScope[]=Object.freeze(rows.map(row=>Object.freeze({...row,pageRoots:Object.freeze(row.pageRoots),seeds:Object.freeze(row.seeds)})));
-export interface RegisteredRobotsAudit {decisionId:typeof REGISTERED_SOURCE_ROBOTS_DECISION.id;municipalityId:string;ags:string;sourceId:string;root:string;registrySha256:string;discovery?:{from:string;sha256:string;anchor?:{url:string;sha256:string}}}
-const AuditSchema=z.object({decisionId:z.literal(REGISTERED_SOURCE_ROBOTS_DECISION.id),municipalityId:z.string(),ags:z.string().regex(/^\d{8}$/),sourceId:z.string(),root:z.string().url(),registrySha256:z.string().regex(/^[a-f0-9]{64}$/),discovery:z.object({from:z.string().url(),sha256:z.string().regex(/^[a-f0-9]{64}$/),anchor:z.object({url:z.string().url(),sha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict().optional()}).strict().optional()}).strict();
+export interface RegisteredRobotsAudit {decisionId:typeof REGISTERED_SOURCE_ROBOTS_DECISION.id;municipalityId:string;ags:string;sourceId:string;root:string;registrySha256:string;municipalDiscovery?:{ags:string;procedureId:string;procedureUrl:string;inventoryUrl:string;inventorySha256:string};discovery?:{from:string;sha256:string;anchor?:{url:string;sha256:string}}}
+export const RegisteredRobotsAuditSchema=z.object({decisionId:z.literal(REGISTERED_SOURCE_ROBOTS_DECISION.id),municipalityId:z.string(),ags:z.string().regex(/^\d{8}$/),sourceId:z.string(),root:z.string().url(),registrySha256:z.string().regex(/^[a-f0-9]{64}$/),municipalDiscovery:z.object({ags:z.string().regex(/^\d{8}$/),procedureId:z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/),procedureUrl:z.string().url(),inventoryUrl:z.string().url(),inventorySha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict().optional(),discovery:z.object({from:z.string().url(),sha256:z.string().regex(/^[a-f0-9]{64}$/),anchor:z.object({url:z.string().url(),sha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict().optional()}).strict().optional()}).strict();
 export interface RegisteredSourceConfiguration {municipalities:readonly {id:string;ags:string;sources:readonly {id:string;kind:string;url:string|null;api?:{url:string};crawlScope?:{pageRoots:string[];followLinkedDocuments:boolean}}[];seedDocuments?:readonly {sourceId:string;url:string}[]}[]}
 export function admittedRegisteredRobotsScopes(registry:RegisteredSourceConfiguration,registrySha256:string):RegisteredRobotsAudit[] {
  if(!/^[a-f0-9]{64}$/.test(registrySha256))throw Error('Admitted registry digest missing');
@@ -101,11 +101,20 @@ function linkedUrlInRegisteredScope(scope:RegisteredRobotsScope,input:string):bo
   return true;
  }catch{return false;}
 }
+export function registeredBobScope(scope:RegisteredRobotsScope):boolean{return scope.kind==='participation'&&scope.root==='https://bob-sh.de/'&&scope.apiUrl==='https://bob-sh.de/list/json'&&scope.sourceId.endsWith('-bob-sh');}
+function boundBobTarget(audit:RegisteredRobotsAudit,scope:RegisteredRobotsScope,input:string):boolean {
+ const binding=audit.municipalDiscovery;if(!binding||!registeredBobScope(scope)||binding.ags!==scope.ags||binding.inventoryUrl!==scope.root||!/^[a-f0-9]{64}$/.test(binding.inventorySha256)||!/^[a-zA-Z0-9_-]{1,128}$/.test(binding.procedureId))return false;
+ try{
+  const procedure=new URL(binding.procedureUrl),target=new URL(input),id=/^\/(?:verfahren|procedure)\/([^/]+)/.exec(procedure.pathname)?.[1],targetId=/^\/(?:verfahren|procedure|file)\/([^/]+)/.exec(target.pathname)?.[1];
+  return procedure.origin===new URL(scope.root).origin&&id===binding.procedureId&&linkedUrlInRegisteredScope(scope,input)&&(!targetId||targetId===id);
+ }catch{return false;}
+}
 export function registeredRobotsAuditApplies(audit:RegisteredRobotsAudit,url:string):boolean {
  if(audit.decisionId!==REGISTERED_SOURCE_ROBOTS_DECISION.id||!/^[a-f0-9]{64}$/.test(audit.registrySha256))return false;
  const scope=registeredRobotsScope(audit.municipalityId,audit.sourceId,audit.root);if(!scope||scope.ags!==audit.ags)return false;
  if(registeredRobotsUrlInRoots(scope,url))return true;
- if(!scope.followLinkedDocuments||!audit.discovery||!/^[a-f0-9]{64}$/.test(audit.discovery.sha256)||!linkedUrlInRegisteredScope(scope,url))return false;
+ if(!audit.discovery||!/^[a-f0-9]{64}$/.test(audit.discovery.sha256)||!linkedUrlInRegisteredScope(scope,url))return false;
+ if(!scope.followLinkedDocuments)return boundBobTarget(audit,scope,url)&&(registeredRobotsUrlInRoots(scope,audit.discovery.from)||boundBobTarget(audit,scope,audit.discovery.from));
  const anchor=audit.discovery.anchor;
  return anchor?/^[a-f0-9]{64}$/.test(anchor.sha256)&&registeredRobotsUrlInRoots(scope,anchor.url)&&linkedUrlInRegisteredScope(scope,audit.discovery.from):registeredRobotsUrlInRoots(scope,audit.discovery.from);
 }
@@ -124,7 +133,7 @@ export function readRegisteredRobotsAudit(evidence:readonly {url:string;locator:
   try{
    const target=new URL(item.url),base=new URL(url);const encoded=decodeURIComponent(target.hash.slice(1));target.hash='';
    if(target.href!==base.href||hash(encoded)!==item.valueSha256||Buffer.byteLength(encoded)!==item.valueBytes)continue;
-   const parsed=AuditSchema.safeParse(JSON.parse(encoded));
+   const parsed=RegisteredRobotsAuditSchema.safeParse(JSON.parse(encoded));
    if(parsed.success&&registeredRobotsAuditApplies(parsed.data,url))return parsed.data;
   }catch{}
  }
