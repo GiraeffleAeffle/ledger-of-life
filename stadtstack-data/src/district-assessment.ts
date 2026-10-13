@@ -392,7 +392,7 @@ export async function writeImmutable(path: string, value: unknown): Promise<void
   try { await file.writeFile(canonical(value) + '\n'); await file.sync(); } finally { await file.close(); }
 }
 export async function runAssessmentPass(item: AssessmentItem, role: typeof roles[number], provider: ExtractorProvider,
-  paths: { ledgerPath: string; pausePath: string }, previous?: { A: AssessmentReceipt; B: AssessmentReceipt }, context: AssessmentEvidenceContext = configuredEvidence): Promise<AssessmentReceipt> {
+  paths: { ledgerPath: string; pausePath: string; signal?: AbortSignal }, previous?: { A: AssessmentReceipt; B: AssessmentReceipt }, context: AssessmentEvidenceContext = configuredEvidence): Promise<AssessmentReceipt> {
   if (provider !== 'openai-subscription' || process.platform !== 'linux') throw Error('Native assessment is VM Codex-only; Haiku requires the approved RAM bridge');
   const evidence = await originalEvidence(item, context);
   const sourceContext = AssessmentSourceContextSchema.parse(context.sourceContext);

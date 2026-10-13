@@ -1,0 +1,162 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {rm,unlink} from 'node:fs/promises';
+import {setTimeout as delay} from 'node:timers/promises';
+import {Pool} from 'pg';
+import {canonicalJson,digest,semanticHash} from '../src/district-adapter-contract.ts';
+import {DistrictJobStore,migrateDistrictJobs,runDistrictJobs,type JobHandler} from '../src/district-jobs.ts';
+import {assessmentQueueContract,assessmentQueueHandlers,enqueuePreparedAssessmentPass,enqueueAssessmentResolution,residualAssessmentItem,exportAssessmentResults} from '../src/district-assessment-jobs.ts';
+import {DistrictAssessmentBroker,assessmentBJobHandler,enqueueAssessmentB} from '../src/district-assessment-broker.ts';
+import {BridgeLeaseSchema,BridgeStatusSchema} from '../src/district-assessment-bridge-contract.ts';
+import {assessmentItemSchema,originalEvidence,buildAssessmentPassInput,type AssessmentItem,type AssessmentOutput,type AssessmentPassInput} from '../src/district-assessment.ts';
+import {DistrictKnowledgeRecordSchema,REQUIRED_DETERMINISTIC_CHECKS,knowledgeEvidenceHash} from '../src/district-schema.ts';
+import {GRAPH_DETERMINISTIC_CHECKS} from '../src/district-graph-claims.ts';
+import {PROVIDER_CONFIGS,SubscriptionRuntimeError,EMPTY_USAGE,type ModelAnswer} from '../src/district-model-contract.ts';
+import {initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
+import {registerR1CodexDocument,reserveR1CodexCall} from '../src/district-codex-accounting.ts';
+import {admittedAssessmentFixture} from './district-assessment.fixture.ts';
+import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
+import type {PreparedDocument} from '../src/district-prepared-document.ts';
+import type {PolicyReceipt} from '../src/district-policy-receipt.ts';
+
+const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
+function recordFor(f:{source:AssessmentItem['sources'][number];policy:PolicyReceipt},text:string){
+ const pinned=PROVIDER_CONFIGS['openai-subscription'],hash=digest('synthetic record contract');
+ const route={provider:'openai-subscription' as const,model:pinned.model,tool:pinned.tool};
+ const config={...route,modelIdentityBasis:pinned.modelIdentityBasis};
+ const record={kind:'text_model',id:'knowledge:fixture:'+randomUUID(),municipalityId:'strausberg',ags:'12064472',districtId:'maerkisch-oderland',title:'Strausberg',titleQuote:'Strausberg',municipalityQuote:'Strausberg',summary:text,summaryQuote:text,caseKeyType:'source_document',caseKey:'source_document:'+f.source.originalSha256,caseQuote:null,caseType:'unknown',documentDate:null,documentDateQuote:null,documentDateReason:'Synthetic undated source',stage:'unknown',stageDate:null,stageDateQuote:null,stageDateReason:'Synthetic undated event',originalStatus:'',stageQuote:'',stages:[],entities:[],relations:[],locations:[],topics:[],sources:[{id:f.source.sourceId,url:f.policy.source.url,sha256:f.source.originalSha256,retrievedAt:'2026-10-11T00:00:00.000Z',locator:'source-original',mimeType:'text/plain',sourceType:'website',policy:f.policy.sourcePolicy}],extraction:{extractorVersion:'synthetic-test',extractorSha256:hash,...config,toolVersion:'synthetic-test',modelIdentitySha256:hash,returnedModel:null,promptVersion:'synthetic-test',promptSha256:hash,judgePromptVersion:'synthetic-test',judgePromptSha256:hash,inputSha256:f.source.originalSha256,textSha256:f.source.textSha256,responseSha256:hash,ocrUsed:false,textMethod:'text',cacheKey:hash,extractedAt:'2026-10-11T00:00:00.000Z',chunk:{index:0,count:1,start:0,end:text.length}},verification:{kind:'text_model',status:'auto-verified',deterministic:{passed:true,checks:[...REQUIRED_DETERMINISTIC_CHECKS,...GRAPH_DETERMINISTIC_CHECKS].map(id=>({id,passed:true,reason:'Synthetic fixture only'}))},faithfulness:{score:0.9,threshold:0.8,...route,toolVersion:'synthetic-test',modelIdentitySha256:hash,returnedModel:null,reason:'Synthetic fixture only',evaluatedAt:'2026-10-11T00:00:00.000Z',responseSha256:hash,sameModel:true,limitation:'Same-model judgment is not independent verification.'},evidenceHash:hash}};
+ record.verification.evidenceHash=knowledgeEvidenceHash(record);return DistrictKnowledgeRecordSchema.parse(record);
+}
+function answer(input:AssessmentPassInput,unresolved=false):ModelAnswer{
+ const data=input.data as {itemId:string;claimIds:string[];evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]};
+ const source=data.evidence[0],locator=source.locators[0];
+ const output:AssessmentOutput={itemId:data.itemId,outcome:unresolved?'unresolved':'supported',assertions:unresolved?[]:[{claimId:data.claimIds[0],sourceId:source.sourceId,locatorId:locator.id,quote:locator.quote,subjectId:null,objectId:null,unit:null,value:null,date:null,dateRole:null,financialRole:'none',stage:null,modality:'unknown'}],scores:{correctness:2,sources:2,usefulness:unresolved?0:1},holdReasons:[],rationale:'Synthetic provider fixture; never a civic assessment.'};
+ const config=PROVIDER_CONFIGS['openai-subscription'];
+ const identity={provider:'openai-subscription' as const,tool:config.tool,toolVersion:'0.0.0-synthetic-test-only',model:config.model,modelIdentityBasis:config.modelIdentityBasis};
+ return {value:output,responseSha256:digest(canonicalJson(output)),evidence:{...identity,modelIdentitySha256:digest(JSON.stringify(identity))},requestedModel:config.model,returnedModel:null,reportedModels:[],runtimeWarnings:[],usage:{...EMPTY_USAGE,perModel:{}}};
+}
+
+test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionString,timeout:120000},async t=>{
+ const base=new URL(connectionString!);if(!['localhost','127.0.0.1','[::1]',''].includes(base.hostname))throw Error('Fixture refuses remote PostgreSQL');
+ const host=base.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Fixture refuses remote host override');
+ const admin=new Pool({connectionString,max:2}),closeAdmin=poolShutdownBarrier(admin),database='district_assessment_queue_'+randomUUID().replaceAll('-','');
+ let db:Pool|undefined,closeDb:(()=>Promise<void>)|undefined,created=false;const directories:string[]=[];
+ t.after(async()=>{try{await closeDb?.();if(created)await admin.query('DROP DATABASE "'+database+'"');}finally{await closeAdmin();for(const directory of directories)await rm(directory,{recursive:true,force:true});}});
+ await admin.query('CREATE DATABASE "'+database+'"');created=true;const url=new URL(base);url.pathname='/'+database;
+ db=new Pool({connectionString:url.href,max:8});closeDb=poolShutdownBarrier(db);const pool=db;await migrateDistrictJobs(pool);
+ async function fixture(name:string,originalText?:string){
+  const text=originalText??'Strausberg synthetic original evidence '+name+' '+randomUUID()+'.',f=await admittedAssessmentFixture(text,true);directories.push(f.directory);
+  const cas=f.context.cas,policy=f.context.policyOptions,store=new DistrictJobStore(pool),record=recordFor(f,text),rubric='Synthetic frozen rubric: exact evidence only; AI agreement is not independent gold.';
+  await initializeManagedAcquisitionLane(cas.root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
+  const put=async(value:unknown,kind:'derived'|'receipt'|'source_original'|'parser_output'='derived',raw=false)=>{
+   const bytes=raw?Buffer.from(value as string):Buffer.from(canonicalJson(value)),hash=digest(bytes);
+   const artifact=await withManagedSourceWrite(cas.root,[{kind:'http_observation',relativePath:`sha256/${hash.slice(0,2)}/${hash}`,contentSha256:hash,url:f.policy.source.url,sourceSha256:f.source.originalSha256,observationId:name,receiptSha256:f.policyArtifact.sha256,independentAllowed:kind==='source_original'}],()=>cas.put(bytes,{kind,mimeType:raw?'text/plain':'application/json',...(kind==='source_original'?{admission:{state:'allowed' as const,sourceSha256:f.source.originalSha256,policyProofSha256:f.policyArtifact.sha256,checkedAt:f.policy.checkedAt,expiresAt:f.policy.expiresAt}}:{})}),policy);
+   await store.addArtifact(artifact);return artifact;
+  };
+  for(const artifact of [f.policyArtifact,f.parserArtifact])await put(JSON.parse((await cas.read(artifact.sha256)).toString('utf8')),'receipt');
+  await put(text,'source_original',true);
+  const item=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,question:'What does the original source establish?',claim:'',rubric,rubricSha256:digest(rubric),sources:[f.source],claimIds:[record.id],entityIds:[],constraints:[],criticalKinds:[]});
+  const itemArtifact=await put(item),recordArtifact=await put(record),bundle=await put({version:'r1-assessment-items-v1',items:[{itemArtifactSha256:itemArtifact.sha256,recordArtifactSha256:recordArtifact.sha256,maxModelCalls:48}]});
+  const snapshot=randomUUID(),scope=f.policy.scope;
+  await pool.query(`INSERT INTO district_pipeline.source_snapshots(id,publisher_id,source_id,municipality_id,ags,tenant,resource_identity,request_method,request_selector_sha256,observation_window,retrieved_at,scope_sha256) VALUES($1,$2,$3,$4,$5,NULL,$6,'GET',$7,$8,$9,$10)`,[snapshot,scope.publisherId,scope.sourceId,scope.municipalityId,scope.ags,f.policy.source.url,digest('synthetic GET '+name),scope.observationWindow,f.policy.checkedAt,semanticHash(scope)]);
+  await pool.query(`INSERT INTO district_pipeline.policy_decisions(id,source_snapshot_id,proof_sha256,source_sha256,receipt_json,state,observed_robots,owner_robots_override,opt_out_version,policy_version,checked_at,expires_at,reason_code) VALUES($1,$2,$3,$4,$5,'allowed','allowed',false,$6,$7,$8,$9,'synthetic_shared_admission')`,[randomUUID(),snapshot,f.policyArtifact.sha256,f.source.originalSha256,f.policy,f.policy.optOutSnapshotSha256,f.policy.version,f.policy.checkedAt,f.policy.expiresAt]);
+  const preparationKey=await store.enqueue({step:'assessment_prepare',lane:'assessment',semanticContractSha256:await assessmentQueueContract(),inputArtifactHashes:[itemArtifact.sha256,recordArtifact.sha256,bundle.sha256,f.originalArtifact.sha256,f.policyArtifact.sha256,f.parserArtifact.sha256],sourceScope:scope,selector:{syntheticFixture:name},policyProofSha256:f.policyArtifact.sha256});
+  const run=async(key:string,handlers:Readonly<Record<string,JobHandler>>)=>{
+   const authorizationId=await store.authorize({approvalSha256:digest('synthetic stage '+randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[key],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
+   return runDistrictJobs({store,cas,handlers,authorizationId,maxJobs:1,maxElapsedMs:60000,ownerPresent:true,leaseMs:30000});
+  };
+  const preparedRun=await run(preparationKey,{assessment_prepare:async()=>({outcome:'succeeded',reasonCode:'completed',outputs:[itemArtifact,recordArtifact,bundle]})});
+  assert.equal(preparedRun.state,'completed',canonicalJson(preparedRun));
+  const AJobKey=(await enqueuePreparedAssessmentPass(pool,store,cas,preparationKey,'A'))[0];
+  const broker=new DistrictAssessmentBroker(pool,cas,{policyOptions:policy,fixtureProtocol:true}),clientContractSha256=digest('synthetic protocol contract');
+  const BJobKey=await enqueueAssessmentB(broker,{itemArtifactSha256:itemArtifact.sha256,sourceScope:scope,policyProofSha256:f.policyArtifact.sha256,transport:'mac-bridge',clientContractSha256});
+  const handlers=(provider:(input:AssessmentPassInput)=>Promise<ModelAnswer>=async input=>answer(input))=>assessmentQueueHandlers(pool,{policyOptions:policy,fixtureProvider:provider});
+  const runB=async(disagree=false)=>{
+   const pending=run(BJobKey,{assessment_b:assessmentBJobHandler(broker)});
+   const deadline=Date.now()+5000;
+   for(;;){const rows=await pool.query(`SELECT b.id FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1 AND b.state='ready'`,[BJobKey]);if(rows.rowCount)break;if(Date.now()>=deadline)throw Error('Synthetic B lease deadline');await delay(10);}
+   const lease=BridgeLeaseSchema.parse(await broker.dispatch({operation:'claim',jobKey:BJobKey,clientId:'synthetic-client',clientContractSha256}));
+   const startedAt=new Date().toISOString();
+   const output=answer(buildAssessmentPassInput(item,await originalEvidence(item,f.context),'B')).value as AssessmentOutput;if(disagree)output.scores.usefulness=2;
+   const config=PROVIDER_CONFIGS['anthropic-subscription'],identity={provider:'anthropic-subscription' as const,tool:'claude-cli' as const,toolVersion:'0.0.0-synthetic-test-only',model:config.model,modelIdentityBasis:config.modelIdentityBasis};
+   const stdout=[{type:'system',subtype:'init',tools:[],mcp_servers:[],model:config.model},{type:'assistant',message:{id:'msg_synthetic',model:config.model,content:[]}},{type:'result',subtype:'success',is_error:false,model:config.model,request_id:'req_synthetic',structured_output:output,usage:{input_tokens:1,output_tokens:1}}].map(value=>JSON.stringify(value)).join('\n')+'\n';
+   const finishedAt=new Date().toISOString(),completedAt=new Date().toISOString();
+   const submitted=await broker.dispatch({operation:'submit',leaseId:lease.leaseId,inputSha256:lease.inputSha256,purgeAck:{sourceFiles:0,responseFiles:0,modelFileWritesDenied:true,completedAt},answer:{stdout,evidence:{...identity,modelIdentitySha256:digest(JSON.stringify(identity))},startedAt,finishedAt}});
+   assert.equal(BridgeStatusSchema.parse(submitted).state,'submitted');
+   const result=await pending,state=await pool.query('SELECT state,reason_code FROM district_pipeline.jobs WHERE job_key=$1',[BJobKey]);
+   assert.equal(state.rows[0].state,'succeeded',canonicalJson(state.rows[0]));
+   return result;
+  };
+  return {...f,cas,policy,proof:f.policy,store,item,record,preparationKey,AJobKey,BJobKey,handlers,run,runB,put};
+ }
+ await t.test('full blind A/B agreement plus mandatory genuine C is admitted',async()=>{
+  const f=await fixture('agreement');let calls=0;
+  const provider=async(input:AssessmentPassInput)=>{calls++;if(input.role==='A'){assert.equal(input.assessments,null);assert.equal('assessments' in input.data,false);}return answer(input);};
+  assert.equal((await f.run(f.AJobKey,f.handlers(provider))).state,'completed');assert.equal((await f.runB()).state,'completed');
+  const pair={AJobKey:f.AJobKey,BJobKey:f.BJobKey};
+  const pending=await enqueueAssessmentResolution(pool,f.store,f.cas,pair,'reconcile',f.policy);await f.run(pending,f.handlers());
+  const pendingRow=await pool.query('SELECT state,reason_code FROM district_pipeline.jobs WHERE job_key=$1',[pending]);assert.equal(pendingRow.rows[0].reason_code,'dependency_uncommitted');
+  const CJobKey=await enqueueAssessmentResolution(pool,f.store,f.cas,pair,'C',f.policy);assert.equal((await f.run(CJobKey,f.handlers(provider))).state,'completed');
+  const finalKey=await enqueueAssessmentResolution(pool,f.store,f.cas,{...pair,CJobKey},'reconcile',f.policy);assert.equal((await f.run(finalKey,f.handlers())).state,'completed');
+  const finalRow=await pool.query(`SELECT receipt FROM district_pipeline.step_receipts WHERE receipt->>'jobKey'=$1`,[finalKey]);const final=JSON.parse((await f.cas.read(finalRow.rows[0].receipt.outputHashes[0])).toString('utf8'));
+  assert.equal(final.disposition,'ai_reconciled');assert.equal(final.independentlyValidated,false);assert.equal(calls,2);
+  const count=await pool.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[f.source.originalSha256]);assert.equal(Number(count.rows[0].count),2);
+  const exported=await exportAssessmentResults(pool,f.cas,[f.AJobKey,f.BJobKey,CJobKey,finalKey],f.policy);
+  assert.equal(exported.results.length,4);assert.equal(canonicalJson(exported).includes('Synthetic provider fixture'),false);
+ });
+ for(const unresolved of [false,true])await t.test('disagreement C '+(unresolved?'holds':'reconciles'),async()=>{
+  const f=await fixture('disagreement-'+unresolved);await f.run(f.AJobKey,f.handlers());await f.runB(true);
+  const pair={AJobKey:f.AJobKey,BJobKey:f.BJobKey},CJobKey=await enqueueAssessmentResolution(pool,f.store,f.cas,pair,'C',f.policy);
+  await f.run(CJobKey,f.handlers(async input=>{assert.ok(input.discrepancies?.mismatches.includes('scores'));return answer(input,unresolved);}));
+  const key=await enqueueAssessmentResolution(pool,f.store,f.cas,{...pair,CJobKey},'reconcile',f.policy),result=await f.run(key,f.handlers());assert.equal(result.state,unresolved?'held':'completed');
+ });
+ await t.test('48 combined extraction/A/C intents cap and ambiguous intents never replay',async()=>{
+  const f=await fixture('cap');let called=false;
+  // Synthetic extraction job uses the same canonical pre-effect reservation as native misses.
+  const extractionKey=await f.store.enqueue({step:'residual_extract',lane:'residual_extraction',semanticContractSha256:digest('synthetic extraction'),inputArtifactHashes:[f.originalArtifact.sha256,f.policyArtifact.sha256],sourceScope:f.proof.scope,selector:{fixture:'48 real reservation operations, no provider'},policyProofSha256:f.policyArtifact.sha256});
+  await f.run(extractionKey,{residual_extract:async context=>{
+   for(let i=0;i<48;i++)await reserveR1CodexCall(pool,context.job,f.source.originalSha256,digest('synthetic source call '+i));
+   await assert.rejects(reserveR1CodexCall(pool,context.job,f.source.originalSha256,digest('synthetic source call 0')),{message:'usage_unknown'});
+   return {outcome:'succeeded',reasonCode:'completed'};
+  }});
+  const result=await f.run(f.AJobKey,f.handlers(async input=>{called=true;return answer(input);}));assert.equal(result.reasonCode,'source_limit_exceeded');assert.equal(called,false);
+  await assert.rejects(pool.query('UPDATE district_pipeline.r1_codex_call_intents SET paid_micro_usd=1 WHERE original_sha256=$1',[f.source.originalSha256]),/Immutable/);
+ });
+ await t.test('tampered B receipt yields a durable hold before C/admission',async()=>{
+  const f=await fixture('tamper');await f.run(f.AJobKey,f.handlers());await f.runB();
+  const pair={AJobKey:f.AJobKey,BJobKey:f.BJobKey},key=await enqueueAssessmentResolution(pool,f.store,f.cas,pair,'reconcile',f.policy);
+  const row=await pool.query(`SELECT receipt FROM district_pipeline.step_receipts WHERE receipt->>'jobKey'=$1`,[f.BJobKey]);let hash:string|undefined;
+  for(const candidate of row.rows[0].receipt.outputHashes){try{const value=JSON.parse((await f.cas.read(candidate)).toString('utf8'));if(value.version==='assessment-receipt-v1')hash=candidate;}catch{}}
+  assert.ok(hash);
+  // Delete only the synthetic committed B receipt, exercising custody/CAS tamper refusal.
+  await unlink(f.cas.root+'/sha256/'+hash.slice(0,2)+'/'+hash);
+  const result=await f.run(key,f.handlers());assert.equal(result.state,'held');
+ });
+ await t.test('usage limit holds without retry or fallback and pauses later Codex effects',async()=>{
+  const f=await fixture('usage-limit');let calls=0;
+  const result=await f.run(f.AJobKey,f.handlers(async()=>{calls++;throw new SubscriptionRuntimeError('rate_limit','Synthetic subscription usage limit');}));assert.equal(result.reasonCode,'budget_paused');assert.equal(calls,1);
+  await f.store.resume(f.AJobKey);const replay=await f.run(f.AJobKey,f.handlers(async input=>{calls++;return answer(input);}));assert.equal(replay.reasonCode,'budget_paused');assert.equal(calls,1);
+ });
+ await t.test('prepared-text item factory binds actual UTF-16 spans and never imports model constraints',async()=>{
+  const f=await fixture('factory'),text=(await f.cas.read(f.source.textSha256)).toString('utf8');
+  const prepared:PreparedDocument={version:'district-prepared-v2',municipalityId:'strausberg',sourceSha256:f.source.originalSha256,sourceBytes:Buffer.byteLength(text),mimeType:'text/plain',references:f.record.sources,extractorSha256:digest('synthetic parser'),toolVersions:{fixture:'synthetic'},text,textSha256:f.source.textSha256,offsetUnit:'utf16_code_units',textLength:text.length,method:'text',ocrUsed:false,limitations:[],receiptSha256:digest('synthetic prepared receipt')};
+  const item=residualAssessmentItem(f.record,prepared,digest('synthetic prepared artifact'),f.policyArtifact.sha256);assert.deepEqual(item.constraints,[]);assert.equal(item.sources[0].textSha256,prepared.textSha256);for(const locator of item.sources[0].locators)assert.ok(text.slice(locator.start,locator.end));
+  await assert.rejects(registerR1CodexDocument(pool,'strausberg',f.source.originalSha256,49));
+ });
+ await t.test('critical finalization binds the complete private record with canonical preparation',async()=>{
+  const text='Strausberg hat den Plan als Satzung beschlossen. Synthetic '+randomUUID(),f=await fixture('critical-factory',text);
+  f.record.stage='adopted';f.record.stageQuote=text;f.record.originalStatus='als Satzung beschlossen';f.record.verification.evidenceHash=knowledgeEvidenceHash(f.record);
+  const prepared:PreparedDocument={version:'district-prepared-v2',municipalityId:'strausberg',sourceSha256:f.source.originalSha256,sourceBytes:Buffer.byteLength(text),mimeType:'text/plain',references:f.record.sources,extractorSha256:digest('synthetic parser'),toolVersions:{fixture:'synthetic'},text,textSha256:f.source.textSha256,offsetUnit:'utf16_code_units',textLength:text.length,method:'text',ocrUsed:false,limitations:[],receiptSha256:digest('synthetic prepared receipt')};
+  const item=residualAssessmentItem(f.record,prepared,digest('synthetic prepared artifact'),f.policyArtifact.sha256);
+  assert.equal(item.criticalTarget?.recordId,f.record.id);assert.ok(item.criticalKinds.includes('stage'));assert.deepEqual(item.constraints,[]);
+  assert.equal(item.criticalTarget?.recordEvidenceSha256,f.record.verification.evidenceHash);
+ });
+ await t.test('500 cumulative selected originals is not renewed by another stage',async()=>{
+  const count=await pool.query('SELECT count(*) FROM district_pipeline.r1_codex_selections'),existing=Number(count.rows[0].count);
+  for(let i=existing;i<500;i++)await registerR1CodexDocument(pool,'strausberg',digest('synthetic document-selection '+i),48);
+  await assert.rejects(registerR1CodexDocument(pool,'strausberg',digest('synthetic overflow original'),48),{message:'source_limit_exceeded'});
+  await registerR1CodexDocument(pool,'strausberg',digest('synthetic document-selection 499'),24);
+  const after=await pool.query('SELECT count(*) FROM district_pipeline.r1_codex_selections');assert.equal(Number(after.rows[0].count),500);
+ });
+});

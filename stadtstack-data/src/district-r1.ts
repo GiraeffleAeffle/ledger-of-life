@@ -38,10 +38,11 @@ import type {StepReceipt,ReasonCode} from './district-step-receipt.ts';
 import type {StructuredSupportingSource} from './district-structured-record.ts';
 import {StructuredKnowledgeRecordSchema} from './district-structured-record.ts';
 import type {StructuredWorkerRequest} from './district-structured-parser-worker.ts';
-import {ResidualInputSchema,residualJobHandlers,enqueueResidualPreparation,enqueueCommittedResidualExtraction,exportResidualTextContribution} from './district-residual-jobs.ts';
+import {ResidualInputSchema,residualJobHandlersFor,enqueueResidualPreparation,enqueueCommittedResidualExtraction,exportResidualTextContribution} from './district-residual-jobs.ts';
 import {CrawlCorpusImportSchema,importCrawlCorpusForResidual} from './district-crawl-import.ts';
 import {DistrictAssessmentBroker,assessmentBJobHandler,enqueueAssessmentB,assessmentEvidenceArtifactHashes} from './district-assessment-broker.ts';
 import {assessmentItemSchema} from './district-assessment.ts';
+import {assessmentQueueHandlers,enqueueResidualAssessmentItems,enqueuePreparedAssessmentPass,enqueueAssessmentResolution,exportAssessmentResults} from './district-assessment-jobs.ts';
 import {r1TextCompositionInputSchema,loadR1TextCompositionInput} from './district-r1-text-composition.ts';
 import {structuredFieldPublicationHold} from './district-public-fields.ts';
 import type {StructuredFieldHold} from './district-public-fields.ts';
@@ -379,7 +380,7 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
    const authorization=await pool.query<{has_b:boolean;only_b:boolean}>(`SELECT BOOL_OR(j.step='assessment_b') AS has_b,BOOL_AND(j.step='assessment_b') AS only_b FROM district_pipeline.preauthorizations a JOIN district_pipeline.jobs j ON j.job_key=ANY(a.allowed_job_keys) WHERE a.id=$1`,[authorizationId]);
    if(authorization.rows[0]?.has_b&&!authorization.rows[0]?.only_b)throw new DistrictExecutionHold('authorization_mode_mismatch');
    const broker=new DistrictAssessmentBroker(pool,new DistrictCas(CAS_ROOT)),assessmentHandler=assessmentBJobHandler(broker);
-   await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlers,acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry),assessment_b:context=>{if(process.platform!=='linux')throw new DistrictExecutionHold('isolation_unavailable');return assessmentHandler(context);}},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
+   await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlersFor(pool),...assessmentQueueHandlers(pool),acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry),assessment_b:context=>{if(process.platform!=='linux')throw new DistrictExecutionHold('isolation_unavailable');return assessmentHandler(context);}},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
   }finally{await pool.end();}return;
  }
  if(args.length)throw Error('R1 commands require only explicit registry configuration flags and bounded JSON stdin');
@@ -430,6 +431,25 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
   if(command==='enqueue-residual-extraction'){
    const manifest=z.object({preparationJobKeys:z.array(HashSchema).min(1).max(10000)}).strict().parse(input),jobKeys:string[]=[];
    for(const preparationJobKey of manifest.preparationJobKeys)jobKeys.push(await enqueueCommittedResidualExtraction(pool,store,cas,preparationJobKey));
+   process.stdout.write(canonicalJson({jobKeys})+'\n');return;
+  }
+  if(command==='assessment-results'){
+   const manifest=z.object({jobKeys:z.array(HashSchema).min(1).max(10000)}).strict().parse(input);
+   process.stdout.write(canonicalJson(await exportAssessmentResults(pool,cas,manifest.jobKeys))+'\n');return;
+  }
+  if(command==='enqueue-assessment-items'){
+   const manifest=z.object({extractionJobKeys:z.array(HashSchema).min(1).max(10000)}).strict().parse(input),jobKeys:string[]=[];
+   for(const key of manifest.extractionJobKeys)jobKeys.push(await enqueueResidualAssessmentItems(pool,store,cas,key));
+   process.stdout.write(canonicalJson({jobKeys})+'\n');return;
+  }
+  if(command==='enqueue-assessment-a'||command==='enqueue-prepared-assessment-b'){
+   const manifest=z.object({preparationJobKeys:z.array(HashSchema).min(1).max(10000)}).strict().parse(input),jobKeys:string[]=[],broker=new DistrictAssessmentBroker(pool,cas);
+   for(const key of manifest.preparationJobKeys)jobKeys.push(...await enqueuePreparedAssessmentPass(pool,store,cas,key,command==='enqueue-assessment-a'?'A':'B',broker));
+   process.stdout.write(canonicalJson({jobKeys})+'\n');return;
+  }
+  if(command==='enqueue-assessment-c'||command==='enqueue-assessment-reconciliation'){
+   const job=z.object({AJobKey:HashSchema,BJobKey:HashSchema,CJobKey:HashSchema.optional()}).strict(),manifest=z.object({jobs:z.array(job).min(1).max(10000)}).strict().parse(input),jobKeys:string[]=[];
+   for(const selected of manifest.jobs)jobKeys.push(await enqueueAssessmentResolution(pool,store,cas,selected,command==='enqueue-assessment-c'?'C':'reconcile'));
    process.stdout.write(canonicalJson({jobKeys})+'\n');return;
   }
   if(command==='enqueue-assessment-b'){
