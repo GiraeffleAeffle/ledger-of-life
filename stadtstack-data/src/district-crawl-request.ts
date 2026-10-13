@@ -6,6 +6,10 @@ import {HttpSourceBindingSchema} from './district-http-observation.ts';
 import {isPublicUrl} from './publication-quality.ts';
 import {initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions} from './civic-opt-out.ts';
 
+/** Local capture failure, never a failure of the already admitted HTTP source. */
+export class CrawlRequestEvidenceCaptureError extends Error {
+ constructor(){super('Managed request evidence capture failed');this.name='CrawlRequestEvidenceCaptureError';}
+}
 /** Only public selectors and digests: never request headers/account credentials. */
 export const ObservationRequestSchema=z.object({
  url:z.url().refine(isPublicUrl,'Unsafe observation request URL'),method:z.enum(['GET','POST']),contentType:z.string().max(4096).refine(value=>!/[\u0000-\u001f\u007f]/u.test(value),'Invalid HTTP scalar').nullable(),bodySha256:HashSchema.nullable(),

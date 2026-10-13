@@ -45,10 +45,10 @@ test('offline frozen crawl import preserves managed originals and produces enque
  const registry=await createOperatorRegistryFixture(t,{context:{root,policy},value}),store=new DistrictJobStore(pool);
  const scope={publisherId:'synthetic-explicit-publisher',sourceId:source.id,municipalityId:city.id,ags:city.ags,tenant:null,observationWindow:'synthetic-bounded-window'};
  const bounds={maxDocuments:1 as const,maxChunks:4,maxModelCalls:8,paidMicroUsd:0 as const};
- async function fixture(label:string,config:{stale?:boolean;missingRequest?:boolean;post?:boolean;extra?:boolean}={}){
-  const rawRoot=join(root!,label+'-raw'),indexRoot=join(root!,label+'-index'),casRoot=join(root!,label+'-cas');
+ async function fixture(label:string,config:{stale?:boolean;missingRequest?:boolean;post?:boolean;extra?:boolean;sameBytes?:boolean;selectExtra?:boolean;body?:Buffer;url?:string;casRoot?:string}={}){
+  const rawRoot=join(root!,label+'-raw'),indexRoot=join(root!,label+'-index'),casRoot=config.casRoot??join(root!,label+'-cas');
   for(const [path,kind] of [[rawRoot,'fetch'],[indexRoot,'artifacts'],[casRoot,'artifacts']] as const)await initializeManagedAcquisitionLane(path,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind});
-  const checkedAt=new Date(Date.now()-(config.stale?7200000:3000)).toISOString(),url='https://example.org/'+label,bytes=Buffer.from('Synthetic civic fixture original '+label),sha256=digest(bytes),observationId=`${Date.now()}-${randomUUID()}.json`,observationPath=join(rawRoot,'observations',observationId);
+  const checkedAt=new Date(Date.now()-(config.stale?7200000:3000)).toISOString(),url=config.url??'https://example.org/'+label,bytes=config.body??Buffer.from('Synthetic civic fixture original '+label),sha256=digest(bytes),observationId=`${Date.now()}-${randomUUID()}.json`,observationPath=join(rawRoot,'observations',observationId);
   const publicSelector=config.post?'municipality=12064472':null;
   const observation={url,method:config.post?'POST':'GET',checkedAt,retrievedAt:checkedAt,state:'fetched',status:200,sha256,bytes:bytes.length,mimeType:'text/plain',policy:{robots:{state:'allowed',url:'https://example.org/robots.txt',sha256:digest('synthetic robots'),checkedAt},tdm:{state:'not_declared',evidence:[{url:'https://example.org/.well-known/tdmrep.json',locator:'TDMRep standardized location HTTP absence',value:'404',checkedAt}]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}};
   const observationBytes=Buffer.from(JSON.stringify(observation,null,2)+'\n'),binding={kind:'http_observation' as const,url,sourceSha256:sha256,observationId,receiptSha256:digest(observationBytes)};
@@ -56,7 +56,7 @@ test('offline frozen crawl import preserves managed originals and produces enque
   const path=join(indexRoot,'index.json'),document={id:label,municipalityId:city.id,ags:city.ags,districtId:city.districtId,sourceId:source.id,url,sha256,mimeType:'text/plain',retrievedAt:checkedAt,checkedAt,status:200,observationPath,documentDate:null,localPath:relative(indexRoot,join(rawRoot,'sha256',sha256)),adapter:'synthetic-test-only',metadata:{}};
   const documents=[document],observations=[{path:observationPath,sha256:digest(observationBytes)}],bindings=[binding];
   if(config.extra){
-   const extraBody=Buffer.from('unselected fixture'),extra={...observation,url:url+'-unselected',sha256:digest(extraBody),bytes:extraBody.length},extraId=`${Date.now()}-${randomUUID()}.json`,extraBytes=Buffer.from(JSON.stringify(extra)+'\n'),extraPath=join(rawRoot,'observations',extraId),extraBinding={...binding,url:extra.url,sourceSha256:extra.sha256,observationId:extraId,receiptSha256:digest(extraBytes)};
+   const extraBody=config.sameBytes?bytes:Buffer.from('unselected fixture'),extra={...observation,url:url+'-unselected',sha256:digest(extraBody),bytes:extraBody.length},extraId=`${Date.now()}-${randomUUID()}.json`,extraBytes=Buffer.from(JSON.stringify(extra)+'\n'),extraPath=join(rawRoot,'observations',extraId),extraBinding={...binding,url:extra.url,sourceSha256:extra.sha256,observationId:extraId,receiptSha256:digest(extraBytes)};
    await withManagedSourceWrite(rawRoot,[{...extraBinding,relativePath:'sha256/'+extra.sha256,contentSha256:extra.sha256,independentAllowed:true}],async()=>{await writeFile(extraPath,extraBytes,{mode:0o600});await writeFile(join(rawRoot,'sha256',extra.sha256),extraBody,{mode:0o600});},policy);
    observations.push({path:extraPath,sha256:digest(extraBytes)});bindings.push(extraBinding);
    documents.push({...document,id:label+'-unselected',url:extra.url,sha256:extra.sha256,observationPath:extraPath,localPath:relative(indexRoot,join(rawRoot,'sha256',extra.sha256))});
@@ -65,6 +65,10 @@ test('offline frozen crawl import preserves managed originals and produces enque
   await withManagedSourceWrite(indexRoot,[...registry.admitted.bindings,...bindings].map(binding=>({...binding,relativePath:'index.json',contentSha256:indexHash,independentAllowed:false})),()=>writeFile(path,indexBytes,{mode:0o600}),policy);
   const requestEvidence=config.missingRequest?undefined:await persistCrawlRequestEvidence(rawRoot,{schemaVersion:'stadtstack-crawl-request-evidence-v1',httpObservation:binding,request:{url,method:config.post?'POST':'GET',contentType:config.post?'application/x-www-form-urlencoded;charset=UTF-8':null,bodySha256:publicSelector===null?null:digest(publicSelector),publicSelector},redirectChain:[url]},policy);
   const manifest={index:{path,sha256:indexHash},rawRoot,registry:registry.registryPin,observations,documents:[{documentId:label,scope,permission:{kind:'facts_with_attribution' as const},bounds,requestEvidence}]};
+  if(config.selectExtra){
+   const extraBinding=bindings[1],extraEvidence=await persistCrawlRequestEvidence(rawRoot,{schemaVersion:'stadtstack-crawl-request-evidence-v1',httpObservation:extraBinding,request:{url:extraBinding.url,method:'GET',contentType:null,bodySha256:null,publicSelector:null},redirectChain:[extraBinding.url]},policy);
+   manifest.documents.push({...manifest.documents[0],documentId:documents[1].id,requestEvidence:extraEvidence});
+  }
   return {manifest,indexBytes,cas:new DistrictCas(casRoot),bytes,binding,observationBytes,document};
  }
  await t.test('happy GET/POST imports preserve exact bytes/clocks and enqueue genuine preparation jobs',async()=>{
@@ -88,6 +92,23 @@ test('offline frozen crawl import preserves managed originals and produces enque
    });
    assert.equal(authorizedPilotCorpusSchema.safeParse(item.manifest.index.sha256).success,false);
   }
+ });
+ await t.test('identical originals retain both HTTP admissions and later reobservation leaves queued jobs executable',async()=>{
+  const item=await fixture('shared-original',{extra:true,sameBytes:true,selectExtra:true});
+  await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+   const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,2);
+   const keys:string[]=[];
+   for(const job of imported.jobs){const loaded=await loadResidualSource(item.cas,job);assert.equal(loaded.document.sha256,item.document.sha256);keys.push(await enqueueResidualPreparation(store,item.cas,job));}
+   assert.notEqual(keys[0],keys[1]);assert.notEqual(imported.jobs[0].httpObservation.observationId,imported.jobs[1].httpObservation.observationId);
+   const later=await fixture('reobserved-original',{body:item.bytes,url:item.document.url,casRoot:item.cas.root});
+   await withFixtureAuthorizedCorpus(later.indexBytes,policy,async()=>{
+    const reimported=await importCrawlCorpusForResidual(store,later.cas,later.manifest);assert.deepEqual(reimported.holds,[]);assert.equal(reimported.jobs.length,1);await enqueueResidualPreparation(store,later.cas,reimported.jobs[0]);
+   });
+   for(let index=0;index<keys.length;index++){
+    const queued=await pool!.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[keys[index]]),loaded=await loadResidualSource(item.cas,queued.rows[0].spec.selector);
+    assert.equal(loaded.sourceBinding.observationId,imported.jobs[index].httpObservation.observationId);assert.deepEqual(await item.cas.read(loaded.document.sha256),item.bytes);
+   }
+  });
  });
  await t.test('unauthorized synthetic index is not admitted outside the fixture capability',async()=>{
   const item=await fixture('unauthorized');await assert.rejects(importCrawlCorpusForResidual(store,item.cas,item.manifest),/owner-authorized/);

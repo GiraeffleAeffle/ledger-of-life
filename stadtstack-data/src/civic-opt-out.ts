@@ -758,6 +758,14 @@ export async function assertManagedObservationReadable(input:string,options:Civi
  * registry contribution while leaving the artifact's other dependencies checked.
  */
 export async function assertManagedSourceBindings(input:string,bindings:Array<ManagedSourceBinding&{independentAllowed?:boolean}>,options:ManagedSourceReadOptions={},kind?:'operator_registry_config'):Promise<void>{
+ return assertManagedSourceBindingSet(input,bindings,options,kind);
+}
+/** Select one independently permitted original without discarding other HTTP admissions. */
+export async function assertManagedIndependentHttpSourceBinding(input:string,binding:Extract<ManagedSourceBinding,{kind:'http_observation'}>,options:ManagedSourceReadOptions={}):Promise<void>{
+ if(binding.kind!=='http_observation')throw new CivicPolicyStateError('HTTP_SOURCE_PROVENANCE_REQUIRED');
+ return assertManagedSourceBindingSet(input,[binding],{...options,sourceUrl:binding.url},undefined,true);
+}
+async function assertManagedSourceBindingSet(input:string,bindings:Array<ManagedSourceBinding&{independentAllowed?:boolean}>,options:ManagedSourceReadOptions,kind?:'operator_registry_config',independentHttpMember=false):Promise<void>{
  await assertManagedSourceReadable(input,options);
  const authority=await assertCivicPolicyAuthority(options),policy={...options,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},state=statePath(policy),path=resolve(input);
  if(kind!==undefined&&(!bindings.length||bindings.some(binding=>binding.kind!==kind)))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
@@ -765,7 +773,9 @@ export async function assertManagedSourceBindings(input:string,bindings:Array<Ma
  await locked(policy,async()=>{
   const inventory=await loadInventory(state),root=inventory.roots.find(item=>contained(item.path,path));if(!root?.complete)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
   await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);
-  const actual=await fileDigest(path),relativePath=relative(root.path,path).split(sep).join('/'),entries=entriesAt(inventory,root.id,relativePath).filter(entry=>entry.contentSha256===actual.sha256);
+  const actual=await fileDigest(path),relativePath=relative(root.path,path).split(sep).join('/');
+  const selected=independentHttpMember?key({...sourceProvenance(bindings[0]),urlSha256:urlHash(bindings[0].url)}):null;
+  const entries=entriesAt(inventory,root.id,relativePath).filter(entry=>entry.contentSha256===actual.sha256&&(!independentHttpMember||entry.kind==='http_observation'&&entry.independentAllowed&&entry.sourceSha256===actual.sha256&&key(entry)===selected));
   if(!entries.length)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
   const checkedHosts=new Set<string>(),independentByIdentity=new Map<string,Set<boolean>>();
   for(const entry of entries){if(!checkedHosts.has(entry.host)){await assertHostNotOptedOut('https://'+entry.host+'/',policy);checkedHosts.add(entry.host);}if(entry.state!=='active'||entry.kind==='authenticated_git_snapshot'&&options.purpose!=='historical_change_reconstruction_only')throw new CivicPolicyStateError('CONTENT_REFERENCE_REVOKED');const identity=key(entry),allowed=independentByIdentity.get(identity);if(allowed)allowed.add(entry.independentAllowed);else independentByIdentity.set(identity,new Set([entry.independentAllowed]));}

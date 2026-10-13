@@ -13,7 +13,7 @@ export const HttpObservationProofSchema=z.object({observationId:z.string().regex
 });
 export const HttpSourceBindingSchema=z.object({kind:z.literal('http_observation'),url:SourceObservationSchema.shape.url,sourceSha256:HashSchema,observationId:HttpObservationProofSchema.shape.observationId,receiptSha256:HashSchema}).strict();
 export type HttpObservationProof=z.infer<typeof HttpObservationProofSchema>;
-export function authenticatedHttpBinding(proofInput:unknown,expected:{url:string;sha256:string;mimeType?:string;retrievedAt?:string;fetchedAt?:string}):ManagedSourceBinding{
+export function authenticatedHttpBinding(proofInput:unknown,expected:{url:string;sha256:string;mimeType?:string;retrievedAt?:string;fetchedAt?:string}):Extract<ManagedSourceBinding,{kind:'http_observation'}>{
  const proof=HttpObservationProofSchema.parse(proofInput),observation=HttpObservationSchema.parse(JSON.parse(proof.bytes));
  if(observation.url!==expected.url||observation.sha256!==expected.sha256||expected.mimeType!==undefined&&observation.mimeType!==expected.mimeType||expected.retrievedAt!==undefined&&observation.retrievedAt!==expected.retrievedAt||expected.fetchedAt!==undefined&&observation.checkedAt!==expected.fetchedAt||observation.state==='fetched'&&(observation.status<200||observation.status>=300)||observation.state==='not_modified'&&observation.status!==304)throw Error('Original HTTP observation does not bind the selected representation');
  return {kind:'http_observation',url:observation.url,sourceSha256:observation.sha256,observationId:proof.observationId,receiptSha256:proof.receiptSha256};
@@ -29,7 +29,7 @@ export async function authenticateHttpSourceBindings(cas:{root:string;read:(hash
   const bytes=Buffer.from(await cas.read(selected.receiptSha256));
   const bound=authenticatedHttpBinding({observationId:selected.observationId,receiptSha256:selected.receiptSha256,bytes:bytes.toString('utf8')},source);
   await assertManagedSourceBindings(join(cas.root,'sha256',source.sha256.slice(0,2),source.sha256),[selected],{...policy,sourceUrl:source.url});
-  if(bound.kind!=='http_observation')throw Error('Original HTTP provenance required');result.push(bound);
+  result.push(bound);
  }
  if(bindings.some(binding=>binding.kind!=='http_observation'||!sources.some(source=>source.url===binding.url&&source.sha256===binding.sourceSha256)))throw Error('Unselected source binding');
  return result;

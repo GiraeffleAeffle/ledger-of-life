@@ -17,7 +17,7 @@ import {DistrictJobStore,canonicalJobIdentity,type DistrictJobSpec,type JobHandl
 import {encodeStepReceipt,type StepReceipt} from './district-step-receipt.ts';
 import type {DistrictCas} from './district-cas.ts';
 import {authenticateTextRunContribution,type TextRunContribution} from './text-run-lineage.ts';
-import {initializeManagedAcquisitionLane,withManagedSourceWrite,withManagedSourceScratch,assertManagedSourceReadable,assertManagedSourceBindings,CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
+import {initializeManagedAcquisitionLane,withManagedSourceWrite,withManagedSourceScratch,assertManagedSourceReadable,assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
 
 export const ResidualBoundsSchema=z.object({maxDocuments:z.literal(1),maxChunks:z.number().int().min(1).max(24),maxModelCalls:z.number().int().min(2).max(48),paidMicroUsd:z.literal(0)}).strict();
 const HttpObservationBindingSchema=z.object({observationId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/),receiptSha256:HashSchema}).strict();
@@ -64,7 +64,7 @@ export async function loadResidualSource(cas:DistrictCas,input:z.infer<typeof Re
  const observationBytes=await cas.read(input.httpObservation.receiptSha256);
  const sourceBinding=authenticatedHttpBinding(HttpObservationProofSchema.parse({...input.httpObservation,bytes:observationBytes.toString('utf8')}),{url:document.url,sha256:document.sha256,mimeType:document.mimeType,retrievedAt:document.retrievedAt,fetchedAt:document.checkedAt});
  if(!input.corpusObservations.some(binding=>canonicalJson(binding)===canonicalJson(sourceBinding))||input.httpObservation.observationId!==basename(document.observationPath??''))throw Error('Residual selected HTTP observation is not its frozen corpus original');
- await assertManagedSourceBindings(join(cas.root,'sha256',document.sha256.slice(0,2),document.sha256),[sourceBinding],policyOptions(receipt));
+ await assertManagedIndependentHttpSourceBinding(join(cas.root,'sha256',document.sha256.slice(0,2),document.sha256),sourceBinding,policyOptions(receipt));
  await assertManagedSourceBindings(join(cas.root,'sha256',input.requestEvidenceSha256.slice(0,2),input.requestEvidenceSha256),[sourceBinding],policyOptions(receipt));
  const requestEvidence=CrawlRequestEvidenceSchema.parse(JSON.parse((await cas.read(input.requestEvidenceSha256)).toString('utf8')));
  if(canonicalJson(requestEvidence.httpObservation)!==canonicalJson(sourceBinding))throw Error('Residual original request evidence binding differs');

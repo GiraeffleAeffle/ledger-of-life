@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,readFile,rm,writeFile,realpath,mkdir,chmod,readdir} from 'node:fs/promises';
-import {join} from 'node:path';
+import {join,basename} from 'node:path';
 import {tmpdir} from 'node:os';
 import {PoliteFetcher as BasePoliteFetcher,PoliteFetchError,parseRobots,robotsAllows,publicUrl,sourceContentBinding} from '../src/polite-fetch.ts';
 import {isPublicAddress} from '../src/public-address.ts';
@@ -18,6 +18,7 @@ import {crawlOparlSource} from '../src/district-source-adapters.ts';
 import {ContentFreeSourcePolicySchema} from '../src/district-schema.ts';
 import {readBoundSourceObservation} from '../src/source-observation.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
+import {CrawlRequestEvidenceSchema,CrawlRequestEvidenceCaptureError} from '../src/district-crawl-request.ts';
 
 async function createPoliteFetcher(options:PoliteFetcherOptions):Promise<BasePoliteFetcher> {
  return new BasePoliteFetcher({...await politeTestOptions(options),fixtureInspection:fixturePolicyInspection});
@@ -59,6 +60,34 @@ test('conditional 304 retains original byte hash and retrieval observation',asyn
  assert.equal(second.sha256,first.sha256);assert.equal(second.retrievedAt,first.retrievedAt);assert.equal(second.status,304);assert.equal(seen.at(-1)?.validators?.etag,'"abc"');assert.equal(seen.filter(item=>item.path==='/robots.txt').length,1);
  const observation=JSON.parse(await readFile(second.observationPath,'utf8'));assert.equal(observation.state,'not_modified');assert.equal(observation.sha256,first.sha256);
  await writeFile(first.localPath,'changed');await assert.rejects(fetcher.fetch('https://stadt.de/plan.pdf'),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='cache_missing');
+});
+test('request evidence records canonical dispatched URLs for roots, fragments and mixed-case hosts',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-canonical-evidence-'));t.after(()=>rm(cache,{recursive:true,force:true}));t.after(()=>rm(cache+'-request-evidence',{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:cache});
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  if(url.pathname==='/start')return {status:302,headers:{location:'/final#not-dispatched'},body:Buffer.alloc(0)};
+  return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Synthetic canonical source')};
+ });
+ for(const input of ['https://stadt.de','https://stadt.de/plan#section','https://STADT.DE/PLAN','HTTPS://STADT.DE/start#section']){
+  const document=await fetcher.fetch(input),evidence=CrawlRequestEvidenceSchema.parse(JSON.parse(await readFile(join(cache+'-request-evidence','requests',basename(document.observationPath)),'utf8')));
+  assert.equal(evidence.request.url,publicUrl(input).href);assert.equal(evidence.redirectChain[0],publicUrl(input).href);assert.equal(evidence.redirectChain.at(-1),document.url);
+  assert.equal(document.status,200);assert.equal(evidence.httpObservation.receiptSha256,hash(await readFile(document.observationPath)));
+  if(input.includes('/start'))assert.deepEqual(evidence.redirectChain,['https://stadt.de/start','https://stadt.de/final']);
+ }
+});
+test('capture failure is an explicit content-free internal error and never rewrites successful source observations',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-capture-error-'));t.after(()=>rm(cache,{recursive:true,force:true}));t.after(()=>rm(cache+'-request-evidence',{recursive:true,force:true}));
+ const body=Buffer.from('SYNTHETIC_SOURCE_CONTENT_NEVER_IN_CAPTURE_ERROR'),fetcher=await createPoliteFetcher({cacheDir:cache}),url='https://stadt.de/plan';
+ await writeFile(cache+'-request-evidence','SYNTHETIC_PRIVATE_CAPTURE_FAILURE',{mode:0o600,flag:'wx'});
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async(dispatched:URL)=>dispatched.pathname==='/robots.txt'||dispatched.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'text/plain'},body});
+ await assert.rejects(fetcher.fetch(url),(error:unknown)=>{
+  assert.ok(error instanceof CrawlRequestEvidenceCaptureError);assert.equal(error instanceof PoliteFetchError,false);assert.equal(error.message,'Managed request evidence capture failed');assert.equal(error.cause,undefined);assert.equal(Object.hasOwn(error,'failure'),false);assert.equal(JSON.stringify(error).includes('SYNTHETIC_PRIVATE'),false);return true;
+ });
+ assert.deepEqual(await readFile(join(cache,'sha256',hash(body))),body);
+ const observations=await Promise.all((await readdir(join(cache,'observations'))).map(async name=>JSON.parse(await readFile(join(cache,'observations',name),'utf8')))),source=observations.filter(row=>row.url===url);
+ assert.equal(source.length,1);assert.equal(source[0].state,'fetched');assert.equal(source[0].status,200);assert.equal(source[0].sha256,hash(body));assert.equal(source[0].failure,undefined);
+ const requests=await Promise.all((await readdir(join(cache,'requests'))).map(async name=>JSON.parse(await readFile(join(cache,'requests',name),'utf8'))));assert.equal(requests.find(row=>row.url===url)?.state,'fetched');
 });
 test('robots denial and unavailable policy are distinct from missing source',async t=>{
  const cache=await mkdtemp(join(tmpdir(),'polite-robots-'));t.after(()=>rm(cache,{recursive:true,force:true}));

@@ -9,7 +9,7 @@ import {tmpdir,homedir} from 'node:os';
 import {createHash,randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {assertCivicPolicyAuthority,provisionCivicPolicyAuthority,CIVIC_POLICY_AUTHORITY_ID,assertManagedSourceReadable,withManagedSourceScratch,recoverManagedSourceScratch,assertHostNotOptedOut,readCivicOptOutSnapshot,registerManagedCacheRoot,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,recordHostOptOut,purgeOptedOutHost,recordManagedSourceContent,withManagedSourceWrite,markManagedCacheInventoryComplete,relinquishManagedSourceContent,HostOptedOutError,CivicPolicyStateError,civicOptOutMain} from '../src/civic-opt-out.ts';
-import {assertManagedSourceBindings,assertManagedRawSourceBinding,assertManagedObservationReadable,ManagedSourceBindingSchema,parseContentFreePreparationPlan,assertSourceHostsNotOptedOut} from '../src/civic-opt-out.ts';
+import {assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,assertManagedRawSourceBinding,assertManagedObservationReadable,ManagedSourceBindingSchema,parseContentFreePreparationPlan,assertSourceHostsNotOptedOut} from '../src/civic-opt-out.ts';
 import {retireManagedRoot,RetireReceiptSchema} from '../src/civic-opt-out.ts';
 import {projectSourcePolicyMetadata} from '../src/source-policy.ts';
 import type {SourceAccessPolicy} from '../src/source-policy.ts';
@@ -1067,4 +1067,22 @@ test('retire-root CLI continues rejecting fixture authorities without printing a
  t.mock.method(console,'log',(value:string)=>{outputs.push(value);});
  await assert.rejects(civicOptOutMain(['retire-root','--root',root,'--reason','fixture must remain API-only','--authority-id',policy.authorityId,'--state-dir',stateDir,'--authority-sha256',policy.authoritySha256]),CivicPolicyStateError);
  assert.deepEqual(outputs,[]);assert.deepEqual(await readFile(join(stateDir,'inventory.json')),before);await lstat(root);
+});
+
+test('independent HTTP membership selects exact live admissions but never relaxes derived ancestry',async t=>{
+ const {base,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),root=join(base,'cas'),body='Synthetic same original bytes';
+ await registerManagedCacheRoot(root,{kind:'artifacts',...policy});
+ const first={...rawEntry(body,'https://first.org/original',true),relativePath:'sha256/'+hash(body).slice(0,2)+'/'+hash(body)},second={...rawEntry(body,'https://second.org/original',true),relativePath:first.relativePath};
+ await publish(root,first,body,stateDir);await publish(root,second,body,stateDir);const path=join(root,first.relativePath);
+ await assertManagedIndependentHttpSourceBinding(path,first,policy);await assertManagedIndependentHttpSourceBinding(path,second,policy);
+ await assert.rejects(assertManagedSourceBindings(path,[first],policy),CivicPolicyStateError);
+ for(const binding of [{...first,observationId:hash('wrong observation')},{...first,receiptSha256:hash('wrong receipt')},{...first,sourceSha256:hash('wrong original')},{...first,url:'https://unknown.org/original'}])await assert.rejects(assertManagedIndependentHttpSourceBinding(path,binding,policy),CivicPolicyStateError);
+ const denied={...rawEntry('non-independent original','https://first.org/denied',false),relativePath:'denied.json'};await publish(root,denied,'non-independent original',stateDir);await assert.rejects(assertManagedIndependentHttpSourceBinding(join(root,denied.relativePath),denied,policy),CivicPolicyStateError);
+ const derived='Synthetic derived composition',derivedPath=join(root,'composition.json');
+ const derivedBindings=[first,second].map(binding=>({...binding,independentAllowed:false}));
+ await withManagedSourceWrite(root,derivedBindings.map(binding=>({...binding,relativePath:'composition.json',contentSha256:hash(derived)})),()=>writeFile(derivedPath,derived,{mode:0o600}),policy);
+ await assertManagedSourceBindings(derivedPath,derivedBindings,policy);await assert.rejects(assertManagedSourceBindings(derivedPath,[derivedBindings[0]],policy),CivicPolicyStateError);await assert.rejects(assertManagedIndependentHttpSourceBinding(derivedPath,first,policy),CivicPolicyStateError);
+ await recordHostOptOut({host:'first.org',reason:'municipality_objection'},policy);
+ await assert.rejects(assertManagedIndependentHttpSourceBinding(path,first,policy),HostOptedOutError);await assertManagedIndependentHttpSourceBinding(path,second,policy);
+ await writeFile(path,'tampered original',{mode:0o600});await assert.rejects(assertManagedIndependentHttpSourceBinding(path,second,policy),CivicPolicyStateError);
 });
