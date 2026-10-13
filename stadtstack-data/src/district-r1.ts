@@ -345,7 +345,7 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
   await mkdir(root,{recursive:true,mode:0o700});
   try{await lstat(output);throw Error('Registry descriptor output directory already exists');}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
   const built=await buildOperatorRegistryConfigDescriptor({repository:REPO,commit:rawArgs[1],outputDirectory:output});
-  process.stdout.write(canonicalJson({descriptorPath:built.descriptorPath,descriptorSha256:built.descriptorSha256,configurationSha256:built.descriptor.sha256,gitCommit:built.descriptor.code.gitCommit})+'\\n');return;
+  process.stdout.write(canonicalJson({descriptorPath:built.descriptorPath,descriptorSha256:built.descriptorSha256,configurationSha256:built.descriptor.sha256,gitCommit:built.descriptor.code.gitCommit})+'\n');return;
  }
  if(command==='migrate'){
   if(rawArgs.length)throw Error('Migration accepts no registry or execution arguments');
