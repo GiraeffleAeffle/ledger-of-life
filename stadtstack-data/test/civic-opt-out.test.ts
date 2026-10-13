@@ -748,6 +748,46 @@ test('Git baselines and approved registry configuration stay typed controls, nev
  assert.equal((await recordHostOptOut({host:'stadt.de',reason:'municipality_objection'},policy)).purge.deletedFiles,2);
 });
 
+test('self-bound registry bytes admit complete descriptor members while inherited artifacts remain exact-set',async t=>{
+ const {base,stateDir}=await sandbox(t),root=join(base,'registry-members'),policy=fixturePolicy(stateDir);
+ await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+ const bytes='Synthetic bounded operator configuration',configurationSha256=hash(bytes),code={gitCommit:'a'.repeat(40),path:'stadtstack-data/sources/district-registry.json',blobOid:'b'.repeat(40),sha256:configurationSha256,bytes:Buffer.byteLength(bytes)};
+ const first=['https://stadt.de/source','https://another.test/source'].map(url=>({kind:'operator_registry_config' as const,url,configurationSha256,schemaContractSha256:hash('first synthetic codec'),code,approval:{role:'district_source_registry' as const,approver:'owner' as const,decisionId:CIVIC_ACQUISITION_DECISION_ID,date:'2026-10-11' as const,configurationSha256,gitCommit:code.gitCommit},independentAllowed:false}));
+ const second=first.map(binding=>({...binding,schemaContractSha256:hash('second synthetic codec')}));
+ const path=join(root,'registry.json'),derived='Synthetic index inheriting operator configuration',derivedPath=join(root,'derived.json');
+ for(const binding of [...first,...second]){
+  await publish(root,{...binding,relativePath:'registry.json',contentSha256:configurationSha256},bytes,stateDir);
+  await publish(root,{...binding,relativePath:'derived.json',contentSha256:hash(derived)},derived,stateDir);
+ }
+ for(const bindings of [first,second]){
+  await assertManagedSourceBindings(path,bindings,policy);
+  await assertManagedSourceBindings(path,bindings,policy,'operator_registry_config');
+  await assert.rejects(assertManagedSourceBindings(derivedPath,bindings,policy),{code:'CONTENT_PROVENANCE_MISMATCH'});
+  await assert.rejects(assertManagedSourceBindings(derivedPath,bindings,policy,'operator_registry_config'),{code:'CONTENT_PROVENANCE_MISMATCH'});
+ }
+ await assertManagedSourceBindings(derivedPath,[...first,...second],policy);
+ for(const bindings of [
+  [],
+  first.slice(1),
+  [first[0],second[1]],
+  first.map(binding=>({...binding,schemaContractSha256:hash('foreign codec')})),
+  first.map(binding=>({...binding,code:{...binding.code,blobOid:'c'.repeat(40)}})),
+  first.map(binding=>({...binding,url:'https://foreign.test/source'})),
+  first.map(binding=>({...binding,independentAllowed:true})),
+ ])await assert.rejects(assertManagedSourceBindings(path,bindings,policy),{code:'CONTENT_PROVENANCE_MISMATCH'});
+ // Deliberate fixture-only revocation preserves genuine entry identities and bytes.
+ const inventoryPath=join(stateDir,'inventory.json'),original=await readFile(inventoryPath),inventory=JSON.parse(original.toString('utf8'));
+ const revoked=inventory.entries.find((entry:{relativePath:string;schemaContractSha256?:string})=>entry.relativePath==='registry.json'&&entry.schemaContractSha256===second[0].schemaContractSha256);
+ assert.ok(revoked);revoked.state='revoked';
+ try{
+  await writeFile(inventoryPath,JSON.stringify(inventory)+'\n',{mode:0o600});
+  for(const bindings of [first,second])await assert.rejects(assertManagedSourceBindings(path,bindings,{...policy,sourceUrl:bindings[0].url}),{code:'CONTENT_REFERENCE_REVOKED'});
+ }finally{await writeFile(inventoryPath,original,{mode:0o600});}
+ // A foreign provenance kind on these bytes cannot disappear behind membership.
+ await publish(root,{...rawEntry(bytes,'https://foreign.test/source'),relativePath:'registry.json'},bytes,stateDir);
+ await assert.rejects(assertManagedSourceBindings(path,first,policy),{code:'CONTENT_PROVENANCE_MISMATCH'});
+});
+
 test('raw source admission verifies the real immutable HTTP observation, not another proof kind or receipt hash',async t=>{
  const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),bytes='synthetic acquired primary source',sourceSha256=hash(bytes),url='https://stadt.de/source';
  await initializeManagedAcquisitionLane(root,{decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});await mkdir(join(root,'observations'),{mode:0o700});
