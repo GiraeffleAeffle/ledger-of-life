@@ -3,6 +3,7 @@ import {resolve,join,relative,isAbsolute,basename} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {PoliteFetcher,PoliteFetchError,type SourceContentBinding} from './polite-fetch.ts';
+import type {PoliteFetcherOptions} from './polite-fetch.ts';
 import {crawlHtmlSource,crawlOparlSource,crawlParticipationApi,crawlMvPlanningApi,sourceDocument,registeredSourceTargets,MunicipalIdentityBindingError} from './district-source-adapters.ts';
 import type {RegistryMunicipality,CrawlDocument,CrawlExcludedDocument,AdapterOptions,AdapterResult,CrawlCoverage,FrontierFailure} from './district-source-adapters.ts';
 import {operatorRegistryConfigImportSchema,importOperatorRegistryConfig,readOperatorRegistryConfigSourcePin} from './district-registry-config.ts';
@@ -12,6 +13,13 @@ import {APPROVED_OWNER_ROBOTS_OVERRIDE,documentOriginExcludes} from './source-po
 import {CIVIC_POLICY_AUTHORITY,assertCivicPolicyAuthority,initializeManagedAcquisitionLane,assertManagedObservationReadable} from './civic-opt-out.ts';
 import {ContentFreeSourcePolicySchema,sha256} from './district-schema.ts';
 import {SourceObservationSchema,sourceObservationMatches} from './source-observation.ts';
+import {HostGroupsSchema} from './district-r1.ts';
+
+/** The shared strict config fixes the floor; exact-host serialization remains in PoliteFetcher. */
+export async function createDistrictCrawlFetcher(options:Omit<PoliteFetcherOptions,'minDelayMs'>,hostGroupsPath:string|URL=new URL('../sources/district-host-groups.json',import.meta.url)):Promise<PoliteFetcher>{
+ const group=HostGroupsSchema.parse(JSON.parse(await readFile(hostGroupsPath,'utf8'))).serviceGroups[0];
+ return new PoliteFetcher({...options,minDelayMs:group.minStartIntervalMs});
+}
 
 export interface CrawlCheck {
  municipalityId:string;sourceId:string;checkState:'checked'|'not_found'|'not_checked';checkedAt:string|null;
@@ -134,9 +142,9 @@ async function main(){
  if(!inside(resolve(importDescriptor.managedRoot))||resolve(importDescriptor.managedRoot)===cache||contains(cache,resolve(importDescriptor.managedRoot))||contains(resolve(importDescriptor.managedRoot),cache))throw Error('Registry control import requires a separate ignored artifacts root');
  const requestedPolicy={...CIVIC_POLICY_AUTHORITY,...(values['policy-authority-sha256']!==undefined?{authoritySha256:values['policy-authority-sha256']}:{})},authority=await assertCivicPolicyAuthority(requestedPolicy);
  const policy={...requestedPolicy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},lane={decisionId:APPROVED_OWNER_ROBOTS_OVERRIDE.id,...policy};
+ const fetcher=await createDistrictCrawlFetcher({cacheDir:cache,ownerPolicyLane:lane,policyTtlMs:Math.min(revalidateAfterMs,60*60_000)});
  const control=await importOperatorRegistryConfig(importDescriptor,policy),{registry}=await readOperatorRegistryConfigSourcePin(control,policy),selection:DistrictCrawlSelection={municipality:values.municipality,sourceId:values.source,pageRoots:values['page-root'],seedDocumentUrls:values['seed-document']};
  validateDistrictCrawlSelection(registry,selection);
- const fetcher=new PoliteFetcher({cacheDir:cache,ownerPolicyLane:lane,policyTtlMs:Math.min(revalidateAfterMs,60*60_000)});
  await fetcher.initialize();await initializeManagedAcquisitionLane(outputRoot,{...lane,kind:'artifacts'});
  if(!inside(await realpath(cache))||!inside(await realpath(outputRoot))||!inside(await realpath(importDescriptor.managedRoot)))throw Error('Cache symlinks may not escape ignored cache directory');
  // One crawler process owns the project's hosts. An interrupted run leaves an explicit operator-visible lock.
