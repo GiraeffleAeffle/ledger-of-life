@@ -6,11 +6,11 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {Pool} from 'pg';
 import {canonicalJson,digest,semanticHash} from '../src/district-adapter-contract.ts';
 import {DistrictJobStore,migrateDistrictJobs,runDistrictJobs,type JobHandler} from '../src/district-jobs.ts';
-import {assessmentQueueContract,assessmentQueueHandlers,enqueuePreparedAssessmentPass,enqueueAssessmentResolution,residualAssessmentItem,exportAssessmentResults} from '../src/district-assessment-jobs.ts';
+import {assessmentQueueContract,assessmentQueueHandlers,enqueuePreparedAssessmentPass,enqueueAssessmentResolution,residualAssessmentItem,residualRecordPropositions,exportAssessmentResults} from '../src/district-assessment-jobs.ts';
 import {DistrictAssessmentBroker,assessmentBJobHandler,enqueueAssessmentB} from '../src/district-assessment-broker.ts';
 import {BridgeLeaseSchema,BridgeStatusSchema} from '../src/district-assessment-bridge-contract.ts';
 import {assessmentItemSchema,originalEvidence,buildAssessmentPassInput,type AssessmentItem,type AssessmentOutput,type AssessmentPassInput} from '../src/district-assessment.ts';
-import {DistrictKnowledgeRecordSchema,REQUIRED_DETERMINISTIC_CHECKS,knowledgeEvidenceHash} from '../src/district-schema.ts';
+import {DistrictKnowledgeRecordSchema,REQUIRED_DETERMINISTIC_CHECKS,knowledgeEvidenceHash,type DistrictKnowledgeRecord} from '../src/district-schema.ts';
 import {GRAPH_DETERMINISTIC_CHECKS} from '../src/district-graph-claims.ts';
 import {PROVIDER_CONFIGS,SubscriptionRuntimeError,EMPTY_USAGE,type ModelAnswer} from '../src/district-model-contract.ts';
 import {initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
@@ -31,7 +31,7 @@ function recordFor(f:{source:AssessmentItem['sources'][number];policy:PolicyRece
 function answer(input:AssessmentPassInput,unresolved=false):ModelAnswer{
  const data=input.data as {itemId:string;claimIds:string[];evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]};
  const source=data.evidence[0],locator=source.locators[0];
- const output:AssessmentOutput={itemId:data.itemId,outcome:unresolved?'unresolved':'supported',assertions:unresolved?[]:[{claimId:data.claimIds[0],sourceId:source.sourceId,locatorId:locator.id,quote:locator.quote,subjectId:null,objectId:null,unit:null,value:null,date:null,dateRole:null,financialRole:'none',stage:null,modality:'unknown'}],scores:{correctness:2,sources:2,usefulness:unresolved?0:1},holdReasons:[],rationale:'Synthetic provider fixture; never a civic assessment.'};
+ const output:AssessmentOutput={itemId:data.itemId,outcome:unresolved?'unresolved':'supported',assertions:unresolved?[]:data.claimIds.map(claimId=>({claimId,sourceId:source.sourceId,locatorId:locator.id,quote:locator.quote,subjectId:null,objectId:null,unit:null,value:null,date:null,dateRole:null,financialRole:'none' as const,stage:null,modality:'unknown' as const})),scores:{correctness:2,sources:2,usefulness:unresolved?0:1},holdReasons:[],rationale:'Synthetic provider fixture; never a civic assessment.'};
  const config=PROVIDER_CONFIGS['openai-subscription'];
  const identity={provider:'openai-subscription' as const,tool:config.tool,toolVersion:'0.0.0-synthetic-test-only',model:config.model,modelIdentityBasis:config.modelIdentityBasis};
  return {value:output,responseSha256:digest(canonicalJson(output)),evidence:{...identity,modelIdentitySha256:digest(JSON.stringify(identity))},requestedModel:config.model,returnedModel:null,reportedModels:[],runtimeWarnings:[],usage:{...EMPTY_USAGE,perModel:{}}};
@@ -45,9 +45,10 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
  t.after(async()=>{try{await closeDb?.();if(created)await admin.query('DROP DATABASE "'+database+'"');}finally{await closeAdmin();for(const directory of directories)await rm(directory,{recursive:true,force:true});}});
  await admin.query('CREATE DATABASE "'+database+'"');created=true;const url=new URL(base);url.pathname='/'+database;
  db=new Pool({connectionString:url.href,max:8});closeDb=poolShutdownBarrier(db);const pool=db;await migrateDistrictJobs(pool);
- async function fixture(name:string,originalText?:string){
+ async function fixture(name:string,originalText?:string,mutate?:(record:DistrictKnowledgeRecord,text:string)=>void){
   const text=originalText??'Strausberg synthetic original evidence '+name+' '+randomUUID()+'.',f=await admittedAssessmentFixture(text,true);directories.push(f.directory);
   const cas=f.context.cas,policy=f.context.policyOptions,store=new DistrictJobStore(pool),record=recordFor(f,text),rubric='Synthetic frozen rubric: exact evidence only; AI agreement is not independent gold.';
+  if(mutate){mutate(record,text);record.verification.evidenceHash=knowledgeEvidenceHash(record);}
   await initializeManagedAcquisitionLane(cas.root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
   const put=async(value:unknown,kind:'derived'|'receipt'|'source_original'|'parser_output'='derived',raw=false)=>{
    const bytes=raw?Buffer.from(value as string):Buffer.from(canonicalJson(value)),hash=digest(bytes);
@@ -56,14 +57,16 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   };
   for(const artifact of [f.policyArtifact,f.parserArtifact])await put(JSON.parse((await cas.read(artifact.sha256)).toString('utf8')),'receipt');
   await put(text,'source_original',true);
-  const item=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,question:'What does the original source establish?',claim:'',rubric,rubricSha256:digest(rubric),sources:[f.source],claimIds:[record.id],entityIds:[],constraints:[],criticalKinds:[]});
+  const projection=residualRecordPropositions(record);
+  const item=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,question:'Verify every proposition independently against the original source.',claim:canonicalJson(projection),rubric,rubricSha256:digest(rubric),sources:[f.source],claimIds:projection.propositions.map(proposition=>proposition.claimId),entityIds:[],constraints:[],criticalKinds:[]});
   const itemArtifact=await put(item),recordArtifact=await put(record),bundle=await put({version:'r1-assessment-items-v1',items:[{itemArtifactSha256:itemArtifact.sha256,recordArtifactSha256:recordArtifact.sha256,maxModelCalls:48}]});
   const snapshot=randomUUID(),scope=f.policy.scope;
   await pool.query(`INSERT INTO district_pipeline.source_snapshots(id,publisher_id,source_id,municipality_id,ags,tenant,resource_identity,request_method,request_selector_sha256,observation_window,retrieved_at,scope_sha256) VALUES($1,$2,$3,$4,$5,NULL,$6,'GET',$7,$8,$9,$10)`,[snapshot,scope.publisherId,scope.sourceId,scope.municipalityId,scope.ags,f.policy.source.url,digest('synthetic GET '+name),scope.observationWindow,f.policy.checkedAt,semanticHash(scope)]);
   await pool.query(`INSERT INTO district_pipeline.policy_decisions(id,source_snapshot_id,proof_sha256,source_sha256,receipt_json,state,observed_robots,owner_robots_override,opt_out_version,policy_version,checked_at,expires_at,reason_code) VALUES($1,$2,$3,$4,$5,'allowed','allowed',false,$6,$7,$8,$9,'synthetic_shared_admission')`,[randomUUID(),snapshot,f.policyArtifact.sha256,f.source.originalSha256,f.policy,f.policy.optOutSnapshotSha256,f.policy.version,f.policy.checkedAt,f.policy.expiresAt]);
   const preparationKey=await store.enqueue({step:'assessment_prepare',lane:'assessment',semanticContractSha256:await assessmentQueueContract(),inputArtifactHashes:[itemArtifact.sha256,recordArtifact.sha256,bundle.sha256,f.originalArtifact.sha256,f.policyArtifact.sha256,f.parserArtifact.sha256],sourceScope:scope,selector:{syntheticFixture:name},policyProofSha256:f.policyArtifact.sha256});
-  const run=async(key:string,handlers:Readonly<Record<string,JobHandler>>)=>{
-   const authorizationId=await store.authorize({approvalSha256:digest('synthetic stage '+randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[key],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
+  const authorize=async(key:string)=>store.authorize({approvalSha256:digest('synthetic lead-issued stage citing #81 '+randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[key],ags:[scope.ags],maxJobs:10,maxElapsedMs:60000,category:'development'});
+  const run=async(key:string,handlers:Readonly<Record<string,JobHandler>>,authorizationId?:string)=>{
+   authorizationId??=await authorize(key);
    return runDistrictJobs({store,cas,handlers,authorizationId,maxJobs:1,maxElapsedMs:60000,ownerPresent:true,leaseMs:30000});
   };
   const preparedRun=await run(preparationKey,{assessment_prepare:async()=>({outcome:'succeeded',reasonCode:'completed',outputs:[itemArtifact,recordArtifact,bundle]})});
@@ -72,23 +75,23 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   const broker=new DistrictAssessmentBroker(pool,cas,{policyOptions:policy,fixtureProtocol:true}),clientContractSha256=digest('synthetic protocol contract');
   const BJobKey=await enqueueAssessmentB(broker,{itemArtifactSha256:itemArtifact.sha256,sourceScope:scope,policyProofSha256:f.policyArtifact.sha256,transport:'mac-bridge',clientContractSha256});
   const handlers=(provider:(input:AssessmentPassInput)=>Promise<ModelAnswer>=async input=>answer(input))=>assessmentQueueHandlers(pool,{policyOptions:policy,fixtureProvider:provider});
-  const runB=async(disagree=false)=>{
+  const runB=async(disagree=false,unresolved=false)=>{
    const pending=run(BJobKey,{assessment_b:assessmentBJobHandler(broker)});
    const deadline=Date.now()+5000;
    for(;;){const rows=await pool.query(`SELECT b.id FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1 AND b.state='ready'`,[BJobKey]);if(rows.rowCount)break;if(Date.now()>=deadline)throw Error('Synthetic B lease deadline');await delay(10);}
    const lease=BridgeLeaseSchema.parse(await broker.dispatch({operation:'claim',jobKey:BJobKey,clientId:'synthetic-client',clientContractSha256}));
    const startedAt=new Date().toISOString();
-   const output=answer(buildAssessmentPassInput(item,await originalEvidence(item,f.context),'B')).value as AssessmentOutput;if(disagree)output.scores.usefulness=2;
+   const output=answer(buildAssessmentPassInput(item,await originalEvidence(item,f.context),'B'),unresolved).value as AssessmentOutput;if(disagree)output.scores.usefulness=2;
    const config=PROVIDER_CONFIGS['anthropic-subscription'],identity={provider:'anthropic-subscription' as const,tool:'claude-cli' as const,toolVersion:'0.0.0-synthetic-test-only',model:config.model,modelIdentityBasis:config.modelIdentityBasis};
    const stdout=[{type:'system',subtype:'init',tools:[],mcp_servers:[],model:config.model},{type:'assistant',message:{id:'msg_synthetic',model:config.model,content:[]}},{type:'result',subtype:'success',is_error:false,model:config.model,request_id:'req_synthetic',structured_output:output,usage:{input_tokens:1,output_tokens:1}}].map(value=>JSON.stringify(value)).join('\n')+'\n';
    const finishedAt=new Date().toISOString(),completedAt=new Date().toISOString();
    const submitted=await broker.dispatch({operation:'submit',leaseId:lease.leaseId,inputSha256:lease.inputSha256,purgeAck:{sourceFiles:0,responseFiles:0,modelFileWritesDenied:true,completedAt},answer:{stdout,evidence:{...identity,modelIdentitySha256:digest(JSON.stringify(identity))},startedAt,finishedAt}});
    assert.equal(BridgeStatusSchema.parse(submitted).state,'submitted');
    const result=await pending,state=await pool.query('SELECT state,reason_code FROM district_pipeline.jobs WHERE job_key=$1',[BJobKey]);
-   assert.equal(state.rows[0].state,'succeeded',canonicalJson(state.rows[0]));
+   assert.equal(state.rows[0].state,unresolved?'held_quality':'succeeded',canonicalJson(state.rows[0]));
    return result;
   };
-  return {...f,cas,policy,proof:f.policy,store,item,record,preparationKey,AJobKey,BJobKey,handlers,run,runB,put};
+  return {...f,cas,policy,proof:f.policy,store,item,record,preparationKey,AJobKey,BJobKey,handlers,authorize,run,runB,put};
  }
  await t.test('full blind A/B agreement plus mandatory genuine C is admitted',async()=>{
   const f=await fixture('agreement');let calls=0;
@@ -133,10 +136,55 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   await unlink(f.cas.root+'/sha256/'+hash.slice(0,2)+'/'+hash);
   const result=await f.run(key,f.handlers());assert.equal(result.state,'held');
  });
- await t.test('usage limit holds without retry or fallback and pauses later Codex effects',async()=>{
+ for(const field of ['summary','documentDate','stage'] as const)await t.test('unsupported actual '+field+' proposition cannot admit a non-critical record',async()=>{
+  const mutate=(record:DistrictKnowledgeRecord,text:string)=>{
+   if(field==='summary')record.summary='The original establishes an entirely different synthetic project.';
+   else if(field==='documentDate'){record.documentDate='2027-01-01';record.documentDateQuote=text;}
+   else {record.stage='draft';record.stageQuote=text;record.originalStatus='Synthetic draft assertion unsupported by the original';}
+  };
+  const f=await fixture('wrong-'+field,undefined,mutate);
+  const projected=JSON.parse(f.item.claim);assert.ok(projected.propositions.some((p:{selector:string;value:unknown})=>p.selector==='/'+field&&p.value===f.record[field]));
+  assert.equal('verification' in projected,false);assert.equal('extraction' in projected,false);
+  const reject=async(input:AssessmentPassInput)=>{assert.equal((input.data as {claim:string}).claim,f.item.claim);return answer(input,true);};
+  await f.run(f.AJobKey,f.handlers(reject));await f.runB();
+  const pair={AJobKey:f.AJobKey,BJobKey:f.BJobKey},CJobKey=await enqueueAssessmentResolution(pool,f.store,f.cas,pair,'C',f.policy);
+  await f.run(CJobKey,f.handlers(reject));
+  const key=await enqueueAssessmentResolution(pool,f.store,f.cas,{...pair,CJobKey},'reconcile',f.policy);
+  const result=await f.run(key,f.handlers());assert.equal(result.state,'held');
+  const row=await pool.query('SELECT state,reason_code FROM district_pipeline.jobs WHERE job_key=$1',[key]);assert.notEqual(row.rows[0].state,'succeeded');
+  const blindB=await fixture('wrong-'+field+'-rejected-by-B',undefined,mutate);
+  await blindB.run(blindB.AJobKey,blindB.handlers());
+  assert.equal((await blindB.runB(false,true)).state,'held');
+  await assert.rejects(enqueueAssessmentResolution(pool,blindB.store,blindB.cas,{AJobKey:blindB.AJobKey,BJobKey:blindB.BJobKey},'C',blindB.policy),/dependency_uncommitted/);
+ });
+ await t.test('partial supported proposition coverage cannot admit a record',async()=>{
+  const f=await fixture('partial-coverage');assert.ok(f.item.claimIds.length>1);
+  await f.run(f.AJobKey,f.handlers());await f.runB();
+  const pair={AJobKey:f.AJobKey,BJobKey:f.BJobKey},CJobKey=await enqueueAssessmentResolution(pool,f.store,f.cas,pair,'C',f.policy);
+  await f.run(CJobKey,f.handlers(async input=>{
+   const complete=answer(input),output=complete.value as AssessmentOutput;
+   output.assertions=output.assertions.slice(0,1);
+   return {...complete,value:output,responseSha256:digest(canonicalJson(output))};
+  }));
+  const key=await enqueueAssessmentResolution(pool,f.store,f.cas,{...pair,CJobKey},'reconcile',f.policy);
+  assert.equal((await f.run(key,f.handlers())).state,'held');
+ });
+ await t.test('usage limit stops its authorization and only a later explicit authorization resumes',async()=>{
   const f=await fixture('usage-limit');let calls=0;
-  const result=await f.run(f.AJobKey,f.handlers(async()=>{calls++;throw new SubscriptionRuntimeError('rate_limit','Synthetic subscription usage limit');}));assert.equal(result.reasonCode,'budget_paused');assert.equal(calls,1);
-  await f.store.resume(f.AJobKey);const replay=await f.run(f.AJobKey,f.handlers(async input=>{calls++;return answer(input);}));assert.equal(replay.reasonCode,'budget_paused');assert.equal(calls,1);
+  const other=await fixture('usage-other-source');
+  const firstAuthorization=await f.store.authorize({approvalSha256:digest('synthetic bounded stage citing #81 '+randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[f.AJobKey,other.AJobKey],ags:[f.proof.scope.ags],maxJobs:10,maxElapsedMs:60000,category:'development'});
+  const result=await f.run(f.AJobKey,f.handlers(async()=>{calls++;throw new SubscriptionRuntimeError('rate_limit','Synthetic subscription usage limit');}),firstAuthorization);assert.equal(result.reasonCode,'budget_paused');assert.equal(calls,1);
+  const further=await other.run(other.AJobKey,other.handlers(async input=>{calls++;return answer(input);}),firstAuthorization);assert.equal(further.reasonCode,'budget_paused');assert.equal(calls,1);
+  await f.store.resume(f.AJobKey);
+  const replay=await f.run(f.AJobKey,f.handlers(async input=>{calls++;return answer(input);}),firstAuthorization);assert.equal(replay.reasonCode,'budget_paused');assert.equal(calls,1);
+  await f.store.resume(f.AJobKey);
+  const nextAuthorization=await f.authorize(f.AJobKey);
+  const resumed=await f.run(f.AJobKey,f.handlers(async input=>{calls++;return answer(input);}),nextAuthorization);assert.equal(resumed.state,'completed');assert.equal(calls,2);
+  const audit=await pool.query('SELECT * FROM district_pipeline.r1_codex_resumptions WHERE held_authorization_id=$1 AND authorization_id=$2',[firstAuthorization,nextAuthorization]);
+  assert.equal(audit.rowCount,1);assert.equal(audit.rows[0].approved_by,'synthetic-test-owner');assert.ok(audit.rows[0].approved_at<audit.rows[0].resumed_at||audit.rows[0].approved_at.getTime()===audit.rows[0].resumed_at.getTime());
+  await assert.rejects(pool.query('DELETE FROM district_pipeline.r1_codex_usage_holds WHERE authorization_id=$1',[firstAuthorization]),/Immutable/);
+  await assert.rejects(pool.query('UPDATE district_pipeline.r1_codex_resumptions SET approved_by=$1 WHERE authorization_id=$2',['synthetic mutation',nextAuthorization]),/Immutable/);
+  const count=await pool.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[f.source.originalSha256]);assert.equal(Number(count.rows[0].count),2);
  });
  await t.test('prepared-text item factory binds actual UTF-16 spans and never imports model constraints',async()=>{
   const f=await fixture('factory'),text=(await f.cas.read(f.source.textSha256)).toString('utf8');

@@ -196,12 +196,6 @@ export type OriginalEvidence = {
   nativeLocators?: z.infer<typeof StructuredLocatorSchema>[];
   selectedContext?: { version: string; selectionSha256: string; spans: { start: number; end: number; text: string }[]; limitations: string[] };
 }[];
-export function assessmentProviderInput(item: AssessmentItem, evidence: OriginalEvidence): Record<string, unknown> {
-  const data: Record<string, unknown> = { itemId: item.itemId, question: item.question, claim: item.claim, rubric: item.rubric,
-    claimIds: item.claimIds, entityIds: item.entityIds, evidence };
-  if (!item.valueTarget && !item.criticalTarget) return data;
-  // Metadata is not evidence. Do not let historical judges or classifiers cue the
-  // blind verifiers, including through duplicate record projections in MCP calls.
   const priorJudgmentFields: Record<string, true> = {
     verification: true, extraction: true, topics: true, category: true, review: true, reviews: true, reviewstate: true,
     assessment: true, assessments: true, evaluation: true, evaluations: true, comparisoneligible: true,
@@ -222,6 +216,14 @@ export function assessmentProviderInput(item: AssessmentItem, evidence: Original
       return [[key, project(member)]];
     }));
   };
+export const assessmentBlindProjection = project;
+export function assessmentProviderInput(item: AssessmentItem, evidence: OriginalEvidence): Record<string, unknown> {
+  const data: Record<string, unknown> = { itemId: item.itemId, question: item.question, claim: item.claim, rubric: item.rubric,
+    claimIds: item.claimIds, entityIds: item.entityIds, evidence };
+  if (!item.valueTarget && !item.criticalTarget) return data;
+  // Metadata is not evidence. Do not let historical judges or classifiers cue the
+  // blind verifiers, including through duplicate record projections in MCP calls.
+  const project = assessmentBlindProjection;
   if (item.valueTarget) {
     const target = item.valueTarget;
     data.valueTarget = { ...target, projectionVersion: 'assessment-blind-provider-v1', fullTargetSha256: digest(target),
@@ -262,6 +264,9 @@ export function deterministicChecks(item: AssessmentItem, evidence: OriginalEvid
     if ((a.value === null) !== (a.unit === null)) issues.push('value_unit:' + a.claimId);
     const constraint = item.constraints.find(c => c.claimId === a.claimId);
     if (constraint && canonical(constraint) !== canonical(a)) issues.push('source_constraint:' + a.claimId);
+  }
+  if (output.outcome === 'supported' && !item.valueTarget) {
+    for (const id of item.claimIds) if (!seen.has(id)) issues.push('missing_claim:' + id);
   }
   if (item.valueTarget) {
     const review = output.valueReview;

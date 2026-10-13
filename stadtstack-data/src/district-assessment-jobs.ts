@@ -6,7 +6,7 @@ import {HashSchema,canonicalJson,digest,semanticHash} from './district-adapter-c
 import {DistrictJobStore,DistrictExecutionHold,canonicalJobIdentity,type DistrictJobSpec,type JobHandlerContext,type JobHandler} from './district-jobs.ts';
 import {encodeStepReceipt,type StepReceipt} from './district-step-receipt.ts';
 import {DistrictCas,type CasArtifact} from './district-cas.ts';
-import {assessmentItemSchema,originalEvidence,buildAssessmentPassInput,runAssessmentPass,createAssessmentReceipt,reconcile,validateReceipt,type AssessmentItem,type AssessmentReceipt,type AssessmentEvidenceContext,type AssessmentPassInput} from './district-assessment.ts';
+import {assessmentBlindProjection,assessmentItemSchema,originalEvidence,buildAssessmentPassInput,runAssessmentPass,createAssessmentReceipt,reconcile,validateReceipt,type AssessmentItem,type AssessmentReceipt,type AssessmentEvidenceContext,type AssessmentPassInput} from './district-assessment.ts';
 import {prepareCriticalAssessment} from './district-critical-assessment.ts';
 import {criticalKnowledgeTarget} from './district-critical-assessment-public.ts';
 import {PreparedDocumentSchema,verifyPreparedDocument,assertPreparedReferenceMembership,type PreparedDocument} from './district-prepared-document.ts';
@@ -44,6 +44,23 @@ async function persist(store:DistrictJobStore,cas:DistrictCas,item:AssessmentIte
  for(const receipt of receipts)await recheckPolicyReceipt(receipt,{...policy,evaluationAt:new Date().toISOString()});
  await store.addArtifact(artifact);return artifact;
 }
+/** The same hint-free projection used by critical reviews, without expanding their taxonomy. */
+export function residualRecordPropositions(record:z.infer<typeof ResidualExtractionSchema>['result']['records'][number]){
+ const {extraction:_generation,verification:_judgment,sources,...claims}=record;
+ const sourceProjection=sources.map(source=>({id:source.id,url:source.url,sha256:source.sha256}));
+ const projection=z.record(z.string(),z.unknown()).parse(assessmentBlindProjection({...claims,sources:sourceProjection}));
+ const metadata=new Set(['id','kind','municipalityId','ags','districtId','sources']);
+ const propositions=Object.entries(projection).sort(([left],[right])=>left<right?-1:left>right?1:0).filter(([field])=>!metadata.has(field)&&!field.endsWith('Quote')).flatMap(([field,value])=>{
+  const claim=(selector:string,member:unknown)=>{
+   const quote=member&&typeof member==='object'&&'quote' in member?member.quote:projection[field+'Quote']??null;
+   const body={selector,value:member,quote,sources:sourceProjection};
+   return {...body,claimId:'proposition:'+semanticHash({recordId:record.id,...body})};
+  };
+  return Array.isArray(value)?value.map((member,index)=>claim('/'+field+'/'+index,member)):[claim('/'+field,value)];
+ });
+ if(!propositions.length)throw new DistrictExecutionHold('quality_failed');
+ return {version:'r1-record-propositions-v1',recordId:record.id,projectionSha256:semanticHash(projection),sources:sourceProjection,propositions};
+}
 /** Quotes are reopened in the actual UTF-16 prepared text; model semantics are never constraints. */
 export function residualAssessmentItem(record:z.infer<typeof ResidualExtractionSchema>['result']['records'][number],prepared:PreparedDocument,preparedArtifactSha256:string,policyReceiptSha256:string):AssessmentItem{
  assertPreparedReferenceMembership(record.sources,prepared.references);
@@ -58,7 +75,8 @@ export function residualAssessmentItem(record:z.infer<typeof ResidualExtractionS
  for(const quote of quotes){let start=prepared.text.indexOf(quote);if(start<0)throw new DistrictExecutionHold('quality_failed');while(start>=0){locators.push({id:'span:'+start+':'+(start+quote.length),page:null,table:null,start,end:start+quote.length});start=prepared.text.indexOf(quote,start+1);}}
  if(!locators.length)locators.push({id:'document',page:null,table:null,start:0,end:prepared.text.length});
  const unique=[...new Map(locators.map(locator=>[locator.id,locator])).values()].sort((a,b)=>a.start-b.start||a.end-b.end);
- const base=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,question:'Which source-bound claims does the original establish, and which require abstention?',claim:'Verify the original evidence; do not infer unsupported stage, financial or identity semantics.',rubric:R1_ASSESSMENT_RUBRIC,rubricSha256:digest(R1_ASSESSMENT_RUBRIC),sources:[{sourceId:prepared.references[0].id,mcpSourceId:record.sources[0].id,originalSha256:prepared.sourceSha256,textSha256:prepared.textSha256,parserVersion:prepared.extractorSha256,parserReceiptSha256:preparedArtifactSha256,admissionReceiptSha256:policyReceiptSha256,ocrSuspected:prepared.ocrUsed,locators:unique}],claimIds:[record.id],entityIds:[...new Set([record.id,...record.entities.map(entity=>entity.entityId)])],constraints:[],criticalKinds:prepared.ocrUsed?['ocr']:[]});
+ const projection=residualRecordPropositions(record);
+ const base=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,question:'Independently verify every source-bound proposition in the supplied record projection. Return supported only with an evidence assertion for every claimId; otherwise abstain or mark unresolved.',claim:canonicalJson(projection),rubric:R1_ASSESSMENT_RUBRIC,rubricSha256:digest(R1_ASSESSMENT_RUBRIC),sources:[{sourceId:prepared.references[0].id,mcpSourceId:record.sources[0].id,originalSha256:prepared.sourceSha256,textSha256:prepared.textSha256,parserVersion:prepared.extractorSha256,parserReceiptSha256:preparedArtifactSha256,admissionReceiptSha256:policyReceiptSha256,ocrSuspected:prepared.ocrUsed,locators:unique}],claimIds:projection.propositions.map(proposition=>proposition.claimId),entityIds:[...new Set([record.id,...record.entities.map(entity=>entity.entityId)])],constraints:[],criticalKinds:prepared.ocrUsed?['ocr']:[]});
  return target?prepareCriticalAssessment(record,base):base;
 }
 export async function enqueueResidualAssessmentItems(pool:Pool,store:DistrictJobStore,cas:DistrictCas,extractionJobKey:string){
@@ -83,6 +101,10 @@ async function checkedItem(pool:Pool,context:JobHandlerContext,selector:z.infer<
  const record=await json(context.cas,selector.recordArtifactSha256);
  if(record.id!==item.itemId)throw new DistrictExecutionHold('quality_failed');
  if(criticalKnowledgeTarget(record)&&canonicalJson(prepareCriticalAssessment(record,item))!==canonicalJson(item))throw new DistrictExecutionHold('quality_failed');
+ if(!criticalKnowledgeTarget(record)){
+  const projection=residualRecordPropositions(record);
+  if(item.claim!==canonicalJson(projection)||canonicalJson(item.claimIds)!==canonicalJson(projection.propositions.map(proposition=>proposition.claimId)))throw new DistrictExecutionHold('quality_failed');
+ }
  const evidence=await originalEvidence(item,{cas:context.cas,...options});
  return {item,evidence};
 }
@@ -153,7 +175,7 @@ export function assessmentQueueHandlers(pool:Pool,options:Omit<AssessmentEvidenc
    const startedAt=new Date().toISOString();
    const receipt=await (options.fixtureProvider
     ? options.fixtureProvider(input).then(answer=>createAssessmentReceipt(item,role,answer,{startedAt,finishedAt:new Date().toISOString()},evidence,input))
-    : runAssessmentPass(item,role,'openai-subscription',{ledgerPath:join(out,'usage.jsonl'),pausePath:join(out,'pause.json'),signal:context.signal},previous,{cas:context.cas,...options,sourceContext})).catch(error=>holdR1CodexFailure(pool,item.sources[0].originalSha256,error));
+    : runAssessmentPass(item,role,'openai-subscription',{ledgerPath:join(out,'usage.jsonl'),pausePath:join(out,context.job.runId,'pause.json'),signal:context.signal},previous,{cas:context.cas,...options,sourceContext})).catch(error=>holdR1CodexFailure(pool,context.job,item.sources[0].originalSha256,error));
    context.signal.throwIfAborted();await originalEvidence(item,{cas:context.cas,...options});
    return {outcome:'succeeded',reasonCode:'completed',outputs:[requestArtifact,await persist(store,context.cas,item,receipt,options.policyOptions??{},'receipt')]};
   })])),
@@ -169,7 +191,7 @@ export function assessmentQueueHandlers(pool:Pool,options:Omit<AssessmentEvidenc
     }
     const C=selector.CJobKey?(await assessmentFromJob(pool,context.cas,selector.CJobKey,'C',item,options.policyOptions)).receipt:undefined;
     const final=C?await reconcile(item,{A,B,C},{cas:context.cas,...options}):null;
-    const admitted=final?.disposition==='ai_reconciled'&&final.output?.outcome==='supported'&&!final.output.holdReasons.length;
+    const admitted=final?.disposition==='ai_reconciled'&&final.output?.outcome==='supported'&&!final.output.holdReasons.length&&item.claimIds.every(id=>final.output!.assertions.some(assertion=>assertion.claimId===id));
     return {outcome:admitted?'succeeded':'held_quality',reasonCode:admitted?'completed':'quality_failed',outputs:final?[await persist(store,context.cas,item,final,options.policyOptions??{})]:[],counts:{acceptedFacts:admitted?1:0,heldFacts:admitted?0:1}};
    }catch(error){if(error instanceof DistrictExecutionHold&&error.reasonCode!=='quality_failed')throw error;return {outcome:'held_quality',reasonCode:'quality_failed'};}
   }),
