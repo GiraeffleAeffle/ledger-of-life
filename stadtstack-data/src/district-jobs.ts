@@ -250,7 +250,7 @@ export class DistrictJobStore {
   async claim(run:RunBounds,leaseMs:number,currentPolicy?:CurrentPolicyCheck):Promise<{kind:'job';job:ClaimedJob}|{kind:'stop';reasonCode:ReasonCode}> {
     if(!Number.isInteger(leaseMs)||leaseMs<50||leaseMs>300000)throw Error('Lease bound rejected');
     return this.transaction<{kind:'job';job:ClaimedJob}|{kind:'stop';reasonCode:ReasonCode}>(async client=>{
-      const auth=await this.assertRun(client,run);
+      let auth=await this.assertRun(client,run);
       if(auth.jobs_started>=auth.max_jobs)return {kind:'stop',reasonCode:'authorization_jobs_exhausted'};
       const candidates=await client.query<JobRow>(`SELECT j.* FROM district_pipeline.jobs j LEFT JOIN district_pipeline.host_lanes h ON h.lane_key=j.host_lane_key
         WHERE j.state IN ('queued','deferred') AND j.not_before<=clock_timestamp() AND j.job_key=ANY($1::text[]) AND j.ags=ANY($2::text[])
@@ -270,6 +270,9 @@ export class DistrictJobStore {
       const row=candidates.rows[0];let hold:ReasonCode|null=null,continuation:JobPolicyContinuation|undefined;
       if(row.cancellation_requested)hold='cancellation_requested';
       if(!hold)hold=await this.policyDisposition(client,row.id,row.spec,currentPolicy,value=>{continuation=value;});
+      // Current-policy proof can perform slow custody I/O. Do not grant a lease
+      // or record a disposition using authority clocks sampled before that work.
+      auth=await this.assertRun(client,run);
       // R1 has no authorization for paid API execution, irrespective of available budget.
       if(Number(row.reserved_micro_usd)>0)hold='paid_not_authorized';
       if(hold){await client.query(`UPDATE district_pipeline.jobs SET state=$2,reason_code=$3 WHERE id=$1`,[row.id,hold==='cancellation_requested'?'cancelled':hold.startsWith('policy_')||hold==='source_policy_stale'?'blocked_policy':hold==='origin_unresolved'?'held_origin':'held_execution',hold]);return {kind:'stop',reasonCode:hold};}
@@ -323,6 +326,12 @@ export class DistrictJobStore {
       const current=await client.query<JobRow>(`SELECT * FROM district_pipeline.jobs WHERE id=$1 AND lease_owner=$2 AND fencing_token=$3 AND state='leased' AND lease_expires_at>clock_timestamp() AND NOT cancellation_requested FOR UPDATE`,[job.id,job.runId,job.fencingToken]);
       if(!current.rowCount)throw new DistrictExecutionHold('lease_lost');
       const policy=await this.policyDisposition(client,job.id,job.spec,currentPolicy,value=>{Object.assign(receipt.versions,policyContinuationVersions(value));});
+      // A continuation hook may outlive the lease or bounded authorization.
+      // Recheck every authority deadline and the exact fence after it returns,
+      // under the same locks and transaction that commits the receipt.
+      await this.assertRun(client,run);
+      const fenced=await client.query(`SELECT id FROM district_pipeline.jobs WHERE id=$1 AND lease_owner=$2 AND fencing_token=$3 AND state='leased' AND lease_expires_at>clock_timestamp() AND NOT cancellation_requested`,[job.id,job.runId,job.fencingToken]);
+      if(!fenced.rowCount)throw new DistrictExecutionHold('lease_lost');
       if(policy)throw new DistrictExecutionHold(policy);
       await this.insertReceipt(client,job,receipt);
       await client.query(`UPDATE district_pipeline.jobs SET state=$4,reason_code=$5,lease_owner=NULL,lease_expires_at=NULL WHERE id=$1 AND lease_owner=$2 AND fencing_token=$3`,[job.id,job.runId,job.fencingToken,receipt.outcome,receipt.reasonCode]);
