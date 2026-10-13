@@ -14,6 +14,7 @@ import {CIVIC_POLICY_AUTHORITY,assertCivicPolicyAuthority,initializeManagedAcqui
 import {ContentFreeSourcePolicySchema,sha256} from './district-schema.ts';
 import {SourceObservationSchema,sourceObservationMatches} from './source-observation.ts';
 import {HostGroupsSchema} from './district-r1.ts';
+import {CrawlRequestEvidenceCaptureError} from './district-crawl-request.ts';
 
 /** The shared strict config fixes the floor; exact-host serialization remains in PoliteFetcher. */
 export async function createDistrictCrawlFetcher(options:Omit<PoliteFetcherOptions,'minDelayMs'>,hostGroupsPath:string|URL=new URL('../sources/district-host-groups.json',import.meta.url)):Promise<PoliteFetcher>{
@@ -77,6 +78,7 @@ export async function crawlDistrictRegistry(registry:CrawlRegistry,fetcher:Polit
       const adapter=districtSourceAdapterKind(source);
       result=options.pageRoots!==undefined||options.seedDocumentUrls!==undefined?await crawlHtmlSource(fetcher,city,source,options):adapter==='oparl'?await crawlOparlSource(fetcher,city,source,options):adapter==='mv-bauleitplan'?await crawlMvPlanningApi(fetcher,city,source,options):adapter==='participation-api'?await crawlParticipationApi(fetcher,city,source,options):await crawlHtmlSource(fetcher,city,source,options);
      }catch(error){
+      if(error instanceof CrawlRequestEvidenceCaptureError)throw error;
       if(options.pageRoots!==undefined||options.seedDocumentUrls!==undefined)throw error;
       if(isCouncilPermissionFailure(error)||error instanceof PoliteFetchError&&(error.status===429||error.failure.startsWith('host_')))throw error;
       const consumed=fetcher.requestCount-startedRequests,remaining=options.maxRequests-consumed;
@@ -97,6 +99,7 @@ export async function crawlDistrictRegistry(registry:CrawlRegistry,fetcher:Polit
      // Continue budgets automatically; zero work means retries are deferred or a prerequisite is inaccessible.
      if(result.coverage?.state!=='partial'||result.requests===0||result.coverage.runnableCount===0)item.done=true;
     }catch(error){
+     if(error instanceof CrawlRequestEvidenceCaptureError)throw error;
      if(isCouncilPermissionFailure(error)||error instanceof MunicipalIdentityBindingError){index.documents=index.documents.filter(document=>document.municipalityId!==city.id||document.sourceId!==source.id);sourceBindings.delete(city.id+'\n'+source.id);}
      if(error instanceof PoliteFetchError&&error.excludedDocument){
       index.excludedDocuments!.push(sourceDocument(error.excludedDocument,city,source,districtSourceAdapterKind(source)));
@@ -177,4 +180,4 @@ async function main(){
   console.log(JSON.stringify({index:out,documents:index.documents.length,excludedDocuments:index.excludedDocuments?.length??0,municipalitiesWithDocuments:new Set(index.documents.map(document=>document.municipalityId)).size,checks:index.checks.map(check=>({municipalityId:check.municipalityId,sourceId:check.sourceId,outcome:check.outcome,coverage:check.coverage,documentCount:check.documentCount}))}));
  }finally{await handle.close().catch(()=>{});await unlink(lock);}
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)main().catch(()=>{console.error('District crawl failed; authority, input integrity, managed provenance or source policy rejected the operation.');process.exitCode=1;});
+if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)main().catch(error=>{console.error(error instanceof CrawlRequestEvidenceCaptureError?'District crawl stopped: managed request evidence capture failed; operator repair required.':'District crawl failed; authority, input integrity, managed provenance or source policy rejected the operation.');process.exitCode=1;});

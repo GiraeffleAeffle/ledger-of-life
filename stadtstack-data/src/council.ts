@@ -5,6 +5,7 @@ import {CouncilBindingError,bodyMatchesCity,bodyIdMatchesCity,councilCoverage,co
 import type {CouncilEvidence,CouncilKind,CouncilWindow,OparlBody,OparlRecord,OparlSystem,OparlListPage} from './council-oparl.ts';
 import type {City} from './cities.ts';
 import type {Catalogue,Signal} from './schema.ts';
+import {CrawlRequestEvidenceCaptureError} from './district-crawl-request.ts';
 
 type Rights={licence:string;reuse:'open_licence'|'facts_with_attribution';evidence:{url:string;checkedAt:string;note:string}};
 export interface CouncilCollection {features:Signal[];sources:Catalogue['cities'][number]['sources']}
@@ -29,14 +30,14 @@ async function discoverCouncil(city:City,acquisition:CouncilAcquisition){
   try{
    const terms=await acquisition.loadText(duesseldorfLicenceUrl),text=terms.text;
    if(text.includes(zeroLicence)&&text.includes('ris-oparl.itk-rheinland.de/Oparl/bodies/0015'))rights={licence:zeroLicence,reuse:'open_licence',evidence:{url:terms.url,checkedAt:terms.checkedAt??terms.retrievedAt,note:`Official Düsseldorf OParl dataset identifies body 0015 and Datenlizenz Deutschland Zero 2.0. Applies to public metadata/derived facts; no blanket permission inferred for attached third-party documents. System value "Open" alone is not a licence. Source SHA-256 ${terms.sha256}; declared resource policy retained in the managed acquisition observation.`}};
-  }catch(error){if(isCouncilPermissionFailure(error))throw error;rights.evidence.note+=' Official open-data dataset licence page could not be fetched; rights remain unknown.';}
+  }catch(error){if(error instanceof CrawlRequestEvidenceCaptureError)throw error;if(isCouncilPermissionFailure(error))throw error;rights.evidence.note+=' Official open-data dataset licence page could not be fetched; rights remain unknown.';}
  }
  if(rights.licence==='unknown'&&(city.id==='freiburg'||city.id==='castrop-rauxel')){
   const termsUrl=city.id==='freiburg'?'https://www.freiburg.de/pb/224613.html':'https://www.castrop-rauxel.de/impressum';
   try{
    const terms=await acquisition.loadText(termsUrl),text=terms.text;
    if(text.includes('Urheberrecht'))rights.evidence={url:terms.url,checkedAt:terms.checkedAt??terms.retrievedAt,note:(city.id==='freiburg'?'Official System/Body contain no licence. Municipal imprint allows private copying only and protects contributions; its scope is the municipal website, not an identified RIS/API reuse grant. Rights remain unknown; attributed derived facts only, no full-text/file redistribution.':'Official System/Body contain no licence. Municipal imprint requires permission beyond statutory exceptions and expressly rejects blanket §5 UrhG official-work status; no RIS/API open grant identified. Rights remain unknown; attributed derived facts only, no full-text/file redistribution.')+` Source SHA-256 ${terms.sha256}; declared resource policy retained in the managed acquisition observation.`};
-  }catch(error){if(isCouncilPermissionFailure(error))throw error;rights.evidence.note+=' Municipal copyright notice could not be fetched; no permission inferred.';}
+  }catch(error){if(error instanceof CrawlRequestEvidenceCaptureError)throw error;if(isCouncilPermissionFailure(error))throw error;rights.evidence.note+=' Municipal copyright notice could not be fetched; no permission inferred.';}
  }
  return {body,rights,checkedAt};
 }

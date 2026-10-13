@@ -9,12 +9,13 @@ import type {CouncilCheckpoint,OparlBody,OparlRecord,StoredCouncilRecord} from '
 import {councilBindingFailure,collectOparl} from '../src/council.ts';
 import {PoliteFetcher,PoliteFetchError} from '../src/polite-fetch.ts';
 import type {FetchOptions} from '../src/polite-fetch.ts';
-import {readFile,writeFile,mkdir,stat,readdir} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,stat,readdir,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {hash} from '../src/common.ts';
 import {recordHostOptOut} from '../src/civic-opt-out.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
+import {CrawlRequestEvidenceCaptureError} from '../src/district-crawl-request.ts';
 
 const at='2026-10-10T12:00:00.000Z';
 const body:OparlBody={id:'https://council.example/body/1',name:'Example',type:'https://schema.oparl.org/1.1/Body',paper:'https://council.example/body/1/paper'};
@@ -435,4 +436,53 @@ test('ordinary council document transport errors keep partial availability witho
  });
  const partial=await traverseCouncilList(selected,'paper',storage,acquisition.loadJson,{now:'2026-10-11T12:00:00.000Z'});
  assert.equal(partial.records.size,1);assert.equal(failure.policyPhase,null);assert.equal(isCouncilPermissionFailure(failure),false);
+});
+
+test('OParl capture failure aborts without returning cached records or checkpointing a permission denial',async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t),city=cities.find(city=>city.id==='koeln')!,cacheRoot=join(root,'raw');
+ const acquisition=createCouncilAcquisition(city,{cacheRoot,policy,fixtureInspection:fixturePolicyInspection}),selected:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body',paper:city.councilBodyId+'/paper'};
+ acquisition.bindBody(selected);
+ const record:OparlRecord={id:selected.paper+'/1',body:selected.id,type:'https://schema.oparl.org/1.1/Paper',name:'Synthetic cached council record',date:'2026-09-01',modified:'2026-09-02T00:00:00Z'};
+ const initialBytes=Buffer.from(JSON.stringify({data:[record]})),updatedBytes=Buffer.from(JSON.stringify({data:[{...record,name:'Synthetic newly fetched council record'}]}));let refresh=false;
+ t.mock.method(acquisition.fetcher as unknown as CouncilWireSeam,'wire',async(url:URL)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  assert.equal(url.pathname,new URL(selected.paper!).pathname);return {status:200,headers:{'content-type':'application/json'},body:refresh?updatedBytes:initialBytes};
+ });
+ const storage=acquisition.storage(selected.id,'paper'),first=await traverseCouncilList(selected,'paper',storage,acquisition.loadJson,{now:at});assert.equal(first.records.size,1);
+ const checkpointPath=join(cacheRoot,'oparl',hash(canonicalOparlUrl(selected.id)),'paper','checkpoint.json'),checkpointBytes=await readFile(checkpointPath),originalCheckpoint=storage.checkpoint.bind(storage);let checkpoints=0;
+ t.mock.method(storage,'checkpoint',async(...args:Parameters<CouncilStorage['checkpoint']>)=>{checkpoints++;return originalCheckpoint(...args);});
+ await rm(cacheRoot+'-request-evidence',{recursive:true,force:true});await writeFile(cacheRoot+'-request-evidence','SYNTHETIC_COUNCIL_CAPTURE_OBSTRUCTION',{mode:0o600,flag:'wx'});refresh=true;
+ const returned:unknown[]=[];
+ await assert.rejects(async()=>{returned.push(await traverseCouncilList(selected,'paper',storage,acquisition.loadJson,{now:'2026-10-11T12:00:00.000Z'}));},(error:unknown)=>{assert.ok(error instanceof CrawlRequestEvidenceCaptureError);assert.equal(isCouncilPermissionFailure(error),false);return true;});
+ assert.deepEqual(returned,[]);assert.equal(checkpoints,0);assert.deepEqual(await readFile(checkpointPath),checkpointBytes);assert.equal((await storage.readSegment(0)).records[0].name,record.name);
+ assert.deepEqual(await readFile(join(cacheRoot,'sha256',hash(initialBytes))),initialBytes);assert.deepEqual(await readFile(join(cacheRoot,'sha256',hash(updatedBytes))),updatedBytes);
+ const observations=await Promise.all((await readdir(join(cacheRoot,'observations'))).map(async name=>JSON.parse(await readFile(join(cacheRoot,'observations',name),'utf8')))),fresh=observations.filter(row=>row.sha256===hash(updatedBytes));
+ assert.equal(fresh.length,1);assert.equal(fresh[0].state,'fetched');assert.equal(fresh[0].status,200);assert.equal(fresh[0].failure,undefined);
+});
+
+for(const [cityId,rightsUrl] of [
+ ['duesseldorf','https://opendata.duesseldorf.de/dataset/oparl-schnittstelle-zum-ratsinformationsystem-der-stadt-d%C3%BCsseldorf'],
+ ['freiburg','https://www.freiburg.de/pb/224613.html'],
+ ['castrop-rauxel','https://www.castrop-rauxel.de/impressum'],
+] as const)test(`${cityId} rights-page capture failure propagates instead of reporting unavailable rights`,async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t),city=cities.find(city=>city.id===cityId)!,cacheRoot=join(root,'raw'),acquisition=createCouncilAcquisition(city,{cacheRoot,policy,fixtureInspection:fixturePolicyInspection});
+ const selected:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases?.[0]??city.name,type:'https://schema.oparl.org/1.1/Body'},bodiesUrl=new URL('/capture-test/bodies',city.endpoint).href,rightsBytes=Buffer.from('<html><body>Synthetic municipal Urheberrecht notice.</body></html>'),seen:string[]=[];
+ t.mock.method(acquisition.fetcher as unknown as CouncilWireSeam,'wire',async(url:URL)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  seen.push(url.href);
+  if(url.href===rightsUrl)return {status:200,headers:{'content-type':'text/html'},body:rightsBytes};
+  const data=url.href===canonicalOparlUrl(city.endpoint!)?{id:city.endpoint,type:'https://schema.oparl.org/1.1/System',body:bodiesUrl}:url.href===bodiesUrl?{data:[selected]}:undefined;
+  assert.ok(data,`Unexpected synthetic rights-discovery URL ${url.href}`);return {status:200,headers:{'content-type':'application/json'},body:Buffer.from(JSON.stringify(data))};
+ });
+ const loadText=acquisition.loadText.bind(acquisition);
+ t.mock.method(acquisition,'loadText',async(url:string)=>{
+  assert.equal(url,rightsUrl);await rm(cacheRoot+'-request-evidence',{recursive:true,force:true});await writeFile(cacheRoot+'-request-evidence','SYNTHETIC_RIGHTS_CAPTURE_OBSTRUCTION',{mode:0o600,flag:'wx'});
+  return loadText(url);
+ });
+ const returned:unknown[]=[];
+ await assert.rejects(async()=>{returned.push(await collectOparl(city,{acquisition,maxPages:1,now:new Date(at)}));},(error:unknown)=>{assert.ok(error instanceof CrawlRequestEvidenceCaptureError);assert.equal(isCouncilPermissionFailure(error),false);return true;});
+ assert.deepEqual(returned,[]);assert.equal(seen.at(-1),rightsUrl);assert.deepEqual(await readFile(join(cacheRoot,'sha256',hash(rightsBytes))),rightsBytes);
+ const observations=await Promise.all((await readdir(join(cacheRoot,'observations'))).map(async name=>JSON.parse(await readFile(join(cacheRoot,'observations',name),'utf8')))),rights=observations.filter(row=>row.url===rightsUrl);
+ assert.equal(rights.length,1);assert.equal(rights[0].state,'fetched');assert.equal(rights[0].status,200);assert.equal(rights[0].failure,undefined);
+ await assert.rejects(stat(join(cacheRoot,'collections')),{code:'ENOENT'});
 });

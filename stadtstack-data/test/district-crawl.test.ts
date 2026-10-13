@@ -19,6 +19,7 @@ import {politeTestOptions} from './fixtures/polite-lane.ts';
 import {writePrivateJson} from '../src/district-private-io.ts';
 import {assertCivicPolicyAuthority,type CivicPolicyOptions} from '../src/civic-opt-out.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
+import {CrawlRequestEvidenceCaptureError} from '../src/district-crawl-request.ts';
 
 /** Adapter-unit fetch/read/write doubles use explicit fixture authority, not a production acquisition marker. */
 class AdapterFixtureFetcher extends BasePoliteFetcher {
@@ -565,4 +566,50 @@ for(const phase of ['robots','tdm'] as const)test(`HTML frontier ${phase} transp
  const returned:unknown[]=[];
  await assert.rejects(async()=>{returned.push(await crawlHtmlSource(second,city,source,{maxDocuments:10,maxPages:3,maxRequests:10}));},error=>error===denial&&denial.policyPhase===phase);
  assert.deepEqual(returned,[]);assert.deepEqual(seen,phase==='robots'?['/robots.txt']:['/robots.txt','/.well-known/tdmrep.json']);
+});
+
+for(const boundary of ['adapter','registry'] as const)test(`${boundary} HTML capture failure aborts with pending revalidation and original custody intact`,async t=>{
+ const folder=await mkdtemp(join(tmpdir(),'district-html-capture-stop-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-10-13T00:00:00.000Z')});
+ const fetcher=await createWireFetcher({cacheDir:folder}),body=Buffer.from('<h1>Synthetic municipal page</h1>'),limits={maxDocuments:1,maxPages:1,maxRequests:3,revalidateAfterMs:1000},seen:string[]=[];
+ interface Wire {wire(url:URL):Promise<{status:number;headers:Record<string,string>;body:Buffer}>}
+ t.mock.method(fetcher as unknown as Wire,'wire',async(url:URL)=>{
+  seen.push(url.href);if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  assert.equal(url.href,source.url);return {status:200,headers:{'content-type':'text/html'},body};
+ });
+ const first=await crawlHtmlSource(fetcher,city,source,limits),original=first.documents[0];assert.equal(first.documents.length,1);
+ t.mock.timers.tick(1001);
+ const deferred=await crawlHtmlSource(fetcher,city,source,{...limits,maxRequests:0}),frontierPath=deferred.coverage!.frontierPath!,pendingBytes=await readFile(frontierPath),pending=JSON.parse(pendingBytes.toString('utf8'));
+ assert.equal(pending.queue.length,1);assert.equal(pending.queue[0].previous.id,original.id);assert.deepEqual(pending.failures,[]);
+ await rm(fetcher.cacheDir+'-request-evidence',{recursive:true,force:true});await writeFile(fetcher.cacheDir+'-request-evidence','SYNTHETIC_LOCAL_CAPTURE_OBSTRUCTION',{mode:0o600,flag:'wx'});
+ let projections=0;
+ const crawl=boundary==='adapter'?crawlHtmlSource(fetcher,city,source,limits):crawlDistrictRegistry({schemaVersion:'stadtstack-source-registry-v1',municipalities:[city]},fetcher,{...limits,onSource:async()=>{projections++;}});
+ await assert.rejects(crawl,(error:unknown)=>{assert.ok(error instanceof CrawlRequestEvidenceCaptureError);assert.equal(error instanceof PoliteFetchError,false);assert.equal(error.message,'Managed request evidence capture failed');return true;});
+ assert.equal(projections,0);assert.deepEqual(await readFile(frontierPath),pendingBytes);
+ assert.deepEqual(await readFile(original.localPath),body);assert.equal(JSON.parse(await readFile(original.observationPath,'utf8')).state,'fetched');
+ const observations=await Promise.all((await readdir(join(fetcher.cacheDir,'observations'))).map(async name=>JSON.parse(await readFile(join(fetcher.cacheDir,'observations',name),'utf8')))),retained=observations.filter(row=>row.url===source.url);
+ assert.equal(retained.length,2);assert.ok(retained.every(row=>row.state==='fetched'&&row.status===200&&row.sha256===hash(body)&&row.failure===undefined));
+ assert.equal(seen.filter(url=>url===source.url).length,2);assert.doesNotMatch((await readFile(frontierPath)).toString('utf8'),/ask_municipality|source_adapter_failed|representation_error/);
+});
+
+test('API discovery capture failure aborts without seed fallback or source-failure projection',async t=>{
+ const folder=await mkdtemp(join(tmpdir(),'district-api-capture-stop-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+ const fetcher=await createWireFetcher({cacheDir:folder}),apiSource:RegistrySource={...source,api:{url:'https://api.stadt.de/plans',format:'mv-bauleitplan'}},seed={sourceId:source.id,url:'https://stadt.de/must-not-fallback.pdf'},municipality={...city,sources:[apiSource],seedDocuments:[seed]},limits={maxDocuments:2,maxPages:2,maxRequests:4},seen:string[]=[];
+ const deferred=await crawlHtmlSource(fetcher,municipality,{...apiSource,registeredSourceUrl:source.url!,url:null},{...limits,maxRequests:0}),frontierPath=deferred.coverage!.frontierPath!,pendingBytes=await readFile(frontierPath);
+ assert.equal(JSON.parse(pendingBytes.toString('utf8')).queue[0].url,seed.url);
+ await writeFile(fetcher.cacheDir+'-request-evidence','SYNTHETIC_LOCAL_API_CAPTURE_OBSTRUCTION',{mode:0o600,flag:'wx'});
+ const body=Buffer.from(JSON.stringify({success:true,total:0,hits:0,results:[[]]}));
+ const apiRequest=new URL(apiSource.api!.url);apiRequest.searchParams.set('offset','0');apiRequest.searchParams.set('n','100');
+ interface Wire {wire(url:URL):Promise<{status:number;headers:Record<string,string>;body:Buffer}>}
+ t.mock.method(fetcher as unknown as Wire,'wire',async(url:URL)=>{
+  seen.push(url.href);if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  assert.equal(url.href,apiRequest.href,'A capture failure must never dispatch the fallback seed');return {status:200,headers:{'content-type':'application/json'},body};
+ });
+ let projections=0;
+ await assert.rejects(crawlDistrictRegistry({schemaVersion:'stadtstack-source-registry-v1',municipalities:[municipality]},fetcher,{...limits,onSource:async()=>{projections++;}}),CrawlRequestEvidenceCaptureError);
+ assert.equal(projections,0);assert.equal(fetcher.requestCount,1);assert.deepEqual(seen,['https://api.stadt.de/robots.txt','https://api.stadt.de/.well-known/tdmrep.json',apiRequest.href]);assert.ok(!seen.includes(seed.url));
+ assert.deepEqual(await readFile(frontierPath),pendingBytes);assert.doesNotMatch(pendingBytes.toString('utf8'),/ask_municipality|source_adapter_failed|api_error/);
+ assert.deepEqual(await readFile(join(fetcher.cacheDir,'sha256',hash(body))),body);
+ const observations=await Promise.all((await readdir(join(fetcher.cacheDir,'observations'))).map(async name=>JSON.parse(await readFile(join(fetcher.cacheDir,'observations',name),'utf8')))),retained=observations.filter(row=>row.url===apiRequest.href);
+ assert.equal(retained.length,1);assert.equal(retained[0].state,'fetched');assert.equal(retained[0].failure,undefined);assert.equal(retained[0].sha256,hash(body));
 });
