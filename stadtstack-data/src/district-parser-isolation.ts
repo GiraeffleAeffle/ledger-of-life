@@ -35,6 +35,17 @@ export class ParserIsolationError extends Error {
 export type ParserOutput = { stdout: string; stderr: string };
 export type ParserSandbox = { run: (tool: string, args: string[], timeoutMs?: number) => Promise<ParserOutput> };
 export type ParserSourceContext = ManagedSourceContext & { purpose: 'document' | 'classification' | 'artifact'; signal?: AbortSignal };
+const inspectionSandboxes=new WeakMap<ParserSandbox,{context:ParserSourceContext;scopeSha256:string;sourceSha256:string}>();
+function inspectionScopeSha256(context:ManagedSourceContext):string {
+  const {signal:_signal,...scope}=context as ParserSourceContext;
+  return digest(JSON.stringify(scope));
+}
+/** Reuse is possible only during the real callback, for its exact source snapshot and scope. */
+export function assertParserSandboxRepresentation(sandbox:ParserSandbox,sourceSha256:string,context:ManagedSourceContext):void {
+  const selected=inspectionSandboxes.get(sandbox);
+  if (!selected || selected.context!==context || selected.sourceSha256!==sourceSha256
+    || selected.scopeSha256!==inspectionScopeSha256(context)) throw new ParserIsolationError('request_rejected');
+}
 const execute = promisify(execFile);
 const DOCKER = '/usr/bin/docker';
 const MAX_PROTOCOL_BYTES = 12 * 1024 * 1024;
@@ -126,6 +137,7 @@ function sandboxArgs(args: string[], originalPath: string | null): string[] {
 export async function withParserSandbox<T>(artifact: string | Uint8Array | null, consume: (sandbox: ParserSandbox) => Promise<T>, sourceContext?: ParserSourceContext): Promise<T> {
   sourceContext?.signal?.throwIfAborted();
   const review = await readParserReview(); // This gate precedes all Docker operations.
+  const scopeSha256=sourceContext?.purpose==='classification'&&artifact!==null?inspectionScopeSha256(sourceContext):undefined;
   if (artifact !== null && !sourceContext) throw new ParserIsolationError('request_rejected');
   try {
     const socket = await lstat(review.dockerSocket);
@@ -156,6 +168,7 @@ export async function withParserSandbox<T>(artifact: string | Uint8Array | null,
       await scope?.assertActive();
       await Promise.all([mkdir(env.HOME!, { mode: 0o700 }), mkdir(env.DOCKER_CONFIG!, { mode: 0o700 })]);
       let selected: string | null = null;
+      let selectedSha256:string|undefined;
       if (artifact !== null) {
         let bytes: Uint8Array;
         if (typeof artifact === 'string') {
@@ -184,6 +197,7 @@ export async function withParserSandbox<T>(artifact: string | Uint8Array | null,
         selected = join(jobRoot, 'document');
         if (!scope) throw new ParserIsolationError('request_rejected');
         const contentSha256 = digest(bytes);
+        selectedSha256=contentSha256;
         if (sourceContext?.bindings.some(binding => 'sourceSha256' in binding && binding.sourceSha256 === contentSha256)) {
           await scope.writeSource('document', bytes);
         } else {
@@ -261,9 +275,13 @@ export async function withParserSandbox<T>(artifact: string | Uint8Array | null,
         await scope?.assertActive();
         return { stdout: decode(response.stdout), stderr: decode(response.stderr) };
       };
-      const result = await Promise.race([consume({ run }), stopped]);
-      await scope?.assertActive();
-      return result;
+      const sandbox:ParserSandbox={run};
+      if(sourceContext&&scopeSha256&&selectedSha256)inspectionSandboxes.set(sandbox,{context:sourceContext,scopeSha256,sourceSha256:selectedSha256});
+      try {
+        const result = await Promise.race([consume(sandbox), stopped]);
+        await scope?.assertActive();
+        return result;
+      } finally { inspectionSandboxes.delete(sandbox); }
     } finally {
       clearTimeout(timer);
       scope?.signal.removeEventListener('abort', cancelled);

@@ -8,7 +8,7 @@ import { deflateRawSync } from 'node:zlib';
 import { randomUUID } from 'node:crypto';
 import { extractDocumentText, runDocumentCommand } from '../src/district-document.ts';
 import { parserContainerArgs, parserControllerEnvironment, ParserIsolationError, ParserReviewSchema,
-  PARSER_ISOLATION_VERSION, PARSER_LIMITS, PARSER_TOOLS, withParserSandbox, readParserReview, type ParserSourceContext } from '../src/district-parser-isolation.ts';
+  PARSER_ISOLATION_VERSION, PARSER_LIMITS, PARSER_TOOLS, withParserSandbox, readParserReview, type ParserSourceContext, type ParserSandbox } from '../src/district-parser-isolation.ts';
 import { metadataPdf } from './fixtures/tdm-pdf.ts';
 import { digest } from '../src/district-adapter-contract.ts';
 import { PREPARED_VM_ROOT } from '../src/district-prepared-document.ts';
@@ -195,8 +195,8 @@ test('reviewed sandbox hides sentinel secrets, host files and inherited Python c
   }
 });
 
-// Origin and policy inspection enroll two real scopes, each with ~100 s of host inventory work.
-test('reviewed origin and policy workers hide sentinel secrets', { ...securityOptions, timeout: 2 * securityOptions.timeout }, async () => {
+// Resource gates and origin run sequentially in one real immutable source scope.
+test('reviewed batched origin and policy workers hide sentinel secrets', securityOptions, async () => {
   const sentinel = 'sentinel-' + randomUUID();
   const previous = Object.fromEntries(secretKeys.map(key => [key, process.env[key]]));
   try {
@@ -204,11 +204,23 @@ test('reviewed origin and policy workers hide sentinel secrets', { ...securityOp
     const html = Buffer.from('<html><title>Beschlussvorlage</title><meta name="tdm-reservation" content="1"><main><p>Herausgeber: Stadt Beispielstadt</p><p>Beschluss zur weiteren Entwicklung des Quartiers in der kommenden Sitzung.</p></main></html>');
     await withInspectionFixture(html, async context => {
       const url = context.bindings[0].url;
-      const origin = await classifyDocumentOrigin({url,mimeType:'text/html',bytes:html},{scratch:context});
-      assert.equal(origin.classification,'official_work'); assert.equal(origin.classifierVersion,DOCUMENT_ORIGIN_CLASSIFIER_VERSION);
-      const policy = await inspectResourcePolicySandbox(url,{'tdm-policy':'https://policy.example.org/public-policy'},html,'text/html',context);
-      assert.equal(policy.reservation,1); assert.equal(policy.access,'public');
-      assert.ok(!JSON.stringify({origin,policy}).includes(sentinel));
+      let escapedSandbox!:ParserSandbox;
+      await withParserSandbox(html,async sandbox=>{
+        escapedSandbox=sandbox;
+        const policy = await inspectResourcePolicySandbox(url,{'tdm-policy':'https://policy.example.org/public-policy'},html,'text/html',context,sandbox);
+        assert.equal(policy.reservation,1); assert.equal(policy.access,'public');
+        const origin = await classifyDocumentOrigin({url,mimeType:'text/html',bytes:html},{scratch:context,sandbox});
+        assert.equal(origin.classification,'official_work'); assert.equal(origin.classifierVersion,DOCUMENT_ORIGIN_CLASSIFIER_VERSION);
+        assert.ok(!JSON.stringify({origin,policy}).includes(sentinel));
+        await assert.rejects(classifyDocumentOrigin({url,mimeType:'text/html',bytes:Buffer.from('different representation')},{scratch:context,sandbox}),ParserIsolationError);
+        await assert.rejects(classifyDocumentOrigin({url,mimeType:'text/html',bytes:html},{scratch:{...context},sandbox}),ParserIsolationError);
+        const bindings=context.bindings;
+        try{
+          context.bindings=[...bindings,{phase:'pre-admission',url:'https://other-scope.invalid/input',sourceSha256:digest(html)}];
+          await assert.rejects(inspectResourcePolicySandbox(url,{},html,'text/html',context,sandbox),ParserIsolationError);
+        }finally{context.bindings=bindings;}
+      },context);
+      await assert.rejects(classifyDocumentOrigin({url,mimeType:'text/html',bytes:html},{scratch:context,sandbox:escapedSandbox}),ParserIsolationError);
     });
   } finally {
     for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }

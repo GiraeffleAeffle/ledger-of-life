@@ -13,7 +13,7 @@ import type {SourceAccessPolicy,PolicyEvidence,TdmRule,OwnerRobotsOverride} from
 import {acquirePrivateRunLock,writePrivateJson} from './district-private-io.ts';
 import {inspectPdfTdmPolicy} from './pdf-tdm-policy.ts';
 import {inspectResourcePolicySandbox} from './district-policy-inspection.ts';
-import type {ParserSourceContext} from './district-parser-isolation.ts';
+import {withParserSandbox,type ParserSourceContext,type ParserSandbox} from './district-parser-isolation.ts';
 import {isPublicAddress} from './public-address.ts';
 import type {PdfTdmPolicyResult} from './pdf-tdm-policy.ts';
 import type {ResourcePolicyInspection} from './source-policy.ts';
@@ -148,6 +148,18 @@ export class PoliteFetcher {
    await initializeManagedAcquisitionLane(this.cacheDir,context);this.activeLane=context;this.authorityMode=authority.mode;
   })().catch(()=>{throw new PoliteFetchError('host_state_unsafe','Policy authority, acquisition marker, ownership or completeness rejected; no implicit provisioning or legacy enrollment');});
   await this.initialization;
+ }
+ private async withInspectionSandbox(body:Buffer,context:ParserSourceContext,inspect:(sandbox?:ParserSandbox)=>Promise<void>):Promise<void>{
+  if(this.fixtureInspection){await inspect();return;}
+  let inspection:Promise<void>|undefined;
+  try{await withParserSandbox(body,sandbox=>inspection=inspect(sandbox),context);}
+  catch(error){
+   // A command timeout also rejects the sandbox supervisor race. Let the PDF
+   // metadata wrapper finish its existing timeout→runtime-finding projection,
+   // rather than changing the fetch hold reason just because it is co-located.
+   if(error instanceof Error&&error.name==='TimeoutError'&&inspection)await inspection;
+   throw error;
+  }
  }
  private policyOptions():CivicPolicyOptions{return this.activeLane??this.lane??{};}
  async assertHostAllowed(url:string):Promise<void>{
@@ -487,7 +499,9 @@ export class PoliteFetcher {
     }
     if(checkTdm)policyPhase='tdm';
     const inspectionContext:ParserSourceContext={...this.activeLane!,root:this.cacheDir,kind:'fetch',purpose:'classification',bindings:[{phase:'pre-admission',url:url.href,sourceSha256:sha256}]};
-    const resourcePolicy=await (this.fixtureInspection?.resource??inspectResourcePolicySandbox)(url.href,response.headers,representation,mimeType,inspectionContext);
+    let validatedPolicy:ValidatedPolicy|undefined;
+    const inspect=async(sandbox?:ParserSandbox)=>{
+    const resourcePolicy=await (this.fixtureInspection?.resource??inspectResourcePolicySandbox)(url.href,response.headers,representation,mimeType,inspectionContext,sandbox);
     if(retainedPolicyEvidence){
      for(const evidence of retainedPolicyEvidence){
       if(evidence.locator==='HTTP TDM-Reservation'&&evidence.value==='1'||evidence.locator==='HTTP X-Robots-Tag'&&/(?:^|,)(?:noai|noimageai)(?:,|$)/.test(evidence.value))resourcePolicy.reservation=1;
@@ -506,7 +520,6 @@ export class PoliteFetcher {
     if(resourcePolicy.declarationUnavailable){policy.tdm.declarationStatus='unavailable';if(policy.tdm.state!=='reserved')policy.tdm.state='unavailable';}
     if(policy.access!=='public')throw new PoliteFetchError('access_barrier',`${policy.access} barrier; ask municipality`);
     if(checkTdm&&(policy.tdm.referenceStatus==='unavailable'||policy.tdm.declarationStatus==='unavailable'))throw new PoliteFetchError('tdm_unavailable','Machine-readable TDM declaration or policy reference is unavailable; source withheld');
-    let validatedPolicy:ValidatedPolicy|undefined;
     if(resource==='robots'){
      try{
       // Validate actual UTF-8 directives; a mislabeled text response must not
@@ -526,11 +539,11 @@ export class PoliteFetcher {
     }
     if(checkTdm&&policy.tdm.state==='reserved'&&!registeredApproval)throw new PoliteFetchError('tdm_reserved','Machine-readable TDM reservation; no owner-authorized official-work exception');
     const oparlContext=options.oparlContext&&options.oparlContext.apiUrl===url.href&&/^(?:application|text)\/(?:[a-z0-9!#$&^_.+-]+\+)?json$/.test(mimeType)?options.oparlContext:undefined;
-    if(checkTdm)policy.documentOrigin=await (this.fixtureInspection?.origin??classifyDocumentOrigin)({url:url.href,mimeType,bytes:representation,title:options.title,linkText:options.linkText,municipalityName:options.municipalityName,oparlContext},{scratch:inspectionContext});
+    if(checkTdm)policy.documentOrigin=await (this.fixtureInspection?.origin??classifyDocumentOrigin)({url:url.href,mimeType,bytes:representation,title:options.title,linkText:options.linkText,municipalityName:options.municipalityName,oparlContext},{scratch:inspectionContext,...(sandbox?{sandbox}:{})});
     if(checkTdm&&mimeType==='application/pdf'){
      // A returned unavailable finding describes the source metadata below.
      // Inspection/cache/runtime exceptions are not source-policy findings.
-     const pdfPolicy=await (this.fixtureInspection?.pdf??inspectPdfTdmPolicy)(representation,sha256,this.cacheDir,inspectionContext);
+     const pdfPolicy=await (this.fixtureInspection?.pdf??inspectPdfTdmPolicy)(representation,sha256,this.cacheDir,inspectionContext,sandbox);
      if(pdfPolicy){
       const finding=pdfPolicy.finding;
       if(finding.state==='unavailable'&&!Object.hasOwn(pdfSourceMetadataFailures,finding.reason))throw new PoliteFetchError('network_error','PDF policy inspection runtime unavailable',undefined,undefined,undefined,{kind:'pdf_policy_runtime',reason:finding.reason});
@@ -544,6 +557,10 @@ export class PoliteFetcher {
       }
      }
     }
+    };
+    // Policy endpoints remain distinct representations/scopes. A document runs
+    // resource gates, origin and (when needed) PDF commands sequentially here.
+    await this.withInspectionSandbox(representation,inspectionContext,inspect);
     Object.assign(policy,projectSourcePolicyMetadata(policy));
     if(checkTdm&&(policy.tdm.referenceStatus==='unavailable'||policy.tdm.declarationStatus==='unavailable'))throw new PoliteFetchError('tdm_unavailable','Machine-readable TDM declaration or policy reference is unavailable; source withheld');
     if(checkTdm&&policy.tdm.state==='reserved'&&!registeredApproval)throw new PoliteFetchError('tdm_reserved','PDF machine-readable TDM reservation; no owner-authorized official-work exception');
