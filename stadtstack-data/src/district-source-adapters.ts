@@ -294,11 +294,25 @@ export async function crawlParticipationApi(fetcher:PoliteFetcher,municipality:R
   if(!source.url||!/^\d{8}$/.test(municipality.ags))throw Error('BOB discovery requires a registered inventory root and exact eight-digit AGS');
   if(fetcher.requestCount-before>=options.maxRequests)return {documents:[],sourceBindings:[sourceContentBinding(response)],notes:['BOB municipal identity inventory deferred by request budget; no empty-coverage inference'],requests:fetcher.requestCount-before,checkedAt:response.checkedAt,coverage:{state:'partial',pendingCount:1,runnableCount:1,blockedCount:0,scope:'Public BOB inventory and exact municipal-code bindings'}};
   inventory=await observedApiResponse(fetcher,{...source,api:{url:source.url,format:'bobsh-list'}},ttl);
-  const root=load(await readSourceText(fetcher,inventory));
-  const literals=root('script:not([src])').toArray().flatMap(element=>[...root(element).text().matchAll(/\bvar\s+initialProcedures\s*=\s*JSON\.parse\('((?:\\.|[^'\\])*)'\)/g)]);
+  // Discovery-only tokenization follows completed HTML5 policy inspection.
+  // Never execute the script or run a repeated-alternation regex over its literal.
+  const root=load(await readSourceText(fetcher,inventory),{xml:{xmlMode:false}}),literals:string[]=[];
+  for(const element of root('script:not([src])').toArray()){
+   const script=root(element).text(),prefix=/\bvar\s+initialProcedures\s*=\s*JSON\.parse\('/g;
+   for(const match of script.matchAll(prefix)){
+    const start=match.index+match[0].length;let end=start;
+    while(end<script.length){
+     if(script[end]==='\\'){end+=2;continue;}
+     if(script[end]==="'")break;
+     end++;
+    }
+    if(end>=script.length||script[end+1]!==')')throw Error('Malformed BOB initialProcedures literal; no empty-coverage inference');
+    literals.push(script.slice(start,end));
+   }
+  }
   if(literals.length!==1)throw Error('BOB initialProcedures inventory missing or ambiguous; no empty-coverage inference');
   // Decode only the observed JSON string literal, never execute upstream JavaScript.
-  const rows:unknown=JSON.parse(JSON.parse('"'+literals[0][1].replace(/"/g,'\\"')+'"'));
+  const rows:unknown=JSON.parse(JSON.parse('"'+literals[0].replace(/"/g,'\\"')+'"'));
   if(!Array.isArray(rows))throw Error('Unexpected BOB municipal identity inventory');
   for(const row of rows){
    if(!row||typeof row!=='object'||typeof row.id!=='string')throw Error('Malformed BOB procedure identity');

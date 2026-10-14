@@ -20,6 +20,7 @@ import {writePrivateJson} from '../src/district-private-io.ts';
 import {assertCivicPolicyAuthority,type CivicPolicyOptions} from '../src/civic-opt-out.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {CrawlRequestEvidenceCaptureError} from '../src/district-crawl-request.ts';
+import {largeBobInventory} from './fixtures/bob-inventory.ts';
 
 /** Adapter-unit fetch/read/write doubles use explicit fixture authority, not a production acquisition marker. */
 class AdapterFixtureFetcher extends BasePoliteFetcher {
@@ -193,6 +194,29 @@ test('BOB scoped empty result is distinct from unsupported inventory and respect
   const result=await pending;assert.equal(result.documents.length,0);assert.equal(result.coverage?.state,mode==='budget'?'partial':'complete');
   assert.equal(result.requests,mode==='budget'?1:2);assert.deepEqual(seen,mode==='budget'?[root+'list/json']:[root+'list/json',root]);
   assert.match(result.notes.join(' '),mode==='budget'?/no empty-coverage inference/:/0 exact-bound procedures/);
+ });
+});
+test('BOB 10.5 MB inventory completes the real fetch/read/binding path for all three towns without neighboring traversal',async t=>{
+ const root='https://bob-sh.de/',inventory=largeBobInventory();assert.ok(inventory.length>=10_500_000);
+ for(const [id,ags] of [['ratzeburg','01053100'],['moelln','01053090'],['schwarzenbek','01053116']])await t.test(id,async t=>{
+  const folder=await mkdtemp(join(tmpdir(),'district-bob-large-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+  const fetcher=await createWireFetcher({cacheDir:folder}),seen:string[]=[],bobSource:RegistrySource={...source,id:id+'-bob-sh',url:root,crawlScope:{pageRoots:[],followLinkedDocuments:false},api:{url:root+'list/json',format:'bobsh-list',method:'POST',form:{municipalCode:'01053'}}};
+  const mapVars=['ratzeburg','moelln','schwarzenbek','neighbor'].map(procedureId=>({procedureId,procedureUrl:`/verfahren/${procedureId}/public/detail`,externalName:'Neutraler Planname'}));
+  const responseHtml=mapVars.map(row=>`<div class="c-procedurelist__item" data-procedure-id="${row.procedureId}">Neutraler Planname</div>`).join('');
+  type Wire={wire(url:URL):Promise<{status:number;headers:Record<string,string>;body:Buffer}>};
+  t.mock.method(fetcher as unknown as Wire,'wire',async(url:URL)=>{
+   seen.push(url.href);
+   if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+   const api=url.href===bobSource.api!.url,body=url.href===root?inventory:Buffer.from(api?JSON.stringify({success:true,procedureCount:mapVars.length,mapVars,responseHtml}):'<h1>Neutraler Planname</h1>');
+   return {status:200,headers:{'content-type':api?'application/json':'text/html'},body};
+  });
+  const result=await crawlParticipationApi(fetcher,{...city,id,name:id,ags},bobSource,{maxDocuments:4,maxPages:4,maxRequests:6});
+  assert.equal(result.coverage?.state,'complete');assert.equal(result.documents.length,1);
+  assert.equal(result.documents[0].metadata.caseKey,id);assert.equal(result.documents[0].ags,ags);
+  assert.deepEqual(seen.filter(url=>url.includes('/verfahren/')),[`${root}verfahren/${id}/public/detail`]);
+  const observed=JSON.parse(await readFile(join(fetcher.cacheDir,'requests',hash('GET '+root+'\n')+'.json'),'utf8'));
+  assert.equal(observed.state,'fetched');assert.equal(observed.bytes,inventory.length);assert.equal(observed.sha256,hash(inventory));
+  assert.equal(observed.policy.documentOrigin.classification,'unknown');assert.equal(observed.failure,undefined);
  });
 });
 test('BOB ambiguous identity never falls back to registry seeds through the district crawler',async t=>{

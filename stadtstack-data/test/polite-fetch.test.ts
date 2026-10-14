@@ -19,6 +19,8 @@ import {ContentFreeSourcePolicySchema} from '../src/district-schema.ts';
 import {readBoundSourceObservation} from '../src/source-observation.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {CrawlRequestEvidenceSchema,CrawlRequestEvidenceCaptureError} from '../src/district-crawl-request.ts';
+import {ParserIsolationError} from '../src/district-parser-isolation.ts';
+import {largeBobInventory} from './fixtures/bob-inventory.ts';
 
 async function createPoliteFetcher(options:PoliteFetcherOptions):Promise<BasePoliteFetcher> {
  return new BasePoliteFetcher({...await politeTestOptions(options),fixtureInspection:fixturePolicyInspection});
@@ -727,7 +729,7 @@ test('policy wrappers preserve typed failures and structured unknown causes with
   policy(url:URL):Promise<unknown>;
   machinePolicy(url:URL):Promise<unknown>;
  }
- for(const phase of ['robots','tdm'] as const)for(const kind of ['unknown','network_error','dns_error','timeout','cache_missing','too_large','unsupported_encoding'] as const){
+ for(const phase of ['robots','tdm'] as const)for(const kind of ['unknown','network_error','inspection_failed','dns_error','timeout','cache_missing','too_large','unsupported_encoding'] as const){
   const error=kind==='unknown'?Error('Synthetic unexpected runtime failure'):new PoliteFetchError(kind,'Synthetic typed failure');
   const fetcher=await createPoliteFetcher({cacheDir:join(cache,phase+'-'+kind)}),seam=fetcher as unknown as PolicySeam;
   t.mock.method(seam,'fetchInternal',async()=>{throw error;});
@@ -742,6 +744,43 @@ test('PDF inspection runtime errors remain network_error with structured cause, 
  const fetcher=new BasePoliteFetcher({...options,fixtureInspection:{...fixturePolicyInspection,pdf:async()=>{throw cause;}}});
  t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'application/pdf'},body:Buffer.from('%PDF-invalid')});
  await assert.rejects(fetcher.fetch('https://stadt.de/plan.pdf'),(failure:unknown)=>failure instanceof PoliteFetchError&&failure.failure==='network_error'&&failure.policyPhase==='tdm'&&failure.cause===cause);
+});
+test('sandbox inspection failures keep HTTP observations honest and remain execution holds',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-inspection-failure-'));t.after(()=>rm(cache,{recursive:true,force:true}));
+ for(const phase of ['robots','tdm','document'] as const)for(const reason of ['command_failed','resource_limit','security_review_required','unavailable','request_rejected'] as const){
+  const root=join(cache,phase+'-'+reason),url='https://bob-sh.de/',body=Buffer.from('<h1>Synthetic inventory</h1>'),target=phase==='robots'?'/robots.txt':phase==='tdm'?'/.well-known/tdmrep.json':'/';
+  const options=await politeTestOptions({cacheDir:root});
+  const fetcher=new BasePoliteFetcher({...options,fixtureInspection:{...fixturePolicyInspection,resource:async(...args)=>{
+   if(new URL(args[0]).pathname===target)throw new ParserIsolationError(reason);
+   return fixturePolicyInspection.resource(...args);
+  }}});
+  t.mock.method(fetcher as unknown as WireSeam,'wire',async(dispatched:URL)=>dispatched.pathname===target?{status:200,headers:{'content-type':'text/html'},body}:{status:404,headers:{},body:Buffer.alloc(0)});
+  await assert.rejects(fetcher.fetch(url),(failure:unknown)=>{
+   assert.ok(failure instanceof PoliteFetchError);assert.equal(failure.failure,'inspection_failed');
+   assert.equal(failure.policyPhase,phase==='document'?'tdm':phase);assert.deepEqual(failure.cause,{kind:'parser_isolation',reason});return true;
+  });
+  const observations=await Promise.all((await readdir(join(root,'observations'))).map(async name=>JSON.parse(await readFile(join(root,'observations',name),'utf8'))));
+  const failed=observations.find(row=>row.url===new URL(target,url).href);
+  assert.equal(failed.status,200);assert.equal(failed.bytes,body.length);assert.equal(failed.sha256,hash(body));assert.equal(failed.state,'failed');assert.equal(failed.failure,'inspection_failed');
+  await assert.rejects(readFile(join(root,'sha256',hash(body))),{code:'ENOENT'});
+ }
+});
+test('BOB HTML5 boundary reservations and unprovable script elision fail closed before retention',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-bob-boundary-'));t.after(()=>rm(cache,{recursive:true,force:true}));
+ const inventory=largeBobInventory().toString('utf8');
+ for(const [name,html,expected] of [
+  ['reservation',inventory.replace('</script>','</script/><meta name="tdm-reservation" content="1">'),'tdm_reserved'],
+  ['barrier',inventory.replace('</script>','</SCRIPT ><h1>Access denied</h1>'),'access_barrier'],
+  ['unprovable','<textarea>'+'\\u0078'.repeat(12000)+'</textarea><meta name="tdm-reservation" content="1">','inspection_failed'],
+ ] as const){
+  const root=join(cache,name),body=Buffer.from(html),fetcher=await createPoliteFetcher({cacheDir:root});
+  t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'text/html'},body});
+  await assert.rejects(fetcher.fetch('https://bob-sh.de/'),(failure:unknown)=>failure instanceof PoliteFetchError&&failure.failure===expected&&failure.policyPhase==='tdm');
+  await assert.rejects(readFile(join(root,'sha256',hash(body))),{code:'ENOENT'});
+  const observations=await Promise.all((await readdir(join(root,'observations'))).map(async file=>JSON.parse(await readFile(join(root,'observations',file),'utf8'))));
+  const source=observations.find(row=>row.url==='https://bob-sh.de/');
+  assert.equal(source.status,200);assert.equal(source.failure,expected);assert.equal(source.sha256,hash(body));assert.equal(source.bytes,body.length);
+ }
 });
 
 test('invalid fetched robots without an owner override remains a source-policy refusal',async t=>{
