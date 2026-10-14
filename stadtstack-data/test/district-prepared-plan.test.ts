@@ -8,7 +8,7 @@ import { provisionCivicPolicyAuthority, initializeManagedAcquisitionLane, withMa
 import { sha256 } from '../src/district-schema.ts';
 import { prepareDocument, verifyPreparedDocument, cachePreparedDocument, readPreparedDocument, assertPreparedSourcesActive, assertPreparedReferenceMembership, readAuthorizedSourceBytes, PREPARED_VM_ROOT, type PreparedSourceReference, type ManagedPreparationInput } from '../src/district-prepared-document.ts';
 import { createWorkPlan, restoreWorkPlan, resumeWorkPlan, runWorkPlan, modelCacheKey, classifyWorkFailure, RemoteWorkFailure, type WorkGroup, type WorkPlan } from '../src/district-work-plan.ts';
-import { PILOT_BASE_CORPUS_SHA256, PILOT_COMPLETION_CORPUS_SHA256, authorizedPilotCorpusSchema, loadFrozenCorpus, crawlDocumentSchema } from '../src/district-corpus.ts';
+import { PILOT_BASE_CORPUS_SHA256, PILOT_COMPLETION_CORPUS_SHA256, R1_NINE_TOWN_2026_10_13_CORPUS_SHA256, authorizedPilotCorpusSchema, loadFrozenCorpus, crawlDocumentSchema } from '../src/district-corpus.ts';
 import { preparationPlanSchema } from '../src/district-preparation-run.ts';
 import { readPinnedJson } from '../src/district-private-io.ts';
 import { ownerRobotsOverrideFor, APPROVED_OWNER_ROBOTS_OVERRIDE } from '../src/source-policy.ts';
@@ -227,6 +227,27 @@ test('interrupted plans require explicit provider resume; operator pause starts 
   let calls = 0;
   await runWorkPlan(recovered, async () => { calls++; throw Error('must not run'); }, async () => {}, async () => true);
   assert.equal(calls, 0);
+});
+
+test('final nine-town admission retains exactly 27 distinct approved source snapshots', () => {
+  const admitted = new Set<string>(R1_NINE_TOWN_2026_10_13_CORPUS_SHA256);
+  assert.equal(R1_NINE_TOWN_2026_10_13_CORPUS_SHA256.length, 27);
+  assert.equal(admitted.size, 27);
+  for (const hash of admitted) assert.equal(authorizedPilotCorpusSchema.parse(hash), hash);
+  for (const hash of [
+    '6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b',
+    'd7b1ba546e570df7bf1835a0d563125560f6c53f18dbb2bbebefd838db9af273',
+    '093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499',
+    'df53bcbab8e36a8277c0a88392f8721286db4040cd4069648aee819134a59188',
+    '4f850a75d1c1ce6220a5ae25bb49ffb73b23944a9d8c7f1c6b460ee8643e4df8',
+    '0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2',
+    'b122e033c8475486af40a980decd5e29bf44dadd7029b2d7fcdfd556cd99ba12',
+    'fd86e3f07dff97a43535bbe6501eedbc45701fe3bdf37dbf8718f4ae126247d1',
+    '4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268',
+  ]) {
+    assert.equal(admitted.has(hash), true);
+    assert.equal(authorizedPilotCorpusSchema.safeParse((hash[0] === '0' ? '1' : '0') + hash.slice(1)).success, false);
+  }
 });
 
 test('pilot authorization rejects an internally correct substituted index and pinned preparation plan', async () => {

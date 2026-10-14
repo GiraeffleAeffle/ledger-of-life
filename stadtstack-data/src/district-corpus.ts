@@ -38,6 +38,15 @@ export const R1_NINE_TOWN_2026_10_13_CORPUS_SHA256=[
  '5217c2ce7d79e660bff39e1651d140846aa6846cb61eb76397de68f24e07c475', // schwarzenbek-gazette
  'f99382159074c49b42c6a8b16b56b1c9c909bdcb76907a492b7452947a4a9bfe', // ludwigslust-website
  '68852a3c8b9bc5ae544d1c5050ee5005263092485e07ee30d9fa88f42d8ccf5c', // ludwigslust-council
+ '6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b', // ludwigslust-gazette
+ 'd7b1ba546e570df7bf1835a0d563125560f6c53f18dbb2bbebefd838db9af273', // moelln-council (refetched after robots decision)
+ '093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499', // parchim-council
+ 'df53bcbab8e36a8277c0a88392f8721286db4040cd4069648aee819134a59188', // parchim-gazette
+ '4f850a75d1c1ce6220a5ae25bb49ffb73b23944a9d8c7f1c6b460ee8643e4df8', // parchim-website
+ '0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2', // ratzeburg-participation (refetched)
+ 'b122e033c8475486af40a980decd5e29bf44dadd7029b2d7fcdfd556cd99ba12', // ruedersdorf-bei-berlin-council (refetched)
+ 'fd86e3f07dff97a43535bbe6501eedbc45701fe3bdf37dbf8718f4ae126247d1', // strausberg-council (refetched)
+ '4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268', // hagenow-publisher-gazette
 ] as const;
 // Exact owner-authorized snapshots; a caller-selected checksum cannot extend scope.
 const ownerAuthorizedCorpusSchema=z.enum([PILOT_BASE_CORPUS_SHA256,PILOT_COMPLETION_CORPUS_SHA256,PATCH_032_R2_STRAUSBERG_SOLARPARK_CORPUS_SHA256,PATCH_032_R2_RUEDERSDORF_HEAT_CORPUS_SHA256,PATCH_032_R2_HOPPEGARTEN_HEAT_CORPUS_SHA256,PATCH_032_STRAUSBERG_SOLARPARK_CORPUS_SHA256,PATCH_032_RUEDERSDORF_HEAT_CORPUS_SHA256,PATCH_032_HOPPEGARTEN_HEAT_CORPUS_SHA256,...R1_NINE_TOWN_2026_10_13_CORPUS_SHA256]);
