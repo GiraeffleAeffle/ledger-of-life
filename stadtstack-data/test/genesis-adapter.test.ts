@@ -270,6 +270,37 @@ test('JSON Object.Content can bind name-only geography only through corrected na
   const corrected = genesisAdapter.parse(snapshot(jsonTable(content, 1, '01053090'), 'data/table'), scope);
   assert.equal(corrected.coverage.state, 'empty');
 });
+test('present malformed or conflicting native titles never fall back to Parameter.name', () => {
+  const title = 'GENESIS-Tabelle: 12411-06-01';
+  for (const changed of [
+    'GENESIS-Tabelle: 99999-00-00;', 'GENESIS-Tabelle: 12411-06-01;',
+    'GENESIS-Tabelle: 31231-02-01;', 'GENESIS-Tabelle: 31231-02-01',
+    'GENESIS-Tabelle:', 'GENESIS-Tabelle 99999-00-00',
+    'Tabelle: 99999-00-00;', 'Tabelle: 12411-06-01 trailing-text',
+    title + '\nTabelle: 31231-02-01', title + '\nTabelle:',
+  ]) {
+    const result = genesisAdapter.parse(snapshot(jsonTable(table().replace(title, changed)), 'data/table'), scope);
+    assert.equal(result.coverage.state, 'held_quality', changed);
+    assert.deepEqual(result.observations, []);
+  }
+  const absent = genesisAdapter.parse(snapshot(jsonTable(table().replace(title, 'Native export')), 'data/table'), scope);
+  assert.equal(absent.coverage.state, 'partial', absent.coverage.reason);
+  assert.deepEqual(absent.observations.map(row => row.value), [7, 3, 4]);
+});
+test('Tabelle titles retain generic native layouts for other tables and explicitly laid out age tables', () => {
+  const population = genesisAdapter.parse(snapshot(jsonTable(table().replace('GENESIS-Tabelle:', 'Tabelle:')), 'data/table'), scope);
+  assert.equal(population.coverage.state, 'partial', population.coverage.reason);
+  assert.deepEqual(population.observations.map(row => row.value), [7, 3, 4]);
+  const content = 'Tabelle: 12411-02-03-5\nBevölkerung (Anzahl);;;\n;;;2024\n01053100;Ratzeburg;unter 3;2\n__________\n';
+  const age = genesisAdapter.parse(snapshot(JSON.stringify({
+    Ident: {Service: 'data', Method: 'table'}, Status: {Code: 0, Type: 'Information'},
+    Parameter: {name: '12411-02-03-5'}, Object: {Content: content, TableLayout: {FrontColumnsNumber: '3'}},
+  }), 'data/table'), scope);
+  assert.equal(age.coverage.state, 'partial', age.coverage.reason);
+  assert.equal(age.observations.length, 1);
+  assert.equal(age.observations[0].value, 2);
+  assert.equal(age.observations[0].date, '2024-12-31');
+});
 test('schema changes, truncated exports, mismatched table IDs and unknown value encodings fail closed', () => {
   for (const content of [table().replace('GENESIS-Tabelle: 12411-06-01', 'GENESIS-Tabelle: 99999-00-00'), table().replace('__________', ''), table().replace(';7;3;4', ';seven;3;4'), table().replace('Bevölkerung (Anzahl)', 'Bevölkerung'), table().replace(';7;3;4', ';7;3')]) {
     const result = genesisAdapter.parse(snapshot(content), scope);

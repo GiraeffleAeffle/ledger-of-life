@@ -167,9 +167,13 @@ export function parseGenesisTable(snapshot: AdmittedSnapshot, scope: AdapterScop
       if (typeof native.Content !== 'string') throw Error('Missing native Object.Content');
       content = native.Content;
     }
-    // Capture the entire native name; never truncate an unknown depth suffix.
-    const tableMatch = /^((?:GENESIS-)?Tabelle):[ \t]*([^\s;]+)[ \t]*\r?$/m.exec(content);
-    const municipalDatencsv = tableMatch?.[1] === 'Tabelle';
+    // An invalid present title is not an absent title: never silently replace it
+    // with Parameter.name, or truncate an unknown depth suffix.
+    const titles = content.match(/^[ \t]*(?:GENESIS-)?Tabelle\b[^\r\n]*/gm) ?? [];
+    if (titles.length > 1) throw Error('Ambiguous native table titles');
+    const title = titles[0];
+    const tableMatch = title === undefined ? null : /^((?:GENESIS-)?Tabelle):[ \t]*([^\s;]+)[ \t]*$/.exec(title);
+    if (titles.length && !tableMatch) throw Error('Malformed native table title');
     const parameters = root ? object(root.Parameter) : null;
     const table = knownTable(tableMatch?.[2] ?? parameters?.name, tables);
     if (parameters && knownTable(parameters.name, tables) !== table) throw Error('Content/Parameter table mismatch');
@@ -178,6 +182,17 @@ export function parseGenesisTable(snapshot: AdmittedSnapshot, scope: AdapterScop
     if (footer < 0) throw Error('Missing native table terminator; possibly truncated export');
     // FrontColumnsNumber is a documented data/table field, not our own row schema.
     const layout = native?.TableLayout ? object(native.TableLayout) : null;
+    const metadata = [
+      'Bevölkerung nach Geschlecht und Altersgruppen (17) -',
+      'Stichtag 31.12. - regionale Tiefe: Gemeinden',
+      'Fortschreibung des Bevölkerungsstandes',
+      'Bevölkerungsstand (Anzahl)',
+    ];
+    const municipalDatencsv = table === '12411-02-03' && tableMatch?.[1] === 'Tabelle' &&
+      (!layout || Number(layout.FrontColumnsNumber) === 4) &&
+      rows[0]?.length === 1 && rows[0][0] === tableMatch[0] &&
+      metadata.every((label, index) => rows[index + 1]?.length === 7 && rows[index + 1][0] === label && rows[index + 1].slice(1).every(value => !value)) &&
+      canonicalJson(rows[5] ?? []) === canonicalJson(['', '', '', '', 'Insgesamt', 'männlich', 'weiblich']);
     const front = layout ? Number(layout.FrontColumnsNumber) : municipalDatencsv ? 4 : 2;
     if (!Number.isInteger(front) || front < 1 || front > 8) throw Error('Changed native front-column layout');
     const selection = typeof parameters?.regionalkey === 'string' && /^\d{8}$|^\d{5}$/.test(parameters.regionalkey) ? parameters.regionalkey : null;
@@ -185,20 +200,9 @@ export function parseGenesisTable(snapshot: AdmittedSnapshot, scope: AdapterScop
     const regionRows = Array.isArray(structure?.Rows) ? structure.Rows.map(object).filter(row => /Gemeind|Kreise/i.test(String(row.Content))) : [];
     const selectedRegion = regionRows.length === 1 && regionRows[0].Code === parameters?.regionalvariable && String(regionRows[0].Selected) === '1' ? regionRows[0] : null;
     if (municipalDatencsv) {
-      // This native layout has no TableLayout: date, AGS, padded name, age, then sex cells.
-      // Recognize its full header, not a guessed count of numeric trailing fields.
-      const metadata = [
-        'Bevölkerung nach Geschlecht und Altersgruppen (17) -',
-        'Stichtag 31.12. - regionale Tiefe: Gemeinden',
-        'Fortschreibung des Bevölkerungsstandes',
-        'Bevölkerungsstand (Anzahl)',
-      ];
-      if (table !== '12411-02-03' || tables[table].level !== 'GE' || front !== 4 ||
-          rows[0]?.length !== 1 || rows[0][0] !== tableMatch?.[0].replace(/\r$/, '') ||
-          metadata.some((label, index) => rows[index + 1]?.length !== 7 || rows[index + 1][0] !== label || rows[index + 1].slice(1).some(Boolean)) ||
-          canonicalJson(rows[5] ?? []) !== canonicalJson(['', '', '', '', 'Insgesamt', 'männlich', 'weiblich'])) {
-        throw Error('Unrecognized municipal datencsv header/layout');
-      }
+      // Only this recognized age-table header supplies an implicit four-column
+      // layout. Other tables and explicit layouts keep the generic native path.
+      if (tables[table].level !== 'GE') throw Error('Municipal datencsv requires GE geography');
       if (root && (parameters?.format !== 'datencsv' || parameters.regionalvariable !== 'GEMEIN' ||
           !selection || selection.length !== 8 || !selectedRegion || selectedRegion.Code !== 'GEMEIN')) {
         throw Error('Municipal datencsv requires evidenced GEMEIN single selection');
