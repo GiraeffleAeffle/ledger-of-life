@@ -25,7 +25,7 @@ async function largeItem(t:TestContext){
  const chunks=documentChunks(text),chunk=chunks.find(c=>c.start>0&&c.text.includes(quote))!;
  const record=recordFor(f,quote);record.extraction.chunk={index:chunk.index,count:chunk.count,start:chunk.start,end:chunk.end};
  record.sources[0].locator=`text-sha256:${f.source.textSha256};chars:${chunk.start}-${chunk.end}`;
- record.topics=[{id:'planning',parentId:null,provenance:'model',confidence:0.8,quote:'source statement'}];
+ record.topics=[{id:'siedlung',parentId:null,provenance:'model',confidence:0.8,quote:'source statement'}];
  record.locations=[{label:'Strausberg',quote:'Strausberg',geometry:null,precision:'none'}];
  record.verification.evidenceHash=knowledgeEvidenceHash(record);
  const body={version:'district-prepared-v2' as const,municipalityId:'strausberg',sourceSha256:f.source.originalSha256,sourceBytes:Buffer.byteLength(text),mimeType:'text/plain',references:record.sources,extractorSha256:digest('synthetic parser'),toolVersions:{fixture:'synthetic'},text,textSha256:f.source.textSha256,offsetUnit:'utf16_code_units' as const,textLength:text.length,method:'text' as const,ocrUsed:false,limitations:[]};
