@@ -10,14 +10,14 @@ import {DistrictCas} from '../src/district-cas.ts';
 import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,runDistrictJobs,type JobHandler,type DistrictJobSpec} from '../src/district-jobs.ts';
 import type {StepReceipt} from '../src/district-step-receipt.ts';
 import {importCrawlCorpusForResidual} from '../src/district-crawl-import.ts';
-import {withFixtureAuthorizedCorpus,authorizedPilotCorpusSchema,loadFrozenCorpusBytes} from '../src/district-corpus.ts';
+import {withFixtureAuthorizedCorpus,authorizedPilotCorpusSchema,loadFrozenCorpusBytes,type CrawlDocument} from '../src/district-corpus.ts';
 import {ResidualInputSchema,residualJobHandlersFor,enqueueResidualPreparation,enqueueCommittedResidualExtraction,loadResidualSource,captureResidualAnswers,exportResidualTextContribution} from '../src/district-residual-jobs.ts';
 import {ObservationRequestSchema,persistCrawlRequestEvidence} from '../src/district-crawl-request.ts';
 import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceBindings,recoverManagedSourceScratch,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 import {createOperatorRegistryFixture,operatorRegistryFixtureValue} from './helpers/operator-registry-fixture.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
-import {enqueueCrawlPolicyRefresh,policyRefreshHandler,recheckResidualPolicy} from '../src/district-policy-refresh.ts';
+import {enqueueCrawlPolicyRefresh,policyRefreshHandler,recheckResidualPolicy,recordedPolicyIdentity} from '../src/district-policy-refresh.ts';
 import {createR1PublicFetcher} from '../src/district-r1.ts';
 import {PoliteFetcher,type FetchObservation} from '../src/polite-fetch.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
@@ -38,6 +38,9 @@ import {loadR1TextCompositionInput,buildR1TextCompositionContext} from '../src/d
 import {authenticatePublicationProvenance} from '../src/district-publication-provenance.ts';
 import {prepareKnowledge} from '../src/prepare-knowledge.ts';
 import {CriticalRecordTargetSchema} from '../src/district-critical-assessment-contract.ts';
+import {readRegisteredRobotsAudit,REGISTERED_SOURCE_POLICY_VALIDITY_MS} from '../src/registered-source-policy.ts';
+import type {BoundSourceObservation} from '../src/source-observation.ts';
+import {MAX_POLICY_METADATA_EVIDENCE} from '../src/source-policy.ts';
 
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 test('public request evidence excludes credential/header fields and binds selector bytes',()=>{
@@ -99,10 +102,135 @@ test('offline frozen crawl import preserves managed originals and produces enque
   }
   return {manifest,indexBytes,cas:new DistrictCas(casRoot),bytes,binding,observationBytes,document,robotsAbsencePin};
  }
+ await t.test('legacy registered discovery is re-derived only from authenticated retained HTML edges',async st=>{
+  const registeredValue=operatorRegistryFixtureValue(),registeredCity=registeredValue.municipalities[0],rootUrl='https://www.stadt-strausberg.de/bauleitplanung-2/',robotsBody='User-agent: *\nAllow: /\n';
+  registeredCity.id='strausberg';registeredCity.ags='12064472';registeredValue.inventory[0].ags=registeredCity.ags;
+  const registeredSource=registeredCity.sources.find(row=>row.kind==='participation')!;
+  Object.assign(registeredSource,{id:'strausberg-planning',url:rootUrl,checkState:'checked',checkedAt:now,crawlScope:{pageRoots:[rootUrl],followLinkedDocuments:true},evidence:[{url:rootUrl,locator:'Synthetic registered-source configuration only',sha256:digest('synthetic registered source'),retrievedAt:now}]});
+  const registered=await createOperatorRegistryFixture(st,{context:{root:root!,policy},value:registeredValue,label:'legacy-discovery-registry'});
+  const registeredScope={...scope,sourceId:registeredSource.id};
+  async function legacy(label:string,config:{absentLink?:boolean;missingParent?:boolean;tamperedParent?:boolean;foreignChild?:boolean;foreignParentScope?:boolean;reservedParent?:boolean;reservedChild?:boolean;multiHop?:boolean;expired?:boolean;cycle?:boolean;ambiguousParent?:boolean;scopedPrefix?:boolean;fresh?:boolean;evidenceRows?:number}={}){
+   const rawRoot=join(root!,label+'-raw'),indexRoot=join(root!,label+'-index'),casRoot=join(root!,label+'-cas');
+   for(const [path,kind] of [[rawRoot,'fetch'],[indexRoot,'artifacts'],[casRoot,'artifacts']] as const)await initializeManagedAcquisitionLane(path,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind});
+   const checkedAt=new Date(Date.now()-(config.expired?8*86400000:config.fresh?3000:2*3600000)).toISOString(),childUrl=(config.foreignChild?'https://example.net':'https://www.stadt-strausberg.de')+'/wp-content/uploads/fixture/planunterlagen.txt',middleUrl=config.scopedPrefix?rootUrl+'unlinked/':'https://www.stadt-strausberg.de/archiv/planunterlagen.html';
+   const documents:CrawlDocument[]=[],observations:Array<{path:string;sha256:string}>=[],bindings:Array<BoundSourceObservation['binding']>=[],originals:Array<{path:string;body:Buffer;observationPath:string;observationBytes:Buffer}>=[];
+   async function original(id:string,url:string,body:Buffer,mimeType:string,from:string,reserved=false){
+    const sha256=digest(body),observationId=`${Date.now()}-${randomUUID()}.json`,observationPath=join(rawRoot,'observations',observationId),sourcePolicy={robots:{state:'allowed' as const,url:'https://www.stadt-strausberg.de/robots.txt',sha256:digest(robotsBody),checkedAt},tdm:{state:reserved?'reserved' as const:'not_declared' as const,evidence:Array.from({length:config.evidenceRows??1},()=>({url:'https://www.stadt-strausberg.de/.well-known/tdmrep.json',locator:reserved?'W3C TDMRep origin rules':'TDMRep standardized location HTTP absence',value:reserved?'reservation=1':'404',checkedAt}))},access:'public' as const,legalClassification:'not_assessed' as const,publication:'facts_with_attribution_only' as const};
+    const observation={url,method:'GET',checkedAt,retrievedAt:checkedAt,state:'fetched',status:200,sha256,bytes:body.length,mimeType,policy:sourcePolicy},observationBytes=Buffer.from(JSON.stringify(observation)+'\n'),binding:BoundSourceObservation['binding']={kind:'http_observation',url,sourceSha256:sha256,observationId,receiptSha256:digest(observationBytes)},path=join(rawRoot,'sha256',sha256);
+    await withManagedSourceWrite(rawRoot,[{...binding,relativePath:'sha256/'+sha256,contentSha256:sha256,independentAllowed:!reserved}],async()=>{
+     await mkdir(join(rawRoot,'sha256'),{recursive:true,mode:0o700});await mkdir(join(rawRoot,'observations'),{recursive:true,mode:0o700});await writeFile(path,body,{mode:0o600});await writeFile(observationPath,observationBytes,{mode:0o600});
+    },policy);
+    const document:CrawlDocument={id,municipalityId:registeredCity.id,ags:registeredCity.ags,districtId:registeredCity.districtId,sourceId:registeredSource.id,url,sha256,mimeType,retrievedAt:checkedAt,checkedAt,status:200,observationPath,documentDate:null,localPath:relative(indexRoot,path),adapter:'synthetic-old-crawl-fixture',metadata:{discoveredFrom:from},policy:sourcePolicy};
+    documents.push(document);observations.push({path:observationPath,sha256:binding.receiptSha256});bindings.push(binding);originals.push({path,body,observationPath,observationBytes});return {document,binding};
+   }
+   let parent:CrawlDocument|undefined,middle:CrawlDocument|undefined;
+   if(!config.missingParent){
+    parent=(await original(label+'-root',rootUrl,Buffer.from(`<html><a href="${config.absentLink?'https://www.stadt-strausberg.de/other/planunterlagen.txt':config.multiHop?middleUrl:childUrl}">Synthetic planunterlagen</a></html>`),'text/html',rootUrl,config.reservedParent)).document;
+    if(config.foreignParentScope)parent.sourceId='website';
+    if(config.ambiguousParent)await original(label+'-other-root',rootUrl,Buffer.from(`<html><a href="${childUrl}">Another synthetic root observation</a></html>`),'text/html',rootUrl);
+   }
+   if(config.multiHop)middle=(await original(label+'-middle',middleUrl,Buffer.from(`<html><a href="${childUrl}">Synthetic planunterlagen</a>${config.cycle?`<a href="${middleUrl}">Cyclic synthetic planunterlagen</a>`:''}</html>`),'text/html',config.cycle?middleUrl:rootUrl)).document;
+   const child=await original(label,childUrl,Buffer.from('Synthetic retained linked original; no real municipal claim'),'text/plain',config.multiHop?middleUrl:rootUrl,config.reservedChild);
+   const path=join(indexRoot,'index.json'),indexBytes=Buffer.from(JSON.stringify({schemaVersion:'stadtstack-crawl-index-v1',generatedAt:checkedAt,documents})+'\n'),indexHash=digest(indexBytes);
+   await withManagedSourceWrite(indexRoot,[...registered.admitted.bindings,...bindings].map(binding=>({...binding,relativePath:'index.json',contentSha256:indexHash,independentAllowed:false})),()=>writeFile(path,indexBytes,{mode:0o600}),policy);
+   const requestEvidence=await persistCrawlRequestEvidence(rawRoot,{schemaVersion:'stadtstack-crawl-request-evidence-v1',httpObservation:child.binding,request:{url:childUrl,method:'GET',contentType:null,bodySha256:null,publicSelector:null},redirectChain:[childUrl]},policy);
+   const manifest={index:{path,sha256:indexHash},rawRoot,registry:registered.registryPin,observations,documents:[{documentId:label,scope:registeredScope,permission:{kind:'facts_with_attribution' as const},bounds,requestEvidence}]};
+   if(config.tamperedParent)await writeFile(originals[0].path,Buffer.from('Changed retained HTML bytes'),{mode:0o600});
+   return {manifest,indexBytes,cas:new DistrictCas(casRoot),child:child.document,parent,middle,originals,checkedAt};
+  }
+  for(const multiHop of [false,true])await st.test(multiHop?'authenticated multi-hop parent retains the exact root anchor':'old direct-root link gets seven genuine days without a request',async()=>{
+   const item=await legacy(multiHop?'registered-multi-hop':'registered-direct',{multiHop});
+   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+    const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
+    const job=imported.jobs[0],proof=await loadPolicyReceipt(item.cas,job.policyReceiptSha256),audit=readRegisteredRobotsAudit(proof.sourcePolicy.tdm.evidence,item.child.url)!;
+    assert.equal(Date.parse(proof.expiresAt),Date.parse(item.checkedAt)+REGISTERED_SOURCE_POLICY_VALIDITY_MS);
+    assert.equal(proof.registeredSourceEligibility!.discovery,undefined);assert.equal(audit.discovery!.from,multiHop?item.middle!.url:item.parent!.url);assert.equal(audit.discovery!.sha256,multiHop?item.middle!.sha256:item.parent!.sha256);
+    assert.deepEqual(audit.discovery!.anchor,multiHop?{url:item.parent!.url,sha256:item.parent!.sha256}:undefined);
+    assert.equal(proof.sourcePolicy.tdm.evidence[0].checkedAt,item.checkedAt);assert.deepEqual(proof.sourcePolicy.tdm.evidence.slice(1),(item.child.policy as BoundSourceObservation['policy']).tdm.evidence);
+    assert.equal(proof.sourcePolicy.robots.checkedAt,item.checkedAt);assert.equal((await loadResidualSource(item.cas,job)).document.checkedAt,item.checkedAt);
+    await enqueueResidualPreparation(store,item.cas,job);
+    for(const original of item.originals){assert.deepEqual(await readFile(original.path),original.body);assert.deepEqual(await readFile(original.observationPath),original.observationBytes);}
+    assert.deepEqual(await readFile(item.manifest.index.path),item.indexBytes);assert.equal(imported.coverage.acquisitionStepReceipts,0);
+   });
+  });
+  await st.test('authenticated discovery survives authorized refresh and expired queued preparation continuation',async rt=>{
+   const item=await legacy('registered-refresh'),seen:string[]=[];
+   interface WireSeam {wire(url:URL):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
+   rt.mock.method(PoliteFetcher.prototype as unknown as WireSeam,'wire',async(url:URL)=>{
+    seen.push(url.pathname);
+    if(url.pathname==='/robots.txt')return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from(robotsBody)};
+    if(url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+    throw Error('Registered refresh must not refetch original or discovery parent');
+   });
+   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+    const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.deepEqual(imported.holds,[]);
+    const original=imported.jobs[0],pinned=await loadPolicyReceipt(item.cas,original.policyReceiptSha256),preparationKey=await enqueueResidualPreparation(store,item.cas,original);
+    const nextTime=new Date(Date.parse(pinned.expiresAt)+1000);
+    rt.mock.timers.enable({apis:['Date'],now:nextTime});
+    try{await assert.rejects(recheckResidualPolicy(store,item.cas,original),(error:unknown)=>error instanceof DistrictExecutionHold&&error.reasonCode==='source_policy_stale');}finally{rt.mock.timers.reset();}
+    const enqueued=await enqueueCrawlPolicyRefresh(store,item.cas,{manifest:item.manifest,maxRequests:4});assert.deepEqual(enqueued.holds,[]);assert.equal(enqueued.jobKeys.length,1);
+    const jobKey=enqueued.jobKeys[0].jobKey,authorizationId=await store.authorize({approvalSha256:digest('Synthetic registered refresh authorization '+jobKey),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[jobKey],ags:[registeredScope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
+    const handler=policyRefreshHandler(store,(context,maxRequests)=>createR1PublicFetcher(store,context,{maxRequests,maxBytes:1024*1024,fixture:{fetchRoot:join(root!,'registered-refresh-fetch'),policy,inspection:fixturePolicyInspection}}));
+    // Only policy-operation fixture time advances; queue leases/receipts use PG time.
+    const run=await runDistrictJobs({store,cas:item.cas,handlers:{policy_refresh:async context=>{
+     rt.mock.timers.enable({apis:['Date'],now:nextTime});
+     try{return await handler(context);}finally{rt.mock.timers.reset();}
+    }},authorizationId,ownerPresent:true,maxJobs:1,maxElapsedMs:60000,leaseMs:60000});
+    const rows=await pool!.query('SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE run_id=$1',[run.runId]),committed=rows.rows[0];
+    assert.equal(committed.receipt.outcome,'succeeded');assert.deepEqual(seen,['/robots.txt','/.well-known/tdmrep.json']);
+    const output=JSON.parse((await item.cas.read(committed.receipt.outputHashes[0])).toString('utf8')),current=await loadPolicyReceipt(item.cas,output.job.policyReceiptSha256);
+    assert.equal(recordedPolicyIdentity(current.sourcePolicy),recordedPolicyIdentity(pinned.sourcePolicy));
+    assert.deepEqual(current.sourcePolicy.tdm.evidence[0],pinned.sourcePolicy.tdm.evidence[0]);assert.equal(current.registeredSourceEligibility!.discovery,undefined);
+    assert.equal(Date.parse(current.expiresAt),nextTime.getTime()+REGISTERED_SOURCE_POLICY_VALIDITY_MS);
+    assert.deepEqual(output.job.httpObservation,original.httpObservation);
+    rt.mock.timers.enable({apis:['Date'],now:nextTime});
+    try{
+     const checked=await recheckResidualPolicy(store,item.cas,original);assert.deepEqual(checked.receipt,pinned);assert.equal(checked.continuation!.refreshStepReceiptSha256,committed.receipt_sha256);
+     const queued=await pool!.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[preparationKey]);
+     assert.deepEqual(await residualJobHandlersFor(pool!).residual_prepare.currentPolicy!(queued.rows[0].spec as DistrictJobSpec,item.cas),checked.continuation);
+     assert.equal((await loadResidualSource(item.cas,original,{store})).policyCheck.currentReceipt.checkedAt,current.checkedAt);
+    }finally{rt.mock.timers.reset();}
+    for(const entry of item.originals){assert.deepEqual(await readFile(entry.path),entry.body);assert.deepEqual(await readFile(entry.observationPath),entry.observationBytes);}
+    assert.deepEqual(await readFile(item.manifest.index.path),item.indexBytes);
+   });
+  });
+  await st.test('full policy metadata preserves all 64 rows and the fresh one-hour receipt',async()=>{
+   const item=await legacy('registered-full-evidence',{fresh:true,evidenceRows:MAX_POLICY_METADATA_EVIDENCE});
+   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+    const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
+    const proof=await loadPolicyReceipt(item.cas,imported.jobs[0].policyReceiptSha256);
+    assert.equal(proof.sourcePolicy.tdm.evidence.length,64);assert.deepEqual(proof.sourcePolicy,item.child.policy);
+    assert.equal(readRegisteredRobotsAudit(proof.sourcePolicy.tdm.evidence,item.child.url),undefined);
+    assert.equal(Date.parse(proof.expiresAt),Date.parse(item.checkedAt)+3600000);
+    for(const entry of item.originals){assert.deepEqual(await readFile(entry.path),entry.body);assert.deepEqual(await readFile(entry.observationPath),entry.observationBytes);}
+   });
+  });
+  for(const [label,config,reason] of [
+   ['absent-link',{absentLink:true},'source_policy_stale'],
+   ['missing-parent',{missingParent:true},'source_policy_stale'],
+   ['changed-parent',{tamperedParent:true},'source_policy_stale'],
+   ['foreign-parent-scope',{foreignParentScope:true},'source_policy_stale'],
+   ['ambiguous-parent',{ambiguousParent:true},'source_policy_stale'],
+   ['cyclic-parent',{multiHop:true,cycle:true},'source_policy_stale'],
+   ['unlinked-parent-under-root-prefix',{multiHop:true,absentLink:true,scopedPrefix:true},'source_policy_stale'],
+   ['foreign-child',{foreignChild:true},'scope_mismatch'],
+   // Full ancestry rejects non-independent reserved originals before derivation.
+   ['reserved-parent',{reservedParent:true},'corpus_ancestry_unavailable'],
+   ['reserved-child',{reservedChild:true},'corpus_ancestry_unavailable'],
+   ['expired-seven-days',{expired:true},'source_policy_stale'],
+  ] as const)await st.test(label+' does not obtain registered linked-document eligibility',async()=>{
+   const item=await legacy('registered-'+label,config);
+   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+    const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.equal(imported.jobs.length,0);assert.deepEqual(imported.holds,[{documentId:item.child.id,reasonCode:reason}]);
+    for(const original of item.originals)assert.deepEqual(await readFile(original.observationPath),original.observationBytes);
+   });
+  });
+ });
  await t.test('happy GET/POST imports preserve exact bytes/clocks and enqueue genuine preparation jobs',async()=>{
   for(const post of [false,true]){
    const item=await fixture(post?'happy-post':'happy-get',{post,extra:true});
    assert.equal(authorizedPilotCorpusSchema.safeParse(item.manifest.index.sha256).success,false);
+   const initialReceipts=await pool!.query('SELECT COUNT(*)::int AS count FROM district_pipeline.step_receipts');
    await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
     assert.equal(loadFrozenCorpusBytes(item.indexBytes,item.manifest.index.sha256).documents.length,2);
     assert.throws(()=>loadFrozenCorpusBytes(Buffer.from('tampered'),item.manifest.index.sha256),/hash mismatch/);
@@ -115,7 +243,7 @@ test('offline frozen crawl import preserves managed originals and produces enque
     const key=await enqueueResidualPreparation(store,item.cas,job);assert.match(key,/^[a-f0-9]{64}$/);
     const queued=await pool!.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[key]);assert.equal(queued.rows[0].spec.step,'residual_prepare');assert.equal(queued.rows[0].spec.selector.bounds.maxDocuments,1);
     const audit=await pool!.query("SELECT payload_json FROM district_pipeline.r1_metadata_snapshots WHERE kind='http_observation' AND payload_json->>'origin'='imported'");assert.ok(audit.rows.some(row=>row.payload_json.observationId===item.binding.observationId));
-    const receipts=await pool!.query('SELECT COUNT(*)::int AS count FROM district_pipeline.step_receipts');assert.equal(receipts.rows[0].count,0);
+    const receipts=await pool!.query('SELECT COUNT(*)::int AS count FROM district_pipeline.step_receipts');assert.equal(receipts.rows[0].count,initialReceipts.rows[0].count);
     await assert.rejects(loadResidualSource(item.cas,{...job,corpusObservations:job.corpusObservations.slice(0,1)}));
    });
    assert.equal(authorizedPilotCorpusSchema.safeParse(item.manifest.index.sha256).success,false);
