@@ -62,7 +62,7 @@ export async function parserIsolationContractSha256(): Promise<string> {
   const files = ['district-parser-isolation.ts', 'district-parser-worker.py', 'district-document.ts', 'district-document-parser-worker.ts',
     'district-policy-inspection.ts', 'district-policy-inspection-worker.ts', 'pdf-tdm-policy.ts', 'pdf-tdm-policy-worker.ts',
     'district-regional-statement-worker.ts', '../regional/statements.mjs',
-    'document-origin.ts', 'document-origin-contract.ts', 'document-origin-rules.ts', 'source-policy.ts', 'public-address.ts',
+    'document-origin.ts', 'document-origin-contract.ts', 'document-origin-rules.ts', 'source-policy.ts', 'registered-source-policy.ts', 'public-address.ts',
     '../Dockerfile.parser', '../Dockerfile.parser.dockerignore',
     '../package.json', '../package-lock.json', 'district-adapter-contract.ts', 'district-structured-parser-worker.ts',
     'council-oparl.ts', 'dedupe.ts', 'common.ts', 'civic-opt-out.ts', 'civic-docker.ts',

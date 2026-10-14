@@ -17,10 +17,12 @@ import {loadResidualSource} from './district-residual-jobs.ts';
 import {readCommittedPolicyRefresh} from './district-policy-refresh.ts';
 import type {BoundSourceObservation} from './source-observation.ts';
 import type {DistrictRegistry} from './district-registry.ts';
+import {sourcePolicyExpiresAt} from './source-policy.ts';
+import {admittedRegisteredRobotsScopes,type RegisteredRobotsAudit} from './registered-source-policy.ts';
 
 export interface CrawlPolicyRefreshOperation {
  enqueue?:(manifest:z.infer<typeof CrawlCorpusImportSchema>,acquired:BoundSourceObservation,custody:{registrySha256:string;corpusObservations:z.infer<typeof ResidualInputSchema>['corpusObservations']})=>Promise<void>;
- refresh?:(acquired:BoundSourceObservation,source:DistrictRegistry['municipalities'][number]['sources'][number])=>Promise<{sourcePolicy:BoundSourceObservation['policy'];expiresAt:string}>;
+ refresh?:(acquired:BoundSourceObservation,source:DistrictRegistry['municipalities'][number]['sources'][number],registeredSourceEligibility?:RegisteredRobotsAudit)=>Promise<{sourcePolicy:BoundSourceObservation['policy'];expiresAt:string}>;
 }
 
 const observationPin=z.object({path:z.string().min(1),sha256:HashSchema}).strict();
@@ -64,6 +66,7 @@ export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:Di
   return {jobs,holds:input.documents.map(row=>({documentId:row.documentId,reasonCode:'corpus_ancestry_unavailable' as const})),coverage:{basis:'authenticated_imported_observations' as const,selected:input.documents.length,imported:0,held:input.documents.length,acquisitionStepReceipts:0}};
  }
  const registrySha256=await persistOperatorRegistry(store,cas,admitted,policy),corpusObservations=[...observations.values()].map(row=>row.binding);
+ const registeredEligibility=admittedRegisteredRobotsScopes(admitted.registry,digest(admitted.bytes));
  await initializeManagedAcquisitionLane(cas.root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
  // Preserve every exact observation, including excluded audit entries and discovery dependencies.
  for(const {bytes,binding} of observations.values()){
@@ -80,6 +83,7 @@ export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:Di
    const matches=corpus.documents.filter(row=>row.id===selected.documentId);if(matches.length!==1)throw Error('Selected ID must identify exactly one original');
    const document=matches[0],city=admitted.registry.municipalities.find(row=>row.id===selected.scope.municipalityId),source=city?.sources.find(row=>row.id===selected.scope.sourceId);
    if(!city||R1_MUNICIPALITIES[city.id]!==city.ags||city.ags!==selected.scope.ags||document.municipalityId!==city.id||document.ags!==city.ags||document.districtId!==city.districtId||!source?.url||source.id!==document.sourceId||source.checkState!=='checked')throw Error('Selected scope differs from registered original');
+   const registeredSourceEligibility=registeredEligibility.find(row=>row.municipalityId===city.id&&row.sourceId===source.id&&row.ags===city.ags&&row.root===source.url);
    const roots=[source.url,...source.crawlScope?.pageRoots??[],...city.seedDocuments.filter(row=>row.sourceId===source.id).map(row=>row.url),...source.api?[source.api.url]:[]],origins=new Set(roots.map(url=>new URL(url).origin));
    if(!origins.has(new URL(document.url).origin))throw Error('Original URL lies outside registered source origins');
    reasonCode='unsupported_mime';if(!residualMimeSupported(document.mimeType))throw Error('Original MIME is unsupported');
@@ -116,15 +120,13 @@ export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:Di
    let sourcePolicy=acquired.policy,expiresAt:string;
    if(operation.refresh){
     reasonCode='source_policy_refused';
-    refreshing=true;const current=await operation.refresh(acquired,source);refreshing=false;sourcePolicy=current.sourcePolicy;expiresAt=current.expiresAt;
+    refreshing=true;const current=await operation.refresh(acquired,source,registeredSourceEligibility);refreshing=false;sourcePolicy=current.sourcePolicy;expiresAt=current.expiresAt;
    }else{
-    const clocks=[acquired.observation.checkedAt,acquired.policy.robots.checkedAt,...acquired.policy.tdm.evidence.map(row=>row.checkedAt)];
-    if(!acquired.policy.tdm.evidence.length||clocks.some(clock=>!clock||!Number.isFinite(Date.parse(clock))||Date.parse(clock)>Date.now()))throw Error('Source policy evidence clock is incomplete');
-    expiresAt=new Date(Math.min(...clocks.map(clock=>Date.parse(clock!)))+60*60*1000).toISOString();
+    expiresAt=sourcePolicyExpiresAt(acquired.policy,acquired.observation.checkedAt,document,selected.scope,registeredSourceEligibility);
    }
    if(Date.parse(expiresAt)<=Date.now())throw Error('Source policy is stale; separately authorized revalidation required');
    reasonCode='source_policy_refused';
-   const proof=await createPolicyReceipt({source:{url:document.url,sha256:document.sha256,mimeType:document.mimeType},sourcePolicy,permission:selected.permission,scope:selected.scope,checkedAt:new Date().toISOString(),expiresAt},policy);
+   const proof=await createPolicyReceipt({source:{url:document.url,sha256:document.sha256,mimeType:document.mimeType},sourcePolicy,registeredSourceEligibility,permission:selected.permission,scope:selected.scope,checkedAt:new Date().toISOString(),expiresAt},policy);
    committing=true;
    const persisted=await persistR1Representation(store,cas,{bytes:acquired.sourceBytes,receipt:proof.receipt,request:{url:request.url,method:request.method,body:request.publicSelector,contentType:request.contentType},retrievedAt:document.retrievedAt,fetchedAt:acquired.observation.checkedAt,sourceVersion:null,redirectChain,httpObservation:{observationId:httpObservation.observationId,receiptSha256:httpObservation.receiptSha256,bytes:evidence.bytes},origin:'imported'},policy);
    const requestHash=selected.requestEvidence.sha256,requestArtifact=await withManagedSourceWrite(cas.root,[{...acquired.binding,relativePath:`sha256/${requestHash.slice(0,2)}/${requestHash}`,contentSha256:requestHash,independentAllowed:false}],()=>cas.put(requestBytes,{kind:'receipt',mimeType:'application/json'}),policy);await store.addArtifact(requestArtifact);

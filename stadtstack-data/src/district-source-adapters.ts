@@ -25,11 +25,12 @@ export interface RegistrySource {
  ownerRobotsOverride?:OwnerRobotsOverride;robotsStatus?:'allowed'|'disallowed'|'unavailable';override?:'owner-approved 2026-10-11';hostProfile?:'municipal'|'default';
  /** Original configured URL retained when an adapter suppresses root discovery. */
  registeredSourceUrl?:string;
+ registeredMunicipalityId?:string;
  legalBasis?:{classification:'section_5_official_act_candidate'|'section_44b_tdm_candidate'|'unassessed';reason?:string};
 }
 function sourceFetchOptions(source:RegistrySource):FetchOptions {
  const registeredSourceUrl=source.registeredSourceUrl??source.url??source.api?.url;
- return {registeredSourceUrl,ownerRobotsOverride:source.ownerRobotsOverride,machinePolicyUrls:source.knownMachinePolicyUrls,hostProfile:source.hostProfile??'municipal'};
+ return {registeredSourceUrl,registeredMunicipalityId:source.registeredMunicipalityId,registeredSourceId:source.id,ownerRobotsOverride:source.ownerRobotsOverride,machinePolicyUrls:source.knownMachinePolicyUrls,hostProfile:source.hostProfile??'municipal'};
 }
 /** Safe coded scope evidence; never includes source-controlled procedure text. */
 export class MunicipalIdentityBindingError extends Error {
@@ -50,7 +51,7 @@ export const DEFAULT_SOURCE_REVALIDATE_MS=24*60*60_000;
 export interface AdapterOptions {maxDocuments:number;maxPages:number;maxRequests:number;activeOparlRecordIds?:Set<string>;revalidateAfterMs?:number;pageRoots?:string[];seedDocumentUrls?:string[];discoveryBindings?:SourceContentBinding[]}
 export interface DiscoveredLink {url:string;title:string;pdf:boolean;structured:boolean}
 interface FrontierEntry extends SourceSeed {from:string;depth:number;revalidate?:boolean;previous?:CrawlDocument}
-export interface FrontierFailure {url:string;failure:string;reason:string;checkedAt:string;status?:number;policy?:SourceAccessPolicy;retryAfter?:string;action:'ask_municipality';urlRole?:'registered_source_context';targetUrlSha256?:string;policyAudit?:{policySha256:string;sourceHostSha256:string;robotsState:SourceAccessPolicy['robots']['state'];robotsStatus:'allowed'|'disallowed'|'unavailable';override:'owner-approved 2026-10-11'|null;tdmState:SourceAccessPolicy['tdm']['state'];tdmReferenceStatus:'unavailable'|null;tdmDeclarationStatus?:'unavailable'|null;access:SourceAccessPolicy['access']}}
+export interface FrontierFailure {url:string;from?:string;depth?:number;failure:string;reason:string;checkedAt:string;status?:number;policy?:SourceAccessPolicy;retryAfter?:string;action:'ask_municipality';urlRole?:'registered_source_context';targetUrlSha256?:string;policyAudit?:{policySha256:string;sourceHostSha256:string;robotsState:SourceAccessPolicy['robots']['state'];robotsStatus:'allowed'|'disallowed'|'unavailable';override:'owner-approved 2026-10-11'|null;tdmState:SourceAccessPolicy['tdm']['state'];tdmReferenceStatus:'unavailable'|null;tdmDeclarationStatus?:'unavailable'|null;access:SourceAccessPolicy['access']}}
 interface SourceFrontier {schemaVersion:1;municipalityId:string;sourceId:string;queue:FrontierEntry[];visited:string[];documents:CrawlDocument[];excludedDocuments?:CrawlExcludedDocument[];failures:FrontierFailure[];roots:string[];checkedUrls?:Record<string,{checkedAt:string;documentId:string}>;lastCheckedAt?:string|null;sourceBindings?:SourceContentBinding[]}
 /** Explicit target selection never inherits unrelated roots, seeds or API discovery. */
 export function registeredSourceTargets(municipality:RegistryMunicipality,source:RegistrySource,options:Pick<AdapterOptions,'pageRoots'|'seedDocumentUrls'>):{kind:'pages'|'seeds';urls:string[];seeds:SourceSeed[]}|undefined {
@@ -190,7 +191,7 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
  // Failed checks are retried only after their explicit backoff/TTL, never by bypassing their restriction.
  const deferred=frontier.failures.filter(item=>item.retryAfter?Date.parse(item.retryAfter)<=now:now-Date.parse(item.checkedAt)>=ttl);
  for(const item of deferred){
-  if(!queued.has(item.url)){frontier.queue.push({url:item.url,sourceId:source.id,depth:0,from:item.url,revalidate:true});queued.add(item.url);}
+  if(!queued.has(item.url)){frontier.queue.push({url:item.url,sourceId:source.id,depth:item.depth??0,from:item.from??item.url,revalidate:true});queued.add(item.url);}
   failed.delete(item.url);visited.delete(item.url);
  }
  frontier.failures=frontier.failures.filter(item=>!deferred.includes(item));
@@ -210,6 +211,10 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
  while(frontier.queue.length&&requests<options.maxRequests&&processedDocuments<options.maxDocuments&&htmlPages<options.maxPages){
   const item=frontier.queue[0];if(visited.has(item.url)&&!item.revalidate){frontier.queue.shift();await persist();continue;}requests++;
   try{
+   if(item.from!==item.url&&fetcher.hasRegisteredSourceDecision(sourceFetchOptions(source))){
+    const parent=frontier.documents.find(row=>row.url===item.from);
+    if(parent&&/^(?:text\/html|application\/xhtml\+xml)$/.test(parent.mimeType)&&discoverDocumentLinks(await readSourceText(fetcher,parent),parent.url).some(link=>link.url===item.url))await fetcher.recordDiscoveredSourceLinks(sourceFetchOptions(source),parent,[item.url]);
+   }
    const response=await fetcher.fetch(item.url,{...sourceFetchOptions(source),title:item.title,linkText:item.title,municipalityName:municipality.name}),isHtml=/^(?:text\/html|application\/xhtml\+xml)$/.test(response.mimeType),isPdf=response.mimeType==='application/pdf';
    frontier.sourceBindings=mergeSourceBindings(frontier.sourceBindings!,[sourceContentBinding(response)]);
    const isStructured=/xml|gml|zip/.test(response.mimeType)||/\.(?:xml|gml|zip)(?:$|[?])/i.test(response.url);
@@ -225,15 +230,18 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
    visited.add(item.url);visited.add(response.url);frontier.queue.shift();
    if(html)htmlPages++;
    if(html&&!discoveryOnly&&!targets){
+    const discovered:string[]=[];
     for(const link of discoverDocumentLinks(html,response.url)){
      if(boundRoots&&!link.pdf&&!link.structured&&!/\/(?:loadDocument|download)\.(?:php|phtml)(?:\?|$)/i.test(link.url)){
       const candidate=new URL(link.url);
       if(!boundRoots.some(root=>candidate.origin===root.origin&&(candidate.pathname===root.pathname||candidate.pathname.startsWith(root.pathname.slice(0,root.pathname.lastIndexOf('/')+1)))))continue;
      }
      if(!boundRoots&&source.crawlScope?.followLinkedDocuments===false&&(link.pdf||link.structured))continue;
+     discovered.push(link.url);
      if(visited.has(link.url)||queued.has(link.url)||failed.has(link.url))continue;
      frontier.queue.push({url:link.url,title:link.title,sourceId:source.id,depth:item.depth+1,from:response.url});queued.add(link.url);
     }
+    await fetcher.recordDiscoveredSourceLinks(sourceFetchOptions(source),response,discovered);
    }
   }catch(error){
    if(error instanceof CrawlRequestEvidenceCaptureError)throw error;
@@ -241,7 +249,7 @@ export async function crawlHtmlSource(fetcher:PoliteFetcher,municipality:Registr
    const failure=error instanceof PoliteFetchError?error.failure:'representation_error',status=error instanceof PoliteFetchError?error.status:undefined,checkedAt=new Date().toISOString();
    const transient=['timeout','network_error','dns_error','robots_unavailable','tdm_unavailable','host_cooldown','host_busy'].includes(failure)||status===429||status!==undefined&&status>=500;
    const retryAfter=error instanceof PoliteFetchError?error.retryAfter:undefined;
-   frontier.failures.push({url:item.url,failure,reason:failure,checkedAt,...(status?{status}:{}),...(error instanceof PoliteFetchError&&error.policy?{policy:error.policy}:{}),...(retryAfter?{retryAfter}:transient?{retryAfter:new Date(Date.now()+15*60_000).toISOString()}:{}),action:'ask_municipality'});
+   frontier.failures.push({url:item.url,from:item.from,depth:item.depth,failure,reason:failure,checkedAt,...(status?{status}:{}),...(error instanceof PoliteFetchError&&error.policy?{policy:error.policy}:{}),...(retryAfter?{retryAfter}:transient?{retryAfter:new Date(Date.now()+15*60_000).toISOString()}:{}),action:'ask_municipality'});
    hostStopped=status===403||status===429||failure.startsWith('host_');
    if(item.previous)frontier.documents=frontier.documents.filter(document=>document.id!==item.previous!.id);
    frontier.lastCheckedAt=checkedAt;failed.add(item.url);frontier.queue.shift();
@@ -281,6 +289,7 @@ export async function crawlParticipationApi(fetcher:PoliteFetcher,municipality:R
  $('.c-procedurelist__item[data-procedure-id]').each((_,element)=>{const row=$(element);names.set(row.attr('data-procedure-id')!,row.text().replace(/\s+/g,' '));});
  const normalizedName=municipality.name.toLocaleLowerCase('de'),seeds:SourceSeed[]=[];
  const bob=source.api.format==='bobsh-list',bindings=new Map<string,string|null>();let inventory:FetchedDocument|undefined;
+ const boundProcedures:Array<{procedureId:string;procedureUrl:string}>=[];
  if(bob){
   if(!source.url||!/^\d{8}$/.test(municipality.ags))throw Error('BOB discovery requires a registered inventory root and exact eight-digit AGS');
   if(fetcher.requestCount-before>=options.maxRequests)return {documents:[],sourceBindings:[sourceContentBinding(response)],notes:['BOB municipal identity inventory deferred by request budget; no empty-coverage inference'],requests:fetcher.requestCount-before,checkedAt:response.checkedAt,coverage:{state:'partial',pendingCount:1,runnableCount:1,blockedCount:0,scope:'Public BOB inventory and exact municipal-code bindings'}};
@@ -315,8 +324,11 @@ export async function crawlParticipationApi(fetcher:PoliteFetcher,municipality:R
   }
   // A consultation start is not the document's publication or decision date.
   seeds.push({url:new URL(procedure.procedureUrl,response.url).href,title:procedure.externalName,sourceId:source.id,documentDate:null});
+  if(bob)boundProcedures.push({procedureId:procedure.procedureId,procedureUrl:seeds.at(-1)!.url});
  }
  const apiRequests=fetcher.requestCount-before;
+ if(bob&&inventory)await fetcher.recordExactMunicipalBobDiscoveries(sourceFetchOptions(source),response,inventory,municipality.ags,boundProcedures);
+ await fetcher.recordDiscoveredSourceLinks(sourceFetchOptions(source),response,seeds.map(seed=>seed.url));
  const result=await crawlHtmlSource(fetcher,municipality,source,{...options,maxRequests:Math.max(0,options.maxRequests-apiRequests),discoveryBindings:mergeSourceBindings(options.discoveryBindings??[],[sourceContentBinding(response)],inventory?[sourceContentBinding(inventory)]:[])},bob?seeds:[...seeds,...municipality.seedDocuments?.filter(seed=>seed.sourceId===source.id)??[]],bob?seeds.map(seed=>seed.url):undefined);
  for(const document of result.documents){document.adapter=source.api.format;const seed=seeds.find(item=>item.url===document.url||item.url===document.metadata.discoveredFrom);const procedure=data.mapVars.find(item=>new URL(item.procedureUrl,response.url).href===seed?.url);if(procedure){document.metadata.caseKey=procedure.procedureId;document.metadata.caseKeyType=source.api.format==='diplan-list'?'diplan':'bobsh';}}
  result.requests+=apiRequests;result.checkedAt=[result.checkedAt,response.checkedAt,inventory?.checkedAt].filter((value):value is string=>!!value).sort().at(-1)??null;result.notes.unshift(`Observed ${source.api.format} public list ${response.url}; sha256 ${response.sha256}; all ${data.procedureCount} listed procedures considered for municipal discovery`);
@@ -333,6 +345,22 @@ export async function crawlMvPlanningApi(fetcher:PoliteFetcher,municipality:Regi
  let state:ApiState;
  try{state=JSON.parse(await readDerivedText(fetcher,statePath)) as ApiState;if(state.url!==source.api.url||!Array.isArray(state.sourceBindings))throw new PoliteFetchError('host_state_unsafe','MV API cache requires managed provenance; use a fresh acquisition lane');await fetcher.assertSourceBindingsAllowed(state.sourceBindings);}
  catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;state={url:source.api.url,offset:0,total:null,complete:false,seeds:[],metadata:{},evidence:[],sourceBindings:[]};}
+ if(state.seeds.length&&fetcher.hasRegisteredSourceDecision(sourceFetchOptions(source))){
+  for(const binding of state.sourceBindings){
+   const rawPath=join(fetcher.cacheDir,'sha256',binding.sha256);await fetcher.assertSourceReadable(rawPath,binding.url);
+   const bytes=await readFile(rawPath);if(hash(bytes)!==binding.sha256)throw new PoliteFetchError('host_state_unsafe','MV discovery body binding mismatch');
+   await fetcher.assertSourceBindingsAllowed([binding]);
+   const data=JSON.parse(bytes.toString('utf8')) as {success?:boolean;results?:unknown[][]};
+   if(data.success!==true||!Array.isArray(data.results)||data.results.some(group=>!Array.isArray(group)))throw Error('Unexpected retained MV discovery response');
+   const links:string[]=[];
+   for(const row of data.results.flat()){
+    if(!row||typeof row!=='object')continue;const record=row as {title?:unknown;_resourceLinkId?:unknown;x_GKZ?:unknown;x_dokumentURL?:unknown};
+    if(!Array.isArray(record.x_GKZ)||!record.x_GKZ.includes(municipality.ags)||typeof record.title!=='string'||typeof record._resourceLinkId!=='string'||!Array.isArray(record.x_dokumentURL))continue;
+    for(const link of record.x_dokumentURL)if(typeof link==='string')links.push(publicUrl(link).href);
+   }
+   fetcher.authorizeRegisteredSourceDiscovery(sourceFetchOptions(source),binding,links);
+  }
+ }
  const priorApiCheck=state.evidence.at(-1)?.checkedAt;
  if(state.complete&&(!priorApiCheck||!Number.isFinite(Date.parse(priorApiCheck))||Date.now()-Date.parse(priorApiCheck)>=(options.revalidateAfterMs??DEFAULT_SOURCE_REVALIDATE_MS))){state.offset=0;state.total=null;state.complete=false;}
  const notes:string[]=[];let requests=0;
@@ -348,6 +376,7 @@ export async function crawlMvPlanningApi(fetcher:PoliteFetcher,municipality:Regi
    if(!Array.isArray(record.x_GKZ)||!record.x_GKZ.includes(municipality.ags)||typeof record.title!=='string'||typeof record._resourceLinkId!=='string'||!Array.isArray(record.x_dokumentURL))continue;
    for(const link of record.x_dokumentURL){
     if(typeof link!=='string')continue;const documentUrl=publicUrl(link).href;if(state.metadata[documentUrl])continue;
+    await fetcher.recordDiscoveredSourceLinks(sourceFetchOptions(source),response,[documentUrl]);
     state.metadata[documentUrl]={title:record.title,caseKey:record._resourceLinkId};state.seeds.push({url:documentUrl,title:record.title,sourceId:source.id,documentDate:null});
    }
   }

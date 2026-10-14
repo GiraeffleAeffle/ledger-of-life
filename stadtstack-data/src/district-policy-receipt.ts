@@ -1,8 +1,9 @@
 import {z} from 'zod';
 import {HashSchema,ScopeSchema,semanticHash,type AdapterScope} from './district-adapter-contract.ts';
 import {ContentFreeSourcePolicySchema,assertSubscriptionSourcePolicy} from './district-schema.ts';
-import {effectiveSourcePermission} from './source-policy.ts';
+import {effectiveSourcePermission,registeredSourcePolicyApplies,registeredSourcePolicyContextUrls,isOriginTdmEvidence,REGISTERED_SOURCE_POLICY_VALIDITY_MS} from './source-policy.ts';
 import {assertHostNotOptedOut,readCivicOptOutSnapshot,CIVIC_POLICY_AUTHORITY_ID,type CivicPolicyOptions} from './civic-opt-out.ts';
+import {RegisteredRobotsAuditSchema,registeredRobotsAuditApplies,type RegisteredRobotsAudit} from './registered-source-policy.ts';
 
 export const POLICY_RECEIPT_VERSION='district-admissibility-v1';
 const DistributionPermissionSchema=z.discriminatedUnion('kind',[
@@ -10,12 +11,19 @@ const DistributionPermissionSchema=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('facts_with_attribution')}).strict(),
  z.object({kind:z.literal('distribution_licence'),distributionUrl:z.url(),licenceId:z.string().min(1),termsUrl:z.url(),termsSha256:HashSchema,approvalSha256:HashSchema}).strict(),
 ]);
-export const PolicyReceiptSchema=z.object({version:z.literal(POLICY_RECEIPT_VERSION),source:z.object({url:z.url(),sha256:HashSchema,mimeType:z.string().min(1)}).strict(),scope:ScopeSchema,sourcePolicy:ContentFreeSourcePolicySchema,permission:DistributionPermissionSchema,checkedAt:z.iso.datetime(),expiresAt:z.iso.datetime(),authorityId:z.string().min(1),authoritySha256:HashSchema,optOutSnapshotSha256:HashSchema,policySnapshotSha256:HashSchema}).strict().superRefine((receipt,ctx)=>{
+export const PolicyReceiptSchema=z.object({version:z.literal(POLICY_RECEIPT_VERSION),source:z.object({url:z.url(),sha256:HashSchema,mimeType:z.string().min(1)}).strict(),scope:ScopeSchema,sourcePolicy:ContentFreeSourcePolicySchema,registeredSourceEligibility:RegisteredRobotsAuditSchema.optional(),permission:DistributionPermissionSchema,checkedAt:z.iso.datetime(),expiresAt:z.iso.datetime(),authorityId:z.string().min(1),authoritySha256:HashSchema,optOutSnapshotSha256:HashSchema,policySnapshotSha256:HashSchema}).strict().superRefine((receipt,ctx)=>{
  const fail=(message:string)=>ctx.addIssue({code:'custom',message});
- if(Date.parse(receipt.expiresAt)<=Date.parse(receipt.checkedAt)||Date.parse(receipt.expiresAt)-Date.parse(receipt.checkedAt)>24*60*60*1000)fail('Policy receipt validity must be positive and at most 24 hours');
+ const eligibility=receipt.registeredSourceEligibility;
+ if(eligibility&&(eligibility.municipalityId!==receipt.scope.municipalityId||eligibility.sourceId!==receipt.scope.sourceId||eligibility.ags!==receipt.scope.ags||eligibility.discovery||eligibility.municipalDiscovery||!registeredRobotsAuditApplies(eligibility,eligibility.root)))fail('Registry eligibility does not bind exact receipt scope');
+ const maxValidity=registeredSourcePolicyApplies(receipt.sourcePolicy,receipt.source,receipt.scope,receipt.registeredSourceEligibility)?REGISTERED_SOURCE_POLICY_VALIDITY_MS:24*60*60*1000;
+ if(Date.parse(receipt.expiresAt)<=Date.parse(receipt.checkedAt)||Date.parse(receipt.expiresAt)-Date.parse(receipt.checkedAt)>maxValidity)fail('Policy receipt validity exceeds its reviewed source scope');
+ if(maxValidity===REGISTERED_SOURCE_POLICY_VALIDITY_MS){
+  const clocks=[receipt.sourcePolicy.robots.checkedAt,...receipt.sourcePolicy.tdm.evidence.filter(isOriginTdmEvidence).map(row=>row.checkedAt)];
+  if(clocks.length<2||clocks.some(clock=>!clock||!Number.isFinite(Date.parse(clock)))||Date.parse(receipt.expiresAt)>Math.min(...clocks.map(clock=>Date.parse(clock!)))+maxValidity)fail('Registered-source receipt exceeds genuine policy evidence validity');
+ }
  if(receipt.permission.kind==='distribution_licence'&&receipt.permission.distributionUrl!==receipt.source.url)fail('Distribution licence does not bind exact received URL');
  if(receipt.sourcePolicy.access==='authenticated_owner_account'&&receipt.permission.kind!=='facts_with_attribution')fail('Owner account permission is facts_with_attribution only');
- if(receipt.policySnapshotSha256!==semanticHash({source:receipt.source,scope:receipt.scope,sourcePolicy:receipt.sourcePolicy,permission:receipt.permission,authorityId:receipt.authorityId,authoritySha256:receipt.authoritySha256,optOutSnapshotSha256:receipt.optOutSnapshotSha256}))fail('Policy snapshot hash mismatch');
+ if(receipt.policySnapshotSha256!==semanticHash({source:receipt.source,scope:receipt.scope,sourcePolicy:receipt.sourcePolicy,permission:receipt.permission,...(receipt.registeredSourceEligibility?{registeredSourceEligibility:receipt.registeredSourceEligibility}:{}),authorityId:receipt.authorityId,authoritySha256:receipt.authoritySha256,optOutSnapshotSha256:receipt.optOutSnapshotSha256}))fail('Policy snapshot hash mismatch');
 });
 export type PolicyReceipt=z.infer<typeof PolicyReceiptSchema>;
 export type DistributionPermission=z.infer<typeof DistributionPermissionSchema>;
@@ -28,13 +36,17 @@ function assertSharedAdmission(receipt:Pick<PolicyReceipt,'source'|'sourcePolicy
  if(receipt.permission.kind==='official_work'&&receipt.sourcePolicy.documentOrigin?.classification!=='official_work')throw Error('Official-work permission lacks exact-byte classification');
  if(receipt.permission.kind==='distribution_licence'&&receipt.permission.distributionUrl!==receipt.source.url)throw Error('Distribution permission mismatch');
 }
-export async function createPolicyReceipt(input:{source:PolicyReceipt['source'];sourcePolicy:unknown;permission:DistributionPermission;scope:AdapterScope;checkedAt:string;expiresAt:string},options:CivicPolicyOptions={}):Promise<{receipt:PolicyReceipt;receiptSha256:string;snapshotSha256:string}> {
- const sourcePolicy=ContentFreeSourcePolicySchema.parse(JSON.parse(JSON.stringify(input.sourcePolicy))),permission=DistributionPermissionSchema.parse(input.permission),scope=ScopeSchema.parse(input.scope);
+async function assertReceiptHostsActive(receipt:Pick<PolicyReceipt,'source'|'sourcePolicy'|'scope'|'registeredSourceEligibility'>,options:CivicPolicyOptions):Promise<void>{
+ await assertHostNotOptedOut(receipt.source.url,options);
+ for(const url of registeredSourcePolicyContextUrls(receipt.sourcePolicy,receipt.source,receipt.scope,receipt.registeredSourceEligibility))await assertHostNotOptedOut(url,options);
+}
+export async function createPolicyReceipt(input:{source:PolicyReceipt['source'];sourcePolicy:unknown;registeredSourceEligibility?:RegisteredRobotsAudit;permission:DistributionPermission;scope:AdapterScope;checkedAt:string;expiresAt:string},options:CivicPolicyOptions={}):Promise<{receipt:PolicyReceipt;receiptSha256:string;snapshotSha256:string}> {
+ const sourcePolicy=ContentFreeSourcePolicySchema.parse(JSON.parse(JSON.stringify(input.sourcePolicy))),permission=DistributionPermissionSchema.parse(input.permission),scope=ScopeSchema.parse(input.scope),registeredSourceEligibility=input.registeredSourceEligibility?RegisteredRobotsAuditSchema.parse(input.registeredSourceEligibility):undefined;
  assertSharedAdmission({source:input.source,sourcePolicy,permission});
- await assertHostNotOptedOut(input.source.url,options);
+ await assertReceiptHostsActive({source:input.source,sourcePolicy,scope,registeredSourceEligibility},options);
  const optout=await readCivicOptOutSnapshot(options);
- await assertHostNotOptedOut(input.source.url,options);
- const fields={source:input.source,scope,sourcePolicy,permission,authorityId:optout.authorityId,authoritySha256:optout.authoritySha256,optOutSnapshotSha256:optout.sha256};
+ await assertReceiptHostsActive({source:input.source,sourcePolicy,scope,registeredSourceEligibility},options);
+ const fields={source:input.source,scope,sourcePolicy,permission,...(registeredSourceEligibility?{registeredSourceEligibility}:{}),authorityId:optout.authorityId,authoritySha256:optout.authoritySha256,optOutSnapshotSha256:optout.sha256};
  const receipt=PolicyReceiptSchema.parse({version:POLICY_RECEIPT_VERSION,...fields,checkedAt:input.checkedAt,expiresAt:input.expiresAt,policySnapshotSha256:semanticHash(fields)});
  if(Date.parse(receipt.checkedAt)>Date.now()||Date.parse(receipt.expiresAt)<=Date.now())throw Error('Current policy receipt clock invalid');
  return {receipt,receiptSha256:semanticHash(receipt),snapshotSha256:receipt.policySnapshotSha256};
@@ -48,10 +60,10 @@ export async function recheckPolicyReceipt(input:unknown,options:CivicPolicyOpti
  const authorityOptions:CivicPolicyOptions={stateDir:options.stateDir,authorityId:receipt.authorityId,authoritySha256:receipt.authoritySha256};
  if(Date.parse(evaluationAt)<Date.parse(current.checkedAt)||Date.parse(evaluationAt)>=Date.parse(current.expiresAt))throw Error('Policy receipt expired; source revalidation required');
  if(Math.abs(Date.now()-Date.parse(evaluationAt))>60_000)throw Error('Current policy check cannot use a historical clock');
- assertSharedAdmission(current);await assertHostNotOptedOut(current.source.url,authorityOptions);
- const optout=await readCivicOptOutSnapshot(authorityOptions);await assertHostNotOptedOut(current.source.url,authorityOptions);
+ assertSharedAdmission(current);await assertReceiptHostsActive(current,authorityOptions);
+ const optout=await readCivicOptOutSnapshot(authorityOptions);await assertReceiptHostsActive(current,authorityOptions);
  if(optout.authorityId!==receipt.authorityId||optout.authoritySha256!==receipt.authoritySha256)throw Error('Current policy authority differs from original authority');
- return {receipt,receiptSha256:semanticHash(receipt),admissibilityReceiptSha256:semanticHash(current),optOutSnapshotSha256:optout.sha256,snapshotSha256:semanticHash({source:current.source,scope:current.scope,sourcePolicy:current.sourcePolicy,permission:current.permission,authorityId:optout.authorityId,authoritySha256:optout.authoritySha256,optOutSnapshotSha256:optout.sha256})};
+ return {receipt,receiptSha256:semanticHash(receipt),admissibilityReceiptSha256:semanticHash(current),optOutSnapshotSha256:optout.sha256,snapshotSha256:semanticHash({source:current.source,scope:current.scope,sourcePolicy:current.sourcePolicy,permission:current.permission,...(current.registeredSourceEligibility?{registeredSourceEligibility:current.registeredSourceEligibility}:{}),authorityId:optout.authorityId,authoritySha256:optout.authoritySha256,optOutSnapshotSha256:optout.sha256})};
 }
 export async function loadPolicyReceipt(cas:{read:(hash:string)=>Promise<Uint8Array>},hash:string):Promise<PolicyReceipt> {
  HashSchema.parse(hash);

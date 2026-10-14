@@ -30,7 +30,7 @@ import {initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSou
 import type {ManagedSourceContent,ManagedSourceBinding,CivicPolicyOptions} from './civic-opt-out.ts';
 import {HttpObservationSchema,HttpObservationProofSchema,HttpSourceBindingSchema,authenticatedHttpBinding} from './district-http-observation.ts';
 import type {HttpObservationProof} from './district-http-observation.ts';
-import {ownerRobotsOverrideFor,ownerGenesisAccessFor} from './source-policy.ts';
+import {ownerRobotsOverrideFor,ownerGenesisAccessFor,sourcePolicyExpiresAt,registeredSourcePolicyApplies,PUBLIC_SOURCE_POLICY_VALIDITY_MS} from './source-policy.ts';
 import {structuredRunSchema,structuredCoverageReceiptSchema,structuredCoverageStateForNoOutput,verifyStructuredRunReceipts} from './district-structured-run.ts';
 import type {StructuredJobResult} from './district-structured-jobs.ts';
 import type {StructuredCoverageReceipt} from './district-structured-run.ts';
@@ -86,7 +86,7 @@ export const HostGroupsSchema=z.object({schemaVersion:z.literal('district-host-g
 export async function acquisitionContract(){
  const hostGroupsBytes=await readFile(join(REPO,'sources/district-host-groups.json'));
  HostGroupsSchema.parse(JSON.parse(hostGroupsBytes.toString('utf8')));
- return semanticHash({version:ACQUISITION_VERSION,hostGroupsSha256:digest(hostGroupsBytes),files:await Promise.all(['district-r1.ts','district-r1-state.ts','polite-fetch.ts','district-crawl-request.ts','district-policy-receipt.ts','source-policy.ts','civic-opt-out.ts','district-native-request.ts','genesis-owner-credentials.ts','genesis-owner-acquisition.ts'].map(async file=>({file,sha256:digest(await readFile(join(REPO,'src',file)))})))});
+ return semanticHash({version:ACQUISITION_VERSION,hostGroupsSha256:digest(hostGroupsBytes),files:await Promise.all(['district-r1.ts','district-r1-state.ts','polite-fetch.ts','district-crawl-request.ts','district-policy-receipt.ts','source-policy.ts','registered-source-policy.ts','civic-opt-out.ts','district-native-request.ts','genesis-owner-credentials.ts','genesis-owner-acquisition.ts'].map(async file=>({file,sha256:digest(await readFile(join(REPO,'src',file)))})))});
 }
 
 /** Controlled counts over the actual committed pages; no source literals or raw hold explanations. */
@@ -238,14 +238,14 @@ export function acquisitionFailureReason(error:unknown):ReasonCode|null {
 }
 export interface AcquisitionFixture {fetchRoot:string;policy:CivicPolicyOptions;inspection?:FixturePolicyInspection}
 /** Shared governed request admission for acquisition and current-policy jobs. */
-export async function createR1PublicFetcher(store:DistrictJobStore,context:Parameters<JobHandler>[0],options:{maxRequests:number;maxBytes:number;fixture?:AcquisitionFixture;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void}){
+export async function createR1PublicFetcher(store:DistrictJobStore,context:Parameters<JobHandler>[0],options:{maxRequests:number;maxBytes:number;fixture?:AcquisitionFixture;registry?:DistrictRegistry;registrySha256?:string;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void}){
  const fixture=options.fixture;
  if(fixture&&(await assertCivicPolicyAuthority(fixture.policy)).mode!=='isolated-fixture')throw Error('Acquisition fixture requires isolated authority');
  const fetchRoot=fixture?.fetchRoot??R1_FETCH_ROOT,policy=fixture?.policy??{};
  await privateRoot(fetchRoot);await initializeManagedAcquisitionLane(fetchRoot,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'fetch'});
  let requests=0;
  const group=HostGroupsSchema.parse(JSON.parse(await readFile(join(REPO,'sources/district-host-groups.json'),'utf8'))).serviceGroups[0],laneKey=`service:${group.id}`;
- return new PoliteFetcher({cacheDir:fetchRoot,minDelayMs:group.minStartIntervalMs,maxBytes:options.maxBytes,ownerPolicyLane:{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID},fixtureInspection:fixture?.inspection,beforeRequest:async url=>{
+ const fetcher=new PoliteFetcher({cacheDir:fetchRoot,minDelayMs:group.minStartIntervalMs,maxBytes:options.maxBytes,ownerPolicyLane:{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID},fixtureInspection:fixture?.inspection,beforeRequest:async url=>{
   context.signal.throwIfAborted();if(++requests>options.maxRequests)throw new DistrictExecutionHold('source_limit_exceeded');
   if(!['http:','https:'].includes(new URL(url).protocol))throw Error('Non-public acquisition transport');
   const lane=await store.pool.query<{normalized_host:string;shared_service_group:string;max_in_flight:number;min_start_interval_ms:number}>('INSERT INTO district_pipeline.host_lanes(lane_key,normalized_host,shared_service_group,max_in_flight,min_start_interval_ms) VALUES($1,$2,$3,$4,$5) ON CONFLICT(lane_key) DO UPDATE SET lane_key=EXCLUDED.lane_key RETURNING normalized_host,shared_service_group,max_in_flight,min_start_interval_ms',[laneKey,'*',group.id,group.maxInFlight,group.minStartIntervalMs]);
@@ -258,8 +258,10 @@ export async function createR1PublicFetcher(store:DistrictJobStore,context:Param
   if(waitMs)await waitBeforeDispatch(waitMs,undefined,{signal:context.signal}).catch(error=>{context.signal.throwIfAborted();throw error;});
   await context.acquireHostLane(laneKey);context.signal.throwIfAborted();
  },onRedirect:options.onRedirect});
+ if(options.registry)fetcher.registerRegisteredSources(options.registry,options.registrySha256??semanticHash(options.registry));
+ return fetcher;
 }
-export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegistry,fixture?:AcquisitionFixture):JobHandler{return async context=>{
+export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegistry,fixture?:AcquisitionFixture,registrySha256=semanticHash(registry)):JobHandler{return async context=>{
  const selector=await validateAcquisitionSelector(registry,store,context.cas,context.job.spec.selector),contract=await acquisitionContract();
  if(context.job.spec.semanticContractSha256!==contract||semanticHash(context.job.spec.sourceScope)!==semanticHash(selector.scope))throw Error('Acquisition job contract mismatch');
  // A custom root/inspection seam is fixture-only, never a production authority override.
@@ -268,13 +270,20 @@ export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegis
  const {city,source}=registeredScope(registry,selector.scope,selector.root);await privateRoot(fetchRoot);
  await initializeManagedAcquisitionLane(fetchRoot,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'fetch'});
  const redirectChain=[selector.request.url];
- const fetcher=await createR1PublicFetcher(store,context,{maxRequests:selector.maxRequests,maxBytes:selector.maxBytes,fixture,onRedirect:event=>{if(event.requestUrl===selector.request.url)redirectChain.push(event.to);}});
+ const fetcher=await createR1PublicFetcher(store,context,{maxRequests:selector.maxRequests,maxBytes:selector.maxBytes,fixture,registry,registrySha256,onRedirect:event=>{if(event.requestUrl===selector.request.url)redirectChain.push(event.to);}});
+ const fetchOptions={method:selector.request.method,body:selector.request.body??undefined,publicOperation:selector.request.publicOperation??undefined,ownerRobotsOverride:ownerRobotsOverrideFor(selector.root)??undefined,registeredSourceUrl:selector.root,registeredMunicipalityId:city.id,registeredSourceId:source.id,municipalityName:city.name,machinePolicyUrls:source.knownMachinePolicyUrls};
+ if(selector.discovery){
+  const {result}=await committedResult(store,context.cas,selector.discovery.stepReceiptSha256,selector.discovery.resultSha256);
+  const original=PolicyReceiptSchema.parse(JSON.parse((await context.cas.read(result.policyReceiptSha256)).toString('utf8')));
+  fetcher.authorizeRegisteredSourceDiscovery(fetchOptions,{...original.source,policy:original.sourcePolicy},[selector.request.url]);
+ }
  let response:FetchedDocument;
- try{response=await fetcher.fetch(selector.request.url,{method:selector.request.method,body:selector.request.body??undefined,publicOperation:selector.request.publicOperation??undefined,ownerRobotsOverride:ownerRobotsOverrideFor(selector.root)??undefined,registeredSourceUrl:selector.root,municipalityName:city.name,machinePolicyUrls:source.knownMachinePolicyUrls});}
+ try{response=await fetcher.fetch(selector.request.url,fetchOptions);}
  catch(error){context.signal.throwIfAborted();const reasonCode=acquisitionFailureReason(error);if(reasonCode===null||reasonCode==='execution_exception')throw error;return {outcome:'held_execution',reasonCode,versions:{acquisition:contract}};}
  context.signal.throwIfAborted();
  const {bytes,httpObservation}=response.policy?.access==='authenticated_owner_account'?await readGenesisOwnerRepresentation(fetchRoot,response,policy,selector.maxBytes):{bytes:await readFetchedBytes(fetchRoot,response.localPath,response.sha256,selector.maxBytes),httpObservation:await readHttpObservation(response,fetchRoot,policy)};
- const checkedAt=new Date().toISOString(),proof=await createPolicyReceipt({source:{url:response.url,sha256:response.sha256,mimeType:response.mimeType},sourcePolicy:response.policy,scope:selector.scope,permission:selector.permission,checkedAt,expiresAt:new Date(Date.parse(checkedAt)+60*60*1000).toISOString()},policy);
+ const registeredSourceEligibility=fetcher.registeredSourceEligibility({registeredMunicipalityId:selector.scope.municipalityId,registeredSourceId:selector.scope.sourceId,registeredSourceUrl:selector.root});
+ const checkedAt=new Date().toISOString(),expiresAt=registeredSourcePolicyApplies(response.policy!,response,selector.scope,registeredSourceEligibility)?sourcePolicyExpiresAt(response.policy!,response.checkedAt,response,selector.scope,registeredSourceEligibility):new Date(Date.parse(checkedAt)+PUBLIC_SOURCE_POLICY_VALIDITY_MS).toISOString(),proof=await createPolicyReceipt({source:{url:response.url,sha256:response.sha256,mimeType:response.mimeType},sourcePolicy:response.policy,registeredSourceEligibility,scope:selector.scope,permission:selector.permission,checkedAt,expiresAt},policy);
  const representation=await persistR1Representation(store,context.cas,{bytes,receipt:proof.receipt,request:selector.request,retrievedAt:response.retrievedAt,fetchedAt:response.checkedAt,sourceVersion:selector.sourceVersion,redirectChain,httpObservation:{observationId:httpObservation.observationId,receiptSha256:httpObservation.receiptSha256,bytes:Buffer.from(httpObservation.bytes)}},policy);
  const descriptor=RepresentationDescriptorSchema.parse({version:'district-r1-representation-v1',scope:selector.scope,root:selector.root,snapshotId:representation.snapshotId,policyDecisionId:representation.policyDecisionId,receiptSha256:representation.receiptSha256,sourceArtifact:representation.sourceArtifact,snapshot:representation.snapshot,httpObservation,fetchedAt:response.checkedAt,admittedAt:proof.receipt.checkedAt,redirectChain});
  const artifact=await persistMetadata(store,context.cas,{kind:'acquisition_descriptor',payload:descriptor,sources:[{sha256:response.sha256,url:response.url,policyReceiptSha256:proof.receiptSha256,httpObservation}]},policy);
@@ -391,8 +400,8 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
    if(authorizationIndex<0)throw Error('Explicit authorization required');
    const authorization=await pool.query<{has_b:boolean;only_b:boolean}>(`SELECT BOOL_OR(j.step='assessment_b') AS has_b,BOOL_AND(j.step='assessment_b') AS only_b FROM district_pipeline.preauthorizations a JOIN district_pipeline.jobs j ON j.job_key=ANY(a.allowed_job_keys) WHERE a.id=$1`,[authorizationId]);
    if(authorization.rows[0]?.has_b&&!authorization.rows[0]?.only_b)throw new DistrictExecutionHold('authorization_mode_mismatch');
-   const refreshStore=new DistrictJobStore(pool),refresh=policyRefreshHandler(refreshStore,(context,maxRequests)=>createR1PublicFetcher(refreshStore,context,{maxRequests,maxBytes:1024*1024}));
-   await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlersFor(pool),...assessmentQueueHandlers(pool),policy_refresh:refresh,acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry)},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
+   const refreshStore=new DistrictJobStore(pool),refresh=policyRefreshHandler(refreshStore,(context,maxRequests)=>createR1PublicFetcher(refreshStore,context,{maxRequests,maxBytes:1024*1024,registry,registrySha256}));
+   await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlersFor(pool),...assessmentQueueHandlers(pool),policy_refresh:refresh,acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry,undefined,registrySha256)},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
   }finally{await pool.end();}return;
  }
  if(args.length)throw Error('R1 commands require only explicit registry configuration flags and bounded JSON stdin');
