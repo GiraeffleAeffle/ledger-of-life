@@ -990,8 +990,13 @@ export async function assertManagedRawSourceBinding(input:string,binding:Extract
  });
 }
 
+function scratchParts(path:string):string[]{
+ if(!path||isAbsolute(path)||path.includes('\\')||/[\x00-\x1f\x7f]/.test(path)||path.split('/').length>6||path.split('/').some(part=>!part||part==='.'||part==='..'||part.length>255))throw new CivicPolicyStateError('SCRATCH_PATH_UNSAFE');
+ return path.split('/');
+}
+const sensitiveScratchPart=(part:string)=>/^\.?(?:ssh|git|env|credentials?|secrets?|auth|tokens?|id_rsa|id_ed25519)(?:[._-]|$)/i.test(part);
 function scratchRelative(path:string):string{
- if(!path||isAbsolute(path)||path.includes('\\')||/[\x00-\x1f\x7f]/.test(path)||path.split('/').length>6||path.split('/').some(part=>!part||part==='.'||part==='..'||part.length>255||/^\.?(?:ssh|git|env|credentials?|secrets?|auth|tokens?|id_rsa|id_ed25519)(?:[._-]|$)/i.test(part)))throw new CivicPolicyStateError('SCRATCH_PATH_UNSAFE');
+ if(scratchParts(path).some(sensitiveScratchPart))throw new CivicPolicyStateError('SCRATCH_PATH_UNSAFE');
  return path;
 }
 async function inspectScratchTree(root:Root,lease:ScratchLease):Promise<{files:Array<{path:string;stat:Stats}>;directories:Array<{path:string;stat:Stats}>}|null>{
@@ -1002,9 +1007,16 @@ async function inspectScratchTree(root:Root,lease:ScratchLease):Promise<{files:A
  const visit=async(folder:string,metadata:Stats):Promise<void>=>{
   for await(const child of await opendir(folder)){
    if(++count>MAX_SCRATCH_FILES||lease.identity===null)throw new CivicPolicyStateError('SCRATCH_INVENTORY_INCOMPLETE');
-   const candidate=join(folder,child.name);scratchRelative(relative(path,candidate).split(sep).join('/'));
+   const candidate=join(folder,child.name),parts=scratchParts(relative(path,candidate).split(sep).join('/'));
    const item=await lstat(candidate);
    if(item.isSymbolicLink()||item.uid!==process.getuid?.()||(item.mode&0o022)!==0)throw new CivicPolicyStateError('SCRATCH_PATH_UNSAFE');
+   if(parts.some(sensitiveScratchPart)){
+    // No credential content is adopted, opened or deleted. Only an empty,
+    // private, owned directory can be retired by its authenticated lease.
+    if(!item.isDirectory()||(item.mode&0o077)!==0)throw new CivicPolicyStateError('SCRATCH_PATH_UNSAFE');
+    for await(const _entry of await opendir(candidate))throw new CivicPolicyStateError('SCRATCH_PATH_UNSAFE');
+    directories.push({path:candidate,stat:item});continue;
+   }
    if(item.isDirectory()){await directory(candidate);await visit(candidate,item);}
    else if(item.isFile()&&item.nlink===1&&item.size<=MAX_CONTENT)files.push({path:candidate,stat:item});
    else throw new CivicPolicyStateError('SCRATCH_PATH_UNSAFE');

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import type {TestContext} from 'node:test';
 import assert from 'node:assert/strict';
+import {z} from 'zod';
 import {rm,readFile,writeFile,lstat} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {join} from 'node:path';
@@ -13,7 +14,7 @@ import {residualAssessmentItem} from '../src/district-assessment-jobs.ts';
 import {ASSESSMENT_CONTEXT_BYTES,ASSESSMENT_RECONCILIATION_BYTES,ASSESSMENT_NEIGHBOUR_CODE_UNITS,AssessmentContextHold,assertAssessmentContextBound,buildPreparedAssessmentContext,verifyAssessmentContext} from '../src/district-assessment-context.ts';
 import {BridgeLeaseSchema,bridgeInputHash,ASSESSMENT_BRIDGE_VERSION,BRIDGE_LIMITS} from '../src/district-assessment-bridge-contract.ts';
 import {documentChunks} from '../src/district-claims.ts';
-import {MAX_SUBSCRIPTION_INPUT_BYTES,encodeSubscriptionInput} from '../src/district-model.ts';
+import {MAX_SUBSCRIPTION_INPUT_BYTES,encodeSubscriptionInput,codexResponseSchema} from '../src/district-model.ts';
 import {OMP_LIMITS,runVmOmpAssessment} from '../src/district-omp-b-runner.ts';
 import {verifyPreparedDocument,type PreparedDocument} from '../src/district-prepared-document.ts';
 import {knowledgeEvidenceHash} from '../src/district-schema.ts';
@@ -146,4 +147,30 @@ test('standalone C authenticates its oversized request before intent and records
  });
  const held=JSON.parse(await readFile(result,'utf8').catch(error=>{throw new Error(stderr,{cause:error});}));assert.equal(held.disposition,'held_quality');assert.equal(held.reason,'assessment_context_exceeded');assert.equal(held.fallbackAttempted,false);
  for(const path of [result+'.intent.json',ledger,pause])await assert.rejects(lstat(path),{code:'ENOENT'});
+});
+
+test('pilot-shaped multichunk A/C assessments use strict complete nullable-review response objects',async t=>{
+ const f=await largeItem(t),evidence=await originalEvidence(f.item,f.context),input=buildAssessmentPassInput(f.item,evidence,'A');
+ const original=z.toJSONSchema(assessmentOutputSchema);
+ assert.ok(original.properties);assert.ok(original.required);
+ assert.ok('valueReview' in original.properties&&'criticalReview' in original.properties);
+ assert.equal(original.required.includes('valueReview'),false);assert.equal(original.required.includes('criticalReview'),false);
+ let objects=0;
+ const strict=(node:unknown):void=>{
+  if(node===null||typeof node!=='object')return;
+  if('type' in node&&node.type==='object'){
+   assert.ok('properties' in node&&node.properties&&typeof node.properties==='object');
+   assert.ok('required' in node&&Array.isArray(node.required));
+   assert.deepEqual([...node.required].sort(),Object.keys(node.properties).sort());
+   assert.ok('additionalProperties' in node&&node.additionalProperties===false);objects++;
+  }
+  for(const value of Object.values(node))strict(value);
+ };
+ const wire=codexResponseSchema(original);strict(wire);assert.ok(objects>10);
+ assert.deepEqual(codexResponseSchema(wire),wire);
+ const output=assessmentOutputSchema.parse({...assessmentOutputSchema.parse(answer(input).value),valueReview:null,criticalReview:null});
+ const A=syntheticAssessmentReceipt(f.item,'A',output,input.data),B=syntheticAssessmentReceipt(f.item,'B',output,input.data);
+ const C=buildAssessmentPassInput(f.item,evidence,'C',{A,B});assert.equal(C.role,'C');
+ assert.ok(Buffer.byteLength(encodeSubscriptionInput(PROMPTS.C,C.data))<ASSESSMENT_RECONCILIATION_BYTES);
+ assert.deepEqual(JSON.parse(f.item.claim).propositions.map((p:{claimId:string})=>p.claimId),f.item.claimIds);
 });

@@ -2,17 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
 import {PassThrough} from 'node:stream';
-import {mkdtemp,writeFile,chmod,rm,readFile} from 'node:fs/promises';
+import {mkdtemp,writeFile,chmod,rm,readFile,mkdir,lstat} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import type {ChildProcess,SpawnOptions} from 'node:child_process';
-import {inspectOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,OMP_RUNNER_VERSION,OMP_VERSION,OmpRunnerHold} from '../src/district-omp-b-runner.ts';
+import {inspectOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OmpRunnerHold} from '../src/district-omp-b-runner.ts';
 import {OMP_CONTAINER_ENVIRONMENT,OMP_EXECUTION_ARGS,OMP_PROCESS} from '../src/district-execution-profile.ts';
 import {semanticHash,digest,canonicalJson} from '../src/district-adapter-contract.ts';
 import {AssessmentBEnqueueManifestSchema} from '../src/district-r1.ts';
 import {assessmentOutputSchema,PROMPTS,digest as assessmentDigest} from '../src/district-assessment.ts';
 import {z} from 'zod';
+import {withManagedSourceScratch,withManagedSourceWrite,initializeManagedAcquisitionLane,assertManagedSourceReadable,readCivicPolicyInventory,CivicPolicyStateError} from '../src/civic-opt-out.ts';
+import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 
 const answer={itemId:'synthetic',outcome:'supported',assertions:[],scores:{correctness:1,sources:1,usefulness:1},holdReasons:[],rationale:'synthetic',valueReview:null};
 function message(overrides:Record<string,unknown>={}){return {responseId:'msg-one',timestamp:1791800000000,role:'assistant',provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',stopReason:'stop',content:[{type:'text',text:JSON.stringify(answer)}],usage:{input:7,output:3,cacheRead:5,cacheWrite:2,totalTokens:17,cost:{input:0.01,output:0.02,cacheRead:0.03,cacheWrite:0.04,total:0.1}},...overrides};}
@@ -239,4 +241,30 @@ test('delivered source-free control contains the exact serialized output schema 
  assert.equal(digest(serialized),assessmentDigest(schema));
  assert.equal(bundle.outputSchemaSha256,assessmentDigest(schema));assert.equal(bundle.systemPromptSha256,digest(control));
  assert.ok(control.startsWith(PROMPTS.B));assert.equal(control.includes('synthetic source, never an operational observation'),false);
+});
+
+for(const failure of ['credential','unsafe-output'] as const)test('parallel A evidence reads survive B '+failure+' in its disjoint enrolled lane',async t=>{
+ const fixture=await createCivicPolicyTestContext(t),cas=fixture.managedRoot,options={...fixture.policy,decisionId:fixture.decisionId,kind:'artifacts' as const},bytes=Buffer.from('Synthetic authenticated assessment original');
+ await initializeManagedAcquisitionLane(cas,options);
+ const binding={kind:'prepared_source' as const,url:'https://assessment.test/original',sourceSha256:digest(bytes),observationId:'synthetic-original',receiptSha256:digest('synthetic-admission')};
+ await withManagedSourceWrite(cas,[{...binding,relativePath:'original.txt',contentSha256:digest(bytes),independentAllowed:false}],()=>writeFile(join(cas,'original.txt'),bytes,{mode:0o600}),fixture.policy);
+ const root=ompAssessmentScratchRoot(cas);assert.equal(root,cas+'-omp-b-scratch');
+ const ready=Promise.withResolvers<void>(),done=Promise.withResolvers<void>();
+ const A=withManagedSourceScratch(cas,[binding],async scope=>{
+  await writeFile(join(scope.directory,'schema.json'),'{}',{mode:0o600});ready.resolve();await done.promise;
+  await scope.assertActive();await assertManagedSourceReadable(join(cas,'original.txt'),fixture.policy);assert.deepEqual(await readFile(join(cas,'original.txt')),bytes);
+ },{...options,purpose:'openai'});
+ void A.catch(ready.reject);await ready.promise;let scratch='';
+ try{
+  const B=withManagedSourceScratch(root,[binding],async scope=>{
+   scratch=scope.directory;await mkdir(join(scratch,failure==='credential'?'host-control':'credentials'),{mode:0o700});
+   if(failure==='unsafe-output')await writeFile(join(scratch,'credentials','token.json'),'Synthetic protected bytes',{mode:0o600});
+   throw new OmpRunnerHold('credential_unavailable');
+  },{...options,purpose:'artifact'});
+  await assert.rejects(B,failure==='credential'?OmpRunnerHold:CivicPolicyStateError);
+ }finally{done.resolve();await A;}
+ const inventory=await readCivicPolicyInventory(fixture.policy);assert.equal(inventory.roots.find(r=>r.path===cas)!.complete,true);
+ assert.equal(inventory.scratch.filter(lease=>lease.rootId===digest(root))[0].state,failure==='credential'?'closed':'partial');
+ if(failure==='credential')await assert.rejects(lstat(scratch),{code:'ENOENT'});
+ else assert.equal(await readFile(join(scratch,'credentials','token.json'),'utf8'),'Synthetic protected bytes');
 });

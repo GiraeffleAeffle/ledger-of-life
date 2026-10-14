@@ -2,7 +2,7 @@ import {spawn as nodeSpawn,type ChildProcess, type SpawnOptions} from 'node:chil
 import {createHash} from 'node:crypto';
 import {constants} from 'node:fs';
 import {lstat,open,mkdir,chmod,readFile} from 'node:fs/promises';
-import {join} from 'node:path';
+import {join,dirname,basename,resolve} from 'node:path';
 import {z} from 'zod';
 import {canonicalDockerSocket,dockerDaemonIdentity} from './civic-docker.ts';
 import {OMP_B_MODEL_MAX_TIME_SECONDS} from './district-execution-profile.ts';
@@ -175,6 +175,11 @@ export async function resolveOmpCredential(spawn:OmpSpawn,binary:string,jobRoot:
  return {token,version:OMP_VERSION,binarySha256,accountLabelSha256};
 }
 export interface OmpRunnerResult {answer:ModelAnswer;stdout:string;startedAt:string;finishedAt:string;imageId:string;settingsSha256:string;systemPromptSha256:string;outputSchemaSha256:string;accountLabelSha256:string;runnerContractSha256:string;toolVersion:string}
+/** A failed control/provider lease must not quarantine the shared evidence CAS.
+ * The sibling is separately enrolled with the same authority/source bindings. */
+export function ompAssessmentScratchRoot(root:string):string{
+ const path=resolve(root);return join(dirname(path),basename(path)+'-omp-b-scratch');
+}
 /** Only the trusted, source-free credential resolver runs on the host. All
  * assessment input/output and child writes belong to the registered lease. */
 export async function runVmOmpAssessment(data:Record<string,unknown>,context:ManagedSourceContext,signal?:AbortSignal,deps:OmpRunnerDependencies={}):Promise<OmpRunnerResult>{
@@ -186,14 +191,14 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
   runSignal.throwIfAborted();
   const socket=await canonicalDockerSocket(review.dockerSocket);
   if(await dockerDaemonIdentity(socket,runSignal)!==review.dockerDaemonId)throw new OmpRunnerHold('security_review_required');
-  return await withManagedSourceScratch(context.root,context.bindings,async scope=>{
+  return await withManagedSourceScratch(ompAssessmentScratchRoot(context.root),context.bindings,async scope=>{
    let container:ManagedDockerContainer|undefined,token:Buffer|undefined,payload:Buffer|undefined;
    const output:Buffer[]=[],errors:Buffer[]=[];let outputBytes=0,errorBytes=0;
    const aborted=Promise.withResolvers<never>(),onAbort=()=>aborted.reject(scope.signal.reason);
    void aborted.promise.catch(()=>{});scope.signal.addEventListener('abort',onAbort,{once:true});
    try{
     await scope.assertActive();
-    const credentialCwd=join(scope.directory,'credential-cwd');await mkdir(credentialCwd,{mode:0o700});
+    const credentialCwd=join(scope.directory,'host-control');await mkdir(credentialCwd,{mode:0o700});
     const auth=await resolveOmpCredential(deps.spawn??nodeSpawn,deps.binary??OMP_BINARY,credentialCwd,review.ompBinarySha256,scope.signal);token=auth.token;
     const controlContract=ompAssessmentControl(),settings=await readFile(new URL('../docker/omp-b/settings.yml',import.meta.url)),prompt=Buffer.from(controlContract.prompt);
     payload=Buffer.from(canonicalJson(data));

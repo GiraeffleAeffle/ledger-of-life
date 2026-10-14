@@ -620,6 +620,55 @@ test('scratch pre-admission provenance is classification-only and unsafe paths n
  assert.equal(await readFile(outside,'utf8'),'unrelated user bytes');const receipt=await recordHostOptOut({host:'council.test',reason:'municipality_objection'},policy);assert.equal(receipt.purge.status,'partial');assert.ok(receipt.purge.issues.some(issue=>issue.code==='unsafe_scratch'));
 });
 
+for(const layout of ['legacy','sealed'])test('canonical recovery retires an interrupted empty private credential directory only: '+layout,async t=>{
+ const {base,stateDir}=await sandbox(t),root=join(base,'cas'),policy=fixturePolicy(stateDir),bytes='Retained authenticated CAS source',entry={...rawEntry(bytes),relativePath:'sha256/'+hash(bytes).slice(0,2)+'/'+hash(bytes)};
+ await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});await publish(root,entry,bytes,stateDir);
+ const binding={kind:'prepared_source' as const,url:entry.url,sourceSha256:hash(bytes),observationId:'synthetic-bridge',receiptSha256:entry.receiptSha256};
+ const rmdir=fsPromises.rmdir,mock=t.mock.method(fsPromises,'rmdir',async(...args:Parameters<typeof fsPromises.rmdir>)=>{
+  if(String(args[0]).endsWith('/credential-cwd'))throw Error('Synthetic interrupted directory retirement');
+  return rmdir(...args);
+ });syncBuiltinESMExports();
+ let scratch='';
+ try{
+  await assert.rejects(withManagedSourceScratch(root,[binding],async scope=>{
+   scratch=scope.directory;await assert.rejects(scope.writeSource('credential-cwd/token.json',Buffer.from('never written')),CivicPolicyStateError);
+   await mkdir(join(scratch,'credential-cwd'),{mode:0o700});
+  },{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'artifact',...policy}),CivicPolicyStateError);
+ }finally{mock.mock.restore();syncBuiltinESMExports();}
+ let inventory=await readCivicPolicyInventory(policy);assert.equal(inventory.scratch[0].state,'partial');
+ if(layout==='sealed')await compactCivicPolicyInventory(policy);
+ const recovered=await recoverManagedSourceScratch(policy);assert.equal(recovered.status,'complete');assert.equal(recovered.deletedFiles,0);assert.equal(recovered.deletedBytes,0);
+ assert.deepEqual(recovered.recoveredLeases,[inventory.scratch[0].id]);await assert.rejects(lstat(scratch),{code:'ENOENT'});
+ inventory=await readCivicPolicyInventory(policy);assert.equal(inventory.scratch[0].state,'purged');assert.equal(inventory.roots[0].complete,true);
+ await assertManagedSourceReadable(join(root,entry.relativePath),policy);assert.equal(await readFile(join(root,entry.relativePath),'utf8'),bytes);
+});
+
+for(const variant of ['content','nested','symlink','public','active'] as const)test('credential-path cleanup still refuses '+variant,async t=>{
+ const {base,stateDir}=await sandbox(t),root=join(base,'protected-scratch'),policy=fixturePolicy(stateDir),outside=join(base,'outside'),binding={phase:'pre-admission' as const,url:'https://council.test/source',sourceSha256:hash('source')};
+ await mkdir(outside,{mode:0o700});await writeFile(join(outside,'token.json'),'Synthetic unrelated credential content',{mode:0o600});
+ let scratch='';
+ const operation=withManagedSourceScratch(root,[binding],async scope=>{
+  scratch=scope.directory;const path=join(scratch,'credential-cwd');
+  if(variant==='symlink')await symlink(outside,path);
+  else{
+   await mkdir(path,{mode:0o700});
+   if(variant==='content')await writeFile(join(path,'token.json'),'Synthetic protected content',{mode:0o600});
+   if(variant==='nested')await mkdir(join(path,'empty-child'),{mode:0o700});
+   if(variant==='public')await chmod(path,0o755);
+  }
+  if(variant==='active'){
+   const receipt=await recoverManagedSourceScratch(policy);assert.equal(receipt.status,'partial');assert.ok(receipt.issues.some(issue=>issue.code==='active_scratch'));
+   assert.equal((await lstat(path)).isDirectory(),true);
+  }
+ },{decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification',...policy});
+ if(variant==='active'){await operation;return;}
+ await assert.rejects(operation,CivicPolicyStateError);const receipt=await recoverManagedSourceScratch(policy);
+ assert.equal(receipt.status,'partial');assert.ok(receipt.issues.some(issue=>issue.code==='unsafe_scratch'));
+ assert.equal((await lstat(join(scratch,'credential-cwd'))).isSymbolicLink(),variant==='symlink');
+ if(variant==='content')assert.equal(await readFile(join(scratch,'credential-cwd','token.json'),'utf8'),'Synthetic protected content');
+ assert.equal(await readFile(join(outside,'token.json'),'utf8'),'Synthetic unrelated credential content');
+});
+
 test('an active scratch producer is stopped by objection and no purge claims completion while it can write',async t=>{
  const {base,stateDir}=await sandbox(t),root=join(base,'active-scratch'),policy=fixturePolicy(stateDir),bytes=Buffer.from('active source');
  let receiptStatus='',directory='';

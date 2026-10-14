@@ -158,6 +158,11 @@ export async function modelReadiness(provider: ExtractorProvider, signal?: Abort
   await assertCivicPolicyAuthority(boundPolicy);
   return evidence;
 }
+function schemaAllowsNull(schema:unknown):boolean{
+ if(schema===null||typeof schema!=='object')return false;
+ if('type' in schema&&(schema.type==='null'||Array.isArray(schema.type)&&schema.type.includes('null')))return true;
+ return 'anyOf' in schema&&Array.isArray(schema.anyOf)&&schema.anyOf.some(schemaAllowsNull);
+}
 export function codexResponseSchema(schema: unknown): unknown {
   if (Array.isArray(schema)) return schema.map(codexResponseSchema);
   if (schema === null || typeof schema !== 'object') return schema;
@@ -176,6 +181,14 @@ export function codexResponseSchema(schema: unknown): unknown {
     if (result.anyOf !== undefined) throw Error('Subscription CLI schema contains overlapping union encodings');
     result.anyOf = result.oneOf;
     delete result.oneOf;
+  }
+  if(result.type==='object'&&result.properties&&typeof result.properties==='object'&&!Array.isArray(result.properties)){
+    // OpenAI strict objects cannot omit nullable optional fields (assessment
+    // valueReview/criticalReview). Require their existing null alternative on
+    // the wire; do not invent a value or weaken the authoritative Zod parser.
+    const required=Array.isArray(result.required)?result.required:[];
+    const nullable=Object.entries(result.properties).filter(([key,value])=>!required.includes(key)&&schemaAllowsNull(value)).map(([key])=>key);
+    if(nullable.length)result.required=[...required,...nullable];
   }
   return result;
 }
