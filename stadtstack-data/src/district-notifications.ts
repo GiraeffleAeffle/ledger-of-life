@@ -24,10 +24,23 @@ export async function sendPipelineNotification(notification:OwnerNotification,de
  const token=await dependencies.readToken();
  let response:Response;
  try{response=await dependencies.send(PIPELINE_NOTIFICATION_ENDPOINT,{method:'POST',redirect:'error',headers:{Authorization:`Bearer ${token}`,'Content-Type':'text/plain; charset=utf-8',Title:notification.phase==='startup'?'Civic pipeline bounded run':'Civic pipeline disposition'},body:message,signal:signal?AbortSignal.any([signal,AbortSignal.timeout(8000)]):AbortSignal.timeout(8000)});}catch{throw new NotificationAmbiguousError('Pipeline notification delivery failed');}
- if(response.status===429||response.status>=500){await response.body?.cancel();throw new NotificationTransientError('Pipeline notification temporarily unavailable');}
+ if(response.status===429||response.status>=500){await response.body?.cancel().catch(()=>{});throw new NotificationTransientError('Pipeline notification temporarily unavailable');}
  if(!response.ok||!response.body)throw Error('Pipeline notification delivery failed');
  const reader=response.body.getReader(),chunks:Uint8Array[]=[];let length=0;
- try{for(;;){let chunk:ReadableStreamReadResult<Uint8Array>;try{chunk=await reader.read();}catch{throw new NotificationAmbiguousError('Pipeline notification delivery failed');}if(chunk.done)break;length+=chunk.value.byteLength;if(length>16384)throw Error('Pipeline notification acknowledgement rejected');chunks.push(chunk.value);}}finally{await reader.cancel();}
+ try{
+  for(;;){
+   let chunk:ReadableStreamReadResult<Uint8Array>;
+   try{chunk=await reader.read();}catch{throw new NotificationAmbiguousError('Pipeline notification delivery failed');}
+   if(chunk.done)break;
+   length+=chunk.value.byteLength;
+   if(length>16384)throw Error('Pipeline notification acknowledgement rejected');
+   chunks.push(chunk.value);
+  }
+ }finally{
+  // An errored stream rejects cancellation with its stored transport error.
+  // Cleanup must not overwrite ambiguous delivery or strict ACK rejection.
+  await reader.cancel().catch(()=>{});
+ }
  let ack:z.infer<typeof acknowledgementSchema>;
  try{ack=acknowledgementSchema.parse(JSON.parse(Buffer.concat(chunks).toString('utf8')));}catch{throw Error('Pipeline notification acknowledgement rejected');}
  if(ack.message!==message||Math.abs(Date.now()-ack.time*1000)>60_000)throw Error('Pipeline notification acknowledgement mismatch');

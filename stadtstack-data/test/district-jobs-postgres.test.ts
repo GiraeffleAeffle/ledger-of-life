@@ -12,6 +12,7 @@ import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,insertR1Metad
 import {CANONICALIZATION_VERSION,STEP_RECEIPT_VERSION,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
 import {reserveR1CodexCall} from '../src/district-codex-accounting.ts';
 import {NotificationAmbiguousError,NotificationTransientError} from '../src/district-jobs.ts';
+import {pipelineNotificationConfig,sendPipelineNotification} from '../src/district-notifications.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 
 // Real Postgres only. The connection must be local and its role must have CREATEDB.
@@ -547,6 +548,25 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     assert.equal(ambiguousPosts[0].id,ambiguousPosts[1].id);assert.equal(canonicalJson(ambiguousPosts[0]),canonicalJson(ambiguousPosts[1]));
     const ambiguousRow=await pool.query<{attempts:number;state:string;provider_message_id:string}>(`SELECT attempts,state,provider_message_id FROM district_pipeline.owner_notifications WHERE run_id=$1 AND phase='startup'`,[recovered.runId]);
     assert.equal(ambiguousRow.rows[0].attempts,2);assert.equal(ambiguousRow.rows[0].state,'delivered');assert.ok(ambiguousRow.rows[0].provider_message_id);
+
+    const streamKey=await store.enqueue(jobSpec('notification-stream-timeout'));
+    const streamIdentity={notificationApprovalSha256:pipelineNotificationConfig.notificationApprovalSha256,notificationDestinationSha256:pipelineNotificationConfig.destinationSha256,notificationProvider:pipelineNotificationConfig.provider};
+    const streamAuth=await authorize([streamKey],{mode:'bounded_unattended',...streamIdentity});
+    const streamPosts:OwnerNotification[]=[];
+    const streamRecovered=await runDistrictJobs({store,cas,handlers,authorizationId:streamAuth,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000,...streamIdentity,notifyOwner:async(notification,signal)=>sendPipelineNotification(notification,{
+      readToken:async()=> 'synthetic_fixture_publisher_token',
+      send:async(_url,init)=>{
+        if(notification.phase==='startup'){
+          streamPosts.push(notification);
+          if(streamPosts.length===1)return new Response(new ReadableStream<Uint8Array>({start(controller){controller.error(new DOMException('timeout','TimeoutError'));}}));
+        }
+        return new Response(JSON.stringify({id:randomUUID(),event:'message',topic:'pipeline',message:String(init?.body),time:Math.floor(Date.now()/1000)}));
+      },
+    },signal)});
+    assert.equal(streamRecovered.state,'completed');assert.equal(streamPosts.length,2);
+    assert.equal(streamPosts[0].id,streamPosts[1].id);assert.equal(canonicalJson(streamPosts[0]),canonicalJson(streamPosts[1]));
+    const streamRow=await pool.query<{attempts:number;state:string}>(`SELECT attempts,state FROM district_pipeline.owner_notifications WHERE run_id=$1 AND phase='startup'`,[streamRecovered.runId]);
+    assert.deepEqual(streamRow.rows,[{attempts:2,state:'delivered'}]);
 
     const parallelKey=await store.enqueue(jobSpec('notification-claim')),parallelAuth=await authorize([parallelKey],{mode:'bounded_unattended',...identity});
     const parallelRun=await store.beginRun(parallelAuth,1,60000,'bounded_unattended',{notificationApprovalSha256:approval,destinationSha256:destination,provider});

@@ -46,6 +46,16 @@ test('acknowledgement stream is bounded even when length is undeclared',async()=
  assert.equal(cancelled,true);
 });
 
+test('errored ACK stream remains ambiguous when cancellation rejects with the stored error',async()=>{
+ const body=new ReadableStream<Uint8Array>({start(controller){controller.error(new DOMException('timeout','TimeoutError'));}});
+ await assert.rejects(sendPipelineNotification(notification,{readToken:async()=>token,send:async()=>new Response(body)}),NotificationAmbiguousError);
+});
+
+test('oversized ACK remains non-retryable even when cleanup cancellation fails',async()=>{
+ const body=new ReadableStream<Uint8Array>({start(controller){controller.enqueue(new Uint8Array(16385));},cancel(){throw new DOMException('cleanup timeout','TimeoutError');}});
+ await assert.rejects(sendPipelineNotification(notification,{readToken:async()=>token,send:async()=>new Response(body)}),error=>error instanceof Error&&error.message==='Pipeline notification acknowledgement rejected'&&!(error instanceof NotificationAmbiguousError));
+});
+
 test('redirect, HTTP transport error and timeout exceptions are generic without token argv or logs',async(t)=>{
  const argv=[...process.argv];
  const logs:unknown[][]=[];
