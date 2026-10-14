@@ -136,6 +136,7 @@ export class PoliteFetcher {
  private readonly onRedirect:PoliteFetcherOptions['onRedirect'];
  private readonly ownerAcquisitionProducer:Readonly<OwnerAcquisitionProducer>|undefined;
  private readonly inventoryTimeoutMs:number;
+ private readonly ownerGenesisTableTimeoutMs:number;
  private delays=new Map<string,number>();
  private robots=new Map<string,{expiresAt:number;response:Promise<RobotsPolicy>}>();
  private machinePolicies=new Map<string,{expiresAt:number;response:Promise<{rules:TdmRule[];evidence:PolicyEvidence}>}>();
@@ -205,8 +206,11 @@ export class PoliteFetcher {
   this.ownerAcquisitionProducer=options.ownerAcquisitionProducer?Object.freeze(OwnerAcquisitionProducerSchema.parse(options.ownerAcquisitionProducer)):undefined;
   this.cacheDir=resolve(options.cacheDir);this.options={minDelayMs:2000,timeoutMs:25000,maxBytes:24*1024*1024,maxRedirects:5,policyTtlMs:PUBLIC_SOURCE_POLICY_VALIDITY_MS,...options};
   // 10.45 MB at 128 KiB/s takes about 80 seconds; retain connection margin.
-  // Explicit caller deadlines still win; non-inventory defaults remain 25s.
+  // Explicit caller deadlines still win.
   this.inventoryTimeoutMs=options.timeoutMs??90_000;
+  // The owner-account child receives normalized options; preserve the parent's
+  // original default/explicit distinction rather than treating 25s as explicit.
+  this.ownerGenesisTableTimeoutMs=publicPolicyFetcher?.ownerGenesisTableTimeoutMs??options.timeoutMs??120_000;
   this.lane=options.ownerPolicyLane;
   this.publicPolicyFetcher=publicPolicyFetcher;
   if(publicPolicyFetcher&&this.cacheDir!==genesisOwnerAccountRoot(publicPolicyFetcher.cacheDir))throw new PoliteFetchError('host_state_unsafe','Owner account lane routing rejected');
@@ -461,6 +465,7 @@ export class PoliteFetcher {
  }
  private requestTimeoutMs(url:URL,method:'GET'|'POST'):number {
   if(method==='GET'&&url.href==='https://bob-sh.de/')return this.inventoryTimeoutMs;
+  if(this.publicPolicyFetcher&&method==='POST'&&url.href==='https://www.regionalstatistik.de/genesisws/rest/2020/data/table')return this.ownerGenesisTableTimeoutMs;
   return this.options.timeoutMs;
  }
  /** Transport seam used by disposable fixture servers; production reaches this
