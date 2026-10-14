@@ -6,13 +6,13 @@ import {canonicalJobIdentity,type DistrictJobStore,type DistrictJobSpec} from '.
 import {StepReceiptSchema} from './district-step-receipt.ts';
 import {HttpObservationProofSchema,authenticatedHttpBinding} from './district-http-observation.ts';
 import {SourceObservationSchema} from './source-observation.ts';
-import {CrawlRequestEvidenceSchema} from './district-crawl-request.ts';
+import {CrawlRequestEvidenceSchema,OwnerAccountRequestEvidenceSchema} from './district-crawl-request.ts';
 import {assertManagedSourceBindings,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {genesisOwnerAccountRoot,readGenesisOwnerRepresentation} from './genesis-owner-acquisition.ts';
 import {ownerGenesisAccessFor,sourcePolicyExpiresAt} from './source-policy.ts';
 import type {RegisteredRobotsAudit} from './registered-source-policy.ts';
 import type {FetchedDocument} from './polite-fetch.ts';
-import type {AcquisitionSelectorSchema} from './district-r1.ts';
+import {isSettledAcquisitionFailure,type AcquisitionSelectorSchema} from './district-r1.ts';
 
 export const OwnerAcquisitionReusePinSchema=z.object({priorJobKey:HashSchema,priorReceiptSha256:HashSchema,priorAttempt:z.number().int().positive(),observationId:HttpObservationProofSchema.shape.observationId,requestEvidenceSha256:HashSchema}).strict();
 export type OwnerAcquisitionReusePin=z.infer<typeof OwnerAcquisitionReusePinSchema>;
@@ -22,6 +22,23 @@ async function boundedBytes(path:string):Promise<Buffer>{
  const stat=await lstat(path);
  if(!stat.isFile()||stat.isSymbolicLink()||stat.size>1024*1024)throw Error('Prior acquisition evidence bounds rejected');
  const bytes=await readFile(path);if(bytes.length>1024*1024)throw Error('Prior acquisition evidence bounds rejected');return bytes;
+}
+
+/** A committed abort's finishedAt does not mean its network handler settled.
+ * Legacy sidecars have no producer proof, so every earlier same-request attempt
+ * must be demonstrably settled; known fetch failures reuse the live classifier. */
+async function assertSettledEarlierRequests(store:Pick<DistrictJobStore,'pool'>,acquisition:Acquisition,startedAt:string){
+ const request=acquisition.request,parameters=[startedAt,request.url,request.method,request.contentType,request.body];
+ const sameRequest=`j.spec->>'step'='acquire_representation' AND j.spec->>'lane'='acquisition' AND j.spec->'selector'->'request'->>'url'=$2 AND j.spec->'selector'->'request'->>'method'=$3 AND j.spec->'selector'->'request'->>'contentType' IS NOT DISTINCT FROM $4::text AND j.spec->'selector'->'request'->>'body' IS NOT DISTINCT FROM $5::text`;
+ const pending=await store.pool.query(`SELECT j.id FROM district_pipeline.jobs j WHERE ${sameRequest} AND j.attempt_started_at<$1::timestamptz AND NOT EXISTS(SELECT 1 FROM district_pipeline.step_receipts r WHERE r.job_id=j.id AND r.attempt=j.attempt) LIMIT 1`,parameters);
+ if(pending.rowCount)throw Error('Legacy request evidence has an earlier unsettled acquisition');
+ const history=await store.pool.query<{job_key:string;spec:DistrictJobSpec;receipt_sha256:string;receipt:unknown}>(`SELECT j.job_key,j.spec,r.receipt_sha256,r.receipt FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE ${sameRequest} AND (r.receipt->>'startedAt')::timestamptz<$1::timestamptz LIMIT 10001`,parameters);
+ if(history.rows.length>10000)throw Error('Earlier acquisition history bound exceeded');
+ for(const row of history.rows){
+  const receipt=StepReceiptSchema.parse(row.receipt);
+  if(canonicalJobIdentity(row.spec).jobKey!==row.job_key||receipt.jobKey!==row.job_key||semanticHash(receipt)!==row.receipt_sha256||receipt.step!=='acquire_representation'||receipt.lane!=='acquisition')throw Error('Earlier acquisition history identity mismatch');
+  if(receipt.outcome!=='succeeded'&&receipt.outcome!=='no_supported_case'&&(receipt.outcome!=='held_execution'||!isSettledAcquisitionFailure(receipt.reasonCode)))throw Error('Legacy request evidence has an earlier non-settled acquisition abort');
+ }
 }
 
 /** Offline admission only. A held request is never retried, and timing is taken
@@ -38,7 +55,8 @@ export async function readPriorGenesisOwnerAcquisition(store:Pick<DistrictJobSto
  if(overlap.rowCount)throw Error('Prior acquisition attempt window overlaps another acquisition');
  const root=genesisOwnerAccountRoot(rawRoot),directory=join(root,'observations');
  if(await realpath(directory)!==directory)throw Error('Prior acquisition observation directory mismatch');
- const candidates:{document:FetchedDocument;requestEvidenceSha256:string;redirectChain:string[]}[]=[],start=Date.parse(receipt.startedAt),end=Date.parse(receipt.finishedAt);
+ const candidates:{document:FetchedDocument;requestEvidenceSha256:string;redirectChain:string[];producerBound:boolean}[]=[],start=Date.parse(receipt.startedAt),end=Date.parse(receipt.finishedAt);
+ let legacyHistoryChecked=false;
  let count=0;
  for await(const entry of await opendir(directory)){
   if(++count>10000)throw Error('Prior acquisition observation scan bound exceeded');
@@ -49,15 +67,19 @@ export async function readPriorGenesisOwnerAcquisition(store:Pick<DistrictJobSto
   const observed=SourceObservationSchema.parse(raw),proof=HttpObservationProofSchema.parse({observationId:entry.name,receiptSha256:digest(bytes),bytes:bytes.toString('utf8')}),binding=authenticatedHttpBinding(proof,{url:acquisition.request.url,sha256:observed.sha256});
   const evidencePath=join(root+'-request-evidence','requests',entry.name);
   await assertManagedSourceBindings(evidencePath,[binding],policy);
-  const evidenceBytes=await boundedBytes(evidencePath),evidence=CrawlRequestEvidenceSchema.parse(JSON.parse(evidenceBytes.toString('utf8')));
+  const evidenceBytes=await boundedBytes(evidencePath),rawEvidence=JSON.parse(evidenceBytes.toString('utf8')),bound=OwnerAccountRequestEvidenceSchema.safeParse(rawEvidence),evidence=bound.success?bound.data:CrawlRequestEvidenceSchema.parse(rawEvidence);
   await assertManagedSourceBindings(evidencePath,[binding],policy);
   if(canonicalJson(evidence.httpObservation)!==canonicalJson(binding)||evidence.request.url!==acquisition.request.url||evidence.request.method!==acquisition.request.method||evidence.request.contentType!==acquisition.request.contentType||evidence.request.bodySha256!==(acquisition.request.body===null?null:digest(acquisition.request.body))||evidence.redirectChain.some(url=>!ownerGenesisAccessFor(url)))throw Error('Prior acquisition request evidence differs from exact selector');
+  if(bound.success){
+   const producer=bound.data.producer;
+   if(producer.jobKey!==receipt.jobKey||producer.attempt!==receipt.attempt||producer.fencingToken!==receipt.leaseToken)throw Error('Prior request evidence producer differs from pinned attempt');
+  }else if(!legacyHistoryChecked){await assertSettledEarlierRequests(store,acquisition,receipt.startedAt);legacyHistoryChecked=true;}
   const document:FetchedDocument={...observed,localPath:join(root,'sha256',observed.sha256.slice(0,2),observed.sha256),observationPath};
-  candidates.push({document,requestEvidenceSha256:digest(evidenceBytes),redirectChain:evidence.redirectChain});
+  candidates.push({document,requestEvidenceSha256:digest(evidenceBytes),redirectChain:evidence.redirectChain,producerBound:bound.success});
  }
  if(candidates.length!==1||candidates[0].document.observationPath!==join(directory,pin.observationId)||candidates[0].requestEvidenceSha256!==pin.requestEvidenceSha256)throw Error('Prior acquisition observation selection is missing or ambiguous');
  const selected=candidates[0],admitted=await readGenesisOwnerRepresentation(rawRoot,selected.document,policy,acquisition.maxBytes);
  const expiresAt=sourcePolicyExpiresAt(selected.document.policy!,selected.document.checkedAt,selected.document,acquisition.scope,eligibility);
  if(Date.parse(expiresAt)<=Date.now())throw Error('Prior acquisition policy evidence is stale');
- return {...admitted,response:selected.document,redirectChain:selected.redirectChain,expiresAt,versions:{acquisitionMode:'offline_prior_attempt',priorAcquisitionJobKey:pin.priorJobKey,priorAcquisitionReceiptSha256:pin.priorReceiptSha256,priorAcquisitionAttempt:String(pin.priorAttempt),priorAcquisitionContractSha256:row.spec.semanticContractSha256,priorHttpObservationId:pin.observationId,priorHttpObservationSha256:admitted.httpObservation.receiptSha256,priorRequestEvidenceSha256:pin.requestEvidenceSha256}};
+ return {...admitted,response:selected.document,redirectChain:selected.redirectChain,expiresAt,versions:{acquisitionMode:'offline_prior_attempt',priorAcquisitionJobKey:pin.priorJobKey,priorAcquisitionReceiptSha256:pin.priorReceiptSha256,priorAcquisitionAttempt:String(pin.priorAttempt),priorAcquisitionContractSha256:row.spec.semanticContractSha256,priorHttpObservationId:pin.observationId,priorHttpObservationSha256:admitted.httpObservation.receiptSha256,priorRequestEvidenceSha256:pin.requestEvidenceSha256,priorRequestProducerProof:selected.producerBound?'bound_job_attempt_fence':'legacy_settled_history'}};
 }

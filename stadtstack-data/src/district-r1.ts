@@ -239,6 +239,8 @@ const acquisitionFailureReasons:Readonly<Record<FetchFailure,ReasonCode>>={
 export function acquisitionFailureReason(error:unknown):ReasonCode|null {
  return error instanceof PoliteFetchError&&Object.hasOwn(acquisitionFailureReasons,error.failure)?acquisitionFailureReasons[error.failure]:null;
 }
+/** These dispositions follow a settled fetch rejection, unlike executor aborts. */
+export function isSettledAcquisitionFailure(reason:ReasonCode):boolean {for(const failure in acquisitionFailureReasons)if(Object.hasOwn(acquisitionFailureReasons,failure)&&acquisitionFailureReasons[failure as FetchFailure]===reason)return true;return false;}
 export interface AcquisitionFixture {fetchRoot:string;policy:CivicPolicyOptions;inspection?:FixturePolicyInspection}
 /** Shared governed request admission for acquisition and current-policy jobs. */
 export async function createR1PublicFetcher(store:DistrictJobStore,context:Parameters<JobHandler>[0],options:{maxRequests:number;maxBytes:number;fixture?:AcquisitionFixture;registry?:DistrictRegistry;registrySha256?:string;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void}){
@@ -248,7 +250,7 @@ export async function createR1PublicFetcher(store:DistrictJobStore,context:Param
  await privateRoot(fetchRoot);await initializeManagedAcquisitionLane(fetchRoot,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'fetch'});
  let requests=0;
  const group=HostGroupsSchema.parse(JSON.parse(await readFile(join(REPO,'sources/district-host-groups.json'),'utf8'))).serviceGroups[0],laneKey=`service:${group.id}`;
- const fetcher=new PoliteFetcher({cacheDir:fetchRoot,minDelayMs:group.minStartIntervalMs,maxBytes:options.maxBytes,ownerPolicyLane:{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID},fixtureInspection:fixture?.inspection,beforeRequest:async url=>{
+ const fetcher=new PoliteFetcher({cacheDir:fetchRoot,minDelayMs:group.minStartIntervalMs,maxBytes:options.maxBytes,ownerPolicyLane:{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID},fixtureInspection:fixture?.inspection,ownerAcquisitionProducer:context.job.spec.step==='acquire_representation'?{jobKey:context.job.jobKey,attempt:context.job.attempt,fencingToken:context.job.fencingToken}:undefined,beforeRequest:async url=>{
   context.signal.throwIfAborted();if(++requests>options.maxRequests)throw new DistrictExecutionHold('source_limit_exceeded');
   if(!['http:','https:'].includes(new URL(url).protocol))throw Error('Non-public acquisition transport');
   const lane=await store.pool.query<{normalized_host:string;shared_service_group:string;max_in_flight:number;min_start_interval_ms:number}>('INSERT INTO district_pipeline.host_lanes(lane_key,normalized_host,shared_service_group,max_in_flight,min_start_interval_ms) VALUES($1,$2,$3,$4,$5) ON CONFLICT(lane_key) DO UPDATE SET lane_key=EXCLUDED.lane_key RETURNING normalized_host,shared_service_group,max_in_flight,min_start_interval_ms',[laneKey,'*',group.id,group.maxInFlight,group.minStartIntervalMs]);

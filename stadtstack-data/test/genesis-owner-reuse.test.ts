@@ -8,14 +8,14 @@ import {z} from 'zod';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {createOperatorRegistryFixture,operatorRegistryFixtureValue} from './helpers/operator-registry-fixture.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
-import {DistrictJobStore,migrateDistrictJobs,runDistrictJobs,type JobHandler} from '../src/district-jobs.ts';
+import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,runDistrictJobs,type JobHandler} from '../src/district-jobs.ts';
 import {DistrictCas,type CasPutOptions} from '../src/district-cas.ts';
-import {acquisitionContract,acquisitionHandler,acquiredRepresentationHandler,enqueueAcquiredRepresentation,loadDescriptor,AcquisitionSelectorSchema,AcquiredRepresentationSelectorSchema} from '../src/district-r1.ts';
+import {acquisitionContract,acquisitionHandler,acquiredRepresentationHandler,enqueueAcquiredRepresentation,loadDescriptor,isSettledAcquisitionFailure,AcquisitionSelectorSchema,AcquiredRepresentationSelectorSchema} from '../src/district-r1.ts';
 import {persistR1Representation,persistOperatorRegistry,enqueueStructuredSnapshot} from '../src/district-r1-state.ts';
 import {genesisOwnerAccountRoot,readGenesisOwnerRepresentation} from '../src/genesis-owner-acquisition.ts';
 import {readPriorGenesisOwnerAcquisition} from '../src/genesis-owner-reuse.ts';
 import {PoliteFetcher} from '../src/polite-fetch.ts';
-import type {FetchedDocument} from '../src/polite-fetch.ts';
+import type {FetchedDocument,FetchOptions} from '../src/polite-fetch.ts';
 import {ContentFreeSourcePolicySchema} from '../src/district-schema.ts';
 import {createPolicyReceipt} from '../src/district-policy-receipt.ts';
 import {admittedRegisteredRobotsScopes} from '../src/registered-source-policy.ts';
@@ -24,14 +24,22 @@ import {authenticatedHttpBinding,authenticateHttpSourceBindings} from '../src/di
 import {assertStructuredParserInput} from '../src/district-structured-jobs.ts';
 import {StructuredWorkerRequestSchema} from '../src/district-structured-parser-worker.ts';
 import {StepReceiptSchema,unknownReceiptCounts,CANONICALIZATION_VERSION,STEP_RECEIPT_VERSION} from '../src/district-step-receipt.ts';
-import {persistCrawlRequestEvidence} from '../src/district-crawl-request.ts';
+import {persistCrawlRequestEvidence,persistOwnerAccountRequestEvidence,CrawlRequestEvidenceSchema,OwnerAcquisitionProducerSchema,type OwnerAcquisitionProducer} from '../src/district-crawl-request.ts';
 import {initializeManagedAcquisitionLane,withManagedSourceWrite,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 import {canonicalJson,digest} from '../src/district-adapter-contract.ts';
 
 const endpoint='https://www.regionalstatistik.de/genesisws/rest/2020/data/table';
 const body='name=12411-02-03&area=free&language=de&regionalvariable=GEMEIN&regionalkey=12064472&startyear=2024&endyear=2024&compress=false&transpose=false&job=false';
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
-const scenarios=['happy','other-job','overlap','stale','ambiguous','opted-out','wrong-request','missing-sidecar','tampered-body','wrong-pin','revoked','not-independent'] as const;
+const scenarios=['happy','bound-happy','bound-wrong-attempt','bound-wrong-fence','late-bound','late-unbound','bound-with-earlier-abort','legacy-settled-earlier','legacy-unknown-hold','legacy-other-request-abort','other-job','overlap','stale','ambiguous','opted-out','wrong-request','missing-sidecar','tampered-body','wrong-pin','revoked','not-independent'] as const;
+type OwnerFixtureFetcher={fetchInternal(url:string,options:FetchOptions,resource:string):Promise<FetchedDocument>};
+const ownerFixturePrototype=PoliteFetcher.prototype as unknown as OwnerFixtureFetcher;
+function deferred(){let release!:()=>void;const ready=new Promise<void>(resolve=>{release=resolve;});return {ready,release};}
+
+test('legacy acquisition history distinguishes settled failures from every executor abort',()=>{
+ for(const reason of ['owner_stopped','cancellation_requested','lease_expired','lease_lost','max_time_reached','authorization_expired','authorization_revoked','authorization_time_exhausted','budget_paused','handler_missing'] as const)assert.equal(isSettledAcquisitionFailure(reason),false,reason);
+ for(const reason of ['execution_exception','policy_excluded','source_http_error'] as const)assert.equal(isSettledAcquisitionFailure(reason),true,reason);
+});
 
 test('offline owner-account salvage uses genuine own-attempt evidence without another request',{skip:!connectionString,timeout:240000},async t=>{
  const url=new URL(connectionString!);
@@ -45,6 +53,9 @@ test('offline owner-account salvage uses genuine own-attempt evidence without an
  const pool=new Pool({connectionString:isolated.href,max:4,connectionTimeoutMillis:5000,statement_timeout:10000});closePool=poolShutdownBarrier(pool);
  const store=new DistrictJobStore(pool);await migrateDistrictJobs(pool);
  for(const scenario of scenarios)await t.test(scenario,async child=>{
+  // Each isolated authority realm has its own request history. This database
+  // was created above solely for this test; discard previous fixture jobs.
+  await pool.query('TRUNCATE district_pipeline.jobs CASCADE');
   const fixture=await createCivicPolicyTestContext(child),fetchRoot=join(fixture.root,'fetch'),ownerRoot=genesisOwnerAccountRoot(fetchRoot);
   const registryValue=operatorRegistryFixtureValue(),city=registryValue.municipalities[0];
   city.id='strausberg';city.ags='12064472';city.districtId='maerkisch-oderland';
@@ -62,7 +73,7 @@ test('offline owner-account salvage uses genuine own-attempt evidence without an
   const eligibility=admittedRegisteredRobotsScopes(registry,registrySha256).find(row=>row.municipalityId===scope.municipalityId&&row.sourceId===scope.sourceId)!;
   const originalBytes=Buffer.from('{"syntheticFixture":true,"rows":[]}\n'),sourceSha256=digest(originalBytes);
   await initializeManagedAcquisitionLane(ownerRoot,{...fixture.policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
-  async function capture(ageMs=0,requestBody=body,sidecar=true){
+  async function capture(ageMs=0,requestBody=body,sidecar=true,producer?:OwnerAcquisitionProducer){
    const checkedAt=new Date().toISOString(),policyAt=new Date(Date.now()-ageMs).toISOString(),observationId=Date.now()+'-'+randomUUID()+'.json';
    const sourcePolicy=ContentFreeSourcePolicySchema.parse({robots:{state:'allowed',url:'https://www.regionalstatistik.de/robots.txt',checkedAt:policyAt},tdm:{state:'not_declared',evidence:[{url:'https://www.regionalstatistik.de/.well-known/tdmrep.json',locator:'TDMRep standardized location HTTP absence',value:'404',checkedAt:policyAt}]},access:'authenticated_owner_account',ownerAccountAccess:{decisionId:'owner-2026-10-13-regionalstatistik-account',credentialKind:'token'},legalClassification:'not_assessed',publication:'facts_with_attribution_only'});
    const observation={url:endpoint,method:'POST' as const,checkedAt,retrievedAt:checkedAt,state:'fetched' as const,status:200,sha256:sourceSha256,bytes:originalBytes.length,mimeType:'application/json',policy:sourcePolicy},observationBytes=Buffer.from(JSON.stringify(observation,null,2)+'\n');
@@ -71,7 +82,8 @@ test('offline owner-account salvage uses genuine own-attempt evidence without an
     await mkdir(join(ownerRoot,'sha256',sourceSha256.slice(0,2)),{recursive:true,mode:0o700});await mkdir(join(ownerRoot,'observations'),{recursive:true,mode:0o700});
     await writeFile(join(ownerRoot,relativeBody),originalBytes,{mode:0o600});await writeFile(join(ownerRoot,relativeObservation),observationBytes,{flag:'wx',mode:0o600});
    },fixture.policy);
-   const requestEvidence=sidecar?await persistCrawlRequestEvidence(ownerRoot,{schemaVersion:'stadtstack-crawl-request-evidence-v1',httpObservation:binding,request:{url:endpoint,method:'POST',contentType:selector.request.contentType,bodySha256:digest(requestBody),publicSelector:null},redirectChain:[endpoint]},fixture.policy):null;
+   const requestInput={schemaVersion:'stadtstack-crawl-request-evidence-v1' as const,httpObservation:binding,request:{url:endpoint,method:'POST' as const,contentType:selector.request.contentType,bodySha256:digest(requestBody),publicSelector:null},redirectChain:[endpoint]};
+   const requestEvidence=!sidecar?null:producer?await persistOwnerAccountRequestEvidence(ownerRoot,{...requestInput,producer},fixture.policy):await persistCrawlRequestEvidence(ownerRoot,requestInput,fixture.policy);
    const document:FetchedDocument={...observation,localPath:join(ownerRoot,relativeBody),observationPath:join(ownerRoot,relativeObservation)};
    return {document,httpObservation,binding,requestEvidence};
   }
@@ -81,15 +93,33 @@ test('offline owner-account salvage uses genuine own-attempt evidence without an
   const originalJobKey=await store.enqueue({step:'acquire_representation',lane:'acquisition',semanticContractSha256:await acquisitionContract(),inputArtifactHashes:[],sourceScope:scope,selector,policyProofSha256:null});
   const concurrentJobKey=scenario==='overlap'?await store.enqueue({step:'acquire_representation',lane:'acquisition',semanticContractSha256:await acquisitionContract(),inputArtifactHashes:[],sourceScope:scope,selector:{...selector,maxBytes:2048},policyProofSha256:null}):undefined;
   let originalContext:Parameters<JobHandler>[0]|undefined;
-  async function run(jobKey:string,handler:JobHandler,step:string){
+  async function run(jobKey:string,handler:JobHandler,step:string,signal?:AbortSignal){
    const keys=jobKey===originalJobKey&&concurrentJobKey?[jobKey,concurrentJobKey]:[jobKey];
    const authorizationId=await store.authorize({approvalSha256:digest('synthetic-k1-'+randomUUID()),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:keys,ags:[scope.ags],maxJobs:keys.length,maxElapsedMs:60000,category:'development'});
-   return runDistrictJobs({store,cas,handlers:{[step]:handler},authorizationId,ownerPresent:true,maxJobs:keys.length,maxElapsedMs:60000});
+   return runDistrictJobs({store,cas,handlers:{[step]:handler},authorizationId,ownerPresent:true,maxJobs:keys.length,maxElapsedMs:60000,signal});
   }
   let captured=baseline,otherAttemptRecorded=false;
-  const fetch=child.mock.method(PoliteFetcher.prototype,'fetch',async()=>{
+  const lateScenario=['late-bound','late-unbound','bound-with-earlier-abort','legacy-other-request-abort'].some(value=>value===scenario);
+  const earlyEntered=deferred(),releaseEarly=deferred(),earlySettled=deferred();
+  let stagingEarlier:'late'|'settled'|undefined,earlyReleased=false;
+  const fetch=child.mock.method(ownerFixturePrototype,'fetchInternal',async function(this:PoliteFetcher,_url:string,options:FetchOptions){
+   // Exercise the real public-fetcher -> R1 owner-account child construction,
+   // but the isolated authority fixture never reads credentials or sends HTTP.
+   assert.equal(this.cacheDir,ownerRoot);
+   const producer=z.object({ownerAcquisitionProducer:OwnerAcquisitionProducerSchema}).passthrough().parse(this.options).ownerAcquisitionProducer;
+   if(stagingEarlier==='settled')throw Error('Synthetic settled earlier acquisition failure');
+   if(stagingEarlier==='late'){
+    earlyEntered.release();await releaseEarly.ready;
+    captured=await capture(0,options.body!,true,scenario==='late-unbound'||scenario==='legacy-other-request-abort'?undefined:producer);
+    return captured.document;
+   }
+   if(lateScenario&&!earlyReleased){
+    earlyReleased=true;releaseEarly.release();await earlySettled.ready;
+    throw Error('Synthetic later acquisition settled while the earlier fetch arrived');
+   }
    if(scenario==='other-job'&&otherAttemptRecorded)return captured.document;
-   captured=await capture(scenario==='stale'?8*86400000:0,scenario==='wrong-request'?body+'&synthetic=other':body,scenario!=='missing-sidecar');
+   const boundProducer=scenario==='bound-wrong-attempt'?{...producer,attempt:producer.attempt+1}:scenario==='bound-wrong-fence'?{...producer,fencingToken:(BigInt(producer.fencingToken)+1n).toString()}:scenario==='bound-happy'||scenario==='bound-with-earlier-abort'?producer:undefined;
+   captured=await capture(scenario==='stale'?8*86400000:0,scenario==='wrong-request'?body+'&synthetic=other':body,scenario!=='missing-sidecar',boundProducer);
    if(scenario==='ambiguous')await capture();
    if(concurrentJobKey){
     // Real fixture leases and a real committed owner-stopped attempt create the
@@ -112,12 +142,32 @@ test('offline owner-account salvage uses genuine own-attempt evidence without an
    const otherRun=await run(otherJobKey,acquisitionHandler(store,registry,{fetchRoot,policy:fixture.policy},registrySha256),'acquire_representation');
    assert.equal(otherRun.state,'held');otherAttemptRecorded=true;
   }
+  let earlierFetchCalls=0;
+  if(lateScenario||scenario==='legacy-settled-earlier'||scenario==='legacy-unknown-hold'){
+   const earlierSelector={...selector,maxBytes:2048,request:scenario==='legacy-other-request-abort'?{...selector.request,body:body.replace('startyear=2024','startyear=2023').replace('endyear=2024','endyear=2023')}:selector.request};
+   const earlierKey=await store.enqueue({step:'acquire_representation',lane:'acquisition',semanticContractSha256:await acquisitionContract(),inputArtifactHashes:[],sourceScope:scope,selector:earlierSelector,policyProofSha256:null});
+   const earlierHandler=acquisitionHandler(store,registry,{fetchRoot,policy:fixture.policy},registrySha256),stop=new AbortController();
+   stagingEarlier=lateScenario?'late':'settled';
+   const earlierRunPromise=run(earlierKey,async context=>{
+    try{if(scenario==='legacy-unknown-hold')throw new DistrictExecutionHold('budget_paused');return await earlierHandler(context);}
+    finally{earlySettled.release();}
+   },'acquire_representation',stop.signal);
+   if(lateScenario){await Promise.race([earlyEntered.ready,earlierRunPromise.then(result=>{throw Error('Earlier fixture stopped before its request hook: '+result.reasonCode);})]);stop.abort();}
+   const earlierRun=await earlierRunPromise;
+   assert.equal(earlierRun.state,'held');assert.equal(earlierRun.reasonCode,lateScenario?'owner_stopped':scenario==='legacy-unknown-hold'?'budget_paused':'execution_exception');
+   stagingEarlier=undefined;earlierFetchCalls=fetch.mock.callCount();
+   if(scenario==='bound-with-earlier-abort'||scenario==='legacy-other-request-abort'){earlyReleased=true;releaseEarly.release();await earlySettled.ready;}
+  }
   cas.armed=true;
   const originalHandler=acquisitionHandler(store,registry,{fetchRoot,policy:fixture.policy},registrySha256);
   const originalRun=await run(originalJobKey,async context=>{originalContext=context;return originalHandler(context);},'acquire_representation');
-  assert.equal(originalRun.state,'held');assert.equal(originalRun.reasonCode,'execution_exception');assert.equal(fetch.mock.callCount(),scenario==='other-job'?2:1);
+  assert.equal(originalRun.state,'held');assert.equal(originalRun.reasonCode,'execution_exception');assert.equal(fetch.mock.callCount(),earlierFetchCalls+(scenario==='other-job'?2:1));
   const priorRow=(await pool.query<{receipt_sha256:string;receipt:unknown}>(`SELECT receipt_sha256,receipt FROM district_pipeline.step_receipts WHERE run_id=$1 AND receipt->>'jobKey'=$2`,[originalRun.runId,originalJobKey])).rows[0],priorReceipt=StepReceiptSchema.parse(priorRow.receipt);
   assert.equal(priorReceipt.outcome,'held_execution');assert.deepEqual(priorReceipt.outputHashes,[]);assert.deepEqual(priorReceipt.versions,{});
+  if(lateScenario){
+   const earlierReceipt=StepReceiptSchema.parse((await pool.query<{receipt:unknown}>(`SELECT receipt FROM district_pipeline.step_receipts WHERE receipt->>'jobKey'<>$1 AND receipt->>'reasonCode'='owner_stopped' ORDER BY committed_at DESC LIMIT 1`,[originalJobKey])).rows[0].receipt);
+   assert.ok(Date.parse(earlierReceipt.finishedAt)<Date.parse(priorReceipt.startedAt),'The late producer finished before the later attempt began; window-overlap rejection alone cannot catch this race');
+  }
   const prior={priorJobKey:originalJobKey,priorReceiptSha256:priorRow.receipt_sha256,priorAttempt:priorReceipt.attempt,observationId:captured.httpObservation.observationId,requestEvidenceSha256:captured.requestEvidence?.sha256??digest('missing synthetic sidecar')};
   const selection=AcquiredRepresentationSelectorSchema.parse({acquisition:selector,prior});
   fetch.mock.restore();
@@ -131,7 +181,8 @@ test('offline owner-account salvage uses genuine own-attempt evidence without an
    assert.ok(entry);if(scenario==='revoked')entry.state='revoked';else entry.independentAllowed=false;
    await writeFile(path,JSON.stringify(inventory)+'\n',{mode:0o600});
   }
-  if(scenario!=='happy'){
+  const happy=scenario==='happy'||scenario==='bound-happy'||scenario==='bound-with-earlier-abort'||scenario==='legacy-settled-earlier'||scenario==='legacy-other-request-abort';
+  if(!happy){
    await assert.rejects(readPriorGenesisOwnerAcquisition(store,fetchRoot,selector,selection.prior,fixture.policy,eligibility));
    await assert.rejects(enqueueAcquiredRepresentation(store,cas,registry,registrySha256,selection,{fetchRoot,policy:fixture.policy}));
    // A previously enqueued/offline-authorized job must also revalidate at execution.
@@ -144,6 +195,11 @@ test('offline owner-account salvage uses genuine own-attempt evidence without an
   for(const source of [baseline,captured])assert.deepEqual((await readGenesisOwnerRepresentation(fetchRoot,source.document,fixture.policy)).bytes,originalBytes);
   const acquired=await readPriorGenesisOwnerAcquisition(store,fetchRoot,selector,prior,fixture.policy,eligibility);
   assert.equal(acquired.response.checkedAt,captured.document.checkedAt);assert.equal(acquired.response.retrievedAt,captured.document.retrievedAt);
+  const bound=scenario==='bound-happy'||scenario==='bound-with-earlier-abort';
+  assert.equal(acquired.versions.priorRequestProducerProof,bound?'bound_job_attempt_fence':'legacy_settled_history');
+  const capturedRequest=JSON.parse(await readFile(captured.requestEvidence!.path,'utf8'));
+  assert.equal(CrawlRequestEvidenceSchema.safeParse(capturedRequest).success,!bound);
+  if(bound)assert.deepEqual(capturedRequest.producer,{jobKey:priorReceipt.jobKey,attempt:priorReceipt.attempt,fencingToken:priorReceipt.leaseToken});
   const jobKey=await enqueueAcquiredRepresentation(store,cas,registry,registrySha256,selection,{fetchRoot,policy:fixture.policy});assert.notEqual(jobKey,originalJobKey);
   const admittedRun=await run(jobKey,acquiredRepresentationHandler(store,registry,{fetchRoot,policy:fixture.policy},registrySha256),'admit_acquired_representation');
   assert.equal(admittedRun.state,'completed');assert.equal(forbiddenFetch.mock.callCount(),0);
