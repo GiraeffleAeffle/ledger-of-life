@@ -19,12 +19,22 @@ import {ContentFreeSourcePolicySchema} from '../src/district-schema.ts';
 import {readBoundSourceObservation} from '../src/source-observation.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {CrawlRequestEvidenceSchema,CrawlRequestEvidenceCaptureError} from '../src/district-crawl-request.ts';
-import {ParserIsolationError} from '../src/district-parser-isolation.ts';
+import {ParserIsolationError,ParserIsolationReasonSchema} from '../src/district-parser-isolation.ts';
 import {largeBobInventory} from './fixtures/bob-inventory.ts';
 
 async function createPoliteFetcher(options:PoliteFetcherOptions):Promise<BasePoliteFetcher> {
  return new BasePoliteFetcher({...await politeTestOptions(options),fixtureInspection:fixturePolicyInspection});
 }
+test('only the exact BOB inventory GET gets the reviewed 90-second default wire deadline',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'polite-bob-deadline-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ interface DeadlineSeam {requestTimeoutMs(url:URL,method:'GET'|'POST'):number}
+ const fetcher=await createPoliteFetcher({cacheDir:join(root,'default')}),seam=fetcher as unknown as DeadlineSeam;
+ assert.equal(seam.requestTimeoutMs(new URL('https://bob-sh.de/'),'GET'),90000);
+ for(const [url,method] of [['https://bob-sh.de/','POST'],['https://bob-sh.de/list/json','POST'],['https://bob-sh.de/robots.txt','GET'],['https://bob-sh.de/.well-known/tdmrep.json','GET'],['https://bob-sh.de/?query=inventory','GET'],['http://bob-sh.de/','GET'],['https://other.bob-sh.de/','GET']] as const)assert.equal(seam.requestTimeoutMs(new URL(url),method),25000);
+ const explicit=await createPoliteFetcher({cacheDir:join(root,'explicit'),timeoutMs:7000});
+ assert.equal((explicit as unknown as DeadlineSeam).requestTimeoutMs(new URL('https://bob-sh.de/'),'GET'),7000);
+ assert.equal(fetcher.options.maxBytes,24*1024*1024);
+});
 test('production and unpinned contexts reject injected parser inspection before execution',()=>{
  for(const ownerPolicyLane of [undefined,{decisionId:APPROVED_OWNER_ROBOTS_OVERRIDE.id,authorityId:'owner-2026-10-11-codex-workstation',authoritySha256:hash('not a fixture'),stateDir:'/home/max/.local/state/stadtstack-data/civic-policy'}]){
   assert.throws(()=>new BasePoliteFetcher({cacheDir:'/unused-before-inspection',ownerPolicyLane,fixtureInspection:fixturePolicyInspection}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_state_unsafe');
@@ -747,7 +757,7 @@ test('PDF inspection runtime errors remain network_error with structured cause, 
 });
 test('sandbox inspection failures keep HTTP observations honest and remain execution holds',async t=>{
  const cache=await mkdtemp(join(tmpdir(),'polite-inspection-failure-'));t.after(()=>rm(cache,{recursive:true,force:true}));
- for(const phase of ['robots','tdm','document'] as const)for(const reason of ['command_failed','resource_limit','security_review_required','unavailable','request_rejected'] as const){
+ for(const phase of ['robots','tdm','document'] as const)for(const reason of ParserIsolationReasonSchema.options){
   const root=join(cache,phase+'-'+reason),url='https://bob-sh.de/',body=Buffer.from('<h1>Synthetic inventory</h1>'),target=phase==='robots'?'/robots.txt':phase==='tdm'?'/.well-known/tdmrep.json':'/';
   const options=await politeTestOptions({cacheDir:root});
   const fetcher=new BasePoliteFetcher({...options,fixtureInspection:{...fixturePolicyInspection,resource:async(...args)=>{
@@ -757,11 +767,12 @@ test('sandbox inspection failures keep HTTP observations honest and remain execu
   t.mock.method(fetcher as unknown as WireSeam,'wire',async(dispatched:URL)=>dispatched.pathname===target?{status:200,headers:{'content-type':'text/html'},body}:{status:404,headers:{},body:Buffer.alloc(0)});
   await assert.rejects(fetcher.fetch(url),(failure:unknown)=>{
    assert.ok(failure instanceof PoliteFetchError);assert.equal(failure.failure,'inspection_failed');
-   assert.equal(failure.policyPhase,phase==='document'?'tdm':phase);assert.deepEqual(failure.cause,{kind:'parser_isolation',reason});return true;
+   assert.equal(failure.policyPhase,phase==='document'?'tdm':phase);assert.deepEqual(failure.cause,{kind:'parser_isolation',reason});assert.equal(failure.inspectionReason,reason);assert.equal(failure.observationUrl,new URL(target,url).href);return true;
   });
   const observations=await Promise.all((await readdir(join(root,'observations'))).map(async name=>JSON.parse(await readFile(join(root,'observations',name),'utf8'))));
   const failed=observations.find(row=>row.url===new URL(target,url).href);
   assert.equal(failed.status,200);assert.equal(failed.bytes,body.length);assert.equal(failed.sha256,hash(body));assert.equal(failed.state,'failed');assert.equal(failed.failure,'inspection_failed');
+  assert.equal(Object.hasOwn(failed,'inspectionReason'),false);assert.equal(Object.hasOwn(failed,'observationUrl'),false);
   await assert.rejects(readFile(join(root,'sha256',hash(body))),{code:'ENOENT'});
  }
 });

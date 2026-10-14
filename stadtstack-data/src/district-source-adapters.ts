@@ -14,6 +14,7 @@ import {PDF_TDM_POLICY_VERSION} from './pdf-tdm-policy.ts';
 import { DOCUMENT_ORIGIN_CLASSIFIER_VERSION } from './document-origin-contract.ts'
 import {writePrivateJson} from './district-private-io.ts';
 import {CrawlRequestEvidenceCaptureError} from './district-crawl-request.ts';
+import type {ParserIsolationReason} from './district-parser-isolation.ts';
 
 export interface RegistrySource {
  id:string;kind:'council'|'participation'|'gazette'|'website'|'structured';url:string|null;vendor:string;
@@ -51,7 +52,7 @@ export const DEFAULT_SOURCE_REVALIDATE_MS=24*60*60_000;
 export interface AdapterOptions {maxDocuments:number;maxPages:number;maxRequests:number;activeOparlRecordIds?:Set<string>;revalidateAfterMs?:number;pageRoots?:string[];seedDocumentUrls?:string[];discoveryBindings?:SourceContentBinding[]}
 export interface DiscoveredLink {url:string;title:string;pdf:boolean;structured:boolean}
 interface FrontierEntry extends SourceSeed {from:string;depth:number;revalidate?:boolean;previous?:CrawlDocument}
-export interface FrontierFailure {url:string;from?:string;depth?:number;failure:string;reason:string;checkedAt:string;status?:number;policy?:SourceAccessPolicy;retryAfter?:string;action:'ask_municipality';urlRole?:'registered_source_context';targetUrlSha256?:string;policyAudit?:{policySha256:string;sourceHostSha256:string;robotsState:SourceAccessPolicy['robots']['state'];robotsStatus:'allowed'|'disallowed'|'unavailable';override:'owner-approved 2026-10-11'|null;tdmState:SourceAccessPolicy['tdm']['state'];tdmReferenceStatus:'unavailable'|null;tdmDeclarationStatus?:'unavailable'|null;access:SourceAccessPolicy['access']}}
+export interface FrontierFailure {url:string;from?:string;depth?:number;failure:string;reason:string;inspectionReason?:ParserIsolationReason;checkedAt:string;status?:number;policy?:SourceAccessPolicy;retryAfter?:string;action:'ask_municipality';urlRole?:'registered_source_context';targetUrlSha256?:string;policyAudit?:{policySha256:string;sourceHostSha256:string;robotsState:SourceAccessPolicy['robots']['state'];robotsStatus:'allowed'|'disallowed'|'unavailable';override:'owner-approved 2026-10-11'|null;tdmState:SourceAccessPolicy['tdm']['state'];tdmReferenceStatus:'unavailable'|null;tdmDeclarationStatus?:'unavailable'|null;access:SourceAccessPolicy['access']}}
 interface SourceFrontier {schemaVersion:1;municipalityId:string;sourceId:string;queue:FrontierEntry[];visited:string[];documents:CrawlDocument[];excludedDocuments?:CrawlExcludedDocument[];failures:FrontierFailure[];roots:string[];checkedUrls?:Record<string,{checkedAt:string;documentId:string}>;lastCheckedAt?:string|null;sourceBindings?:SourceContentBinding[]}
 /** Explicit target selection never inherits unrelated roots, seeds or API discovery. */
 export function registeredSourceTargets(municipality:RegistryMunicipality,source:RegistrySource,options:Pick<AdapterOptions,'pageRoots'|'seedDocumentUrls'>):{kind:'pages'|'seeds';urls:string[];seeds:SourceSeed[]}|undefined {
