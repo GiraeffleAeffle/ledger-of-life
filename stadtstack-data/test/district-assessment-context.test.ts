@@ -84,7 +84,7 @@ test('tampered excerpt, hash, offset, chunk id and missing quote coverage are re
  ];
  for(const mutate of mutations){const item=structuredClone(f.item);mutate(item);await assert.rejects(originalEvidence(assessmentItemSchema.parse(item),f.context),AssessmentContextHold);}
  const wrong=structuredClone(f.record);wrong.summaryQuote='Uncited document-only prefix.';wrong.verification.evidenceHash=knowledgeEvidenceHash(wrong);assert.throws(()=>residualAssessmentItem(wrong,f.prepared,f.parser.sha256,f.policyArtifact.sha256),AssessmentContextHold);
- const wrongChunk=structuredClone(f.record);wrongChunk.extraction.chunk.start++;assert.throws(()=>residualAssessmentItem(wrongChunk,f.prepared,f.parser.sha256,f.policyArtifact.sha256),AssessmentContextHold);
+ const wrongChunk=structuredClone(f.record);wrongChunk.extraction.chunk.start++;wrongChunk.verification.evidenceHash=knowledgeEvidenceHash(wrongChunk);assert.throws(()=>residualAssessmentItem(wrongChunk,f.prepared,f.parser.sha256,f.policyArtifact.sha256),AssessmentContextHold);
  const absent=structuredClone(source.assessmentContext!);absent.preparedTextSha256=digest('foreign prepared text');assert.throws(()=>verifyAssessmentContext(absent,f.text,f.prepared.textSha256,source.locators),AssessmentContextHold);
 });
 
