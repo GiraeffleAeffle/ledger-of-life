@@ -7,6 +7,7 @@ import {syncBuiltinESMExports} from 'node:module';
 import {tmpdir} from 'node:os';
 import {join,relative} from 'node:path';
 import {Pool,type QueryResult} from 'pg';
+import {z} from 'zod';
 import {digest,canonicalJson,semanticHash} from '../src/district-adapter-contract.ts';
 import {DistrictCas} from '../src/district-cas.ts';
 import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,runDistrictJobs,type JobHandler,type DistrictJobSpec} from '../src/district-jobs.ts';
@@ -156,7 +157,7 @@ test('offline frozen crawl import preserves managed originals and produces enque
     assert.deepEqual(await readFile(item.manifest.index.path),item.indexBytes);assert.equal(imported.coverage.acquisitionStepReceipts,0);
    });
   });
-  for(const failure of [new CivicPolicyStateError('CIVIC_POLICY_BUSY'),new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE'),Object.assign(new Error('Synthetic ancestor filesystem I/O failure'),{code:'EIO'}),Object.assign(new Error('Synthetic ancestor filesystem permission failure'),{code:'EACCES'}),new Error('Synthetic unrelated ancestor read failure')])await st.test('ancestor read propagates '+(failure instanceof CivicPolicyStateError?failure.code:failure.message),async rt=>{
+  for(const failure of [new CivicPolicyStateError('CIVIC_POLICY_BUSY'),new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE'),new SyntaxError('Synthetic lower-call state JSON parse failure'),new z.ZodError([{code:'custom',path:[],message:'Synthetic lower-call state schema parse failure'}]),Object.assign(new Error('Synthetic ancestor filesystem I/O failure'),{code:'EIO'}),Object.assign(new Error('Synthetic ancestor filesystem permission failure'),{code:'EACCES'}),new Error('Synthetic unrelated ancestor read failure')])await st.test('ancestor read propagates '+(failure instanceof CivicPolicyStateError?failure.code:failure.message),async rt=>{
    const item=await legacy('ancestor-failure-'+digest(failure instanceof CivicPolicyStateError?failure.code:failure.message).slice(0,8)),originalReadFile=fsPromises.readFile;
    let intercepted=0;
    rt.mock.method(fsPromises,'readFile',async(...args:Parameters<typeof fsPromises.readFile>)=>{
@@ -167,6 +168,31 @@ test('offline frozen crawl import preserves managed originals and produces enque
     await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>assert.rejects(importCrawlCorpusForResidual(store,item.cas,item.manifest),error=>error===failure));
     assert.equal(intercepted,1);
    }finally{rt.mock.restoreAll();syncBuiltinESMExports();}
+   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+    const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
+    assert.equal(Date.parse((await loadPolicyReceipt(item.cas,imported.jobs[0].policyReceiptSha256)).expiresAt),Date.parse(item.checkedAt)+REGISTERED_SOURCE_POLICY_VALIDITY_MS);
+   });
+  });
+  for(const malformed of ['{','{}'])await st.test('parent managed authority '+(malformed==='{'?'JSON':'schema')+' corruption propagates instead of lineage fallback',async rt=>{
+   const item=await legacy('parent-state-parse-'+digest(malformed).slice(0,8)),authorityPath=join(policy.stateDir,'authority.json'),authorityBytes=await readFile(authorityPath),originalOpen=fsPromises.open;
+   let parentRead=false,injected=0;
+   rt.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+    const path=String(args[0]);if(path===item.originals[0].path)parentRead=true;
+    if(parentRead&&path===authorityPath&&injected===0&&new Error().stack?.includes('loadInventory')){
+     injected++;await writeFile(authorityPath,malformed,{mode:0o600});
+     const handle=await originalOpen(...args),close=handle.close.bind(handle);
+     // Restore after the real bounded state reader captures invalid bytes, but
+     // before its parser runs: later reads cannot create a misleading failure.
+     handle.close=async()=>{try{await close();}finally{await writeFile(authorityPath,authorityBytes,{mode:0o600});}};
+     return handle;
+    }
+    return originalOpen(...args);
+   });syncBuiltinESMExports();
+   try{
+    await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>assert.rejects(importCrawlCorpusForResidual(store,item.cas,item.manifest),(error:unknown)=>error instanceof CivicPolicyStateError&&error.code==='CIVIC_POLICY_INVENTORY_UNAVAILABLE'));
+    assert.equal(injected,1);
+   }finally{rt.mock.restoreAll();syncBuiltinESMExports();await writeFile(authorityPath,authorityBytes,{mode:0o600});}
+   assert.deepEqual(await readFile(authorityPath),authorityBytes);
    await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
     const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
     assert.equal(Date.parse((await loadPolicyReceipt(item.cas,imported.jobs[0].policyReceiptSha256)).expiresAt),Date.parse(item.checkedAt)+REGISTERED_SOURCE_POLICY_VALIDITY_MS);

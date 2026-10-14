@@ -536,6 +536,26 @@ test('production authority cannot fork into a temporary store and fixture author
  await rm(join(stateDir,'authority.json'));await assert.rejects(assertHostNotOptedOut('https://council.test/doc',policy),CivicPolicyStateError);await assert.rejects(readCivicOptOutSnapshot(policy),CivicPolicyStateError);
 });
 
+for(const malformed of ['{','{}'])test('authority '+(malformed==='{'?'JSON':'schema')+' failures retain state errors at precheck and locked inventory read',async t=>{
+ const {stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),path=join(stateDir,'authority.json'),saved=await readFile(path);
+ await writeFile(path,malformed,{mode:0o600});
+ await assert.rejects(assertCivicPolicyAuthority(policy),(error:unknown)=>error instanceof CivicPolicyStateError&&error.code==='CIVIC_POLICY_AUTHORITY_UNAVAILABLE');
+ await writeFile(path,saved,{mode:0o600});
+ const originalOpen=fsPromises.open;let injected=0;
+ t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+  if(String(args[0])===path&&injected===0&&new Error().stack?.includes('loadInventory')){
+   injected++;await writeFile(path,malformed,{mode:0o600});
+   const handle=await originalOpen(...args),close=handle.close.bind(handle);
+   handle.close=async()=>{try{await close();}finally{await writeFile(path,saved,{mode:0o600});}};
+   return handle;
+  }
+  return originalOpen(...args);
+ });syncBuiltinESMExports();
+ try{await assert.rejects(readCivicPolicyInventory(policy),(error:unknown)=>error instanceof CivicPolicyStateError&&error.code==='CIVIC_POLICY_INVENTORY_UNAVAILABLE');assert.equal(injected,1);}
+ finally{t.mock.restoreAll();syncBuiltinESMExports();await writeFile(path,saved,{mode:0o600});}
+ assert.deepEqual(await readFile(path),saved);await assertCivicPolicyAuthority(policy);
+});
+
 test('private records, result caches, quarantines, frozen archives and materialized outputs are source content',async t=>{
  const {base,stateDir}=await sandbox(t),root=join(base,'private-outputs'),policy=fixturePolicy(stateDir);
  await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});

@@ -5,6 +5,7 @@ import {digest,ScopeSchema,HashSchema} from './district-adapter-contract.ts';
 import {authorizedPilotCorpusSchema,loadFrozenCorpusBytes,corpusFixturePolicy,type CrawlDocument as ImportedDocument} from './district-corpus.ts';
 import {operatorRegistryInputPinSchema,readOperatorRegistryInputPin,CrawlRegistryPinSchema,readCrawlOperatorRegistryInputPin} from './district-registry-config.ts';
 import {SourceObservationSchema,sourceObservationMatches,readBoundSourceObservation} from './source-observation.ts';
+import {ContentFreeSourcePolicySchema,assertSubscriptionSourcePolicy} from './district-schema.ts';
 import {HttpObservationProofSchema,authenticatedHttpBinding} from './district-http-observation.ts';
 import {createPolicyReceipt,PolicyReceiptSchema} from './district-policy-receipt.ts';
 import {ResidualInputSchema,ResidualBoundsSchema,residualMimeSupported} from './district-residual-jobs.ts';
@@ -39,21 +40,24 @@ const unavailableSourceEvidenceCodes=new Set(['ENOENT','CONTENT_BINDING_MISMATCH
 function sourceEvidenceUnavailable(error:unknown):boolean{
  return error instanceof CivicPolicyStateError&&unavailableSourceEvidenceCodes.has(error.code)||(error as NodeJS.ErrnoException)?.code==='ENOENT';
 }
-// These failures describe only the retained parent's content/admission evidence.
-// Managed-state/I/O failures and unexpected exceptions are not lineage absence.
-const parentEvidenceValidationMessages=new Set([
- 'Source observation index binding is incomplete or excluded',
- 'Source observation is outside the explicitly managed raw root',
- 'Source observation path/type/size rejected',
- 'Source observation does not bind the requested representation',
- 'Source representation bytes changed after observation binding',
- 'Source policy evidence missing or invalid; recollect before subscription extraction',
- 'Source policy blocks extraction; ask_municipality',
- 'Source policy evidence clock is incomplete',
-]);
-function parentEvidenceInvalid(error:unknown):boolean{
- if(error instanceof CivicPolicyStateError||(error as NodeJS.ErrnoException)?.code!==undefined)return false;
- return error instanceof z.ZodError||error instanceof SyntaxError||error instanceof Error&&parentEvidenceValidationMessages.has(error.message);
+/** Raised only by explicit, pure checks of the retained parent's content. */
+class ParentEvidenceInvalid extends Error {
+ constructor(){super('Retained parent observation/policy evidence is invalid');this.name='ParentEvidenceInvalid';}
+}
+function assertParentEvidence(value:unknown,parent:ImportedDocument,source:DistrictRegistry['municipalities'][number]['sources'][number],base:RegisteredRobotsAudit):void{
+ const observation=SourceObservationSchema.safeParse(value);
+ if(!observation.success)throw new ParentEvidenceInvalid();
+ const sourcePolicy=ContentFreeSourcePolicySchema.safeParse(observation.data.policy);
+ if(!sourcePolicy.success)throw new ParentEvidenceInvalid();
+ // These are synchronous content checks, never managed-state reads. Only their
+ // documented validation failures become lineage absence.
+ try{
+  assertSubscriptionSourcePolicy(sourcePolicy.data,parent,source);
+  sourcePolicyExpiresAt(sourcePolicy.data,observation.data.checkedAt,parent,{municipalityId:parent.municipalityId,sourceId:parent.sourceId,ags:parent.ags},base);
+ }catch(error){
+  if(error instanceof Error&&['Source policy evidence missing or invalid; recollect before subscription extraction','Source policy blocks extraction; ask_municipality','Source policy exception is not bound to the registered source; ask_municipality','Source policy evidence clock is incomplete'].includes(error.message))throw new ParentEvidenceInvalid();
+  throw error;
+ }
 }
 const MAX_IMPORTED_DISCOVERY_HOPS=32;
 /** Reconstruct only byte-verified HTML edges in the authenticated frozen corpus.
@@ -77,13 +81,10 @@ function importedRegisteredPolicy(documents:readonly ImportedDocument[],rawRoot:
     if(!targets){
      const expected=parent.observationPath?observations.get(basename(parent.observationPath)):undefined;
      if(!expected||expected.observation.bytes>64*1024*1024)return original;
-     let bound:BoundSourceObservation;
-     try{
-      bound=await readBoundSourceObservation({rawRoot,document:parent,policy,registeredSource:source});
-      if(JSON.stringify(expected.binding)!==JSON.stringify(bound.binding))return original;
-      // Historical discovery need not be fresh, but its evidence clocks must be real.
-      sourcePolicyExpiresAt(bound.policy,bound.observation.checkedAt,parent,{municipalityId:parent.municipalityId,sourceId:parent.sourceId,ags:parent.ags},base);
-     }catch(error){if(!parentEvidenceInvalid(error))throw error;return original;}
+     assertParentEvidence(expected.observation,parent,source,base);
+     const bound=await readBoundSourceObservation({rawRoot,document:parent,policy,registeredSource:source});
+     if(JSON.stringify(expected.binding)!==JSON.stringify(bound.binding))return original;
+     assertParentEvidence(bound.observation,parent,source,base);
      targets=new Set(discoverDocumentLinks(bound.sourceBytes.toString('utf8'),parent.url).filter(link=>byUrl.has(link.url)).map(link=>link.url));
      parents.set(parent.url,targets);
     }
@@ -93,7 +94,7 @@ function importedRegisteredPolicy(documents:readonly ImportedDocument[],rawRoot:
   }catch(error){
    // Missing/changed parent evidence cannot widen policy. State/operational
    // failures must propagate, never masquerade as a one-hour stale policy.
-   if(!sourceEvidenceUnavailable(error))throw error;
+   if(!(error instanceof ParentEvidenceInvalid)&&!sourceEvidenceUnavailable(error))throw error;
    return original;
   }
   let audit=base;
