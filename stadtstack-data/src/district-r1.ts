@@ -25,6 +25,8 @@ import {PoliteFetcher,PoliteFetchError} from './polite-fetch.ts';
 import type {FetchedDocument,FetchFailure,FixturePolicyInspection} from './polite-fetch.ts';
 import {nativePublicRequestHeaders} from './district-native-request.ts';
 import {readGenesisOwnerRepresentation} from './genesis-owner-acquisition.ts';
+import {OwnerAcquisitionReusePinSchema,readPriorGenesisOwnerAcquisition} from './genesis-owner-reuse.ts';
+import {admittedRegisteredRobotsScopes,type RegisteredRobotsAudit} from './registered-source-policy.ts';
 import {pipelineNotificationConfig} from './district-notifications.ts';
 import {initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceReadable,assertManagedRawSourceBinding,assertCivicPolicyAuthority,CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
 import type {ManagedSourceContent,ManagedSourceBinding,CivicPolicyOptions} from './civic-opt-out.ts';
@@ -59,6 +61,7 @@ const ACQUISITION_VERSION='district-r1-acquisition-v1';
 const PermissionSchema=PolicyReceiptSchema.shape.permission;
 const requestSchema=z.object({url:z.url(),method:z.enum(['GET','POST']),body:z.string().max(65536).nullable(),contentType:z.string().nullable(),publicOperation:z.enum(['genesis_guest','ted_search']).nullable()}).strict();
 export const AcquisitionSelectorSchema=z.object({version:z.literal(ACQUISITION_VERSION),scope:ScopeSchema,root:z.url(),request:requestSchema,permission:PermissionSchema,maxRequests:z.number().int().min(1).max(100),maxBytes:z.number().int().min(1).max(64*1024*1024),sourceVersion:z.string().nullable(),discovery:z.object({stepReceiptSha256:HashSchema,resultSha256:HashSchema}).strict().nullable()}).strict();
+export const AcquiredRepresentationSelectorSchema=z.object({acquisition:AcquisitionSelectorSchema,prior:OwnerAcquisitionReusePinSchema}).strict();
 const assessmentBEnqueueInput=z.object({itemArtifactSha256:HashSchema,sourceScope:ScopeSchema,policyProofSha256:HashSchema});
 export const AssessmentBEnqueueManifestSchema=z.object({jobs:z.array(z.discriminatedUnion('transport',[
  assessmentBEnqueueInput.extend({transport:z.literal('mac-bridge'),clientContractSha256:HashSchema}).strict(),
@@ -86,7 +89,7 @@ export const HostGroupsSchema=z.object({schemaVersion:z.literal('district-host-g
 export async function acquisitionContract(){
  const hostGroupsBytes=await readFile(join(REPO,'sources/district-host-groups.json'));
  HostGroupsSchema.parse(JSON.parse(hostGroupsBytes.toString('utf8')));
- return semanticHash({version:ACQUISITION_VERSION,hostGroupsSha256:digest(hostGroupsBytes),files:await Promise.all(['district-r1.ts','district-r1-state.ts','polite-fetch.ts','district-crawl-request.ts','district-policy-receipt.ts','source-policy.ts','registered-source-policy.ts','civic-opt-out.ts','district-native-request.ts','genesis-owner-credentials.ts','genesis-owner-acquisition.ts'].map(async file=>({file,sha256:digest(await readFile(join(REPO,'src',file)))})))});
+ return semanticHash({version:ACQUISITION_VERSION,hostGroupsSha256:digest(hostGroupsBytes),files:await Promise.all(['district-r1.ts','district-r1-state.ts','polite-fetch.ts','district-crawl-request.ts','district-policy-receipt.ts','source-policy.ts','registered-source-policy.ts','civic-opt-out.ts','district-native-request.ts','genesis-owner-credentials.ts','genesis-owner-acquisition.ts','genesis-owner-reuse.ts','district-http-observation.ts'].map(async file=>({file,sha256:digest(await readFile(join(REPO,'src',file)))})))});
 }
 
 /** Controlled counts over the actual committed pages; no source literals or raw hold explanations. */
@@ -236,6 +239,8 @@ const acquisitionFailureReasons:Readonly<Record<FetchFailure,ReasonCode>>={
 export function acquisitionFailureReason(error:unknown):ReasonCode|null {
  return error instanceof PoliteFetchError&&Object.hasOwn(acquisitionFailureReasons,error.failure)?acquisitionFailureReasons[error.failure]:null;
 }
+/** These dispositions follow a settled fetch rejection, unlike executor aborts. */
+export function isSettledAcquisitionFailure(reason:ReasonCode):boolean {for(const failure in acquisitionFailureReasons)if(Object.hasOwn(acquisitionFailureReasons,failure)&&acquisitionFailureReasons[failure as FetchFailure]===reason)return true;return false;}
 export interface AcquisitionFixture {fetchRoot:string;policy:CivicPolicyOptions;inspection?:FixturePolicyInspection}
 /** Shared governed request admission for acquisition and current-policy jobs. */
 export async function createR1PublicFetcher(store:DistrictJobStore,context:Parameters<JobHandler>[0],options:{maxRequests:number;maxBytes:number;fixture?:AcquisitionFixture;registry?:DistrictRegistry;registrySha256?:string;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void}){
@@ -245,7 +250,7 @@ export async function createR1PublicFetcher(store:DistrictJobStore,context:Param
  await privateRoot(fetchRoot);await initializeManagedAcquisitionLane(fetchRoot,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'fetch'});
  let requests=0;
  const group=HostGroupsSchema.parse(JSON.parse(await readFile(join(REPO,'sources/district-host-groups.json'),'utf8'))).serviceGroups[0],laneKey=`service:${group.id}`;
- const fetcher=new PoliteFetcher({cacheDir:fetchRoot,minDelayMs:group.minStartIntervalMs,maxBytes:options.maxBytes,ownerPolicyLane:{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID},fixtureInspection:fixture?.inspection,beforeRequest:async url=>{
+ const fetcher=new PoliteFetcher({cacheDir:fetchRoot,minDelayMs:group.minStartIntervalMs,maxBytes:options.maxBytes,ownerPolicyLane:{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID},fixtureInspection:fixture?.inspection,ownerAcquisitionProducer:context.job.spec.step==='acquire_representation'?{jobKey:context.job.jobKey,attempt:context.job.attempt,fencingToken:context.job.fencingToken}:undefined,beforeRequest:async url=>{
   context.signal.throwIfAborted();if(++requests>options.maxRequests)throw new DistrictExecutionHold('source_limit_exceeded');
   if(!['http:','https:'].includes(new URL(url).protocol))throw Error('Non-public acquisition transport');
   const lane=await store.pool.query<{normalized_host:string;shared_service_group:string;max_in_flight:number;min_start_interval_ms:number}>('INSERT INTO district_pipeline.host_lanes(lane_key,normalized_host,shared_service_group,max_in_flight,min_start_interval_ms) VALUES($1,$2,$3,$4,$5) ON CONFLICT(lane_key) DO UPDATE SET lane_key=EXCLUDED.lane_key RETURNING normalized_host,shared_service_group,max_in_flight,min_start_interval_ms',[laneKey,'*',group.id,group.maxInFlight,group.minStartIntervalMs]);
@@ -261,6 +266,38 @@ export async function createR1PublicFetcher(store:DistrictJobStore,context:Param
  if(options.registry)fetcher.registerRegisteredSources(options.registry,options.registrySha256??semanticHash(options.registry));
  return fetcher;
 }
+async function completeAcquisitionAdmission(store:DistrictJobStore,context:Parameters<JobHandler>[0],selector:z.infer<typeof AcquisitionSelectorSchema>,contract:string,policy:CivicPolicyOptions,response:FetchedDocument,admitted:{bytes:Buffer;httpObservation:HttpObservationProof},redirectChain:string[],registeredSourceEligibility?:RegisteredRobotsAudit,originalExpiresAt?:string,versions:Record<string,string>={}):ReturnType<JobHandler>{
+ const {bytes,httpObservation}=admitted;
+ const checkedAt=new Date().toISOString(),expiresAt=originalExpiresAt??(registeredSourcePolicyApplies(response.policy!,response,selector.scope,registeredSourceEligibility)?sourcePolicyExpiresAt(response.policy!,response.checkedAt,response,selector.scope,registeredSourceEligibility):new Date(Date.parse(checkedAt)+PUBLIC_SOURCE_POLICY_VALIDITY_MS).toISOString()),proof=await createPolicyReceipt({source:{url:response.url,sha256:response.sha256,mimeType:response.mimeType},sourcePolicy:response.policy,registeredSourceEligibility,scope:selector.scope,permission:selector.permission,checkedAt,expiresAt},policy);
+ const representation=await persistR1Representation(store,context.cas,{bytes,receipt:proof.receipt,request:selector.request,retrievedAt:response.retrievedAt,fetchedAt:response.checkedAt,sourceVersion:selector.sourceVersion,redirectChain,httpObservation:{observationId:httpObservation.observationId,receiptSha256:httpObservation.receiptSha256,bytes:Buffer.from(httpObservation.bytes)}},policy);
+ const descriptor=RepresentationDescriptorSchema.parse({version:'district-r1-representation-v1',scope:selector.scope,root:selector.root,snapshotId:representation.snapshotId,policyDecisionId:representation.policyDecisionId,receiptSha256:representation.receiptSha256,sourceArtifact:representation.sourceArtifact,snapshot:representation.snapshot,httpObservation,fetchedAt:response.checkedAt,admittedAt:proof.receipt.checkedAt,redirectChain});
+ const artifact=await persistMetadata(store,context.cas,{kind:'acquisition_descriptor',payload:descriptor,sources:[{sha256:response.sha256,url:response.url,policyReceiptSha256:proof.receiptSha256,httpObservation}]},policy);
+ return {outcome:'succeeded',reasonCode:'completed',outputs:[representation.sourceArtifact,representation.receiptArtifact,representation.observationArtifact,artifact],versions:{acquisition:contract,...versions},counts:{bytes:bytes.length}};
+}
+
+function acquisitionEligibility(registry:DistrictRegistry,registrySha256:string,selector:z.infer<typeof AcquisitionSelectorSchema>){
+ return admittedRegisteredRobotsScopes(registry,registrySha256).find(row=>row.municipalityId===selector.scope.municipalityId&&row.sourceId===selector.scope.sourceId&&row.ags===selector.scope.ags&&row.root===selector.root);
+}
+
+/** A separate, newly authorized admission job: this handler has no fetcher and
+ * cannot retry the already consumed owner-account request. */
+export function acquiredRepresentationHandler(store:DistrictJobStore,registry:DistrictRegistry,fixture?:AcquisitionFixture,registrySha256=semanticHash(registry)):JobHandler{return async context=>{
+ const selected=AcquiredRepresentationSelectorSchema.parse(context.job.spec.selector),selector=await validateAcquisitionSelector(registry,store,context.cas,selected.acquisition),contract=await acquisitionContract();
+ if(context.job.spec.step!=='admit_acquired_representation'||context.job.spec.lane!=='acquisition'||context.job.spec.semanticContractSha256!==contract||semanticHash(context.job.spec.sourceScope)!==semanticHash(selector.scope)||!context.job.spec.inputArtifactHashes.includes(registrySha256))throw Error('Offline acquisition job contract mismatch');
+ if(fixture&&(await assertCivicPolicyAuthority(fixture.policy)).mode!=='isolated-fixture')throw Error('Acquisition fixture requires isolated authority');
+ context.signal.throwIfAborted();
+ const eligibility=acquisitionEligibility(registry,registrySha256,selector),policy=fixture?.policy??{},acquired=await readPriorGenesisOwnerAcquisition(store,fixture?.fetchRoot??R1_FETCH_ROOT,selector,selected.prior,policy,eligibility);
+ context.signal.throwIfAborted();
+ return completeAcquisitionAdmission(store,context,selector,contract,policy,acquired.response,acquired,acquired.redirectChain,eligibility,acquired.expiresAt,acquired.versions);
+};}
+
+export async function enqueueAcquiredRepresentation(store:DistrictJobStore,cas:DistrictCas,registry:DistrictRegistry,registrySha256:string,input:unknown,fixture?:AcquisitionFixture):Promise<string>{
+ const selected=AcquiredRepresentationSelectorSchema.parse(input),selector=await validateAcquisitionSelector(registry,store,cas,selected.acquisition);
+ if(fixture&&(await assertCivicPolicyAuthority(fixture.policy)).mode!=='isolated-fixture')throw Error('Acquisition fixture requires isolated authority');
+ await readPriorGenesisOwnerAcquisition(store,fixture?.fetchRoot??R1_FETCH_ROOT,selector,selected.prior,fixture?.policy??{},acquisitionEligibility(registry,registrySha256,selector));
+ return store.enqueue({step:'admit_acquired_representation',lane:'acquisition',semanticContractSha256:await acquisitionContract(),inputArtifactHashes:[registrySha256],sourceScope:selector.scope,selector:selected,policyProofSha256:null});
+}
+
 export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegistry,fixture?:AcquisitionFixture,registrySha256=semanticHash(registry)):JobHandler{return async context=>{
  const selector=await validateAcquisitionSelector(registry,store,context.cas,context.job.spec.selector),contract=await acquisitionContract();
  if(context.job.spec.semanticContractSha256!==contract||semanticHash(context.job.spec.sourceScope)!==semanticHash(selector.scope))throw Error('Acquisition job contract mismatch');
@@ -283,25 +320,23 @@ export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegis
  context.signal.throwIfAborted();
  const {bytes,httpObservation}=response.policy?.access==='authenticated_owner_account'?await readGenesisOwnerRepresentation(fetchRoot,response,policy,selector.maxBytes):{bytes:await readFetchedBytes(fetchRoot,response.localPath,response.sha256,selector.maxBytes),httpObservation:await readHttpObservation(response,fetchRoot,policy)};
  const registeredSourceEligibility=fetcher.registeredSourceEligibility({registeredMunicipalityId:selector.scope.municipalityId,registeredSourceId:selector.scope.sourceId,registeredSourceUrl:selector.root});
- const checkedAt=new Date().toISOString(),expiresAt=registeredSourcePolicyApplies(response.policy!,response,selector.scope,registeredSourceEligibility)?sourcePolicyExpiresAt(response.policy!,response.checkedAt,response,selector.scope,registeredSourceEligibility):new Date(Date.parse(checkedAt)+PUBLIC_SOURCE_POLICY_VALIDITY_MS).toISOString(),proof=await createPolicyReceipt({source:{url:response.url,sha256:response.sha256,mimeType:response.mimeType},sourcePolicy:response.policy,registeredSourceEligibility,scope:selector.scope,permission:selector.permission,checkedAt,expiresAt},policy);
- const representation=await persistR1Representation(store,context.cas,{bytes,receipt:proof.receipt,request:selector.request,retrievedAt:response.retrievedAt,fetchedAt:response.checkedAt,sourceVersion:selector.sourceVersion,redirectChain,httpObservation:{observationId:httpObservation.observationId,receiptSha256:httpObservation.receiptSha256,bytes:Buffer.from(httpObservation.bytes)}},policy);
- const descriptor=RepresentationDescriptorSchema.parse({version:'district-r1-representation-v1',scope:selector.scope,root:selector.root,snapshotId:representation.snapshotId,policyDecisionId:representation.policyDecisionId,receiptSha256:representation.receiptSha256,sourceArtifact:representation.sourceArtifact,snapshot:representation.snapshot,httpObservation,fetchedAt:response.checkedAt,admittedAt:proof.receipt.checkedAt,redirectChain});
- const artifact=await persistMetadata(store,context.cas,{kind:'acquisition_descriptor',payload:descriptor,sources:[{sha256:response.sha256,url:response.url,policyReceiptSha256:proof.receiptSha256,httpObservation}]},policy);
- return {outcome:'succeeded',reasonCode:'completed',outputs:[representation.sourceArtifact,representation.receiptArtifact,representation.observationArtifact,artifact],versions:{acquisition:contract},counts:{bytes:bytes.length}};
+ return completeAcquisitionAdmission(store,context,selector,contract,policy,response,{bytes,httpObservation},redirectChain,registeredSourceEligibility);
 };}
-async function loadDescriptor(store:DistrictJobStore,cas:DistrictCas,hash:string){
- HashSchema.parse(hash);await assertManagedSourceReadable(join(cas.root,'sha256',hash.slice(0,2),hash));const bytes=await cas.read(hash),descriptor=RepresentationDescriptorSchema.parse(JSON.parse(bytes.toString('utf8')));
+export async function loadDescriptor(store:DistrictJobStore,cas:DistrictCas,hash:string,policy:CivicPolicyOptions={}){
+ HashSchema.parse(hash);await assertManagedSourceReadable(join(cas.root,'sha256',hash.slice(0,2),hash),policy);const bytes=await cas.read(hash),descriptor=RepresentationDescriptorSchema.parse(JSON.parse(bytes.toString('utf8')));
  const audit=await store.pool.query<{sha256:string;payload_json:unknown}>(`SELECT sha256,payload_json FROM district_pipeline.r1_metadata_snapshots WHERE kind='acquisition_descriptor' AND payload_json->'artifact'->>'sha256'=$1 LIMIT 2`,[hash]);
  if(audit.rowCount!==1||semanticHash(audit.rows[0].payload_json)!==audit.rows[0].sha256)throw Error('Canonical acquisition descriptor audit binding mismatch');
  const safe=R1ArtifactAuditSchema.parse(audit.rows[0].payload_json);
  if(safe.kind!=='acquisition_descriptor'||safe.artifact.sha256!==hash||safe.artifact.byteLength!==bytes.length||!safe.sources.some(source=>source.policyReceiptSha256===descriptor.receiptSha256&&canonicalJson(source.binding)===canonicalJson(authenticatedHttpBinding(descriptor.httpObservation,{url:descriptor.snapshot.url,sha256:descriptor.snapshot.sourceSha256}))))throw Error('Acquisition artifact does not match its content-free audit');
- const committed=await store.pool.query(`SELECT id FROM district_pipeline.step_receipts WHERE receipt->>'step'='acquire_representation' AND outcome='succeeded' AND receipt->'outputHashes' @> $1::jsonb`,[JSON.stringify([hash])]);
+ const committed=await store.pool.query(`SELECT id FROM district_pipeline.step_receipts WHERE receipt->>'step' IN ('acquire_representation','admit_acquired_representation') AND outcome='succeeded' AND receipt->'outputHashes' @> $1::jsonb`,[JSON.stringify([hash])]);
  if(!committed.rowCount)throw Error('Representation descriptor is not a committed acquisition output');
- const rows=await store.pool.query(`SELECT r.id FROM district_pipeline.representations r JOIN district_pipeline.policy_decisions p ON p.id=r.policy_decision_id JOIN district_pipeline.source_snapshots s ON s.id=r.source_snapshot_id WHERE r.source_snapshot_id=$1 AND r.policy_decision_id=$2 AND r.artifact_sha256=$3 AND p.proof_sha256=$4 AND r.admission='admitted' AND p.state='allowed' AND r.fetched_at=$5 AND r.admitted_at=$6 AND s.retrieved_at=$7 AND s.scope_sha256=$8`,[descriptor.snapshotId,descriptor.policyDecisionId,descriptor.snapshot.sourceSha256,descriptor.receiptSha256,descriptor.fetchedAt,descriptor.admittedAt,descriptor.snapshot.retrievedAt,semanticHash(descriptor.scope)]);
+ // The source snapshot retains its first-seen retrieval clock. Each subsequent
+ // representation is clock-bound by its own immutable HTTP observation above.
+ const rows=await store.pool.query(`SELECT r.id FROM district_pipeline.representations r JOIN district_pipeline.policy_decisions p ON p.id=r.policy_decision_id JOIN district_pipeline.source_snapshots s ON s.id=r.source_snapshot_id WHERE r.source_snapshot_id=$1 AND r.policy_decision_id=$2 AND r.artifact_sha256=$3 AND p.proof_sha256=$4 AND r.admission='admitted' AND p.state='allowed' AND r.fetched_at=$5 AND r.admitted_at=$6 AND s.scope_sha256=$7`,[descriptor.snapshotId,descriptor.policyDecisionId,descriptor.snapshot.sourceSha256,descriptor.receiptSha256,descriptor.fetchedAt,descriptor.admittedAt,semanticHash(descriptor.scope)]);
  if(rows.rowCount!==1)throw Error('Descriptor lacks actual persisted representation');
  const proof=PolicyReceiptSchema.parse(JSON.parse((await cas.read(descriptor.receiptSha256)).toString('utf8')));
  if(semanticHash(proof)!==descriptor.receiptSha256||semanticHash(proof.scope)!==semanticHash(descriptor.scope)||proof.source.sha256!==descriptor.snapshot.sourceSha256||proof.source.url!==descriptor.snapshot.url)throw Error('Descriptor policy mismatch');
- await recheckPolicyReceipt(proof,{evaluationAt:new Date().toISOString()});await cas.verify(descriptor.snapshot.sourceSha256);return descriptor;
+ await recheckPolicyReceipt(proof,{...policy,evaluationAt:new Date().toISOString()});await cas.verify(descriptor.snapshot.sourceSha256);return descriptor;
 }
 async function stdinJson(){let bytes=0;const chunks:Buffer[]=[];for await(const chunk of process.stdin){const value=Buffer.from(chunk);bytes+=value.length;if(bytes>4*1024*1024)throw Error('Operator manifest too large');chunks.push(value);}return JSON.parse(Buffer.concat(chunks).toString('utf8'));}
 
@@ -401,7 +436,7 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
    const authorization=await pool.query<{has_b:boolean;only_b:boolean}>(`SELECT BOOL_OR(j.step='assessment_b') AS has_b,BOOL_AND(j.step='assessment_b') AS only_b FROM district_pipeline.preauthorizations a JOIN district_pipeline.jobs j ON j.job_key=ANY(a.allowed_job_keys) WHERE a.id=$1`,[authorizationId]);
    if(authorization.rows[0]?.has_b&&!authorization.rows[0]?.only_b)throw new DistrictExecutionHold('authorization_mode_mismatch');
    const refreshStore=new DistrictJobStore(pool),refresh=policyRefreshHandler(refreshStore,(context,maxRequests)=>createR1PublicFetcher(refreshStore,context,{maxRequests,maxBytes:1024*1024,registry,registrySha256}));
-   await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlersFor(pool),...assessmentQueueHandlers(pool),policy_refresh:refresh,acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry,undefined,registrySha256)},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
+   await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlersFor(pool),...assessmentQueueHandlers(pool),policy_refresh:refresh,acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry,undefined,registrySha256),admit_acquired_representation:acquiredRepresentationHandler(new DistrictJobStore(pool),registry,undefined,registrySha256)},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
   }finally{await pool.end();}return;
  }
  if(args.length)throw Error('R1 commands require only explicit registry configuration flags and bounded JSON stdin');
@@ -519,7 +554,7 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
   }
   if(command==='representations'){
    const selection=z.object({runIds:z.array(z.uuid()).min(1).max(1000)}).strict().parse(input);
-   const rows=await pool.query<{receipt:unknown}>(`SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=ANY($1::uuid[]) AND receipt->>'step'='acquire_representation' AND outcome='succeeded' ORDER BY committed_at`,[selection.runIds]);
+   const rows=await pool.query<{receipt:unknown}>(`SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=ANY($1::uuid[]) AND receipt->>'step' IN ('acquire_representation','admit_acquired_representation') AND outcome='succeeded' ORDER BY committed_at`,[selection.runIds]);
    const representations:{representationSha256:string;snapshotId:string;sourceSha256:string;policyReceiptSha256:string;scope:AdapterScope;httpObservation:{observationId:string;receiptSha256:string}}[]=[];
    for(const row of rows.rows){const receipt=StepReceiptSchema.parse(row.receipt);for(const hash of receipt.outputHashes){
     const artifact=await pool.query<{kind:string}>('SELECT kind FROM district_pipeline.artifacts WHERE sha256=$1',[hash]);
@@ -528,6 +563,11 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
     representations.push({representationSha256:hash,snapshotId:descriptor.snapshotId,sourceSha256:descriptor.snapshot.sourceSha256,policyReceiptSha256:descriptor.receiptSha256,scope:descriptor.scope,httpObservation:{observationId:descriptor.httpObservation.observationId,receiptSha256:descriptor.httpObservation.receiptSha256}});
    }}
    process.stdout.write(canonicalJson({representations})+'\n');return;
+  }
+  if(command==='enqueue-acquired-representation'){
+   const manifest=z.object({jobs:z.array(AcquiredRepresentationSelectorSchema).min(1).max(100)}).strict().parse(input),jobKeys:string[]=[];
+   for(const item of manifest.jobs)jobKeys.push(await enqueueAcquiredRepresentation(store,cas,registry,registrySha256,item));
+   process.stdout.write(canonicalJson({jobKeys})+'\n');return;
   }
   if(command==='enqueue-acquisition'){
    const manifest=z.object({jobs:z.array(AcquisitionSelectorSchema).min(1).max(10000)}).strict().parse(input),jobKeys:string[]=[];

@@ -31,7 +31,7 @@ import {nativePublicRequestHeaders,type NativePublicOperation} from './district-
 import {ownerGenesisAccessFor,ownerGenesisRobotsDecisionFor} from './source-policy.ts';
 import {readGenesisOwnerCredentials,type GenesisOwnerCredentials} from './genesis-owner-credentials.ts';
 import {genesisOwnerAccountRoot,readGenesisOwnerRepresentation} from './genesis-owner-acquisition.ts';
-import {persistCrawlRequestEvidence,CrawlRequestEvidenceCaptureError} from './district-crawl-request.ts';
+import {persistCrawlRequestEvidence,persistOwnerAccountRequestEvidence,OwnerAcquisitionProducerSchema,CrawlRequestEvidenceCaptureError,type OwnerAcquisitionProducer} from './district-crawl-request.ts';
 import {semanticHash} from './district-adapter-contract.ts';
 import {admittedRegisteredRobotsScopes,registeredRobotsAuditApplies,registeredRobotsEvidence,readRegisteredRobotsAudit,registeredRobotsScope,registeredBobScope,REGISTERED_SOURCE_POLICY_VALIDITY_MS,PUBLIC_SOURCE_POLICY_VALIDITY_MS,type RegisteredRobotsAudit,type RegisteredSourceConfiguration} from './registered-source-policy.ts';
 import {sourcePolicyValidityMs,registeredSourcePolicyContextUrls,isOriginTdmEvidence} from './source-policy.ts';
@@ -109,7 +109,7 @@ export interface FixturePolicyInspection {
  origin(input:DocumentOriginInput,options:DocumentOriginOptions):Promise<DocumentOriginClassification>;
  pdf(bytes:Buffer,sha256:string,cacheRoot:string,context:ParserSourceContext):Promise<PdfTdmPolicyResult>;
 }
-export interface PoliteFetcherOptions {cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;beforeRequest?:(url:string)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void}
+export interface PoliteFetcherOptions {cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;ownerAcquisitionProducer?:OwnerAcquisitionProducer;beforeRequest?:(url:string)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void}
 const sleep=(ms:number)=>new Promise<void>(done=>setTimeout(done,ms));
 const representationPolicyLocators={
  'tdm-reservation':'HTTP TDM-Reservation',
@@ -130,10 +130,11 @@ function retryAfterTime(value:string|undefined,now:number):number {
  return Number.isFinite(time)?Math.max(now,time):0;
 }
 export class PoliteFetcher {
- readonly cacheDir:string;readonly options:Required<Omit<PoliteFetcherOptions,'ownerPolicyLane'|'fixtureInspection'|'beforeRequest'|'onRedirect'>>;
+ readonly cacheDir:string;readonly options:Required<Omit<PoliteFetcherOptions,'ownerPolicyLane'|'fixtureInspection'|'ownerAcquisitionProducer'|'beforeRequest'|'onRedirect'>>;
  private readonly fixtureInspection:FixturePolicyInspection|undefined;
  private readonly beforeRequest:PoliteFetcherOptions['beforeRequest'];
  private readonly onRedirect:PoliteFetcherOptions['onRedirect'];
+ private readonly ownerAcquisitionProducer:Readonly<OwnerAcquisitionProducer>|undefined;
  private delays=new Map<string,number>();
  private robots=new Map<string,{expiresAt:number;response:Promise<RobotsPolicy>}>();
  private machinePolicies=new Map<string,{expiresAt:number;response:Promise<{rules:TdmRule[];evidence:PolicyEvidence}>}>();
@@ -200,6 +201,7 @@ export class PoliteFetcher {
   if(options.fixtureInspection&&(!options.ownerPolicyLane?.authorityId?.startsWith('fixture:')||!options.ownerPolicyLane.authoritySha256||!options.ownerPolicyLane.stateDir))throw new PoliteFetchError('host_state_unsafe','Injected inspection requires a fully pinned isolated fixture authority');
   this.fixtureInspection=options.fixtureInspection;
   this.beforeRequest=options.beforeRequest;this.onRedirect=options.onRedirect;
+  this.ownerAcquisitionProducer=options.ownerAcquisitionProducer?Object.freeze(OwnerAcquisitionProducerSchema.parse(options.ownerAcquisitionProducer)):undefined;
   this.cacheDir=resolve(options.cacheDir);this.options={minDelayMs:2000,timeoutMs:25000,maxBytes:24*1024*1024,maxRedirects:5,policyTtlMs:PUBLIC_SOURCE_POLICY_VALIDITY_MS,...options};
   this.lane=options.ownerPolicyLane;
   this.publicPolicyFetcher=publicPolicyFetcher;
@@ -585,7 +587,7 @@ export class PoliteFetcher {
   await this.initialize();this.fetchCount++;
   try{
    if(!this.publicPolicyFetcher&&options.method==='POST'&&options.publicOperation==='genesis_guest'&&ownerGenesisAccessFor(url)){
-    this.ownerAccountFetcher??=new PoliteFetcher({...this.options,cacheDir:genesisOwnerAccountRoot(this.cacheDir),ownerPolicyLane:this.activeLane,fixtureInspection:this.fixtureInspection,beforeRequest:this.beforeRequest,onRedirect:this.onRedirect},this);
+    this.ownerAccountFetcher??=new PoliteFetcher({...this.options,cacheDir:genesisOwnerAccountRoot(this.cacheDir),ownerPolicyLane:this.activeLane,fixtureInspection:this.fixtureInspection,ownerAcquisitionProducer:this.ownerAcquisitionProducer,beforeRequest:this.beforeRequest,onRedirect:this.onRedirect},this);
     await this.ownerAccountFetcher.initialize();
     return await this.ownerAccountFetcher.fetchInternal(url,options,'document');
    }
@@ -830,7 +832,9 @@ export class PoliteFetcher {
     if(checkTdm){
      try{
       const publicSelector=originalBody!==undefined&&![...new URLSearchParams(originalBody).keys()].some(key=>/^(?:username|user|password|secret|authorization|access_token|api_key|apikey|token|sessionid|phpsessid|cookie)$/i.test(key))&&String(policy.access)!=='authenticated_owner_account'?originalBody:null;
-      await persistCrawlRequestEvidence(this.cacheDir,{schemaVersion:'stadtstack-crawl-request-evidence-v1',httpObservation:{kind:'http_observation',url:url.href,sourceSha256:sha256,observationId:basename(observationPath),receiptSha256:hash(observationBytes)},request:{url:actualRedirectChain[0],method:originalMethod,contentType:originalBody===undefined?null:nativePublicRequestHeaders(publicUrl(actualRedirectChain[0]),originalMethod,originalBody,options.publicOperation)['Content-Type']??null,bodySha256:originalBody===undefined?null:hash(originalBody),publicSelector},redirectChain:actualRedirectChain},this.policyOptions());
+      const evidence={schemaVersion:'stadtstack-crawl-request-evidence-v1' as const,httpObservation:{kind:'http_observation' as const,url:url.href,sourceSha256:sha256,observationId:basename(observationPath),receiptSha256:hash(observationBytes)},request:{url:actualRedirectChain[0],method:originalMethod,contentType:originalBody===undefined?null:nativePublicRequestHeaders(publicUrl(actualRedirectChain[0]),originalMethod,originalBody,options.publicOperation)['Content-Type']??null,bodySha256:originalBody===undefined?null:hash(originalBody),publicSelector},redirectChain:actualRedirectChain};
+      if(this.publicPolicyFetcher&&this.ownerAcquisitionProducer&&String(policy.access)==='authenticated_owner_account')await persistOwnerAccountRequestEvidence(this.cacheDir,{...evidence,producer:this.ownerAcquisitionProducer},this.policyOptions());
+      else await persistCrawlRequestEvidence(this.cacheDir,evidence,this.policyOptions());
      }catch{throw new CrawlRequestEvidenceCaptureError();}
     }
     return {url:url.href,sha256,localPath,mimeType,retrievedAt,checkedAt,status:response.status,observationPath,policy:observation.policy,...(validatedPolicy?{validatedPolicy}:{})};

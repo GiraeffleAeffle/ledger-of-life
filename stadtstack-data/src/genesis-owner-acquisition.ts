@@ -1,6 +1,6 @@
 import {readFile,lstat,realpath} from 'node:fs/promises';
 import {join,resolve,basename,dirname} from 'node:path';
-import {assertManagedSourceReadable,assertManagedSourceBindings,type CivicPolicyOptions} from './civic-opt-out.ts';
+import {assertManagedSourceReadable,assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {HttpObservationProofSchema,authenticatedHttpBinding,type HttpObservationProof} from './district-http-observation.ts';
 import {assertSubscriptionSourcePolicy} from './district-schema.ts';
 import {hash} from './common.ts';
@@ -22,7 +22,7 @@ export async function readGenesisOwnerRepresentation(rawRoot:string,document:Fet
  }
  const observationBytes=await readFile(observationPath),httpObservation=HttpObservationProofSchema.parse({observationId:basename(observationPath),receiptSha256:hash(observationBytes),bytes:observationBytes.toString('utf8')});
  const binding=authenticatedHttpBinding(httpObservation,{url:document.url,sha256:document.sha256,mimeType:document.mimeType,retrievedAt:document.retrievedAt,fetchedAt:document.checkedAt});
- await assertManagedSourceBindings(bodyPath,[{...binding,independentAllowed:true}],policy);
+ await assertManagedIndependentHttpSourceBinding(bodyPath,binding,policy);
  await assertManagedSourceBindings(observationPath,[binding],policy);
  const observed=JSON.parse(httpObservation.bytes),sourcePolicy=assertSubscriptionSourcePolicy(observed.policy,document);
  if(sourcePolicy.access!=='authenticated_owner_account'||semanticHash(sourcePolicy)!==semanticHash(document.policy))throw Error('Owner account observed policy mismatch');
