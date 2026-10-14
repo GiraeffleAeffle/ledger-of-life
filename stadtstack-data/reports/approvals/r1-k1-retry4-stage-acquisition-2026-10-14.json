@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "stadtstack-r1-stage-authorization-record-v1",
+  "id": "r1-k1-retry4-stage-acquisition-2026-10-14",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under the owner approvals below; not a new owner approval",
+  "issuedAt": "2026-10-14T14:00:24.825Z",
+  "parentApproval": {
+    "id": "r1-k1-retry4-2026-10-14",
+    "path": "stadtstack-data/reports/approvals/r1-k1-retry4-2026-10-14.json",
+    "sha256": "18b46f294132b087888155c645c5d467c55bd4a4922d645d749df367d4f82ba0",
+    "clause": "approved.k1Retry4"
+  },
+  "relatedApprovals": [
+    {
+      "id": "r1-k2-and-genesis-owner-account-2026-10-13",
+      "sha256": "d7c8074d80d5636520cdb0422d1f161da6529c0dbe1cb1f97256b21770823b66"
+    },
+    {
+      "id": "r1-genesis-api-robots-2026-10-13",
+      "sha256": "ca6f7f1458488014eeea307ee3a327e84d28ff4ac34aa12a1fd11dc0444428a7"
+    },
+    {
+      "id": "r1-k1-retry3-stage-structured-parse-2026-10-14",
+      "sha256": "dc69da730db4d0a5d83c2522c830e52148c6ad950b502fab52d96ff100928920"
+    }
+  ],
+  "preconditionsMet": {
+    "code": "rebuild-r1 3c62cf7 (GENESIS 12411-02-03 -> 12411-02-03-5 request mapping 3bc4cc3 reviewed YES; parallel executors + assessment context reviewed YES; migrations 005/006 applied)",
+    "sourceGate": "tsc=0, 1728 tests, 1680 pass, 0 fail, 48 opt-in skips",
+    "parserAuthorization": "image sha256:4295abdbf539c35dc97afb770aa756cee094ff9e263e82078b233d2e67042dd2, contract 2e8d168d64e23e3feafd1fde11426fa9385f665ae7680d412cd5c866eaed359a; sentinels 29/30 (+1 Mac skip), 30/30, 17/17"
+  },
+  "stage": {
+    "step": "acquire_representation",
+    "selector": "K1 acquisition with request name 12411-02-03-5 (otherwise identical: Strausberg 12064472, GEMEIN, 2024, datencsv) via the owner-account lane",
+    "registryDescriptor": {
+      "path": "cache/districts/r1-operator/registry-96e34c4-code-3c62cf7/operator-registry-config.json",
+      "sha256": "9329792e31607c6945d52bf4449278c2804567f07cb64779659e53fc42fae239"
+    },
+    "jobKeys": [
+      "49f125e6b604998bed983b3ec35cda20cff33285a716cfa8b80fda4f3cd1b4d4"
+    ],
+    "ags": [
+      "12064472"
+    ],
+    "maxJobs": 1,
+    "maxElapsedMs": 240000,
+    "osDeadlineSeconds": 360,
+    "mode": "bounded_unattended",
+    "category": "production",
+    "expiresAt": "2026-10-14T21:59:59Z",
+    "newDataRequests": 1
+  },
+  "cumulativeWithinK1": {
+    "wallSecondsUsedBefore": 782,
+    "note": "601 s (runs 1-3) + 65 s (6ff963f2) + 49 s (bdb941c2) + 67 s (d848a753)",
+    "jobsIncludingThis": 7,
+    "k1MaxJobs": 8,
+    "wallSecondsBoundIncludingThis": 1142,
+    "k1TotalSeconds": 1500
+  }
+}
