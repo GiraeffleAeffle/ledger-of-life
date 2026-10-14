@@ -21,6 +21,7 @@ import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {CrawlRequestEvidenceSchema,CrawlRequestEvidenceCaptureError} from '../src/district-crawl-request.ts';
 import {ParserIsolationError,ParserIsolationReasonSchema} from '../src/district-parser-isolation.ts';
 import {largeBobInventory} from './fixtures/bob-inventory.ts';
+import {genesisOwnerAccountRoot} from '../src/genesis-owner-acquisition.ts';
 
 async function createPoliteFetcher(options:PoliteFetcherOptions):Promise<BasePoliteFetcher> {
  return new BasePoliteFetcher({...await politeTestOptions(options),fixtureInspection:fixturePolicyInspection});
@@ -34,6 +35,43 @@ test('only the exact BOB inventory GET gets the reviewed 90-second default wire 
  const explicit=await createPoliteFetcher({cacheDir:join(root,'explicit'),timeoutMs:7000});
  assert.equal((explicit as unknown as DeadlineSeam).requestTimeoutMs(new URL('https://bob-sh.de/'),'GET'),7000);
  assert.equal(fetcher.options.maxBytes,24*1024*1024);
+});
+test('only the exact GENESIS data/table POST in the owner-account lane gets the 120-second default wire deadline',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'polite-genesis-deadline-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ interface DeadlineSeam {requestTimeoutMs(url:URL,method:'GET'|'POST'):number}
+ const table='https://www.regionalstatistik.de/genesisws/rest/2020/data/table';
+ const publicFetcher=await createPoliteFetcher({cacheDir:join(root,'default')});
+ // Mirror fetch() routing, including its normalized timeoutMs:25000 options.
+ const ownerFetcher=new BasePoliteFetcher({...publicFetcher.options,cacheDir:genesisOwnerAccountRoot(publicFetcher.cacheDir)},publicFetcher);
+ const publicSeam=publicFetcher as unknown as DeadlineSeam,ownerSeam=ownerFetcher as unknown as DeadlineSeam;
+ assert.equal(ownerSeam.requestTimeoutMs(new URL(table),'POST'),120000);
+ assert.equal(publicSeam.requestTimeoutMs(new URL(table),'POST'),25000);
+ for(const [url,method] of [
+  [table,'GET'],
+  [table+'file','POST'],
+  [table+'/','POST'],
+  [table+'?name=12411-02-03-5','POST'],
+  [table+'#fragment','POST'],
+  [table.replace('https:','http:'),'POST'],
+  [table.replace('www.regionalstatistik.de','regionalstatistik.de'),'POST'],
+  [table.replace('www.regionalstatistik.de','other.regionalstatistik.de'),'POST'],
+  [table.replace('/2020/','/2021/'),'POST'],
+  ['https://www.regionalstatistik.de/robots.txt','GET'],
+  ['https://www.regionalstatistik.de/.well-known/tdmrep.json','GET'],
+  ['https://www.regionalstatistik.de/robots.txt','POST'],
+  ['https://www.regionalstatistik.de/.well-known/tdmrep.json','POST'],
+ ] as const){
+  assert.equal(ownerSeam.requestTimeoutMs(new URL(url),method),25000,`${method} ${url}`);
+  assert.equal(publicSeam.requestTimeoutMs(new URL(url),method),25000,`${method} ${url}`);
+ }
+ assert.equal(ownerFetcher.options.timeoutMs,25000); // DNS and nonmatching requests stay unchanged.
+ assert.equal(ownerFetcher.options.maxBytes,24*1024*1024);
+ for(const timeoutMs of [0,7000,180000]){
+  const explicit=await createPoliteFetcher({cacheDir:join(root,`explicit-${timeoutMs}`),timeoutMs});
+  const explicitOwner=new BasePoliteFetcher({...explicit.options,cacheDir:genesisOwnerAccountRoot(explicit.cacheDir)},explicit);
+  assert.equal((explicitOwner as unknown as DeadlineSeam).requestTimeoutMs(new URL(table),'POST'),timeoutMs);
+  assert.equal((explicit as unknown as DeadlineSeam).requestTimeoutMs(new URL(table),'POST'),timeoutMs);
+ }
 });
 test('production and unpinned contexts reject injected parser inspection before execution',()=>{
  for(const ownerPolicyLane of [undefined,{decisionId:APPROVED_OWNER_ROBOTS_OVERRIDE.id,authorityId:'owner-2026-10-11-codex-workstation',authoritySha256:hash('not a fixture'),stateDir:'/home/max/.local/state/stadtstack-data/civic-policy'}]){
