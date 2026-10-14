@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "stadtstack-r1-stage-authorization-record-v1",
+  "id": "r1-k1-retry3-stage-offline-admission-2026-10-14",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under the owner approvals below; not a new owner approval",
+  "issuedAt": "2026-10-14T12:41:38.750Z",
+  "parentApproval": {
+    "id": "r1-k1-retry3-2026-10-14-amendment-1",
+    "path": "stadtstack-data/reports/approvals/r1-k1-retry3-2026-10-14-amendment-1.json",
+    "sha256": "e725d6f1ba75b23033ef9d91c9f2da94bf4f55dd9935029fcdf51c9511e10bd2",
+    "clause": "approved.additionalJobs[0]"
+  },
+  "relatedApprovals": [
+    {
+      "id": "r1-k1-retry3-2026-10-14",
+      "sha256": "55a7713242aabe6c36cc6035ecd88fec4f27b21fd353ce8011c7416d209bea1b"
+    },
+    {
+      "id": "r1-k1-retry3-stage-acquisition-2026-10-14",
+      "sha256": "cbae8fa668f27b9bc6488b2c10303310b4cee022f404a470b8f675a4a0e281e8"
+    },
+    {
+      "id": "r1-k2-and-genesis-owner-account-2026-10-13",
+      "sha256": "d7c8074d80d5636520cdb0422d1f161da6529c0dbe1cb1f97256b21770823b66"
+    },
+    {
+      "id": "r1-genesis-api-robots-2026-10-13",
+      "sha256": "ca6f7f1458488014eeea307ee3a327e84d28ff4ac34aa12a1fd11dc0444428a7"
+    }
+  ],
+  "preconditionsMet": {
+    "code": "rebuild-r1 987167f (K1 offline admission 9969cd1+5ce51f5 reviewed YES after P1 fix; BOB follow-up aa68e0f+c65b72f reviewed YES)",
+    "sourceGate": "r1-final4: tsc=0, 1704 tests, 1656 pass, 0 fail, 48 opt-in skips",
+    "parserAuthorization": "image sha256:86620bfe32961179cfc834374f2c9766440612c087130aa7d5162d9dd393b142, contract 2fe659e61ba5036135c40a525c14e62f87cdaf81d8422fd1eb0f4a15c2d4f580; sentinels 29/30 (+1 Mac skip), 30/30, 17/17"
+  },
+  "stage": {
+    "step": "admit_acquired_representation",
+    "selector": "offline admission of the 2026-10-14T09:19:36Z owner-account observation 1791969586290-b8c97242-ccdc-43e4-ba66-8d9932ace9f8.json of held job 178e0587… (receipt 9dff8ed4…, attempt 1); no fetcher",
+    "registryDescriptor": {
+      "path": "cache/districts/r1-operator/registry-96e34c4-code-987167f/operator-registry-config.json",
+      "sha256": "2312148973d9aafaa24c32ca3bca8a728020f4319586ee57592dec235da1ca14"
+    },
+    "jobKeys": [
+      "d289d9e373c31122fc441665fc47b0d6cd672aaf9f5296a96a5976b9d900c88b"
+    ],
+    "ags": [
+      "12064472"
+    ],
+    "maxJobs": 1,
+    "maxElapsedMs": 240000,
+    "osDeadlineSeconds": 360,
+    "mode": "bounded_unattended",
+    "category": "production",
+    "expiresAt": "2026-10-14T21:59:59Z",
+    "newDataRequests": 0
+  },
+  "cumulativeWithinK1": {
+    "priorRuns": [
+      {
+        "runId": "85a9e281-e4cf-43c1-927d-871c7b6f9232",
+        "processWallSeconds": 165
+      },
+      {
+        "runId": "0c1de10f-4ab5-49d3-8924-1369052b2c43",
+        "processWallSeconds": 164
+      },
+      {
+        "runId": "a0591964-4fa8-456a-9f1d-8bb1f040cc0e",
+        "processWallSeconds": 272
+      },
+      {
+        "runId": "6ff963f2-f752-43b5-b06d-c584eadaa6c7",
+        "processWallSeconds": 65,
+        "result": "request succeeded; admission held execution_exception (duplicate-observation exact-set defect)"
+      }
+    ],
+    "jobsIncludingThis": 5,
+    "k1MaxJobs": 6,
+    "wallSecondsUsedBefore": 666,
+    "wallSecondsBoundIncludingThis": 1026,
+    "k1TotalSeconds": 1500
+  }
+}
