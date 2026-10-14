@@ -17,7 +17,7 @@ import {loadResidualSource} from './district-residual-jobs.ts';
 import {readCommittedPolicyRefresh} from './district-policy-refresh.ts';
 import type {BoundSourceObservation} from './source-observation.ts';
 import type {DistrictRegistry} from './district-registry.ts';
-import {sourcePolicyExpiresAt,registeredSourcePolicyApplies} from './source-policy.ts';
+import {sourcePolicyExpiresAt,registeredSourcePolicyApplies,MAX_POLICY_METADATA_EVIDENCE} from './source-policy.ts';
 import {admittedRegisteredRobotsScopes,registeredRobotsAuditApplies,registeredRobotsEvidence,type RegisteredRobotsAudit} from './registered-source-policy.ts';
 import {discoverDocumentLinks} from './district-source-adapters.ts';
 
@@ -44,7 +44,7 @@ function importedRegisteredPolicy(documents:readonly ImportedDocument[],rawRoot:
  for(const document of documents)byUrl.set(document.url,byUrl.has(document.url)?null:document);
  return async(document:ImportedDocument,acquired:BoundSourceObservation,source:DistrictRegistry['municipalities'][number]['sources'][number],base:RegisteredRobotsAudit|undefined):Promise<BoundSourceObservation['policy']>=>{
   const original=acquired.policy;
-  if(!base||registeredSourcePolicyApplies(original,document,{municipalityId:document.municipalityId,sourceId:document.sourceId,ags:document.ags},base))return original;
+  if(!base||original.tdm.evidence.length>=MAX_POLICY_METADATA_EVIDENCE||registeredSourcePolicyApplies(original,document,{municipalityId:document.municipalityId,sourceId:document.sourceId,ags:document.ags},base))return original;
   const chain:Array<{child:ImportedDocument;parent:ImportedDocument}>=[],seen=new Set<string>();
   let child=document;
   try{
@@ -166,12 +166,11 @@ export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:Di
     await loadResidualSource(cas,job);jobs.push(job);continue;
    }
    reasonCode='source_policy_stale';
-   let sourcePolicy=acquired.policy,expiresAt:string;
+   let sourcePolicy=await deriveRegisteredPolicy(document,acquired,source,registeredSourceEligibility),expiresAt:string;
    if(operation.refresh){
     reasonCode='source_policy_refused';
-    refreshing=true;const current=await operation.refresh(acquired,source,registeredSourceEligibility);refreshing=false;sourcePolicy=current.sourcePolicy;expiresAt=current.expiresAt;
+    refreshing=true;const current=await operation.refresh({...acquired,policy:sourcePolicy},source,registeredSourceEligibility);refreshing=false;sourcePolicy=current.sourcePolicy;expiresAt=current.expiresAt;
    }else{
-    sourcePolicy=await deriveRegisteredPolicy(document,acquired,source,registeredSourceEligibility);
     expiresAt=sourcePolicyExpiresAt(sourcePolicy,acquired.observation.checkedAt,document,selected.scope,registeredSourceEligibility);
    }
    if(Date.parse(expiresAt)<=Date.now())throw Error('Source policy is stale; separately authorized revalidation required');
