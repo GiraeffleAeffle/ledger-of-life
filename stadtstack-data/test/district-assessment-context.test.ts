@@ -4,33 +4,35 @@ import assert from 'node:assert/strict';
 import {rm} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {canonicalJson,digest} from '../src/district-adapter-contract.ts';
-import {canonical,assessmentItemSchema,assessmentOutputSchema,originalEvidence,buildAssessmentPassInput,reconcile,verifyPinnedAssessment,type AssessmentItem} from '../src/district-assessment.ts';
+import {canonical,PROMPTS,assessmentItemSchema,assessmentOutputSchema,originalEvidence,buildAssessmentPassInput,reconcile,verifyPinnedAssessment,type AssessmentItem} from '../src/district-assessment.ts';
 import {residualAssessmentItem} from '../src/district-assessment-jobs.ts';
 import {ASSESSMENT_CONTEXT_BYTES,AssessmentContextHold,assertAssessmentContextBound,buildPreparedAssessmentContext,verifyAssessmentContext} from '../src/district-assessment-context.ts';
 import {BridgeLeaseSchema,bridgeInputHash,ASSESSMENT_BRIDGE_VERSION,BRIDGE_LIMITS} from '../src/district-assessment-bridge-contract.ts';
 import {documentChunks} from '../src/district-claims.ts';
-import {MAX_SUBSCRIPTION_INPUT_BYTES} from '../src/district-model.ts';
+import {MAX_SUBSCRIPTION_INPUT_BYTES,encodeSubscriptionInput} from '../src/district-model.ts';
 import {OMP_LIMITS,runVmOmpAssessment} from '../src/district-omp-b-runner.ts';
 import {verifyPreparedDocument,type PreparedDocument} from '../src/district-prepared-document.ts';
 import {knowledgeEvidenceHash} from '../src/district-schema.ts';
-import {CIVIC_ACQUISITION_DECISION_ID,withManagedSourceWrite} from '../src/civic-opt-out.ts';
+import {withManagedSourceWrite} from '../src/civic-opt-out.ts';
 import {admittedAssessmentFixture,recordFor,syntheticAssessmentReceipt} from './district-assessment.fixture.ts';
 
 async function largeItem(t:TestContext){
  // Many chunks, one independently extraction-cited chunk; irrelevant duplicate
  // quotations elsewhere must not broaden the context or bind another chunk.
  const quote='Strausberg synthetic source statement. ÄÖÜ 😀';
- const text=quote+'\n'+'x'.repeat(56000)+'\n'+quote+'\n'+'x'.repeat(70000);
+ const text='Uncited document-only prefix.\n'+quote+'\n'+'x'.repeat(56000)+'\n'+quote+'\n'+'x'.repeat(70000);
  const f=await admittedAssessmentFixture(text,true);t.after(()=>rm(f.directory,{recursive:true,force:true}));
  const chunks=documentChunks(text),chunk=chunks.find(c=>c.start>0&&c.text.includes(quote))!;
  const record=recordFor(f,quote);record.extraction.chunk={index:chunk.index,count:chunk.count,start:chunk.start,end:chunk.end};
  record.sources[0].locator=`text-sha256:${f.source.textSha256};chars:${chunk.start}-${chunk.end}`;
+ record.topics=[{id:'planning',parentId:null,provenance:'model',confidence:0.8,quote:'source statement'}];
+ record.locations=[{label:'Strausberg',quote:'Strausberg',geometry:null,precision:'none'}];
  record.verification.evidenceHash=knowledgeEvidenceHash(record);
  const body={version:'district-prepared-v2' as const,municipalityId:'strausberg',sourceSha256:f.source.originalSha256,sourceBytes:Buffer.byteLength(text),mimeType:'text/plain',references:record.sources,extractorSha256:digest('synthetic parser'),toolVersions:{fixture:'synthetic'},text,textSha256:f.source.textSha256,offsetUnit:'utf16_code_units' as const,textLength:text.length,method:'text' as const,ocrUsed:false,limitations:[]};
  const prepared:PreparedDocument={...body,receiptSha256:digest(canonical(body))};verifyPreparedDocument(prepared,prepared,Buffer.from(text));
  const put=async(value:unknown)=>{
   const bytes=Buffer.from(canonicalJson(value)),hash=digest(bytes);
-  return withManagedSourceWrite(f.context.cas.root,[{kind:'http_observation',relativePath:`sha256/${hash.slice(0,2)}/${hash}`,contentSha256:hash,url:f.policy.source.url,sourceSha256:f.source.originalSha256,observationId:'synthetic-context',receiptSha256:f.policyArtifact.sha256,independentAllowed:false}],()=>f.context.cas.put(bytes,{kind:'derived',mimeType:'application/json'}),{...f.context.policyOptions,decisionId:CIVIC_ACQUISITION_DECISION_ID});
+  return withManagedSourceWrite(f.context.cas.root,[{kind:'http_observation',relativePath:`sha256/${hash.slice(0,2)}/${hash}`,contentSha256:hash,url:f.policy.source.url,sourceSha256:f.source.originalSha256,observationId:'synthetic-context',receiptSha256:f.policyArtifact.sha256,independentAllowed:false}],()=>f.context.cas.put(bytes,{kind:'derived',mimeType:'application/json'}),f.context.policyOptions);
  };
  const parser=await put(prepared),item=residualAssessmentItem(record,prepared,parser.sha256,f.policyArtifact.sha256);
  return {...f,text,quote,chunk,chunks,record,prepared,parser,item,put};
@@ -49,6 +51,8 @@ test('100+ KB multichunk prepared original yields bounded byte-exact blind A/B/C
  const CInput=buildAssessmentPassInput(f.item,evidence,'C',{A,B});assert.equal(canonicalJson(CInput.data.evidence),canonicalJson(AInput.data.evidence));
  for(const input of [AInput,BInput,CInput]){
   const bytes=Buffer.byteLength(canonicalJson(input.data));assert.ok(bytes<=ASSESSMENT_CONTEXT_BYTES);assert.ok(bytes<BRIDGE_LIMITS.evidenceContextBytes);assert.ok(bytes<MAX_SUBSCRIPTION_INPUT_BYTES);assert.ok(bytes<OMP_LIMITS.inputBytes);
+  assert.ok(Buffer.byteLength(PROMPTS[input.role])<8000);
+  assert.ok(Buffer.byteLength(encodeSubscriptionInput(PROMPTS[input.role],input.data))<MAX_SUBSCRIPTION_INPUT_BYTES);
   assert.equal(canonicalJson(input.data).includes(f.text),false);
  }
  const binding={version:ASSESSMENT_BRIDGE_VERSION,leaseId:randomUUID(),jobKey:digest('synthetic job'),authorityId:f.authority.authorityId,authoritySha256:f.authority.authoritySha256,policySnapshotSha256:digest('synthetic snapshot'),expiresAt:new Date(Date.now()+60000).toISOString(),role:'B' as const,provider:'anthropic-subscription' as const,requestedModel:'claude-haiku-5-5' as const,system:'Synthetic source-free prompt',data:BInput.data,outputSchema:{},clientContractSha256:digest('synthetic client')};
@@ -71,7 +75,7 @@ test('tampered excerpt, hash, offset, chunk id and missing quote coverage are re
   item=>{const projection=JSON.parse(item.claim);projection.propositions.push({quote:'claim never present in cited context'});item.claim=canonicalJson(projection);},
  ];
  for(const mutate of mutations){const item=structuredClone(f.item);mutate(item);await assert.rejects(originalEvidence(assessmentItemSchema.parse(item),f.context),AssessmentContextHold);}
- const wrong=structuredClone(f.record);wrong.summaryQuote=f.text.slice(0,13000);assert.throws(()=>residualAssessmentItem(wrong,f.prepared,f.parser.sha256,f.policyArtifact.sha256),AssessmentContextHold);
+ const wrong=structuredClone(f.record);wrong.summaryQuote='Uncited document-only prefix.';wrong.verification.evidenceHash=knowledgeEvidenceHash(wrong);assert.throws(()=>residualAssessmentItem(wrong,f.prepared,f.parser.sha256,f.policyArtifact.sha256),AssessmentContextHold);
  const wrongChunk=structuredClone(f.record);wrongChunk.extraction.chunk.start++;assert.throws(()=>residualAssessmentItem(wrongChunk,f.prepared,f.parser.sha256,f.policyArtifact.sha256),AssessmentContextHold);
  const absent=structuredClone(source.assessmentContext!);absent.preparedTextSha256=digest('foreign prepared text');assert.throws(()=>verifyAssessmentContext(absent,f.text,f.prepared.textSha256,source.locators),AssessmentContextHold);
 });

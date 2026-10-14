@@ -638,7 +638,7 @@ test('offline frozen crawl import preserves managed originals and produces enque
    const assessmentHandlers=assessmentQueueHandlers(pool!,{policyOptions:policy,fixtureProtocol:true,fixtureProvider:async input=>{modelCalls++;return groundedAnswer(input);}});
    const runAssessment=async(jobKey:string,phase:string,handlers:Readonly<Record<string,JobHandler>>=assessmentHandlers)=>runDistrictJobs({store,cas:item.cas,handlers,authorizationId:await authorize(jobKey,phase),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
    const assessmentPreparationKey=await enqueueResidualAssessmentItems(pool!,store,item.cas,extractionKey);
-   assert.equal((await runAssessment(assessmentPreparationKey,'assessment-items')).state,'completed');
+   const itemPreparation=await runAssessment(assessmentPreparationKey,'assessment-items');assert.equal(itemPreparation.state,'completed',canonicalJson(itemPreparation));
    const AJobKey=(await enqueuePreparedAssessmentPass(pool!,store,item.cas,assessmentPreparationKey,'A'))[0];
    const deniedA:JobHandler=context=>assessmentHandlers.assessment_a(context);
    deniedA.currentPolicy=async(spec,cas)=>{

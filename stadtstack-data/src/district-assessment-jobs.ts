@@ -78,11 +78,11 @@ export function residualAssessmentItem(record:z.infer<typeof ResidualExtractionS
  const assessmentContext=buildPreparedAssessmentContext(prepared.text,prepared.textSha256,record.extraction.chunk,record.sources.map(source=>source.locator));
  const cited=assessmentContext.chunks[0];
  const quotes=new Set<string>();
- const visit=(value:unknown):void=>{if(Array.isArray(value))value.forEach(visit);else if(value&&typeof value==='object')for(const [key,member] of Object.entries(value)){if(key==='quote'&&typeof member==='string'&&member.length)quotes.add(member);else visit(member);}};
- // Only actual candidate claims, never previous judge rationale or extraction metadata.
- for(const value of [record.entities,record.relations,record.stages])visit(value);
- for(const quote of [record.titleQuote,record.summaryQuote,record.municipalityQuote,record.caseQuote,record.documentDateQuote,record.stageDateQuote,record.stageQuote])if(quote)quotes.add(quote);
- const target=criticalKnowledgeTarget(record);if(target)for(const claim of target.claims)quotes.add(claim.quote);
+ const visit=(value:unknown):void=>{if(Array.isArray(value))value.forEach(visit);else if(value&&typeof value==='object')for(const [key,member] of Object.entries(value)){if((key==='quote'||key.endsWith('Quote'))&&typeof member==='string'&&member.length)quotes.add(member);else visit(member);}};
+ // Complete claim projection includes nested predicate, topic, location and
+ // identifier quotes, but excludes previous judgment and extraction metadata.
+ const projection=residualRecordPropositions(record);visit(projection);
+ const target=criticalKnowledgeTarget(record);if(target)visit(target);
  const locators:AssessmentItem['sources'][number]['locators']=[];
  for(const quote of quotes){
   let local=cited.excerpt.indexOf(quote);if(local<0)throw new AssessmentContextHold();
@@ -90,7 +90,6 @@ export function residualAssessmentItem(record:z.infer<typeof ResidualExtractionS
  }
  if(!locators.length)throw new AssessmentContextHold();
  const unique=[...new Map(locators.map(locator=>[locator.id,locator])).values()].sort((a,b)=>a.start-b.start||a.end-b.end);
- const projection=residualRecordPropositions(record);
  const base=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,question:'Independently verify every source-bound proposition in the supplied record projection. Return supported only with an evidence assertion for every claimId; otherwise abstain or mark unresolved.',claim:canonicalJson(projection),rubric:R1_ASSESSMENT_RUBRIC,rubricSha256:digest(R1_ASSESSMENT_RUBRIC),sources:[{sourceId:prepared.references[0].id,mcpSourceId:record.sources[0].id,originalSha256:prepared.sourceSha256,textSha256:prepared.textSha256,parserVersion:prepared.extractorSha256,parserReceiptSha256:preparedArtifactSha256,admissionReceiptSha256:policyReceiptSha256,ocrSuspected:prepared.ocrUsed,locators:unique,assessmentContext}],claimIds:projection.propositions.map(proposition=>proposition.claimId),entityIds:[...new Set([record.id,...record.entities.map(entity=>entity.entityId)])],constraints:[],criticalKinds:prepared.ocrUsed?['ocr']:[]});
  return target?prepareCriticalAssessment(record,base):base;
 }
