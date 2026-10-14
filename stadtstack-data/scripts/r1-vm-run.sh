@@ -4,6 +4,9 @@
 # (--max-seconds) ends cleanup_seconds earlier so an aborted job can close its managed
 # source scope (each shared-inventory load/save takes seconds) before TERM/KILL; a KILL
 # mid-save would leave inventory.lock and uncertain leases behind.
+# Each invocation needs its own authorization. Provider concurrency defaults to 1;
+# pass --codex-concurrency / --omp-b-concurrency or set R1_CODEX_CONCURRENCY /
+# R1_OMP_B_CONCURRENCY identically for the concurrent cohort (range 1..64).
 set -eu
 cleanup_seconds=120
 seconds=${1-}

@@ -41,7 +41,9 @@ export async function reserveR1CodexCall(pool:Pool,job:ClaimedJob,originalSha256
    if(Number(count.rows[0].count)>=500)throw new DistrictExecutionHold('source_limit_exceeded');
    await client.query('INSERT INTO district_pipeline.r1_codex_selections(municipality_id,original_sha256) VALUES($1,$2)',[job.spec.sourceScope.municipalityId,originalSha256]);
   }
-  const document=await client.query<{max_calls:number}>('SELECT max_calls FROM district_pipeline.r1_codex_documents WHERE original_sha256=$1',[originalSha256]);
+  // Pin the per-original ceiling through count+insert, even if selection/usage
+  // accounting later narrows its independent global transaction lock.
+  const document=await client.query<{max_calls:number}>('SELECT max_calls FROM district_pipeline.r1_codex_documents WHERE original_sha256=$1 FOR UPDATE',[originalSha256]);
   const prior=await client.query(`SELECT 1 FROM district_pipeline.r1_codex_call_intents i LEFT JOIN district_pipeline.r1_codex_usage_holds h ON h.failed_intent_id=i.id WHERE i.job_id=$1 AND i.request_sha256=$2 AND (h.authorization_id IS NULL OR h.authorization_id=$3)`,[job.id,requestSha256,authorization.authorization_id]);
   if(prior.rowCount)throw new DistrictExecutionHold('usage_unknown');
   const count=await client.query<{count:string}>('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[originalSha256]);

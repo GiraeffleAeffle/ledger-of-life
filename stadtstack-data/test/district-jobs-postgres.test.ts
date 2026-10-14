@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import {fork} from 'node:child_process';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
@@ -9,6 +10,8 @@ import {canonicalJson,digest} from '../src/district-adapter-contract.ts';
 import {DistrictCas} from '../src/district-cas.ts';
 import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,insertR1MetadataSnapshot,runDistrictJobs,deliverDistrictOwnerNotifications,artifactVerificationHandler,type AuthorizationInput,type ClaimedJob,type DistrictJobSpec,type JobHandler,type OwnerNotification,type NotificationAcknowledgement} from '../src/district-jobs.ts';
 import {CANONICALIZATION_VERSION,STEP_RECEIPT_VERSION,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
+import {reserveR1CodexCall} from '../src/district-codex-accounting.ts';
+import {NotificationTransientError} from '../src/district-jobs.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 
 // Real Postgres only. The connection must be local and its role must have CREATEDB.
@@ -52,6 +55,7 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     const expected=['source_snapshots','representations','policy_decisions','artifacts','jobs','job_dependencies','step_receipts','host_lanes','provider_budgets','case_identities','entity_identities','identity_assertions','release_candidates','release_files','active_release','preauthorizations','owner_notifications','r1_metadata_snapshots'];
     expected.push('assessment_bridge_leases','assessment_bridge_submission_intents','assessment_bridge_purge_acknowledgements','assessment_bridge_submissions','assessment_bridge_events');
     expected.push('r1_codex_documents','r1_codex_selections','r1_codex_call_intents','r1_codex_call_authorizations','r1_codex_usage_holds','r1_codex_resumptions');
+    expected.push('resource_slots');
     const tables=await pool.query<{table_name:string}>(`SELECT table_name FROM information_schema.tables WHERE table_schema='district_pipeline'`);
     for(const name of expected)assert.ok(tables.rows.some(row=>row.table_name===name),name);
     const original=await pool.query<{sha256:string}>('SELECT sha256 FROM district_pipeline.schema_migrations WHERE version=1');
@@ -59,7 +63,7 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=1',[original.rows[0].sha256]);
     const migrations=await pool.query<{version:number;sha256:string}>('SELECT version,sha256 FROM district_pipeline.schema_migrations ORDER BY version');
-    assert.deepEqual(migrations.rows.map(row=>row.version),[1,2,3,4]);
+    assert.deepEqual(migrations.rows.map(row=>row.version),[1,2,3,4,5]);
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=2',[digest('wrong-002')]);
     await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
     assert.equal((await pool.query<{sha256:string}>('SELECT sha256 FROM district_pipeline.schema_migrations WHERE version=1')).rows[0].sha256,original.rows[0].sha256);
@@ -72,6 +76,9 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=4',[digest('wrong-004')]);
     await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=4',[migrations.rows[3].sha256]);
+    await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=5',[digest('wrong-005')]);
+    await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
+    await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=5',[migrations.rows[4].sha256]);
   });
 
   await t.test('immutable artifact audits omit private quotes/errors while full payload remains purgeable CAS',async()=>{
@@ -278,13 +285,80 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     await assert.rejects(runDistrictJobs({store,cas,handlers,authorizationId,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000}),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='notification_unavailable');
   });
 
-  await t.test('one global R1 executor admits no sibling process while a handler is running',async()=>{
+  await t.test('independent executors progress concurrently without holding live siblings',async()=>{
     const started=Promise.withResolvers<void>(),release=Promise.withResolvers<void>();
-    const key=await store.enqueue(jobSpec('exclusive','wait_for_release')),other=await store.enqueue(jobSpec('exclusive-other'));
+    const key=await store.enqueue(jobSpec('concurrent','wait_for_release')),other=await store.enqueue(jobSpec('concurrent-other'));
     const first=run(await authorize([key]),1,{wait_for_release:async()=>{started.resolve();await release.promise;return {outcome:'succeeded',reasonCode:'completed'};}});
     await started.promise;
-    try{await assert.rejects(run(await authorize([other]),1),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='executor_busy');}finally{release.resolve();}
+    try{const second=await run(await authorize([other]),1);assert.equal(second.state,'completed');assert.equal(second.jobsStarted,1);}finally{release.resolve();}
     assert.equal((await first).state,'completed');
+  });
+  await t.test('two separate executor processes complete disjoint jobs concurrently',async()=>{
+    const keys=await Promise.all([1,2].map(n=>store.enqueue(jobSpec('process-'+n,'process_fixture'))));
+    const auths=await Promise.all(keys.map(key=>authorize([key])));
+    const launch=(id:string,wait:boolean)=>{
+      const entered=Promise.withResolvers<void>(),completed=Promise.withResolvers<void>();
+      const child=fork(new URL('./helpers/parallel-executor.ts',import.meta.url),[isolated.href,id,cas.root,wait?'wait':'go'],{execArgv:['--experimental-strip-types'],stdio:['ignore','ignore','inherit','ipc']});
+      child.on('message',(message:{entered?:boolean;result?:{state:string}})=>{
+        if(message.entered)entered.resolve();
+        if(message.result)assert.equal(message.result.state,'completed');
+      });
+      child.on('error',error=>{entered.reject(error);completed.reject(error);});
+      child.on('exit',code=>{if(code===0)completed.resolve();else{const error=Error('Fixture executor exit '+code);entered.reject(error);completed.reject(error);}});
+      return {child,entered:entered.promise,completed:completed.promise};
+    };
+    const first=launch(auths[0],true);await first.entered;
+    try{const second=launch(auths[1],false);await second.entered;await second.completed;}finally{first.child.send({release:true});}
+    await first.completed;
+  });
+
+  await t.test('concurrent per-original reservations never exceed 48 durable intents',async()=>{
+    const keys=await Promise.all([1,2].map(n=>store.enqueue(jobSpec('codex-cap-'+n,'residual_extract'))));
+    const claims=await Promise.all(keys.map(async key=>{
+      const bounds=await store.beginRun(await authorize([key]),1,60000),claim=await store.claim(bounds,30000);
+      assert.equal(claim.kind,'job');if(claim.kind!=='job')throw Error('Expected claim');return {bounds,job:claim.job};
+    }));
+    const original=digest(randomUUID());
+    const reservations=await Promise.allSettled(Array.from({length:60},(_,n)=>reserveR1CodexCall(pool,claims[n%2].job,original,digest('request-'+n))));
+    assert.equal(reservations.filter(r=>r.status==='fulfilled').length,48);
+    assert.equal((await pool.query<{count:string}>('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[original])).rows[0].count,'48');
+    for(const result of reservations)if(result.status==='rejected')assert.equal((result.reason as DistrictExecutionHold).reasonCode,'source_limit_exceeded');
+    for(const {bounds,job} of claims){await store.hold(job,'owner_stopped',receiptFor(job));await store.endRun(bounds.runId,'held','owner_stopped');}
+  });
+
+  await t.test('resource slots bound both resources, fence renewals and recover expired crashed holders',async()=>{
+    for(const resource of ['codex-subscription','omp-b'] as const){
+      const keys=await Promise.all([1,2,3].map(n=>store.enqueue(jobSpec(resource+'-'+n))));
+      const claims=await Promise.all(keys.map(async key=>{
+        const bounds=await store.beginRun(await authorize([key]),1,60000),claim=await store.claim(bounds,30000);
+        if(claim.kind!=='job')throw Error('Expected claim');return {bounds,job:claim.job};
+      }));
+      const admitted=await Promise.all(claims.map(({bounds,job})=>store.acquireResourceSlot(bounds,job,resource,2)));
+      assert.equal(admitted.filter(Boolean).length,2);
+      const held=admitted.findIndex(Boolean),waiting=admitted.findIndex(value=>!value);
+      await pool.query(`UPDATE district_pipeline.resource_slots SET expires_at=clock_timestamp()-interval '1 second' WHERE job_id=$1`,[claims[held].job.id]);
+      await assert.rejects(store.renew(claims[held].bounds,claims[held].job,30000),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='lease_lost');
+      assert.equal(await store.acquireResourceSlot(claims[waiting].bounds,claims[waiting].job,resource,2),true);
+      assert.equal((await pool.query<{count:string}>('SELECT count(*) FROM district_pipeline.resource_slots WHERE resource=$1',[resource])).rows[0].count,'2');
+      for(const {bounds,job} of claims){await store.releaseResourceSlot(job,resource);await store.hold(job,'owner_stopped',receiptFor(job));await store.endRun(bounds.runId,'held','owner_stopped');}
+    }
+  });
+
+  await t.test('handler wrapper serializes provider lifetimes while waiting jobs renew',async()=>{
+    for(const step of ['residual_extract','assessment_b']){
+      let active=0,peak=0;const entered=Promise.withResolvers<void>(),release=Promise.withResolvers<void>();
+      const keys=await Promise.all([1,2].map(n=>store.enqueue(jobSpec('wrapper-'+step+n,step))));
+      const auths=await Promise.all(keys.map(key=>authorize([key])));
+      const handler:JobHandler=async()=>{active++;peak=Math.max(peak,active);entered.resolve();await release.promise;active--;return {outcome:'succeeded',reasonCode:'completed'};};
+      const first=runDistrictJobs({store,cas,handlers:{[step]:handler},authorizationId:auths[0],ownerPresent:true,maxJobs:1,maxElapsedMs:60000,leaseMs:300});
+      await entered.promise;
+      const second=runDistrictJobs({store,cas,handlers:{[step]:handler},authorizationId:auths[1],ownerPresent:true,maxJobs:1,maxElapsedMs:60000,leaseMs:300});
+      try{
+        for(;;){const waiting=await pool.query('SELECT 1 FROM district_pipeline.jobs WHERE job_key=$1 AND state=$2',[keys[1],'leased']);if(waiting.rowCount)break;await pool.query('SELECT pg_sleep(0.01)');}
+        await pool.query('SELECT pg_sleep(0.4)');assert.equal(peak,1);
+      }finally{release.resolve();}
+      const results=await Promise.all([first,second]);assert.ok(results.every(result=>result.state==='completed'));assert.equal(peak,1);
+    }
   });
 
   await t.test('shared host lanes enforce one in-flight request, start delays, paused access and explicit resumption',async()=>{
@@ -393,6 +467,22 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     assert.equal(runs.rows[0].owner_present,false);assert.equal(runs.rows[0].execution_mode,'bounded_unattended');
     const outbox=await pool.query<{state:string;provider_message_id:string;provider:string}>('SELECT state,provider_message_id,provider FROM district_pipeline.owner_notifications WHERE run_id=$1',[result.runId]);
     assert.equal(outbox.rowCount,2);for(const row of outbox.rows){assert.equal(row.state,'delivered');assert.ok(row.provider_message_id);assert.equal(row.provider,provider);}
+    const retryKey=await store.enqueue(jobSpec('notification-transient')),retryAuth=await authorize([retryKey],{mode:'bounded_unattended',...identity});
+    let transientCalls=0;
+    const retried=await runDistrictJobs({store,cas,handlers,authorizationId:retryAuth,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000,...identity,notifyOwner:async notification=>{
+      if(notification.phase==='startup'&&transientCalls++===0)throw new NotificationTransientError('synthetic outage');
+      return acknowledge(notification);
+    }});
+    assert.equal(retried.state,'completed');assert.equal(transientCalls,2);
+
+    const parallelKey=await store.enqueue(jobSpec('notification-claim')),parallelAuth=await authorize([parallelKey],{mode:'bounded_unattended',...identity});
+    const parallelRun=await store.beginRun(parallelAuth,1,60000,'bounded_unattended',{notificationApprovalSha256:approval,destinationSha256:destination,provider});
+    const deliveries=new Map<string,number>(),config={notificationApprovalSha256:approval,destinationSha256:destination,provider,notifyOwner:async(notification:OwnerNotification)=>{
+      deliveries.set(notification.id,(deliveries.get(notification.id)??0)+1);await pool.query('SELECT pg_sleep(0.05)');return acknowledge(notification);
+    }};
+    await Promise.all([deliverDistrictOwnerNotifications(store,config),deliverDistrictOwnerNotifications(store,config)]);
+    assert.deepEqual([...deliveries.values()],[1]);
+    await store.endRun(parallelRun.runId,'completed','no_ready_jobs');await deliverDistrictOwnerNotifications(store,config);
     const replayKey=await store.enqueue(jobSpec('notification-ack-replay')),replayAuthorization=await authorize([replayKey],{mode:'bounded_unattended',...identity});
     const replay=await runDistrictJobs({store,cas,handlers,authorizationId:replayAuthorization,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000,...identity,notifyOwner:async notification=>({...await acknowledge(notification),messageId:outbox.rows[0].provider_message_id})});
     assert.equal(replay.reasonCode,'notification_failed');assert.equal(replay.jobsStarted,0);
@@ -407,5 +497,12 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     const pending=await store.pendingNotifications();assert.equal(pending.length,2);assert.ok(pending.some(item=>item.phase==='disposition'&&item.reasonCode==='notification_failed'));assert.doesNotMatch(JSON.stringify(pending),/private-notification-destination/);
     const failedRun=await pool.query<{state:string;reason_code:string}>('SELECT state,reason_code FROM district_pipeline.executor_runs WHERE id=$1',[failed.runId]);
     assert.equal(failedRun.rows[0].state,'held');assert.equal(failedRun.rows[0].reason_code,'notification_failed');
+    await deliverDistrictOwnerNotifications(store,{notificationApprovalSha256:approval,destinationSha256:destination,provider,notifyOwner:acknowledge});
+    const persistentKey=await store.enqueue(jobSpec('notification-persistent')),persistentAuth=await authorize([persistentKey],{mode:'bounded_unattended',...identity});
+    let persistentAttempts=0;
+    const persistent=await runDistrictJobs({store,cas,handlers,authorizationId:persistentAuth,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:1200,...identity,notifyOwner:async()=>{
+      persistentAttempts++;throw new NotificationTransientError('synthetic persistent outage');
+    }});
+    assert.equal(persistent.reasonCode,'notification_failed');assert.equal(persistent.jobsStarted,0);assert.equal(persistentAttempts,2);
   });
 });
