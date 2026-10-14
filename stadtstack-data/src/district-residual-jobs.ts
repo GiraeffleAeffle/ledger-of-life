@@ -1,25 +1,28 @@
-import {readFile} from 'node:fs/promises';
-import {basename,join} from 'node:path';
+import {readFile,readdir} from 'node:fs/promises';
+import {basename,dirname,join} from 'node:path';
 import type {Pool} from 'pg';
 import {z} from 'zod';
 import {HashSchema,canonicalJson,digest,semanticHash} from './district-adapter-contract.ts';
 import {readOperatorRegistryInputPin,operatorRegistryInputPinSchema,CrawlRegistryPinSchema,readCrawlOperatorRegistryInputPin} from './district-registry-config.ts';
-import {authorizedPilotCorpusSchema,loadFrozenCorpusBytes,corpusFixturePolicy} from './district-corpus.ts';
+import {authorizedPilotCorpusSchema,loadFrozenCorpusBytes,corpusFixturePolicy,type CrawlDocument} from './district-corpus.ts';
 import {HttpObservationProofSchema,authenticatedHttpBinding,HttpSourceBindingSchema} from './district-http-observation.ts';
 import {SourceObservationSchema,sourceObservationMatches} from './source-observation.ts';
 import {CrawlRequestEvidenceSchema} from './district-crawl-request.ts';
 import type {PolicyReceipt} from './district-policy-receipt.ts';
 import {PreparedDocumentSchema,prepareDocument,verifyPreparedDocument,preparationExtractorSha256,collectPreparationToolVersions,type PreparedSourceReference} from './district-prepared-document.ts';
-import {inferPreparedDocument,jointExtractionContract,documentResultSchema} from './district-inference.ts';
+import {inferPreparedDocument,jointExtractionContract,archiveJointExtractionContract,documentResultSchema,type MunicipalityBinding} from './district-inference.ts';
 import {documentChunks} from './district-claims.ts';
 import {readParserReview,ParserIsolationError} from './district-parser-isolation.ts';
 import {DistrictJobStore,canonicalJobIdentity,type DistrictJobSpec,type JobHandlerContext,type JobHandler,type JobHandlerResult} from './district-jobs.ts';
 import {encodeStepReceipt,type StepReceipt} from './district-step-receipt.ts';
-import type {DistrictCas} from './district-cas.ts';
+import type {DistrictCas,CasArtifact} from './district-cas.ts';
 import {authenticateTextRunContribution,type TextRunContribution} from './text-run-lineage.ts';
-import {initializeManagedAcquisitionLane,withManagedSourceWrite,withManagedSourceScratch,assertManagedSourceReadable,assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
+import {initializeManagedAcquisitionLane,withManagedSourceWrite,withManagedSourceScratch,assertManagedSourceReadable,assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {recheckResidualPolicy,type ResidualPolicyCheck} from './district-policy-refresh.ts';
 import {registerR1CodexDocument,reserveR1CodexCall,holdR1CodexFailure} from './district-codex-accounting.ts';
+import {buildQueueTextRun} from './district-queue-text-run.ts';
+import {preparedSourceBindings,type PreparedDocument} from './district-prepared-document.ts';
+import type {ModelEvidence} from './district-model-contract.ts';
 
 export const ResidualBoundsSchema=z.object({maxDocuments:z.literal(1),maxChunks:z.number().int().min(1).max(24),maxModelCalls:z.number().int().min(2).max(48),paidMicroUsd:z.literal(0)}).strict();
 const HttpObservationBindingSchema=z.object({observationId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/),receiptSha256:HashSchema}).strict();
@@ -34,6 +37,7 @@ export async function residualJobContract(){
 }
 export function residualMimeSupported(mimeType:string){return ['application/pdf','text/html','application/xhtml+xml','text/plain','application/json','application/xml','text/xml'].includes(mimeType.split(';')[0].trim().toLowerCase());}
 export interface ResidualSourceOptions {store?:DistrictJobStore;onContinuation?:(check:ResidualPolicyCheck)=>void}
+export interface LoadedResidualSource {document:CrawlDocument;municipality:MunicipalityBinding;receipt:PolicyReceipt;reference:PreparedSourceReference;sourceBinding:z.infer<typeof HttpSourceBindingSchema>;policyCheck:ResidualPolicyCheck}
 interface ResidualJobContext extends JobHandlerContext {store:DistrictJobStore;recordPolicy:(check:ResidualPolicyCheck)=>void}
 type ResidualHandler=(context:ResidualJobContext)=>Promise<JobHandlerResult>;
 async function recheckJobPolicy(context:ResidualJobContext){
@@ -41,7 +45,7 @@ async function recheckJobPolicy(context:ResidualJobContext){
  context.recordPolicy(checked);return checked;
 }
 /** Metadata narratives remain attached to their actual original; no synthetic text is generated here. */
-export async function loadResidualSource(cas:DistrictCas,input:z.infer<typeof ResidualInputSchema>,options:ResidualSourceOptions={}){
+export async function loadResidualSource(cas:DistrictCas,input:z.infer<typeof ResidualInputSchema>,options:ResidualSourceOptions={}):Promise<LoadedResidualSource>{
  input=ResidualInputSchema.strip().parse(input);
  // Defense at the byte-load boundary, even when an execution caller skipped parsing.
  authorizedPilotCorpusSchema.parse(input.corpusSha256);
@@ -86,12 +90,25 @@ export async function loadResidualSource(cas:DistrictCas,input:z.infer<typeof Re
 const policyOptions=(receipt:PolicyReceipt)=>({...corpusFixturePolicy(),authorityId:receipt.authorityId,authoritySha256:receipt.authoritySha256});
 async function persist(context:ResidualJobContext,receipt:PolicyReceipt,value:unknown,kind:'parser_output'|'derived',textBytes=false){
  await recheckJobPolicy(context);context.signal.throwIfAborted();
- const bytes=textBytes?Buffer.from(value as string,'utf8'):Buffer.from(canonicalJson(value)),hash=digest(bytes),relativePath=`sha256/${hash.slice(0,2)}/${hash}`,policy=policyOptions(receipt);
+ const bytes=value instanceof Uint8Array?value:textBytes?Buffer.from(value as string,'utf8'):Buffer.from(canonicalJson(value)),hash=digest(bytes),relativePath=`sha256/${hash.slice(0,2)}/${hash}`,policy=policyOptions(receipt);
  await initializeManagedAcquisitionLane(context.cas.root,{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...policy});
  const selected=context.job.spec.step==='residual_extract'?ExtractionSelectorSchema.parse(context.job.spec.selector):PreparationSelectorSchema.parse(context.job.spec.selector);
  const source=await loadResidualSource(context.cas,selected,{store:context.store,onContinuation:context.recordPolicy});
  const artifact=await withManagedSourceWrite(context.cas.root,[{relativePath,contentSha256:hash,...source.sourceBinding,independentAllowed:true}],()=>context.cas.put(bytes,{kind,mimeType:textBytes?'text/plain':'application/json'}),policy);
  await recheckJobPolicy(context);return artifact;
+}
+/** Preserve complete original cache envelopes byte-for-byte, including cache hits. */
+export async function captureResidualAnswers(out:string,prepared:PreparedDocument,policy:CivicPolicyOptions,put:(bytes:Buffer)=>Promise<CasArtifact>){
+ const versions:Record<string,string>={},cache=join(out,'cache');
+ let names:string[];
+ try{names=await readdir(cache);}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return versions;throw error;}
+ for(const name of names.sort())if(/^[a-f0-9]{64}\.answer\.json$/.test(name)){
+  const path=join(cache,name),bindings=preparedSourceBindings(prepared.references,prepared.receiptSha256);
+  await assertManagedSourceBindings(path,bindings,policy);const bytes=await readFile(path);
+  await assertManagedSourceBindings(path,bindings,policy);
+  const stored=await put(bytes);versions['modelAnswer.'+name.slice(0,64)]=stored.sha256;
+ }
+ return versions;
 }
 async function admitted(context:ResidualJobContext,selector:z.infer<typeof PreparationSelectorSchema>){
  if(process.platform!=='linux')throw Error('Residual source execution requires the authorized Codex VM');
@@ -120,12 +137,16 @@ const extract=(pool:Pool):ResidualHandler=>async context=>{
  const prepared=PreparedDocumentSchema.parse(JSON.parse((await context.cas.read(selector.preparedArtifactSha256)).toString('utf8')));
  verifyPreparedDocument(prepared,{...prepared,municipalityId:source.municipality.id,sourceSha256:source.document.sha256,extractorSha256:selector.contract.preparationSha256,references:[source.reference],toolVersions:await collectPreparationToolVersions(source.document.mimeType)},await context.cas.read(source.document.sha256));
  const chunks=documentChunks(prepared.text);if(chunks.length>selector.bounds.maxChunks||2*chunks.length>selector.bounds.maxModelCalls)return {outcome:'held_quality',reasonCode:'quality_failed'};
- const out=join(context.cas.root,'residual-model',context.job.jobKey),policy=policyOptions(source.receipt);
- const options={taskId:context.job.jobKey,groupId:semanticHash({municipalityId:source.municipality.id,sourceSha256:source.document.sha256}),purpose:'production' as const,provider:'openai-subscription' as const,municipality:source.municipality,prepared,expected:prepared,contract:selector.contract.extraction,out,usage:{ledgerPath:join(out,'usage.jsonl'),pausePath:join(out,context.job.runId,'pause.json'),signal:context.signal,beforeSourceCall:async(requestSha256:string)=>{await reserveR1CodexCall(pool,context.job,source.document.sha256,requestSha256,selector.bounds.maxModelCalls);}},policy};
+ const out=join(dirname(context.cas.root),basename(context.cas.root)+'-residual-model',context.job.jobKey),policy=policyOptions(source.receipt);
+ const modelVersions:Record<string,string>={};
+ const options={taskId:context.job.jobKey,groupId:semanticHash({municipalityId:source.municipality.id,sourceSha256:source.document.sha256}),purpose:'production' as const,provider:'openai-subscription' as const,municipality:source.municipality,prepared,expected:prepared,contract:selector.contract.extraction,out,usage:{ledgerPath:join(out,'usage.jsonl'),pausePath:join(out,context.job.runId,'pause.json'),signal:context.signal,onModelIdentity:async(identity:ModelEvidence)=>{const stored=await persist(context,source.receipt,identity,'derived');modelVersions['modelIdentity.'+identity.modelIdentitySha256]=stored.sha256;},beforeSourceCall:async(requestSha256:string)=>{await reserveR1CodexCall(pool,context.job,source.document.sha256,requestSha256,selector.bounds.maxModelCalls);}},policy};
+ const generationArchive=await archiveJointExtractionContract(out,selector.contract.extraction,context.signal);
+ const archive=await persist(context,source.receipt,await readFile(generationArchive.path),'derived');
  const result=await inferPreparedDocument(options).catch(error=>holdR1CodexFailure(pool,context.job,source.document.sha256,error));context.signal.throwIfAborted();await recheckJobPolicy(context);
+ Object.assign(modelVersions,await captureResidualAnswers(out,prepared,policy,bytes=>persist(context,source.receipt,bytes,'derived')));
  const envelope=ResidualExtractionSchema.parse({schemaVersion:'district-residual-extraction-v1',documentId:selector.documentId,corpusSha256:selector.corpusSha256,registrySha256:selector.registrySha256,policyReceiptSha256:selector.policyReceiptSha256,preparationJobKey:selector.preparationJobKey,preparationReceiptId:selector.preparationReceiptId,preparationReceiptSha256:selector.preparationReceiptSha256,preparedArtifactSha256:selector.preparedArtifactSha256,result});
  const rejected=result.chunks.some(chunk=>chunk.outcome==='rejected');
- return {outcome:result.records.length?'succeeded':rejected?'held_quality':'no_supported_case',reasonCode:result.records.length?'completed':rejected?'quality_failed':'no_supported_case',outputs:[await persist(context,source.receipt,envelope,'derived')],versions:{extractor:selector.contract.extraction.extractorSha256,prompt:result.promptSha256,schema:result.schemaSha256},counts:{spans:result.chunks.length,acceptedFacts:result.records.length,heldFacts:result.quarantine.length,distinctCases:new Set(result.records.map(row=>row.caseKey)).size}};
+ return {outcome:result.records.length?'succeeded':rejected?'held_quality':'no_supported_case',reasonCode:result.records.length?'completed':rejected?'quality_failed':'no_supported_case',outputs:[await persist(context,source.receipt,envelope,'derived')],versions:{extractor:selector.contract.extraction.extractorSha256,prompt:result.promptSha256,schema:result.schemaSha256,generationArchiveSha256:archive.sha256,...modelVersions},counts:{spans:result.chunks.length,acceptedFacts:result.records.length,heldFacts:result.quarantine.length,distinctCases:new Set(result.records.map(row=>row.caseKey)).size}};
 };
 /** No source subprocess runs outside the existing reviewed parser/model APIs. */
 function sourceScoped(store:DistrictJobStore,handler:ResidualHandler):JobHandler{
@@ -171,13 +192,11 @@ export async function enqueueCommittedResidualExtraction(pool:Pool,store:Distric
  return store.enqueue({...row.spec,step:'residual_extract',lane:'residual_extraction',inputArtifactHashes:[...new Set([...row.spec.inputArtifactHashes,preparedArtifactSha256,prepared.textSha256])],selector:extractionSelector},{dependencies:[{jobKey:preparationJobKey,expectedReceiptSha256:encoded.sha256}],reservedMicroUsd:0});
 }
 
-/** Export only a genuine sealed run artifact. Per-document receipts never become
- * a fabricated aggregate model identity or a replacement for a missing run. */
-export async function exportResidualTextContribution(pool:Pool,cas:DistrictCas,jobKeys:readonly string[],contribution:TextRunContribution){
+/** Authenticate committed native queue outputs before assembly or export. */
+export async function loadCommittedResidualOutputs(pool:Pool,cas:DistrictCas,jobKeys:readonly string[]){
  if(!jobKeys.length||new Set(jobKeys).size!==jobKeys.length)throw Error('Residual contribution requires distinct committed extraction jobs');
- const authenticated=authenticateTextRunContribution(contribution),receipts:StepReceipt[]=[],results:z.infer<typeof ResidualExtractionSchema>[]=[],store=new DistrictJobStore(pool);
- if(authenticated.sourceArtifactKind!=='native_extraction_output'||authenticated.extractionRun.assignmentMode!=='codex-only')throw Error('Residual contribution requires its genuine Codex-only native run');
- for(const jobKey of jobKeys){
+ const receipts:StepReceipt[]=[],results:z.infer<typeof ResidualExtractionSchema>[]=[],sources:LoadedResidualSource[]=[],selectors:z.infer<typeof ExtractionSelectorSchema>[]=[],store=new DistrictJobStore(pool);
+ for(const jobKey of [...jobKeys].sort()){
   HashSchema.parse(jobKey);
   const committed=await pool.query<{spec:DistrictJobSpec;receipt:StepReceipt;receipt_sha256:string}>(`SELECT j.spec,r.receipt,r.receipt_sha256 FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id AND r.outcome=j.state WHERE j.job_key=$1 AND j.spec->>'step'='residual_extract' AND j.state IN ('succeeded','no_supported_case','held_quality') ORDER BY r.attempt DESC LIMIT 1`,[jobKey]);
   if(committed.rows.length!==1)throw Error('Residual contribution extraction is not committed');
@@ -186,12 +205,21 @@ export async function exportResidualTextContribution(pool:Pool,cas:DistrictCas,j
   const source=await loadResidualSource(cas,selector,{store}),outputHash=encoded.receipt.outputHashes[0];
   await assertManagedSourceReadable(join(cas.root,'sha256',outputHash.slice(0,2),outputHash),policyOptions(source.receipt));
   const result=ResidualExtractionSchema.parse(JSON.parse((await cas.read(outputHash)).toString('utf8')));
-  if(result.documentId!==selector.documentId||result.policyReceiptSha256!==selector.policyReceiptSha256||result.preparationJobKey!==selector.preparationJobKey||result.result.sourceSha256!==source.document.sha256||result.result.municipalityId!==source.municipality.id||result.result.taskId!==jobKey||result.preparationReceiptSha256!==selector.preparationReceiptSha256||result.preparationReceiptId!==selector.preparationReceiptId||result.preparedArtifactSha256!==selector.preparedArtifactSha256||result.corpusSha256!==authenticated.pins.corpusSha256||result.registrySha256!==authenticated.pins.registrySha256||result.result.promptSha256!==authenticated.pins.promptContractSha256||result.result.schemaSha256!==authenticated.pins.schemaSha256)throw Error('Residual contribution original run/provenance mismatch');
-  receipts.push(encoded.receipt);results.push(result);
+  if(result.documentId!==selector.documentId||result.policyReceiptSha256!==selector.policyReceiptSha256||result.preparationJobKey!==selector.preparationJobKey||result.result.sourceSha256!==source.document.sha256||result.result.municipalityId!==source.municipality.id||result.result.taskId!==jobKey||result.preparationReceiptSha256!==selector.preparationReceiptSha256||result.preparationReceiptId!==selector.preparationReceiptId||result.preparedArtifactSha256!==selector.preparedArtifactSha256||result.corpusSha256!==selector.corpusSha256||result.registrySha256!==selector.registrySha256||result.result.promptSha256!==selector.contract.extraction.promptSha256||result.result.schemaSha256!==selector.contract.extraction.schemaSha256||encoded.receipt.policyProofSha256!==selector.policyReceiptSha256||semanticHash([...encoded.receipt.inputHashes].sort())!==semanticHash([...row.spec.inputArtifactHashes].sort()))throw Error('Residual contribution changes committed extraction lineage');
+  receipts.push(encoded.receipt);results.push(result);sources.push(source);selectors.push(selector);
  }
- const records=results.flatMap(row=>row.result.records),quarantine=results.flatMap(row=>row.result.quarantine);
- if(semanticHash(records)!==semanticHash(authenticated.records)||semanticHash(quarantine)!==semanticHash(authenticated.quarantine.cases))throw Error('Residual contribution rewrites or omits native outputs');
- const groups=new Set(results.map(row=>canonicalJson({municipalityId:row.result.municipalityId,sourceSha256:row.result.sourceSha256})));
- if(groups.size!==results.length||groups.size!==authenticated.groups.attempted.length||authenticated.groups.attempted.some(group=>!groups.has(canonicalJson(group))))throw Error('Residual contribution attempt accounting differs from committed groups');
- return {contribution,stepReceipts:receipts,results};
+ return {receipts,results,sources,selectors};
+}
+
+/** Queue export authenticates the entire sealed closure, not a caller-written aggregate. */
+export async function exportResidualTextContribution(pool:Pool,cas:DistrictCas,jobKeys:readonly string[],contribution:TextRunContribution){
+ if(!jobKeys.length||new Set(jobKeys).size!==jobKeys.length)throw Error('Residual contribution requires distinct committed extraction jobs');
+ const authenticated=authenticateTextRunContribution(contribution);
+ if(authenticated.sourceArtifactKind!=='native_extraction_output'||authenticated.extractionRun.assignmentMode!=='codex-only')throw Error('Residual contribution requires its genuine Codex-only native run');
+ const queue=authenticated.extractionRun.queue as {reconciliationJobKeys?:unknown}|undefined;
+ const reconciliationJobKeys=z.array(HashSchema).parse(queue?.reconciliationJobKeys);
+ const expected=await buildQueueTextRun(pool,cas,{jobKeys:[...jobKeys],reconciliationJobKeys});
+ for(const key of ['extractionRun','records','quarantine','crawl','registry'] as const)if(contribution.artifacts[key].sha256!==expected.contribution.artifacts[key].sha256)throw Error('Queue text seal differs from committed lineage');
+ if(contribution.artifacts.preparationPlan?.sha256!==expected.contribution.artifacts.preparationPlan?.sha256)throw Error('Queue text preparation seal mismatch');
+ return {contribution,stepReceipts:expected.committed.receipts,results:expected.committed.results};
 }

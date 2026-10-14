@@ -62,7 +62,14 @@ async function assembleKnowledge(options:PrepareKnowledgeOptions,provenance:Auth
  let composition:R1TextCompositionContext|undefined,retainedPublication:R1TextCompositionContext['retainedPublication']=null;
  if(options.textComposition){
   const path=await realpath(resolve(options.textComposition)),base=dirname(path),inputBytes=await provenance.read(path),raw=JSON.parse(inputBytes.toString('utf8'));
-  const loadArtifact=async(pin:{path:string;sha256:string})=>{const actual=await realpath(resolve(base,pin.path)),child=relative(base,actual);if(!child||child.startsWith('..')||isAbsolute(child)||actual.split(/[\\/]/).includes('out'))throw Error('Text composition artifact escapes its managed private input root');const bytes=await provenance.read(actual);if(hash(bytes)!==pin.sha256)throw Error('Text composition independent artifact pin mismatch');return bytes;};
+  const loadArtifact=async(pin:{path:string;sha256:string})=>{
+   const actual=await realpath(resolve(base,pin.path)),child=relative(base,actual);
+   const fixedCasPath=join(resolve(options.casRoot??join(cacheDir,'districts','cas')),'sha256',pin.sha256.slice(0,2),pin.sha256);
+   if(actual.split(/[\\/]/).includes('out')||actual!==fixedCasPath&&(!child||child.startsWith('..')||isAbsolute(child)))throw Error('Text composition artifact escapes its managed private input root');
+   // Queue-native members occupy different CAS shards. The fixed hash path is
+   // not a custody bypass: this capability still requires an exact inventory pin.
+   const bytes=await provenance.read(actual);if(hash(bytes)!==pin.sha256)throw Error('Text composition independent artifact pin mismatch');return bytes;
+  };
   const input=await loadR1TextCompositionInput(raw,loadArtifact);
   for(const contribution of input.contributions)authorizedPilotCorpusSchema.parse(contribution.pins.corpusSha256);
   composition=buildR1TextCompositionContext(input);

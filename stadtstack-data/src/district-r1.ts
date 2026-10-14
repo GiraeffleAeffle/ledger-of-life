@@ -43,10 +43,13 @@ import {CrawlCorpusImportSchema,importCrawlCorpusForResidual} from './district-c
 import {DistrictAssessmentBroker,enqueueAssessmentB,assessmentEvidenceArtifactHashes} from './district-assessment-broker.ts';
 import {assessmentItemSchema} from './district-assessment.ts';
 import {assessmentQueueHandlers,enqueueResidualAssessmentItems,enqueuePreparedAssessmentPass,enqueueAssessmentResolution,exportAssessmentResults} from './district-assessment-jobs.ts';
-import {r1TextCompositionInputSchema,loadR1TextCompositionInput} from './district-r1-text-composition.ts';
+import {r1TextCompositionInputSchema,loadR1TextCompositionInput,buildR1TextCompositionContext} from './district-r1-text-composition.ts';
 import {structuredFieldPublicationHold} from './district-public-fields.ts';
 import type {StructuredFieldHold} from './district-public-fields.ts';
 import {CrawlPolicyRefreshEnqueueSchema,enqueueCrawlPolicyRefresh,policyRefreshHandler} from './district-policy-refresh.ts';
+import {QueueTextSealInputSchema,sealQueueTextContribution} from './district-queue-text-run.ts';
+import {KnowledgeRecordsSchema} from './district-schema.ts';
+import {readTextLineageArtifact} from './text-run-lineage.ts';
 
 const REPO=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 export const R1_FETCH_ROOT=join(REPO,'cache/districts/r1-fetch');
@@ -416,6 +419,16 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
    if(canonicalJson(manifest.manifest.registry)!==canonicalJson(registryPin))throw Error('Refresh descriptor must match admitted CLI registry pin');
    process.stdout.write(canonicalJson(await enqueueCrawlPolicyRefresh(store,cas,manifest))+'\n');return;
   }
+  if(command==='seal-text-contribution'){
+   const manifest=QueueTextSealInputSchema.parse(input);
+   for(const jobKey of manifest.jobKeys){
+    const row=await pool.query<{selector:unknown}>('SELECT spec->\'selector\' AS selector FROM district_pipeline.jobs WHERE job_key=$1',[jobKey]);
+    if(row.rowCount!==1)throw Error('Queue seal extraction selector unavailable');
+    const selected=ResidualInputSchema.strip().parse(row.rows[0].selector);
+    if(selected.registrySha256!==registrySha256||canonicalJson(selected.registry)!==canonicalJson(registryPin))throw Error('Queue seal descriptor must match admitted CLI registry');
+   }
+   process.stdout.write(canonicalJson(await sealQueueTextContribution(pool,cas,manifest))+'\n');return;
+  }
   if(command==='export-text-contribution'){
    const manifest=z.object({jobKeys:z.array(HashSchema).min(1).max(10000),compositionArtifactSha256:HashSchema}).strict().parse(input),compositionPath=join(cas.root,'sha256',manifest.compositionArtifactSha256.slice(0,2),manifest.compositionArtifactSha256);
    await assertManagedSourceReadable(compositionPath);
@@ -427,6 +440,8 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
     await assertManagedSourceReadable(actualPath);return cas.read(pin.sha256);
    });
    const exported=await exportResidualTextContribution(pool,cas,manifest.jobKeys,composition.contributions[0]),stepReceiptSha256s:string[]=[];
+   const context=buildR1TextCompositionContext(composition),native=KnowledgeRecordsSchema.parse(readTextLineageArtifact(exported.contribution.artifacts.records));
+   if(exported.contribution.pins.registrySha256!==registrySha256||canonicalJson(context.knowledge.records)!==canonicalJson(native.records)||canonicalJson(serialized.approvedRunOrder)!==canonicalJson([exported.contribution.runId])||serialized.generatedAt!==native.generatedAt)throw Error('Residual export composition rewrites its sealed admissions');
    for(let index=0;index<exported.stepReceipts.length;index++){
     const receipt=exported.stepReceipts[index],result=exported.results[index],policy=PolicyReceiptSchema.parse(JSON.parse((await cas.read(result.policyReceiptSha256)).toString('utf8')));
     const selectorRow=await pool.query<{selector:unknown}>('SELECT spec->\'selector\' AS selector FROM district_pipeline.jobs WHERE job_key=$1',[receipt.jobKey]);
@@ -435,7 +450,7 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
     const source={url:reference.url,sha256:reference.sha256,policyReceiptSha256:reference.policyReceiptSha256,binding:httpObservationBinding(reference)};
     const hash=semanticHash(receipt);await exportStepReceipt(store,cas,hash,source);await exportStepReceipt(store,cas,result.preparationReceiptSha256,source);stepReceiptSha256s.push(hash);
    }
-   process.stdout.write(canonicalJson({compositionArtifactSha256:manifest.compositionArtifactSha256,path:compositionPath,runId:exported.contribution.runId,stepReceiptSha256s,committedDocuments:exported.results.length,records:exported.results.reduce((count,result)=>count+result.result.records.length,0)})+'\n');return;
+   process.stdout.write(canonicalJson({compositionArtifactSha256:manifest.compositionArtifactSha256,path:compositionPath,runId:exported.contribution.runId,stepReceiptSha256s,committedDocuments:exported.results.length,records:context.knowledge.records.length,heldRecords:context.composition.quarantine.cases.filter(entry=>entry.candidate!==undefined).length})+'\n');return;
   }
   if(command==='enqueue-residual-preparation'){
    const manifest=z.object({jobs:z.array(ResidualInputSchema).min(1).max(10000)}).strict().parse(input),jobKeys:string[]=[];

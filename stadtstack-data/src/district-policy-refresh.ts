@@ -87,7 +87,7 @@ export function policyRefreshHandler(store:DistrictJobStore,createFetcher:(conte
  }
 };}
 /** Historical committed refresh evidence is not current source admission. */
-async function readPolicyRefreshCommit(store:DistrictJobStore,cas:DistrictCas,key:string,original:z.infer<typeof CrawlCorpusImportSchema>){
+export async function readPolicyRefreshCommit(store:DistrictJobStore,cas:DistrictCas,key:string,original:z.infer<typeof CrawlCorpusImportSchema>){
  HashSchema.parse(key);
  if(original.documents.length!==1||original.documents[0].policyRefreshJobKey)throw Error('Refresh commitment requires the unchanged original selection');
  const selected=original.documents[0];
@@ -138,7 +138,7 @@ export function residualOriginalIdentity(input:ResidualInput|Omit<ResidualInput,
  const {policyReceiptSha256,...original}=input as ResidualInput;
  return semanticHash(original);
 }
-function recordedPolicyIdentity(policy:PolicyReceipt['sourcePolicy']){
+export function recordedPolicyIdentity(policy:PolicyReceipt['sourcePolicy']){
  const {checkedAt,...robots}=policy.robots;
  const evidence=policy.tdm.evidence.map(row=>{
   if(row.locator!=='W3C TDMRep origin rules'&&row.locator!=='TDMRep matching location'&&!row.locator.startsWith('TDMRep standardized location HTTP absence'))return row;
