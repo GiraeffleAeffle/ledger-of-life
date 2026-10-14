@@ -1,6 +1,6 @@
 import {z} from 'zod';
 import {join} from 'node:path';
-import {assertManagedSourceReadable,assertManagedSourceBindings,type CivicPolicyOptions} from './civic-opt-out.ts';
+import {assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {HashSchema,digest} from './district-adapter-contract.ts';
 import {ContentFreeSourcePolicySchema} from './district-schema.ts';
 import {SourceObservationSchema} from './source-observation.ts';
@@ -25,10 +25,12 @@ export async function authenticateHttpSourceBindings(cas:{root:string;read:(hash
   const matches=bindings.filter(binding=>binding.kind==='http_observation'&&binding.url===source.url&&binding.sourceSha256===source.sha256);
   if(matches.length!==1)throw Error('Exactly one original HTTP binding is required per selected source');
   const selected=matches[0];if(selected.kind!=='http_observation')throw Error('Original HTTP provenance required');
-  await assertManagedSourceReadable(join(cas.root,'sha256',selected.receiptSha256.slice(0,2),selected.receiptSha256),{...policy,sourceUrl:source.url});
+  const observationPath=join(cas.root,'sha256',selected.receiptSha256.slice(0,2),selected.receiptSha256);
+  await assertManagedSourceBindings(observationPath,[selected],{...policy,sourceUrl:source.url});
   const bytes=Buffer.from(await cas.read(selected.receiptSha256));
   const bound=authenticatedHttpBinding({observationId:selected.observationId,receiptSha256:selected.receiptSha256,bytes:bytes.toString('utf8')},source);
-  await assertManagedSourceBindings(join(cas.root,'sha256',source.sha256.slice(0,2),source.sha256),[selected],{...policy,sourceUrl:source.url});
+  await assertManagedSourceBindings(observationPath,[selected],{...policy,sourceUrl:source.url});
+  await assertManagedIndependentHttpSourceBinding(join(cas.root,'sha256',source.sha256.slice(0,2),source.sha256),selected,{...policy,sourceUrl:source.url});
   result.push(bound);
  }
  if(bindings.some(binding=>binding.kind!=='http_observation'||!sources.some(source=>source.url===binding.url&&source.sha256===binding.sourceSha256)))throw Error('Unselected source binding');

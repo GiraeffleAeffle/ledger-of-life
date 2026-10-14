@@ -10,7 +10,7 @@ import {withParserSandbox,parserIsolationContractSha256,ParserIsolationError,typ
 import {admitStructuredObservations,StructuredKnowledgeRecordSchema,StructuredSupportingSourceSchema,type StructuredKnowledgeRecord,type StructuredAdmission} from './district-structured-record.ts';
 import {PolicyReceiptSchema,recheckPolicyReceipt} from './district-policy-receipt.ts';
 import {runDistrictJobsCli,type JobHandler,type JobHandlerContext,type JobHandlerResult} from './district-jobs.ts';
-import {initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceBindings,CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
+import {initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {pipelineNotificationConfig} from './district-notifications.ts';
 import {structuredFieldPublicationHold} from './district-public-fields.ts';
 import {HttpSourceBindingSchema,authenticateHttpSourceBindings} from './district-http-observation.ts';
@@ -31,13 +31,23 @@ export async function structuredJobContract(adapter:StructuredWorkerRequest['ada
  return {adapterContractSha256,parserContractSha256,hostContractSha256,semanticContractSha256:semanticHash({worker:STRUCTURED_WORKER_VERSION,adapterContractSha256,parserContractSha256,hostContractSha256})};
 }
 
+/** Independent HTTP membership is only for the actual original, never for a
+ * multi-source input bundle or another derived parser artifact. */
+export async function assertStructuredParserInput(cas:{root:string},request:StructuredWorkerRequest,bindings:z.infer<typeof HttpSourceBindingSchema>[],policy:CivicPolicyOptions){
+ const path=join(cas.root,'sha256',request.inputArtifactSha256.slice(0,2),request.inputArtifactSha256);
+ if(request.inputArtifactSha256===request.snapshot.sourceSha256&&!request.auxiliary.length){
+  const selected=bindings.filter(binding=>binding.sourceSha256===request.snapshot.sourceSha256&&binding.url===request.snapshot.url);
+  if(selected.length!==1)throw Error('Parser original requires one selected HTTP observation');
+  await assertManagedIndependentHttpSourceBinding(path,selected[0],policy);
+ }else await assertManagedSourceBindings(path,bindings,policy);
+}
+
 async function isolatedAdapter(context:JobHandlerContext,request:StructuredWorkerRequest,sourceContext:ParserSourceContext&{bindings:z.infer<typeof HttpSourceBindingSchema>[]}){
  context.signal.throwIfAborted();
- const path=join(context.cas.root,'sha256',request.inputArtifactSha256.slice(0,2),request.inputArtifactSha256);
  const policy={stateDir:sourceContext.stateDir,authorityId:sourceContext.authorityId,authoritySha256:sourceContext.authoritySha256};
- await assertManagedSourceBindings(path,sourceContext.bindings,policy);
+ await assertStructuredParserInput(context.cas,request,sourceContext.bindings,policy);
  const input=await context.cas.read(request.inputArtifactSha256);
- await assertManagedSourceBindings(path,sourceContext.bindings,policy);
+ await assertStructuredParserInput(context.cas,request,sourceContext.bindings,policy);
  const output=await withParserSandbox(input,sandbox=>sandbox.run('node',['--experimental-strip-types','/opt/stadtstack/src/district-structured-parser-worker.ts','/input/document',canonicalJson(request)]),sourceContext);
  context.signal.throwIfAborted();
  const parsed=outputSchema.parse(JSON.parse(output.stdout));

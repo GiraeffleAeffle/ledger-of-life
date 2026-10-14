@@ -100,6 +100,24 @@ The reviewed completion snapshot is `fb4e08eee8bf1a3bf036433893553b5ebb0e7ae4dec
 
 The append-only authorized corpus allowlist additionally retains the exact 0.3.2 round-2 and round-3 target snapshots for Strausberg Solarpark, Rüdersdorf heat planning and Hoppegarten heat planning (`src/district-corpus.ts`). These specific additions do not authorize arbitrary new corpus hashes, municipalities or source endpoints.
 
+### Offline admission of a held owner-account acquisition
+
+`knowledge:r1 enqueue-acquired-representation` creates a **new** `admit_acquired_representation` job under the current acquisition contract. It does not resume or rewrite the old held job and grants no new HTTP request. Its dedicated handler has no fetcher: only a newly and explicitly authorized admission of the already acquired owner-account representation is possible.
+
+```sh
+npm run knowledge:r1 -- enqueue-acquired-representation \
+  --registry-config "$REGISTRY_DESCRIPTOR_JSON" \
+  --registry-config-sha256 "$REGISTRY_DESCRIPTOR_SHA256" < "$OFFLINE_ACQUISITION_MANIFEST"
+```
+
+The strict stdin manifest is `{jobs: [{acquisition, prior}]}` (1–100 jobs). `acquisition` is the **identical original acquisition selector**, including scope, root, public URL/method/form/content type, permission, historical request/byte bounds, source version and discovery pin. `prior` contains `priorJobKey`, `priorReceiptSha256`, `priorAttempt`, `observationId` and `requestEvidenceSha256`. Only the approved GENESIS owner-account lane and `facts_with_attribution` permission are accepted. The old request budget in `acquisition` is identity metadata, not authorization to send it again.
+
+Both enqueue and execution authenticate the prior job's canonical identity and its **last committed held_execution acquire_representation receipt**, then require exactly one matching observation and managed request sidecar within that receipt's original `[startedAt, finishedAt]` attempt window. Historical lease-expiry timestamps are not available and are not invented. Observation check and filename-creation clocks must both be in-window; any other committed acquisition attempt overlapping that window rejects reuse. URL, method, content type, public-form digest, redirect chain, sidecar digest and own HTTP observation binding must match. Missing, stale, ambiguous, changed, revoked, non-independent or opted-out evidence holds/refuses admission; there is **no network fallback**.
+
+Admission preserves the original observation, body, retrieval/check and policy-evidence clocks. Its genuine new policy receipt records the current admission check but expires against the original evidence via `sourcePolicyExpiresAt`, never against a restamped policy clock. The committed admission receipt records the prior job/receipt/attempt/contract, observation ID/digest and request-sidecar digest in content-free versions. `representations` and `enqueue-structured` accept this honest committed admission step; they do not relabel it a new fetch. Snapshot first-seen retrieval clocks remain unchanged while each refetched representation is authenticated by its own immutable HTTP observation.
+
+Byte-identical original bodies may have multiple genuine independent HTTP admissions. Original-body readers, structured enqueue/export and the parser's raw-original gate select an **active, independently allowed, exact HTTP member** rather than requiring every historical observation on that content path. Each selected observation artifact and every derived multi-source parser bundle retains exact contributor-set checks. This exception never turns another job's observation, policy receipt or derived artifact into a permitted original.
+
 ### Offline crawl-to-residual import
 
 `knowledge:r1 import-crawl-corpus` explicitly imports an already frozen, **exact owner-authorized** managed index. It performs no networking, parsing, model calls or enqueueing. Registry/robots approval is not corpus approval: the existing eight production hashes remain unchanged; no new nine-town corpus is authorized by this implementation.
