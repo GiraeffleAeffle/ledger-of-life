@@ -133,9 +133,9 @@ function csv(source: string): string[][] {
 }
 function cellValue(raw: string): number | null {
   const value = raw.trim();
-  // '-' is the publisher's exact-zero sign; '.', '...', '/', 'x' and empty are not zero.
+  // '-' is the publisher's exact-zero sign; suppression/missing signs are not zero.
   if (value === '-') return 0;
-  if (['', '.', '...', '/', 'x', 'X'].includes(value)) return null;
+  if (['', '.', '...', '…', '/', 'x', 'X'].includes(value)) return null;
   if (!/^[+-]?\d+(?:,\d+)?$/.test(value)) throw Error(`Unknown native value/quality encoding: ${value}`);
   const result = Number(value.replace(',', '.'));
   if (!Number.isFinite(result) || Math.abs(result) > Number.MAX_SAFE_INTEGER) throw Error('Unsafe native numeric value');
@@ -168,21 +168,42 @@ export function parseGenesisTable(snapshot: AdmittedSnapshot, scope: AdapterScop
       content = native.Content;
     }
     // Capture the entire native name; never truncate an unknown depth suffix.
-    const tableMatch = /^GENESIS-Tabelle:[ \t]*([^\s;]+)/m.exec(content);
+    const tableMatch = /^((?:GENESIS-)?Tabelle):[ \t]*([^\s;]+)[ \t]*\r?$/m.exec(content);
+    const municipalDatencsv = tableMatch?.[1] === 'Tabelle';
     const parameters = root ? object(root.Parameter) : null;
-    const table = knownTable(tableMatch?.[1] ?? parameters?.name, tables);
+    const table = knownTable(tableMatch?.[2] ?? parameters?.name, tables);
     if (parameters && knownTable(parameters.name, tables) !== table) throw Error('Content/Parameter table mismatch');
     const rows = csv(content);
     const footer = rows.findIndex(row => row[0].startsWith('__________'));
     if (footer < 0) throw Error('Missing native table terminator; possibly truncated export');
     // FrontColumnsNumber is a documented data/table field, not our own row schema.
     const layout = native?.TableLayout ? object(native.TableLayout) : null;
-    const front = layout ? Number(layout.FrontColumnsNumber) : 2;
+    const front = layout ? Number(layout.FrontColumnsNumber) : municipalDatencsv ? 4 : 2;
     if (!Number.isInteger(front) || front < 1 || front > 8) throw Error('Changed native front-column layout');
     const selection = typeof parameters?.regionalkey === 'string' && /^\d{8}$|^\d{5}$/.test(parameters.regionalkey) ? parameters.regionalkey : null;
     const structure = native?.Structure ? object(native.Structure) : null;
     const regionRows = Array.isArray(structure?.Rows) ? structure.Rows.map(object).filter(row => /Gemeind|Kreise/i.test(String(row.Content))) : [];
     const selectedRegion = regionRows.length === 1 && regionRows[0].Code === parameters?.regionalvariable && String(regionRows[0].Selected) === '1' ? regionRows[0] : null;
+    if (municipalDatencsv) {
+      // This native layout has no TableLayout: date, AGS, padded name, age, then sex cells.
+      // Recognize its full header, not a guessed count of numeric trailing fields.
+      const metadata = [
+        'Bevölkerung nach Geschlecht und Altersgruppen (17) -',
+        'Stichtag 31.12. - regionale Tiefe: Gemeinden',
+        'Fortschreibung des Bevölkerungsstandes',
+        'Bevölkerungsstand (Anzahl)',
+      ];
+      if (table !== '12411-02-03' || tables[table].level !== 'GE' || front !== 4 ||
+          rows[0]?.length !== 1 || rows[0][0] !== tableMatch?.[0].replace(/\r$/, '') ||
+          metadata.some((label, index) => rows[index + 1]?.length !== 7 || rows[index + 1][0] !== label || rows[index + 1].slice(1).some(Boolean)) ||
+          canonicalJson(rows[5] ?? []) !== canonicalJson(['', '', '', '', 'Insgesamt', 'männlich', 'weiblich'])) {
+        throw Error('Unrecognized municipal datencsv header/layout');
+      }
+      if (root && (parameters?.format !== 'datencsv' || parameters.regionalvariable !== 'GEMEIN' ||
+          !selection || selection.length !== 8 || !selectedRegion || selectedRegion.Code !== 'GEMEIN')) {
+        throw Error('Municipal datencsv requires evidenced GEMEIN single selection');
+      }
+    }
     const header: string[][] = [];
     const observations: ParseResult['observations'] = [];
     let observedRows = 0, started = false;
@@ -190,11 +211,18 @@ export function parseGenesisTable(snapshot: AdmittedSnapshot, scope: AdapterScop
     let headerWidth = 0;
     for (let r = 1; r < footer; r++) {
       const row = rows[r];
+      if (municipalDatencsv && r >= 6 &&
+          (row.length !== 7 || !/^\d{2}\.\d{2}\.(?:(?:19|20)\d{2}|2100)$/.test(row[0]) ||
+           !/^\d{8}$/.test(row[1]) || !row[2].trim() ||
+           !/^(?:unter \d+ Jahre|\d+ bis unter \d+ Jahre|\d+ Jahre und mehr|Insgesamt)$/.test(row[3]) ||
+           selection !== null && row[1] !== selection)) {
+        throw Error('Changed municipal datencsv dimensions or selection mismatch');
+      }
       const leading = row.slice(0, front);
       const code = leading.find(value => /^\d{8}$|^\d{5}$/.test(value.trim()))?.trim();
       const hasFront = leading.some(value => value.trim() !== '');
       const values = row.slice(front);
-      const numericCells = values.length > 0 && values.every(value => /^[+-]?\d+(?:,\d+)?$|^[-.\/xX]$|^\.\.\.$|^$/.test(value.trim()));
+      const numericCells = values.length > 0 && values.every(value => /^[+-]?\d+(?:,\d+)?$|^[-.\/xX…]$|^\.\.\.$|^$/.test(value.trim()));
       if (code && !numericCells) throw Error('Changed native value columns');
       if (!started && !(hasFront && numericCells && (code || selectedRegion && values.some(value => value.trim() !== '')))) {header.push(row); continue;}
       if (!hasFront && row.every(value => !value.trim())) continue;
@@ -234,7 +262,7 @@ export function parseGenesisTable(snapshot: AdmittedSnapshot, scope: AdapterScop
         observations.push(observation({publisherId: scope.publisherId, sourceId: scope.sourceId, nativeId, nativeVersion: snapshot.sourceVersion, kind: 'StatisticalObservation', subject: `regionalstatistik:${level}:${activeCode}`, predicate: `describes:${tables[table].statistic}`, value, unit: units[0], date, dateRole: 'statistical_reference_date', financialRole: 'none', geography: {ags: level === 'GE' ? activeCode : null, basis: 'source_explicit', role: 'administrative_area'}, sourceReferenceDate: date, publishedAt: null, retrievedAt: snapshot.retrievedAt, evidence: [locator, ...frontEvidence, ...headerEvidence, ...regionEvidence], limitations: [...LIMITATIONS, `native_geography_level=${level};native_region_code=${activeCode}`, 'Reference dates from year-only cells use the Regio-Stat 2026 table-specific day.', ...(value === null ? [`Missing/suppressed/non-applicable source cell retained: ${rawValue}`] : [])]}));
       }
     }
-    if (!started) {
+    if (!started && !municipalDatencsv) {
       const lastHeader = header.filter(row => row.some(value => value.trim())).at(-1);
       if (!lastHeader || lastHeader.slice(0, front).some(value => value.trim()) || !lastHeader.slice(front).some(value => /\d{4}/.test(value))) throw Error('Unrecognized rows cannot establish an empty result');
     }
