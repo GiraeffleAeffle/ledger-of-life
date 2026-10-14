@@ -17,7 +17,7 @@ import {MAX_SUBSCRIPTION_INPUT_BYTES,encodeSubscriptionInput} from '../src/distr
 import {OMP_LIMITS,runVmOmpAssessment} from '../src/district-omp-b-runner.ts';
 import {verifyPreparedDocument,type PreparedDocument} from '../src/district-prepared-document.ts';
 import {knowledgeEvidenceHash} from '../src/district-schema.ts';
-import {withManagedSourceWrite} from '../src/civic-opt-out.ts';
+import {withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 import {admittedAssessmentFixture,recordFor,answer,syntheticAssessmentReceipt} from './district-assessment.fixture.ts';
 
 async function largeItem(t:TestContext){
@@ -137,9 +137,13 @@ test('standalone C authenticates its oversized request before intent and records
  const f=await largeItem(t),evidence=await originalEvidence(f.item,f.context),input=buildAssessmentPassInput(f.item,evidence,'A');
  const output=assessmentOutputSchema.parse({itemId:f.item.itemId,outcome:'abstain',assertions:[],scores:{correctness:0,sources:0,usefulness:0},holdReasons:[],rationale:'x'.repeat(22000)});
  const A=syntheticAssessmentReceipt(f.item,'A',output,input.data),B=syntheticAssessmentReceipt(f.item,'B',output,input.data);
- const itemPath=join(f.directory,'cli-item.json'),aPath=join(f.directory,'cli-A.json'),bPath=join(f.directory,'cli-B.json'),result=join(f.directory,'cli-C.json'),ledger=join(f.directory,'cli-ledger.jsonl'),pause=join(f.directory,'cli-pause.json');
- await Promise.all([[itemPath,f.item],[aPath,A],[bPath,B]].map(([path,value])=>writeFile(path as string,canonicalJson(value),{mode:0o600})));
- await assert.rejects(promisify(execFile)(process.execPath,['--experimental-strip-types',fileURLToPath(new URL('../src/district-assessment.ts',import.meta.url)),'pass',itemPath,'C','openai-subscription',result,ledger,pause,aPath,bPath,'--cas-root',f.context.cas.root,'--policy-state-dir',f.context.policyOptions!.stateDir!],{timeout:15000}),{code:1});
- const held=JSON.parse(await readFile(result,'utf8'));assert.equal(held.disposition,'held_quality');assert.equal(held.reason,'assessment_context_exceeded');assert.equal(held.fallbackAttempted,false);
+ const itemArtifact=await f.put(f.item),itemPath=join(f.context.cas.root,itemArtifact.storageKey),aPath=join(f.directory,'cli-A.json'),bPath=join(f.directory,'cli-B.json'),sourcePath=join(f.directory,'cli-source-context.json'),result=join(f.directory,'cli-C.json'),ledger=join(f.directory,'cli-ledger.jsonl'),pause=join(f.directory,'cli-pause.json');
+ const sourceContext={root:f.context.cas.root,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...f.context.policyOptions,bindings:[{kind:'http_observation',url:f.policy.source.url,sourceSha256:f.source.originalSha256,observationId:'synthetic-context',receiptSha256:f.policyArtifact.sha256}]};
+ await Promise.all([[sourcePath,sourceContext],[aPath,A],[bPath,B]].map(([path,value])=>writeFile(path as string,canonicalJson(value),{mode:0o600})));
+ let stderr='';await assert.rejects(promisify(execFile)(process.execPath,['--experimental-strip-types',fileURLToPath(new URL('../src/district-assessment.ts',import.meta.url)),'pass',itemPath,'C','openai-subscription',result,ledger,pause,aPath,bPath,'--cas-root',f.context.cas.root,'--source-context',sourcePath],{timeout:15000}),error=>{
+  if(!(error instanceof Error)||!('stderr' in error)||typeof error.stderr!=='string'||!('code' in error))return false;
+  stderr=error.stderr;return error.code===1;
+ });
+ const held=JSON.parse(await readFile(result,'utf8').catch(error=>{throw new Error(stderr,{cause:error});}));assert.equal(held.disposition,'held_quality');assert.equal(held.reason,'assessment_context_exceeded');assert.equal(held.fallbackAttempted,false);
  for(const path of [result+'.intent.json',ledger,pause])await assert.rejects(lstat(path),{code:'ENOENT'});
 });
