@@ -11,7 +11,7 @@ import {CrawlRequestEvidenceSchema} from './district-crawl-request.ts';
 import type {PolicyReceipt} from './district-policy-receipt.ts';
 import {PreparedDocumentSchema,prepareDocument,verifyPreparedDocument,preparationExtractorSha256,collectPreparationToolVersions,type PreparedSourceReference} from './district-prepared-document.ts';
 import {inferPreparedDocument,jointExtractionContract,archiveJointExtractionContract,documentResultSchema,type MunicipalityBinding} from './district-inference.ts';
-import {documentChunks} from './district-claims.ts';
+import {documentChunks,type DocumentChunk} from './district-claims.ts';
 import {readParserReview,parserOutputContractSha256,PARSER_ISOLATION_VERSION,ParserIsolationError} from './district-parser-isolation.ts';
 import {DistrictJobStore,canonicalJobIdentity,type DistrictJobSpec,type JobHandlerContext,type JobHandler,type JobHandlerResult} from './district-jobs.ts';
 import {encodeStepReceipt,type StepReceipt} from './district-step-receipt.ts';
@@ -146,7 +146,13 @@ const extract=(pool:Pool):ResidualHandler=>async context=>{
  const predecessor=await committedResidualPreparation(pool,context.store,context.cas,selector.preparationJobKey);
  if(predecessor.encoded.receipt.id!==selector.preparationReceiptId||predecessor.encoded.sha256!==selector.preparationReceiptSha256||predecessor.preparedArtifactSha256!==selector.preparedArtifactSha256||canonicalJson(ResidualInputSchema.strip().parse(predecessor.selector))!==canonicalJson(ResidualInputSchema.strip().parse(selector)))throw Error('Residual extraction preparation predecessor differs from authenticated selector');
  const prepared=predecessor.prepared;
- const chunks=documentChunks(prepared.text);if(chunks.length>selector.bounds.maxChunks||2*chunks.length>selector.bounds.maxModelCalls)return {outcome:'held_quality',reasonCode:'quality_failed'};
+ let chunks:DocumentChunk[];
+ try{chunks=documentChunks(prepared.text);}
+ catch(error){
+  if(!(error instanceof Error)||error.message!=='Document exceeds model chunk limit')throw error;
+  return {outcome:'held_quality',reasonCode:'quality_failed'};
+ }
+ if(chunks.length>selector.bounds.maxChunks||2*chunks.length>selector.bounds.maxModelCalls)return {outcome:'held_quality',reasonCode:'quality_failed'};
  const out=join(dirname(context.cas.root),basename(context.cas.root)+'-residual-model',context.job.jobKey),policy=policyOptions(source.receipt);
  const modelVersions:Record<string,string>={};
  const options={taskId:context.job.jobKey,groupId:semanticHash({municipalityId:source.municipality.id,sourceSha256:source.document.sha256}),purpose:'production' as const,provider:'openai-subscription' as const,municipality:source.municipality,prepared,expected:prepared,contract:selector.contract.extraction,out,usage:{ledgerPath:join(out,'usage.jsonl'),pausePath:join(out,context.job.runId,'pause.json'),signal:context.signal,onModelIdentity:async(identity:ModelEvidence)=>{const stored=await persist(context,source.receipt,identity,'derived');modelVersions['modelIdentity.'+identity.modelIdentitySha256]=stored.sha256;},beforeSourceCall:async(requestSha256:string)=>{await reserveR1CodexCall(pool,context.job,source.document.sha256,requestSha256,selector.bounds.maxModelCalls);}},policy};

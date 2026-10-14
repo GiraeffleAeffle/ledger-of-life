@@ -167,6 +167,9 @@ The disposable-PostgreSQL topology injects model-only and parser/document source
 hash changes, reuses a genuinely committed broad-selector fixture without changing
 its receipt/artifacts, and carries the resulting extraction through assessment and
 export. These are labelled synthetic source edits, not production observations.
+Exceeding the deterministic 320,800-UTF-16-unit document chunk budget is
+`held_quality` / `quality_failed` at extraction, before any model call; it is not an
+execution outage. Unexpected chunking exceptions still fail as execution errors.
 
 
 ## Required Strausberg core release

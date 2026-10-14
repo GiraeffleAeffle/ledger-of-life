@@ -28,6 +28,14 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
   return typeof bytes==='string'?bytes+suffix:Buffer.concat([bytes,Buffer.from(suffix)]);
  }) as typeof readFile;
  t.mock.module('node:fs/promises',{namedExports:{...filesystem,readFile:contractReadFile}});
+ const claimsModule=await import('../../src/district-claims.ts');
+ let chunkFailure:'oversized'|'unexpected'|undefined;
+ // Deterministic chunk-boundary seam, after genuine predecessor admission:
+ // exercise the real 320,800-UTF-16 limit without altering frozen CAS artifacts.
+ t.mock.module(new URL('../../src/district-claims.ts',import.meta.url),{namedExports:{...claimsModule,documentChunks:(text:string)=>{
+  if(chunkFailure==='unexpected')throw TypeError('Synthetic unexpected chunk implementation failure');
+  return claimsModule.documentChunks(chunkFailure==='oversized'?'x'.repeat(320801):text);
+ }}});
  const sourceHashes=await import('../../src/district-contract-source.ts'),provenance=await import('../../src/district-host-provenance.ts');
  let hostGeneration=0;
  const currentHostHash:typeof sourceHashes.contractSourceHash=async file=>{
@@ -127,7 +135,7 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
   const bounds={maxDocuments:1 as const,maxChunks:12,maxModelCalls:48,paidMicroUsd:0 as const},manifest={index:{path:indexPath,sha256:indexHash},rawRoot,registry:registry.registryPin,observations:[{path:observationPath,sha256:binding.receiptSha256}],documents:[{documentId:document.id,scope,permission:{kind:'facts_with_attribution' as const},bounds,requestEvidence}]};
   claims=DistrictExtractionClaimsSchema.parse({title:'Strausberg',titleQuote:'Strausberg',summary:text,summaryQuote:text,caseKey:null,caseKeyType:'source_document',caseQuote:null,caseType:'unknown',topics:[],stages:[],locations:[],municipalityQuote:city.name,stage:'adopted',stageQuote:'am 13.10.2026 als Satzung beschlossen',originalStatus:'als Satzung beschlossen',stageDate:'2026-10-13',stageDateQuote:'am 13.10.2026 als Satzung beschlossen',stageDateReason:null,documentDate:'2026-10-13',documentDateQuote:'Stand: 13.10.2026',documentDateReason:null,entities:[],relations:[]});
   const complete=async()=>{const receipt=await civic.recoverManagedSourceScratch(policy);assert.equal(receipt.status,'complete',canonicalJson(receipt));const inventory=JSON.parse(await readFile(join(policy.stateDir!,'inventory.json'),'utf8'));assert.equal(inventory.roots.find((entry:{path:string})=>entry.path===cas.root).complete,true);return inventory;};
-  const authorize=(jobKey:string)=>store.authorize({approvalSha256:digest('Synthetic topology authorization '+jobKey),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
+  const authorize=(jobKey:string,phase='initial')=>store.authorize({approvalSha256:digest('Synthetic topology authorization '+jobKey+' '+phase),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
   const run=async(jobKey:string,handlers:Parameters<typeof runDistrictJobs>[0]['handlers'])=>{const result=await runDistrictJobs({store,cas,handlers,authorizationId:await authorize(jobKey),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});assert.equal(result.state,'completed',canonicalJson(result));await complete();return result;};
   await withFixtureAuthorizedCorpus(indexBytes,policy,async()=>{
    const imported=await importCrawlCorpusForResidual(store,cas,manifest);assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
@@ -175,6 +183,15 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
    // Consuming frozen prepared text must not probe tools or require a new parser
    // review. Only the current semantic parser contract is compared offline.
    const probesBeforeExtraction=toolProbes;
+   chunkFailure='oversized';
+   const budgetRun=await runDistrictJobs({store,cas,handlers,authorizationId:await authorize(extractionKey,'chunk-budget'),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+   assert.equal(budgetRun.state,'held');assert.equal(budgetRun.reasonCode,'quality_failed');await complete();
+   const budgetReceipt=(await pool.query('SELECT receipt FROM district_pipeline.step_receipts WHERE receipt->>\'jobKey\'=$1 ORDER BY attempt DESC LIMIT 1',[extractionKey])).rows[0].receipt;
+   assert.equal(budgetReceipt.outcome,'held_quality');assert.equal(budgetReceipt.reasonCode,'quality_failed');assert.equal(modelCalls,0);
+   await store.resume(extractionKey);chunkFailure='unexpected';
+   const unexpectedChunk=await runDistrictJobs({store,cas,handlers,authorizationId:await authorize(extractionKey,'unexpected-chunk-failure'),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+   assert.equal(unexpectedChunk.state,'held');assert.equal(unexpectedChunk.reasonCode,'execution_exception');assert.equal(modelCalls,0);
+   await store.resume(extractionKey);chunkFailure=undefined;
    await run(extractionKey,handlers);assert.equal(toolProbes,probesBeforeExtraction);assert.equal(parserRoots.length,1);assert.equal(modelCalls,2);assert.ok(sourceModelRoots.every(path=>path.startsWith(cas.root+'-residual-model/')&&!path.startsWith(cas.root+'/')));
    hostGeneration++; // Already produced prepared/extraction outputs remain admissible downstream.
    const groundedAnswer=(input:AssessmentPassInput):ModelAnswer=>{const response=answer(input),output=response.value as AssessmentOutput,data=input.data as {criticalTarget:unknown;evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]},target=CriticalRecordTargetSchema.strip().parse(data.criticalTarget);output.assertions=target.claims.map(claim=>({claimId:claim.claimId,sourceId:claim.sourceId,locatorId:data.evidence.find(entry=>entry.sourceId===claim.sourceId)!.locators.find(locator=>locator.quote===claim.quote)!.id,quote:claim.quote,subjectId:claim.subjectId,objectId:claim.objectId,value:null,unit:null,date:claim.date,dateRole:claim.dateRole,financialRole:claim.financialRoles[0],stage:claim.stage,modality:claim.modality}));output.criticalReview={recordId:target.recordId,recordEvidenceSha256:target.recordEvidenceSha256,claimProjectionSha256:target.claimProjectionSha256,claims:target.claims.map(claim=>({claimId:claim.claimId,claimSha256:claim.claimSha256,verdict:'supported',rationale:'Synthetic topology fixture, not independent gold'}))};return {...response,value:output,responseSha256:digest(canonicalJson(output))};};

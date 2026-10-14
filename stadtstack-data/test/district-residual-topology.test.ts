@@ -9,6 +9,9 @@ test('real residual queue handlers preserve an enrolled production-topology CAS'
  // This is runner/reporting isolation, not an authority gate; the child must
  // provision and pin its own real isolated-fixture authority before any seam.
  const {NODE_TEST_CONTEXT:_parentTestContext,...env}=process.env;
- const result=await execute(process.execPath,['--experimental-strip-types','--experimental-test-module-mocks','--test','--test-reporter=tap',fileURLToPath(new URL('./fixtures/residual-production-topology.ts',import.meta.url))],{env,timeout:320_000,maxBuffer:4*1024*1024});
+ const result=await execute(process.execPath,['--experimental-strip-types','--experimental-test-module-mocks','--test','--test-reporter=tap',fileURLToPath(new URL('./fixtures/residual-production-topology.ts',import.meta.url))],{env,timeout:320_000,maxBuffer:4*1024*1024}).catch((error:unknown)=>{
+  if(error instanceof Error&&'stdout' in error)throw new Error(error.message+'\n'+String(error.stdout),{cause:error});
+  throw error;
+ });
  assert.match(result.stdout,/# fail 0/);
 });
