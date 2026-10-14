@@ -9,6 +9,7 @@ import {canonicalJson,digest,semanticHash} from './district-adapter-contract.ts'
 import {withManagedSourceScratch,type ManagedSourceContext,type ManagedDockerContainer} from './civic-opt-out.ts';
 import {assessmentOutputSchema,PROMPTS} from './district-assessment.ts';
 import {modelIdentitySha256,type ModelAnswer,type ReportedUsage,type TokenCounts,assertModelResponseIdentity} from './district-model-contract.ts';
+import {assertAssessmentContextBound} from './district-assessment-context.ts';
 
 export const OMP_VERSION='omp/18.9.2';
 export const OMP_BINARY='/home/max/.local/bin/omp';
@@ -120,7 +121,7 @@ async function reviewFile(path:string,contract:string):Promise<OmpReview>{
  }catch(e){if(e instanceof OmpRunnerHold)throw e;throw new OmpRunnerHold('security_review_required');}
 }
 export async function ompRunnerContractSha256():Promise<string>{
- const files=['district-omp-b-runner.ts','district-assessment.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ const files=['district-omp-b-runner.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
  const control=ompAssessmentControl();
  return semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))})))});
 }
@@ -168,6 +169,7 @@ export interface OmpRunnerResult {answer:ModelAnswer;stdout:string;startedAt:str
 /** Only the trusted, source-free credential resolver runs on the host. All
  * assessment input/output and child writes belong to the registered lease. */
 export async function runVmOmpAssessment(data:Record<string,unknown>,context:ManagedSourceContext,signal?:AbortSignal,deps:OmpRunnerDependencies={}):Promise<OmpRunnerResult>{
+ assertAssessmentContextBound(data);
  const deadline=new AbortController(),started=Date.now(),timer=setTimeout(()=>deadline.abort(new OmpRunnerHold('resource_limit')),OMP_LIMITS.walltimeMs);
  const runSignal=signal?AbortSignal.any([signal,deadline.signal]):deadline.signal;
  try{

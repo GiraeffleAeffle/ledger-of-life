@@ -95,7 +95,7 @@ test('credential resolver holds for zero or multiple accounts, wrong version, no
 }));
 
 test('omp runner fingerprint includes the canonical authority, lifecycle and every reviewed image profile file',async()=>{
- const files=['district-omp-b-runner.ts','district-assessment.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ const files=['district-omp-b-runner.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
  const control=ompAssessmentControl();
  const expected=semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL('../src/'+file,import.meta.url)))})))});
  assert.equal(await ompRunnerContractSha256(),expected);
