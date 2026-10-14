@@ -11,6 +11,7 @@ import {spawn} from 'node:child_process';
 import {assertCivicPolicyAuthority,provisionCivicPolicyAuthority,CIVIC_POLICY_AUTHORITY_ID,assertManagedSourceReadable,withManagedSourceScratch,recoverManagedSourceScratch,assertHostNotOptedOut,readCivicOptOutSnapshot,registerManagedCacheRoot,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,recordHostOptOut,purgeOptedOutHost,recordManagedSourceContent,withManagedSourceWrite,markManagedCacheInventoryComplete,relinquishManagedSourceContent,HostOptedOutError,CivicPolicyStateError,civicOptOutMain} from '../src/civic-opt-out.ts';
 import {assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,assertManagedRawSourceBinding,assertManagedObservationReadable,ManagedSourceBindingSchema,parseContentFreePreparationPlan,assertSourceHostsNotOptedOut} from '../src/civic-opt-out.ts';
 import {retireManagedRoot,RetireReceiptSchema} from '../src/civic-opt-out.ts';
+import {compactCivicPolicyInventory,readCivicPolicyInventory} from '../src/civic-opt-out.ts';
 import {projectSourcePolicyMetadata} from '../src/source-policy.ts';
 import type {SourceAccessPolicy} from '../src/source-policy.ts';
 import type {ManagedSourceContent,ManagedSourceBinding,CivicPolicyOptions} from '../src/civic-opt-out.ts';
@@ -368,6 +369,34 @@ test('explicit acquisition initialization seals empty roots of every kind with o
  const inventory=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));assert.equal(inventory.roots.length,3);assert.ok(inventory.roots.every((root:{complete:boolean})=>root.complete));
 });
 
+for(const layout of ['legacy','sealed'])for(const direction of ['nested','ancestor'])test('overlapping '+direction+' lanes leave no debris or incomplete enrolled root: '+layout,async t=>{
+ const {base,stateDir}=await sandbox(t),outer=join(base,'lanes'),root=join(outer,'cas'),policy=fixturePolicy(stateDir);
+ const options={decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts' as const,...policy};
+ await initializeManagedAcquisitionLane(root,options);
+ if(layout==='sealed')await compactCivicPolicyInventory(policy);
+ const attempted=direction==='nested'?join(root,'residual-prepared','deep'):outer;
+ const original=await readFile(join(stateDir,'inventory.json')),marker=await readFile(join(root,'.civic-acquisition-lane.json')),files=await readdir(base,{recursive:true});
+ await assert.rejects(initializeManagedAcquisitionLane(attempted,options),CivicPolicyStateError);
+ await assert.rejects(registerManagedCacheRoot(attempted,{kind:'artifacts',...policy}),CivicPolicyStateError);
+ let called=false;
+ await assert.rejects(withManagedSourceScratch(attempted,[{phase:'pre-admission',url:'https://overlap.test/source',sourceSha256:hash('synthetic overlap source')}],async()=>{called=true;},{...options,purpose:'classification'}),CivicPolicyStateError);
+ assert.equal(called,false);assert.deepEqual(await readdir(base,{recursive:true}),files);
+ assert.deepEqual(await readFile(join(stateDir,'inventory.json')),original);assert.deepEqual(await readFile(join(root,'.civic-acquisition-lane.json')),marker);
+ if(direction==='nested')await assert.rejects(lstat(join(root,'residual-prepared')),{code:'ENOENT'});
+ else await assert.rejects(lstat(join(outer,'.civic-acquisition-lane.json')),{code:'ENOENT'});
+ await markManagedCacheInventoryComplete(root,policy);
+ const inventory=await readCivicPolicyInventory(policy);assert.equal(inventory.roots.length,1);assert.equal(inventory.roots[0].path,root);assert.equal(inventory.roots[0].complete,true);assert.deepEqual(inventory.scratch,[]);
+});
+
+test('authority-state overlap refuses lane creation without filesystem or inventory changes',async t=>{
+ const {base,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),files=await readdir(base,{recursive:true}),original=await readFile(join(stateDir,'inventory.json'));
+ for(const path of [stateDir,join(stateDir,'forbidden','lane'),base]){
+  await assert.rejects(initializeManagedAcquisitionLane(path,{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...policy}),CivicPolicyStateError);
+  await assert.rejects(registerManagedCacheRoot(path,{kind:'artifacts',...policy}),CivicPolicyStateError);
+ }
+ assert.deepEqual(await readdir(base,{recursive:true}),files);assert.deepEqual(await readFile(join(stateDir,'inventory.json')),original);
+});
+
 test('dated paths and known legacy CAS files cannot authorize nonempty unmarked acquisition roots',async t=>{
  const {base,stateDir}=await sandbox(t),root=join(base,'isolated0.3.2-owner-2026-10-11'),bytes='historical source';
  await mkdir(join(root,'sha256'),{recursive:true,mode:0o700});await writeFile(join(root,'sha256',hash(bytes)),bytes,{mode:0o600});
@@ -591,13 +620,17 @@ test('gated scratch subprocesses are durably registered before command execution
  await assert.rejects(lstat(directory),{code:'ENOENT'});
 });
 
-test('interrupted worker scratch is recoverable without scanning unrelated temporary directories',async t=>{
+for(const layout of ['legacy','sealed'])test('interrupted worker scratch is recoverable without scanning unrelated temporary directories: '+layout,async t=>{
  const {base,stateDir}=await sandbox(t),root=join(base,'orphan-scratch'),policy=fixturePolicy(stateDir),unrelated=join(base,'unrelated-tmp');await mkdir(unrelated,{mode:0o700});await writeFile(join(unrelated,'source.pdf'),'unrelated untouched',{mode:0o600});
  const moduleUrl=new URL('../src/civic-opt-out.ts',import.meta.url).href;
  const script=`import {withManagedSourceScratch,CIVIC_ACQUISITION_DECISION_ID} from ${JSON.stringify(moduleUrl)};import {createHash} from 'node:crypto';import {writeFile} from 'node:fs/promises';import {join} from 'node:path';const root=process.argv[1],policy=JSON.parse(process.argv[2]),bytes=Buffer.from('synthetic orphan source');await withManagedSourceScratch(root,[{phase:'pre-admission',url:'https://council.test/source',sourceSha256:createHash('sha256').update(bytes).digest('hex')}],async scope=>{await scope.writeSource('source.pdf',bytes);await writeFile(join(scope.directory,'answer.json'),'partial synthetic output',{mode:0o600});process.exit(0);},{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification'});`;
  const child=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',script,root,JSON.stringify(policy)],{stdio:'ignore'});
  const code=await new Promise<number|null>((resolve,reject)=>{child.once('error',reject);child.once('close',resolve);});assert.equal(code,0);
  const before=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8')),lease=before.scratch[0];assert.equal(lease.state,'active');assert.equal((await lstat(join(root,lease.directory,'source.pdf'))).isFile(),true);
+ if(layout==='sealed'){
+  const migration=await compactCivicPolicyInventory(policy);assert.deepEqual(migration.preservedWorkingLeases,[lease.id]);
+  assert.deepEqual((await readCivicPolicyInventory(policy)).scratch[0],lease);
+ }
  const receipt=await recoverManagedSourceScratch(policy);assert.equal(receipt.status,'complete');assert.equal(receipt.deletedFiles,2);assert.deepEqual(receipt.recoveredLeases,[lease.id]);await assert.rejects(lstat(join(root,lease.directory)),{code:'ENOENT'});assert.equal(await readFile(join(unrelated,'source.pdf'),'utf8'),'unrelated untouched');
 });
 
@@ -722,11 +755,12 @@ test('projected content-free policy evidence survives, while unbound source-bear
  const result=await recordHostOptOut({host:'unknown.test',reason:'rights_holder_objection'},policy);assert.equal(result.purge.status,'partial');assert.equal((await lstat(unsafePath)).isFile(),true);
 });
 
-test('retained publications preserve their actual member proof and cannot be relabelled as prepared or HTTP data',async t=>{
+for(const layout of ['legacy','sealed'])test('retained publications preserve their actual member proof and cannot be relabelled as prepared or HTTP data: '+layout,async t=>{
  const {base,stateDir}=await sandbox(t),root=join(base,'publication'),policy=fixturePolicy(stateDir),bytes='synthetic retained published fact and short quote';
  await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
  const binding:Extract<ManagedSourceBinding,{kind:'retained_publication'}>={kind:'retained_publication',url:'https://stadt.de/source',sourceSha256:null,publication:{manifestSha256:hash('manifest'),releaseId:'release-fixture',memberPath:'cities/example.json',memberSha256:hash(bytes),memberBytes:Buffer.byteLength(bytes)}};
  await publish(root,{...binding,relativePath:'retained.json',contentSha256:hash(bytes),independentAllowed:false},bytes,stateDir);
+ if(layout==='sealed')await compactCivicPolicyInventory(policy);
  await assertManagedSourceBindings(join(root,'retained.json'),[binding],policy);
  await assert.rejects(assertManagedSourceBindings(join(root,'retained.json'),[{kind:'prepared_source',url:binding.url,sourceSha256:hash(bytes),observationId:'invented',receiptSha256:hash('invented')}],policy),CivicPolicyStateError);
  await assert.rejects(assertManagedSourceBindings(join(root,'retained.json'),[{...binding,publication:{...binding.publication,manifestSha256:hash('other')}}],policy),CivicPolicyStateError);
@@ -734,7 +768,7 @@ test('retained publications preserve their actual member proof and cannot be rel
  assert.equal((await recordHostOptOut({host:'stadt.de',reason:'municipality_objection'},policy)).purge.deletedFiles,1);
 });
 
-test('Git baselines and approved registry configuration stay typed controls, never raw/prepared/model admission',async t=>{
+for(const layout of ['legacy','sealed'])test('Git baselines and approved registry configuration stay typed controls, never raw/prepared/model admission: '+layout,async t=>{
  const {base,stateDir}=await sandbox(t),root=join(base,'typed-controls'),policy=fixturePolicy(stateDir),bytes='synthetic historical rows';
  await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
  const snapshot={gitCommit:'a'.repeat(40),path:'stadtstack-data/out/cities/example.json',blobOid:'b'.repeat(40),sha256:hash(bytes),bytes:Buffer.byteLength(bytes)},historical:Extract<ManagedSourceBinding,{kind:'authenticated_git_snapshot'}>={kind:'authenticated_git_snapshot',purpose:'historical_change_reconstruction_only',url:'https://stadt.de/source',sourceSha256:null,snapshot};
@@ -743,12 +777,15 @@ test('Git baselines and approved registry configuration stay typed controls, nev
  await assert.rejects(withManagedSourceScratch(root,[historical],async()=>{}, {decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',purpose:'document',...policy}),CivicPolicyStateError);
  const configBytes='synthetic strictly validated operator configuration',configurationSha256=hash(configBytes),config:Extract<ManagedSourceBinding,{kind:'operator_registry_config'}>={kind:'operator_registry_config',url:'https://stadt.de/source',configurationSha256,schemaContractSha256:hash('closed-registry-codec'),code:{...snapshot,path:'stadtstack-data/sources/district-registry.json',sha256:configurationSha256,bytes:Buffer.byteLength(configBytes)},approval:{role:'district_source_registry',approver:'owner',decisionId:CIVIC_ACQUISITION_DECISION_ID,date:'2026-10-11',configurationSha256,gitCommit:snapshot.gitCommit}};
  await publish(root,{...config,relativePath:'registry.json',contentSha256:configurationSha256,independentAllowed:false},configBytes,stateDir);await assertManagedSourceBindings(join(root,'registry.json'),[config],policy);
+ if(layout==='sealed')await compactCivicPolicyInventory(policy);
+ await assertManagedSourceBindings(join(root,'baseline.json'),[historical],{...policy,purpose:'historical_change_reconstruction_only'});
+ await assertManagedSourceBindings(join(root,'registry.json'),[config],policy);
  await assert.rejects(assertManagedSourceBindings(join(root,'registry.json'),[{...config,schemaContractSha256:hash('different')}],policy),CivicPolicyStateError);
  await assert.rejects(withManagedSourceScratch(root,[config],async()=>{}, {decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',purpose:'openai',...policy}),CivicPolicyStateError);
  assert.equal((await recordHostOptOut({host:'stadt.de',reason:'municipality_objection'},policy)).purge.deletedFiles,2);
 });
 
-test('self-bound registry bytes admit complete descriptor members while inherited artifacts remain exact-set',async t=>{
+for(const layout of ['legacy','sealed'])test('self-bound registry bytes admit complete descriptor members while inherited artifacts remain exact-set: '+layout,async t=>{
  const {base,stateDir}=await sandbox(t),root=join(base,'registry-members'),policy=fixturePolicy(stateDir);
  await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
  const bytes='Synthetic bounded operator configuration',configurationSha256=hash(bytes),code={gitCommit:'a'.repeat(40),path:'stadtstack-data/sources/district-registry.json',blobOid:'b'.repeat(40),sha256:configurationSha256,bytes:Buffer.byteLength(bytes)};
@@ -759,6 +796,7 @@ test('self-bound registry bytes admit complete descriptor members while inherite
   await publish(root,{...binding,relativePath:'registry.json',contentSha256:configurationSha256},bytes,stateDir);
   await publish(root,{...binding,relativePath:'derived.json',contentSha256:hash(derived)},derived,stateDir);
  }
+ if(layout==='sealed')await compactCivicPolicyInventory(policy);
  for(const bindings of [first,second]){
   await assertManagedSourceBindings(path,bindings,policy);
   await assertManagedSourceBindings(path,bindings,policy,'operator_registry_config');
@@ -777,8 +815,10 @@ test('self-bound registry bytes admit complete descriptor members while inherite
  ])await assert.rejects(assertManagedSourceBindings(path,bindings,policy),{code:'CONTENT_PROVENANCE_MISMATCH'});
  // Deliberate fixture-only revocation preserves genuine entry identities and bytes.
  const inventoryPath=join(stateDir,'inventory.json'),original=await readFile(inventoryPath),inventory=JSON.parse(original.toString('utf8'));
- const revoked=inventory.entries.find((entry:{relativePath:string;schemaContractSha256?:string})=>entry.relativePath==='registry.json'&&entry.schemaContractSha256===second[0].schemaContractSha256);
- assert.ok(revoked);revoked.state='revoked';
+ const logical=await readCivicPolicyInventory(policy),revoked=logical.entries.find(entry=>entry.relativePath==='registry.json'&&entry.schemaContractSha256===second[0].schemaContractSha256);
+ assert.ok(revoked);
+ if(layout==='sealed')inventory.storage.entryStates[revoked.id]='revoked';
+ else inventory.entries.find((entry:{id:string})=>entry.id===revoked.id).state='revoked';
  try{
   await writeFile(inventoryPath,JSON.stringify(inventory)+'\n',{mode:0o600});
   for(const bindings of [first,second])await assert.rejects(assertManagedSourceBindings(path,bindings,{...policy,sourceUrl:bindings[0].url}),{code:'CONTENT_REFERENCE_REVOKED'});
@@ -1125,4 +1165,175 @@ test('independent HTTP membership selects exact live admissions but never relaxe
  await recordHostOptOut({host:'first.org',reason:'municipality_objection'},policy);
  await assert.rejects(assertManagedIndependentHttpSourceBinding(path,first,policy),HostOptedOutError);await assertManagedIndependentHttpSourceBinding(path,second,policy);
  await writeFile(path,'tampered original',{mode:0o600});await assert.rejects(assertManagedIndependentHttpSourceBinding(path,second,policy),CivicPolicyStateError);
+});
+
+async function compactionFixture(t:TestContext){
+ const {base,stateDir}=await sandbox(t),root=join(base,'sealed-artifacts'),policy=fixturePolicy(stateDir),bytes='Synthetic sealed publication';
+ await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+ const binding:Extract<ManagedSourceBinding,{kind:'retained_publication'}>={kind:'retained_publication',url:'https://sealed.test/source',sourceSha256:null,publication:{manifestSha256:hash('sealed manifest'),releaseId:'sealed-fixture',memberPath:'facts.json',memberSha256:hash(bytes),memberBytes:Buffer.byteLength(bytes)}};
+ await publish(root,{...binding,relativePath:'facts.json',contentSha256:hash(bytes),independentAllowed:false},bytes,stateDir);
+ await withManagedSourceScratch(root,[{phase:'pre-admission',url:binding.url,sourceSha256:hash(bytes)}],async scope=>{await scope.writeSource('document',Buffer.from(bytes));},{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification',...policy});
+ return {root,stateDir,policy,binding,bytes};
+}
+
+test('compaction proves every logical record, preserves original backup bytes, is idempotent, and dry run writes nothing',async t=>{
+ const {stateDir,policy}=await compactionFixture(t),path=join(stateDir,'inventory.json');
+ const original=await readFile(path),logical=await readCivicPolicyInventory(policy),filesBefore=await readdir(stateDir,{recursive:true});
+ const dry=await compactCivicPolicyInventory({...policy,dryRun:true});
+ assert.equal(dry.status,'dry_run');assert.equal(dry.logicalEquality,true);assert.equal(dry.backupPath,null);
+ assert.deepEqual(await readFile(path),original);assert.deepEqual(await readdir(stateDir,{recursive:true}),filesBefore);
+ const receipt=await compactCivicPolicyInventory(policy),physical=JSON.parse(await readFile(path,'utf8'));
+ assert.equal(receipt.status,'compacted');assert.equal(receipt.logicalSha256,dry.logicalSha256);assert.deepEqual(receipt.after,dry.after);
+ assert.equal(receipt.before.sha256,hash(original));assert.equal(receipt.before.bytes,original.length);
+ assert.deepEqual(await readFile(receipt.backupPath!),original);assert.equal((await lstat(receipt.backupPath!)).mode&0o777,0o600);
+ assert.deepEqual(await readCivicPolicyInventory(policy),logical);
+ assert.equal(physical.entries.length,0);assert.equal(physical.scratch.length,0);assert.equal(physical.storage.segments.length,2);
+ assert.equal(physical.storage.segments[0].previousSha256,null);assert.equal(physical.storage.segments[1].previousSha256,physical.storage.segments[0].sha256);
+ for(const pin of receipt.segments){const segmentPath=join(stateDir,'inventory-segments',pin.sha256+'.json'),segment=await readFile(segmentPath);assert.equal(hash(segment),pin.sha256);assert.equal(segment.length,pin.bytes);assert.equal((await lstat(segmentPath)).mode&0o777,0o600);}
+ const filesAfter=await readdir(stateDir,{recursive:true}),again=await compactCivicPolicyInventory(policy);
+ assert.equal(again.status,'already_compacted');assert.deepEqual(again.before,receipt.after);assert.deepEqual(again.after,receipt.after);
+ assert.equal(again.logicalSha256,receipt.logicalSha256);assert.deepEqual(await readdir(stateDir,{recursive:true}),filesAfter);
+ await assert.rejects(compactCivicPolicyInventory({...policy,authoritySha256:undefined}),{code:'CIVIC_POLICY_AUTHORITY_UNPINNED'});
+});
+
+for(const family of ['entries','scratch'])for(const mutation of ['tamper','missing','symlink','hardlink','mode'])test('sealed '+family+' '+mutation+' fails closed even after cache warming',async t=>{
+ const {root,stateDir,policy}=await compactionFixture(t),migration=await compactCivicPolicyInventory(policy);
+ await readCivicPolicyInventory(policy);
+ const pin=migration.segments.find(segment=>segment.family===family)!;
+ const path=join(stateDir,'inventory-segments',pin.sha256+'.json'),original=await readFile(path),target=join(stateDir,'unrelated.json');
+ if(mutation==='tamper'){const tampered=Buffer.from(original);tampered[10]^=1;await writeFile(path,tampered,{mode:0o600});}
+ if(mutation==='missing')await rm(path);
+ if(mutation==='symlink'){await writeFile(target,original,{mode:0o600});await rm(path);await symlink(target,path);}
+ if(mutation==='hardlink')await link(path,target);
+ if(mutation==='mode')await chmod(path,0o644);
+ await assert.rejects(readCivicPolicyInventory(policy),CivicPolicyStateError);
+ await assert.rejects(assertManagedSourceReadable(join(root,'facts.json'),policy),CivicPolicyStateError);
+ const purge=await recordHostOptOut({host:'sealed.test',reason:'municipality_objection'},policy);
+ assert.equal(purge.purge.status,'error');assert.deepEqual(purge.purge.issues,[{code:'inventory_unavailable'}]);
+ assert.equal(await readFile(join(root,'facts.json'),'utf8'),'Synthetic sealed publication');
+});
+
+test('manifest chain corruption fails closed, and archived scratch still prevents restoration from being blessed',async t=>{
+ const {root,stateDir,policy,binding,bytes}=await compactionFixture(t);
+ await compactCivicPolicyInventory(policy);
+ const path=join(stateDir,'inventory.json'),original=await readFile(path),physical=JSON.parse(original.toString('utf8'));
+ physical.storage.segments[1].previousSha256=hash('foreign predecessor');
+ await writeFile(path,JSON.stringify(physical)+'\n',{mode:0o600});await assert.rejects(readCivicPolicyInventory(policy),CivicPolicyStateError);
+ await writeFile(path,original,{mode:0o600});
+ const archived=(await readCivicPolicyInventory(policy)).scratch[0];assert.equal(archived.state,'closed');assert.equal(archived.tombstones.length,1);assert.equal(archived.sources[0].host,'sealed.test');
+ await mkdir(join(root,archived.directory),{mode:0o700});await writeFile(join(root,archived.directory,'restored'),bytes,{mode:0o600});
+ await assert.rejects(markManagedCacheInventoryComplete(root,policy),{code:'MANAGED_INVENTORY_INCOMPLETE'});
+ const receipt=await recordHostOptOut({host:'sealed.test',reason:'municipality_objection'},policy);
+ assert.equal(receipt.purge.deletedFiles,1);assert.equal(receipt.purge.status,'partial');
+ await assert.rejects(lstat(join(root,'facts.json')),{code:'ENOENT'});
+ await assert.rejects(assertManagedSourceBindings(join(root,'facts.json'),[binding],policy),CivicPolicyStateError);
+ assert.equal((await readCivicPolicyInventory(policy)).entries[0].state,'deleted');
+ assert.deepEqual((await readCivicPolicyInventory(policy)).scratch[0],archived);
+});
+
+test('new bulk entries and closed leases append sealed history; hot writes and retirement preserve exact ownership',async t=>{
+ const {root,stateDir,policy,binding,bytes}=await compactionFixture(t);
+ await compactCivicPolicyInventory(policy);const before=await readCivicPolicyInventory(policy);
+ await publish(root,{...binding,url:'https://second-sealed.test/source',relativePath:'second.json',contentSha256:hash(bytes),independentAllowed:false},bytes,stateDir);
+ await withManagedSourceScratch(root,[{phase:'pre-admission',url:'https://second-sealed.test/source',sourceSha256:hash(bytes)}],async scope=>{await scope.writeSource('document',Buffer.from(bytes));},{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification',...policy});
+ const logical=await readCivicPolicyInventory(policy),physical=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));
+ assert.equal(physical.entries.length,0);assert.equal(physical.scratch.length,0);assert.equal(physical.storage.segments.length,4);
+ assert.equal(logical.entries.length,2);assert.equal(logical.scratch.length,2);assert.deepEqual(logical.scratch[0],before.scratch[0]);
+ await assertManagedSourceBindings(join(root,'second.json'),[{...binding,url:'https://second-sealed.test/source'}],policy);
+ const purge=await recordHostOptOut({host:'second-sealed.test',reason:'municipality_objection'},policy);assert.equal(purge.purge.deletedFiles,1);
+ await assertManagedSourceBindings(join(root,'facts.json'),[binding],policy);
+ const retired=await retireManagedRoot(root,{reason:'Synthetic compacted ownership retirement'},policy);
+ assert.equal(retired.status,'retired');assert.equal(retired.removedEntries,2);assert.equal(retired.removedScratchLeases,2);
+ const after=await readCivicPolicyInventory(policy);assert.deepEqual(after.roots,[]);assert.deepEqual(after.entries,[]);assert.deepEqual(after.scratch,[]);
+ await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+ assert.deepEqual((await readCivicPolicyInventory(policy)).scratch,[]);
+ assert.deepEqual((await readCivicPolicyInventory(policy)).entries,[]);
+ await publish(root,{...binding,relativePath:'facts.json',contentSha256:hash(bytes),independentAllowed:false},bytes,stateDir);
+ const reopened=await readCivicPolicyInventory(policy);assert.equal(reopened.entries.length,1);assert.equal(reopened.entries[0].state,'active');assert.deepEqual(reopened.scratch,[]);
+});
+
+test('compaction refuses a mismatched existing backup without publishing a new layout',async t=>{
+ const {stateDir,policy}=await compactionFixture(t),path=join(stateDir,'inventory.json'),original=await readFile(path),backupPath=join(stateDir,'backup.json');
+ await writeFile(backupPath,'foreign bytes',{mode:0o600});
+ await assert.rejects(compactCivicPolicyInventory({...policy,backupPath}),{code:'CIVIC_POLICY_BACKUP_MISMATCH'});
+ assert.deepEqual(await readFile(path),original);assert.equal(await readFile(backupPath,'utf8'),'foreign bytes');await assert.rejects(lstat(join(stateDir,'inventory-segments')),{code:'ENOENT'});
+});
+
+test('a marked external inventory waiter gets an acquisition opportunity before the holder re-enters',async t=>{
+ const {base,root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),bytes='Synthetic fair lock source',entry=rawEntry(bytes),waiterRoot=join(base,'external-waiter');
+ await registerManagedCacheRoot(root,{kind:'fetch',...policy});await publish(root,entry,bytes,stateDir);
+ const entered=Promise.withResolvers<void>(),release=Promise.withResolvers<void>(),marked=Promise.withResolvers<string>();
+ const watcher=watch(stateDir,(_event,name)=>{if(String(name).startsWith('inventory.wait-'))marked.resolve(String(name));});t.after(()=>watcher.close());
+ const holding=withManagedSourceWrite(root,[entry],async()=>{entered.resolve();await release.promise;},policy);
+ await entered.promise;
+ const moduleUrl=new URL('../src/civic-opt-out.ts',import.meta.url).href;
+ const script=`import {registerManagedCacheRoot} from ${JSON.stringify(moduleUrl)};await registerManagedCacheRoot(process.argv[1],{kind:'fetch',...JSON.parse(process.argv[2])});`;
+ const child=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',script,waiterRoot,JSON.stringify(policy)],{stdio:'ignore'});
+ t.after(()=>{if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');});
+ const finished=new Promise<number|null>((resolve,reject)=>{child.once('error',reject);child.once('close',resolve);});
+ const marker=await marked.promise;assert.equal((await lstat(join(stateDir,marker))).mode&0o777,0o600);
+ release.resolve();await holding;
+ await withManagedSourceWrite(root,[entry],async()=>{
+  const inventory=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));
+  assert.ok(inventory.roots.some((item:{path:string})=>item.path===waiterRoot));
+ },policy);
+ assert.equal(await finished,0);assert.deepEqual((await readdir(stateDir)).filter(name=>name.startsWith('inventory.wait-')),[]);
+});
+
+for(const family of ['entries','scratch'])test('sealed '+family+' without an owning root fail closed unless explicitly retired',async t=>{
+ const {base,stateDir}=await sandbox(t),root=join(base,'orphan-sealed'),policy=fixturePolicy(stateDir),bytes='Synthetic orphan sealed record';
+ await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+ if(family==='entries'){
+  const binding:Extract<ManagedSourceBinding,{kind:'retained_publication'}>={kind:'retained_publication',url:'https://orphan-sealed.test/source',sourceSha256:null,publication:{manifestSha256:hash('orphan manifest'),releaseId:'orphan-fixture',memberPath:'facts.json',memberSha256:hash(bytes),memberBytes:Buffer.byteLength(bytes)}};
+  await publish(root,{...binding,relativePath:'facts.json',contentSha256:hash(bytes),independentAllowed:false},bytes,stateDir);
+ }else{
+  await withManagedSourceScratch(root,[{phase:'pre-admission',url:'https://orphan-sealed.test/source',sourceSha256:hash(bytes)}],async scope=>{await scope.writeSource('document',Buffer.from(bytes));},{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification',...policy});
+ }
+ const migration=await compactCivicPolicyInventory(policy);assert.equal(migration.segments.length,1);assert.equal(migration.segments[0].family,family);
+ const path=join(stateDir,'inventory.json'),original=await readFile(path),physical=JSON.parse(original.toString('utf8'));
+ assert.deepEqual(physical.storage.retiredRoots,{});physical.roots=[];await writeFile(path,JSON.stringify(physical)+'\n',{mode:0o600});
+ await assert.rejects(readCivicPolicyInventory(policy),CivicPolicyStateError);
+ await assert.rejects(recoverManagedSourceScratch(policy),CivicPolicyStateError);
+ const receipt=await recordHostOptOut({host:'orphan-sealed.test',reason:'municipality_objection'},policy);
+ assert.equal(receipt.purge.status,'error');assert.deepEqual(receipt.purge.issues,[{code:'inventory_unavailable'}]);assert.equal(receipt.purge.deletedFiles,0);
+ if(family==='entries')assert.equal(await readFile(join(root,'facts.json'),'utf8'),bytes);
+ // Real retirement, unlike deleting roots out of the manifest, records the
+ // cutoff and removes ownership without leaving an orphaned logical record.
+ await writeFile(path,original,{mode:0o600});const retired=await retireManagedRoot(root,{reason:'Synthetic explicit sealed retirement'},policy);
+ assert.equal(retired.status,'retired');const after=await readCivicPolicyInventory(policy);assert.deepEqual(after.roots,[]);assert.deepEqual(after.entries,[]);assert.deepEqual(after.scratch,[]);
+});
+
+for(const family of ['observations','requests'])test('content-free '+family+' replacement retires sealed bindings by copy-on-write without poisoning the root',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),url='https://metadata-sealed.test/source';
+ await initializeManagedAcquisitionLane(root,{kind:'fetch',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+ const relativePath=family==='observations'?'observations/sealed.json':'requests/'+hash('sealed request')+'.json';
+ const initial=JSON.stringify({url,method:'GET',checkedAt:now,retrievedAt:null,state:'failed',failure:'network_error'})+'\n';
+ const replacement=JSON.stringify({url,method:'GET',checkedAt:now,retrievedAt:null,state:'failed',failure:'not_found'})+'\n';
+ const binding:Extract<ManagedSourceBinding,{kind:'retained_publication'}>={kind:'retained_publication',url,sourceSha256:null,publication:{manifestSha256:hash('metadata manifest'),releaseId:'metadata-fixture',memberPath:relativePath,memberSha256:hash(initial),memberBytes:Buffer.byteLength(initial)}};
+ await publish(root,{...binding,relativePath,contentSha256:hash(initial),independentAllowed:false},initial,stateDir);
+ await compactCivicPolicyInventory(policy);
+ const before=await readCivicPolicyInventory(policy),physicalBefore=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));
+ assert.equal(before.entries.length,1);assert.equal(before.entries[0].state,'active');
+ const segmentPath=join(stateDir,'inventory-segments',physicalBefore.storage.segments[0].sha256+'.json'),segmentBefore=await readFile(segmentPath);
+ await writeFile(join(root,relativePath),replacement,{mode:0o600});await markManagedCacheInventoryComplete(root,policy);
+ const after=await readCivicPolicyInventory(policy),physicalAfter=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));
+ assert.equal(after.roots[0].complete,true);assert.deepEqual(after.entries,[{...before.entries[0],state:'missing'}]);
+ assert.equal(physicalAfter.storage.entryStates[before.entries[0].id],'missing');assert.deepEqual(physicalAfter.storage.segments,physicalBefore.storage.segments);assert.deepEqual(await readFile(segmentPath),segmentBefore);
+ assert.equal(before.entries[0].state,'active');assert.equal(await readFile(join(root,relativePath),'utf8'),replacement);
+ await assert.rejects(assertManagedSourceReadable(join(root,relativePath),policy),{code:'CONTENT_REFERENCE_REVOKED'});
+ await writeFile(join(root,relativePath),initial,{mode:0o600});await markManagedCacheInventoryComplete(root,policy);
+ assert.equal((await readCivicPolicyInventory(policy)).entries[0].state,'revoked');
+ const receipt=await recordHostOptOut({host:'metadata-sealed.test',reason:'municipality_objection'},policy);
+ assert.equal(receipt.purge.status,'purged');assert.equal(receipt.purge.deletedFiles,1);assert.deepEqual(await readFile(segmentPath),segmentBefore);
+});
+
+test('late scratch finalization cannot reactivate or mutate a sealed terminal lease',async t=>{
+ const {base,stateDir}=await sandbox(t),root=join(base,'terminal-scratch'),policy=fixturePolicy(stateDir),bytes=Buffer.from('Synthetic terminal lease source');
+ await assert.rejects(withManagedSourceScratch(root,[{phase:'pre-admission',url:'https://terminal-sealed.test/source',sourceSha256:hash(bytes)}],async()=>{
+  // Fixture-only state corruption simulates an unexpectedly terminal durable
+  // lease while its wrapper is still alive; normal recovery skips terminal leases.
+  const path=join(stateDir,'inventory.json'),physical=JSON.parse(await readFile(path,'utf8'));physical.scratch[0].state='purged';
+  await writeFile(path,JSON.stringify(physical)+'\n',{mode:0o600});await compactCivicPolicyInventory(policy);
+ },{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification',...policy}),{code:'SCRATCH_IDENTITY_MISMATCH'});
+ const after=await readCivicPolicyInventory(policy);assert.equal(after.scratch[0].state,'purged');assert.equal(JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8')).scratch.length,0);
 });
