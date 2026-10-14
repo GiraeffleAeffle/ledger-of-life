@@ -7,7 +7,7 @@ import {ResidualInputSchema,loadResidualSource} from './district-residual-jobs.t
 import {corpusFixturePolicy} from './district-corpus.ts';
 import {DistrictJobStore,canonicalJobIdentity,DistrictExecutionHold,policyContinuationVersions,type JobHandler,type JobHandlerResult,type JobPolicyContinuation} from './district-jobs.ts';
 import {encodeStepReceipt} from './district-step-receipt.ts';
-import {loadPolicyReceipt,recheckPolicyReceipt,type PolicyReceipt,type PolicyRecheckResult} from './district-policy-receipt.ts';
+import {PolicyReceiptSchema,loadPolicyReceipt,recheckPolicyReceipt,type PolicyReceipt,type PolicyRecheckResult} from './district-policy-receipt.ts';
 import {assertCivicPolicyAuthority,assertManagedSourceReadable,assertManagedSourceBindings,assertManagedObservationReadable,withManagedSourceWrite,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,HostOptedOutError,CivicPolicyStateError} from './civic-opt-out.ts';
 import type {DistrictCas} from './district-cas.ts';
 import type {PoliteFetcher} from './polite-fetch.ts';
@@ -18,9 +18,11 @@ const PreviousRefreshSchema=z.object({jobKey:HashSchema,receiptSha256:HashSchema
 const SelectorSchema=z.object({version:z.literal(VERSION),manifestSha256:HashSchema,scope:ScopeSchema,maxRequests:z.number().int().min(2).max(100),originalIdentitySha256:HashSchema,previousRefresh:PreviousRefreshSchema.optional()}).strict();
 export const CrawlPolicyRefreshEnqueueSchema=z.object({manifest:z.lazy(()=>CrawlCorpusImportSchema),maxRequests:SelectorSchema.shape.maxRequests,previousRefreshes:z.array(PreviousRefreshSchema.extend({documentId:z.string().min(1)}).strict()).max(500).optional()}).strict();
 const OriginalRobotsAbsencePinSchema=z.object({path:z.string().min(1),observationId:z.string().regex(/^[0-9]+-[a-f0-9-]{36}\.json$/),receiptSha256:HashSchema}).strict();
-export async function policyRefreshContract(){
- const files=['district-policy-refresh.ts','district-crawl-import.ts','district-residual-jobs.ts','district-registry-config.ts','district-r1.ts','district-jobs.ts','district-step-receipt.ts','polite-fetch.ts','district-policy-receipt.ts','source-policy.ts','registered-source-policy.ts','civic-opt-out.ts'];
- return semanticHash({version:VERSION,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))}))),hostGroupsSha256:digest(await readFile(new URL('../sources/district-host-groups.json',import.meta.url)))});
+export async function policyRefreshContract(hash?:(file:string)=>Promise<string>){
+ // Refresh jobs promise a receipt codec, not a frozen authorization decision.
+ // They always evaluate current policy; decision inputs/results remain receipts.
+ const files=['district-adapter-contract.ts','district-schema.ts'];
+ return semanticHash({version:VERSION,receiptSchema:z.toJSONSchema(PolicyReceiptSchema),files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
 }
 /** Preflight is offline and may admit stale originals only for this network job.
  * It does not admit them to preparation or models and grants no fetch approval. */

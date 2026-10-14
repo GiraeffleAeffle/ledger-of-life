@@ -13,7 +13,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
     && npm cache clean --force
 COPY --chmod=0444 src/district-adapter-contract.ts src/district-structured-parser-worker.ts \
-    src/district-document.ts src/district-document-parser-worker.ts src/district-parser-isolation.ts \
+    src/district-document.ts src/district-document-parser-worker.ts src/district-parser-isolation.ts src/district-contract-source.ts src/district-execution-profile.ts \
     src/district-policy-inspection-worker.ts src/pdf-tdm-policy-worker.ts src/district-regional-statement-worker.ts \
     src/document-origin-contract.ts src/document-origin-rules.ts src/source-policy.ts src/registered-source-policy.ts src/public-address.ts \
     src/council-oparl.ts src/dedupe.ts src/common.ts ./src/

@@ -27,13 +27,14 @@ import type {ModelEvidence} from './district-model-contract.ts';
 export const ResidualBoundsSchema=z.object({maxDocuments:z.literal(1),maxChunks:z.number().int().min(1).max(24),maxModelCalls:z.number().int().min(2).max(48),paidMicroUsd:z.literal(0)}).strict();
 const HttpObservationBindingSchema=z.object({observationId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/),receiptSha256:HashSchema}).strict();
 export const ResidualInputSchema=z.object({documentId:z.string().min(1),corpusSha256:authorizedPilotCorpusSchema,corpusObservations:z.array(HttpSourceBindingSchema).min(1).max(10000),registrySha256:HashSchema,registry:operatorRegistryInputPinSchema,crawlRegistry:CrawlRegistryPinSchema.optional(),policyReceiptSha256:HashSchema,httpObservation:HttpObservationBindingSchema,requestEvidenceSha256:HashSchema,bounds:ResidualBoundsSchema}).strict();
-const ContractSchema=z.object({preparationSha256:HashSchema,extraction:z.object({promptSha256:HashSchema,schemaSha256:HashSchema,extractorSha256:HashSchema}).strict(),hostSha256:HashSchema}).strict();
+const ContractSchema=z.object({preparationSha256:HashSchema,extraction:z.object({promptSha256:HashSchema,schemaSha256:HashSchema,extractorSha256:HashSchema}).strict(),outputSha256:HashSchema}).strict();
 const PreparationSelectorSchema=ResidualInputSchema.extend({contract:ContractSchema}).strict();
 const ExtractionSelectorSchema=PreparationSelectorSchema.extend({preparationJobKey:HashSchema,preparationReceiptId:z.uuid(),preparationReceiptSha256:HashSchema,preparedArtifactSha256:HashSchema}).strict();
 export const ResidualExtractionSchema=z.object({schemaVersion:z.literal('district-residual-extraction-v1'),documentId:z.string(),corpusSha256:HashSchema,registrySha256:HashSchema,policyReceiptSha256:HashSchema,preparationJobKey:HashSchema,preparationReceiptId:z.uuid(),preparationReceiptSha256:HashSchema,preparedArtifactSha256:HashSchema,result:documentResultSchema.extend({provider:z.literal('openai-subscription'),purpose:z.literal('production')})}).strict();
-export async function residualJobContract(){
- const files=['district-residual-jobs.ts','district-codex-accounting.ts','district-corpus.ts','district-crawl-request.ts','district-http-observation.ts','source-observation.ts','district-inference.ts','district-answer-cache.ts','district-model.ts','district-policy-receipt.ts','district-policy-refresh.ts','civic-opt-out.ts','district-jobs.ts'];
- return ContractSchema.parse({preparationSha256:await preparationExtractorSha256(),extraction:await jointExtractionContract(),hostSha256:semanticHash(await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))}))))});
+export async function residualJobContract(hash?:(file:string)=>Promise<string>){
+ // The wrapper is mixed: bounds, output schema/assembly and source selection.
+ const files=['district-residual-jobs.ts','district-inference.ts','district-answer-cache.ts','district-model.ts'];
+ return ContractSchema.parse({preparationSha256:await preparationExtractorSha256(hash),extraction:await jointExtractionContract(hash),outputSha256:semanticHash(await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))}))))});
 }
 export function residualMimeSupported(mimeType:string){return ['application/pdf','text/html','application/xhtml+xml','text/plain','application/json','application/xml','text/xml'].includes(mimeType.split(';')[0].trim().toLowerCase());}
 export interface ResidualSourceOptions {store?:DistrictJobStore;onContinuation?:(check:ResidualPolicyCheck)=>void}
@@ -119,17 +120,17 @@ async function admitted(context:ResidualJobContext,selector:z.infer<typeof Prepa
  if(context.job.spec.policyProofSha256!==selector.policyReceiptSha256||canonicalJson(context.job.spec.sourceScope)!==canonicalJson(source.receipt.scope))throw Error('Residual job scope or policy binding mismatch');
  for(const hash of [selector.corpusSha256,selector.registrySha256,selector.policyReceiptSha256,selector.httpObservation.receiptSha256,selector.requestEvidenceSha256,source.document.sha256,...selector.corpusObservations.map(binding=>binding.receiptSha256)])if(!context.job.spec.inputArtifactHashes.includes(hash))throw Error('Residual original/provenance omitted from job identity');
  await assertManagedSourceReadable(join(context.cas.root,'sha256',source.document.sha256.slice(0,2),source.document.sha256),{...policyOptions(source.receipt),sourceUrl:source.document.url});
- await readParserReview();context.signal.throwIfAborted();return source;
+ context.signal.throwIfAborted();return source;
 }
 const prepare:ResidualHandler=async context=>{
  const selector=PreparationSelectorSchema.parse(context.job.spec.selector);if(context.job.spec.step!=='residual_prepare')throw Error('Residual preparation step mismatch');
  try{
- const source=await admitted(context,selector),toolVersions=await collectPreparationToolVersions(source.document.mimeType),bytes=await context.cas.read(source.document.sha256);
+ const source=await admitted(context,selector),parserReview=await readParserReview(),toolVersions=await collectPreparationToolVersions(source.document.mimeType),bytes=await context.cas.read(source.document.sha256);
  await recheckJobPolicy(context);
  const input={bytes,municipalityId:source.municipality.id,references:[source.reference],mimeType:source.document.mimeType,extractorSha256:selector.contract.preparationSha256,toolVersions,managedRoot:join(dirname(context.cas.root),basename(context.cas.root)+'-residual-prepared'),policy:policyOptions(source.receipt),signal:context.signal,sourceBindings:[source.sourceBinding]};
  const prepared=await prepareDocument(input);context.signal.throwIfAborted();
  const chunks=documentChunks(prepared.text);if(chunks.length>selector.bounds.maxChunks||2*chunks.length>selector.bounds.maxModelCalls)return {outcome:'held_quality',reasonCode:'quality_failed'};
- return {outcome:'succeeded',reasonCode:'completed',outputs:[await persist(context,source.receipt,prepared,'parser_output'),await persist(context,source.receipt,prepared.text,'parser_output',true)],versions:{preparation:prepared.extractorSha256,...prepared.toolVersions},counts:{bytes:bytes.length,spans:chunks.length}};
+ return {outcome:'succeeded',reasonCode:'completed',outputs:[await persist(context,source.receipt,prepared,'parser_output'),await persist(context,source.receipt,prepared.text,'parser_output',true)],versions:{preparation:prepared.extractorSha256,...prepared.toolVersions,parserAuthorization:parserReview.runnerSha256},counts:{bytes:bytes.length,spans:chunks.length}};
  }catch(error){if(error instanceof ParserIsolationError)return {outcome:'held_execution',reasonCode:'isolation_unavailable'};if(error instanceof Error&&error.message==='Document exceeds model chunk limit')return {outcome:'held_quality',reasonCode:'quality_failed'};throw error;}
 };
 const extract=(pool:Pool):ResidualHandler=>async context=>{

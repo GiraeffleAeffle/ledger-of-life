@@ -8,7 +8,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import type {ChildProcess,SpawnOptions} from 'node:child_process';
 import {inspectOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,OMP_RUNNER_VERSION,OMP_VERSION,OmpRunnerHold} from '../src/district-omp-b-runner.ts';
-import {ompContainerEnvironment,ompExecutionArgs} from '../src/civic-docker.ts';
+import {OMP_CONTAINER_ENVIRONMENT,OMP_EXECUTION_ARGS,OMP_PROCESS} from '../src/district-execution-profile.ts';
 import {semanticHash,digest,canonicalJson} from '../src/district-adapter-contract.ts';
 import {AssessmentBEnqueueManifestSchema} from '../src/district-r1.ts';
 import {assessmentOutputSchema,PROMPTS,digest as assessmentDigest} from '../src/district-assessment.ts';
@@ -46,7 +46,7 @@ test('omp event inspection rejects tool use, terminal failures, wrong route, ext
 });
 
 test('omp argv and environment remain fixed and source-free',()=>{
- const args=ompExecutionArgs(),env=ompContainerEnvironment();
+ const args=OMP_EXECUTION_ARGS,env=OMP_CONTAINER_ENVIRONMENT;
  assert.equal(args.includes('--api-key'),false);assert.equal(args.some(value=>/source text|database_url|proxy|broker|api[_-]?key/i.test(value)),false);
  assert.equal(env.some(value=>/source text|database_url|proxy|broker|api[_-]?key/i.test(value)),false);
  assert.equal(env.includes('ANTHROPIC_OAUTH_TOKEN=undefined'),false);assert.equal(env.includes('PI_CONFIG_DIR=.omp'),true);assert.equal(args.includes('--no-tools'),true);
@@ -95,7 +95,7 @@ test('credential resolver holds for zero or multiple accounts, wrong version, no
 }));
 
 test('omp runner fingerprint includes the canonical authority, lifecycle and every reviewed image profile file',async()=>{
- const files=['district-omp-b-runner.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ const files=['district-omp-b-runner.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
  const control=ompAssessmentControl();
  const expected=semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL('../src/'+file,import.meta.url)))})))});
  assert.equal(await ompRunnerContractSha256(),expected);
@@ -106,9 +106,9 @@ test('omp image uses the pinned parser runtime without inherited environment and
  const base=parser.match(/^FROM (.+)$/m)?.[1];assert.ok(base);assert.ok(dockerfile.includes('FROM '+base+' AS runtime'));
  assert.match(dockerfile,/^FROM scratch$/m);assert.match(dockerfile,/^COPY --from=runtime \/ \/$/m);assert.match(dockerfile,/^USER 65534:65534$/m);
  const entrypoint=dockerfile.match(/^ENTRYPOINT (.+)$/m)?.[1];assert.ok(entrypoint);
- assert.deepEqual(JSON.parse(entrypoint),['/usr/bin/env','-i',...ompContainerEnvironment(),'/opt/stadtstack/entry.sh']);
+ assert.deepEqual(JSON.parse(entrypoint),OMP_PROCESS.Entrypoint);
  const environment=dockerfile.match(/^ENV ([\s\S]*?)^USER /m)?.[1];assert.ok(environment);
- assert.deepEqual(environment.replace(/\\\n\s*/g,' ').trim().split(/\s+/),ompContainerEnvironment());
+ assert.deepEqual(environment.replace(/\\\n\s*/g,' ').trim().split(/\s+/),OMP_CONTAINER_ENVIRONMENT);
  assert.equal(await readFile(new URL('../docker/omp-b/entry.sh',import.meta.url),'utf8'),'#!/bin/sh\nset -eu\nIFS= read -r token || exit 126\n[ -n \"$token\" ] || exit 126\nexport ANTHROPIC_OAUTH_TOKEN=\"$token\"\nunset token\nexec omp \"$@\"\n');
 });
 

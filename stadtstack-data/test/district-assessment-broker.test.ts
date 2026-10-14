@@ -77,9 +77,9 @@ test('strict bridge requests bind exact input, pinned B route and actual purge a
  assert.throws(()=>BridgeRequestSchema.parse({...request,sourceAuthority:{allowed:true}}));
  assert.throws(()=>BridgeAnswerSchema.parse({...request.answer,stdout:'é'.repeat(60*1024)}));
  const mac=AssessmentBSelectorSchema.parse({version:ASSESSMENT_BRIDGE_VERSION,transport:'mac-bridge',role:'B',provider:'anthropic-subscription',requestedModel:'claude-haiku-5-5',itemArtifactSha256:hash,clientContractSha256:hash});
- const vm=AssessmentBSelectorSchema.parse({version:ASSESSMENT_BRIDGE_VERSION,transport:'vm-omp',role:'B',provider:'anthropic-subscription',requestedModel:'claude-haiku-5-5',itemArtifactSha256:hash,runnerContractSha256:'c'.repeat(64)});
+ const vm=AssessmentBSelectorSchema.parse({version:ASSESSMENT_BRIDGE_VERSION,transport:'vm-omp',role:'B',provider:'anthropic-subscription',requestedModel:'claude-haiku-5-5',itemArtifactSha256:hash,runnerOutputContractSha256:'c'.repeat(64)});
  assert.equal(mac.transport,'mac-bridge');assert.equal(vm.transport,'vm-omp');assert.equal('clientContractSha256' in vm,false);
- assert.throws(()=>AssessmentBSelectorSchema.parse({version:ASSESSMENT_BRIDGE_VERSION,transport:'vm-omp',role:'B',provider:'anthropic-subscription',requestedModel:'claude-haiku-5-5',itemArtifactSha256:hash,runnerContractSha256:'c'.repeat(64),clientContractSha256:hash}));
+ assert.throws(()=>AssessmentBSelectorSchema.parse({version:ASSESSMENT_BRIDGE_VERSION,transport:'vm-omp',role:'B',provider:'anthropic-subscription',requestedModel:'claude-haiku-5-5',itemArtifactSha256:hash,runnerOutputContractSha256:'c'.repeat(64),clientContractSha256:hash}));
  assert.deepEqual(assessmentEvidenceArtifactHashes(item),[digest(text),hash,'b'.repeat(64)].sort());
  assert.equal(canonicalJson(request).includes('DATABASE_URL'),false);
 });

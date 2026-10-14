@@ -98,7 +98,7 @@ export async function verifyStructuredRunReceipts(run:StructuredRun,cas:District
    await cas.verify(row.sourceSha256);
    const outputHash=receipt.outputHashes[0],output=StructuredJobResultSchema.parse(JSON.parse((await cas.read(outputHash)).toString('utf8')));
    dependencies.add(outputHash);contracts.add(output.adapterContractSha256);
-   if(output.sourceSha256!==row.sourceSha256||output.policyReceiptSha256!==row.policyReceiptSha256||semanticHash(output.scope)!==row.scopeSha256||output.adapterId!==row.adapterId||output.adapterVersion!==row.adapterVersion||receipt.versions.worker!==STRUCTURED_WORKER_VERSION||receipt.versions.adapter!==output.adapterVersion||receipt.versions.parser!==output.parserContractSha256||receipt.versions.host!==output.hostContractSha256)throw Error('Structured sandbox contract binding mismatch');
+   if(output.sourceSha256!==row.sourceSha256||output.policyReceiptSha256!==row.policyReceiptSha256||semanticHash(output.scope)!==row.scopeSha256||output.adapterId!==row.adapterId||output.adapterVersion!==row.adapterVersion||receipt.versions.worker!==STRUCTURED_WORKER_VERSION||receipt.versions.adapter!==output.adapterVersion||receipt.versions.parser!==output.parserContractSha256||receipt.versions.mapping!==output.mappingContractSha256)throw Error('Structured sandbox contract binding mismatch');
    for(const source of output.supportingSources){
     if(!receipt.inputHashes.includes(source.sha256)||!receipt.inputHashes.includes(source.policyReceiptSha256))throw Error('Unbound supporting parser input');
     const proof=await loadPolicyReceipt(cas,source.policyReceiptSha256),freshHash=options.currentAdmissionReceipts?.[source.policyReceiptSha256],fresh=freshHash?await loadPolicyReceipt(cas,freshHash):undefined;

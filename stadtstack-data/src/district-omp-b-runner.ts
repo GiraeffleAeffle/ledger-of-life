@@ -4,7 +4,8 @@ import {constants} from 'node:fs';
 import {lstat,open,mkdir,chmod,readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {z} from 'zod';
-import {canonicalDockerSocket,dockerDaemonIdentity,OMP_B_MODEL_MAX_TIME_SECONDS} from './civic-docker.ts';
+import {canonicalDockerSocket,dockerDaemonIdentity} from './civic-docker.ts';
+import {OMP_B_MODEL_MAX_TIME_SECONDS} from './district-execution-profile.ts';
 import {canonicalJson,digest,semanticHash} from './district-adapter-contract.ts';
 import {withManagedSourceScratch,type ManagedSourceContext,type ManagedDockerContainer} from './civic-opt-out.ts';
 import {assessmentOutputSchema,PROMPTS} from './district-assessment.ts';
@@ -120,10 +121,18 @@ async function reviewFile(path:string,contract:string):Promise<OmpReview>{
   if(value.runnerContractSha256!==contract||Date.parse(value.reviewedAt)>Date.now())throw new OmpRunnerHold('security_review_required');return value;
  }catch(e){if(e instanceof OmpRunnerHold)throw e;throw new OmpRunnerHold('security_review_required');}
 }
-export async function ompRunnerContractSha256():Promise<string>{
- const files=['district-omp-b-runner.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+export async function ompRunnerContractSha256(hash?:(file:string)=>Promise<string>):Promise<string>{
+ const files=['district-omp-b-runner.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
  const control=ompAssessmentControl();
- return semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))})))});
+ return semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
+}
+/** Selector/lease identity excludes the independently reviewed host authority.
+ * The mixed runner remains semantic for model framing, event decoding and CLI
+ * arguments. runVmOmpAssessment still validates the live security contract. */
+export async function ompRunnerOutputContractSha256(hash?:(file:string)=>Promise<string>):Promise<string>{
+ const files=['district-omp-b-runner.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ const control=ompAssessmentControl();
+ return semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
 }
 function capture(spawn:OmpSpawn,file:string,args:string[],options:SpawnOptions,input:Buffer,limit:number,timeoutMs:number,signal?:AbortSignal):Promise<{stdout:Buffer;stderr:Buffer;code:number}>{
  const {promise,resolve,reject}=Promise.withResolvers<{stdout:Buffer;stderr:Buffer;code:number}>();

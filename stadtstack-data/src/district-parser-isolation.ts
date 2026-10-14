@@ -9,6 +9,8 @@ import { z } from 'zod';
 import { digest, semanticHash, HashSchema,PARSER_INPUT_MAX_BYTES } from './district-adapter-contract.ts';
 import type { ManagedSourceContext, ManagedSourceScratch, ManagedDockerContainer, ManagedDockerSession } from './civic-opt-out.ts';
 import type { Readable, Writable } from 'node:stream';
+import {contractSourceManifest,type ContractSourceHash} from './district-contract-source.ts';
+import {PARSER_PROCESS} from './district-execution-profile.ts';
 
 export const PARSER_ISOLATION_VERSION = 'district-parser-isolation-v1';
 export const PARSER_REVIEW_PATH = '/etc/stadtstack/parser-isolation-review.json';
@@ -57,7 +59,7 @@ const ResponseSchema = z.union([
 ]);
 
 /** This hash can be inspected without launching Docker, a parser, or a model. */
-export async function parserIsolationContractSha256(): Promise<string> {
+export async function parserIsolationContractSha256(hash?:ContractSourceHash): Promise<string> {
   const adapters = await readdir(new URL('./adapters/', import.meta.url), { withFileTypes: true });
   if (adapters.some(entry => entry.isSymbolicLink() || entry.isDirectory())) throw new ParserIsolationError('security_review_required');
   const files = ['district-parser-isolation.ts', 'district-parser-worker.py', 'district-document.ts', 'district-document-parser-worker.ts',
@@ -65,10 +67,26 @@ export async function parserIsolationContractSha256(): Promise<string> {
     'district-regional-statement-worker.ts', '../regional/statements.mjs',
     'document-origin.ts', 'document-origin-contract.ts', 'document-origin-rules.ts', 'source-policy.ts', 'registered-source-policy.ts', 'public-address.ts',
     '../Dockerfile.parser', '../Dockerfile.parser.dockerignore',
-    '../package.json', '../package-lock.json', 'district-adapter-contract.ts', 'district-structured-parser-worker.ts',
+    '../package.json', '../package-lock.json', 'district-adapter-contract.ts', 'district-contract-source.ts', 'district-execution-profile.ts', 'district-structured-parser-worker.ts',
     'council-oparl.ts', 'dedupe.ts', 'common.ts', 'civic-opt-out.ts', 'civic-docker.ts',
     ...adapters.filter(entry => entry.isFile() && entry.name.endsWith('.ts')).map(entry => 'adapters/' + entry.name)].sort();
-  return semanticHash({ version: PARSER_ISOLATION_VERSION, files: await Promise.all(files.map(async file => ({ file, sha256: digest(await readFile(new URL(file, import.meta.url))) }))) });
+  return semanticHash({ version: PARSER_ISOLATION_VERSION, files: await contractSourceManifest(files,hash) });
+}
+
+/** Output identity is independent of the privileged review's host-code hash.
+ * The immutable executed image and actual tools are additionally pinned in each
+ * preparation receipt. Keep the mixed launcher conservative: it sets the parser
+ * environment/protocol/limits, but do not inherit its authority import closure. */
+export async function parserOutputContractSha256(hash?:ContractSourceHash):Promise<string>{
+  const adapters=await readdir(new URL('./adapters/',import.meta.url),{withFileTypes:true});
+  if(adapters.some(entry=>entry.isSymbolicLink()||entry.isDirectory()))throw new ParserIsolationError('security_review_required');
+  const files=['district-parser-isolation.ts','district-parser-worker.py','district-document.ts','district-document-parser-worker.ts',
+    'district-structured-parser-worker.ts','district-adapter-contract.ts','district-contract-source.ts','district-execution-profile.ts',
+    'district-policy-inspection-worker.ts','pdf-tdm-policy-worker.ts','district-regional-statement-worker.ts','../regional/statements.mjs',
+    '../Dockerfile.parser','../Dockerfile.parser.dockerignore','../package.json','../package-lock.json',
+    'council-oparl.ts','dedupe.ts','common.ts',
+    ...adapters.filter(entry=>entry.isFile()&&entry.name.endsWith('.ts')).map(entry=>'adapters/'+entry.name)].sort();
+  return semanticHash({version:PARSER_ISOLATION_VERSION,files:await contractSourceManifest(files,hash)});
 }
 
 export async function readParserReview(): Promise<ParserReview> {
@@ -112,16 +130,13 @@ export function parserContainerArgs(imageId: string, name: string, artifactPath:
   // worker exits and Docker removes the container. Attached `run --rm` exits only after
   // removal, so the controller proves absence instead of racing its own forced removal.
   return ['run', '--rm', '--interactive', '--pull=never', '--name', name, '--network=none', '--ipc=none',
-    '--read-only', '--user=65534:65534', '--cap-drop=ALL', '--security-opt=no-new-privileges=true',
+    '--read-only', `--user=${PARSER_PROCESS.User}`, '--cap-drop=ALL', '--security-opt=no-new-privileges=true',
     '--pids-limit=32', '--memory=512m', '--memory-swap=512m', '--cpus=1', '--ulimit=cpu=120:120',
     '--ulimit=nofile=64:64', '--ulimit=nproc=32:32', '--ulimit=fsize=33554432:33554432', '--ulimit=core=0:0',
-    '--stop-timeout=1', '--log-driver=none', '--workdir=/scratch',
+    '--stop-timeout=1', '--log-driver=none', `--workdir=${PARSER_PROCESS.WorkingDir}`,
     '--tmpfs=/scratch:rw,noexec,nosuid,nodev,size=134217728,uid=65534,gid=65534,mode=0700',
     ...(artifactPath ? ['--mount', `type=bind,src=${artifactPath},dst=/input/document,readonly,bind-propagation=rprivate`] : []),
-    '--entrypoint=/usr/bin/env', imageId, '-i', 'PATH=/usr/local/bin:/usr/bin:/bin',
-    'LANG=C.UTF-8', 'LC_ALL=C.UTF-8', 'TZ=UTC', 'HOME=/scratch/home', 'TMPDIR=/scratch/tmp',
-    'TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata', 'OMP_THREAD_LIMIT=1',
-    '/usr/bin/python3', '-I', '-S', '/opt/stadtstack/parser-worker.py'];
+    `--entrypoint=${PARSER_PROCESS.Entrypoint[0]}`, imageId, ...PARSER_PROCESS.Cmd];
 }
 
 function sandboxArgs(args: string[], originalPath: string | null): string[] {

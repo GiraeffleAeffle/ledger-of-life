@@ -15,13 +15,13 @@ import type {ModelAnswer} from './district-model-contract.ts';
 import type {ReasonCode} from './district-step-receipt.ts';
 import {assertCivicPolicyAuthority,readCivicOptOutSnapshot,assertManagedSourceReadable,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError,type CivicPolicyAuthorityReceipt} from './civic-opt-out.ts';
 import {ASSESSMENT_BRIDGE_VERSION,BRIDGE_LIMITS,BridgeLeaseSchema,BridgeRequestSchema,BridgeStatusSchema,BridgePurgeAckSchema,BridgeAnswerSchema,bridgeInputHash,type BridgeAnswer,type BridgeLease,type BridgeRequest,type BridgeStatus} from './district-assessment-bridge-contract.ts';
-import {runVmOmpAssessment,ompRunnerContractSha256,type OmpRunnerResult} from './district-omp-b-runner.ts';
+import {runVmOmpAssessment,ompRunnerOutputContractSha256,type OmpRunnerResult} from './district-omp-b-runner.ts';
 import {AssessmentContextHold,assertAssessmentContextBound} from './district-assessment-context.ts';
 
 export const ASSESSMENT_B_STEP='assessment_b';
 export const AssessmentBSelectorSchema=z.discriminatedUnion('transport',[
  z.object({version:z.literal(ASSESSMENT_BRIDGE_VERSION),transport:z.literal('mac-bridge'),role:z.literal('B'),provider:z.literal('anthropic-subscription'),requestedModel:z.literal('claude-haiku-5-5'),itemArtifactSha256:HashSchema,clientContractSha256:HashSchema}).strict(),
- z.object({version:z.literal(ASSESSMENT_BRIDGE_VERSION),transport:z.literal('vm-omp'),role:z.literal('B'),provider:z.literal('anthropic-subscription'),requestedModel:z.literal('claude-haiku-5-5'),itemArtifactSha256:HashSchema,runnerContractSha256:HashSchema}).strict(),
+ z.object({version:z.literal(ASSESSMENT_BRIDGE_VERSION),transport:z.literal('vm-omp'),role:z.literal('B'),provider:z.literal('anthropic-subscription'),requestedModel:z.literal('claude-haiku-5-5'),itemArtifactSha256:HashSchema,runnerOutputContractSha256:HashSchema}).strict(),
 ]);
 type LeaseState='ready'|'active'|'held'|'expired'|'cancelled'|'submitted';
 interface LeaseRow extends QueryResultRow {id:string;job_id:string;run_id:string;fencing_token:string;item_sha256:string;request_artifact_sha256:string;request_sha256:string;input_sha256:string;authority_id:string;authority_sha256:string;policy_snapshot_sha256:string;client_contract_sha256:string;state:LeaseState;reason_code:ReasonCode|null;created_at:Date;deadline_at:Date;client_id:string|null;claimed_at:Date|null;expires_at:Date;receipt_sha256:string|null;purge_ack_sha256:string|null}
@@ -31,11 +31,11 @@ interface CheckedEvidence {item:AssessmentItem;evidence:OriginalEvidence;data:Re
 interface SubmissionRow extends QueryResultRow {submission_sha256:string;provider_response_sha256:string;answer_artifact_sha256:string;receipt_artifact_sha256:string|null;reconciliation_input_sha256:string;provider_request_id:string|null;provider_response_id:string|null;state:'accepted'|'rejected';reason_code:ReasonCode}
 export interface RecordedBridgeAssessment {receipt:AssessmentReceipt;answer:ModelAnswer;providerRequestId:string|null;providerResponseId:string|null;clocks:Pick<BridgeAnswer,'startedAt'|'finishedAt'>}
 
-/** Pin implementation bytes as well as the frozen request contract. No guessed
- * policy source pin: a missing settled module prevents enqueue/execution. */
-export async function assessmentBJobContract():Promise<string>{
- const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','district-assessment-bridge-contract.ts','district-policy-receipt.ts','district-jobs.ts','district-cas.ts','district-claude.ts','district-model-contract.ts','district-omp-b-runner.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh','civic-opt-out.ts','source-policy.ts','document-origin.ts'];
- return semanticHash({version:ASSESSMENT_BRIDGE_VERSION,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))})))});
+/** Mixed broker request/output interpretation stays semantic; live authorization
+ * and custody imports are not transitive output fingerprints. */
+export async function assessmentBJobContract(hash?:(file:string)=>Promise<string>):Promise<string>{
+ const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','district-assessment-bridge-contract.ts','district-claude.ts','district-model-contract.ts','district-omp-b-runner.ts','district-execution-profile.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ return semanticHash({version:ASSESSMENT_BRIDGE_VERSION,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
 }
 function hardDeadline(row:JobAuthorityRow):number{
  return Math.min(row.expires_at.getTime(),row.run_started_at.getTime()+row.run_max_elapsed_ms,(row.first_started_at?.getTime()??0)+row.max_elapsed_ms);
@@ -187,7 +187,7 @@ export class DistrictAssessmentBroker {
   const selector=AssessmentBSelectorSchema.parse(job.spec.selector);
   // Fixture mode exercises private protocol/storage only, never native provider execution.
   if(this.fixtureProtocol&&selector.transport!=='mac-bridge')throw new DistrictExecutionHold('isolation_unavailable');
-  if(job.spec.step!==ASSESSMENT_B_STEP||job.spec.lane!=='assessment'||job.spec.semanticContractSha256!==await assessmentBJobContract()||canonicalJobIdentity(job.spec).jobKey!==job.jobKey||selector.transport==='vm-omp'&&selector.runnerContractSha256!==await ompRunnerContractSha256())throw new DistrictExecutionHold('quality_failed');
+  if(job.spec.step!==ASSESSMENT_B_STEP||job.spec.lane!=='assessment'||job.spec.semanticContractSha256!==await assessmentBJobContract()||canonicalJobIdentity(job.spec).jobKey!==job.jobKey||selector.transport==='vm-omp'&&selector.runnerOutputContractSha256!==await ompRunnerOutputContractSha256())throw new DistrictExecutionHold('quality_failed');
   return this.transaction(async client=>{
    const current=await this.job(client,job.id,job.runId),reason=disposition(current,job.runId,job.fencingToken);
    if(reason)throw new DistrictExecutionHold(reason);
@@ -202,7 +202,7 @@ export class DistrictAssessmentBroker {
    signal.throwIfAborted();
    const request=await this.persist(client,Buffer.from(canonicalJson(checked.data)),'derived',checked.sources,job.jobKey);
    const id=randomUUID(),deadline=new Date(Math.min(hardDeadline(current),checked.validUntil,current.now.getTime()+BRIDGE_LIMITS.maxLeaseMs));
-   const clientContractSha256=selector.transport==='mac-bridge'?selector.clientContractSha256:selector.runnerContractSha256;
+   const clientContractSha256=selector.transport==='mac-bridge'?selector.clientContractSha256:selector.runnerOutputContractSha256;
    const binding={jobKey:job.jobKey,authorityId:checked.sourceAuthority.authorityId,authoritySha256:checked.sourceAuthority.authoritySha256,policySnapshotSha256:checked.policySnapshotSha256,role:'B' as const,provider:'anthropic-subscription' as const,requestedModel:'claude-haiku-5-5' as const,system:PROMPTS.B,data:checked.data,outputSchema:z.toJSONSchema(assessmentOutputSchema),clientContractSha256};
    const inputSha256=bridgeInputHash(binding);
    const latest=await this.job(client,job.id,job.runId),latestReason=disposition(latest,job.runId,job.fencingToken);
@@ -325,7 +325,7 @@ export class DistrictAssessmentBroker {
   let leaseId:string|undefined;
   try{
    const selector=AssessmentBSelectorSchema.parse(job.spec.selector);
-   if(selector.transport!=='vm-omp'||selector.runnerContractSha256!==await ompRunnerContractSha256())throw new DistrictExecutionHold('quality_failed');
+   if(selector.transport!=='vm-omp'||selector.runnerOutputContractSha256!==await ompRunnerOutputContractSha256())throw new DistrictExecutionHold('quality_failed');
    leaseId=await this.prepare(job,signal);
    const prepared=await this.transaction(async client=>{
     const authority=await this.job(client,job.id,job.runId),reason=disposition(authority,job.runId,job.fencingToken);
@@ -407,7 +407,7 @@ export function assessmentBJobHandler(broker:DistrictAssessmentBroker):JobHandle
 };}
 export async function enqueueAssessmentB(broker:DistrictAssessmentBroker,input:({itemArtifactSha256:string;sourceScope:AdapterScope;policyProofSha256:string;transport:'mac-bridge';clientContractSha256:string}|{itemArtifactSha256:string;sourceScope:AdapterScope;policyProofSha256:string;transport:'vm-omp'})):Promise<string>{
  const base={version:ASSESSMENT_BRIDGE_VERSION,role:'B',provider:'anthropic-subscription',requestedModel:'claude-haiku-5-5',itemArtifactSha256:input.itemArtifactSha256};
- const selector=AssessmentBSelectorSchema.parse(input.transport==='mac-bridge'?{...base,transport:input.transport,clientContractSha256:input.clientContractSha256}:{...base,transport:input.transport,runnerContractSha256:await ompRunnerContractSha256()});
+ const selector=AssessmentBSelectorSchema.parse(input.transport==='mac-bridge'?{...base,transport:input.transport,clientContractSha256:input.clientContractSha256}:{...base,transport:input.transport,runnerOutputContractSha256:await ompRunnerOutputContractSha256()});
  const item=assessmentItemSchema.parse(JSON.parse((await broker.cas.read(selector.itemArtifactSha256)).toString('utf8')));
  return broker.store.enqueue({step:ASSESSMENT_B_STEP,lane:'assessment',semanticContractSha256:await assessmentBJobContract(),inputArtifactHashes:[...new Set([selector.itemArtifactSha256,...assessmentEvidenceArtifactHashes(item)])].sort(),sourceScope:ScopeSchema.parse(input.sourceScope),selector,policyProofSha256:HashSchema.parse(input.policyProofSha256)});
 }

@@ -163,7 +163,7 @@ test('offline owner-account salvage uses genuine own-attempt evidence without an
   const originalRun=await run(originalJobKey,async context=>{originalContext=context;return originalHandler(context);},'acquire_representation');
   assert.equal(originalRun.state,'held');assert.equal(originalRun.reasonCode,'execution_exception');assert.equal(fetch.mock.callCount(),earlierFetchCalls+(scenario==='other-job'?2:1));
   const priorRow=(await pool.query<{receipt_sha256:string;receipt:unknown}>(`SELECT receipt_sha256,receipt FROM district_pipeline.step_receipts WHERE run_id=$1 AND receipt->>'jobKey'=$2`,[originalRun.runId,originalJobKey])).rows[0],priorReceipt=StepReceiptSchema.parse(priorRow.receipt);
-  assert.equal(priorReceipt.outcome,'held_execution');assert.deepEqual(priorReceipt.outputHashes,[]);assert.deepEqual(priorReceipt.versions,{});
+  assert.equal(priorReceipt.outcome,'held_execution');assert.deepEqual(priorReceipt.outputHashes,[]);assert.equal(priorReceipt.versions.hostCodeManifestVersion,'district-host-code-v1');assert.match(priorReceipt.versions['hostCode.src/civic-opt-out.ts'],/^[a-f0-9]{64}$/);
   if(lateScenario){
    const earlierReceipt=StepReceiptSchema.parse((await pool.query<{receipt:unknown}>(`SELECT receipt FROM district_pipeline.step_receipts WHERE receipt->>'jobKey'<>$1 AND receipt->>'reasonCode'='owner_stopped' ORDER BY committed_at DESC LIMIT 1`,[originalJobKey])).rows[0].receipt);
    assert.ok(Date.parse(earlierReceipt.finishedAt)<Date.parse(priorReceipt.startedAt),'The late producer finished before the later attempt began; window-overlap rejection alone cannot catch this race');

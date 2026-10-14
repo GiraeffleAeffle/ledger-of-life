@@ -25,8 +25,8 @@ export const documentResultSchema=z.object({schemaVersion:z.literal('stadtstack-
 export type DocumentResult=z.infer<typeof documentResultSchema>;
 const rawClaimsFromRecordSchema=DistrictExtractionClaimsSchema.extend({entities:z.array(EntityMentionSchema.strip()),relations:z.array(RelationClaimSchema.strip())}).strip();
 
-export async function jointExtractionContract(){
- const extractorSha256=await extractorHash();
+export async function jointExtractionContract(hash?:(file:string)=>Promise<string>){
+ const extractorSha256=await extractorHash(hash);
  // Work-plan prompt identity binds both actual prompts and the gate implementation.
  return {promptSha256:sha256(JSON.stringify({extraction:PROMPT_SHA256,judge:JUDGE_PROMPT_SHA256,extractorSha256})),schemaSha256:CLAIM_SCHEMA_SHA256,extractorSha256};
 }
