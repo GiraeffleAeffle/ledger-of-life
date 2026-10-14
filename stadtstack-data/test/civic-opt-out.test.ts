@@ -1230,3 +1230,24 @@ test('compaction refuses a mismatched existing backup without publishing a new l
  await assert.rejects(compactCivicPolicyInventory({...policy,backupPath}),{code:'CIVIC_POLICY_BACKUP_MISMATCH'});
  assert.deepEqual(await readFile(path),original);assert.equal(await readFile(backupPath,'utf8'),'foreign bytes');await assert.rejects(lstat(join(stateDir,'inventory-segments')),{code:'ENOENT'});
 });
+
+test('a marked external inventory waiter gets an acquisition opportunity before the holder re-enters',async t=>{
+ const {base,root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),bytes='Synthetic fair lock source',entry=rawEntry(bytes),waiterRoot=join(base,'external-waiter');
+ await registerManagedCacheRoot(root,{kind:'fetch',...policy});await publish(root,entry,bytes,stateDir);
+ const entered=Promise.withResolvers<void>(),release=Promise.withResolvers<void>(),marked=Promise.withResolvers<string>();
+ const watcher=watch(stateDir,(_event,name)=>{if(String(name).startsWith('inventory.wait-'))marked.resolve(String(name));});t.after(()=>watcher.close());
+ const holding=withManagedSourceWrite(root,[entry],async()=>{entered.resolve();await release.promise;},policy);
+ await entered.promise;
+ const moduleUrl=new URL('../src/civic-opt-out.ts',import.meta.url).href;
+ const script=`import {registerManagedCacheRoot} from ${JSON.stringify(moduleUrl)};await registerManagedCacheRoot(process.argv[1],{kind:'fetch',...JSON.parse(process.argv[2])});`;
+ const child=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',script,waiterRoot,JSON.stringify(policy)],{stdio:'ignore'});
+ t.after(()=>{if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');});
+ const finished=new Promise<number|null>((resolve,reject)=>{child.once('error',reject);child.once('close',resolve);});
+ const marker=await marked.promise;assert.equal((await lstat(join(stateDir,marker))).mode&0o777,0o600);
+ release.resolve();await holding;
+ await withManagedSourceWrite(root,[entry],async()=>{
+  const inventory=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));
+  assert.ok(inventory.roots.some((item:{path:string})=>item.path===waiterRoot));
+ },policy);
+ assert.equal(await finished,0);assert.deepEqual((await readdir(stateDir)).filter(name=>name.startsWith('inventory.wait-')),[]);
+});

@@ -485,15 +485,33 @@ export async function readCivicOptOutSnapshot(options:CivicPolicyOptions={}):Pro
 }
 const queues=new Map<string,Promise<void>>();
 const nextLockAttempt=new Map<string,number>();
+async function hasInventoryWaiters(state:string):Promise<boolean>{
+ for await(const entry of await opendir(state)){
+  if(!entry.name.startsWith('inventory.wait-'))continue;
+  if(!/^inventory\.wait-[a-f0-9-]{36}$/.test(entry.name))throw new CivicPolicyStateError();
+  try{
+   const stat=await lstat(join(state,entry.name));
+   if(!stat.isFile()||stat.isSymbolicLink()||stat.uid!==process.getuid?.()||stat.nlink!==1||(stat.mode&0o777)!==0o600||stat.size!==0)throw new CivicPolicyStateError();
+   return true;
+  }catch(error){if(!missing(error))throw error;}
+ }
+ return false;
+}
 async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisioning=false):Promise<T>{
  const state=statePath(options);
  const prior=queues.get(state)??Promise.resolve();let done!:()=>void;const gate=new Promise<void>(resolve=>{done=resolve;});queues.set(state,gate);await prior;
- const path=join(state,'inventory.lock');let handle:FileHandle|undefined;
+ const path=join(state,'inventory.lock');let handle:FileHandle|undefined,waiting:FileHandle|undefined,waitingIdentity:Stats|undefined;
+ let waitingPath:string|undefined;
+ const stopWaiting=async()=>{
+  if(!waiting)return;
+  try{const current=await lstat(waitingPath!);if(!waitingIdentity||!sameIdentity(waitingIdentity,current)||current.isSymbolicLink())throw new CivicPolicyStateError();await unlink(waitingPath!);}
+  finally{await waiting.close();waiting=undefined;}
+ };
  try{
   if(provisioning)await directory(state,true,true);else await assertCivicPolicyAuthority(options);
   if(!provisioning)await warmInventorySegments(state);
   const cooldown=(nextLockAttempt.get(state)??0)-performance.now();
-  if(cooldown>0)await new Promise<void>(resolve=>setTimeout(resolve,cooldown));
+  if(cooldown>0&&await hasInventoryWaiters(state))await new Promise<void>(resolve=>setTimeout(resolve,cooldown));
   const deadline=performance.now()+5_000;
   for(;;){
    try{handle=await open(path,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);break;}
@@ -502,16 +520,18 @@ async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisio
     if(performance.now()>=deadline)throw new CivicPolicyStateError('CIVIC_POLICY_BUSY');
     try{const current=await lstat(path);if(!current.isFile()||current.isSymbolicLink()||current.uid!==process.getuid?.()||current.nlink!==1||(current.mode&0o077)!==0||current.size>8192)throw new CivicPolicyStateError();}
     catch(inspectError){if(missing(inspectError))continue;throw inspectError;}
+    if(!provisioning&&!waiting){waitingPath=join(state,'inventory.wait-'+randomUUID());waiting=await open(waitingPath,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);waitingIdentity=await waiting.stat();}
     await new Promise<void>(resolve=>setTimeout(resolve,25));
    }
   }
   const original=await handle.stat();
   try{
+   await stopWaiting();
    await handle.writeFile(JSON.stringify({pid:process.pid,nonce:randomUUID()})+'\n');await handle.sync();
    if(!provisioning)await assertCivicPolicyAuthority(options);
    return await work();
   }finally{const current=await lstat(path);if(!sameIdentity(original,current)||current.isSymbolicLink())throw new CivicPolicyStateError();await unlink(path);nextLockAttempt.set(state,performance.now()+50);}
- }finally{try{await handle?.close();}finally{done();if(queues.get(state)===gate)queues.delete(state);}}
+ }finally{try{try{await stopWaiting();}finally{await handle?.close();}}finally{done();if(queues.get(state)===gate)queues.delete(state);}}
 }
 function entryId(entry:Omit<Entry,'id'|'state'>):string{return digest(JSON.stringify([entry.rootId,entry.relativePath,entry.contentSha256,entry.kind,entry.sourceSha256,entry.host,entry.urlSha256,entry.observationId??null,entry.receiptSha256??null,entry.publication??null,entry.snapshot??null,entry.purpose??null,entry.configurationSha256??null,entry.schemaContractSha256??null,entry.code??null,entry.approval??null,entry.independentAllowed]));}
 function checkedRelative(root:Root,path:string,contentSha256:string,receiptSha256?:string):string{
@@ -573,11 +593,11 @@ async function loadInventory(state:string):Promise<Inventory>{
 }
 async function saveInventory(state:string,value:Inventory){
  const sealed=sealedInventories.get(value);
- let parsed:Inventory|z.infer<typeof hotInventorySchema>;
  if(sealed){
   const entries:Entry[]=[],scratch:ScratchLease[]=[],addedEntries:Entry[]=[],addedScratch:ScratchLease[]=[],entryStates:Record<string,Entry['state']>={};
   const roots=new Set(value.roots.map(root=>root.id)),retiredRoots={...sealed.storage.retiredRoots};
   const lastSegment=sealed.storage.segments.at(-1)?.sha256;
+  const retired=[...sealed.roots].some(rootId=>!roots.has(rootId));
   if(lastSegment)for(const rootId of sealed.roots)if(!roots.has(rootId))retiredRoots[rootId]=lastSegment;
   for(const entry of value.entries){
    const original=sealed.entries.get(entry.id);
@@ -587,16 +607,18 @@ async function saveInventory(state:string,value:Inventory){
   for(const lease of value.scratch)if(!sealed.scratch.has(lease.id)){if(archivedLease(lease))addedScratch.push(lease);else scratch.push(lease);}
   const plan=planInventorySegments(value.inventoryId,sealed.storage.segments,addedEntries,addedScratch);
   for(const segment of plan.added)await publishSegment(state,segment);
-  parsed=hotInventorySchema.parse({schemaVersion:1,inventoryId:value.inventoryId,roots:value.roots,entries,scratch,storage:{format:'sealed-segments-v1',segments:plan.pins,entryStates,retiredRoots}});
+  const parsed=hotInventorySchema.parse({schemaVersion:1,inventoryId:value.inventoryId,roots:value.roots,entries,scratch,storage:{format:'sealed-segments-v1',segments:plan.pins,entryStates,retiredRoots}});
   const serialized=JSON.stringify(parsed);
   if(Buffer.byteLength(serialized)+1>MAX_STATE)throw new CivicPolicyStateError();
   await atomicJson(join(state,'inventory.json'),parsed,false,true,serialized);
   for(const segment of plan.added){const stored=await readSegment(state,segment.pin,value.inventoryId);for(const entry of stored.entries)sealed.entries.set(entry.id,entry);for(const lease of stored.scratch)sealed.scratch.set(lease.id,lease);}
-  for(const [id,entry] of sealed.entries)if(!roots.has(entry.rootId))sealed.entries.delete(id);
-  for(const [id,lease] of sealed.scratch)if(!roots.has(lease.rootId))sealed.scratch.delete(id);
+  if(retired){
+   for(const [id,entry] of sealed.entries)if(!roots.has(entry.rootId))sealed.entries.delete(id);
+   for(const [id,lease] of sealed.scratch)if(!roots.has(lease.rootId))sealed.scratch.delete(id);
+  }
   sealed.roots=roots;sealed.storage=parsed.storage;validatedInventoryBytes.set(state,digest(serialized+'\n'));return;
  }
- parsed=inventorySchema.parse(value);
+ const parsed=inventorySchema.parse(value);
  const serialized=JSON.stringify(parsed);
  if(Buffer.byteLength(serialized)+1>MAX_STATE)throw new CivicPolicyStateError();
  await atomicJson(join(state,'inventory.json'),parsed,false,true,serialized);
