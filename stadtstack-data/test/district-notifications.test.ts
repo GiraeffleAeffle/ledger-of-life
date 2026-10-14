@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {canonicalJson,digest,semanticHash} from '../src/district-adapter-contract.ts';
 import {PIPELINE_NOTIFICATION_ENDPOINT,PIPELINE_NOTIFICATION_APPROVAL,pipelineNotificationConfig,sendPipelineNotification} from '../src/district-notifications.ts';
 import type {OwnerNotification} from '../src/district-jobs.ts';
-import {NotificationTransientError} from '../src/district-jobs.ts';
+import {NotificationAmbiguousError,NotificationTransientError} from '../src/district-jobs.ts';
 
 const token='synthetic_publisher_token_not_a_secret';
 const notification:OwnerNotification={id:'00000000-0000-4000-8000-000000000001',phase:'startup',runId:'00000000-0000-4000-8000-000000000002',authorizationId:'00000000-0000-4000-8000-000000000003',state:'running',reasonCode:null,jobsStarted:0,receiptIds:[],notificationApprovalSha256:semanticHash(PIPELINE_NOTIFICATION_APPROVAL),destinationSha256:semanticHash(PIPELINE_NOTIFICATION_ENDPOINT),provider:'ntfy'};
@@ -52,15 +52,15 @@ test('redirect, HTTP transport error and timeout exceptions are generic without 
  for(const method of ['log','warn','error'] as const)t.mock.method(console,method,(...args:unknown[])=>{logs.push(args);});
  for(const error of [new TypeError(`redirect denied ${token}`),new Error(`HTTP failed ${token}`),new DOMException(`timeout ${token}`,'TimeoutError')]){
   await assert.rejects(sendPipelineNotification(notification,{readToken:async()=>token,send:async()=>{throw error;}}),(failure:unknown)=>{
-   assert.ok(failure instanceof Error);assert.equal(failure.message,'Pipeline notification delivery failed');assert.equal(String(failure).includes(token),false);return true;
+   assert.ok(failure instanceof NotificationAmbiguousError);assert.equal(failure.message,'Pipeline notification delivery failed');assert.equal(String(failure).includes(token),false);return true;
   });
  }
  assert.deepEqual(process.argv,argv);assert.equal(process.argv.some(arg=>arg.includes(token)),false);assert.deepEqual(logs,[]);
 });
 
-test('only transport and retryable HTTP failures are transient; invalid ACKs remain strict',async()=>{
+test('transport/timeouts are ambiguous, retryable HTTP failures transient, and invalid ACKs strict',async()=>{
  for(const status of [429,500,503])await assert.rejects(sendPipelineNotification(notification,{readToken:async()=>token,send:async()=>new Response('unavailable',{status})}),NotificationTransientError);
  await assert.rejects(sendPipelineNotification(notification,{readToken:async()=>token,send:async()=>new Response('forbidden',{status:403})}),error=>error instanceof Error&&!(error instanceof NotificationTransientError));
  const controller=new AbortController();controller.abort();
- await assert.rejects(sendPipelineNotification(notification,{readToken:async()=>token,send:async(_url,init)=>{assert.equal(init?.signal?.aborted,true);throw Error('aborted');}},controller.signal),NotificationTransientError);
+ await assert.rejects(sendPipelineNotification(notification,{readToken:async()=>token,send:async(_url,init)=>{assert.equal(init?.signal?.aborted,true);throw new DOMException('timed out','TimeoutError');}},controller.signal),NotificationAmbiguousError);
 });

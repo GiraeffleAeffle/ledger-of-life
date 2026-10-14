@@ -63,6 +63,7 @@ export async function migrateDistrictJobs(pool:Pool):Promise<void> {
     {version:3,file:new URL('../migrations/003_assessment_bridge.sql',import.meta.url)},
     {version:4,file:new URL('../migrations/004_r1_codex_calls.sql',import.meta.url)},
     {version:5,file:new URL('../migrations/005_parallel_executors.sql',import.meta.url)},
+    {version:6,file:new URL('../migrations/006_resource_slot_ownership.sql',import.meta.url)},
   ];
   const client=await pool.connect();
   try {
@@ -177,6 +178,10 @@ export class DistrictJobStore {
       if(mode==='bounded_unattended'&&(!notification||notification.notificationApprovalSha256!==auth.notification_approval_sha256||notification.destinationSha256!==auth.notification_destination_sha256||notification.provider!==auth.notification_provider))throw new DistrictExecutionHold('notification_unavailable');
       if(auth.jobs_started>=auth.max_jobs)throw new DistrictExecutionHold('authorization_jobs_exhausted');
       if(maxJobs>auth.max_jobs||maxElapsedMs>auth.max_elapsed_ms)throw Error('Executor bounds exceed preauthorization');
+      // The authorization row lock serializes registration for this authority,
+      // while distinct authorizations remain independently runnable.
+      const active=await client.query(`SELECT 1 FROM district_pipeline.executor_runs WHERE authorization_id=$1 AND state='running'`,[authorizationId]);
+      if(active.rowCount)throw new DistrictExecutionHold('executor_busy');
       const runId=randomUUID();
       const run=await client.query<{started_at:Date}>(`INSERT INTO district_pipeline.executor_runs(id,authorization_id,owner_present,execution_mode,state,max_jobs,max_elapsed_ms) VALUES($1,$2,$3,$4,'running',$5,$6) RETURNING started_at`,[runId,authorizationId,mode==='attended',mode,maxJobs,maxElapsedMs]);
       await client.query('UPDATE district_pipeline.preauthorizations SET first_started_at=COALESCE(first_started_at,$2::timestamptz) WHERE id=$1',[authorizationId,run.rows[0].started_at]);
@@ -285,7 +290,7 @@ export class DistrictJobStore {
       if(row.host_lane_key){const disposition=await this.hostAdmission(client,row.host_lane_key,row.id,fence,expiry);if(disposition){await client.query(`UPDATE district_pipeline.jobs SET state='deferred',reason_code=$2,not_before=CASE WHEN $2='host_delay' THEN COALESCE((SELECT GREATEST(next_start_at,retry_after) FROM district_pipeline.host_lanes WHERE lane_key=$3),clock_timestamp()) ELSE not_before END WHERE id=$1`,[row.id,disposition,row.host_lane_key]);return {kind:'stop',reasonCode:disposition};}}
       const dependencies=await client.query<{id:string}>(`SELECT r.id FROM district_pipeline.job_dependencies d JOIN district_pipeline.jobs p ON p.id=d.predecessor_job_id JOIN district_pipeline.step_receipts r ON r.job_id=p.id AND r.outcome=p.state WHERE d.job_id=$1 AND (d.expected_receipt_sha256 IS NULL OR d.expected_receipt_sha256=r.receipt_sha256) ORDER BY r.id`,[row.id]);
       const receiptIds=dependencies.rows.map(receipt=>receipt.id);
-      const leased=await client.query<JobRow>(`UPDATE district_pipeline.jobs SET state='leased',reason_code=NULL,lease_owner=$2,lease_expires_at=$3,fencing_token=$4,attempt=attempt+1,attempt_started_at=clock_timestamp(),claimed_dependency_receipt_ids=$5 WHERE id=$1 RETURNING *`,[row.id,run.runId,expiry,fence,receiptIds]);
+      const leased=await client.query<JobRow>(`UPDATE district_pipeline.jobs SET state='leased',reason_code=NULL,resource_slot_required=NULL,lease_owner=$2,lease_expires_at=$3,fencing_token=$4,attempt=attempt+1,attempt_started_at=clock_timestamp(),claimed_dependency_receipt_ids=$5 WHERE id=$1 RETURNING *`,[row.id,run.runId,expiry,fence,receiptIds]);
       await client.query('UPDATE district_pipeline.preauthorizations SET jobs_started=jobs_started+1 WHERE id=$1',[run.authorizationId]);
       const current=leased.rows[0];return {kind:'job',job:{id:current.id,jobKey:current.job_key,spec:current.spec,attempt:current.attempt,fencingToken:fence,runId:run.runId,enqueuedAt:current.created_at.toISOString(),startedAt:current.attempt_started_at.toISOString(),leaseExpiresAt:expiry.toISOString(),dependencyReceiptIds:receiptIds,category:auth.category,...(continuation?{policyContinuations:[continuation]}:{})}};
     });
@@ -295,12 +300,17 @@ export class DistrictJobStore {
     return this.transaction(async client=>{
       const auth=await this.assertRun(client,run);
       const expiry=new Date(Math.min(auth.now.getTime()+leaseMs,auth.expires_at.getTime(),auth.first_started_at!.getTime()+auth.max_elapsed_ms,run.startedAt.getTime()+run.maxElapsedMs));
-      const result=await client.query(`UPDATE district_pipeline.jobs SET lease_expires_at=$4 WHERE id=$1 AND lease_owner=$2 AND fencing_token=$3 AND state='leased' AND lease_expires_at>clock_timestamp() AND NOT cancellation_requested`,[job.id,job.runId,job.fencingToken,expiry]);
+      const result=await client.query<{resource_slot_required:ExecutionResource|null}>(`UPDATE district_pipeline.jobs SET lease_expires_at=$4 WHERE id=$1 AND lease_owner=$2 AND fencing_token=$3 AND state='leased' AND lease_expires_at>clock_timestamp() AND NOT cancellation_requested RETURNING resource_slot_required`,[job.id,job.runId,job.fencingToken,expiry]);
       if(!result.rowCount)throw new DistrictExecutionHold('lease_lost');
+      const resource=result.rows[0].resource_slot_required;
+      if(resource){
+        // Admission/reclamation uses this exact lock. Missing or expired slots
+        // are lost ownership, never permission to continue a provider handler.
+        await client.query('SELECT pg_advisory_xact_lock(18443,hashtext($1))',[resource]);
+        const slot=await client.query(`UPDATE district_pipeline.resource_slots SET expires_at=$4 WHERE resource=$1 AND job_id=$2 AND fencing_token=$3 AND expires_at>clock_timestamp() RETURNING job_id`,[resource,job.id,job.fencingToken,expiry]);
+        if(slot.rowCount!==1)throw new DistrictExecutionHold('lease_lost');
+      }
       await client.query('UPDATE district_pipeline.host_lane_leases SET expires_at=$3 WHERE job_id=$1 AND fencing_token=$2',[job.id,job.fencingToken,expiry]);
-      await client.query(`UPDATE district_pipeline.resource_slots SET expires_at=$3 WHERE job_id=$1 AND fencing_token=$2 AND expires_at>clock_timestamp()`,[job.id,job.fencingToken,expiry]);
-      const expired=await client.query(`SELECT 1 FROM district_pipeline.resource_slots WHERE job_id=$1 AND fencing_token=$2 AND expires_at<=clock_timestamp()`,[job.id,job.fencingToken]);
-      if(expired.rowCount)throw new DistrictExecutionHold('lease_lost');
       return expiry.toISOString();
     });
   }
@@ -329,11 +339,17 @@ export class DistrictJobStore {
       const active=await client.query<{count:string;limit:number|null}>('SELECT count(*) AS count,min(slot_limit) AS limit FROM district_pipeline.resource_slots WHERE resource=$1',[resource]);
       if(Number(active.rows[0].count)>=Math.min(limit,active.rows[0].limit??limit))return false;
       await client.query('INSERT INTO district_pipeline.resource_slots(resource,job_id,fencing_token,slot_limit,expires_at) VALUES($1,$2,$3,$4,$5)',[resource,job.id,job.fencingToken,limit,current.rows[0].lease_expires_at]);
+      await client.query('UPDATE district_pipeline.jobs SET resource_slot_required=$2 WHERE id=$1',[job.id,resource]);
       return true;
     });
   }
   async releaseResourceSlot(job:ClaimedJob,resource:ExecutionResource):Promise<void> {
-    await this.pool.query('DELETE FROM district_pipeline.resource_slots WHERE resource=$1 AND job_id=$2 AND fencing_token=$3',[resource,job.id,job.fencingToken]);
+    await this.transaction(async client=>{
+      await client.query('SELECT id FROM district_pipeline.jobs WHERE id=$1 FOR UPDATE',[job.id]);
+      await client.query('SELECT pg_advisory_xact_lock(18443,hashtext($1))',[resource]);
+      await client.query('DELETE FROM district_pipeline.resource_slots WHERE resource=$1 AND job_id=$2 AND fencing_token=$3',[resource,job.id,job.fencingToken]);
+      await client.query('UPDATE district_pipeline.jobs SET resource_slot_required=NULL WHERE id=$1 AND lease_owner=$2 AND fencing_token=$3 AND resource_slot_required=$4',[job.id,job.runId,job.fencingToken,resource]);
+    });
   }
   private async insertReceipt(client:PoolClient,job:ClaimedJob,receipt:StepReceipt):Promise<void> {
     const encoded=encodeStepReceipt(receipt);
@@ -421,12 +437,16 @@ export class DistrictJobStore {
       return result.rows[0].payload;
     });
   }
+  async recordNotificationAttempt(id:string,claimToken:string):Promise<void> {
+    const result=await this.pool.query(`UPDATE district_pipeline.owner_notifications SET attempts=attempts+1 WHERE id=$1 AND claim_token=$2 AND claim_expires_at>clock_timestamp() AND state<>'delivered'`,[id,claimToken]);
+    if(result.rowCount!==1)throw new DistrictExecutionHold('notification_failed');
+  }
   async recordNotificationDelivery(id:string,claimToken:string,acknowledgement:NotificationAcknowledgement|null):Promise<void> {
     const ack=acknowledgement===null?null:NotificationAcknowledgementSchema.parse(acknowledgement);
     await this.transaction(async client=>{
       const notification=await client.query<{run_id:string}>('SELECT run_id FROM district_pipeline.owner_notifications WHERE id=$1',[id]);
       if(!notification.rowCount||!await this.lockRunAuthority(client,notification.rows[0].run_id))throw new DistrictExecutionHold('lease_lost');
-      const result=await client.query<{run_id:string}>(`UPDATE district_pipeline.owner_notifications SET state=$2,attempts=attempts+1,claim_token=NULL,claim_expires_at=NULL,delivered_at=CASE WHEN $2='delivered' THEN clock_timestamp() ELSE NULL END,provider=$3,provider_message_id=$4,acknowledged_at=$5 WHERE id=$1 AND state<>'delivered' AND claim_token=$9 AND claim_expires_at>clock_timestamp() AND ($2='failed' OR (expected_provider=$3 AND destination_sha256=$6 AND payload_sha256=$7 AND id=$8::uuid)) RETURNING run_id`,[id,ack?'delivered':'failed',ack?.provider??null,ack?.messageId??null,ack?.acknowledgedAt??null,ack?.destinationSha256??null,ack?.payloadSha256??null,ack?.notificationId??null,claimToken]);
+      const result=await client.query<{run_id:string}>(`UPDATE district_pipeline.owner_notifications SET state=$2,claim_token=NULL,claim_expires_at=NULL,delivered_at=CASE WHEN $2='delivered' THEN clock_timestamp() ELSE NULL END,provider=$3,provider_message_id=$4,acknowledged_at=$5 WHERE id=$1 AND state<>'delivered' AND claim_token=$9 AND claim_expires_at>clock_timestamp() AND ($2='failed' OR (expected_provider=$3 AND destination_sha256=$6 AND payload_sha256=$7 AND id=$8::uuid)) RETURNING run_id`,[id,ack?'delivered':'failed',ack?.provider??null,ack?.messageId??null,ack?.acknowledgedAt??null,ack?.destinationSha256??null,ack?.payloadSha256??null,ack?.notificationId??null,claimToken]);
       if(!ack&&result.rowCount){
         await this.endLockedRun(client,result.rows[0].run_id,'held','notification_failed');
         await client.query(`UPDATE district_pipeline.executor_runs SET state='held',reason_code='notification_failed',finished_at=clock_timestamp() WHERE id=$1`,[result.rows[0].run_id]);
@@ -659,17 +679,19 @@ export async function deliverDistrictOwnerNotifications(store:DistrictJobStore,c
       let timeout:NodeJS.Timeout|undefined;
       try {
         if(remaining<=0)throw new DistrictExecutionHold('notification_failed');
+        await store.recordNotificationAttempt(notification.id,claimToken);
         const deadline=Promise.withResolvers<never>();
-        timeout=setTimeout(()=>{controller.abort();deadline.reject(new DistrictExecutionHold('notification_failed'));},Math.min(10000,remaining));
+        timeout=setTimeout(()=>{controller.abort();deadline.reject(new NotificationAmbiguousError('Notification delivery deadline'));},Math.min(10000,remaining));
         const raw=await Promise.race([Promise.resolve().then(()=>config.notifyOwner(notification,controller.signal)),deadline.promise]);
-        // Invalid ACKs and ambiguous timeouts never trigger another send.
+        // Every retry uses this same immutable notification ID/payload. A timeout
+        // may follow provider acceptance; duplicates are informational, not ACKs.
         const acknowledgement=NotificationAcknowledgementSchema.parse(raw);
         if(acknowledgement.destinationSha256!==config.destinationSha256||acknowledgement.provider!==config.provider||acknowledgement.notificationId!==notification.id||acknowledgement.payloadSha256!==digest(canonicalJson(notification)))throw new DistrictExecutionHold('notification_failed');
         await store.recordNotificationDelivery(notification.id,claimToken,acknowledgement);
         break;
       } catch(error) {
         const delayMs=Math.min(5000,500*2**attempt++);
-        if(error instanceof NotificationTransientError&&attempt<8&&budget-(performance.now()-started)>delayMs){
+        if((error instanceof NotificationTransientError||error instanceof NotificationAmbiguousError)&&attempt<8&&budget-(performance.now()-started)>delayMs){
           clearTimeout(timeout);controller.abort();await delay(delayMs);
           continue;
         }
@@ -679,8 +701,10 @@ export async function deliverDistrictOwnerNotifications(store:DistrictJobStore,c
     }
   }
 }
-/** Only explicitly transient failures retry; malformed/ambiguous ACKs fail closed. */
+/** Explicit server refusal/no-effect failures eligible for bounded retries. */
 export class NotificationTransientError extends Error {}
+/** The provider may already have accepted; retries are explicitly at least once. */
+export class NotificationAmbiguousError extends Error {}
 
 export const artifactVerificationHandler:JobHandler=async ({job,signal,cas})=>{
   for(const hash of job.spec.inputArtifactHashes){signal.throwIfAborted();await cas.verify(hash);}

@@ -11,7 +11,7 @@ import {DistrictCas} from '../src/district-cas.ts';
 import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,insertR1MetadataSnapshot,runDistrictJobs,deliverDistrictOwnerNotifications,artifactVerificationHandler,type AuthorizationInput,type ClaimedJob,type DistrictJobSpec,type JobHandler,type OwnerNotification,type NotificationAcknowledgement} from '../src/district-jobs.ts';
 import {CANONICALIZATION_VERSION,STEP_RECEIPT_VERSION,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
 import {reserveR1CodexCall} from '../src/district-codex-accounting.ts';
-import {NotificationTransientError} from '../src/district-jobs.ts';
+import {NotificationAmbiguousError,NotificationTransientError} from '../src/district-jobs.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 
 // Real Postgres only. The connection must be local and its role must have CREATEDB.
@@ -63,7 +63,7 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=1',[original.rows[0].sha256]);
     const migrations=await pool.query<{version:number;sha256:string}>('SELECT version,sha256 FROM district_pipeline.schema_migrations ORDER BY version');
-    assert.deepEqual(migrations.rows.map(row=>row.version),[1,2,3,4,5]);
+    assert.deepEqual(migrations.rows.map(row=>row.version),[1,2,3,4,5,6]);
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=2',[digest('wrong-002')]);
     await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
     assert.equal((await pool.query<{sha256:string}>('SELECT sha256 FROM district_pipeline.schema_migrations WHERE version=1')).rows[0].sha256,original.rows[0].sha256);
@@ -79,6 +79,9 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=5',[digest('wrong-005')]);
     await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=5',[migrations.rows[4].sha256]);
+    await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=6',[digest('wrong-006')]);
+    await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
+    await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=6',[migrations.rows[5].sha256]);
   });
 
   await t.test('immutable artifact audits omit private quotes/errors while full payload remains purgeable CAS',async()=>{
@@ -312,6 +315,17 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     await first.completed;
   });
 
+  await t.test('one authorization cannot register two simultaneous running runs',async()=>{
+    const key=await store.enqueue(jobSpec('same-authorization')),authorizationId=await authorize([key],{maxJobs:2});
+    const registrations=await Promise.allSettled([store.beginRun(authorizationId,1,60000),store.beginRun(authorizationId,1,60000)]);
+    assert.equal(registrations.filter(result=>result.status==='fulfilled').length,1);
+    for(const result of registrations){
+      if(result.status==='rejected')assert.equal((result.reason as DistrictExecutionHold).reasonCode,'executor_busy');
+      else await store.endRun(result.value.runId,'completed','no_ready_jobs');
+    }
+    const next=await store.beginRun(authorizationId,1,60000);await store.endRun(next.runId,'completed','no_ready_jobs');
+  });
+
   await t.test('concurrent per-original reservations never exceed 48 durable intents',async()=>{
     const keys=await Promise.all([1,2].map(n=>store.enqueue(jobSpec('codex-cap-'+n,'residual_extract'))));
     const claims=await Promise.all(keys.map(async key=>{
@@ -341,6 +355,49 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
       assert.equal(await store.acquireResourceSlot(claims[waiting].bounds,claims[waiting].job,resource,2),true);
       assert.equal((await pool.query<{count:string}>('SELECT count(*) FROM district_pipeline.resource_slots WHERE resource=$1',[resource])).rows[0].count,'2');
       for(const {bounds,job} of claims){await store.releaseResourceSlot(job,resource);await store.hold(job,'owner_stopped',receiptFor(job));await store.endRun(bounds.runId,'held','owner_stopped');}
+    }
+  });
+
+  await t.test('slot renewal shares admission lock and lost/reclaimed slots cannot silently renew',async()=>{
+    for(const resource of ['codex-subscription','omp-b'] as const){
+      const claims=await Promise.all([1,2].map(async n=>{
+        const key=await store.enqueue(jobSpec('slot-renewal-race-'+resource+n)),bounds=await store.beginRun(await authorize([key]),1,60000),claim=await store.claim(bounds,30000);
+        if(claim.kind!=='job')throw Error('Expected claim');return {bounds,job:claim.job};
+      }));
+      const [holder,waiting]=claims;
+      assert.equal(await store.acquireResourceSlot(holder.bounds,holder.job,resource,1),true);
+      // Waiting jobs have no acquired obligation and may legitimately renew.
+      await store.renew(waiting.bounds,waiting.job,30000);
+      const originalExpiry=(await pool.query<{lease_expires_at:Date}>('SELECT lease_expires_at FROM district_pipeline.jobs WHERE id=$1',[holder.job.id])).rows[0].lease_expires_at;
+      const workPool=new Pool({connectionString:isolated.href,max:1,statement_timeout:15000}),workStore=new DistrictJobStore(workPool),closeWork=poolShutdownBarrier(workPool);
+      const probe=await workPool.connect(),pid=(await probe.query<{pid:number}>('SELECT pg_backend_pid() AS pid')).rows[0].pid;probe.release();
+      const guard=await pool.connect();let locked=false,settled=false;
+      let renewal:Promise<{ok:boolean;error?:unknown}>|undefined,admission:Promise<boolean>|undefined;
+      try {
+        await guard.query('SELECT pg_advisory_lock(18443,hashtext($1))',[resource]);locked=true;
+        renewal=workStore.renew(holder.bounds,holder.job,30000).then(()=>{settled=true;return {ok:true};},error=>{settled=true;return {ok:false,error};});
+        const deadline=Date.now()+10000;
+        for(;;){
+          const activity=await pool.query<{wait_event_type:string|null}>('SELECT wait_event_type FROM pg_stat_activity WHERE pid=$1',[pid]);
+          if(activity.rows[0]?.wait_event_type==='Lock')break;
+          assert.equal(settled,false,'Renewal bypassed the admission/reclamation lock');
+          assert.ok(Date.now()<deadline,'Renewal did not wait on the resource lock');await pool.query('SELECT pg_sleep(0.01)');
+        }
+        await pool.query(`UPDATE district_pipeline.resource_slots SET expires_at=clock_timestamp()-interval '1 second' WHERE resource=$1 AND job_id=$2`,[resource,holder.job.id]);
+        admission=store.acquireResourceSlot(waiting.bounds,waiting.job,resource,1);
+        await guard.query('SELECT pg_advisory_unlock(18443,hashtext($1))',[resource]);locked=false;
+        const renewed=await renewal;assert.equal(renewed.ok,false);assert.equal((renewed.error as DistrictExecutionHold).reasonCode,'lease_lost');
+        assert.equal(await admission,true);
+        assert.equal((await pool.query<{lease_expires_at:Date}>('SELECT lease_expires_at FROM district_pipeline.jobs WHERE id=$1',[holder.job.id])).rows[0].lease_expires_at.toISOString(),originalExpiry.toISOString(),'Failed slot renewal must roll back the job renewal');
+        // The slot row has now disappeared: durable acquisition tracking still
+        // rejects the old holder instead of treating it as a waiting job.
+        await assert.rejects(store.renew(holder.bounds,holder.job,30000),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='lease_lost');
+        assert.equal((await pool.query<{count:string}>('SELECT count(*) FROM district_pipeline.resource_slots WHERE resource=$1',[resource])).rows[0].count,'1');
+      } finally {
+        if(locked)await guard.query('SELECT pg_advisory_unlock(18443,hashtext($1))',[resource]);guard.release();
+        await renewal;await admission;await closeWork();
+        for(const {bounds,job} of claims){await store.releaseResourceSlot(job,resource);await store.hold(job,'owner_stopped',receiptFor(job));await store.endRun(bounds.runId,'held','owner_stopped');}
+      }
     }
   });
 
@@ -474,6 +531,22 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
       return acknowledge(notification);
     }});
     assert.equal(retried.state,'completed');assert.equal(transientCalls,2);
+    const transientRow=await pool.query<{attempts:number}>(`SELECT attempts FROM district_pipeline.owner_notifications WHERE run_id=$1 AND phase='startup'`,[retried.runId]);
+    assert.equal(transientRow.rows[0].attempts,2);
+
+    const ambiguousKey=await store.enqueue(jobSpec('notification-ambiguous')),ambiguousAuth=await authorize([ambiguousKey],{mode:'bounded_unattended',...identity});
+    const ambiguousPosts:OwnerNotification[]=[];
+    const recovered=await runDistrictJobs({store,cas,handlers,authorizationId:ambiguousAuth,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000,...identity,notifyOwner:async notification=>{
+      if(notification.phase==='startup'){
+        ambiguousPosts.push(notification);
+        if(ambiguousPosts.length===1)throw new NotificationAmbiguousError('synthetic accepted-but-timeout');
+      }
+      return acknowledge(notification);
+    }});
+    assert.equal(recovered.state,'completed');assert.equal(ambiguousPosts.length,2);
+    assert.equal(ambiguousPosts[0].id,ambiguousPosts[1].id);assert.equal(canonicalJson(ambiguousPosts[0]),canonicalJson(ambiguousPosts[1]));
+    const ambiguousRow=await pool.query<{attempts:number;state:string;provider_message_id:string}>(`SELECT attempts,state,provider_message_id FROM district_pipeline.owner_notifications WHERE run_id=$1 AND phase='startup'`,[recovered.runId]);
+    assert.equal(ambiguousRow.rows[0].attempts,2);assert.equal(ambiguousRow.rows[0].state,'delivered');assert.ok(ambiguousRow.rows[0].provider_message_id);
 
     const parallelKey=await store.enqueue(jobSpec('notification-claim')),parallelAuth=await authorize([parallelKey],{mode:'bounded_unattended',...identity});
     const parallelRun=await store.beginRun(parallelAuth,1,60000,'bounded_unattended',{notificationApprovalSha256:approval,destinationSha256:destination,provider});
