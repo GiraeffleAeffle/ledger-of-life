@@ -7,6 +7,7 @@ import {DOCUMENT_ORIGIN_INPUT_TOKEN} from './document-origin-contract.ts';
 import type {DocumentOriginInput,DocumentOriginCommand} from './document-origin-contract.ts';
 import {inspectResourcePolicy} from './source-policy.ts';
 import {PARSER_INPUT_MAX_BYTES} from './district-adapter-contract.ts';
+import {ParserIsolationError} from './district-parser-isolation.ts';
 
 const execute=promisify(execFile);
 const metadataSchema=z.object({url:z.url(),mimeType:z.string(),title:z.string().optional(),linkText:z.string().optional(),municipalityName:z.string().optional(),administrativeOriginEvidence:z.union([z.string(),z.array(z.string())]).optional(),oparlContext:z.object({bodyId:z.string(),bodyName:z.string(),apiUrl:z.string()}).strict().optional()}).strict();
@@ -35,4 +36,7 @@ async function main(){
   process.stdout.write(JSON.stringify(inspectResourcePolicy(input.url,input.headers,bytes,input.mimeType))+'\n');
  }else throw Error('Policy inspection operation rejected');
 }
-await main().catch(()=>{process.exitCode=1;});
+await main().catch(error=>{
+ // No exception text or source bytes cross the worker protocol.
+ process.exitCode=error instanceof ParserIsolationError&&error.reason==='request_rejected'?64:1;
+});

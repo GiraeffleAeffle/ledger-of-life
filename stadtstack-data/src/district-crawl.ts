@@ -4,6 +4,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {PoliteFetcher,PoliteFetchError,type SourceContentBinding} from './polite-fetch.ts';
 import type {PoliteFetcherOptions} from './polite-fetch.ts';
+import {ParserIsolationReasonSchema,type ParserIsolationReason} from './district-parser-isolation.ts';
 import {crawlHtmlSource,crawlOparlSource,crawlParticipationApi,crawlMvPlanningApi,sourceDocument,registeredSourceTargets,MunicipalIdentityBindingError} from './district-source-adapters.ts';
 import type {RegistryMunicipality,CrawlDocument,CrawlExcludedDocument,AdapterOptions,AdapterResult,CrawlCoverage,FrontierFailure} from './district-source-adapters.ts';
 import {operatorRegistryConfigImportSchema,importOperatorRegistryConfig,readOperatorRegistryConfigSourcePin} from './district-registry-config.ts';
@@ -24,6 +25,7 @@ export async function createDistrictCrawlFetcher(options:Omit<PoliteFetcherOptio
 
 export interface CrawlCheck {
  municipalityId:string;sourceId:string;checkState:'checked'|'not_found'|'not_checked';checkedAt:string|null;
+ inspectionReason?:ParserIsolationReason;
  httpStatus?:number;reason?:string;retryAfter?:string;documentCount:number;outcome?:'documents_collected'|'no_documents'|'partial'|'blocked'|'failed'|'not_checked'|'registry_not_found';requests?:number;rounds?:number;coverage?:CrawlCoverage;blocked?:FrontierFailure[];
 }
 export interface DistrictCrawlIndex {schemaVersion:'stadtstack-crawl-index-v1';generatedAt:string;documents:CrawlDocument[];excludedDocuments?:CrawlExcludedDocument[];checks:CrawlCheck[]}
@@ -105,12 +107,14 @@ export async function crawlDistrictRegistry(registry:CrawlRegistry,fetcher:Polit
       index.excludedDocuments!.push(sourceDocument(error.excludedDocument,city,source,districtSourceAdapterKind(source)));
       index.documents=index.documents.filter(document=>document.municipalityId!==city.id||document.sourceId!==source.id||document.url!==error.excludedDocument!.url);
      }
-     const reason=error instanceof PoliteFetchError?`${error.failure}; ask municipality`:error instanceof MunicipalIdentityBindingError?error.message:isCouncilPermissionFailure(error)?'Source permission state unavailable; ask municipality':'Source adapter failed; ask municipality';
+     const parsedInspectionReason=ParserIsolationReasonSchema.safeParse(error instanceof PoliteFetchError?error.inspectionReason:undefined);
+     const diagnostics=parsedInspectionReason.success?{inspectionReason:parsedInspectionReason.data}:{};
+     const reason=error instanceof PoliteFetchError?`${error.failure}${parsedInspectionReason.success?' ('+parsedInspectionReason.data+')':''}; ask municipality`:error instanceof MunicipalIdentityBindingError?error.message:isCouncilPermissionFailure(error)?'Source permission state unavailable; ask municipality':'Source adapter failed; ask municipality';
      const targets=registeredSourceTargets(city,source,options);
      const coverage:CrawlCoverage={state:targets?'partial':'blocked',pendingCount:0,runnableCount:0,blockedCount:1,scope:targets?'Selected registered targets blocked; source-wide traversal not assessed':'Configured source endpoint',action:'ask_municipality',...(targets?{sourceCoverage:'not_assessed' as const,targetScope:{kind:targets.kind==='pages'?'page_roots' as const:'seed_documents' as const,urls:targets.urls,state:'blocked' as const,pendingCount:0,runnableCount:0,blockedCount:1}}:{})};
-     const failure=error instanceof PoliteFetchError?error.failure:error instanceof MunicipalIdentityBindingError?error.code:isCouncilPermissionFailure(error)?'source_permission_unavailable':'source_adapter_failed',failedUrl=error instanceof PoliteFetchError&&error.excludedDocument?error.excludedDocument.url:targets?.urls[0]??source.api?.url??source.url??seeds[0]?.url;
-     const blocked:FrontierFailure[]|undefined=failedUrl?[{url:failedUrl,failure,reason:failure,checkedAt,action:'ask_municipality',...(error instanceof PoliteFetchError&&error.policy?{policy:error.policy}:{}),...(error instanceof PoliteFetchError&&error.status?{status:error.status}:{})}]:undefined;
-     index.checks[checkIndex]={...base,checkState:'checked',checkedAt,rounds:round,outcome:'blocked',reason,coverage,blocked,...(error instanceof PoliteFetchError&&error.status?{httpStatus:error.status}:{}),...(error instanceof PoliteFetchError&&error.retryAfter?{retryAfter:error.retryAfter}:{})};
+     const failure=error instanceof PoliteFetchError?error.failure:error instanceof MunicipalIdentityBindingError?error.code:isCouncilPermissionFailure(error)?'source_permission_unavailable':'source_adapter_failed',failedUrl=error instanceof PoliteFetchError?(error.observationUrl??error.excludedDocument?.url??targets?.urls[0]??source.api?.url??source.url??seeds[0]?.url):targets?.urls[0]??source.api?.url??source.url??seeds[0]?.url;
+     const blocked:FrontierFailure[]|undefined=failedUrl?[{url:failedUrl,failure,reason:failure,checkedAt:error instanceof PoliteFetchError?error.observationCheckedAt??checkedAt:checkedAt,action:'ask_municipality',...diagnostics,...(error instanceof PoliteFetchError&&error.policy?{policy:error.policy}:{}),...(error instanceof PoliteFetchError&&error.status?{status:error.status}:{})}]:undefined;
+     index.checks[checkIndex]={...base,checkState:'checked',checkedAt,rounds:round,outcome:'blocked',reason,coverage,blocked,...diagnostics,...(error instanceof PoliteFetchError&&error.status?{httpStatus:error.status}:{}),...(error instanceof PoliteFetchError&&error.retryAfter?{retryAfter:error.retryAfter}:{})};
      index.generatedAt=new Date().toISOString();item.done=true;
     }
     await options.onSource?.(index,[...sourceBindings.values()].flat());

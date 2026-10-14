@@ -14,7 +14,7 @@ import type {SourceAccessPolicy,PolicyEvidence,TdmRule,OwnerRobotsOverride} from
 import {acquirePrivateRunLock,writePrivateJson} from './district-private-io.ts';
 import {inspectPdfTdmPolicy} from './pdf-tdm-policy.ts';
 import {inspectResourcePolicySandbox} from './district-policy-inspection.ts';
-import {withParserSandbox,ParserIsolationError,type ParserSourceContext,type ParserSandbox} from './district-parser-isolation.ts';
+import {withParserSandbox,ParserIsolationError,type ParserIsolationReason,type ParserSourceContext,type ParserSandbox} from './district-parser-isolation.ts';
 import {isPublicAddress} from './public-address.ts';
 import type {PdfTdmPolicyResult} from './pdf-tdm-policy.ts';
 import type {ResourcePolicyInspection} from './source-policy.ts';
@@ -51,7 +51,7 @@ export function sourceContentBinding(document:FetchedDocument):SourceContentBind
 }
 export class PoliteFetchError extends Error {
  failure:FetchFailure;status?:number;policy?:SourceAccessPolicy;retryAfter?:string;robotsEvidence?:PolicyEvidence;excludedDocument?:ExcludedDocument;
- observationCheckedAt?:string;
+ observationCheckedAt?:string;observationUrl?:string;inspectionReason?:ParserIsolationReason;
  policyPhase:'robots'|'tdm'|null=null;
  constructor(failure:FetchFailure,message:string,status?:number,policy?:SourceAccessPolicy,retryAfter?:string,cause?:unknown){super(message,cause===undefined?undefined:{cause});this.name='PoliteFetchError';this.failure=failure;this.status=status;this.policy=policy;this.retryAfter=retryAfter;}
 }
@@ -135,6 +135,7 @@ export class PoliteFetcher {
  private readonly beforeRequest:PoliteFetcherOptions['beforeRequest'];
  private readonly onRedirect:PoliteFetcherOptions['onRedirect'];
  private readonly ownerAcquisitionProducer:Readonly<OwnerAcquisitionProducer>|undefined;
+ private readonly inventoryTimeoutMs:number;
  private delays=new Map<string,number>();
  private robots=new Map<string,{expiresAt:number;response:Promise<RobotsPolicy>}>();
  private machinePolicies=new Map<string,{expiresAt:number;response:Promise<{rules:TdmRule[];evidence:PolicyEvidence}>}>();
@@ -203,6 +204,9 @@ export class PoliteFetcher {
   this.beforeRequest=options.beforeRequest;this.onRedirect=options.onRedirect;
   this.ownerAcquisitionProducer=options.ownerAcquisitionProducer?Object.freeze(OwnerAcquisitionProducerSchema.parse(options.ownerAcquisitionProducer)):undefined;
   this.cacheDir=resolve(options.cacheDir);this.options={minDelayMs:2000,timeoutMs:25000,maxBytes:24*1024*1024,maxRedirects:5,policyTtlMs:PUBLIC_SOURCE_POLICY_VALIDITY_MS,...options};
+  // 10.45 MB at 128 KiB/s takes about 80 seconds; retain connection margin.
+  // Explicit caller deadlines still win; non-inventory defaults remain 25s.
+  this.inventoryTimeoutMs=options.timeoutMs??90_000;
   this.lane=options.ownerPolicyLane;
   this.publicPolicyFetcher=publicPolicyFetcher;
   if(publicPolicyFetcher&&this.cacheDir!==genesisOwnerAccountRoot(publicPolicyFetcher.cacheDir))throw new PoliteFetchError('host_state_unsafe','Owner account lane routing rejected');
@@ -231,7 +235,10 @@ export class PoliteFetcher {
    // metadata wrapper finish its existing timeout→runtime-finding projection,
    // rather than changing the fetch hold reason just because it is co-located.
    if(error instanceof Error&&error.name==='TimeoutError'&&inspection)await inspection;
-   if(error instanceof ParserIsolationError)throw new PoliteFetchError('inspection_failed','Representation inspection sandbox failed',undefined,undefined,undefined,{kind:'parser_isolation',reason:error.reason});
+   if(error instanceof ParserIsolationError){
+    const failure=new PoliteFetchError('inspection_failed','Representation inspection sandbox failed',undefined,undefined,undefined,{kind:'parser_isolation',reason:error.reason});
+    failure.inspectionReason=error.reason;throw failure;
+   }
    throw error;
   }
  }
@@ -452,6 +459,10 @@ export class PoliteFetcher {
   const selected=candidates[0];
   return {status:status!,proof:{path:selected.path,observationId:basename(selected.path),receiptSha256:hash(selected.bytes)}};
  }
+ private requestTimeoutMs(url:URL,method:'GET'|'POST'):number {
+  if(method==='GET'&&url.href==='https://bob-sh.de/')return this.inventoryTimeoutMs;
+  return this.options.timeoutMs;
+ }
  /** Transport seam used by disposable fixture servers; production reaches this
   * only through the authority, DNS pinning and exact-host scheduler above. */
  private wireRequest(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,pinned:{address:string;family:number},nativeHeaders:Record<string,string>):Promise<WireResponse>{
@@ -475,7 +486,7 @@ export class PoliteFetcher {
      stream.on('error',(error:Error)=>{clearTimeout(timer);request.destroy();reject(error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Response stream failed'));});
      if(decoder)response.on('error',error=>decoder.destroy(error));
     });
-    const timer=setTimeout(()=>request.destroy(new PoliteFetchError('timeout','Request deadline exceeded')),this.options.timeoutMs);
+    const timer=setTimeout(()=>request.destroy(new PoliteFetchError('timeout','Request deadline exceeded')),this.requestTimeoutMs(url,method));
     request.on('error',error=>{clearTimeout(timer);reject(error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Public request failed'));});
     request.end(body);
    });
@@ -514,6 +525,8 @@ export class PoliteFetcher {
     if(failure.status===429||(failure.failure!=='http_error'&&failure.failure!=='robots_unavailable'))throw failure;
     const unavailable=new PoliteFetchError('robots_unavailable',`Robots policy unavailable${failure.status?` (policy HTTP ${failure.status})`:''}; source existence is unknown`,failure.status,undefined,failure.retryAfter,failure);
     unavailable.policyPhase=failure.policyPhase;
+    unavailable.observationUrl=failure.observationUrl??result?.url??new URL('/robots.txt',url).href;
+    unavailable.observationCheckedAt=failure.observationCheckedAt??result?.checkedAt??attemptedAt;
     unavailable.robotsEvidence=failure.robotsEvidence??{url:new URL('/robots.txt',url).href,locator:'Actual robots retrieval/interpretation attempt unavailable',value:'unavailable',checkedAt:result?.checkedAt??attemptedAt,...(result?{sha256:result.sha256}:{})};throw unavailable;
    }
   })();cached={expiresAt:Date.now()+ttl,response:pending};this.robots.set(cacheKey,cached);}
@@ -528,8 +541,9 @@ export class PoliteFetcher {
    const pending=(async()=>{
     // Standardized location, not a guessed municipal API: W3C TDMRep 2024 §6.1.
     const redirectChain=knownUrl?undefined:[policyUrl];
+    const attemptedAt=new Date().toISOString();let response:(FetchedDocument&{validatedPolicy?:ValidatedPolicy})|undefined;
     try{
-     const response=await this.fetchInternal(policyUrl,{ownerRobotsOverride,hostProfile},'tdm',redirectChain);
+     response=await this.fetchInternal(policyUrl,{ownerRobotsOverride,hostProfile},'tdm',redirectChain);
      if(response.validatedPolicy?.kind!=='tdm')throw new PoliteFetchError('tdm_unavailable','Validated TDM policy missing');
      return {rules:response.validatedPolicy.value,evidence:{url:response.url,locator:'W3C TDMRep origin rules',value:'checked',sha256:response.sha256,checkedAt:response.checkedAt}};
     }catch(error){
@@ -541,7 +555,9 @@ export class PoliteFetcher {
      failure.policyPhase??='tdm';
      if(failure.status===429||(failure.failure!=='http_error'&&failure.failure!=='tdm_unavailable'))throw failure;
      const unavailable=new PoliteFetchError('tdm_unavailable',`Machine-readable TDM policy could not be checked${failure.status?` (policy HTTP ${failure.status})`:''}; ask municipality`,failure.status,undefined,failure.retryAfter,failure);
-     unavailable.policyPhase=failure.policyPhase;throw unavailable;
+     unavailable.policyPhase=failure.policyPhase;
+     unavailable.observationUrl=failure.observationUrl??response?.url??redirectChain?.at(-1)??policyUrl;
+     unavailable.observationCheckedAt=failure.observationCheckedAt??response?.checkedAt??attemptedAt;throw unavailable;
     }
    })();cached={expiresAt:Date.now()+ttl,response:pending};this.machinePolicies.set(cacheKey,cached);
   }
@@ -845,9 +861,10 @@ export class PoliteFetcher {
     Object.assign(policy,projectSourcePolicyMetadata(policy));observation.policy=policy;
     if(policy.access!=='authenticated_owner_account')delete policy.ownerAccountAccess;
     const original=error instanceof PoliteFetchError?error:error instanceof HostOptedOutError?new PoliteFetchError('host_opted_out','Host objection is active; source retention stopped'):error instanceof CivicPolicyStateError?new PoliteFetchError('host_state_unsafe','Managed source inventory is incomplete or unavailable; use an explicitly registered safe acquisition lane'):new PoliteFetchError('network_error','Fetch or cache operation failed',undefined,undefined,undefined,ownerCredentials?undefined:error);
-    // An authenticated failure has no remote strings, causes, paths or headers.
+    // Authentication drops remote error strings, causes, filesystem paths and headers, not public observation attribution.
     const failure=ownerCredentials?new PoliteFetchError(original.failure,'Authenticated GENESIS request held',original.status):original;
-    failure.policyPhase??=policyPhase;failure.policy=policy;observation.state='failed';observation.failure=failure.failure;observation.retryAfter=ownerCredentials?undefined:failure.retryAfter;await this.observation(observation);failure.observationCheckedAt=observation.checkedAt;
+    if(ownerCredentials){failure.observationUrl=original.observationUrl;failure.observationCheckedAt=original.observationCheckedAt;}
+    failure.policyPhase??=policyPhase;failure.policy=policy;observation.state='failed';observation.failure=failure.failure;observation.retryAfter=ownerCredentials?undefined:failure.retryAfter;await this.observation(observation);failure.observationCheckedAt??=observation.checkedAt;failure.observationUrl??=observation.url;
     // A failed admission does not undo a 304's representation-header update.
     if(observation.status===304&&observation.sha256&&observation.retrievedAt&&requestMetadataPath){
      await mkdir(join(this.cacheDir,'requests'),{recursive:true});const temporary=requestMetadataPath+'.'+randomUUID()+'.tmp';

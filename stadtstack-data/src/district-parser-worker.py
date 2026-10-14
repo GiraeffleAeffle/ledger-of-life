@@ -57,6 +57,15 @@ def reply(value):
     sys.stdout.flush()
 
 
+def command_failure_reason(name, args, status, stderr):
+    # Exit 64 is reserved by the fixed policy worker for a proven elision refusal.
+    if name == 'node' and status == 64 and '/opt/stadtstack/src/district-policy-inspection-worker.ts' in args:
+        return 'request_rejected'
+    if name == 'node' and b'FATAL ERROR:' in stderr and b'heap out of memory' in stderr:
+        return 'heap_limit'
+    return 'command_failed'
+
+
 def run_tool(request):
     name = request.get('tool')
     args = request.get('args')
@@ -89,7 +98,7 @@ def run_tool(request):
             while selector.get_map():
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
-                    raise TimeoutError('resource_limit')
+                    raise TimeoutError('deadline')
                 for key, _ in selector.select(min(remaining, 0.25)):
                     data = os.read(key.fileobj.fileno(), 65536)
                     if not data:
@@ -101,7 +110,7 @@ def run_tool(request):
                     target.extend(data)
             status = process.wait(timeout=max(0.01, deadline - time.monotonic()))
         if status != 0:
-            return {'ok': False, 'reason': 'command_failed'}
+            return {'ok': False, 'reason': command_failure_reason(name, args, status, buffers['stderr'])}
         return {'ok': True, **{key: base64.b64encode(value).decode('ascii')
                               for key, value in buffers.items()}}
     finally:
@@ -148,7 +157,9 @@ def main():
             if not isinstance(request, dict) or set(request) != {'tool', 'args'}:
                 raise ValueError('request')
             reply(run_tool(request))
-        except (TimeoutError, subprocess.TimeoutExpired, MemoryError, OverflowError):
+        except (TimeoutError, subprocess.TimeoutExpired):
+            reply({'ok': False, 'reason': 'deadline'})
+        except (MemoryError, OverflowError):
             reply({'ok': False, 'reason': 'resource_limit'})
         except Exception:
             # Never return parser stderr, command arguments or input contents on failure.

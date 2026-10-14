@@ -23,7 +23,8 @@ export const ParserReviewSchema = z.object({
   dockerSocket: z.string().regex(/^\/run\/(?:[a-zA-Z0-9._-]+\/)*[a-zA-Z0-9._-]+\.sock$/),
 }).strict();
 export type ParserReview = z.infer<typeof ParserReviewSchema>;
-export type ParserIsolationReason = 'security_review_required' | 'unavailable' | 'resource_limit' | 'command_failed' | 'request_rejected';
+export const ParserIsolationReasonSchema=z.enum(['security_review_required','unavailable','resource_limit','heap_limit','deadline','command_failed','request_rejected']);
+export type ParserIsolationReason=z.infer<typeof ParserIsolationReasonSchema>;
 export class ParserIsolationError extends Error {
   readonly reason: ParserIsolationReason;
   constructor(reason: ParserIsolationReason) {
@@ -52,7 +53,7 @@ const MAX_PROTOCOL_BYTES = 12 * 1024 * 1024;
 const ResponseSchema = z.union([
   z.object({ ready: z.literal(true) }).strict(),
   z.object({ ok: z.literal(true), stdout: z.string(), stderr: z.string() }).strict(),
-  z.object({ ok: z.literal(false), reason: z.enum(['resource_limit', 'command_failed', 'request_rejected']) }).strict(),
+  z.object({ ok: z.literal(false), reason: z.enum(['resource_limit', 'heap_limit', 'deadline', 'command_failed', 'request_rejected']) }).strict(),
 ]);
 
 /** This hash can be inspected without launching Docker, a parser, or a model. */
@@ -249,7 +250,7 @@ export async function withParserSandbox<T>(artifact: string | Uint8Array | null,
           } catch { fail(new ParserIsolationError('request_rejected')); return; }
         }
       });
-      timer = setTimeout(() => fail(new ParserIsolationError('resource_limit')), PARSER_LIMITS.walltimeMs);
+      timer = setTimeout(() => fail(new ParserIsolationError('deadline')), PARSER_LIMITS.walltimeMs);
       if (!('ready' in await ready)) throw new ParserIsolationError('unavailable');
       const run = async (tool: string, args: string[], timeoutMs?: number): Promise<ParserOutput> => {
         await scope?.assertActive();

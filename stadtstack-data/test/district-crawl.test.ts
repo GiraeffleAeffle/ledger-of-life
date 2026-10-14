@@ -21,6 +21,7 @@ import {assertCivicPolicyAuthority,type CivicPolicyOptions} from '../src/civic-o
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {CrawlRequestEvidenceCaptureError} from '../src/district-crawl-request.ts';
 import {largeBobInventory} from './fixtures/bob-inventory.ts';
+import {ParserIsolationError,ParserIsolationReasonSchema} from '../src/district-parser-isolation.ts';
 
 /** Adapter-unit fetch/read/write doubles use explicit fixture authority, not a production acquisition marker. */
 class AdapterFixtureFetcher extends BasePoliteFetcher {
@@ -636,4 +637,73 @@ test('API discovery capture failure aborts without seed fallback or source-failu
  assert.deepEqual(await readFile(join(fetcher.cacheDir,'sha256',hash(body))),body);
  const observations=await Promise.all((await readdir(join(fetcher.cacheDir,'observations'))).map(async name=>JSON.parse(await readFile(join(fetcher.cacheDir,'observations',name),'utf8')))),retained=observations.filter(row=>row.url===apiRequest.href);
  assert.equal(retained.length,1);assert.equal(retained[0].state,'fetched');assert.equal(retained[0].failure,undefined);assert.equal(retained[0].sha256,hash(body));
+});
+test('BOB index records the deepest failing URL and closed inspection reason without changing fetch codecs',async t=>{
+ const root='https://bob-sh.de/';
+ for(const scenario of [...ParserIsolationReasonSchema.options.map(reason=>({reason,failedUrl:root})),{reason:undefined,failedUrl:root},{reason:undefined,failedUrl:root+'robots.txt'}])await t.test(scenario.reason??scenario.failedUrl,async t=>{
+  const folder=await mkdtemp(join(tmpdir(),'district-bob-diagnostics-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+  const options=await politeTestOptions({cacheDir:join(folder,'managed')}),seen:string[]=[];
+  const fetcher=new BasePoliteFetcher({...options,fixtureInspection:{...fixturePolicyInspection,resource:async(...args)=>{
+   if(args[0]===scenario.failedUrl&&scenario.reason)throw new ParserIsolationError(scenario.reason);
+   return fixturePolicyInspection.resource(...args);
+  }}});
+  type Wire={wire(url:URL):Promise<{status:number;headers:Record<string,string>;body:Buffer}>};
+  t.mock.method(fetcher as unknown as Wire,'wire',async(url:URL)=>{
+   seen.push(url.href);
+   if(url.href===scenario.failedUrl&&!scenario.reason)throw new PoliteFetchError('timeout','PRIVATE_INTERNAL_SENTINEL');
+   if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+   return {status:200,headers:{'content-type':'text/html'},body:Buffer.from(url.href===root?'<script>var initialProcedures = JSON.parse(\'[]\');</script>':JSON.stringify({success:true,procedureCount:0,mapVars:[],responseHtml:''}))};
+  });
+  const bobSource:RegistrySource={...source,url:root,api:{url:root+'list/json',format:'bobsh-list',method:'POST',form:{municipalCode:'01053'}}};
+  const result=await crawlDistrictRegistry({schemaVersion:'stadtstack-source-registry-v1',municipalities:[{...city,ags:'01053116',sources:[bobSource]}]},fetcher,{maxDocuments:4,maxPages:4,maxRequests:6});
+  const check=result.checks[0];assert.equal(check.outcome,'blocked');assert.equal(check.blocked?.[0].url,scenario.failedUrl);
+  assert.equal(check.inspectionReason,scenario.reason);assert.equal(check.blocked?.[0].inspectionReason,scenario.reason);
+  assert.equal(check.blocked?.[0].failure,scenario.reason?'inspection_failed':'timeout');
+  assert.equal(JSON.stringify(result).includes('PRIVATE_INTERNAL_SENTINEL'),false);
+  if(scenario.failedUrl.endsWith('/robots.txt'))assert.equal(seen.some(url=>url.endsWith('/list/json')),false);
+  for(const directory of ['observations','requests']){
+   let names:string[];try{names=await readdir(join(fetcher.cacheDir,directory));}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')continue;throw error;}
+   for(const name of names){
+    const metadata=JSON.parse(await readFile(join(fetcher.cacheDir,directory,name),'utf8'));
+    assert.equal(Object.hasOwn(metadata,'inspectionReason'),false);assert.equal(Object.hasOwn(metadata,'observationUrl'),false);
+   }
+  }
+ });
+});
+test('BOB policy-error wrappers preserve the actual endpoint and observation clock in blocked entries',async t=>{
+ const root='https://bob-sh.de/';
+ const scenarios=[
+  {path:'/robots.txt',status:undefined,failure:'timeout'},
+  {path:'/robots.txt',status:503,failure:'robots_unavailable'},
+  {path:'/.well-known/tdmrep.json',status:403,failure:'access_barrier'},
+  {path:'/.well-known/tdmrep.json',status:503,failure:'tdm_unavailable'},
+  {path:'/.well-known/tdmrep.json',status:200,failure:'tdm_unavailable'}
+ ] as const;
+ for(const scenario of scenarios)await t.test(`${scenario.path} ${scenario.status??'timeout'}`,async t=>{
+  const folder=await mkdtemp(join(tmpdir(),'district-bob-policy-attribution-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+  const options=await politeTestOptions({cacheDir:join(folder,'managed')});
+  t.mock.timers.enable({apis:['Date'],now:Date.now()});
+  const fetcher=new BasePoliteFetcher({...options,fixtureInspection:fixturePolicyInspection}),seen:string[]=[];
+  type Wire={wire(url:URL):Promise<{status:number;headers:Record<string,string>;body:Buffer}>};
+  t.mock.method(fetcher as unknown as Wire,'wire',async(url:URL)=>{
+   seen.push(url.href);
+   if(url.pathname===scenario.path){
+    t.mock.timers.tick(1000);
+    if(scenario.status===undefined)throw new PoliteFetchError('timeout','PRIVATE_POLICY_ERROR');
+    return {status:scenario.status,headers:{'content-type':'text/html'},body:Buffer.from('<h1>No machine-readable policy</h1>')};
+   }
+   if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+   throw new Error('List dispatch must not follow a policy hold');
+  });
+  const bobSource:RegistrySource={...source,url:root,api:{url:root+'list/json',format:'bobsh-list',method:'POST',form:{municipalCode:'01053'}}};
+  const result=await crawlDistrictRegistry({schemaVersion:'stadtstack-source-registry-v1',municipalities:[{...city,ags:'01053116',sources:[bobSource]}]},fetcher,{maxDocuments:4,maxPages:4,maxRequests:6});
+  const check=result.checks[0],blocked=check.blocked?.[0],failedUrl=root.slice(0,-1)+scenario.path;
+  assert.equal(check.outcome,'blocked');assert.equal(blocked?.url,failedUrl);assert.equal(blocked?.failure,scenario.failure);
+  assert.equal(seen.includes(root+'list/json'),false);assert.equal(JSON.stringify(result).includes('PRIVATE_POLICY_ERROR'),false);
+  const observations=await Promise.all((await readdir(join(fetcher.cacheDir,'observations'))).map(async name=>JSON.parse(await readFile(join(fetcher.cacheDir,'observations',name),'utf8'))));
+  const actual=observations.find(row=>row.url===failedUrl&&row.state==='failed'),outer=observations.find(row=>row.url===root+'list/json');
+  assert.ok(actual);assert.ok(outer);assert.equal(blocked?.checkedAt,actual.checkedAt);
+  if(scenario.status!==undefined)assert.notEqual(actual.checkedAt,outer.checkedAt);
+  for(const metadata of observations){assert.equal(Object.hasOwn(metadata,'inspectionReason'),false);assert.equal(Object.hasOwn(metadata,'observationUrl'),false);}
+ });
 });
