@@ -523,6 +523,8 @@ export class PoliteFetcher {
     if(failure.status===429||(failure.failure!=='http_error'&&failure.failure!=='robots_unavailable'))throw failure;
     const unavailable=new PoliteFetchError('robots_unavailable',`Robots policy unavailable${failure.status?` (policy HTTP ${failure.status})`:''}; source existence is unknown`,failure.status,undefined,failure.retryAfter,failure);
     unavailable.policyPhase=failure.policyPhase;
+    unavailable.observationUrl=failure.observationUrl??result?.url??new URL('/robots.txt',url).href;
+    unavailable.observationCheckedAt=failure.observationCheckedAt??result?.checkedAt??attemptedAt;
     unavailable.robotsEvidence=failure.robotsEvidence??{url:new URL('/robots.txt',url).href,locator:'Actual robots retrieval/interpretation attempt unavailable',value:'unavailable',checkedAt:result?.checkedAt??attemptedAt,...(result?{sha256:result.sha256}:{})};throw unavailable;
    }
   })();cached={expiresAt:Date.now()+ttl,response:pending};this.robots.set(cacheKey,cached);}
@@ -537,8 +539,9 @@ export class PoliteFetcher {
    const pending=(async()=>{
     // Standardized location, not a guessed municipal API: W3C TDMRep 2024 §6.1.
     const redirectChain=knownUrl?undefined:[policyUrl];
+    const attemptedAt=new Date().toISOString();let response:(FetchedDocument&{validatedPolicy?:ValidatedPolicy})|undefined;
     try{
-     const response=await this.fetchInternal(policyUrl,{ownerRobotsOverride,hostProfile},'tdm',redirectChain);
+     response=await this.fetchInternal(policyUrl,{ownerRobotsOverride,hostProfile},'tdm',redirectChain);
      if(response.validatedPolicy?.kind!=='tdm')throw new PoliteFetchError('tdm_unavailable','Validated TDM policy missing');
      return {rules:response.validatedPolicy.value,evidence:{url:response.url,locator:'W3C TDMRep origin rules',value:'checked',sha256:response.sha256,checkedAt:response.checkedAt}};
     }catch(error){
@@ -550,7 +553,9 @@ export class PoliteFetcher {
      failure.policyPhase??='tdm';
      if(failure.status===429||(failure.failure!=='http_error'&&failure.failure!=='tdm_unavailable'))throw failure;
      const unavailable=new PoliteFetchError('tdm_unavailable',`Machine-readable TDM policy could not be checked${failure.status?` (policy HTTP ${failure.status})`:''}; ask municipality`,failure.status,undefined,failure.retryAfter,failure);
-     unavailable.policyPhase=failure.policyPhase;throw unavailable;
+     unavailable.policyPhase=failure.policyPhase;
+     unavailable.observationUrl=failure.observationUrl??response?.url??redirectChain?.at(-1)??policyUrl;
+     unavailable.observationCheckedAt=failure.observationCheckedAt??response?.checkedAt??attemptedAt;throw unavailable;
     }
    })();cached={expiresAt:Date.now()+ttl,response:pending};this.machinePolicies.set(cacheKey,cached);
   }
@@ -852,8 +857,9 @@ export class PoliteFetcher {
     Object.assign(policy,projectSourcePolicyMetadata(policy));observation.policy=policy;
     if(policy.access!=='authenticated_owner_account')delete policy.ownerAccountAccess;
     const original=error instanceof PoliteFetchError?error:error instanceof HostOptedOutError?new PoliteFetchError('host_opted_out','Host objection is active; source retention stopped'):error instanceof CivicPolicyStateError?new PoliteFetchError('host_state_unsafe','Managed source inventory is incomplete or unavailable; use an explicitly registered safe acquisition lane'):new PoliteFetchError('network_error','Fetch or cache operation failed',undefined,undefined,undefined,ownerCredentials?undefined:error);
-    // An authenticated failure has no remote strings, causes, paths or headers.
+    // Authentication drops remote error strings, causes, filesystem paths and headers, not public observation attribution.
     const failure=ownerCredentials?new PoliteFetchError(original.failure,'Authenticated GENESIS request held',original.status):original;
+    if(ownerCredentials){failure.observationUrl=original.observationUrl;failure.observationCheckedAt=original.observationCheckedAt;}
     failure.policyPhase??=policyPhase;failure.policy=policy;observation.state='failed';observation.failure=failure.failure;observation.retryAfter=ownerCredentials?undefined:failure.retryAfter;await this.observation(observation);failure.observationCheckedAt??=observation.checkedAt;failure.observationUrl??=observation.url;
     // A failed admission does not undo a 304's representation-header update.
     if(observation.status===304&&observation.sha256&&observation.retrievedAt&&requestMetadataPath){
