@@ -369,6 +369,34 @@ test('explicit acquisition initialization seals empty roots of every kind with o
  const inventory=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));assert.equal(inventory.roots.length,3);assert.ok(inventory.roots.every((root:{complete:boolean})=>root.complete));
 });
 
+for(const layout of ['legacy','sealed'])for(const direction of ['nested','ancestor'])test('overlapping '+direction+' lanes leave no debris or incomplete enrolled root: '+layout,async t=>{
+ const {base,stateDir}=await sandbox(t),outer=join(base,'lanes'),root=join(outer,'cas'),policy=fixturePolicy(stateDir);
+ const options={decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts' as const,...policy};
+ await initializeManagedAcquisitionLane(root,options);
+ if(layout==='sealed')await compactCivicPolicyInventory(policy);
+ const attempted=direction==='nested'?join(root,'residual-prepared','deep'):outer;
+ const original=await readFile(join(stateDir,'inventory.json')),marker=await readFile(join(root,'.civic-acquisition-lane.json')),files=await readdir(base,{recursive:true});
+ await assert.rejects(initializeManagedAcquisitionLane(attempted,options),CivicPolicyStateError);
+ await assert.rejects(registerManagedCacheRoot(attempted,{kind:'artifacts',...policy}),CivicPolicyStateError);
+ let called=false;
+ await assert.rejects(withManagedSourceScratch(attempted,[{phase:'pre-admission',url:'https://overlap.test/source',sourceSha256:hash('synthetic overlap source')}],async()=>{called=true;},{...options,purpose:'classification'}),CivicPolicyStateError);
+ assert.equal(called,false);assert.deepEqual(await readdir(base,{recursive:true}),files);
+ assert.deepEqual(await readFile(join(stateDir,'inventory.json')),original);assert.deepEqual(await readFile(join(root,'.civic-acquisition-lane.json')),marker);
+ if(direction==='nested')await assert.rejects(lstat(join(root,'residual-prepared')),{code:'ENOENT'});
+ else await assert.rejects(lstat(join(outer,'.civic-acquisition-lane.json')),{code:'ENOENT'});
+ await markManagedCacheInventoryComplete(root,policy);
+ const inventory=await readCivicPolicyInventory(policy);assert.equal(inventory.roots.length,1);assert.equal(inventory.roots[0].path,root);assert.equal(inventory.roots[0].complete,true);assert.deepEqual(inventory.scratch,[]);
+});
+
+test('authority-state overlap refuses lane creation without filesystem or inventory changes',async t=>{
+ const {base,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),files=await readdir(base,{recursive:true}),original=await readFile(join(stateDir,'inventory.json'));
+ for(const path of [stateDir,join(stateDir,'forbidden','lane'),base]){
+  await assert.rejects(initializeManagedAcquisitionLane(path,{decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',...policy}),CivicPolicyStateError);
+  await assert.rejects(registerManagedCacheRoot(path,{kind:'artifacts',...policy}),CivicPolicyStateError);
+ }
+ assert.deepEqual(await readdir(base,{recursive:true}),files);assert.deepEqual(await readFile(join(stateDir,'inventory.json')),original);
+});
+
 test('dated paths and known legacy CAS files cannot authorize nonempty unmarked acquisition roots',async t=>{
  const {base,stateDir}=await sandbox(t),root=join(base,'isolated0.3.2-owner-2026-10-11'),bytes='historical source';
  await mkdir(join(root,'sha256'),{recursive:true,mode:0o700});await writeFile(join(root,'sha256',hash(bytes)),bytes,{mode:0o600});

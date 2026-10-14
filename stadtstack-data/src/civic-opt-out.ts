@@ -763,10 +763,14 @@ function managedRootPath(input:string,state:string):string{
  if(path===parse(path).root||path===homedir()||path===state||contained(path,state)||contained(state,path)||path.split(sep).some(part=>part==='.secrets'||part==='.ssh'||part==='.git'))throw new CivicPolicyStateError();
  return path;
 }
+function assertManagedRootDisjoint(inventory:Inventory,path:string):void{
+ if(inventory.roots.some(root=>contained(root.path,path)||contained(path,root.path)))throw new CivicPolicyStateError();
+}
 async function reconcileManagedRoot(inventory:Inventory,path:string,kind:Root['kind']):Promise<Root>{
+ assertManagedRootDisjoint(inventory,path);
  const stat=await directory(path,true),id=digest(path);let root=inventory.roots.find(root=>root.id===id);
  if(root){if(root.kind!==kind||!sameIdentity(root.identity,stat))throw new CivicPolicyStateError();}
- else{if(inventory.roots.some(root=>contained(root.path,path)||contained(path,root.path)))throw new CivicPolicyStateError();root={id,path,kind,identity:{dev:stat.dev,ino:stat.ino},complete:false};inventory.roots.push(root);}
+ else{root={id,path,kind,identity:{dev:stat.dev,ino:stat.ino},complete:false};inventory.roots.push(root);}
  root.complete=await reconcile(root,inventory);return root;
 }
 async function enrollRoot(state:string,path:string,kind:Root['kind']):Promise<Root>{
@@ -779,6 +783,9 @@ async function readAcquisitionLaneMarker(path:string,kind:Root['kind'],authority
  }catch(error){if(missing(error))throw error;throw new CivicPolicyStateError('ACQUISITION_LANE_UNSAFE');}
 }
 async function reconcileAcquisitionLane(inventory:Inventory,path:string,kind:Root['kind'],authority:CivicPolicyAuthorityReceipt):Promise<Root>{
+ // Callers already reject authority/state overlap via managedRootPath. Check
+ // enrolled roots before mkdir or marker publication, including legacy roots.
+ assertManagedRootDisjoint(inventory,path);
  let needsMarker=false;
  try{await directory(path);}catch(error){if(missing(error))needsMarker=true;else throw error;}
  if(!needsMarker){
