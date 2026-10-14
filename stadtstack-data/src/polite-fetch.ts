@@ -14,7 +14,7 @@ import type {SourceAccessPolicy,PolicyEvidence,TdmRule,OwnerRobotsOverride} from
 import {acquirePrivateRunLock,writePrivateJson} from './district-private-io.ts';
 import {inspectPdfTdmPolicy} from './pdf-tdm-policy.ts';
 import {inspectResourcePolicySandbox} from './district-policy-inspection.ts';
-import {withParserSandbox,type ParserSourceContext,type ParserSandbox} from './district-parser-isolation.ts';
+import {withParserSandbox,ParserIsolationError,type ParserSourceContext,type ParserSandbox} from './district-parser-isolation.ts';
 import {isPublicAddress} from './public-address.ts';
 import type {PdfTdmPolicyResult} from './pdf-tdm-policy.ts';
 import type {ResourcePolicyInspection} from './source-policy.ts';
@@ -36,7 +36,7 @@ import {semanticHash} from './district-adapter-contract.ts';
 import {admittedRegisteredRobotsScopes,registeredRobotsAuditApplies,registeredRobotsEvidence,readRegisteredRobotsAudit,registeredRobotsScope,registeredBobScope,REGISTERED_SOURCE_POLICY_VALIDITY_MS,PUBLIC_SOURCE_POLICY_VALIDITY_MS,type RegisteredRobotsAudit,type RegisteredSourceConfiguration} from './registered-source-policy.ts';
 import {sourcePolicyValidityMs,registeredSourcePolicyContextUrls,isOriginTdmEvidence} from './source-policy.ts';
 
-export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'credential_unavailable'|'dns_error'|'timeout'|'network_error'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cross_host_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded'|'host_admission_deferred';
+export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'credential_unavailable'|'dns_error'|'timeout'|'network_error'|'inspection_failed'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cross_host_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded'|'host_admission_deferred';
 class RequestAdmissionInterruption extends Error {readonly admissionError:unknown;constructor(error:unknown){super('Public request admission held');this.admissionError=error;}}
 export interface FetchObservation {
  url:string;method:'GET'|'POST';checkedAt:string;retrievedAt:string|null;state:'fetched'|'not_modified'|'redirected'|'failed'|'excluded';
@@ -219,14 +219,17 @@ export class PoliteFetcher {
   await this.initialization;
  }
  private async withInspectionSandbox(body:Buffer,context:ParserSourceContext,inspect:(sandbox?:ParserSandbox)=>Promise<void>):Promise<void>{
-  if(this.fixtureInspection){await inspect();return;}
   let inspection:Promise<void>|undefined;
-  try{await withParserSandbox(body,sandbox=>inspection=inspect(sandbox),context);}
+  try{
+   if(this.fixtureInspection){await inspect();return;}
+   await withParserSandbox(body,sandbox=>inspection=inspect(sandbox),context);
+  }
   catch(error){
    // A command timeout also rejects the sandbox supervisor race. Let the PDF
    // metadata wrapper finish its existing timeout→runtime-finding projection,
    // rather than changing the fetch hold reason just because it is co-located.
    if(error instanceof Error&&error.name==='TimeoutError'&&inspection)await inspection;
+   if(error instanceof ParserIsolationError)throw new PoliteFetchError('inspection_failed','Representation inspection sandbox failed',undefined,undefined,undefined,{kind:'parser_isolation',reason:error.reason});
    throw error;
   }
  }

@@ -19,6 +19,7 @@ import {ContentFreeSourcePolicySchema} from '../src/district-schema.ts';
 import {readBoundSourceObservation} from '../src/source-observation.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {CrawlRequestEvidenceSchema,CrawlRequestEvidenceCaptureError} from '../src/district-crawl-request.ts';
+import {ParserIsolationError} from '../src/district-parser-isolation.ts';
 
 async function createPoliteFetcher(options:PoliteFetcherOptions):Promise<BasePoliteFetcher> {
  return new BasePoliteFetcher({...await politeTestOptions(options),fixtureInspection:fixturePolicyInspection});
@@ -727,7 +728,7 @@ test('policy wrappers preserve typed failures and structured unknown causes with
   policy(url:URL):Promise<unknown>;
   machinePolicy(url:URL):Promise<unknown>;
  }
- for(const phase of ['robots','tdm'] as const)for(const kind of ['unknown','network_error','dns_error','timeout','cache_missing','too_large','unsupported_encoding'] as const){
+ for(const phase of ['robots','tdm'] as const)for(const kind of ['unknown','network_error','inspection_failed','dns_error','timeout','cache_missing','too_large','unsupported_encoding'] as const){
   const error=kind==='unknown'?Error('Synthetic unexpected runtime failure'):new PoliteFetchError(kind,'Synthetic typed failure');
   const fetcher=await createPoliteFetcher({cacheDir:join(cache,phase+'-'+kind)}),seam=fetcher as unknown as PolicySeam;
   t.mock.method(seam,'fetchInternal',async()=>{throw error;});
@@ -742,6 +743,26 @@ test('PDF inspection runtime errors remain network_error with structured cause, 
  const fetcher=new BasePoliteFetcher({...options,fixtureInspection:{...fixturePolicyInspection,pdf:async()=>{throw cause;}}});
  t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'application/pdf'},body:Buffer.from('%PDF-invalid')});
  await assert.rejects(fetcher.fetch('https://stadt.de/plan.pdf'),(failure:unknown)=>failure instanceof PoliteFetchError&&failure.failure==='network_error'&&failure.policyPhase==='tdm'&&failure.cause===cause);
+});
+test('sandbox inspection failures keep HTTP observations honest and remain execution holds',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-inspection-failure-'));t.after(()=>rm(cache,{recursive:true,force:true}));
+ for(const phase of ['robots','tdm','document'] as const)for(const reason of ['command_failed','resource_limit','security_review_required','unavailable','request_rejected'] as const){
+  const root=join(cache,phase+'-'+reason),url='https://bob-sh.de/',body=Buffer.from('<h1>Synthetic inventory</h1>'),target=phase==='robots'?'/robots.txt':phase==='tdm'?'/.well-known/tdmrep.json':'/';
+  const options=await politeTestOptions({cacheDir:root});
+  const fetcher=new BasePoliteFetcher({...options,fixtureInspection:{...fixturePolicyInspection,resource:async(...args)=>{
+   if(new URL(args[0]).pathname===target)throw new ParserIsolationError(reason);
+   return fixturePolicyInspection.resource(...args);
+  }}});
+  t.mock.method(fetcher as unknown as WireSeam,'wire',async(dispatched:URL)=>dispatched.pathname===target?{status:200,headers:{'content-type':'text/html'},body}:{status:404,headers:{},body:Buffer.alloc(0)});
+  await assert.rejects(fetcher.fetch(url),(failure:unknown)=>{
+   assert.ok(failure instanceof PoliteFetchError);assert.equal(failure.failure,'inspection_failed');
+   assert.equal(failure.policyPhase,phase==='document'?'tdm':phase);assert.deepEqual(failure.cause,{kind:'parser_isolation',reason});return true;
+  });
+  const observations=await Promise.all((await readdir(join(root,'observations'))).map(async name=>JSON.parse(await readFile(join(root,'observations',name),'utf8'))));
+  const failed=observations.find(row=>row.url===new URL(target,url).href);
+  assert.equal(failed.status,200);assert.equal(failed.bytes,body.length);assert.equal(failed.sha256,hash(body));assert.equal(failed.state,'failed');assert.equal(failed.failure,'inspection_failed');
+  await assert.rejects(readFile(join(root,'sha256',hash(body))),{code:'ENOENT'});
+ }
 });
 
 test('invalid fetched robots without an owner override remains a source-policy refusal',async t=>{

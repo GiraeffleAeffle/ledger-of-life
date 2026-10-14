@@ -274,7 +274,11 @@ export function inspectResourcePolicy(url:string,headers:Record<string,string|un
  if(/(?:^|,)\s*(?:noai|noimageai)\s*(?:,|$)/i.test(headers['x-robots-tag']??'')){reservation=1;evidence.push({url,locator:'HTTP X-Robots-Tag',value:headers['x-robots-tag']!});}
  const looksLikeHtml=/^<(?:!doctype\s+html|html|head|body|title|form|div)\b/i.test(body.subarray(0,256).toString('utf8').trimStart());
  if(/html/.test(mimeType)||looksLikeHtml){
-  const $=load(body.toString('utf8')),title=$('title,h1').text().replace(/\s+/g,' ').trim();
+  // The BOB inventory contains a multi-megabyte escaped JSON script. parse5
+  // accumulates its character token as a V8 rope and exhausts the fixed worker
+  // heap. Use Cheerio's bounded-memory HTML tokenizer for this exact root only;
+  // inspect the complete representation, including policy/barrier tags after it.
+  const $=load(body.toString('utf8'),url==='https://bob-sh.de/'?{xml:{xmlMode:false}}:{}),title=$('title,h1').text().replace(/\s+/g,' ').trim();
   $('meta[name]').each((_,element)=>{
    const name=($(element).attr('name')??'').toLowerCase(),rawValue=$(element).attr('content')??'',value=rawValue.trim();
    if(name==='tdm-reservation')recordReservation(rawValue,'HTML meta[name=tdm-reservation]');

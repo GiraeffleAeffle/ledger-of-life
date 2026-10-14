@@ -223,11 +223,11 @@ export async function validateAcquisitionSelector(registry:DistrictRegistry,stor
  return selector;
 }
 // Do not project error messages, URLs, response bodies or policy evidence into receipts.
-// network_error also wraps unexpected cache/inspection errors; keep it generic.
+// Sandbox inspection failures and unexpected cache errors remain execution holds.
 const acquisitionFailureReasons:Readonly<Record<FetchFailure,ReasonCode>>={
  unsafe_url:'source_policy_refused',robots_blocked:'source_policy_refused',robots_unavailable:'source_policy_refused',
  tdm_reserved:'source_policy_refused',tdm_unavailable:'source_policy_refused',access_barrier:'source_access_barrier',credential_unavailable:'source_access_barrier',
- dns_error:'source_unavailable',timeout:'source_unavailable',network_error:'execution_exception',http_error:'source_http_error',
+ dns_error:'source_unavailable',timeout:'source_unavailable',network_error:'execution_exception',inspection_failed:'execution_exception',http_error:'source_http_error',
  too_large:'source_limit_exceeded',redirect_limit:'source_redirect_refused',invalid_redirect:'source_redirect_refused',
  cross_host_redirect:'source_redirect_refused',cache_missing:'cas_unavailable',unsupported_encoding:'source_unavailable',
  host_busy:'host_capacity',host_state_unsafe:'source_policy_refused',host_cooldown:'host_delay',

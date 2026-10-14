@@ -5,6 +5,8 @@ import {SourceAccessPolicySchema,ContentFreeSourcePolicySchema,assertSubscriptio
 import {districtSourceSchema,loadDistrictRegistry} from '../src/district-registry.ts';
 import { DOCUMENT_ORIGIN_CLASSIFIER_VERSION } from '../src/document-origin-contract.ts'
 import {frozenCorpusSchema,excludedCrawlDocumentSchema} from '../src/district-corpus.ts';
+import {spawnSync} from 'node:child_process';
+import {largeBobInventory} from './fixtures/bob-inventory.ts';
 
 test('TDMRep uses ordered specific rules and encoded path matching',()=>{
  const rules=parseTdmRules([{location:'/public/*','tdm-reservation':0},{location:'/','tdm-reservation':1}]);
@@ -29,6 +31,39 @@ test('access barriers do not become municipal source content',()=>{
  const cases=[['<title>Login</title><input type="password">','authentication'],['<title>Just a moment</title><form id="challenge-form"></form>','captcha'],['<h1>Zahlung erforderlich</h1>','paywall']] as const;
  for(const [html,expected] of cases)assert.equal(inspectResourcePolicy('https://stadt.de/',{},Buffer.from(html),'text/html').access,expected);
  assert.equal(inspectResourcePolicy('https://stadt.de/',{},Buffer.from('<h1>Bauleitplanung</h1><footer><a href="/login">Login</a></footer>'),'text/html').access,'public');
+});
+test('BOB inventory inspection fits the unchanged 256 MiB worker heap and checks trailing policy tags',{timeout:30000},()=>{
+ const body=largeBobInventory();assert.ok(body.length>=10_500_000);
+ const child=spawnSync(process.execPath,['--experimental-strip-types','--max-old-space-size=256','--input-type=module','-e',`
+  import {readFileSync} from 'node:fs';
+  import {inspectResourcePolicy} from ${JSON.stringify(new URL('../src/source-policy.ts',import.meta.url).href)};
+  const body=readFileSync(0);
+  const results=[inspectResourcePolicy('https://bob-sh.de/',{},body,'text/html')];
+  for(const suffix of ['<meta name="tdm-reservation" content="1">','<meta name="tdm-reservation" content="invalid">','<meta name="robots" content="noai">','<meta name="tdm-policy" content="https://bob-sh.de/policy.json">','<h1>Access denied</h1><form id="challenge-form"></form>','<h1>Login</h1><input type="password">','<h1>Payment required</h1>']){
+   results.push(inspectResourcePolicy('https://bob-sh.de/',{},Buffer.concat([body,Buffer.from(suffix)]),'text/html'));
+  }
+  console.log(JSON.stringify(results));
+ `],{input:body,encoding:'utf8',timeout:25000,maxBuffer:64*1024});
+ assert.equal(child.error,undefined);assert.equal(child.signal,null,child.stderr);assert.equal(child.status,0,child.stderr);
+ const results=JSON.parse(child.stdout);
+ assert.equal(results[0].access,'public');assert.equal(results[0].reservation,null);
+ assert.equal(results[1].reservation,1);assert.equal(results[2].declarationUnavailable,true);assert.equal(results[3].reservation,1);
+ assert.ok(results[4].evidence.some((row:{locator:string})=>row.locator==='HTML meta[name=tdm-policy]'));
+ assert.deepEqual(results.slice(5).map((row:{access:string})=>row.access),['captcha','authentication','paywall']);
+});
+test('BOB inventory tokenizer preserves source policy findings without changing other URL classifiers',()=>{
+ for(const html of [
+  '<meta NAME="TDM-RESERVATION" content="1"><h1>Plan</h1>',
+  '<script>const fake="<meta name=tdm-reservation content=0>";</script><meta name=tdm-reservation content=1>',
+  '<!-- <meta name=tdm-reservation content=0> --><meta name=robots content=noai>',
+  '<meta name=tdm-reservation content=invalid><meta name=tdm-policy content="/policy.json">',
+  '<h1>Access denied</h1><form id=challenge-form>',
+  '<title>Login</title><input TYPE=PASSWORD>',
+  '<h1>Payment required</h1>',
+ ]){
+  const bytes=Buffer.from(html),inventory=inspectResourcePolicy('https://bob-sh.de/',{},bytes,'text/html'),generic=inspectResourcePolicy('https://bob-sh.de/verfahren/p/public/detail',{},bytes,'text/html');
+  assert.deepEqual({...inventory,evidence:inventory.evidence.map(({url:_url,...row})=>row)},{...generic,evidence:generic.evidence.map(({url:_url,...row})=>row)});
+ }
 });
 
 const councilUrl='https://strausberg.allris.cloud/public/si010';
