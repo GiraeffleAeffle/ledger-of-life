@@ -73,19 +73,25 @@ Phase 1 separates output-semantic fingerprints (**a**) from live host enforcemen
 extraction contracts, predecessor compatibility, or registry descriptor admission.
 Frozen original bytes, source/registry scope, policy receipts, prepared text, evidence
 context, prompts, schemas, model identities and decoding remain identity inputs.
-This is a clean cutover: residual selectors use `outputSha256`, structured results
-use `district-structured-job-result-v2` / `mappingContractSha256`, and VM-B selectors
-use `runnerOutputContractSha256`. Old broad-contract selectors are not silently
-upgraded or accepted by a compatibility shim; prepare/enqueue this cohort under the
-split before its multi-day run. Historical receipts are never rewritten.
+New residual preparation selectors bind only `{preparationSha256}`; extraction
+selectors separately bind the current extraction/output contract and the exact
+committed preparation receipt/artifact. Structured results use
+`district-structured-job-result-v2` / `mappingContractSha256`, and VM-B selectors use
+`runnerOutputContractSha256`. Historical receipts and keys are never rewritten.
+Only the committed-preparation reader accepts the historical broad residual
+selector, authenticating its original contract/key/receipt and matching its
+preparation hash to current semantics; its old extraction hash is not a preparation
+compatibility requirement. Old **queued** broad preparation selectors require
+explicit re-enqueue under the narrow preparation identity.
 
 Actual implemented classification (paths are relative to `src/`, unless prefixed
 `../`; lists describe code fingerprints, not removal of runtime imports/checks):
 
 | Contract | a: included implementation files | b: excluded implementation files |
 | --- | --- | --- |
-| Residual output assembly | `district-residual-jobs.ts`, `district-inference.ts`, `district-answer-cache.ts`, `district-model.ts`; preparation and joint-extraction contracts below | `district-codex-accounting.ts`, `district-corpus.ts`, `district-crawl-request.ts`, `district-http-observation.ts`, `source-observation.ts`, `district-policy-receipt.ts`, `district-policy-refresh.ts`, `civic-opt-out.ts`, `district-jobs.ts` |
+| Residual extraction/output assembly | `district-residual-jobs.ts`, `district-inference.ts`, `district-answer-cache.ts`, `district-model.ts`; preparation and joint-extraction contracts below | `district-codex-accounting.ts`, `district-corpus.ts`, `district-crawl-request.ts`, `district-http-observation.ts`, `source-observation.ts`, `district-policy-receipt.ts`, `district-policy-refresh.ts`, `civic-opt-out.ts`, `district-jobs.ts` |
 | Preparation | `district-document.ts`, `district-prepared-document.ts`, `district-preparation-run.ts`, `district-schema.ts`, `district-contract-source.ts`; parser-output contract below | `district-registry-config.ts`, `district-registry.ts`, `district-corpus.ts`, `source-observation.ts`, `district-private-io.ts`, `source-policy.ts`, `document-origin.ts`, `document-origin-contract.ts`, `document-origin-rules.ts`, `civic-opt-out.ts`; the parser **authorization hash** |
+| Residual preparation job | Only the preparation contract above, plus immutable original/scope/registry/policy/bounds input pins | Extraction prompts, chunking, model/decoding, cache and residual extraction/output assembly are **not preparation identity**, even though they remain semantic for extraction |
 | Joint extraction / generation archive | `district-claims.ts`, `district-stage-evidence.ts`, `district-public-fields.ts`, `district-inference.ts`, `district-answer-cache.ts`, `district-model.ts`, `district-claude.ts`, `district-model-contract.ts`, `district-prepared-document.ts`, `district-schema.ts`, `district-graph-claims.ts`, `topic-vocabulary.ts`, `../regional/taxonomy.mjs` | `district-model-readiness.ts`, `district-model-usage.ts`, `district-model-diagnostics.ts`, `district-private-io.ts`, `source-policy.ts`, `document-origin.ts`, `document-origin-rules.ts`, `document-origin-contract.ts`, `civic-opt-out.ts` |
 | Assessment queue | `district-assessment-jobs.ts`, `district-assessment-context.ts`, `district-claims.ts`, `district-assessment.ts`, `district-critical-assessment.ts`, `district-critical-assessment-public.ts`, `district-residual-jobs.ts`, `district-inference.ts`, `district-model.ts`, `district-model-contract.ts` | `district-codex-accounting.ts`, `district-jobs.ts`, `district-model-usage.ts`, `district-model-diagnostics.ts`, `district-policy-receipt.ts`, `district-policy-refresh.ts`, `civic-opt-out.ts` |
 | Assessment B | `district-assessment-broker.ts`, `district-assessment.ts`, `district-assessment-context.ts`, `district-claims.ts`, `district-assessment-bridge-contract.ts`, `district-claude.ts`, `district-model-contract.ts`, `district-omp-b-runner.ts`, `../docker/omp-b/Dockerfile`, `../docker/omp-b/settings.yml`, `../docker/omp-b/entry.sh`, `../scripts/build-omp-b-image.sh` | `district-policy-receipt.ts`, `district-jobs.ts`, `district-cas.ts`, `civic-opt-out.ts`, `source-policy.ts`, `document-origin.ts`; OMP **authorization hash** in selectors/leases |
@@ -144,6 +150,23 @@ artifacts/receipts become new input pins, never a silently relabelled old genera
 The regression gate includes per-contract host/semantic hash injection, immutable
 prepared/tool/image negative checks and a real disposable-PostgreSQL residual →
 assessment → export topology surviving several synthetic host generations.
+
+Residual preparation no longer evaluates extraction chunk/model-call limits:
+those gates run in extraction against the frozen prepared text. A prompt, model,
+strict-schema/decoding, chunking or extraction-assembly fix therefore leaves narrow
+preparation keys unchanged and can consume already committed prepared output.
+Extraction enqueue selects the current extraction contract instead of inheriting
+its predecessor's frozen extraction generation. It verifies original bytes,
+references, prepared receipt and text hashes, recorded preparation contract and
+current parser-output contract. Claim repeats predecessor authentication; consuming
+prepared text does not launch tool-version probes or require parser authorization
+for a new parse. A preparation-semantic change re-keys both stages and refuses reuse
+of the old prepared output. Previously queued extractions retain their frozen
+extraction semantics and require explicit new extraction enqueue after such a fix.
+The disposable-PostgreSQL topology injects model-only and parser/document source
+hash changes, reuses a genuinely committed broad-selector fixture without changing
+its receipt/artifacts, and carries the resulting extraction through assessment and
+export. These are labelled synthetic source edits, not production observations.
 
 
 ## Required Strausberg core release

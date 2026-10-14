@@ -26,6 +26,7 @@ import {PoliteFetcher,type FetchObservation} from '../src/polite-fetch.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {loadPolicyReceipt,recheckPolicyReceipt} from '../src/district-policy-receipt.ts';
 import {prepareDocument,PreparedDocumentSchema} from '../src/district-prepared-document.ts';
+import {parserOutputContractSha256,PARSER_ISOLATION_VERSION} from '../src/district-parser-isolation.ts';
 import {assessmentItemSchema,originalEvidence,buildAssessmentPassInput,type AssessmentOutput,type AssessmentPassInput} from '../src/district-assessment.ts';
 import {assessmentQueueHandlers,enqueueResidualAssessmentItems,enqueuePreparedAssessmentPass,enqueueAssessmentResolution} from '../src/district-assessment-jobs.ts';
 import {buildPreparedAssessmentContext} from '../src/district-assessment-context.ts';
@@ -504,19 +505,21 @@ test('offline frozen crawl import preserves managed originals and produces enque
    assert.deepEqual(checked.versions,{[`policyRebinding.${original.policyReceiptSha256}.${secondReceipt.receipt_sha256}`]:checked.admissibilityReceiptSha256});
    const loaded=await loadResidualSource(item.cas,original,{store});assert.deepEqual(loaded.receipt,pinned);assert.equal(loaded.policyCheck.admissibilityReceiptSha256,checked.admissibilityReceiptSha256);
    const textOutput:{parserSha256?:string;textSha256?:string}={};
-   // Existing preparation command seam: decode the real synthetic original text
-   // in-process; no Docker, command output, model result, or version is invented.
+   // Decode the real synthetic original text in-process, without Docker or a
+   // parser review. Source contract/Node version are actual; the explicitly
+   // synthetic image identity is fixture metadata, never authorization evidence.
+   const fixtureToolVersions={node:process.versions.node,parser_contract:await parserOutputContractSha256(),parser_isolation:PARSER_ISOLATION_VERSION,parser_image:'sha256:'+digest('Synthetic policy-continuation fixture image; no Docker used')};
    const prepareFixture:JobHandler=async context=>{
     const selected=ResidualInputSchema.strip().parse(context.job.spec.selector),source=await loadResidualSource(context.cas,selected,{store}),bytes=await context.cas.read(source.document.sha256);
     const selector=context.job.spec.selector as {contract:{preparationSha256:string}};
-    const prepared=await prepareDocument({bytes,municipalityId:source.municipality.id,references:[source.reference],mimeType:source.document.mimeType,extractorSha256:selector.contract.preparationSha256,toolVersions:{node:process.versions.node},managedRoot:join(context.cas.root,'continuation-prepared'),policy,sourceBindings:[source.sourceBinding],signal:context.signal},async()=>assert.fail('Plain-text fixture has no subprocess'));
+    const prepared=await prepareDocument({bytes,municipalityId:source.municipality.id,references:[source.reference],mimeType:source.document.mimeType,extractorSha256:selector.contract.preparationSha256,toolVersions:fixtureToolVersions,managedRoot:join(context.cas.root,'continuation-prepared'),policy,sourceBindings:[source.sourceBinding],signal:context.signal},async()=>assert.fail('Plain-text fixture has no subprocess'));
     const persist=async(value:Buffer,kind:'parser_output'|'derived',mimeType:string)=>{
      const hash=digest(value),artifact=await withManagedSourceWrite(context.cas.root,[{...source.sourceBinding,relativePath:`sha256/${hash.slice(0,2)}/${hash}`,contentSha256:hash,independentAllowed:true}],()=>context.cas.put(value,{kind,mimeType}),policy);
      await store.addArtifact(artifact);return artifact;
     };
     const parser=await persist(Buffer.from(canonicalJson(prepared)),'parser_output','application/json'),text=await persist(Buffer.from(prepared.text),'derived','text/plain');
     textOutput.parserSha256=parser.sha256;textOutput.textSha256=text.sha256;
-    return {outcome:'succeeded',reasonCode:'completed',outputs:[parser,text],versions:{preparation:prepared.extractorSha256,node:process.versions.node,...source.policyCheck.versions},counts:{bytes:bytes.length}};
+    return {outcome:'succeeded',reasonCode:'completed',outputs:[parser,text],versions:{preparation:prepared.extractorSha256,...fixtureToolVersions,...source.policyCheck.versions},counts:{bytes:bytes.length}};
    };
    prepareFixture.currentPolicy=production.residual_prepare.currentPolicy;
    for(const code of ['CIVIC_POLICY_BUSY','CIVIC_POLICY_INVENTORY_UNAVAILABLE'])for(const phase of ['claim','finish'] as const)await st.test(phase+' continuation preserves '+code+' as an execution hold',async()=>{
