@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-k1-retry3-2026-10-14-amendment-1",
+  "amends": {
+    "id": "r1-k1-retry3-2026-10-14",
+    "sha256": "55a7713242aabe6c36cc6035ecd88fec4f27b21fd353ce8011c7416d209bea1b"
+  },
+  "related": [
+    {
+      "id": "r1-k1-retry3-stage-acquisition-2026-10-14",
+      "sha256": "cbae8fa668f27b9bc6488b2c10303310b4cee022f404a470b8f675a4a0e281e8"
+    }
+  ],
+  "recordedAt": "2026-10-14T12:31:43.065Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session, structured question (ask tool) with two options",
+  "questionShownToOwner": "The K1 fetch you approved worked: Strausberg table, 944 bytes, HTTP 200. Our code then failed to admit it because the identical bytes were already stored from yesterday; that bug is fixed and reviewed. To use the data without a new request I need 2 more jobs: an offline admission of the data already fetched, then the parse. That makes 6 jobs, one over the K1 cap of 5. No new request to regionalstatistik, and time stays within 25 min (666 of 1,500 s used). Deadline: today 23:59. OK? Options: \"Yes, 6 jobs\" (Offline admission plus parse, no further request; K1 completes today) / \"No\" (K1 stays incomplete; the fetched bytes remain unused). Recommended: Yes, 6 jobs.",
+  "ownerStatementsVerbatim": [
+    "User selected: Yes, 6 jobs"
+  ],
+  "approved": {
+    "k1MaxJobs": 6,
+    "additionalJobs": [
+      "admit_acquired_representation (offline admission of the 2026-10-14T09:19Z owner-account response of job 178e058796303a144145dadeab137247f34260fce60ec20c346d720de74802f2; no fetcher, no request)",
+      "structured_parse of the admitted representation"
+    ],
+    "newDataRequests": 0,
+    "k1TotalSeconds": 1500,
+    "wallSecondsUsedBefore": 666,
+    "expiresAt": "2026-10-14T21:59:59Z"
+  },
+  "interpretation": "Raises only the K1 job cap from 5 to 6 for these two jobs; no further GENESIS request; all other K1 limits and rules unchanged."
+}
