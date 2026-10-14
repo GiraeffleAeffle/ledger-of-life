@@ -39,6 +39,22 @@ const unavailableSourceEvidenceCodes=new Set(['ENOENT','CONTENT_BINDING_MISMATCH
 function sourceEvidenceUnavailable(error:unknown):boolean{
  return error instanceof CivicPolicyStateError&&unavailableSourceEvidenceCodes.has(error.code)||(error as NodeJS.ErrnoException)?.code==='ENOENT';
 }
+// These failures describe only the retained parent's content/admission evidence.
+// Managed-state/I/O failures and unexpected exceptions are not lineage absence.
+const parentEvidenceValidationMessages=new Set([
+ 'Source observation index binding is incomplete or excluded',
+ 'Source observation is outside the explicitly managed raw root',
+ 'Source observation path/type/size rejected',
+ 'Source observation does not bind the requested representation',
+ 'Source representation bytes changed after observation binding',
+ 'Source policy evidence missing or invalid; recollect before subscription extraction',
+ 'Source policy blocks extraction; ask_municipality',
+ 'Source policy evidence clock is incomplete',
+]);
+function parentEvidenceInvalid(error:unknown):boolean{
+ if(error instanceof CivicPolicyStateError||(error as NodeJS.ErrnoException)?.code!==undefined)return false;
+ return error instanceof z.ZodError||error instanceof SyntaxError||error instanceof Error&&parentEvidenceValidationMessages.has(error.message);
+}
 const MAX_IMPORTED_DISCOVERY_HOPS=32;
 /** Reconstruct only byte-verified HTML edges in the authenticated frozen corpus.
  * A frontier/metadata parent URL is a lookup hint, never discovery authorization.
@@ -61,10 +77,13 @@ function importedRegisteredPolicy(documents:readonly ImportedDocument[],rawRoot:
     if(!targets){
      const expected=parent.observationPath?observations.get(basename(parent.observationPath)):undefined;
      if(!expected||expected.observation.bytes>64*1024*1024)return original;
-     const bound=await readBoundSourceObservation({rawRoot,document:parent,policy,registeredSource:source});
-     if(JSON.stringify(expected.binding)!==JSON.stringify(bound.binding))return original;
-     // Historical discovery need not be fresh, but its evidence clocks must be real.
-     sourcePolicyExpiresAt(bound.policy,bound.observation.checkedAt,parent,{municipalityId:parent.municipalityId,sourceId:parent.sourceId,ags:parent.ags},base);
+     let bound:BoundSourceObservation;
+     try{
+      bound=await readBoundSourceObservation({rawRoot,document:parent,policy,registeredSource:source});
+      if(JSON.stringify(expected.binding)!==JSON.stringify(bound.binding))return original;
+      // Historical discovery need not be fresh, but its evidence clocks must be real.
+      sourcePolicyExpiresAt(bound.policy,bound.observation.checkedAt,parent,{municipalityId:parent.municipalityId,sourceId:parent.sourceId,ags:parent.ags},base);
+     }catch(error){if(!parentEvidenceInvalid(error))throw error;return original;}
      targets=new Set(discoverDocumentLinks(bound.sourceBytes.toString('utf8'),parent.url).filter(link=>byUrl.has(link.url)).map(link=>link.url));
      parents.set(parent.url,targets);
     }
