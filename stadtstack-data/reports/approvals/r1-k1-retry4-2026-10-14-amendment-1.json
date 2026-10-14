@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-k1-retry4-2026-10-14-amendment-1",
+  "amends": {
+    "id": "r1-k1-retry4-2026-10-14",
+    "sha256": "18b46f294132b087888155c645c5d467c55bd4a4922d645d749df367d4f82ba0"
+  },
+  "related": [
+    {
+      "id": "r1-k1-retry4-stage-acquisition-2026-10-14",
+      "sha256": "f061ef586144454a50886fdaf83c0f86a980155697d935fde78df2f09ef41952"
+    }
+  ],
+  "recordedAt": "2026-10-14T19:23:04.457Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session: structured question (ask tool) and a chat message",
+  "questionShownToOwner": "Not stuck; R1 keeps running. One question: the K1 request for the town-level table 12411-02-03-5 reached regionalstatistik.de but got no answer within our 25-second limit (timeout). Try once more with a 120-second limit (a small reviewed code change, already being prepared; 1 more request; within the K1 time budget, deadline today 23:59)? Options: \"A: retry with 120 s\" (1 more request after the reviewed change) / \"B: stop K1\" (K1 closes with an honest timeout result). Recommended: A.",
+  "ownerStatementsVerbatim": [
+    "User selected: A: retry with 120 s",
+    "Ok then please do the recommended A"
+  ],
+  "approved": {
+    "k1Retry4b": "One more GENESIS data/table POST via the owner-account lane, identical to the timed-out retry-4 request (name=12411-02-03-5, Strausberg 12064472, GEMEIN, 2024, datencsv), with a reviewed 120-second wire deadline scoped to that exact owner-account POST, followed by the structured parse",
+    "jobs": "K1 jobs 8 (acquisition) and 9 (parse)",
+    "timeBudget": "within the remaining K1 process wall time (1500 s total; 873 s used)",
+    "expiresAt": "2026-10-14T21:59:59Z"
+  },
+  "interpretation": "Both statements select option A as worded; if this request also fails, K1 closes with an honest result and no further request without a new approval."
+}
