@@ -244,16 +244,28 @@ test('real municipal datencsv refuses changed headers, dimensions, selection and
     native => { native.Status.Code = 104; native.Status.Content = 'Keine Objekte'; },
     native => { native.Status.Type = 'Error'; },
   ];
-  for (const mutate of mutations) {
-    const native = JSON.parse(strausbergResponse);
-    mutate(native);
-    const result = genesisAdapter.parse(snapshot(JSON.stringify(native), 'data/table'), townScope);
-    assert.equal(result.coverage.state, 'held_quality', String(mutate));
-    assert.deepEqual(result.observations, []);
+  for (const explicitLayout of [false, true]) {
+    for (const mutate of mutations) {
+      const native = JSON.parse(strausbergResponse);
+      if (explicitLayout) native.Object.TableLayout = {FrontColumnsNumber: '4'};
+      mutate(native);
+      const result = genesisAdapter.parse(snapshot(JSON.stringify(native), 'data/table'), townScope);
+      assert.equal(result.coverage.state, 'held_quality', `explicitLayout=${explicitLayout}: ${String(mutate)}`);
+      assert.deepEqual(result.observations, []);
+    }
   }
   const other = genesisAdapter.parse(snapshot(strausbergResponse, 'data/table'), scope);
   assert.equal(other.coverage.state, 'empty');
   assert.equal(other.coverage.observedRows, 18);
+});
+test('valid municipal candidates retain strict semantics with an explicit four-column layout', () => {
+  const native = JSON.parse(strausbergResponse);
+  native.Object.TableLayout = {FrontColumnsNumber: '4'};
+  const result = genesisAdapter.parse(snapshot(JSON.stringify(native), 'data/table'), {...scope, municipalityId: 'strausberg', ags: '12064472'});
+  assert.equal(result.coverage.state, 'partial', result.coverage.reason);
+  assert.equal(result.coverage.observedRows, 18);
+  assert.equal(result.observations.length, 54);
+  assert.deepEqual(result.observations.slice(0, 3).map(row => row.value), [572, 289, 283]);
 });
 test('housing-stock table preserves area units and decimals, not construction completion', () => {
   const content = 'GENESIS-Tabelle: 31231-02-01\nWohnungsbestand;;;;\n;;Wohngebäude (Anzahl);Wohnungen (Anzahl);Wohnfläche (1000 m²)\n;;2024;2024;2024\n01053100;Ratzeburg;2;3;1,25\n__________\n';

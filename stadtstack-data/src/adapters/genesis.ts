@@ -188,11 +188,10 @@ export function parseGenesisTable(snapshot: AdmittedSnapshot, scope: AdapterScop
       'Fortschreibung des Bevölkerungsstandes',
       'Bevölkerungsstand (Anzahl)',
     ];
+    // Detect the municipal candidate independently of header/layout validity.
+    // A malformed candidate must never escape into the generic explicit-layout path.
     const municipalDatencsv = table === '12411-02-03' && tableMatch?.[1] === 'Tabelle' &&
-      (!layout || Number(layout.FrontColumnsNumber) === 4) &&
-      rows[0]?.length === 1 && rows[0][0] === tableMatch[0] &&
-      metadata.every((label, index) => rows[index + 1]?.length === 7 && rows[index + 1][0] === label && rows[index + 1].slice(1).every(value => !value)) &&
-      canonicalJson(rows[5] ?? []) === canonicalJson(['', '', '', '', 'Insgesamt', 'männlich', 'weiblich']);
+      metadata.some((label, index) => rows[index + 1]?.[0] === label);
     const front = layout ? Number(layout.FrontColumnsNumber) : municipalDatencsv ? 4 : 2;
     if (!Number.isInteger(front) || front < 1 || front > 8) throw Error('Changed native front-column layout');
     const selection = typeof parameters?.regionalkey === 'string' && /^\d{8}$|^\d{5}$/.test(parameters.regionalkey) ? parameters.regionalkey : null;
@@ -200,9 +199,12 @@ export function parseGenesisTable(snapshot: AdmittedSnapshot, scope: AdapterScop
     const regionRows = Array.isArray(structure?.Rows) ? structure.Rows.map(object).filter(row => /Gemeind|Kreise/i.test(String(row.Content))) : [];
     const selectedRegion = regionRows.length === 1 && regionRows[0].Code === parameters?.regionalvariable && String(regionRows[0].Selected) === '1' ? regionRows[0] : null;
     if (municipalDatencsv) {
-      // Only this recognized age-table header supplies an implicit four-column
-      // layout. Other tables and explicit layouts keep the generic native path.
-      if (tables[table].level !== 'GE') throw Error('Municipal datencsv requires GE geography');
+      if (tables[table].level !== 'GE' || front !== 4 ||
+          rows[0]?.length !== 1 || rows[0][0] !== tableMatch?.[0] ||
+          metadata.some((label, index) => rows[index + 1]?.length !== 7 || rows[index + 1][0] !== label || rows[index + 1].slice(1).some(Boolean)) ||
+          canonicalJson(rows[5] ?? []) !== canonicalJson(['', '', '', '', 'Insgesamt', 'männlich', 'weiblich'])) {
+        throw Error('Unrecognized municipal datencsv header/layout');
+      }
       if (root && (parameters?.format !== 'datencsv' || parameters.regionalvariable !== 'GEMEIN' ||
           !selection || selection.length !== 8 || !selectedRegion || selectedRegion.Code !== 'GEMEIN')) {
         throw Error('Municipal datencsv requires evidenced GEMEIN single selection');
