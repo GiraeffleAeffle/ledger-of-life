@@ -24,9 +24,10 @@ const PredecessorSchema=z.object({jobKey:HashSchema,receiptId:z.uuid(),receiptSh
 const ItemSelectorSchema=z.object({version:z.literal('r1-assessment-item-job-v1'),extraction:PredecessorSchema,extractionArtifactSha256:HashSchema}).strict();
 const PassSelectorSchema=z.object({version:z.literal('r1-assessment-pass-job-v1'),itemArtifactSha256:HashSchema,recordArtifactSha256:HashSchema,maxModelCalls:z.number().int().min(2).max(48),predecessors:z.array(PredecessorSchema),AJobKey:HashSchema.optional(),BJobKey:HashSchema.optional(),CJobKey:HashSchema.optional()}).strict();
 const ItemBundleSchema=z.object({version:z.literal('r1-assessment-items-v1'),items:z.array(z.object({itemArtifactSha256:HashSchema,recordArtifactSha256:HashSchema,maxModelCalls:z.number().int().min(2).max(48)}).strict())}).strict();
-export async function assessmentQueueContract(){
- const files=['district-assessment-jobs.ts','district-assessment-context.ts','district-claims.ts','district-codex-accounting.ts','district-assessment.ts','district-critical-assessment.ts','district-critical-assessment-public.ts','district-residual-jobs.ts','district-inference.ts','district-jobs.ts','district-model.ts','district-model-contract.ts','district-model-usage.ts','district-model-diagnostics.ts','district-policy-receipt.ts','district-policy-refresh.ts','civic-opt-out.ts'];
- return semanticHash(await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))}))));
+export async function assessmentQueueContract(hash?:(file:string)=>Promise<string>){
+ // Item building, evidence context, reconciliation and model framing are semantic.
+ const files=['district-assessment-jobs.ts','district-assessment-context.ts','district-claims.ts','district-assessment.ts','district-critical-assessment.ts','district-critical-assessment-public.ts','district-residual-jobs.ts','district-inference.ts','district-model.ts','district-model-contract.ts'];
+ return semanticHash(await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))}))));
 }
 /** Operational usage/failure metadata is not CAS content or a nested managed lane. */
 export function assessmentModelUsagePaths(casRoot:string,jobKey:string,runId:string){

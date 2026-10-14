@@ -86,10 +86,12 @@ export const RepresentationDescriptorSchema=z.object({version:z.literal('distric
  if(descriptor.receiptSha256!==descriptor.snapshot.policyReceiptSha256||descriptor.sourceArtifact.sha256!==descriptor.snapshot.sourceSha256||descriptor.sourceArtifact.mimeType!==descriptor.snapshot.mimeType)ctx.addIssue({code:'custom',message:'Representation policy and source artifact binding mismatch'});
 });
 export const HostGroupsSchema=z.object({schemaVersion:z.literal('district-host-groups-v1'),serviceGroups:z.tuple([z.object({id:z.literal('r1-public-acquisition'),groupingBasis:z.literal('conservative_capacity_pool_not_publisher_equivalence'),scope:z.literal('all_registered_public_sources_and_observed_redirect_hosts'),minStartIntervalMs:z.literal(2500),maxInFlight:z.literal(1)}).strict()])}).strict();
-export async function acquisitionContract(){
+export async function acquisitionContract(hash?:(file:string)=>Promise<string>){
  const hostGroupsBytes=await readFile(join(REPO,'sources/district-host-groups.json'));
- HostGroupsSchema.parse(JSON.parse(hostGroupsBytes.toString('utf8')));
- return semanticHash({version:ACQUISITION_VERSION,hostGroupsSha256:digest(hostGroupsBytes),files:await Promise.all(['district-r1.ts','district-r1-state.ts','polite-fetch.ts','district-crawl-request.ts','district-policy-receipt.ts','source-policy.ts','registered-source-policy.ts','civic-opt-out.ts','district-native-request.ts','genesis-owner-credentials.ts','genesis-owner-acquisition.ts','genesis-owner-reuse.ts','district-http-observation.ts'].map(async file=>({file,sha256:digest(await readFile(join(REPO,'src',file)))})))});
+ HostGroupsSchema.parse(JSON.parse(hostGroupsBytes.toString('utf8'))); // Live pacing, not identity.
+ // Mixed request/representation code stays semantic; authority/policy/custody do not.
+ const files=['district-r1.ts','district-r1-state.ts','polite-fetch.ts','district-native-request.ts','genesis-owner-acquisition.ts'];
+ return semanticHash({version:ACQUISITION_VERSION,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(join(REPO,'src',file)))})))});
 }
 
 /** Controlled counts over the actual committed pages; no source literals or raw hold explanations. */

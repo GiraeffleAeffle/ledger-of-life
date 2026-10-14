@@ -4,7 +4,8 @@ import { join, relative, isAbsolute } from 'node:path';
 import { z } from 'zod';
 import { extractDocumentText, runDocumentCommand, MAX_DOCUMENT_BYTES, type DocumentCommand } from './district-document.ts';
 import { SourceAccessPolicySchema, assertSubscriptionSourcePolicy, sha256, hashSchema } from './district-schema.ts';
-import { collectParserToolVersions, parserIsolationContractSha256, readParserReview, PARSER_ISOLATION_VERSION, type ParserTool } from './district-parser-isolation.ts';
+import { collectParserToolVersions, parserOutputContractSha256, readParserReview, PARSER_ISOLATION_VERSION, type ParserTool } from './district-parser-isolation.ts';
+import {contractSourceManifest,type ContractSourceHash} from './district-contract-source.ts';
 import type { CivicPolicyOptions, ManagedSourceBinding, ManagedAcquisitionLaneOptions } from './civic-opt-out.ts';
 import type { ParserSourceContext } from './district-parser-isolation.ts';
 export const PREPARED_DOCUMENT_VERSION = 'district-prepared-v2';
@@ -82,13 +83,15 @@ export async function assertPreparedSourcesActive(references: PreparedSourceRefe
     if (!hosts.has(host)) { await assertHostNotOptedOut(reference.url, options); hosts.add(host); }
   }
 }
-export async function preparationExtractorSha256(): Promise<string> {
-  return sha256(canonical({ sourceFiles: await Promise.all(['district-document.ts', 'district-prepared-document.ts', 'district-preparation-run.ts', 'district-registry-config.ts', 'district-registry.ts', 'district-corpus.ts', 'source-observation.ts', 'district-private-io.ts', 'district-schema.ts', 'source-policy.ts', 'document-origin.ts', 'document-origin-contract.ts', 'document-origin-rules.ts', 'civic-opt-out.ts'].map(async file => sha256(await readFile(new URL(file, import.meta.url))))), parserIsolation: await parserIsolationContractSha256() }));
+export async function preparationExtractorSha256(hash?:ContractSourceHash): Promise<string> {
+  // Mixed preparation/schema modules remain conservative semantic dependencies.
+  const files=['district-document.ts','district-prepared-document.ts','district-preparation-run.ts','district-schema.ts','district-contract-source.ts'];
+  return sha256(canonical({sourceFiles:await contractSourceManifest(files,hash),parserOutput:await parserOutputContractSha256(hash)}));
 }
 export async function collectPreparationToolVersions(mimeType: string, sourceContext?: ParserSourceContext): Promise<Record<string, string>> {
   const tools: ParserTool[] = mimeType.split(';')[0] === 'application/pdf' ? ['pdfinfo', 'pdftotext', 'pdftoppm', 'tesseract'] : /zip/i.test(mimeType) ? ['python3'] : ['node'];
   const review = await readParserReview();
-  return { node: process.versions.node, parser_isolation: PARSER_ISOLATION_VERSION, parser_image: review.imageId, parser_contract: review.runnerSha256, ...await collectParserToolVersions(tools, sourceContext) };
+  return { node: process.versions.node, parser_isolation: PARSER_ISOLATION_VERSION, parser_image: review.imageId, parser_contract: await parserOutputContractSha256(), ...await collectParserToolVersions(tools, sourceContext) };
 }
 export async function readAuthorizedSourceBytes(rawRoot: string, path: string, expectedSha256: string, policy: CivicPolicyOptions = {}): Promise<Uint8Array> {
   hashSchema.parse(expectedSha256);
@@ -139,7 +142,7 @@ export async function prepareDocument(input: PreparationInput & Partial<ManagedP
   }
   if (command === runDocumentCommand) {
     const review = await readParserReview();
-    if (versions.parser_isolation !== PARSER_ISOLATION_VERSION || versions.parser_image !== review.imageId || versions.parser_contract !== review.runnerSha256) throw Error('Preparation parser isolation evidence differs from reviewed sandbox');
+    if (versions.parser_isolation !== PARSER_ISOLATION_VERSION || versions.parser_image !== review.imageId || versions.parser_contract !== await parserOutputContractSha256()) throw Error('Preparation parser isolation evidence differs from reviewed sandbox');
   }
   const result = await extractDocumentText(input.bytes, input.mimeType, sourceContext, command);
   input.signal?.throwIfAborted();

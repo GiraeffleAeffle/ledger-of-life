@@ -9,6 +9,7 @@ import {canonicalJson, digest, HashSchema, ScopeSchema, type AdapterScope} from 
 import {DistrictCas, type CasArtifact} from './district-cas.ts';
 import {CANONICALIZATION_VERSION, STEP_RECEIPT_VERSION, ReasonCodeSchema, encodeStepReceipt, unknownReceiptCounts, type JobOutcome, type ReasonCode, type StepReceipt} from './district-step-receipt.ts';
 import {CivicPolicyStateError} from './civic-opt-out.ts';
+import {hostCodeVersions} from './district-host-provenance.ts';
 
 // This is the authorized R1 ring, not a district-prefix or whole-Amt admission rule.
 export const R1_MUNICIPALITIES:Readonly<Record<string,string>>={strausberg:'12064472',hoppegarten:'12064227','ruedersdorf-bei-berlin':'12064428',ratzeburg:'01053100',moelln:'01053090',schwarzenbek:'01053116',ludwigslust:'13076090',parchim:'13076108',hagenow:'13076060'};
@@ -470,7 +471,7 @@ export class DistrictJobStore {
       for(const row of abandoned.rows){
         const job:ClaimedJob={id:row.id,jobKey:row.job_key,spec:row.spec,attempt:row.attempt,fencingToken:row.fencing_token,runId:row.lease_owner,enqueuedAt:row.created_at.toISOString(),startedAt:row.attempt_started_at.toISOString(),leaseExpiresAt:row.lease_expires_at.toISOString(),dependencyReceiptIds:row.claimed_dependency_receipt_ids,category:row.category};
         const reason:ReasonCode=row.lease_expires_at<=row.now?'lease_expired':'lease_lost';
-        const receipt=makeReceipt(job,{outcome:'held_execution',reasonCode:reason},null,null,row.now.toISOString());
+        const receipt=await makeReceipt(job,{outcome:'held_execution',reasonCode:reason},null,null,row.now.toISOString());
         await this.insertReceipt(client,job,receipt);
         await client.query(`UPDATE district_pipeline.jobs SET state='held_execution',reason_code=$2,lease_owner=NULL,lease_expires_at=NULL,fencing_token=fencing_token+1 WHERE id=$1`,[row.id,reason]);
         await client.query('DELETE FROM district_pipeline.host_lane_leases WHERE job_id=$1',[row.id]);
@@ -516,8 +517,8 @@ export class DistrictJobStore {
   }
 }
 
-function makeReceipt(job:ClaimedJob,result:JobHandlerResult,elapsedMs:number|null,cpu:NodeJS.CpuUsage|null,finishedAt=new Date().toISOString()):StepReceipt {
-  const versions={...result.versions};for(const continuation of job.policyContinuations??[])Object.assign(versions,policyContinuationVersions(continuation));
+async function makeReceipt(job:ClaimedJob,result:JobHandlerResult,elapsedMs:number|null,cpu:NodeJS.CpuUsage|null,finishedAt=new Date().toISOString()):Promise<StepReceipt> {
+  const versions={...result.versions,...await hostCodeVersions()};for(const continuation of job.policyContinuations??[])Object.assign(versions,policyContinuationVersions(continuation));
   return {version:STEP_RECEIPT_VERSION,canonicalizationVersion:CANONICALIZATION_VERSION,id:randomUUID(),runId:job.runId,jobKey:job.jobKey,step:job.spec.step,lane:job.spec.lane,sourceId:job.spec.sourceScope.sourceId,municipalityId:job.spec.sourceScope.municipalityId,attempt:job.attempt,leaseToken:job.fencingToken,category:job.category,dependencyReceiptIds:job.dependencyReceiptIds,enqueuedAt:job.enqueuedAt,startedAt:job.startedAt,finishedAt,queueWaitMs:Math.max(0,Date.parse(job.startedAt)-Date.parse(job.enqueuedAt)),elapsedMs,cpuUserMicros:cpu?.user??null,cpuSystemMicros:cpu?.system??null,outcome:result.outcome,reasonCode:result.reasonCode,inputHashes:job.spec.inputArtifactHashes,outputHashes:[...new Set((result.outputs??[]).map(output=>output.sha256))].sort(),policyProofSha256:job.spec.policyProofSha256,originProofSha256:result.originProofSha256??null,versions,cache:result.cache??{disposition:'not_applicable',originalGenerationReceiptId:null},provider:result.provider??null,counts:{...unknownReceiptCounts,...result.counts}};
 }
 export type ExecutionResource='codex-subscription'|'omp-b';
@@ -555,6 +556,7 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
   if(options.notificationProvider)token.parse(options.notificationProvider);
   const notificationConfig:NotificationConfig|undefined=mode==='bounded_unattended'?{notifyOwner:options.notifyOwner!,notificationApprovalSha256:options.notificationApprovalSha256!,destinationSha256:options.notificationDestinationSha256!,provider:options.notificationProvider!}:undefined;
   if(!Number.isInteger(options.maxJobs)||options.maxJobs<1||options.maxJobs>10000||!Number.isInteger(options.maxElapsedMs)||options.maxElapsedMs<1||options.maxElapsedMs>86400000)throw Error('Executor bounds required');
+  await hostCodeVersions(); // Snapshot the immutable executor checkout before claiming/effects.
   const leaseMs=options.leaseMs??30000;if(!Number.isInteger(leaseMs)||leaseMs<50||leaseMs>300000)throw Error('Lease bound rejected');
   const resourceLimits={'codex-subscription':options.resourceLimits?.['codex-subscription']??Number(process.env.R1_CODEX_CONCURRENCY??1),'omp-b':options.resourceLimits?.['omp-b']??Number(process.env.R1_OMP_B_CONCURRENCY??1)};
   Object.values(resourceLimits).forEach(validateResourceLimit);
@@ -622,12 +624,12 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
           if(!subscription||(provider.actualBilledUsd!==null&&provider.actualBilledUsd>0)||provider.reservedMicroUsd>0)throw new DistrictExecutionHold('paid_not_authorized');
         }
         for(const output of result.outputs??[]){controller.signal.throwIfAborted();await options.cas.verify(output.sha256);await options.store.addArtifact(output);}
-        receipt=makeReceipt(job,result,performance.now()-start,process.cpuUsage(cpu));
+        receipt=await makeReceipt(job,result,performance.now()-start,process.cpuUsage(cpu));
         await options.store.finish(run,job,receipt,currentPolicy);receiptIds.push(receipt.id);
         if(result.outcome!=='succeeded'&&result.outcome!=='no_supported_case'){stopped=result.reasonCode;break;}
       } catch(error) {
         const reason=error instanceof DistrictExecutionHold?error.reasonCode:'execution_exception';
-        receipt=makeReceipt(job,{outcome:'held_execution',reasonCode:reason},performance.now()-start,process.cpuUsage(cpu));
+        receipt=await makeReceipt(job,{outcome:'held_execution',reasonCode:reason},performance.now()-start,process.cpuUsage(cpu));
         if(await options.store.hold(job,reason,receipt))receiptIds.push(receipt.id);
         stopped=reason;break;
       } finally {

@@ -5,10 +5,10 @@ import {createHash} from 'node:crypto';
 import {PassThrough,Writable} from 'node:stream';
 import type {Readable,Duplex} from 'node:stream';
 import {z} from 'zod';
+import {PARSER_PROCESS,OMP_PROCESS} from './district-execution-profile.ts';
 
 const hash=(value:string)=>createHash('sha256').update(value).digest('hex');
 const hex=z.string().regex(/^[a-f0-9]{64}$/),image=z.string().regex(/^sha256:[a-f0-9]{64}$/);
-export const OMP_B_MODEL_MAX_TIME_SECONDS=150;
 export const DockerParserResourceSchema=z.object({
  id:z.string().uuid(),scratchId:z.string().uuid(),rootId:hex,authoritySha256:hex,nonce:z.string().uuid(),name:z.string().regex(/^stadtstack-parser-[a-f0-9-]{36}-[a-f0-9-]{36}$/),
  socketPath:z.string().min(1).max(4096),daemonId:z.string().regex(/^[A-Za-z0-9:_-]{1,256}$/),imageId:image,contractSha256:hex,
@@ -41,8 +41,7 @@ function stable(value:unknown):string{
 }
 export function dockerParserConfig(resource:DockerParserIdentity,scratchDirectory:string){
  return {
-  Image:resource.imageId,User:'65534:65534',WorkingDir:'/scratch',OpenStdin:true,StdinOnce:true,Tty:false,AttachStdin:true,AttachStdout:true,AttachStderr:true,StopTimeout:1,
-  Entrypoint:['/usr/bin/env'],Cmd:['-i','PATH=/usr/local/bin:/usr/bin:/bin','LANG=C.UTF-8','LC_ALL=C.UTF-8','TZ=UTC','HOME=/scratch/home','TMPDIR=/scratch/tmp','TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata','OMP_THREAD_LIMIT=1','/usr/bin/python3','-I','-S','/opt/stadtstack/parser-worker.py'],Labels:labels(resource),
+  Image:resource.imageId,...PARSER_PROCESS,OpenStdin:true,StdinOnce:true,Tty:false,AttachStdin:true,AttachStdout:true,AttachStderr:true,StopTimeout:1,Labels:labels(resource),
   HostConfig:{ReadonlyRootfs:true,NetworkMode:'none',IpcMode:'none',Privileged:false,AutoRemove:false,CapDrop:['ALL'],CapAdd:[],SecurityOpt:['no-new-privileges'],Memory:536870912,MemorySwap:536870912,NanoCpus:1000000000,PidsLimit:32,
    Ulimits:[{Name:'cpu',Soft:120,Hard:120},{Name:'nofile',Soft:64,Hard:64},{Name:'nproc',Soft:32,Hard:32},{Name:'fsize',Soft:33554432,Hard:33554432},{Name:'core',Soft:0,Hard:0}],LogConfig:{Type:'none',Config:{}},
    Tmpfs:{'/scratch':'rw,noexec,nosuid,nodev,size=134217728,uid=65534,gid=65534,mode=0700'},
@@ -50,13 +49,9 @@ export function dockerParserConfig(resource:DockerParserIdentity,scratchDirector
   },
  };
 }
-export function ompExecutionArgs():string[]{return ['--print','--mode','json','--model','anthropic/claude-haiku-5-5','--thinking','off','--no-session','--no-tools','--no-lsp','--no-pty','--no-extensions','--no-skills','--no-rules','--no-title','--no-prewalk','--config','/opt/stadtstack/omp-b-settings.yml','--system-prompt','/control/system-prompt.md','--max-time',String(OMP_B_MODEL_MAX_TIME_SECONDS),'--cwd','/work'];}
-export function ompContainerEnvironment():string[]{return ['PATH=/usr/local/bin:/usr/bin:/bin','HOME=/home/omp','PI_CONFIG_DIR=.omp','PI_CODING_AGENT_DIR=/home/omp/.omp/agent','XDG_CONFIG_HOME=/home/omp/.config','XDG_DATA_HOME=/home/omp/.local/share','XDG_STATE_HOME=/home/omp/.local/state','XDG_CACHE_HOME=/home/omp/.cache','TMPDIR=/tmp','LANG=C.UTF-8','TZ=UTC','PI_NO_TITLE=1','PI_NO_PTY=1'];}
 export function dockerOmpBConfig(resource:DockerParserIdentity&{profile:'omp-b';controlSha256:string;controlBytes:number},scratchDirectory:string){
- const environment=ompContainerEnvironment();
  return {
-  Image:resource.imageId,User:'65534:65534',WorkingDir:'/work',OpenStdin:true,StdinOnce:true,Tty:false,AttachStdin:true,AttachStdout:true,AttachStderr:true,StopTimeout:1,
-  Env:environment,Entrypoint:['/usr/bin/env','-i',...environment,'/opt/stadtstack/entry.sh'],Cmd:ompExecutionArgs(),
+  Image:resource.imageId,...OMP_PROCESS,OpenStdin:true,StdinOnce:true,Tty:false,AttachStdin:true,AttachStdout:true,AttachStderr:true,StopTimeout:1,
   Labels:{...labels(resource),'org.stadtstack.profile':'omp-b','org.stadtstack.control':resource.controlSha256,'org.stadtstack.control-bytes':String(resource.controlBytes)},
   HostConfig:{ReadonlyRootfs:true,NetworkMode:'bridge',IpcMode:'none',Privileged:false,AutoRemove:false,CapDrop:['ALL'],CapAdd:[],SecurityOpt:['no-new-privileges:true'],Memory:536870912,MemorySwap:536870912,NanoCpus:1000000000,PidsLimit:32,
    Ulimits:[{Name:'nofile',Soft:64,Hard:64},{Name:'nproc',Soft:32,Hard:32},{Name:'fsize',Soft:33554432,Hard:33554432},{Name:'core',Soft:0,Hard:0}],LogConfig:{Type:'none',Config:{}},

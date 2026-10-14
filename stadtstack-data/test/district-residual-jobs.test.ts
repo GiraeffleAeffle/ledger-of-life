@@ -71,7 +71,7 @@ test('unauthorized corpora fail schema, enqueue, defensive load and both executi
  await assert.rejects(loadResidualSource(cas,unauthorized),/owner-authorized/);
  const handlers=residualJobHandlersFor({query:async()=>assert.fail('Must not query unauthorized source')} as unknown as Pool);
  for(const step of ['residual_prepare','residual_extract']){
-  const selector={...unauthorized,contract:{preparationSha256:hash,extraction:{promptSha256:hash,schemaSha256:hash,extractorSha256:hash},hostSha256:hash},...(step==='residual_extract'?{preparationJobKey:hash,preparationReceiptId:'11111111-1111-4111-8111-111111111111',preparationReceiptSha256:hash,preparedArtifactSha256:hash}:{})};
+  const selector={...unauthorized,contract:{preparationSha256:hash,extraction:{promptSha256:hash,schemaSha256:hash,extractorSha256:hash},outputSha256:hash},...(step==='residual_extract'?{preparationJobKey:hash,preparationReceiptId:'11111111-1111-4111-8111-111111111111',preparationReceiptSha256:hash,preparedArtifactSha256:hash}:{})};
   await assert.rejects(handlers[step]({job:{spec:{step,selector}},cas} as unknown as JobHandlerContext),/owner-authorized/);
  }
  assert.equal(reads,0);assert.equal(enqueues,0);

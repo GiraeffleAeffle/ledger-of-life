@@ -22,7 +22,7 @@ function resource(profile:'parser'|'omp-b',socketPath:string):ManagedDockerResou
 }
 function inspection(record:ManagedDockerResource,directory:string):SyntheticInspection{
  const {HostConfig,...Config}=managedDockerConfig(record,directory);
- return {Id:record.containerId,Name:'/'+record.name,Image:record.imageId,Config:{...Config,Env:'Env' in Config?Config.Env:[]},HostConfig,State:{Running:false},Mounts:HostConfig.Mounts.map(mount=>({Type:mount.Type,Source:mount.Source,Destination:mount.Target,RW:!mount.ReadOnly,Propagation:mount.BindOptions.Propagation})),NetworkSettings:{Networks:{[HostConfig.NetworkMode]:{}}}};
+ return {Id:record.containerId,Name:'/'+record.name,Image:record.imageId,Config:{...Config,Env:'Env' in Config?[...Config.Env]:[]},HostConfig,State:{Running:false},Mounts:HostConfig.Mounts.map(mount=>({Type:mount.Type,Source:mount.Source,Destination:mount.Target,RW:!mount.ReadOnly,Propagation:mount.BindOptions.Propagation})),NetworkSettings:{Networks:{[HostConfig.NetworkMode]:{}}}};
 }
 async function withDaemon(work:(socket:string,root:string,daemon:{value:SyntheticInspection|null;requests:string[];created:unknown})=>Promise<void>){
  const root=await realpath(await mkdtemp(join(tmpdir(),'civic-docker-test-'))),socket=join(root,'engine.sock');

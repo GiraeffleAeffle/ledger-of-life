@@ -58,6 +58,86 @@ Policy-resource wrappers preserve typed transport/runtime failures and original 
 
 Assessment-broker protocol fixtures explicitly opt into `fixtureProtocol` with a genuinely provisioned, fully pinned isolated authority. Default brokers still require production VM authority; fixture mode rejects native `vm-omp` execution and is not exposed as a CLI option. Protocol tests exercise actual managed CAS and disposable PostgreSQL transactions with synthetic provider event bytes, not production assessment evidence. Persisted structured snapshots use the worker's canonical metadata codec, including the required original HTTP method/body/content type; the source URL remains on the snapshot, not duplicated inside its request.
 
+## R1 output identity and host enforcement
+
+Phase 1 separates output-semantic fingerprints (**a**) from live host enforcement
+(**b**). A host-only source edit does not change the named job keys, preparation or
+extraction contracts, predecessor compatibility, or registry descriptor admission.
+Frozen original bytes, source/registry scope, policy receipts, prepared text, evidence
+context, prompts, schemas, model identities and decoding remain identity inputs.
+This is a clean cutover: residual selectors use `outputSha256`, structured results
+use `district-structured-job-result-v2` / `mappingContractSha256`, and VM-B selectors
+use `runnerOutputContractSha256`. Old broad-contract selectors are not silently
+upgraded or accepted by a compatibility shim; prepare/enqueue this cohort under the
+split before its multi-day run. Historical receipts are never rewritten.
+
+Actual implemented classification (paths are relative to `src/`, unless prefixed
+`../`; lists describe code fingerprints, not removal of runtime imports/checks):
+
+| Contract | a: included implementation files | b: excluded implementation files |
+| --- | --- | --- |
+| Residual output assembly | `district-residual-jobs.ts`, `district-inference.ts`, `district-answer-cache.ts`, `district-model.ts`; preparation and joint-extraction contracts below | `district-codex-accounting.ts`, `district-corpus.ts`, `district-crawl-request.ts`, `district-http-observation.ts`, `source-observation.ts`, `district-policy-receipt.ts`, `district-policy-refresh.ts`, `civic-opt-out.ts`, `district-jobs.ts` |
+| Preparation | `district-document.ts`, `district-prepared-document.ts`, `district-preparation-run.ts`, `district-schema.ts`, `district-contract-source.ts`; parser-output contract below | `district-registry-config.ts`, `district-registry.ts`, `district-corpus.ts`, `source-observation.ts`, `district-private-io.ts`, `source-policy.ts`, `document-origin.ts`, `document-origin-contract.ts`, `document-origin-rules.ts`, `civic-opt-out.ts`; the parser **authorization hash** |
+| Joint extraction / generation archive | `district-claims.ts`, `district-stage-evidence.ts`, `district-public-fields.ts`, `district-inference.ts`, `district-answer-cache.ts`, `district-model.ts`, `district-claude.ts`, `district-model-contract.ts`, `district-prepared-document.ts`, `district-schema.ts`, `district-graph-claims.ts`, `topic-vocabulary.ts`, `../regional/taxonomy.mjs` | `district-model-readiness.ts`, `district-model-usage.ts`, `district-model-diagnostics.ts`, `district-private-io.ts`, `source-policy.ts`, `document-origin.ts`, `document-origin-rules.ts`, `document-origin-contract.ts`, `civic-opt-out.ts` |
+| Assessment queue | `district-assessment-jobs.ts`, `district-assessment-context.ts`, `district-claims.ts`, `district-assessment.ts`, `district-critical-assessment.ts`, `district-critical-assessment-public.ts`, `district-residual-jobs.ts`, `district-inference.ts`, `district-model.ts`, `district-model-contract.ts` | `district-codex-accounting.ts`, `district-jobs.ts`, `district-model-usage.ts`, `district-model-diagnostics.ts`, `district-policy-receipt.ts`, `district-policy-refresh.ts`, `civic-opt-out.ts` |
+| Assessment B | `district-assessment-broker.ts`, `district-assessment.ts`, `district-assessment-context.ts`, `district-claims.ts`, `district-assessment-bridge-contract.ts`, `district-claude.ts`, `district-model-contract.ts`, `district-omp-b-runner.ts`, `../docker/omp-b/Dockerfile`, `../docker/omp-b/settings.yml`, `../docker/omp-b/entry.sh`, `../scripts/build-omp-b-image.sh` | `district-policy-receipt.ts`, `district-jobs.ts`, `district-cas.ts`, `civic-opt-out.ts`, `source-policy.ts`, `document-origin.ts`; OMP **authorization hash** in selectors/leases |
+| Acquisition | `district-r1.ts`, `district-r1-state.ts`, `polite-fetch.ts`, `district-native-request.ts`, `genesis-owner-acquisition.ts` | `district-crawl-request.ts`, `district-policy-receipt.ts`, `source-policy.ts`, `registered-source-policy.ts`, `civic-opt-out.ts`, `genesis-owner-credentials.ts`, `genesis-owner-reuse.ts`, `district-http-observation.ts`, `../sources/district-host-groups.json` (still validated live) |
+| Policy refresh | `district-adapter-contract.ts`, `district-schema.ts`, actual JSON receipt schema and refresh version | `district-policy-refresh.ts`, `district-crawl-import.ts`, `district-residual-jobs.ts`, `district-registry-config.ts`, `district-r1.ts`, `district-jobs.ts`, `district-step-receipt.ts`, `polite-fetch.ts`, `district-policy-receipt.ts`, `source-policy.ts`, `registered-source-policy.ts`, `civic-opt-out.ts`, `../sources/district-host-groups.json`; jobs evaluate **current**, not frozen, policy |
+| Structured mapping | `district-structured-jobs.ts`, `district-structured-record.ts`, `district-public-fields.ts`, `district-entity-resolution.ts`, `district-case-linking.ts`, `district-schema.ts`, `district-graph-claims.ts`, `planning-stages.ts`, `case-supersession.ts`; selected `../sources/<adapter>-contract.json`, worker version and parser-output contract below | `district-structured-registry-admission.ts`, `district-registry-config.ts`, `district-policy-receipt.ts`, `district-http-observation.ts`, `source-observation.ts`, `source-policy.ts`, `document-origin-contract.ts`, `document-origin.ts`, `civic-opt-out.ts`, `civic-docker.ts`, `district-cas.ts`, `district-step-receipt.ts`, `district-jobs.ts`; parser **authorization hash** |
+| Parser output | `district-parser-isolation.ts` (mixed launcher environment/protocol/limits), `district-parser-worker.py`, `district-document.ts`, `district-document-parser-worker.ts`, `district-structured-parser-worker.ts`, `district-adapter-contract.ts`, `district-contract-source.ts`, `district-policy-inspection-worker.ts`, `pdf-tdm-policy-worker.ts`, `district-regional-statement-worker.ts`, `../regional/statements.mjs`, `../Dockerfile.parser`, `../Dockerfile.parser.dockerignore`, `../package.json`, `../package-lock.json`, `council-oparl.ts`, `dedupe.ts`, `common.ts`, every `adapters/*.ts` | Host authority/security closure: `civic-opt-out.ts`, `civic-docker.ts`, `district-policy-inspection.ts`, `pdf-tdm-policy.ts`, `document-origin.ts`, `document-origin-contract.ts`, `document-origin-rules.ts`, `source-policy.ts`, `registered-source-policy.ts`, `public-address.ts` |
+| OMP output | `district-omp-b-runner.ts`, `district-assessment.ts`, `district-assessment-context.ts`, `district-claims.ts`, the four OMP image/settings/entry/build files above; control prompt and output schema | `civic-docker.ts`, `civic-opt-out.ts`; root-owned review contract remains independent |
+| Operator registry descriptor | `district-registry-config.ts`, `district-registry.ts`, `district-schema.ts`, `district-git-snapshot-import.ts`, `district-retained-import.ts`, `text-run-lineage.ts`, `public-address.ts` | `district-private-io.ts`, `source-policy.ts`, `registered-source-policy.ts`, `document-origin-contract.ts`, `polite-fetch.ts`, `civic-opt-out.ts` |
+| Shared execution profile (additional a input to parser output, OMP output and assessment B) | `district-execution-profile.ts`: actual parser locale/environment/entrypoint and user/cwd; OMP model/CLI flags, decoding mode, environment, user/cwd and execution limit, extracted verbatim from custody | Remaining `civic-docker.ts` socket/lifecycle/labels/resource custody remains b, and still belongs to both security reviews |
+
+Conservative mixed files remain coupled: document/preparation/schema modules;
+residual, inference, answer-cache, model and Claude modules; assessment item/context,
+queue and broker modules; parser/OMP launchers; acquisition controller/state/fetcher
+and owner response screening; structured mapping/record/entity/case modules; and
+registry/schema/Git/retained-proof modules. Their semantic schemas, selection,
+request/response framing, normalization or output construction share a file with
+execution checks. Editing the host portions of **these mixed files** still changes
+output identity in phase 1. Assessment A/C/reconcile also remain one conservative
+queue contract, and parser output retains the whole adapter/image closure. No
+transitive hashing of their authority/policy imports is restored.
+
+The trivial execution-profile extraction is important: the real source-bearing
+Engine parser and OMP containers consume `PARSER_PROCESS` / `OMP_PROCESS`, and the
+source-free parser CLI uses the same parser profile. Dropping custody bytes never
+drops the actual model selector, thinking/JSON arguments, locale or process
+environment from semantic identity. No duplicate profile or compatibility re-export
+remains in the custody module.
+
+Every executor-created step receipt, including held/crash-reconciliation receipts,
+records `versions.hostCodeManifestVersion`, `hostCodeManifestSha256` and
+`hostCode.<relative-path>` SHA-256 entries for **every** file in `src/`, `scripts/`,
+`docker/`, both package manifests, parser image build files and host-group config.
+This is complete source-byte provenance (including mixed files), not just a branch
+name or a summary hash. It is never a job selector or compatibility predicate.
+Deploy an immutable checkout and restart executors after host edits: the manifest
+is captured once per process before claim/effects to match its loaded implementation.
+Synthetic integration fixtures inject alternate host hashes/manifests explicitly;
+they do not edit production code or claim those hashes as live execution evidence.
+
+Prepared receipts retain exact executed immutable `parser_image`, actual tool
+versions and the semantic `parser_contract`; preparation step versions separately
+record `parserAuthorization`. Structured step versions likewise record parser
+image/authorization apart from semantic mapping/parser pins. Parser and OMP reviews
+still authenticate the **current full security hash**, including authority code,
+before every new parse/model execution; a host security edit requires privileged
+re-review before new effects. Consuming already prepared immutable text is not a
+new parse and no longer demands the current parser review. OMP result receipts
+retain their actual image, binary/tool, prompt/schema/settings and security contract.
+
+All live authority/objection/inventory/policy/custody, deadline, notification,
+accounting, lease/fencing and finish checks remain in place. A changed live policy
+can still refuse a queued job or historical output: compatibility is not permission.
+If a host change changes transformed input bytes or admitted evidence, those exact
+artifacts/receipts become new input pins, never a silently relabelled old generation.
+The regression gate includes per-contract host/semantic hash injection, immutable
+prepared/tool/image negative checks and a real disposable-PostgreSQL residual →
+assessment → export topology surviving several synthetic host generations.
+
+
 ## Required Strausberg core release
 
 The retained historical core records name their original evaluator/version policy; R1 does not rerun or substitute that historical evaluation.

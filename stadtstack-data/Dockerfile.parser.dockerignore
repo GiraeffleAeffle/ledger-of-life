@@ -7,6 +7,8 @@
 !src/
 !src/district-parser-worker.py
 !src/district-parser-isolation.ts
+!src/district-contract-source.ts
+!src/district-execution-profile.ts
 !src/district-document.ts
 !src/district-document-parser-worker.ts
 !src/district-structured-parser-worker.ts

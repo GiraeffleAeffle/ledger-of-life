@@ -189,10 +189,12 @@ export function rebindSourceReferences(record: DistrictKnowledgeRecord, sources:
   rebound.verification.evidenceHash = knowledgeEvidenceHash(rebound);
   return DistrictKnowledgeRecordSchema.parse(rebound);
 }
-export const EXTRACTOR_SOURCE_FILES=['district-claims.ts','district-stage-evidence.ts','district-public-fields.ts','district-inference.ts','district-answer-cache.ts','district-model.ts','district-claude.ts','district-model-contract.ts','district-model-readiness.ts','district-model-usage.ts','district-model-diagnostics.ts','district-private-io.ts','district-prepared-document.ts','district-schema.ts','source-policy.ts','document-origin.ts','document-origin-rules.ts','document-origin-contract.ts','civic-opt-out.ts','district-graph-claims.ts','topic-vocabulary.ts','../regional/taxonomy.mjs'] as const;
-export async function extractorHash():Promise<string>{
+// Only output-semantic code. Readiness, diagnostics, usage, custody and policy
+// remain live checks and are captured by the step host-code provenance manifest.
+export const EXTRACTOR_SOURCE_FILES=['district-claims.ts','district-stage-evidence.ts','district-public-fields.ts','district-inference.ts','district-answer-cache.ts','district-model.ts','district-claude.ts','district-model-contract.ts','district-prepared-document.ts','district-schema.ts','district-graph-claims.ts','topic-vocabulary.ts','../regional/taxonomy.mjs'] as const;
+export async function extractorHash(hash?:(file:string)=>Promise<string>):Promise<string>{
   const hashes: string[] = [];
-  for (const file of EXTRACTOR_SOURCE_FILES) hashes.push(sha256(await readFile(new URL(file, import.meta.url))));
+  for (const file of EXTRACTOR_SOURCE_FILES) hashes.push(hash?await hash(file):sha256(await readFile(new URL(file, import.meta.url))));
   return sha256(JSON.stringify({ version: EXTRACTOR_VERSION, hashes }));
 }
 export const safeFailure=(error:unknown):string=>error instanceof z.ZodError?'Structured output/schema validation failed':error instanceof Error&&/^(Missing document prerequisite:|Document command failed:|Document exceeds|Document has|PDF |Unsupported document|Subscription CLI |Source |Unbound |Document path|No supported case|Prepared |Frozen )/.test(error.message)?error.message:'Extraction failed; see source-bound quarantine identity';

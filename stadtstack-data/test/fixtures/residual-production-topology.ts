@@ -15,6 +15,25 @@ import type {ModelAnswer,ModelEvidence} from '../../src/district-model-contract.
 // Static project imports cannot work here: parser/model mocks must be installed
 // before loading the real queue-handler dependency graph.
 test('enrolled artifacts CAS survives real preparation/extraction and fixture A/B/C/seal/export',async t=>{
+ const {digest:contractDigest,semanticHash}=await import('../../src/district-adapter-contract.ts');
+ const sourceHashes=await import('../../src/district-contract-source.ts'),provenance=await import('../../src/district-host-provenance.ts');
+ let hostGeneration=0;
+ const currentHostHash:typeof sourceHashes.contractSourceHash=async file=>{
+  const original=await sourceHashes.contractSourceHash(file);
+  return ['civic-opt-out.ts','district-jobs.ts','source-policy.ts'].includes(file)&&hostGeneration?contractDigest(original+' synthetic host generation '+hostGeneration):original;
+ };
+ // Inject different host source hashes/manifests, not effects or fake real data.
+ // Every queue/policy/custody transaction still uses the current real host code.
+ t.mock.module(new URL('../../src/district-contract-source.ts',import.meta.url),{namedExports:{...sourceHashes,
+  contractSourceHash:currentHostHash,
+  contractSourceManifest:(files:readonly string[],hash= currentHostHash)=>sourceHashes.contractSourceManifest(files,hash),
+ }});
+ t.mock.module(new URL('../../src/district-host-provenance.ts',import.meta.url),{namedExports:{hostCodeVersions:async()=>{
+  const versions={...await provenance.hostCodeVersions()};
+  for(const file of ['civic-opt-out.ts','district-jobs.ts','source-policy.ts'])versions['hostCode.src/'+file]=await currentHostHash(file);
+  const manifest=Object.entries(versions).filter(([key])=>key.startsWith('hostCode.')).map(([key,sha256])=>({file:key.slice('hostCode.'.length),sha256}));
+  return {...versions,hostCodeManifestSha256:semanticHash(manifest)};
+ }}});
  const {createCivicPolicyTestContext}=await import('./civic-policy.ts');
  const fixture=await createCivicPolicyTestContext(t),{policy,root}=fixture;
  const civic=await import('../../src/civic-opt-out.ts'),parser=await import('../../src/district-parser-isolation.ts');
@@ -23,7 +42,7 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
  const review={version:parser.PARSER_ISOLATION_VERSION,imageId:'sha256:'+digest('synthetic topology parser image'),runnerSha256:await parser.parserIsolationContractSha256(),securityReviewId:'synthetic-topology-only',reviewedBy:'synthetic-fixture',reviewedAt:new Date().toISOString(),dockerSocket:'/run/synthetic-topology.sock'};
  const parserRoots:string[]=[];
  t.mock.module(new URL('../../src/district-parser-isolation.ts',import.meta.url),{namedExports:{...parser,
-  readParserReview:async()=>{await requireFixture();return review;},
+  readParserReview:async()=>{await requireFixture();return {...review,runnerSha256:await parser.parserIsolationContractSha256()};},
   collectParserToolVersions:async(tools:readonly string[])=>{await requireFixture();assert.deepEqual(tools,['node']);return {node:process.versions.node};},
   withParserSandbox:async(artifact:Uint8Array,consume:(sandbox:ParserSandbox)=>Promise<unknown>,context:ParserSourceContext)=>{
    await requireFixture(context);assert.ok(context);parserRoots.push(context.root);
@@ -101,13 +120,23 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
   await withFixtureAuthorizedCorpus(indexBytes,policy,async()=>{
    const imported=await importCrawlCorpusForResidual(store,cas,manifest);assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
    const handlers=residual.residualJobHandlersFor(pool),preparationKey=await residual.enqueueResidualPreparation(store,cas,imported.jobs[0]);
+   const semanticBefore=await residual.residualJobContract();hostGeneration++;
+   assert.deepEqual(await residual.residualJobContract(),semanticBefore);
+   assert.equal(await residual.enqueueResidualPreparation(store,cas,imported.jobs[0]),preparationKey);
    await run(preparationKey,handlers);assert.deepEqual(parserRoots,[cas.root+'-residual-prepared']);await assert.rejects(lstat(join(cas.root,'residual-prepared')),{code:'ENOENT'});
    const inventory=await complete();assert.equal(inventory.roots.find((entry:{path:string})=>entry.path===cas.root+'-residual-prepared').kind,'prepared');
-   const extractionKey=await residual.enqueueCommittedResidualExtraction(pool,store,cas,preparationKey);await run(extractionKey,handlers);assert.equal(modelCalls,2);assert.ok(sourceModelRoots.every(path=>path.startsWith(cas.root+'-residual-model/')&&!path.startsWith(cas.root+'/')));
+   const preparationReceipt=(await pool.query('SELECT receipt FROM district_pipeline.step_receipts WHERE receipt->>\'jobKey\'=$1',[preparationKey])).rows[0].receipt;
+   assert.equal(preparationReceipt.versions['hostCode.src/civic-opt-out.ts'],await currentHostHash('civic-opt-out.ts'));
+   const extractionKey=await residual.enqueueCommittedResidualExtraction(pool,store,cas,preparationKey);
+   hostGeneration++;assert.deepEqual(await residual.residualJobContract(),semanticBefore);
+   assert.equal(await residual.enqueueCommittedResidualExtraction(pool,store,cas,preparationKey),extractionKey);
+   await run(extractionKey,handlers);assert.equal(modelCalls,2);assert.ok(sourceModelRoots.every(path=>path.startsWith(cas.root+'-residual-model/')&&!path.startsWith(cas.root+'/')));
+   hostGeneration++; // Already produced prepared/extraction outputs remain admissible downstream.
    const groundedAnswer=(input:AssessmentPassInput):ModelAnswer=>{const response=answer(input),output=response.value as AssessmentOutput,data=input.data as {criticalTarget:unknown;evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]},target=CriticalRecordTargetSchema.strip().parse(data.criticalTarget);output.assertions=target.claims.map(claim=>({claimId:claim.claimId,sourceId:claim.sourceId,locatorId:data.evidence.find(entry=>entry.sourceId===claim.sourceId)!.locators.find(locator=>locator.quote===claim.quote)!.id,quote:claim.quote,subjectId:claim.subjectId,objectId:claim.objectId,value:null,unit:null,date:claim.date,dateRole:claim.dateRole,financialRole:claim.financialRoles[0],stage:claim.stage,modality:claim.modality}));output.criticalReview={recordId:target.recordId,recordEvidenceSha256:target.recordEvidenceSha256,claimProjectionSha256:target.claimProjectionSha256,claims:target.claims.map(claim=>({claimId:claim.claimId,claimSha256:claim.claimSha256,verdict:'supported',rationale:'Synthetic topology fixture, not independent gold'}))};return {...response,value:output,responseSha256:digest(canonicalJson(output))};};
    const assessmentHandlers=assessments.assessmentQueueHandlers(pool,{policyOptions:policy,fixtureProtocol:true,fixtureProvider:async input=>groundedAnswer(input)}),assessmentPreparation=await assessments.enqueueResidualAssessmentItems(pool,store,cas,extractionKey);await run(assessmentPreparation,assessmentHandlers);
    const AJobKey=(await assessments.enqueuePreparedAssessmentPass(pool,store,cas,assessmentPreparation,'A'))[0];await run(AJobKey,assessmentHandlers);
    const aSpec=(await pool.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[AJobKey])).rows[0].spec,item=assessment.assessmentItemSchema.parse(JSON.parse((await cas.read(aSpec.selector.itemArtifactSha256)).toString('utf8'))),broker=new DistrictAssessmentBroker(pool,cas,{policyOptions:policy,fixtureProtocol:true}),clientContractSha256=digest('synthetic topology B client'),BJobKey=await enqueueAssessmentB(broker,{itemArtifactSha256:aSpec.selector.itemArtifactSha256,sourceScope:scope,policyProofSha256:imported.jobs[0].policyReceiptSha256,transport:'mac-bridge',clientContractSha256});
+   hostGeneration++; // B was enqueued under an older host manifest.
    const pendingB=run(BJobKey,assessmentHandlers),deadline=Date.now()+50000;
    for(;;){const ready=await pool.query("SELECT 1 FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1 AND b.state='ready'",[BJobKey]);if(ready.rowCount)break;if(Date.now()>deadline)throw Error('Synthetic B lease did not become ready');await delay(10);}
    const lease=BridgeLeaseSchema.parse(await broker.dispatch({operation:'claim',jobKey:BJobKey,clientId:'synthetic-topology-client',clientContractSha256})),input=assessment.buildAssessmentPassInput(item,await assessment.originalEvidence(item,{cas,policyOptions:policy}),'B'),output=groundedAnswer(input).value,config=PROVIDER_CONFIGS['anthropic-subscription'],startedAt=new Date().toISOString(),evidence={provider:'anthropic-subscription' as const,tool:'claude-cli' as const,toolVersion:'0.0.0-synthetic-test-only',model:config.model,modelIdentityBasis:config.modelIdentityBasis};
