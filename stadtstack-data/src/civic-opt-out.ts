@@ -64,6 +64,10 @@ const scratchSchema=z.object({
  tombstones:z.array(z.object({pathSha256:hex,contentSha256:hex,bytes:z.number().int().nonnegative()}).strict()).max(MAX_SCRATCH_FILES),
 }).strict();
 const inventorySchema=z.object({schemaVersion:z.literal(1),inventoryId:z.string().uuid(),roots:z.array(rootSchema).max(10_000),entries:z.array(entrySchema).max(MAX_INVENTORY_RECORDS),scratch:z.array(scratchSchema).max(MAX_INVENTORY_RECORDS).default([])}).strict();
+const segmentPinSchema=z.object({sha256:hex,bytes:z.number().int().positive().max(MAX_STATE),family:z.enum(['entries','scratch']),previousSha256:hex.nullable()}).strict();
+const storageSchema=z.object({format:z.literal('sealed-segments-v1'),segments:z.array(segmentPinSchema).max(MAX_INVENTORY_RECORDS),entryStates:z.record(hex,z.enum(['active','revoked','deleted','missing'])),retiredRoots:z.record(hex,hex)}).strict();
+const hotInventorySchema=inventorySchema.extend({storage:storageSchema});
+const segmentSchema=z.object({schemaVersion:z.literal('civic-inventory-segment-v1'),inventoryId:z.string().uuid(),family:z.enum(['entries','scratch']),previousSha256:hex.nullable(),entries:z.array(entrySchema).max(MAX_INVENTORY_RECORDS),scratch:z.array(scratchSchema).max(MAX_INVENTORY_RECORDS)}).strict();
 const issueSchema=z.object({code:z.enum(['no_managed_roots','inventory_incomplete','unsafe_root','content_changed','unsafe_content','shared_derived_requires_rebuild','inventory_unavailable','operation_failed','inventory_busy','active_scratch','unsafe_scratch','scratch_processes_active','daemon_resource_pending']),rootId:hex.optional(),contentId:hex.optional()}).strict();
 const purgeSchema=z.object({host:z.string(),receivedAt:timestamp,purgeDueAt:timestamp,attemptedAt:timestamp,status:z.enum(['purged','partial','error']),deletedFiles:z.number().int().nonnegative(),deletedBytes:z.number().int().nonnegative(),removedReferences:z.number().int().nonnegative(),retainedSharedFiles:z.number().int().nonnegative(),retainedSharedBytes:z.number().int().nonnegative(),missingFiles:z.number().int().nonnegative(),issues:z.array(issueSchema),scope:z.literal('registered_managed_roots')}).strict();
 export const RetireReceiptSchema=z.object({schemaVersion:z.literal('civic-root-retirement-v1'),authorityId:opaque,authoritySha256:hex,rootId:hex,rootPath:z.string(),reason:z.string().trim().min(1).max(1800),attemptedAt:timestamp,status:z.enum(['retired','partial']),deletedFiles:z.number().int().nonnegative(),deletedBytes:z.number().int().nonnegative(),missingFiles:z.number().int().nonnegative(),removedEntries:z.number().int().nonnegative(),removedScratchLeases:z.number().int().nonnegative(),issues:z.array(issueSchema)}).strict();
@@ -105,15 +109,94 @@ type Inventory=z.infer<typeof inventorySchema>;
 // Legacy bytes requiring codec defaults stay on the full-validation path until
 // a save emits the fully parsed value. Authority and safe-file reads stay live.
 const validatedInventoryBytes=new Map<string,string>();
+type SegmentPin=z.infer<typeof segmentPinSchema>;
+interface SealedInventory {storage:z.infer<typeof storageSchema>;entries:Map<string,Entry>;scratch:Map<string,ScratchLease>;roots:Set<string>}
+const sealedInventories=new WeakMap<Inventory,SealedInventory>();
+// Cached segment objects are frozen. Every load still opens O_NOFOLLOW and checks
+// nanosecond inode metadata; changed metadata forces a fresh digest/codec check.
+const segmentCache=new Map<string,{stamp:string;value:z.infer<typeof segmentSchema>}>();
+const bulkEntry=(entry:Entry)=>['retained_publication','operator_registry_config','authenticated_git_snapshot'].includes(entry.kind);
+const archivedLease=(lease:ScratchLease)=>lease.state==='closed'||lease.state==='purged';
+const validatedSegmentEntries=new WeakMap<Entry,Root['kind']>();
+const validatedSegmentLeases=new WeakSet<ScratchLease>();
+function freezeRecord(value:unknown):void{
+ if(value&&typeof value==='object'&&!Object.isFrozen(value)){for(const child of Object.values(value))freezeRecord(child);Object.freeze(value);}
+}
+async function readSegment(state:string,pin:SegmentPin,inventoryId:string):Promise<z.infer<typeof segmentSchema>>{
+ const path=join(state,'inventory-segments',pin.sha256+'.json');
+ await directory(dirname(path),false,true);
+ const handle=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
+ try{
+  const stat=await handle.stat({bigint:true}),stamp=snapshotStamp(stat);
+  if(!stat.isFile()||stat.nlink!==1n||stat.uid!==BigInt(process.getuid!())||(stat.mode&0o777n)!==0o600n||stat.size!==BigInt(pin.bytes)||snapshotStamp(await lstat(path,{bigint:true}))!==stamp)throw new CivicPolicyStateError();
+  let cached=segmentCache.get(path);
+  if(!cached||cached.stamp!==stamp){
+   const buffer=Buffer.allocUnsafe(pin.bytes+1);let total=0;
+   while(total<buffer.length){const {bytesRead}=await handle.read(buffer,total,buffer.length-total,null);if(!bytesRead)break;total+=bytesRead;}
+   const bytes=buffer.subarray(0,total);
+   if(total!==pin.bytes||digest(bytes)!==pin.sha256||snapshotStamp(await handle.stat({bigint:true}))!==stamp||snapshotStamp(await lstat(path,{bigint:true}))!==stamp)throw new CivicPolicyStateError();
+   const value=segmentSchema.parse(JSON.parse(bytes.toString('utf8')));
+   if(value.family==='entries'&&(value.scratch.length||!value.entries.length||value.entries.some(entry=>!bulkEntry(entry)))||value.family==='scratch'&&(value.entries.length||!value.scratch.length||value.scratch.some(lease=>!archivedLease(lease))))throw new CivicPolicyStateError();
+   freezeRecord(value);cached={stamp,value};segmentCache.set(path,cached);
+  }
+  const value=cached.value;
+  if(value.inventoryId!==inventoryId||value.family!==pin.family||value.previousSha256!==pin.previousSha256)throw new CivicPolicyStateError();
+  return value;
+ }finally{await handle.close();}
+}
+async function warmInventorySegments(state:string):Promise<void>{
+ try{await directory(join(state,'inventory-segments'),false,true);}catch(error){if(missing(error))return;throw error;}
+ try{
+  const physical:unknown=JSON.parse((await fileBytes(join(state,'inventory.json'),MAX_STATE,true)).bytes.toString('utf8'));
+  if(!physical||typeof physical!=='object'||!('storage' in physical))return;
+  const parsed=hotInventorySchema.parse(physical);
+  const cold=parsed.storage.segments.some(pin=>!segmentCache.has(join(state,'inventory-segments',pin.sha256+'.json')));
+  for(const pin of parsed.storage.segments)await readSegment(state,pin,parsed.inventoryId);
+  // Cold immutable decoding/semantic validation is deliberately outside the
+  // exclusive lock. The locked load re-opens every pin and the current manifest,
+  // so this speculative warming never authorizes a stale inventory.
+  if(cold)await loadInventory(state);
+ }catch{throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');}
+}
+async function hydrateInventory(state:string,physical:z.infer<typeof hotInventorySchema>):Promise<Inventory>{
+ const entries=new Map<string,Entry>(),scratch=new Map<string,ScratchLease>(),roots=new Set(physical.roots.map(root=>root.id));
+ const segmentOrdinals=new Map(physical.storage.segments.map((pin,index)=>[pin.sha256,index])),retiredThrough=new Map<string,number>();
+ for(const [rootId,sha256] of Object.entries(physical.storage.retiredRoots)){const ordinal=segmentOrdinals.get(sha256);if(ordinal===undefined)throw new CivicPolicyStateError();retiredThrough.set(rootId,ordinal);}
+ let previousSha256:string|null=null;
+ for(const [ordinal,pin] of physical.storage.segments.entries()){
+  if(pin.previousSha256!==previousSha256)throw new CivicPolicyStateError();
+  const segment=await readSegment(state,pin,physical.inventoryId);previousSha256=pin.sha256;
+  for(const entry of segment.entries){if((retiredThrough.get(entry.rootId)??-1)>=ordinal)continue;if(entries.has(entry.id))throw new CivicPolicyStateError();entries.set(entry.id,entry);}
+  for(const lease of segment.scratch){if((retiredThrough.get(lease.rootId)??-1)>=ordinal)continue;if(scratch.has(lease.id))throw new CivicPolicyStateError();scratch.set(lease.id,lease);}
+ }
+ const logical:Inventory={schemaVersion:1,inventoryId:physical.inventoryId,roots:physical.roots,entries:[],scratch:[]};
+ for(const [id,state] of Object.entries(physical.storage.entryStates))if(!entries.has(id)||entries.get(id)!.state===state)throw new CivicPolicyStateError();
+ for(const entry of entries.values())if(roots.has(entry.rootId)){const state=physical.storage.entryStates[entry.id];logical.entries.push(state===undefined?entry:{...entry,state});}
+ for(const entry of physical.entries)logical.entries.push(entry);
+ for(const lease of scratch.values())if(roots.has(lease.rootId))logical.scratch.push(lease);
+ for(const lease of physical.scratch)logical.scratch.push(lease);
+ if(logical.entries.length>MAX_INVENTORY_RECORDS||logical.scratch.length>MAX_INVENTORY_RECORDS)throw new CivicPolicyStateError();
+ sealedInventories.set(logical,{storage:physical.storage,entries,scratch,roots});return logical;
+}
+function setEntryState(inventory:Inventory,entry:Entry,state:Entry['state']):void{
+ const index=inventoryIndex(inventory),current=index.byId.get(entry.id)!;
+ if(current.state===state)return;
+ const replacement={...current,state},position=index.positions.get(entry.id)!;
+ inventory.entries[position[0]]=replacement;
+ index.byPath.get(inventoryPathKey(entry.rootId,entry.relativePath))![position[1]]=replacement;
+ index.byHost.get(entry.host)![position[2]]=replacement;
+ index.byId.set(entry.id,replacement);
+}
 // Transaction-local acceleration only; no index is serialized or reused across
 // disk loads. Buckets keep the inventory's insertion order and entry objects,
 // so state transitions are visible without rebuilding any index.
-interface InventoryIndex {byId:Map<string,Entry>;byPath:Map<string,Entry[]>;byHost:Map<string,Entry[]>;cas:Map<string,{contentSha256:string;sourceSha256:string|null;conflicting:boolean}>}
+interface InventoryIndex {byId:Map<string,Entry>;byPath:Map<string,Entry[]>;byHost:Map<string,Entry[]>;positions:Map<string,[number,number,number]>;cas:Map<string,{contentSha256:string;sourceSha256:string|null;conflicting:boolean}>}
 const inventoryIndices=new WeakMap<Inventory,InventoryIndex>();
 const inventoryPathKey=(rootId:string,path:string)=>rootId+'\0'+path;
 function indexEntry(index:InventoryIndex,entry:Entry){
  index.byId.set(entry.id,entry);
  const pathKey=inventoryPathKey(entry.rootId,entry.relativePath),pathBucket=index.byPath.get(pathKey),hostBucket=index.byHost.get(entry.host);
+ index.positions.set(entry.id,[index.byId.size-1,pathBucket?.length??0,hostBucket?.length??0]);
  if(pathBucket)pathBucket.push(entry);else index.byPath.set(pathKey,[entry]);
  if(hostBucket)hostBucket.push(entry);else index.byHost.set(entry.host,[entry]);
  const binding=index.cas.get(pathKey);
@@ -122,7 +205,7 @@ function indexEntry(index:InventoryIndex,entry:Entry){
 }
 function inventoryIndex(inventory:Inventory):InventoryIndex{
  let index=inventoryIndices.get(inventory);
- if(!index){index={byId:new Map(),byPath:new Map(),byHost:new Map(),cas:new Map()};for(const entry of inventory.entries)indexEntry(index,entry);inventoryIndices.set(inventory,index);}
+ if(!index){index={byId:new Map(),byPath:new Map(),byHost:new Map(),positions:new Map(),cas:new Map()};for(const entry of inventory.entries)indexEntry(index,entry);inventoryIndices.set(inventory,index);}
  return index;
 }
 function entriesAt(inventory:Inventory,rootId:string,path:string):Entry[]{return inventoryIndex(inventory).byPath.get(inventoryPathKey(rootId,path))??[];}
@@ -401,12 +484,16 @@ export async function readCivicOptOutSnapshot(options:CivicPolicyOptions={}):Pro
  return {...body,sha256:digest(JSON.stringify(body))};
 }
 const queues=new Map<string,Promise<void>>();
+const nextLockAttempt=new Map<string,number>();
 async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisioning=false):Promise<T>{
  const state=statePath(options);
  const prior=queues.get(state)??Promise.resolve();let done!:()=>void;const gate=new Promise<void>(resolve=>{done=resolve;});queues.set(state,gate);await prior;
  const path=join(state,'inventory.lock');let handle:FileHandle|undefined;
  try{
   if(provisioning)await directory(state,true,true);else await assertCivicPolicyAuthority(options);
+  if(!provisioning)await warmInventorySegments(state);
+  const cooldown=(nextLockAttempt.get(state)??0)-performance.now();
+  if(cooldown>0)await new Promise<void>(resolve=>setTimeout(resolve,cooldown));
   const deadline=performance.now()+5_000;
   for(;;){
    try{handle=await open(path,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);break;}
@@ -423,7 +510,7 @@ async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisio
    await handle.writeFile(JSON.stringify({pid:process.pid,nonce:randomUUID()})+'\n');await handle.sync();
    if(!provisioning)await assertCivicPolicyAuthority(options);
    return await work();
-  }finally{const current=await lstat(path);if(!sameIdentity(original,current)||current.isSymbolicLink())throw new CivicPolicyStateError();await unlink(path);}
+  }finally{const current=await lstat(path);if(!sameIdentity(original,current)||current.isSymbolicLink())throw new CivicPolicyStateError();await unlink(path);nextLockAttempt.set(state,performance.now()+50);}
  }finally{try{await handle?.close();}finally{done();if(queues.get(state)===gate)queues.delete(state);}}
 }
 function entryId(entry:Omit<Entry,'id'|'state'>):string{return digest(JSON.stringify([entry.rootId,entry.relativePath,entry.contentSha256,entry.kind,entry.sourceSha256,entry.host,entry.urlSha256,entry.observationId??null,entry.receiptSha256??null,entry.publication??null,entry.snapshot??null,entry.purpose??null,entry.configurationSha256??null,entry.schemaContractSha256??null,entry.code??null,entry.approval??null,entry.independentAllowed]));}
@@ -452,35 +539,68 @@ function makeEntry(root:Root,input:ManagedSourceContent):Entry{
  return entrySchema.parse({...value,id:entryId(value),state:'active'});
 }
 async function loadInventory(state:string):Promise<Inventory>{
- let value:Inventory,bytes:Buffer,sha256:string,validated:boolean;
+ let value:Inventory,bytes:Buffer,sha256:string,validated:boolean,physical:unknown;
  try{
   bytes=(await fileBytes(join(state,'inventory.json'),MAX_STATE,true)).bytes;sha256=digest(bytes);
   validated=validatedInventoryBytes.get(state)===sha256;
-  value=JSON.parse(bytes.toString('utf8'));
-  if(!validated){validatedInventoryBytes.delete(state);value=inventorySchema.parse(value);}
+  physical=JSON.parse(bytes.toString('utf8'));
+  if(physical&&typeof physical==='object'&&'storage' in physical){
+   const parsed=hotInventorySchema.parse(physical);physical=parsed;value=await hydrateInventory(state,parsed);
+  }else{value=validated?physical as Inventory:inventorySchema.parse(physical);physical=value;}
  }catch{validatedInventoryBytes.delete(state);throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');}
  const authority=authoritySchema.parse(JSON.parse((await fileBytes(join(state,AUTHORITY_MARKER),8192,true)).bytes.toString('utf8')));if(value.inventoryId!==authority.inventoryId)throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
  if(validated)return value;
  const roots=new Map(value.roots.map(root=>[root.id,root]));
  if(roots.size!==value.roots.length||inventoryIndex(value).byId.size!==value.entries.length)throw new CivicPolicyStateError();
  for(const root of value.roots)if(root.id!==digest(root.path)||root.path!==resolve(root.path))throw new CivicPolicyStateError();
- for(const entry of value.entries){const root=roots.get(entry.rootId);if(!root||entry.host!==canonicalHost(entry.host)||entry.id!==entryId(entry)||root.kind==='fetch'&&entry.relativePath.startsWith('sha256/')&&entry.sourceSha256!==entry.contentSha256)throw new CivicPolicyStateError();checkedRelative(root,entry.relativePath,entry.contentSha256,entry.receiptSha256);}
+ for(const entry of value.entries){
+  const root=roots.get(entry.rootId);if(!root)throw new CivicPolicyStateError();
+  if(validatedSegmentEntries.get(entry)===root.kind)continue;
+  if(entry.host!==canonicalHost(entry.host)||entry.id!==entryId(entry)||root.kind==='fetch'&&entry.relativePath.startsWith('sha256/')&&entry.sourceSha256!==entry.contentSha256)throw new CivicPolicyStateError();
+  checkedRelative(root,entry.relativePath,entry.contentSha256,entry.receiptSha256);
+  if(Object.isFrozen(entry))validatedSegmentEntries.set(entry,root.kind);
+ }
  if(new Set(value.scratch.map(lease=>lease.id)).size!==value.scratch.length)throw new CivicPolicyStateError();
  for(const lease of value.scratch){
+  if(!roots.has(lease.rootId))throw new CivicPolicyStateError();
+  if(validatedSegmentLeases.has(lease))continue;
   if(!roots.has(lease.rootId)||lease.directory!=='scratch/'+lease.id||lease.sources.some(source=>source.host!==canonicalHost(source.host)||source.kind==='pre_admission'&&lease.purpose!=='classification'||source.kind==='preparation_input'&&lease.purpose!=='document'||['authenticated_git_snapshot','operator_registry_config'].includes(source.kind)&&lease.purpose!=='artifact'))throw new CivicPolicyStateError();
   if(new Set(lease.resources.map(resource=>resource.id)).size!==lease.resources.length||lease.resources.some(resource=>resource.scratchId!==lease.id||resource.rootId!==lease.rootId||resource.name!==('profile' in resource?'stadtstack-omp-b-':'stadtstack-parser-')+lease.id+'-'+resource.nonce||resource.artifactRelativePath===null&&(resource.artifactSha256!==null||resource.artifactBytes!==null)||resource.artifactRelativePath!==null&&(resource.artifactSha256===null||resource.artifactBytes===null)))throw new CivicPolicyStateError('DAEMON_RESOURCE_BINDING_MISMATCH');
+  if(Object.isFrozen(lease))validatedSegmentLeases.add(lease);
  }
- if(bytes.equals(Buffer.from(JSON.stringify(value)+'\n')))validatedInventoryBytes.set(state,sha256);
+ if(bytes.equals(Buffer.from(JSON.stringify(physical)+'\n')))validatedInventoryBytes.set(state,sha256);
  return value;
 }
 async function saveInventory(state:string,value:Inventory){
- // Always retain the exact full codec; no second incremental validator. Reuse
- // its parsed result so saved/cached bytes include every codec default. The
- // already-single serialization is passed through atomicJson without a repeat.
- const parsed=inventorySchema.parse(value),serialized=JSON.stringify(parsed);
+ const sealed=sealedInventories.get(value);
+ let parsed:Inventory|z.infer<typeof hotInventorySchema>;
+ if(sealed){
+  const entries:Entry[]=[],scratch:ScratchLease[]=[],addedEntries:Entry[]=[],addedScratch:ScratchLease[]=[],entryStates:Record<string,Entry['state']>={};
+  const roots=new Set(value.roots.map(root=>root.id)),retiredRoots={...sealed.storage.retiredRoots};
+  const lastSegment=sealed.storage.segments.at(-1)?.sha256;
+  if(lastSegment)for(const rootId of sealed.roots)if(!roots.has(rootId))retiredRoots[rootId]=lastSegment;
+  for(const entry of value.entries){
+   const original=sealed.entries.get(entry.id);
+   if(original){if(entry!==original&&entry.state!==original.state)entryStates[entry.id]=entry.state;}
+   else if(bulkEntry(entry))addedEntries.push(entry);else entries.push(entry);
+  }
+  for(const lease of value.scratch)if(!sealed.scratch.has(lease.id)){if(archivedLease(lease))addedScratch.push(lease);else scratch.push(lease);}
+  const plan=planInventorySegments(value.inventoryId,sealed.storage.segments,addedEntries,addedScratch);
+  for(const segment of plan.added)await publishSegment(state,segment);
+  parsed=hotInventorySchema.parse({schemaVersion:1,inventoryId:value.inventoryId,roots:value.roots,entries,scratch,storage:{format:'sealed-segments-v1',segments:plan.pins,entryStates,retiredRoots}});
+  const serialized=JSON.stringify(parsed);
+  if(Buffer.byteLength(serialized)+1>MAX_STATE)throw new CivicPolicyStateError();
+  await atomicJson(join(state,'inventory.json'),parsed,false,true,serialized);
+  for(const segment of plan.added){const stored=await readSegment(state,segment.pin,value.inventoryId);for(const entry of stored.entries)sealed.entries.set(entry.id,entry);for(const lease of stored.scratch)sealed.scratch.set(lease.id,lease);}
+  for(const [id,entry] of sealed.entries)if(!roots.has(entry.rootId))sealed.entries.delete(id);
+  for(const [id,lease] of sealed.scratch)if(!roots.has(lease.rootId))sealed.scratch.delete(id);
+  sealed.roots=roots;sealed.storage=parsed.storage;validatedInventoryBytes.set(state,digest(serialized+'\n'));return;
+ }
+ parsed=inventorySchema.parse(value);
+ const serialized=JSON.stringify(parsed);
  if(Buffer.byteLength(serialized)+1>MAX_STATE)throw new CivicPolicyStateError();
  await atomicJson(join(state,'inventory.json'),parsed,false,true,serialized);
- validatedInventoryBytes.set(state,createHash('sha256').update(serialized).update('\n').digest('hex'));
+ validatedInventoryBytes.set(state,digest(serialized+'\n'));
 }
 async function verifyRoot(root:Root){if(!sameIdentity(root.identity,await directory(root.path)))throw new CivicPolicyStateError();}
 function mergeEntries(inventory:Inventory,entries:Entry[]){
@@ -611,7 +731,7 @@ async function reconcile(root:Root,inventory:Inventory,retiring=false):Promise<b
    if(!current.length)complete=false;
    // A restored copy does not become exempt merely because its prior reference
    // was tombstoned. Keep it withdrawn and eligible for a renewed purge.
-   for(const entry of current)if(entry.state==='deleted'||entry.state==='missing')entry.state='revoked';
+   for(const entry of current)if(entry.state==='deleted'||entry.state==='missing')setEntryState(inventory,entry,'revoked');
   }catch{complete=false;}
  }
  return complete;
@@ -1178,10 +1298,10 @@ async function withdraw(state:string,inventory:Inventory,selected:Entry[],receip
   const issue=(code:Issue['code'])=>receipt.issues.push({code,rootId:root.id,contentId:digest(first.relativePath)});
   try{await verifyRoot(root);}catch{issue('unsafe_root');continue;}
   let actual:{sha256:string;stat:Stats};
-  try{actual=await fileDigest(join(root.path,first.relativePath));}catch(error){if(missing(error)){for(const entry of items){if(entry.state==='active')receipt.removedReferences++;entry.state='missing';}receipt.missingFiles++;continue;}issue('unsafe_content');continue;}
+  try{actual=await fileDigest(join(root.path,first.relativePath));}catch(error){if(missing(error)){for(const entry of items){if(entry.state==='active')receipt.removedReferences++;setEntryState(inventory,entry,'missing');}receipt.missingFiles++;continue;}issue('unsafe_content');continue;}
   const matching=items.find(entry=>entry.contentSha256===actual.sha256);
   if(!matching){
-   if(entriesAt(inventory,root.id,first.relativePath).some(entry=>entry.contentSha256===actual.sha256)){for(const entry of items){if(entry.state==='active')receipt.removedReferences++;entry.state='missing';}continue;}
+   if(entriesAt(inventory,root.id,first.relativePath).some(entry=>entry.contentSha256===actual.sha256)){for(const entry of items){if(entry.state==='active')receipt.removedReferences++;setEntryState(inventory,entry,'missing');}continue;}
    issue('content_changed');continue;
   }
   first=matching;
@@ -1194,7 +1314,7 @@ async function withdraw(state:string,inventory:Inventory,selected:Entry[],receip
    }
   }catch{issue('inventory_unavailable');continue;}
   if(independent){
-   for(const entry of items){if(entry.state==='active')receipt.removedReferences++;entry.state='revoked';}
+   for(const entry of items){if(entry.state==='active')receipt.removedReferences++;setEntryState(inventory,entry,'revoked');}
    receipt.retainedSharedFiles++;receipt.retainedSharedBytes+=actual.stat.size;
    // Hash identity, not a caller flag or filename, distinguishes an original
    // shared representation from a derived copy that may embed withdrawn refs.
@@ -1206,7 +1326,7 @@ async function withdraw(state:string,inventory:Inventory,selected:Entry[],receip
    // Owner-only state/root components exclude other users from the rename race;
    // participating producers are serialized by the shared inventory lock.
    await unlinkManagedFile(root,first.relativePath,actual);receipt.deletedFiles++;receipt.deletedBytes+=actual.stat.size;
-   for(const entry of entriesAt(inventory,root.id,first.relativePath)){if(selected.has(entry)&&entry.state==='active')receipt.removedReferences++;entry.state='deleted';}
+   for(const entry of entriesAt(inventory,root.id,first.relativePath)){if(selected.has(entry)&&entry.state==='active')receipt.removedReferences++;setEntryState(inventory,entry,'deleted');}
   }catch{issue('unsafe_content');}
  }
 }
@@ -1243,13 +1363,13 @@ export async function recordHostOptOut(input:{host:string;reason:'municipality_o
  }
  try{
   const purge=await locked(options,async()=>{effective=(await readObjection(state,host))!;return purgeLocked(state,effective,options);});return {...effective,receivedAt:purge.receivedAt,purgeDueAt:purge.purgeDueAt,purge};
- }catch(error){const purge=emptyReceipt(effective);purge.status='error';purge.issues.push({code:error instanceof CivicPolicyStateError&&error.code==='CIVIC_POLICY_BUSY'?'inventory_busy':'operation_failed'});await saveAttempt(state,purge);return {...effective,receivedAt:purge.receivedAt,purgeDueAt:purge.purgeDueAt,purge};}
+ }catch(error){const purge=emptyReceipt(effective);purge.status='error';purge.issues.push({code:error instanceof CivicPolicyStateError&&error.code==='CIVIC_POLICY_BUSY'?'inventory_busy':error instanceof CivicPolicyStateError&&error.code==='CIVIC_POLICY_INVENTORY_UNAVAILABLE'?'inventory_unavailable':'operation_failed'});await saveAttempt(state,purge);return {...effective,receivedAt:purge.receivedAt,purgeDueAt:purge.purgeDueAt,purge};}
 }
 export async function purgeOptedOutHost(input:string,options:CivicPolicyOptions={}):Promise<PurgeReceipt>{
  await assertCivicPolicyAuthority(options);
  const state=statePath(options),host=canonicalHost(input),objection=await readObjection(state,host);if(!objection)throw new CivicPolicyStateError('HOST_NOT_REGISTERED');
  try{return await locked(options,async()=>purgeLocked(state,(await readObjection(state,host))!,options));}
- catch(error){const receipt=emptyReceipt(objection);receipt.status='error';receipt.issues.push({code:error instanceof CivicPolicyStateError&&error.code==='CIVIC_POLICY_BUSY'?'inventory_busy':'operation_failed'});await saveAttempt(state,receipt);return receipt;}
+ catch(error){const receipt=emptyReceipt(objection);receipt.status='error';receipt.issues.push({code:error instanceof CivicPolicyStateError&&error.code==='CIVIC_POLICY_BUSY'?'inventory_busy':error instanceof CivicPolicyStateError&&error.code==='CIVIC_POLICY_INVENTORY_UNAVAILABLE'?'inventory_unavailable':'operation_failed'});await saveAttempt(state,receipt);return receipt;}
 }
 /** Withdraws only newly managed provenance for a classification exclusion. No
  * legacy/frozen discovery, host-wide objection or public metadata deletion.
@@ -1263,16 +1383,125 @@ export async function relinquishManagedSourceContent(input:string,source:{url:st
   return {disposition:receipt.issues.length?'partial':receipt.retainedSharedFiles?'retained_independent':'removed',removedReferences:receipt.removedReferences};
  });
 }
+interface PlannedSegment {pin:SegmentPin;serialized:string;inventoryId:string}
+function planInventorySegments(inventoryId:string,existing:SegmentPin[],entries:Entry[],scratch:ScratchLease[]):{pins:SegmentPin[];added:PlannedSegment[]}{
+ const pins=[...existing],added:PlannedSegment[]=[];
+ for(const family of ['entries','scratch'] as const){
+  const records=family==='entries'?entries:scratch;let chunk:Array<Entry|ScratchLease>=[],bytes=0;
+  const flush=()=>{
+   if(!chunk.length)return;
+   const previousSha256=pins.at(-1)?.sha256??null;
+   const value=segmentSchema.parse({schemaVersion:'civic-inventory-segment-v1',inventoryId,family,previousSha256,entries:family==='entries'?chunk:[],scratch:family==='scratch'?chunk:[]});
+   const serialized=JSON.stringify(value),size=Buffer.byteLength(serialized)+1;
+   if(size>MAX_STATE)throw new CivicPolicyStateError();
+   const pin:SegmentPin={sha256:digest(serialized+'\n'),bytes:size,family,previousSha256};
+   pins.push(pin);added.push({pin,serialized,inventoryId});chunk=[];bytes=0;
+  };
+  for(const record of records){const size=Buffer.byteLength(JSON.stringify(record))+1;if(bytes+size>16*1024*1024)flush();chunk.push(record);bytes+=size;}
+  flush();
+ }
+ storageSchema.shape.segments.parse(pins);return {pins,added};
+}
+async function publishSegment(state:string,segment:PlannedSegment):Promise<void>{
+ const folder=join(state,'inventory-segments');await directory(folder,true,true);
+ const path=join(folder,segment.pin.sha256+'.json');
+ try{await atomicJson(path,null,true,true,segment.serialized);}
+ catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;}
+ // Also verifies an orphaned segment reused after a crash; never overwrite it.
+ await readSegment(state,segment.pin,segment.inventoryId);
+}
+function logicalInventorySha256(value:Inventory):string{
+ const hash=createHash('sha256');hash.update(canonical({schemaVersion:value.schemaVersion,inventoryId:value.inventoryId}));
+ // Inventory arrays are identity sets. Record fields, including ordered sources,
+ // groups/resources/tombstones, are preserved exactly; only top-level order changes.
+ for(const records of [value.roots,value.entries,value.scratch]){
+  hash.update('[');
+  for(const record of [...records].sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0)){hash.update(canonical(record));hash.update('\n');}
+  hash.update(']');
+ }
+ return hash.digest('hex');
+}
+export interface InventoryCompactionReceipt {
+ schemaVersion:'civic-inventory-compaction-v1';status:'compacted'|'already_compacted'|'dry_run';authoritySha256:string;
+ before:{bytes:number;sha256:string};after:{bytes:number;sha256:string};segments:SegmentPin[];
+ backupPath:string|null;logicalSha256:string;logicalEquality:true;preservedWorkingLeases:string[];
+}
+/** One-shot owner cutover. Active/planned/partial leases stay fully hot and exact.
+ * No worker is killed, lock stolen, root scanned, or authority marker replaced.
+ */
+export async function compactCivicPolicyInventory(options:CivicPolicyOptions&{dryRun?:boolean;backupPath?:string}={}):Promise<InventoryCompactionReceipt>{
+ if(!options.authoritySha256)throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_UNPINNED');
+ const authority=await assertCivicPolicyAuthority(options),state=statePath(options);
+ return locked(options,async()=>{
+  const original=(await fileBytes(join(state,'inventory.json'),MAX_STATE,true)).bytes,inventory=await loadInventory(state),before={bytes:original.length,sha256:digest(original)};
+  const logicalSha256=logicalInventorySha256(inventory),preservedWorkingLeases=inventory.scratch.filter(lease=>!archivedLease(lease)).map(lease=>lease.id);
+  const sealed=sealedInventories.get(inventory);
+  if(sealed)return {schemaVersion:'civic-inventory-compaction-v1',status:options.dryRun?'dry_run':'already_compacted',authoritySha256:authority.authoritySha256,before,after:before,segments:sealed.storage.segments,backupPath:null,logicalSha256,logicalEquality:true,preservedWorkingLeases};
+  const plan=planInventorySegments(inventory.inventoryId,[],inventory.entries.filter(bulkEntry),inventory.scratch.filter(archivedLease));
+  const physical=hotInventorySchema.parse({...inventory,entries:inventory.entries.filter(entry=>!bulkEntry(entry)),scratch:inventory.scratch.filter(lease=>!archivedLease(lease)),storage:{format:'sealed-segments-v1',segments:plan.pins,entryStates:{},retiredRoots:{}}});
+  const serialized=JSON.stringify(physical),after={bytes:Buffer.byteLength(serialized)+1,sha256:digest(serialized+'\n')};
+  if(after.bytes>MAX_STATE)throw new CivicPolicyStateError();
+  const reconstructed:Inventory={schemaVersion:1,inventoryId:physical.inventoryId,roots:physical.roots,entries:[...physical.entries],scratch:[...physical.scratch]};
+  for(const segment of plan.added){const value=segmentSchema.parse(JSON.parse(segment.serialized));reconstructed.entries.push(...value.entries);reconstructed.scratch.push(...value.scratch);}
+  if(logicalInventorySha256(reconstructed)!==logicalSha256)throw new CivicPolicyStateError('CIVIC_POLICY_COMPACTION_MISMATCH');
+  let backupPath:string|null=null;
+  if(!options.dryRun){
+   backupPath=options.backupPath===undefined?join(state,'inventory.json.backup-'+before.sha256):resolve(options.backupPath);
+   if(backupPath===join(state,'inventory.json')||contained(join(state,'inventory-segments'),backupPath))throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');
+   await directory(dirname(backupPath),false,true);
+   // Backup preserves ORIGINAL bytes (including whitespace/default omissions).
+   const temporary=join(dirname(backupPath),'.'+randomUUID()+'.tmp');
+   const handle=await open(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
+   try{await handle.writeFile(original);await handle.sync();}finally{await handle.close();}
+   try{
+    try{await link(temporary,backupPath);}catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;const existing=await fileBytes(backupPath,MAX_STATE,true);if(!existing.bytes.equals(original))throw new CivicPolicyStateError('CIVIC_POLICY_BACKUP_MISMATCH');}
+    const parent=await open(dirname(backupPath),constants.O_RDONLY|constants.O_NOFOLLOW);try{await parent.sync();}finally{await parent.close();}
+   }finally{await unlink(temporary);}
+   for(const segment of plan.added)await publishSegment(state,segment);
+   await atomicJson(join(state,'inventory.json'),physical,false,true,serialized);
+   validatedInventoryBytes.delete(state);
+   const reread=await loadInventory(state),published=(await fileBytes(join(state,'inventory.json'),MAX_STATE,true)).bytes;
+   if(logicalInventorySha256(reread)!==logicalSha256||published.length!==after.bytes||digest(published)!==after.sha256)throw new CivicPolicyStateError('CIVIC_POLICY_COMPACTION_MISMATCH');
+  }
+  return {schemaVersion:'civic-inventory-compaction-v1',status:options.dryRun?'dry_run':'compacted',authoritySha256:authority.authoritySha256,before,after,segments:plan.pins,backupPath,logicalSha256,logicalEquality:true,preservedWorkingLeases};
+ });
+}
+/** Read-only, owner-local audit reconstruction, including full archived records.
+ * This is not an authorization snapshot. Call ordinary live read boundaries.
+ */
+export async function readCivicPolicyInventory(options:CivicPolicyOptions={}):Promise<Inventory>{
+ return locked(options,async()=>structuredClone(await loadInventory(statePath(options))));
+}
+/** Offline sizing/codec benchmark, deliberately not an authority operation.
+ * Caller supplies a private COPY; this routine never writes or acquires a lock.
+ */
+export async function benchmarkCivicInventoryCopy(path:string,iterations=5):Promise<{
+ before:{bytes:number;parseMs:number;serializeMs:number};after:{bytes:number;parseMs:number;serializeMs:number};byteReduction:number;codecSpeedup:number;segments:number;
+}>{
+ if(!Number.isInteger(iterations)||iterations<1||iterations>20)throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');
+ const bytes=(await fileBytes(resolve(path),MAX_STATE,true)).bytes,original=bytes.toString('utf8'),inventory=inventorySchema.parse(JSON.parse(original));
+ const plan=planInventorySegments(inventory.inventoryId,[],inventory.entries.filter(bulkEntry),inventory.scratch.filter(archivedLease));
+ const compact=JSON.stringify(hotInventorySchema.parse({...inventory,entries:inventory.entries.filter(entry=>!bulkEntry(entry)),scratch:inventory.scratch.filter(lease=>!archivedLease(lease)),storage:{format:'sealed-segments-v1',segments:plan.pins,entryStates:{},retiredRoots:{}}}))+'\n';
+ const measure=(text:string)=>{
+  const parseTimes:number[]=[],serializeTimes:number[]=[];
+  for(let i=0;i<iterations;i++){const start=performance.now(),value:unknown=JSON.parse(text),parsed=performance.now();JSON.stringify(value);const end=performance.now();parseTimes.push(parsed-start);serializeTimes.push(end-parsed);}
+  parseTimes.sort((a,b)=>a-b);serializeTimes.sort((a,b)=>a-b);
+  return {bytes:Buffer.byteLength(text),parseMs:parseTimes[Math.floor(iterations/2)],serializeMs:serializeTimes[Math.floor(iterations/2)]};
+ };
+ const before=measure(original),after=measure(compact);
+ return {before,after,byteReduction:before.bytes/after.bytes,codecSpeedup:(before.parseMs+before.serializeMs)/(after.parseMs+after.serializeMs),segments:plan.pins.length};
+}
 /** CLI is an explicit local operator action, never a web/contact endpoint.
  * register --host HOST --reason CODE [--reference OPAQUE] [--received-at ISO]
  * purge --host HOST; both accept --state-dir PATH and return metadata only.
  * Exit 2 means partial/error; a deadline is never evidence of completed purge.
  */
 export async function civicOptOutMain(args:string[]=process.argv.slice(2)):Promise<void>{
- const command=args[0],{values}=parseArgs({args:args.slice(1),options:{host:{type:'string'},root:{type:'string'},reason:{type:'string'},reference:{type:'string'},'received-at':{type:'string'},'state-dir':{type:'string'},'authority-id':{type:'string'},'authority-sha256':{type:'string'}},strict:true});
+ const command=args[0],{values}=parseArgs({args:args.slice(1),options:{host:{type:'string'},root:{type:'string'},reason:{type:'string'},reference:{type:'string'},'received-at':{type:'string'},'state-dir':{type:'string'},'authority-id':{type:'string'},'authority-sha256':{type:'string'},'dry-run':{type:'boolean'},backup:{type:'string'}},strict:true});
  const options={stateDir:values['state-dir'],authorityId:values['authority-id'],authoritySha256:values['authority-sha256']};
  if(options.authorityId!==undefined&&options.authorityId!==CIVIC_POLICY_AUTHORITY_ID||statePath(options)!==CIVIC_POLICY_STATE_DIR)throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_FOREIGN');
  if(command==='provision'){console.log(JSON.stringify(await provisionCivicPolicyAuthority(options)));return;}
+ if(command==='compact-inventory'){console.log(JSON.stringify(await compactCivicPolicyInventory({...options,dryRun:values['dry-run'],backupPath:values.backup})));return;}
  if(command==='recover-scratch'){const receipt=await recoverManagedSourceScratch(options);console.log(JSON.stringify(receipt));if(receipt.status!=='complete')process.exitCode=2;return;}
  if(command==='retire-root'){if(!values.root||!values.reason)throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');const receipt=await retireManagedRoot(values.root,{reason:values.reason},options);console.log(JSON.stringify(receipt));if(receipt.status!=='retired')process.exitCode=2;return;}
  if(!values.host||!['register','purge'].includes(command))throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');
