@@ -8,7 +8,9 @@ export function nativePublicRequestHeaders(url:URL,method:'GET'|'POST',body:stri
  if(operation==='genesis_guest'){
   if(url.origin!=='https://www.regionalstatistik.de'||!/^\/genesisws\/rest\/2020\/(?:metadata\/table|data\/table(?:file)?)$/.test(url.pathname)||url.search)throw Error('GENESIS guest profile endpoint mismatch');
   const params=new URLSearchParams(body),allowed=['name','area','language','regionalvariable','regionalkey','startyear','endyear','compress','transpose','job','format','quality'];
-  if([...params.keys()].some(key=>!allowed.includes(key))||[...params.keys()].some(key=>params.getAll(key).length!==1)||params.get('area')!=='free'||params.get('language')!=='de'||!/^\d{5}-\d{2}-\d{2}$/.test(params.get('name')??''))throw Error('GENESIS public selector rejected');
+  // Catalog IDs retain their existing profile; only this municipal-depth request name is admitted.
+  const name=params.get('name')??'',knownName=/^\d{5}-\d{2}-\d{2}$/.test(name)||name==='12411-02-03-5';
+  if([...params.keys()].some(key=>!allowed.includes(key))||[...params.keys()].some(key=>params.getAll(key).length!==1)||params.get('area')!=='free'||params.get('language')!=='de'||!knownName)throw Error('GENESIS public selector rejected');
   if(url.pathname.includes('/data/')&&(!/^\d{5}(?:\d{3})?$/.test(params.get('regionalkey')??'')||!/^\d{4}$/.test(params.get('startyear')??'')||params.get('startyear')!==params.get('endyear')||['compress','transpose','job'].some(key=>params.get(key)!=='false')))throw Error('GENESIS data request must be single-region single-year synchronous');
   return {'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',username:'GAST',password:'GAST'};
  }

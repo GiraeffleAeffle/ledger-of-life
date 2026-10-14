@@ -1,5 +1,5 @@
 {
-  "contractVersion": "regionalstatistik-datencsv-v1",
+  "contractVersion": "regionalstatistik-datencsv-v2",
   "sourceId": "regionalstatistik-genesis",
   "family": 1,
   "wave": "A",
@@ -31,12 +31,12 @@
   },
   "tables": [
     {"id": "12411-06-01", "catalogPage": 44, "title": "Bevölkerung nach Geschlecht", "catalogGeography": "GE", "referenceDay": "06-30", "periodicity": "annual", "semantics": "Population stock at sole/main residence; sex dimensions remain source-coded. Not the year-end population table.", "methodology": "From reporting year 2022 population progression is based on Census 15 May 2022; comparability before/after 2016 is limited by method changes."},
-    {"id": "12411-02-03", "catalogPage": 46, "title": "Bevölkerung nach Geschlecht und Altersgruppen", "catalogGeography": "GE", "referenceDay": "12-31", "periodicity": "annual", "semantics": "Source age-group and sex cells are distinct observations; no unobserved totals or denominator completion."},
+    {"id": "12411-02-03", "requestName": "12411-02-03-5", "requestNameBasis": "Explicit municipal-depth mapping admitted for owner-approved K1 retry4; live response remains unverified, no generic suffix inference.", "catalogPage": 46, "title": "Bevölkerung nach Geschlecht und Altersgruppen", "catalogGeography": "GE", "referenceDay": "12-31", "periodicity": "annual", "semantics": "Source age-group and sex cells are distinct observations; no unobserved totals or denominator completion."},
     {"id": "31231-02-01", "catalogPage": 190, "title": "Bestand an Wohngebäuden und Wohnungen in Wohn- und Nichtwohngebäuden", "catalogGeography": "GE", "referenceDay": "12-31", "periodicity": "annual", "semantics": "Building/dwelling stock and housing-area measures are not project-specific completions, occupancy, public ownership or impact."}
   ],
   "mapping": {
     "nativeInputs": "Publisher WADL, native metadata/table JSON, native data/table JSON Object.Content, native tablefile datencsv; no normalized observations feed",
-    "tableIdentity": "GENESIS-Tabelle preamble and/or corrected Parameter.name; conflicting IDs fail closed",
+    "tableIdentity": "GENESIS-Tabelle preamble and/or corrected Parameter.name resolve to the catalog ID; only 12411-02-03-5 maps explicitly to 12411-02-03. Full names are checked, unknown suffixes and conflicting catalog IDs fail closed. Native observation IDs retain the catalog ID.",
     "geography": "Explicit native 8-digit code stays GE; matching native 5-digit code stays KR with null town AGS and district subject. No padding or assignment of a district total to each town. Name-only geography requires native corrected Parameter.regionalkey and matching Structure.Rows variable with Selected=1. Uncoded multi-region rows remain held.",
     "referenceDate": "Exact source date must agree with catalog day. Year-only fields map via catalog table-specific reference day. RetrievedAt is never publication or reference date.",
     "publicationDate": "Unknown/null, never borrowed from retrieval or table Stand timestamp",
@@ -73,5 +73,5 @@
     {"municipality": "Parchim", "ags": "13076108", "state": "not_checked"},
     {"municipality": "Hagenow", "ags": "13076060", "state": "not_checked"}
   ],
-  "changelog": [{"date": "2026-10-11", "change": "Added deterministic native snapshot adapter and unexecuted fixture suite; documented GAST remains unexercised and all nine-town coverage remains not_checked."}]
+  "changelog": [{"date": "2026-10-11", "change": "Added deterministic native snapshot adapter and unexecuted fixture suite; documented GAST remains unexercised and all nine-town coverage remains not_checked."}, {"date": "2026-10-14", "change": "Separated catalog ID 12411-02-03 from explicit municipal-depth request name 12411-02-03-5 for owner-approved K1 retry4; parser resolves exact names without weakening region/selection or Status 104 holds. No other depth mappings added."}]
 }

@@ -32,7 +32,7 @@ test('GENESIS WADL discovery paginates catalog-backed metadata requests without 
     ids.push(new URLSearchParams(result.resources[0].body!).get('name')!);
     cursor = result.coverage.nextCursor;
   } while (cursor);
-  assert.deepEqual(ids, Object.keys(GENESIS_TABLES));
+  assert.deepEqual(ids, Object.keys(GENESIS_TABLES).map(id => id === '12411-02-03' ? '12411-02-03-5' : id));
   assert.ok(genesisAdapter.discover(input, scope, null).coverage.limitations.some(value => value.includes('not exercised')));
 });
 test('native metadata drives the regional variable and bounded REST table/tablefile POST form bodies', () => {
@@ -49,6 +49,17 @@ test('native metadata drives the regional variable and bounded REST table/tablef
   assert.equal(second.resources[0].url, GENESIS_BASE + 'data/tablefile');
   assert.equal(new URLSearchParams(second.resources[0].body!).get('format'), 'datencsv');
   assert.equal(second.coverage.nextCursor, null);
+});
+test('municipal age-table metadata builds the exact mapped Strausberg request without changing catalog identity', () => {
+  const townScope = {...scope, municipalityId: 'strausberg', ags: '12064472'};
+  for (const name of ['12411-02-03', '12411-02-03-5']) {
+    const input = snapshot(metadata(name), 'metadata/table');
+    const first = genesisAdapter.discover(input, townScope, null);
+    assert.equal(first.resources[0].body, 'name=12411-02-03-5&area=free&language=de&regionalvariable=GEMEIN&regionalkey=12064472&startyear=2024&endyear=2024&compress=false&transpose=false&job=false');
+    assert.equal(first.resources[0].parentId, '12411-02-03:metadata/table');
+    const second = genesisAdapter.discover(input, townScope, first.coverage.nextCursor);
+    assert.equal(second.resources[0].body, first.resources[0].body + '&format=datencsv&quality=on');
+  }
 });
 test('cursor binds source bytes and municipal scope and never reports complete coverage', () => {
   const input = snapshot(wadl, 'application.wadl');
@@ -107,6 +118,47 @@ test('age table keeps row age group as identity and year-end reference, never to
   assert.notEqual(result.observations[0].nativeId, result.observations[1].nativeId);
   assert.ok(result.observations[0].evidence[0].rowKey!.includes('unter 3'));
 });
+test('mapped municipal datencsv accepts exact catalog/request identities and preserves native selection gates', () => {
+  const townScope = {...scope, municipalityId: 'strausberg', ags: '12064472'};
+  const fixture = (contentName: string, parameterName: string, key = '12064472', variable = 'GEMEIN', selected = '1') => JSON.stringify({
+    Ident: {Service: 'data', Method: 'table'}, Status: {Code: 0, Type: 'Information'},
+    Parameter: {name: parameterName, regionalkey: key, regionalvariable: variable},
+    Object: {
+      Content: `GENESIS-Tabelle: ${contentName}\nBevölkerung (Anzahl);;\n;;2024\nStrausberg;unter 3;2\nStrausberg;3 bis unter 6;3\n__________\n`,
+      TableLayout: {FrontColumnsNumber: '2'},
+      Structure: {Rows: [{Code: 'GEMEIN', Content: 'Gemeinden', Selected: selected}]},
+    },
+  });
+  for (const contentName of ['12411-02-03', '12411-02-03-5']) {
+    for (const parameterName of ['12411-02-03', '12411-02-03-5']) {
+      const result = genesisAdapter.parse(snapshot(fixture(contentName, parameterName), 'data/table'), townScope);
+      assert.equal(result.coverage.state, 'partial');
+      assert.equal(result.coverage.observedRows, 2);
+      assert.deepEqual(result.observations.map(row => row.value), [2, 3]);
+      assert.ok(result.observations.every(row => row.nativeId.startsWith('12411-02-03:GE:12064472:') && row.geography.ags === '12064472' && row.date === '2024-12-31' && row.predicate === 'describes:population_by_age'));
+      assert.ok(result.observations[0].evidence.some(row => row.path === '$.Parameter.regionalkey' && row.rawValue === '12064472'));
+    }
+  }
+  const bare = genesisAdapter.parse(snapshot(table('12411-02-03-5', '12064472;Strausberg;7;3;4')), townScope);
+  assert.deepEqual(bare.observations.map(row => row.value), [7, 3, 4]);
+  assert.ok(bare.observations.every(row => row.date === '2024-12-31'));
+  assert.equal(genesisAdapter.parse(snapshot(fixture('12411-02-03-5', '12411-02-03-5', '12064227'), 'data/table'), townScope).coverage.state, 'empty');
+  for (const source of [
+    fixture('12411-02-03-5', '12411-02-03-5', '12064472', 'KREISE'),
+    fixture('12411-02-03-5', '12411-02-03-5', '12064472', 'GEMEIN', '0'),
+    fixture('12411-02-03-5', '31231-02-01'),
+    fixture('12411-02-03-4', '12411-02-03-5'),
+    fixture('12411-02-03-5', '12411-02-03-5-extra'),
+  ]) {
+    const result = genesisAdapter.parse(snapshot(source, 'data/table'), townScope);
+    assert.equal(result.coverage.state, 'held_quality');
+    assert.deepEqual(result.observations, []);
+  }
+  for (const name of ['99999-00-00', '12411-02-03-4', '12411-02-03-55', '12411-02-03-5-extra', '12411-06-01-5', '31231-02-01-5']) {
+    assert.equal(genesisAdapter.parse(snapshot(table(name)), scope).coverage.state, 'held_quality');
+    assert.equal(genesisAdapter.discover(snapshot(metadata(name), 'metadata/table'), scope, null).coverage.state, 'held_quality');
+  }
+});
 test('housing-stock table preserves area units and decimals, not construction completion', () => {
   const content = 'GENESIS-Tabelle: 31231-02-01\nWohnungsbestand;;;;\n;;Wohngebäude (Anzahl);Wohnungen (Anzahl);Wohnfläche (1000 m²)\n;;2024;2024;2024\n01053100;Ratzeburg;2;3;1,25\n__________\n';
   const result = genesisAdapter.parse(snapshot(content), scope);
@@ -133,10 +185,15 @@ test('schema changes, truncated exports, mismatched table IDs and unknown value 
 });
 test('withdrawn/unavailable native object is held, not an inferred retraction; auth failure is blocked', () => {
   for (const [Content, state] of [['Es gibt keine Objekte zum angegebenen Selektionskriterium', 'held_quality'], ['Anmeldung fehlgeschlagen', 'blocked_access']] as const) {
-    const input = snapshot(JSON.stringify({Ident: {Service: 'data', Method: 'table'}, Status: {Code: 104, Type: 'Information', Content}, Object: null}), 'data/table');
-    assert.equal(genesisAdapter.parse(input, scope).coverage.state, state);
-    assert.deepEqual(genesisAdapter.parse(input, scope).observations, []);
-    assert.equal(genesisAdapter.discover(input, scope, null).coverage.state, state);
+    for (const name of ['12411-02-03', '12411-02-03-5']) {
+      const input = snapshot(JSON.stringify({Ident: {Service: 'data', Method: 'table'}, Status: {Code: 104, Type: 'Information', Content}, Parameter: {name, regionalkey: '12064472', regionalvariable: 'GEMEIN'}, Object: null}), 'data/table');
+      const result = genesisAdapter.parse(input, {...scope, municipalityId: 'strausberg', ags: '12064472'});
+      assert.equal(result.coverage.state, state);
+      assert.equal(result.coverage.observedRows, 0);
+      assert.equal(result.coverage.reason, Content);
+      assert.deepEqual(result.observations, []);
+      assert.equal(genesisAdapter.discover(input, scope, null).coverage.state, state);
+    }
   }
 });
 test('byte, publisher, DTD and input-size failures are held without parsing or fetching', () => {

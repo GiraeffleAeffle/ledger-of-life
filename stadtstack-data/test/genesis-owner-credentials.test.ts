@@ -49,6 +49,19 @@ test('checked-in owner decision rejects uncovered endpoints and forged account a
  assert.equal(ContentFreeSourcePolicySchema.safeParse(forged).success,false);assert.equal(effectiveSourcePermission(forged,{url:endpoint,sha256:'a'.repeat(64)}),false);
 });
 
+test('mapped request passes the same owner-account header and secrecy boundary',()=>{
+ const credentials=new GenesisOwnerCredentials('token',token,''),mapped=body.replace('name=12411-02-03','name=12411-02-03-5');
+ try{
+  for(const url of [endpoint,endpoint+'file']){
+   assert.equal(credentials.requestHeaders(new URL(url),'POST',mapped,'genesis_guest').username,token);
+  }
+  assert.throws(()=>credentials.requestHeaders(new URL(endpoint.replace('data/table','metadata/table')),'POST',mapped,'genesis_guest'),GenesisCredentialUnavailable);
+  assert.throws(()=>credentials.requestHeaders(new URL(endpoint),'POST',mapped.replace('12411-02-03-5','12411-02-03-4'),'genesis_guest'),/selector rejected/);
+  assert.throws(()=>credentials.screenResponse(Buffer.from(JSON.stringify({Parameter:{name:'12411-02-03-5'},echo:token})),{'content-type':'application/json'},200),GenesisResponseScreeningHold);
+  credentials.screenResponse(Buffer.from(JSON.stringify({Status:{Code:104,Content:'Es gibt keine Objekte zum angegebenen Selektionskriterium'},Parameter:{name:'12411-02-03-5'},Object:null})),{'content-type':'application/json'},200);
+ }finally{credentials.clear();}
+});
+
 test('empty approval list preserves the GENESIS guest hold in an isolated source snapshot',async t=>{
  const {snapshot}=await isolatedGenesisSnapshot(t),policyPath=join(snapshot,'src','source-policy.ts'),source=await readFile(policyPath,'utf8');
  // Remove the decision ONLY in this disposable source copy. A production entry

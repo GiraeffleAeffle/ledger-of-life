@@ -30,6 +30,19 @@ test('GENESIS selector rejects credential overrides, duplicate fields and unboun
  assert.equal(nativePublicRequestHeaders(genesisUrl,'POST',district.toString(),'genesis_guest').username,'GAST');
 });
 
+test('GENESIS admits only the exact municipal-depth exception, retaining synchronous bounds',()=>{
+ const mapped=genesisBody.replace('name=12411-06-01','name=12411-02-03-5');
+ assert.equal(nativePublicRequestHeaders(genesisUrl,'POST',mapped,'genesis_guest').username,'GAST');
+ for(const name of ['12411-02-03-4','12411-02-03-55','12411-02-03-5-extra','12411-06-01-5','31231-02-01-5','unknown']){
+  const params=new URLSearchParams(mapped);params.set('name',name);
+  assert.throws(()=>nativePublicRequestHeaders(genesisUrl,'POST',params.toString(),'genesis_guest'),/selector rejected/);
+ }
+ for(const [key,value] of [['username','fixture'],['endyear','2025'],['job','true'],['regionalkey','12064472,12064227']]){
+  const params=new URLSearchParams(mapped);params.set(key,value);
+  assert.throws(()=>nativePublicRequestHeaders(genesisUrl,'POST',params.toString(),'genesis_guest'),/selector rejected|single-region/);
+ }
+});
+
 test('TED profile validates strict JSON and never carries GENESIS guest headers',()=>{
  assert.deepEqual(nativePublicRequestHeaders(tedUrl,'POST',JSON.stringify(tedBody),'ted_search'),{'Content-Type':'application/json'});
  assert.deepEqual(nativePublicRequestHeaders(tedUrl,'POST',JSON.stringify({...tedBody,iterationNextToken:'synthetic-cursor'}),'ted_search'),{'Content-Type':'application/json'});
