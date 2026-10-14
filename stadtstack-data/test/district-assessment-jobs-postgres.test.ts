@@ -28,7 +28,7 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
  t.after(async()=>{try{await closeDb?.();if(created)await admin.query('DROP DATABASE "'+database+'"');}finally{await closeAdmin();for(const directory of directories)await rm(directory,{recursive:true,force:true});}});
  await admin.query('CREATE DATABASE "'+database+'"');created=true;const url=new URL(base);url.pathname='/'+database;
  db=new Pool({connectionString:url.href,max:8});closeDb=poolShutdownBarrier(db);const pool=db;await migrateDistrictJobs(pool);
- async function fixture(name:string,originalText?:string,mutate?:(record:DistrictKnowledgeRecord,text:string)=>void){
+ async function fixture(name:string,originalText?:string,mutate?:(record:DistrictKnowledgeRecord,text:string)=>void,mutateItem?:(item:AssessmentItem)=>void){
   const text=originalText??'Strausberg synthetic original evidence '+name+' '+randomUUID()+'.',f=await admittedAssessmentFixture(text,true);directories.push(f.directory);
   const cas=f.context.cas,policy=f.context.policyOptions,store=new DistrictJobStore(pool),record=recordFor(f,text),rubric='Synthetic frozen rubric: exact evidence only; AI agreement is not independent gold.';
   if(mutate){mutate(record,text);record.verification.evidenceHash=knowledgeEvidenceHash(record);}
@@ -42,6 +42,7 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   await put(text,'source_original',true);
   const projection=residualRecordPropositions(record);
   const item=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,question:'Verify every proposition independently against the original source.',claim:canonicalJson(projection),rubric,rubricSha256:digest(rubric),sources:[f.source],claimIds:projection.propositions.map(proposition=>proposition.claimId),entityIds:[],constraints:[],criticalKinds:[]});
+  mutateItem?.(item);
   const itemArtifact=await put(item),recordArtifact=await put(record),bundle=await put({version:'r1-assessment-items-v1',items:[{itemArtifactSha256:itemArtifact.sha256,recordArtifactSha256:recordArtifact.sha256,maxModelCalls:48}]});
   const snapshot=randomUUID(),scope=f.policy.scope;
   await pool.query(`INSERT INTO district_pipeline.source_snapshots(id,publisher_id,source_id,municipality_id,ags,tenant,resource_identity,request_method,request_selector_sha256,observation_window,retrieved_at,scope_sha256) VALUES($1,$2,$3,$4,$5,NULL,$6,'GET',$7,$8,$9,$10)`,[snapshot,scope.publisherId,scope.sourceId,scope.municipalityId,scope.ags,f.policy.source.url,digest('synthetic GET '+name),scope.observationWindow,f.policy.checkedAt,semanticHash(scope)]);
@@ -168,6 +169,17 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   await assert.rejects(pool.query('DELETE FROM district_pipeline.r1_codex_usage_holds WHERE authorization_id=$1',[firstAuthorization]),/Immutable/);
   await assert.rejects(pool.query('UPDATE district_pipeline.r1_codex_resumptions SET approved_by=$1 WHERE authorization_id=$2',['synthetic mutation',nextAuthorization]),/Immutable/);
   const count=await pool.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[f.source.originalSha256]);assert.equal(Number(count.rows[0].count),2);
+ });
+ await t.test('oversized A/B context holds quality before any call intent or B lease',async()=>{
+  const f=await fixture('context-overcap',undefined,undefined,item=>{item.question='x'.repeat(22000);});let called=false;
+  const A=await f.run(f.AJobKey,f.handlers(async input=>{called=true;return answer(input);}));
+  const broker=new DistrictAssessmentBroker(pool,f.cas,{policyOptions:f.policy,fixtureProtocol:true});
+  const B=await f.run(f.BJobKey,{assessment_b:assessmentBJobHandler(broker)});
+  assert.equal(A.reasonCode,'assessment_context_exceeded');assert.equal(B.reasonCode,'assessment_context_exceeded');assert.equal(called,false);
+  const jobs=await pool.query('SELECT state,reason_code FROM district_pipeline.jobs WHERE job_key=ANY($1::text[])',[[f.AJobKey,f.BJobKey]]);
+  assert.ok(jobs.rows.every(row=>row.state==='held_quality'&&row.reason_code==='assessment_context_exceeded'));
+  const intents=await pool.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[f.source.originalSha256]);assert.equal(Number(intents.rows[0].count),0);
+  const leases=await pool.query('SELECT count(*) FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1',[f.BJobKey]);assert.equal(Number(leases.rows[0].count),0);
  });
  await t.test('prepared-text item factory binds actual UTF-16 spans and never imports model constraints',async()=>{
   const f=await fixture('factory'),text=(await f.cas.read(f.source.textSha256)).toString('utf8');

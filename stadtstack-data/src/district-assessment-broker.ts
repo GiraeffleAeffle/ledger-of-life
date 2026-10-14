@@ -16,6 +16,7 @@ import type {ReasonCode} from './district-step-receipt.ts';
 import {assertCivicPolicyAuthority,readCivicOptOutSnapshot,assertManagedSourceReadable,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError,type CivicPolicyAuthorityReceipt} from './civic-opt-out.ts';
 import {ASSESSMENT_BRIDGE_VERSION,BRIDGE_LIMITS,BridgeLeaseSchema,BridgeRequestSchema,BridgeStatusSchema,BridgePurgeAckSchema,BridgeAnswerSchema,bridgeInputHash,type BridgeAnswer,type BridgeLease,type BridgeRequest,type BridgeStatus} from './district-assessment-bridge-contract.ts';
 import {runVmOmpAssessment,ompRunnerContractSha256,type OmpRunnerResult} from './district-omp-b-runner.ts';
+import {AssessmentContextHold,assertAssessmentContextBound} from './district-assessment-context.ts';
 
 export const ASSESSMENT_B_STEP='assessment_b';
 export const AssessmentBSelectorSchema=z.discriminatedUnion('transport',[
@@ -33,7 +34,7 @@ export interface RecordedBridgeAssessment {receipt:AssessmentReceipt;answer:Mode
 /** Pin implementation bytes as well as the frozen request contract. No guessed
  * policy source pin: a missing settled module prevents enqueue/execution. */
 export async function assessmentBJobContract():Promise<string>{
- const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-bridge-contract.ts','district-policy-receipt.ts','district-jobs.ts','district-cas.ts','district-claude.ts','district-model-contract.ts','district-omp-b-runner.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh','civic-opt-out.ts','source-policy.ts','document-origin.ts'];
+ const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','district-assessment-bridge-contract.ts','district-policy-receipt.ts','district-jobs.ts','district-cas.ts','district-claude.ts','district-model-contract.ts','district-omp-b-runner.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh','civic-opt-out.ts','source-policy.ts','document-origin.ts'];
  return semanticHash({version:ASSESSMENT_BRIDGE_VERSION,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))})))});
 }
 function hardDeadline(row:JobAuthorityRow):number{
@@ -142,7 +143,7 @@ export class DistrictAssessmentBroker {
   if(!primary)throw new DistrictExecutionHold('policy_excluded');
   const evidence=await originalEvidence(item,{...this.context,currentAdmissionReceipts});
   const data=assessmentProviderInput(item,evidence);
-  if(Buffer.byteLength(canonicalJson(data))>BRIDGE_LIMITS.evidenceContextBytes)throw new DistrictExecutionHold('quality_failed');
+  assertAssessmentContextBound(data);
   const finalAuthority=await assertCivicPolicyAuthority(this.context.policyOptions),finalOptout=await readCivicOptOutSnapshot(this.context.policyOptions);
   if(!same(finalAuthority,sourceAuthority)||finalOptout.authorityId!==sourceAuthority.authorityId||finalOptout.authoritySha256!==sourceAuthority.authoritySha256||finalOptout.sha256!==optout.sha256)throw new DistrictExecutionHold('authorization_revoked');
   return {item,evidence,data,sources,sourceAuthority,policySnapshotSha256:semanticHash({sourceAuthority,optOutSnapshotSha256:optout.sha256,sources:snapshots.sort((a,b)=>a.sourceId.localeCompare(b.sourceId))}),validUntil};
@@ -398,7 +399,12 @@ export class DistrictAssessmentBroker {
 }
 
 /** Fixed registry entry. Never run Codex in place of offline/unavailable Haiku. */
-export function assessmentBJobHandler(broker:DistrictAssessmentBroker):JobHandler{return ({job,signal,cas})=>{if(cas.root!==broker.cas.root)throw new DistrictExecutionHold('cas_unavailable');const selector=AssessmentBSelectorSchema.parse(job.spec.selector);return selector.transport==='vm-omp'?broker.waitForVmOmpAssessment(job,signal):broker.waitForAssessment(job,signal);};}
+export function assessmentBJobHandler(broker:DistrictAssessmentBroker):JobHandler{return async({job,signal,cas})=>{
+ if(cas.root!==broker.cas.root)throw new DistrictExecutionHold('cas_unavailable');
+ const selector=AssessmentBSelectorSchema.parse(job.spec.selector);
+ try{return await(selector.transport==='vm-omp'?broker.waitForVmOmpAssessment(job,signal):broker.waitForAssessment(job,signal));}
+ catch(error){if(!(error instanceof AssessmentContextHold))throw error;return {outcome:'held_quality',reasonCode:error.reasonCode,counts:{heldFacts:1}};}
+};}
 export async function enqueueAssessmentB(broker:DistrictAssessmentBroker,input:({itemArtifactSha256:string;sourceScope:AdapterScope;policyProofSha256:string;transport:'mac-bridge';clientContractSha256:string}|{itemArtifactSha256:string;sourceScope:AdapterScope;policyProofSha256:string;transport:'vm-omp'})):Promise<string>{
  const base={version:ASSESSMENT_BRIDGE_VERSION,role:'B',provider:'anthropic-subscription',requestedModel:'claude-haiku-5-5',itemArtifactSha256:input.itemArtifactSha256};
  const selector=AssessmentBSelectorSchema.parse(input.transport==='mac-bridge'?{...base,transport:input.transport,clientContractSha256:input.clientContractSha256}:{...base,transport:input.transport,runnerContractSha256:await ompRunnerContractSha256()});

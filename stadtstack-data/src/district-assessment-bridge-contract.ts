@@ -1,12 +1,13 @@
 import {z} from 'zod';
 import {HashSchema,canonicalJson,digest} from './district-adapter-contract.ts';
+import {ASSESSMENT_CONTEXT_BYTES} from './district-assessment-context.ts';
 
 export const ASSESSMENT_BRIDGE_VERSION='district-assessment-bridge-v1';
 export const BRIDGE_LIMITS=Object.freeze({requestBytes:512*1024,responseBytes:256*1024,evidenceContextBytes:24000,leaseMs:120000,heartbeatMs:10000,maxLeaseMs:300000});
 export const ASSESSMENT_BRIDGE_SSH_HOST='codex-workstation';
 export const ASSESSMENT_BRIDGE_REMOTE_COMMAND="bash -lc 'export DATABASE_URL=\"postgresql:///civic_r1?host=/var/run/postgresql\"; exec node --experimental-strip-types /home/max/civic-rebuild-r1/stadtstack-data/src/district-assessment-broker.ts'";
 export const BridgeLeaseSchema=z.object({version:z.literal(ASSESSMENT_BRIDGE_VERSION),leaseId:z.uuid(),jobKey:HashSchema,inputSha256:HashSchema,authorityId:z.string().min(1),authoritySha256:HashSchema,policySnapshotSha256:HashSchema,expiresAt:z.iso.datetime(),role:z.literal('B'),provider:z.literal('anthropic-subscription'),requestedModel:z.literal('claude-haiku-5-5'),system:z.string().max(8000),data:z.unknown(),outputSchema:z.unknown(),clientContractSha256:HashSchema}).strict().superRefine((lease,ctx)=>{
- if(Buffer.byteLength(canonicalJson(lease.data))>BRIDGE_LIMITS.evidenceContextBytes)ctx.addIssue({code:'custom',message:'Original evidence context exceeds bridge bound'});
+ if(Buffer.byteLength(canonicalJson(lease.data))>ASSESSMENT_CONTEXT_BYTES)ctx.addIssue({code:'custom',message:'Assessment context exceeds shared governed bound'});
  if(lease.inputSha256!==bridgeInputHash(lease))ctx.addIssue({code:'custom',message:'Bridge input binding mismatch'});
 });
 export type BridgeLease=z.infer<typeof BridgeLeaseSchema>;
