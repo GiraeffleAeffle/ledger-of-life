@@ -6,7 +6,7 @@ import {HashSchema,canonicalJson,digest,semanticHash} from './district-adapter-c
 import {DistrictJobStore,DistrictExecutionHold,canonicalJobIdentity,type DistrictJobSpec,type JobHandlerContext,type JobHandler,type JobHandlerResult} from './district-jobs.ts';
 import {encodeStepReceipt,type StepReceipt} from './district-step-receipt.ts';
 import {DistrictCas,type CasArtifact} from './district-cas.ts';
-import {assessmentBlindProjection,assessmentItemSchema,originalEvidence,buildAssessmentPassInput,runAssessmentPass,createAssessmentReceipt,reconcile,validateReceipt,type AssessmentItem,type AssessmentReceipt,type AssessmentEvidenceContext,type AssessmentPassInput} from './district-assessment.ts';
+import {assessmentBlindProjection,assessmentItemSchema,assertResidualAssessmentContext,originalEvidence,buildAssessmentPassInput,runAssessmentPass,createAssessmentReceipt,reconcile,validateReceipt,type AssessmentItem,type AssessmentReceipt,type AssessmentEvidenceContext,type AssessmentPassInput} from './district-assessment.ts';
 import {prepareCriticalAssessment} from './district-critical-assessment.ts';
 import {criticalKnowledgeTarget} from './district-critical-assessment-public.ts';
 import {PreparedDocumentSchema,verifyPreparedDocument,assertPreparedReferenceMembership,type PreparedDocument} from './district-prepared-document.ts';
@@ -110,6 +110,7 @@ async function checkedItem(pool:Pool,context:JobHandlerContext,selector:z.infer<
   if(canonicalJson(row.pin)!==canonicalJson(pin)||!context.job.dependencyReceiptIds.includes(pin.receiptId))throw new DistrictExecutionHold('quality_failed');
  }
  const item=assessmentItemSchema.parse(await json(context.cas,selector.itemArtifactSha256));
+ assertResidualAssessmentContext(item);
  for(const hash of [selector.itemArtifactSha256,selector.recordArtifactSha256,...assessmentEvidenceArtifactHashes(item)]){
   if(!context.job.spec.inputArtifactHashes.includes(hash))throw new DistrictExecutionHold('quality_failed');
   await assertManagedSourceReadable(join(context.cas.root,'sha256',hash.slice(0,2),hash),options.policyOptions);
@@ -273,12 +274,14 @@ export function assessmentQueueHandlers(pool:Pool,options:Omit<AssessmentEvidenc
 }
 export async function enqueuePreparedAssessmentPass(pool:Pool,store:DistrictJobStore,cas:DistrictCas,preparationJobKey:string,role:'A'|'B',broker?:DistrictAssessmentBroker){
  const row=await committed(pool,preparationJobKey,'assessment_prepare'),bundles:z.infer<typeof ItemBundleSchema>[]=[];
+ if(row.spec.semanticContractSha256!==await assessmentQueueContract())throw new AssessmentContextHold();
  for(const hash of row.receipt.outputHashes){const raw=await json(cas,hash);if(raw.version==='r1-assessment-items-v1')bundles.push(ItemBundleSchema.parse(raw));}
  if(bundles.length!==1)throw new DistrictExecutionHold('quality_failed');
  const jobKeys:string[]=[];
  for(const entry of bundles[0].items){
   if(!row.receipt.outputHashes.includes(entry.itemArtifactSha256)||!row.receipt.outputHashes.includes(entry.recordArtifactSha256))throw new DistrictExecutionHold('quality_failed');
   const item=assessmentItemSchema.parse(await json(cas,entry.itemArtifactSha256)),proof=await loadPolicyReceipt(cas,item.sources[0].admissionReceiptSha256);
+  assertResidualAssessmentContext(item);
   if(semanticHash(proof)!==row.spec.policyProofSha256||canonicalJson(proof.scope)!==canonicalJson(row.spec.sourceScope))throw new DistrictExecutionHold('policy_excluded');
   if(role==='B'){if(!broker)throw new DistrictExecutionHold('handler_missing');jobKeys.push(await enqueueAssessmentB(broker,{itemArtifactSha256:entry.itemArtifactSha256,sourceScope:proof.scope,policyProofSha256:semanticHash(proof),transport:'vm-omp'}));continue;}
   const selector=PassSelectorSchema.parse({version:'r1-assessment-pass-job-v1',...entry,predecessors:[row.pin]});
@@ -288,6 +291,7 @@ export async function enqueuePreparedAssessmentPass(pool:Pool,store:DistrictJobS
 }
 export async function enqueueAssessmentResolution(pool:Pool,store:DistrictJobStore,cas:DistrictCas,input:{AJobKey:string;BJobKey:string;CJobKey?:string},stage:'C'|'reconcile',policy:CivicPolicyOptions={}){
  const A=await committed(pool,input.AJobKey,'assessment_a'),selector=PassSelectorSchema.parse(A.spec.selector),item=assessmentItemSchema.parse(await json(cas,selector.itemArtifactSha256));
+ assertResidualAssessmentContext(item);
  const B=await assessmentFromJob(pool,cas,input.BJobKey,'B',item,policy);await assessmentFromJob(pool,cas,input.AJobKey,'A',item,policy);
  const C=input.CJobKey?await assessmentFromJob(pool,cas,input.CJobKey,'C',item,policy):undefined;
  if(stage==='C'&&C)throw new DistrictExecutionHold('quality_failed');

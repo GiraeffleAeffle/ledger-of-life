@@ -17,6 +17,7 @@ import {registerR1CodexDocument,reserveR1CodexCall} from '../src/district-codex-
 import {admittedAssessmentFixture,recordFor,answer} from './district-assessment.fixture.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 import type {PreparedDocument} from '../src/district-prepared-document.ts';
+import {buildPreparedAssessmentContext,AssessmentContextHold} from '../src/district-assessment-context.ts';
 
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 
@@ -41,7 +42,12 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   for(const artifact of [f.policyArtifact,f.parserArtifact])await put(JSON.parse((await cas.read(artifact.sha256)).toString('utf8')),'receipt');
   await put(text,'source_original',true);
   const projection=residualRecordPropositions(record);
-  const item=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,question:'Verify every proposition independently against the original source.',claim:canonicalJson(projection),rubric,rubricSha256:digest(rubric),sources:[f.source],claimIds:projection.propositions.map(proposition=>proposition.claimId),entityIds:[],constraints:[],criticalKinds:[]});
+  const quotes=new Set<string>();
+  const visit=(value:unknown):void=>{if(Array.isArray(value))value.forEach(visit);else if(value&&typeof value==='object')for(const [key,member] of Object.entries(value)){if((key==='quote'||key.endsWith('Quote'))&&typeof member==='string'&&member.length)quotes.add(member);else visit(member);}};
+  visit(record);
+  const locators=[...quotes].map(quote=>{const start=text.indexOf(quote);assert.ok(start>=0);return {id:`span:${start}:${start+quote.length}`,page:null,table:null,start,end:start+quote.length};}).sort((a,b)=>a.start-b.start||a.end-b.end);
+  const boundedSource={...f.source,locators,assessmentContext:buildPreparedAssessmentContext(text,f.source.textSha256,record.extraction.chunk,record.sources.map(source=>source.locator),locators)};
+  const item=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,question:'Verify every proposition independently against the original source.',claim:canonicalJson(projection),rubric,rubricSha256:digest(rubric),sources:[boundedSource],claimIds:projection.propositions.map(proposition=>proposition.claimId),entityIds:[],constraints:[],criticalKinds:[]});
   mutateItem?.(item);
   const itemArtifact=await put(item),recordArtifact=await put(record),bundle=await put({version:'r1-assessment-items-v1',items:[{itemArtifactSha256:itemArtifact.sha256,recordArtifactSha256:recordArtifact.sha256,maxModelCalls:48}]});
   const snapshot=randomUUID(),scope=f.policy.scope;
@@ -184,6 +190,31 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   assert.ok(jobs.rows.every(row=>row.state==='held_quality'&&row.reason_code==='assessment_context_exceeded'));
   const intents=await pool.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[f.source.originalSha256]);assert.equal(Number(intents.rows[0].count),0);
   const leases=await pool.query('SELECT count(*) FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1',[f.BJobKey]);assert.equal(Number(leases.rows[0].count),0);
+ });
+ await t.test('stale successful preparation keys refuse both passes before creating jobs',async()=>{
+  const f=await fixture('stale-preparation'),row=(await pool.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[f.preparationKey])).rows[0];
+  const bundle=await f.put({version:'r1-assessment-items-v1',items:[{itemArtifactSha256:(await f.put(f.item)).sha256,recordArtifactSha256:(await f.put(f.record)).sha256,maxModelCalls:48}]});
+  const oldKey=await f.store.enqueue({...row.spec,semanticContractSha256:digest('synthetic pre-cutover assessment contract')});
+  await f.run(oldKey,{assessment_prepare:async()=>({outcome:'succeeded',reasonCode:'completed',outputs:[await f.put(f.item),await f.put(f.record),bundle]})});
+  const before=(await pool.query("SELECT count(*) FROM district_pipeline.jobs WHERE step IN ('assessment_a','assessment_b')")).rows[0].count;
+  const broker=new DistrictAssessmentBroker(pool,f.cas,{policyOptions:f.policy,fixtureProtocol:true});
+  for(const role of ['A','B'] as const)await assert.rejects(enqueuePreparedAssessmentPass(pool,f.store,f.cas,oldKey,role,broker),AssessmentContextHold);
+  assert.equal((await pool.query("SELECT count(*) FROM district_pipeline.jobs WHERE step IN ('assessment_a','assessment_b')")).rows[0].count,before);
+ });
+ await t.test('current-contract residual execution refuses small legacy context-free items without calls or leases',async()=>{
+  const f=await fixture('legacy-item'),legacy=structuredClone(f.item);delete legacy.sources[0].assessmentContext;
+  assert.ok(Buffer.byteLength(canonicalJson(legacy))<22000);
+  const itemHash=(await f.put(legacy)).sha256,broker=new DistrictAssessmentBroker(pool,f.cas,{policyOptions:f.policy,fixtureProtocol:true});let called=false;
+  for(const [key,step] of [[f.AJobKey,'assessment_a'],[f.BJobKey,'assessment_b']] as const){
+   const spec=(await pool.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[key])).rows[0].spec,oldHash=spec.selector.itemArtifactSha256;
+   const next=await f.store.enqueue({...spec,selector:{...spec.selector,itemArtifactSha256:itemHash},inputArtifactHashes:spec.inputArtifactHashes.map((hash:string)=>hash===oldHash?itemHash:hash)},{dependencies:(spec.selector.predecessors??[]).map((pin:{jobKey:string;receiptSha256:string})=>({jobKey:pin.jobKey,expectedReceiptSha256:pin.receiptSha256}))});
+   const handlers=step==='assessment_a'?f.handlers(async input=>{called=true;return answer(input);}):{assessment_b:assessmentBJobHandler(broker)};
+   const result=await f.run(next,handlers);assert.equal(result.reasonCode,'quality_failed');
+   assert.equal((await pool.query('SELECT state FROM district_pipeline.jobs WHERE job_key=$1',[next])).rows[0].state,'held_quality');
+  }
+  assert.equal(called,false);
+  assert.equal(Number((await pool.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[f.source.originalSha256])).rows[0].count),0);
+  assert.equal(Number((await pool.query("SELECT count(*) FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.source_id=$1 AND j.spec->>'policyProofSha256'=$2",[f.proof.scope.sourceId,f.policyArtifact.sha256])).rows[0].count),0);
  });
  await t.test('prepared-text item factory binds actual UTF-16 spans and never imports model constraints',async()=>{
   const f=await fixture('factory'),text=(await f.cas.read(f.source.textSha256)).toString('utf8');

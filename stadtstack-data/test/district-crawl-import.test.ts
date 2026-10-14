@@ -28,6 +28,7 @@ import {loadPolicyReceipt,recheckPolicyReceipt} from '../src/district-policy-rec
 import {prepareDocument,PreparedDocumentSchema} from '../src/district-prepared-document.ts';
 import {assessmentItemSchema,originalEvidence,buildAssessmentPassInput,type AssessmentOutput,type AssessmentPassInput} from '../src/district-assessment.ts';
 import {assessmentQueueHandlers,enqueueResidualAssessmentItems,enqueuePreparedAssessmentPass,enqueueAssessmentResolution} from '../src/district-assessment-jobs.ts';
+import {buildPreparedAssessmentContext} from '../src/district-assessment-context.ts';
 import {DistrictAssessmentBroker,enqueueAssessmentB} from '../src/district-assessment-broker.ts';
 import {BridgeLeaseSchema,BridgeStatusSchema} from '../src/district-assessment-bridge-contract.ts';
 import {DistrictExtractionClaimsSchema} from '../src/district-schema.ts';
@@ -582,7 +583,9 @@ test('offline frozen crawl import preserves managed originals and produces enque
    assert.equal(preparedReceipt.outcome,'succeeded');assert.equal(preparedReceipt.policyProofSha256,original.policyReceiptSha256);
    assert.equal(preparedReceipt.versions[`policyRebinding.${original.policyReceiptSha256}.${secondReceipt.receipt_sha256}`],checked.admissibilityReceiptSha256);
    const prepared=JSON.parse((await item.cas.read(textOutput.parserSha256!)).toString('utf8')),rubric='Synthetic exact-original policy continuation fixture';
-   const assessment=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:'synthetic-continuation-item',question:'Is this exact original available?',claim:prepared.text,rubric,rubricSha256:digest(rubric),sources:[{sourceId:scope.sourceId,originalSha256:item.document.sha256,textSha256:textOutput.textSha256,parserVersion:prepared.extractorSha256,parserReceiptSha256:textOutput.parserSha256,admissionReceiptSha256:original.policyReceiptSha256,ocrSuspected:false,locators:[{id:'synthetic-original',page:null,table:null,start:0,end:prepared.text.length}]}],claimIds:['synthetic-original-claim'],entityIds:[],constraints:[],criticalKinds:[]});
+   const locators=[{id:'synthetic-original',page:null,table:null,start:0,end:prepared.text.length}];
+   const assessmentContext=buildPreparedAssessmentContext(prepared.text,prepared.textSha256,{index:0,count:1,start:0,end:prepared.text.length},[`text-sha256:${prepared.textSha256};chars:0-${prepared.text.length}`],locators);
+   const assessment=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:'synthetic-continuation-item',question:'Is this exact original available?',claim:canonicalJson({quote:prepared.text}),rubric,rubricSha256:digest(rubric),sources:[{sourceId:scope.sourceId,originalSha256:item.document.sha256,textSha256:textOutput.textSha256,parserVersion:prepared.extractorSha256,parserReceiptSha256:textOutput.parserSha256,admissionReceiptSha256:original.policyReceiptSha256,ocrSuspected:false,locators,assessmentContext}],claimIds:['synthetic-original-claim'],entityIds:[],constraints:[],criticalKinds:[]});
    await assert.rejects(originalEvidence(assessment,{cas:item.cas,policyOptions:policy}),/expired/);
    const evidence=await originalEvidence(assessment,{cas:item.cas,policyOptions:policy,currentAdmissionReceipts:{[original.policyReceiptSha256]:checked.admissibilityReceiptSha256}});
    assert.equal(evidence[0].admissionReceiptSha256,original.policyReceiptSha256);assert.equal(evidence[0].locators[0].quote,prepared.text);

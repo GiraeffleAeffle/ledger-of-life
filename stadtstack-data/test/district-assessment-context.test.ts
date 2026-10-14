@@ -1,8 +1,12 @@
 import test from 'node:test';
 import type {TestContext} from 'node:test';
 import assert from 'node:assert/strict';
-import {rm} from 'node:fs/promises';
+import {rm,readFile,writeFile,lstat} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {canonicalJson,digest} from '../src/district-adapter-contract.ts';
 import {canonical,PROMPTS,assessmentItemSchema,assessmentOutputSchema,originalEvidence,buildAssessmentPassInput,reconcile,verifyPinnedAssessment,type AssessmentItem} from '../src/district-assessment.ts';
 import {residualAssessmentItem} from '../src/district-assessment-jobs.ts';
@@ -118,4 +122,24 @@ test('fixed windows merge, clip to cited chunks and preserve byte-exact Unicode 
  const edges=[{start:0,end:1},{start:text.length-1,end:text.length}],clipped=buildPreparedAssessmentContext(text,textSha256,chunk,source,edges);
  assert.equal(clipped.spans[0].start,0);assert.equal(clipped.spans.at(-1)!.end,text.length);
  assert.throws(()=>buildPreparedAssessmentContext(text,textSha256,chunk,source,[{start:301,end:302}]),AssessmentContextHold);
+});
+
+test('legacy residual and prepared-text items cannot expose whole documents without governed context',async t=>{
+ const f=await largeItem(t),legacy=structuredClone(f.item);delete legacy.sources[0].assessmentContext;
+ await assert.rejects(originalEvidence(legacy,f.context),AssessmentContextHold);
+ // A legacy critical/other prepared-text question has no projection marker;
+ // its authenticated prepared-document parser receipt still identifies text.
+ legacy.claim='Legacy independently assessed text question';
+ await assert.rejects(originalEvidence(legacy,f.context),AssessmentContextHold);
+});
+
+test('standalone C authenticates its oversized request before intent and records a typed quality hold',async t=>{
+ const f=await largeItem(t),evidence=await originalEvidence(f.item,f.context),input=buildAssessmentPassInput(f.item,evidence,'A');
+ const output=assessmentOutputSchema.parse({itemId:f.item.itemId,outcome:'abstain',assertions:[],scores:{correctness:0,sources:0,usefulness:0},holdReasons:[],rationale:'x'.repeat(22000)});
+ const A=syntheticAssessmentReceipt(f.item,'A',output,input.data),B=syntheticAssessmentReceipt(f.item,'B',output,input.data);
+ const itemPath=join(f.directory,'cli-item.json'),aPath=join(f.directory,'cli-A.json'),bPath=join(f.directory,'cli-B.json'),result=join(f.directory,'cli-C.json'),ledger=join(f.directory,'cli-ledger.jsonl'),pause=join(f.directory,'cli-pause.json');
+ await Promise.all([[itemPath,f.item],[aPath,A],[bPath,B]].map(([path,value])=>writeFile(path as string,canonicalJson(value),{mode:0o600})));
+ await assert.rejects(promisify(execFile)(process.execPath,['--experimental-strip-types',fileURLToPath(new URL('../src/district-assessment.ts',import.meta.url)),'pass',itemPath,'C','openai-subscription',result,ledger,pause,aPath,bPath,'--cas-root',f.context.cas.root,'--policy-state-dir',f.context.policyOptions!.stateDir!],{timeout:15000}),{code:1});
+ const held=JSON.parse(await readFile(result,'utf8'));assert.equal(held.disposition,'held_quality');assert.equal(held.reason,'assessment_context_exceeded');assert.equal(held.fallbackAttempted,false);
+ for(const path of [result+'.intent.json',ledger,pause])await assert.rejects(lstat(path),{code:'ENOENT'});
 });

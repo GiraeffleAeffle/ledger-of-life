@@ -108,6 +108,12 @@ export const assessmentItemSchema = z.object({
   criticalTarget: CriticalRecordTargetSchema.optional(),
 }).strict();
 export type AssessmentItem = z.infer<typeof assessmentItemSchema>;
+/** Residual execution cannot consume historical unbounded items, even when
+ * their small whole document happens to fit the new request cap. */
+export function assertResidualAssessmentContext(item: AssessmentItem): void {
+  if (item.valueTarget || !item.sources.length || item.sources.some(source =>
+    !source.assessmentContext || source.nativeLocators?.length || source.contextSelection)) throw new AssessmentContextHold();
+}
 const preparedContextInstructions = ' assessmentContext supplies byte-exact quote spans with fixed neighbouring text, clipped to authenticated extraction-cited chunks, not the whole document or chunk. Chunk ids, UTF-16 offsets, prepared-text SHA-256 and UTF-8 excerpt hashes bind the evidence. Use only supplied spans and exact locators for every proposition. Omitted context is unavailable: abstain/escalate if needed for meaning or qualifications; do not infer it. When claim.version is r1-provider-propositions-v1, each proposition.sourceIds resolves to the complete attribution in claim.sources; every proposition, value, quote and claimId is preserved, not summarised.';
 const valueReviewInstructions = ' When valueTarget is present, write the complete valueReview answer, kind, citations, all score rationales, missing roles, limitations and graph contribution from the frozen MCP evidence AND original sources. Evaluate only its specified lane; withoutGraph must not use graph evidence. Scores must equal valueReview scores. Use nativeEvidence/structured citations for original cells, never invented quotation text. When valueTarget is absent return null valueReview. selectedContext, when present, contains exact original spans with omitted broader context explicitly disclosed. Consider its limitations; if those spans cannot establish a claim or its qualification, abstain/escalate rather than infer omitted context. When criticalTarget is present, independently assess its complete claimProjection and every named critical claim: dates/date roles, endpoints, conditions, units and amounts, stage and financial role. Its proposed values are hypotheses, not accepted labels. Return criticalReview binding the exact record/evidence/projection and every claim hash, with supported/unsupported/unresolved and an evidence-bound rationale; select original assertions for supported claims. Missing or contradictory evidence must not earn support. When absent return null criticalReview.';
 export const PROMPTS = Object.freeze({
@@ -120,6 +126,10 @@ export async function originalEvidence(item: AssessmentItem, context: Assessment
   if (bytesHash(item.rubric) !== item.rubricSha256) throw Error('Rubric binding failed');
   if (!item.sources.length && (!item.valueTarget || Object.keys(item.valueTarget.sources).length)) throw Error('Missing original evidence');
   if (item.valueTarget && Object.keys(item.valueTarget.sources).length !== item.sources.length) throw Error('Value target original source coverage mismatch');
+  let residualProjection = false;
+  if (!item.valueTarget && !item.criticalTarget) {
+    try { residualProjection = JSON.parse(item.claim)?.version === 'r1-record-propositions-v1'; } catch { /* Ordinary native/value questions need not be JSON projections. */ }
+  }
   const evidence = await Promise.all(item.sources.map(async source => {
     const policy = await loadPolicyReceipt(context.cas, source.admissionReceiptSha256);
     const currentHash = context.currentAdmissionReceipts?.[source.admissionReceiptSha256];
@@ -145,6 +155,11 @@ export async function originalEvidence(item: AssessmentItem, context: Assessment
       if (prepared.sourceSha256 !== source.originalSha256 || prepared.textSha256 !== source.textSha256
         || prepared.extractorSha256 !== source.parserVersion || prepared.municipalityId !== policy.scope.municipalityId) throw Error('Prepared parser receipt binding failed');
     }
+    // Prepared-document text is the residual lane, not the unrelated native
+    // cell/value lane. Authenticate policy/parser first; never expose a legacy
+    // prepared document simply because it fits the byte cap.
+    if (!item.valueTarget && !source.nativeLocators?.length
+      && (residualProjection || !parserStep.success || parserStep.data.step === 'prepare')) assertResidualAssessmentContext(item);
     const [original, textBytes] = await Promise.all([context.cas.read(source.originalSha256), context.cas.read(source.textSha256)]);
     if (bytesHash(original) !== source.originalSha256 || bytesHash(textBytes) !== source.textSha256) throw Error('Original evidence binding failed');
     const text = textBytes.toString('utf8');
@@ -261,6 +276,7 @@ export function assessmentProviderInput(item: AssessmentItem, evidence: Original
     let parsed: unknown;
     try { parsed = JSON.parse(item.claim); } catch { if (evidence.some(source => source.assessmentContext)) throw new AssessmentContextHold(); }
     if (parsed && typeof parsed === 'object' && 'version' in parsed && parsed.version === 'r1-record-propositions-v1') {
+      assertResidualAssessmentContext(item);
       const projection = propositionProjectionSchema.parse(parsed);
       if (projection.recordId !== item.itemId || canonical(item.claimIds) !== canonical(projection.propositions.map(p => p.claimId))
         || projection.propositions.some(p => canonical(p.sources) !== canonical(projection.sources))) throw new AssessmentContextHold();
@@ -577,16 +593,29 @@ async function main() {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
+    // Complete authenticated preflight precedes the ambiguous-effect marker.
+    // In particular C's review envelope can exceed its cap without any call.
+    try {
+      const evidence = await originalEvidence(item, context);
+      buildAssessmentPassInput(item, evidence, role, previous);
+    } catch (error) {
+      if (!(error instanceof AssessmentContextHold)) throw error;
+      await writeImmutable(output, { version: 'assessment-quality-hold-v1', itemSha256: digest(item), role, provider,
+        disposition: 'held_quality', blocksAffectedAdmission: true, fallbackAttempted: false,
+        reason: error.reasonCode, finishedAt: new Date().toISOString() });
+      throw error;
+    }
     // An ambiguous crash leaves this intent in place: explicit reconciliation is
     // required before a new submission, never an automatic subscription replay.
     await writeImmutable(output + '.intent.json', { version: 'assessment-intent-v1', itemSha256: digest(item),
       role, provider, requestedModel: PROVIDER_CONFIGS[provider].model, startedAt: new Date().toISOString() });
     try {
       await writeImmutable(output, await runAssessmentPass(item, role, provider, { ledgerPath, pausePath }, previous, context));
-    } catch {
-      await writeImmutable(output, { version: 'assessment-execution-hold-v1', itemSha256: digest(item), role, provider,
-        disposition: 'held_execution', blocksAffectedAdmission: true, fallbackAttempted: false,
-        reason: 'subscription_or_original_evidence_contract_failed', finishedAt: new Date().toISOString() });
+    } catch (error) {
+      const quality = error instanceof AssessmentContextHold;
+      await writeImmutable(output, { version: quality ? 'assessment-quality-hold-v1' : 'assessment-execution-hold-v1', itemSha256: digest(item), role, provider,
+        disposition: quality ? 'held_quality' : 'held_execution', blocksAffectedAdmission: true, fallbackAttempted: false,
+        reason: quality ? error.reasonCode : 'subscription_or_original_evidence_contract_failed', finishedAt: new Date().toISOString() });
       throw Error('Assessment execution held');
     }
   } else if (command === 'reconcile') {
