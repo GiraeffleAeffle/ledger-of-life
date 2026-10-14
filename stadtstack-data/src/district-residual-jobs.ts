@@ -126,7 +126,7 @@ const prepare:ResidualHandler=async context=>{
  try{
  const source=await admitted(context,selector),toolVersions=await collectPreparationToolVersions(source.document.mimeType),bytes=await context.cas.read(source.document.sha256);
  await recheckJobPolicy(context);
- const input={bytes,municipalityId:source.municipality.id,references:[source.reference],mimeType:source.document.mimeType,extractorSha256:selector.contract.preparationSha256,toolVersions,managedRoot:join(context.cas.root,'residual-prepared'),policy:policyOptions(source.receipt),signal:context.signal,sourceBindings:[source.sourceBinding]};
+ const input={bytes,municipalityId:source.municipality.id,references:[source.reference],mimeType:source.document.mimeType,extractorSha256:selector.contract.preparationSha256,toolVersions,managedRoot:join(dirname(context.cas.root),basename(context.cas.root)+'-residual-prepared'),policy:policyOptions(source.receipt),signal:context.signal,sourceBindings:[source.sourceBinding]};
  const prepared=await prepareDocument(input);context.signal.throwIfAborted();
  const chunks=documentChunks(prepared.text);if(chunks.length>selector.bounds.maxChunks||2*chunks.length>selector.bounds.maxModelCalls)return {outcome:'held_quality',reasonCode:'quality_failed'};
  return {outcome:'succeeded',reasonCode:'completed',outputs:[await persist(context,source.receipt,prepared,'parser_output'),await persist(context,source.receipt,prepared.text,'parser_output',true)],versions:{preparation:prepared.extractorSha256,...prepared.toolVersions},counts:{bytes:bytes.length,spans:chunks.length}};

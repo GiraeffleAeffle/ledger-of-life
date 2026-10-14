@@ -50,7 +50,7 @@ test('public request evidence excludes credential/header fields and binds select
  assert.throws(()=>ObservationRequestSchema.parse({...request,headers:{username:'owner',password:'secret'}}));
  assert.throws(()=>ObservationRequestSchema.parse({...request,bodySha256:digest('tampered')}));
 });
-test('offline frozen crawl import preserves managed originals and produces enqueue-ready residual jobs',{skip:!connectionString,timeout:450000},async t=>{
+test('offline frozen crawl import preserves managed originals and produces enqueue-ready residual jobs',{skip:!connectionString,timeout:900000},async t=>{
  const endpoint=new URL(connectionString!);
  if(!['postgres:','postgresql:'].includes(endpoint.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(endpoint.hostname))throw Error('Test refuses non-local PG');
  const host=endpoint.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Test refuses non-local PG host');

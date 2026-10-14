@@ -1,5 +1,5 @@
 import {readFile} from 'node:fs/promises';
-import {join} from 'node:path';
+import {basename,dirname,join} from 'node:path';
 import type {Pool} from 'pg';
 import {z} from 'zod';
 import {HashSchema,canonicalJson,digest,semanticHash} from './district-adapter-contract.ts';
@@ -26,6 +26,11 @@ const ItemBundleSchema=z.object({version:z.literal('r1-assessment-items-v1'),ite
 export async function assessmentQueueContract(){
  const files=['district-assessment-jobs.ts','district-codex-accounting.ts','district-assessment.ts','district-critical-assessment.ts','district-critical-assessment-public.ts','district-residual-jobs.ts','district-inference.ts','district-jobs.ts','district-model.ts','district-model-contract.ts','district-model-usage.ts','district-model-diagnostics.ts','district-policy-receipt.ts','district-policy-refresh.ts','civic-opt-out.ts'];
  return semanticHash(await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL(file,import.meta.url)))}))));
+}
+/** Operational usage/failure metadata is not CAS content or a nested managed lane. */
+export function assessmentModelUsagePaths(casRoot:string,jobKey:string,runId:string){
+ const out=join(dirname(casRoot),basename(casRoot)+'-assessment-model',jobKey);
+ return {ledgerPath:join(out,'usage.jsonl'),pausePath:join(out,runId,'pause.json')};
 }
 async function committed(pool:Pool,jobKey:string,step:string){
  HashSchema.parse(jobKey);
@@ -225,11 +230,11 @@ export function assessmentQueueHandlers(pool:Pool,options:Omit<AssessmentEvidenc
    await reserveR1CodexCall(pool,context.job,item.sources[0].originalSha256,input.requestSha256,selector.maxModelCalls);
    const policies=await Promise.all(item.sources.map(source=>loadPolicyReceipt(context.cas,evidenceOptions.currentAdmissionReceipts?.[source.admissionReceiptSha256]??source.admissionReceiptSha256)));
    const sourceContext={root:context.cas.root,kind:'artifacts' as const,decisionId:CIVIC_ACQUISITION_DECISION_ID,...options.policyOptions,bindings:policies.map(receipt=>({kind:'prepared_source' as const,url:receipt.source.url,sourceSha256:receipt.source.sha256,observationId:receipt.scope.sourceId,receiptSha256:semanticHash(receipt)}))};
-   const out=join(context.cas.root,'assessment-model',context.job.jobKey);
+   const paths=assessmentModelUsagePaths(context.cas.root,context.job.jobKey,context.job.runId);
    const startedAt=new Date().toISOString();
    const receipt=await (options.fixtureProvider
     ? options.fixtureProvider(input).then(answer=>createAssessmentReceipt(item,role,answer,{startedAt,finishedAt:new Date().toISOString()},evidence,input))
-    : runAssessmentPass(item,role,'openai-subscription',{ledgerPath:join(out,'usage.jsonl'),pausePath:join(out,context.job.runId,'pause.json'),signal:context.signal},previous,{cas:context.cas,...evidenceOptions,sourceContext})).catch(error=>holdR1CodexFailure(pool,context.job,item.sources[0].originalSha256,error));
+    : runAssessmentPass(item,role,'openai-subscription',{...paths,signal:context.signal},previous,{cas:context.cas,...evidenceOptions,sourceContext})).catch(error=>holdR1CodexFailure(pool,context.job,item.sources[0].originalSha256,error));
    context.signal.throwIfAborted();await originalEvidence(item,{cas:context.cas,...evidenceOptions});
    return {outcome:'succeeded',reasonCode:'completed',outputs:[requestArtifact,await persist(store,context.cas,item,receipt,evidenceOptions,'receipt')]};
   })])),
