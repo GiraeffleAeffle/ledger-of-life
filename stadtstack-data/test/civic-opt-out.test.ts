@@ -1279,3 +1279,61 @@ test('a marked external inventory waiter gets an acquisition opportunity before 
  },policy);
  assert.equal(await finished,0);assert.deepEqual((await readdir(stateDir)).filter(name=>name.startsWith('inventory.wait-')),[]);
 });
+
+for(const family of ['entries','scratch'])test('sealed '+family+' without an owning root fail closed unless explicitly retired',async t=>{
+ const {base,stateDir}=await sandbox(t),root=join(base,'orphan-sealed'),policy=fixturePolicy(stateDir),bytes='Synthetic orphan sealed record';
+ await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+ if(family==='entries'){
+  const binding:Extract<ManagedSourceBinding,{kind:'retained_publication'}>={kind:'retained_publication',url:'https://orphan-sealed.test/source',sourceSha256:null,publication:{manifestSha256:hash('orphan manifest'),releaseId:'orphan-fixture',memberPath:'facts.json',memberSha256:hash(bytes),memberBytes:Buffer.byteLength(bytes)}};
+  await publish(root,{...binding,relativePath:'facts.json',contentSha256:hash(bytes),independentAllowed:false},bytes,stateDir);
+ }else{
+  await withManagedSourceScratch(root,[{phase:'pre-admission',url:'https://orphan-sealed.test/source',sourceSha256:hash(bytes)}],async scope=>{await scope.writeSource('document',Buffer.from(bytes));},{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification',...policy});
+ }
+ const migration=await compactCivicPolicyInventory(policy);assert.equal(migration.segments.length,1);assert.equal(migration.segments[0].family,family);
+ const path=join(stateDir,'inventory.json'),original=await readFile(path),physical=JSON.parse(original.toString('utf8'));
+ assert.deepEqual(physical.storage.retiredRoots,{});physical.roots=[];await writeFile(path,JSON.stringify(physical)+'\n',{mode:0o600});
+ await assert.rejects(readCivicPolicyInventory(policy),CivicPolicyStateError);
+ await assert.rejects(recoverManagedSourceScratch(policy),CivicPolicyStateError);
+ const receipt=await recordHostOptOut({host:'orphan-sealed.test',reason:'municipality_objection'},policy);
+ assert.equal(receipt.purge.status,'error');assert.deepEqual(receipt.purge.issues,[{code:'inventory_unavailable'}]);assert.equal(receipt.purge.deletedFiles,0);
+ if(family==='entries')assert.equal(await readFile(join(root,'facts.json'),'utf8'),bytes);
+ // Real retirement, unlike deleting roots out of the manifest, records the
+ // cutoff and removes ownership without leaving an orphaned logical record.
+ await writeFile(path,original,{mode:0o600});const retired=await retireManagedRoot(root,{reason:'Synthetic explicit sealed retirement'},policy);
+ assert.equal(retired.status,'retired');const after=await readCivicPolicyInventory(policy);assert.deepEqual(after.roots,[]);assert.deepEqual(after.entries,[]);assert.deepEqual(after.scratch,[]);
+});
+
+for(const family of ['observations','requests'])test('content-free '+family+' replacement retires sealed bindings by copy-on-write without poisoning the root',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),url='https://metadata-sealed.test/source';
+ await initializeManagedAcquisitionLane(root,{kind:'fetch',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+ const relativePath=family==='observations'?'observations/sealed.json':'requests/'+hash('sealed request')+'.json';
+ const initial=JSON.stringify({url,method:'GET',checkedAt:now,retrievedAt:null,state:'failed',failure:'network_error'})+'\n';
+ const replacement=JSON.stringify({url,method:'GET',checkedAt:now,retrievedAt:null,state:'failed',failure:'not_found'})+'\n';
+ const binding:Extract<ManagedSourceBinding,{kind:'retained_publication'}>={kind:'retained_publication',url,sourceSha256:null,publication:{manifestSha256:hash('metadata manifest'),releaseId:'metadata-fixture',memberPath:relativePath,memberSha256:hash(initial),memberBytes:Buffer.byteLength(initial)}};
+ await publish(root,{...binding,relativePath,contentSha256:hash(initial),independentAllowed:false},initial,stateDir);
+ await compactCivicPolicyInventory(policy);
+ const before=await readCivicPolicyInventory(policy),physicalBefore=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));
+ assert.equal(before.entries.length,1);assert.equal(before.entries[0].state,'active');
+ const segmentPath=join(stateDir,'inventory-segments',physicalBefore.storage.segments[0].sha256+'.json'),segmentBefore=await readFile(segmentPath);
+ await writeFile(join(root,relativePath),replacement,{mode:0o600});await markManagedCacheInventoryComplete(root,policy);
+ const after=await readCivicPolicyInventory(policy),physicalAfter=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));
+ assert.equal(after.roots[0].complete,true);assert.deepEqual(after.entries,[{...before.entries[0],state:'missing'}]);
+ assert.equal(physicalAfter.storage.entryStates[before.entries[0].id],'missing');assert.deepEqual(physicalAfter.storage.segments,physicalBefore.storage.segments);assert.deepEqual(await readFile(segmentPath),segmentBefore);
+ assert.equal(before.entries[0].state,'active');assert.equal(await readFile(join(root,relativePath),'utf8'),replacement);
+ await assert.rejects(assertManagedSourceReadable(join(root,relativePath),policy),{code:'CONTENT_REFERENCE_REVOKED'});
+ await writeFile(join(root,relativePath),initial,{mode:0o600});await markManagedCacheInventoryComplete(root,policy);
+ assert.equal((await readCivicPolicyInventory(policy)).entries[0].state,'revoked');
+ const receipt=await recordHostOptOut({host:'metadata-sealed.test',reason:'municipality_objection'},policy);
+ assert.equal(receipt.purge.status,'purged');assert.equal(receipt.purge.deletedFiles,1);assert.deepEqual(await readFile(segmentPath),segmentBefore);
+});
+
+test('late scratch finalization cannot reactivate or mutate a sealed terminal lease',async t=>{
+ const {base,stateDir}=await sandbox(t),root=join(base,'terminal-scratch'),policy=fixturePolicy(stateDir),bytes=Buffer.from('Synthetic terminal lease source');
+ await assert.rejects(withManagedSourceScratch(root,[{phase:'pre-admission',url:'https://terminal-sealed.test/source',sourceSha256:hash(bytes)}],async()=>{
+  // Fixture-only state corruption simulates an unexpectedly terminal durable
+  // lease while its wrapper is still alive; normal recovery skips terminal leases.
+  const path=join(stateDir,'inventory.json'),physical=JSON.parse(await readFile(path,'utf8'));physical.scratch[0].state='purged';
+  await writeFile(path,JSON.stringify(physical)+'\n',{mode:0o600});await compactCivicPolicyInventory(policy);
+ },{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification',...policy}),{code:'SCRATCH_IDENTITY_MISMATCH'});
+ const after=await readCivicPolicyInventory(policy);assert.equal(after.scratch[0].state,'purged');assert.equal(JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8')).scratch.length,0);
+});

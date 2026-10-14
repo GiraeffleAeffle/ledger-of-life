@@ -171,9 +171,9 @@ async function hydrateInventory(state:string,physical:z.infer<typeof hotInventor
  }
  const logical:Inventory={schemaVersion:1,inventoryId:physical.inventoryId,roots:physical.roots,entries:[],scratch:[]};
  for(const [id,state] of Object.entries(physical.storage.entryStates))if(!entries.has(id)||entries.get(id)!.state===state)throw new CivicPolicyStateError();
- for(const entry of entries.values())if(roots.has(entry.rootId)){const state=physical.storage.entryStates[entry.id];logical.entries.push(state===undefined?entry:{...entry,state});}
+ for(const entry of entries.values()){const state=physical.storage.entryStates[entry.id];logical.entries.push(state===undefined?entry:{...entry,state});}
  for(const entry of physical.entries)logical.entries.push(entry);
- for(const lease of scratch.values())if(roots.has(lease.rootId))logical.scratch.push(lease);
+ for(const lease of scratch.values())logical.scratch.push(lease);
  for(const lease of physical.scratch)logical.scratch.push(lease);
  if(logical.entries.length>MAX_INVENTORY_RECORDS||logical.scratch.length>MAX_INVENTORY_RECORDS)throw new CivicPolicyStateError();
  sealedInventories.set(logical,{storage:physical.storage,entries,scratch,roots});return logical;
@@ -661,7 +661,7 @@ function accountObservationCopy(root:Root,inventory:Inventory,path:string,bytes:
  if(observation.policy===undefined||ContentFreeSourcePolicySchema.safeParse(observation.policy).success){
   // A verified content-free replacement can retire the prior unsafe version;
   // it cannot erase an explicit source-content binding to these exact bytes.
-  for(const entry of prior)if(entry.contentSha256!==contentSha256&&(entry.state==='active'||entry.state==='revoked'))entry.state='missing';
+  for(const entry of prior)if(entry.contentSha256!==contentSha256&&(entry.state==='active'||entry.state==='revoked'))setEntryState(inventory,entry,'missing');
   return prior.some(entry=>entry.contentSha256===contentSha256)?'source':'metadata';
  }
  const sourceSha256=hex.safeParse(observation.sha256);if(!sourceSha256.success||!receipt)return 'unbound';
@@ -996,6 +996,7 @@ function processExists(pid:number,group=false):boolean{
 }
 const activeScratch=new Map<string,AbortController>();
 async function cleanScratch(inventory:Inventory,lease:ScratchLease,policy:CivicPolicyOptions,receipt?:Pick<PurgeReceipt,'issues'|'deletedFiles'|'deletedBytes'|'missingFiles'>,ownerFinished=false):Promise<boolean>{
+ if(archivedLease(lease))throw new CivicPolicyStateError('SCRATCH_CLOSED');
  const root=inventory.roots.find(item=>item.id===lease.rootId)!;
  const issue=(code:Issue['code'])=>receipt?.issues.push({code,rootId:lease.rootId,contentId:digest(lease.directory)});
  if(!ownerFinished&&lease.state==='active'&&processExists(lease.ownerPid)){issue('active_scratch');return false;}
@@ -1118,7 +1119,7 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
    const resource:ManagedDockerResource=ManagedDockerResourceSchema.parse({...identity,configSha256:dockerConfigSha256(identity,scratchDirectory),containerId:null,state:'reserved'});
    const persist=async()=>{
     await locked(policy,async()=>{const inventory=await loadInventory(state),current=inventory.scratch.find(item=>item.id===id),stored=current?.resources.find(item=>item.id===resourceId);
-     if(!current||!stored||stored.nonce!==resource.nonce||stored.configSha256!==resource.configSha256||stored.containerId!==null&&stored.containerId!==resource.containerId)throw new CivicPolicyStateError('DAEMON_RESOURCE_BINDING_MISMATCH');
+     if(!current||archivedLease(current)||!stored||stored.nonce!==resource.nonce||stored.configSha256!==resource.configSha256||stored.containerId!==null&&stored.containerId!==resource.containerId)throw new CivicPolicyStateError('DAEMON_RESOURCE_BINDING_MISMATCH');
      Object.assign(stored,resource);await saveInventory(state,inventory);
     });
    };
@@ -1173,7 +1174,7 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
   // Drain abort-triggered removals (and their failure commits) before loading
   // the final close transaction, so no stale callback can overwrite it.
   await Promise.allSettled([...daemonRemovers].map(remove=>remove()));
-  const clean=await locked(policy,async()=>{const inventory=await loadInventory(state),current=inventory.scratch.find(item=>item.id===id);if(!current||current.ownerPid!==process.pid)throw new CivicPolicyStateError('SCRATCH_IDENTITY_MISMATCH');current.state='closing';const complete=await cleanScratch(inventory,current,policy,undefined,true);if(!complete)current.state='partial';await saveInventory(state,inventory);return complete;});
+  const clean=await locked(policy,async()=>{const inventory=await loadInventory(state),current=inventory.scratch.find(item=>item.id===id);if(!current||current.ownerPid!==process.pid||archivedLease(current))throw new CivicPolicyStateError('SCRATCH_IDENTITY_MISMATCH');current.state='closing';const complete=await cleanScratch(inventory,current,policy,undefined,true);if(!complete)current.state='partial';await saveInventory(state,inventory);return complete;});
   if(!clean)throw new CivicPolicyStateError('SCRATCH_CLEANUP_INCOMPLETE');
  }
 }
