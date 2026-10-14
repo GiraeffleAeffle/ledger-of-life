@@ -16,8 +16,12 @@ export const PATCH_032_R2_HOPPEGARTEN_HEAT_CORPUS_SHA256='2dd6731e63d03e1928ef9d
 export const PATCH_032_STRAUSBERG_SOLARPARK_CORPUS_SHA256='1306a37e00e47505bd9f8f13a80521587cb6efd41ad2a9a945b00b4b8446225d';
 export const PATCH_032_RUEDERSDORF_HEAT_CORPUS_SHA256='5dcbf35e456d0c2fc04dd7ecfd3cb069f76020ffbb67c5bd245e1bacb7193db6';
 export const PATCH_032_HOPPEGARTEN_HEAT_CORPUS_SHA256='9aae0d802de6aeb9b349bef5cd9862ceb573091dbad45f121bfacb39ad8f600a';
+// Exact frozen Strausberg planning index under owner approvals r1-nine-town-crawl-2026-10-13
+// (caae1253f8654a214174500d22e4a3d41251996c0e747d22bef41d6ca9b3c593) and r1-nine-town-models-2026-10-13
+// (2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b); no scope or job authorization implied.
+export const R1_NINE_TOWN_STRAUSBERG_PLANNING_CORPUS_SHA256='59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4';
 // Exact owner-authorized snapshots; a caller-selected checksum cannot extend scope.
-const ownerAuthorizedCorpusSchema=z.enum([PILOT_BASE_CORPUS_SHA256,PILOT_COMPLETION_CORPUS_SHA256,PATCH_032_R2_STRAUSBERG_SOLARPARK_CORPUS_SHA256,PATCH_032_R2_RUEDERSDORF_HEAT_CORPUS_SHA256,PATCH_032_R2_HOPPEGARTEN_HEAT_CORPUS_SHA256,PATCH_032_STRAUSBERG_SOLARPARK_CORPUS_SHA256,PATCH_032_RUEDERSDORF_HEAT_CORPUS_SHA256,PATCH_032_HOPPEGARTEN_HEAT_CORPUS_SHA256]);
+const ownerAuthorizedCorpusSchema=z.enum([PILOT_BASE_CORPUS_SHA256,PILOT_COMPLETION_CORPUS_SHA256,PATCH_032_R2_STRAUSBERG_SOLARPARK_CORPUS_SHA256,PATCH_032_R2_RUEDERSDORF_HEAT_CORPUS_SHA256,PATCH_032_R2_HOPPEGARTEN_HEAT_CORPUS_SHA256,PATCH_032_STRAUSBERG_SOLARPARK_CORPUS_SHA256,PATCH_032_RUEDERSDORF_HEAT_CORPUS_SHA256,PATCH_032_HOPPEGARTEN_HEAT_CORPUS_SHA256,R1_NINE_TOWN_STRAUSBERG_PLANNING_CORPUS_SHA256]);
 const fixtureCorpus=new AsyncLocalStorage<{sha256:string;policy:CivicPolicyOptions}>();
 export const authorizedPilotCorpusSchema=hashSchema.refine(hash=>ownerAuthorizedCorpusSchema.safeParse(hash).success||fixtureCorpus.getStore()?.sha256===hash,'Corpus is not an exact owner-authorized snapshot');
 /** Test-only, scoped capability: no environment switch or production hash entry. */
