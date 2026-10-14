@@ -2,9 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {mkdtemp,mkdir,writeFile,readFile,rm,unlink} from 'node:fs/promises';
+import {promises as fsPromises} from 'node:fs';
+import {syncBuiltinESMExports} from 'node:module';
 import {tmpdir} from 'node:os';
 import {join,relative} from 'node:path';
 import {Pool,type QueryResult} from 'pg';
+import {z} from 'zod';
 import {digest,canonicalJson,semanticHash} from '../src/district-adapter-contract.ts';
 import {DistrictCas} from '../src/district-cas.ts';
 import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,runDistrictJobs,type JobHandler,type DistrictJobSpec} from '../src/district-jobs.ts';
@@ -13,7 +16,7 @@ import {importCrawlCorpusForResidual} from '../src/district-crawl-import.ts';
 import {withFixtureAuthorizedCorpus,authorizedPilotCorpusSchema,loadFrozenCorpusBytes,type CrawlDocument} from '../src/district-corpus.ts';
 import {ResidualInputSchema,residualJobHandlersFor,enqueueResidualPreparation,enqueueCommittedResidualExtraction,loadResidualSource,captureResidualAnswers,exportResidualTextContribution} from '../src/district-residual-jobs.ts';
 import {ObservationRequestSchema,persistCrawlRequestEvidence} from '../src/district-crawl-request.ts';
-import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceBindings,recoverManagedSourceScratch,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
+import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceBindings,recoverManagedSourceScratch,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError} from '../src/civic-opt-out.ts';
 import {createOperatorRegistryFixture,operatorRegistryFixtureValue} from './helpers/operator-registry-fixture.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
@@ -109,14 +112,15 @@ test('offline frozen crawl import preserves managed originals and produces enque
   Object.assign(registeredSource,{id:'strausberg-planning',url:rootUrl,checkState:'checked',checkedAt:now,crawlScope:{pageRoots:[rootUrl],followLinkedDocuments:true},evidence:[{url:rootUrl,locator:'Synthetic registered-source configuration only',sha256:digest('synthetic registered source'),retrievedAt:now}]});
   const registered=await createOperatorRegistryFixture(st,{context:{root:root!,policy},value:registeredValue,label:'legacy-discovery-registry'});
   const registeredScope={...scope,sourceId:registeredSource.id};
-  async function legacy(label:string,config:{absentLink?:boolean;missingParent?:boolean;tamperedParent?:boolean;foreignChild?:boolean;foreignParentScope?:boolean;reservedParent?:boolean;reservedChild?:boolean;multiHop?:boolean;expired?:boolean;cycle?:boolean;ambiguousParent?:boolean;scopedPrefix?:boolean;fresh?:boolean;evidenceRows?:number}={}){
+  async function legacy(label:string,config:{absentLink?:boolean;missingParent?:boolean;tamperedParent?:boolean;foreignChild?:boolean;foreignParentScope?:boolean;reservedParent?:boolean;reservedChild?:boolean;multiHop?:boolean;expired?:boolean;cycle?:boolean;ambiguousParent?:boolean;scopedPrefix?:boolean;fresh?:boolean;evidenceRows?:number;parentEvidence?:'missing-policy'|'missing-robots-clock'|'missing-tdm-clock'|'invalid-policy-metadata'}={}){
    const rawRoot=join(root!,label+'-raw'),indexRoot=join(root!,label+'-index'),casRoot=join(root!,label+'-cas');
    for(const [path,kind] of [[rawRoot,'fetch'],[indexRoot,'artifacts'],[casRoot,'artifacts']] as const)await initializeManagedAcquisitionLane(path,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind});
    const checkedAt=new Date(Date.now()-(config.expired?8*86400000:config.fresh?3000:2*3600000)).toISOString(),childUrl=(config.foreignChild?'https://example.net':'https://www.stadt-strausberg.de')+'/wp-content/uploads/fixture/planunterlagen.txt',middleUrl=config.scopedPrefix?rootUrl+'unlinked/':'https://www.stadt-strausberg.de/archiv/planunterlagen.html';
    const documents:CrawlDocument[]=[],observations:Array<{path:string;sha256:string}>=[],bindings:Array<BoundSourceObservation['binding']>=[],originals:Array<{path:string;body:Buffer;observationPath:string;observationBytes:Buffer}>=[];
    async function original(id:string,url:string,body:Buffer,mimeType:string,from:string,reserved=false){
     const sha256=digest(body),observationId=`${Date.now()}-${randomUUID()}.json`,observationPath=join(rawRoot,'observations',observationId),sourcePolicy={robots:{state:'allowed' as const,url:'https://www.stadt-strausberg.de/robots.txt',sha256:digest(robotsBody),checkedAt},tdm:{state:reserved?'reserved' as const:'not_declared' as const,evidence:Array.from({length:config.evidenceRows??1},()=>({url:'https://www.stadt-strausberg.de/.well-known/tdmrep.json',locator:reserved?'W3C TDMRep origin rules':'TDMRep standardized location HTTP absence',value:reserved?'reservation=1':'404',checkedAt}))},access:'public' as const,legalClassification:'not_assessed' as const,publication:'facts_with_attribution_only' as const};
-    const observation={url,method:'GET',checkedAt,retrievedAt:checkedAt,state:'fetched',status:200,sha256,bytes:body.length,mimeType,policy:sourcePolicy},observationBytes=Buffer.from(JSON.stringify(observation)+'\n'),binding:BoundSourceObservation['binding']={kind:'http_observation',url,sourceSha256:sha256,observationId,receiptSha256:digest(observationBytes)},path=join(rawRoot,'sha256',sha256);
+    const parentEvidence=id===label+'-root'?config.parentEvidence:undefined,observedPolicy=parentEvidence==='missing-policy'?undefined:parentEvidence==='missing-robots-clock'?{...sourcePolicy,robots:{...sourcePolicy.robots,checkedAt:undefined}}:parentEvidence==='missing-tdm-clock'?{...sourcePolicy,tdm:{...sourcePolicy.tdm,evidence:sourcePolicy.tdm.evidence.map(row=>({...row,checkedAt:undefined}))}}:parentEvidence==='invalid-policy-metadata'?{...sourcePolicy,tdm:{...sourcePolicy.tdm,evidence:Array.from({length:MAX_POLICY_METADATA_EVIDENCE+1},()=>sourcePolicy.tdm.evidence[0])}}:sourcePolicy;
+    const observation={url,method:'GET',checkedAt,retrievedAt:checkedAt,state:'fetched',status:200,sha256,bytes:body.length,mimeType,policy:observedPolicy},observationBytes=Buffer.from(JSON.stringify(observation)+'\n'),binding:BoundSourceObservation['binding']={kind:'http_observation',url,sourceSha256:sha256,observationId,receiptSha256:digest(observationBytes)},path=join(rawRoot,'sha256',sha256);
     await withManagedSourceWrite(rawRoot,[{...binding,relativePath:'sha256/'+sha256,contentSha256:sha256,independentAllowed:!reserved}],async()=>{
      await mkdir(join(rawRoot,'sha256'),{recursive:true,mode:0o700});await mkdir(join(rawRoot,'observations'),{recursive:true,mode:0o700});await writeFile(path,body,{mode:0o600});await writeFile(observationPath,observationBytes,{mode:0o600});
     },policy);
@@ -153,6 +157,47 @@ test('offline frozen crawl import preserves managed originals and produces enque
     assert.deepEqual(await readFile(item.manifest.index.path),item.indexBytes);assert.equal(imported.coverage.acquisitionStepReceipts,0);
    });
   });
+  for(const failure of [new CivicPolicyStateError('CIVIC_POLICY_BUSY'),new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE'),new SyntaxError('Synthetic lower-call state JSON parse failure'),new z.ZodError([{code:'custom',path:[],message:'Synthetic lower-call state schema parse failure'}]),Object.assign(new Error('Synthetic ancestor filesystem I/O failure'),{code:'EIO'}),Object.assign(new Error('Synthetic ancestor filesystem permission failure'),{code:'EACCES'}),new Error('Synthetic unrelated ancestor read failure')])await st.test('ancestor read propagates '+(failure instanceof CivicPolicyStateError?failure.code:failure.message),async rt=>{
+   const item=await legacy('ancestor-failure-'+digest(failure instanceof CivicPolicyStateError?failure.code:failure.message).slice(0,8)),originalReadFile=fsPromises.readFile;
+   let intercepted=0;
+   rt.mock.method(fsPromises,'readFile',async(...args:Parameters<typeof fsPromises.readFile>)=>{
+    if(String(args[0])===item.originals[0].path){intercepted++;throw failure;}
+    return originalReadFile(...args);
+   });syncBuiltinESMExports();
+   try{
+    await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>assert.rejects(importCrawlCorpusForResidual(store,item.cas,item.manifest),error=>error===failure));
+    assert.equal(intercepted,1);
+   }finally{rt.mock.restoreAll();syncBuiltinESMExports();}
+   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+    const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
+    assert.equal(Date.parse((await loadPolicyReceipt(item.cas,imported.jobs[0].policyReceiptSha256)).expiresAt),Date.parse(item.checkedAt)+REGISTERED_SOURCE_POLICY_VALIDITY_MS);
+   });
+  });
+  for(const malformed of ['{','{}'])await st.test('parent managed authority '+(malformed==='{'?'JSON':'schema')+' corruption propagates instead of lineage fallback',async rt=>{
+   const item=await legacy('parent-state-parse-'+digest(malformed).slice(0,8)),authorityPath=join(policy.stateDir,'authority.json'),authorityBytes=await readFile(authorityPath),originalOpen=fsPromises.open;
+   let parentRead=false,injected=0;
+   rt.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+    const path=String(args[0]);if(path===item.originals[0].path)parentRead=true;
+    if(parentRead&&path===authorityPath&&injected===0&&new Error().stack?.includes('loadInventory')){
+     injected++;await writeFile(authorityPath,malformed,{mode:0o600});
+     const handle=await originalOpen(...args),close=handle.close.bind(handle);
+     // Restore after the real bounded state reader captures invalid bytes, but
+     // before its parser runs: later reads cannot create a misleading failure.
+     handle.close=async()=>{try{await close();}finally{await writeFile(authorityPath,authorityBytes,{mode:0o600});}};
+     return handle;
+    }
+    return originalOpen(...args);
+   });syncBuiltinESMExports();
+   try{
+    await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>assert.rejects(importCrawlCorpusForResidual(store,item.cas,item.manifest),(error:unknown)=>error instanceof CivicPolicyStateError&&error.code==='CIVIC_POLICY_INVENTORY_UNAVAILABLE'));
+    assert.equal(injected,1);
+   }finally{rt.mock.restoreAll();syncBuiltinESMExports();await writeFile(authorityPath,authorityBytes,{mode:0o600});}
+   assert.deepEqual(await readFile(authorityPath),authorityBytes);
+   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+    const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
+    assert.equal(Date.parse((await loadPolicyReceipt(item.cas,imported.jobs[0].policyReceiptSha256)).expiresAt),Date.parse(item.checkedAt)+REGISTERED_SOURCE_POLICY_VALIDITY_MS);
+   });
+  });
   await st.test('authenticated discovery survives authorized refresh and expired queued preparation continuation',async rt=>{
    const item=await legacy('registered-refresh'),seen:string[]=[];
    interface WireSeam {wire(url:URL):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
@@ -183,8 +228,16 @@ test('offline frozen crawl import preserves managed originals and produces enque
     assert.deepEqual(current.sourcePolicy.tdm.evidence[0],pinned.sourcePolicy.tdm.evidence[0]);assert.equal(current.registeredSourceEligibility!.discovery,undefined);
     assert.equal(Date.parse(current.expiresAt),nextTime.getTime()+REGISTERED_SOURCE_POLICY_VALIDITY_MS);
     assert.deepEqual(output.job.httpObservation,original.httpObservation);
+    const refreshSpec=(await pool!.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[jobKey])).rows[0].spec,refreshManifestPath=join(item.cas.root,'sha256',refreshSpec.selector.manifestSha256.slice(0,2),refreshSpec.selector.manifestSha256);
     rt.mock.timers.enable({apis:['Date'],now:nextTime});
     try{
+     const originalOpen=fsPromises.open,failure=new CivicPolicyStateError('CIVIC_POLICY_BUSY');let intercepted=false;
+     rt.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+      if(String(args[0])===refreshManifestPath){intercepted=true;throw failure;}
+      return originalOpen(...args);
+     });syncBuiltinESMExports();
+     try{await assert.rejects(recheckResidualPolicy(store,item.cas,original),error=>error===failure);assert.equal(intercepted,true);}
+     finally{rt.mock.restoreAll();syncBuiltinESMExports();}
      const checked=await recheckResidualPolicy(store,item.cas,original);assert.deepEqual(checked.receipt,pinned);assert.equal(checked.continuation!.refreshStepReceiptSha256,committed.receipt_sha256);
      const queued=await pool!.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[preparationKey]);
      assert.deepEqual(await residualJobHandlersFor(pool!).residual_prepare.currentPolicy!(queued.rows[0].spec as DistrictJobSpec,item.cas),checked.continuation);
@@ -203,6 +256,24 @@ test('offline frozen crawl import preserves managed originals and produces enque
     assert.equal(readRegisteredRobotsAudit(proof.sourcePolicy.tdm.evidence,item.child.url),undefined);
     assert.equal(Date.parse(proof.expiresAt),Date.parse(item.checkedAt)+3600000);
     for(const entry of item.originals){assert.deepEqual(await readFile(entry.path),entry.body);assert.deepEqual(await readFile(entry.observationPath),entry.observationBytes);}
+   });
+  });
+  for(const parentEvidence of ['missing-policy','missing-robots-clock','missing-tdm-clock','invalid-policy-metadata'] as const)for(const fresh of [false,true])await st.test(parentEvidence+' parent '+(parentEvidence==='invalid-policy-metadata'?'cannot pass complete corpus custody':fresh?'keeps the fresh one-hour child':'keeps the stale child hold'),async()=>{
+   const item=await legacy('parent-evidence-'+parentEvidence+'-'+fresh,{parentEvidence,fresh});
+   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+    const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);
+    if(parentEvidence==='invalid-policy-metadata'){
+     // Over-cap metadata cannot pass the preceding complete custody admission;
+     // it is not a parent-only lineage defect and must still hold the index.
+     assert.equal(imported.jobs.length,0);assert.deepEqual(imported.holds,[{documentId:item.child.id,reasonCode:'corpus_ancestry_unavailable'}]);
+    }else if(fresh){
+     assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
+     const proof=await loadPolicyReceipt(item.cas,imported.jobs[0].policyReceiptSha256);
+     assert.deepEqual(proof.sourcePolicy,item.child.policy);assert.equal(readRegisteredRobotsAudit(proof.sourcePolicy.tdm.evidence,item.child.url),undefined);
+     assert.equal(Date.parse(proof.expiresAt),Date.parse(item.checkedAt)+3600000);
+    }else{assert.equal(imported.jobs.length,0);assert.deepEqual(imported.holds,[{documentId:item.child.id,reasonCode:'source_policy_stale'}]);}
+    for(const original of item.originals){assert.deepEqual(await readFile(original.path),original.body);assert.deepEqual(await readFile(original.observationPath),original.observationBytes);}
+    assert.deepEqual(await readFile(item.manifest.index.path),item.indexBytes);
    });
   });
   for(const [label,config,reason] of [
@@ -447,6 +518,25 @@ test('offline frozen crawl import preserves managed originals and produces enque
     return {outcome:'succeeded',reasonCode:'completed',outputs:[parser,text],versions:{preparation:prepared.extractorSha256,node:process.versions.node,...source.policyCheck.versions},counts:{bytes:bytes.length}};
    };
    prepareFixture.currentPolicy=production.residual_prepare.currentPolicy;
+   for(const code of ['CIVIC_POLICY_BUSY','CIVIC_POLICY_INVENTORY_UNAVAILABLE'])for(const phase of ['claim','finish'] as const)await st.test(phase+' continuation preserves '+code+' as an execution hold',async()=>{
+    await store.resume(preparationKey);
+    const before=(await pool!.query('SELECT attempt FROM district_pipeline.jobs WHERE job_key=$1',[preparationKey])).rows[0],failure=new CivicPolicyStateError(code);
+    let hookCalls=0,handlerCalls=0;
+    const guardedPrepare:JobHandler=async context=>{handlerCalls++;return prepareFixture(context);};
+    guardedPrepare.currentPolicy=async(spec,cas)=>{
+     const continuation=await production.residual_prepare.currentPolicy!(spec,cas);
+     if(++hookCalls===(phase==='claim'?1:2))throw failure;
+     return continuation;
+    };
+    const result=await runDistrictJobs({store,cas:item.cas,handlers:{residual_prepare:guardedPrepare},authorizationId:await authorize(preparationKey,code+'-'+phase),ownerPresent:true,maxJobs:1,maxElapsedMs:60000,leaseMs:60000});
+    assert.equal(result.state,'held');assert.equal(result.reasonCode,'execution_exception');assert.equal(result.jobsStarted,phase==='claim'?0:1);
+    assert.equal(hookCalls,phase==='claim'?1:2);assert.equal(handlerCalls,phase==='claim'?0:1);
+    const after=(await pool!.query('SELECT state,reason_code,attempt,lease_owner FROM district_pipeline.jobs WHERE job_key=$1',[preparationKey])).rows[0];
+    assert.equal(after.state,'held_execution');assert.equal(after.reason_code,'execution_exception');assert.equal(after.attempt,before.attempt+(phase==='claim'?0:1));assert.equal(after.lease_owner,null);
+    const receipts=await pool!.query('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId]);assert.equal(receipts.rowCount,phase==='claim'?0:1);
+    for(const row of receipts.rows){assert.equal(row.receipt.outcome,'held_execution');assert.equal(row.receipt.reasonCode,'execution_exception');assert.deepEqual(row.receipt.outputHashes,[]);}
+    assert.equal((await pool!.query("SELECT id FROM district_pipeline.step_receipts WHERE run_id=$1 AND (outcome='succeeded' OR receipt->>'reasonCode'='source_policy_stale')",[result.runId])).rowCount,0);
+   });
    for(const bound of ['lease','authorization'] as const)await st.test(`finish continuation crossing ${bound} deadline cannot commit successful effects`,async()=>{
     await store.resume(preparationKey);
     const authorizationId=await authorize(preparationKey,'delayed-finish-'+bound,bound==='authorization'?new Date(Date.now()+30000).toISOString():undefined);

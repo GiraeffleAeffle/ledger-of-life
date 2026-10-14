@@ -8,6 +8,7 @@ import {join,dirname} from 'node:path';
 import {tmpdir,homedir} from 'node:os';
 import {createHash,randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
+import {DistrictCas} from '../src/district-cas.ts';
 import {assertCivicPolicyAuthority,provisionCivicPolicyAuthority,CIVIC_POLICY_AUTHORITY_ID,assertManagedSourceReadable,withManagedSourceScratch,recoverManagedSourceScratch,assertHostNotOptedOut,readCivicOptOutSnapshot,registerManagedCacheRoot,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,recordHostOptOut,purgeOptedOutHost,recordManagedSourceContent,withManagedSourceWrite,markManagedCacheInventoryComplete,relinquishManagedSourceContent,HostOptedOutError,CivicPolicyStateError,civicOptOutMain} from '../src/civic-opt-out.ts';
 import {assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,assertManagedRawSourceBinding,assertManagedObservationReadable,ManagedSourceBindingSchema,parseContentFreePreparationPlan,assertSourceHostsNotOptedOut} from '../src/civic-opt-out.ts';
 import {retireManagedRoot,RetireReceiptSchema} from '../src/civic-opt-out.ts';
@@ -535,6 +536,26 @@ test('production authority cannot fork into a temporary store and fixture author
  await rm(join(stateDir,'authority.json'));await assert.rejects(assertHostNotOptedOut('https://council.test/doc',policy),CivicPolicyStateError);await assert.rejects(readCivicOptOutSnapshot(policy),CivicPolicyStateError);
 });
 
+for(const malformed of ['{','{}'])test('authority '+(malformed==='{'?'JSON':'schema')+' failures retain state errors at precheck and locked inventory read',async t=>{
+ const {stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),path=join(stateDir,'authority.json'),saved=await readFile(path);
+ await writeFile(path,malformed,{mode:0o600});
+ await assert.rejects(assertCivicPolicyAuthority(policy),(error:unknown)=>error instanceof CivicPolicyStateError&&error.code==='CIVIC_POLICY_AUTHORITY_UNAVAILABLE');
+ await writeFile(path,saved,{mode:0o600});
+ const originalOpen=fsPromises.open;let injected=0;
+ t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+  if(String(args[0])===path&&injected===0&&new Error().stack?.includes('loadInventory')){
+   injected++;await writeFile(path,malformed,{mode:0o600});
+   const handle=await originalOpen(...args),close=handle.close.bind(handle);
+   handle.close=async()=>{try{await close();}finally{await writeFile(path,saved,{mode:0o600});}};
+   return handle;
+  }
+  return originalOpen(...args);
+ });syncBuiltinESMExports();
+ try{await assert.rejects(readCivicPolicyInventory(policy),(error:unknown)=>error instanceof CivicPolicyStateError&&error.code==='CIVIC_POLICY_INVENTORY_UNAVAILABLE');assert.equal(injected,1);}
+ finally{t.mock.restoreAll();syncBuiltinESMExports();await writeFile(path,saved,{mode:0o600});}
+ assert.deepEqual(await readFile(path),saved);await assertCivicPolicyAuthority(policy);
+});
+
 test('private records, result caches, quarantines, frozen archives and materialized outputs are source content',async t=>{
  const {base,stateDir}=await sandbox(t),root=join(base,'private-outputs'),policy=fixturePolicy(stateDir);
  await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
@@ -785,7 +806,7 @@ for(const layout of ['legacy','sealed'])test('Git baselines and approved registr
  assert.equal((await recordHostOptOut({host:'stadt.de',reason:'municipality_objection'},policy)).purge.deletedFiles,2);
 });
 
-for(const layout of ['legacy','sealed'])test('self-bound registry bytes admit complete descriptor members while inherited artifacts remain exact-set: '+layout,async t=>{
+for(const layout of ['legacy','sealed'])test('self-bound and inherited registry bytes admit complete same-configuration descriptor members: '+layout,async t=>{
  const {base,stateDir}=await sandbox(t),root=join(base,'registry-members'),policy=fixturePolicy(stateDir);
  await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
  const bytes='Synthetic bounded operator configuration',configurationSha256=hash(bytes),code={gitCommit:'a'.repeat(40),path:'stadtstack-data/sources/district-registry.json',blobOid:'b'.repeat(40),sha256:configurationSha256,bytes:Buffer.byteLength(bytes)};
@@ -800,8 +821,8 @@ for(const layout of ['legacy','sealed'])test('self-bound registry bytes admit co
  for(const bindings of [first,second]){
   await assertManagedSourceBindings(path,bindings,policy);
   await assertManagedSourceBindings(path,bindings,policy,'operator_registry_config');
-  await assert.rejects(assertManagedSourceBindings(derivedPath,bindings,policy),{code:'CONTENT_PROVENANCE_MISMATCH'});
-  await assert.rejects(assertManagedSourceBindings(derivedPath,bindings,policy,'operator_registry_config'),{code:'CONTENT_PROVENANCE_MISMATCH'});
+  await assertManagedSourceBindings(derivedPath,bindings,policy);
+  await assertManagedSourceBindings(derivedPath,bindings,policy,'operator_registry_config');
  }
  await assertManagedSourceBindings(derivedPath,[...first,...second],policy);
  for(const bindings of [
@@ -827,6 +848,52 @@ for(const layout of ['legacy','sealed'])test('self-bound registry bytes admit co
  await publish(root,{...rawEntry(bytes,'https://foreign.test/source'),relativePath:'registry.json'},bytes,stateDir);
  await assert.rejects(assertManagedSourceBindings(path,first,policy),{code:'CONTENT_PROVENANCE_MISMATCH'});
 });
+
+for(const layout of ['legacy','sealed'])test('corpus CAS permits only complete same-byte registry extras and exact source ancestry: '+layout,async t=>{
+ const {base,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),cas=new DistrictCas(join(base,'family-cas'));
+ await initializeManagedAcquisitionLane(cas.root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+ const configuration='Synthetic registry family configuration',configurationSha256=hash(configuration),code={gitCommit:'a'.repeat(40),path:'stadtstack-data/sources/district-registry.json',blobOid:'b'.repeat(40),sha256:configurationSha256,bytes:Buffer.byteLength(configuration)};
+ const first=['https://family-one.test/source','https://family-two.test/source'].map(url=>({kind:'operator_registry_config' as const,url,configurationSha256,schemaContractSha256:hash('synthetic first family'),code,approval:{role:'district_source_registry' as const,approver:'owner' as const,decisionId:CIVIC_ACQUISITION_DECISION_ID,date:'2026-10-11' as const,configurationSha256,gitCommit:code.gitCommit},independentAllowed:false}));
+ const second=first.map(binding=>({...binding,schemaContractSha256:hash('synthetic second family')}));
+ const original=rawEntry('Synthetic original','https://original-family.test/document'),observation:ManagedSourceBinding={kind:'http_observation',url:original.url,sourceSha256:original.sourceSha256,observationId:original.observationId,receiptSha256:original.receiptSha256};
+ const put=async(label:string,bindings:ManagedSourceBinding[])=>{
+  const bytes=Buffer.from(JSON.stringify({schemaVersion:'stadtstack-crawl-index-v1',documents:[],notes:['Synthetic family-membership fixture',label]})+'\n'),contentSha256=hash(bytes),relativePath=`sha256/${contentSha256.slice(0,2)}/${contentSha256}`;
+  const artifact=await withManagedSourceWrite(cas.root,bindings.map(binding=>({...binding,relativePath,contentSha256,independentAllowed:false})),()=>cas.put(bytes,{kind:'derived',mimeType:'application/json'}),policy);
+  return join(cas.root,artifact.storageKey);
+ };
+ const corpusPath=await put('complete',[...first,...second,observation]);
+ const partial=await put('partial-extra',[...first,second[0],observation]);
+ const foreignSha256=hash('Synthetic foreign configuration'),foreign=second.map(binding=>({...binding,configurationSha256:foreignSha256,code:{...binding.code,sha256:foreignSha256},approval:{...binding.approval,configurationSha256:foreignSha256}}));
+ const foreignPath=await put('foreign-configuration',[...first,...foreign,observation]);
+ const extraObservation={...observation,url:'https://extra-family.test/original',observationId:hash('extra observation'),receiptSha256:hash('extra HTTP receipt')};
+ const extraPath=await put('extra-observation',[...first,...second,observation,extraObservation]);
+ const preparedPath=await put('extra-prepared-receipt',[...first,...second,observation,{...extraObservation,kind:'prepared_source'}]);
+ if(layout==='sealed')await compactCivicPolicyInventory(policy);
+ for(const family of [first,second]){
+  await assertManagedSourceBindings(corpusPath,[...family,observation],policy);
+  await assertManagedSourceBindings(corpusPath,family,policy,'operator_registry_config');
+ }
+ for(const [path,declared] of [
+  [corpusPath,[first[0],second[1],observation]],
+  [corpusPath,[...first]],
+  [partial,[...first,observation]],
+  [foreignPath,[...first,observation]],
+  [extraPath,[...first,observation]],
+  [preparedPath,[...first,observation]],
+ ] as const)await assert.rejects(assertManagedSourceBindings(path,[...declared],policy),{code:'CONTENT_PROVENANCE_MISMATCH'});
+ // Deliberate fixture-only state fault: an otherwise ignorable descriptor
+ // contributor remains a live read gate in both physical inventory layouts.
+ const inventoryPath=join(stateDir,'inventory.json'),physicalBytes=await readFile(inventoryPath),physical=JSON.parse(physicalBytes.toString('utf8')),logical=await readCivicPolicyInventory(policy),revoked=logical.entries.find(entry=>join(cas.root,entry.relativePath)===corpusPath&&entry.schemaContractSha256===second[0].schemaContractSha256)!;
+ assert.ok(revoked);
+ if(layout==='sealed')physical.storage.entryStates[revoked.id]='revoked';else physical.entries.find((entry:{id:string})=>entry.id===revoked.id).state='revoked';
+ try{
+  await writeFile(inventoryPath,JSON.stringify(physical)+'\n',{mode:0o600});
+  await assert.rejects(assertManagedSourceBindings(corpusPath,[...first,observation],policy),{code:'CONTENT_REFERENCE_REVOKED'});
+ }finally{await writeFile(inventoryPath,physicalBytes,{mode:0o600});}
+ const objection=await recordHostOptOut({host:'family-two.test',reason:'municipality_objection'},policy);assert.equal(objection.host,'family-two.test');
+ await assert.rejects(assertManagedSourceBindings(corpusPath,[...first,observation],policy),HostOptedOutError);
+});
+
 
 test('raw source admission verifies the real immutable HTTP observation, not another proof kind or receipt hash',async t=>{
  const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),bytes='synthetic acquired primary source',sourceSha256=hash(bytes),url='https://stadt.de/source';

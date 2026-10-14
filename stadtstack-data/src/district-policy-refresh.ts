@@ -8,7 +8,7 @@ import {corpusFixturePolicy} from './district-corpus.ts';
 import {DistrictJobStore,canonicalJobIdentity,DistrictExecutionHold,policyContinuationVersions,type JobHandler,type JobHandlerResult,type JobPolicyContinuation} from './district-jobs.ts';
 import {encodeStepReceipt} from './district-step-receipt.ts';
 import {loadPolicyReceipt,recheckPolicyReceipt,type PolicyReceipt,type PolicyRecheckResult} from './district-policy-receipt.ts';
-import {assertCivicPolicyAuthority,assertManagedSourceReadable,assertManagedSourceBindings,assertManagedObservationReadable,withManagedSourceWrite,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,HostOptedOutError} from './civic-opt-out.ts';
+import {assertCivicPolicyAuthority,assertManagedSourceReadable,assertManagedSourceBindings,assertManagedObservationReadable,withManagedSourceWrite,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,HostOptedOutError,CivicPolicyStateError} from './civic-opt-out.ts';
 import type {DistrictCas} from './district-cas.ts';
 import type {PoliteFetcher} from './polite-fetch.ts';
 import {acquisitionFailureReason} from './district-r1.ts';
@@ -175,5 +175,5 @@ export async function recheckResidualPolicy(store:DistrictJobStore|undefined,cas
   const checked=await recheckPolicyReceipt(receipt,{...policy,evaluationAt,currentProof:currentReceipt});
   const continuation={fromReceiptSha256:input.policyReceiptSha256,toReceiptSha256:committed.job.policyReceiptSha256,refreshStepReceiptSha256:committed.receiptSha256,refreshStepReceiptId:committed.receiptId,originalIdentitySha256:identity};
   return {...checked,currentReceipt,continuation,versions:policyContinuationVersions(continuation)};
- }catch{throw new DistrictExecutionHold('source_policy_stale');}
+ }catch(error){if(error instanceof CivicPolicyStateError)throw error;throw new DistrictExecutionHold('source_policy_stale');}
 }

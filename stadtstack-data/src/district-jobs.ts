@@ -8,6 +8,7 @@ import {z} from 'zod';
 import {canonicalJson, digest, HashSchema, ScopeSchema, type AdapterScope} from './district-adapter-contract.ts';
 import {DistrictCas, type CasArtifact} from './district-cas.ts';
 import {CANONICALIZATION_VERSION, STEP_RECEIPT_VERSION, ReasonCodeSchema, encodeStepReceipt, unknownReceiptCounts, type JobOutcome, type ReasonCode, type StepReceipt} from './district-step-receipt.ts';
+import {CivicPolicyStateError} from './civic-opt-out.ts';
 
 // This is the authorized R1 ring, not a district-prefix or whole-Amt admission rule.
 export const R1_MUNICIPALITIES:Readonly<Record<string,string>>={strausberg:'12064472',hoppegarten:'12064227','ruedersdorf-bei-berlin':'12064428',ratzeburg:'01053100',moelln:'01053090',schwarzenbek:'01053116',ludwigslust:'13076090',parchim:'13076108',hagenow:'13076060'};
@@ -230,7 +231,7 @@ export class DistrictJobStore {
         const current=await client.query(`SELECT p.checked_at,p.expires_at,clock_timestamp() AS now FROM district_pipeline.policy_decisions p JOIN district_pipeline.source_snapshots s ON s.id=p.source_snapshot_id JOIN district_pipeline.step_receipts r ON r.receipt_sha256=$2 JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE p.proof_sha256=$1 AND p.state='allowed' AND p.source_sha256=$3 AND s.publisher_id=$4 AND s.source_id=$5 AND s.municipality_id=$6 AND s.ags=$7 AND s.tenant IS NOT DISTINCT FROM $8 AND s.observation_window=$9 AND j.state='succeeded' AND j.step='policy_refresh' AND r.outcome='succeeded' AND r.id=$10 AND r.receipt->'versions'->>'policyRefreshReceipt'=$1 AND r.receipt->'versions'->>'policyRefreshOriginal'=$11`,[continuation.toReceiptSha256,continuation.refreshStepReceiptSha256,policy.source_sha256,scope.publisherId,scope.sourceId,scope.municipalityId,scope.ags,scope.tenant,scope.observationWindow,continuation.refreshStepReceiptId,continuation.originalIdentitySha256]);
         if(current.rowCount!==1||current.rows[0].checked_at<=policy.checked_at||current.rows[0].checked_at>current.rows[0].now||current.rows[0].expires_at<=current.rows[0].now)return 'source_policy_stale';
         onContinuation?.(continuation);return null;
-      }catch{return 'source_policy_stale';}
+      }catch(error){return error instanceof CivicPolicyStateError?'execution_exception':'source_policy_stale';}
     }
     return null;
   }

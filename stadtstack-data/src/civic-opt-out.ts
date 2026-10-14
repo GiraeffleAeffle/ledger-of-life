@@ -135,7 +135,8 @@ async function readSegment(state:string,pin:SegmentPin,inventoryId:string):Promi
    while(total<buffer.length){const {bytesRead}=await handle.read(buffer,total,buffer.length-total,null);if(!bytesRead)break;total+=bytesRead;}
    const bytes=buffer.subarray(0,total);
    if(total!==pin.bytes||digest(bytes)!==pin.sha256||snapshotStamp(await handle.stat({bigint:true}))!==stamp||snapshotStamp(await lstat(path,{bigint:true}))!==stamp)throw new CivicPolicyStateError();
-   const value=segmentSchema.parse(JSON.parse(bytes.toString('utf8')));
+   let value:z.infer<typeof segmentSchema>;
+   try{value=segmentSchema.parse(JSON.parse(bytes.toString('utf8')));}catch{throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');}
    if(value.family==='entries'&&(value.scratch.length||!value.entries.length||value.entries.some(entry=>!bulkEntry(entry)))||value.family==='scratch'&&(value.entries.length||!value.scratch.length||value.scratch.some(lease=>!archivedLease(lease))))throw new CivicPolicyStateError();
    freezeRecord(value);cached={stamp,value};segmentCache.set(path,cached);
   }
@@ -567,8 +568,8 @@ async function loadInventory(state:string):Promise<Inventory>{
   if(physical&&typeof physical==='object'&&'storage' in physical){
    const parsed=hotInventorySchema.parse(physical);physical=parsed;value=await hydrateInventory(state,parsed);
   }else{value=validated?physical as Inventory:inventorySchema.parse(physical);physical=value;}
+  const authority=authoritySchema.parse(JSON.parse((await fileBytes(join(state,AUTHORITY_MARKER),8192,true)).bytes.toString('utf8')));if(value.inventoryId!==authority.inventoryId)throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
  }catch{validatedInventoryBytes.delete(state);throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');}
- const authority=authoritySchema.parse(JSON.parse((await fileBytes(join(state,AUTHORITY_MARKER),8192,true)).bytes.toString('utf8')));if(value.inventoryId!==authority.inventoryId)throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
  if(validated)return value;
  const roots=new Map(value.roots.map(root=>[root.id,root]));
  if(roots.size!==value.roots.length||inventoryIndex(value).byId.size!==value.entries.length)throw new CivicPolicyStateError();
@@ -942,7 +943,28 @@ async function assertManagedSourceBindingSet(input:string,bindings:Array<Managed
   if(registryArtifact){
    // Select complete descriptor families, never a mixture of partial endpoint sets.
    if([...declared].some(identity=>!expected.has(identity))||entries.some(entry=>declaredDescriptors!.has(registryDescriptorKey(entry))&&!declared.has(key(entry))))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
-  }else if(expected.size!==declared.size||[...expected].some(identity=>!declared.has(identity)))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
+  }else if(expected.size!==declared.size||[...expected].some(identity=>!declared.has(identity))){
+   if([...declared].some(identity=>!expected.has(identity)))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
+   // An inherited artifact may carry older complete codec/code descriptor
+   // families for the same exact configuration. Other provenance stays exact.
+   const families=new Map<string,{configurationSha256:string;urls:Set<string>;declared:boolean}>();
+   for(const entry of entries){
+    if(kind!==undefined&&entry.kind!==kind)continue;
+    const included=declared.has(key(entry));
+    if(entry.kind!=='operator_registry_config'){
+     if(!included)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
+     continue;
+    }
+    const descriptor=registryDescriptorKey(entry),family=families.get(descriptor);
+    if(family){
+     // Any declared endpoint commits to its entire descriptor family.
+     if(family.declared!==included)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
+     family.urls.add(entry.urlSha256);
+    }else families.set(descriptor,{configurationSha256:entry.configurationSha256!,urls:new Set([entry.urlSha256]),declared:included});
+   }
+   const complete=[...families.values()].filter(family=>family.declared);
+   for(const family of families.values())if(!family.declared&&!complete.some(member=>member.configurationSha256===family.configurationSha256&&member.urls.size===family.urls.size&&[...family.urls].every(url=>member.urls.has(url))))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
+  }
   await assertCivicPolicyAuthority(policy);
  });
 }
@@ -961,7 +983,8 @@ export async function assertManagedRawSourceBinding(input:string,binding:Extract
   if(!entry||!/^sha256\/[a-f0-9]{64}$/.test(relativePath)||!/^[A-Za-z0-9][A-Za-z0-9._-]{0,159}\.json$/.test(binding.observationId))throw new CivicPolicyStateError('HTTP_SOURCE_PROVENANCE_REQUIRED');
   const observationBytes=(await fileBytes(join(root.path,'observations',binding.observationId),MAX_STATE)).bytes;
   if(digest(observationBytes)!==binding.receiptSha256)throw new CivicPolicyStateError('HTTP_OBSERVATION_BINDING_MISMATCH');
-  const observation=observationSchema.parse(JSON.parse(observationBytes.toString('utf8')));
+  let observation:z.infer<typeof observationSchema>;
+  try{observation=observationSchema.parse(JSON.parse(observationBytes.toString('utf8')));}catch{throw new CivicPolicyStateError('INVALID_MANAGED_OBSERVATION');}
   if(urlHash(observation.url)!==urlHash(binding.url)||observation.sha256!==binding.sourceSha256||!['fetched','not_modified'].includes(observation.state))throw new CivicPolicyStateError('HTTP_OBSERVATION_BINDING_MISMATCH');
   await assertHostNotOptedOut(binding.url,policy);if((await fileDigest(path)).sha256!==binding.sourceSha256)throw new CivicPolicyStateError('CONTENT_BINDING_MISMATCH');await assertHostNotOptedOut(binding.url,policy);
  });
@@ -1509,7 +1532,8 @@ export async function benchmarkCivicInventoryCopy(path:string,iterations=5):Prom
  before:{bytes:number;parseMs:number;serializeMs:number};after:{bytes:number;parseMs:number;serializeMs:number};byteReduction:number;codecSpeedup:number;segments:number;
 }>{
  if(!Number.isInteger(iterations)||iterations<1||iterations>20)throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');
- const bytes=(await fileBytes(resolve(path),MAX_STATE,true)).bytes,original=bytes.toString('utf8'),inventory=inventorySchema.parse(JSON.parse(original));
+ const bytes=(await fileBytes(resolve(path),MAX_STATE,true)).bytes,original=bytes.toString('utf8');let inventory:Inventory;
+ try{inventory=inventorySchema.parse(JSON.parse(original));}catch{throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');}
  const plan=planInventorySegments(inventory.inventoryId,[],inventory.entries.filter(bulkEntry),inventory.scratch.filter(archivedLease));
  const compact=JSON.stringify(hotInventorySchema.parse({...inventory,entries:inventory.entries.filter(entry=>!bulkEntry(entry)),scratch:inventory.scratch.filter(lease=>!archivedLease(lease)),storage:{format:'sealed-segments-v1',segments:plan.pins,entryStates:{},retiredRoots:{}}}))+'\n';
  const measure=(text:string)=>{
