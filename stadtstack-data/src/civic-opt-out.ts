@@ -754,8 +754,9 @@ export async function assertManagedObservationReadable(input:string,options:Civi
  if(sourceBound)await assertManagedSourceReadable(path,policy);
 }
 
-/** Exact inherited provenance; kind restricts the comparison to an operator
- * registry contribution while leaving the artifact's other dependencies checked.
+/** Exact inherited provenance, except self-bound operator configuration bytes may
+ * carry several admitted descriptors. Their complete declared descriptor set must
+ * be an active member; derived artifacts retain exact-set ancestry, including kind filters.
  */
 export async function assertManagedSourceBindings(input:string,bindings:Array<ManagedSourceBinding&{independentAllowed?:boolean}>,options:ManagedSourceReadOptions={},kind?:'operator_registry_config'):Promise<void>{
  return assertManagedSourceBindingSet(input,bindings,options,kind);
@@ -770,6 +771,7 @@ async function assertManagedSourceBindingSet(input:string,bindings:Array<Managed
  const authority=await assertCivicPolicyAuthority(options),policy={...options,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},state=statePath(policy),path=resolve(input);
  if(kind!==undefined&&(!bindings.length||bindings.some(binding=>binding.kind!==kind)))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
  const key=(value:{kind:string;urlSha256:string;sourceSha256:string|null;observationId?:string;receiptSha256?:string;publication?:unknown;snapshot?:unknown;purpose?:string;configurationSha256?:string;schemaContractSha256?:string;code?:unknown;approval?:unknown})=>canonical([value.kind,value.urlSha256,value.sourceSha256,value.observationId??null,value.receiptSha256??null,value.publication??null,value.snapshot??null,value.purpose??null,value.configurationSha256??null,value.schemaContractSha256??null,value.code??null,value.approval??null]);
+ const registryDescriptorKey=(value:{kind:string;configurationSha256?:string;schemaContractSha256?:string;code?:unknown;approval?:unknown})=>canonical([value.configurationSha256,value.schemaContractSha256,value.code,value.approval]);
  await locked(policy,async()=>{
   const inventory=await loadInventory(state),root=inventory.roots.find(item=>contained(item.path,path));if(!root?.complete)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
   await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);
@@ -779,12 +781,19 @@ async function assertManagedSourceBindingSet(input:string,bindings:Array<Managed
   if(!entries.length)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
   const checkedHosts=new Set<string>(),independentByIdentity=new Map<string,Set<boolean>>();
   for(const entry of entries){if(!checkedHosts.has(entry.host)){await assertHostNotOptedOut('https://'+entry.host+'/',policy);checkedHosts.add(entry.host);}if(entry.state!=='active'||entry.kind==='authenticated_git_snapshot'&&options.purpose!=='historical_change_reconstruction_only')throw new CivicPolicyStateError('CONTENT_REFERENCE_REVOKED');const identity=key(entry),allowed=independentByIdentity.get(identity);if(allowed)allowed.add(entry.independentAllowed);else independentByIdentity.set(identity,new Set([entry.independentAllowed]));}
+  const registryArtifact=bindings.length>0&&bindings.every(binding=>binding.kind==='operator_registry_config'&&binding.independentAllowed===false&&binding.configurationSha256===actual.sha256&&binding.code.bytes===actual.stat.size);
+  if(registryArtifact&&entries.some(entry=>entry.kind!=='operator_registry_config'||entry.independentAllowed||entry.configurationSha256!==actual.sha256||entry.code?.bytes!==actual.stat.size))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
   const expected=new Set(entries.filter(entry=>kind===undefined||entry.kind===kind).map(key)),declared=new Set<string>(),bindingHosts=new Set<string>();
+  const declaredDescriptors=registryArtifact?new Set<string>():undefined;
   for(const binding of bindings){
-   const host=hostFromUrl(binding.url);if(!bindingHosts.has(host)){await assertHostNotOptedOut(binding.url,policy);bindingHosts.add(host);}const identity=key({...sourceProvenance(binding),urlSha256:urlHash(binding.url)});declared.add(identity);
+   const host=hostFromUrl(binding.url);if(!bindingHosts.has(host)){await assertHostNotOptedOut(binding.url,policy);bindingHosts.add(host);}const provenance=sourceProvenance(binding),identity=key({...provenance,urlSha256:urlHash(binding.url)});declared.add(identity);
+   if(declaredDescriptors)declaredDescriptors.add(registryDescriptorKey(provenance));
    if(binding.independentAllowed!==undefined&&independentByIdentity.get(identity)?.has(!binding.independentAllowed))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
   }
-  if(expected.size!==declared.size||[...expected].some(identity=>!declared.has(identity)))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
+  if(registryArtifact){
+   // Select complete descriptor families, never a mixture of partial endpoint sets.
+   if([...declared].some(identity=>!expected.has(identity))||entries.some(entry=>declaredDescriptors!.has(registryDescriptorKey(entry))&&!declared.has(key(entry))))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
+  }else if(expected.size!==declared.size||[...expected].some(identity=>!declared.has(identity)))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
   await assertCivicPolicyAuthority(policy);
  });
 }

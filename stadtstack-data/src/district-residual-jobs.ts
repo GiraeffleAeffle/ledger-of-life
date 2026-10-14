@@ -54,8 +54,10 @@ export async function loadResidualSource(cas:DistrictCas,input:z.infer<typeof Re
  const migration=input.crawlRegistry?await readCrawlOperatorRegistryInputPin(input.crawlRegistry,input.registry,policyOptions(receipt)):undefined;
  const admittedRegistry=migration?.processing??await readOperatorRegistryInputPin(input.registry,policyOptions(receipt));
  if(digest(admittedRegistry.bytes)!==input.registrySha256)throw Error('Residual registry differs from authenticated operator configuration');
- await assertManagedSourceReadable(join(cas.root,'sha256',input.registrySha256.slice(0,2),input.registrySha256),policyOptions(receipt));
+ const registryPath=join(cas.root,'sha256',input.registrySha256.slice(0,2),input.registrySha256);
+ await assertManagedSourceBindings(registryPath,admittedRegistry.bindings,policyOptions(receipt));
  if(digest(await cas.read(input.registrySha256))!==digest(admittedRegistry.bytes))throw Error('Residual registry CAS copy changes admitted configuration');
+ await assertManagedSourceBindings(registryPath,admittedRegistry.bindings,policyOptions(receipt));
  const registry=admittedRegistry.registry,corpusPath=join(cas.root,'sha256',input.corpusSha256.slice(0,2),input.corpusSha256);
  await assertManagedSourceBindings(corpusPath,[...admittedRegistry.bindings,...(migration?.crawl.bindings??[]),...input.corpusObservations],policyOptions(receipt));
  const corpus=loadFrozenCorpusBytes(await cas.read(input.corpusSha256),input.corpusSha256);

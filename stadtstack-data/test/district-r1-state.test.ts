@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {mkdtemp,rm,readFile,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
@@ -18,6 +20,9 @@ import {StructuredWorkerRequestSchema,StructuredInputBundleSchema} from '../src/
 import {createOperatorRegistryFixture,operatorRegistryFixtureValue,writeOperatorRegistryInputPin} from './helpers/operator-registry-fixture.ts';
 import {persistOperatorRegistry} from '../src/district-r1-state.ts';
 import type {DistrictRegistry} from '../src/district-registry.ts';
+import {buildOperatorRegistryConfigDescriptor,importOperatorRegistryConfig,readOperatorRegistryInputPin} from '../src/district-registry-config.ts';
+import {authenticateStructuredRegistry} from '../src/district-structured-registry-admission.ts';
+import {authenticatePublicationProvenance} from '../src/district-publication-provenance.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 
 // Opt-in real local Postgres, with a newly created disposable database. All source
@@ -104,6 +109,43 @@ test('R1 state preserves independent HTTP and policy proofs through managed CAS 
  }
  const registry=await admittedRegistry(registryValue,'structured-registry');
  const input={adapter:'gauges' as const,operation:'parse' as const,registry:registry.registryPin,registrySha256:registry.registrySha256,scope:first.receipt.scope,districtId:'mol',snapshot:primary.snapshot,options:{},cursor:null,sourceBindings:[binding,supportBinding],supportingSources:[supportingSource],auxiliary:[{slot:'stationSnapshot' as const,snapshot:support.snapshot}]};
+ await t.test('identical registry bytes persisted under two authenticated descriptors admit both without discarding custody',async()=>{
+  const repository=join(root,'structured-registry','repository'),env:NodeJS.ProcessEnv=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.startsWith('GIT_')));
+  Object.assign(env,{GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_CONFIG_SYSTEM:'/dev/null',GIT_ATTR_NOSYSTEM:'1',GIT_TERMINAL_PROMPT:'0'});
+  const execute=promisify(execFile),git=async(args:string[])=>(await execute('/usr/bin/git',['-c','core.hooksPath=/dev/null','-c','core.attributesFile=/dev/null','-c','commit.gpgSign=false','-c','user.name=Synthetic Fixture','-c','user.email=fixture@example.test',...args],{cwd:repository,env})).stdout.trim();
+  await git(['commit','--allow-empty','--no-verify','-m','Synthetic second approved descriptor with unchanged registry bytes']);
+  const descriptor=(await buildOperatorRegistryConfigDescriptor({repository,commit:await git(['rev-parse','HEAD']),outputDirectory:join(root,'second-registry-proof')})).descriptor;
+  assert.notEqual(descriptor.code.gitCommit,registry.input.code.gitCommit);
+  const sourcePin=await importOperatorRegistryConfig({...descriptor,managedRoot:registry.managedRoot,destinationPath:'registry.json'},policy);
+  const nextPin=await writeOperatorRegistryInputPin(root,'second-registry-input',sourcePin),next=await readOperatorRegistryInputPin(nextPin,policy);
+  assert.deepEqual(next.bytes,registry.body);assert.notDeepEqual(next.bindings,registry.admitted.bindings);
+  assert.equal(await persistOperatorRegistry(store,cas,next,policy),registry.registrySha256);
+  const path=join(cas.root,'sha256',registry.registrySha256.slice(0,2),registry.registrySha256);
+  for(const [pin,bindings] of [[registry.registryPin,registry.admitted.bindings],[nextPin,next.bindings]] as const){
+   assert.deepEqual((await readOperatorRegistryInputPin(pin,policy)).bytes,registry.body);
+   assert.deepEqual((await authenticateStructuredRegistry(cas,{registry:pin,registrySha256:registry.registrySha256,scope:input.scope,districtId:input.districtId,supportingSourceIds:[supportingSource.id]},policy)).bindings,bindings);
+   await enqueueStructuredSnapshot(store,cas,{...input,registry:pin},policy);
+   // The sealing/publication capability uses the same generic managed gate.
+   const control=Buffer.from(JSON.stringify({schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:[{path,sha256:registry.registrySha256,bytes:registry.body.length,bindings}]})+'\n'),controlPath=join(root,'registry-provenance-'+pin.sha256+'.json');
+   await writeFile(controlPath,control,{mode:0o600});
+   assert.deepEqual(await (await authenticatePublicationProvenance(controlPath,digest(control),policy)).read(path),registry.body);
+  }
+  assert.equal((await pool.query('SELECT COUNT(*) AS count FROM district_pipeline.artifacts WHERE sha256=$1',[registry.registrySha256])).rows[0].count,'1');
+  for(const altered of [
+   {...sourcePin,bindings:sourcePin.bindings.slice(1)},
+   {...sourcePin,bindings:sourcePin.bindings.map(binding=>({...binding,schemaContractSha256:digest('foreign descriptor')}))},
+  ]){
+   const foreign=await writeOperatorRegistryInputPin(root,'foreign-registry-'+digest(canonicalJson(altered)),altered);
+   await assert.rejects(authenticateStructuredRegistry(cas,{registry:foreign,registrySha256:registry.registrySha256,scope:input.scope,districtId:input.districtId,supportingSourceIds:[supportingSource.id]},policy));
+  }
+  const inventoryPath=join(options.stateDir,'inventory.json'),original=await readFile(inventoryPath),inventory=JSON.parse(original.toString('utf8'));
+  const revoked=inventory.entries.find((entry:{rootId:string;contentSha256:string;code?:{gitCommit:string}})=>entry.rootId===digest(cas.root)&&entry.contentSha256===registry.registrySha256&&entry.code?.gitCommit===descriptor.code.gitCommit);
+  assert.ok(revoked);revoked.state='revoked';
+  try{
+   await writeFile(inventoryPath,JSON.stringify(inventory)+'\n',{mode:0o600});
+   for(const pin of [registry.registryPin,nextPin])await assert.rejects(enqueueStructuredSnapshot(store,cas,{...input,registry:pin},policy),{code:'CONTENT_REFERENCE_REVOKED'});
+  }finally{await writeFile(inventoryPath,original,{mode:0o600});}
+ });
  const queued=await enqueueStructuredSnapshot(store,cas,input,policy);
  await t.test('all source and HTTP proofs plus immutable auxiliary bundle participate in job identity',async()=>{
   for(const hash of [primary.sourceArtifact.sha256,primary.receiptSha256,primary.httpObservation.receiptSha256,support.sourceArtifact.sha256,support.receiptSha256,support.httpObservation.receiptSha256])assert.ok(queued.spec.inputArtifactHashes.includes(hash),hash);
