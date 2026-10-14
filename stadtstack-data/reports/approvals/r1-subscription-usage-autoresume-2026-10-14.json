@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-subscription-usage-autoresume-2026-10-14",
+  "related": [
+    {
+      "id": "r1-nine-town-models-2026-10-13",
+      "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+    }
+  ],
+  "recordedAt": "2026-10-14T20:46:47.992Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session (owner leaving for South Korea the next day; asked the lead to work mostly autonomously)",
+  "questionShownToOwner": "1. Usage limits. When the Claude Max checker (Haiku) or OpenAI Codex hits its usage limit, today's rule stops the run until you decide. A (recommended): I resume automatically once that limit window has reset. Normal subscription only, no extra usage, no other model, same caps (48 Codex calls per document, at most 500 documents, until 25 Oct). A limit then costs hours instead of days. B: every limit hit waits until you answer.",
+  "ownerStatementsVerbatim": [
+    "I need you to work mostly autonomous if possible because I will take a plane to South Korea tomorrow",
+    "We haven't used much of our subscription so just go on. You are fine to use it. There should be plenty left of the limit"
+  ],
+  "approved": {
+    "option": "A",
+    "rule": "When a normal-subscription usage limit (Claude Max for assessment B, OpenAI subscription for Codex extraction/A/C) holds a run, the lead may resume the held work with a new stage authorization after that subscription limit window has reset. Unchanged: normal subscription only, no extra/overage usage, no API keys, no other model or transport, no wait-for-reset inside a running job, per-document 48-call cap, at most 500 documents, approval r1-nine-town-models-2026-10-13 expiry 2026-10-25T21:59:59Z."
+  },
+  "interpretation": "The owner did not pick an option label; \"just go on. You are fine to use it\" is read as option A (continue using the subscriptions, resuming after limit resets) and not as permission for extra usage, API keys or other models. The owner may correct this."
+}

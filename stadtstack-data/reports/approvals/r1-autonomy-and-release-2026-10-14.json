@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-autonomy-and-release-2026-10-14",
+  "related": [
+    {
+      "id": "r1-nine-town-models-2026-10-13",
+      "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+    },
+    {
+      "id": "r1-subscription-usage-autoresume-2026-10-14",
+      "sha256": "9882aa1a3938c41a358760705705b943b31e569e11a7b5a2f6579c8661a6b028"
+    }
+  ],
+  "recordedAt": "2026-10-14T20:50:59.345Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session, the evening before the owner flies to South Korea",
+  "questionShownToOwner": "2. Go for publishing the richer MCP. A (recommended): I prepare everything and send you a short summary plus the value-test sample on ntfy or Vikunja. You reply \"GO\" from your phone, then the ops session deploys from the VM. Your audit should take under 2 h and can be split into several sittings. B: if all gates and the frozen value test pass, Ops deploys automatically and you check the samples afterwards. C: the candidate waits ready until you are back.",
+  "ownerStatementsVerbatim": [
+    "I need you to work mostly autonomous if possible because I will take a plane to South Korea tomorrow",
+    "Please try to work as autonomously as possible like I said. So please don't expect me to answer you much tomorrow and in my holidays. It should be possible to do this mostly autonomously and then a buzz agent should ask the questions in buzz to show what is possible to compare and find out about municipalities and how they can learn from each other with the data we have. If it turns out well we can extend to other neighbouring cities"
+  ],
+  "approved": {
+    "releaseGo": "Option B: if every R1 gate passes (source/security/runtime gates, sealed immutable candidate, exact replay, frozen value test with unchanged denominators and its pass verdict), the hosted civic MCP release of the richer dataset may be deployed from the VM by the ops session through the existing governed dispatcher without waiting for a further owner GO; the owner audits the value-test samples afterwards. A failed or ambiguous gate means no release.",
+    "buzzDemo": "After the release, a Buzz agent asks/answers questions in Buzz that demonstrate what the data allows: comparing municipalities and how they can learn from each other. Implemented by the ops session through the governed Buzz change process.",
+    "futureScope": "Extension to neighbouring municipalities only later and only if this turns out well (separate decision).",
+    "autonomy": "The lead proceeds without expecting owner answers; real decisions get an ntfy + Vikunja task with a stated conservative default that is applied if unanswered."
+  },
+  "notApproved": [
+    "Skipping or weakening any gate, review or the frozen value test",
+    "Publication of withheld/quarantined material",
+    "Paid API use, extra usage, other models",
+    "New sources or municipalities"
+  ],
+  "interpretation": "The owner did not pick an option label. \"work as autonomously as possible … don't expect me to answer you much … It should be possible to do this mostly autonomously\" is read as option B for the release GO (gates must all pass; owner sample audit afterwards). The owner may correct this at any time; a correction before the release takes precedence."
+}
