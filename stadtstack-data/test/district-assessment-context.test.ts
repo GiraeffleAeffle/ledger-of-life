@@ -6,7 +6,7 @@ import {randomUUID} from 'node:crypto';
 import {canonicalJson,digest} from '../src/district-adapter-contract.ts';
 import {canonical,PROMPTS,assessmentItemSchema,assessmentOutputSchema,originalEvidence,buildAssessmentPassInput,reconcile,verifyPinnedAssessment,type AssessmentItem} from '../src/district-assessment.ts';
 import {residualAssessmentItem} from '../src/district-assessment-jobs.ts';
-import {ASSESSMENT_CONTEXT_BYTES,AssessmentContextHold,assertAssessmentContextBound,buildPreparedAssessmentContext,verifyAssessmentContext} from '../src/district-assessment-context.ts';
+import {ASSESSMENT_CONTEXT_BYTES,ASSESSMENT_RECONCILIATION_BYTES,ASSESSMENT_NEIGHBOUR_CODE_UNITS,AssessmentContextHold,assertAssessmentContextBound,buildPreparedAssessmentContext,verifyAssessmentContext} from '../src/district-assessment-context.ts';
 import {BridgeLeaseSchema,bridgeInputHash,ASSESSMENT_BRIDGE_VERSION,BRIDGE_LIMITS} from '../src/district-assessment-bridge-contract.ts';
 import {documentChunks} from '../src/district-claims.ts';
 import {MAX_SUBSCRIPTION_INPUT_BYTES,encodeSubscriptionInput} from '../src/district-model.ts';
@@ -14,7 +14,7 @@ import {OMP_LIMITS,runVmOmpAssessment} from '../src/district-omp-b-runner.ts';
 import {verifyPreparedDocument,type PreparedDocument} from '../src/district-prepared-document.ts';
 import {knowledgeEvidenceHash} from '../src/district-schema.ts';
 import {withManagedSourceWrite} from '../src/civic-opt-out.ts';
-import {admittedAssessmentFixture,recordFor,syntheticAssessmentReceipt} from './district-assessment.fixture.ts';
+import {admittedAssessmentFixture,recordFor,answer,syntheticAssessmentReceipt} from './district-assessment.fixture.ts';
 
 async function largeItem(t:TestContext){
  // Many chunks, one independently extraction-cited chunk; irrelevant duplicate
@@ -42,15 +42,21 @@ test('100+ KB multichunk prepared original yields bounded byte-exact blind A/B/C
  const f=await largeItem(t);assert.ok(Buffer.byteLength(f.text)>100000);assert.ok(f.chunks.length>4);
  const evidence=await originalEvidence(f.item,f.context),context=f.item.sources[0].assessmentContext!;
  assert.equal(evidence[0].text,null);assert.equal(context.preparedTextSha256,digest(f.text));
- assert.equal(context.chunks[0].excerpt,f.text.slice(f.chunk.start,f.chunk.end));assert.equal(context.chunks[0].excerptSha256,digest(context.chunks[0].excerpt));
+ assert.equal(context.neighbourCodeUnits,ASSESSMENT_NEIGHBOUR_CODE_UNITS);
+ assert.ok(context.spans.reduce((bytes,span)=>bytes+Buffer.byteLength(span.excerpt),0)<2000);
+ for(const span of context.spans){assert.equal(span.excerpt,f.text.slice(span.start,span.end));assert.equal(span.excerptSha256,digest(span.excerpt));assert.ok(span.start>=f.chunk.start&&span.end<=f.chunk.end);}
  assert.ok(f.item.sources[0].locators.every(l=>l.start>=f.chunk.start&&l.end<=f.chunk.end));
  verifyAssessmentContext(context,f.text,f.prepared.textSha256,f.item.sources[0].locators);
  const AInput=buildAssessmentPassInput(f.item,evidence,'A'),BInput=buildAssessmentPassInput(f.item,evidence,'B');assert.equal(canonicalJson(AInput.data),canonicalJson(BInput.data));
- const output=assessmentOutputSchema.parse({itemId:f.item.itemId,outcome:'abstain',assertions:[],scores:{correctness:0,sources:0,usefulness:0},holdReasons:['insufficient_evidence'],rationale:'Synthetic abstention only; no actual model assessment.'});
+ const projected=JSON.parse(JSON.stringify(AInput.data.claim));
+ assert.equal(projected.version,'r1-provider-propositions-v1');
+ const restored={...projected,version:'r1-record-propositions-v1',propositions:projected.propositions.map(({sourceIds,...p}:Record<string,unknown>&{sourceIds:string[]})=>({...p,sources:sourceIds.map(id=>projected.sources.find((source:{id:string})=>source.id===id))}))};
+ assert.deepEqual(restored,JSON.parse(f.item.claim));
+ const output=assessmentOutputSchema.parse(answer(AInput).value);
  const A=syntheticAssessmentReceipt(f.item,'A',output,AInput.data),B=syntheticAssessmentReceipt(f.item,'B',output,BInput.data);
  const CInput=buildAssessmentPassInput(f.item,evidence,'C',{A,B});assert.equal(canonicalJson(CInput.data.evidence),canonicalJson(AInput.data.evidence));
  for(const input of [AInput,BInput,CInput]){
-  const bytes=Buffer.byteLength(canonicalJson(input.data));assert.ok(bytes<=ASSESSMENT_CONTEXT_BYTES);assert.ok(bytes<BRIDGE_LIMITS.evidenceContextBytes);assert.ok(bytes<MAX_SUBSCRIPTION_INPUT_BYTES);assert.ok(bytes<OMP_LIMITS.inputBytes);
+  const bytes=Buffer.byteLength(canonicalJson(input.data));assert.ok(bytes<=(input.role==='C'?ASSESSMENT_RECONCILIATION_BYTES:ASSESSMENT_CONTEXT_BYTES));if(input.role!=='C')assert.ok(bytes<BRIDGE_LIMITS.evidenceContextBytes);assert.ok(bytes<MAX_SUBSCRIPTION_INPUT_BYTES);assert.ok(bytes<OMP_LIMITS.inputBytes);
   assert.ok(Buffer.byteLength(PROMPTS[input.role])<8000);
   assert.ok(Buffer.byteLength(encodeSubscriptionInput(PROMPTS[input.role],input.data))<MAX_SUBSCRIPTION_INPUT_BYTES);
   assert.equal(canonicalJson(input.data).includes(f.text),false);
@@ -60,16 +66,18 @@ test('100+ KB multichunk prepared original yields bounded byte-exact blind A/B/C
  const C=syntheticAssessmentReceipt(f.item,'C',output,CInput.data,CInput.dependencies),final=await reconcile(f.item,{A,B,C},f.context);
  const [item,AArtifact,BArtifact,CArtifact,finalArtifact]=await Promise.all([f.put(f.item),f.put(A),f.put(B),f.put(C),f.put(final)]);
  const replay=await verifyPinnedAssessment(f.context.cas,finalArtifact.sha256,{itemArtifactSha256:item.sha256,AArtifactSha256:AArtifact.sha256,BArtifactSha256:BArtifact.sha256,CArtifactSha256:CArtifact.sha256},f.context);
- assert.equal(replay.item.sources[0].assessmentContext!.chunks[0].excerptSha256,context.chunks[0].excerptSha256);
+ assert.equal(replay.item.sources[0].assessmentContext!.spans[0].excerptSha256,context.spans[0].excerptSha256);
 });
 
 test('tampered excerpt, hash, offset, chunk id and missing quote coverage are rejected on authenticated reopen',async t=>{
  const f=await largeItem(t),source=f.item.sources[0];
  const mutations:((item:AssessmentItem)=>void)[]=[
-  item=>{item.sources[0].assessmentContext!.chunks[0].excerpt+='forged';},
-  item=>{const span=item.sources[0].assessmentContext!.chunks[0];span.excerpt+='forged';span.excerptSha256=digest(span.excerpt);},
-  item=>{item.sources[0].assessmentContext!.chunks[0].excerptSha256=digest('forged');},
+  item=>{item.sources[0].assessmentContext!.spans[0].excerpt+='forged';},
+  item=>{const span=item.sources[0].assessmentContext!.spans[0];span.excerpt+='forged';span.excerptSha256=digest(span.excerpt);},
+  item=>{item.sources[0].assessmentContext!.spans[0].excerptSha256=digest('forged');},
   item=>{item.sources[0].assessmentContext!.chunks[0].start++;},
+  item=>{item.sources[0].assessmentContext!.spans[0].start++;},
+  item=>{item.sources[0].assessmentContext!.spans[0].chunkId='chunk:foreign';},
   item=>{item.sources[0].assessmentContext!.chunks[0].id='chunk:forged';},
   item=>{item.sources[0].locators[0].start=0;},
   item=>{const projection=JSON.parse(item.claim);projection.propositions.push({quote:'claim never present in cited context'});item.claim=canonicalJson(projection);},
@@ -82,16 +90,32 @@ test('tampered excerpt, hash, offset, chunk id and missing quote coverage are re
 
 test('minimal over-cap context and C review envelope have a distinct pre-effect quality hold, never truncation',async t=>{
  const f=await largeItem(t),wideText=f.text.replaceAll('x','漢'),textSha256=digest(wideText);
- assert.throws(()=>buildPreparedAssessmentContext(wideText,textSha256,f.record.extraction.chunk,[`text-sha256:${textSha256};chars:${f.chunk.start}-${f.chunk.end}`]),{reasonCode:'assessment_context_exceeded'});
+ assert.throws(()=>buildPreparedAssessmentContext(wideText,textSha256,f.record.extraction.chunk,[`text-sha256:${textSha256};chars:${f.chunk.start}-${f.chunk.end}`],[{start:f.chunk.start,end:f.chunk.end}]),{reasonCode:'assessment_context_exceeded'});
  const evidence=await originalEvidence(f.item,f.context),input=buildAssessmentPassInput(f.item,evidence,'A');
- const output=assessmentOutputSchema.parse({itemId:f.item.itemId,outcome:'abstain',assertions:[],scores:{correctness:0,sources:0,usefulness:0},holdReasons:[],rationale:'x'.repeat(7000)});
+ const output=assessmentOutputSchema.parse({itemId:f.item.itemId,outcome:'abstain',assertions:[],scores:{correctness:0,sources:0,usefulness:0},holdReasons:[],rationale:'x'.repeat(11000)});
  const A=syntheticAssessmentReceipt(f.item,'A',output,input.data),B=syntheticAssessmentReceipt(f.item,'B',output,input.data);
- assert.throws(()=>buildAssessmentPassInput(f.item,evidence,'C',{A,B}),{reasonCode:'assessment_context_exceeded'});
+ const CInput=buildAssessmentPassInput(f.item,evidence,'C',{A,B});assert.ok(Buffer.byteLength(canonicalJson(CInput.data))>ASSESSMENT_CONTEXT_BYTES);assert.ok(Buffer.byteLength(encodeSubscriptionInput(PROMPTS.C,CInput.data))<=ASSESSMENT_RECONCILIATION_BYTES);
+ const huge={...output,rationale:'x'.repeat(22000)},hugeA=syntheticAssessmentReceipt(f.item,'A',huge,input.data),hugeB=syntheticAssessmentReceipt(f.item,'B',huge,input.data);
+ assert.throws(()=>buildAssessmentPassInput(f.item,evidence,'C',{A:hugeA,B:hugeB}),{reasonCode:'assessment_context_exceeded'});
 });
 
 test('shared request bound is UTF-8/canonical-envelope exact and rejects native B before review or credentials',async()=>{
  const exact={text:'x'.repeat(ASSESSMENT_CONTEXT_BYTES-Buffer.byteLength(canonicalJson({text:''})))};
  assert.equal(Buffer.byteLength(canonicalJson(exact)),ASSESSMENT_CONTEXT_BYTES);assertAssessmentContextBound(exact);
  assert.throws(()=>assertAssessmentContextBound({text:exact.text+'x'}),{reasonCode:'assessment_context_exceeded'});
+ const exactC={text:'x'.repeat(ASSESSMENT_RECONCILIATION_BYTES-Buffer.byteLength(canonicalJson({text:''})))};
+ assertAssessmentContextBound(exactC,'C');assert.throws(()=>assertAssessmentContextBound({text:exactC.text+'x'},'C'),{reasonCode:'assessment_context_exceeded'});
  await assert.rejects(runVmOmpAssessment({text:'x'.repeat(ASSESSMENT_CONTEXT_BYTES)},{} as never),{reasonCode:'assessment_context_exceeded'});
+});
+
+test('fixed windows merge, clip to cited chunks and preserve byte-exact Unicode boundaries',()=>{
+ const text='a'.repeat(300)+'😀'+'b'.repeat(300),textSha256=digest(text),chunk=documentChunks(text)[0];
+ const source=[`text-sha256:${textSha256};chars:${chunk.start}-${chunk.end}`],locators=[{start:557,end:558},{start:558,end:559}];
+ const context=buildPreparedAssessmentContext(text,textSha256,chunk,source,locators);
+ assert.equal(context.spans.length,1);assert.equal(context.spans[0].start,302);assert.equal(context.spans[0].end,text.length);
+ assert.equal(Buffer.from(context.spans[0].excerpt).toString('utf8'),context.spans[0].excerpt);
+ verifyAssessmentContext(context,text,textSha256,locators);
+ const edges=[{start:0,end:1},{start:text.length-1,end:text.length}],clipped=buildPreparedAssessmentContext(text,textSha256,chunk,source,edges);
+ assert.equal(clipped.spans[0].start,0);assert.equal(clipped.spans.at(-1)!.end,text.length);
+ assert.throws(()=>buildPreparedAssessmentContext(text,textSha256,chunk,source,[{start:301,end:302}]),AssessmentContextHold);
 });

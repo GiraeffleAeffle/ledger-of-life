@@ -129,7 +129,11 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   const f=await fixture('wrong-'+field,undefined,mutate);
   const projected=JSON.parse(f.item.claim);assert.ok(projected.propositions.some((p:{selector:string;value:unknown})=>p.selector==='/'+field&&p.value===f.record[field]));
   assert.equal('verification' in projected,false);assert.equal('extraction' in projected,false);
-  const reject=async(input:AssessmentPassInput)=>{assert.equal((input.data as {claim:string}).claim,f.item.claim);return answer(input,true);};
+  const reject=async(input:AssessmentPassInput)=>{
+   const supplied=JSON.parse(JSON.stringify(input.data.claim));
+   const restored={...supplied,version:'r1-record-propositions-v1',propositions:supplied.propositions.map(({sourceIds,...p}:Record<string,unknown>&{sourceIds:string[]})=>({...p,sources:sourceIds.map(id=>supplied.sources.find((source:{id:string})=>source.id===id))}))};
+   assert.equal(canonicalJson(restored),f.item.claim);return answer(input,true);
+  };
   await f.run(f.AJobKey,f.handlers(reject));await f.runB();
   const pair={AJobKey:f.AJobKey,BJobKey:f.BJobKey},CJobKey=await enqueueAssessmentResolution(pool,f.store,f.cas,pair,'C',f.policy);
   await f.run(CJobKey,f.handlers(reject));
