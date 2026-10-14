@@ -100,6 +100,30 @@ test('licensed Kita native GENESIS cells keep KR granularity and 1 March referen
  assert.equal(adapter.parse(snapshot(content.replace('__________',''),'kita-regional-statistics'),scope('kita-regional-statistics','01053100')).coverage.state,'held_quality');
  assert.equal(adapter.parse(snapshot(content.replace('(Anzahl);;','(Anzahl);;;'),'kita-regional-statistics'),scope('kita-regional-statistics','01053100')).coverage.state,'held_quality','A wider header than the native data row is malformed, not partial coverage');
 });
+test('Kita native JSON Tabelle titles preserve explicit generic layouts through education parsing',()=>{
+ for(const [name,label,unit,value] of [
+  ['22541-01-04','Genehmigte Plätze','Anzahl','123'],
+  ['22543-03-01','Betreuungsquote unter 3 Jahre','%','32,5'],
+ ]){
+  const content=`Tabelle: ${name}\n${label} (${unit});;\n;;2025\n;;Insgesamt\n01053;Herzogtum Lauenburg;${value}\n__________\n`;
+  const native={Ident:{Service:'data',Method:'table'},Status:{Code:0,Type:'Information'},Parameter:{name,regionalvariable:'KREISE',regionalkey:'01053'},Object:{Content:content,TableLayout:{FrontColumnsNumber:'2'},Structure:{Rows:[{Code:'KREISE',Content:'Kreise',Selected:'1'}]}}};
+  const input={...snapshot(JSON.stringify(native),'kita-regional-statistics','https://www.regionalstatistik.de/genesisws/rest/2020/data/table'),mimeType:'application/json'};
+  const result=adapter.parse(input,scope('kita-regional-statistics','01053100'));
+  assert.equal(result.coverage.state,'partial',result.coverage.reason);
+  assert.equal(result.observations.length,1);
+  assert.equal(result.observations[0].value,Number(value.replace(',','.')));
+  assert.equal(result.observations[0].unit,unit);
+  assert.equal(result.observations[0].date,'2025-03-01');
+  assert.equal(result.observations[0].subject,'regionalstatistik:KR:01053');
+  assert.equal(result.observations[0].geography.ags,null);
+  for(const title of [`Tabelle: ${name};`,'Tabelle: 99999-00-00;']){
+   const changed={...native,Object:{...native.Object,Content:content.replace(`Tabelle: ${name}`,title)}};
+   const held=adapter.parse({...input,...snapshot(JSON.stringify(changed),'kita-regional-statistics',input.url)},scope('kita-regional-statistics','01053100'));
+   assert.equal(held.coverage.state,'held_quality');
+   assert.deepEqual(held.observations,[]);
+  }
+ }
+});
 test('every family route stays scoped to nine pilots; paid/restricted directories held; K03 unaddressed',()=>{
  assert.equal(EDUCATION_SOURCES.length,6);
  for(const source of ['sh-school-directory','mv-kita-directory','mv-school-directory'])assert.equal(adapter.parse(snapshot('<main>Directory</main>'),scope(source)).coverage.state,'blocked_policy');
