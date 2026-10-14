@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {mkdtemp,mkdir,writeFile,readFile,rm,unlink} from 'node:fs/promises';
+import {promises as fsPromises} from 'node:fs';
+import {syncBuiltinESMExports} from 'node:module';
 import {tmpdir} from 'node:os';
 import {join,relative} from 'node:path';
 import {Pool,type QueryResult} from 'pg';
@@ -13,7 +15,7 @@ import {importCrawlCorpusForResidual} from '../src/district-crawl-import.ts';
 import {withFixtureAuthorizedCorpus,authorizedPilotCorpusSchema,loadFrozenCorpusBytes,type CrawlDocument} from '../src/district-corpus.ts';
 import {ResidualInputSchema,residualJobHandlersFor,enqueueResidualPreparation,enqueueCommittedResidualExtraction,loadResidualSource,captureResidualAnswers,exportResidualTextContribution} from '../src/district-residual-jobs.ts';
 import {ObservationRequestSchema,persistCrawlRequestEvidence} from '../src/district-crawl-request.ts';
-import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceBindings,recoverManagedSourceScratch,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
+import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceBindings,recoverManagedSourceScratch,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError} from '../src/civic-opt-out.ts';
 import {createOperatorRegistryFixture,operatorRegistryFixtureValue} from './helpers/operator-registry-fixture.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
@@ -153,6 +155,22 @@ test('offline frozen crawl import preserves managed originals and produces enque
     assert.deepEqual(await readFile(item.manifest.index.path),item.indexBytes);assert.equal(imported.coverage.acquisitionStepReceipts,0);
    });
   });
+  for(const failure of [new CivicPolicyStateError('CIVIC_POLICY_BUSY'),new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE'),new Error('Synthetic unrelated ancestor read failure')])await st.test('ancestor read propagates '+(failure instanceof CivicPolicyStateError?failure.code:failure.message),async rt=>{
+   const item=await legacy('ancestor-failure-'+digest(failure instanceof CivicPolicyStateError?failure.code:failure.message).slice(0,8)),originalReadFile=fsPromises.readFile;
+   let intercepted=0;
+   rt.mock.method(fsPromises,'readFile',async(...args:Parameters<typeof fsPromises.readFile>)=>{
+    if(String(args[0])===item.originals[0].path){intercepted++;throw failure;}
+    return originalReadFile(...args);
+   });syncBuiltinESMExports();
+   try{
+    await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>assert.rejects(importCrawlCorpusForResidual(store,item.cas,item.manifest),error=>error===failure));
+    assert.equal(intercepted,1);
+   }finally{rt.mock.restoreAll();syncBuiltinESMExports();}
+   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+    const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
+    assert.equal(Date.parse((await loadPolicyReceipt(item.cas,imported.jobs[0].policyReceiptSha256)).expiresAt),Date.parse(item.checkedAt)+REGISTERED_SOURCE_POLICY_VALIDITY_MS);
+   });
+  });
   await st.test('authenticated discovery survives authorized refresh and expired queued preparation continuation',async rt=>{
    const item=await legacy('registered-refresh'),seen:string[]=[];
    interface WireSeam {wire(url:URL):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
@@ -183,8 +201,16 @@ test('offline frozen crawl import preserves managed originals and produces enque
     assert.deepEqual(current.sourcePolicy.tdm.evidence[0],pinned.sourcePolicy.tdm.evidence[0]);assert.equal(current.registeredSourceEligibility!.discovery,undefined);
     assert.equal(Date.parse(current.expiresAt),nextTime.getTime()+REGISTERED_SOURCE_POLICY_VALIDITY_MS);
     assert.deepEqual(output.job.httpObservation,original.httpObservation);
+    const refreshSpec=(await pool!.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[jobKey])).rows[0].spec,refreshManifestPath=join(item.cas.root,'sha256',refreshSpec.selector.manifestSha256.slice(0,2),refreshSpec.selector.manifestSha256);
     rt.mock.timers.enable({apis:['Date'],now:nextTime});
     try{
+     const originalOpen=fsPromises.open,failure=new CivicPolicyStateError('CIVIC_POLICY_BUSY');let intercepted=false;
+     rt.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+      if(String(args[0])===refreshManifestPath){intercepted=true;throw failure;}
+      return originalOpen(...args);
+     });syncBuiltinESMExports();
+     try{await assert.rejects(recheckResidualPolicy(store,item.cas,original),error=>error===failure);assert.equal(intercepted,true);}
+     finally{rt.mock.restoreAll();syncBuiltinESMExports();}
      const checked=await recheckResidualPolicy(store,item.cas,original);assert.deepEqual(checked.receipt,pinned);assert.equal(checked.continuation!.refreshStepReceiptSha256,committed.receipt_sha256);
      const queued=await pool!.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[preparationKey]);
      assert.deepEqual(await residualJobHandlersFor(pool!).residual_prepare.currentPolicy!(queued.rows[0].spec as DistrictJobSpec,item.cas),checked.continuation);

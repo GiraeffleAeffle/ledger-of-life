@@ -942,7 +942,28 @@ async function assertManagedSourceBindingSet(input:string,bindings:Array<Managed
   if(registryArtifact){
    // Select complete descriptor families, never a mixture of partial endpoint sets.
    if([...declared].some(identity=>!expected.has(identity))||entries.some(entry=>declaredDescriptors!.has(registryDescriptorKey(entry))&&!declared.has(key(entry))))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
-  }else if(expected.size!==declared.size||[...expected].some(identity=>!declared.has(identity)))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
+  }else if(expected.size!==declared.size||[...expected].some(identity=>!declared.has(identity))){
+   if([...declared].some(identity=>!expected.has(identity)))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
+   // An inherited artifact may carry older complete codec/code descriptor
+   // families for the same exact configuration. Other provenance stays exact.
+   const families=new Map<string,{configurationSha256:string;urls:Set<string>;declared:boolean}>();
+   for(const entry of entries){
+    if(kind!==undefined&&entry.kind!==kind)continue;
+    const included=declared.has(key(entry));
+    if(entry.kind!=='operator_registry_config'){
+     if(!included)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
+     continue;
+    }
+    const descriptor=registryDescriptorKey(entry),family=families.get(descriptor);
+    if(family){
+     // Any declared endpoint commits to its entire descriptor family.
+     if(family.declared!==included)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
+     family.urls.add(entry.urlSha256);
+    }else families.set(descriptor,{configurationSha256:entry.configurationSha256!,urls:new Set([entry.urlSha256]),declared:included});
+   }
+   const complete=[...families.values()].filter(family=>family.declared);
+   for(const family of families.values())if(!family.declared&&!complete.some(member=>member.configurationSha256===family.configurationSha256&&member.urls.size===family.urls.size&&[...family.urls].every(url=>member.urls.has(url))))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
+  }
   await assertCivicPolicyAuthority(policy);
  });
 }

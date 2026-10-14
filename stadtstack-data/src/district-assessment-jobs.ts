@@ -14,7 +14,7 @@ import {ResidualExtractionSchema,ResidualInputSchema,loadResidualSource,residual
 import {loadPolicyReceipt,recheckPolicyReceipt} from './district-policy-receipt.ts';
 import {assessmentEvidenceArtifactHashes,DistrictAssessmentBroker,assessmentBJobHandler,enqueueAssessmentB} from './district-assessment-broker.ts';
 import {reserveR1CodexCall,holdR1CodexFailure} from './district-codex-accounting.ts';
-import {assertCivicPolicyAuthority,assertManagedSourceReadable,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions} from './civic-opt-out.ts';
+import {assertCivicPolicyAuthority,assertManagedSourceReadable,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError,type CivicPolicyOptions} from './civic-opt-out.ts';
 import type {ModelAnswer} from './district-model-contract.ts';
 import {recheckResidualPolicy} from './district-policy-refresh.ts';
 
@@ -170,7 +170,7 @@ async function currentAssessmentPolicy(store:DistrictJobStore,cas:DistrictCas,sp
   const residual=await assessmentResidualInput(store.pool,spec);
   if(residual.policyReceiptSha256!==spec.policyProofSha256)throw new DistrictExecutionHold('source_policy_stale');
   return await recheckResidualPolicy(store,cas,residual);
- }catch(error){if(error instanceof DistrictExecutionHold&&error.reasonCode==='policy_excluded')throw error;throw new DistrictExecutionHold('source_policy_stale');}
+ }catch(error){if(error instanceof CivicPolicyStateError||error instanceof DistrictExecutionHold&&error.reasonCode==='policy_excluded')throw error;throw new DistrictExecutionHold('source_policy_stale');}
 }
 export function assessmentQueueHandlers(pool:Pool,options:Omit<AssessmentEvidenceContext,'cas'>&{fixtureProvider?:(input:AssessmentPassInput)=>Promise<ModelAnswer>;fixtureProtocol?:true}={}):Readonly<Record<string,JobHandler>>{
  const store=new DistrictJobStore(pool);
@@ -252,7 +252,7 @@ export function assessmentQueueHandlers(pool:Pool,options:Omit<AssessmentEvidenc
     const final=C?await reconcile(item,{A,B,C},{cas:context.cas,...evidenceOptions}):null;
     const admitted=final?.disposition==='ai_reconciled'&&final.output?.outcome==='supported'&&!final.output.holdReasons.length&&item.claimIds.every(id=>final.output!.assertions.some(assertion=>assertion.claimId===id));
     return {outcome:admitted?'succeeded':'held_quality',reasonCode:admitted?'completed':'quality_failed',outputs:final?[await persist(store,context.cas,item,final,evidenceOptions)]:[],counts:{acceptedFacts:admitted?1:0,heldFacts:admitted?0:1}};
-   }catch(error){if(error instanceof DistrictExecutionHold&&error.reasonCode!=='quality_failed')throw error;return {outcome:'held_quality',reasonCode:'quality_failed'};}
+   }catch(error){if(error instanceof CivicPolicyStateError||error instanceof DistrictExecutionHold&&error.reasonCode!=='quality_failed')throw error;return {outcome:'held_quality',reasonCode:'quality_failed'};}
   }),
  };
 }

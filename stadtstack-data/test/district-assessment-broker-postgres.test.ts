@@ -14,7 +14,7 @@ import {BridgeLeaseSchema,BridgeStatusSchema,type BridgeLease} from '../src/dist
 import {assessmentItemSchema,type AssessmentOutput} from '../src/district-assessment.ts';
 import {createPolicyReceipt} from '../src/district-policy-receipt.ts';
 import {encodeStepReceipt,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
-import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
+import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError} from '../src/civic-opt-out.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 
 // Opt-in isolated LOCAL Postgres only; synthetic sources/CLI event fixtures.
@@ -181,8 +181,17 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
    if(scenario==='opted-out')await recordHostOptOut({host:'example.org',reason:'rights_holder_objection'},f.policyOptions);
    if(scenario==='authority-missing')await unlink(join(f.policyOptions.stateDir,'authority.json'));
    if(scenario==='stale-fence')await db.query('UPDATE district_pipeline.jobs SET fencing_token=fencing_token+1 WHERE job_key=$1',[f.jobKey]);
-   const held=BridgeStatusSchema.parse(await f.broker.dispatch({operation:'check',leaseId:lease.leaseId,inputSha256:lease.inputSha256}));assert.notEqual(held.state,'active');assert.equal(held.purgeAckSha256,null);
+   try{
+    const held=BridgeStatusSchema.parse(await f.broker.dispatch({operation:'check',leaseId:lease.leaseId,inputSha256:lease.inputSha256}));assert.notEqual(held.state,'active');assert.equal(held.purgeAckSha256,null);
+   }catch(error){
+    assert.equal(scenario,'authority-missing');assert.ok(error instanceof CivicPolicyStateError);assert.equal(error.code,'CIVIC_POLICY_AUTHORITY_UNPROVISIONED');
+   }
    assert.equal((await f.run).state,'held');
+   if(scenario==='authority-missing'){
+    // The executor records the propagated operator failure and fences the job;
+    // the SQL lease need not be rewritten before a later fenced check/submit.
+    const saved=await db.query<{state:string;reason_code:string}>('SELECT state,reason_code FROM district_pipeline.jobs WHERE job_key=$1',[f.jobKey]);assert.equal(saved.rows[0].state,'held_execution');assert.equal(saved.rows[0].reason_code,'execution_exception');
+   }
    const submitted=BridgeStatusSchema.parse(await f.broker.dispatch(submitFor(lease)));assert.notEqual(submitted.state,'submitted');assert.equal(submitted.receiptSha256,null);
    assert.equal((await db.query('SELECT * FROM district_pipeline.assessment_bridge_submissions WHERE lease_id=$1',[lease.leaseId])).rows.length,0);
   }

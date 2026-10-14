@@ -13,7 +13,7 @@ import {loadPolicyReceipt,recheckPolicyReceipt} from './district-policy-receipt.
 import {inspectClaudeEvents} from './district-claude.ts';
 import type {ModelAnswer} from './district-model-contract.ts';
 import type {ReasonCode} from './district-step-receipt.ts';
-import {assertCivicPolicyAuthority,readCivicOptOutSnapshot,assertManagedSourceReadable,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyAuthorityReceipt} from './civic-opt-out.ts';
+import {assertCivicPolicyAuthority,readCivicOptOutSnapshot,assertManagedSourceReadable,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError,type CivicPolicyAuthorityReceipt} from './civic-opt-out.ts';
 import {ASSESSMENT_BRIDGE_VERSION,BRIDGE_LIMITS,BridgeLeaseSchema,BridgeRequestSchema,BridgeStatusSchema,BridgePurgeAckSchema,BridgeAnswerSchema,bridgeInputHash,type BridgeAnswer,type BridgeLease,type BridgeRequest,type BridgeStatus} from './district-assessment-bridge-contract.ts';
 import {runVmOmpAssessment,ompRunnerContractSha256,type OmpRunnerResult} from './district-omp-b-runner.ts';
 
@@ -179,7 +179,7 @@ export class DistrictAssessmentBroker {
    if(latestReason)return {reason:latestReason};
    if(row.deadline_at<=latest.now||(row.state==='active'&&row.expires_at<=latest.now))return {reason:'lease_expired'};
    return {job:latest,checked};
-  }catch(error){return {reason:error instanceof DistrictExecutionHold?error.reasonCode:'policy_excluded'};}
+  }catch(error){if(error instanceof CivicPolicyStateError)throw error;return {reason:error instanceof DistrictExecutionHold?error.reasonCode:'policy_excluded'};}
  }
  async prepare(job:ClaimedJob,signal:AbortSignal):Promise<string>{
   signal.throwIfAborted();

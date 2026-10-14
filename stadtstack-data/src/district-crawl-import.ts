@@ -10,7 +10,7 @@ import {createPolicyReceipt,PolicyReceiptSchema} from './district-policy-receipt
 import {ResidualInputSchema,ResidualBoundsSchema,residualMimeSupported} from './district-residual-jobs.ts';
 import {CrawlRequestEvidenceSchema} from './district-crawl-request.ts';
 import {persistOperatorRegistry,persistR1Representation} from './district-r1-state.ts';
-import {assertCivicPolicyAuthority,assertManagedObservationReadable,assertManagedSourceReadable,assertManagedSourceBindings,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,type ManagedSourceBinding,type CivicPolicyOptions} from './civic-opt-out.ts';
+import {assertCivicPolicyAuthority,assertManagedObservationReadable,assertManagedSourceReadable,assertManagedSourceBindings,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError,type ManagedSourceBinding,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {R1_MUNICIPALITIES,type DistrictJobStore} from './district-jobs.ts';
 import type {DistrictCas} from './district-cas.ts';
 import {loadResidualSource} from './district-residual-jobs.ts';
@@ -35,6 +35,10 @@ export const CrawlCorpusImportSchema=z.object({
  if(new Set(input.documents.map(row=>row.documentId)).size!==input.documents.length||new Set(input.observations.map(row=>row.path)).size!==input.observations.length)ctx.addIssue({code:'custom',message:'Import selections and original observation paths must be distinct'});
 });
 type HoldCode='corpus_ancestry_unavailable'|'scope_mismatch'|'original_observation_invalid'|'source_policy_stale'|'source_policy_refused'|'request_evidence_unavailable'|'unsupported_mime';
+const unavailableSourceEvidenceCodes=new Set(['ENOENT','CONTENT_BINDING_MISMATCH','HTTP_OBSERVATION_BINDING_MISMATCH','HTTP_SOURCE_PROVENANCE_REQUIRED','CONTENT_PROVENANCE_MISSING']);
+function sourceEvidenceUnavailable(error:unknown):boolean{
+ return error instanceof CivicPolicyStateError&&unavailableSourceEvidenceCodes.has(error.code)||(error as NodeJS.ErrnoException)?.code==='ENOENT';
+}
 const MAX_IMPORTED_DISCOVERY_HOPS=32;
 /** Reconstruct only byte-verified HTML edges in the authenticated frozen corpus.
  * A frontier/metadata parent URL is a lookup hint, never discovery authorization.
@@ -67,8 +71,10 @@ function importedRegisteredPolicy(documents:readonly ImportedDocument[],rawRoot:
     if(!targets.has(child.url))return original;
     chain.push({child,parent});child=parent;
    }
-  }catch{
-   // Missing/changed/opted-out/reserved parent evidence cannot widen the old policy.
+  }catch(error){
+   // Missing/changed parent evidence cannot widen policy. State/operational
+   // failures must propagate, never masquerade as a one-hour stale policy.
+   if(!sourceEvidenceUnavailable(error))throw error;
    return original;
   }
   let audit=base;
@@ -109,7 +115,8 @@ export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:Di
    if(!evidence||resolve(document.observationPath!)!==join(rawRoot,'observations',evidence.binding.observationId)||!document.checkedAt||document.status===undefined||!sourceObservationMatches(evidence.observation,{...document,checkedAt:document.checkedAt,status:document.status,sizeBytes:'sizeBytes' in document?document.sizeBytes:evidence.observation.bytes,bodyState:'exclusion' in document?'excluded':'retained'}))throw Error('Full corpus original/negative ancestry is incomplete');
   }
   await assertManagedSourceBindings(input.index.path,[...crawlBindings,...[...observations.values()].map(row=>row.binding)],policy);
- }catch{
+ }catch(error){
+  if(error instanceof CivicPolicyStateError&&!sourceEvidenceUnavailable(error))throw error;
   // Never copy an index with only a selected subset of its actual dependencies.
   return {jobs,holds:input.documents.map(row=>({documentId:row.documentId,reasonCode:'corpus_ancestry_unavailable' as const})),coverage:{basis:'authenticated_imported_observations' as const,selected:input.documents.length,imported:0,held:input.documents.length,acquisitionStepReceipts:0}};
  }
@@ -127,7 +134,7 @@ export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:Di
  const hash=input.index.sha256,indexArtifact=await withManagedSourceWrite(cas.root,[...(migration?crawlBindings:[]),...admitted.bindings,...corpusObservations].map(binding=>({...binding,relativePath:`sha256/${hash.slice(0,2)}/${hash}`,contentSha256:hash,independentAllowed:false})),()=>cas.put(indexBytes,{kind:'derived',mimeType:'application/json'}),policy);
  await store.addArtifact(indexArtifact);
  for(const selected of input.documents){
-  let reasonCode:HoldCode='scope_mismatch',committing=false,refreshing=false;
+  let reasonCode:HoldCode='scope_mismatch',committing=false,refreshing=false,deriving=false;
   try{
    const matches=corpus.documents.filter(row=>row.id===selected.documentId);if(matches.length!==1)throw Error('Selected ID must identify exactly one original');
    const document=matches[0],city=admitted.registry.municipalities.find(row=>row.id===selected.scope.municipalityId),source=city?.sources.find(row=>row.id===selected.scope.sourceId);
@@ -166,7 +173,9 @@ export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:Di
     await loadResidualSource(cas,job);jobs.push(job);continue;
    }
    reasonCode='source_policy_stale';
+   deriving=true;
    let sourcePolicy=await deriveRegisteredPolicy(document,acquired,source,registeredSourceEligibility),expiresAt:string;
+   deriving=false;
    if(operation.refresh){
     reasonCode='source_policy_refused';
     refreshing=true;const current=await operation.refresh({...acquired,policy:sourcePolicy},source,registeredSourceEligibility);refreshing=false;sourcePolicy=current.sourcePolicy;expiresAt=current.expiresAt;
@@ -180,7 +189,7 @@ export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:Di
    const persisted=await persistR1Representation(store,cas,{bytes:acquired.sourceBytes,receipt:proof.receipt,request:{url:request.url,method:request.method,body:request.publicSelector,contentType:request.contentType},retrievedAt:document.retrievedAt,fetchedAt:acquired.observation.checkedAt,sourceVersion:null,redirectChain,httpObservation:{observationId:httpObservation.observationId,receiptSha256:httpObservation.receiptSha256,bytes:evidence.bytes},origin:'imported'},policy);
    const requestHash=selected.requestEvidence.sha256,requestArtifact=await withManagedSourceWrite(cas.root,[{...acquired.binding,relativePath:`sha256/${requestHash.slice(0,2)}/${requestHash}`,contentSha256:requestHash,independentAllowed:false}],()=>cas.put(requestBytes,{kind:'receipt',mimeType:'application/json'}),policy);await store.addArtifact(requestArtifact);
    jobs.push(ResidualInputSchema.parse({documentId:document.id,corpusSha256:input.index.sha256,corpusObservations,registrySha256,registry:input.registry,...(input.crawlRegistry?{crawlRegistry:input.crawlRegistry}:{}),policyReceiptSha256:persisted.receiptSha256,httpObservation:persisted.httpObservation,requestEvidenceSha256:requestArtifact.sha256,bounds:selected.bounds}));
-  }catch(error){if(committing||refreshing)throw error;holds.push({documentId:selected.documentId,reasonCode});}
+  }catch(error){if(committing||refreshing||deriving||error instanceof CivicPolicyStateError&&!sourceEvidenceUnavailable(error))throw error;holds.push({documentId:selected.documentId,reasonCode});}
  }
  return {jobs,holds,coverage:{basis:'authenticated_imported_observations' as const,selected:input.documents.length,imported:jobs.length,held:holds.length,acquisitionStepReceipts:0}};
 }
