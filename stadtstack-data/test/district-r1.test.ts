@@ -19,6 +19,7 @@ import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {sendPipelineNotification,pipelineNotificationConfig} from '../src/district-notifications.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
+import {genesisAdapter,GENESIS_BASE} from '../src/adapters/genesis.ts';
 
 const scope={publisherId:'fixture-publisher',sourceId:'fixture-source',municipalityId:'ratzeburg',ags:'01053100',tenant:null,observationWindow:'2026-10-11'};
 async function registryFixture(){
@@ -48,6 +49,22 @@ test('non-root acquisitions cannot use caller-invented resource references',asyn
   await assert.rejects(validateAcquisitionSelector(registry,store,cas,{...selector,request:{...selector.request,url:'https://example.org/root/child'}}),/committed discovery/);
   await assert.rejects(validateAcquisitionSelector(registry,store,cas,{...selector,request:{...selector.request,body:'unexpected'}}),/GET selector/);
   await assert.rejects(validateAcquisitionSelector(registry,store,cas,{...selector,request:{url:'https://example.org/root',method:'POST',body:'{}',contentType:'application/json',publicOperation:'ted_search'}}),/endpoint mismatch/);
+ }finally{await pool.end();}
+});
+test('mapped Strausberg selector validates against the unchanged registry data/table route',async()=>{
+ const registry=districtRegistrySchema.parse(JSON.parse(await readFile(new URL('../sources/district-registry.json',import.meta.url),'utf8')));
+ const townScope={publisherId:'statistische-aemter-bund-laender',sourceId:'regionalstatistik-genesis',municipalityId:'strausberg',ags:'12064472',tenant:null,observationWindow:'2024'};
+ const bytes=Buffer.from(JSON.stringify({Ident:{Service:'metadata',Method:'table'},Status:{Code:0,Type:'Information'},Object:{Code:'12411-02-03-5',Structure:{Rows:[{Code:'GEMEIN',Content:'Gemeinden',Selected:null}]}}}));
+ const resource=genesisAdapter.discover({bytes,sourceSha256:digest(bytes),url:GENESIS_BASE+'metadata/table',mimeType:'application/json',retrievedAt:'2026-10-14T00:00:00Z',policyReceiptSha256:'a'.repeat(64),sourceVersion:'synthetic'},townScope,null).resources[0];
+ const expected='name=12411-02-03-5&area=free&language=de&regionalvariable=GEMEIN&regionalkey=12064472&startyear=2024&endyear=2024&compress=false&transpose=false&job=false';
+ assert.equal(resource.body,expected);
+ const input={...selector,scope:townScope,root:GENESIS_BASE+'data/table',request:{url:resource.url,method:resource.method,body:resource.body,contentType:'application/x-www-form-urlencoded;charset=UTF-8',publicOperation:'genesis_guest'},permission:{kind:'facts_with_attribution'}};
+ const pool=new Pool(),store=new DistrictJobStore(pool),cas=new DistrictCas(join(tmpdir(),'r1-unopened-genesis-cas'));
+ try{
+  assert.equal(registeredScope(registry,townScope,input.root).source.url,input.root);
+  assert.equal((await validateAcquisitionSelector(registry,store,cas,input)).request.body,expected);
+  for(const name of ['12411-02-03-4','12411-06-01-5','unknown'])await assert.rejects(validateAcquisitionSelector(registry,store,cas,{...input,request:{...input.request,body:expected.replace('12411-02-03-5',name)}}),/selector rejected/);
+  await assert.rejects(validateAcquisitionSelector(registry,store,cas,{...input,permission:{kind:'official_work'}}),/facts_with_attribution/);
  }finally{await pool.end();}
 });
 

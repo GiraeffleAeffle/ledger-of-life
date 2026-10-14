@@ -6,14 +6,14 @@ import {
 import {readCsv, readZip} from './structured-tables.ts';
 import {load} from 'cheerio';
 
-export interface GenesisTableDefinition {level: 'GE' | 'KR'; referenceDay: string; statistic: string}
+export interface GenesisTableDefinition {level: 'GE' | 'KR'; referenceDay: string; statistic: string; requestName?: '12411-02-03-5'}
 export type GenesisTables = Readonly<Record<string, GenesisTableDefinition>>;
 
-export const GENESIS_VERSION = 'regionalstatistik-datencsv-v1';
+export const GENESIS_VERSION = 'regionalstatistik-datencsv-v2';
 export const GENESIS_BASE = 'https://www.regionalstatistik.de/genesisws/rest/2020/';
 export const GENESIS_TABLES = {
   '12411-06-01': {level: 'GE', referenceDay: '06-30', statistic: 'population'},
-  '12411-02-03': {level: 'GE', referenceDay: '12-31', statistic: 'population_by_age'},
+  '12411-02-03': {level: 'GE', referenceDay: '12-31', statistic: 'population_by_age', requestName: '12411-02-03-5'},
   '31231-02-01': {level: 'GE', referenceDay: '12-31', statistic: 'housing_stock'},
 } as const;
 const MAX_BYTES = 4 * 1024 * 1024;
@@ -63,8 +63,12 @@ function failureState(reason: string): AdapterCoverage['state'] {
   return 'held_quality';
 }
 function knownTable(code: unknown, tables: GenesisTables = GENESIS_TABLES): string {
-  if (typeof code !== 'string' || !Object.hasOwn(tables, code)) throw Error('Unknown or changed table identifier');
-  return code;
+  if (typeof code !== 'string') throw Error('Unknown or changed table identifier');
+  if (Object.hasOwn(tables, code)) return code;
+  for (const catalogId in tables) {
+    if (Object.hasOwn(tables, catalogId) && tables[catalogId].requestName === code) return catalogId;
+  }
+  throw Error('Unknown or changed table identifier');
 }
 function request(path: string, table: string, params: Record<string, string>, parent: string): ResourceReference {
   return {url: `${GENESIS_BASE}${path}`, nativeId: `${table}:${path}`, parentId: parent, method: 'POST', body: new URLSearchParams({name: table, area: 'free', language: 'de', ...params}).toString(), format: path.endsWith('tablefile') ? 'csv' : 'json'};
@@ -102,7 +106,7 @@ function discover(snapshot: AdmittedSnapshot, scope: AdapterScope, cursor: strin
         const operation = resources.children('resource').filter((_, element) => $(element).attr('path') === `/${service}`).children('resource').filter((_, element) => $(element).attr('path') === `/${method}`);
         if (operation.length !== 1 || operation.children('method').filter((_, element) => $(element).attr('name') === 'POST').length !== 1) throw Error('Changed WADL POST capabilities');
       }
-      return page(Object.keys(tables).map(table => request('metadata/table', table, {}, snapshot.url)), snapshot, scope, cursor);
+      return page(Object.entries(tables).map(([table, definition]) => request('metadata/table', definition.requestName ?? table, {}, snapshot.url)), snapshot, scope, cursor);
     }
     const root = object(JSON.parse(source));
     const failure = nativeFailure(root);
@@ -116,7 +120,8 @@ function discover(snapshot: AdmittedSnapshot, scope: AdapterScope, cursor: strin
     const year = /^(19\d{2}|20\d{2}|2100)(?:$|-)/.exec(scope.observationWindow)?.[1];
     if (!year) throw Error('Discovery requires a year or ISO-date observation window');
     const params = {regionalvariable, regionalkey: tables[table].level === 'GE' ? scope.ags : scope.ags.slice(0, 5), startyear: year, endyear: year, compress: 'false', transpose: 'false', job: 'false'};
-    return page([request('data/table', table, params, `${table}:metadata/table`), request('data/tablefile', table, {...params, format: 'datencsv', quality: 'on'}, `${table}:metadata/table`)], snapshot, scope, cursor);
+    const requestName = tables[table].requestName ?? table;
+    return page([request('data/table', requestName, params, `${table}:metadata/table`), request('data/tablefile', requestName, {...params, format: 'datencsv', quality: 'on'}, `${table}:metadata/table`)], snapshot, scope, cursor);
   } catch (error) {
     return {resources: [], coverage: coverage(snapshot, scope, 'held_quality', error instanceof Error ? error.message : 'Invalid native discovery snapshot')};
   }
@@ -162,10 +167,11 @@ export function parseGenesisTable(snapshot: AdmittedSnapshot, scope: AdapterScop
       if (typeof native.Content !== 'string') throw Error('Missing native Object.Content');
       content = native.Content;
     }
-    const tableMatch = /^GENESIS-Tabelle:\s*(\d{5}-\d{2}-\d{2})/m.exec(content);
+    // Capture the entire native name; never truncate an unknown depth suffix.
+    const tableMatch = /^GENESIS-Tabelle:[ \t]*([^\s;]+)/m.exec(content);
     const parameters = root ? object(root.Parameter) : null;
     const table = knownTable(tableMatch?.[1] ?? parameters?.name, tables);
-    if (parameters && parameters.name !== table) throw Error('Content/Parameter table mismatch');
+    if (parameters && knownTable(parameters.name, tables) !== table) throw Error('Content/Parameter table mismatch');
     const rows = csv(content);
     const footer = rows.findIndex(row => row[0].startsWith('__________'));
     if (footer < 0) throw Error('Missing native table terminator; possibly truncated export');
@@ -241,6 +247,7 @@ export function createGenesisAdapter(sourceId: string, tables: GenesisTables): S
   // Freeze the mapping at construction; caller edits cannot silently change replay semantics.
   const definitions: GenesisTables = Object.freeze(Object.fromEntries(Object.entries(tables).map(([code, definition]) => {
     if (!/^\d{5}-\d{2}-\d{2}$/.test(code) || !/^\d{2}-\d{2}$/.test(definition.referenceDay) || !['GE', 'KR'].includes(definition.level)) throw Error('Invalid catalog GENESIS mapping');
+    if (definition.requestName !== undefined && (code !== '12411-02-03' || definition.requestName !== '12411-02-03-5' || definition.level !== 'GE')) throw Error('Invalid explicit GENESIS request-name mapping');
     return [code, Object.freeze({...definition})];
   })));
   return {id: sourceId, version: GENESIS_VERSION, discover: (snapshot, scope, cursor) => discover(snapshot, scope, cursor, sourceId, definitions), parse: (snapshot, scope) => parseGenesisTable(snapshot, scope, sourceId, definitions)};
