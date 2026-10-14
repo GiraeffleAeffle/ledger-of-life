@@ -10,7 +10,7 @@ import {DistrictCas} from '../src/district-cas.ts';
 import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,runDistrictJobs,type JobHandler,type DistrictJobSpec} from '../src/district-jobs.ts';
 import type {StepReceipt} from '../src/district-step-receipt.ts';
 import {importCrawlCorpusForResidual} from '../src/district-crawl-import.ts';
-import {withFixtureAuthorizedCorpus,authorizedPilotCorpusSchema,loadFrozenCorpusBytes} from '../src/district-corpus.ts';
+import {withFixtureAuthorizedCorpus,authorizedPilotCorpusSchema,loadFrozenCorpusBytes,type CrawlDocument} from '../src/district-corpus.ts';
 import {ResidualInputSchema,residualJobHandlersFor,enqueueResidualPreparation,enqueueCommittedResidualExtraction,loadResidualSource,captureResidualAnswers,exportResidualTextContribution} from '../src/district-residual-jobs.ts';
 import {ObservationRequestSchema,persistCrawlRequestEvidence} from '../src/district-crawl-request.ts';
 import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceBindings,recoverManagedSourceScratch,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
@@ -38,6 +38,8 @@ import {loadR1TextCompositionInput,buildR1TextCompositionContext} from '../src/d
 import {authenticatePublicationProvenance} from '../src/district-publication-provenance.ts';
 import {prepareKnowledge} from '../src/prepare-knowledge.ts';
 import {CriticalRecordTargetSchema} from '../src/district-critical-assessment-contract.ts';
+import {readRegisteredRobotsAudit,REGISTERED_SOURCE_POLICY_VALIDITY_MS} from '../src/registered-source-policy.ts';
+import type {BoundSourceObservation} from '../src/source-observation.ts';
 
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 test('public request evidence excludes credential/header fields and binds selector bytes',()=>{
@@ -99,6 +101,78 @@ test('offline frozen crawl import preserves managed originals and produces enque
   }
   return {manifest,indexBytes,cas:new DistrictCas(casRoot),bytes,binding,observationBytes,document,robotsAbsencePin};
  }
+ await t.test('legacy registered discovery is re-derived only from authenticated retained HTML edges',async st=>{
+  const registeredValue=operatorRegistryFixtureValue(),registeredCity=registeredValue.municipalities[0],rootUrl='https://www.stadt-strausberg.de/bauleitplanung-2/';
+  registeredCity.id='strausberg';registeredCity.ags='12064472';registeredValue.inventory[0].ags=registeredCity.ags;
+  const registeredSource=registeredCity.sources.find(row=>row.kind==='participation')!;
+  Object.assign(registeredSource,{id:'strausberg-planning',url:rootUrl,checkState:'checked',checkedAt:now,crawlScope:{pageRoots:[rootUrl],followLinkedDocuments:true},evidence:[{url:rootUrl,locator:'Synthetic registered-source configuration only',sha256:digest('synthetic registered source'),retrievedAt:now}]});
+  const registered=await createOperatorRegistryFixture(st,{context:{root:root!,policy},value:registeredValue,label:'legacy-discovery-registry'});
+  const registeredScope={...scope,sourceId:registeredSource.id};
+  async function legacy(label:string,config:{absentLink?:boolean;missingParent?:boolean;tamperedParent?:boolean;foreignChild?:boolean;foreignParentScope?:boolean;reservedParent?:boolean;reservedChild?:boolean;multiHop?:boolean;expired?:boolean;cycle?:boolean;ambiguousParent?:boolean;scopedPrefix?:boolean}={}){
+   const rawRoot=join(root!,label+'-raw'),indexRoot=join(root!,label+'-index'),casRoot=join(root!,label+'-cas');
+   for(const [path,kind] of [[rawRoot,'fetch'],[indexRoot,'artifacts'],[casRoot,'artifacts']] as const)await initializeManagedAcquisitionLane(path,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind});
+   const checkedAt=new Date(Date.now()-(config.expired?8*86400000:2*3600000)).toISOString(),childUrl=(config.foreignChild?'https://example.net':'https://www.stadt-strausberg.de')+'/wp-content/uploads/fixture/planunterlagen.txt',middleUrl=config.scopedPrefix?rootUrl+'unlinked/':'https://www.stadt-strausberg.de/archiv/planunterlagen.html';
+   const documents:CrawlDocument[]=[],observations:Array<{path:string;sha256:string}>=[],bindings:Array<BoundSourceObservation['binding']>=[],originals:Array<{path:string;body:Buffer;observationPath:string;observationBytes:Buffer}>=[];
+   async function original(id:string,url:string,body:Buffer,mimeType:string,from:string,reserved=false){
+    const sha256=digest(body),observationId=`${Date.now()}-${randomUUID()}.json`,observationPath=join(rawRoot,'observations',observationId),sourcePolicy={robots:{state:'allowed' as const,url:'https://www.stadt-strausberg.de/robots.txt',sha256:digest('synthetic robots'),checkedAt},tdm:{state:reserved?'reserved' as const:'not_declared' as const,evidence:[{url:'https://www.stadt-strausberg.de/.well-known/tdmrep.json',locator:reserved?'W3C TDMRep origin rules':'TDMRep standardized location HTTP absence',value:reserved?'reservation=1':'404',checkedAt}]},access:'public' as const,legalClassification:'not_assessed' as const,publication:'facts_with_attribution_only' as const};
+    const observation={url,method:'GET',checkedAt,retrievedAt:checkedAt,state:'fetched',status:200,sha256,bytes:body.length,mimeType,policy:sourcePolicy},observationBytes=Buffer.from(JSON.stringify(observation)+'\n'),binding:BoundSourceObservation['binding']={kind:'http_observation',url,sourceSha256:sha256,observationId,receiptSha256:digest(observationBytes)},path=join(rawRoot,'sha256',sha256);
+    await withManagedSourceWrite(rawRoot,[{...binding,relativePath:'sha256/'+sha256,contentSha256:sha256,independentAllowed:!reserved}],async()=>{
+     await mkdir(join(rawRoot,'sha256'),{recursive:true,mode:0o700});await mkdir(join(rawRoot,'observations'),{recursive:true,mode:0o700});await writeFile(path,body,{mode:0o600});await writeFile(observationPath,observationBytes,{mode:0o600});
+    },policy);
+    const document:CrawlDocument={id,municipalityId:registeredCity.id,ags:registeredCity.ags,districtId:registeredCity.districtId,sourceId:registeredSource.id,url,sha256,mimeType,retrievedAt:checkedAt,checkedAt,status:200,observationPath,documentDate:null,localPath:relative(indexRoot,path),adapter:'synthetic-old-crawl-fixture',metadata:{discoveredFrom:from},policy:sourcePolicy};
+    documents.push(document);observations.push({path:observationPath,sha256:binding.receiptSha256});bindings.push(binding);originals.push({path,body,observationPath,observationBytes});return {document,binding};
+   }
+   let parent:CrawlDocument|undefined,middle:CrawlDocument|undefined;
+   if(!config.missingParent){
+    parent=(await original(label+'-root',rootUrl,Buffer.from(`<html><a href="${config.absentLink?'https://www.stadt-strausberg.de/other/planunterlagen.txt':config.multiHop?middleUrl:childUrl}">Synthetic planunterlagen</a></html>`),'text/html',rootUrl,config.reservedParent)).document;
+    if(config.foreignParentScope)parent.sourceId='website';
+    if(config.ambiguousParent)await original(label+'-other-root',rootUrl,Buffer.from(`<html><a href="${childUrl}">Another synthetic root observation</a></html>`),'text/html',rootUrl);
+   }
+   if(config.multiHop)middle=(await original(label+'-middle',middleUrl,Buffer.from(`<html><a href="${childUrl}">Synthetic planunterlagen</a>${config.cycle?`<a href="${middleUrl}">Cyclic synthetic planunterlagen</a>`:''}</html>`),'text/html',config.cycle?middleUrl:rootUrl)).document;
+   const child=await original(label,childUrl,Buffer.from('Synthetic retained linked original; no real municipal claim'),'text/plain',config.multiHop?middleUrl:rootUrl,config.reservedChild);
+   const path=join(indexRoot,'index.json'),indexBytes=Buffer.from(JSON.stringify({schemaVersion:'stadtstack-crawl-index-v1',generatedAt:checkedAt,documents})+'\n'),indexHash=digest(indexBytes);
+   await withManagedSourceWrite(indexRoot,[...registered.admitted.bindings,...bindings].map(binding=>({...binding,relativePath:'index.json',contentSha256:indexHash,independentAllowed:false})),()=>writeFile(path,indexBytes,{mode:0o600}),policy);
+   const requestEvidence=await persistCrawlRequestEvidence(rawRoot,{schemaVersion:'stadtstack-crawl-request-evidence-v1',httpObservation:child.binding,request:{url:childUrl,method:'GET',contentType:null,bodySha256:null,publicSelector:null},redirectChain:[childUrl]},policy);
+   const manifest={index:{path,sha256:indexHash},rawRoot,registry:registered.registryPin,observations,documents:[{documentId:label,scope:registeredScope,permission:{kind:'facts_with_attribution' as const},bounds,requestEvidence}]};
+   if(config.tamperedParent)await writeFile(originals[0].path,Buffer.from('Changed retained HTML bytes'),{mode:0o600});
+   return {manifest,indexBytes,cas:new DistrictCas(casRoot),child:child.document,parent,middle,originals,checkedAt};
+  }
+  for(const multiHop of [false,true])await st.test(multiHop?'authenticated multi-hop parent retains the exact root anchor':'old direct-root link gets seven genuine days without a request',async()=>{
+   const item=await legacy(multiHop?'registered-multi-hop':'registered-direct',{multiHop});
+   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+    const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
+    const job=imported.jobs[0],proof=await loadPolicyReceipt(item.cas,job.policyReceiptSha256),audit=readRegisteredRobotsAudit(proof.sourcePolicy.tdm.evidence,item.child.url)!;
+    assert.equal(Date.parse(proof.expiresAt),Date.parse(item.checkedAt)+REGISTERED_SOURCE_POLICY_VALIDITY_MS);
+    assert.equal(proof.registeredSourceEligibility!.discovery,undefined);assert.equal(audit.discovery!.from,multiHop?item.middle!.url:item.parent!.url);assert.equal(audit.discovery!.sha256,multiHop?item.middle!.sha256:item.parent!.sha256);
+    assert.deepEqual(audit.discovery!.anchor,multiHop?{url:item.parent!.url,sha256:item.parent!.sha256}:undefined);
+    assert.equal(proof.sourcePolicy.tdm.evidence[0].checkedAt,item.checkedAt);assert.deepEqual(proof.sourcePolicy.tdm.evidence.slice(1),(item.child.policy as BoundSourceObservation['policy']).tdm.evidence);
+    assert.equal(proof.sourcePolicy.robots.checkedAt,item.checkedAt);assert.equal((await loadResidualSource(item.cas,job)).document.checkedAt,item.checkedAt);
+    await enqueueResidualPreparation(store,item.cas,job);
+    for(const original of item.originals){assert.deepEqual(await readFile(original.path),original.body);assert.deepEqual(await readFile(original.observationPath),original.observationBytes);}
+    assert.deepEqual(await readFile(item.manifest.index.path),item.indexBytes);assert.equal(imported.coverage.acquisitionStepReceipts,0);
+   });
+  });
+  for(const [label,config,reason] of [
+   ['absent-link',{absentLink:true},'source_policy_stale'],
+   ['missing-parent',{missingParent:true},'source_policy_stale'],
+   ['changed-parent',{tamperedParent:true},'source_policy_stale'],
+   ['foreign-parent-scope',{foreignParentScope:true},'source_policy_stale'],
+   ['ambiguous-parent',{ambiguousParent:true},'source_policy_stale'],
+   ['cyclic-parent',{multiHop:true,cycle:true},'source_policy_stale'],
+   ['unlinked-parent-under-root-prefix',{multiHop:true,absentLink:true,scopedPrefix:true},'source_policy_stale'],
+   ['foreign-child',{foreignChild:true},'scope_mismatch'],
+   // Full ancestry rejects non-independent reserved originals before derivation.
+   ['reserved-parent',{reservedParent:true},'corpus_ancestry_unavailable'],
+   ['reserved-child',{reservedChild:true},'corpus_ancestry_unavailable'],
+   ['expired-seven-days',{expired:true},'source_policy_stale'],
+  ] as const)await st.test(label+' does not obtain registered linked-document eligibility',async()=>{
+   const item=await legacy('registered-'+label,config);
+   await withFixtureAuthorizedCorpus(item.indexBytes,policy,async()=>{
+    const imported=await importCrawlCorpusForResidual(store,item.cas,item.manifest);assert.equal(imported.jobs.length,0);assert.deepEqual(imported.holds,[{documentId:item.child.id,reasonCode:reason}]);
+    for(const original of item.originals)assert.deepEqual(await readFile(original.observationPath),original.observationBytes);
+   });
+  });
+ });
  await t.test('happy GET/POST imports preserve exact bytes/clocks and enqueue genuine preparation jobs',async()=>{
   for(const post of [false,true]){
    const item=await fixture(post?'happy-post':'happy-get',{post,extra:true});

@@ -2,7 +2,7 @@ import {readFile,lstat,realpath} from 'node:fs/promises';
 import {basename,dirname,join,resolve} from 'node:path';
 import {z} from 'zod';
 import {digest,ScopeSchema,HashSchema} from './district-adapter-contract.ts';
-import {authorizedPilotCorpusSchema,loadFrozenCorpusBytes,corpusFixturePolicy} from './district-corpus.ts';
+import {authorizedPilotCorpusSchema,loadFrozenCorpusBytes,corpusFixturePolicy,type CrawlDocument as ImportedDocument} from './district-corpus.ts';
 import {operatorRegistryInputPinSchema,readOperatorRegistryInputPin,CrawlRegistryPinSchema,readCrawlOperatorRegistryInputPin} from './district-registry-config.ts';
 import {SourceObservationSchema,sourceObservationMatches,readBoundSourceObservation} from './source-observation.ts';
 import {HttpObservationProofSchema,authenticatedHttpBinding} from './district-http-observation.ts';
@@ -10,15 +10,16 @@ import {createPolicyReceipt,PolicyReceiptSchema} from './district-policy-receipt
 import {ResidualInputSchema,ResidualBoundsSchema,residualMimeSupported} from './district-residual-jobs.ts';
 import {CrawlRequestEvidenceSchema} from './district-crawl-request.ts';
 import {persistOperatorRegistry,persistR1Representation} from './district-r1-state.ts';
-import {assertCivicPolicyAuthority,assertManagedObservationReadable,assertManagedSourceReadable,assertManagedSourceBindings,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,type ManagedSourceBinding} from './civic-opt-out.ts';
+import {assertCivicPolicyAuthority,assertManagedObservationReadable,assertManagedSourceReadable,assertManagedSourceBindings,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,type ManagedSourceBinding,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {R1_MUNICIPALITIES,type DistrictJobStore} from './district-jobs.ts';
 import type {DistrictCas} from './district-cas.ts';
 import {loadResidualSource} from './district-residual-jobs.ts';
 import {readCommittedPolicyRefresh} from './district-policy-refresh.ts';
 import type {BoundSourceObservation} from './source-observation.ts';
 import type {DistrictRegistry} from './district-registry.ts';
-import {sourcePolicyExpiresAt} from './source-policy.ts';
-import {admittedRegisteredRobotsScopes,type RegisteredRobotsAudit} from './registered-source-policy.ts';
+import {sourcePolicyExpiresAt,registeredSourcePolicyApplies} from './source-policy.ts';
+import {admittedRegisteredRobotsScopes,registeredRobotsAuditApplies,registeredRobotsEvidence,type RegisteredRobotsAudit} from './registered-source-policy.ts';
+import {discoverDocumentLinks} from './district-source-adapters.ts';
 
 export interface CrawlPolicyRefreshOperation {
  enqueue?:(manifest:z.infer<typeof CrawlCorpusImportSchema>,acquired:BoundSourceObservation,custody:{registrySha256:string;corpusObservations:z.infer<typeof ResidualInputSchema>['corpusObservations']})=>Promise<void>;
@@ -34,6 +35,53 @@ export const CrawlCorpusImportSchema=z.object({
  if(new Set(input.documents.map(row=>row.documentId)).size!==input.documents.length||new Set(input.observations.map(row=>row.path)).size!==input.observations.length)ctx.addIssue({code:'custom',message:'Import selections and original observation paths must be distinct'});
 });
 type HoldCode='corpus_ancestry_unavailable'|'scope_mismatch'|'original_observation_invalid'|'source_policy_stale'|'source_policy_refused'|'request_evidence_unavailable'|'unsupported_mime';
+const MAX_IMPORTED_DISCOVERY_HOPS=32;
+/** Reconstruct only byte-verified HTML edges in the authenticated frozen corpus.
+ * A frontier/metadata parent URL is a lookup hint, never discovery authorization.
+ * Multi-hop parents must reach a reviewed root/page through at most 32 such edges. */
+function importedRegisteredPolicy(documents:readonly ImportedDocument[],rawRoot:string,policy:CivicPolicyOptions,observations:ReadonlyMap<string,{binding:BoundSourceObservation['binding'];observation:BoundSourceObservation['observation']}>){
+ const byUrl=new Map<string,ImportedDocument|null>(),parents=new Map<string,Set<string>>();
+ for(const document of documents)byUrl.set(document.url,byUrl.has(document.url)?null:document);
+ return async(document:ImportedDocument,acquired:BoundSourceObservation,source:DistrictRegistry['municipalities'][number]['sources'][number],base:RegisteredRobotsAudit|undefined):Promise<BoundSourceObservation['policy']>=>{
+  const original=acquired.policy;
+  if(!base||registeredSourcePolicyApplies(original,document,{municipalityId:document.municipalityId,sourceId:document.sourceId,ags:document.ags},base))return original;
+  const chain:Array<{child:ImportedDocument;parent:ImportedDocument}>=[],seen=new Set<string>();
+  let child=document;
+  try{
+   while(child.url!==base.root&&!source.crawlScope?.pageRoots.includes(child.url)){
+    if(chain.length>=MAX_IMPORTED_DISCOVERY_HOPS||seen.has(child.url))return original;
+    seen.add(child.url);
+    const from=child.metadata.discoveredFrom,parent=typeof from==='string'?byUrl.get(from):undefined;
+    if(!parent||parent.municipalityId!==document.municipalityId||parent.ags!==document.ags||parent.districtId!==document.districtId||parent.sourceId!==document.sourceId||!/^(?:text\/html|application\/xhtml\+xml)$/.test(parent.mimeType))return original;
+    let targets=parents.get(parent.url);
+    if(!targets){
+     const expected=parent.observationPath?observations.get(basename(parent.observationPath)):undefined;
+     if(!expected||expected.observation.bytes>64*1024*1024)return original;
+     const bound=await readBoundSourceObservation({rawRoot,document:parent,policy,registeredSource:source});
+     if(JSON.stringify(expected.binding)!==JSON.stringify(bound.binding))return original;
+     // Historical discovery need not be fresh, but its evidence clocks must be real.
+     sourcePolicyExpiresAt(bound.policy,bound.observation.checkedAt,parent,{municipalityId:parent.municipalityId,sourceId:parent.sourceId,ags:parent.ags},base);
+     targets=new Set(discoverDocumentLinks(bound.sourceBytes.toString('utf8'),parent.url).filter(link=>byUrl.has(link.url)).map(link=>link.url));
+     parents.set(parent.url,targets);
+    }
+    if(!targets.has(child.url))return original;
+    chain.push({child,parent});child=parent;
+   }
+  }catch{
+   // Missing/changed/opted-out/reserved parent evidence cannot widen the old policy.
+   return original;
+  }
+  let audit=base;
+  for(let index=chain.length-1;index>=0;index--){
+   const edge=chain[index],anchor=audit.discovery?.anchor??(audit.discovery?{url:audit.discovery.from,sha256:audit.discovery.sha256}:undefined);
+   audit={...base,discovery:{from:edge.parent.url,sha256:edge.parent.sha256,...(anchor?{anchor}:{})}};
+   if(!registeredRobotsAuditApplies(audit,edge.child.url))return original;
+  }
+  // Only this new R1 receipt policy gains the content-free decision. The original
+  // observation and every existing policy clock stay byte-for-byte unchanged.
+  return {...original,tdm:{...original.tdm,evidence:[registeredRobotsEvidence(audit,document.url,acquired.observation.checkedAt),...original.tdm.evidence]}};
+ };
+}
 /** Default import is offline; the separate durable refresh path supplies explicit operations. */
 export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:DistrictCas,rawInput:unknown,operation:CrawlPolicyRefreshOperation={}){
  const input=CrawlCorpusImportSchema.parse(rawInput),authority=await assertCivicPolicyAuthority(corpusFixturePolicy()),policy={...corpusFixturePolicy(),authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
@@ -67,6 +115,7 @@ export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:Di
  }
  const registrySha256=await persistOperatorRegistry(store,cas,admitted,policy),corpusObservations=[...observations.values()].map(row=>row.binding);
  const registeredEligibility=admittedRegisteredRobotsScopes(admitted.registry,digest(admitted.bytes));
+ const deriveRegisteredPolicy=importedRegisteredPolicy(corpus.documents,rawRoot,policy,observations);
  await initializeManagedAcquisitionLane(cas.root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
  // Preserve every exact observation, including excluded audit entries and discovery dependencies.
  for(const {bytes,binding} of observations.values()){
@@ -122,7 +171,8 @@ export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:Di
     reasonCode='source_policy_refused';
     refreshing=true;const current=await operation.refresh(acquired,source,registeredSourceEligibility);refreshing=false;sourcePolicy=current.sourcePolicy;expiresAt=current.expiresAt;
    }else{
-    expiresAt=sourcePolicyExpiresAt(acquired.policy,acquired.observation.checkedAt,document,selected.scope,registeredSourceEligibility);
+    sourcePolicy=await deriveRegisteredPolicy(document,acquired,source,registeredSourceEligibility);
+    expiresAt=sourcePolicyExpiresAt(sourcePolicy,acquired.observation.checkedAt,document,selected.scope,registeredSourceEligibility);
    }
    if(Date.parse(expiresAt)<=Date.now())throw Error('Source policy is stale; separately authorized revalidation required');
    reasonCode='source_policy_refused';
