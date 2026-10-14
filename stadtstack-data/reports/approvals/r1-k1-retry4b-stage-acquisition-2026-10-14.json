@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "stadtstack-r1-stage-authorization-record-v1",
+  "id": "r1-k1-retry4b-stage-acquisition-2026-10-14",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under the owner approvals below; not a new owner approval",
+  "issuedAt": "2026-10-14T19:56:03.336Z",
+  "parentApproval": {
+    "id": "r1-k1-retry4-2026-10-14-amendment-1",
+    "path": "stadtstack-data/reports/approvals/r1-k1-retry4-2026-10-14-amendment-1.json",
+    "sha256": "4bd2978145f6d8d7cc3b8d1c3358a4c15555e74e21b644973d1f14909a5d242e",
+    "clause": "approved.k1Retry4b"
+  },
+  "relatedApprovals": [
+    {
+      "id": "r1-k1-retry4-2026-10-14",
+      "sha256": "18b46f294132b087888155c645c5d467c55bd4a4922d645d749df367d4f82ba0"
+    },
+    {
+      "id": "r1-k1-retry4-stage-acquisition-2026-10-14",
+      "sha256": "f061ef586144454a50886fdaf83c0f86a980155697d935fde78df2f09ef41952"
+    },
+    {
+      "id": "r1-k2-and-genesis-owner-account-2026-10-13",
+      "sha256": "d7c8074d80d5636520cdb0422d1f161da6529c0dbe1cb1f97256b21770823b66"
+    },
+    {
+      "id": "r1-genesis-api-robots-2026-10-13",
+      "sha256": "ca6f7f1458488014eeea307ee3a327e84d28ff4ac34aa12a1fd11dc0444428a7"
+    }
+  ],
+  "preconditionsMet": {
+    "code": "rebuild-r1 ec9f49e (120 s owner-account data/table POST deadline 7f285ff reviewed YES; contract split eb77a08 reviewed YES twice)",
+    "sourceGate": "tsc=0, 1743 tests, 1695 pass, 0 fail, 48 opt-in skips",
+    "parserAuthorization": "image sha256:d2506818b1bf2fa555b6e18545c636d2be1797b205a4d9e3541f222b2f91c5cd, contract c850509c2fd983853eb96e4a802e7e7f3f4dd403fe05628fd9231aa5038ff7fb; sentinels 29/30 (+1 Mac skip), 30/30, 17/17"
+  },
+  "stage": {
+    "step": "acquire_representation",
+    "selector": "identical to retry-4 (name=12411-02-03-5, Strausberg 12064472, GEMEIN, 2024, datencsv) via the owner-account lane, 120 s wire deadline",
+    "registryDescriptor": {
+      "path": "cache/districts/r1-operator/registry-96e34c4-code-ec9f49e/operator-registry-config.json",
+      "sha256": "c565886b00b2ebd967ded484cc6eea55e5ee4fece6c310b0137a90069e869ed0"
+    },
+    "jobKeys": [
+      "ada9a841dbf235b3423b2e631877f17c7535e00e546e1a4c1fcb4d26e902c849"
+    ],
+    "ags": [
+      "12064472"
+    ],
+    "maxJobs": 1,
+    "maxElapsedMs": 300000,
+    "osDeadlineSeconds": 420,
+    "mode": "bounded_unattended",
+    "category": "production",
+    "expiresAt": "2026-10-14T21:59:59Z",
+    "newDataRequests": 1
+  },
+  "cumulativeWithinK1": {
+    "wallSecondsUsedBefore": 873,
+    "note": "782 s + 91 s (retry-4 run 04d311ee, timeout)",
+    "jobsIncludingThis": 8,
+    "k1MaxJobs": 9,
+    "wallSecondsBoundIncludingThis": 1293,
+    "k1TotalSeconds": 1500,
+    "note2": "bound uses the OS deadline; actual process wall time is accounted"
+  }
+}
