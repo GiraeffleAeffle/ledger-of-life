@@ -20,6 +20,7 @@ import {readBoundSourceObservation} from '../src/source-observation.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {CrawlRequestEvidenceSchema,CrawlRequestEvidenceCaptureError} from '../src/district-crawl-request.ts';
 import {ParserIsolationError} from '../src/district-parser-isolation.ts';
+import {largeBobInventory} from './fixtures/bob-inventory.ts';
 
 async function createPoliteFetcher(options:PoliteFetcherOptions):Promise<BasePoliteFetcher> {
  return new BasePoliteFetcher({...await politeTestOptions(options),fixtureInspection:fixturePolicyInspection});
@@ -762,6 +763,23 @@ test('sandbox inspection failures keep HTTP observations honest and remain execu
   const failed=observations.find(row=>row.url===new URL(target,url).href);
   assert.equal(failed.status,200);assert.equal(failed.bytes,body.length);assert.equal(failed.sha256,hash(body));assert.equal(failed.state,'failed');assert.equal(failed.failure,'inspection_failed');
   await assert.rejects(readFile(join(root,'sha256',hash(body))),{code:'ENOENT'});
+ }
+});
+test('BOB HTML5 boundary reservations and unprovable script elision fail closed before retention',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-bob-boundary-'));t.after(()=>rm(cache,{recursive:true,force:true}));
+ const inventory=largeBobInventory().toString('utf8');
+ for(const [name,html,expected] of [
+  ['reservation',inventory.replace('</script>','</script/><meta name="tdm-reservation" content="1">'),'tdm_reserved'],
+  ['barrier',inventory.replace('</script>','</SCRIPT ><h1>Access denied</h1>'),'access_barrier'],
+  ['unprovable','<textarea>'+'\\u0078'.repeat(12000)+'</textarea><meta name="tdm-reservation" content="1">','inspection_failed'],
+ ] as const){
+  const root=join(cache,name),body=Buffer.from(html),fetcher=await createPoliteFetcher({cacheDir:root});
+  t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json'?{status:404,headers:{},body:Buffer.alloc(0)}:{status:200,headers:{'content-type':'text/html'},body});
+  await assert.rejects(fetcher.fetch('https://bob-sh.de/'),(failure:unknown)=>failure instanceof PoliteFetchError&&failure.failure===expected&&failure.policyPhase==='tdm');
+  await assert.rejects(readFile(join(root,'sha256',hash(body))),{code:'ENOENT'});
+  const observations=await Promise.all((await readdir(join(root,'observations'))).map(async file=>JSON.parse(await readFile(join(root,'observations',file),'utf8'))));
+  const source=observations.find(row=>row.url==='https://bob-sh.de/');
+  assert.equal(source.status,200);assert.equal(source.failure,expected);assert.equal(source.sha256,hash(body));assert.equal(source.bytes,body.length);
  }
 });
 

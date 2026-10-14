@@ -294,8 +294,8 @@ export async function crawlParticipationApi(fetcher:PoliteFetcher,municipality:R
   if(!source.url||!/^\d{8}$/.test(municipality.ags))throw Error('BOB discovery requires a registered inventory root and exact eight-digit AGS');
   if(fetcher.requestCount-before>=options.maxRequests)return {documents:[],sourceBindings:[sourceContentBinding(response)],notes:['BOB municipal identity inventory deferred by request budget; no empty-coverage inference'],requests:fetcher.requestCount-before,checkedAt:response.checkedAt,coverage:{state:'partial',pendingCount:1,runnableCount:1,blockedCount:0,scope:'Public BOB inventory and exact municipal-code bindings'}};
   inventory=await observedApiResponse(fetcher,{...source,api:{url:source.url,format:'bobsh-list'}},ttl);
-  // Match the inventory inspection's low-memory HTML tokenizer. Never execute
-  // the script, and do not run a repeated-alternation regex over its 10 MB literal.
+  // Discovery-only tokenization follows completed HTML5 policy inspection.
+  // Never execute the script or run a repeated-alternation regex over its literal.
   const root=load(await readSourceText(fetcher,inventory),{xml:{xmlMode:false}}),literals:string[]=[];
   for(const element of root('script:not([src])').toArray()){
    const script=root(element).text(),prefix=/\bvar\s+initialProcedures\s*=\s*JSON\.parse\('/g;

@@ -1,7 +1,8 @@
-import {load} from 'cheerio';
+import {load,type CheerioAPI} from 'cheerio';
 import {isIP} from 'node:net';
 import {createHash} from 'node:crypto';
 import {isPublicAddress} from './public-address.ts';
+import {ParserIsolationError} from './district-parser-isolation.ts';
 import { DocumentOriginSchema,DOCUMENT_ORIGIN_CLASSIFIER_VERSION,type DocumentOriginClassification } from './document-origin-contract.ts'
 import {readRegisteredRobotsAudit,registeredRobotsScope,registeredRobotsAuditApplies,registeredRobotsUrlInRoots,REGISTERED_SOURCE_POLICY_VALIDITY_MS,PUBLIC_SOURCE_POLICY_VALIDITY_MS,type RegisteredRobotsAudit} from './registered-source-policy.ts';
 export {REGISTERED_SOURCE_POLICY_VALIDITY_MS,PUBLIC_SOURCE_POLICY_VALIDITY_MS} from './registered-source-policy.ts';
@@ -262,6 +263,42 @@ export function parseTdmReservation(value:string|undefined):TdmReservationDeclar
  return {state:'invalid',reservation:scalar.split(',').some(token=>token.trim()==='1')?1:null};
 }
 export interface ResourcePolicyInspection {reservation:0|1|null;evidence:PolicyEvidence[];access:SourceAccessPolicy['access'];unavailable:boolean;referenceUnavailable:boolean;declarationUnavailable:boolean}
+/** Preserve HTML5 tokenization; only the inventory's non-markup escaped payload
+ * can be shortened. The first escape keeps every tokenizer state transition,
+ * and parse5 itself must prove the replacement lies in ordinary script text.
+ * No attribute, heading, raw-text delimiter or policy/barrier markup is elided. */
+function loadBobInventoryPolicyHtml(html:string):CheerioAPI {
+ const unit=/\\u[0-9a-fA-F]{4}/y,parts:string[]=[],elisions:Array<{start:number;end:number}>=[];
+ let scan=0,copiedUntil=0,reducedLength=0;
+ while(scan<html.length){
+  const start=html.indexOf('\\u',scan);if(start===-1)break;
+  let end=start;
+  while(end<html.length){unit.lastIndex=end;if(!unit.test(html))break;end+=6;}
+  scan=end>start?end:start+2;
+  if(end-start<64*1024)continue;
+  const unchanged=html.slice(copiedUntil,start+6);
+  parts.push(unchanged);reducedLength+=unchanged.length;
+  elisions.push({start:reducedLength-6,end:reducedLength});copiedUntil=end;
+ }
+ if(!elisions.length)return load(html);
+ parts.push(html.slice(copiedUntil));
+ const $=load(parts.join(''),{sourceCodeLocationInfo:true}),scriptText:Array<{start:number;end:number}>=[];
+ for(const script of $('script').toArray()){
+  if(script.namespace!=='http://www.w3.org/1999/xhtml')continue;
+  let parent=script.parent,heading=false;
+  while(parent){
+   if('name' in parent&&(parent.name==='title'||parent.name==='h1')){heading=true;break;}
+   parent=parent.parent;
+  }
+  if(heading)continue;
+  for(const child of script.children){
+   const location=child.sourceCodeLocation;
+   if(child.type==='text'&&location)scriptText.push({start:location.startOffset,end:location.endOffset});
+  }
+ }
+ if(!elisions.every(range=>scriptText.some(text=>text.start<=range.start&&text.end>=range.end)))throw new ParserIsolationError('request_rejected');
+ return $;
+}
 export function inspectResourcePolicy(url:string,headers:Record<string,string|undefined>,body:Buffer,mimeType:string):ResourcePolicyInspection {
  const evidence:PolicyEvidence[]=[];let reservation:0|1|null=null,access:SourceAccessPolicy['access']='public';
  const recordReservation=(value:string|undefined,locator:string)=>{
@@ -274,11 +311,9 @@ export function inspectResourcePolicy(url:string,headers:Record<string,string|un
  if(/(?:^|,)\s*(?:noai|noimageai)\s*(?:,|$)/i.test(headers['x-robots-tag']??'')){reservation=1;evidence.push({url,locator:'HTTP X-Robots-Tag',value:headers['x-robots-tag']!});}
  const looksLikeHtml=/^<(?:!doctype\s+html|html|head|body|title|form|div)\b/i.test(body.subarray(0,256).toString('utf8').trimStart());
  if(/html/.test(mimeType)||looksLikeHtml){
-  // The BOB inventory contains a multi-megabyte escaped JSON script. parse5
-  // accumulates its character token as a V8 rope and exhausts the fixed worker
-  // heap. Use Cheerio's bounded-memory HTML tokenizer for this exact root only;
-  // inspect the complete representation, including policy/barrier tags after it.
-  const $=load(body.toString('utf8'),url==='https://bob-sh.de/'?{xml:{xmlMode:false}}:{}),title=$('title,h1').text().replace(/\s+/g,' ').trim();
+  // parse5 stays authoritative for every HTML boundary. Only giant literal
+  // Unicode-escape runs proven to be script text may be shortened for this root.
+  const html=body.toString('utf8'),$=url==='https://bob-sh.de/'?loadBobInventoryPolicyHtml(html):load(html),title=$('title,h1').text().replace(/\s+/g,' ').trim();
   $('meta[name]').each((_,element)=>{
    const name=($(element).attr('name')??'').toLowerCase(),rawValue=$(element).attr('content')??'',value=rawValue.trim();
    if(name==='tdm-reservation')recordReservation(rawValue,'HTML meta[name=tdm-reservation]');
